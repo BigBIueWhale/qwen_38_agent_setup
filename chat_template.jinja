@@ -42,17 +42,30 @@
 {%- if not messages %}
     {{- raise_exception('No messages provided.') }}
 {%- endif %}
+{%- set sysns = namespace(count=0, text='') %}
+{%- for message in messages %}
+    {%- if sysns.count == loop.index0 and (message.role == 'system' or message.role == 'developer') %}
+        {%- set sys_content = render_content(message.content, false, true)|trim %}
+        {%- if sys_content %}
+            {%- set sysns.text = sysns.text + ('\n' if sysns.text else '') + sys_content %}
+        {%- endif %}
+        {%- set sysns.count = sysns.count + 1 %}
+    {%- endif %}
+{%- endfor %}
+{%- set num_sys = sysns.count %}
+{%- set merged_system = sysns.text %}
 {%- set reasoning_instructions = '' %}
-{%- if enable_thinking is undefined or enable_thinking is true %}
+{%- if enable_thinking is defined and enable_thinking is false %}
+    {{- raise_exception('Thinking cannot be disabled in this correctness-first profile. Use xhigh thinking and preserve_thinking=false to omit historical traces.') }}
+{%- else %}
     {%- set resolved_reasoning_effort = reasoning_effort|default('xhigh') %}
-    {%- if resolved_reasoning_effort not in ('xhigh', 'medium', 'low') %}
-        {{- raise_exception('Unexpected reasoning effort ' ~ reasoning_effort ~ '. Supported types are xhigh (default), medium, and low.') }}
+    {%- if resolved_reasoning_effort == 'high' or resolved_reasoning_effort == 'max' %}
+        {%- set resolved_reasoning_effort = 'xhigh' %}
     {%- endif %}
-    {%- if resolved_reasoning_effort == 'xhigh' %}
-        {%- set reasoning_instructions = 'Reasoning effort is set to xhigh. Please think carefully through the task, validate key assumptions, consider plausible alternatives, and prioritize correctness, consistency, and clarity in the final answer.' %}
-    {%- elif resolved_reasoning_effort == 'low' %}
-        {%- set reasoning_instructions = 'Reasoning effort is set to low. Keep your thinking brief and focused, moving directly to the conclusion without unnecessary elaboration.' %}
+    {%- if resolved_reasoning_effort != 'xhigh' %}
+        {{- raise_exception('Unexpected reasoning effort ' ~ reasoning_effort ~ '. This correctness-first profile accepts only xhigh; high and max are aliases for xhigh.') }}
     {%- endif %}
+    {%- set reasoning_instructions = 'Reasoning effort is set to xhigh. Please think carefully through the task, validate key assumptions, consider plausible alternatives, and prioritize correctness, consistency, and clarity in the final answer.' %}
 {%- endif %}
 {%- if tools and tools is iterable and tools is not mapping %}
     {{- '<|im_start|>system\n' }}
@@ -66,21 +79,13 @@
     {%- endfor %}
     {{- "\n</tools>" }}
     {{- '\n\nIf you choose to call a function ONLY reply in the following format with NO suffix:\n\n<tool_call>\n<function=example_function_name>\n<parameter=example_parameter_1>\nvalue_1\n</parameter>\n<parameter=example_parameter_2>\nThis is the value for the second parameter\nthat can span\nmultiple lines\n</parameter>\n</function>\n</tool_call>\n\n<IMPORTANT>\nReminder:\n- Function calls MUST follow the specified format: an inner <function=...></function> block must be nested within <tool_call></tool_call> XML tags\n- Required parameters MUST be specified\n- You may provide optional reasoning for your function call in natural language BEFORE the function call, but NOT after\n- If there is no function call available, answer the question like normal with your current knowledge and do not tell the user about function calls\n</IMPORTANT>' }}
-    {%- if messages[0].role == 'system' %}
-        {%- set content = render_content(messages[0].content, false, true)|trim %}
-        {%- if content %}
-            {{- '\n\n' + content }}
-        {%- endif %}
+    {%- if merged_system %}
+        {{- '\n\n' + merged_system }}
     {%- endif %}
     {{- '<|im_end|>\n' }}
 {%- else %}
-    {%- if messages[0].role == 'system' %}
-        {%- set content = render_content(messages[0].content, false, true)|trim %}
-        {%- if content %}
-            {{- '<|im_start|>system\n' + (reasoning_instructions + '\n\n' if reasoning_instructions else '')  + content + '<|im_end|>\n' }}
-        {%- elif reasoning_instructions %}
-            {{- '<|im_start|>system\n' + reasoning_instructions + '<|im_end|>\n' }}
-        {%- endif %}
+    {%- if merged_system %}
+        {{- '<|im_start|>system\n' + (reasoning_instructions + '\n\n' if reasoning_instructions else '')  + merged_system + '<|im_end|>\n' }}
     {%- elif reasoning_instructions %}
         {{- '<|im_start|>system\n' + reasoning_instructions + '<|im_end|>\n' }}
     {%- endif %}
@@ -96,15 +101,11 @@
         {%- endif %}
     {%- endif %}
 {%- endfor %}
-{%- if ns.multi_step_tool %}
-    {{- raise_exception('No user query found in messages.') }}
-{%- endif %}
 {%- for message in messages %}
+    {%- if loop.index0 >= num_sys %}
     {%- set content = render_content(message.content, true)|trim %}
-    {%- if message.role == "system" %}
-        {%- if not loop.first %}
-            {{- raise_exception('System message must be at the beginning.') }}
-        {%- endif %}
+    {%- if message.role == "system" or message.role == "developer" %}
+        {{- raise_exception('System message must be at the beginning.') }}
     {%- elif message.role == "user" %}
         {{- '<|im_start|>' + message.role + '\n' + content + '<|im_end|>' + '\n' }}
     {%- elif message.role == "assistant" %}
@@ -113,7 +114,8 @@
             {%- set reasoning_content = message.reasoning_content %}
         {%- endif %}
         {%- set reasoning_content = reasoning_content|trim %}
-        {%- if preserve_thinking is undefined or preserve_thinking is true or loop.index0 > ns.last_query_index %}
+        {#- By default, omit old hidden traces while retaining reasoning from the current user/tool chain. Explicit preserve_thinking=true restores full-history traces. #}
+        {%- if preserve_thinking is true or loop.index0 > ns.last_query_index %}
             {{- '<|im_start|>' + message.role + '\n<think>\n' + reasoning_content + '\n</think>\n\n' + content }}
         {%- else %}
             {{- '<|im_start|>' + message.role + '\n' + content }}
@@ -122,6 +124,9 @@
             {%- for tool_call in message.tool_calls %}
                 {%- if tool_call.function is defined %}
                     {%- set tool_call = tool_call.function %}
+                {%- endif %}
+                {%- if tool_call.name is not defined or tool_call.name is none %}
+                    {{- raise_exception('Tool call is missing a function name.') }}
                 {%- endif %}
                 {%- if loop.first %}
                     {%- if content|trim %}
@@ -132,13 +137,19 @@
                 {%- else %}
                     {{- '\n<tool_call>\n<function=' + tool_call.name + '>\n' }}
                 {%- endif %}
-                {%- if tool_call.arguments is defined and tool_call.arguments != '' %}
+                {%- if tool_call.arguments is mapping %}
                     {%- for args_name, args_value in tool_call.arguments|items %}
                         {{- '<parameter=' + args_name + '>\n' }}
                         {%- set args_value = args_value | string if args_value is string else args_value | tojson | safe %}
                         {{- args_value }}
                         {{- '\n</parameter>\n' }}
                     {%- endfor %}
+                {%- elif tool_call.arguments is string %}
+                    {%- if tool_call.arguments|trim %}
+                        {{- raise_exception('Tool call arguments for function "' + (tool_call.name | string) + '" were passed as a JSON string. Parse them into an object before calling apply_chat_template.') }}
+                    {%- endif %}
+                {%- elif tool_call.arguments is defined and tool_call.arguments is not none %}
+                    {{- raise_exception('Tool call arguments for function "' + (tool_call.name | string) + '" must be an object/mapping or a JSON string.') }}
                 {%- endif %}
                 {{- '</function>\n</tool_call>' }}
             {%- endfor %}
@@ -159,12 +170,10 @@
     {%- else %}
         {{- raise_exception('Unexpected message role.') }}
     {%- endif %}
+    {%- endif %}
 {%- endfor %}
 {%- if add_generation_prompt %}
     {{- '<|im_start|>assistant\n' }}
-    {%- if enable_thinking is defined and enable_thinking is false %}
-        {{- '<think>\n\n</think>\n\n' }}
-    {%- else %}
-        {{- '<think>\n' }}
-    {%- endif %}
+    {{- '<think>\n' }}
 {%- endif %}
+{#- Project-pinned agent template: developer roles, merged system messages, xhigh-only effort, historical thinking omitted by default, and fail-loud historical tool-call validation. #}

@@ -46,5 +46,5 @@ if [[ -n "${remaining_listener}" ]]; then
 fi
 
 printf '\nSTOPPED — no Qwen service is listening on TCP port %s.\n' "${LISTEN_PORT}"
-printf 'Preserved: model weights, pinned images, reviewed patch, and cache volume.\n'
+printf 'Preserved: model weights, pinned images, reviewed patches/template, and cache volume.\n'
 printf 'To start it again: ./start.sh\n'

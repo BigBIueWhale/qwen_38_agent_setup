@@ -70,7 +70,7 @@ cleanup_failed_start() {
     printf '\nRemoving only the failed project container...\n' >&2
     docker rm --force "${CONTAINER_NAME}" >/dev/null 2>&1 || true
   fi
-  printf 'The model files, image, patch, and cache volume were preserved.\n' >&2
+  printf 'The model files, image, reviewed patches/template, and cache volume were preserved.\n' >&2
   exit "${status}"
 }
 trap cleanup_failed_start EXIT

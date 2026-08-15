@@ -6,7 +6,6 @@ PROJECT_DIR="$(cd -- "${COMMON_SCRIPT_DIR}/.." && pwd)"
 source "${PROJECT_DIR}/config/runtime-v1.sh"
 readonly COMMON_SCRIPT_DIR PROJECT_DIR
 readonly MODEL_DIR="${PROJECT_DIR}/${MODEL_DIR_NAME}"
-readonly PATCH_FILE="${PROJECT_DIR}/patches/vllm-turboquant-k8v4-direct-workspace.patch"
 readonly MODEL_MANIFEST="${PROJECT_DIR}/manifests/${MODEL_MANIFEST_NAME}"
 
 die() {
@@ -220,7 +219,8 @@ assert_running_profile() {
   local running image_id network port_bindings published_ports cap_drop security_opts
   local model_source model_rw cache_name cache_type cache_project_label
   local cache_profile_label actual_command expected_command
-  local actual_environment wrapped_environment required_environment patched_sha api
+  local actual_environment wrapped_environment required_environment api
+  local installed_report expected_installed_report image_profile_label
 
   assert_owned_container
   running="$(docker inspect --format '{{.State.Running}}' "${CONTAINER_NAME}")"
@@ -232,6 +232,13 @@ assert_running_profile() {
   [[ "${image_id}" == "${EXPECTED_IMAGE_ID}" ]] || \
     die "Running container image does not match." \
       "Expected: ${EXPECTED_IMAGE_ID}" "Found: ${image_id}"
+  image_profile_label="$(
+    docker image inspect --format '{{index .Config.Labels "qwen38.runtime.profile"}}' \
+      "${IMAGE_TAG}"
+  )"
+  [[ "${image_profile_label}" == "${PROFILE_VERSION}" ]] || \
+    die "Runtime image profile label does not match." \
+      "Expected: ${PROFILE_VERSION}" "Found: ${image_profile_label:-missing}"
 
   network="$(docker inspect --format '{{.HostConfig.NetworkMode}}' "${CONTAINER_NAME}")"
   [[ "${network}" == "host" ]] || \
@@ -312,14 +319,38 @@ assert_running_profile() {
       "Expected max length: ${MAX_MODEL_LEN}" \
       "Response: ${api}"
 
-  patched_sha="$(
+  installed_report="$(
     docker exec "${CONTAINER_NAME}" sha256sum \
       /usr/local/lib/python3.12/dist-packages/vllm/v1/attention/backends/turboquant_attn.py \
-      | { read -r file_sha _; printf '%s' "${file_sha}"; }
+      /usr/local/lib/python3.12/dist-packages/vllm/tool_parsers/structural_tag_registry.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/config/model.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/anthropic/protocol.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/anthropic/serving.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/chat_completion/protocol.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/sampling_params.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/v1/core/sched/utils.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/input_processor.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/v1/request.py \
+      /opt/qwen38/chat_template.jinja \
+      /opt/qwen38/phase_budget_unit.py
   )"
-  [[ "${patched_sha}" == "${PATCHED_FILE_SHA256}" ]] || \
-    die "Running TurboQuant source does not match the reviewed patch." \
-      "Expected: ${PATCHED_FILE_SHA256}" "Found: ${patched_sha}"
+  expected_installed_report="$(printf '%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s' \
+    "${TURBOQUANT_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/attention/backends/turboquant_attn.py \
+    "${TOOL_SCHEMA_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/tool_parsers/structural_tag_registry.py \
+    "${MODEL_CONFIG_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/config/model.py \
+    "${ANTHROPIC_PROTOCOL_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/anthropic/protocol.py \
+    "${ANTHROPIC_SERVING_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/anthropic/serving.py \
+    "${CHAT_PROTOCOL_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/chat_completion/protocol.py \
+    "${SAMPLING_PARAMS_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/sampling_params.py \
+    "${SCHED_UTILS_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/core/sched/utils.py \
+    "${INPUT_PROCESSOR_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/input_processor.py \
+    "${REQUEST_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/request.py \
+    "${AGENT_CHAT_TEMPLATE_SHA256}" /opt/qwen38/chat_template.jinja \
+    "${PHASE_BUDGET_UNIT_SHA256}" /opt/qwen38/phase_budget_unit.py)"
+  [[ "${installed_report}" == "${expected_installed_report}" ]] || \
+    die "Running source/template bytes do not match the reviewed profile." \
+      "Expected:" "${expected_installed_report}" \
+      "Found:" "${installed_report}"
 
   assert_runtime_versions
 }
@@ -330,6 +361,9 @@ print_healthy_summary() {
   printf 'Listener:      %s:%s only\n' "${LISTEN_HOST}" "${LISTEN_PORT}"
   printf 'Model:         %s\n' "${SERVED_MODEL}"
   printf 'Context limit: %s tokens\n' "${MAX_MODEL_LEN}"
+  printf 'Thinking:      xhigh; old traces omitted by default\n'
+  printf 'Sampling:      explicit Qwen3.8 defaults; repetition penalty 1.0\n'
+  printf 'Phase ceilings: reasoning 262144; final response 131072 tokens\n'
   printf 'Runtime image: %s\n' "${EXPECTED_IMAGE_ID}"
   printf 'To stop it:    ./stop.sh\n'
 }

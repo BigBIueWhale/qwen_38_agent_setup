@@ -1,0 +1,175 @@
+diff --git a/vllm/config/model.py b/vllm/config/model.py
+index fcdce3ef58..67593b4590 100644
+--- a/vllm/config/model.py
++++ b/vllm/config/model.py
+@@ -1689,12 +1689,15 @@ class ModelConfig:
+         config.update(self.override_generation_config)
+ 
+         available_params = [
++            "presence_penalty",
+             "repetition_penalty",
+             "temperature",
+             "top_k",
+             "top_p",
+             "min_p",
+             "max_new_tokens",
++            "thinking_token_budget",
++            "final_response_token_budget",
+         ]
+         if any(p in config for p in available_params):
+             diff_sampling_param = {
+diff --git a/vllm/entrypoints/anthropic/protocol.py b/vllm/entrypoints/anthropic/protocol.py
+index 02b9356113..cf52797461 100644
+--- a/vllm/entrypoints/anthropic/protocol.py
++++ b/vllm/entrypoints/anthropic/protocol.py
+@@ -117,6 +117,39 @@ class AnthropicOutputConfig(BaseModel):
+     effort: Literal["low", "medium", "high", "xhigh", "max"] | None = None
+     format: AnthropicJsonOutputFormat | None = None
+ 
++    @model_validator(mode="after")
++    def validate_correctness_first_effort(self) -> "AnthropicOutputConfig":
++        if self.effort in ("low", "medium"):
++            raise ValueError(
++                "This correctness-first profile accepts only high, xhigh, or max; "
++                "all three select Qwen xhigh reasoning."
++            )
++        return self
++
++
++class AnthropicThinkingConfig(BaseModel):
++    """Anthropic-compatible control for extended/adaptive thinking."""
++
++    type: Literal["enabled", "disabled", "adaptive"]
++    budget_tokens: Annotated[int, Field(gt=0)] | None = None
++
++    @model_validator(mode="after")
++    def validate_budget_shape(self) -> "AnthropicThinkingConfig":
++        if self.type == "disabled":
++            raise ValueError(
++                "Thinking cannot be disabled in this correctness-first profile. "
++                "Use preserve_thinking=false to omit historical reasoning traces."
++            )
++        if self.type == "enabled" and self.budget_tokens is None:
++            raise ValueError(
++                "thinking.budget_tokens is required when thinking is enabled"
++            )
++        if self.type != "enabled" and self.budget_tokens is not None:
++            raise ValueError(
++                "thinking.budget_tokens is only valid when thinking.type is enabled"
++            )
++        return self
++
+ 
+ class AnthropicMessagesRequest(BaseModel):
+     """Anthropic Messages API request"""
+@@ -136,6 +169,7 @@ class AnthropicMessagesRequest(BaseModel):
+     tools: list[AnthropicTool] | None = None
+     top_k: int | None = None
+     top_p: float | None = None
++    thinking: AnthropicThinkingConfig | None = None
+ 
+     # vLLM-specific fields that are not in Anthropic spec
+     cache_salt: str | None = Field(
+diff --git a/vllm/entrypoints/anthropic/serving.py b/vllm/entrypoints/anthropic/serving.py
+index 4ec5c14e01..7e8e4441ef 100644
+--- a/vllm/entrypoints/anthropic/serving.py
++++ b/vllm/entrypoints/anthropic/serving.py
+@@ -477,6 +477,14 @@ class AnthropicServingMessages(OpenAIServingChat):
+                 chat_template_kwargs=anthropic_request.chat_template_kwargs,
+             )
+ 
++        chat_template_kwargs = dict(anthropic_request.chat_template_kwargs or {})
++        thinking_kwargs: dict[str, Any] = {}
++        if anthropic_request.thinking is not None:
++            thinking = anthropic_request.thinking
++            chat_template_kwargs["enable_thinking"] = True
++            if thinking.budget_tokens is not None:
++                thinking_kwargs["thinking_token_budget"] = thinking.budget_tokens
++
+         return ChatCompletionRequest(
+             model=anthropic_request.model,
+             messages=openai_messages,
+@@ -489,7 +497,8 @@ class AnthropicServingMessages(OpenAIServingChat):
+             cache_salt=anthropic_request.cache_salt,
+             kv_transfer_params=anthropic_request.kv_transfer_params,
+             ec_transfer_params=anthropic_request.ec_transfer_params,
+-            chat_template_kwargs=anthropic_request.chat_template_kwargs,
++            chat_template_kwargs=chat_template_kwargs or None,
++            **thinking_kwargs,
+         )
+ 
+     @classmethod
+diff --git a/vllm/entrypoints/openai/chat_completion/protocol.py b/vllm/entrypoints/openai/chat_completion/protocol.py
+index e8bb4e5678..a7a27d466e 100644
+--- a/vllm/entrypoints/openai/chat_completion/protocol.py
++++ b/vllm/entrypoints/openai/chat_completion/protocol.py
+@@ -44,6 +44,7 @@ from vllm.logprobs import Logprob
+ from vllm.renderers import ChatParams, TokenizeParams, merge_kwargs
+ from vllm.sampling_params import (
+     BeamSearchParams,
++    FinalResponseTokenBudget,
+     RepetitionDetectionParams,
+     RequestOutputKind,
+     SamplingParams,
+@@ -256,6 +257,7 @@ class ChatCompletionRequest(OpenAIBaseModel):
+         ),
+     )
+     thinking_token_budget: ThinkingTokenBudget = None
++    final_response_token_budget: FinalResponseTokenBudget = None
+     include_reasoning: bool = True
+     parallel_tool_calls: bool | None = True
+ 
+@@ -664,6 +666,8 @@ class ChatCompletionRequest(OpenAIBaseModel):
+         default_sampling_params: dict,
+     ) -> SamplingParams:
+         # Default parameters
++        if (presence_penalty := self.presence_penalty) is None:
++            presence_penalty = default_sampling_params.get("presence_penalty", 0.0)
+         if (repetition_penalty := self.repetition_penalty) is None:
+             repetition_penalty = default_sampling_params.get(
+                 "repetition_penalty",
+@@ -685,6 +689,25 @@ class ChatCompletionRequest(OpenAIBaseModel):
+             min_p = default_sampling_params.get(
+                 "min_p", self._DEFAULT_SAMPLING_PARAMS["min_p"]
+             )
++        thinking_token_budget = self.thinking_token_budget
++        if (
++            thinking_token_budget is None
++            and "thinking_token_budget" not in self.model_fields_set
++        ):
++            thinking_token_budget = default_sampling_params.get(
++                "thinking_token_budget"
++            )
++        final_response_token_budget = self.final_response_token_budget
++        server_final_response_budget = default_sampling_params.get(
++            "final_response_token_budget"
++        )
++        if server_final_response_budget is not None:
++            if final_response_token_budget is None:
++                final_response_token_budget = server_final_response_budget
++            else:
++                final_response_token_budget = min(
++                    final_response_token_budget, server_final_response_budget
++                )
+ 
+         # Merge server-default stop_token_ids (e.g., model-specific tokens
+         # like </call> for gpt-oss) with any request-specified ones
+@@ -711,7 +734,7 @@ class ChatCompletionRequest(OpenAIBaseModel):
+             extra_args["ec_transfer_params"] = self.ec_transfer_params
+         return SamplingParams.from_optional(
+             n=self.n,
+-            presence_penalty=self.presence_penalty,
++            presence_penalty=presence_penalty,
+             frequency_penalty=self.frequency_penalty,
+             repetition_penalty=repetition_penalty,
+             temperature=temperature,
+@@ -741,7 +764,8 @@ class ChatCompletionRequest(OpenAIBaseModel):
+             structured_outputs=self.extract_structured_outputs(),
+             logit_bias=self.logit_bias,
+             bad_words=self.bad_words,
+-            thinking_token_budget=self.thinking_token_budget,
++            thinking_token_budget=thinking_token_budget,
++            final_response_token_budget=final_response_token_budget,
+             allowed_token_ids=self.allowed_token_ids,
+             extra_args=extra_args or None,
+             skip_clone=True,  # Created fresh per request, safe to skip clone

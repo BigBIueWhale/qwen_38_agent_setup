@@ -1,0 +1,195 @@
+diff --git a/vllm/sampling_params.py b/vllm/sampling_params.py
+index 46c4046082..1b30cf3924 100644
+--- a/vllm/sampling_params.py
++++ b/vllm/sampling_params.py
+@@ -77,6 +77,37 @@ ThinkingTokenBudget = Annotated[
+ ]
+ 
+ 
++def validate_final_response_token_budget(
++    value: int | float | bool | None,
++) -> int | None:
++    """Validate the visible post-reasoning response-token limit."""
++    if value is None:
++        return None
++    if isinstance(value, (bool, float)) or not isinstance(value, int):
++        raise VLLMValidationError(
++            "`final_response_token_budget` must be a positive integer "
++            "or -1 for unlimited.",
++            parameter="final_response_token_budget",
++            value=value,
++        )
++    if value == -1:
++        return None
++    if value <= 0:
++        raise VLLMValidationError(
++            "`final_response_token_budget` must be a positive integer "
++            "or -1 for unlimited.",
++            parameter="final_response_token_budget",
++            value=value,
++        )
++    return value
++
++
++FinalResponseTokenBudget = Annotated[
++    int | None,
++    BeforeValidator(validate_final_response_token_budget),
++]
++
++
+ class SamplingType(IntEnum):
+     GREEDY = 0
+     RANDOM = 1
+@@ -364,6 +395,12 @@ class SamplingParams(
+     skip_reading_prefix_cache: bool | None = None
+     thinking_token_budget: int | None = None
+     """Maximum number of tokens allowed for thinking operations."""
++    final_response_token_budget: int | None = None
++    """Maximum output tokens after an explicit reasoning-end sequence."""
++    _reasoning_end_token_sequences: list[list[int]] = msgspec.field(
++        default_factory=list
++    )
++    """Internal natural/forced reasoning-end sequences used by the scheduler."""
+ 
+     repetition_detection: RepetitionDetectionParams | None = None
+     """Parameters for detecting repetitive N-gram patterns in output tokens.
+@@ -388,6 +425,7 @@ class SamplingParams(
+         stop_token_ids: list[int] | None = None,
+         bad_words: list[str] | None = None,
+         thinking_token_budget: int | None = None,
++        final_response_token_budget: int | None = None,
+         include_stop_str_in_output: bool = False,
+         ignore_eos: bool = False,
+         max_tokens: int | None = 16,
+@@ -451,6 +489,7 @@ class SamplingParams(
+             stop_token_ids=stop_token_ids,
+             bad_words=bad_words,
+             thinking_token_budget=thinking_token_budget,
++            final_response_token_budget=final_response_token_budget,
+             include_stop_str_in_output=include_stop_str_in_output,
+             ignore_eos=ignore_eos,
+             max_tokens=max_tokens,
+@@ -489,6 +528,9 @@ class SamplingParams(
+         self.thinking_token_budget = validate_thinking_token_budget(
+             self.thinking_token_budget
+         )
++        self.final_response_token_budget = validate_final_response_token_budget(
++            self.final_response_token_budget
++        )
+ 
+         if self.stop is None:
+             self.stop = []
+@@ -1142,6 +1184,7 @@ class SamplingParams(
+             f"stop_token_ids={self.stop_token_ids}, "
+             f"bad_words={self.bad_words}, "
+             f"thinking_token_budget={self.thinking_token_budget}, "
++            f"final_response_token_budget={self.final_response_token_budget}, "
+             f"include_stop_str_in_output={self.include_stop_str_in_output}, "
+             f"ignore_eos={self.ignore_eos}, "
+             f"max_tokens={self.max_tokens}, "
+diff --git a/vllm/v1/core/sched/utils.py b/vllm/v1/core/sched/utils.py
+index c7cb6b9436..b1e0d9a7b6 100644
+--- a/vllm/v1/core/sched/utils.py
++++ b/vllm/v1/core/sched/utils.py
+@@ -97,7 +97,26 @@ def check_stop(request: Request, max_model_len: int) -> bool:
+     sampling_params = request.sampling_params
+     assert sampling_params is not None
+ 
+-    if request.num_output_tokens < sampling_params.min_tokens:
++    final_budget = sampling_params.final_response_token_budget
++    final_budget_reached = False
++    if final_budget is not None:
++        if request.final_response_start_index is None:
++            output = request.output_token_ids
++            for end_sequence in sampling_params._reasoning_end_token_sequences:
++                end_length = len(end_sequence)
++                if end_length and list(output[-end_length:]) == end_sequence:
++                    request.final_response_start_index = len(output)
++                    break
++        elif (
++            request.num_output_tokens - request.final_response_start_index
++            >= final_budget
++        ):
++            final_budget_reached = True
++
++    if (
++        request.num_output_tokens < sampling_params.min_tokens
++        and not final_budget_reached
++    ):
+         return False
+ 
+     last_token_id = request.output_token_ids[-1]
+@@ -109,6 +128,10 @@ def check_stop(request: Request, max_model_len: int) -> bool:
+         request.status = RequestStatus.FINISHED_STOPPED
+         request.stop_reason = last_token_id
+         return True
++    if final_budget_reached:
++        request.status = RequestStatus.FINISHED_LENGTH_CAPPED
++        request.stop_reason = "final_response_token_budget"
++        return True
+     if (
+         request.num_tokens >= max_model_len
+         or request.num_output_tokens >= request.max_tokens
+diff --git a/vllm/v1/engine/input_processor.py b/vllm/v1/engine/input_processor.py
+index ac870c931a..0fa36770c5 100644
+--- a/vllm/v1/engine/input_processor.py
++++ b/vllm/v1/engine/input_processor.py
+@@ -119,14 +119,18 @@ class InputProcessor:
+                         "bound sampling mask size, reduce transfer overhead, "
+                         "and avoid potential OOMs"
+                     )
+-            if params.thinking_token_budget is not None and (
++            if (
++                params.thinking_token_budget is not None
++                or params.final_response_token_budget is not None
++            ) and (
+                 self.vllm_config.reasoning_config is None
+                 or not self.vllm_config.reasoning_config.enabled
+             ):
+                 raise VLLMValidationError(
+-                    "thinking_token_budget is set but reasoning_config is "
++                    "A phase-specific reasoning/response budget is set but "
++                    "reasoning_config is "
+                     "not configured. Please set --reasoning-parser "
+-                    "and/or --reasoning-config to use thinking_token_budget."
++                    "and/or --reasoning-config to use phase-specific budgets."
+                 )
+         elif isinstance(params, PoolingParams):
+             supported_pooling_tasks = [
+@@ -340,6 +344,22 @@ class InputProcessor:
+             )
+             if self.tokenizer is not None:
+                 sampling_params.update_from_tokenizer(self.tokenizer)
++            if sampling_params.final_response_token_budget is not None:
++                reasoning_config = self.vllm_config.reasoning_config
++                assert reasoning_config is not None and reasoning_config.enabled
++                end_sequences: list[list[int]] = []
++                for end_sequence in (
++                    reasoning_config.natural_reasoning_end_token_ids,
++                    reasoning_config.reasoning_end_token_ids,
++                ):
++                    if end_sequence and end_sequence not in end_sequences:
++                        end_sequences.append(list(end_sequence))
++                if not end_sequences:
++                    raise VLLMValidationError(
++                        "final_response_token_budget requires at least one "
++                        "reasoning-end token sequence."
++                    )
++                sampling_params._reasoning_end_token_sequences = end_sequences
+         else:
+             pooling_params = params.clone()
+ 
+diff --git a/vllm/v1/request.py b/vllm/v1/request.py
+index 0b969c991d..8969a7b92b 100644
+--- a/vllm/v1/request.py
++++ b/vllm/v1/request.py
+@@ -98,6 +98,9 @@ class Request:
+         self.status = RequestStatus.WAITING
+         self.events: list[EngineCoreEvent] = []
+         self.stop_reason: int | str | None = None
++        # Set by the scheduler immediately after it observes a complete
++        # reasoning-end token sequence. The index excludes that delimiter.
++        self.final_response_start_index: int | None = None
+ 
+         # P/D: Connector-specific KV transfer parameters.
+         self.kv_transfer_params: dict[str, Any] | None = None

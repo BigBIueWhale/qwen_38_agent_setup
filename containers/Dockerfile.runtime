@@ -1,27 +1,275 @@
 ARG BASE_IMAGE=qwen38-vllm:main-9df9b0b
 
 FROM ${BASE_IMAGE} AS upstream-verifier
-ARG UPSTREAM_FILE_SHA256=48994be137f3d25d4ee4f79ba2b89b0a6c3d988085079ffea1d241a34c2c755f
-RUN printf '%s  %s\n' \
-      "${UPSTREAM_FILE_SHA256}" \
+ARG TURBOQUANT_UPSTREAM_FILE_SHA256=48994be137f3d25d4ee4f79ba2b89b0a6c3d988085079ffea1d241a34c2c755f
+ARG TOOL_SCHEMA_UPSTREAM_FILE_SHA256=015b989c567c6794e6dbbba72af88694470421adab13775c95b50efe9eedd2b7
+ARG MODEL_CONFIG_UPSTREAM_FILE_SHA256=17c687232886184f0390f38fc1c2c8ae078eaf24ebd1960a6b0c6a0669a35a98
+ARG ANTHROPIC_PROTOCOL_UPSTREAM_FILE_SHA256=a159978048c4cc8a409ca74b638618c5ccd2b1ffbc6a922702bc09b2918f9dc4
+ARG ANTHROPIC_SERVING_UPSTREAM_FILE_SHA256=cc99303714b88b7138ff5411cc367a66f98bf851c55f63bff226f562f5b528ef
+ARG CHAT_PROTOCOL_UPSTREAM_FILE_SHA256=cb756e3d18e9061a2b306f305e10bd71d43f01ad1b236d0e9cbbb8756cd504dc
+ARG SAMPLING_PARAMS_UPSTREAM_FILE_SHA256=a29d80a2dc533c9a560f96acc3538fffcd00bf0412a6a7aa105d46553afb8359
+ARG SCHED_UTILS_UPSTREAM_FILE_SHA256=85e82eae555a03497ad2ac1540ed562a6c36fc26185aa6233725c914816aa1b3
+ARG INPUT_PROCESSOR_UPSTREAM_FILE_SHA256=f9a7946a16acc2374ff2bdfc22f212cb43461d9ef4d99c5e19a536339f11212f
+ARG REQUEST_UPSTREAM_FILE_SHA256=0287844f70eeaeb077d714e833a4b449a15e045a6516f8530182e357a5bec82f
+RUN printf '%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n' \
+      "${TURBOQUANT_UPSTREAM_FILE_SHA256}" \
       /usr/local/lib/python3.12/dist-packages/vllm/v1/attention/backends/turboquant_attn.py \
+      "${TOOL_SCHEMA_UPSTREAM_FILE_SHA256}" \
+      /usr/local/lib/python3.12/dist-packages/vllm/tool_parsers/structural_tag_registry.py \
+      "${MODEL_CONFIG_UPSTREAM_FILE_SHA256}" \
+      /usr/local/lib/python3.12/dist-packages/vllm/config/model.py \
+      "${ANTHROPIC_PROTOCOL_UPSTREAM_FILE_SHA256}" \
+      /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/anthropic/protocol.py \
+      "${ANTHROPIC_SERVING_UPSTREAM_FILE_SHA256}" \
+      /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/anthropic/serving.py \
+      "${CHAT_PROTOCOL_UPSTREAM_FILE_SHA256}" \
+      /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/chat_completion/protocol.py \
+      "${SAMPLING_PARAMS_UPSTREAM_FILE_SHA256}" \
+      /usr/local/lib/python3.12/dist-packages/vllm/sampling_params.py \
+      "${SCHED_UTILS_UPSTREAM_FILE_SHA256}" \
+      /usr/local/lib/python3.12/dist-packages/vllm/v1/core/sched/utils.py \
+      "${INPUT_PROCESSOR_UPSTREAM_FILE_SHA256}" \
+      /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/input_processor.py \
+      "${REQUEST_UPSTREAM_FILE_SHA256}" \
+      /usr/local/lib/python3.12/dist-packages/vllm/v1/request.py \
     | sha256sum --check --strict
 
 FROM upstream-verifier AS runtime
-ARG PATCHED_FILE_SHA256=0aa02c874d33c1113a49cb1aab49cfdc53e6a0d77fdc9ba91f7f89e6bddc0367
+ARG TURBOQUANT_PATCHED_FILE_SHA256=0aa02c874d33c1113a49cb1aab49cfdc53e6a0d77fdc9ba91f7f89e6bddc0367
+ARG TOOL_SCHEMA_PATCHED_FILE_SHA256=7b18b3b6f5f230b73726a9a8ede72b8599aaeffed1e45142e116198a4633ba54
+ARG MODEL_CONFIG_PATCHED_FILE_SHA256=6a0b5fdcb292fef440ee59321b7db437dae2cd5fd80eb2372fa3647fb163a3cf
+ARG ANTHROPIC_PROTOCOL_PATCHED_FILE_SHA256=d7808b7aafdac29f3bbf5e8787dad83f913bba9b8626d52c2e6a92fb8ef87207
+ARG ANTHROPIC_SERVING_PATCHED_FILE_SHA256=b283dc7f47fe1cbb57f5a9cc4000a27ff5106e94d5caf152e5f7142e8a056e19
+ARG CHAT_PROTOCOL_PATCHED_FILE_SHA256=c96dccf12a0a931929bbe8da86776d386dbc7db548cb2f9ab209136f911da0f2
+ARG SAMPLING_PARAMS_PATCHED_FILE_SHA256=cbd49b4d7a8b84f7cc2dfb43ea13381337d5408d4eaadcf8d1b91082c269a06b
+ARG SCHED_UTILS_PATCHED_FILE_SHA256=bf00f90553b05358a2671466eabe3c3f2caee6b64a6ad64ad5544f7ffc997aa2
+ARG INPUT_PROCESSOR_PATCHED_FILE_SHA256=2b9e64486ce316fb4bc2293f18b1f005ae2e4b9adc60e39331a5add342b4b018
+ARG REQUEST_PATCHED_FILE_SHA256=9894e1e7d12850796c04f2f17116f7cea58daaa78ec9e24294df136c37b41e60
+ARG AGENT_CHAT_TEMPLATE_SHA256=07d9cf1a50bc702b27832586af016188d4cb5787e9a88847a5611237f722343e
+ARG PHASE_BUDGET_UNIT_SHA256=428b8a26b6fdf9612cc6cca43c4a0aa1f952f7157e448348b73130cac2e1543d
+RUN install --directory --mode=0755 /opt/qwen38
 COPY --chmod=0644 \
   vllm/vllm/v1/attention/backends/turboquant_attn.py \
   /usr/local/lib/python3.12/dist-packages/vllm/v1/attention/backends/turboquant_attn.py
-RUN printf '%s  %s\n' \
-      "${PATCHED_FILE_SHA256}" \
+COPY --chmod=0644 \
+  vllm/vllm/tool_parsers/structural_tag_registry.py \
+  /usr/local/lib/python3.12/dist-packages/vllm/tool_parsers/structural_tag_registry.py
+COPY --chmod=0644 \
+  vllm/vllm/config/model.py \
+  /usr/local/lib/python3.12/dist-packages/vllm/config/model.py
+COPY --chmod=0644 \
+  vllm/vllm/entrypoints/anthropic/protocol.py \
+  /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/anthropic/protocol.py
+COPY --chmod=0644 \
+  vllm/vllm/entrypoints/anthropic/serving.py \
+  /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/anthropic/serving.py
+COPY --chmod=0644 \
+  vllm/vllm/entrypoints/openai/chat_completion/protocol.py \
+  /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/chat_completion/protocol.py
+COPY --chmod=0644 \
+  vllm/vllm/sampling_params.py \
+  /usr/local/lib/python3.12/dist-packages/vllm/sampling_params.py
+COPY --chmod=0644 \
+  vllm/vllm/v1/core/sched/utils.py \
+  /usr/local/lib/python3.12/dist-packages/vllm/v1/core/sched/utils.py
+COPY --chmod=0644 \
+  vllm/vllm/v1/engine/input_processor.py \
+  /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/input_processor.py
+COPY --chmod=0644 \
+  vllm/vllm/v1/request.py \
+  /usr/local/lib/python3.12/dist-packages/vllm/v1/request.py
+COPY --chmod=0644 chat_template.jinja /opt/qwen38/chat_template.jinja
+COPY --chmod=0644 scripts/phase_budget_unit.py /opt/qwen38/phase_budget_unit.py
+RUN printf '%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n' \
+      "${TURBOQUANT_PATCHED_FILE_SHA256}" \
       /usr/local/lib/python3.12/dist-packages/vllm/v1/attention/backends/turboquant_attn.py \
-    | sha256sum --check --strict
+      "${TOOL_SCHEMA_PATCHED_FILE_SHA256}" \
+      /usr/local/lib/python3.12/dist-packages/vllm/tool_parsers/structural_tag_registry.py \
+      "${MODEL_CONFIG_PATCHED_FILE_SHA256}" \
+      /usr/local/lib/python3.12/dist-packages/vllm/config/model.py \
+      "${ANTHROPIC_PROTOCOL_PATCHED_FILE_SHA256}" \
+      /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/anthropic/protocol.py \
+      "${ANTHROPIC_SERVING_PATCHED_FILE_SHA256}" \
+      /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/anthropic/serving.py \
+      "${CHAT_PROTOCOL_PATCHED_FILE_SHA256}" \
+      /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/chat_completion/protocol.py \
+      "${SAMPLING_PARAMS_PATCHED_FILE_SHA256}" \
+      /usr/local/lib/python3.12/dist-packages/vllm/sampling_params.py \
+      "${SCHED_UTILS_PATCHED_FILE_SHA256}" \
+      /usr/local/lib/python3.12/dist-packages/vllm/v1/core/sched/utils.py \
+      "${INPUT_PROCESSOR_PATCHED_FILE_SHA256}" \
+      /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/input_processor.py \
+      "${REQUEST_PATCHED_FILE_SHA256}" \
+      /usr/local/lib/python3.12/dist-packages/vllm/v1/request.py \
+      "${AGENT_CHAT_TEMPLATE_SHA256}" \
+      /opt/qwen38/chat_template.jinja \
+      "${PHASE_BUDGET_UNIT_SHA256}" \
+      /opt/qwen38/phase_budget_unit.py \
+    | sha256sum --check --strict \
+ && /usr/bin/python3 - <<'PY'
+from vllm.entrypoints.anthropic.protocol import AnthropicMessagesRequest
+from vllm.entrypoints.anthropic.serving import AnthropicServingMessages
+from vllm.entrypoints.openai.chat_completion.protocol import (
+    ChatCompletionRequest,
+    ChatCompletionToolsParam,
+)
+from vllm.tool_parsers.structural_tag_registry import get_model_structural_tag
+from pydantic import ValidationError
+from jinja2.sandbox import ImmutableSandboxedEnvironment
+import os
+import runpy
+import stat
+
+assert stat.S_IMODE(os.stat("/opt/qwen38").st_mode) == 0o755
+assert stat.S_IMODE(os.stat("/opt/qwen38/chat_template.jinja").st_mode) == 0o644
+assert stat.S_IMODE(os.stat("/opt/qwen38/phase_budget_unit.py").st_mode) == 0o644
+
+tool = ChatCompletionToolsParam.model_validate(
+    {
+        "type": "function",
+        "function": {
+            "name": "read_file",
+            "description": "Read a UTF-8 file.",
+            "parameters": {
+                "type": "object",
+                "properties": {"path": {"type": "string"}},
+                "required": ["path"],
+                "additionalProperties": False,
+            },
+        },
+    }
+)
+assert tool.function.strict is None
+assert get_model_structural_tag("qwen_3_coder", [tool], "auto", False) is not None
+assert get_model_structural_tag("qwen_3_coder", [tool], "none", False) is None
+
+defaults = {
+    "temperature": 1.0,
+    "top_p": 0.95,
+    "top_k": 20,
+    "min_p": 0.0,
+    "presence_penalty": 0.0,
+    "repetition_penalty": 1.0,
+    "thinking_token_budget": 262144,
+    "final_response_token_budget": 131072,
+}
+request = ChatCompletionRequest(
+    model="qwen3.8",
+    messages=[{"role": "user", "content": "test"}],
+    max_tokens=1024,
+)
+sampling = request.to_sampling_params(1024, defaults)
+assert sampling.temperature == 1.0
+assert sampling.top_p == 0.95
+assert sampling.top_k == 20
+assert sampling.min_p == 0.0
+assert sampling.presence_penalty == 0.0
+assert sampling.repetition_penalty == 1.0
+assert sampling.repetition_detection is None
+assert sampling.thinking_token_budget == 262144
+assert sampling.final_response_token_budget == 131072
+
+anthropic = AnthropicMessagesRequest(
+    model="qwen3.8",
+    messages=[{"role": "user", "content": "test"}],
+    max_tokens=1024,
+    thinking={"type": "enabled", "budget_tokens": 512},
+)
+converted = AnthropicServingMessages._build_base_request(
+    anthropic, [{"role": "user", "content": "test"}]
+)
+assert converted.thinking_token_budget == 512
+assert converted.chat_template_kwargs == {"enable_thinking": True}
+
+adaptive = AnthropicMessagesRequest(
+    model="qwen3.8",
+    messages=[{"role": "user", "content": "test"}],
+    max_tokens=1024,
+    thinking={"type": "adaptive"},
+    output_config={"effort": "max"},
+)
+adaptive_converted = AnthropicServingMessages._build_base_request(
+    adaptive, [{"role": "user", "content": "test"}]
+)
+AnthropicServingMessages._handle_output_config(adaptive_converted, adaptive)
+assert adaptive_converted.thinking_token_budget is None
+assert adaptive_converted.reasoning_effort == "max"
+
+for rejected in (
+    {"thinking": {"type": "disabled"}},
+    {"output_config": {"effort": "low"}},
+):
+    try:
+        AnthropicMessagesRequest(
+            model="qwen3.8",
+            messages=[{"role": "user", "content": "test"}],
+            max_tokens=1024,
+            **rejected,
+        )
+    except ValidationError:
+        pass
+    else:
+        raise AssertionError(f"unsafe thinking configuration was accepted: {rejected}")
+
+def raise_exception(message):
+    raise RuntimeError(message)
+
+environment = ImmutableSandboxedEnvironment(
+    trim_blocks=True,
+    lstrip_blocks=True,
+    extensions=["jinja2.ext.loopcontrols"],
+)
+template = environment.from_string(open("/opt/qwen38/chat_template.jinja").read())
+base_context = {
+    "messages": [
+        {"role": "user", "content": "first"},
+        {
+            "role": "assistant",
+            "content": "visible answer",
+            "reasoning_content": "OLD_HIDDEN_TRACE",
+        },
+        {"role": "user", "content": "next"},
+    ],
+    "add_generation_prompt": True,
+    "enable_thinking": True,
+    "tools": None,
+    "raise_exception": raise_exception,
+}
+rendered = template.render(**base_context, reasoning_effort="max")
+assert "OLD_HIDDEN_TRACE" not in rendered
+preserved = template.render(
+    **base_context,
+    reasoning_effort="high",
+    preserve_thinking=True,
+)
+assert "OLD_HIDDEN_TRACE" in preserved
+for rejected_context in (
+    {"reasoning_effort": "medium"},
+    {"reasoning_effort": "low"},
+    {"enable_thinking": False},
+):
+    context = dict(base_context)
+    context.update(rejected_context)
+    try:
+        template.render(**context)
+    except RuntimeError:
+        pass
+    else:
+        raise AssertionError(f"unsafe template configuration was accepted: {rejected_context}")
+
+runpy.run_path("/opt/qwen38/phase_budget_unit.py", run_name="__main__")
+PY
 
 LABEL org.opencontainers.image.revision="9df9b0b0a1816b6d0d0f6ecd0da563cc37fd72f5" \
       qwen38.base.image="sha256:fa4a002a88b7043a1a89966dea8a500fe9696f84e75730d9da916f916048d401" \
-      qwen38.patch.diff.sha256="a9721067f1a7ee9497a4bd51e47e3a474561189e881b4704bfc4beac8ea48380" \
-      qwen38.patch.file.sha256="0aa02c874d33c1113a49cb1aab49cfdc53e6a0d77fdc9ba91f7f89e6bddc0367" \
+      qwen38.patch.turboquant.diff.sha256="a9721067f1a7ee9497a4bd51e47e3a474561189e881b4704bfc4beac8ea48380" \
+      qwen38.patch.turboquant.file.sha256="0aa02c874d33c1113a49cb1aab49cfdc53e6a0d77fdc9ba91f7f89e6bddc0367" \
+      qwen38.patch.tool-schema.diff.sha256="eb5141db2aa702c9cc7dbcf1c8116e4dff37e832d1e5ce6a0ded3f38d66f4510" \
+      qwen38.patch.tool-schema.file.sha256="7b18b3b6f5f230b73726a9a8ede72b8599aaeffed1e45142e116198a4633ba54" \
+      qwen38.patch.agent-defaults.diff.sha256="e1a31e2408603ebc174fc59e6a1e1e6dbfc5abf1d92221c8d976aa361f7d2423" \
+      qwen38.patch.phase-budgets.diff.sha256="f20d7dff41931248272842ed2c7a163c6f013e405ccf35733c40ff131a2fc503" \
+      qwen38.template.file.sha256="07d9cf1a50bc702b27832586af016188d4cb5787e9a88847a5611237f722343e" \
       qwen38.project="Qwen_best_model_ever" \
-      qwen38.runtime.profile="single-loopback-text-k8v4-v1"
+      qwen38.runtime.profile="single-loopback-text-k8v4-agent-v3"
 
 ENTRYPOINT ["vllm", "serve"]

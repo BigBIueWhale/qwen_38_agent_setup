@@ -1,0 +1,18 @@
+diff --git a/vllm/tool_parsers/structural_tag_registry.py b/vllm/tool_parsers/structural_tag_registry.py
+index 1f9a651ee4..226980ed9c 100644
+--- a/vllm/tool_parsers/structural_tag_registry.py
++++ b/vllm/tool_parsers/structural_tag_registry.py
+@@ -110,8 +110,11 @@ def get_model_structural_tag(
+     if not tools or tool_choice == "none":
+         return None
+ 
+-    if tool_choice == "auto" and not _any_tool_strict(tools):
+-        return None
++    # This single-purpose local agent runtime treats every advertised tool
++    # schema as load-bearing.  For auto tool choice the model still decides
++    # whether to call a tool, but once it starts a call xgrammar must constrain
++    # the function name and arguments even when a client omits OpenAI's
++    # optional ``strict`` annotation (as Anthropic-style clients commonly do).
+ 
+     dumped_tools = [_dump_tool_for_xgrammar(tool) for tool in tools]
+     dumped_tool_choice = _dump_tool_choice_for_xgrammar(tool_choice)
