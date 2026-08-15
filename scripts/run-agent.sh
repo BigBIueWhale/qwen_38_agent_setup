@@ -38,20 +38,28 @@ if docker volume inspect "${CACHE_VOLUME}" >/dev/null 2>&1; then
     docker volume inspect --format '{{index .Labels "qwen38.runtime.profile"}}' \
       "${CACHE_VOLUME}"
   )"
+  cache_model_revision_label="$(
+    docker volume inspect --format '{{index .Labels "qwen38.model.revision"}}' \
+      "${CACHE_VOLUME}"
+  )"
   if [[ "${cache_label}" != "${CONTAINER_LABEL}" || \
-        "${cache_profile_label}" != "${PROFILE_VERSION}" ]]; then
+        "${cache_profile_label}" != "${PROFILE_VERSION}" || \
+        "${cache_model_revision_label}" != "${MODEL_REVISION}" ]]; then
     die "The expected cache-volume name belongs to an unrecognized volume." \
       "Volume: ${CACHE_VOLUME}" \
       "Expected project label: ${CONTAINER_LABEL}" \
       "Found label: ${cache_label:-missing}" \
       "Expected profile label: ${PROFILE_VERSION}" \
       "Found profile label: ${cache_profile_label:-missing}" \
+      "Expected model revision: ${MODEL_REVISION}" \
+      "Found model revision: ${cache_model_revision_label:-missing}" \
       "The volume was not modified or deleted."
   fi
 else
   docker volume create \
     --label "qwen38.project=${CONTAINER_LABEL}" \
     --label "qwen38.runtime.profile=${PROFILE_VERSION}" \
+    --label "qwen38.model.revision=${MODEL_REVISION}" \
     "${CACHE_VOLUME}" >/dev/null
 fi
 
@@ -80,6 +88,7 @@ docker run --detach \
   --name "${CONTAINER_NAME}" \
   --label "qwen38.project=${CONTAINER_LABEL}" \
   --label "qwen38.runtime.profile=${PROFILE_VERSION}" \
+  --label "qwen38.model.revision=${MODEL_REVISION}" \
   --gpus all \
   --network host \
   --restart no \

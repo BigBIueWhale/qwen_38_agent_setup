@@ -16,7 +16,7 @@ source, and the actual RTX 5090 runtime.
   `9b507bdc9afafb87b7898700cc2a591aa6639461`.
 - Historical vLLM: `8cd174fa358326d5cc4195446be2ebcd65c481ce`.
 - Current model: `unsloth/Qwen3.8-27B-NVFP4`, revision
-  `a767244d27bd76589a3e3b2ab4e64032c4ebc7af`.
+  `16b6615af3548b88e2d8e382457bc705b00479cf`.
 - Current vLLM: `9df9b0b0a1816b6d0d0f6ecd0da563cc37fd72f5`.
 
 The historical clone was left clean. It is outside this repository and is not a

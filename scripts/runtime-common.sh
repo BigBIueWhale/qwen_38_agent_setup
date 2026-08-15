@@ -237,8 +237,9 @@ assert_runtime_versions() {
 
 assert_running_profile() {
   local running image_id network port_bindings published_ports cap_drop security_opts
-  local model_source model_rw cache_name cache_type cache_project_label
-  local cache_profile_label actual_command expected_command
+  local model_source model_rw model_revision_label cache_name cache_type
+  local cache_project_label cache_profile_label cache_model_revision_label
+  local actual_command expected_command
   local actual_environment wrapped_environment required_environment api
   local installed_report expected_installed_report image_profile_label
 
@@ -259,6 +260,15 @@ assert_running_profile() {
   [[ "${image_profile_label}" == "${PROFILE_VERSION}" ]] || \
     die "Runtime image profile label does not match." \
       "Expected: ${PROFILE_VERSION}" "Found: ${image_profile_label:-missing}"
+
+  model_revision_label="$(
+    docker inspect --format '{{index .Config.Labels "qwen38.model.revision"}}' \
+      "${CONTAINER_NAME}"
+  )"
+  [[ "${model_revision_label}" == "${MODEL_REVISION}" ]] || \
+    die "Running container model-revision label does not match." \
+      "Expected: ${MODEL_REVISION}" \
+      "Found:    ${model_revision_label:-missing}"
 
   network="$(docker inspect --format '{{.HostConfig.NetworkMode}}' "${CONTAINER_NAME}")"
   [[ "${network}" == "host" ]] || \
@@ -304,11 +314,16 @@ assert_running_profile() {
     docker volume inspect --format '{{index .Labels "qwen38.runtime.profile"}}' \
       "${CACHE_VOLUME}"
   )"
+  cache_model_revision_label="$(
+    docker volume inspect --format '{{index .Labels "qwen38.model.revision"}}' \
+      "${CACHE_VOLUME}"
+  )"
   [[ "${cache_project_label}" == "${CONTAINER_LABEL}" && \
-     "${cache_profile_label}" == "${PROFILE_VERSION}" ]] || \
+     "${cache_profile_label}" == "${PROFILE_VERSION}" && \
+     "${cache_model_revision_label}" == "${MODEL_REVISION}" ]] || \
     die "Pinned cache-volume labels do not match." \
-      "Expected project/profile: ${CONTAINER_LABEL}/${PROFILE_VERSION}" \
-      "Found project/profile: ${cache_project_label:-missing}/${cache_profile_label:-missing}"
+      "Expected project/profile/revision: ${CONTAINER_LABEL}/${PROFILE_VERSION}/${MODEL_REVISION}" \
+      "Found project/profile/revision: ${cache_project_label:-missing}/${cache_profile_label:-missing}/${cache_model_revision_label:-missing}"
 
   actual_command="$(docker inspect --format '{{range .Config.Cmd}}{{println .}}{{end}}' "${CONTAINER_NAME}")"
   expected_command="$(printf '%s\n' "${VLLM_ARGS[@]}")"
@@ -400,6 +415,7 @@ print_healthy_summary() {
   printf 'Endpoint:      %s\n' "${ENDPOINT}"
   printf 'Listener:      %s:%s only\n' "${LISTEN_HOST}" "${LISTEN_PORT}"
   printf 'Model:         %s\n' "${SERVED_MODEL}"
+  printf 'Model revision: %s\n' "${MODEL_REVISION}"
   printf 'Context limit: %s tokens\n' "${MAX_MODEL_LEN}"
   printf 'Thinking:      xhigh; old traces omitted by default\n'
   printf 'Sampling:      explicit Qwen3.8 defaults; repetition penalty 1.0\n'

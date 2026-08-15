@@ -136,7 +136,7 @@ context number.
   derivative.
 - Selected weight checkpoint:
   `unsloth/Qwen3.8-27B-NVFP4` at Hugging Face revision
-  `a767244d27bd76589a3e3b2ab4e64032c4ebc7af`.
+  `16b6615af3548b88e2d8e382457bc705b00479cf`.
 - Local checkpoint directory: `Qwen3.8-27B-NVFP4-Unsloth/`.
 - The full snapshot is present, including configuration, tokenizer, chat template,
   vision tensors, and the separately stored MTP tensors. Presence on disk does not
@@ -146,13 +146,20 @@ context number.
     `c473512c70eace07e2256fe9fd76596ac03e3295bee7d54cfb72676416afcc05`.
   - `model_mtp.safetensors`: 849,400,392 bytes, SHA-256
     `1d8268aa85ace093a561e3e7b63b9d390dac1cd55a90cd55b5ec509c3c9da9fe`.
+  - `tokenizer.json`: 19,989,325 bytes, SHA-256
+    `06b9509352d2af50381ab2247e083b80d32d5c0aba91c272ca9ff729b6a0e523`.
 - The index declares 1,968 tensors and 23,417,592,488 total tensor bytes.
-- `manifests/model-snapshot-a767244d.sha256` pins all 13 top-level snapshot files,
+- `manifests/model-snapshot-16b6615a.sha256` pins all 13 top-level snapshot files,
   including the tokenizer, vocabulary, chat template, model/index, generation and
   processor configurations, README, and attributes. The manifest itself is pinned as
-  `43ebab0147f818aad9887f5d2db9b88eb25111c0e458c7e40c5af508fa39019b`.
+  `6d979221939858d8f98c7e615028e1e468cffb3ff2d501f943646c1e12ef2cdc`.
   Start/status reject missing, changed, or unexpected top-level snapshot files; they
   do not validate only the two large tensors and silently accept changed prompting.
+- The revision is a full 40-character commit identity, never the moving `main`
+  branch. The current snapshot serializes tokenizer truncation as `null`; no hidden
+  2,048-token backend truncation is accepted. The running container and its cache
+  volume are independently labelled with this exact model revision, and status
+  rejects a label mismatch before accepting the deployment.
 
 ### Checkpoint provenance and quality assessment
 
@@ -183,8 +190,8 @@ context number.
 ### vLLM source and container policy
 
 - This directory is an entirely local Git repository on branch `main` with no root
-  remote. The repository-local commit identity is `Local Qwen Setup
-  <local-qwen@localhost>`; global Git configuration is untouched.
+  remote. The repository-local commit identity is `Ronen Zyroff
+  <rzyroff@gmail.com>`; global Git configuration is untouched.
 - Multi-gigabyte weights/checkpoint trees, Docker image archives, compiler/runtime
   caches, redundant tokenizer payloads, temporary output, credentials, and editor
   state are deliberately ignored. Exact revisions, hashes, manifests, and recovery
