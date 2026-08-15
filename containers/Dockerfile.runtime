@@ -1,0 +1,27 @@
+ARG BASE_IMAGE=qwen38-vllm:main-9df9b0b
+
+FROM ${BASE_IMAGE} AS upstream-verifier
+ARG UPSTREAM_FILE_SHA256=48994be137f3d25d4ee4f79ba2b89b0a6c3d988085079ffea1d241a34c2c755f
+RUN printf '%s  %s\n' \
+      "${UPSTREAM_FILE_SHA256}" \
+      /usr/local/lib/python3.12/dist-packages/vllm/v1/attention/backends/turboquant_attn.py \
+    | sha256sum --check --strict
+
+FROM upstream-verifier AS runtime
+ARG PATCHED_FILE_SHA256=0aa02c874d33c1113a49cb1aab49cfdc53e6a0d77fdc9ba91f7f89e6bddc0367
+COPY --chmod=0644 \
+  vllm/vllm/v1/attention/backends/turboquant_attn.py \
+  /usr/local/lib/python3.12/dist-packages/vllm/v1/attention/backends/turboquant_attn.py
+RUN printf '%s  %s\n' \
+      "${PATCHED_FILE_SHA256}" \
+      /usr/local/lib/python3.12/dist-packages/vllm/v1/attention/backends/turboquant_attn.py \
+    | sha256sum --check --strict
+
+LABEL org.opencontainers.image.revision="9df9b0b0a1816b6d0d0f6ecd0da563cc37fd72f5" \
+      qwen38.base.image="sha256:fa4a002a88b7043a1a89966dea8a500fe9696f84e75730d9da916f916048d401" \
+      qwen38.patch.diff.sha256="a9721067f1a7ee9497a4bd51e47e3a474561189e881b4704bfc4beac8ea48380" \
+      qwen38.patch.file.sha256="0aa02c874d33c1113a49cb1aab49cfdc53e6a0d77fdc9ba91f7f89e6bddc0367" \
+      qwen38.project="Qwen_best_model_ever" \
+      qwen38.runtime.profile="single-loopback-text-k8v4-v1"
+
+ENTRYPOINT ["vllm", "serve"]

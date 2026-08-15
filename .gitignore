@@ -1,0 +1,54 @@
+# Downloaded model weights and alternate checkpoint trees. Their identities are
+# recorded by tracked manifests/revisions; committing the blobs would create a
+# repository hundreds of gigabytes in size.
+/*.safetensors
+/Qwen3.8-27B-FP8/
+/Qwen3.8-27B-NVFP4-RadixArk/
+/Qwen3.8-27B-NVFP4-Unsloth/
+
+# Large/redundant tokenizer payloads from the official root snapshot. Keep the
+# smaller configs, chat template, model index, and manifest evidence tracked.
+/tokenizer.json
+/vocab.json
+/merges.txt
+
+# Reconstructable Docker artifacts and runtime/compiler caches.
+/artifacts/*.tar
+/artifacts/*.tar.*
+/.cache/
+
+# Local runtime output and interrupted downloads.
+*.log
+*.pid
+*.part
+*.partial
+*.tmp
+*.temp
+
+# Python-generated files.
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Local environments, credentials, and secrets.
+.env
+.env.*
+!.env.example
+.venv/
+venv/
+*.pem
+*.key
+credentials.json
+
+# Editor and desktop metadata.
+.DS_Store
+Thumbs.db
+*~
+*.swp
+*.swo
+.idea/
+.vscode/

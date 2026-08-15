@@ -1,0 +1,99 @@
+diff --git a/vllm/v1/attention/backends/turboquant_attn.py b/vllm/v1/attention/backends/turboquant_attn.py
+index 5d743be886..cf153a5a24 100644
+--- a/vllm/v1/attention/backends/turboquant_attn.py
++++ b/vllm/v1/attention/backends/turboquant_attn.py
+@@ -960,22 +960,49 @@ class TurboQuantAttentionImpl(AttentionImpl["TurboQuantMetadata"]):
+         mse_bytes = self._mse_bytes
+         val_data_bytes = self._val_data_bytes
+ 
+-        # Dequant cached K/V from TQ cache
++        # Dequant cached K/V from TQ cache.
+         # Allocate slightly over to align to block_size for the grid.
+-        # Reuse cached buffers to avoid per-call allocation (~16MB at 8K).
+         alloc_len = math.ceil(cached_len / block_size) * block_size
+-        buf_shape = (1, Hk, alloc_len, D)
+-        # Use WorkspaceManager for dequant buffers.
+-        # Shared across all layers — saves 60× memory at long context.
+-        # Required for CUDA Graph capture (per-layer growth incompatible with CG).
+-        k_buf, v_buf = current_workspace_manager().get_simultaneous(
+-            (buf_shape, torch.float16),
+-            (buf_shape, torch.float16),
+-        )
++        qdtype = query.dtype
++
++        if self.tq_config.key_fp8:
++            # K8V4 needs no inverse key rotation. Dequantize directly into the
++            # final, FlashAttention-contiguous [seq, Hk, D] buffers and append
++            # the raw current chunk in place. Previously this path first used
++            # the two reserved dequant buffers and then allocated another two
++            # full-length K/V buffers on every continuation chunk. At long
++            # context those extra, progressively growing allocations trigger
++            # CUDA allocator OOM/retry cycles even when the request eventually
++            # succeeds. The workspace is already reserved to the native maximum
++            # and shared across layers, so reusing it here removes both the copy
++            # and the runtime allocations without increasing reserved memory.
++            full_alloc_len = math.ceil(seq_len / block_size) * block_size
++            full_shape = (full_alloc_len, Hk, D)
++            k_full_buf, v_full_buf = current_workspace_manager().get_simultaneous(
++                (full_shape, qdtype),
++                (full_shape, qdtype),
++            )
++            k_full = k_full_buf[:seq_len]
++            v_full = v_full_buf[:seq_len]
++
++            # The dequant kernels accept arbitrary output strides and expect a
++            # logical [B, Hk, seq, D] view. These views write directly into the
++            # contiguous [seq, Hk, D] storage consumed by FlashAttention.
++            k_cached = k_full_buf[:alloc_len].transpose(0, 1).unsqueeze(0)
++            v_cached = v_full_buf[:alloc_len].transpose(0, 1).unsqueeze(0)
++        else:
++            buf_shape = (1, Hk, alloc_len, D)
++            # MSE-key modes still need separate FP16 dequant buffers because
++            # their inverse rotation produces the final contiguous K tensor.
++            k_buf, v_buf = current_workspace_manager().get_simultaneous(
++                (buf_shape, torch.float16),
++                (buf_shape, torch.float16),
++            )
++            k_cached = k_buf[:, :, :alloc_len, :]
++            v_cached = v_buf[:, :, :alloc_len, :]
++
+         # Skip .zero_() — kernel writes all positions up to cached_len,
+         # and we only read [:cached_len] afterwards.
+-        k_cached = k_buf[:, :, :alloc_len, :]
+-        v_cached = v_buf[:, :, :alloc_len, :]
+ 
+         grid = (alloc_len, 1 * Hk)
+         if self._soa_store:
+@@ -1067,21 +1094,22 @@ class TurboQuantAttentionImpl(AttentionImpl["TurboQuantMetadata"]):
+                 0, 1
+             )  # (cached_len, Hk, D) — already fp16
+         else:
+-            k_cached_trim = k_cached[0, :, :cached_len, :].transpose(
+-                0, 1
+-            )  # (cached_len, Hk, D)
++            k_cached_trim = k_full[:cached_len]
+ 
+         # Skip .contiguous() — the copy into k_full/v_full handles layout
+-        v_cached_trim = v_cached[0, :, :cached_len, :].transpose(0, 1)
++        if self.tq_config.key_fp8:
++            v_cached_trim = v_full[:cached_len]
++        else:
++            v_cached_trim = v_cached[0, :, :cached_len, :].transpose(0, 1)
+ 
+         # Concatenate cached + current chunk K/V (match query dtype)
+-        # Pre-allocate full K/V buffer, copy into slices (no cat alloc)
+-        qdtype = query.dtype
+-        k_full = torch.empty(seq_len, Hk, D, dtype=qdtype, device=device)
+-        v_full = torch.empty(seq_len, Hk, D, dtype=qdtype, device=device)
+-        k_full[:cached_len] = k_cached_trim.to(qdtype)
++        if not self.tq_config.key_fp8:
++            # Pre-allocate full K/V buffers for rotated MSE-key modes.
++            k_full = torch.empty(seq_len, Hk, D, dtype=qdtype, device=device)
++            v_full = torch.empty(seq_len, Hk, D, dtype=qdtype, device=device)
++            k_full[:cached_len] = k_cached_trim.to(qdtype)
++            v_full[:cached_len] = v_cached_trim.to(qdtype)
+         k_full[cached_len:] = key_chunk
+-        v_full[:cached_len] = v_cached_trim.to(qdtype)
+         v_full[cached_len:] = val_chunk
+ 
+         # Attention: q_len queries attending to seq_len K/V with causal mask
