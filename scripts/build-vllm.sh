@@ -2,7 +2,7 @@
 set -euo pipefail
 
 MODE="${1:-build}"
-EXPECTED_STATUS=$' M vllm/config/model.py\n M vllm/entrypoints/anthropic/protocol.py\n M vllm/entrypoints/anthropic/serving.py\n M vllm/entrypoints/openai/chat_completion/protocol.py\n M vllm/sampling_params.py\n M vllm/tool_parsers/structural_tag_registry.py\n M vllm/v1/attention/backends/turboquant_attn.py\n M vllm/v1/core/sched/utils.py\n M vllm/v1/engine/input_processor.py\n M vllm/v1/request.py'
+EXPECTED_STATUS=$' M vllm/config/model.py\n M vllm/entrypoints/anthropic/api_router.py\n M vllm/entrypoints/anthropic/protocol.py\n M vllm/entrypoints/anthropic/serving.py\n M vllm/entrypoints/openai/chat_completion/protocol.py\n M vllm/entrypoints/openai/chat_completion/serving.py\n M vllm/entrypoints/openai/responses/context.py\n M vllm/entrypoints/openai/responses/protocol.py\n M vllm/entrypoints/openai/responses/serving.py\n M vllm/entrypoints/openai/responses/streaming_events.py\n M vllm/entrypoints/openai/responses/utils.py\n M vllm/parser/engine/parser_engine.py\n M vllm/parser/qwen3.py\n M vllm/sampling_params.py\n M vllm/tool_parsers/structural_tag_registry.py\n M vllm/v1/attention/backends/turboquant_attn.py\n M vllm/v1/core/sched/utils.py\n M vllm/v1/engine/input_processor.py\n M vllm/v1/request.py\n M vllm/v1/structured_output/__init__.py'
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
 # shellcheck source=../config/runtime-v1.sh
@@ -17,6 +17,9 @@ TURBOQUANT_PATCH_FILE="${PROJECT_DIR}/patches/vllm-turboquant-k8v4-direct-worksp
 TOOL_SCHEMA_PATCH_FILE="${PROJECT_DIR}/patches/vllm-enforce-auto-tool-schema.patch"
 AGENT_DEFAULTS_PATCH_FILE="${PROJECT_DIR}/patches/vllm-qwen38-agent-defaults-and-thinking.patch"
 PHASE_BUDGET_PATCH_FILE="${PROJECT_DIR}/patches/vllm-qwen38-separate-final-response-budget.patch"
+IMPLICIT_TOOL_GRAMMAR_PATCH_FILE="${PROJECT_DIR}/patches/vllm-qwen-implicit-tool-grammar-boundary.patch"
+ANTHROPIC_VALIDATION_PATCH_FILE="${PROJECT_DIR}/patches/vllm-anthropic-validation-http400.patch"
+TOOL_TRUNCATION_PATCH_FILE="${PROJECT_DIR}/patches/vllm-tool-truncation-finish-reason.patch"
 
 TURBOQUANT_REL="vllm/v1/attention/backends/turboquant_attn.py"
 TOOL_SCHEMA_REL="vllm/tool_parsers/structural_tag_registry.py"
@@ -28,6 +31,16 @@ SAMPLING_PARAMS_REL="vllm/sampling_params.py"
 SCHED_UTILS_REL="vllm/v1/core/sched/utils.py"
 INPUT_PROCESSOR_REL="vllm/v1/engine/input_processor.py"
 REQUEST_REL="vllm/v1/request.py"
+QWEN3_PARSER_REL="vllm/parser/qwen3.py"
+STRUCTURED_OUTPUT_REL="vllm/v1/structured_output/__init__.py"
+ANTHROPIC_API_ROUTER_REL="vllm/entrypoints/anthropic/api_router.py"
+CHAT_SERVING_REL="vllm/entrypoints/openai/chat_completion/serving.py"
+RESPONSES_CONTEXT_REL="vllm/entrypoints/openai/responses/context.py"
+RESPONSES_PROTOCOL_REL="vllm/entrypoints/openai/responses/protocol.py"
+RESPONSES_SERVING_REL="vllm/entrypoints/openai/responses/serving.py"
+RESPONSES_STREAMING_REL="vllm/entrypoints/openai/responses/streaming_events.py"
+RESPONSES_UTILS_REL="vllm/entrypoints/openai/responses/utils.py"
+PARSER_ENGINE_REL="vllm/parser/engine/parser_engine.py"
 
 case "${MODE}" in
   build|check)
@@ -61,18 +74,24 @@ if [[ "${actual_status}" != "${EXPECTED_STATUS}" ]]; then
   exit 1
 fi
 
-printf '%s  %s\n%s  %s\n%s  %s\n%s  %s\n' \
+printf '%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n' \
   "${TURBOQUANT_PATCH_DIFF_SHA256}" "${TURBOQUANT_PATCH_FILE}" \
   "${TOOL_SCHEMA_PATCH_DIFF_SHA256}" "${TOOL_SCHEMA_PATCH_FILE}" \
   "${AGENT_DEFAULTS_PATCH_DIFF_SHA256}" "${AGENT_DEFAULTS_PATCH_FILE}" \
-  "${PHASE_BUDGET_PATCH_DIFF_SHA256}" "${PHASE_BUDGET_PATCH_FILE}" | \
+  "${PHASE_BUDGET_PATCH_DIFF_SHA256}" "${PHASE_BUDGET_PATCH_FILE}" \
+  "${IMPLICIT_TOOL_GRAMMAR_PATCH_DIFF_SHA256}" "${IMPLICIT_TOOL_GRAMMAR_PATCH_FILE}" \
+  "${ANTHROPIC_VALIDATION_PATCH_DIFF_SHA256}" "${ANTHROPIC_VALIDATION_PATCH_FILE}" \
+  "${TOOL_TRUNCATION_PATCH_DIFF_SHA256}" "${TOOL_TRUNCATION_PATCH_FILE}" | \
   sha256sum --check --strict
 
 for reviewed_patch in \
   "${TURBOQUANT_PATCH_FILE}" \
   "${TOOL_SCHEMA_PATCH_FILE}" \
   "${AGENT_DEFAULTS_PATCH_FILE}" \
-  "${PHASE_BUDGET_PATCH_FILE}"; do
+  "${PHASE_BUDGET_PATCH_FILE}" \
+  "${IMPLICIT_TOOL_GRAMMAR_PATCH_FILE}" \
+  "${ANTHROPIC_VALIDATION_PATCH_FILE}" \
+  "${TOOL_TRUNCATION_PATCH_FILE}"; do
   git -C "${VLLM_DIR}" apply --reverse --check "${reviewed_patch}"
 done
 
@@ -116,7 +135,40 @@ read -r actual_phase_budget_diff _ < <(
   exit 1
 }
 
-printf '%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n' \
+read -r actual_implicit_tool_grammar_diff _ < <(
+  git -C "${VLLM_DIR}" diff -- \
+    "${QWEN3_PARSER_REL}" \
+    "${STRUCTURED_OUTPUT_REL}" | sha256sum
+)
+[[ "${actual_implicit_tool_grammar_diff}" == "${IMPLICIT_TOOL_GRAMMAR_PATCH_DIFF_SHA256}" ]] || {
+  echo "Refusing unreviewed Qwen implicit-tool grammar-boundary diff: ${actual_implicit_tool_grammar_diff}" >&2
+  exit 1
+}
+
+read -r actual_anthropic_validation_diff _ < <(
+  git -C "${VLLM_DIR}" diff -- "${ANTHROPIC_API_ROUTER_REL}" | sha256sum
+)
+[[ "${actual_anthropic_validation_diff}" == "${ANTHROPIC_VALIDATION_PATCH_DIFF_SHA256}" ]] || {
+  echo "Refusing unreviewed Anthropic validation-error mapping diff: ${actual_anthropic_validation_diff}" >&2
+  exit 1
+}
+
+read -r actual_tool_truncation_diff _ < <(
+  git -C "${VLLM_DIR}" diff -- \
+    "${CHAT_SERVING_REL}" \
+    "${RESPONSES_CONTEXT_REL}" \
+    "${RESPONSES_PROTOCOL_REL}" \
+    "${RESPONSES_SERVING_REL}" \
+    "${RESPONSES_STREAMING_REL}" \
+    "${RESPONSES_UTILS_REL}" \
+    "${PARSER_ENGINE_REL}" | sha256sum
+)
+[[ "${actual_tool_truncation_diff}" == "${TOOL_TRUNCATION_PATCH_DIFF_SHA256}" ]] || {
+  echo "Refusing unreviewed tool-truncation/stream-parity diff: ${actual_tool_truncation_diff}" >&2
+  exit 1
+}
+
+printf '%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n' \
   "${TURBOQUANT_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${TURBOQUANT_REL}" \
   "${TOOL_SCHEMA_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${TOOL_SCHEMA_REL}" \
   "${MODEL_CONFIG_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${MODEL_CONFIG_REL}" \
@@ -127,6 +179,16 @@ printf '%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n
   "${SCHED_UTILS_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${SCHED_UTILS_REL}" \
   "${INPUT_PROCESSOR_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${INPUT_PROCESSOR_REL}" \
   "${REQUEST_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${REQUEST_REL}" \
+  "${QWEN3_PARSER_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${QWEN3_PARSER_REL}" \
+  "${STRUCTURED_OUTPUT_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${STRUCTURED_OUTPUT_REL}" \
+  "${ANTHROPIC_API_ROUTER_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${ANTHROPIC_API_ROUTER_REL}" \
+  "${CHAT_SERVING_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${CHAT_SERVING_REL}" \
+  "${RESPONSES_CONTEXT_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${RESPONSES_CONTEXT_REL}" \
+  "${RESPONSES_PROTOCOL_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${RESPONSES_PROTOCOL_REL}" \
+  "${RESPONSES_SERVING_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${RESPONSES_SERVING_REL}" \
+  "${RESPONSES_STREAMING_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${RESPONSES_STREAMING_REL}" \
+  "${RESPONSES_UTILS_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${RESPONSES_UTILS_REL}" \
+  "${PARSER_ENGINE_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${PARSER_ENGINE_REL}" \
   "${AGENT_CHAT_TEMPLATE_SHA256}" "${TEMPLATE_FILE}" \
   "${PHASE_BUDGET_UNIT_SHA256}" "${PHASE_BUDGET_UNIT_FILE}" | \
   sha256sum --check --strict
@@ -139,7 +201,7 @@ printf '%s  %s\n%s  %s\n' \
 git -C "${VLLM_DIR}" diff --check
 
 if [[ "${MODE}" == "check" ]]; then
-  echo "Pinned base image, vLLM commit, ten reviewed source files, patches, agent template, and phase-budget unit are exact."
+  echo "Pinned base image, vLLM commit, twenty reviewed source files, seven patches, agent template, and phase-budget unit are exact."
   exit 0
 fi
 
@@ -159,6 +221,16 @@ DOCKER_BUILDKIT=1 docker build --progress=plain \
   --build-arg "SCHED_UTILS_UPSTREAM_FILE_SHA256=${SCHED_UTILS_UPSTREAM_FILE_SHA256}" \
   --build-arg "INPUT_PROCESSOR_UPSTREAM_FILE_SHA256=${INPUT_PROCESSOR_UPSTREAM_FILE_SHA256}" \
   --build-arg "REQUEST_UPSTREAM_FILE_SHA256=${REQUEST_UPSTREAM_FILE_SHA256}" \
+  --build-arg "QWEN3_PARSER_UPSTREAM_FILE_SHA256=${QWEN3_PARSER_UPSTREAM_FILE_SHA256}" \
+  --build-arg "STRUCTURED_OUTPUT_UPSTREAM_FILE_SHA256=${STRUCTURED_OUTPUT_UPSTREAM_FILE_SHA256}" \
+  --build-arg "ANTHROPIC_API_ROUTER_UPSTREAM_FILE_SHA256=${ANTHROPIC_API_ROUTER_UPSTREAM_FILE_SHA256}" \
+  --build-arg "CHAT_SERVING_UPSTREAM_FILE_SHA256=${CHAT_SERVING_UPSTREAM_FILE_SHA256}" \
+  --build-arg "RESPONSES_CONTEXT_UPSTREAM_FILE_SHA256=${RESPONSES_CONTEXT_UPSTREAM_FILE_SHA256}" \
+  --build-arg "RESPONSES_PROTOCOL_UPSTREAM_FILE_SHA256=${RESPONSES_PROTOCOL_UPSTREAM_FILE_SHA256}" \
+  --build-arg "RESPONSES_SERVING_UPSTREAM_FILE_SHA256=${RESPONSES_SERVING_UPSTREAM_FILE_SHA256}" \
+  --build-arg "RESPONSES_STREAMING_UPSTREAM_FILE_SHA256=${RESPONSES_STREAMING_UPSTREAM_FILE_SHA256}" \
+  --build-arg "RESPONSES_UTILS_UPSTREAM_FILE_SHA256=${RESPONSES_UTILS_UPSTREAM_FILE_SHA256}" \
+  --build-arg "PARSER_ENGINE_UPSTREAM_FILE_SHA256=${PARSER_ENGINE_UPSTREAM_FILE_SHA256}" \
   --build-arg "TURBOQUANT_PATCHED_FILE_SHA256=${TURBOQUANT_PATCHED_FILE_SHA256}" \
   --build-arg "TOOL_SCHEMA_PATCHED_FILE_SHA256=${TOOL_SCHEMA_PATCHED_FILE_SHA256}" \
   --build-arg "MODEL_CONFIG_PATCHED_FILE_SHA256=${MODEL_CONFIG_PATCHED_FILE_SHA256}" \
@@ -169,6 +241,16 @@ DOCKER_BUILDKIT=1 docker build --progress=plain \
   --build-arg "SCHED_UTILS_PATCHED_FILE_SHA256=${SCHED_UTILS_PATCHED_FILE_SHA256}" \
   --build-arg "INPUT_PROCESSOR_PATCHED_FILE_SHA256=${INPUT_PROCESSOR_PATCHED_FILE_SHA256}" \
   --build-arg "REQUEST_PATCHED_FILE_SHA256=${REQUEST_PATCHED_FILE_SHA256}" \
+  --build-arg "QWEN3_PARSER_PATCHED_FILE_SHA256=${QWEN3_PARSER_PATCHED_FILE_SHA256}" \
+  --build-arg "STRUCTURED_OUTPUT_PATCHED_FILE_SHA256=${STRUCTURED_OUTPUT_PATCHED_FILE_SHA256}" \
+  --build-arg "ANTHROPIC_API_ROUTER_PATCHED_FILE_SHA256=${ANTHROPIC_API_ROUTER_PATCHED_FILE_SHA256}" \
+  --build-arg "CHAT_SERVING_PATCHED_FILE_SHA256=${CHAT_SERVING_PATCHED_FILE_SHA256}" \
+  --build-arg "RESPONSES_CONTEXT_PATCHED_FILE_SHA256=${RESPONSES_CONTEXT_PATCHED_FILE_SHA256}" \
+  --build-arg "RESPONSES_PROTOCOL_PATCHED_FILE_SHA256=${RESPONSES_PROTOCOL_PATCHED_FILE_SHA256}" \
+  --build-arg "RESPONSES_SERVING_PATCHED_FILE_SHA256=${RESPONSES_SERVING_PATCHED_FILE_SHA256}" \
+  --build-arg "RESPONSES_STREAMING_PATCHED_FILE_SHA256=${RESPONSES_STREAMING_PATCHED_FILE_SHA256}" \
+  --build-arg "RESPONSES_UTILS_PATCHED_FILE_SHA256=${RESPONSES_UTILS_PATCHED_FILE_SHA256}" \
+  --build-arg "PARSER_ENGINE_PATCHED_FILE_SHA256=${PARSER_ENGINE_PATCHED_FILE_SHA256}" \
   --build-arg "AGENT_CHAT_TEMPLATE_SHA256=${AGENT_CHAT_TEMPLATE_SHA256}" \
   --build-arg "PHASE_BUDGET_UNIT_SHA256=${PHASE_BUDGET_UNIT_SHA256}" \
   --build-arg "SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH}" \
@@ -189,10 +271,20 @@ actual_installed_report="$(
     /usr/local/lib/python3.12/dist-packages/vllm/v1/core/sched/utils.py \
     /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/input_processor.py \
     /usr/local/lib/python3.12/dist-packages/vllm/v1/request.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/parser/qwen3.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/v1/structured_output/__init__.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/anthropic/api_router.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/chat_completion/serving.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/responses/context.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/responses/protocol.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/responses/serving.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/responses/streaming_events.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/responses/utils.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/parser/engine/parser_engine.py \
     /opt/qwen38/chat_template.jinja \
     /opt/qwen38/phase_budget_unit.py
 )"
-expected_installed_report="$(printf '%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s' \
+expected_installed_report="$(printf '%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s' \
   "${TURBOQUANT_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/attention/backends/turboquant_attn.py \
   "${TOOL_SCHEMA_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/tool_parsers/structural_tag_registry.py \
   "${MODEL_CONFIG_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/config/model.py \
@@ -203,6 +295,16 @@ expected_installed_report="$(printf '%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s 
   "${SCHED_UTILS_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/core/sched/utils.py \
   "${INPUT_PROCESSOR_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/input_processor.py \
   "${REQUEST_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/request.py \
+  "${QWEN3_PARSER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/qwen3.py \
+  "${STRUCTURED_OUTPUT_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/structured_output/__init__.py \
+  "${ANTHROPIC_API_ROUTER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/anthropic/api_router.py \
+  "${CHAT_SERVING_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/chat_completion/serving.py \
+  "${RESPONSES_CONTEXT_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/responses/context.py \
+  "${RESPONSES_PROTOCOL_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/responses/protocol.py \
+  "${RESPONSES_SERVING_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/responses/serving.py \
+  "${RESPONSES_STREAMING_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/responses/streaming_events.py \
+  "${RESPONSES_UTILS_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/responses/utils.py \
+  "${PARSER_ENGINE_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/engine/parser_engine.py \
   "${AGENT_CHAT_TEMPLATE_SHA256}" /opt/qwen38/chat_template.jinja \
   "${PHASE_BUDGET_UNIT_SHA256}" /opt/qwen38/phase_budget_unit.py)"
 if [[ "${actual_installed_report}" != "${expected_installed_report}" ]]; then

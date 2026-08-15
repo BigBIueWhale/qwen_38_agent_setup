@@ -1,0 +1,324 @@
+diff --git a/vllm/entrypoints/openai/chat_completion/serving.py b/vllm/entrypoints/openai/chat_completion/serving.py
+index 12c028276a..71c53dbce0 100644
+--- a/vllm/entrypoints/openai/chat_completion/serving.py
++++ b/vllm/entrypoints/openai/chat_completion/serving.py
+@@ -711,7 +711,16 @@ class OpenAIServingChat(GenerateBaseServing):
+                         # finish_reason is:
+                         # "tool_calls" for "auto" or "required" tool calls,
+                         # and "stop" for named tool calls.
+-                        if tools_streamed[i] and not tool_choice_function_name:
++                        # A parser may already have emitted a partial tool-call
++                        # prefix when generation exhausts max_tokens.  Preserve
++                        # the engine's ``length`` finish reason in that case:
++                        # clients must never mistake a truncated call for an
++                        # executable, normally-terminated tool call.
++                        if (
++                            output.finish_reason == "stop"
++                            and tools_streamed[i]
++                            and not tool_choice_function_name
++                        ):
+                             finish_reason_ = "tool_calls"
+                         else:
+                             finish_reason_ = (
+@@ -999,10 +1008,13 @@ class OpenAIServingChat(GenerateBaseServing):
+             # In OpenAI's API, when a tool is called, the finish_reason is:
+             # "tool_calls" for "auto" or "required" tool calls,
+             # and "stop" for named tool calls.
+-            is_finish_reason_tool_calls = auto_tools_called or (
+-                request.tool_choice
+-                and request.tool_choice == "required"
+-                and output.finish_reason == "stop"
++            # Parsing a partial function prefix does not override the engine's
++            # terminal condition.  In particular, ``length`` is a fail-closed
++            # signal: the returned call prefix is incomplete and must not be
++            # executed by an agent client.
++            is_finish_reason_tool_calls = output.finish_reason == "stop" and (
++                auto_tools_called
++                or (request.tool_choice and request.tool_choice == "required")
+             )
+ 
+             routed_experts_b64 = (
+diff --git a/vllm/entrypoints/openai/responses/context.py b/vllm/entrypoints/openai/responses/context.py
+index 9bc3161f88..30dad06707 100644
+--- a/vllm/entrypoints/openai/responses/context.py
++++ b/vllm/entrypoints/openai/responses/context.py
+@@ -361,6 +361,7 @@ class ParsableContext(ConversationContext):
+                     content=content,
+                     tool_calls=tool_calls,
+                     tools=self.request.tools,
++                    incomplete=completion.finish_reason == "length",
+                 )
+             )
+         elif completion.text:
+diff --git a/vllm/entrypoints/openai/responses/protocol.py b/vllm/entrypoints/openai/responses/protocol.py
+index 7ad9f57116..368192298e 100644
+--- a/vllm/entrypoints/openai/responses/protocol.py
++++ b/vllm/entrypoints/openai/responses/protocol.py
+@@ -41,6 +41,9 @@ from openai.types.responses import ResponseCreatedEvent as OpenAIResponseCreated
+ from openai.types.responses import (
+     ResponseInProgressEvent as OpenAIResponseInProgressEvent,
+ )
++from openai.types.responses import (
++    ResponseIncompleteEvent as OpenAIResponseIncompleteEvent,
++)
+ from openai.types.responses.response import IncompleteDetails, ToolChoice
+ from openai.types.responses.response_reasoning_item import (
+     Content as ResponseReasoningTextContent,
+@@ -65,9 +68,11 @@ from vllm.exceptions import VLLMValidationError
+ from vllm.logger import init_logger
+ from vllm.renderers import ChatParams, TokenizeParams, merge_kwargs
+ from vllm.sampling_params import (
++    FinalResponseTokenBudget,
+     RequestOutputKind,
+     SamplingParams,
+     StructuredOutputsParams,
++    ThinkingTokenBudget,
+ )
+ from vllm.utils import random_uuid
+ 
+@@ -170,6 +175,21 @@ class ResponsesRequest(OpenAIBaseModel):
+             "without affecting model inference."
+         ),
+     )
++    thinking_token_budget: ThinkingTokenBudget = Field(
++        default=None,
++        description=(
++            "vLLM extension: maximum number of generated reasoning tokens before "
++            "forcing the configured reasoning-end transition."
++        ),
++    )
++    final_response_token_budget: FinalResponseTokenBudget = Field(
++        default=None,
++        description=(
++            "vLLM extension: maximum number of generated tokens after the "
++            "reasoning-end transition. The server-configured ceiling remains a "
++            "hard upper bound."
++        ),
++    )
+     service_tier: Literal["auto", "default", "flex", "scale", "priority"] = "auto"
+     store: bool | None = True
+     stream: bool | None = False
+@@ -422,6 +442,26 @@ class ResponsesRequest(OpenAIBaseModel):
+         if (frequency_penalty := self.frequency_penalty) is None:
+             frequency_penalty = default_sampling_params.get("frequency_penalty", 0.0)
+ 
++        thinking_token_budget = self.thinking_token_budget
++        if (
++            thinking_token_budget is None
++            and "thinking_token_budget" not in self.model_fields_set
++        ):
++            thinking_token_budget = default_sampling_params.get(
++                "thinking_token_budget"
++            )
++        final_response_token_budget = self.final_response_token_budget
++        server_final_response_budget = default_sampling_params.get(
++            "final_response_token_budget"
++        )
++        if server_final_response_budget is not None:
++            if final_response_token_budget is None:
++                final_response_token_budget = server_final_response_budget
++            else:
++                final_response_token_budget = min(
++                    final_response_token_budget, server_final_response_budget
++                )
++
+         stop = self.stop if self.stop else []
+         if isinstance(stop, str):
+             stop = [stop]
+@@ -453,6 +493,8 @@ class ResponsesRequest(OpenAIBaseModel):
+             skip_clone=True,  # Created fresh per request, safe to skip clone
+             skip_special_tokens=self.skip_special_tokens,
+             include_stop_str_in_output=self.include_stop_str_in_output,
++            thinking_token_budget=thinking_token_budget,
++            final_response_token_budget=final_response_token_budget,
+         )
+ 
+     def is_include_output_logprobs(self) -> bool:
+@@ -836,9 +878,14 @@ class ResponseInProgressEvent(OpenAIResponseInProgressEvent):
+     response: ResponsesResponse  # type: ignore[override]
+ 
+ 
++class ResponseIncompleteEvent(OpenAIResponseIncompleteEvent):
++    response: ResponsesResponse  # type: ignore[override]
++
++
+ StreamingResponsesResponse: TypeAlias = (
+     ResponseCreatedEvent
+     | ResponseInProgressEvent
++    | ResponseIncompleteEvent
+     | ResponseCompletedEvent
+     | ResponseOutputItemAddedEvent
+     | ResponseOutputItemDoneEvent
+diff --git a/vllm/entrypoints/openai/responses/serving.py b/vllm/entrypoints/openai/responses/serving.py
+index 9d8c5dafb9..5d4d1cc412 100644
+--- a/vllm/entrypoints/openai/responses/serving.py
++++ b/vllm/entrypoints/openai/responses/serving.py
+@@ -68,6 +68,7 @@ from vllm.entrypoints.openai.responses.protocol import (
+     ResponseInProgressEvent,
+     ResponseInputOutputItem,
+     ResponseInputOutputMessage,
++    ResponseIncompleteEvent,
+     ResponsesRequest,
+     ResponsesResponse,
+     ResponseUsage,
+@@ -1091,6 +1092,7 @@ class OpenAIServingResponses(GenerateBaseServing):
+                 tool_calls=tool_calls,
+                 logprobs=logprobs,
+                 tools=request.tools,
++                incomplete=final_output.finish_reason == "length",
+             )
+ 
+         # Fallback when no parser is configured
+@@ -1358,6 +1360,7 @@ class OpenAIServingResponses(GenerateBaseServing):
+         ],
+     ) -> AsyncGenerator[StreamingResponsesResponse, None]:
+         processor = SimpleStreamingEventProcessor(tools=request.tools)
++        final_finish_reason: str | None = None
+ 
+         hide_stream_metadata = not request.include_reasoning and self.parser is not None
+ 
+@@ -1381,6 +1384,8 @@ class OpenAIServingResponses(GenerateBaseServing):
+                 continue
+ 
+             output = ctx.last_output.outputs[0]
++            if output.finish_reason is not None:
++                final_finish_reason = output.finish_reason
+             self._raise_if_error(output.finish_reason, request.request_id)
+             delta_text = output.text
+             delta_token_ids = as_list(output.token_ids)
+@@ -1413,7 +1418,9 @@ class OpenAIServingResponses(GenerateBaseServing):
+                 for event in processor.emit_delta(dm, output, _get_logprobs):
+                     yield _increment_sequence_number_and_return(event)
+ 
+-        for event in processor.close_current():
++        for event in processor.close_current(
++            incomplete=final_finish_reason == "length"
++        ):
+             yield _increment_sequence_number_and_return(event)
+ 
+     async def _process_harmony_streaming_events(
+@@ -1556,10 +1563,19 @@ class OpenAIServingResponses(GenerateBaseServing):
+                 request_metadata,
+                 created_time=created_time,
+             )
+-            yield _increment_sequence_number_and_return(
+-                ResponseCompletedEvent(
+-                    type="response.completed",
+-                    sequence_number=-1,
+-                    response=final_response,
++            if final_response.status == "incomplete":
++                yield _increment_sequence_number_and_return(
++                    ResponseIncompleteEvent(
++                        type="response.incomplete",
++                        sequence_number=-1,
++                        response=final_response,
++                    )
++                )
++            else:
++                yield _increment_sequence_number_and_return(
++                    ResponseCompletedEvent(
++                        type="response.completed",
++                        sequence_number=-1,
++                        response=final_response,
++                    )
+                 )
+-            )
+diff --git a/vllm/entrypoints/openai/responses/streaming_events.py b/vllm/entrypoints/openai/responses/streaming_events.py
+index 531a35c572..90204374d7 100644
+--- a/vllm/entrypoints/openai/responses/streaming_events.py
++++ b/vllm/entrypoints/openai/responses/streaming_events.py
+@@ -1069,9 +1069,14 @@ def emit_simple_tool_call_delta(
+ 
+ def emit_simple_tool_call_done(
+     state: SimpleStreamingState,
++    *,
++    incomplete: bool = False,
+ ) -> list[StreamingResponsesResponse]:
+     events: list[StreamingResponsesResponse] = []
+-    if state.has_emitted_tool_call_delta:
++    # ``arguments.done`` is an execution boundary for agent clients.  Never
++    # emit it when max_output_tokens interrupted the structured call, even if
++    # the parser could recover a syntactically valid JSON prefix.
++    if state.has_emitted_tool_call_delta and not incomplete:
+         events.append(
+             ResponseFunctionCallArgumentsDoneEvent(
+                 type="response.function_call_arguments.done",
+@@ -1092,7 +1097,7 @@ def emit_simple_tool_call_done(
+                 name=state.tool_call_name,
+                 namespace=state.tool_call_namespace,
+                 arguments=state.accumulated_text,
+-                status="completed",
++                status="incomplete" if incomplete else "completed",
+                 id=state.current_item_id,
+                 call_id=state.tool_call_id,
+             ),
+@@ -1226,11 +1231,18 @@ class SimpleStreamingEventProcessor:
+             and self.state.tool_call_index != tool_call.index
+         )
+ 
+-    def close_current(self) -> list[StreamingResponsesResponse]:
++    def close_current(
++        self, *, incomplete: bool = False
++    ) -> list[StreamingResponsesResponse]:
+         """Close the current state and emit its 'done' event sequence."""
+         handlers = self._STATE_HANDLERS.get(self.state.current_state)
+         if handlers is None:
+             return []
++        if self.state.current_state == _StateType.TOOL_CALL:
++            return emit_simple_tool_call_done(
++                self.state,
++                incomplete=incomplete,
++            )
+         return handlers.done_fn(self.state)
+ 
+     def open(
+diff --git a/vllm/entrypoints/openai/responses/utils.py b/vllm/entrypoints/openai/responses/utils.py
+index d3de64844a..c5ce8301d1 100644
+--- a/vllm/entrypoints/openai/responses/utils.py
++++ b/vllm/entrypoints/openai/responses/utils.py
+@@ -55,6 +55,8 @@ def build_response_output_items(
+     tool_calls: list[FunctionCall] | None,
+     logprobs: list[Logprob] | None = None,
+     tools: list[Tool] | None = None,
++    *,
++    incomplete: bool = False,
+ ) -> list[ResponseOutputItem]:
+     outputs: list[ResponseOutputItem] = []
+     tool_call_name_map = build_responses_tool_call_name_map(tools)
+@@ -85,7 +87,7 @@ def build_response_output_items(
+                     )
+                 ],
+                 role="assistant",
+-                status="completed",
++                status="incomplete" if incomplete else "completed",
+                 type="message",
+             )
+         )
+@@ -101,7 +103,7 @@ def build_response_output_items(
+                     call_id=tool_call.id
+                     or make_tool_call_id(func_name=tool_call.name, idx=idx),
+                     type="function_call",
+-                    status="completed",
++                    status="incomplete" if incomplete else "completed",
+                     name=call_name.name,
+                     namespace=call_name.namespace,
+                     arguments=tool_call.arguments,
+diff --git a/vllm/parser/engine/parser_engine.py b/vllm/parser/engine/parser_engine.py
+index 048e714cb4..2964adc19e 100644
+--- a/vllm/parser/engine/parser_engine.py
++++ b/vllm/parser/engine/parser_engine.py
+@@ -753,7 +753,13 @@ class ParserEngine(Parser):
+         if len(tool_call_deltas) > 1:
+             tool_call_deltas = self._coalesce_tool_call_deltas(tool_call_deltas)
+ 
+-        if self._deferred_content and (not seen_tool_event or not tool_call_deltas):
++        # In batch mode, text following a tool call is observed in the same
++        # event list that created the call, so the ordinary cross-delta
++        # deferral condition would strand it forever.  A finished parse has no
++        # later delta to wait for and must flush exactly as streaming does.
++        if self._deferred_content and (
++            finished or not seen_tool_event or not tool_call_deltas
++        ):
+             content_parts.insert(0, self._deferred_content)
+             self._deferred_content = ""
+ 

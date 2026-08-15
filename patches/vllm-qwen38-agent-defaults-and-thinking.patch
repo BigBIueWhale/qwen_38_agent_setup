@@ -100,7 +100,7 @@ index 4ec5c14e01..7e8e4441ef 100644
  
      @classmethod
 diff --git a/vllm/entrypoints/openai/chat_completion/protocol.py b/vllm/entrypoints/openai/chat_completion/protocol.py
-index e8bb4e5678..a7a27d466e 100644
+index e8bb4e5678..f8a4ca299e 100644
 --- a/vllm/entrypoints/openai/chat_completion/protocol.py
 +++ b/vllm/entrypoints/openai/chat_completion/protocol.py
 @@ -44,6 +44,7 @@ from vllm.logprobs import Logprob
@@ -119,7 +119,100 @@ index e8bb4e5678..a7a27d466e 100644
      include_reasoning: bool = True
      parallel_tool_calls: bool | None = True
  
-@@ -664,6 +666,8 @@ class ChatCompletionRequest(OpenAIBaseModel):
+@@ -564,6 +566,92 @@ class ChatCompletionRequest(OpenAIBaseModel):
+                 msg["tool_calls"] = list(tool_calls)
+         return self
+ 
++    @model_validator(mode="after")
++    def _validate_tool_result_correlation(self) -> "ChatCompletionRequest":
++        """Reject tool histories that the Qwen template cannot correlate safely.
++
++        Qwen's XML history format preserves tool-call order but does not render
++        OpenAI/Anthropic transport IDs into the model prompt. Accepting an
++        orphan, mismatched, duplicate, missing, or out-of-order result would
++        therefore silently attach tool output to the wrong call. This
++        correctness-first runtime rejects the malformed history instead of
++        guessing, reordering, or continuing with corrupted context.
++        """
++        pending_ids: list[str] = []
++        pending_message_index: int | None = None
++
++        for message_index, message in enumerate(self.messages):
++            if not isinstance(message, dict):
++                continue
++            role = message.get("role")
++            tool_calls = message.get("tool_calls") or []
++
++            if role == "tool":
++                result_id = message.get("tool_call_id")
++                if not pending_ids:
++                    raise ValueError(
++                        f"Tool result at messages[{message_index}] is orphaned; "
++                        "no preceding assistant tool call is awaiting a result."
++                    )
++                expected_id = pending_ids[0]
++                if not result_id:
++                    raise ValueError(
++                        f"Tool result at messages[{message_index}] is missing "
++                        f"tool_call_id; expected {expected_id!r}."
++                    )
++                if result_id != expected_id:
++                    raise ValueError(
++                        f"Tool result at messages[{message_index}] has "
++                        f"tool_call_id {result_id!r}; expected {expected_id!r} "
++                        "to preserve declared parallel-call order."
++                    )
++                pending_ids.pop(0)
++                if not pending_ids:
++                    pending_message_index = None
++                continue
++
++            if pending_ids:
++                raise ValueError(
++                    f"Message at messages[{message_index}] has role {role!r} "
++                    f"before all results for assistant message "
++                    f"messages[{pending_message_index}] were supplied; still "
++                    f"awaiting {pending_ids!r}."
++                )
++
++            if not tool_calls:
++                continue
++            if role != "assistant":
++                raise ValueError(
++                    f"Message at messages[{message_index}] declares tool_calls "
++                    f"with non-assistant role {role!r}."
++                )
++
++            call_ids: list[str] = []
++            for call_index, tool_call in enumerate(tool_calls):
++                call_id = (
++                    tool_call.get("id") if isinstance(tool_call, dict) else None
++                )
++                if not call_id:
++                    raise ValueError(
++                        f"Tool call messages[{message_index}].tool_calls"
++                        f"[{call_index}] is missing its transport id."
++                    )
++                if call_id in call_ids:
++                    raise ValueError(
++                        f"Tool call messages[{message_index}].tool_calls"
++                        f"[{call_index}] repeats transport id {call_id!r}."
++                    )
++                call_ids.append(call_id)
++            pending_ids = call_ids
++            pending_message_index = message_index
++
++        if pending_ids:
++            raise ValueError(
++                f"Assistant tool-call message messages[{pending_message_index}] "
++                f"has no complete result sequence; still awaiting {pending_ids!r}."
++            )
++        return self
++
+     _grammar_from_parser: bool = PrivateAttr(default=False)
+     """CAUTION: Should only be set by the parser-engine adapter's adjust_request."""
+ 
+@@ -664,6 +752,8 @@ class ChatCompletionRequest(OpenAIBaseModel):
          default_sampling_params: dict,
      ) -> SamplingParams:
          # Default parameters
@@ -128,7 +221,7 @@ index e8bb4e5678..a7a27d466e 100644
          if (repetition_penalty := self.repetition_penalty) is None:
              repetition_penalty = default_sampling_params.get(
                  "repetition_penalty",
-@@ -685,6 +689,25 @@ class ChatCompletionRequest(OpenAIBaseModel):
+@@ -685,6 +775,25 @@ class ChatCompletionRequest(OpenAIBaseModel):
              min_p = default_sampling_params.get(
                  "min_p", self._DEFAULT_SAMPLING_PARAMS["min_p"]
              )
@@ -154,7 +247,7 @@ index e8bb4e5678..a7a27d466e 100644
  
          # Merge server-default stop_token_ids (e.g., model-specific tokens
          # like </call> for gpt-oss) with any request-specified ones
-@@ -711,7 +734,7 @@ class ChatCompletionRequest(OpenAIBaseModel):
+@@ -711,7 +820,7 @@ class ChatCompletionRequest(OpenAIBaseModel):
              extra_args["ec_transfer_params"] = self.ec_transfer_params
          return SamplingParams.from_optional(
              n=self.n,
@@ -163,7 +256,7 @@ index e8bb4e5678..a7a27d466e 100644
              frequency_penalty=self.frequency_penalty,
              repetition_penalty=repetition_penalty,
              temperature=temperature,
-@@ -741,7 +764,8 @@ class ChatCompletionRequest(OpenAIBaseModel):
+@@ -741,7 +850,8 @@ class ChatCompletionRequest(OpenAIBaseModel):
              structured_outputs=self.extract_structured_outputs(),
              logit_bias=self.logit_bias,
              bad_words=self.bad_words,

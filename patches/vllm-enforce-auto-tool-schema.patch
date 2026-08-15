@@ -1,18 +1,35 @@
 diff --git a/vllm/tool_parsers/structural_tag_registry.py b/vllm/tool_parsers/structural_tag_registry.py
-index 1f9a651ee4..226980ed9c 100644
+index 1f9a651ee4..1c3bde8dbb 100644
 --- a/vllm/tool_parsers/structural_tag_registry.py
 +++ b/vllm/tool_parsers/structural_tag_registry.py
-@@ -110,8 +110,11 @@ def get_model_structural_tag(
+@@ -110,10 +110,29 @@ def get_model_structural_tag(
      if not tools or tool_choice == "none":
          return None
  
 -    if tool_choice == "auto" and not _any_tool_strict(tools):
--        return None
-+    # This single-purpose local agent runtime treats every advertised tool
-+    # schema as load-bearing.  For auto tool choice the model still decides
++    # This single-purpose Qwen agent runtime treats every advertised Qwen tool
++    # schema as load-bearing. For auto tool choice the model still decides
 +    # whether to call a tool, but once it starts a call xgrammar must constrain
-+    # the function name and arguments even when a client omits OpenAI's
-+    # optional ``strict`` annotation (as Anthropic-style clients commonly do).
++    # the function name and arguments regardless of OpenAI's optional
++    # ``strict`` annotation (which Anthropic-style clients normally omit).
++    # Preserve upstream's opt-in strictness contract for every other parser.
++    if (
++        tool_choice == "auto"
++        and not _any_tool_strict(tools)
++        and model != "qwen_3_coder"
++    ):
+         return None
  
      dumped_tools = [_dump_tool_for_xgrammar(tool) for tool in tools]
++    if model == "qwen_3_coder":
++        # XGrammar deliberately interprets ``strict: false`` as an instruction
++        # to replace the parameter schema with ``true``. That best-effort
++        # fallback is incompatible with this runtime's fail-closed contract:
++        # a declared Qwen tool schema is always enforced.
++        for dumped_tool in dumped_tools:
++            function = dumped_tool.get("function")
++            if isinstance(function, dict):
++                function.pop("strict", None)
      dumped_tool_choice = _dump_tool_choice_for_xgrammar(tool_choice)
+ 
+     if model in _VLLM_STRUCTURAL_TAG_REGISTRY:

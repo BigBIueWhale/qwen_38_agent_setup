@@ -6,6 +6,7 @@ from __future__ import annotations
 import msgspec
 
 from vllm.entrypoints.openai.chat_completion.protocol import ChatCompletionRequest
+from vllm.entrypoints.openai.responses.protocol import ResponsesRequest
 from vllm.exceptions import VLLMValidationError
 from vllm.sampling_params import SamplingParams
 from vllm.v1.core.sched.utils import check_stop
@@ -104,6 +105,32 @@ assert (
 )
 assert (
     chat_request(final_response_token_budget=None)
+    .to_sampling_params(200_000, defaults)
+    .final_response_token_budget
+    == 131_072
+)
+
+
+def responses_request(**kwargs) -> ResponsesRequest:
+    return ResponsesRequest(
+        model="qwen3.8",
+        input="test",
+        max_output_tokens=200_000,
+        **kwargs,
+    )
+
+
+responses_defaults = responses_request().to_sampling_params(200_000, defaults)
+assert responses_defaults.thinking_token_budget == 262_144
+assert responses_defaults.final_response_token_budget == 131_072
+responses_explicit = responses_request(
+    thinking_token_budget=128,
+    final_response_token_budget=5,
+).to_sampling_params(200_000, defaults)
+assert responses_explicit.thinking_token_budget == 128
+assert responses_explicit.final_response_token_budget == 5
+assert (
+    responses_request(final_response_token_budget=200_000)
     .to_sampling_params(200_000, defaults)
     .final_response_token_budget
     == 131_072

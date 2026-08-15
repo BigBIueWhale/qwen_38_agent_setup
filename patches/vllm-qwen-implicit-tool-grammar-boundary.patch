@@ -1,0 +1,95 @@
+diff --git a/vllm/parser/qwen3.py b/vllm/parser/qwen3.py
+index 0041a46eaa..09e5fdbec2 100644
+--- a/vllm/parser/qwen3.py
++++ b/vllm/parser/qwen3.py
+@@ -73,14 +73,18 @@ def _qwen3_arg_converter(raw_args: str, partial: bool) -> str:
+         value = match.group(2)
+         params[name] = _trim_wrapping_newlines(value)
+ 
+-    if partial:
+-        remaining = _PARAM_RE.sub("", raw_args)
+-        m = _PARTIAL_PARAM_RE.search(remaining)
+-        if m:
+-            name = m.group(1)
+-            value = m.group(2)
+-            if name:
+-                params[name] = _trim_wrapping_newlines(value)
++    # The streaming path necessarily exposes a safe prefix of the final
++    # parameter before it knows whether generation will close the XML tag.
++    # Recover that same final parameter in batch mode too.  Complete arguments
++    # are unchanged because _PARAM_RE removes every already-closed parameter;
++    # this branch only has an effect on malformed or max-token-truncated XML.
++    remaining = _PARAM_RE.sub("", raw_args)
++    m = _PARTIAL_PARAM_RE.search(remaining)
++    if m:
++        name = m.group(1)
++        value = m.group(2)
++        if name:
++            params[name] = _trim_wrapping_newlines(value)
+ 
+     return json.dumps(params, ensure_ascii=False)
+ 
+@@ -274,3 +278,34 @@ class Qwen3Parser(ParserEngine):
+                         continue
+                     return True
+         return False
++
++    def extract_content_ids(self, input_ids: list[int]) -> list[int]:
++        """Keep an implicit ``<tool_call>`` boundary in generated content.
++
++        The structured-output scheduler must skip unconstrained reasoning
++        tokens, but it must advance the Qwen XML grammar with ``<tool_call>``
++        itself. Dropping that trigger leaves the rest of the call looking like
++        unconstrained text, so neither the function name nor its arguments are
++        actually schema-constrained.
++        """
++        content_ids = super().extract_content_ids(input_ids)
++        if len(content_ids) != len(input_ids):
++            return content_ids
++
++        tool_call_id = self._tool_call_token_id
++        tool_call_end_id = self._tool_call_end_token_id
++        reasoning_start_id = self._reasoning_start_token_id
++        if tool_call_id is None:
++            return input_ids
++
++        for i in range(len(input_ids) - 1, -1, -1):
++            if reasoning_start_id is not None and input_ids[i] == reasoning_start_id:
++                break
++            if input_ids[i] != tool_call_id:
++                continue
++            if tool_call_end_id is not None and any(
++                input_ids[j] == tool_call_end_id for j in range(i + 1, len(input_ids))
++            ):
++                continue
++            return input_ids[i:]
++        return input_ids
+diff --git a/vllm/v1/structured_output/__init__.py b/vllm/v1/structured_output/__init__.py
+index f2ba4ac368..3c49d918a1 100644
+--- a/vllm/v1/structured_output/__init__.py
++++ b/vllm/v1/structured_output/__init__.py
+@@ -463,6 +463,24 @@ class StructuredOutputManager:
+             token = all_token_ids[idx]
+             prefix.append(token)
+             if reasoner.is_reasoning_end_streaming(prefix, [token]):
++                # Some parsers use the first structured-output token itself as
++                # an implicit reasoning terminator. Qwen, for example, may
++                # begin ``<tool_call>`` without first emitting ``</think>``.
++                # In that case the trigger belongs to grammar content and must
++                # not be trimmed with the reasoning prefix.
++                extract_content_ids = getattr(reasoner, "extract_content_ids", None)
++                content_ids = (
++                    extract_content_ids(prefix)
++                    if callable(extract_content_ids)
++                    else []
++                )
++                step_prefix_len = idx - start + 1
++                if (
++                    content_ids
++                    and len(content_ids) <= step_prefix_len
++                    and list(prefix[-len(content_ids) :]) == list(content_ids)
++                ):
++                    return idx - len(content_ids)
+                 return idx
+         return len(all_token_ids) - 1
+ 

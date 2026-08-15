@@ -6,8 +6,10 @@ This script is intended to run *inside* the network-isolated serving container:
     docker exec -i qwen38-agent-native python3 - \
       --targets 32768 131072 261120 < scripts/long_context_probe.py
 
-The target is the exact tokenized input length.  The final target leaves 1,024
-tokens for thinking plus the answer inside the 262,144-token native window.
+The target is the requested tokenized input length. The default final target
+leaves 1,024 tokens for thinking plus the answer inside the 262,144-token native
+window. ``--max-model-len`` exists for controlled context-capacity research;
+the supported project profile always uses the native default.
 """
 
 from __future__ import annotations
@@ -101,10 +103,10 @@ def transformers_token_count(tokenizer, messages: list[dict]) -> int:
 
 
 def fit_messages(
-    tokenizer, target: int, salt: str
+    tokenizer, target: int, salt: str, max_model_len: int
 ) -> tuple[list[dict], list[str], int, int]:
-    if not 1 <= target < MAX_MODEL_LEN:
-        raise ValueError(f"target must be between 1 and {MAX_MODEL_LEN - 1}")
+    if not 1 <= target < max_model_len:
+        raise ValueError(f"target must be between 1 and {max_model_len - 1}")
 
     # No token-density estimate is used. Start with one filler unit and allow
     # only exact tokenizer results to decide how the bracket grows.
@@ -130,9 +132,16 @@ def fit_messages(
     return messages, values, count, low
 
 
-def run_probe(base_url: str, model: str, tokenizer, target: int, salt: str) -> dict:
+def run_probe(
+    base_url: str,
+    model: str,
+    tokenizer,
+    target: int,
+    salt: str,
+    max_model_len: int,
+) -> dict:
     messages, expected, input_tokens, repetitions = fit_messages(
-        tokenizer, target, salt
+        tokenizer, target, salt, max_model_len
     )
     server_token_count = vllm_token_count(base_url, model, messages)
     if server_token_count != input_tokens:
@@ -140,7 +149,7 @@ def run_probe(base_url: str, model: str, tokenizer, target: int, salt: str) -> d
             "Tokenizer disagreement: Transformers counted "
             f"{input_tokens}, but vLLM /tokenize counted {server_token_count}"
         )
-    max_tokens = min(1_024, MAX_MODEL_LEN - input_tokens)
+    max_tokens = min(1_024, max_model_len - input_tokens)
     if max_tokens < 256:
         raise RuntimeError(
             f"Only {max_tokens} output tokens remain at input size {input_tokens}"
@@ -192,6 +201,12 @@ def main() -> None:
     parser.add_argument("--model", default=DEFAULT_MODEL)
     parser.add_argument("--salt", default="baseline")
     parser.add_argument(
+        "--max-model-len",
+        type=int,
+        default=MAX_MODEL_LEN,
+        help="Configured server context; the supported profile default is 262144.",
+    )
+    parser.add_argument(
         "--targets",
         type=int,
         nargs="+",
@@ -209,7 +224,12 @@ def main() -> None:
     results = []
     for target in args.targets:
         result = run_probe(
-            args.url.rstrip("/"), args.model, tokenizer, target, args.salt
+            args.url.rstrip("/"),
+            args.model,
+            tokenizer,
+            target,
+            args.salt,
+            args.max_model_len,
         )
         results.append(result)
         print(json.dumps(result, ensure_ascii=False), flush=True)

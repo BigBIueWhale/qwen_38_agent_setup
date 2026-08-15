@@ -47,10 +47,30 @@ require_command() {
 
 check_host_prerequisites() {
   local command_name docker_client docker_server toolkit_line toolkit_version
-  local gpu_report runtimes
+  local gpu_report runtimes git_line sha256sum_line ss_line
   for command_name in docker git nvidia-container-cli nvidia-smi sha256sum ss; do
     require_command "${command_name}"
   done
+
+  if [[ "${BASH_VERSION}" != "${EXPECTED_BASH_VERSION}" ]]; then
+    die "Bash version does not match the validated host tools." \
+      "Expected: ${EXPECTED_BASH_VERSION}" \
+      "Found:    ${BASH_VERSION}"
+  fi
+  IFS= read -r git_line < <(git --version)
+  IFS= read -r sha256sum_line < <(sha256sum --version)
+  IFS= read -r ss_line < <(ss --version 2>&1)
+  if [[ "${git_line}" != "${EXPECTED_GIT_VERSION_REPORT}" || \
+        "${sha256sum_line}" != "${EXPECTED_SHA256SUM_VERSION_REPORT}" || \
+        "${ss_line}" != "${EXPECTED_SS_VERSION_REPORT}" ]]; then
+    die "Host command versions do not match the validated lock." \
+      "Expected git:       ${EXPECTED_GIT_VERSION_REPORT}" \
+      "Found git:          ${git_line}" \
+      "Expected sha256sum: ${EXPECTED_SHA256SUM_VERSION_REPORT}" \
+      "Found sha256sum:    ${sha256sum_line}" \
+      "Expected ss:        ${EXPECTED_SS_VERSION_REPORT}" \
+      "Found ss:           ${ss_line}"
+  fi
 
   docker_client="$(docker version --format '{{.Client.Version}}')"
   docker_server="$(docker version --format '{{.Server.Version}}')"
@@ -331,10 +351,20 @@ assert_running_profile() {
       /usr/local/lib/python3.12/dist-packages/vllm/v1/core/sched/utils.py \
       /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/input_processor.py \
       /usr/local/lib/python3.12/dist-packages/vllm/v1/request.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/parser/qwen3.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/v1/structured_output/__init__.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/anthropic/api_router.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/chat_completion/serving.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/responses/context.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/responses/protocol.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/responses/serving.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/responses/streaming_events.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/responses/utils.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/parser/engine/parser_engine.py \
       /opt/qwen38/chat_template.jinja \
       /opt/qwen38/phase_budget_unit.py
   )"
-  expected_installed_report="$(printf '%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s' \
+  expected_installed_report="$(printf '%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s' \
     "${TURBOQUANT_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/attention/backends/turboquant_attn.py \
     "${TOOL_SCHEMA_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/tool_parsers/structural_tag_registry.py \
     "${MODEL_CONFIG_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/config/model.py \
@@ -345,6 +375,16 @@ assert_running_profile() {
     "${SCHED_UTILS_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/core/sched/utils.py \
     "${INPUT_PROCESSOR_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/input_processor.py \
     "${REQUEST_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/request.py \
+    "${QWEN3_PARSER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/qwen3.py \
+    "${STRUCTURED_OUTPUT_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/structured_output/__init__.py \
+    "${ANTHROPIC_API_ROUTER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/anthropic/api_router.py \
+    "${CHAT_SERVING_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/chat_completion/serving.py \
+    "${RESPONSES_CONTEXT_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/responses/context.py \
+    "${RESPONSES_PROTOCOL_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/responses/protocol.py \
+    "${RESPONSES_SERVING_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/responses/serving.py \
+    "${RESPONSES_STREAMING_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/responses/streaming_events.py \
+    "${RESPONSES_UTILS_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/responses/utils.py \
+    "${PARSER_ENGINE_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/engine/parser_engine.py \
     "${AGENT_CHAT_TEMPLATE_SHA256}" /opt/qwen38/chat_template.jinja \
     "${PHASE_BUDGET_UNIT_SHA256}" /opt/qwen38/phase_budget_unit.py)"
   [[ "${installed_report}" == "${expected_installed_report}" ]] || \

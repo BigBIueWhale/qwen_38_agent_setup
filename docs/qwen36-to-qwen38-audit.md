@@ -89,7 +89,9 @@ Disposition: **do not carry the patch**. Current vLLM replaced the old independe
 `Qwen3CoderToolParser` path with the unified streaming Parser Engine and current
 `vllm/parser/qwen3.py`. The obsolete function body the patch replaced is not the
 current serving path. Applying the wrapper would either fail or restore a superseded
-parser model. Current parser tests, including Qwen boundary/truncation cases, passed.
+parser model. Current reconstruction/truncation tests passed. That does not imply
+the entire decoder-time grammar integration was correct; item 5 records the separate
+current-code boundary defect found by this audit.
 
 Good idea retained: parser behavior is tested at both unit and live protocol levels,
 and malformed historical tool calls fail rather than being coerced silently.
@@ -139,11 +141,26 @@ intentionally omits old hidden traces.
 Historical idea: detect a Qwen tool call emitted while the old reasoning parser still
 believes it is inside thinking.
 
-Disposition: **superseded by the unified Qwen state machine**. Current
-`vllm/parser/qwen3.py` explicitly defines `(REASONING, TOOL_START)` as an implicit
-reasoning-end transition. Both streaming and non-streaming behavior share the Parser
-Engine. The live OpenAI and Anthropic trials exercised model-generated tool calls
-with reasoning enabled and passed 3/3 per protocol.
+Disposition: **the historical warning patch is not carried, but its invariant was not
+fully superseded**. Current `vllm/parser/qwen3.py` explicitly defines
+`(REASONING, TOOL_START)` as an implicit reasoning-end transition, so post-generation
+streaming and non-streaming parsing reconstruct the call correctly. The historical
+patch only warned; it did not repair grammar enforcement.
+
+First-principles tracing found a different current defect. The structured-output
+scheduler recorded the `<tool_call>` token itself as the final reasoning token and
+trimmed it before advancing XGrammar. Qwen's triggered grammar begins with
+`<tool_call>\n<function=`. Without the trigger, an unknown function and schema-invalid
+arguments remain ordinary free text and are accepted even though the final parser
+can still return a plausible structured call.
+
+The new current-source patch makes `Qwen3Parser.extract_content_ids()` retain an
+unpaired tool-start marker and makes `StructuredOutputManager` record the implicit
+reasoning boundary immediately before that suffix. With the real tokenizer,
+`<tool_call>` is the single special token 248058. Feeding it to the real XGrammar
+matcher rejected an unknown function at token 5, a nested wrong type at token 18,
+and an extra property at token 20. A sensitivity control dropping only token 248058
+accepted the unknown call, proving the regression test detects the original bypass.
 
 ### 6. `monkey_patch_default_sampling_params.py` — model-specific defaults
 
@@ -183,10 +200,13 @@ the declared JSON schema instead of trusting post-hoc parsing.
 
 Disposition: **adopt narrowly after current-code review**. Current vLLM normally
 activates structural schema constraints in automatic tool mode only if the client
-marks the tool `strict:true`. Claude-like clients may omit that flag. The reviewed
-current-source patch in `vllm/tool_parsers/structural_tag_registry.py` forces the
-schema for `auto` tool choice while leaving the decision *whether* to call a tool to
-the model. `tool_choice=none` remains unconstrained. Runtime environment variable
+marks the tool `strict:true`. Claude-like clients may omit that flag, and XGrammar
+deliberately replaces the parameter schema with `true` for explicit `strict:false`.
+The reviewed current-source patch forces the real schema for omitted, false, and true
+strict values only when the exact structural-tag model is `qwen_3_coder`. It leaves
+the decision *whether* to call a tool to the model, keeps `tool_choice=none`
+unconstrained, and preserves upstream non-strict behavior for `llama`, `qwen_3_5`,
+`deepseek_v4`, and every other parser. The runtime environment variable
 `VLLM_ENFORCE_STRICT_TOOL_CALLING=1` is explicit.
 
 This is not copied historical code. The implementation targets current structural
@@ -228,13 +248,19 @@ profile does not create a usable multimodal request path. No patch is installed.
 Historical idea: preserve cumulative partial tool arguments and make truncation
 observable in streaming output.
 
-Disposition: **do not carry the old parser wrapper**. Current vLLM's unified streaming
-Parser Engine replaced the target/state layout, has dedicated Qwen delta-boundary
-tests (`a0df04e477`), and shares transition semantics with non-streaming parsing. The
-current parser-focused Docker test runs completed with 98 parser tests plus 124
-targeted tool tests passing, including streaming boundary coverage. The project-owned
-live probes separately exercised non-streaming OpenAI and Anthropic tool-call and
-continuation invariants.
+Disposition: **do not carry the old parser wrapper, but do not assume the rewritten
+frontend is therefore correct**. Current vLLM's unified Parser Engine replaced the
+old target/state layout and has dedicated Qwen delta-boundary tests (`a0df04e477`).
+The installed-image suites completed 286 focused parser/grammar/Anthropic-conversion
+tests and 382 Qwen streaming/replay tests, yet new fault injection still found four
+current-code defects: Chat streaming could relabel an in-tool `length` cutoff as
+`tool_calls`; Responses streaming could emit executable/completed events for a
+truncated call; Qwen batch parsing dropped the final unterminated parameter prefix;
+and generic batch parsing could strand text after a tool. Narrow fixes target the
+current code rather than resurrecting the historical wrapper. A 30-prefix corpus with
+the real tokenizer now proves stream/batch semantic parity, and live truncation tests
+cover Chat, Anthropic, and Responses. The implicit grammar-trigger bug in item 5 was
+also outside the old wrapper's scope and retains its dedicated sensitivity test.
 
 ### 13. `launch_with_patches.py` and `sitecustomize.py` — propagation machinery
 
@@ -244,19 +270,22 @@ cause startup to fail.
 Disposition: **retain the fail-closed objective, reject runtime monkey-patching**. The
 current changes are baked into an immutable Docker image. The build verifies upstream
 file hashes, patch hashes, live diffs, installed file hashes, and functional tests.
-Startup then re-hashes all ten installed vLLM files, the template, and phase-budget
+Startup then re-hashes all twenty installed vLLM files, the template, and phase-budget
 test. There is no launcher/sitecustomize registry that can drift between processes.
 
 ## Current-source changes that actually remain
 
-Only four reviewed diff artifacts are applied to ten source files:
+Seven reviewed diff artifacts are applied to twenty source files:
 
 | Diff | Purpose | SHA-256 |
 |---|---|---|
 | `patches/vllm-turboquant-k8v4-direct-workspace.patch` | remove unsafe duplicate K8V4 continuation workspace allocations | `a9721067f1a7ee9497a4bd51e47e3a474561189e881b4704bfc4beac8ea48380` |
-| `patches/vllm-enforce-auto-tool-schema.patch` | schema-constrain auto tool arguments even when clients omit `strict:true` | `eb5141db2aa702c9cc7dbcf1c8116e4dff37e832d1e5ce6a0ded3f38d66f4510` |
-| `patches/vllm-qwen38-agent-defaults-and-thinking.patch` | explicit model defaults, Anthropic thinking controls, phase-ceiling request plumbing | `e1a31e2408603ebc174fc59e6a1e1e6dbfc5abf1d92221c8d976aa361f7d2423` |
+| `patches/vllm-enforce-auto-tool-schema.patch` | schema-constrain Qwen auto tool arguments for strict omitted/false/true without broadening other parsers | `4f75c793a9c2cdcfb2fd0768ba49a4e34748d3a37d8392b07d3592ca50939c07` |
+| `patches/vllm-qwen38-agent-defaults-and-thinking.patch` | explicit model defaults, Anthropic thinking controls, phase-ceiling request plumbing, fail-closed ordered tool-result correlation | `6428d2cfa77f28e57e117999d0ec8fab5430856c985ba530e04885c2f5c420b7` |
 | `patches/vllm-qwen38-separate-final-response-budget.patch` | count final tokens only after explicit reasoning end and enforce a separate hard ceiling | `f20d7dff41931248272842ed2c7a163c6f013e405ccf35733c40ff131a2fc503` |
+| `patches/vllm-qwen-implicit-tool-grammar-boundary.patch` | retain an implicit Qwen tool-start token as the structural grammar trigger and recover a final partial Qwen parameter consistently | `d231c6e2e7040c4cd4b38432cb8c794805afddbf2c6e4f7ff6febb78e3fd9f48` |
+| `patches/vllm-anthropic-validation-http400.patch` | report Anthropic request-conversion validation failures as HTTP 400, not HTTP 500 | `030b64be104e6ef57a40f6bae740dfa9d4634a420c6c93a395f62bfb98d6d053` |
+| `patches/vllm-tool-truncation-finish-reason.patch` | preserve truncation terminals, fail Responses incomplete events closed, flush deferred batch content, and carry phase budgets through Responses | `1a220f6db9b40967d867b3cfb1a92d95d907ca059718ffe61772b4cb4409f551` |
 
 The separate final-response ceiling is deliberately a hard ceiling: EOS and configured
 stop sequences still win, but `min_tokens` cannot force generation past it. Multi-token
@@ -270,6 +299,48 @@ context limit still bound it. A tool call is a separate structured phase, not th
 visible final-response phase; Qwen's tool-start marker can end reasoning implicitly in
 the parser without reclassifying tool arguments as final prose.
 
+## Tool-result correlation is part of prompt correctness
+
+The OpenAI and Anthropic protocols assign an ID to every tool call and return that ID
+with the corresponding result. Qwen's rendered tool-history XML does not include
+those transport IDs. It represents a group of calls followed by a group of results,
+so association inside the model prompt is positional. This makes apparently harmless
+API leniency unsafe: accepting two results in reverse order silently teaches the model
+that each result belongs to the wrong call.
+
+The reviewed request validator therefore requires all of the following before either
+API renders the conversation:
+
+- every assistant tool call has a nonempty, unique ID;
+- its results form one immediately following, uninterrupted group;
+- that group contains exactly one result per call, in declared call order; and
+- no orphan, duplicate, unknown, missing, interrupted, or incomplete result exists.
+
+There is intentionally no guessing, ID repair, positional reordering, or best-effort
+fallback. OpenAI validation errors are HTTP 400. Anthropic request conversion uses the
+same canonical validator and the narrow router patch maps its Pydantic validation
+failure to HTTP 400 `invalid_request_error`; unrelated server exceptions remain HTTP
+500. Live adversarial requests proved both orphan-result paths, while successful SSE
+tests proved valid call/result/continuation chains through both protocols.
+
+## Current-upstream and K8V4 implementation checks
+
+The pinned vLLM commit was compared with remote `main` at
+`d4801990a45792c7081652f8ebea4ee56ceb67f9` on 2026-08-15. Remote was ten commits
+ahead. Its only intervening parser change added streaming reasoning-token counting;
+it did not repair the implicit Qwen tool-trigger boundary, Qwen-only non-strict schema
+contract, ordered result correlation, or Anthropic validation mapping. Keeping the
+reviewed pin is therefore deliberate.
+
+The checkpoint's static symmetric per-tensor FP8 `kv_cache_scheme` is calibration
+metadata for the ordinary FP8 cache path, not pre-quantized KV data stored in the
+weights. The selected TurboQuant attention implementation does not read the model
+layers' `_k_scale`/`_v_scale`; its runtime store kernel quantizes keys to FP8 and
+values to packed 4-bit with a per-vector FP16 scale and zero point. Consequently,
+the explicit `--kv-cache-dtype turboquant_k8v4` argument defines this deployment's
+live KV semantics. vLLM's generic `+1.17% PPL` source comment is not a quality result
+for this Qwen3.8 checkpoint and is not treated as one.
+
 ## Separate budgets and the physical context window
 
 Qwen3.8 recommends a reasoning ceiling of 262,144 and a final-response ceiling of
@@ -277,7 +348,10 @@ Qwen3.8 recommends a reasoning ceiling of 262,144 and a final-response ceiling o
 not a promise that 393,216 generated tokens fit inside this workstation's native
 262,144-token profile.
 
-This server defaults both ceilings explicitly, but every request is also constrained
+This server defaults both ceilings explicitly across Chat Completions, Anthropic
+Messages, and Responses. Responses exposes validated vLLM extension fields for both
+budgets; omitted values inherit the server lock and the final ceiling cannot be raised
+or nulled out. Every request is also constrained
 by:
 
 ```text

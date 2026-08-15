@@ -12,7 +12,7 @@ baseline for model architecture, native capabilities, and published recommendati
 The stricter local serving policy and reviewed implementation differences are
 authoritative for this deployment and are recorded above the upstream card.
 
-### Final status — v3 validated and running
+### Final status — v6 validated and running
 
 The only supported text-only profile is complete and is currently served at
 `http://127.0.0.1:8000`. It uses the exact selected Qwen3.8-27B NVFP4 checkpoint,
@@ -54,7 +54,7 @@ normal use.
   second invocation validates the existing server instead of creating a duplicate.
 - `status.sh` says either `HEALTHY` or `STOPPED`. It verifies the pinned host versions,
   image IDs and offline archive, source commit, exact patch, complete model-snapshot
-  manifest, all ten reviewed vLLM source files, the agent template and budget test,
+  manifest, all twenty reviewed vLLM source files, the agent template and budget test,
   vLLM argument vector, container hardening, mounts, runtime package versions, API
   identity, and listener address. A mismatch is an error, not a warning.
 - `stop.sh` stops and removes only the exact labelled project container, verifies that
@@ -80,6 +80,15 @@ If startup fails after creating a container, `start.sh` prints the last 120 log 
 removes only that failed labelled container, and preserves the model, images, patch,
 and cache. It never reports readiness until health, API identity, versions, arguments,
 mounts, hardening, and the exact listener have all passed.
+
+Startup waiting is event-driven, not a polling loop. `start.sh` follows the exact
+container log stream through a Bash coprocess, accepts only the pinned vLLM-ready
+message, fails immediately on known fatal startup patterns, and uses one absolute
+deadline. It then closes and waits for the log producer before performing the full
+health/configuration validation. There is no repeated `sleep`, health polling, or
+orphaned `docker logs --follow` process. A complete stop/start acceptance proved this
+path and restored the supported service in about 43 seconds after the required
+integrity hashes completed.
 
 ### Objective
 
@@ -182,7 +191,7 @@ context number.
   instructions remain tracked.
 - `vllm/` is a proper Git submodule, not a recursively embedded 380 MiB directory. It
   records upstream commit `9df9b0b0a1816b6d0d0f6ecd0da563cc37fd72f5`. Its working
-  tree intentionally contains ten source-file changes represented by four reviewed
+  tree intentionally contains twenty source-file changes represented by seven reviewed
   patch artifacts. Root status ignores submodule dirty noise because the exact
   tracked patches, expected dirty-file list, live-diff hashes, and final file hashes
   are authoritative.
@@ -195,35 +204,44 @@ context number.
     `a9721067f1a7ee9497a4bd51e47e3a474561189e881b4704bfc4beac8ea48380`.
   - Automatic tool-schema enforcement:
     `patches/vllm-enforce-auto-tool-schema.patch`, SHA-256
-    `eb5141db2aa702c9cc7dbcf1c8116e4dff37e832d1e5ce6a0ded3f38d66f4510`.
+    `4f75c793a9c2cdcfb2fd0768ba49a4e34748d3a37d8392b07d3592ca50939c07`.
   - Agent defaults and Anthropic thinking controls:
     `patches/vllm-qwen38-agent-defaults-and-thinking.patch`, SHA-256
-    `e1a31e2408603ebc174fc59e6a1e1e6dbfc5abf1d92221c8d976aa361f7d2423`.
+    `6428d2cfa77f28e57e117999d0ec8fab5430856c985ba530e04885c2f5c420b7`.
   - Separate final-response phase ceiling:
     `patches/vllm-qwen38-separate-final-response-budget.patch`, SHA-256
     `f20d7dff41931248272842ed2c7a163c6f013e405ccf35733c40ff131a2fc503`.
+  - Qwen implicit-tool grammar-boundary fix:
+    `patches/vllm-qwen-implicit-tool-grammar-boundary.patch`, SHA-256
+    `d231c6e2e7040c4cd4b38432cb8c794805afddbf2c6e4f7ff6febb78e3fd9f48`.
+  - Anthropic validation-error HTTP mapping:
+    `patches/vllm-anthropic-validation-http400.patch`, SHA-256
+    `030b64be104e6ef57a40f6bae740dfa9d4634a420c6c93a395f62bfb98d6d053`.
+  - Tool truncation, stream/batch parity, and Responses phase-budget correctness:
+    `patches/vllm-tool-truncation-finish-reason.patch`, SHA-256
+    `1a220f6db9b40967d867b3cfb1a92d95d907ca059718ffe61772b4cb4409f551`.
 - Immutable base tag: `qwen38-vllm:main-9df9b0b`; required base image ID:
   `sha256:fa4a002a88b7043a1a89966dea8a500fe9696f84e75730d9da916f916048d401`.
-- Final runtime tag: `qwen38-vllm:qwen38-27b-nvfp4-k8v4-runtime-v3`; required
+- Final runtime tag: `qwen38-vllm:qwen38-27b-nvfp4-k8v4-runtime-v6`; required
   runtime image ID:
-  `sha256:5bf315d0db49b61a24addaeae96a1551e87b307cf3da6168f306a7e6c71e6205`.
+  `sha256:3452967bf6d1dca98122042e6d1b4445a4d5addd5ed6947e84a94e003fcac884`.
 - The single authoritative lock is `config/runtime-v1.sh`. Start, status, stop, and
   build checks source the same constants and argument array instead of maintaining
   independent defaults.
 - The old local vLLM 0.14.1 image is unsuitable; it predates the required Qwen3.8
   and current TurboQuant path.
 - The model directory is mounted read-only. The only writable runtime state is the
-  project- and profile-labelled `qwen38-vllm-cache-single-loopback-agent-v3` Docker
+  project- and profile-labelled `qwen38-vllm-cache-single-loopback-agent-v6` Docker
   volume.
   Its versioned name prevents reuse of the legacy compilation cache. Permissions
   were not weakened to work around Docker user-namespace remapping. Previous caches
   remain preserved but are not mounted by the supported profile.
 
-`scripts/build-vllm.sh` defensively verifies the exact commit, exact ten-file dirty
-state, all four patch hashes, reverse applicability, every grouped live-diff hash,
+`scripts/build-vllm.sh` defensively verifies the exact commit, exact twenty-file dirty
+state, all seven patch hashes, reverse applicability, every grouped live-diff hash,
 all upstream and final source hashes, the template and phase-test hashes, and
 whitespace validity before building. An arbitrary edit, extra dirty file, or missing
-patch is rejected. From a clean pinned checkout, apply the four tracked patch files
+patch is rejected. From a clean pinned checkout, apply the seven tracked patch files
 in the order listed above before running the build script.
 
 The final image is a deterministic patch layer described by
@@ -232,16 +250,16 @@ installation. The build:
 
 1. Refuses unless the local base tag resolves to the exact pinned base image ID.
 2. Runs with `--pull=false`, `--network none`, and `--provenance=false`.
-3. Verifies all ten upstream installed source hashes before replacement.
-4. Copies only the ten reviewed source files, the project chat template, and the
+3. Verifies all twenty upstream installed source hashes before replacement.
+4. Copies only the twenty reviewed source files, the project chat template, and the
    phase-budget unit from the allowlisted build context.
-5. Verifies all twelve installed file hashes, exercises sampling/default/Anthropic/
+5. Verifies all twenty-two installed file hashes, exercises sampling/default/Anthropic/
    schema/template invariants, and runs the phase-budget unit suite during the build.
 6. Requires the produced image ID to equal the pinned final image ID.
 
 The Dockerfile and build-context allowlist are themselves pinned as
-`a8bfe7e14c537958d54f014c3056c7c50a453dfd33a0c632af1b3e8beb42905f`
-and `32cf68ab7d096293d4b90179e906fbf67f1949557dc3f626cab60c43fa25cc56`
+`3ad07d29169e00e6b48441d21abbfee78c1d1d06261f9e92ec2808d1daa0ebaf`
+and `cacac15870fe9dee962785d6ab7d3289c73adf02d5ff05ace1be1c5e5e8b1ff1`
 respectively, and `build-vllm.sh check` verifies both.
 
 Two consecutive builds produced the same exact image ID. The supported commands are:
@@ -257,16 +275,18 @@ a replacement base.
 
 For recovery after an accidental Docker image prune, the exact base and final runtime
 are also preserved together in the 8.0 GiB local archive
-`artifacts/qwen38-vllm-images-runtime-v3.tar`, SHA-256
-`8d85d9360eae5ca0fe78ea36cdaefb3b04abcacb91ffc827ef7cdfc9ecf3c96d`.
+`artifacts/qwen38-vllm-images-runtime-v6.tar`, SHA-256
+`ad6a38a0658e3d57b8037ebd4b3dcfe91b3d9eae3733fc78ee15ae7c755b8d08`.
 `./scripts/restore-images.sh` verifies that archive before loading it, performs no
 network pull, and hard-fails unless both restored image IDs match the version lock.
 This is disaster recovery, not an alternate serving mode.
-The older v1 and v2 archives remain preserved as historical artifacts but are not
-accepted by the v3 start/status/restore lock.
+The older v1 through v5 archives remain preserved as historical artifacts but are
+not accepted by the v6 start/status/restore lock.
 
 The exact pinned software and hardware compatibility record is:
 
+- Host Bash `5.2.21(1)-release`; Git `2.43.0`; GNU `sha256sum` / coreutils
+  `9.4`; `ss` / iproute2 `6.1.0`.
 - Docker client/server `29.7.2`; NVIDIA Container CLI/library `1.19.1`.
 - NVIDIA driver `595.71.05`; RTX 5090, 32,607 MiB; CUDA capability `12.0`.
 - Ubuntu `24.04`; glibc `2.39-0ubuntu8.8`; container CUDA `13.0.3`; CUDA runtime
@@ -284,6 +304,14 @@ than being re-resolved.
 
 The patched implementation completed the focused TurboQuant suite with **125 passed,
 2 skipped** inside Docker. No host Python packages were used.
+
+The pinned commit was also compared to vLLM remote `main` at
+`d4801990a45792c7081652f8ebea4ee56ceb67f9` on 2026-08-15. Remote was ten commits
+ahead. The only intervening parser change adds streaming reasoning-token counting;
+none of the ten commits repairs the Qwen implicit-tool structural-grammar boundary,
+the Qwen-only non-strict schema contract, ordered tool-result correlation, or the
+Anthropic HTTP-400 mapping. The older pinned commit is therefore retained
+deliberately, rather than updating source merely because the remote ref moved.
 
 ### Only runtime profile: agent, maximum context, no vision
 
@@ -336,8 +364,9 @@ Important consequences of this configuration:
   the server configuration; a client that omits them does not fall back to generic
   vLLM defaults.
 - `VLLM_ENFORCE_STRICT_TOOL_CALLING=1` is explicit. Once the model chooses a tool,
-  its argument generation is constrained to the declared schema even if the client
-  omitted `strict:true`; `tool_choice=none` is still respected.
+  its argument generation is constrained to the declared schema whether the client
+  omitted `strict`, sent `strict:false`, or sent `strict:true`; `tool_choice=none` is
+  still respected.
 - `--quantization compressed-tensors` selects the checkpoint's mixed NVFP4/FP8
   recipe; BF16 is retained for unquantized compute/state.
 - The measured safe chunk size is 2,048 tokens. The provisional 8,192-token setting
@@ -376,6 +405,14 @@ listeners are left untouched.
 - K8V4 means FP8 keys plus 4-bit values. It is preferred over K4V4 because preserving
   key precision is the more correctness-oriented 4-bit-cache choice.
 - Do not silently substitute FP8-only KV, BF16 KV, K4V4, or a 2/3-bit cache.
+- The checkpoint's `config.json` does contain a static, symmetric, per-tensor FP8
+  `kv_cache_scheme`. That is calibration metadata, not a pre-quantized cache stored
+  in the weights. Compressed Tensors can load those `_k_scale`/`_v_scale` values for
+  the ordinary FP8 KV backend. The selected TurboQuant backend never reads those
+  layer scales: its store kernel quantizes each runtime key to FP8 and each runtime
+  value to packed 4-bit with a per-vector FP16 scale and zero point. Therefore
+  `--kv-cache-dtype turboquant_k8v4`—not the checkpoint metadata—defines the actual
+  live cache semantics.
 - Current vLLM `main` contains explicit TurboQuant K8V4 support. Earlier vLLM release
   images had an `Unknown TurboQuant cache dtype auto` regression, which is another
   reason to build/test the pinned current source.
@@ -399,6 +436,11 @@ listeners are left untouched.
   rotation, and the value dequantization path retains the prior FP16-to-BF16
   conversion behavior. Focused TurboQuant tests passed before the patch was baked
   into the immutable serving image.
+- vLLM's source comment reports a `+1.17% PPL` reference figure for the generic K8V4
+  preset. It is not a Qwen3.8-27B/this-checkpoint measurement and is not presented
+  here as this deployment's exact quality delta. The honest quality statement is
+  that K8V4 preserves keys at FP8 while quantizing values to 4-bit, and the runtime
+  correctness tests pass; a model-specific BF16-KV quality study remains unreported.
 - The final runtime locks exactly 1,024 MiB of shared workspace at startup and does
   not resize it during the cold native-context acceptance.
 - Therefore one-million-token residency cannot fit on this 32 GiB card with
@@ -418,18 +460,18 @@ extended-context/YaRN profile on this card.
   maximum. No YaRN override or `VLLM_ALLOW_LONG_MAX_MODEL_LEN` is used.
 - vLLM loaded 20.47 GiB of text-only model weights. The manually reserved K8V4 cache
   is 6.45 GiB, the shared TurboQuant workspace is 1 GiB, and CUDA graph capture used
-  about 0.06 GiB. After the immutable-image cold acceptance, `nvidia-smi` reported
-  30,297 MiB used and 1,814 MiB free out of 32,607 MiB.
+  about 0.06 GiB. After the final v4 native-context acceptance, `nvidia-smi` reported
+  30,287 MiB used and 1,824 MiB free out of 32,607 MiB.
 - A cache allocation declaration alone was not accepted as proof. The final image
   performed a cold, substantial continuation-prefill followed by normal generation
   and accurate retrieval near the native limit.
 
 The final reproducible-runtime acceptance used probe salt
-`v3-final-1786803000`. Its requested input target and constructed input were exactly
+`v4-final-1786807758`. Its requested input target and constructed input were exactly
 **261,120 tokens**. Transformers, vLLM `/tokenize`, and inference
-`usage.prompt_tokens` all reported the same 261,120 count. The model produced 238
-completion tokens, stopped normally at 261,358 total tokens, and returned all three
-exact records. Elapsed inference time was 144.769 seconds and peak KV-cache use was
+`usage.prompt_tokens` all reported the same 261,120 count. The model produced 396
+completion tokens, stopped normally at 261,516 total tokens, and returned all three
+exact records. Elapsed inference time was 153.509 seconds and peak KV-cache use was
 97.0%.
 
 The final acceptance log had no CUDA OOM, allocator retry, preemption, fallback,
@@ -440,6 +482,23 @@ a correctness or memory fallback. Separate real-tokenizer retrieval probes also
 passed at 32,765 and exactly 131,072 input tokens. The policy probes deliberately
 generated HTTP 400 responses for forbidden low/disabled-thinking requests; their
 template stack traces are expected fail-closed evidence, not inference failures.
+
+The native boundary was also tested directly rather than inferred from configuration.
+A real-tokenizer request with 262,143 prompt tokens plus one requested output token
+completed with HTTP 200 at exactly the 262,144-token physical limit. The immediately
+larger request—262,144 prompt tokens plus one output token—was rejected with HTTP 400
+before inference. `scripts/test-native-context-boundary.sh` reproduces both sides and
+requires those exact outcomes.
+
+Disposable static-YaRN startup experiments separately found the GPU allocation edge.
+Engines could initialize at configured lengths 307,200, 320,000, 327,680, 331,776,
+333,824, and 335,872 tokens; the successful high-end trials had only tens of MiB free.
+The next natural page boundary, 337,920, failed immediately during engine startup with
+a CUDA OOM. This brackets allocation startup, not model quality or reliable generation:
+the experiments did not establish retrieval accuracy across the extended range,
+static YaRN changes positional scaling even on shorter prompts, and the last successes
+have no defensive memory margin. They therefore do not create a supported extended
+mode or supersede the native 262,144-token limit.
 
 `scripts/long_context_probe.py` deliberately contains no character/token-density
 estimate and no integer-division sizing shortcut. It starts with one filler unit and
@@ -453,9 +512,12 @@ The tokenizer may warn while measuring an oversized upper bracket during search,
 that candidate is never submitted for inference.
 
 Although the upstream model supports YaRN extension to one million tokens, static
-YaRN can reduce performance on shorter contexts. With only 1,971 measured cache
-tokens beyond the native boundary, an extended profile has no useful role here. Do
-not enable YaRN merely to advertise a larger configured number.
+YaRN can reduce performance on shorter contexts. The supported cache reservation has
+only 1,971 measured cache tokens beyond native; experimentally consuming essentially
+all remaining safety margin moved startup only to the 335,872/337,920 bracket, still
+far below one million and without a quality acceptance. An extended profile has no
+defensible role here. Do not enable YaRN merely to advertise a larger configured
+number.
 
 ### Tool calling and agent behavior
 
@@ -476,9 +538,25 @@ it never authorizes invoking or inspecting the user's host-installed Claude Code
   current user/tool chain. An explicit `true` is supported when full trace replay is
   more important than context lifetime.
 - Enable prefix caching so retained conversation prefixes can be reused.
-- Enforce each declared tool JSON schema after the model chooses a tool, including
-  when a client omitted the optional `strict:true` flag. Automatic tool choice still
-  allows a normal answer, and `tool_choice=none` remains a hard opt-out.
+- Enforce each declared Qwen tool JSON schema after the model chooses a tool for
+  `strict` omitted, `strict:false`, and `strict:true`. XGrammar normally interprets
+  explicit `strict:false` as permission to replace the parameter schema with `true`;
+  this runtime removes that fallback for the exact `qwen_3_coder` structural-tag
+  model only. Other parsers retain upstream opt-in behavior. Automatic tool choice
+  still allows a normal answer, and `tool_choice=none` remains a hard opt-out.
+- Keep the Qwen `<tool_call>` special token when it acts as an implicit reasoning-end
+  marker. Current parser reconstruction already recognized a call emitted before
+  `</think>`, but the structured-output scheduler used to trim the trigger itself
+  before advancing XGrammar. That made the parsed call look correct after generation
+  while leaving its function name and arguments unconstrained during generation.
+  The narrow boundary patch records the reasoning end immediately before the trigger
+  and feeds the trigger into the grammar.
+- Reject malformed historical tool chains. Every assistant tool call must have a
+  unique transport ID, and the immediately following tool results must provide one
+  complete, ordered, matching result per call. Orphan, missing-ID, duplicate-ID,
+  mismatched, out-of-order, interrupted, and incomplete chains fail instead of being
+  guessed or reordered. This is necessary because Qwen's rendered XML history is
+  positional and does not expose OpenAI/Anthropic transport IDs to the model.
 - Validate tools using an actual JSON-schema tool request and require a structured
   `tool_calls` response with valid JSON arguments. Then return a tool result and
   validate the following assistant turn.
@@ -496,12 +574,112 @@ does not execute a host tool or mount the host workspace. All 3/3 trials passed 
 both protocols in the final image. Anthropic responses included both thinking and
 `tool_use` blocks.
 
+`scripts/test-tool-calling-adversarial.sh` proves the decoder-time and wire-protocol
+invariants inside the serving container. With the real pinned tokenizer, the four
+special markers are single tokens (`<tool_call>` is token 248058). The actual
+XGrammar state machine accepted a valid nested Qwen XML call, rejected an unknown
+tool at token 5, rejected a nested string-for-integer error at token 18, and rejected
+an extra property at token 20. A sensitivity control deliberately omitted token
+248058 and confirmed that the unknown call was then accepted as free text; the fixed
+scheduler retained it. The same probe reconstructed real OpenAI and Anthropic SSE
+tool streams, completed both tool-result continuations, respected `tool_choice=none`,
+exposed exactly one call with parallel calls disabled, and required HTTP 400 for
+orphan results on both APIs. Anthropic returns `invalid_request_error`, not a false
+HTTP 500.
+
+The installed-image Docker suites completed **286 parser/structural-output/Anthropic
+conversion tests passed, 10 intentionally deselected**, plus **382 Qwen streaming
+and replay tests passed, 2,868 unrelated cases deselected**. The ten deselections are
+one generic upstream parametrization that assumes every non-strict automatic parser,
+including Qwen, remains unconstrained; project-specific assertions replace its Qwen
+expectation and also prove unrelated parsers are unchanged.
+
 `scripts/test-agent-policy.sh` additionally verifies the real server defaults and
-rejection behavior. Its final v3 result saved 1,798 real tokenizer tokens by omitting
+rejection behavior. Its final v6 result saved 1,798 real tokenizer tokens by omitting
 a synthetic completed trace, proved `xhigh`/`high`/`max` token-ID identity, proved
 legacy `reasoning_content` ingress normalization on an actual Chat Completion,
 required HTTP 400 for all low/disabled variants, and exercised a five-token separate
 final-response ceiling.
+
+`scripts/test-agent-history-roundtrip.sh` validates the complete multi-turn history
+contract with the real tokenizer. OpenAI and Anthropic histories representing the
+same user → assistant reasoning/tool call → typed tool result → continuation rendered
+to exactly identical model token IDs. Rendering, parser reconstruction, and
+rerendering were also token-identical; nested typed arguments survived, while
+transport-only call IDs were correctly absent from Qwen's positional XML. Both live
+streaming and non-streaming paths completed with the same tool/continuation semantics.
+
+`scripts/test-responses-protocol.sh` separately validates the protocol required by
+current OpenAI Codex. Non-streaming and SSE `/v1/responses` requests selected one
+strict typed `read_file` function, accepted the matching `function_call_output`, and
+completed the continuation under explicit xhigh / `preserve_thinking=false` policy.
+The stream included created, in-progress, output-item, function-argument delta/done,
+reasoning-part/text delta/done, and completed events. This proves the server protocol
+surface, not end-to-end correctness of an untested Codex client.
+
+#### Degenerate and truncated tool-output contract
+
+Streaming is not permitted to turn an incomplete model emission into a more
+successful result than non-streaming. Before the v5/v6 hardening, a live Qwen request
+cut off inside `<tool_call>` could be parsed into a recoverable partial call while the
+Chat streaming path changed the engine's `length` terminal to `tool_calls`. The
+Responses streaming path could emit `response.function_call_arguments.done`, mark the
+function item `completed`, and terminate with `response.completed` even though the
+engine had exhausted `max_output_tokens`. A client could therefore execute a prefix
+that the model never completed. The non-streaming Qwen argument converter also lost a
+recoverable final `<parameter>` prefix in some malformed cuts, while the generic batch
+parser could strand content following a tool call that streaming returned.
+
+The reviewed fixes make truncation fail closed and preserve stream/batch semantics:
+
+- Chat Completions retains the underlying `finish_reason="length"` for a partial
+  tool call in required and automatic modes, both streaming and non-streaming. A
+  recoverable partial `tool_calls` object may be returned for diagnostics, but it is
+  not executable.
+- Anthropic Messages exposes any partial `tool_use`/`input_json_delta` buffer but
+  terminates with `stop_reason="max_tokens"`, never `tool_use` or `end_turn`.
+- Responses marks the response and function item `incomplete`, includes
+  `incomplete_details.reason="max_output_tokens"`, suppresses
+  `response.function_call_arguments.done` for the interrupted item, emits
+  `response.output_item.done` with `status="incomplete"`, and terminates with
+  `response.incomplete`. It emits neither `response.completed` nor an executable
+  argument-done boundary for that item.
+- Qwen's final unterminated parameter prefix is recovered consistently, and the
+  generic batch parser flushes deferred trailing content when parsing finishes.
+
+The client-side rule is stricter than “valid JSON means executable.” Partial deltas
+are buffers only. Chat calls may execute only after a normal `tool_calls` terminal;
+Anthropic calls only after a normal `tool_use` terminal; Responses calls only after
+the argument-done/item-completed events **and** an overall `response.completed`.
+Any `length`, `max_tokens`, `incomplete`, transport error, missing terminal, parser
+error, or schema error discards the buffered call without executing it. This overall
+Responses terminal gate also protects against a completed first item followed by a
+degenerate partial item. The one supported client policy explicitly disables parallel
+tool calls, but the overall terminal gate remains mandatory defense in depth.
+
+`scripts/test-tool-output-degeneracy.sh` runs inside the serving container with the
+real checkpoint tokenizer and installed vLLM code. Its controlled corpus covers
+reasoning without a close marker, partial trigger/name/parameter, missing argument
+blocks/closers, valid nested types, unknown tools, wrong nested types, extra
+properties, trailing content, and a complete call followed by a partial second call.
+All 30 selected real-token prefix cuts had identical streaming/non-streaming
+reasoning, content, and typed-call semantics. The live fault injection keeps
+`reasoning_effort="xhigh"` but uses an explicit test-only 128-token reasoning ceiling;
+production remains 262,144. A real-tokenizer calibration then selected a 384-token
+cut inside a 3,952-token schema-mandated value. Four independently sampled Chat
+requests all ended `length`; both Anthropic requests ended `max_tokens`; both
+Responses requests ended incomplete with no false execution terminal. The test does
+not compare independently sampled output bytes and makes no determinism assumption.
+
+Prefix caching was measured in an agentic continuation rather than assumed from the
+launch flag. The final v6 run of `scripts/test-agent-prefix-cache.sh` constructed
+65,528 cold prompt tokens with the real tokenizer. The salted cold request took
+12.899 seconds to its first event and reported zero cached tokens. Its 65,632-token
+continuation reported 64,480 cached plus 1,152 newly computed prompt tokens and
+0.386-second TTFT. An otherwise identical fresh-salt control took 12.970 seconds and
+again reported zero cached tokens: the measured continuation speedup was 33.639× and
+the cache-hit fraction was 98.2448%. The test requires both usage counters and timing separation,
+so a cache flag that produces no real hit is a failure.
 
 Correctness checks intentionally assert protocol structure and semantic invariants,
 not byte-identical prose. GPU inference, sampling, and tool-oriented generation are
@@ -558,6 +736,12 @@ still cap the request. Tool XML is a structured tool phase, not visible final pr
 
 The Docker build unit-tests multi-token delimiters, exact boundaries, serialization,
 EOS precedence, `min_tokens`, invalid values, and client-versus-server clamping.
+A v6 addition gives `/v1/responses` the same validated vLLM extensions as Chat:
+`thinking_token_budget` and `final_response_token_budget`. Omitted fields inherit the
+server defaults, an explicit smaller value is honored, and a request cannot raise or
+null out the 131,072 final-response hard ceiling. This closes the previous gap where
+Responses bypassed both phase-specific defaults even though Chat and Anthropic
+carried them correctly.
 A live request with `final_response_token_budget=5` returned separated reasoning,
 exactly five final tokens under the real served tokenizer,
 `finish_reason="length"`, and
@@ -579,15 +763,82 @@ idea are in [`docs/qwen36-to-qwen38-audit.md`](docs/qwen36-to-qwen38-audit.md).
 The bottom line is:
 
 - no historical monkey patch was copied;
-- reasoning ingress, hybrid accounting, multimodal cache recovery, and old parser
-  failures are fixed or superseded upstream;
+- reasoning ingress, hybrid accounting, multimodal cache recovery, and the old
+  parser's reconstruction/truncation failures are fixed or superseded upstream;
+- the audit nevertheless found a different current scheduler/parser integration
+  defect: an implicit Qwen tool start was parsed correctly after generation but its
+  structural-grammar trigger was trimmed during decoding. That current-code defect
+  is fixed by a new narrow patch and a real-tokenizer sensitivity test;
 - the old egress rename and repetition detector were rejected;
 - multimodal workarounds are intentionally unreachable in text-only mode;
 - explicit model defaults, fail-closed verification, real-tokenizer tests, and strict
   tool schemas were retained as principles, then implemented against current code;
+- malformed tool-result correlation is now rejected for both protocols, and
+  Anthropic-side validation errors are accurately reported as HTTP 400;
 - one narrow `/tokenize` caveat remains: its diagnostic request type does not apply
   Chat Completions' legacy `reasoning_content` input normalizer, so use `reasoning`
   on that endpoint. Real inference ingress is covered and passed.
+
+### Original agent-service use case and current client audit
+
+The original use case was reviewed last, after the server correctness work, from a
+clean clone of `BigBIueWhale/agent_service` at
+`/home/user/Desktop/agent_service`, exact commit
+`7c6f9ea66cb12678217f7427513234518323d13c`. Its durable contribution is not a
+particular CLI: it is a singleton session lifecycle, copied per-session workspace,
+sealed no-GPU/no-Internet agent container, narrow model proxy, loopback-only
+observation, cancellation, explicit JSONL events/artifacts/final record, ordered
+teardown, labels, and orphan recovery. Those ideas should form the outer execution
+envelope for this project's eventual autonomous coding service.
+
+Its Qwen3.6/Qwen Code `0.15.6` configuration is historical and must not be copied. It
+uses AWQ, port 8001, a smaller context/output profile, vision, obsolete sampling and
+compression assumptions, host-install instructions, and polling waits. A future
+service must retain the architecture ideas while replacing the inner client through
+a small, explicitly tested adapter boundary.
+
+Current source pins compared were Qwen Code `0.21.12` at
+`b965d5f8c24f48e65fb0b17c7d45f34ca4ce8f38`, OpenAI Codex at
+`00f6a8a60e5c5e93d185c7fe67fd596b7e62240f`, and the Claude Code public repository
+at `0fa8c19d50f70f9f383fb6ff5ce5209575267d21` / changelog `2.1.233`.
+No host client or user configuration was touched.
+
+Qwen Code is the best-aligned first adapter candidate because it uses the tested Chat
+Completions path and exposes Qwen-specific request controls. It is not yet installed
+or declared supported. A future pinned Docker client must explicitly set:
+
+- `contextWindowSize: 262144`; current Qwen Code otherwise classifies names matching
+  `qwen3.<digit>` as one-million-token commercial models;
+- `thinkingMandatory: true`, preventing internal side queries from transmitting
+  `chat_template_kwargs.enable_thinking=false` to this mandatory-xhigh server;
+- text-only capabilities/modalities, zero automatic retries, explicit long request/
+  stream deadlines, the complete recommended sampling tuple, total
+  `max_tokens: 262144`, reasoning budget 262,144, final budget 131,072, xhigh, and
+  `preserve_thinking:false`.
+
+The total generation limit is deliberately 262,144, not 131,072: Qwen Code clamps it
+to its real-count prompt-dependent safe remainder and vLLM enforces the exact physical
+remainder, while the separate final phase stays independently capped at 131,072.
+Setting total generation to the final
+phase ceiling would unnecessarily discard possible reasoning capacity on short
+prompts. The one native window still means prompt + reasoning + tools + final output
+can never exceed 262,144.
+
+Current Codex no longer supports Chat Completions and requires Responses. The live
+Responses protocol probes passed, and v6 now applies both pinned phase-budget defaults
+to that API even when Codex cannot express them. Codex's normal request still omits
+`max_output_tokens`, cannot lower the Qwen-specific phase budgets per request, and has
+not been run with its complete actual prompt/tool palette. Claude Code has a strong agent interface and
+the server's native Messages protocol passes, but the proprietary client's unknown-
+model prompting, compaction, and rewriting cannot be audited from its public
+repository. Neither is called end-to-end compatible from protocol probes alone.
+
+The full evidence, reviewed future Qwen Code configuration fragment, old/new
+dispositions, client comparison, and eight-part adapter acceptance contract are in
+[`docs/agent-service-and-client-audit.md`](docs/agent-service-and-client-audit.md).
+The operating default remains one long main thread, completed-thinking omission,
+real prefix reuse, and late validated compaction. Subagents are opt-in for genuinely
+independent work, not a default that fragments the precious primary context.
 
 ### Vision decision
 
@@ -616,18 +867,45 @@ The required primary-profile checklist is complete:
 4. Normal generation completed under the checkpoint's fully explicit recommended
    thinking sampling configuration; the old repetition detector is absent.
 5. Repeated OpenAI and Anthropic structured tool calls and post-tool continuations
-   passed 3/3 trials per protocol.
+   passed 3/3 trials per protocol. Real SSE reconstruction, implicit-trigger grammar
+   activation, strict omitted/false/true, nested types, unknown names, extra
+   properties, `tool_choice=none`, parallel-call filtering, and malformed-history
+   HTTP errors also passed the adversarial suite.
 6. Cold continuation prefill and generation succeeded at exactly 261,120 input /
-   261,358 total tokens with exact retrieval and no memory fallback.
+   261,516 total tokens with exact retrieval and no memory fallback.
 7. The measured cache ceiling is 264,115, but the model's finalized maximum remains
-   the native 262,144. No YaRN profile is enabled because the physical headroom above
-   native is negligible.
+   the native 262,144. The exact native boundary passed at 262,143 prompt + one output
+   in 133.0 seconds on v6 and rejected 262,144 + one with HTTP 400. Static-YaRN startup was experimentally bracketed at
+   335,872 success / 337,920 OOM, but has neither quality validation nor safe margin,
+   so no YaRN profile is enabled.
 8. Default historical-thinking omission, explicit restoration, xhigh/high/max
    equivalence, low/disabled rejection, and legacy ingress aliasing passed live.
 9. The separate final-response ceiling passed build-time boundary/serialization/
-   precedence tests and a live exact-five-real-token stop test.
+   precedence tests and a live exact-five-real-token stop test. Chat, Anthropic, and
+   Responses all carry the phase controls; Responses omission inherits the server
+   defaults and cannot null or raise the final ceiling.
 10. Vision is intentionally disabled. No vision-quality claim is made; enabling it
    requires a separately versioned and validated replacement profile.
+11. Installed-image suites passed 286 focused parser/grammar/Anthropic conversion
+    cases and 382 Qwen streaming/replay cases. TurboQuant passed 125 cases with two
+    platform-inapplicable skips.
+12. Equivalent OpenAI/Anthropic full tool histories and render → parse → rerender
+    produced exact identical real-tokenizer IDs; live streaming/non-streaming
+    continuations preserved the same typed semantics.
+13. A timed 65K-token agent continuation reported 64,480 cached prompt tokens and
+    0.386-second TTFT versus a 12.970-second zero-cache control: 33.639× measured
+    prefix reuse on v6.
+14. Native `/v1/responses` non-streaming/SSE tool loops and continuation passed for
+    current Codex's required protocol, without claiming untested client compatibility.
+15. Startup readiness uses a single log-stream deadline and no busy polling; complete
+    stop/start validation left no log follower or unexpected listener behind.
+16. The pinned clean `agent_service` clone and current Qwen Code/Codex/Claude source
+    audits produced an explicit outer-service design and client-adapter acceptance
+    contract; they did not install a host client or create a second serving mode.
+17. Degenerate tool-output fault injection compared 30 real-token parser prefixes and
+    independently sampled live stream/non-stream requests. Chat retained `length`,
+    Anthropic retained `max_tokens`, and Responses emitted only incomplete terminals;
+    no truncated call received an executable success boundary.
 
 Known nonfatal startup noise is also recorded so it is not mistaken for a runtime
 fallback:

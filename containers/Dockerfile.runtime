@@ -11,7 +11,17 @@ ARG SAMPLING_PARAMS_UPSTREAM_FILE_SHA256=a29d80a2dc533c9a560f96acc3538fffcd00bf0
 ARG SCHED_UTILS_UPSTREAM_FILE_SHA256=85e82eae555a03497ad2ac1540ed562a6c36fc26185aa6233725c914816aa1b3
 ARG INPUT_PROCESSOR_UPSTREAM_FILE_SHA256=f9a7946a16acc2374ff2bdfc22f212cb43461d9ef4d99c5e19a536339f11212f
 ARG REQUEST_UPSTREAM_FILE_SHA256=0287844f70eeaeb077d714e833a4b449a15e045a6516f8530182e357a5bec82f
-RUN printf '%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n' \
+ARG QWEN3_PARSER_UPSTREAM_FILE_SHA256=8a7ee658322de7b736ea5b0f802d70dd07a124b5878b4f8ad2f99eca8e1d35fb
+ARG STRUCTURED_OUTPUT_UPSTREAM_FILE_SHA256=355f6f1193c15d5d6901a0f567e2e16005e3681f04f70079c6ba11e020b4d33a
+ARG ANTHROPIC_API_ROUTER_UPSTREAM_FILE_SHA256=0e5f655dd0ff66cfb5c53e5413ca90713eb5d5b16547e8ef01891845fb047e37
+ARG CHAT_SERVING_UPSTREAM_FILE_SHA256=a42294241a5a2f0cfb115dfa09ded8cb08647f9c6ad98d22c71d3fac3bae3520
+ARG RESPONSES_CONTEXT_UPSTREAM_FILE_SHA256=04f25b6fb1180c9e4e24045d77f8eed880ea3e26b01f070951a1ae6112ba129b
+ARG RESPONSES_PROTOCOL_UPSTREAM_FILE_SHA256=0d7335e0ea5b361f26dba13223c277b2af3eed0c2a86333a657b4ec04e4fd343
+ARG RESPONSES_SERVING_UPSTREAM_FILE_SHA256=ac586de722ddada5032c760da0dfb8faae281fbec4e5d324204cafdad00b5e30
+ARG RESPONSES_STREAMING_UPSTREAM_FILE_SHA256=cf1d8f5e0619148374ce10be15b1a9f7640016d810f1fe766c2dd451a918aa1f
+ARG RESPONSES_UTILS_UPSTREAM_FILE_SHA256=577100edd0951f7f2936d2b37b7b4ec9a03d85088b35e49de6c0e9633a59adc2
+ARG PARSER_ENGINE_UPSTREAM_FILE_SHA256=3ac89a7f22f0e4f0d3f6f2365d79f64da9da217969793f6a33a6db9cf5ef60ff
+RUN printf '%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n' \
       "${TURBOQUANT_UPSTREAM_FILE_SHA256}" \
       /usr/local/lib/python3.12/dist-packages/vllm/v1/attention/backends/turboquant_attn.py \
       "${TOOL_SCHEMA_UPSTREAM_FILE_SHA256}" \
@@ -32,21 +42,51 @@ RUN printf '%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  
       /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/input_processor.py \
       "${REQUEST_UPSTREAM_FILE_SHA256}" \
       /usr/local/lib/python3.12/dist-packages/vllm/v1/request.py \
+      "${QWEN3_PARSER_UPSTREAM_FILE_SHA256}" \
+      /usr/local/lib/python3.12/dist-packages/vllm/parser/qwen3.py \
+      "${STRUCTURED_OUTPUT_UPSTREAM_FILE_SHA256}" \
+      /usr/local/lib/python3.12/dist-packages/vllm/v1/structured_output/__init__.py \
+      "${ANTHROPIC_API_ROUTER_UPSTREAM_FILE_SHA256}" \
+      /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/anthropic/api_router.py \
+      "${CHAT_SERVING_UPSTREAM_FILE_SHA256}" \
+      /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/chat_completion/serving.py \
+      "${RESPONSES_CONTEXT_UPSTREAM_FILE_SHA256}" \
+      /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/responses/context.py \
+      "${RESPONSES_PROTOCOL_UPSTREAM_FILE_SHA256}" \
+      /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/responses/protocol.py \
+      "${RESPONSES_SERVING_UPSTREAM_FILE_SHA256}" \
+      /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/responses/serving.py \
+      "${RESPONSES_STREAMING_UPSTREAM_FILE_SHA256}" \
+      /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/responses/streaming_events.py \
+      "${RESPONSES_UTILS_UPSTREAM_FILE_SHA256}" \
+      /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/responses/utils.py \
+      "${PARSER_ENGINE_UPSTREAM_FILE_SHA256}" \
+      /usr/local/lib/python3.12/dist-packages/vllm/parser/engine/parser_engine.py \
     | sha256sum --check --strict
 
 FROM upstream-verifier AS runtime
 ARG TURBOQUANT_PATCHED_FILE_SHA256=0aa02c874d33c1113a49cb1aab49cfdc53e6a0d77fdc9ba91f7f89e6bddc0367
-ARG TOOL_SCHEMA_PATCHED_FILE_SHA256=7b18b3b6f5f230b73726a9a8ede72b8599aaeffed1e45142e116198a4633ba54
+ARG TOOL_SCHEMA_PATCHED_FILE_SHA256=e88b5cd98ace7c76453552f5f08264e0be23d1a5bc9b9d15cc0f39ba75ec043e
 ARG MODEL_CONFIG_PATCHED_FILE_SHA256=6a0b5fdcb292fef440ee59321b7db437dae2cd5fd80eb2372fa3647fb163a3cf
 ARG ANTHROPIC_PROTOCOL_PATCHED_FILE_SHA256=d7808b7aafdac29f3bbf5e8787dad83f913bba9b8626d52c2e6a92fb8ef87207
 ARG ANTHROPIC_SERVING_PATCHED_FILE_SHA256=b283dc7f47fe1cbb57f5a9cc4000a27ff5106e94d5caf152e5f7142e8a056e19
-ARG CHAT_PROTOCOL_PATCHED_FILE_SHA256=c96dccf12a0a931929bbe8da86776d386dbc7db548cb2f9ab209136f911da0f2
+ARG CHAT_PROTOCOL_PATCHED_FILE_SHA256=0dae9a86a71ec3bbe1d55e55e7c8c7e2c14a6a8f5b1fa3f98a5223a63165e77b
 ARG SAMPLING_PARAMS_PATCHED_FILE_SHA256=cbd49b4d7a8b84f7cc2dfb43ea13381337d5408d4eaadcf8d1b91082c269a06b
 ARG SCHED_UTILS_PATCHED_FILE_SHA256=bf00f90553b05358a2671466eabe3c3f2caee6b64a6ad64ad5544f7ffc997aa2
 ARG INPUT_PROCESSOR_PATCHED_FILE_SHA256=2b9e64486ce316fb4bc2293f18b1f005ae2e4b9adc60e39331a5add342b4b018
 ARG REQUEST_PATCHED_FILE_SHA256=9894e1e7d12850796c04f2f17116f7cea58daaa78ec9e24294df136c37b41e60
+ARG QWEN3_PARSER_PATCHED_FILE_SHA256=e5c192fda3ceba5c1686a790fd29b4ba663abdc9cbb7cc292634f4c503fd28e4
+ARG STRUCTURED_OUTPUT_PATCHED_FILE_SHA256=f458a20495496d1bade5785addc50b6d655a81fd9d655912b703c4ed2e04314b
+ARG ANTHROPIC_API_ROUTER_PATCHED_FILE_SHA256=05d17ec4f7ef1f05bdf95b6ce0d04ab80d1f5f8d0bbc130a551ea0512897e56e
+ARG CHAT_SERVING_PATCHED_FILE_SHA256=da0922ec020e0d4cf0111af1bf00b534348ce13e6e19ac7ce50b3d6cbf58653a
+ARG RESPONSES_CONTEXT_PATCHED_FILE_SHA256=45aabb486f12047609dac95a8f05bd48ce653e9c139cb1195f44c2df3b114423
+ARG RESPONSES_PROTOCOL_PATCHED_FILE_SHA256=ae15671c1863efa07573a6f2282fb7c7e364c0af7a778e50151241b501a5468e
+ARG RESPONSES_SERVING_PATCHED_FILE_SHA256=ee5f461f39c7a03fb4147d6f045c127b311785def7689e607002676de50f2f83
+ARG RESPONSES_STREAMING_PATCHED_FILE_SHA256=5400a68d6219ca3944edb8a6d077da5e0ad0c767c34759dec7d35463dd1090b2
+ARG RESPONSES_UTILS_PATCHED_FILE_SHA256=6c70148e6de4a9806f2e4e8fe3e02659780e86b6886601bb8a60b377235dc29d
+ARG PARSER_ENGINE_PATCHED_FILE_SHA256=9ffce8a3aac1d885cbbd4de269201ef32bdd6089b5f92d61f94eebf1130a5faf
 ARG AGENT_CHAT_TEMPLATE_SHA256=07d9cf1a50bc702b27832586af016188d4cb5787e9a88847a5611237f722343e
-ARG PHASE_BUDGET_UNIT_SHA256=428b8a26b6fdf9612cc6cca43c4a0aa1f952f7157e448348b73130cac2e1543d
+ARG PHASE_BUDGET_UNIT_SHA256=913266638d302de31cdeae1acfdc5a568a01513481a57e5a4e7e9cbe258a99df
 RUN install --directory --mode=0755 /opt/qwen38
 COPY --chmod=0644 \
   vllm/vllm/v1/attention/backends/turboquant_attn.py \
@@ -78,9 +118,39 @@ COPY --chmod=0644 \
 COPY --chmod=0644 \
   vllm/vllm/v1/request.py \
   /usr/local/lib/python3.12/dist-packages/vllm/v1/request.py
+COPY --chmod=0644 \
+  vllm/vllm/parser/qwen3.py \
+  /usr/local/lib/python3.12/dist-packages/vllm/parser/qwen3.py
+COPY --chmod=0644 \
+  vllm/vllm/v1/structured_output/__init__.py \
+  /usr/local/lib/python3.12/dist-packages/vllm/v1/structured_output/__init__.py
+COPY --chmod=0644 \
+  vllm/vllm/entrypoints/anthropic/api_router.py \
+  /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/anthropic/api_router.py
+COPY --chmod=0644 \
+  vllm/vllm/entrypoints/openai/chat_completion/serving.py \
+  /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/chat_completion/serving.py
+COPY --chmod=0644 \
+  vllm/vllm/entrypoints/openai/responses/context.py \
+  /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/responses/context.py
+COPY --chmod=0644 \
+  vllm/vllm/entrypoints/openai/responses/protocol.py \
+  /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/responses/protocol.py
+COPY --chmod=0644 \
+  vllm/vllm/entrypoints/openai/responses/serving.py \
+  /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/responses/serving.py
+COPY --chmod=0644 \
+  vllm/vllm/entrypoints/openai/responses/streaming_events.py \
+  /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/responses/streaming_events.py
+COPY --chmod=0644 \
+  vllm/vllm/entrypoints/openai/responses/utils.py \
+  /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/responses/utils.py
+COPY --chmod=0644 \
+  vllm/vllm/parser/engine/parser_engine.py \
+  /usr/local/lib/python3.12/dist-packages/vllm/parser/engine/parser_engine.py
 COPY --chmod=0644 chat_template.jinja /opt/qwen38/chat_template.jinja
 COPY --chmod=0644 scripts/phase_budget_unit.py /opt/qwen38/phase_budget_unit.py
-RUN printf '%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n' \
+RUN printf '%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n' \
       "${TURBOQUANT_PATCHED_FILE_SHA256}" \
       /usr/local/lib/python3.12/dist-packages/vllm/v1/attention/backends/turboquant_attn.py \
       "${TOOL_SCHEMA_PATCHED_FILE_SHA256}" \
@@ -101,6 +171,26 @@ RUN printf '%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  
       /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/input_processor.py \
       "${REQUEST_PATCHED_FILE_SHA256}" \
       /usr/local/lib/python3.12/dist-packages/vllm/v1/request.py \
+      "${QWEN3_PARSER_PATCHED_FILE_SHA256}" \
+      /usr/local/lib/python3.12/dist-packages/vllm/parser/qwen3.py \
+      "${STRUCTURED_OUTPUT_PATCHED_FILE_SHA256}" \
+      /usr/local/lib/python3.12/dist-packages/vllm/v1/structured_output/__init__.py \
+      "${ANTHROPIC_API_ROUTER_PATCHED_FILE_SHA256}" \
+      /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/anthropic/api_router.py \
+      "${CHAT_SERVING_PATCHED_FILE_SHA256}" \
+      /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/chat_completion/serving.py \
+      "${RESPONSES_CONTEXT_PATCHED_FILE_SHA256}" \
+      /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/responses/context.py \
+      "${RESPONSES_PROTOCOL_PATCHED_FILE_SHA256}" \
+      /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/responses/protocol.py \
+      "${RESPONSES_SERVING_PATCHED_FILE_SHA256}" \
+      /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/responses/serving.py \
+      "${RESPONSES_STREAMING_PATCHED_FILE_SHA256}" \
+      /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/responses/streaming_events.py \
+      "${RESPONSES_UTILS_PATCHED_FILE_SHA256}" \
+      /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/responses/utils.py \
+      "${PARSER_ENGINE_PATCHED_FILE_SHA256}" \
+      /usr/local/lib/python3.12/dist-packages/vllm/parser/engine/parser_engine.py \
       "${AGENT_CHAT_TEMPLATE_SHA256}" \
       /opt/qwen38/chat_template.jinja \
       "${PHASE_BUDGET_UNIT_SHA256}" \
@@ -113,10 +203,18 @@ from vllm.entrypoints.openai.chat_completion.protocol import (
     ChatCompletionRequest,
     ChatCompletionToolsParam,
 )
+from vllm.entrypoints.openai.responses.protocol import ResponseIncompleteEvent
+from vllm.entrypoints.openai.responses.streaming_events import (
+    SimpleStreamingEventProcessor,
+    _StateType,
+)
 from vllm.tool_parsers.structural_tag_registry import get_model_structural_tag
+from vllm.parser.qwen3 import Qwen3Parser, _qwen3_arg_converter
+from vllm.v1.structured_output import StructuredOutputManager
 from pydantic import ValidationError
 from jinja2.sandbox import ImmutableSandboxedEnvironment
 import os
+import json
 import runpy
 import stat
 
@@ -140,8 +238,137 @@ tool = ChatCompletionToolsParam.model_validate(
     }
 )
 assert tool.function.strict is None
-assert get_model_structural_tag("qwen_3_coder", [tool], "auto", False) is not None
+assert json.loads(
+    _qwen3_arg_converter("<parameter=path>/partial", partial=False)
+) == {"path": "/partial"}
+assert ResponseIncompleteEvent is not None
+processor = SimpleStreamingEventProcessor()
+processor.state.current_state = _StateType.TOOL_CALL
+processor.state.current_item_id = "fc_build"
+processor.state.tool_call_id = "call_build"
+processor.state.tool_call_name = "read_file"
+processor.state.tool_call_index = 0
+processor.state.accumulated_text = '{"path":"/partial"}'
+processor.state.has_emitted_tool_call_delta = True
+incomplete_events = processor.close_current(incomplete=True)
+assert [event.type for event in incomplete_events] == ["response.output_item.done"]
+assert incomplete_events[0].item.status == "incomplete"
+qwen_tag = get_model_structural_tag("qwen_3_coder", [tool], "auto", False)
+assert qwen_tag is not None
 assert get_model_structural_tag("qwen_3_coder", [tool], "none", False) is None
+assert get_model_structural_tag("llama", [tool], "auto", False) is None
+assert get_model_structural_tag("qwen_3_5", [tool], "auto", False) is None
+
+# A Qwen tool schema is load-bearing even when OpenAI's optional strict flag
+# is omitted or explicitly false. Other structural-tag models retain upstream
+# opt-in semantics. The dumped grammar must therefore contain the real schema.
+for strict_value in (None, False, True):
+    strict_tool = tool.model_copy(deep=True)
+    strict_tool.function.strict = strict_value
+    tag = get_model_structural_tag("qwen_3_coder", [strict_tool], "auto", False)
+    assert tag is not None
+    tag_dump = tag.model_dump()
+    schema = tag_dump["format"]["tags"][0]["content"]["json_schema"]
+    assert schema["properties"]["path"] == {
+        "type": "string"
+    }
+    assert schema["additionalProperties"] is False
+
+# Decoder-time boundary invariant: an explicit </think> is excluded from the
+# grammar, while an implicit <tool_call> reasoning terminator is retained as
+# the Qwen structural grammar's trigger token.
+parser = object.__new__(Qwen3Parser)
+parser._reasoning_start_token_id = 101
+parser._reasoning_end_token_id = 102
+parser._tool_call_token_id = 103
+parser._tool_call_end_token_id = 104
+parser.parser_engine_config = type("Config", (), {"initial_state": object()})()
+assert parser.extract_content_ids([101, 11, 102, 21]) == [21]
+assert parser.extract_content_ids([101, 11, 103]) == [103]
+assert parser.is_reasoning_end_streaming([101, 11, 103], [103])
+implicit_end = StructuredOutputManager._find_reasoning_end_index(
+    parser, [101, 11, 103], 2
+)
+assert implicit_end == 1
+request_stub = type("Request", (), {})()
+request_stub.all_token_ids = [101, 11, 103]
+request_stub.structured_output_request = type("Structured", (), {})()
+request_stub.structured_output_request.reasoning_end_token_index = implicit_end
+assert StructuredOutputManager.trim_reasoning_for_advance(
+    object(), request_stub, [103]
+) == [103]
+
+# The Qwen history wire format is positional and does not expose transport
+# IDs to the model. Require a complete, ordered one-result-per-call sequence
+# rather than allowing corrupted tool context or silently reordering it.
+valid_history = [
+    {"role": "user", "content": "test"},
+    {
+        "role": "assistant",
+        "tool_calls": [
+            {
+                "id": "call_a",
+                "type": "function",
+                "function": {"name": "read_file", "arguments": "{}"},
+            },
+            {
+                "id": "call_b",
+                "type": "function",
+                "function": {"name": "read_file", "arguments": "{}"},
+            },
+        ],
+    },
+    {"role": "tool", "tool_call_id": "call_a", "content": "A"},
+    {"role": "tool", "tool_call_id": "call_b", "content": "B"},
+    {"role": "user", "content": "continue"},
+]
+ChatCompletionRequest(model="qwen3.8", messages=valid_history, max_tokens=1)
+invalid_histories = (
+    [
+        {"role": "user", "content": "test"},
+        {"role": "tool", "tool_call_id": "orphan", "content": "bad"},
+    ],
+    [
+        {
+            "role": "assistant",
+            "tool_calls": [
+                {
+                    "id": "call_a",
+                    "type": "function",
+                    "function": {"name": "read_file", "arguments": "{}"},
+                },
+                {
+                    "id": "call_b",
+                    "type": "function",
+                    "function": {"name": "read_file", "arguments": "{}"},
+                },
+            ],
+        },
+        {"role": "tool", "tool_call_id": "call_b", "content": "B"},
+        {"role": "tool", "tool_call_id": "call_a", "content": "A"},
+    ],
+    [
+        {
+            "role": "assistant",
+            "tool_calls": [
+                {
+                    "id": "call_a",
+                    "type": "function",
+                    "function": {"name": "read_file", "arguments": "{}"},
+                }
+            ],
+        }
+    ],
+)
+for invalid_history in invalid_histories:
+    try:
+        ChatCompletionRequest(
+            model="qwen3.8", messages=invalid_history, max_tokens=1
+        )
+    except ValidationError:
+        pass
+    else:
+        raise AssertionError(f"malformed tool history was accepted: {invalid_history}")
 
 defaults = {
     "temperature": 1.0,
@@ -264,12 +491,21 @@ LABEL org.opencontainers.image.revision="9df9b0b0a1816b6d0d0f6ecd0da563cc37fd72f
       qwen38.base.image="sha256:fa4a002a88b7043a1a89966dea8a500fe9696f84e75730d9da916f916048d401" \
       qwen38.patch.turboquant.diff.sha256="a9721067f1a7ee9497a4bd51e47e3a474561189e881b4704bfc4beac8ea48380" \
       qwen38.patch.turboquant.file.sha256="0aa02c874d33c1113a49cb1aab49cfdc53e6a0d77fdc9ba91f7f89e6bddc0367" \
-      qwen38.patch.tool-schema.diff.sha256="eb5141db2aa702c9cc7dbcf1c8116e4dff37e832d1e5ce6a0ded3f38d66f4510" \
-      qwen38.patch.tool-schema.file.sha256="7b18b3b6f5f230b73726a9a8ede72b8599aaeffed1e45142e116198a4633ba54" \
-      qwen38.patch.agent-defaults.diff.sha256="e1a31e2408603ebc174fc59e6a1e1e6dbfc5abf1d92221c8d976aa361f7d2423" \
+      qwen38.patch.tool-schema.diff.sha256="4f75c793a9c2cdcfb2fd0768ba49a4e34748d3a37d8392b07d3592ca50939c07" \
+      qwen38.patch.tool-schema.file.sha256="e88b5cd98ace7c76453552f5f08264e0be23d1a5bc9b9d15cc0f39ba75ec043e" \
+      qwen38.patch.agent-defaults.diff.sha256="6428d2cfa77f28e57e117999d0ec8fab5430856c985ba530e04885c2f5c420b7" \
       qwen38.patch.phase-budgets.diff.sha256="f20d7dff41931248272842ed2c7a163c6f013e405ccf35733c40ff131a2fc503" \
+      qwen38.patch.implicit-tool-grammar.diff.sha256="d231c6e2e7040c4cd4b38432cb8c794805afddbf2c6e4f7ff6febb78e3fd9f48" \
+      qwen38.patch.implicit-tool-grammar.qwen3-file.sha256="e5c192fda3ceba5c1686a790fd29b4ba663abdc9cbb7cc292634f4c503fd28e4" \
+      qwen38.patch.implicit-tool-grammar.manager-file.sha256="f458a20495496d1bade5785addc50b6d655a81fd9d655912b703c4ed2e04314b" \
+      qwen38.patch.anthropic-validation-http400.diff.sha256="030b64be104e6ef57a40f6bae740dfa9d4634a420c6c93a395f62bfb98d6d053" \
+      qwen38.patch.anthropic-validation-http400.file.sha256="05d17ec4f7ef1f05bdf95b6ce0d04ab80d1f5f8d0bbc130a551ea0512897e56e" \
+      qwen38.patch.tool-truncation.diff.sha256="1a220f6db9b40967d867b3cfb1a92d95d907ca059718ffe61772b4cb4409f551" \
+      qwen38.patch.tool-truncation.chat-serving-file.sha256="da0922ec020e0d4cf0111af1bf00b534348ce13e6e19ac7ce50b3d6cbf58653a" \
+      qwen38.patch.tool-truncation.responses-serving-file.sha256="ee5f461f39c7a03fb4147d6f045c127b311785def7689e607002676de50f2f83" \
+      qwen38.patch.tool-truncation.parser-engine-file.sha256="9ffce8a3aac1d885cbbd4de269201ef32bdd6089b5f92d61f94eebf1130a5faf" \
       qwen38.template.file.sha256="07d9cf1a50bc702b27832586af016188d4cb5787e9a88847a5611237f722343e" \
       qwen38.project="Qwen_best_model_ever" \
-      qwen38.runtime.profile="single-loopback-text-k8v4-agent-v3"
+      qwen38.runtime.profile="single-loopback-text-k8v4-agent-v6"
 
 ENTRYPOINT ["vllm", "serve"]

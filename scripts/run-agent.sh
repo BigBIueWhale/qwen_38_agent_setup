@@ -92,26 +92,59 @@ docker run --detach \
   "${IMAGE_TAG}" \
   "${VLLM_ARGS[@]}" >/dev/null
 
-printf '\nContainer created. Waiting for the pinned model to become healthy'
-deadline=$((SECONDS + STARTUP_TIMEOUT_SECONDS))
-while true; do
-  if [[ "$(docker inspect --format '{{.State.Running}}' "${CONTAINER_NAME}")" != "true" ]]; then
-    printf '\nERROR: The container exited during startup.\n' >&2
-    false
-  fi
-  if docker exec "${CONTAINER_NAME}" curl --fail --silent \
-      "${ENDPOINT}/health" >/dev/null 2>&1; then
+printf '\nContainer created. Blocking on the Docker log stream for readiness...\n'
+readiness_pattern='Application startup complete|Engine core initialization failed|EngineCore encountered a fatal error|CUDA out of memory|ValueError:.*KV cache|Traceback \(most recent call last\)'
+readiness_line=''
+readiness_status=1
+startup_deadline=$((SECONDS + STARTUP_TIMEOUT_SECONDS))
+coproc STARTUP_LOG_STREAM {
+  docker logs --follow "${CONTAINER_NAME}" 2>&1
+}
+startup_log_pid="${STARTUP_LOG_STREAM_PID}"
+startup_log_fd="${STARTUP_LOG_STREAM[0]}"
+while ((SECONDS < startup_deadline)); do
+  remaining_seconds=$((startup_deadline - SECONDS))
+  if ! IFS= read -r -t "${remaining_seconds}" startup_log_line \
+      <&"${startup_log_fd}"; then
     break
   fi
-  if ((SECONDS >= deadline)); then
-    printf '\nERROR: Startup exceeded %s seconds.\n' \
-      "${STARTUP_TIMEOUT_SECONDS}" >&2
-    false
+  if [[ "${startup_log_line}" =~ ${readiness_pattern} ]]; then
+    readiness_line="${startup_log_line}"
+    readiness_status=0
+    break
   fi
-  printf '.'
-  sleep 2
 done
-printf ' ready.\n'
+
+# A matched line or absolute timeout ends this one event stream explicitly.
+# Do not leave `docker logs --follow` alive and do not wait for a second event.
+kill "${startup_log_pid}" >/dev/null 2>&1 || true
+wait "${startup_log_pid}" >/dev/null 2>&1 || true
+exec {startup_log_fd}<&-
+
+if ((readiness_status != 0)); then
+  if [[ "$(docker inspect --format '{{.State.Running}}' "${CONTAINER_NAME}")" != "true" ]]; then
+    die "The container exited before reporting application readiness."
+  fi
+  if ((SECONDS >= startup_deadline)); then
+    die "Startup exceeded the pinned timeout." \
+      "Timeout: ${STARTUP_TIMEOUT_SECONDS} seconds"
+  fi
+  die "The blocking Docker-log readiness wait failed." \
+    "Exit status: ${readiness_status}"
+fi
+printf '%s\n' "${readiness_line}"
+if [[ "${readiness_line}" != *'Application startup complete'* ]]; then
+  die "vLLM reported a fatal startup condition before readiness." \
+    "Matched log line: ${readiness_line}"
+fi
+if [[ "$(docker inspect --format '{{.State.Running}}' "${CONTAINER_NAME}")" != "true" ]]; then
+  die "The container exited immediately after reporting readiness."
+fi
+if ! docker exec "${CONTAINER_NAME}" curl --fail --silent \
+    "${ENDPOINT}/health" >/dev/null; then
+  die "The one post-readiness health validation failed."
+fi
+printf 'Pinned vLLM application is ready.\n'
 
 assert_running_profile
 cleanup_needed=false
