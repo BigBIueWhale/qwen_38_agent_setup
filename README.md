@@ -37,9 +37,9 @@ The deployment is complete and healthy. There is one supported mode:
 | Batching | One sequence; 2,048-token chunked prefill |
 | Listener | 127.0.0.1:8000 only |
 | Agent client | Qwen Code 0.21.12 at b965d5f8c24f48e65fb0b17c7d45f34ca4ce8f38 |
-| Agent image | sha256:cc916c63598c5953810482e2e5f614eaa1e96695f5c07bfb2c3f2f894e9aa323 |
-| Agent-service source | b942b995043eea663bea19349fd82daac258bdee |
-| Agent-service image | sha256:af69927e9deb3cf969619c831b0977348fc2e07f4c60361f8fd726315fbbfdda |
+| Agent image | sha256:b58feacef0a13333d19f701a00ef1774c82a94c19325dd38fc1b5f7ff439d66f |
+| Agent-service source | a6547dfbcbbc6615998da4fe90ab8e8dc40565fe |
+| Agent-service image | sha256:e8fb724cd200010a51944d9050dbab99a1b65b3bfb077304ae70b5bab01ba4f8 |
 | Agent-service listener | 127.0.0.1:8090 only |
 | Runtime profile | single-loopback-vision-k8v4-agent-v12 |
 | Runtime image | sha256:5d545d85950310cb09bebacba9083a242e8943c92669428eb23468d959f4f2d5 |
@@ -699,6 +699,17 @@ rerun after every runtime-profile change before that image is accepted:
     awaited one foreground Explore subagent before independent main-thread and
     byte-exact output verification. Both writes remained inside staged workspace
     copies.
+26. Unlicense/reproducibility refresh at service commit
+    a6547dfbcbbc6615998da4fe90ab8e8dc40565fe: pass. Two independent no-cache agent
+    builds produced exact image ID
+    sha256:b58feacef0a13333d19f701a00ef1774c82a94c19325dd38fc1b5f7ff439d66f
+    after all sixteen focused Qwen Code suites and 2,326 tests; independent cached
+    and no-cache service builds produced exact image ID
+    sha256:e8fb724cd200010a51944d9050dbab99a1b65b3bfb077304ae70b5bab01ba4f8
+    after all fourteen Rust tests. The deployed paired stack passed its complete
+    loopback/image/source contract and a fresh five-turn native file-tool smoke;
+    the durable bundle contained the exact requested output, an unchanged input,
+    zero teardown diagnostics, and no owned session-container leftovers.
 
 The supported status currently reports:
 
@@ -733,7 +744,7 @@ b965d5f8c24f48e65fb0b17c7d45f34ca4ce8f38. The official release archive is pinned
 by SHA-256 61beddff8bde1dd2654c8714f927b46ab7cf9822b8561d11e3a2b8e085b5e745,
 and the landmark-aware source transformation is independently pinned. It runs only
 inside immutable agent image
-sha256:cc916c63598c5953810482e2e5f614eaa1e96695f5c07bfb2c3f2f894e9aa323.
+sha256:b58feacef0a13333d19f701a00ef1774c82a94c19325dd38fc1b5f7ff439d66f.
 The accepted service sends this exact outgoing policy on every main and foreground
 subagent turn:
 
@@ -753,7 +764,7 @@ subagent turn:
   subagents.
 
 The service is the updated original `/home/user/Desktop/agent_service` at commit
-b942b995043eea663bea19349fd82daac258bdee, not a copied launcher. Its own README and
+a6547dfbcbbc6615998da4fe90ab8e8dc40565fe, not a copied launcher. Its own README and
 lock file are authoritative for Qwen Code source/patch,
 agent/service images, package snapshot, exact tools, copied-workspace envelope,
 stream-event validation, cancellation, bundles, and 127.0.0.1:8090 listener. Repeated
@@ -798,6 +809,22 @@ Known nonfatal log noise is documented rather than hidden:
 
 Do not silence these messages by enabling remote code, weakening offline mode,
 changing cache/image precision, adding retries, or installing host packages.
+
+### Licensing and third-party scope
+
+Original material in this repository for which the repository author owns the
+copyright is released under [The Unlicense](LICENSE), SPDX identifier
+`Unlicense`. This public-domain dedication does not and cannot relicense material
+owned by Alibaba, Unsloth, vLLM contributors, NVIDIA, dependency authors, or any
+other third party.
+
+The Qwen model/configuration/tokenizer/model-card material and the pinned vLLM
+submodule retain their upstream terms and notices. Review patches or generated
+transformations containing modified upstream source likewise remain subject to
+the applicable upstream license. The exact scope and preserved Apache-2.0 text
+are recorded in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and
+[LICENSES/Apache-2.0.txt](LICENSES/Apache-2.0.txt). Model weights, local Docker
+archives, and caches remain outside Git and are not relicensed by this repository.
 
 # Qwen3.8-27B
 
