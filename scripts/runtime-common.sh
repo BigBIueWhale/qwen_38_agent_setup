@@ -241,7 +241,9 @@ assert_running_profile() {
   local cache_project_label cache_profile_label cache_model_revision_label
   local actual_command expected_command
   local actual_environment wrapped_environment required_environment api
-  local installed_report expected_installed_report image_profile_label
+  local installed_report expected_installed_report
+  local additional_installed_report expected_additional_installed_report
+  local image_profile_label
 
   assert_owned_container
   running="$(docker inspect --format '{{.State.Running}}' "${CONTAINER_NAME}")"
@@ -407,6 +409,39 @@ assert_running_profile() {
       "Expected:" "${expected_installed_report}" \
       "Found:" "${installed_report}"
 
+  additional_installed_report="$(
+    docker exec "${CONTAINER_NAME}" sha256sum \
+      /usr/local/lib/python3.12/dist-packages/vllm/v1/worker/workspace.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/v1/worker/gpu_model_runner.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/serve/utils/api_utils.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/envs.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/chat_utils.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/multimodal/media/connector.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/multimodal/media/image.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/renderers/params.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/model_executor/models/qwen3_vl.py \
+      /opt/qwen38/vision_workspace_unit.py \
+      /opt/qwen38/vision_contract_unit.py \
+      /opt/qwen38/vision_mlp_unit.py
+  )"
+  expected_additional_installed_report="$(printf '%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s' \
+    "${WORKSPACE_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/worker/workspace.py \
+    "${GPU_MODEL_RUNNER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/worker/gpu_model_runner.py \
+    "${API_UTILS_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/serve/utils/api_utils.py \
+    "${ENVS_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/envs.py \
+    "${CHAT_UTILS_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/chat_utils.py \
+    "${MEDIA_CONNECTOR_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/multimodal/media/connector.py \
+    "${IMAGE_MEDIA_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/multimodal/media/image.py \
+    "${RENDER_PARAMS_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/renderers/params.py \
+    "${QWEN3_VL_MODEL_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/model_executor/models/qwen3_vl.py \
+    "${VISION_WORKSPACE_UNIT_SHA256}" /opt/qwen38/vision_workspace_unit.py \
+    "${VISION_CONTRACT_UNIT_SHA256}" /opt/qwen38/vision_contract_unit.py \
+    "${VISION_MLP_UNIT_SHA256}" /opt/qwen38/vision_mlp_unit.py)"
+  [[ "${additional_installed_report}" == "${expected_additional_installed_report}" ]] || \
+    die "Running vision/runtime bytes do not match the reviewed profile." \
+      "Expected:" "${expected_additional_installed_report}" \
+      "Found:" "${additional_installed_report}"
+
   assert_runtime_versions
 }
 
@@ -417,6 +452,8 @@ print_healthy_summary() {
   printf 'Model:         %s\n' "${SERVED_MODEL}"
   printf 'Model revision: %s\n' "${MODEL_REVISION}"
   printf 'Context limit: %s tokens\n' "${MAX_MODEL_LEN}"
+  printf 'Vision:         15 inline static PNG images; 16,777,216 pixels each; videos disabled\n'
+  printf 'Image quality:  BF16 vision tower; <=30:1 proven aspect ratio; no request overrides\n'
   printf 'Thinking:      xhigh; old traces omitted by default\n'
   printf 'Sampling:      explicit Qwen3.8 defaults; repetition penalty 1.0\n'
   printf 'Phase ceilings: reasoning 262144; final response 131072 tokens\n'

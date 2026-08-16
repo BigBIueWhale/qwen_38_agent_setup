@@ -6,934 +6,717 @@ pipeline_tag: image-text-to-text
 
 ## Qwen3.8-27B NVFP4 — correctness-first local agent server
 
-This section is the durable decision record for the local deployment work in this
-directory. The upstream Qwen model card begins below and remains the authoritative
-baseline for model architecture, native capabilities, and published recommendations.
-The stricter local serving policy and reviewed implementation differences are
-authoritative for this deployment and are recorded above the upstream card.
-
-### Final status — v6 validated and running
-
-The only supported text-only profile is complete and is currently served at
-`http://127.0.0.1:8000`. It uses the exact selected Qwen3.8-27B NVFP4 checkpoint,
-TurboQuant K8V4, the native 262,144-token model limit, BF16 unquantized compute,
-one sequence, no vision encoder, no MTP/speculative decoding, and no CPU/KV
-offload. The final cold long-context acceptance completed successfully with three
-independent real-tokenizer counts in agreement and no CUDA OOM, allocator retry,
-preemption, or fallback.
-
-The agent policy is equally explicit: thinking is always enabled at Qwen `xhigh`
-quality; OpenAI/Anthropic `high` and `max` are exact aliases; lower or disabled modes
-are rejected. Completed historical hidden reasoning traces are omitted by default to
-extend the useful life of one continuous agent thread, while explicit
-`preserve_thinking=true` remains supported. Qwen3.8's recommended thinking sampling
-parameters and separate 262,144-token reasoning / 131,072-token final-response
-ceilings are server-side defaults. All limits remain subject to the physical
-262,144-token prompt-plus-generation window.
-
-### The only three commands needed
-
-There is exactly **one supported serving mode**. It is text-only, K8V4,
-262,144-token, single-sequence, and loopback-only. There is no mode argument and no
-alternate isolated, wildcard, vision, MTP, reduced-context, or fallback launch path.
-
-From this directory, the complete everyday interface is:
-
-```bash
-./start.sh
-./status.sh
-./stop.sh
-```
-
-No Docker knowledge is required: open a terminal in this folder and enter exactly one
-of those lines. Do not copy the internal Docker/vLLM command from later sections for
-normal use.
-
-- `start.sh` starts the only profile, waits for real API health, validates the entire
-  running configuration, and prints the endpoint. Running it twice is safe: the
-  second invocation validates the existing server instead of creating a duplicate.
-- `status.sh` says either `HEALTHY` or `STOPPED`. It verifies the pinned host versions,
-  image IDs and offline archive, source commit, exact patch, complete model-snapshot
-  manifest, all twenty reviewed vLLM source files, the agent template and budget test,
-  vLLM argument vector, container hardening, mounts, runtime package versions, API
-  identity, and listener address. A mismatch is an error, not a warning.
-- `stop.sh` stops and removes only the exact labelled project container, verifies that
-  port 8000 no longer has a listener, and preserves the weights, images, reviewed
-  patches/template, and versioned compilation cache.
-
-All three commands take **no arguments**. Supplying a mode or option is rejected with
-the exact correct command. The scripts never guess, silently downgrade, substitute a
-tag, kill an unknown listener, delete an unrecognized container/volume, or continue
-after a failed check. Checkpoint hashing takes several seconds by design.
-
-The output vocabulary is deliberately simple:
-
-- `HEALTHY` means every locked runtime invariant passed, not merely that a process
-  exists.
-- `STOPPED` means the project container is absent and port 8000 is actually free.
-- `ALREADY STOPPED` means teardown had nothing to do and changed nothing.
-- `ERROR` states what was expected, what was found, what was left untouched, and the
-  exact safe next command when one exists. “Nothing was silently substituted” means
-  the script did not continue through the discrepancy.
-
-If startup fails after creating a container, `start.sh` prints the last 120 log lines,
-removes only that failed labelled container, and preserves the model, images, patch,
-and cache. It never reports readiness until health, API identity, versions, arguments,
-mounts, hardening, and the exact listener have all passed.
-
-Startup waiting is event-driven, not a polling loop. `start.sh` follows the exact
-container log stream through a Bash coprocess, accepts only the pinned vLLM-ready
-message, fails immediately on known fatal startup patterns, and uses one absolute
-deadline. It then closes and waits for the log producer before performing the full
-health/configuration validation. There is no repeated `sleep`, health polling, or
-orphaned `docker logs --follow` process. A complete stop/start acceptance proved this
-path and restored the supported service in about 43 seconds after the required
-integrity hashes completed.
-
-### Objective
-
-Build the best practical, correctness-oriented, completely local coding-agent service
-for this workstation. The target is a Claude Code-like agent experience with reliable
-structured tool calling, long multi-turn sessions, and as much *verified* context as a
-single RTX 5090 can provide. Do not trade away correctness merely to advertise a larger
-context number.
-
-### Fixed hardware and security constraints
-
-- GPU: NVIDIA GeForce RTX 5090, 32,607 MiB reported VRAM.
-- Driver: 595.71.05; host CUDA compatibility level reported by `nvidia-smi`: 13.2.
-- At the time of the initial audit the GPU used only 15 MiB, with 32,097 MiB free.
-- CPU/RAM: 24 logical CPUs and 62 GiB system RAM.
-- **Docker is the software-execution boundary for this project.** Install and run
-  model-serving dependencies, tokenizers, protocol clients, test libraries, and
-  integration tooling inside project-owned or disposable Docker containers. Do not
-  install them into, import them from, or otherwise alter host application/runtime
-  environments merely for convenience.
-- The host-installed Claude Code application and its configuration, credentials,
-  sessions, history, and data directories are explicitly outside this project's
-  scope. Do not invoke, inspect, configure, test with, or modify that installation.
-  A Claude Code-like compatibility target does not authorize interacting with the
-  user's actual host application. Any client/protocol validation must use
-  project-owned scripts or a disposable Docker-contained client.
-- Apart from files under this project directory, host interaction is limited to
-  Docker administration and explicitly required hardware/security diagnostics such
-  as `nvidia-smi` and loopback-listener verification with `ss`. Do not install host
-  packages or modify unrelated host files, applications, services, or settings.
-- The host is directly exposed to the public Internet. Any service created by this
-  project must listen only on `127.0.0.1`.
-- The one supported container uses Docker host networking only so vLLM itself binds
-  the host kernel's `127.0.0.1:8000`. It publishes no Docker ports and must never use
-  a local `0.0.0.0` or `[::]` listener. `start.sh` and `status.sh` require exactly one
-  port-8000 listener and reject it unless its local address is exactly
-  `127.0.0.1:8000`.
-- Pre-existing wildcard listeners were observed on ports 22, 8472, 21118, and 21128.
-  They were not created by this project and must not be changed without separate
-  authorization.
-
-### Exact model and checkpoint
-
-- Required base model: **Qwen/Qwen3.8-27B**, dense 27B, not Qwen3.6 and not a MoE
-  derivative.
-- Selected weight checkpoint:
-  `unsloth/Qwen3.8-27B-NVFP4` at Hugging Face revision
-  `16b6615af3548b88e2d8e382457bc705b00479cf`.
-- Local checkpoint directory: `Qwen3.8-27B-NVFP4-Unsloth/`.
-- The full snapshot is present, including configuration, tokenizer, chat template,
-  vision tensors, and the separately stored MTP tensors. Presence on disk does not
-  imply that vision or MTP will be loaded at runtime.
-- Verified Hugging Face LFS objects:
-  - `model.safetensors`: 22,568,192,096 bytes, SHA-256
-    `c473512c70eace07e2256fe9fd76596ac03e3295bee7d54cfb72676416afcc05`.
-  - `model_mtp.safetensors`: 849,400,392 bytes, SHA-256
-    `1d8268aa85ace093a561e3e7b63b9d390dac1cd55a90cd55b5ec509c3c9da9fe`.
-  - `tokenizer.json`: 19,989,325 bytes, SHA-256
-    `06b9509352d2af50381ab2247e083b80d32d5c0aba91c272ca9ff729b6a0e523`.
-- The index declares 1,968 tensors and 23,417,592,488 total tensor bytes.
-- `manifests/model-snapshot-16b6615a.sha256` pins all 13 top-level snapshot files,
-  including the tokenizer, vocabulary, chat template, model/index, generation and
-  processor configurations, README, and attributes. The manifest itself is pinned as
-  `6d979221939858d8f98c7e615028e1e468cffb3ff2d501f943646c1e12ef2cdc`.
-  Start/status reject missing, changed, or unexpected top-level snapshot files; they
-  do not validate only the two large tensors and silently accept changed prompting.
-- The revision is a full 40-character commit identity, never the moving `main`
-  branch. The current snapshot serializes tokenizer truncation as `null`; no hidden
-  2,048-token backend truncation is accepted. The running container and its cache
-  volume are independently labelled with this exact model revision, and status
-  rejects a label mismatch before accepting the deployment.
-
-### Checkpoint provenance and quality assessment
-
-- The Unsloth repository appeared about one minute after the public model launch, so
-  it was necessarily prepared with pre-release access. A publisher name or a
-  `base_model` tag is not sufficient proof of provenance.
-- Provenance was independently checked against the official BF16 weights already in
-  this directory. Multiple untouched tensors from early, middle, and vision layers
-  match byte-for-byte, including large recurrent-control and vision tensors. This is
-  genuine Qwen3.8-27B-derived data, not a renamed Qwen3.6 checkpoint.
-- The recipe is mixed precision, not indiscriminate 4-bit quantization:
-  - Most MLP projections use dynamic NVFP4 W4A4, group size 16.
-  - Full-attention projections, important Gated DeltaNet projections, the LM head,
-    and the final eight MLP layers use FP8.
-  - Fragile Gated DeltaNet recurrent/control tensors and the vision tower remain
-    BF16.
-- This recipe is a good correctness/context compromise on 32 GiB, but it is not yet
-  formally quality-proven: Unsloth has not published a BF16-vs-quant perplexity, KL,
-  or task-benchmark delta for this exact checkpoint. Do not describe it as lossless.
-- Independent reports confirm that it loads through vLLM on Blackwell. A small B200
-  comparison found similar repetition-collapse rates for this quant, another NVFP4
-  quant, and BF16, suggesting that observed looping was primarily a sampling issue;
-  that is useful runtime evidence, not a comprehensive accuracy evaluation.
-- A download of `RadixArk/Qwen3.8-27B-NVFP4` was stopped after its publication
-  timeline/provenance was challenged. Its partial directory is preserved and is not
-  the selected checkpoint. Do not resume or delete it without an explicit decision.
-
-### vLLM source and container policy
-
-- This directory is an entirely local Git repository on branch `main` with no root
-  remote. The repository-local commit identity is `Ronen Zyroff
-  <rzyroff@gmail.com>`; global Git configuration is untouched.
-- Multi-gigabyte weights/checkpoint trees, Docker image archives, compiler/runtime
-  caches, redundant tokenizer payloads, temporary output, credentials, and editor
-  state are deliberately ignored. Exact revisions, hashes, manifests, and recovery
-  instructions remain tracked.
-- `vllm/` is a proper Git submodule, not a recursively embedded 380 MiB directory. It
-  records upstream commit `9df9b0b0a1816b6d0d0f6ecd0da563cc37fd72f5`. Its working
-  tree intentionally contains twenty source-file changes represented by seven reviewed
-  patch artifacts. Root status ignores submodule dirty noise because the exact
-  tracked patches, expected dirty-file list, live-diff hashes, and final file hashes
-  are authoritative.
-- Local vLLM source: `vllm/`.
-- Pinned source commit:
-  `9df9b0b0a1816b6d0d0f6ecd0da563cc37fd72f5` from vLLM `main`.
-- Reviewed changes, and no others:
-  - K8V4 direct-workspace fix:
-    `patches/vllm-turboquant-k8v4-direct-workspace.patch`, SHA-256
-    `a9721067f1a7ee9497a4bd51e47e3a474561189e881b4704bfc4beac8ea48380`.
-  - Automatic tool-schema enforcement:
-    `patches/vllm-enforce-auto-tool-schema.patch`, SHA-256
-    `4f75c793a9c2cdcfb2fd0768ba49a4e34748d3a37d8392b07d3592ca50939c07`.
-  - Agent defaults and Anthropic thinking controls:
-    `patches/vllm-qwen38-agent-defaults-and-thinking.patch`, SHA-256
-    `6428d2cfa77f28e57e117999d0ec8fab5430856c985ba530e04885c2f5c420b7`.
-  - Separate final-response phase ceiling:
-    `patches/vllm-qwen38-separate-final-response-budget.patch`, SHA-256
-    `f20d7dff41931248272842ed2c7a163c6f013e405ccf35733c40ff131a2fc503`.
-  - Qwen implicit-tool grammar-boundary fix:
-    `patches/vllm-qwen-implicit-tool-grammar-boundary.patch`, SHA-256
-    `d231c6e2e7040c4cd4b38432cb8c794805afddbf2c6e4f7ff6febb78e3fd9f48`.
-  - Anthropic validation-error HTTP mapping:
-    `patches/vllm-anthropic-validation-http400.patch`, SHA-256
-    `030b64be104e6ef57a40f6bae740dfa9d4634a420c6c93a395f62bfb98d6d053`.
-  - Tool truncation, stream/batch parity, and Responses phase-budget correctness:
-    `patches/vllm-tool-truncation-finish-reason.patch`, SHA-256
-    `1a220f6db9b40967d867b3cfb1a92d95d907ca059718ffe61772b4cb4409f551`.
-- Immutable base tag: `qwen38-vllm:main-9df9b0b`; required base image ID:
-  `sha256:fa4a002a88b7043a1a89966dea8a500fe9696f84e75730d9da916f916048d401`.
-- Final runtime tag: `qwen38-vllm:qwen38-27b-nvfp4-k8v4-runtime-v6`; required
-  runtime image ID:
-  `sha256:3452967bf6d1dca98122042e6d1b4445a4d5addd5ed6947e84a94e003fcac884`.
-- The single authoritative lock is `config/runtime-v1.sh`. Start, status, stop, and
-  build checks source the same constants and argument array instead of maintaining
-  independent defaults.
-- The old local vLLM 0.14.1 image is unsuitable; it predates the required Qwen3.8
-  and current TurboQuant path.
-- The model directory is mounted read-only. The only writable runtime state is the
-  project- and profile-labelled `qwen38-vllm-cache-single-loopback-agent-v6` Docker
-  volume.
-  Its versioned name prevents reuse of the legacy compilation cache. Permissions
-  were not weakened to work around Docker user-namespace remapping. Previous caches
-  remain preserved but are not mounted by the supported profile.
-
-`scripts/build-vllm.sh` defensively verifies the exact commit, exact twenty-file dirty
-state, all seven patch hashes, reverse applicability, every grouped live-diff hash,
-all upstream and final source hashes, the template and phase-test hashes, and
-whitespace validity before building. An arbitrary edit, extra dirty file, or missing
-patch is rejected. From a clean pinned checkout, apply the seven tracked patch files
-in the order listed above before running the build script.
-
-The final image is a deterministic patch layer described by
-`containers/Dockerfile.runtime`. It performs no dependency resolution or package
-installation. The build:
-
-1. Refuses unless the local base tag resolves to the exact pinned base image ID.
-2. Runs with `--pull=false`, `--network none`, and `--provenance=false`.
-3. Verifies all twenty upstream installed source hashes before replacement.
-4. Copies only the twenty reviewed source files, the project chat template, and the
-   phase-budget unit from the allowlisted build context.
-5. Verifies all twenty-two installed file hashes, exercises sampling/default/Anthropic/
-   schema/template invariants, and runs the phase-budget unit suite during the build.
-6. Requires the produced image ID to equal the pinned final image ID.
-
-The Dockerfile and build-context allowlist are themselves pinned as
-`3ad07d29169e00e6b48441d21abbfee78c1d1d06261f9e92ec2808d1daa0ebaf`
-and `cacac15870fe9dee962785d6ab7d3289c73adf02d5ff05ace1be1c5e5e8b1ff1`
-respectively, and `build-vllm.sh check` verifies both.
-
-Two consecutive builds produced the same exact image ID. The supported commands are:
-
-```bash
-./scripts/build-vllm.sh check
-./scripts/build-vllm.sh build
-```
-
-The `build` command is advanced maintenance, not another serving mode. It hard-fails
-if the deterministic result changes. It never falls back to the mutable tag or pulls
-a replacement base.
-
-For recovery after an accidental Docker image prune, the exact base and final runtime
-are also preserved together in the 8.0 GiB local archive
-`artifacts/qwen38-vllm-images-runtime-v6.tar`, SHA-256
-`ad6a38a0658e3d57b8037ebd4b3dcfe91b3d9eae3733fc78ee15ae7c755b8d08`.
-`./scripts/restore-images.sh` verifies that archive before loading it, performs no
-network pull, and hard-fails unless both restored image IDs match the version lock.
-This is disaster recovery, not an alternate serving mode.
-The older v1 through v5 archives remain preserved as historical artifacts but are
-not accepted by the v6 start/status/restore lock.
-
-The exact pinned software and hardware compatibility record is:
-
-- Host Bash `5.2.21(1)-release`; Git `2.43.0`; GNU `sha256sum` / coreutils
-  `9.4`; `ss` / iproute2 `6.1.0`.
-- Docker client/server `29.7.2`; NVIDIA Container CLI/library `1.19.1`.
-- NVIDIA driver `595.71.05`; RTX 5090, 32,607 MiB; CUDA capability `12.0`.
-- Ubuntu `24.04`; glibc `2.39-0ubuntu8.8`; container CUDA `13.0.3`; CUDA runtime
-  package `13.0.96-1`; `TORCH_CUDA_ARCH_LIST=12.0`.
-- Python `3.12.3`; vLLM `0.27.2rc1.dev106+g9df9b0b0a`; PyTorch
-  `2.13.0+cu130`; PyTorch CUDA `13.0`; Transformers `5.15.0`.
-- Tokenizers `0.22.2`; Safetensors `0.8.0`; Compressed Tensors `0.17.0`;
-  FlashInfer Python `0.6.16.post3`; Triton `3.7.1`; NumPy `2.3.5`; FastAPI
-  `0.136.3`; Uvicorn `0.52.3`.
-
-`status.sh` verifies the host versions and the complete in-container runtime report;
-an update requires an explicit new profile version and revalidation. All other OS and
-Python transitive bytes are pinned by the immutable base and final image IDs rather
-than being re-resolved.
-
-The patched implementation completed the focused TurboQuant suite with **125 passed,
-2 skipped** inside Docker. No host Python packages were used.
-
-The pinned commit was also compared to vLLM remote `main` at
-`d4801990a45792c7081652f8ebea4ee56ceb67f9` on 2026-08-15. Remote was ten commits
-ahead. The only intervening parser change adds streaming reasoning-token counting;
-none of the ten commits repairs the Qwen implicit-tool structural-grammar boundary,
-the Qwen-only non-strict schema contract, ordered tool-result correlation, or the
-Anthropic HTTP-400 mapping. The older pinned commit is therefore retained
-deliberately, rather than updating source merely because the remote ref moved.
-
-### Only runtime profile: agent, maximum context, no vision
-
-The profile is intentionally text-only so the vision encoder cannot consume
-VRAM needed by the KV cache. This is the only profile. The exact argument array is
-locked in `config/runtime-v1.sh` and validated against the running container:
-
-```bash
-/model
---served-model-name qwen3.8-27b-nvfp4-k8v4
---host 127.0.0.1 --port 8000
---language-model-only
---model-impl vllm
---config-format hf
---load-format safetensors
---tokenizer /model
---chat-template /opt/qwen38/chat_template.jinja
---chat-template-content-format openai
---generation-config /model
---override-generation-config '{"temperature":1.0,"top_p":0.95,"top_k":20,"min_p":0.0,"presence_penalty":0.0,"repetition_penalty":1.0,"thinking_token_budget":262144,"final_response_token_budget":131072}'
---quantization compressed-tensors
---dtype bfloat16
---kv-cache-dtype turboquant_k8v4
---max-model-len 262144
---max-num-seqs 1
---max-num-batched-tokens 2048
---kv-cache-memory 6925634765
---cpu-offload-gb 0
---enable-prefix-caching
---enable-chunked-prefill
---attention-config.flash_attn_version=2
---kernel-config.enable_flashinfer_autotune=False
---reasoning-parser qwen3
---enable-auto-tool-choice
---tool-call-parser qwen3_coder
---default-chat-template-kwargs '{"enable_thinking":true,"preserve_thinking":false,"reasoning_effort":"xhigh"}'
-```
-
-Important consequences of this configuration:
-
-- `--language-model-only` is independently confirmed twice in startup logs: every
-  multimodal limit is zero and vLLM reports text-only mode.
-- `speculative_config=None` is logged. No `--speculative-config` is supplied, so the
-  separate MTP weights are not loaded and MTP is not used.
-- The project-pinned Qwen3.8 agent template, generation configuration, tokenizer,
-  developer role, Qwen3 reasoning parser, and Qwen3 Coder tool parser are all
-  explicit. The template is derived from the selected checkpoint template, and its
-  exact project diff/hash are part of the immutable image.
-- All recommended thinking sampling values and both phase ceilings are explicit in
-  the server configuration; a client that omits them does not fall back to generic
-  vLLM defaults.
-- `VLLM_ENFORCE_STRICT_TOOL_CALLING=1` is explicit. Once the model chooses a tool,
-  its argument generation is constrained to the declared schema whether the client
-  omitted `strict`, sent `strict:false`, or sent `strict:true`; `tool_choice=none` is
-  still respected.
-- `--quantization compressed-tensors` selects the checkpoint's mixed NVFP4/FP8
-  recipe; BF16 is retained for unquantized compute/state.
-- The measured safe chunk size is 2,048 tokens. The provisional 8,192-token setting
-  was rejected after long-continuation testing.
-- KV memory is set directly to exactly 6.45 GiB rather than inferred from a brittle
-  utilization percentage. CPU offload is explicitly zero.
-- FlashAttention 2 is explicit. vLLM's automatic backend selection would otherwise
-  downgrade the TurboQuant path from FA3; making FA2 explicit avoids a hidden
-  override.
-- FlashInfer autotuning is explicitly disabled. The standard heuristic kernel choice
-  is used, avoiding the startup autotuner's probe-OOM-and-fallback behavior observed
-  in rejected candidates.
-- `trust_remote_code` remains false. Current vLLM natively resolves the checkpoint as
-  `Qwen3_5ForConditionalGeneration`.
-
-The one profile uses Docker host networking **only** so the vLLM process itself binds
-the host kernel's `127.0.0.1`, while publishing no Docker port. It does not bind
-`0.0.0.0` inside or outside the container. The container also uses `--cap-drop ALL`,
-`no-new-privileges:true`, and an explicit `--restart no` policy. There is no alternate
-network or serving-mode code path.
-
-The verified listener is:
-
-```text
-LISTEN ... 127.0.0.1:8000 ...
-```
-
-`docker port qwen38-agent-native` produces no mappings, and inspection reports empty
-port bindings. The peer-address column shown by `ss` is not a listening address; the
-local listening address is exactly `127.0.0.1`. Pre-existing unrelated wildcard
-listeners are left untouched.
-
-### KV-cache decision
-
-- Required primary cache format: `--kv-cache-dtype turboquant_k8v4`.
-- K8V4 means FP8 keys plus 4-bit values. It is preferred over K4V4 because preserving
-  key precision is the more correctness-oriented 4-bit-cache choice.
-- Do not silently substitute FP8-only KV, BF16 KV, K4V4, or a 2/3-bit cache.
-- The checkpoint's `config.json` does contain a static, symmetric, per-tensor FP8
-  `kv_cache_scheme`. That is calibration metadata, not a pre-quantized cache stored
-  in the weights. Compressed Tensors can load those `_k_scale`/`_v_scale` values for
-  the ordinary FP8 KV backend. The selected TurboQuant backend never reads those
-  layer scales: its store kernel quantizes each runtime key to FP8 and each runtime
-  value to packed 4-bit with a per-vector FP16 scale and zero point. Therefore
-  `--kv-cache-dtype turboquant_k8v4`—not the checkpoint metadata—defines the actual
-  live cache semantics.
-- Current vLLM `main` contains explicit TurboQuant K8V4 support. Earlier vLLM release
-  images had an `Unknown TurboQuant cache dtype auto` regression, which is another
-  reason to build/test the pinned current source.
-- The exact raw-cache accounting from the pinned vLLM code is 388 bytes per KV head
-  per token: 256 bytes for the FP8 key plus 128 packed 4-bit value bytes plus 4 bytes
-  for the FP16 value scale and zero point. Qwen3.8 has 4 KV heads in each of 16
-  full-attention layers, so K8V4 consumes 24,832 bytes per token. That is 6.0625 GiB
-  at 262,144 tokens and about 23.126 GiB at 1,000,000 tokens.
-- Upstream continuation-prefill pre-reserved two full-length FP16 dequantization
-  buffers (about 1 GiB combined at native context), then allocated another
-  full-length K/V pair (about another 1 GiB) on every growing chunk. Progressive
-  4–512 MiB allocations caused CUDA allocator OOM/retry warnings even when a request
-  eventually succeeded. That behavior was rejected under the no-fallback rule.
-- The local patch applies only when `key_fp8` is true, which is the exact K8V4 path.
-  It reuses the already reserved 1 GiB shared workspace as the final
-  `[sequence, KV head, head dimension]` BF16 buffers, gives the dequantization kernel
-  strided logical views into those buffers, and appends the current chunk in place.
-  This removes the duplicate full-length buffers, copy, and runtime allocations
-  without increasing the reserved workspace. MSE-key modes are unchanged.
-- The patched kernel semantics were checked directly: FP8 keys need no inverse
-  rotation, and the value dequantization path retains the prior FP16-to-BF16
-  conversion behavior. Focused TurboQuant tests passed before the patch was baked
-  into the immutable serving image.
-- vLLM's source comment reports a `+1.17% PPL` reference figure for the generic K8V4
-  preset. It is not a Qwen3.8-27B/this-checkpoint measurement and is not presented
-  here as this deployment's exact quality delta. The honest quality statement is
-  that K8V4 preserves keys at FP8 while quantizing values to 4-bit, and the runtime
-  correctness tests pass; a model-specific BF16-KV quality study remains unreported.
-- The final runtime locks exactly 1,024 MiB of shared workspace at startup and does
-  not resize it during the cold native-context acceptance.
-- Therefore one-million-token residency cannot fit on this 32 GiB card with
-  20.47 GiB of loaded text-only weights. This is a physical memory limit,
-  not a configuration problem.
-
-The raw 24,832-byte/token figure describes the 16 full-attention layers. vLLM must
-also page and align the hybrid Gated DeltaNet state, so the measured allocation is
-the authoritative deployment number: 6.45 GiB provides **264,115 cache tokens** and
-reports **1.01×** maximum concurrency at a 262,144-token request length. That is only
-1,971 cache tokens above the native model limit; it is not enough to justify an
-extended-context/YaRN profile on this card.
-
-### Context strategy
-
-- Qwen3.8-27B is native at **262,144 tokens**, and that is the finalized quality-first
-  maximum. No YaRN override or `VLLM_ALLOW_LONG_MAX_MODEL_LEN` is used.
-- vLLM loaded 20.47 GiB of text-only model weights. The manually reserved K8V4 cache
-  is 6.45 GiB, the shared TurboQuant workspace is 1 GiB, and CUDA graph capture used
-  about 0.06 GiB. After the final v4 native-context acceptance, `nvidia-smi` reported
-  30,287 MiB used and 1,824 MiB free out of 32,607 MiB.
-- A cache allocation declaration alone was not accepted as proof. The final image
-  performed a cold, substantial continuation-prefill followed by normal generation
-  and accurate retrieval near the native limit.
-
-The final reproducible-runtime acceptance used probe salt
-`v4-final-1786807758`. Its requested input target and constructed input were exactly
-**261,120 tokens**. Transformers, vLLM `/tokenize`, and inference
-`usage.prompt_tokens` all reported the same 261,120 count. The model produced 396
-completion tokens, stopped normally at 261,516 total tokens, and returned all three
-exact records. Elapsed inference time was 153.509 seconds and peak KV-cache use was
-97.0%.
-
-The final acceptance log had no CUDA OOM, allocator retry, preemption, fallback,
-workspace mutation, runtime exception, or unexpected HTTP error. It did report first-use Triton
-JIT compilation for four previously unseen long-context kernels; all compiled
-successfully, the request completed normally, and this is latency warmup rather than
-a correctness or memory fallback. Separate real-tokenizer retrieval probes also
-passed at 32,765 and exactly 131,072 input tokens. The policy probes deliberately
-generated HTTP 400 responses for forbidden low/disabled-thinking requests; their
-template stack traces are expected fail-closed evidence, not inference failures.
-
-The native boundary was also tested directly rather than inferred from configuration.
-A real-tokenizer request with 262,143 prompt tokens plus one requested output token
-completed with HTTP 200 at exactly the 262,144-token physical limit. The immediately
-larger request—262,144 prompt tokens plus one output token—was rejected with HTTP 400
-before inference. `scripts/test-native-context-boundary.sh` reproduces both sides and
-requires those exact outcomes.
-
-Disposable static-YaRN startup experiments separately found the GPU allocation edge.
-Engines could initialize at configured lengths 307,200, 320,000, 327,680, 331,776,
-333,824, and 335,872 tokens; the successful high-end trials had only tens of MiB free.
-The next natural page boundary, 337,920, failed immediately during engine startup with
-a CUDA OOM. This brackets allocation startup, not model quality or reliable generation:
-the experiments did not establish retrieval accuracy across the extended range,
-static YaRN changes positional scaling even on shorter prompts, and the last successes
-have no defensive memory margin. They therefore do not create a supported extended
-mode or supersede the native 262,144-token limit.
-
-`scripts/long_context_probe.py` deliberately contains no character/token-density
-estimate and no integer-division sizing shortcut. It starts with one filler unit and
-grows the bracket using only exact `AutoTokenizer.apply_chat_template(...)` results,
-then binary-searches using those real results. The tokenizer is loaded from `/model`
-inside the serving Docker image with `local_files_only=True` and
-`trust_remote_code=False`.
-Before inference, the script hard-fails unless Transformers and vLLM `/tokenize`
-agree; after inference, it also requires the API's reported prompt count to agree.
-The tokenizer may warn while measuring an oversized upper bracket during search, but
-that candidate is never submitted for inference.
-
-Although the upstream model supports YaRN extension to one million tokens, static
-YaRN can reduce performance on shorter contexts. The supported cache reservation has
-only 1,971 measured cache tokens beyond native; experimentally consuming essentially
-all remaining safety margin moved startup only to the 335,872/337,920 bracket, still
-far below one million and without a quality acceptance. An extended profile has no
-defensible role here. Do not enable YaRN merely to advertise a larger configured
-number.
-
-### Tool calling and agent behavior
-
-The service must be optimized for a local Claude Code-like coding agent, not just a
-chat demo. “Claude Code-like” describes the protocol and agent behavior target only;
-it never authorizes invoking or inspecting the user's host-installed Claude Code.
-
-- Enable automatic tool choice: `--enable-auto-tool-choice`.
-- Use the Qwen tool parser: `--tool-call-parser qwen3_coder`.
-- Use the Qwen reasoning parser: `--reasoning-parser qwen3`.
-- Use the exact project-pinned Qwen3.8 agent template at
-  `/opt/qwen38/chat_template.jinja`; it retains Qwen3.8's developer-role, merged
-  system-message, and historical tool-call validation behavior.
-- Force Qwen `xhigh` thinking. OpenAI/Anthropic `high` and `max` map to that exact
-  prompt; `medium`, `low`, and disabled thinking are rejected.
-- Default `preserve_thinking=false`: omit hidden reasoning from completed historical
-  turns while retaining visible answers, tool calls/results, and reasoning in the
-  current user/tool chain. An explicit `true` is supported when full trace replay is
-  more important than context lifetime.
-- Enable prefix caching so retained conversation prefixes can be reused.
-- Enforce each declared Qwen tool JSON schema after the model chooses a tool for
-  `strict` omitted, `strict:false`, and `strict:true`. XGrammar normally interprets
-  explicit `strict:false` as permission to replace the parameter schema with `true`;
-  this runtime removes that fallback for the exact `qwen_3_coder` structural-tag
-  model only. Other parsers retain upstream opt-in behavior. Automatic tool choice
-  still allows a normal answer, and `tool_choice=none` remains a hard opt-out.
-- Keep the Qwen `<tool_call>` special token when it acts as an implicit reasoning-end
-  marker. Current parser reconstruction already recognized a call emitted before
-  `</think>`, but the structured-output scheduler used to trim the trigger itself
-  before advancing XGrammar. That made the parsed call look correct after generation
-  while leaving its function name and arguments unconstrained during generation.
-  The narrow boundary patch records the reasoning end immediately before the trigger
-  and feeds the trigger into the grammar.
-- Reject malformed historical tool chains. Every assistant tool call must have a
-  unique transport ID, and the immediately following tool results must provide one
-  complete, ordered, matching result per call. Orphan, missing-ID, duplicate-ID,
-  mismatched, out-of-order, interrupted, and incomplete chains fail instead of being
-  guessed or reordered. This is necessary because Qwen's rendered XML history is
-  positional and does not expose OpenAI/Anthropic transport IDs to the model.
-- Validate tools using an actual JSON-schema tool request and require a structured
-  `tool_calls` response with valid JSON arguments. Then return a tool result and
-  validate the following assistant turn.
-- This vLLM build exposes both OpenAI `/v1/chat/completions` and native Anthropic-style
-  `/v1/messages` plus `/v1/messages/count_tokens`. The tested Messages API shapes do
-  **not** require a separate protocol adapter. This is a server-protocol result, not
-  permission to test any particular host application.
-
-`scripts/test-protocols.sh 3` runs the project-owned probe entirely inside the serving
-container. For each of three OpenAI trials and three Anthropic trials, it requires
-exactly one structured `read_file` call, the exact requested path in decoded JSON,
-the correct tool-stop reason, and a successful post-tool continuation containing the
-supplied heading. The probe supplies a synthetic tool result back to the model; it
-does not execute a host tool or mount the host workspace. All 3/3 trials passed for
-both protocols in the final image. Anthropic responses included both thinking and
-`tool_use` blocks.
-
-`scripts/test-tool-calling-adversarial.sh` proves the decoder-time and wire-protocol
-invariants inside the serving container. With the real pinned tokenizer, the four
-special markers are single tokens (`<tool_call>` is token 248058). The actual
-XGrammar state machine accepted a valid nested Qwen XML call, rejected an unknown
-tool at token 5, rejected a nested string-for-integer error at token 18, and rejected
-an extra property at token 20. A sensitivity control deliberately omitted token
-248058 and confirmed that the unknown call was then accepted as free text; the fixed
-scheduler retained it. The same probe reconstructed real OpenAI and Anthropic SSE
-tool streams, completed both tool-result continuations, respected `tool_choice=none`,
-exposed exactly one call with parallel calls disabled, and required HTTP 400 for
-orphan results on both APIs. Anthropic returns `invalid_request_error`, not a false
-HTTP 500.
-
-The installed-image Docker suites completed **286 parser/structural-output/Anthropic
-conversion tests passed, 10 intentionally deselected**, plus **382 Qwen streaming
-and replay tests passed, 2,868 unrelated cases deselected**. The ten deselections are
-one generic upstream parametrization that assumes every non-strict automatic parser,
-including Qwen, remains unconstrained; project-specific assertions replace its Qwen
-expectation and also prove unrelated parsers are unchanged.
-
-`scripts/test-agent-policy.sh` additionally verifies the real server defaults and
-rejection behavior. Its final v6 result saved 1,798 real tokenizer tokens by omitting
-a synthetic completed trace, proved `xhigh`/`high`/`max` token-ID identity, proved
-legacy `reasoning_content` ingress normalization on an actual Chat Completion,
-required HTTP 400 for all low/disabled variants, and exercised a five-token separate
-final-response ceiling.
-
-`scripts/test-agent-history-roundtrip.sh` validates the complete multi-turn history
-contract with the real tokenizer. OpenAI and Anthropic histories representing the
-same user → assistant reasoning/tool call → typed tool result → continuation rendered
-to exactly identical model token IDs. Rendering, parser reconstruction, and
-rerendering were also token-identical; nested typed arguments survived, while
-transport-only call IDs were correctly absent from Qwen's positional XML. Both live
-streaming and non-streaming paths completed with the same tool/continuation semantics.
-
-`scripts/test-responses-protocol.sh` separately validates the protocol required by
-current OpenAI Codex. Non-streaming and SSE `/v1/responses` requests selected one
-strict typed `read_file` function, accepted the matching `function_call_output`, and
-completed the continuation under explicit xhigh / `preserve_thinking=false` policy.
-The stream included created, in-progress, output-item, function-argument delta/done,
-reasoning-part/text delta/done, and completed events. This proves the server protocol
-surface, not end-to-end correctness of an untested Codex client.
-
-#### Degenerate and truncated tool-output contract
-
-Streaming is not permitted to turn an incomplete model emission into a more
-successful result than non-streaming. Before the v5/v6 hardening, a live Qwen request
-cut off inside `<tool_call>` could be parsed into a recoverable partial call while the
-Chat streaming path changed the engine's `length` terminal to `tool_calls`. The
-Responses streaming path could emit `response.function_call_arguments.done`, mark the
-function item `completed`, and terminate with `response.completed` even though the
-engine had exhausted `max_output_tokens`. A client could therefore execute a prefix
-that the model never completed. The non-streaming Qwen argument converter also lost a
-recoverable final `<parameter>` prefix in some malformed cuts, while the generic batch
-parser could strand content following a tool call that streaming returned.
-
-The reviewed fixes make truncation fail closed and preserve stream/batch semantics:
-
-- Chat Completions retains the underlying `finish_reason="length"` for a partial
-  tool call in required and automatic modes, both streaming and non-streaming. A
-  recoverable partial `tool_calls` object may be returned for diagnostics, but it is
-  not executable.
-- Anthropic Messages exposes any partial `tool_use`/`input_json_delta` buffer but
-  terminates with `stop_reason="max_tokens"`, never `tool_use` or `end_turn`.
-- Responses marks the response and function item `incomplete`, includes
-  `incomplete_details.reason="max_output_tokens"`, suppresses
-  `response.function_call_arguments.done` for the interrupted item, emits
-  `response.output_item.done` with `status="incomplete"`, and terminates with
-  `response.incomplete`. It emits neither `response.completed` nor an executable
-  argument-done boundary for that item.
-- Qwen's final unterminated parameter prefix is recovered consistently, and the
-  generic batch parser flushes deferred trailing content when parsing finishes.
-
-The client-side rule is stricter than “valid JSON means executable.” Partial deltas
-are buffers only. Chat calls may execute only after a normal `tool_calls` terminal;
-Anthropic calls only after a normal `tool_use` terminal; Responses calls only after
-the argument-done/item-completed events **and** an overall `response.completed`.
-Any `length`, `max_tokens`, `incomplete`, transport error, missing terminal, parser
-error, or schema error discards the buffered call without executing it. This overall
-Responses terminal gate also protects against a completed first item followed by a
-degenerate partial item. The one supported client policy explicitly disables parallel
-tool calls, but the overall terminal gate remains mandatory defense in depth.
-
-`scripts/test-tool-output-degeneracy.sh` runs inside the serving container with the
-real checkpoint tokenizer and installed vLLM code. Its controlled corpus covers
-reasoning without a close marker, partial trigger/name/parameter, missing argument
-blocks/closers, valid nested types, unknown tools, wrong nested types, extra
-properties, trailing content, and a complete call followed by a partial second call.
-All 30 selected real-token prefix cuts had identical streaming/non-streaming
-reasoning, content, and typed-call semantics. The live fault injection keeps
-`reasoning_effort="xhigh"` but uses an explicit test-only 128-token reasoning ceiling;
-production remains 262,144. A real-tokenizer calibration then selected a 384-token
-cut inside a 3,952-token schema-mandated value. Four independently sampled Chat
-requests all ended `length`; both Anthropic requests ended `max_tokens`; both
-Responses requests ended incomplete with no false execution terminal. The test does
-not compare independently sampled output bytes and makes no determinism assumption.
-
-Prefix caching was measured in an agentic continuation rather than assumed from the
-launch flag. The final v6 run of `scripts/test-agent-prefix-cache.sh` constructed
-65,528 cold prompt tokens with the real tokenizer. The salted cold request took
-12.899 seconds to its first event and reported zero cached tokens. Its 65,632-token
-continuation reported 64,480 cached plus 1,152 newly computed prompt tokens and
-0.386-second TTFT. An otherwise identical fresh-salt control took 12.970 seconds and
-again reported zero cached tokens: the measured continuation speedup was 33.639× and
-the cache-hit fraction was 98.2448%. The test requires both usage counters and timing separation,
-so a cache flag that produces no real hit is a failure.
-
-Correctness checks intentionally assert protocol structure and semantic invariants,
-not byte-identical prose. GPU inference, sampling, and tool-oriented generation are
-not made bitwise deterministic by a fixed seed or a supposedly deterministic prompt.
-Repeated trials and invariant pass rates are the relevant validation.
-
-### Thinking continuity, phase budgets, and sampling correctness
-
-Do not benchmark Qwen3.8 thinking mode with greedy decoding and then blame the quant
-for repetition. Deterministic prompts are a myth: even greedy or fixed-seed GPU
-inference must not be treated as a guarantee of bitwise-identical output. Use the
-upstream thinking recommendations, which the server pins explicitly:
-
-- Thinking: temperature 1.0, top-p 0.95, top-k 20, min-p 0.0,
-  presence penalty 0.0, repetition penalty 1.0.
-- Thinking cannot be disabled in this one profile. Only Qwen `xhigh` is accepted;
-  client-facing `high` and `max` are aliases, not lower-effort modes.
-- `repetition_penalty=1.0` is neutral and
-  `SamplingParams.repetition_detection=None`. The historical Qwen3.6 repetition
-  detector is intentionally not carried forward because Qwen3.8's published
-  recommendation no longer includes such a mechanism.
-- The default is **not to replay completed hidden thinking**. This is the
-  context-efficient policy for stable, long, single-thread autonomous operation: the
-  model retains visible outcomes and current tool-chain reasoning without repeatedly
-  spending tokens on every old hidden trace. `preserve_thinking=true` remains an
-  explicit escape hatch; it is not a second serving mode.
-
-Qwen3.8 recommends, for runtimes with separate limits inside a one-million-token
-context, a 262,144-token ceiling for reasoning content and a 131,072-token ceiling
-for the final response. Upstream vLLM did not distinguish that final phase, so this
-image adds a reviewed phase counter. The server defaults are:
-
-```text
-thinking_token_budget = 262144
-final_response_token_budget = 131072
-```
-
-These are ceilings, not reservations and not additive capacity. This workstation's
-model window is native 262,144, so every request also obeys:
-
-```text
-prompt tokens + reasoning tokens + final/tool tokens <= 262144
-all generated tokens <= the request's total max_tokens
-```
-
-The usable phase budget is therefore the minimum of the phase ceiling, the client's
-total generation limit, and the remaining physical context. A client may lower the
-final ceiling but cannot raise it above 131,072 or null out the server ceiling. The
-final counter begins after the explicit reasoning-end token sequence; EOS and stop
-sequences can end earlier, while `min_tokens` cannot force generation past the hard
-phase ceiling. If malformed model output never explicitly ends reasoning, the
-separate final counter cannot begin, but total `max_tokens` and the physical window
-still cap the request. Tool XML is a structured tool phase, not visible final prose.
-
-The Docker build unit-tests multi-token delimiters, exact boundaries, serialization,
-EOS precedence, `min_tokens`, invalid values, and client-versus-server clamping.
-A v6 addition gives `/v1/responses` the same validated vLLM extensions as Chat:
-`thinking_token_budget` and `final_response_token_budget`. Omitted fields inherit the
-server defaults, an explicit smaller value is honored, and a request cannot raise or
-null out the 131,072 final-response hard ceiling. This closes the previous gap where
-Responses bypassed both phase-specific defaults even though Chat and Anthropic
-carried them correctly.
-A live request with `final_response_token_budget=5` returned separated reasoning,
-exactly five final tokens under the real served tokenizer,
-`finish_reason="length"`, and
-`stop_reason="final_response_token_budget"`.
-
-### Dedicated Qwen3.6 historical audit
-
-The historical setup at `/home/user/Desktop/qwen_36_agent_setup` was cloned at commit
-`79249a8b7a5eeb7174050decb4864fedacc4667e` and reviewed item by item. It was not used
-as a patch bundle. Qwen3.6-27B and Qwen3.8-27B share the same
-`Qwen3_5ForConditionalGeneration` architecture and selected 64-layer/hybrid-attention
-dimensions; the material changes are post-training, quantized weights, tokenizer/
-template policy, official sampling/output guidance, and current vLLM's rewritten
-frontend/parser engine.
-
-The complete 12-workaround disposition, architecture table, tokenizer/template
-findings, upstream-fix evidence, caveats, and rationale for every adopted/rejected
-idea are in [`docs/qwen36-to-qwen38-audit.md`](docs/qwen36-to-qwen38-audit.md).
-The bottom line is:
-
-- no historical monkey patch was copied;
-- reasoning ingress, hybrid accounting, multimodal cache recovery, and the old
-  parser's reconstruction/truncation failures are fixed or superseded upstream;
-- the audit nevertheless found a different current scheduler/parser integration
-  defect: an implicit Qwen tool start was parsed correctly after generation but its
-  structural-grammar trigger was trimmed during decoding. That current-code defect
-  is fixed by a new narrow patch and a real-tokenizer sensitivity test;
-- the old egress rename and repetition detector were rejected;
-- multimodal workarounds are intentionally unreachable in text-only mode;
-- explicit model defaults, fail-closed verification, real-tokenizer tests, and strict
-  tool schemas were retained as principles, then implemented against current code;
-- malformed tool-result correlation is now rejected for both protocols, and
-  Anthropic-side validation errors are accurately reported as HTTP 400;
-- one narrow `/tokenize` caveat remains: its diagnostic request type does not apply
-  Chat Completions' legacy `reasoning_content` input normalizer, so use `reasoning`
-  on that endpoint. Real inference ingress is covered and passed.
-
-### Original agent-service use case and current client audit
-
-The original use case was reviewed last, after the server correctness work, from a
-clean clone of `BigBIueWhale/agent_service` at
-`/home/user/Desktop/agent_service`, exact commit
-`7c6f9ea66cb12678217f7427513234518323d13c`. Its durable contribution is not a
-particular CLI: it is a singleton session lifecycle, copied per-session workspace,
-sealed no-GPU/no-Internet agent container, narrow model proxy, loopback-only
-observation, cancellation, explicit JSONL events/artifacts/final record, ordered
-teardown, labels, and orphan recovery. Those ideas should form the outer execution
-envelope for this project's eventual autonomous coding service.
-
-Its Qwen3.6/Qwen Code `0.15.6` configuration is historical and must not be copied. It
-uses AWQ, port 8001, a smaller context/output profile, vision, obsolete sampling and
-compression assumptions, host-install instructions, and polling waits. A future
-service must retain the architecture ideas while replacing the inner client through
-a small, explicitly tested adapter boundary.
-
-Current source pins compared were Qwen Code `0.21.12` at
-`b965d5f8c24f48e65fb0b17c7d45f34ca4ce8f38`, OpenAI Codex at
-`00f6a8a60e5c5e93d185c7fe67fd596b7e62240f`, and the Claude Code public repository
-at `0fa8c19d50f70f9f383fb6ff5ce5209575267d21` / changelog `2.1.233`.
-No host client or user configuration was touched.
-
-Qwen Code is the best-aligned first adapter candidate because it uses the tested Chat
-Completions path and exposes Qwen-specific request controls. It is not yet installed
-or declared supported. A future pinned Docker client must explicitly set:
-
-- `contextWindowSize: 262144`; current Qwen Code otherwise classifies names matching
-  `qwen3.<digit>` as one-million-token commercial models;
-- `thinkingMandatory: true`, preventing internal side queries from transmitting
-  `chat_template_kwargs.enable_thinking=false` to this mandatory-xhigh server;
-- text-only capabilities/modalities, zero automatic retries, explicit long request/
-  stream deadlines, the complete recommended sampling tuple, total
-  `max_tokens: 262144`, reasoning budget 262,144, final budget 131,072, xhigh, and
-  `preserve_thinking:false`.
-
-The total generation limit is deliberately 262,144, not 131,072: Qwen Code clamps it
-to its real-count prompt-dependent safe remainder and vLLM enforces the exact physical
-remainder, while the separate final phase stays independently capped at 131,072.
-Setting total generation to the final
-phase ceiling would unnecessarily discard possible reasoning capacity on short
-prompts. The one native window still means prompt + reasoning + tools + final output
-can never exceed 262,144.
-
-Current Codex no longer supports Chat Completions and requires Responses. The live
-Responses protocol probes passed, and v6 now applies both pinned phase-budget defaults
-to that API even when Codex cannot express them. Codex's normal request still omits
-`max_output_tokens`, cannot lower the Qwen-specific phase budgets per request, and has
-not been run with its complete actual prompt/tool palette. Claude Code has a strong agent interface and
-the server's native Messages protocol passes, but the proprietary client's unknown-
-model prompting, compaction, and rewriting cannot be audited from its public
-repository. Neither is called end-to-end compatible from protocol probes alone.
-
-The full evidence, reviewed future Qwen Code configuration fragment, old/new
-dispositions, client comparison, and eight-part adapter acceptance contract are in
-[`docs/agent-service-and-client-audit.md`](docs/agent-service-and-client-audit.md).
-The operating default remains one long main thread, completed-thinking omission,
-real prefix reuse, and late validated compaction. Subagents are opt-in for genuinely
-independent work, not a default that fragments the precious primary context.
-
-### Vision decision
-
-- Vision is not part of the only supported profile.
-- No vision-capable service is enabled. The agent endpoint is truly
-  text-only, not merely a vision model that happens not to receive images.
-- There is no secondary vision launch mode hidden in the scripts. Adding vision later
-  would require an explicit new versioned profile, separate VRAM/context measurement,
-  actual image validation, and a deliberate change to the one-mode policy.
-- Expect lower available context because approximately 0.86 GiB of stored vision
-  tensors plus runtime encoder activations become relevant.
-- Do not claim vision quality from a text-only smoke test; validate an actual image
-  request separately if this profile is enabled.
-
-### Required validation record
-
-The required primary-profile checklist is complete:
-
-1. The exact image, digest, source commit, source patches, CUDA/PyTorch/Transformers/
-   vLLM versions, and rebuild procedure are recorded above.
-2. The exact launch arguments are encoded in `config/runtime-v1.sh` and recorded
-   above. Docker has no published ports; `ss` verifies only `127.0.0.1:8000`.
-3. Measured model residency is 20.47 GiB. The explicit cache reservation is 6.45 GiB,
-   capacity is 264,115 tokens, native concurrency is 1.01×, and the shared TurboQuant
-   workspace is 1 GiB.
-4. Normal generation completed under the checkpoint's fully explicit recommended
-   thinking sampling configuration; the old repetition detector is absent.
-5. Repeated OpenAI and Anthropic structured tool calls and post-tool continuations
-   passed 3/3 trials per protocol. Real SSE reconstruction, implicit-trigger grammar
-   activation, strict omitted/false/true, nested types, unknown names, extra
-   properties, `tool_choice=none`, parallel-call filtering, and malformed-history
-   HTTP errors also passed the adversarial suite.
-6. Cold continuation prefill and generation succeeded at exactly 261,120 input /
-   261,516 total tokens with exact retrieval and no memory fallback.
-7. The measured cache ceiling is 264,115, but the model's finalized maximum remains
-   the native 262,144. The exact native boundary passed at 262,143 prompt + one output
-   in 133.0 seconds on v6 and rejected 262,144 + one with HTTP 400. Static-YaRN startup was experimentally bracketed at
-   335,872 success / 337,920 OOM, but has neither quality validation nor safe margin,
-   so no YaRN profile is enabled.
-8. Default historical-thinking omission, explicit restoration, xhigh/high/max
-   equivalence, low/disabled rejection, and legacy ingress aliasing passed live.
-9. The separate final-response ceiling passed build-time boundary/serialization/
-   precedence tests and a live exact-five-real-token stop test. Chat, Anthropic, and
-   Responses all carry the phase controls; Responses omission inherits the server
-   defaults and cannot null or raise the final ceiling.
-10. Vision is intentionally disabled. No vision-quality claim is made; enabling it
-   requires a separately versioned and validated replacement profile.
-11. Installed-image suites passed 286 focused parser/grammar/Anthropic conversion
-    cases and 382 Qwen streaming/replay cases. TurboQuant passed 125 cases with two
-    platform-inapplicable skips.
-12. Equivalent OpenAI/Anthropic full tool histories and render → parse → rerender
-    produced exact identical real-tokenizer IDs; live streaming/non-streaming
-    continuations preserved the same typed semantics.
-13. A timed 65K-token agent continuation reported 64,480 cached prompt tokens and
-    0.386-second TTFT versus a 12.970-second zero-cache control: 33.639× measured
-    prefix reuse on v6.
-14. Native `/v1/responses` non-streaming/SSE tool loops and continuation passed for
-    current Codex's required protocol, without claiming untested client compatibility.
-15. Startup readiness uses a single log-stream deadline and no busy polling; complete
-    stop/start validation left no log follower or unexpected listener behind.
-16. The pinned clean `agent_service` clone and current Qwen Code/Codex/Claude source
-    audits produced an explicit outer-service design and client-adapter acceptance
-    contract; they did not install a host client or create a second serving mode.
-17. Degenerate tool-output fault injection compared 30 real-token parser prefixes and
-    independently sampled live stream/non-stream requests. Chat retained `length`,
-    Anthropic retained `max_tokens`, and Responses emitted only incomplete terminals;
-    no truncated call received an executable success boundary.
-
-Known nonfatal startup noise is also recorded so it is not mistaken for a runtime
-fallback:
-
-- Transformers emits messages labelled `ERROR` because `min_frames` and `max_frames`
-  are missing from a Qwen3-VL processor docstring. vLLM independently logs that all
-  multimodal limits are zero and text-only mode is active; the messages are
-  documentation-validation noise, not an enabled vision path.
-- Optional ROCm import warnings appear on this CUDA image. The runtime explicitly
-  selects CUDA, SM 12.0, the TurboQuant attention backend, the NVFP4 linear kernel,
-  and FlashAttention, and all acceptance requests complete normally.
-- A previously unseen long-context shape can cause vLLM's JIT monitor to warn while
-  Triton compiles its optimized TurboQuant/dequantization kernels. The final cold
-  request compiled four such kernels successfully. This is expected first-use
-  latency, not fallback execution or a failed allocation.
-- Deliberate fail-closed tests for forbidden `low` or disabled thinking produce a
-  template exception and HTTP 400 in the log. Those entries are the expected result
-  of the policy probe; an accepted request would be the failure.
-
-Do not “fix” these warnings by weakening offline mode, enabling remote code, changing
-the cache type, adding an automatic backend fallback, or altering host packages.
+This front section is the authoritative record for the one local deployment in this
+directory. The upstream Qwen model card follows it verbatim under the heading
+Qwen3.8-27B. The upstream card describes the model family and Alibaba recommendations;
+this section records the stricter local security, quality, reproducibility, memory,
+protocol, image, and agent contracts that were actually built and proved on this
+workstation.
+
+### Bottom line
+
+The deployment is complete and healthy. There is one supported mode:
+
+| Property | Locked value |
+|---|---|
+| Checkpoint | unsloth/Qwen3.8-27B-NVFP4 |
+| Checkpoint revision | 16b6615af3548b88e2d8e382457bc705b00479cf |
+| Served name | qwen3.8-27b-nvfp4-k8v4 |
+| Weights | Mixed NVFP4/FP8 Compressed Tensors; fragile state and vision remain BF16 |
+| KV cache | TurboQuant K8V4: FP8 keys, packed 4-bit values |
+| Total context | Native 262,144 prompt-plus-generation tokens |
+| Vision | Full BF16 tower, FlashAttention, full released processor pixel budget |
+| Images | At most 15 static inline PNGs, 16,777,216 pixels each, aspect ratio at most 30:1 |
+| Video/audio | Rejected |
+| Thinking | Always enabled at xhigh; high and max are exact aliases |
+| Historical thinking | Omitted by default and by the supported agent client |
+| Reasoning ceiling | 262,144 generated reasoning tokens, subject to remaining context |
+| Final-answer ceiling | 131,072 generated final tokens, subject to remaining context |
+| MTP/speculation | Disabled |
+| CPU/KV offload | Zero |
+| Batching | One sequence; 2,048-token chunked prefill |
+| Listener | 127.0.0.1:8000 only |
+| Agent client | Qwen Code 0.21.12 at b965d5f8c24f48e65fb0b17c7d45f34ca4ce8f38 |
+| Agent image | sha256:303601e191432b197970203b7e9c220833d871c5338c43b8a735d812f65ac77c |
+| Agent-service source | d4d18887875514305c81535cea3bcebaff763932 |
+| Agent-service listener | 127.0.0.1:8090 only |
+| Runtime profile | single-loopback-vision-k8v4-agent-v10 |
+| Runtime image | sha256:1cb1528d5fc533291e5ab572f38d4b59af5d5d17b0a5f3f7a281731eec8b54da |
+
+This is not a text-only profile with an optional vision switch. It is not a
+one-million-token profile. It has no MTP, eager-mode, lower-quality image, alternate
+cache, alternate port, wildcard-listener, or silent fallback variant. Historical
+runtime images and caches are retained only as recovery evidence; none is accepted
+by the current scripts.
+
+The total context limit means exactly:
+
+    prompt tokens + reasoning tokens + tool/final tokens <= 262144
+
+It does not mean 262,144 prompt tokens followed by additional output.
+
+### The only everyday commands
+
+From this directory:
+
+    ./start.sh
+    ./status.sh
+    ./stop.sh
+
+All three take no arguments. A supplied mode, port, model, or tuning option is an
+error.
+
+- start.sh starts the one profile, waits on the exact vLLM readiness log event, then
+  validates the complete live configuration before reporting success. Re-running it
+  validates the existing owned container rather than starting a duplicate.
+- status.sh validates host prerequisites, eight ordered vLLM patches, every reviewed
+  source and test file, the model manifest, image archive, image identity and labels,
+  command and environment, mounts, runtime packages, API identity, listener,
+  hardening, and live health. HEALTHY means all checks passed.
+- stop.sh removes only the exact project-labelled container and verifies that port
+  8000 is free. It never kills an unknown process or deletes weights, images, caches,
+  patches, or test evidence.
+
+Startup uses a single event-driven log-follow deadline, not sleep-based busy waiting.
+A failed startup prints the final logs, removes only the exact failed project
+container, and leaves durable inputs intact. No command guesses a replacement,
+continues after a mismatch, or calls a mutable network fallback.
+
+Advanced reproducibility operations are deliberately separate from serving mode:
+
+    ./scripts/build-vllm.sh check
+    ./scripts/build-vllm.sh build
+    ./scripts/restore-images.sh
+
+The check reconstructs the source tree from the pinned upstream commit plus all eight
+patches. The build runs offline from the exact base image and fails unless it produces
+the pinned image ID. Restore verifies the pinned local archive before loading it.
+
+### Security and host boundary
+
+The machine is assumed exposed to the public Internet on every non-loopback
+interface. The service therefore binds vLLM itself to 127.0.0.1:8000 under Docker
+host networking and publishes no Docker ports. status.sh requires exactly one
+port-8000 listener and rejects any local address other than 127.0.0.1:8000.
+docker port has no mappings.
+
+The container uses cap-drop ALL, no-new-privileges, restart=no, a read-only model
+mount, and a dedicated labelled cache volume. The only writable runtime state is
+that versioned cache volume. The model checkpoint is never modified.
+
+Docker is the dependency-execution boundary. Tokenizers, protocol clients, build
+tools, Python libraries, and integration tests run in the serving container or in
+disposable/project-owned containers. Nothing in this project authorizes installing
+host Python/npm packages, editing host application configuration, or touching the
+user's host Claude Code installation, credentials, history, sessions, or settings.
+Host interaction is limited to project files, Docker lifecycle control, and explicit
+hardware/listener diagnostics such as nvidia-smi and ss.
+
+The observed unrelated wildcard listeners on other ports predate this project and
+are outside its scope.
+
+### Model identity and provenance
+
+The exact model snapshot is Qwen3.8-27B, not Qwen3.6, not a renamed derivative, and
+not an MoE model:
+
+- repository: unsloth/Qwen3.8-27B-NVFP4
+- revision: 16b6615af3548b88e2d8e382457bc705b00479cf
+- local directory: Qwen3.8-27B-NVFP4-Unsloth
+- model.safetensors: 22,568,192,096 bytes,
+  c473512c70eace07e2256fe9fd76596ac03e3295bee7d54cfb72676416afcc05
+- model_mtp.safetensors: 849,400,392 bytes,
+  1d8268aa85ace093a561e3e7b63b9d390dac1cd55a90cd55b5ec509c3c9da9fe
+- tokenizer.json: 19,989,325 bytes,
+  06b9509352d2af50381ab2247e083b80d32d5c0aba91c272ca9ff729b6a0e523
+- model index: 1,968 tensors and 23,417,592,488 tensor bytes
+- top-level snapshot manifest:
+  manifests/model-snapshot-16b6615a.sha256
+- manifest hash:
+  6d979221939858d8f98c7e615028e1e468cffb3ff2d501f943646c1e12ef2cdc
+
+The manifest covers all thirteen snapshot files: weights, MTP weights, tokenizer,
+vocabulary, both templates/configuration surfaces, image and video processor
+configuration, index, README, and attributes. Missing, changed, or unexpected
+top-level files fail status. A moving main branch is never accepted.
+
+The unusually early publication time of the Unsloth quant was not treated as proof
+of authenticity. Untouched large tensors from early, middle, recurrent-control, and
+vision portions were independently compared with the official BF16 checkpoint and
+matched. The selected checkpoint is genuinely derived from Qwen3.8-27B.
+
+The quantization recipe is mixed:
+
+- most MLP projections use dynamic NVFP4 W4A4 with group size 16;
+- full-attention projections, important Gated DeltaNet projections, the LM head, and
+  the final eight MLP layers use FP8;
+- fragile recurrent/control state and the complete vision tower remain BF16.
+
+This is a practical quality/context compromise, not a claim of lossless weight
+quantization. No publisher has supplied a comprehensive BF16-versus-this-checkpoint
+perplexity or task-quality delta. The rejected RadixArk partial download remains
+historical data and is not selected, resumed, or silently deleted.
+
+The snapshot includes separate MTP tensors, but presence on disk is not activation.
+The launch has no speculative configuration and logs speculative_config=None, so MTP
+is not loaded or used.
+
+### Exact vLLM and image provenance
+
+The vLLM submodule is pinned at:
+
+    9df9b0b0a1816b6d0d0f6ecd0da563cc37fd72f5
+
+It is intentionally reconstructed by eight ordered reviewed patches:
+
+| Patch | SHA-256 |
+|---|---|
+| patches/vllm-turboquant-k8v4-direct-workspace.patch | a9721067f1a7ee9497a4bd51e47e3a474561189e881b4704bfc4beac8ea48380 |
+| patches/vllm-enforce-auto-tool-schema.patch | 4f75c793a9c2cdcfb2fd0768ba49a4e34748d3a37d8392b07d3592ca50939c07 |
+| patches/vllm-qwen38-agent-defaults-and-thinking.patch | 6428d2cfa77f28e57e117999d0ec8fab5430856c985ba530e04885c2f5c420b7 |
+| patches/vllm-qwen38-separate-final-response-budget.patch | f20d7dff41931248272842ed2c7a163c6f013e405ccf35733c40ff131a2fc503 |
+| patches/vllm-qwen-implicit-tool-grammar-boundary.patch | d231c6e2e7040c4cd4b38432cb8c794805afddbf2c6e4f7ff6febb78e3fd9f48 |
+| patches/vllm-anthropic-validation-http400.patch | 030b64be104e6ef57a40f6bae740dfa9d4634a420c6c93a395f62bfb98d6d053 |
+| patches/vllm-tool-truncation-finish-reason.patch | 1a220f6db9b40967d867b3cfb1a92d95d907ca059718ffe61772b4cb4409f551 |
+| patches/vllm-qwen38-vision-runtime.patch | f92603724861da5b5a364f43e57d3f95ef43a9dded8ae645278373850db3140f |
+
+The reconstructed tree has exactly twenty-nine reviewed runtime-source changes,
+seven reviewed test changes, and one reviewed new workspace test. The build check
+rejects an extra dirty file, missing hunk, wrong order, changed final hash, whitespace
+error, or patch that does not recreate the exact live tree.
+
+Pinned build inputs and products:
+
+| Item | Identity |
+|---|---|
+| Immutable base tag | qwen38-vllm:main-9df9b0b |
+| Immutable base ID | sha256:fa4a002a88b7043a1a89966dea8a500fe9696f84e75730d9da916f916048d401 |
+| Runtime tag | qwen38-vllm:qwen38-27b-nvfp4-k8v4-runtime-v10 |
+| Runtime ID | sha256:1cb1528d5fc533291e5ab572f38d4b59af5d5d17b0a5f3f7a281731eec8b54da |
+| Offline archive | artifacts/qwen38-vllm-images-runtime-v10.tar |
+| Archive size | 8,557,642,240 bytes, mode 0600 |
+| Archive SHA-256 | 87c75b5bc6f76eb3d9501848b0e2af4a0c69ea718b8ec9db2cdd47185c4db396 |
+| Runtime Dockerfile SHA-256 | 20ad32dce3c10c299bc7094fb190a115490629b323534d80e5cd74491a6cf62e |
+| Docker context allowlist SHA-256 | 84271b998e45ede241d88e0cd8e82eccab2cb2e3e91a31c32da126d6d2d9710a |
+| Build verifier SHA-256 | 488fe49655416a07d481cfa94b185f4e668eecaed6184e9f2b90c89e936d2e20 |
+| Runtime validator SHA-256 | b162092c711ba2d15f47ff6d654a801c5d0a04e89208de3c0cd15d52a4fc8cd1 |
+| Runtime lock SHA-256 | 7d07ef1b29d6fd4dbb20f106f25f05a954e8dea50e0e91712ec472a4e4dd615b |
+
+The final runtime layer does no package resolution or installation. It is built with
+pull=false, network=none, provenance=false, an exact base ID, an allowlisted context,
+upstream installed-file hashes, final installed-file hashes, and build-time invariant
+tests. Two offline builds produced the identical v10 image ID.
+
+The local repository identity is Ronen Zyroff <rzyroff@gmail.com>. Global Git
+configuration is untouched. Large checkpoint trees, image archives, caches,
+credentials, transient output, and editor state are ignored; the compact hashes,
+manifests, patch artifacts, validation scripts, and recovery instructions are tracked.
+
+### Exact launch contract
+
+config/runtime-v1.sh is the single source of truth consumed by start, status, stop,
+restore, and build verification. The exact server argument semantics are:
+
+    /model
+    --served-model-name qwen3.8-27b-nvfp4-k8v4
+    --host 127.0.0.1 --port 8000
+    --model-impl vllm
+    --config-format hf
+    --load-format safetensors
+    --tokenizer /model
+    --chat-template /opt/qwen38/chat_template.jinja
+    --chat-template-content-format openai
+    --generation-config /model
+    --override-generation-config
+      {"temperature":1.0,"top_p":0.95,"top_k":20,"min_p":0.0,
+       "presence_penalty":0.0,"repetition_penalty":1.0,
+       "thinking_token_budget":262144,"final_response_token_budget":131072}
+    --quantization compressed-tensors
+    --dtype bfloat16
+    --kv-cache-dtype turboquant_k8v4
+    --max-model-len 262144
+    --max-num-seqs 1
+    --max-num-batched-tokens 2048
+    --kv-cache-memory 6925634765
+    --cpu-offload-gb 0
+    --enable-prefix-caching
+    --enable-chunked-prefill
+    --attention-config.flash_attn_version=2
+    --kernel-config.enable_flashinfer_autotune=False
+    --reasoning-parser qwen3
+    --enable-auto-tool-choice
+    --tool-call-parser qwen3_coder
+    --default-chat-template-kwargs
+      {"enable_thinking":true,"preserve_thinking":false,
+       "reasoning_effort":"xhigh","add_vision_id":false}
+    --limit-mm-per-prompt
+      {"image":{"count":15,"width":4096,"height":4096},"video":0}
+    --mm-processor-kwargs
+      {"size":{"longest_edge":16777216,"shortest_edge":65536}}
+    --mm-processor-device cpu
+    --no-mm-device-do-normalize
+    --mm-encoder-tp-mode weights
+    --mm-processor-cache-gb 4
+    --mm-processor-cache-type lru
+    --mm-hasher-algorithm sha256
+    --mm-tensor-ipc direct_rpc
+    --no-skip-mm-profiling
+
+The exact relevant environment includes:
+
+    HF_HUB_OFFLINE=1
+    TRANSFORMERS_OFFLINE=1
+    VLLM_NO_USAGE_STATS=1
+    VLLM_ENFORCE_STRICT_TOOL_CALLING=1
+    VLLM_QWEN38_STRICT_IMAGE_CONTRACT=1
+    VLLM_QWEN38_VISION_HEADROOM_BYTES=671088640
+    VLLM_MAX_IMAGE_PIXELS=16777216
+    GLOO_SOCKET_IFNAME=lo
+    NCCL_SOCKET_IFNAME=lo
+
+Consequences:
+
+- There is no language-model-only flag. The complete vision model is loaded.
+- There is no speculative/MTP argument.
+- CUDA graphs remain enabled. Vision was not bought by forcing eager text execution.
+- The measured 2,048-token prefill chunk remains fixed. Vision was not bought by
+  reducing text prefill performance.
+- FlashAttention 2 is explicit because automatic selection otherwise changes the
+  TurboQuant path. FlashInfer autotuning is explicitly off so probe-OOM-and-fallback
+  behavior cannot be mistaken for normal startup.
+- CPU offload and KV offload are exactly zero.
+- Multimodal profiling is mandatory and cannot be skipped to obtain a deceptively
+  optimistic allocation.
+- All unquantized model computation, including the entire vision tower, uses BF16.
+- trust_remote_code remains false. Current vLLM resolves the architecture natively as
+  Qwen3_5ForConditionalGeneration.
+- Request-side media limits, processor overrides, and lower image-detail choices are
+  rejected by the strict image patch rather than silently replacing the profile.
+
+### Agent defaults: xhigh thinking, exact sampling, long output
+
+The one deployment is explicitly configured for complex agentic work. A client that
+omits Qwen-specific fields receives all of these server-side defaults:
+
+    enable_thinking       = true
+    reasoning_effort      = xhigh
+    preserve_thinking     = false
+    add_vision_id         = false
+
+    temperature           = 1.0
+    top_p                 = 0.95
+    top_k                 = 20
+    min_p                 = 0.0
+    presence_penalty      = 0.0
+    repetition_penalty    = 1.0
+
+    thinking_token_budget       = 262144
+    final_response_token_budget = 131072
+
+These sampling values are Alibaba's published Qwen3.8 thinking-mode tuple.
+repetition_penalty=1.0 is neutral. The historical Qwen3.6 repetition detector is not
+used; SamplingParams.repetition_detection is None. Adding a heuristic repetition
+intervention would alter the learned distribution and is not part of this profile.
+
+xhigh is the canonical effort. Omitted effort, OpenAI high, OpenAI max, and the
+supported Anthropic high/max-style forms render the same xhigh model token IDs.
+Medium, low, disabled thinking, and incompatible Anthropic controls are rejected with
+HTTP 400. The supported agent client always sends xhigh and never asks for a weaker
+mode.
+
+preserve_thinking=false does not turn reasoning off. It removes completed hidden
+reasoning blocks from older turns while retaining visible answers, native tool calls,
+typed tool results, and the current unresolved user/tool chain. This is the selected
+single-long-thread policy: scarce context is spent on the task and its durable
+outcomes instead of replaying every old hidden trace. A direct diagnostic API request
+can explicitly test preserve_thinking=true, and that behavior was verified, but it is
+not the supported agent-service policy or another launch mode.
+
+Alibaba's 262,144 reasoning and 131,072 final ceilings are recommendations for
+frameworks that distinguish the phases within a much larger window. Locally they are
+hard server defaults but not reservations and not additive capacity. The usable
+generation allowance is the minimum of the phase ceiling, the request's total
+generation ceiling, and physical context remaining after exact rendering. A short
+prompt can use extensive reasoning; a nearly full prompt cannot.
+
+The final counter starts only after the explicit reasoning-end marker. Tool XML is a
+structured tool phase, not visible final prose. EOS and stop sequences may end
+earlier; min_tokens cannot cross a hard phase ceiling. Chat, Anthropic Messages, and
+Responses all inherit the same defaults. Clients may lower a phase ceiling for a
+deliberate request but cannot null or raise the server's final-response ceiling. A
+live five-real-token final-ceiling probe stopped at exactly five final tokens.
+
+Prompts are not claimed deterministic. Correctness tests compare structure, typed
+semantics, exact rendering, and repeated pass rates rather than pretending a fixed
+seed makes long sampled GPU trajectories byte-identical.
+
+### KV cache, context length, and VRAM
+
+TurboQuant K8V4 is the only cache format:
+
+- keys are stored at FP8;
+- values are packed to 4-bit;
+- every live vector retains the TurboQuant scale/zero-point metadata;
+- K8V4 is not K4V4, ordinary FP8 cache, BF16 cache, or a two/three-bit format;
+- the checkpoint's static FP8 cache calibration metadata does not pre-quantize the
+  runtime cache and does not define this K8V4 path.
+
+For Qwen3.8's four KV heads in each of sixteen full-attention layers, the pinned code
+accounts 388 bytes per head per token: 256 FP8 key bytes, 128 packed value bytes, and
+four FP16 scale/zero-point bytes. The raw cache is therefore 24,832 bytes per token:
+
+- 6.0625 GiB at 262,144 tokens;
+- about 23.126 GiB at one million tokens.
+
+vLLM must also page and align the hybrid Gated DeltaNet state. The explicit
+6,925,634,765-byte allocation reports 264,115 cache-token capacity, 1.01 times native
+maximum concurrency. That leaves only 1,971 cache tokens beyond native, not a useful
+extended-context tier.
+
+The reviewed TurboQuant patch reuses the already reserved 1,024 MiB dequantization
+workspace as the final BF16 continuation buffers on the exact K8V4 key-FP8 path. It
+eliminates duplicate full-length K/V buffers and progressive runtime allocations
+without changing K4V4/MSE modes. Focused kernel tests passed.
+
+Vision adds the complete BF16 tower and transient encoder/MLP activations. vLLM logs
+21.34 GiB loaded model memory, 6.45 GiB KV reservation, 1,024 MiB reclaimable
+TurboQuant workspace, and about 0.06 GiB CUDA graph capture. The vision patch
+temporarily releases that workspace plus a fixed 640 MiB raw headroom around vision
+encoding, then restores them exactly. It does not change cache capacity, text
+prefill size, graphs, weight precision, or image precision. Logs from maximum images
+show release/restoration and no OOM, retry, preemption, or fallback.
+
+On the exact final live image:
+
+- immediately after startup and before the full suite: 31,223 MiB used, 888 MiB free;
+- after all validated image shapes and JIT kernels: 31,879 MiB used, 232 MiB free;
+- total reported VRAM: 32,607 MiB.
+
+The small post-suite global free number is not the memory available during a vision
+encode; the exact patch deliberately makes 1,664 MiB available around that phase.
+The full-context and maximum-image runs completed, so residency is proven by
+execution rather than inferred from an idle screenshot.
+
+The native context is 262,144 total tokens. config.json, tokenizer_config.json, the
+upstream card, exact tokenizer, vLLM request accounting, and the live boundary agree:
+
+    262143 prompt + 1 output = 262144 total  -> accepted
+    262144 prompt + 1 output = 262145 total -> HTTP 400
+
+The accepted multimodal boundary included all fifteen maximum-size images and
+245,745 tokens of multimodal expansion. No YaRN, long-context environment override,
+or nominal one-million setting is enabled.
+
+Static-YaRN allocation experiments were separately bracketed: engines initialized
+through 335,872 configured tokens and OOMed at 337,920. That is only an allocation
+edge, with tens of MiB margin and no extended-context retrieval/quality proof.
+Static YaRN also changes short-context position scaling. It is therefore rejected as
+a supported mode. One million tokens physically cannot coexist with these weights
+and a 23.126-GiB raw K8V4 cache on this 32-GiB card.
+
+Every long-context constructor uses the real checkpoint tokenizer inside Docker,
+applies the real chat template, and requires Transformers, vLLM /tokenize, and final
+usage.prompt_tokens to agree. There is no character division, target//8, token-density
+estimate, padding fudge, tokenizer substitution, or host tokenizer.
+
+### Exact image-quality contract
+
+Qwen3.8-27B is natively trained and post-trained as a vision-language model. Alibaba
+publishes visual and multimodal-agent benchmarks, a dynamic-resolution processor,
+and a released image processor with:
+
+    longest_edge = 16777216 pixels
+    shortest_edge = 65536 pixels
+    patch_size = 16
+    temporal_patch_size = 2
+    spatial merge = 2
+
+Those released processor values justify using the complete 16,777,216-pixel image
+budget. They do not publish the exact distribution of aspect ratios or crops used
+throughout training. A permissive utility constant or an extreme resize formula is
+not proof that the model learned equal quality at that ratio. The deployment
+therefore separates three claims:
+
+1. Official: the model is a native vision-language model and the released image
+   processor exposes the pixel range above.
+2. Unpublished: Alibaba has not documented a complete learned aspect-ratio
+   distribution for Qwen3.8-27B.
+3. Locally proved: full-budget images work at square and at both portrait/landscape
+   endpoints through 30:1; the deployment rejects anything beyond 30:1.
+
+The transport/decoder contract is intentionally narrower and fail-closed:
+
+- only an exact inline data:image/png;base64, URL is accepted;
+- remote URLs, file URLs, JPEG, WebP, GIF, BMP, SVG, animated PNG, and video are
+  rejected before inference;
+- source PNG must be static, eight-bit RGB or RGBA;
+- palette, grayscale, 16-bit, and RGB tRNS forms are rejected;
+- RGBA is deterministically composited onto pinned white and passed as RGB;
+- transport remains lossless PNG; there is no JPEG transcode;
+- source and processed image limits are both 16,777,216 pixels;
+- source aspect ratio must be at most 30:1 in either orientation;
+- official 32-pixel neural-grid alignment remains part of Qwen preprocessing;
+- detail=auto and detail=high use the same full-quality path;
+- detail=low is rejected;
+- add_vision_id is fixed false;
+- callers cannot provide image embeddings, PIL objects, UUIDs, audio/video/file
+  parts, media-IO overrides, per-request processor overrides, or alternate limits;
+- at most fifteen images are accepted; the sixteenth is HTTP 400;
+- image dimensions declared by the serving limit are 4,096 by 4,096, while other
+  shapes within the same pixel/aspect contract are accepted and processed on the
+  official grid.
+
+Full quality here has a precise meaning: maximum released processor pixel budget,
+complete BF16 vision weights and activations, lossless transport, official dynamic
+resolution, no low-detail path, no silent downscale from an over-limit source, and no
+vision quantization. It does not falsely mean that a neural patch encoder preserves
+every source pixel as an independent token. Sources outside the contract are rejected
+with the violated bound rather than silently changed.
+
+The maximum was proved, not estimated:
+
+- fifteen distinct 4,096 x 4,096 images were encoded in one request;
+- every image used the full 16,777,216 source pixels;
+- the model transcribed all thirty independent pixel strings exactly;
+- the request used 246,022 prompt tokens and completed normally;
+- a sixteenth image was rejected before inference;
+- the exact native-context boundary with those fifteen images also passed.
+
+Aspect proof used six independent fresh near-full-pixel images, alternating
+22,080 x 736 and 736 x 22,080. Each had 16,250,880 pixels and 15,870 visual tokens.
+The model recovered codes placed at both far ends of every image. A 31:1 control,
+21,824 x 704, was rejected with an explicit HTTP 400 naming the 30:1 bound.
+
+### Where images live in an agent history
+
+Images are not moved to the newest user message. They remain in the exact
+chronological content position at which the user or tool supplied them:
+
+    user text
+    assistant reasoning/tool call
+    tool result: text -> image -> text
+    assistant acknowledgement
+    later user question
+    assistant response
+
+The patched OpenAI path accepts a typed content list on the originating tool role.
+The patched Anthropic converter retains a tool_result's text/image/text sequence in
+the corresponding tool response instead of inventing a later user image turn. The
+Qwen template emits each vision marker at that content position. Transport-only tool
+IDs are validated and correlated, while Qwen's positional tool XML remains ordered.
+
+OpenAI and Anthropic representations of the same history produced exactly identical
+16,562 prompt-token IDs. Marker ordering proved:
+
+    tool start < preceding tool text < vision marker <
+    following tool text < tool end < later acknowledgement < later question
+
+Moving the same image to another turn changed prompt token IDs as expected. The
+model therefore sees the image in the chronology in which Qwen's interleaved
+vision-language training and template expect it, rather than a clumped approximation.
+
+Old images remain in message history unless normal context management removes that
+history. They are not re-downloaded: only inline bytes are allowed. Two caches have
+different jobs:
+
+- vLLM prefix caching reuses the unchanged rendered/token prefix;
+- the multimodal processor cache keys exact image bytes with SHA-256 and reuses the
+  image preprocessing/encoder input independently.
+
+The measured cold history had zero prefix and multimodal hits and 6.1716-second TTFT.
+A warm OpenAI continuation hit 14,560 prefix tokens and the image cache. The
+equivalent warm Anthropic stream hit the same 14,560 prefix tokens, hit the image
+cache, and reached first token in 0.3520 seconds: 17.531 times faster. Changing image
+bytes caused zero multimodal hits. Moving identical bytes caused a multimodal hit but
+zero prefix hit, which proves the caches are not being conflated.
+
+This cache behavior does not depend on preserving old hidden reasoning. Omitting
+completed hidden traces stabilizes the durable message prefix and gives the main
+thread more useful lifetime; retained visible/tool/image history remains cacheable.
+
+### Tool calling and protocol correctness
+
+The server explicitly selects the qwen3 reasoning parser and qwen3_coder tool parser.
+Automatic tool choice is enabled, parallel tool calls are disabled in the supported
+agent policy, and every selected tool is constrained to its declared JSON schema
+whether strict is omitted, false, or true. A normal non-tool answer and
+tool_choice=none remain valid. Unknown names, wrong nested types, extra properties,
+duplicate IDs, orphan results, missing or out-of-order results, and incomplete chains
+fail closed.
+
+A narrow scheduler patch retains the implicit Qwen tool-start token at the exact
+reasoning-to-tool grammar boundary. Without it, post-generation parsing could
+recognize a call that decoder-time structural grammar had not constrained. Real
+token sensitivity tests show that the fixed path rejects an unknown tool, wrong type,
+and extra property at their first invalid token.
+
+Streaming and non-streaming paths are separately tested. An incomplete generation is
+never promoted into a successful executable call:
+
+- Chat preserves finish_reason=length;
+- Anthropic preserves stop_reason=max_tokens;
+- Responses marks the response and function item incomplete, emits no executable
+  arguments-done/completed terminal, and ends with response.incomplete.
+
+Thirty controlled real-token prefix cuts produced the same typed semantics in
+streaming and non-streaming parser paths. Live independently sampled fault injection
+also passed; no claim of byte-identical sampled prose was needed.
+
+Complete tool loops passed three of three OpenAI trials and three of three Anthropic
+trials. OpenAI Chat, Anthropic Messages, and OpenAI Responses passed streaming and
+non-streaming tool calls plus typed tool-result continuation. Equivalent protocol
+histories passed render -> tokenize -> parse -> rerender with token-identical
+semantics. Anthropic validation problems return HTTP 400 invalid_request_error, not a
+misleading server 500.
+
+The installed-image focused suites passed:
+
+- 125 TurboQuant cases, two platform-inapplicable skips;
+- 286 parser/structural-output/Anthropic conversion cases with ten intentional
+  generic-policy deselections replaced by project-specific assertions;
+- 382 Qwen streaming/replay cases;
+- vision workspace, image-contract, and vision-MLP units during the immutable build.
+
+### Validation record for v10
+
+All results below were obtained from the exact pinned v10 image:
+
+1. Runtime source reconstruction and immutable offline build: pass; two builds
+   produced the same ID.
+2. Full model/tokenizer/template/processor manifest: pass.
+3. Exact loopback-only listener and no published Docker ports: pass.
+4. MTP/speculation absent, CPU offload zero, CUDA graphs retained: pass.
+5. Exact xhigh defaults, high/max alias identity, low/disabled rejection: pass.
+6. Default preserve_thinking=false and explicit diagnostic restoration: pass; omission
+   saved 1,798 real tokens in the controlled history.
+7. Exact five-real-token final-response phase stop: pass.
+8. OpenAI/Anthropic tool loops, adversarial grammar, orphan rejection, and
+   streaming/non-streaming round trip: pass.
+9. Responses streaming/non-streaming tool loop and incomplete-output gates: pass.
+10. Fifteen full-pixel distinct-image transcription and sixteenth-image rejection:
+    pass.
+11. Portrait/landscape 30:1 far-end perception and 31:1 rejection: pass.
+12. Chronological OpenAI/Anthropic tool-result image parity: pass.
+13. Cold/warm image and prompt-cache counters plus time separation: pass.
+14. Exact 262,143-prompt-plus-one-output native boundary with fifteen images: pass;
+    262,145 total rejected.
+15. Logs after maximum image/context work: no CUDA OOM, allocation retry, preemption,
+    semantic fallback, or failed restoration.
+16. Pinned Qwen Code archive plus exact patch reconstruction: pass; 33 changed/new
+    files, twelve focused suites, and 1,720 tests; two builds produced the identical
+    agent image ID.
+17. Real Qwen Code text-read, original-PNG vision, shell, and final-response tool
+    loop: pass twice against a hostile configuration workspace; ordinary QWEN.md and
+    AGENTS.md guidance remained active while `.env`, MCP, hooks, skills, rules,
+    memory, output language, workspace settings, and slash commands remained inert.
+18. Qwen Code image chronology and caching: pass; the first four-turn run recorded
+    35,360 prefix-hit tokens and one of two multimodal hits, while the repeated run
+    recorded 45,760 prefix-hit tokens and two of two multimodal hits. Mean backend
+    TTFT fell from 1.129958153 to 0.279406309 seconds, 4.044140 times faster.
+19. Strict client image rejection and foreground subagent: pass; JPEG failed with a
+    typed missing-PNG-signature result and no conversion/retry; one Explore subagent
+    returned through correlated parent/child tool events and was verified by the
+    main thread.
+20. Live agent isolation and lifecycle: pass; only loopback, no route/DNS/GPU/ports,
+    sealed model proxy only, read-only roots, cap-drop-all, no-new-privileges, exact
+    readiness-boundary cancellation with exit 143, durable partial bundle, and zero
+    owned session-container leftovers.
+
+The supported status currently reports:
+
+    HEALTHY
+    endpoint 127.0.0.1:8000
+    262144 total-token context
+    15 inline static PNG images, 16777216 pixels each
+    BF16 vision tower, aspect ratio <= 30:1
+    xhigh thinking, old traces omitted by default
+    explicit Qwen3.8 sampling
+    reasoning/final ceilings 262144 / 131072
+
+### Historical audits and client direction
+
+The historical /home/user/Desktop/qwen_36_agent_setup repository was audited idea by
+idea against Qwen3.8, the current checkpoint/template, and current vLLM. Old hunks
+were not copied blindly. Durable principles—strict schemas, exact tokenization,
+malformed-chain rejection, fail-closed launch verification—were retained. Obsolete
+Qwen3.6 egress renaming and its repetition detector were rejected. New current-code
+defects in TurboQuant workspace use, grammar boundaries, phase budgets, truncation,
+protocol validation, and vision handling received narrow current patches and tests.
+The detailed audit is docs/qwen36-to-qwen38-audit.md.
+
+The original /home/user/Desktop/agent_service is the selected client/orchestration
+project, not a duplicated launcher here. Its durable outer design is singleton
+ownership, copied workspaces, no-GPU/no-Internet agent containers, narrow Unix-socket
+proxying to loopback vLLM, cancellation, durable JSONL/bundles, labels, orphan
+recovery, and ordered teardown.
+
+The chosen and deployed client is pinned Qwen Code 0.21.12 at
+b965d5f8c24f48e65fb0b17c7d45f34ca4ce8f38. It runs only inside immutable agent image
+sha256:303601e191432b197970203b7e9c220833d871c5338c43b8a735d812f65ac77c.
+The accepted service sends this exact outgoing policy on every main and foreground
+subagent turn:
+
+- contextWindowSize 262144;
+- exact server/model identity;
+- xhigh mandatory thinking;
+- preserveThinking false;
+- Alibaba thinking sampling tuple;
+- total generation ceiling 262144 and separate final ceiling 131072;
+- exact /tokenize count on the same rendered request before generation;
+- no character/image-token heuristic or tokenizer fallback;
+- splitToolMedia false so tool images stay in their originating tool result;
+- typed content parts and PNG-only image tools matching the strict backend;
+- no client retry/downgrade, XML recovery, implicit continuation, or partial-call
+  execution;
+- one long main thread with late exact compaction and only sequential foreground
+  subagents.
+
+The service is the updated original `/home/user/Desktop/agent_service` at commit
+d4d18887875514305c81535cea3bcebaff763932, not a copied launcher. Its own README and
+lock file are authoritative for Qwen Code source/patch,
+agent/service images, package snapshot, exact tools, copied-workspace envelope,
+stream-event validation, cancellation, bundles, and 127.0.0.1:8090 listener. Repeated
+real tool-and-image sessions proved prefix and multimodal caching through Qwen Code;
+the frontend's compatibility cache-read counter remained zero and is deliberately
+not trusted over vLLM's authoritative counters.
+
+Codex Responses and Anthropic Messages protocol surfaces are proven on the server,
+but neither creates another supported client mode. Host Claude Code remains entirely
+untouched. There is exactly one accepted local-agent behavior: the pinned Qwen Code
+container through the isolated service into this pinned vLLM backend.
+
+### Exact software/hardware compatibility record
+
+The validated host/runtime record is:
+
+- Bash 5.2.21(1)-release; Git 2.43.0; coreutils 9.4; iproute2 6.1.0;
+- Docker client/server 29.7.2; NVIDIA Container Toolkit 1.19.1;
+- NVIDIA driver 595.71.05; RTX 5090; 32,607 MiB; compute capability 12.0;
+- Ubuntu 24.04; glibc 2.39-0ubuntu8.8; container CUDA 13.0.3;
+- Python 3.12.3;
+- vLLM 0.27.2rc1.dev106+g9df9b0b0a;
+- PyTorch 2.13.0+cu130 with CUDA 13.0;
+- Transformers 5.15.0; Tokenizers 0.22.2; Safetensors 0.8.0;
+- Compressed Tensors 0.17.0; FlashInfer 0.6.16.post3;
+- Triton 3.7.1; NumPy 2.3.5; FastAPI 0.136.3; Uvicorn 0.52.3.
+
+An update to any locked component requires a new explicit profile/image version and
+the complete relevant acceptance suite. A version string in prose is not a pin; the
+immutable image IDs, hashes, labels, source reconstruction, and live checks are.
+
+Known nonfatal log noise is documented rather than hidden:
+
+- Transformers emits ERROR-labelled docstring validation messages for missing
+  min_frames/max_frames fields; they are documentation noise, not a video path.
+- Optional ROCm import warnings occur in the CUDA image; live selection remains CUDA,
+  SM 12.0, NVFP4, TurboQuant, and FlashAttention.
+- First use of an unseen long-context/image shape can JIT-compile a Triton kernel;
+  successful compilation is warmup, not a fallback.
+- Deliberate low/disabled-thinking tests log template exceptions and HTTP 400; that is
+  expected fail-closed evidence.
+
+Do not silence these messages by enabling remote code, weakening offline mode,
+changing cache/image precision, adding retries, or installing host packages.
 
 # Qwen3.8-27B
 

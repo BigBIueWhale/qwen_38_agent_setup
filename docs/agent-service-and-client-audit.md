@@ -1,25 +1,28 @@
 # Original `agent_service` use case and current client audit
 
-Audit date: 2026-08-15
+Audit date: 2026-08-15 through 2026-08-16
 
-This is an inspiration and compatibility record, not an instruction to install a
-client on the host. The only supported runtime in this repository remains the one
-text-only, loopback-only vLLM profile. Any future coding client and orchestration
-service must be pinned, built, configured, and run in project-owned Docker images.
+This is an inspiration, compatibility, and implementation record, not an instruction
+to install a client on the host. The only supported runtime is the one vision-capable,
+loopback-only vLLM profile plus the updated original `agent_service`. Qwen Code and
+the Rust service are pinned, built, configured, and run in project-owned Docker
+images. Nothing was installed into the host client environment.
 
 ## Exact source pins inspected
 
 | Project | Exact revision inspected | Date / version |
 |---|---|---|
 | Original `BigBIueWhale/agent_service` | `7c6f9ea66cb12678217f7427513234518323d13c` | 2026-05-03 |
+| Updated local `agent_service` | `d4d18887875514305c81535cea3bcebaff763932` | 2026-08-16, single Qwen3.8 mode |
 | Current Qwen Code | `b965d5f8c24f48e65fb0b17c7d45f34ca4ce8f38` | 2026-08-14, `0.21.12` |
 | Current OpenAI Codex | `00f6a8a60e5c5e93d185c7fe67fd596b7e62240f` | 2026-08-15 |
 | Current Claude Code public repository | `0fa8c19d50f70f9f383fb6ff5ce5209575267d21` | 2026-08-14, changelog `2.1.233` |
 
-The original repository is cloned at `/home/user/Desktop/agent_service` and was left
-clean. The three current-client research clones were disposable source-audit inputs
-under `/tmp`; they are not runtime dependencies. No host client, configuration,
-credential, session, or history directory was read or modified.
+The original repository at `/home/user/Desktop/agent_service` was updated in place;
+there is no duplicate launcher. The three current-client research clones were
+disposable source-audit inputs under `/tmp`; they are not runtime dependencies. No
+host client, configuration, credential, session, or history directory was read or
+modified.
 
 ## What remains valuable in `agent_service`
 
@@ -35,25 +38,23 @@ envelope around an autonomous coding agent:
   route blocked;
 - a deliberately narrow two-hop `socat` bridge from that network to the model server
   bound on host loopback, without giving the agent general host-network access;
-- a separate loopback-only, read-only ttyd observation path;
 - cancellation, a wall-clock limit, explicit resource limits, ordered teardown,
   project/session labels, and orphan cleanup after an orchestrator crash;
 - a structured JSONL event stream and preserved forensic bundle even when the agent
   process fails.
 
-Those properties remain useful whether the inner client eventually is Qwen Code,
-Claude Code, Codex, or another protocol-compatible client. `qwen serve`, ACP, a client
-daemon, or a browser UI may replace parts of the inner control plane; none replaces
-the outer copied-workspace boundary, network isolation, lifecycle, result bundling,
-or recovery semantics.
+Those properties were retained around the selected pinned Qwen Code client. The old
+ttyd observer, browser UI, client daemon, and alternate adapter paths were not
+retained: they would create additional modes and listening surfaces. Claude Code and
+Codex remain research comparisons, not executable service adapters.
 
 ## What must not be copied from the historical service
 
 The original repository pins Qwen Code `0.15.6`, Qwen3.6-27B AWQ, port 8001, a
 152,000-token vLLM window, 32,768 output tokens, temperature 0.6, historical
-repetition/compression workarounds, and vision-capable request settings. Those are
-incompatible with this repository's selected model, current client, measured memory
-profile, and one-mode text-only policy.
+repetition/compression workarounds, and lossy/permissive vision request settings.
+Those are incompatible with this repository's selected model, current client,
+measured memory profile, and one full-quality-vision mode.
 
 Its local-development document installs Node/Qwen Code and edits `~/.qwen/settings.json`
 and shell startup files. That directly violates this project's Docker-only client
@@ -70,9 +71,9 @@ prefix reuse, and compaction only when the physical window actually requires it.
 
 ## Current client comparison
 
-### Qwen Code `0.21.12`: best-aligned candidate, not yet an installed mode
+### Qwen Code `0.21.12`: selected, patched, and installed
 
-Qwen Code is currently the most directly aligned client candidate because its generic
+Qwen Code is the directly aligned selected client because its generic
 OpenAI provider uses Chat Completions, the exact protocol on which this deployment's
 Qwen rendering, parser, strict tool grammar, stream reconstruction, and full-history
 round trip were tested. It exposes explicit `samplingParams`, `extra_body`,
@@ -83,13 +84,15 @@ Several current behaviors materially supersede the historical `0.15.6` complaint
 - provider entries are arrays of `ModelConfig`; the obsolete wrapped provider shape
   is not accepted;
 - a complete history is retained rather than dropping an arbitrary tail;
-- output capacity is dynamically clamped to the real context window and prompt
-  count, with a safety margin, rather than estimated from characters;
+- the project patch makes output capacity use vLLM `/tokenize` on the exact rendered
+  messages, tool schemas, template kwargs, and image history, then clamps to the
+  physical remainder with no safety margin, padding, or minimum fabrication;
 - compaction has explicit warning/automatic/hard thresholds, a 20,000-token summary
   reserve, state validation, truncation detection, and a three-consecutive-failure
   circuit breaker instead of a permanent first-failure latch;
-- current compaction restores recent file/image references, plan state, and active
-  agent reminders;
+- the project patch applies the same exact rendered-token count to compaction,
+  retains visible/task state, and deliberately removes old raw images rather than
+  detaching them into a false recent turn;
 - the client supports streaming headless output, ACP, `qwen serve`, SDK/daemon
   lifecycle surfaces, and session continuation.
 
@@ -103,10 +106,9 @@ server correctly rejects. `thinkingMandatory: true` makes Qwen Code strip every 
 disable shape before transmission, allowing the server's mandatory-xhigh default to
 remain authoritative.
 
-The following is the reviewed provider fragment for a future pinned, Docker-contained
-Qwen Code client. It is a design input, not a second launch mode and not permission to
-write host settings. `baseUrl` must point to the narrow model proxy inside the sealed
-agent network; it must never be changed to a wildcard listener.
+The following is the deployed sealed provider fragment. It is not a second launch
+mode and is not permission to write host settings. `baseUrl` points to the narrow
+model proxy inside the network-none agent namespace.
 
 ```json
 {
@@ -124,18 +126,22 @@ agent network; it must never be changed to a wildcard listener.
         "id": "qwen3.8-27b-nvfp4-k8v4",
         "name": "Local Qwen3.8-27B NVFP4 K8V4",
         "envKey": "QWEN38_LOCAL_API_KEY",
-        "baseUrl": "http://MODEL_PROXY_INSIDE_AGENT_NETWORK:8000/v1",
+        "baseUrl": "http://127.0.0.1:18000/v1",
         "capabilities": {
           "agent": true,
-          "vision": false
+          "vision": true
         },
         "generationConfig": {
-          "timeout": 7200000,
+          "timeout": 86400000,
           "maxRetries": 0,
           "thinkingMandatory": true,
+          "strictToolCalling": true,
+          "exactTokenCounting": "vllm",
+          "splitToolMedia": false,
+          "toolResultContentFormat": "parts",
           "contextWindowSize": 262144,
           "modalities": {
-            "image": false,
+            "image": true,
             "pdf": false,
             "audio": false,
             "video": false
@@ -150,13 +156,15 @@ agent network; it must never be changed to a wildcard listener.
             "max_tokens": 262144
           },
           "extra_body": {
+            "parallel_tool_calls": false,
             "reasoning_effort": "xhigh",
             "thinking_token_budget": 262144,
             "final_response_token_budget": 131072,
             "chat_template_kwargs": {
               "enable_thinking": true,
               "preserve_thinking": false,
-              "reasoning_effort": "xhigh"
+              "reasoning_effort": "xhigh",
+              "add_vision_id": false
             }
           }
         }
@@ -166,43 +174,28 @@ agent network; it must never be changed to a wildcard listener.
 }
 ```
 
-The future client container must additionally pin these deployment environment
-variables; current Qwen Code explicitly documents that they are not settings keys:
-
-```text
-QWEN_STREAM_IDLE_TIMEOUT_MS=600000
-QWEN_STREAM_MAX_LIFETIME_MS=7200000
-```
-
-The first allows ten minutes of silence during a very large prefill or reasoning
-phase, while the second makes the same two-hour outer request bound apply even to a
-stream that keeps producing small chunks. Their stock values are four and fifteen
-minutes respectively, which are too short for this profile's maximum-generation
-contract. Neither guard is disabled, and the outer session manager still has the
-independent authority to cancel the run sooner.
-
 `max_tokens` is the total-generation ceiling, not the final-response phase ceiling.
 Setting it to 262,144 allows Qwen Code to clamp it to its prompt-dependent safe
-remainder (using the real/API prompt count and its explicit margin), after which vLLM
-enforces the exact physical remainder; setting it to 131,072 would unnecessarily cut
-possible reasoning in half on a short prompt. The independent server-enforced
+remainder using vLLM's exact rendered-request token count, with no heuristic margin;
+setting it to 131,072 would unnecessarily cut possible reasoning in half on a short
+prompt. The independent server-enforced
 `final_response_token_budget` still caps visible final output at 131,072. On the
 native 262,144-token profile the upstream one-million-context recommendation cannot
 simultaneously spend 262,144 reasoning tokens and 131,072 final tokens; prompt,
 reasoning, tools, and final output always share the one physical window.
 
-`maxRetries: 0` is deliberate for the defensive profile. It makes a transport error
-observable instead of silently replaying an ambiguous long generation. A future
-orchestrator may implement an explicit, state-aware retry only after proving that it
-cannot duplicate an already executed tool result. The long timeout is not permission
-to run forever: the outer session manager retains cancellation and a separate
-wall-clock deadline.
+`maxRetries: 0` is deliberate. A transport error remains observable instead of
+silently replaying an ambiguous long generation; there is no orchestrator retry
+fallback. The long provider timeout keeps the 262K contract reachable, while
+explicit cancellation remains unbounded and authoritative.
 
-This fragment still needs an end-to-end run from a pinned Qwen Code Docker image
-through the future isolated proxy before it becomes supported. In particular, the
-test must record the exact outgoing bodies for main and side queries, verify real API
-usage counts drive compaction, and prove that no internal path disables thinking,
-enables vision, changes sampling, retries silently, or selects another model.
+The end-to-end isolated-proxy acceptance passed. Source tests prove that every main
+and foreground-subagent request carries the sealed sampling and template policy;
+real model runs proved native tool results, exact image transport, strict JPEG
+rejection, foreground subagent correlation, stream terminal validation, and
+cancellation. Backend counters—not Qwen Code's compatibility usage field—proved
+actual prefix and multimodal cache reuse and a 4.044140-times mean-TTFT improvement
+on the repeated four-turn image task.
 
 ### OpenAI Codex: Responses protocol is promising, client behavior is not proven
 
@@ -218,7 +211,7 @@ The live project-owned Responses probe passed non-streaming and SSE tool selecti
 strict typed arguments, `function_call_output` continuation, xhigh reasoning,
 completed response events, and semantic transport equivalence. vLLM's request model
 accepts Codex's extra metadata and `reasoning.encrypted_content` include request.
-The v6 request model also applies the pinned `thinking_token_budget=262144` and
+The v10 request model also applies the pinned `thinking_token_budget=262144` and
 `final_response_token_budget=131072` defaults to Responses requests. It accepts
 explicit smaller vLLM-extension values while retaining the server's final ceiling as
 a hard upper bound.
@@ -251,22 +244,19 @@ model proxy.
 
 ## Design decision for the original use case
 
-Do not couple the outer service to a particular CLI. Preserve `agent_service`'s
-session/workspace/network/result architecture, but define a small client-adapter
-boundary whose output is a normalized event stream and terminal result. The first
-implementation candidate should be pinned Qwen Code `0.21.12` because it is the
-model-native, Chat-protocol-aligned option and exposes all required Qwen controls.
-Codex and Claude Code should remain isolated experimental adapters until each passes
-the same full contract, not marketing-based substitutes.
+Preserve `agent_service`'s session/workspace/network/result envelope, but expose only
+the pinned Qwen Code `0.21.12` adapter. A general adapter selection surface would
+violate the one-mode requirement. Codex and Claude Code remain source/protocol
+research only and have no runtime path, setting, image, or listener in this service.
 
-The acceptance contract for any adapter is:
+The accepted Qwen Code contract is:
 
 1. exact client source/package/image identity and configuration are pinned;
 2. the client container has no GPU, no Internet/DNS/default route, and reaches only
    the narrow model proxy; every published observer/API socket is loopback-only;
-3. model identity, 262,144 context, text-only modalities, xhigh thinking,
+3. model identity, 262,144 context, full-quality PNG vision, xhigh thinking,
    `preserve_thinking=false`, all sampling parameters, both phase ceilings, and zero
-   silent retries/fallbacks are proven from captured outgoing requests;
+   silent retries/fallbacks are sealed into both client and server defaults;
 4. streamed and non-streamed tool turns have the same typed semantics, and complete
    tool-call/result history round-trips to identical model token IDs; partial deltas
    remain non-executable until the protocol's overall successful terminal, while
@@ -279,7 +269,16 @@ The acceptance contract for any adapter is:
    mismatches all produce explicit terminal records and preserve forensics;
 8. the default is one long main thread. Compaction is delayed until the measured
    window requires it, completed hidden thinking is omitted to preserve useful
-   context, and subagents are opt-in for genuinely independent work.
+   context, and only sequential foreground `general-purpose`/`Explore` subagents are
+   permitted;
+9. original static RGB/RGBA PNG bytes stay in their originating tool result, remain
+   cacheable at that chronological position, and invalid media fails before egress;
+10. hostile workspace settings, environment, MCP, hooks, rules, skills, output
+    language, memory, and custom commands cannot alter the sealed behavior.
 
-No current client has yet passed this entire outer-service contract. That is the
-remaining integration boundary, not a defect in the validated vLLM serving profile.
+The pinned Qwen Code agent image passed this entire contract. Two identical real
+text/image/shell tasks passed, the repeated run showed both higher prefix hits and
+all multimodal hits, JPEG rejected without workaround, a foreground Explore subagent
+round-tripped correctly, live isolation showed no route/DNS/GPU, and immediate
+readiness-boundary cancellation preserved a truthful partial bundle with no orphan
+containers. This is the only supported local-agent mode.

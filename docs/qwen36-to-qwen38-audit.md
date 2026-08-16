@@ -1,6 +1,6 @@
 # Qwen3.6 historical setup → Qwen3.8 current deployment audit
 
-Date of audit: 2026-08-15
+Date of audit: 2026-08-15 through 2026-08-16
 
 This is an evidence record, not a migration recipe. The historical repository was
 read as a set of bug reports, design ideas, and test hypotheses. None of its runtime
@@ -227,21 +227,33 @@ slack. Adding an environment-tunable GiB of slack would weaken the exact-memory 
 
 Historical idea: preserve image/video parts attached to `tool` messages.
 
-Disposition: **known current caveat but intentionally unreachable**. Current chat
-ingress still has media-flattening behavior worth fixing for a vision agent. The only
-supported profile is truly text-only via `--language-model-only`; all multimodal
-limits are zero, so carrying a complex media monkey patch would add untestable attack
-surface with no reachable feature. Enabling vision requires a new versioned profile
-and a fresh audit of this item.
+Disposition: **adopt the invariant through current-source changes, not the historical
+patch**. Vision is now inseparable from the one supported profile. The current patch
+accepts typed content on the originating OpenAI tool role, keeps Anthropic
+`tool_result` text/image/text parts together, validates tool IDs, and renders the
+vision marker at the same chronological Qwen-template position. It does not detach
+the image into the newest user turn.
+
+Equivalent OpenAI and Anthropic histories rendered to exactly the same 16,562 token
+IDs. Moving the image changed the token IDs. The deployed Qwen Code client pins
+`splitToolMedia=false` and `toolResultContentFormat=parts`; a real native
+`read_file` image tool turn remained in later requests, producing one multimodal
+cache hit in its first four-turn session and two of two hits in the repeated session.
+This directly proves the model, template, vLLM frontend, and client agree on the
+chronology.
 
 ### 11. `monkey_patch_mm_cache_validator_eviction.py` — multimodal cache drift
 
 Historical idea: if validation rejects a request after sender-cache mutation, restore
 the sender/receiver cache invariant.
 
-Disposition: **fixed upstream and unreachable here**. Current vLLM includes the P0/P1
-multimodal processor-cache recovery change (`3962042304`). In addition, the text-only
-profile does not create a usable multimodal request path. No patch is installed.
+Disposition: **fixed upstream and exercised here**. Current vLLM includes the P0/P1
+multimodal processor-cache recovery change (`3962042304`), so no historical cache
+validator patch is installed. The one profile uses a 4-GiB SHA-256-keyed multimodal
+processor cache. Cold/warm tests separately varied image bytes and chronological
+position, proving that byte identity controls the multimodal cache while stable token
+prefix controls the prefix cache. Real Qwen Code tool-image history then produced the
+expected live cache hits without sender/receiver drift.
 
 ### 12. `monkey_patch_qwen3_coder_streaming_truncation.py` — dropped partial args
 
@@ -270,12 +282,14 @@ cause startup to fail.
 Disposition: **retain the fail-closed objective, reject runtime monkey-patching**. The
 current changes are baked into an immutable Docker image. The build verifies upstream
 file hashes, patch hashes, live diffs, installed file hashes, and functional tests.
-Startup then re-hashes all twenty installed vLLM files, the template, and phase-budget
-test. There is no launcher/sitecustomize registry that can drift between processes.
+Startup then re-hashes all twenty-nine reviewed runtime files, seven reviewed test
+files, the template, Dockerfile, allowlist, and build units. There is no
+launcher/sitecustomize registry that can drift between processes.
 
 ## Current-source changes that actually remain
 
-Seven reviewed diff artifacts are applied to twenty source files:
+Eight reviewed diff artifacts reconstruct twenty-nine runtime-source changes, seven
+reviewed test changes, and one reviewed new workspace test:
 
 | Diff | Purpose | SHA-256 |
 |---|---|---|
@@ -286,6 +300,7 @@ Seven reviewed diff artifacts are applied to twenty source files:
 | `patches/vllm-qwen-implicit-tool-grammar-boundary.patch` | retain an implicit Qwen tool-start token as the structural grammar trigger and recover a final partial Qwen parameter consistently | `d231c6e2e7040c4cd4b38432cb8c794805afddbf2c6e4f7ff6febb78e3fd9f48` |
 | `patches/vllm-anthropic-validation-http400.patch` | report Anthropic request-conversion validation failures as HTTP 400, not HTTP 500 | `030b64be104e6ef57a40f6bae740dfa9d4634a420c6c93a395f62bfb98d6d053` |
 | `patches/vllm-tool-truncation-finish-reason.patch` | preserve truncation terminals, fail Responses incomplete events closed, flush deferred batch content, and carry phase budgets through Responses | `1a220f6db9b40967d867b3cfb1a92d95d907ca059718ffe61772b4cb4409f551` |
+| `patches/vllm-qwen38-vision-runtime.patch` | enforce lossless static-PNG ingress, chronological tool media, full BF16 image processing, and exact reclaimable vision workspace without reducing context, graphs, or prefill chunking | `f92603724861da5b5a364f43e57d3f95ef43a9dded8ae645278373850db3140f` |
 
 The separate final-response ceiling is deliberately a hard ceiling: EOS and configured
 stop sequences still win, but `min_tokens` cannot force generation past it. Multi-token
@@ -377,8 +392,13 @@ served tokenizer, `finish_reason="length"`, and
   explicit defaults, real-tokenizer testing, schema-constrained tool arguments, and
   measured cache capacity.
 - The most important obsolete ideas were the old parser wrappers, output-field rename,
-  repetition detector, utilization-slack patch, and multimodal patches in a text-only
-  service.
+  repetition detector, utilization-slack patch, and historical multimodal monkey
+  patches. Vision instead received a current-source implementation with a narrower
+  lossless contract and direct runtime proof.
 - Qwen3.8's stronger template/tool behavior and new official sampling/budget guidance
   make several Qwen3.6 complaints void, but they do not remove the need for narrow
   current-source fixes or live long-context/tool validation.
+- The original `agent_service` now runs the pinned Qwen Code client with the exact
+  vLLM tokenizer, full-quality chronological PNG tools, foreground-only subagents,
+  xhigh/unpreserved-thinking defaults, and live cache/lifecycle acceptance. It does
+  not resurrect the historical Qwen3.6 launcher or create a second model mode.

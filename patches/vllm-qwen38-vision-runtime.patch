@@ -1,0 +1,1565 @@
+diff --git a/tests/entrypoints/anthropic/test_anthropic_messages_conversion.py b/tests/entrypoints/anthropic/test_anthropic_messages_conversion.py
+index a54e13666f68484125e84b7968be7e609dd62c4c..edb2341d0e394617366ce47620624d892049f6f2 100644
+--- a/tests/entrypoints/anthropic/test_anthropic_messages_conversion.py
++++ b/tests/entrypoints/anthropic/test_anthropic_messages_conversion.py
+@@ -239,7 +239,7 @@ class TestToolResultContent:
+         assert tool_msg[0]["content"] == "line 1\nline 2"
+ 
+     def test_tool_result_with_image(self):
+-        """Image in tool_result should produce a follow-up user message."""
++        """An image remains inside the originating tool-result message."""
+         request = self._make_tool_result_request(
+             [
+                 {
+@@ -256,16 +256,7 @@ class TestToolResultContent:
+ 
+         tool_msg = [m for m in result.messages if m["role"] == "tool"]
+         assert len(tool_msg) == 1
+-        assert tool_msg[0]["content"] == ""
+-
+-        # The image should be injected as a follow-up user message
+-        follow_up = [
+-            m
+-            for m in result.messages
+-            if m["role"] == "user" and isinstance(m.get("content"), list)
+-        ]
+-        assert len(follow_up) == 1
+-        img_parts = follow_up[0]["content"]
++        img_parts = tool_msg[0]["content"]
+         assert len(img_parts) == 1
+         assert img_parts[0] == {
+             "type": "image_url",
+@@ -273,8 +264,7 @@ class TestToolResultContent:
+         }
+ 
+     def test_tool_result_with_text_and_image(self):
+-        """Mixed text+image tool_result: text in tool msg, image in user
+-        msg."""
++        """Mixed tool-result blocks retain their exact relative order."""
+         request = self._make_tool_result_request(
+             [
+                 {"type": "text", "text": "Here is the screenshot"},
+@@ -292,17 +282,13 @@ class TestToolResultContent:
+ 
+         tool_msg = [m for m in result.messages if m["role"] == "tool"]
+         assert len(tool_msg) == 1
+-        assert tool_msg[0]["content"] == "Here is the screenshot"
+-
+-        follow_up = [
+-            m
+-            for m in result.messages
+-            if m["role"] == "user" and isinstance(m.get("content"), list)
++        assert tool_msg[0]["content"] == [
++            {"type": "text", "text": "Here is the screenshot"},
++            {
++                "type": "image_url",
++                "image_url": {"url": "data:image/jpeg;base64,QUFB"},
++            },
+         ]
+-        assert len(follow_up) == 1
+-        assert follow_up[0]["content"][0]["image_url"]["url"] == (
+-            "data:image/jpeg;base64,QUFB"
+-        )
+ 
+     def test_tool_result_with_multiple_images(self):
+         request = self._make_tool_result_request(
+@@ -326,13 +312,9 @@ class TestToolResultContent:
+         )
+         result = _convert(request)
+ 
+-        follow_up = [
+-            m
+-            for m in result.messages
+-            if m["role"] == "user" and isinstance(m.get("content"), list)
+-        ]
+-        assert len(follow_up) == 1
+-        urls = [p["image_url"]["url"] for p in follow_up[0]["content"]]
++        tool_msg = [m for m in result.messages if m["role"] == "tool"]
++        assert len(tool_msg) == 1
++        urls = [p["image_url"]["url"] for p in tool_msg[0]["content"]]
+         assert urls == [
+             "data:image/png;base64,IMG1",
+             "https://example.com/img2.jpg",
+diff --git a/tests/entrypoints/serve/utils/test_api_utils.py b/tests/entrypoints/serve/utils/test_api_utils.py
+index c23d0e9e682834c0649045634b8a392efc8592f2..07fd519d5b02f6292bb3ca2d09fb8a97598a5cc2 100644
+--- a/tests/entrypoints/serve/utils/test_api_utils.py
++++ b/tests/entrypoints/serve/utils/test_api_utils.py
+@@ -110,3 +110,18 @@ class TestGetMaxTokens:
+                 input_length=150,
+                 default_sampling_params={"max_tokens": 2048},
+             )
++
++    def test_input_length_equal_to_max_model_len_is_explicit(self):
++        with pytest.raises(
++            ValueError,
++            match=(
++                r"Input length \(100\) equals model's maximum context length "
++                r"\(100\), leaving no room for the required output token"
++            ),
++        ):
++            get_max_tokens(
++                max_model_len=100,
++                max_tokens=1,
++                input_length=100,
++                default_sampling_params={"max_tokens": 2048},
++            )
+diff --git a/tests/entrypoints/unit_tests/test_chat_utils.py b/tests/entrypoints/unit_tests/test_chat_utils.py
+index 2778770e373ba50c356410e2d619d5f61e6187e4..0ce1634348473c408151603fe109d6fdb4cc6c22 100644
+--- a/tests/entrypoints/unit_tests/test_chat_utils.py
++++ b/tests/entrypoints/unit_tests/test_chat_utils.py
+@@ -10,6 +10,7 @@ from unittest.mock import MagicMock
+ import pytest
+ import torch
+ 
++import vllm.envs as envs
+ from vllm.assets.audio import AudioAsset
+ from vllm.assets.image import ImageAsset
+ from vllm.assets.video import VideoAsset
+@@ -18,6 +19,7 @@ from vllm.entrypoints.chat_utils import (
+     MEDIA_CONNECTOR_REGISTRY,
+     AsyncMultiModalItemTracker,
+     ConversationMessage,
++    _parse_chat_message_content_mm_part,
+     _postprocess_messages,
+     parse_chat_messages,
+     parse_chat_messages_async,
+@@ -29,6 +31,7 @@ from vllm.multimodal.utils import (
+     encode_image_url,
+     encode_video_url,
+ )
++from vllm.renderers.params import ChatParams
+ from vllm.utils.serial_utils import tensor2base64
+ 
+ KIMI_K2_5_MODEL_ID = "moonshotai/Kimi-K2.5"
+@@ -38,6 +41,60 @@ QWEN25OMNI_MODEL_ID = "Qwen/Qwen2.5-Omni-7B"
+ MISTRAL_MODEL_ID = "mistralai/Mistral-Small-3.1-24B-Instruct-2503"
+ 
+ 
++def test_qwen38_strict_content_part_contract(monkeypatch):
++    monkeypatch.setattr(envs, "VLLM_QWEN38_STRICT_IMAGE_CONTRACT", True)
++    canonical = {
++        "type": "image_url",
++        "image_url": {
++            "url": "data:image/png;base64,AAAA",
++            "detail": "high",
++        },
++    }
++    assert _parse_chat_message_content_mm_part(canonical) == (
++        "image_url",
++        "data:image/png;base64,AAAA",
++    )
++
++    with pytest.raises(VLLMValidationError, match="explicit content-part"):
++        _parse_chat_message_content_mm_part(
++            {"image_url": "data:image/png;base64,AAAA"}
++        )
++    with pytest.raises(VLLMValidationError, match="UUIDs are forbidden"):
++        _parse_chat_message_content_mm_part(canonical | {"uuid": "trusted"})
++    with pytest.raises(VLLMValidationError, match="'low'"):
++        _parse_chat_message_content_mm_part(
++            {
++                "type": "image_url",
++                "image_url": {
++                    "url": "data:image/png;base64,AAAA",
++                    "detail": "low",
++                },
++            }
++        )
++    with pytest.raises(VLLMValidationError, match="video, audio"):
++        _parse_chat_message_content_mm_part(
++            {"type": "video_url", "video_url": {"url": "https://example.test"}}
++        )
++    with pytest.raises(VLLMValidationError, match="file_id"):
++        _parse_chat_message_content_mm_part(
++            {"type": "input_image", "file_id": "file_123", "detail": "high"}
++        )
++
++
++def test_qwen38_strict_request_overrides_fail_closed(monkeypatch):
++    monkeypatch.setattr(envs, "VLLM_QWEN38_STRICT_IMAGE_CONTRACT", True)
++
++    with pytest.raises(VLLMValidationError, match="media_io_kwargs"):
++        ChatParams(media_io_kwargs={"image": {"image_mode": None}}).with_defaults()
++    with pytest.raises(VLLMValidationError, match="mm_processor_kwargs"):
++        ChatParams(mm_processor_kwargs={"size": {"longest_edge": 1}}).with_defaults()
++    with pytest.raises(VLLMValidationError, match="add_vision_id"):
++        ChatParams(chat_template_kwargs={"add_vision_id": True}).with_defaults()
++
++    params = ChatParams(chat_template_kwargs={"add_vision_id": False}).with_defaults()
++    assert params.chat_template_kwargs == {"add_vision_id": False}
++
++
+ @pytest.fixture(scope="function")
+ def kimi_k2_5_model_config():
+     return ModelConfig(
+diff --git a/tests/multimodal/media/test_connector.py b/tests/multimodal/media/test_connector.py
+index b222d57d3c24872ef5c5660dc38f2ea3b9a0bd59..164f4cad2ca2c4411d6862a46a793cf7e75468c9 100644
+--- a/tests/multimodal/media/test_connector.py
++++ b/tests/multimodal/media/test_connector.py
+@@ -17,7 +17,9 @@ import requests
+ import torch
+ from PIL import Image, ImageChops
+ 
++import vllm.envs as envs
+ from vllm.assets.base import VLLM_S3_BUCKET_URL
++from vllm.exceptions import VLLMUnprocessableEntityError
+ from vllm.multimodal.image import convert_image_mode
+ from vllm.multimodal.inputs import PlaceholderRange
+ from vllm.multimodal.media import MediaConnector
+@@ -569,4 +571,32 @@ def test_get_cached_bytes_file_deleted_before_read():
+         # Delete the file to simulate concurrent eviction
+         connector._media_cache_path(url).unlink()
+ 
+-        assert connector._get_cached_bytes(url) is None
++    assert connector._get_cached_bytes(url) is None
++
++
++@pytest.mark.asyncio
++async def test_qwen38_strict_connector_accepts_only_exact_inline_png(monkeypatch):
++    monkeypatch.setattr(envs, "VLLM_QWEN38_STRICT_IMAGE_CONTRACT", True)
++    monkeypatch.setattr(envs, "VLLM_MAX_IMAGE_PIXELS", 16_777_216)
++
++    image = Image.new("RGB", (4, 4), (1, 2, 3))
++    with BytesIO() as buffer:
++        image.save(buffer, format="PNG")
++        encoded = base64.b64encode(buffer.getvalue()).decode("ascii")
++
++    connector = MediaConnector()
++    canonical_url = f"data:image/png;base64,{encoded}"
++    assert connector.fetch_image(canonical_url).size == (4, 4)
++    assert (await connector.fetch_image_async(canonical_url)).size == (4, 4)
++
++    forbidden = (
++        "https://example.com/image.png",
++        "file:///tmp/image.png",
++        f"data:image/png;charset=utf-8;base64,{encoded}",
++        f"data:image/jpeg;base64,{encoded}",
++    )
++    for url in forbidden:
++        with pytest.raises(VLLMUnprocessableEntityError, match="inline, lossless PNG"):
++            connector.fetch_image(url)
++        with pytest.raises(VLLMUnprocessableEntityError, match="inline, lossless PNG"):
++            await connector.fetch_image_async(url)
+diff --git a/tests/multimodal/media/test_image.py b/tests/multimodal/media/test_image.py
+index 5bbf54b7872e9d115e400274401d87acbc1e53b5..92cb451e9bbebfbe34656576c8ba6899a6406984 100644
+--- a/tests/multimodal/media/test_image.py
++++ b/tests/multimodal/media/test_image.py
+@@ -1,11 +1,13 @@
+ # SPDX-License-Identifier: Apache-2.0
+ # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
++from io import BytesIO
+ from pathlib import Path
+ 
+ import numpy as np
+ import pytest
+ from PIL import Image
+ 
++import vllm.envs as envs
+ from vllm.multimodal.media import ImageMediaIO
+ 
+ pytestmark = pytest.mark.cpu_test
+@@ -282,3 +284,73 @@ def test_image_pixel_limit_disabled(monkeypatch):
+     image_io = ImageMediaIO()
+     result = image_io.load_bytes(data)
+     assert result.media.size == (1000, 1000)
++
++
++def _png_bytes(mode="RGB", size=(8, 8), color=None, **save_kwargs):
++    if color is None:
++        color = (10, 20, 30, 255) if mode == "RGBA" else (10, 20, 30)
++    image = Image.new(mode, size, color)
++    with BytesIO() as buffer:
++        image.save(buffer, format="PNG", **save_kwargs)
++        return buffer.getvalue()
++
++
++def test_qwen38_strict_image_contract_accepts_rgb_and_rgba(monkeypatch):
++    monkeypatch.setattr(envs, "VLLM_QWEN38_STRICT_IMAGE_CONTRACT", True)
++    monkeypatch.setattr(envs, "VLLM_MAX_IMAGE_PIXELS", 16_777_216)
++
++    image_io = ImageMediaIO()
++    assert image_io.load_bytes(_png_bytes()).media.mode == "RGB"
++
++    rgba = image_io.load_bytes(_png_bytes(mode="RGBA", color=(0, 0, 0, 0))).media
++    assert rgba.mode == "RGB"
++    assert rgba.getpixel((0, 0)) == (255, 255, 255)
++
++
++def test_qwen38_strict_image_contract_rejects_ambiguous_inputs(monkeypatch):
++    monkeypatch.setattr(envs, "VLLM_QWEN38_STRICT_IMAGE_CONTRACT", True)
++    monkeypatch.setattr(envs, "VLLM_MAX_IMAGE_PIXELS", 16_777_216)
++
++    with pytest.raises(ValueError, match="requires image_mode='RGB'"):
++        ImageMediaIO(image_mode=None)
++    with pytest.raises(ValueError, match="pinned white"):
++        ImageMediaIO(rgba_background_color=(0, 0, 0))
++
++    image_io = ImageMediaIO()
++    with pytest.raises(ValueError, match="media type 'image/png'"):
++        image_io.load_base64("image/jpeg", "AA==")
++
++    jpeg = Image.new("RGB", (8, 8), (1, 2, 3))
++    with BytesIO() as buffer:
++        jpeg.save(buffer, format="JPEG")
++        jpeg_bytes = buffer.getvalue()
++    with pytest.raises(ValueError, match="accepts only decoded PNG"):
++        image_io.load_bytes(jpeg_bytes)
++
++    with pytest.raises(ValueError, match="only 8-bit RGB or RGBA"):
++        image_io.load_bytes(_png_bytes(mode="L", color=128))
++    assert image_io.load_bytes(_png_bytes(size=(30, 1))).media.size == (30, 1)
++    assert image_io.load_bytes(_png_bytes(size=(1, 30))).media.size == (1, 30)
++    with pytest.raises(ValueError, match="aspect ratio <= 30:1"):
++        image_io.load_bytes(_png_bytes(size=(31, 1)))
++    with pytest.raises(ValueError, match="aspect ratio <= 30:1"):
++        image_io.load_bytes(_png_bytes(size=(1, 31)))
++
++    second_frame = Image.new("RGB", (8, 8), (30, 20, 10))
++    with BytesIO() as buffer:
++        first_frame = Image.new("RGB", (8, 8), (10, 20, 30))
++        first_frame.save(
++            buffer,
++            format="PNG",
++            save_all=True,
++            append_images=[second_frame],
++            duration=100,
++            loop=0,
++        )
++        animated_png = buffer.getvalue()
++    with pytest.raises(ValueError, match="single-frame PNG"):
++        image_io.load_bytes(animated_png)
++
++    monkeypatch.setattr(envs, "VLLM_MAX_IMAGE_PIXELS", 16_777_215)
++    with pytest.raises(ValueError, match="requires VLLM_MAX_IMAGE_PIXELS"):
++        image_io.load_bytes(_png_bytes())
+diff --git a/tests/quantization/test_turboquant.py b/tests/quantization/test_turboquant.py
+index 04a365b48dc13a89f0e4b0a3314731b0b8e5ff45..a12d12bb14a119613c1433e95ec3939cccd8f25a 100644
+--- a/tests/quantization/test_turboquant.py
++++ b/tests/quantization/test_turboquant.py
+@@ -362,7 +362,13 @@ class TestTurboQuantWorkspaceReservation:
+ 
+         class FakeWorkspaceManager:
+             def get_simultaneous(self, *shapes_and_dtypes):
+-                calls.append(shapes_and_dtypes)
++                calls.append(("primary", None, shapes_and_dtypes))
++
++            def get_reclaimable_simultaneous(self, name, *shapes_and_dtypes):
++                calls.append(("reclaimable", name, shapes_and_dtypes))
++
++            def reserve_raw_cuda_headroom(self, name, size):
++                calls.append(("raw-headroom", name, size))
+ 
+         monkeypatch.setattr(
+             turboquant_attn,
+@@ -374,6 +380,11 @@ class TestTurboQuantWorkspaceReservation:
+             "is_workspace_manager_initialized",
+             lambda: True,
+         )
++        monkeypatch.setattr(
++            turboquant_attn.envs,
++            "VLLM_QWEN38_VISION_HEADROOM_BYTES",
++            1024,
++        )
+ 
+         turboquant_attn.TurboQuantMetadataBuilder(
+             kv_cache_spec=self._fake_kv_cache_spec(),
+@@ -384,13 +395,26 @@ class TestTurboQuantWorkspaceReservation:
+ 
+         assert calls == [
+             (
+-                ((16, 8, 4, 129), torch.float32),
+-                ((16, 8, 128), torch.float16),
+-                ((16, 8), torch.float32),
++                "primary",
++                None,
++                (
++                    ((16, 8, 4, 129), torch.float32),
++                    ((16, 8, 128), torch.float16),
++                    ((16, 8), torch.float32),
++                ),
++            ),
++            (
++                "reclaimable",
++                "turboquant_continuation_prefill",
++                (
++                    ((1, 4, 8192, 128), torch.float16),
++                    ((1, 4, 8192, 128), torch.float16),
++                ),
+             ),
+             (
+-                ((1, 4, 8192, 128), torch.float16),
+-                ((1, 4, 8192, 128), torch.float16),
++                "raw-headroom",
++                "qwen38_vision_encoder_headroom",
++                1024,
+             ),
+         ]
+ 
+@@ -403,7 +427,13 @@ class TestTurboQuantWorkspaceReservation:
+ 
+         class FakeWorkspaceManager:
+             def get_simultaneous(self, *shapes_and_dtypes):
+-                calls.append(shapes_and_dtypes)
++                calls.append(("primary", None, shapes_and_dtypes))
++
++            def get_reclaimable_simultaneous(self, name, *shapes_and_dtypes):
++                calls.append(("reclaimable", name, shapes_and_dtypes))
++
++            def reserve_raw_cuda_headroom(self, name, size):
++                calls.append(("raw-headroom", name, size))
+ 
+         monkeypatch.setattr(
+             turboquant_attn,
+@@ -415,6 +445,11 @@ class TestTurboQuantWorkspaceReservation:
+             "is_workspace_manager_initialized",
+             lambda: True,
+         )
++        monkeypatch.setattr(
++            turboquant_attn.envs,
++            "VLLM_QWEN38_VISION_HEADROOM_BYTES",
++            1024,
++        )
+ 
+         turboquant_attn.TurboQuantMetadataBuilder(
+             kv_cache_spec=self._fake_kv_cache_spec(),
+@@ -425,9 +460,13 @@ class TestTurboQuantWorkspaceReservation:
+ 
+         assert calls == [
+             (
+-                ((16, 8, 4, 129), torch.float32),
+-                ((16, 8, 128), torch.float16),
+-                ((16, 8), torch.float32),
++                "primary",
++                None,
++                (
++                    ((16, 8, 4, 129), torch.float32),
++                    ((16, 8, 128), torch.float16),
++                    ((16, 8), torch.float32),
++                ),
+             )
+         ]
+ 
+diff --git a/tests/v1/worker/test_gpu_model_runner_mm_gather.py b/tests/v1/worker/test_gpu_model_runner_mm_gather.py
+index a86e77c8f52fb2843b20c912fbaa5e7d3af11a83..9f549b6070922137b5e77d7073875026b1622f68 100644
+--- a/tests/v1/worker/test_gpu_model_runner_mm_gather.py
++++ b/tests/v1/worker/test_gpu_model_runner_mm_gather.py
+@@ -12,6 +12,7 @@ while a miss within the processed range still fails loudly.
+ lightweight stub for `self` instead of a full (CUDA-only) runner.
+ """
+ 
++from contextlib import contextmanager
+ from types import SimpleNamespace
+ 
+ import pytest
+@@ -98,3 +99,59 @@ def test_target_path_raises_on_encoder_cache_miss():
+     f0 = _feature("h0", offset=0, length=8)
+     with pytest.raises(RuntimeError, match="Encoder cache miss"):
+         _gather([f0], [], num_scheduled=8, shift=0)
++
++
++def test_text_step_does_not_release_reclaimable_workspace(monkeypatch):
++    """Text-only scheduler steps must not touch the continuation workspace."""
++    releases = []
++
++    @contextmanager
++    def release_workspace():
++        releases.append(True)
++        yield
++
++    monkeypatch.setattr(
++        "vllm.v1.worker.gpu_model_runner.release_reclaimable_workspaces",
++        release_workspace,
++    )
++    runner = SimpleNamespace()
++    scheduler_output = SimpleNamespace(scheduled_encoder_inputs={})
++
++    result = GPUModelRunner._execute_mm_encoder(runner, scheduler_output)
++
++    assert result == []
++    assert releases == []
++
++
++def test_encoder_step_releases_workspace_only_around_encoder(monkeypatch):
++    """An encoder step restores the continuation pool after encoder execution."""
++    events = []
++
++    @contextmanager
++    def release_workspace():
++        events.append("release")
++        try:
++            yield
++        finally:
++            events.append("restore")
++
++    def execute_encoder(scheduler_output):
++        assert scheduler_output.scheduled_encoder_inputs
++        events.append("encode")
++        return [torch.ones(1)]
++
++    monkeypatch.setattr(
++        "vllm.v1.worker.gpu_model_runner.release_reclaimable_workspaces",
++        release_workspace,
++    )
++    runner = SimpleNamespace(
++        _execute_mm_encoder_with_released_workspace=execute_encoder,
++    )
++    scheduler_output = SimpleNamespace(
++        scheduled_encoder_inputs={"request": [0]},
++    )
++
++    result = GPUModelRunner._execute_mm_encoder(runner, scheduler_output)
++
++    assert len(result) == 1
++    assert events == ["release", "encode", "restore"]
+diff --git a/tests/v1/worker/test_workspace.py b/tests/v1/worker/test_workspace.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..2dbd6d6f2a65b7e9f1eca2d4252b9c0f48139e78
+--- /dev/null
++++ b/tests/v1/worker/test_workspace.py
+@@ -0,0 +1,121 @@
++# SPDX-License-Identifier: Apache-2.0
++# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
++
++import pytest
++import torch
++
++from vllm.v1.worker import workspace
++
++pytestmark = pytest.mark.cpu_test
++
++
++def test_reclaimable_workspace_release_preserves_primary(monkeypatch):
++    empty_cache_calls = []
++    monkeypatch.setattr(
++        torch.accelerator, "empty_cache", lambda: empty_cache_calls.append(True)
++    )
++    manager = workspace.WorkspaceManager(torch.device("cpu"))
++    (primary,) = manager.get_simultaneous(((64,), torch.uint8))
++    primary.fill_(17)
++    primary_ptr = primary.data_ptr()
++    manager.get_reclaimable_simultaneous(
++        "phase-local",
++        ((64,), torch.float32),
++        ((32,), torch.float16),
++    )
++    manager.lock()
++    empty_cache_calls.clear()
++
++    released = manager.release_reclaimable_workspaces()
++
++    assert released == 512
++    assert primary.data_ptr() == primary_ptr
++    assert primary.tolist() == [17] * 64
++    with pytest.raises(AssertionError, match="Model phases must not overlap"):
++        manager.get_reclaimable_simultaneous(
++            "phase-local", ((64,), torch.float32)
++        )
++
++    assert manager.restore_reclaimable_workspaces() == released
++    assert empty_cache_calls == [True, True]
++    (restored,) = manager.get_reclaimable_simultaneous(
++        "phase-local", ((64,), torch.float32)
++    )
++    assert restored.shape == (64,)
++    with pytest.raises(AssertionError, match="is locked"):
++        manager.get_reclaimable_simultaneous(
++            "phase-local", ((1024,), torch.float32)
++        )
++
++
++def test_reclaimable_workspace_context_restores_after_error(monkeypatch):
++    empty_cache_calls = []
++    monkeypatch.setattr(
++        torch.accelerator, "empty_cache", lambda: empty_cache_calls.append(True)
++    )
++    manager = workspace.WorkspaceManager(torch.device("cpu"))
++    manager.get_reclaimable_simultaneous(
++        "phase-local", ((64,), torch.float32)
++    )
++    manager.lock()
++    empty_cache_calls.clear()
++    monkeypatch.setattr(workspace, "_manager", manager)
++
++    with pytest.raises(RuntimeError, match="encoder failed"):
++        with workspace.release_reclaimable_workspaces() as released:
++            assert released == 256
++            raise RuntimeError("encoder failed")
++
++    (restored,) = manager.get_reclaimable_simultaneous(
++        "phase-local", ((64,), torch.float32)
++    )
++    assert restored.shape == (64,)
++    assert empty_cache_calls == [True, True]
++
++
++def test_nested_reclaimable_workspace_release_fails_closed(monkeypatch):
++    monkeypatch.setattr(torch.accelerator, "empty_cache", lambda: None)
++    manager = workspace.WorkspaceManager(torch.device("cpu"))
++    manager.get_reclaimable_simultaneous(
++        "phase-local", ((64,), torch.float32)
++    )
++    manager.lock()
++    monkeypatch.setattr(workspace, "_manager", manager)
++
++    with pytest.raises(AssertionError, match="already released"):
++        with workspace.release_reclaimable_workspaces():
++            with workspace.release_reclaimable_workspaces():
++                pass
++
++    (restored,) = manager.get_reclaimable_simultaneous(
++        "phase-local", ((64,), torch.float32)
++    )
++    assert restored.shape == (64,)
++
++
++def test_raw_cuda_headroom_is_physically_freed_and_restored(monkeypatch):
++    allocations = []
++    frees = []
++
++    def allocate(size):
++        allocations.append(size)
++        return 0x1000 + len(allocations)
++
++    monkeypatch.setattr(workspace, "_raw_cuda_malloc_committed", allocate)
++    monkeypatch.setattr(workspace, "_raw_cuda_free", frees.append)
++    monkeypatch.setattr(torch.accelerator, "empty_cache", lambda: None)
++    manager = workspace.WorkspaceManager(torch.device("cuda"))
++
++    manager.reserve_raw_cuda_headroom("physical-headroom", 1024)
++    manager.lock()
++    assert manager.release_reclaimable_workspaces() == 1024
++    with pytest.raises(AssertionError, match="Model phases must not overlap"):
++        manager.reserve_raw_cuda_headroom("physical-headroom", 1024)
++    assert manager.restore_reclaimable_workspaces() == 1024
++
++    assert allocations == [1024, 1024]
++    assert frees == [0x1001]
++    manager.reserve_raw_cuda_headroom("physical-headroom", 1024)
++    assert allocations == [1024, 1024]
++    with pytest.raises(AssertionError, match="changed size"):
++        manager.reserve_raw_cuda_headroom("physical-headroom", 2048)
+diff --git a/vllm/entrypoints/anthropic/serving.py b/vllm/entrypoints/anthropic/serving.py
+index 7e8e4441efee914aca39aef7e739acc8b303686e..f04a1e2b5961096757432fa2dba5a5ab81151c3c 100644
+--- a/vllm/entrypoints/anthropic/serving.py
++++ b/vllm/entrypoints/anthropic/serving.py
+@@ -407,9 +407,16 @@ class AnthropicServingMessages(OpenAIServingChat):
+     def _convert_user_tool_result(
+         cls, block, openai_messages: list[dict[str, Any]]
+     ) -> None:
+-        """Convert user tool_result with text and image support"""
++        """Convert a tool result without changing media ownership or order.
++
++        Qwen's released template renders structured media exactly where it
++        appears inside the originating ``<tool_response>``.  Moving images to a
++        synthetic later user message changes the trained prompt structure,
++        multimodal marker positions, and prefix-cache identity.
++        """
+         tool_text = ""
+-        tool_image_urls: list[str] = []
++        tool_content_parts: list[dict[str, Any]] = []
++        has_image = False
+         tool_reference: list[dict[str, Any]] = []
+ 
+         if isinstance(block.content, str):
+@@ -421,12 +428,17 @@ class AnthropicServingMessages(OpenAIServingChat):
+                     continue
+                 item_type = item.get("type")
+                 if item_type == "text":
+-                    text_parts.append(item.get("text", ""))
++                    text = item.get("text", "")
++                    text_parts.append(text)
++                    tool_content_parts.append({"type": "text", "text": text})
+                 elif item_type == "image":
+                     source = item.get("source", {})
+                     url = cls._convert_image_source_to_url(source)
+                     if url:
+-                        tool_image_urls.append(url)
++                        has_image = True
++                        tool_content_parts.append(
++                            {"type": "image_url", "image_url": {"url": url}}
++                        )
+                 elif item_type == "tool_reference":
+                     ref_name = item.get("tool_name") or item.get("name")
+                     if ref_name:
+@@ -439,21 +451,10 @@ class AnthropicServingMessages(OpenAIServingChat):
+             {
+                 "role": "tool",
+                 "tool_call_id": block.tool_use_id or "",
+-                "content": tool_text or "",
++                "content": tool_content_parts if has_image else (tool_text or ""),
+             }
+         )
+ 
+-        if tool_image_urls:
+-            openai_messages.append(
+-                {
+-                    "role": "user",
+-                    "content": [  # type: ignore[dict-item]
+-                        {"type": "image_url", "image_url": {"url": img}}
+-                        for img in tool_image_urls
+-                    ],
+-                }
+-            )
+-
+         if tool_reference:
+             openai_messages.append(
+                 {
+diff --git a/vllm/entrypoints/chat_utils.py b/vllm/entrypoints/chat_utils.py
+index 30b6ecc76be1bf4e2f1e5e1741b40fc8fddb41b7..b7e302f569f8a9d601e3fa22ce6f82af29706551 100644
+--- a/vllm/entrypoints/chat_utils.py
++++ b/vllm/entrypoints/chat_utils.py
+@@ -1532,6 +1532,92 @@ def _collect_extra_fields(part: dict[str, Any]) -> dict[str, Any]:
+     return {k: v for k, v in part.items() if k not in _KNOWN_CONTENT_PART_FIELDS}
+ 
+ 
++def _enforce_qwen38_strict_content_part(part: dict[str, Any]) -> None:
++    """Enforce the sole lossless/static image input contract before I/O.
++
++    Validation happens before the connector is touched so unsupported URLs and
++    modalities cannot trigger network or file access and so cache identity is
++    always derived from the actual accepted PNG bytes rather than a caller-
++    supplied UUID.
++    """
++    if not envs.VLLM_QWEN38_STRICT_IMAGE_CONTRACT:
++        return
++
++    part_type = part.get("type")
++    if not isinstance(part_type, str):
++        raise VLLMValidationError(
++            "The Qwen3.8 image contract requires an explicit content-part "
++            "'type'; undocumented shorthand media parts are forbidden.",
++            parameter="type",
++        )
++
++    if part.get("uuid") is not None:
++        raise VLLMValidationError(
++            "Caller-supplied multimodal UUIDs are forbidden by the Qwen3.8 "
++            "image contract; cache identity must be derived from the actual "
++            "PNG bytes.",
++            parameter="uuid",
++        )
++
++    forbidden_modalities = {
++        "audio_embeds",
++        "audio_url",
++        "image_embeds",
++        "image_pil",
++        "input_audio",
++        "prompt_embeds",
++        "tool_reference",
++        "video_url",
++    }
++    if part_type in forbidden_modalities:
++        raise VLLMValidationError(
++            f"Content part type {part_type!r} is forbidden by the sole "
++            "Qwen3.8 deployment. Only text and canonical inline PNG images "
++            "are supported; video, audio, embeddings, PIL objects, caller "
++            "UUIDs, and deferred tool references are disabled.",
++            parameter="type",
++            value=part_type,
++        )
++
++    if part_type == "image_url":
++        image_url = part.get("image_url")
++        if not isinstance(image_url, dict) or not isinstance(
++            image_url.get("url"), str
++        ):
++            raise VLLMValidationError(
++                "A Qwen3.8 image_url part must use the canonical "
++                "{'type':'image_url','image_url':{'url':...}} shape.",
++                parameter="image_url",
++            )
++        detail = image_url.get("detail", "auto")
++        if detail not in ("auto", "high"):
++            raise VLLMValidationError(
++                "image_url.detail must be 'auto' or 'high'. Both use the sole "
++                "full Qwen processor path; 'low' and unknown quality modes are "
++                "forbidden.",
++                parameter="image_url.detail",
++                value=detail,
++            )
++    elif part_type == "input_image":
++        if part.get("file_id") is not None or not isinstance(
++            part.get("image_url"), str
++        ):
++            raise VLLMValidationError(
++                "A Qwen3.8 Responses input_image part must contain an inline "
++                "image_url; file_id and uploaded-file indirection are forbidden.",
++                parameter="image_url",
++            )
++        detail = part.get("detail", "auto")
++        if detail not in ("auto", "high"):
++            raise VLLMValidationError(
++                "input_image.detail must be 'auto' or 'high'. Both use the "
++                "sole full Qwen processor path; 'low' and unknown quality modes "
++                "are forbidden.",
++                parameter="detail",
++                value=detail,
++            )
++
++
+ def _parse_chat_message_content_mm_part(
+     part: ChatCompletionContentPartParam,
+ ) -> tuple[str, _ContentPart]:
+@@ -1552,15 +1638,23 @@ def _parse_chat_message_content_mm_part(
+     assert isinstance(
+         part, dict
+     )  # This is needed to avoid mypy errors: part.get() from str
++    _enforce_qwen38_strict_content_part(part)
+     part_type = part.get("type", None)
+     uuid = part.get("uuid", None)
+ 
+     if isinstance(part_type, str) and part_type in MM_PARSER_MAP and uuid is None:  # noqa: E501
+         content = MM_PARSER_MAP[part_type](part)
+ 
+-        # Special case for 'image_url.detail'
+-        # We only support 'auto', which is the default
+-        if part_type == "image_url" and part.get("detail", "auto") != "auto":
++        # Special case for nested OpenAI Chat 'image_url.detail'.
++        if part_type == "image_url" and isinstance(part.get("image_url"), dict):
++            detail = part["image_url"].get("detail", "auto")  # type: ignore[index]
++        else:
++            detail = "auto"
++        if (
++            part_type == "image_url"
++            and detail != "auto"
++            and not envs.VLLM_QWEN38_STRICT_IMAGE_CONTRACT
++        ):
+             logger.warning(
+                 "'image_url.detail' is currently not supported and will be ignored."
+             )
+diff --git a/vllm/entrypoints/serve/utils/api_utils.py b/vllm/entrypoints/serve/utils/api_utils.py
+index c75cd16e54f469233448b9748948c2dc0b609dbc..40b33f85056e75297015f28f688db63cbbd3e9bd 100644
+--- a/vllm/entrypoints/serve/utils/api_utils.py
++++ b/vllm/entrypoints/serve/utils/api_utils.py
+@@ -186,6 +186,13 @@ def get_max_tokens(
+             f"context length ({max_model_len})."
+         )
+     model_max_tokens = max_model_len - input_length
++    if model_max_tokens == 0:
++        raise ValueError(
++            f"Input length ({input_length}) equals model's maximum context "
++            f"length ({max_model_len}), leaving no room for the required "
++            "output token. Reduce the input length before requesting a "
++            "completion."
++        )
+     platform_max_tokens = current_platform.get_max_output_tokens(input_length)
+     fallback_max_tokens = (
+         max_tokens
+diff --git a/vllm/envs.py b/vllm/envs.py
+index 07a22dc7c794905c9076f9b8d2701d740e1023d3..ca7a31d2b07811385a4bf9a82afd019dff929388 100755
+--- a/vllm/envs.py
++++ b/vllm/envs.py
+@@ -81,6 +81,8 @@ if TYPE_CHECKING:
+     VLLM_MAX_AUDIO_DECODE_BYTES: int = 268_435_456
+     VLLM_MAX_AUDIO_PREPROCESS_WORKERS: int = max(1, min(os.cpu_count() or 1, 2))
+     VLLM_MAX_IMAGE_PIXELS: int = 178_956_970
++    VLLM_QWEN38_STRICT_IMAGE_CONTRACT: bool = False
++    VLLM_QWEN38_VISION_HEADROOM_BYTES: int = 0
+     VLLM_VIDEO_LOADER_BACKEND: str = "opencv"
+     VLLM_MEDIA_CONNECTOR: str = "http"
+     VLLM_MM_HASHER_ALGORITHM: str = "blake3"
+@@ -1022,6 +1024,19 @@ environment_variables: dict[str, Callable[[], Any]] = {
+     "VLLM_MAX_IMAGE_PIXELS": lambda: int(
+         os.getenv("VLLM_MAX_IMAGE_PIXELS", "178956970")
+     ),
++    # Project-specific, fail-closed media contract for the pinned Qwen3.8
++    # deployment.  This is deliberately opt-in so upstream vLLM behaviour is
++    # unchanged outside the immutable runtime built by this repository.
++    "VLLM_QWEN38_STRICT_IMAGE_CONTRACT": lambda: bool(
++        int(os.getenv("VLLM_QWEN38_STRICT_IMAGE_CONTRACT", "0"))
++    ),
++    # Extra phase-local bytes reserved alongside the TurboQuant continuation
++    # workspace. The allocation is released while the mutually exclusive
++    # multimodal encoder runs, then restored before language-model execution.
++    # Default zero keeps upstream behaviour unchanged.
++    "VLLM_QWEN38_VISION_HEADROOM_BYTES": lambda: int(
++        os.getenv("VLLM_QWEN38_VISION_HEADROOM_BYTES", "0")
++    ),
+     # Backend for Video IO — selects the frame-sampling algorithm.
+     # - "opencv": uniform sampling.
+     # - "opencv_dynamic": duration-aware dynamic sampling.
+@@ -2281,6 +2296,8 @@ def compile_factors() -> dict[str, object]:
+         "VLLM_MAX_AUDIO_DECODE_BYTES",
+         "VLLM_MAX_AUDIO_PREPROCESS_WORKERS",
+         "VLLM_MAX_IMAGE_PIXELS",
++        "VLLM_QWEN38_STRICT_IMAGE_CONTRACT",
++        "VLLM_QWEN38_VISION_HEADROOM_BYTES",
+         "VLLM_VIDEO_LOADER_BACKEND",
+         "VLLM_MEDIA_CONNECTOR",
+         "VLLM_OBJECT_STORAGE_SHM_BUFFER_NAME",
+diff --git a/vllm/model_executor/models/qwen3_vl.py b/vllm/model_executor/models/qwen3_vl.py
+index 89495ff94902bd028bab6fd10748b7b42e184484..7d37c984ebc4fa102fd2952886b3175621552e2d 100644
+--- a/vllm/model_executor/models/qwen3_vl.py
++++ b/vllm/model_executor/models/qwen3_vl.py
+@@ -428,8 +428,27 @@ class Qwen3_VisionMLP(nn.Module):
+         )
+         self.act_fn = act_fn
+ 
++        # A maximum-resolution Qwen3.8 image produces a
++        # [65_536, 4_304] BF16 tensor here.  The ordinary GELU call allocates
++        # another 538 MiB result before linear_fc2 can consume it.  The fc1
++        # result has no other consumer during inference, so apply the exact
++        # PyTorch tanh-GELU operation into that storage instead.  Keep every
++        # other activation and autograd execution on the ordinary path.
++        self._use_inplace_gelu_tanh = (
++            isinstance(act_fn, nn.GELU) and act_fn.approximate == "tanh"
++        )
++
+     def forward(self, x: torch.Tensor):
+-        mlp_output = self.linear_fc2(self.act_fn(self.linear_fc1(x)))
++        hidden_states = self.linear_fc1(x)
++        if self._use_inplace_gelu_tanh and not torch.is_grad_enabled():
++            hidden_states = torch.ops.aten.gelu.out(
++                hidden_states,
++                approximate="tanh",
++                out=hidden_states,
++            )
++        else:
++            hidden_states = self.act_fn(hidden_states)
++        mlp_output = self.linear_fc2(hidden_states)
+         return mlp_output
+ 
+ 
+diff --git a/vllm/multimodal/media/connector.py b/vllm/multimodal/media/connector.py
+index fed41657e98c3aef8a9d2ee887d88beeb6ac01fe..4a5ef2328b95698e958ac25be6b20d5ade48ff62 100644
+--- a/vllm/multimodal/media/connector.py
++++ b/vllm/multimodal/media/connector.py
+@@ -489,6 +489,17 @@ class MediaConnector:
+         `media_io_kwargs={"image": {"image_mode": None}}` to keep the
+         original image mode (e.g. preserving the alpha channel).
+         """
++        if envs.VLLM_QWEN38_STRICT_IMAGE_CONTRACT and not image_url.startswith(
++            "data:image/png;base64,"
++        ):
++            raise VLLMUnprocessableEntityError(
++                "The Qwen3.8 image contract accepts only inline, lossless PNG "
++                "data URLs with the exact prefix 'data:image/png;base64,'. "
++                "HTTP(S), file URLs, redirects, and other media types are "
++                "forbidden.",
++                parameter="image_url",
++                value="<redacted non-canonical image URL>",
++            )
+         image_io = ImageMediaIO(
+             **({"image_mode": image_mode} | self.media_io_kwargs.get("image", {}))
+         )
+@@ -516,6 +527,17 @@ class MediaConnector:
+         `media_io_kwargs={"image": {"image_mode": None}}` to keep the
+         original image mode (e.g. preserving the alpha channel).
+         """
++        if envs.VLLM_QWEN38_STRICT_IMAGE_CONTRACT and not image_url.startswith(
++            "data:image/png;base64,"
++        ):
++            raise VLLMUnprocessableEntityError(
++                "The Qwen3.8 image contract accepts only inline, lossless PNG "
++                "data URLs with the exact prefix 'data:image/png;base64,'. "
++                "HTTP(S), file URLs, redirects, and other media types are "
++                "forbidden.",
++                parameter="image_url",
++                value="<redacted non-canonical image URL>",
++            )
+         image_io = ImageMediaIO(
+             **({"image_mode": image_mode} | self.media_io_kwargs.get("image", {}))
+         )
+diff --git a/vllm/multimodal/media/image.py b/vllm/multimodal/media/image.py
+index d9fc2132ed55f5bab010262a1ab94b439bf2f3ec..9bf666cd31db47329e79613a5e80a3af8f212958 100644
+--- a/vllm/multimodal/media/image.py
++++ b/vllm/multimodal/media/image.py
+@@ -17,6 +17,7 @@ from ..image import convert_image_mode, normalize_image, rgba_to_rgb
+ from .base import MediaIO, MediaWithBytes
+ 
+ MAGIC_NUMPY_PREFIX = b"\x93NUMPY"  # https://numpy.org/devdocs/reference/generated/numpy.lib.format.html#format-version-1-0
++QWEN38_MAX_PROVEN_IMAGE_ASPECT_RATIO = 30
+ 
+ 
+ class ImageMediaIO(MediaIO[Image.Image]):
+@@ -28,6 +29,12 @@ class ImageMediaIO(MediaIO[Image.Image]):
+     def __init__(self, image_mode: str | None = "RGB", **kwargs) -> None:
+         super().__init__()
+ 
++        if envs.VLLM_QWEN38_STRICT_IMAGE_CONTRACT and image_mode != "RGB":
++            raise ValueError(
++                "The Qwen3.8 image contract requires image_mode='RGB'; "
++                "per-request image-mode changes are forbidden."
++            )
++
+         # Target mode for loaded images; `None` keeps the original mode
+         # (i.e. no conversion, alpha channel is preserved as-is).
+         self.image_mode = image_mode
+@@ -58,6 +65,15 @@ class ImageMediaIO(MediaIO[Image.Image]):
+             )
+         self.rgba_background_color = rgba_bg
+ 
++        if (
++            envs.VLLM_QWEN38_STRICT_IMAGE_CONTRACT
++            and self.rgba_background_color != (255, 255, 255)
++        ):
++            raise ValueError(
++                "The Qwen3.8 image contract requires RGBA images to be "
++                "composited on the pinned white (255, 255, 255) background."
++            )
++
+     def _convert_image_mode(
+         self, image: Image.Image | MediaWithBytes[Image.Image]
+     ) -> Image.Image:
+@@ -78,6 +94,49 @@ class ImageMediaIO(MediaIO[Image.Image]):
+             image = Image.open(BytesIO(data))
+             w, h = image.size
+             max_pixels = envs.VLLM_MAX_IMAGE_PIXELS
++            if envs.VLLM_QWEN38_STRICT_IMAGE_CONTRACT:
++                required_max_pixels = 16_777_216
++                if max_pixels != required_max_pixels:
++                    raise ValueError(
++                        "The Qwen3.8 image contract requires "
++                        f"VLLM_MAX_IMAGE_PIXELS={required_max_pixels}; found "
++                        f"{max_pixels}."
++                    )
++                if image.format != "PNG":
++                    raise ValueError(
++                        "The Qwen3.8 image contract accepts only decoded PNG "
++                        f"files; detected {image.format or 'unknown format'}."
++                    )
++                if getattr(image, "is_animated", False) or getattr(
++                    image, "n_frames", 1
++                ) != 1:
++                    raise ValueError(
++                        "The Qwen3.8 image contract accepts only static, "
++                        "single-frame PNG files; animated PNG is forbidden."
++                    )
++                if image.mode not in ("RGB", "RGBA"):
++                    raise ValueError(
++                        "The Qwen3.8 image contract accepts only 8-bit RGB or "
++                        f"RGBA PNG source pixels; detected mode {image.mode!r}."
++                    )
++                if image.mode == "RGB" and "transparency" in image.info:
++                    raise ValueError(
++                        "The Qwen3.8 image contract requires transparent PNG "
++                        "pixels to use explicit 8-bit RGBA, not an RGB tRNS key."
++                    )
++                short_edge = min(w, h)
++                long_edge = max(w, h)
++                if (
++                    short_edge <= 0
++                    or long_edge
++                    > short_edge * QWEN38_MAX_PROVEN_IMAGE_ASPECT_RATIO
++                ):
++                    raise ValueError(
++                        "The Qwen3.8 deployment's empirically proven full-quality "
++                        "contract requires image aspect ratio "
++                        f"<= {QWEN38_MAX_PROVEN_IMAGE_ASPECT_RATIO}:1; received "
++                        f"{w}x{h}."
++                    )
+             if max_pixels > 0 and w * h > max_pixels:
+                 raise ValueError(
+                     f"Image dimensions {w}x{h} ({w * h} pixels) exceed "
+@@ -99,6 +158,14 @@ class ImageMediaIO(MediaIO[Image.Image]):
+         return MediaWithBytes(converted, data, io_config)
+ 
+     def load_base64(self, media_type: str, data: str) -> MediaWithBytes[Image.Image]:
++        if (
++            envs.VLLM_QWEN38_STRICT_IMAGE_CONTRACT
++            and media_type != "image/png"
++        ):
++            raise ValueError(
++                "The Qwen3.8 image contract requires the exact data-URL "
++                f"media type 'image/png'; received {media_type!r}."
++            )
+         return self.load_bytes(pybase64.b64decode(data, validate=True))
+ 
+     def load_file(self, filepath: Path) -> MediaWithBytes[Image.Image]:
+diff --git a/vllm/renderers/params.py b/vllm/renderers/params.py
+index c0e2d2129e545a500d9b74c944c3da4810d3e65a..4e08236cbb2e49386c6be1fdf43930be5d05f878 100644
+--- a/vllm/renderers/params.py
++++ b/vllm/renderers/params.py
+@@ -3,6 +3,7 @@
+ from dataclasses import dataclass, field
+ from typing import TYPE_CHECKING, Any, Literal, TypeVar
+ 
++import vllm.envs as envs
+ from vllm.exceptions import VLLMValidationError
+ from vllm.inputs import EmbedsPrompt, TextPrompt, TokensPrompt
+ from vllm.logger import init_logger
+@@ -102,6 +103,31 @@ class ChatParams:
+         default_media_io_kwargs: dict[str, dict[str, Any]] | None = None,
+         default_mm_processor_kwargs: dict[str, Any] | None = None,
+     ):
++        if envs.VLLM_QWEN38_STRICT_IMAGE_CONTRACT:
++            if self.media_io_kwargs:
++                raise VLLMValidationError(
++                    "Request-level media_io_kwargs are forbidden by the "
++                    "Qwen3.8 image contract; the sole server-side RGB/RGBA PNG "
++                    "decode path cannot be overridden.",
++                    parameter="media_io_kwargs",
++                )
++            if self.mm_processor_kwargs:
++                raise VLLMValidationError(
++                    "Request-level mm_processor_kwargs are forbidden by the "
++                    "Qwen3.8 image contract; the checkpoint's pinned full-quality "
++                    "processor settings cannot be overridden.",
++                    parameter="mm_processor_kwargs",
++                )
++            if (
++                "add_vision_id" in self.chat_template_kwargs
++                and self.chat_template_kwargs["add_vision_id"] is not False
++            ):
++                raise VLLMValidationError(
++                    "chat_template_kwargs.add_vision_id must remain false in the "
++                    "sole Qwen3.8 prompt format.",
++                    parameter="chat_template_kwargs.add_vision_id",
++                    value=self.chat_template_kwargs["add_vision_id"],
++                )
+         if (
+             not default_chat_template_kwargs
+             and not default_media_io_kwargs
+diff --git a/vllm/v1/attention/backends/turboquant_attn.py b/vllm/v1/attention/backends/turboquant_attn.py
+index cf153a5a2422c9d6f5e9aca520246ddf338129ec..f7038b24d9c7983c7065d54fa78eaa299d3c0995 100644
+--- a/vllm/v1/attention/backends/turboquant_attn.py
++++ b/vllm/v1/attention/backends/turboquant_attn.py
+@@ -25,6 +25,7 @@ from typing import Any, ClassVar
+ import torch
+ import torch.nn.functional as F
+ 
++import vllm.envs as envs
+ from vllm.config import get_current_vllm_config
+ from vllm.config.cache import CacheDType
+ from vllm.logger import init_logger
+@@ -82,6 +83,8 @@ if _HAS_FLASH_ATTN:
+ # kernel can read them efficiently. This avoids O(cached_len) dequant work
+ # per continuation, eliminating the O(N²/chunk_size) collapse at long context.
+ _CONTINUATION_DECODE_THRESHOLD = 128
++_CONTINUATION_WORKSPACE_NAME = "turboquant_continuation_prefill"
++_VISION_HEADROOM_WORKSPACE_NAME = "qwen38_vision_encoder_headroom"
+ 
+ 
+ def _soa_imports():
+@@ -285,10 +288,22 @@ class TurboQuantMetadataBuilder(AttentionMetadataBuilder[TurboQuantMetadata]):
+         max_cached_len = max(0, model_config.max_model_len - 1)
+         alloc_len = round_up(max_cached_len, self.kv_cache_spec.block_size)
+         cache_buf_shape = (1, num_kv_heads, alloc_len, head_size)
+-        current_workspace_manager().get_simultaneous(
++        vision_headroom_bytes = envs.VLLM_QWEN38_VISION_HEADROOM_BYTES
++        if vision_headroom_bytes < 0:
++            raise ValueError(
++                "VLLM_QWEN38_VISION_HEADROOM_BYTES must be non-negative, got "
++                f"{vision_headroom_bytes}."
++            )
++        current_workspace_manager().get_reclaimable_simultaneous(
++            _CONTINUATION_WORKSPACE_NAME,
+             (cache_buf_shape, torch.float16),
+             (cache_buf_shape, torch.float16),
+         )
++        if vision_headroom_bytes:
++            current_workspace_manager().reserve_raw_cuda_headroom(
++                _VISION_HEADROOM_WORKSPACE_NAME,
++                vision_headroom_bytes,
++            )
+ 
+     def build_for_cudagraph_capture(
+         self, common_attn_metadata: CommonAttentionMetadata
+@@ -978,9 +993,12 @@ class TurboQuantAttentionImpl(AttentionImpl["TurboQuantMetadata"]):
+             # and the runtime allocations without increasing reserved memory.
+             full_alloc_len = math.ceil(seq_len / block_size) * block_size
+             full_shape = (full_alloc_len, Hk, D)
+-            k_full_buf, v_full_buf = current_workspace_manager().get_simultaneous(
+-                (full_shape, qdtype),
+-                (full_shape, qdtype),
++            k_full_buf, v_full_buf = (
++                current_workspace_manager().get_reclaimable_simultaneous(
++                    _CONTINUATION_WORKSPACE_NAME,
++                    (full_shape, qdtype),
++                    (full_shape, qdtype),
++                )
+             )
+             k_full = k_full_buf[:seq_len]
+             v_full = v_full_buf[:seq_len]
+@@ -994,9 +1012,12 @@ class TurboQuantAttentionImpl(AttentionImpl["TurboQuantMetadata"]):
+             buf_shape = (1, Hk, alloc_len, D)
+             # MSE-key modes still need separate FP16 dequant buffers because
+             # their inverse rotation produces the final contiguous K tensor.
+-            k_buf, v_buf = current_workspace_manager().get_simultaneous(
+-                (buf_shape, torch.float16),
+-                (buf_shape, torch.float16),
++            k_buf, v_buf = (
++                current_workspace_manager().get_reclaimable_simultaneous(
++                    _CONTINUATION_WORKSPACE_NAME,
++                    (buf_shape, torch.float16),
++                    (buf_shape, torch.float16),
++                )
+             )
+             k_cached = k_buf[:, :, :alloc_len, :]
+             v_cached = v_buf[:, :, :alloc_len, :]
+diff --git a/vllm/v1/worker/gpu_model_runner.py b/vllm/v1/worker/gpu_model_runner.py
+index cd1679bdd96b8fb3c81b48cfe7f7a436d3a7a656..58f3c8902538c846c06e99985f92bfbeae1d7e38 100644
+--- a/vllm/v1/worker/gpu_model_runner.py
++++ b/vllm/v1/worker/gpu_model_runner.py
+@@ -235,7 +235,7 @@ from vllm.v1.worker.utils import (
+     is_residual_scattered_for_sp,
+     raise_if_nan_logits,
+ )
+-from vllm.v1.worker.workspace import lock_workspace
++from vllm.v1.worker.workspace import lock_workspace, release_reclaimable_workspaces
+ 
+ from .utils import (
+     AttentionGroup,
+@@ -3070,6 +3070,14 @@ class GPUModelRunner(
+ 
+     def _execute_mm_encoder(
+         self, scheduler_output: "SchedulerOutput"
++    ) -> list[torch.Tensor]:
++        if not scheduler_output.scheduled_encoder_inputs:
++            return []
++        with release_reclaimable_workspaces():
++            return self._execute_mm_encoder_with_released_workspace(scheduler_output)
++
++    def _execute_mm_encoder_with_released_workspace(
++        self, scheduler_output: "SchedulerOutput"
+     ) -> list[torch.Tensor]:
+         mm_hashes, mm_kwargs, mm_lora_refs = self._batch_mm_inputs_from_scheduler(
+             scheduler_output
+diff --git a/vllm/v1/worker/workspace.py b/vllm/v1/worker/workspace.py
+index 1c502bfd8ff11b4ceadedac20c6ae00023ee2b4c..d93389883be183e8609a56f84af5cce1670c4503 100644
+--- a/vllm/v1/worker/workspace.py
++++ b/vllm/v1/worker/workspace.py
+@@ -1,10 +1,13 @@
+ # SPDX-License-Identifier: Apache-2.0
+ # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
+ 
++import ctypes
+ import inspect
+ import os
++from contextlib import contextmanager
+ from itertools import accumulate
+ from math import prod
++from typing import Iterator
+ 
+ import torch
+ 
+@@ -24,6 +27,77 @@ def _compute_bytes(shape: tuple[int, ...], dtype: torch.dtype) -> int:
+ _MB = 1024**2
+ _GiB = 1024**3
+ 
++_CUDA_SUCCESS = 0
++_cuda_runtime: ctypes.CDLL | None = None
++
++
++def _get_cuda_runtime() -> ctypes.CDLL:
++    """Load the CUDA 13 runtime pinned by the immutable serving image."""
++    global _cuda_runtime
++    if _cuda_runtime is None:
++        runtime = ctypes.CDLL("libcudart.so.13")
++        runtime.cudaMalloc.argtypes = [
++            ctypes.POINTER(ctypes.c_void_p),
++            ctypes.c_size_t,
++        ]
++        runtime.cudaMalloc.restype = ctypes.c_int
++        runtime.cudaMemset.argtypes = [
++            ctypes.c_void_p,
++            ctypes.c_int,
++            ctypes.c_size_t,
++        ]
++        runtime.cudaMemset.restype = ctypes.c_int
++        runtime.cudaFree.argtypes = [ctypes.c_void_p]
++        runtime.cudaFree.restype = ctypes.c_int
++        runtime.cudaDeviceSynchronize.argtypes = []
++        runtime.cudaDeviceSynchronize.restype = ctypes.c_int
++        runtime.cudaGetErrorString.argtypes = [ctypes.c_int]
++        runtime.cudaGetErrorString.restype = ctypes.c_char_p
++        _cuda_runtime = runtime
++    return _cuda_runtime
++
++
++def _check_cuda_runtime(status: int, operation: str) -> None:
++    if status == _CUDA_SUCCESS:
++        return
++    runtime = _get_cuda_runtime()
++    error = runtime.cudaGetErrorString(status)
++    detail = error.decode("utf-8", errors="replace") if error else "unknown error"
++    raise RuntimeError(f"{operation} failed with CUDA error {status}: {detail}")
++
++
++def _raw_cuda_malloc_committed(size: int) -> int:
++    """Allocate and physically commit bytes outside PyTorch's caching allocator."""
++    runtime = _get_cuda_runtime()
++    pointer = ctypes.c_void_p()
++    _check_cuda_runtime(
++        runtime.cudaMalloc(ctypes.byref(pointer), size),
++        f"cudaMalloc({size})",
++    )
++    if pointer.value is None:
++        raise RuntimeError("cudaMalloc succeeded without returning a pointer.")
++    try:
++        _check_cuda_runtime(
++            runtime.cudaMemset(pointer, 0, size),
++            f"cudaMemset({size})",
++        )
++        _check_cuda_runtime(
++            runtime.cudaDeviceSynchronize(),
++            "cudaDeviceSynchronize after headroom commit",
++        )
++    except BaseException:
++        runtime.cudaFree(pointer)
++        raise
++    return int(pointer.value)
++
++
++def _raw_cuda_free(pointer: int) -> None:
++    runtime = _get_cuda_runtime()
++    _check_cuda_runtime(
++        runtime.cudaFree(ctypes.c_void_p(pointer)),
++        "cudaFree(headroom)",
++    )
++
+ # Global workspace manager instance
+ _manager: "WorkspaceManager | None" = None
+ 
+@@ -42,6 +116,11 @@ class WorkspaceManager:
+         self._current_workspaces: list[torch.Tensor | None] = [
+             None
+         ] * self._num_ubatches
++        self._reclaimable_workspaces: dict[str, list[torch.Tensor | None]] = {}
++        self._reclaimable_workspace_sizes: dict[str, list[int]] = {}
++        self._raw_cuda_headroom_sizes: dict[str, int] = {}
++        self._raw_cuda_headroom_pointers: dict[str, int | None] = {}
++        self._reclaimable_workspaces_released = False
+         self._locked: bool = False
+ 
+     @staticmethod
+@@ -116,6 +195,220 @@ class WorkspaceManager:
+             for i in range(len(shapes_and_dtypes))
+         ]
+ 
++    def get_reclaimable_simultaneous(
++        self,
++        name: str,
++        *shapes_and_dtypes: tuple[tuple[int, ...], torch.dtype],
++    ) -> list[torch.Tensor]:
++        """Get views into a named workspace that can be released between phases.
++
++        Reclaimable workspaces must not be referenced by CUDA graphs. Their backing
++        allocations can be temporarily released while a mutually exclusive model
++        phase needs the memory, then restored at their exact profiled sizes.
++
++        Args:
++            name: Stable name shared by all users of this workspace.
++            *shapes_and_dtypes: One or more (shape, dtype) tuples.
++        Returns:
++            Tensor views into the named workspace allocation.
++
++        Raises:
++            AssertionError: If the workspace is released, or would grow while the
++                manager is locked.
++        """
++        if self._reclaimable_workspaces_released:
++            raise AssertionError(
++                f"Reclaimable workspace '{name}' was requested while reclaimable "
++                "workspaces are released. Model phases must not overlap."
++            )
++
++        actual_bytes = [_compute_bytes(s, d) for s, d in shapes_and_dtypes]
++        aligned_bytes = [round_up(actual, 256) for actual in actual_bytes]
++        total_bytes = sum(aligned_bytes)
++        offsets = list(accumulate([0] + aligned_bytes[:-1]))
++
++        workspaces = self._reclaimable_workspaces.setdefault(
++            name, [None] * self._num_ubatches
++        )
++        sizes = self._reclaimable_workspace_sizes.setdefault(
++            name, [0] * self._num_ubatches
++        )
++        ubatch_id = dbo_current_ubatch_id()
++        current_workspace = workspaces[ubatch_id]
++        current_size = self._workspace_size_bytes(current_workspace)
++
++        if current_size < total_bytes:
++            if self._locked:
++                raise AssertionError(
++                    f"Reclaimable workspace '{name}' is locked but requires "
++                    f"{total_bytes / _MB:.2f} MB, current size is "
++                    f"{current_size / _MB:.2f} MB."
++                )
++            workspaces[ubatch_id] = None
++            del current_workspace
++            torch.accelerator.empty_cache()
++            workspaces[ubatch_id] = torch.empty(
++                (total_bytes,), dtype=torch.uint8, device=self._device
++            )
++            sizes[ubatch_id] = total_bytes
++            current_workspace = workspaces[ubatch_id]
++
++            if envs.VLLM_DEBUG_WORKSPACE:
++                logger.info(
++                    "[WORKSPACE DEBUG] Resized reclaimable workspace '%s': "
++                    "%.2f MB -> %.2f MB (ubatch %d)",
++                    name,
++                    current_size / _MB,
++                    total_bytes / _MB,
++                    ubatch_id,
++                )
++
++        assert current_workspace is not None
++        return [
++            current_workspace[offsets[i] : offsets[i] + actual_bytes[i]]
++            .view(shapes_and_dtypes[i][1])
++            .reshape(shapes_and_dtypes[i][0])
++            for i in range(len(shapes_and_dtypes))
++        ]
++
++    def reserve_raw_cuda_headroom(self, name: str, size: int) -> None:
++        """Reserve driver-visible CUDA memory that can be freed for another phase.
++
++        PyTorch caching-allocator segments can remain physically mapped after every
++        tensor view is dropped and ``empty_cache`` is called. Such a tensor is not a
++        valid defensive headroom guarantee. This reservation deliberately lives
++        outside the caching allocator: ``cudaFree`` must increase driver-visible
++        free memory before the vision encoder begins, and ``cudaMalloc`` restores
++        the same committed reservation before text execution resumes.
++        """
++        if self._reclaimable_workspaces_released:
++            raise AssertionError(
++                f"Raw CUDA headroom '{name}' was requested while reclaimable "
++                "workspaces are released. Model phases must not overlap."
++            )
++        if self._device.type != "cuda":
++            raise AssertionError(
++                f"Raw CUDA headroom '{name}' requires a CUDA workspace manager."
++            )
++        if size <= 0:
++            raise ValueError(f"Raw CUDA headroom size must be positive, got {size}.")
++
++        previous_size = self._raw_cuda_headroom_sizes.get(name)
++        if previous_size is not None:
++            if previous_size != size:
++                raise AssertionError(
++                    f"Raw CUDA headroom '{name}' changed size from "
++                    f"{previous_size} to {size} bytes."
++                )
++            assert self._raw_cuda_headroom_pointers[name] is not None
++            return
++        if self._locked:
++            raise AssertionError(
++                f"Raw CUDA headroom '{name}' cannot be added after workspace lock."
++            )
++
++        pointer = _raw_cuda_malloc_committed(size)
++        self._raw_cuda_headroom_sizes[name] = size
++        self._raw_cuda_headroom_pointers[name] = pointer
++        if envs.VLLM_DEBUG_WORKSPACE:
++            logger.info(
++                "[WORKSPACE DEBUG] Reserved raw CUDA headroom '%s': %.2f MB",
++                name,
++                size / _MB,
++            )
++
++    def _driver_free_bytes(self) -> int | None:
++        if self._device.type != "cuda":
++            return None
++        free_bytes, _ = torch.cuda.mem_get_info(self._device)
++        return free_bytes
++
++    def release_reclaimable_workspaces(self) -> int:
++        """Release all phase-local backing tensors and return their byte count."""
++        if self._reclaimable_workspaces_released:
++            raise AssertionError("Reclaimable workspaces are already released.")
++
++        driver_free_before = (
++            self._driver_free_bytes() if envs.VLLM_DEBUG_WORKSPACE else None
++        )
++        released_bytes = 0
++        for name, pointer in self._raw_cuda_headroom_pointers.items():
++            assert pointer is not None
++            _raw_cuda_free(pointer)
++            self._raw_cuda_headroom_pointers[name] = None
++            released_bytes += self._raw_cuda_headroom_sizes[name]
++        for workspaces in self._reclaimable_workspaces.values():
++            released_bytes += sum(self._workspace_size_bytes(ws) for ws in workspaces)
++            for ubatch_id in range(self._num_ubatches):
++                workspaces[ubatch_id] = None
++        self._reclaimable_workspaces_released = True
++        if released_bytes:
++            torch.accelerator.empty_cache()
++
++        if envs.VLLM_DEBUG_WORKSPACE and released_bytes:
++            driver_free_after = self._driver_free_bytes()
++            if driver_free_before is None or driver_free_after is None:
++                logger.info(
++                    "[WORKSPACE DEBUG] Released %.2f MB of reclaimable workspace",
++                    released_bytes / _MB,
++                )
++            else:
++                logger.info(
++                    "[WORKSPACE DEBUG] Released %.2f MB of reclaimable workspace; "
++                    "driver free memory %.2f MB -> %.2f MB",
++                    released_bytes / _MB,
++                    driver_free_before / _MB,
++                    driver_free_after / _MB,
++                )
++        return released_bytes
++
++    def restore_reclaimable_workspaces(self) -> int:
++        """Restore released backing tensors at their exact profiled sizes."""
++        if not self._reclaimable_workspaces_released:
++            raise AssertionError("Reclaimable workspaces are not released.")
++
++        driver_free_before = (
++            self._driver_free_bytes() if envs.VLLM_DEBUG_WORKSPACE else None
++        )
++        restored_bytes = 0
++        restore_bytes = sum(
++            sum(sizes) for sizes in self._reclaimable_workspace_sizes.values()
++        )
++        if restore_bytes:
++            torch.accelerator.empty_cache()
++        for name, sizes in self._reclaimable_workspace_sizes.items():
++            workspaces = self._reclaimable_workspaces[name]
++            for ubatch_id, size in enumerate(sizes):
++                if size == 0:
++                    continue
++                assert workspaces[ubatch_id] is None
++                workspaces[ubatch_id] = torch.empty(
++                    (size,), dtype=torch.uint8, device=self._device
++                )
++                restored_bytes += size
++        for name, size in self._raw_cuda_headroom_sizes.items():
++            assert self._raw_cuda_headroom_pointers[name] is None
++            self._raw_cuda_headroom_pointers[name] = _raw_cuda_malloc_committed(size)
++            restored_bytes += size
++        self._reclaimable_workspaces_released = False
++
++        if envs.VLLM_DEBUG_WORKSPACE and restored_bytes:
++            driver_free_after = self._driver_free_bytes()
++            if driver_free_before is None or driver_free_after is None:
++                logger.info(
++                    "[WORKSPACE DEBUG] Restored %.2f MB of reclaimable workspace",
++                    restored_bytes / _MB,
++                )
++            else:
++                logger.info(
++                    "[WORKSPACE DEBUG] Restored %.2f MB of reclaimable workspace; "
++                    "driver free memory %.2f MB -> %.2f MB",
++                    restored_bytes / _MB,
++                    driver_free_before / _MB,
++                    driver_free_after / _MB,
++                )
++        return restored_bytes
++
+     def _ensure_workspace_size(self, required_bytes: int) -> torch.Tensor:
+         """Ensure workspace is allocated and large enough, return current workspace.
+ 
+@@ -258,6 +551,17 @@ def lock_workspace() -> None:
+     current_workspace_manager().lock()
+ 
+ 
++@contextmanager
++def release_reclaimable_workspaces() -> Iterator[int]:
++    """Temporarily release phase-local workspaces and restore them on exit."""
++    manager = current_workspace_manager()
++    released_bytes = manager.release_reclaimable_workspaces()
++    try:
++        yield released_bytes
++    finally:
++        manager.restore_reclaimable_workspaces()
++
++
+ def unlock_workspace() -> None:
+     """Unlock the workspace to allow growth.
+ 
