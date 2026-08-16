@@ -1,0 +1,1464 @@
+{
+  "accounting": {
+    "converted_tensors": 1968,
+    "fp8_scale_tensors": 233,
+    "fp8_weight_tensors": 233,
+    "kv_calibration_tensors": 32,
+    "nvfp4_metadata_tensors": 504,
+    "nvfp4_weight_tensors": 168,
+    "official_tensors": 1199,
+    "reference_precision_tensors": 798
+  },
+  "fp8": {
+    "aggregate": {
+      "approximation_rms": 0.014972685965402762,
+      "cosine_similarity": 0.9996461412440728,
+      "elements": 10624696320,
+      "max_absolute_error": 0.0546875,
+      "mean_absolute_error": 0.00026464456985408414,
+      "reference_rms": 0.014981256792403277,
+      "relative_l2_error": 0.026601502335981443
+    },
+    "saturated_values": 2953450,
+    "saturation_fraction": 0.00027797970982383803,
+    "semantics": "E4M3 value * per-output-channel floating scale (BF16 in this snapshot)",
+    "worst_tensors": [
+      {
+        "metrics": {
+          "approximation_rms": 0.016058013700537815,
+          "cosine_similarity": 0.999644572730532,
+          "elements": 31457280,
+          "max_absolute_error": 0.0546875,
+          "mean_absolute_error": 0.0002802446214825648,
+          "reference_rms": 0.016066750750819113,
+          "relative_l2_error": 0.02666015179128547
+        },
+        "name": "model.language_model.layers.1.linear_attn.out_proj.weight",
+        "saturated_values": 8428
+      },
+      {
+        "metrics": {
+          "approximation_rms": 0.01622059515104611,
+          "cosine_similarity": 0.9996452898165155,
+          "elements": 31457280,
+          "max_absolute_error": 0.0517578125,
+          "mean_absolute_error": 0.00028707720617726873,
+          "reference_rms": 0.016230091092572268,
+          "relative_l2_error": 0.02663358066498254
+        },
+        "name": "model.language_model.layers.4.linear_attn.out_proj.weight",
+        "saturated_values": 8423
+      },
+      {
+        "metrics": {
+          "approximation_rms": 0.015822896076860236,
+          "cosine_similarity": 0.9996453529447823,
+          "elements": 31457280,
+          "max_absolute_error": 0.037109375,
+          "mean_absolute_error": 0.00028123589976170537,
+          "reference_rms": 0.015832058367420503,
+          "relative_l2_error": 0.026631157381973997
+        },
+        "name": "model.language_model.layers.14.linear_attn.out_proj.weight",
+        "saturated_values": 8272
+      },
+      {
+        "metrics": {
+          "approximation_rms": 0.016521247106672878,
+          "cosine_similarity": 0.9996453751193152,
+          "elements": 5242880,
+          "max_absolute_error": 0.00384521484375,
+          "mean_absolute_error": 0.0002951149857417873,
+          "reference_rms": 0.01653112239063386,
+          "relative_l2_error": 0.026630488736087792
+        },
+        "name": "model.language_model.layers.15.self_attn.v_proj.weight",
+        "saturated_values": 1618
+      },
+      {
+        "metrics": {
+          "approximation_rms": 0.015802645942653196,
+          "cosine_similarity": 0.9996453931575825,
+          "elements": 31457280,
+          "max_absolute_error": 0.03125,
+          "mean_absolute_error": 0.00028155511621926664,
+          "reference_rms": 0.01581209483665112,
+          "relative_l2_error": 0.026629813588858478
+        },
+        "name": "model.language_model.layers.16.linear_attn.out_proj.weight",
+        "saturated_values": 8302
+      },
+      {
+        "metrics": {
+          "approximation_rms": 0.016034318700970787,
+          "cosine_similarity": 0.9996454934666867,
+          "elements": 31457280,
+          "max_absolute_error": 0.0478515625,
+          "mean_absolute_error": 0.00028458211414500965,
+          "reference_rms": 0.01604360736995882,
+          "relative_l2_error": 0.026625885390716267
+        },
+        "name": "model.language_model.layers.5.linear_attn.out_proj.weight",
+        "saturated_values": 8401
+      },
+      {
+        "metrics": {
+          "approximation_rms": 0.01593788450295212,
+          "cosine_similarity": 0.9996455036665911,
+          "elements": 31457280,
+          "max_absolute_error": 0.052734375,
+          "mean_absolute_error": 0.0002767878126265961,
+          "reference_rms": 0.01594717265941142,
+          "relative_l2_error": 0.02662553199846357
+        },
+        "name": "model.language_model.layers.3.self_attn.o_proj.weight",
+        "saturated_values": 8434
+      },
+      {
+        "metrics": {
+          "approximation_rms": 0.015681239955085316,
+          "cosine_similarity": 0.9996455018595349,
+          "elements": 52428800,
+          "max_absolute_error": 0.014404296875,
+          "mean_absolute_error": 0.0002754860918330463,
+          "reference_rms": 0.015690120784971433,
+          "relative_l2_error": 0.02662546433412536
+        },
+        "name": "model.language_model.layers.0.linear_attn.in_proj_qkv.weight",
+        "saturated_values": 16812
+      },
+      {
+        "metrics": {
+          "approximation_rms": 0.01600272558467215,
+          "cosine_similarity": 0.999645612985619,
+          "elements": 31457280,
+          "max_absolute_error": 0.05078125,
+          "mean_absolute_error": 0.0002828072485159868,
+          "reference_rms": 0.016012417301891194,
+          "relative_l2_error": 0.026621633630601382
+        },
+        "name": "model.language_model.layers.6.linear_attn.out_proj.weight",
+        "saturated_values": 8369
+      },
+      {
+        "metrics": {
+          "approximation_rms": 0.017649441984380992,
+          "cosine_similarity": 0.9996456225823339,
+          "elements": 5242880,
+          "max_absolute_error": 0.0068359375,
+          "mean_absolute_error": 0.0003100937281958871,
+          "reference_rms": 0.017660004131757213,
+          "relative_l2_error": 0.02662120666620229
+        },
+        "name": "model.language_model.layers.31.self_attn.v_proj.weight",
+        "saturated_values": 1553
+      },
+      {
+        "metrics": {
+          "approximation_rms": 0.01604017502898581,
+          "cosine_similarity": 0.9996456335905869,
+          "elements": 52428800,
+          "max_absolute_error": 0.0064697265625,
+          "mean_absolute_error": 0.00028756263955840607,
+          "reference_rms": 0.01604973102083259,
+          "relative_l2_error": 0.026620768958191206
+        },
+        "name": "model.language_model.layers.13.linear_attn.in_proj_qkv.weight",
+        "saturated_values": 16385
+      },
+      {
+        "metrics": {
+          "approximation_rms": 0.015719839987730775,
+          "cosine_similarity": 0.9996456619759145,
+          "elements": 52428800,
+          "max_absolute_error": 0.00628662109375,
+          "mean_absolute_error": 0.0002812726816028971,
+          "reference_rms": 0.01572899131823798,
+          "relative_l2_error": 0.026619583722665662
+        },
+        "name": "model.language_model.layers.8.linear_attn.in_proj_qkv.weight",
+        "saturated_values": 16486
+      },
+      {
+        "metrics": {
+          "approximation_rms": 0.015844732573917743,
+          "cosine_similarity": 0.9996456886706293,
+          "elements": 31457280,
+          "max_absolute_error": 0.0390625,
+          "mean_absolute_error": 0.00028171736215880594,
+          "reference_rms": 0.015854162827113813,
+          "relative_l2_error": 0.026618695741996795
+        },
+        "name": "model.language_model.layers.10.linear_attn.out_proj.weight",
+        "saturated_values": 8375
+      },
+      {
+        "metrics": {
+          "approximation_rms": 0.015716826836277183,
+          "cosine_similarity": 0.9996456866655888,
+          "elements": 52428800,
+          "max_absolute_error": 0.0067138671875,
+          "mean_absolute_error": 0.0002813179839719614,
+          "reference_rms": 0.015726047452619907,
+          "relative_l2_error": 0.02661869571415598
+        },
+        "name": "model.language_model.layers.9.linear_attn.in_proj_qkv.weight",
+        "saturated_values": 16159
+      },
+      {
+        "metrics": {
+          "approximation_rms": 0.016425597669600694,
+          "cosine_similarity": 0.9996457018647229,
+          "elements": 31457280,
+          "max_absolute_error": 0.01953125,
+          "mean_absolute_error": 0.0002905747808122722,
+          "reference_rms": 0.016435902375556182,
+          "relative_l2_error": 0.026618510281822574
+        },
+        "name": "model.language_model.layers.47.self_attn.o_proj.weight",
+        "saturated_values": 7954
+      },
+      {
+        "metrics": {
+          "approximation_rms": 0.015491438482000613,
+          "cosine_similarity": 0.9996457058564273,
+          "elements": 31457280,
+          "max_absolute_error": 0.0062255859375,
+          "mean_absolute_error": 0.000276263097047021,
+          "reference_rms": 0.015500375160368072,
+          "relative_l2_error": 0.026617891702131746
+        },
+        "name": "model.language_model.layers.24.linear_attn.in_proj_z.weight",
+        "saturated_values": 9819
+      },
+      {
+        "metrics": {
+          "approximation_rms": 0.016128203802403256,
+          "cosine_similarity": 0.9996457232695373,
+          "elements": 31457280,
+          "max_absolute_error": 0.00701904296875,
+          "mean_absolute_error": 0.00028859741800781464,
+          "reference_rms": 0.016137926962342487,
+          "relative_l2_error": 0.026617467301164932
+        },
+        "name": "model.language_model.layers.8.linear_attn.in_proj_z.weight",
+        "saturated_values": 9981
+      },
+      {
+        "metrics": {
+          "approximation_rms": 0.011921213144419775,
+          "cosine_similarity": 0.9996457256337261,
+          "elements": 89128960,
+          "max_absolute_error": 0.006103515625,
+          "mean_absolute_error": 0.00021382250063078866,
+          "reference_rms": 0.0119277531067072,
+          "relative_l2_error": 0.026616928210493697
+        },
+        "name": "model.language_model.layers.56.mlp.up_proj.weight",
+        "saturated_values": 28528
+      },
+      {
+        "metrics": {
+          "approximation_rms": 0.011626589031930482,
+          "cosine_similarity": 0.9996457182246594,
+          "elements": 89128960,
+          "max_absolute_error": 0.017578125,
+          "mean_absolute_error": 0.00020481901740541946,
+          "reference_rms": 0.011632388688616465,
+          "relative_l2_error": 0.026616890438115857
+        },
+        "name": "model.language_model.layers.63.mlp.down_proj.weight",
+        "saturated_values": 8256
+      },
+      {
+        "metrics": {
+          "approximation_rms": 0.01608869750162408,
+          "cosine_similarity": 0.9996457382772014,
+          "elements": 31457280,
+          "max_absolute_error": 0.005615234375,
+          "mean_absolute_error": 0.0002875305876624876,
+          "reference_rms": 0.01609825166758329,
+          "relative_l2_error": 0.02661682127586123
+        },
+        "name": "model.language_model.layers.22.linear_attn.in_proj_z.weight",
+        "saturated_values": 10135
+      }
+    ]
+  },
+  "kv_calibration": {
+    "maximum": 0.25390625,
+    "minimum": 0.019287109375,
+    "runtime_use": "none: turboquant_k8v4 quantizes live K/V independently",
+    "storage_dtypes": {
+      "BF16": 32
+    },
+    "tensors": 32
+  },
+  "nvfp4": {
+    "aggregate": {
+      "approximation_rms": 0.011254039776867392,
+      "cosine_similarity": 0.9941543194672355,
+      "elements": 14973665280,
+      "max_absolute_error": 0.12423950433731079,
+      "mean_absolute_error": 0.0009218484497823072,
+      "reference_rms": 0.011240125090416176,
+      "relative_l2_error": 0.10820059467497674
+    },
+    "group_size": 16,
+    "nibble_histogram": [
+      1037825607,
+      1018113845,
+      963003651,
+      880434507,
+      1129682405,
+      1130435349,
+      1013085173,
+      834117437,
+      0,
+      1018030386,
+      962958339,
+      880217154,
+      1129393931,
+      1130051516,
+      1012520595,
+      833795385
+    ],
+    "saturated_values": 1667912822,
+    "saturation_fraction": 0.11138974932395443,
+    "scale_saturated_values": 149,
+    "scale_saturation_fraction": 1.5921285506390055e-07,
+    "semantics": "low-nibble-first E2M1 value * FP8 block scale / checkpoint weight_global_scale divisor",
+    "worst_tensors": [
+      {
+        "checkpoint_input_global_divisor": 161.0,
+        "checkpoint_weight_global_divisor": 2752.0,
+        "metrics": {
+          "approximation_rms": 0.010701452049079631,
+          "cosine_similarity": 0.9883193682781741,
+          "elements": 89128960,
+          "max_absolute_error": 0.11639261245727539,
+          "mean_absolute_error": 0.0012031083146901472,
+          "reference_rms": 0.0106335450494848,
+          "relative_l2_error": 0.15346409473018105
+        },
+        "name": "model.language_model.layers.0.mlp.down_proj.weight_packed",
+        "nibble_histogram": [
+          6096485,
+          5988744,
+          5679361,
+          5207899,
+          6718536,
+          6762844,
+          6131861,
+          5029489,
+          0,
+          5984793,
+          5680192,
+          5213203,
+          6713387,
+          6759574,
+          6131043,
+          5031549
+        ],
+        "saturated_values": 10061038,
+        "scale_saturated_values": 1
+      },
+      {
+        "checkpoint_input_global_divisor": 836.0,
+        "checkpoint_weight_global_divisor": 6400.0,
+        "metrics": {
+          "approximation_rms": 0.010202777821505594,
+          "cosine_similarity": 0.9920779833264066,
+          "elements": 89128960,
+          "max_absolute_error": 0.01816406100988388,
+          "mean_absolute_error": 0.0009806165186110126,
+          "reference_rms": 0.010167247005095272,
+          "relative_l2_error": 0.12614125988768932
+        },
+        "name": "model.language_model.layers.0.mlp.gate_proj.weight_packed",
+        "nibble_histogram": [
+          6070692,
+          5966227,
+          5663762,
+          5199910,
+          6721801,
+          6793546,
+          6153444,
+          5039488,
+          0,
+          5968017,
+          5663009,
+          5200212,
+          6721151,
+          6791068,
+          6144018,
+          5032615
+        ],
+        "saturated_values": 10072103,
+        "scale_saturated_values": 1
+      },
+      {
+        "checkpoint_input_global_divisor": 836.0,
+        "checkpoint_weight_global_divisor": 6400.0,
+        "metrics": {
+          "approximation_rms": 0.009851460058052458,
+          "cosine_similarity": 0.9921181539548455,
+          "elements": 89128960,
+          "max_absolute_error": 0.012755127623677254,
+          "mean_absolute_error": 0.0009462066598164643,
+          "reference_rms": 0.009817860049415036,
+          "relative_l2_error": 0.12581476814808734
+        },
+        "name": "model.language_model.layers.0.mlp.up_proj.weight_packed",
+        "nibble_histogram": [
+          6068554,
+          5968058,
+          5665807,
+          5206189,
+          6723805,
+          6792644,
+          6147963,
+          5032327,
+          0,
+          5967148,
+          5665686,
+          5204992,
+          6726700,
+          6782873,
+          6144252,
+          5031962
+        ],
+        "saturated_values": 10064289,
+        "scale_saturated_values": 0
+      },
+      {
+        "checkpoint_input_global_divisor": 94.5,
+        "checkpoint_weight_global_divisor": 2272.0,
+        "metrics": {
+          "approximation_rms": 0.01099645337374244,
+          "cosine_similarity": 0.9922769035206591,
+          "elements": 89128960,
+          "max_absolute_error": 0.052937254309654236,
+          "mean_absolute_error": 0.0010356606816217132,
+          "reference_rms": 0.01097072523269448,
+          "relative_l2_error": 0.1244504696652537
+        },
+        "name": "model.language_model.layers.2.mlp.down_proj.weight_packed",
+        "nibble_histogram": [
+          6093709,
+          5984424,
+          5677709,
+          5206399,
+          6717653,
+          6770932,
+          6120394,
+          5040720,
+          0,
+          5984916,
+          5674999,
+          5207890,
+          6719873,
+          6767478,
+          6121376,
+          5040488
+        ],
+        "saturated_values": 10081208,
+        "scale_saturated_values": 1
+      },
+      {
+        "checkpoint_input_global_divisor": 142.0,
+        "checkpoint_weight_global_divisor": 6080.0,
+        "metrics": {
+          "approximation_rms": 0.010832168409186398,
+          "cosine_similarity": 0.9928011418534249,
+          "elements": 89128960,
+          "max_absolute_error": 0.027189552783966064,
+          "mean_absolute_error": 0.0009892365599734557,
+          "reference_rms": 0.01080189865164521,
+          "relative_l2_error": 0.12019113783121474
+        },
+        "name": "model.language_model.layers.1.mlp.down_proj.weight_packed",
+        "nibble_histogram": [
+          6162887,
+          6043862,
+          5722462,
+          5226687,
+          6719161,
+          6735145,
+          6048353,
+          4985987,
+          0,
+          6046471,
+          5720678,
+          5230409,
+          6714961,
+          6737194,
+          6050228,
+          4984475
+        ],
+        "saturated_values": 9970462,
+        "scale_saturated_values": 2
+      },
+      {
+        "checkpoint_input_global_divisor": 660.0,
+        "checkpoint_weight_global_divisor": 11584.0,
+        "metrics": {
+          "approximation_rms": 0.010681949276254113,
+          "cosine_similarity": 0.9928092324980526,
+          "elements": 89128960,
+          "max_absolute_error": 0.016005374491214752,
+          "mean_absolute_error": 0.0009810975338125107,
+          "reference_rms": 0.010653287492933138,
+          "relative_l2_error": 0.12011433093780967
+        },
+        "name": "model.language_model.layers.1.mlp.gate_proj.weight_packed",
+        "nibble_histogram": [
+          6078477,
+          5970186,
+          5670527,
+          5208188,
+          6729375,
+          6797987,
+          6148418,
+          5041659,
+          0,
+          5972286,
+          5668116,
+          5201563,
+          6719834,
+          6781085,
+          6126897,
+          5014362
+        ],
+        "saturated_values": 10056021,
+        "scale_saturated_values": 1
+      },
+      {
+        "checkpoint_input_global_divisor": 660.0,
+        "checkpoint_weight_global_divisor": 11584.0,
+        "metrics": {
+          "approximation_rms": 0.01044730964395126,
+          "cosine_similarity": 0.9928408555484134,
+          "elements": 89128960,
+          "max_absolute_error": 0.01484014093875885,
+          "mean_absolute_error": 0.0009579161512411061,
+          "reference_rms": 0.010419924823450624,
+          "relative_l2_error": 0.11984495428264823
+        },
+        "name": "model.language_model.layers.1.mlp.up_proj.weight_packed",
+        "nibble_histogram": [
+          6088979,
+          5984948,
+          5677723,
+          5207711,
+          6728218,
+          6780026,
+          6119458,
+          5024263,
+          0,
+          5978462,
+          5677082,
+          5207639,
+          6729103,
+          6779549,
+          6124439,
+          5021360
+        ],
+        "saturated_values": 10045623,
+        "scale_saturated_values": 0
+      },
+      {
+        "checkpoint_input_global_divisor": 74.0,
+        "checkpoint_weight_global_divisor": 4016.0,
+        "metrics": {
+          "approximation_rms": 0.01098102406880486,
+          "cosine_similarity": 0.9929564921907125,
+          "elements": 89128960,
+          "max_absolute_error": 0.03538191318511963,
+          "mean_absolute_error": 0.000992781331730929,
+          "reference_rms": 0.010955913796586083,
+          "relative_l2_error": 0.11884679204308236
+        },
+        "name": "model.language_model.layers.3.mlp.down_proj.weight_packed",
+        "nibble_histogram": [
+          6091850,
+          5984787,
+          5679303,
+          5212570,
+          6733194,
+          6783572,
+          6124191,
+          5007968,
+          0,
+          5985960,
+          5680166,
+          5211178,
+          6724744,
+          6781916,
+          6122263,
+          5005298
+        ],
+        "saturated_values": 10013266,
+        "scale_saturated_values": 2
+      },
+      {
+        "checkpoint_input_global_divisor": 104.5,
+        "checkpoint_weight_global_divisor": 8032.0,
+        "metrics": {
+          "approximation_rms": 0.010985023988776684,
+          "cosine_similarity": 0.9937370266016657,
+          "elements": 89128960,
+          "max_absolute_error": 0.015921667218208313,
+          "mean_absolute_error": 0.000937283564295219,
+          "reference_rms": 0.010967096460202398,
+          "relative_l2_error": 0.1120227634388435
+        },
+        "name": "model.language_model.layers.4.mlp.down_proj.weight_packed",
+        "nibble_histogram": [
+          6102262,
+          5995672,
+          5688084,
+          5218930,
+          6731509,
+          6781527,
+          6103063,
+          4992896,
+          0,
+          5999400,
+          5686826,
+          5220173,
+          6728516,
+          6776304,
+          6111570,
+          4992228
+        ],
+        "saturated_values": 9985124,
+        "scale_saturated_values": 2
+      },
+      {
+        "checkpoint_input_global_divisor": 39.75,
+        "checkpoint_weight_global_divisor": 4544.0,
+        "metrics": {
+          "approximation_rms": 0.011569207796942274,
+          "cosine_similarity": 0.9937773468772414,
+          "elements": 89128960,
+          "max_absolute_error": 0.0403175875544548,
+          "mean_absolute_error": 0.0009763840519391649,
+          "reference_rms": 0.011557440265574868,
+          "relative_l2_error": 0.11161996704043038
+        },
+        "name": "model.language_model.layers.50.mlp.down_proj.weight_packed",
+        "nibble_histogram": [
+          6382564,
+          6238370,
+          5844997,
+          5284908,
+          6688488,
+          6583935,
+          5821909,
+          4908570,
+          0,
+          6237874,
+          5845562,
+          5288092,
+          6687814,
+          6582570,
+          5824972,
+          4908335
+        ],
+        "saturated_values": 9816905,
+        "scale_saturated_values": 3
+      },
+      {
+        "checkpoint_input_global_divisor": 56.5,
+        "checkpoint_weight_global_divisor": 9280.0,
+        "metrics": {
+          "approximation_rms": 0.011181977324143923,
+          "cosine_similarity": 0.9937899577481699,
+          "elements": 89128960,
+          "max_absolute_error": 0.023208513855934143,
+          "mean_absolute_error": 0.0009462200186452996,
+          "reference_rms": 0.011165761049781757,
+          "relative_l2_error": 0.11153586812822595
+        },
+        "name": "model.language_model.layers.51.mlp.gate_proj.weight_packed",
+        "nibble_histogram": [
+          6241560,
+          6119221,
+          5772302,
+          5259758,
+          6714386,
+          6686392,
+          5972876,
+          4944506,
+          0,
+          6118272,
+          5769144,
+          5249233,
+          6699728,
+          6678083,
+          5960794,
+          4942705
+        ],
+        "saturated_values": 9887211,
+        "scale_saturated_values": 2
+      },
+      {
+        "checkpoint_input_global_divisor": 106.5,
+        "checkpoint_weight_global_divisor": 6944.0,
+        "metrics": {
+          "approximation_rms": 0.010944725419843183,
+          "cosine_similarity": 0.993798789690505,
+          "elements": 89128960,
+          "max_absolute_error": 0.020755328238010406,
+          "mean_absolute_error": 0.0009276106562636011,
+          "reference_rms": 0.010925038582859172,
+          "relative_l2_error": 0.11148104943956436
+        },
+        "name": "model.language_model.layers.5.mlp.down_proj.weight_packed",
+        "nibble_histogram": [
+          6125348,
+          6012667,
+          5701296,
+          5224117,
+          6728246,
+          6769074,
+          6085511,
+          4979591,
+          0,
+          6012952,
+          5699449,
+          5223951,
+          6731381,
+          6768105,
+          6084925,
+          4982347
+        ],
+        "saturated_values": 9961938,
+        "scale_saturated_values": 1
+      },
+      {
+        "checkpoint_input_global_divisor": 588.0,
+        "checkpoint_weight_global_divisor": 7520.0,
+        "metrics": {
+          "approximation_rms": 0.010986084043463339,
+          "cosine_similarity": 0.9937961904999372,
+          "elements": 89128960,
+          "max_absolute_error": 0.04625789821147919,
+          "mean_absolute_error": 0.0009325452414472266,
+          "reference_rms": 0.010971380247468502,
+          "relative_l2_error": 0.1114721749945793
+        },
+        "name": "model.language_model.layers.2.mlp.gate_proj.weight_packed",
+        "nibble_histogram": [
+          6066915,
+          5963482,
+          5660136,
+          5201070,
+          6732159,
+          6799928,
+          6140510,
+          5023065,
+          0,
+          5959531,
+          5662762,
+          5207608,
+          6729567,
+          6802518,
+          6148333,
+          5031376
+        ],
+        "saturated_values": 10054441,
+        "scale_saturated_values": 1
+      },
+      {
+        "checkpoint_input_global_divisor": 588.0,
+        "checkpoint_weight_global_divisor": 7520.0,
+        "metrics": {
+          "approximation_rms": 0.010638564719618484,
+          "cosine_similarity": 0.9938206740061535,
+          "elements": 89128960,
+          "max_absolute_error": 0.01786070317029953,
+          "mean_absolute_error": 0.0009014739197427757,
+          "reference_rms": 0.010624882495854283,
+          "relative_l2_error": 0.11124849286816217
+        },
+        "name": "model.language_model.layers.2.mlp.up_proj.weight_packed",
+        "nibble_histogram": [
+          6097560,
+          5985014,
+          5678922,
+          5212165,
+          6724466,
+          6781858,
+          6117922,
+          5017357,
+          0,
+          5986214,
+          5683669,
+          5211415,
+          6724784,
+          6781441,
+          6116428,
+          5009745
+        ],
+        "saturated_values": 10027102,
+        "scale_saturated_values": 0
+      },
+      {
+        "checkpoint_input_global_divisor": 60.5,
+        "checkpoint_weight_global_divisor": 7680.0,
+        "metrics": {
+          "approximation_rms": 0.011758997994399648,
+          "cosine_similarity": 0.9938308159064935,
+          "elements": 89128960,
+          "max_absolute_error": 0.023632794618606567,
+          "mean_absolute_error": 0.000991647104866098,
+          "reference_rms": 0.01174799629599927,
+          "relative_l2_error": 0.11113418574373347
+        },
+        "name": "model.language_model.layers.52.mlp.gate_proj.weight_packed",
+        "nibble_histogram": [
+          6202880,
+          6085700,
+          5745736,
+          5246290,
+          6719117,
+          6713201,
+          6016795,
+          4979145,
+          0,
+          6080129,
+          5742471,
+          5233687,
+          6704122,
+          6694870,
+          5996729,
+          4968088
+        ],
+        "saturated_values": 9947233,
+        "scale_saturated_values": 1
+      },
+      {
+        "checkpoint_input_global_divisor": 48.0,
+        "checkpoint_weight_global_divisor": 8832.0,
+        "metrics": {
+          "approximation_rms": 0.011089865585455173,
+          "cosine_similarity": 0.9938512780815241,
+          "elements": 89128960,
+          "max_absolute_error": 0.02314028888940811,
+          "mean_absolute_error": 0.0009279148854569448,
+          "reference_rms": 0.01107369505662068,
+          "relative_l2_error": 0.110984431027507
+        },
+        "name": "model.language_model.layers.50.mlp.gate_proj.weight_packed",
+        "nibble_histogram": [
+          6338092,
+          6197757,
+          5810572,
+          5264601,
+          6688119,
+          6623993,
+          5906631,
+          4916178,
+          0,
+          6192392,
+          5804515,
+          5260856,
+          6679704,
+          6622543,
+          5898878,
+          4924129
+        ],
+        "saturated_values": 9840307,
+        "scale_saturated_values": 2
+      },
+      {
+        "checkpoint_input_global_divisor": 21.375,
+        "checkpoint_weight_global_divisor": 3520.0,
+        "metrics": {
+          "approximation_rms": 0.011799903755350442,
+          "cosine_similarity": 0.9938744466569601,
+          "elements": 89128960,
+          "max_absolute_error": 0.029296875,
+          "mean_absolute_error": 0.0009867418623542457,
+          "reference_rms": 0.011781592658728784,
+          "relative_l2_error": 0.11078163505263454
+        },
+        "name": "model.language_model.layers.51.mlp.down_proj.weight_packed",
+        "nibble_histogram": [
+          6296009,
+          6166568,
+          5805410,
+          5267025,
+          6709565,
+          6653602,
+          5907120,
+          4906790,
+          0,
+          6163860,
+          5804199,
+          5274338,
+          6713918,
+          6649215,
+          5903987,
+          4907354
+        ],
+        "saturated_values": 9814144,
+        "scale_saturated_values": 1
+      },
+      {
+        "checkpoint_input_global_divisor": 129.0,
+        "checkpoint_weight_global_divisor": 5152.0,
+        "metrics": {
+          "approximation_rms": 0.0108267101636933,
+          "cosine_similarity": 0.9938986968209526,
+          "elements": 89128960,
+          "max_absolute_error": 0.05226125568151474,
+          "mean_absolute_error": 0.0009102739319307653,
+          "reference_rms": 0.010814435270773975,
+          "relative_l2_error": 0.11053387964996307
+        },
+        "name": "model.language_model.layers.6.mlp.down_proj.weight_packed",
+        "nibble_histogram": [
+          6208930,
+          6077607,
+          5729604,
+          5232454,
+          6699909,
+          6700965,
+          6023993,
+          4987620,
+          0,
+          6083804,
+          5729625,
+          5232121,
+          6701041,
+          6708652,
+          6023110,
+          4989525
+        ],
+        "saturated_values": 9977145,
+        "scale_saturated_values": 1
+      },
+      {
+        "checkpoint_input_global_divisor": 19.0,
+        "checkpoint_weight_global_divisor": 3376.0,
+        "metrics": {
+          "approximation_rms": 0.011794152219371494,
+          "cosine_similarity": 0.9939027820598456,
+          "elements": 89128960,
+          "max_absolute_error": 0.032958984375,
+          "mean_absolute_error": 0.000981587347158189,
+          "reference_rms": 0.011781761299506529,
+          "relative_l2_error": 0.11049144518827152
+        },
+        "name": "model.language_model.layers.55.mlp.down_proj.weight_packed",
+        "nibble_histogram": [
+          6160283,
+          6044540,
+          5723841,
+          5237247,
+          6727326,
+          6738715,
+          6044935,
+          4970599,
+          0,
+          6043965,
+          5721554,
+          5232851,
+          6726012,
+          6743853,
+          6043630,
+          4969609
+        ],
+        "saturated_values": 9940208,
+        "scale_saturated_values": 1
+      },
+      {
+        "checkpoint_input_global_divisor": 7.0,
+        "checkpoint_weight_global_divisor": 3616.0,
+        "metrics": {
+          "approximation_rms": 0.01169078400720027,
+          "cosine_similarity": 0.9939313094277094,
+          "elements": 89128960,
+          "max_absolute_error": 0.12423950433731079,
+          "mean_absolute_error": 0.0009700651969538888,
+          "reference_rms": 0.011677464659925552,
+          "relative_l2_error": 0.1102384917286681
+        },
+        "name": "model.language_model.layers.54.mlp.down_proj.weight_packed",
+        "nibble_histogram": [
+          6251935,
+          6122447,
+          5774424,
+          5256881,
+          6710250,
+          6677965,
+          5956746,
+          4940598,
+          0,
+          6122510,
+          5772518,
+          5255642,
+          6708644,
+          6678337,
+          5958818,
+          4941245
+        ],
+        "saturated_values": 9881843,
+        "scale_saturated_values": 1
+      }
+    ]
+  },
+  "provenance": {
+    "converted_manifest": {
+      "bytes": 23444511709,
+      "entries": 13,
+      "manifest": "/project/manifests/model-snapshot-16b6615a.sha256",
+      "sha256": "6d979221939858d8f98c7e615028e1e468cffb3ff2d501f943646c1e12ef2cdc"
+    },
+    "converted_repository": "unsloth/Qwen3.8-27B-NVFP4",
+    "converted_revision": "16b6615af3548b88e2d8e382457bc705b00479cf",
+    "official_manifest": {
+      "bytes": 55563142209,
+      "entries": 24,
+      "manifest": "/project/manifests/official-qwen38-27b-1d4bf0f2.sha256",
+      "sha256": "2b50c4c6f4544fc73a891c460b0731c2d7b1824fe7c92d534ecc1193c4bad067"
+    },
+    "official_repository": "Qwen/Qwen3.8-27B",
+    "official_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0"
+  },
+  "reference_precision": {
+    "byte_identical_tensors": 637,
+    "bytes": 4366132704,
+    "effective_gain_aggregate": {
+      "approximation_rms": 1.0677232113089201,
+      "cosine_similarity": 0.9999982560254281,
+      "elements": 668672,
+      "max_absolute_error": 0.0078125,
+      "mean_absolute_error": 0.0016164691188332737,
+      "reference_rms": 1.0677343198636304,
+      "relative_l2_error": 0.001868761274076235
+    },
+    "elements": 2183066352,
+    "modification_classification": "exact lossy BF16 offset-norm calibration round trip",
+    "modified_aggregate": {
+      "approximation_rms": 0.18230437601155108,
+      "cosine_similarity": 0.9999401014629609,
+      "elements": 668672,
+      "max_absolute_error": 0.0078125,
+      "mean_absolute_error": 0.0016164691186678684,
+      "reference_rms": 0.18230127301211974,
+      "relative_l2_error": 0.010945291357502059
+    },
+    "modified_tensor_names": [
+      "model.language_model.layers.0.input_layernorm.weight",
+      "model.language_model.layers.0.post_attention_layernorm.weight",
+      "model.language_model.layers.1.input_layernorm.weight",
+      "model.language_model.layers.1.post_attention_layernorm.weight",
+      "model.language_model.layers.10.input_layernorm.weight",
+      "model.language_model.layers.10.post_attention_layernorm.weight",
+      "model.language_model.layers.11.input_layernorm.weight",
+      "model.language_model.layers.11.post_attention_layernorm.weight",
+      "model.language_model.layers.11.self_attn.k_norm.weight",
+      "model.language_model.layers.11.self_attn.q_norm.weight",
+      "model.language_model.layers.12.input_layernorm.weight",
+      "model.language_model.layers.12.post_attention_layernorm.weight",
+      "model.language_model.layers.13.input_layernorm.weight",
+      "model.language_model.layers.13.post_attention_layernorm.weight",
+      "model.language_model.layers.14.input_layernorm.weight",
+      "model.language_model.layers.14.post_attention_layernorm.weight",
+      "model.language_model.layers.15.input_layernorm.weight",
+      "model.language_model.layers.15.post_attention_layernorm.weight",
+      "model.language_model.layers.15.self_attn.k_norm.weight",
+      "model.language_model.layers.15.self_attn.q_norm.weight",
+      "model.language_model.layers.16.input_layernorm.weight",
+      "model.language_model.layers.16.post_attention_layernorm.weight",
+      "model.language_model.layers.17.input_layernorm.weight",
+      "model.language_model.layers.17.post_attention_layernorm.weight",
+      "model.language_model.layers.18.input_layernorm.weight",
+      "model.language_model.layers.18.post_attention_layernorm.weight",
+      "model.language_model.layers.19.input_layernorm.weight",
+      "model.language_model.layers.19.post_attention_layernorm.weight",
+      "model.language_model.layers.19.self_attn.k_norm.weight",
+      "model.language_model.layers.19.self_attn.q_norm.weight",
+      "model.language_model.layers.2.input_layernorm.weight",
+      "model.language_model.layers.2.post_attention_layernorm.weight",
+      "model.language_model.layers.20.input_layernorm.weight",
+      "model.language_model.layers.20.post_attention_layernorm.weight",
+      "model.language_model.layers.21.input_layernorm.weight",
+      "model.language_model.layers.21.post_attention_layernorm.weight",
+      "model.language_model.layers.22.input_layernorm.weight",
+      "model.language_model.layers.22.post_attention_layernorm.weight",
+      "model.language_model.layers.23.input_layernorm.weight",
+      "model.language_model.layers.23.post_attention_layernorm.weight",
+      "model.language_model.layers.23.self_attn.k_norm.weight",
+      "model.language_model.layers.23.self_attn.q_norm.weight",
+      "model.language_model.layers.24.input_layernorm.weight",
+      "model.language_model.layers.24.post_attention_layernorm.weight",
+      "model.language_model.layers.25.input_layernorm.weight",
+      "model.language_model.layers.25.post_attention_layernorm.weight",
+      "model.language_model.layers.26.input_layernorm.weight",
+      "model.language_model.layers.26.post_attention_layernorm.weight",
+      "model.language_model.layers.27.input_layernorm.weight",
+      "model.language_model.layers.27.post_attention_layernorm.weight",
+      "model.language_model.layers.27.self_attn.k_norm.weight",
+      "model.language_model.layers.27.self_attn.q_norm.weight",
+      "model.language_model.layers.28.input_layernorm.weight",
+      "model.language_model.layers.28.post_attention_layernorm.weight",
+      "model.language_model.layers.29.input_layernorm.weight",
+      "model.language_model.layers.29.post_attention_layernorm.weight",
+      "model.language_model.layers.3.input_layernorm.weight",
+      "model.language_model.layers.3.post_attention_layernorm.weight",
+      "model.language_model.layers.3.self_attn.k_norm.weight",
+      "model.language_model.layers.3.self_attn.q_norm.weight",
+      "model.language_model.layers.30.input_layernorm.weight",
+      "model.language_model.layers.30.post_attention_layernorm.weight",
+      "model.language_model.layers.31.input_layernorm.weight",
+      "model.language_model.layers.31.post_attention_layernorm.weight",
+      "model.language_model.layers.31.self_attn.k_norm.weight",
+      "model.language_model.layers.31.self_attn.q_norm.weight",
+      "model.language_model.layers.32.input_layernorm.weight",
+      "model.language_model.layers.32.post_attention_layernorm.weight",
+      "model.language_model.layers.33.input_layernorm.weight",
+      "model.language_model.layers.33.post_attention_layernorm.weight",
+      "model.language_model.layers.34.input_layernorm.weight",
+      "model.language_model.layers.34.post_attention_layernorm.weight",
+      "model.language_model.layers.35.input_layernorm.weight",
+      "model.language_model.layers.35.post_attention_layernorm.weight",
+      "model.language_model.layers.35.self_attn.k_norm.weight",
+      "model.language_model.layers.35.self_attn.q_norm.weight",
+      "model.language_model.layers.36.input_layernorm.weight",
+      "model.language_model.layers.36.post_attention_layernorm.weight",
+      "model.language_model.layers.37.input_layernorm.weight",
+      "model.language_model.layers.37.post_attention_layernorm.weight",
+      "model.language_model.layers.38.input_layernorm.weight",
+      "model.language_model.layers.38.post_attention_layernorm.weight",
+      "model.language_model.layers.39.input_layernorm.weight",
+      "model.language_model.layers.39.post_attention_layernorm.weight",
+      "model.language_model.layers.39.self_attn.k_norm.weight",
+      "model.language_model.layers.39.self_attn.q_norm.weight",
+      "model.language_model.layers.4.input_layernorm.weight",
+      "model.language_model.layers.4.post_attention_layernorm.weight",
+      "model.language_model.layers.40.input_layernorm.weight",
+      "model.language_model.layers.40.post_attention_layernorm.weight",
+      "model.language_model.layers.41.input_layernorm.weight",
+      "model.language_model.layers.41.post_attention_layernorm.weight",
+      "model.language_model.layers.42.input_layernorm.weight",
+      "model.language_model.layers.42.post_attention_layernorm.weight",
+      "model.language_model.layers.43.input_layernorm.weight",
+      "model.language_model.layers.43.post_attention_layernorm.weight",
+      "model.language_model.layers.43.self_attn.k_norm.weight",
+      "model.language_model.layers.43.self_attn.q_norm.weight",
+      "model.language_model.layers.44.input_layernorm.weight",
+      "model.language_model.layers.44.post_attention_layernorm.weight",
+      "model.language_model.layers.45.input_layernorm.weight",
+      "model.language_model.layers.45.post_attention_layernorm.weight",
+      "model.language_model.layers.46.input_layernorm.weight",
+      "model.language_model.layers.46.post_attention_layernorm.weight",
+      "model.language_model.layers.47.input_layernorm.weight",
+      "model.language_model.layers.47.post_attention_layernorm.weight",
+      "model.language_model.layers.47.self_attn.k_norm.weight",
+      "model.language_model.layers.47.self_attn.q_norm.weight",
+      "model.language_model.layers.48.input_layernorm.weight",
+      "model.language_model.layers.48.post_attention_layernorm.weight",
+      "model.language_model.layers.49.input_layernorm.weight",
+      "model.language_model.layers.49.post_attention_layernorm.weight",
+      "model.language_model.layers.5.input_layernorm.weight",
+      "model.language_model.layers.5.post_attention_layernorm.weight",
+      "model.language_model.layers.50.input_layernorm.weight",
+      "model.language_model.layers.50.post_attention_layernorm.weight",
+      "model.language_model.layers.51.input_layernorm.weight",
+      "model.language_model.layers.51.post_attention_layernorm.weight",
+      "model.language_model.layers.51.self_attn.k_norm.weight",
+      "model.language_model.layers.51.self_attn.q_norm.weight",
+      "model.language_model.layers.52.input_layernorm.weight",
+      "model.language_model.layers.52.post_attention_layernorm.weight",
+      "model.language_model.layers.53.input_layernorm.weight",
+      "model.language_model.layers.53.post_attention_layernorm.weight",
+      "model.language_model.layers.54.input_layernorm.weight",
+      "model.language_model.layers.54.post_attention_layernorm.weight",
+      "model.language_model.layers.55.input_layernorm.weight",
+      "model.language_model.layers.55.post_attention_layernorm.weight",
+      "model.language_model.layers.55.self_attn.k_norm.weight",
+      "model.language_model.layers.55.self_attn.q_norm.weight",
+      "model.language_model.layers.56.input_layernorm.weight",
+      "model.language_model.layers.56.post_attention_layernorm.weight",
+      "model.language_model.layers.57.input_layernorm.weight",
+      "model.language_model.layers.57.post_attention_layernorm.weight",
+      "model.language_model.layers.58.input_layernorm.weight",
+      "model.language_model.layers.58.post_attention_layernorm.weight",
+      "model.language_model.layers.59.input_layernorm.weight",
+      "model.language_model.layers.59.post_attention_layernorm.weight",
+      "model.language_model.layers.59.self_attn.k_norm.weight",
+      "model.language_model.layers.59.self_attn.q_norm.weight",
+      "model.language_model.layers.6.input_layernorm.weight",
+      "model.language_model.layers.6.post_attention_layernorm.weight",
+      "model.language_model.layers.60.input_layernorm.weight",
+      "model.language_model.layers.60.post_attention_layernorm.weight",
+      "model.language_model.layers.61.input_layernorm.weight",
+      "model.language_model.layers.61.post_attention_layernorm.weight",
+      "model.language_model.layers.62.input_layernorm.weight",
+      "model.language_model.layers.62.post_attention_layernorm.weight",
+      "model.language_model.layers.63.input_layernorm.weight",
+      "model.language_model.layers.63.post_attention_layernorm.weight",
+      "model.language_model.layers.63.self_attn.k_norm.weight",
+      "model.language_model.layers.63.self_attn.q_norm.weight",
+      "model.language_model.layers.7.input_layernorm.weight",
+      "model.language_model.layers.7.post_attention_layernorm.weight",
+      "model.language_model.layers.7.self_attn.k_norm.weight",
+      "model.language_model.layers.7.self_attn.q_norm.weight",
+      "model.language_model.layers.8.input_layernorm.weight",
+      "model.language_model.layers.8.post_attention_layernorm.weight",
+      "model.language_model.layers.9.input_layernorm.weight",
+      "model.language_model.layers.9.post_attention_layernorm.weight",
+      "model.language_model.norm.weight"
+    ],
+    "numerically_modified_tensors": 161,
+    "tensors": 798,
+    "worst_modified_tensors": [
+      {
+        "metrics": {
+          "approximation_rms": 0.059753187294067645,
+          "cosine_similarity": 0.999421765045717,
+          "elements": 5120,
+          "max_absolute_error": 0.00390625,
+          "mean_absolute_error": 0.001710473099956289,
+          "reference_rms": 0.05972737999676475,
+          "relative_l2_error": 0.03401700014777691
+        },
+        "name": "model.language_model.layers.18.input_layernorm.weight"
+      },
+      {
+        "metrics": {
+          "approximation_rms": 0.06256100538299596,
+          "cosine_similarity": 0.9994477093411419,
+          "elements": 5120,
+          "max_absolute_error": 0.00390625,
+          "mean_absolute_error": 0.0017489572986960412,
+          "reference_rms": 0.06257946158946505,
+          "relative_l2_error": 0.033231649525205235
+        },
+        "name": "model.language_model.layers.24.input_layernorm.weight"
+      },
+      {
+        "metrics": {
+          "approximation_rms": 0.06456425651679376,
+          "cosine_similarity": 0.9994722718259361,
+          "elements": 5120,
+          "max_absolute_error": 0.00390625,
+          "mean_absolute_error": 0.0017668234882876276,
+          "reference_rms": 0.0645910720751185,
+          "relative_l2_error": 0.03248369626357001
+        },
+        "name": "model.language_model.layers.17.input_layernorm.weight"
+      },
+      {
+        "metrics": {
+          "approximation_rms": 0.06698904669603115,
+          "cosine_similarity": 0.9994831271276038,
+          "elements": 5120,
+          "max_absolute_error": 0.00390625,
+          "mean_absolute_error": 0.0018409401935059577,
+          "reference_rms": 0.06690133917546714,
+          "relative_l2_error": 0.03219968476680776
+        },
+        "name": "model.language_model.layers.2.input_layernorm.weight"
+      },
+      {
+        "metrics": {
+          "approximation_rms": 0.06800867859071436,
+          "cosine_similarity": 0.999528589574249,
+          "elements": 5120,
+          "max_absolute_error": 0.00390625,
+          "mean_absolute_error": 0.00175438740698155,
+          "reference_rms": 0.0679436989544636,
+          "relative_l2_error": 0.030734950693681793
+        },
+        "name": "model.language_model.layers.16.input_layernorm.weight"
+      },
+      {
+        "metrics": {
+          "approximation_rms": 0.07543951238240998,
+          "cosine_similarity": 0.9995782702132456,
+          "elements": 5120,
+          "max_absolute_error": 0.00390625,
+          "mean_absolute_error": 0.001865609409287572,
+          "reference_rms": 0.07545799679992048,
+          "relative_l2_error": 0.029039851308011243
+        },
+        "name": "model.language_model.layers.40.input_layernorm.weight"
+      },
+      {
+        "metrics": {
+          "approximation_rms": 0.070968702402775,
+          "cosine_similarity": 0.9995801678712135,
+          "elements": 5120,
+          "max_absolute_error": 0.00390625,
+          "mean_absolute_error": 0.0017314527183771133,
+          "reference_rms": 0.07093607999075129,
+          "relative_l2_error": 0.028987271346414083
+        },
+        "name": "model.language_model.layers.14.input_layernorm.weight"
+      },
+      {
+        "metrics": {
+          "approximation_rms": 0.07266643821902048,
+          "cosine_similarity": 0.9995822343648166,
+          "elements": 5120,
+          "max_absolute_error": 0.00390625,
+          "mean_absolute_error": 0.0017684096441371367,
+          "reference_rms": 0.07262591868556595,
+          "relative_l2_error": 0.028919002522099117
+        },
+        "name": "model.language_model.layers.10.input_layernorm.weight"
+      },
+      {
+        "metrics": {
+          "approximation_rms": 0.07404429360836809,
+          "cosine_similarity": 0.9995858996456045,
+          "elements": 5120,
+          "max_absolute_error": 0.00390625,
+          "mean_absolute_error": 0.0018033183878287673,
+          "reference_rms": 0.07402816625686626,
+          "relative_l2_error": 0.02878243555233463
+        },
+        "name": "model.language_model.layers.12.input_layernorm.weight"
+      },
+      {
+        "metrics": {
+          "approximation_rms": 0.07998434017811826,
+          "cosine_similarity": 0.9996156126352432,
+          "elements": 5120,
+          "max_absolute_error": 0.00390625,
+          "mean_absolute_error": 0.001899296895135194,
+          "reference_rms": 0.07994831951424314,
+          "relative_l2_error": 0.027736692217982008
+        },
+        "name": "model.language_model.layers.13.input_layernorm.weight"
+      },
+      {
+        "metrics": {
+          "approximation_rms": 0.08415478118849906,
+          "cosine_similarity": 0.9996478097688346,
+          "elements": 5120,
+          "max_absolute_error": 0.00390625,
+          "mean_absolute_error": 0.0019208871133741922,
+          "reference_rms": 0.08412660920374081,
+          "relative_l2_error": 0.026546722668093214
+        },
+        "name": "model.language_model.layers.51.input_layernorm.weight"
+      },
+      {
+        "metrics": {
+          "approximation_rms": 0.05359651341556814,
+          "cosine_similarity": 0.9996516887320408,
+          "elements": 5120,
+          "max_absolute_error": 0.00390625,
+          "mean_absolute_error": 0.001155857474077493,
+          "reference_rms": 0.053577422522584524,
+          "relative_l2_error": 0.02640071448445619
+        },
+        "name": "model.language_model.layers.0.input_layernorm.weight"
+      },
+      {
+        "metrics": {
+          "approximation_rms": 0.08769604655003195,
+          "cosine_similarity": 0.9996741020156032,
+          "elements": 5120,
+          "max_absolute_error": 0.00390625,
+          "mean_absolute_error": 0.001925932615995407,
+          "reference_rms": 0.08770923688132515,
+          "relative_l2_error": 0.025528818292153508
+        },
+        "name": "model.language_model.layers.6.input_layernorm.weight"
+      },
+      {
+        "metrics": {
+          "approximation_rms": 0.06935712463756938,
+          "cosine_similarity": 0.9996847777071856,
+          "elements": 5120,
+          "max_absolute_error": 0.00390625,
+          "mean_absolute_error": 0.0014168336150760298,
+          "reference_rms": 0.06936555119819564,
+          "relative_l2_error": 0.025107424328753385
+        },
+        "name": "model.language_model.layers.23.input_layernorm.weight"
+      },
+      {
+        "metrics": {
+          "approximation_rms": 0.08944552526716078,
+          "cosine_similarity": 0.9996905545355754,
+          "elements": 5120,
+          "max_absolute_error": 0.00390625,
+          "mean_absolute_error": 0.0019012199714779853,
+          "reference_rms": 0.08940210680676199,
+          "relative_l2_error": 0.024888297550690126
+        },
+        "name": "model.language_model.layers.9.input_layernorm.weight"
+      },
+      {
+        "metrics": {
+          "approximation_rms": 0.08445120302001813,
+          "cosine_similarity": 0.9997159255261897,
+          "elements": 5120,
+          "max_absolute_error": 0.00390625,
+          "mean_absolute_error": 0.0016816003480926156,
+          "reference_rms": 0.08437026720539798,
+          "relative_l2_error": 0.023866591969135622
+        },
+        "name": "model.language_model.layers.25.input_layernorm.weight"
+      },
+      {
+        "metrics": {
+          "approximation_rms": 0.07969252626611721,
+          "cosine_similarity": 0.9997207862059975,
+          "elements": 5120,
+          "max_absolute_error": 0.00390625,
+          "mean_absolute_error": 0.0015522575238719582,
+          "reference_rms": 0.07966961731610847,
+          "relative_l2_error": 0.0236362189905901
+        },
+        "name": "model.language_model.layers.39.input_layernorm.weight"
+      },
+      {
+        "metrics": {
+          "approximation_rms": 0.09899617860142657,
+          "cosine_similarity": 0.999741213409743,
+          "elements": 5120,
+          "max_absolute_error": 0.00390625,
+          "mean_absolute_error": 0.0019342206418514253,
+          "reference_rms": 0.09904388867330272,
+          "relative_l2_error": 0.02274985501584148
+        },
+        "name": "model.language_model.layers.8.input_layernorm.weight"
+      },
+      {
+        "metrics": {
+          "approximation_rms": 0.08768100749292324,
+          "cosine_similarity": 0.9997605167892671,
+          "elements": 5120,
+          "max_absolute_error": 0.00390625,
+          "mean_absolute_error": 0.0015875129669439048,
+          "reference_rms": 0.08762830180618063,
+          "relative_l2_error": 0.02190014313853025
+        },
+        "name": "model.language_model.layers.15.input_layernorm.weight"
+      },
+      {
+        "metrics": {
+          "approximation_rms": 0.10428531882739252,
+          "cosine_similarity": 0.9997692358807612,
+          "elements": 5120,
+          "max_absolute_error": 0.00390625,
+          "mean_absolute_error": 0.0019316762685775758,
+          "reference_rms": 0.1042451984566583,
+          "relative_l2_error": 0.02149078840137178
+        },
+        "name": "model.language_model.layers.5.input_layernorm.weight"
+      }
+    ]
+  },
+  "status": "PASS"
+}

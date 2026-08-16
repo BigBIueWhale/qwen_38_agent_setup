@@ -15,6 +15,11 @@ PHASE_BUDGET_UNIT_FILE="${PROJECT_DIR}/scripts/phase_budget_unit.py"
 VISION_WORKSPACE_UNIT_FILE="${PROJECT_DIR}/scripts/vision_workspace_unit.py"
 VISION_CONTRACT_UNIT_FILE="${PROJECT_DIR}/scripts/vision_contract_unit.py"
 VISION_MLP_UNIT_FILE="${PROJECT_DIR}/scripts/vision_mlp_unit.py"
+TURBOQUANT_K8V4_UNIT_FILE="${PROJECT_DIR}/scripts/turboquant_k8v4_unit.py"
+QWEN38_CONTEXT_UNIT_FILE="${PROJECT_DIR}/scripts/qwen38_context_unit.py"
+NVFP4_KERNEL_UNIT_FILE="${PROJECT_DIR}/scripts/nvfp4_kernel_unit.py"
+SOURCE_PATCH_DIR="${PROJECT_DIR}/patches/source_patch_v1"
+SOURCE_PATCH_MANIFEST="${SOURCE_PATCH_DIR}/manifest.sha256"
 
 TURBOQUANT_PATCH_FILE="${PROJECT_DIR}/patches/vllm-turboquant-k8v4-direct-workspace.patch"
 TOOL_SCHEMA_PATCH_FILE="${PROJECT_DIR}/patches/vllm-enforce-auto-tool-schema.patch"
@@ -24,6 +29,7 @@ IMPLICIT_TOOL_GRAMMAR_PATCH_FILE="${PROJECT_DIR}/patches/vllm-qwen-implicit-tool
 ANTHROPIC_VALIDATION_PATCH_FILE="${PROJECT_DIR}/patches/vllm-anthropic-validation-http400.patch"
 TOOL_TRUNCATION_PATCH_FILE="${PROJECT_DIR}/patches/vllm-tool-truncation-finish-reason.patch"
 VISION_RUNTIME_PATCH_FILE="${PROJECT_DIR}/patches/vllm-qwen38-vision-runtime.patch"
+NUMERICAL_AUDITS_PATCH_FILE="${PROJECT_DIR}/patches/vllm-qwen38-numerical-audits.patch"
 
 TURBOQUANT_REL="vllm/v1/attention/backends/turboquant_attn.py"
 TOOL_SCHEMA_REL="vllm/tool_parsers/structural_tag_registry.py"
@@ -87,7 +93,7 @@ if [[ "${actual_status}" != "${EXPECTED_STATUS}" ]]; then
   exit 1
 fi
 
-printf '%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n' \
+printf '%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n' \
   "${TURBOQUANT_PATCH_DIFF_SHA256}" "${TURBOQUANT_PATCH_FILE}" \
   "${TOOL_SCHEMA_PATCH_DIFF_SHA256}" "${TOOL_SCHEMA_PATCH_FILE}" \
   "${AGENT_DEFAULTS_PATCH_DIFF_SHA256}" "${AGENT_DEFAULTS_PATCH_FILE}" \
@@ -95,25 +101,37 @@ printf '%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n' \
   "${IMPLICIT_TOOL_GRAMMAR_PATCH_DIFF_SHA256}" "${IMPLICIT_TOOL_GRAMMAR_PATCH_FILE}" \
   "${ANTHROPIC_VALIDATION_PATCH_DIFF_SHA256}" "${ANTHROPIC_VALIDATION_PATCH_FILE}" \
   "${TOOL_TRUNCATION_PATCH_DIFF_SHA256}" "${TOOL_TRUNCATION_PATCH_FILE}" \
-  "${VISION_RUNTIME_PATCH_DIFF_SHA256}" "${VISION_RUNTIME_PATCH_FILE}" | \
+  "${VISION_RUNTIME_PATCH_DIFF_SHA256}" "${VISION_RUNTIME_PATCH_FILE}" \
+  "${NUMERICAL_AUDITS_PATCH_DIFF_SHA256}" "${NUMERICAL_AUDITS_PATCH_FILE}" | \
   sha256sum --check --strict
 
-PATCH_SEQUENCE=(
-  "${TURBOQUANT_PATCH_FILE}"
-  "${TOOL_SCHEMA_PATCH_FILE}"
-  "${AGENT_DEFAULTS_PATCH_FILE}"
-  "${PHASE_BUDGET_PATCH_FILE}"
-  "${IMPLICIT_TOOL_GRAMMAR_PATCH_FILE}"
-  "${ANTHROPIC_VALIDATION_PATCH_FILE}"
-  "${TOOL_TRUNCATION_PATCH_FILE}"
-  "${VISION_RUNTIME_PATCH_FILE}"
+printf '%s  %s\n' \
+  "${SOURCE_PATCH_MANIFEST_SHA256}" "${SOURCE_PATCH_MANIFEST}" | \
+  sha256sum --check --strict
+(
+  cd "${PROJECT_DIR}"
+  sha256sum --check --strict \
+    "${SOURCE_PATCH_MANIFEST#${PROJECT_DIR}/}"
 )
-readonly -a PATCH_SEQUENCE
 
-# Prove that the documented patch sequence recreates this exact worktree from
-# the pinned upstream commit. This is stronger than checking reverse
-# applicability against an already layered tree, especially when a later patch
-# intentionally extends an earlier file such as Anthropic serving.
+# The patcher and its failure tests execute inside the exact immutable Python
+# image boundary. Nothing is imported into or installed on the host.
+docker run --rm \
+  --network none \
+  --read-only \
+  --user "$(id -u):$(id -g)" \
+  --tmpfs /tmp:rw,nodev,nosuid,size=512m \
+  --env PYTHONPYCACHEPREFIX=/tmp/pycache \
+  --entrypoint python3 \
+  --volume "${PROJECT_DIR}:/project:ro" \
+  --workdir /project \
+  "${BASE_IMAGE_TAG}" \
+  -m unittest -v patches.source_patch_v1.test_framework
+
+# Prove that the landmark-aware transaction recreates this exact worktree from
+# the pinned upstream commit. The reviewed diffs are independently hashed and
+# parsed as review evidence, but they never select mutation locations. The
+# private worktree is discarded on every failure and never becomes a runtime.
 VERIFY_WORKTREE="$(mktemp -d /tmp/qwen38-vllm-verify.XXXXXX)"
 cleanup_verify_worktree() {
   git -C "${VLLM_DIR}" worktree remove --force "${VERIFY_WORKTREE}" \
@@ -122,10 +140,18 @@ cleanup_verify_worktree() {
 trap cleanup_verify_worktree EXIT
 git -C "${VLLM_DIR}" worktree add --detach "${VERIFY_WORKTREE}" \
   "${VLLM_COMMIT}" >/dev/null
-for reviewed_patch in "${PATCH_SEQUENCE[@]}"; do
-  git -C "${VERIFY_WORKTREE}" apply --check "${reviewed_patch}"
-  git -C "${VERIFY_WORKTREE}" apply "${reviewed_patch}"
-done
+docker run --rm \
+  --network none \
+  --read-only \
+  --user "$(id -u):$(id -g)" \
+  --tmpfs /tmp:rw,nodev,nosuid,size=512m \
+  --env PYTHONPYCACHEPREFIX=/tmp/pycache \
+  --entrypoint python3 \
+  --volume "${PROJECT_DIR}:/project:ro" \
+  --volume "${VERIFY_WORKTREE}:/source:rw" \
+  --workdir /project \
+  "${BASE_IMAGE_TAG}" \
+  -m patches.source_patch_v1.apply_vllm_patchset /source /project
 reproduced_status="$(
   git -C "${VERIFY_WORKTREE}" status --short --untracked-files=all
 )"
@@ -191,10 +217,16 @@ printf '%s  %s\n%s  %s\n' \
   "${DOCKERIGNORE_SHA256}" "${DOCKERIGNORE}" | \
   sha256sum --check --strict
 
+printf '%s  %s\n%s  %s\n%s  %s\n' \
+  "${TURBOQUANT_K8V4_UNIT_SHA256}" "${TURBOQUANT_K8V4_UNIT_FILE}" \
+  "${QWEN38_CONTEXT_UNIT_SHA256}" "${QWEN38_CONTEXT_UNIT_FILE}" \
+  "${NVFP4_KERNEL_UNIT_SHA256}" "${NVFP4_KERNEL_UNIT_FILE}" | \
+  sha256sum --check --strict
+
 git -C "${VLLM_DIR}" diff --check
 
 if [[ "${MODE}" == "check" ]]; then
-  echo "Pinned base image, vLLM commit, twenty-nine reviewed runtime source files, seven reviewed test files, eight ordered patches, agent template, and all build units are exact."
+  echo "Pinned base image, vLLM commit, transactional landmark patcher, twenty-nine reviewed runtime source files, seven reviewed modified test files, one reviewed new test file, nine review diffs, agent template, three numerical audit units, and all build units are exact."
   exit 0
 fi
 
@@ -267,6 +299,10 @@ DOCKER_BUILDKIT=1 docker build --progress=plain \
   --build-arg "VISION_WORKSPACE_UNIT_SHA256=${VISION_WORKSPACE_UNIT_SHA256}" \
   --build-arg "VISION_CONTRACT_UNIT_SHA256=${VISION_CONTRACT_UNIT_SHA256}" \
   --build-arg "VISION_MLP_UNIT_SHA256=${VISION_MLP_UNIT_SHA256}" \
+  --build-arg "TURBOQUANT_K8V4_UNIT_SHA256=${TURBOQUANT_K8V4_UNIT_SHA256}" \
+  --build-arg "QWEN38_CONTEXT_UNIT_SHA256=${QWEN38_CONTEXT_UNIT_SHA256}" \
+  --build-arg "NVFP4_KERNEL_UNIT_SHA256=${NVFP4_KERNEL_UNIT_SHA256}" \
+  --build-arg "NUMERICAL_AUDITS_PATCH_DIFF_SHA256=${NUMERICAL_AUDITS_PATCH_DIFF_SHA256}" \
   --build-arg "SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH}" \
   --tag "${IMAGE_TAG}" \
   --file "${DOCKERFILE}" \
@@ -343,9 +379,12 @@ additional_installed_report="$(
     /usr/local/lib/python3.12/dist-packages/vllm/model_executor/models/qwen3_vl.py \
     /opt/qwen38/vision_workspace_unit.py \
     /opt/qwen38/vision_contract_unit.py \
-    /opt/qwen38/vision_mlp_unit.py
+    /opt/qwen38/vision_mlp_unit.py \
+    /opt/qwen38/turboquant_k8v4_unit.py \
+    /opt/qwen38/qwen38_context_unit.py \
+    /opt/qwen38/nvfp4_kernel_unit.py
 )"
-expected_additional_installed_report="$(printf '%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s' \
+expected_additional_installed_report="$(printf '%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s' \
   "${WORKSPACE_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/worker/workspace.py \
   "${GPU_MODEL_RUNNER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/worker/gpu_model_runner.py \
   "${API_UTILS_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/serve/utils/api_utils.py \
@@ -357,7 +396,10 @@ expected_additional_installed_report="$(printf '%s  %s\n%s  %s\n%s  %s\n%s  %s\n
   "${QWEN3_VL_MODEL_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/model_executor/models/qwen3_vl.py \
   "${VISION_WORKSPACE_UNIT_SHA256}" /opt/qwen38/vision_workspace_unit.py \
   "${VISION_CONTRACT_UNIT_SHA256}" /opt/qwen38/vision_contract_unit.py \
-  "${VISION_MLP_UNIT_SHA256}" /opt/qwen38/vision_mlp_unit.py)"
+  "${VISION_MLP_UNIT_SHA256}" /opt/qwen38/vision_mlp_unit.py \
+  "${TURBOQUANT_K8V4_UNIT_SHA256}" /opt/qwen38/turboquant_k8v4_unit.py \
+  "${QWEN38_CONTEXT_UNIT_SHA256}" /opt/qwen38/qwen38_context_unit.py \
+  "${NVFP4_KERNEL_UNIT_SHA256}" /opt/qwen38/nvfp4_kernel_unit.py)"
 if [[ "${additional_installed_report}" != "${expected_additional_installed_report}" ]]; then
   echo "Built image contains unexpected vision/runtime bytes." >&2
   echo "Expected:" >&2

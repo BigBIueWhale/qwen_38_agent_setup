@@ -19,7 +19,7 @@ The deployment is complete and healthy. There is one supported mode:
 
 | Property | Locked value |
 |---|---|
-| Checkpoint | unsloth/Qwen3.8-27B-NVFP4 |
+| Checkpoint | Corrected `unsloth/Qwen3.8-27B-NVFP4`, with 161 official BF16 offset-RMSNorm tensors restored |
 | Checkpoint revision | 16b6615af3548b88e2d8e382457bc705b00479cf |
 | Served name | qwen3.8-27b-nvfp4-k8v4 |
 | Weights | Mixed NVFP4/FP8 Compressed Tensors; fragile state and vision remain BF16 |
@@ -37,11 +37,12 @@ The deployment is complete and healthy. There is one supported mode:
 | Batching | One sequence; 2,048-token chunked prefill |
 | Listener | 127.0.0.1:8000 only |
 | Agent client | Qwen Code 0.21.12 at b965d5f8c24f48e65fb0b17c7d45f34ca4ce8f38 |
-| Agent image | sha256:303601e191432b197970203b7e9c220833d871c5338c43b8a735d812f65ac77c |
-| Agent-service source | d4d18887875514305c81535cea3bcebaff763932 |
+| Agent image | sha256:cc916c63598c5953810482e2e5f614eaa1e96695f5c07bfb2c3f2f894e9aa323 |
+| Agent-service source | d68af3f4410094affcb8ff7c1ff539a2b6bf6c92 |
+| Agent-service image | sha256:17d26b4923f626f74ed6da2aa89d2e76b2c60f951a7f85ea4ec26c99cd110ffc |
 | Agent-service listener | 127.0.0.1:8090 only |
-| Runtime profile | single-loopback-vision-k8v4-agent-v10 |
-| Runtime image | sha256:1cb1528d5fc533291e5ab572f38d4b59af5d5d17b0a5f3f7a281731eec8b54da |
+| Runtime profile | single-loopback-vision-k8v4-agent-v12 |
+| Runtime image | sha256:5d545d85950310cb09bebacba9083a242e8943c92669428eb23468d959f4f2d5 |
 
 This is not a text-only profile with an optional vision switch. It is not a
 one-million-token profile. It has no MTP, eager-mode, lower-quality image, alternate
@@ -69,7 +70,7 @@ error.
 - start.sh starts the one profile, waits on the exact vLLM readiness log event, then
   validates the complete live configuration before reporting success. Re-running it
   validates the existing owned container rather than starting a duplicate.
-- status.sh validates host prerequisites, eight ordered vLLM patches, every reviewed
+- status.sh validates host prerequisites, nine ordered vLLM transformations, every reviewed
   source and test file, the model manifest, image archive, image identity and labels,
   command and environment, mounts, runtime packages, API identity, listener,
   hardening, and live health. HEALTHY means all checks passed.
@@ -88,8 +89,8 @@ Advanced reproducibility operations are deliberately separate from serving mode:
     ./scripts/build-vllm.sh build
     ./scripts/restore-images.sh
 
-The check reconstructs the source tree from the pinned upstream commit plus all eight
-patches. The build runs offline from the exact base image and fails unless it produces
+The check reconstructs the source tree from the pinned upstream commit through all nine
+landmark-aware transformations. The build runs offline from the exact base image and fails unless it produces
 the pinned image ID. Restore verifies the pinned local archive before loading it.
 
 ### Security and host boundary
@@ -100,9 +101,13 @@ host networking and publishes no Docker ports. status.sh requires exactly one
 port-8000 listener and rejects any local address other than 127.0.0.1:8000.
 docker port has no mappings.
 
-The container uses cap-drop ALL, no-new-privileges, restart=no, a read-only model
-mount, and a dedicated labelled cache volume. The only writable runtime state is
-that versioned cache volume. The model checkpoint is never modified.
+The container uses cap-drop ALL, no-new-privileges, restart=no, a read-only root, a
+read-only model mount, and a dedicated labelled cache volume. The only durable
+writable runtime state is that exact versioned cache volume. Ephemeral writes are
+confined to three bounded tmpfs mounts: `/root` is 4 GiB and executable for runtime
+JIT scratch, `/tmp` is 2 GiB and executable for controlled temporary programs, and
+`/run` is 64 MiB and non-executable. status.sh validates the root flag, every exact
+tmpfs option, and both exact mounts. The model checkpoint is never modified.
 
 Docker is the dependency-execution boundary. Tokenizers, protocol clients, build
 tools, Python libraries, and integration tests run in the serving container or in
@@ -122,28 +127,32 @@ not an MoE model:
 
 - repository: unsloth/Qwen3.8-27B-NVFP4
 - revision: 16b6615af3548b88e2d8e382457bc705b00479cf
-- local directory: Qwen3.8-27B-NVFP4-Unsloth
+- immutable conversion source: Qwen3.8-27B-NVFP4-Unsloth
+- official BF16 reference: Qwen/Qwen3.8-27B at
+  1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0
+- deployable directory: Qwen3.8-27B-NVFP4-Corrected
 - model.safetensors: 22,568,192,096 bytes,
-  c473512c70eace07e2256fe9fd76596ac03e3295bee7d54cfb72676416afcc05
+  5fd70b38b3708e47adc1e9e9ab90f5d688ec01177d0718fdd16678696fdb0988
 - model_mtp.safetensors: 849,400,392 bytes,
   1d8268aa85ace093a561e3e7b63b9d390dac1cd55a90cd55b5ec509c3c9da9fe
 - tokenizer.json: 19,989,325 bytes,
   06b9509352d2af50381ab2247e083b80d32d5c0aba91c272ca9ff729b6a0e523
 - model index: 1,968 tensors and 23,417,592,488 tensor bytes
-- top-level snapshot manifest:
-  manifests/model-snapshot-16b6615a.sha256
+- top-level deployable manifest:
+  manifests/model-corrected-16b6615a-norms-1d4bf0f2.sha256
 - manifest hash:
-  6d979221939858d8f98c7e615028e1e468cffb3ff2d501f943646c1e12ef2cdc
+  3a86177c30b97035d27ad0cf516fc4c2ddb83701c4de4fc6adcb23c7c2531bfc
 
-The manifest covers all thirteen snapshot files: weights, MTP weights, tokenizer,
+The manifest covers all thirteen deployable files: weights, MTP weights, tokenizer,
 vocabulary, both templates/configuration surfaces, image and video processor
 configuration, index, README, and attributes. Missing, changed, or unexpected
 top-level files fail status. A moving main branch is never accepted.
 
 The unusually early publication time of the Unsloth quant was not treated as proof
-of authenticity. Untouched large tensors from early, middle, recurrent-control, and
-vision portions were independently compared with the official BF16 checkpoint and
-matched. The selected checkpoint is genuinely derived from Qwen3.8-27B.
+of authenticity. Every tensor was accounted for against the official BF16 checkpoint:
+all 233 FP8 and 168 NVFP4 matrices were independently dequantized, and all 798
+reference-precision tensors were compared. The selected checkpoint is genuinely
+derived from Qwen3.8-27B.
 
 The quantization recipe is mixed:
 
@@ -157,6 +166,25 @@ quantization. No publisher has supplied a comprehensive BF16-versus-this-checkpo
 perplexity or task-quality delta. The rejected RadixArk partial download remains
 historical data and is not selected, resumed, or silently deleted.
 
+The full audit measured aggregate FP8 relative L2 0.0266015 / cosine 0.9996461 and
+aggregate NVFP4 relative L2 0.1082006 / cosine 0.9941543 against official BF16. The
+worst NVFP4 tensor was layer 0's down projection at relative L2 0.1534641. The live
+production-kernel audit intentionally loads that complete 5,120 x 17,408 matrix and
+requires `FlashInferCutlassNvFp4LinearKernel`. Across M=1, 17, and 129 it stayed below
+0.00381 relative L2 and above 0.999993 cosine against independent dequantization plus
+BF16 matmul. This establishes implementation correctness to a tight tolerance; it
+does not erase the model-quality cost of four-bit weights.
+
+That exhaustive comparison found a separate conversion defect in 161 language
+RMSNorm tensors. Qwen stores offset weights and applies gain `1 + w`; the conversion
+path had rounded `1 + w` to BF16 before subtracting one. The deployable snapshot
+restores those 161 byte ranges from the exact official revision. A streamed semantic
+digest proves every other byte is unchanged. `./scripts/repair-model.sh` recreates
+the corrected directory atomically, offline, and inside the pinned Docker boundary.
+The source conversion is retained as evidence but is never mounted by the supported
+runtime. Full methods, aggregate errors, kernel comparisons, and limitations are in
+`docs/qwen38-weight-quantization-audit.md`.
+
 The snapshot includes separate MTP tensors, but presence on disk is not activation.
 The launch has no speculative configuration and logs speculative_config=None, so MTP
 is not loaded or used.
@@ -167,7 +195,7 @@ The vLLM submodule is pinned at:
 
     9df9b0b0a1816b6d0d0f6ecd0da563cc37fd72f5
 
-It is intentionally reconstructed by eight ordered reviewed patches:
+It is intentionally reconstructed by nine ordered, reviewed semantic transformations:
 
 | Patch | SHA-256 |
 |---|---|
@@ -179,11 +207,17 @@ It is intentionally reconstructed by eight ordered reviewed patches:
 | patches/vllm-anthropic-validation-http400.patch | 030b64be104e6ef57a40f6bae740dfa9d4634a420c6c93a395f62bfb98d6d053 |
 | patches/vllm-tool-truncation-finish-reason.patch | 1a220f6db9b40967d867b3cfb1a92d95d907ca059718ffe61772b4cb4409f551 |
 | patches/vllm-qwen38-vision-runtime.patch | f92603724861da5b5a364f43e57d3f95ef43a9dded8ae645278373850db3140f |
+| patches/vllm-qwen38-numerical-audits.patch | a73aa2f2ae3f82010eb2bafcdf663c2fe14854c30165dbc4d8457725bc3b6632 |
 
 The reconstructed tree has exactly twenty-nine reviewed runtime-source changes,
-seven reviewed test changes, and one reviewed new workspace test. The build check
-rejects an extra dirty file, missing hunk, wrong order, changed final hash, whitespace
-error, or patch that does not recreate the exact live tree.
+seven reviewed existing-test changes, and one reviewed new workspace test. The
+landmark-aware Python patcher calculates every mutation before writing, validates
+unique structural landmarks and complete pre/post hashes, performs atomic
+transactions with rollback, and is itself covered by seven failure-path tests. The
+unified diffs remain review artifacts, but they do not select mutation locations.
+The build check rejects an extra dirty file, ambiguous landmark, missing hunk, wrong
+stage, changed final hash, whitespace error, partial intermediate state, concurrent
+source drift, or a patch that does not recreate the exact live tree.
 
 Pinned build inputs and products:
 
@@ -191,21 +225,21 @@ Pinned build inputs and products:
 |---|---|
 | Immutable base tag | qwen38-vllm:main-9df9b0b |
 | Immutable base ID | sha256:fa4a002a88b7043a1a89966dea8a500fe9696f84e75730d9da916f916048d401 |
-| Runtime tag | qwen38-vllm:qwen38-27b-nvfp4-k8v4-runtime-v10 |
-| Runtime ID | sha256:1cb1528d5fc533291e5ab572f38d4b59af5d5d17b0a5f3f7a281731eec8b54da |
-| Offline archive | artifacts/qwen38-vllm-images-runtime-v10.tar |
-| Archive size | 8,557,642,240 bytes, mode 0600 |
-| Archive SHA-256 | 87c75b5bc6f76eb3d9501848b0e2af4a0c69ea718b8ec9db2cdd47185c4db396 |
-| Runtime Dockerfile SHA-256 | 20ad32dce3c10c299bc7094fb190a115490629b323534d80e5cd74491a6cf62e |
-| Docker context allowlist SHA-256 | 84271b998e45ede241d88e0cd8e82eccab2cb2e3e91a31c32da126d6d2d9710a |
-| Build verifier SHA-256 | 488fe49655416a07d481cfa94b185f4e668eecaed6184e9f2b90c89e936d2e20 |
-| Runtime validator SHA-256 | b162092c711ba2d15f47ff6d654a801c5d0a04e89208de3c0cd15d52a4fc8cd1 |
-| Runtime lock SHA-256 | 7d07ef1b29d6fd4dbb20f106f25f05a954e8dea50e0e91712ec472a4e4dd615b |
+| Runtime tag | qwen38-vllm:qwen38-27b-nvfp4-k8v4-runtime-v12 |
+| Runtime ID | sha256:5d545d85950310cb09bebacba9083a242e8943c92669428eb23468d959f4f2d5 |
+| Offline archive | artifacts/qwen38-vllm-images-runtime-v12.tar |
+| Archive size | 8,557,665,792 bytes, mode 0600 |
+| Archive SHA-256 | 7738cf9654f033c529e73e32611c48d85f92684eab5c34f712d95e8e1648e128 |
+| Runtime Dockerfile SHA-256 | 01ee13d532707172ad91f0df686eac7854eb1d3f906abfd4117337dcbcb8e3ed |
+| Docker context allowlist SHA-256 | a15c81d0be5c474d9f0cd5e8b1d3f89b5eb7266ce60d45476069de9499f6b103 |
+| Build verifier SHA-256 | 908f8a28bbfddb8929d838dda730cff4c4306cea7006a809e1d07b3847adfdda |
+| Runtime validator SHA-256 | 7b3d6d526357cc75bcf851c5ce24ab1c59b9d0005471abdaac56b01aec84e1c1 |
+| Runtime lock SHA-256 | e9c5b532ec8bf28b18c3a66f491e0c5e5a63df5fd42f8b35755383e755ba9c3c |
 
 The final runtime layer does no package resolution or installation. It is built with
 pull=false, network=none, provenance=false, an exact base ID, an allowlisted context,
 upstream installed-file hashes, final installed-file hashes, and build-time invariant
-tests. Two offline builds produced the identical v10 image ID.
+tests. Two offline builds produced the identical v12 image ID.
 
 The local repository identity is Ronen Zyroff <rzyroff@gmail.com>. Global Git
 configuration is untouched. Large checkpoint trees, image archives, caches,
@@ -378,6 +412,15 @@ workspace as the final BF16 continuation buffers on the exact K8V4 key-FP8 path.
 eliminates duplicate full-length K/V buffers and progressive runtime allocations
 without changing K4V4/MSE modes. Focused kernel tests passed.
 
+This storage path is numerically tested rather than accepted from its name. The
+runtime's actual Triton store produced the independently constructed FP8 key bytes,
+packed V4 nibbles, and FP16 affine metadata for Qwen's exact D=256 geometry. The
+actual fused GQA decode matched an explicit FP32 score/softmax/accumulation reference
+with maximum absolute difference 0.00381172 and minimum cosine 0.999998331. Eighteen
+value codes fell on floating-point rounding boundaries; all were within the stated
+`2e-5` boundary interval and differed by only one code step. All stable codes, key
+bytes, scales, and minima matched exactly.
+
 Vision adds the complete BF16 tower and transient encoder/MLP activations. vLLM logs
 21.34 GiB loaded model memory, 6.45 GiB KV reservation, 1,024 MiB reclaimable
 TurboQuant workspace, and about 0.06 GiB CUDA graph capture. The vision patch
@@ -386,13 +429,15 @@ encoding, then restores them exactly. It does not change cache capacity, text
 prefill size, graphs, weight precision, or image precision. Logs from maximum images
 show release/restoration and no OOM, retry, preemption, or fallback.
 
-On the exact final live image:
+On the exact final v12 live image:
 
 - immediately after startup and before the full suite: 31,223 MiB used, 888 MiB free;
-- after all validated image shapes and JIT kernels: 31,879 MiB used, 232 MiB free;
+- after the fifteen-image/full-native-boundary/cache/protocol/agent-client suite:
+  31,809 MiB used, 302 MiB free;
 - total reported VRAM: 32,607 MiB.
 
-The small post-suite global free number is not the memory available during a vision
+The post-suite reading is an observed residency point, not a claim that generation
+always peaks at exactly that number. The small global free number is not the memory available during a vision
 encode; the exact patch deliberately makes 1,664 MiB available around that phase.
 The full-context and maximum-image runs completed, so residency is proven by
 execution rather than inferred from an idle screenshot.
@@ -418,6 +463,15 @@ Every long-context constructor uses the real checkpoint tokenizer inside Docker,
 applies the real chat template, and requires Transformers, vLLM /tokenize, and final
 usage.prompt_tokens to agree. There is no character division, target//8, token-density
 estimate, padding fudge, tokenizer substitution, or host tokenizer.
+
+The model-position audit separately freezes the 64-layer / 16-full-attention
+geometry, 256-dimensional heads, 0.25 partial RoPE, 10,000,000 theta, and interleaved
+MRoPE sections `[11,11,10]`. An independent implementation of the released
+Transformers 5.15 image-position algorithm matched vLLM element-for-element for
+interleaved image placements and generated-token continuation, even when the
+transport feature list was deliberately reversed. Complete derivations, test code,
+results, and the limits of the claim are in
+`docs/qwen38-context-turboquant-audit.md`.
 
 ### Exact image-quality contract
 
@@ -523,12 +577,17 @@ different jobs:
 - the multimodal processor cache keys exact image bytes with SHA-256 and reuses the
   image preprocessing/encoder input independently.
 
-The measured cold history had zero prefix and multimodal hits and 6.1716-second TTFT.
+The final v12 measured cold history had zero prefix and multimodal hits and
+6.0440-second TTFT.
 A warm OpenAI continuation hit 14,560 prefix tokens and the image cache. The
 equivalent warm Anthropic stream hit the same 14,560 prefix tokens, hit the image
-cache, and reached first token in 0.3520 seconds: 17.531 times faster. Changing image
+cache, and reached first token in 0.3331 seconds: 18.146 times faster. Changing image
 bytes caused zero multimodal hits. Moving identical bytes caused a multimodal hit but
-zero prefix hit, which proves the caches are not being conflated.
+zero prefix hit, which proves the caches are not being conflated. That deliberately
+moved history is a negative cache/render control: because its text contradicts its
+media chronology, semantic OCR is not treated as an acceptance invariant. Every
+chronologically valid OpenAI/Anthropic stream and non-stream request still required
+and returned the exact pixel-only value.
 
 This cache behavior does not depend on preserving old hidden reasoning. Omitting
 completed hidden traces stabilizes the durable message prefix and gives the main
@@ -577,13 +636,16 @@ The installed-image focused suites passed:
 - 382 Qwen streaming/replay cases;
 - vision workspace, image-contract, and vision-MLP units during the immutable build.
 
-### Validation record for v10
+### Validation record for v12
 
-All results below were obtained from the exact pinned v10 image:
+The source/image invariants and numerical results below were obtained from the exact
+pinned v12 image. The protocol, cache, native-boundary, and full-image tests are
+rerun after every runtime-profile change before that image is accepted:
 
 1. Runtime source reconstruction and immutable offline build: pass; two builds
    produced the same ID.
-2. Full model/tokenizer/template/processor manifest: pass.
+2. Full corrected model/tokenizer/template/processor manifest and exact 161-range
+   official-norm repair proof: pass.
 3. Exact loopback-only listener and no published Docker ports: pass.
 4. MTP/speculation absent, CPU offload zero, CUDA graphs retained: pass.
 5. Exact xhigh defaults, high/max alias identity, low/disabled rejection: pass.
@@ -602,25 +664,41 @@ All results below were obtained from the exact pinned v10 image:
     262,145 total rejected.
 15. Logs after maximum image/context work: no CUDA OOM, allocation retry, preemption,
     semantic fallback, or failed restoration.
-16. Pinned Qwen Code archive plus exact patch reconstruction: pass; 33 changed/new
-    files, twelve focused suites, and 1,720 tests; two builds produced the identical
-    agent image ID.
-17. Real Qwen Code text-read, original-PNG vision, shell, and final-response tool
+16. Complete official-BF16 versus converted tensor audit: pass; 1,199 official and
+    1,968 converted tensors fully accounted, 233 FP8 and 168 NVFP4 tensors fully
+    dequantized, and all 798 reference-precision tensors compared.
+17. Actual K8V4 Triton store/fused decode versus independently packed FP32 reference:
+    pass; maximum absolute difference 0.00381172 and minimum cosine 0.999998331.
+18. Actual worst-layer NVFP4 production kernel versus independent dequantization and
+    BF16 matmul at M=1/17/129: pass; required FlashInfer-CUTLASS selector.
+19. Exact text/image MRoPE implementation versus independent Transformers 5.15
+    semantics and continuation positions: pass.
+20. Pinned Qwen Code archive plus exact semantic reconstruction: pass; sixteen
+    focused suites and 2,326 tests; two builds produced the identical agent image ID.
+21. Real Qwen Code text-read, original-PNG vision, shell, and final-response tool
     loop: pass twice against a hostile configuration workspace; ordinary QWEN.md and
     AGENTS.md guidance remained active while `.env`, MCP, hooks, skills, rules,
     memory, output language, workspace settings, and slash commands remained inert.
-18. Qwen Code image chronology and caching: pass; the first four-turn run recorded
+22. Qwen Code image chronology and caching: pass; the first four-turn run recorded
     35,360 prefix-hit tokens and one of two multimodal hits, while the repeated run
     recorded 45,760 prefix-hit tokens and two of two multimodal hits. Mean backend
     TTFT fell from 1.129958153 to 0.279406309 seconds, 4.044140 times faster.
-19. Strict client image rejection and foreground subagent: pass; JPEG failed with a
+23. Strict client image rejection and foreground subagent: pass; JPEG failed with a
     typed missing-PNG-signature result and no conversion/retry; one Explore subagent
     returned through correlated parent/child tool events and was verified by the
     main thread.
-20. Live agent isolation and lifecycle: pass; only loopback, no route/DNS/GPU/ports,
-    sealed model proxy only, read-only roots, cap-drop-all, no-new-privileges, exact
+24. Live stack isolation and lifecycle: pass; backend root and agent roots read-only,
+    backend JIT/temp writes confined to exact bounded tmpfs, only the versioned vLLM
+    cache durable and writable, only loopback, no route/DNS/GPU/published ports in
+    agent sessions, sealed model proxy only, cap-drop-all, no-new-privileges, exact
     readiness-boundary cancellation with exit 143, durable partial bundle, and zero
     owned session-container leftovers.
+25. Final paired-stack smoke at service commit
+    d68af3f4410094affcb8ff7c1ff539a2b6bf6c92: pass; the pinned Qwen Code
+    0.21.12 client completed an exact native file-tool round trip, then launched and
+    awaited one foreground Explore subagent before independent main-thread and
+    byte-exact output verification. Both writes remained inside staged workspace
+    copies.
 
 The supported status currently reports:
 
@@ -651,8 +729,11 @@ proxying to loopback vLLM, cancellation, durable JSONL/bundles, labels, orphan
 recovery, and ordered teardown.
 
 The chosen and deployed client is pinned Qwen Code 0.21.12 at
-b965d5f8c24f48e65fb0b17c7d45f34ca4ce8f38. It runs only inside immutable agent image
-sha256:303601e191432b197970203b7e9c220833d871c5338c43b8a735d812f65ac77c.
+b965d5f8c24f48e65fb0b17c7d45f34ca4ce8f38. The official release archive is pinned
+by SHA-256 61beddff8bde1dd2654c8714f927b46ab7cf9822b8561d11e3a2b8e085b5e745,
+and the landmark-aware source transformation is independently pinned. It runs only
+inside immutable agent image
+sha256:cc916c63598c5953810482e2e5f614eaa1e96695f5c07bfb2c3f2f894e9aa323.
 The accepted service sends this exact outgoing policy on every main and foreground
 subagent turn:
 
@@ -672,7 +753,7 @@ subagent turn:
   subagents.
 
 The service is the updated original `/home/user/Desktop/agent_service` at commit
-d4d18887875514305c81535cea3bcebaff763932, not a copied launcher. Its own README and
+d68af3f4410094affcb8ff7c1ff539a2b6bf6c92, not a copied launcher. Its own README and
 lock file are authoritative for Qwen Code source/patch,
 agent/service images, package snapshot, exact tools, copied-workspace envelope,
 stream-event validation, cancellation, bundles, and 127.0.0.1:8090 listener. Repeated

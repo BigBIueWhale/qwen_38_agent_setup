@@ -237,8 +237,11 @@ assert_runtime_versions() {
 
 assert_running_profile() {
   local running image_id network port_bindings published_ports cap_drop security_opts
-  local model_source model_rw model_revision_label cache_name cache_type
-  local cache_project_label cache_profile_label cache_model_revision_label
+  local read_only_root root_tmpfs tmp_tmpfs run_tmpfs
+  local model_source model_rw model_revision_label model_official_revision_label
+  local model_correction_label model_sha256_label model_manifest_sha256_label
+  local cache_name cache_type cache_project_label cache_profile_label
+  local cache_model_revision_label cache_model_correction_label cache_model_sha256_label
   local actual_command expected_command
   local actual_environment wrapped_environment required_environment api
   local installed_report expected_installed_report
@@ -271,6 +274,29 @@ assert_running_profile() {
     die "Running container model-revision label does not match." \
       "Expected: ${MODEL_REVISION}" \
       "Found:    ${model_revision_label:-missing}"
+  model_official_revision_label="$(
+    docker inspect --format '{{index .Config.Labels "qwen38.model.official-revision"}}' \
+      "${CONTAINER_NAME}"
+  )"
+  model_correction_label="$(
+    docker inspect --format '{{index .Config.Labels "qwen38.model.correction"}}' \
+      "${CONTAINER_NAME}"
+  )"
+  model_sha256_label="$(
+    docker inspect --format '{{index .Config.Labels "qwen38.model.sha256"}}' \
+      "${CONTAINER_NAME}"
+  )"
+  model_manifest_sha256_label="$(
+    docker inspect --format '{{index .Config.Labels "qwen38.model.manifest.sha256"}}' \
+      "${CONTAINER_NAME}"
+  )"
+  [[ "${model_official_revision_label}" == "${OFFICIAL_MODEL_REVISION}" && \
+     "${model_correction_label}" == "${MODEL_CORRECTION}" && \
+     "${model_sha256_label}" == "${MODEL_SHA256}" && \
+     "${model_manifest_sha256_label}" == "${MODEL_MANIFEST_SHA256}" ]] || \
+    die "Running container corrected-model labels do not match." \
+      "Expected official revision/correction/model/manifest: ${OFFICIAL_MODEL_REVISION}/${MODEL_CORRECTION}/${MODEL_SHA256}/${MODEL_MANIFEST_SHA256}" \
+      "Found official revision/correction/model/manifest: ${model_official_revision_label:-missing}/${model_correction_label:-missing}/${model_sha256_label:-missing}/${model_manifest_sha256_label:-missing}"
 
   network="$(docker inspect --format '{{.HostConfig.NetworkMode}}' "${CONTAINER_NAME}")"
   [[ "${network}" == "host" ]] || \
@@ -294,6 +320,32 @@ assert_running_profile() {
   [[ "${security_opts}" == '["no-new-privileges:true"]' ]] || \
     die "Container no-new-privileges protection is missing." \
       "Found: ${security_opts}"
+
+  read_only_root="$(
+    docker inspect --format '{{.HostConfig.ReadonlyRootfs}}' "${CONTAINER_NAME}"
+  )"
+  root_tmpfs="$(
+    docker inspect --format '{{index .HostConfig.Tmpfs "/root"}}' "${CONTAINER_NAME}"
+  )"
+  tmp_tmpfs="$(
+    docker inspect --format '{{index .HostConfig.Tmpfs "/tmp"}}' "${CONTAINER_NAME}"
+  )"
+  run_tmpfs="$(
+    docker inspect --format '{{index .HostConfig.Tmpfs "/run"}}' "${CONTAINER_NAME}"
+  )"
+  [[ "${read_only_root}" == "true" ]] || \
+    die "Container root filesystem is writable." \
+      "Expected read-only root; found: ${read_only_root:-missing}"
+  [[ "${root_tmpfs}" == "${ROOT_TMPFS_OPTIONS}" && \
+     "${tmp_tmpfs}" == "${TMP_TMPFS_OPTIONS}" && \
+     "${run_tmpfs}" == "${RUN_TMPFS_OPTIONS}" ]] || \
+    die "Container runtime tmpfs mounts differ from the exact profile." \
+      "Expected /root: ${ROOT_TMPFS_OPTIONS}" \
+      "Found /root: ${root_tmpfs:-missing}" \
+      "Expected /tmp: ${TMP_TMPFS_OPTIONS}" \
+      "Found /tmp: ${tmp_tmpfs:-missing}" \
+      "Expected /run: ${RUN_TMPFS_OPTIONS}" \
+      "Found /run: ${run_tmpfs:-missing}"
 
   model_source="$(docker inspect --format '{{range .Mounts}}{{if eq .Destination "/model"}}{{.Source}}{{end}}{{end}}' "${CONTAINER_NAME}")"
   model_rw="$(docker inspect --format '{{range .Mounts}}{{if eq .Destination "/model"}}{{.RW}}{{end}}{{end}}' "${CONTAINER_NAME}")"
@@ -320,12 +372,22 @@ assert_running_profile() {
     docker volume inspect --format '{{index .Labels "qwen38.model.revision"}}' \
       "${CACHE_VOLUME}"
   )"
+  cache_model_correction_label="$(
+    docker volume inspect --format '{{index .Labels "qwen38.model.correction"}}' \
+      "${CACHE_VOLUME}"
+  )"
+  cache_model_sha256_label="$(
+    docker volume inspect --format '{{index .Labels "qwen38.model.sha256"}}' \
+      "${CACHE_VOLUME}"
+  )"
   [[ "${cache_project_label}" == "${CONTAINER_LABEL}" && \
      "${cache_profile_label}" == "${PROFILE_VERSION}" && \
-     "${cache_model_revision_label}" == "${MODEL_REVISION}" ]] || \
+     "${cache_model_revision_label}" == "${MODEL_REVISION}" && \
+     "${cache_model_correction_label}" == "${MODEL_CORRECTION}" && \
+     "${cache_model_sha256_label}" == "${MODEL_SHA256}" ]] || \
     die "Pinned cache-volume labels do not match." \
-      "Expected project/profile/revision: ${CONTAINER_LABEL}/${PROFILE_VERSION}/${MODEL_REVISION}" \
-      "Found project/profile/revision: ${cache_project_label:-missing}/${cache_profile_label:-missing}/${cache_model_revision_label:-missing}"
+      "Expected project/profile/revision/correction/model: ${CONTAINER_LABEL}/${PROFILE_VERSION}/${MODEL_REVISION}/${MODEL_CORRECTION}/${MODEL_SHA256}" \
+      "Found project/profile/revision/correction/model: ${cache_project_label:-missing}/${cache_profile_label:-missing}/${cache_model_revision_label:-missing}/${cache_model_correction_label:-missing}/${cache_model_sha256_label:-missing}"
 
   actual_command="$(docker inspect --format '{{range .Config.Cmd}}{{println .}}{{end}}' "${CONTAINER_NAME}")"
   expected_command="$(printf '%s\n' "${VLLM_ARGS[@]}")"

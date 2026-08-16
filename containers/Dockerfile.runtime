@@ -132,6 +132,10 @@ ARG PHASE_BUDGET_UNIT_SHA256=913266638d302de31cdeae1acfdc5a568a01513481a57e5a4e7
 ARG VISION_WORKSPACE_UNIT_SHA256=34f6ef1c477794de5e8b349c2da1dd491607a5618498358aa8b86085336a3df8
 ARG VISION_CONTRACT_UNIT_SHA256=3a35831a58641f360ebc8c2c961c44deac1024e0a3431363ab68f803d86b4740
 ARG VISION_MLP_UNIT_SHA256=857ba547a099c6ba646210eb33dd7b159bf9a1972d1772ea396071c8d8e4f2e3
+ARG TURBOQUANT_K8V4_UNIT_SHA256
+ARG QWEN38_CONTEXT_UNIT_SHA256
+ARG NVFP4_KERNEL_UNIT_SHA256
+ARG NUMERICAL_AUDITS_PATCH_DIFF_SHA256
 RUN install --directory --mode=0755 /opt/qwen38
 COPY --chmod=0644 \
   vllm/vllm/v1/attention/backends/turboquant_attn.py \
@@ -225,6 +229,14 @@ COPY --chmod=0644 scripts/phase_budget_unit.py /opt/qwen38/phase_budget_unit.py
 COPY --chmod=0644 scripts/vision_workspace_unit.py /opt/qwen38/vision_workspace_unit.py
 COPY --chmod=0644 scripts/vision_contract_unit.py /opt/qwen38/vision_contract_unit.py
 COPY --chmod=0644 scripts/vision_mlp_unit.py /opt/qwen38/vision_mlp_unit.py
+COPY --chmod=0644 scripts/turboquant_k8v4_unit.py /opt/qwen38/turboquant_k8v4_unit.py
+COPY --chmod=0644 scripts/qwen38_context_unit.py /opt/qwen38/qwen38_context_unit.py
+COPY --chmod=0644 scripts/nvfp4_kernel_unit.py /opt/qwen38/nvfp4_kernel_unit.py
+RUN printf '%s  %s\n%s  %s\n%s  %s\n' \
+      "${TURBOQUANT_K8V4_UNIT_SHA256}" /opt/qwen38/turboquant_k8v4_unit.py \
+      "${QWEN38_CONTEXT_UNIT_SHA256}" /opt/qwen38/qwen38_context_unit.py \
+      "${NVFP4_KERNEL_UNIT_SHA256}" /opt/qwen38/nvfp4_kernel_unit.py \
+    | sha256sum --check --strict
 RUN printf '%s  %s\n%s  %s\n' \
       "${QWEN3_VL_MODEL_PATCHED_FILE_SHA256}" \
       /usr/local/lib/python3.12/dist-packages/vllm/model_executor/models/qwen3_vl.py \
@@ -330,6 +342,16 @@ assert stat.S_IMODE(os.stat("/opt/qwen38/phase_budget_unit.py").st_mode) == 0o64
 assert stat.S_IMODE(os.stat("/opt/qwen38/vision_workspace_unit.py").st_mode) == 0o644
 assert stat.S_IMODE(os.stat("/opt/qwen38/vision_contract_unit.py").st_mode) == 0o644
 assert stat.S_IMODE(os.stat("/opt/qwen38/vision_mlp_unit.py").st_mode) == 0o644
+assert stat.S_IMODE(os.stat("/opt/qwen38/turboquant_k8v4_unit.py").st_mode) == 0o644
+assert stat.S_IMODE(os.stat("/opt/qwen38/qwen38_context_unit.py").st_mode) == 0o644
+assert stat.S_IMODE(os.stat("/opt/qwen38/nvfp4_kernel_unit.py").st_mode) == 0o644
+
+for audit_path in (
+    "/opt/qwen38/turboquant_k8v4_unit.py",
+    "/opt/qwen38/qwen38_context_unit.py",
+    "/opt/qwen38/nvfp4_kernel_unit.py",
+):
+    compile(open(audit_path, encoding="utf-8").read(), audit_path, "exec")
 
 tool = ChatCompletionToolsParam.model_validate(
     {
@@ -616,7 +638,8 @@ PY
 LABEL org.opencontainers.image.revision="9df9b0b0a1816b6d0d0f6ecd0da563cc37fd72f5" \
       qwen38.base.image="sha256:fa4a002a88b7043a1a89966dea8a500fe9696f84e75730d9da916f916048d401" \
       qwen38.patch.turboquant.diff.sha256="a9721067f1a7ee9497a4bd51e47e3a474561189e881b4704bfc4beac8ea48380" \
-      qwen38.patch.turboquant.file.sha256="1ae979841b20ffc2d0db63b30a9ecc4928548b9854983fd98aa9c2c0808e441d" \
+      qwen38.patch.turboquant.file.sha256="59faab97fa3331028ac76dc63732e6eca239d0f7a83b79e18fd30c6d9b92c2df" \
+      qwen38.patch.numerical-audits.diff.sha256="${NUMERICAL_AUDITS_PATCH_DIFF_SHA256}" \
       qwen38.patch.workspace.file.sha256="b859dfdc5676f90a0b00718e34adcd0a02d266be1543ca146eebb724a9235c00" \
       qwen38.patch.gpu-model-runner.file.sha256="a7bed200b304fdc17320a30178ded7669d4677e787947470b872ef0ec14b6c8b" \
       qwen38.patch.api-utils.file.sha256="5c6fbd5ff02c042d6f96bfbe7f4d784f97dbfa8029bc09e059c66c16a807f74b" \
@@ -642,6 +665,6 @@ LABEL org.opencontainers.image.revision="9df9b0b0a1816b6d0d0f6ecd0da563cc37fd72f
       qwen38.patch.tool-truncation.parser-engine-file.sha256="9ffce8a3aac1d885cbbd4de269201ef32bdd6089b5f92d61f94eebf1130a5faf" \
       qwen38.template.file.sha256="07d9cf1a50bc702b27832586af016188d4cb5787e9a88847a5611237f722343e" \
       qwen38.project="Qwen_best_model_ever" \
-      qwen38.runtime.profile="single-loopback-vision-k8v4-agent-v10"
+      qwen38.runtime.profile="single-loopback-vision-k8v4-agent-v12"
 
 ENTRYPOINT ["vllm", "serve"]

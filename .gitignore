@@ -5,6 +5,7 @@
 /Qwen3.8-27B-FP8/
 /Qwen3.8-27B-NVFP4-RadixArk/
 /Qwen3.8-27B-NVFP4-Unsloth/
+/Qwen3.8-27B-NVFP4-Corrected/
 
 # Large/redundant tokenizer payloads from the official root snapshot. Keep the
 # smaller configs, chat template, model index, and manifest evidence tracked.

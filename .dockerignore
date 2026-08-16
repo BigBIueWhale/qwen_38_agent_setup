@@ -5,6 +5,9 @@
 !scripts/vision_workspace_unit.py
 !scripts/vision_contract_unit.py
 !scripts/vision_mlp_unit.py
+!scripts/turboquant_k8v4_unit.py
+!scripts/qwen38_context_unit.py
+!scripts/nvfp4_kernel_unit.py
 !containers/
 !containers/Dockerfile.runtime
 !vllm/

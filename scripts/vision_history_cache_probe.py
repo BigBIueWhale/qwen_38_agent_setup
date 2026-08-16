@@ -303,6 +303,36 @@ def metric_delta(before: dict[str, int], after: dict[str, int]) -> dict[str, int
     return {key: after[key] - before[key] for key in before}
 
 
+def settled_metric_snapshot(
+    *, quiet_seconds: float = 10.0, timeout_seconds: float = 30.0
+) -> dict[str, int]:
+    """Return a baseline only after deferred metric publication has quiesced.
+
+    Very large requests can finish their HTTP response just before all of their
+    cache counters become visible at ``/metrics``.  Starting a new attribution
+    window immediately would then charge those counters to the next request.
+    Waiting for an actually quiet counter window preserves the probe's strict
+    per-request assertions without weakening them or guessing away a delta.
+    """
+    started = time.monotonic()
+    stable_since = started
+    previous = metric_snapshot()
+    while True:
+        time.sleep(0.5)
+        current = metric_snapshot()
+        now = time.monotonic()
+        if current != previous:
+            previous = current
+            stable_since = now
+        elif now - stable_since >= quiet_seconds:
+            return current
+        if now - started >= timeout_seconds:
+            raise AssertionError(
+                "Cache metrics did not quiesce before attribution: "
+                f"last_snapshot={current}"
+            )
+
+
 def validate_delta(delta: dict[str, int], prompt_tokens: int) -> None:
     if delta["prefix_queries"] != prompt_tokens:
         raise AssertionError(
@@ -402,7 +432,9 @@ def render_proof(
     )
 
 
-def collect_openai_stream(payload: dict[str, Any], code: str) -> dict[str, Any]:
+def collect_openai_stream(
+    payload: dict[str, Any], code: str | None
+) -> dict[str, Any]:
     content = ""
     reasoning = ""
     finish_reason = None
@@ -425,10 +457,17 @@ def collect_openai_stream(payload: dict[str, Any], code: str) -> dict[str, Any]:
             reasoning += delta.get("reasoning") or ""
             content += delta.get("content") or ""
             finish_reason = choice.get("finish_reason") or finish_reason
-    if not saw_done or finish_reason != "stop" or code not in content or not usage:
+    semantic_value_present = code is not None and code in content
+    if (
+        not saw_done
+        or finish_reason != "stop"
+        or (code is not None and not semantic_value_present)
+        or not usage
+    ):
         raise AssertionError(
             f"OpenAI stream failed: done={saw_done}, finish={finish_reason}, "
-            f"code={code in content}, usage={usage}, answer={content!r}"
+            f"required_code={code!r}, code_present={semantic_value_present}, "
+            f"usage={usage}, answer={content!r}"
         )
     return {
         "ttft_seconds": first_semantic,
@@ -436,6 +475,8 @@ def collect_openai_stream(payload: dict[str, Any], code: str) -> dict[str, Any]:
         "prompt_tokens": int(usage["prompt_tokens"]),
         "completion_tokens": int(usage["completion_tokens"]),
         "reasoning_present": bool(reasoning),
+        "semantic_value_required": code is not None,
+        "semantic_value_present": semantic_value_present,
         "answer": content,
     }
 
@@ -557,7 +598,7 @@ def main() -> None:
     render, moved_render = render_proof(tokenizer, data_url)
     salt = "vision-history-cache-" + uuid.uuid4().hex
 
-    snapshot = metric_snapshot()
+    snapshot = settled_metric_snapshot()
     cold_stream, snapshot = measured(
         lambda: collect_openai_stream(
             openai_payload(data_url, stream=True, salt=salt), code
@@ -595,7 +636,7 @@ def main() -> None:
     )
     moved_control, _ = measured(
         lambda: collect_openai_stream(
-            openai_payload(data_url, stream=True, salt=salt, moved=True), code
+            openai_payload(data_url, stream=True, salt=salt, moved=True), None
         ),
         snapshot,
     )

@@ -1,0 +1,225 @@
+diff --git a/tests/quantization/test_turboquant.py b/tests/quantization/test_turboquant.py
+index a12d12bb14..7cff80fcfd 100644
+--- a/tests/quantization/test_turboquant.py
++++ b/tests/quantization/test_turboquant.py
+@@ -707,7 +707,189 @@ class TestHadamardRotation:
+ 
+ @pytest.mark.skipif(not GPGPU_AVAILABLE, reason="GPGPU not available")
+ class TestStoreDecodeRoundTrip:
+-    """End-to-end: store KV into TQ cache, decode, compare vs fp16 ref."""
++    """End-to-end: store KV into TQ cache, decode, compare with references."""
++
++    def test_qwen38_k8v4_bf16_gqa_matches_packed_reference(self):
++        """Exercise Qwen3.8's actual K8V4 dimensions and numeric path.
++
++        This deliberately uses multiple cache blocks and nontrivial attention.
++        Unlike a one-token test, it independently verifies every stored byte,
++        GQA head mapping, score softmax, and value accumulation.  It also uses
++        BF16 inputs, D=256, 24 query heads, and 4 KV heads: the exact full-
++        attention geometry of Qwen3.8-27B.
++        """
++        from vllm.v1.attention.ops.triton_turboquant_decode import (
++            triton_turboquant_decode_attention,
++        )
++        from vllm.v1.attention.ops.triton_turboquant_store import (
++            triton_turboquant_store,
++        )
++
++        preset = "turboquant_k8v4"
++        d = 256
++        num_kv_heads = 4
++        num_query_heads = 24
++        num_tokens = 37
++        block_size = 16
++        num_blocks = math.ceil(num_tokens / block_size)
++        device = torch.device(DEVICE_TYPE)
++        cfg = TurboQuantConfig.from_cache_dtype(preset, head_dim=d)
++
++        assert cfg.key_packed_size == 256
++        assert cfg.value_packed_size == 132
++        assert cfg.slot_size == 388
++        assert cfg.slot_size_aligned == 388
++
++        torch.manual_seed(38027)
++        key = torch.randn(
++            num_tokens,
++            num_kv_heads,
++            d,
++            device=device,
++            dtype=torch.bfloat16,
++        )
++        value = torch.randn_like(key)
++        query = torch.randn(
++            1,
++            num_query_heads,
++            d,
++            device=device,
++            dtype=torch.bfloat16,
++        )
++
++        kv_cache = torch.zeros(
++            num_blocks,
++            block_size,
++            num_kv_heads,
++            cfg.slot_size_aligned,
++            device=device,
++            dtype=torch.uint8,
++        )
++        slot_mapping = torch.arange(num_tokens, device=device, dtype=torch.int32)
++        # K8 does not use the rotation/centroid tables, but the common launcher
++        # contract still requires valid tensors.
++        identity = torch.eye(d, device=device, dtype=torch.float32)
++        centroids = torch.arange(16, device=device, dtype=torch.float32)
++        midpoints = torch.arange(15, device=device, dtype=torch.float32) + 0.5
++
++        triton_turboquant_store(
++            key,
++            value,
++            kv_cache,
++            slot_mapping,
++            identity,
++            midpoints,
++            mse_bits=cfg.key_mse_bits,
++            key_packed_size=cfg.key_packed_size,
++            value_quant_bits=cfg.effective_value_quant_bits,
++            key_fp8=cfg.key_fp8,
++        )
++        if device.type == "cuda":
++            torch.cuda.synchronize()
++
++        # Independent byte-level encoder.  The store kernel converts the BF16
++        # inputs through FP32, exactly as this reference does.
++        key_fp8 = key.float().to(torch.float8_e4m3fn)
++        expected_key_bytes = key_fp8.view(torch.uint8).cpu()
++        value_fp32 = value.float()
++        value_min = value_fp32.amin(dim=-1)
++        value_max = value_fp32.amax(dim=-1)
++        quant_scale = torch.clamp((value_max - value_min) / 15.0, min=1e-8)
++        value_codes = torch.clamp(
++            (
++                (value_fp32 - value_min.unsqueeze(-1))
++                / quant_scale.unsqueeze(-1)
++                + 0.5
++            )
++            .to(torch.int32),
++            0,
++            15,
++        )
++        packed_values = (
++            value_codes[..., 0::2] | (value_codes[..., 1::2] << 4)
++        ).to(torch.uint8).cpu()
++        stored_scales = quant_scale.to(torch.float16)
++        stored_minima = value_min.to(torch.float16)
++        scale_bytes = stored_scales.view(torch.uint8).reshape(
++            num_tokens, num_kv_heads, 2
++        ).cpu()
++        minimum_bytes = stored_minima.view(torch.uint8).reshape(
++            num_tokens, num_kv_heads, 2
++        ).cpu()
++        expected_slots = torch.cat(
++            [expected_key_bytes, packed_values, scale_bytes, minimum_bytes], dim=-1
++        )
++        actual_slots = torch.empty_like(expected_slots)
++        cache_cpu = kv_cache.cpu()
++        for token_idx in range(num_tokens):
++            block_idx, block_offset = divmod(token_idx, block_size)
++            actual_slots[token_idx] = cache_cpu[block_idx, block_offset]
++        value_start = cfg.key_packed_size
++        value_end = value_start + d // 2
++        assert torch.equal(actual_slots[..., :value_start], expected_key_bytes)
++        assert torch.equal(actual_slots[..., value_end:386], scale_bytes)
++        assert torch.equal(actual_slots[..., 386:388], minimum_bytes)
++
++        actual_packed = actual_slots[..., value_start:value_end]
++        actual_codes_cpu = torch.empty(
++            num_tokens, num_kv_heads, d, dtype=torch.int32
++        )
++        actual_codes_cpu[..., 0::2] = (actual_packed & 0x0F).to(torch.int32)
++        actual_codes_cpu[..., 1::2] = (actual_packed >> 4).to(torch.int32)
++        actual_codes = actual_codes_cpu.to(device)
++        rounded_inputs = (
++            (value_fp32 - value_min.unsqueeze(-1)) / quant_scale.unsqueeze(-1) + 0.5
++        )
++        boundary_distance = (rounded_inputs - rounded_inputs.round()).abs()
++        code_delta = (actual_codes - value_codes).abs()
++        stable = boundary_distance > 2e-5
++        assert (code_delta[stable] == 0).all()
++        assert (code_delta[~stable] <= 1).all()
++
++        block_table = torch.arange(
++            num_blocks, device=device, dtype=torch.int32
++        ).unsqueeze(0)
++        seq_lens = torch.tensor([num_tokens], device=device, dtype=torch.int32)
++        output = triton_turboquant_decode_attention(
++            query=query,
++            kv_cache=kv_cache,
++            block_table=block_table,
++            seq_lens=seq_lens,
++            Pi=identity,
++            centroids=centroids,
++            scale=1.0 / math.sqrt(d),
++            mse_bits=cfg.key_mse_bits,
++            key_packed_size=cfg.key_packed_size,
++            value_quant_bits=cfg.effective_value_quant_bits,
++            key_fp8=True,
++            norm_correction=False,
++            PiT=identity,
++            max_num_kv_splits=4,
++        )
++
++        dequant_key = key_fp8.float()
++        dequant_value = (
++            actual_codes.float() * stored_scales.float().unsqueeze(-1)
++            + stored_minima.float().unsqueeze(-1)
++        )
++        reference = torch.empty_like(query, dtype=torch.float32)
++        for query_head in range(num_query_heads):
++            kv_head = query_head // (num_query_heads // num_kv_heads)
++            scores = (
++                query[0, query_head].float() @ dequant_key[:, kv_head].T
++            ) / math.sqrt(d)
++            probabilities = torch.softmax(scores, dim=-1)
++            reference[0, query_head] = probabilities @ dequant_value[:, kv_head]
++
++        output_fp32 = output.float()
++        assert output.dtype == torch.bfloat16
++        assert torch.allclose(output_fp32, reference, atol=2e-2, rtol=2e-2), (
++            f"fused/reference max_abs={(output_fp32 - reference).abs().max().item():.6f}"
++        )
++        similarities = torch.nn.functional.cosine_similarity(
++            output_fp32, reference, dim=-1
++        )
++        assert similarities.min().item() > 0.999
+ 
+     @pytest.mark.parametrize(
+         "preset",
+diff --git a/vllm/v1/attention/backends/turboquant_attn.py b/vllm/v1/attention/backends/turboquant_attn.py
+index f7038b24d9..94d9ebd440 100644
+--- a/vllm/v1/attention/backends/turboquant_attn.py
++++ b/vllm/v1/attention/backends/turboquant_attn.py
+@@ -3,17 +3,19 @@
+ """TurboQuant attention backend for vLLM.
+ 
+ Prefill: Standard scaled dot-product attention on uncompressed K/V,
+-         then quantize K and store K+V into combined cache slot.
+-Decode:  Compute TQ attention scores from compressed cache,
+-         unpack FP16 values, softmax + weighted sum.
++         then quantize K and store K+V into a combined cache slot.
++Decode:  Compute attention scores from compressed K, dequantize packed V,
++         then perform float32 online softmax and value accumulation.
+ 
+ Cache layout (no leading 2 dimension):
+   (num_blocks, block_size, num_kv_heads, slot_size)
+-  where slot_size = key_packed_size + value_fp16_size
++  where slot_size = key_packed_size + value_packed_size
+ 
+ Per-head per-position slot layout:
+-  [key_packed (kps bytes) | value_fp16 (D*2 bytes)]
+-  For turboquant_k3v4_nc head_dim=256: [100 bytes key | 512 bytes value] = 612
++  [key_packed | packed value codes | FP16 value scale | FP16 value minimum]
++  For turboquant_k8v4 at head_dim=256:
++    [256-byte E4M3 key | 128-byte 4-bit V | 2-byte scale | 2-byte minimum]
++    = 388 bytes per KV head/token (before alignment, already even here).
+ """
+ 
+ import contextlib

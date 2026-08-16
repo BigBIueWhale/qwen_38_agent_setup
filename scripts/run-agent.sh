@@ -42,9 +42,19 @@ if docker volume inspect "${CACHE_VOLUME}" >/dev/null 2>&1; then
     docker volume inspect --format '{{index .Labels "qwen38.model.revision"}}' \
       "${CACHE_VOLUME}"
   )"
+  cache_model_correction_label="$(
+    docker volume inspect --format '{{index .Labels "qwen38.model.correction"}}' \
+      "${CACHE_VOLUME}"
+  )"
+  cache_model_sha256_label="$(
+    docker volume inspect --format '{{index .Labels "qwen38.model.sha256"}}' \
+      "${CACHE_VOLUME}"
+  )"
   if [[ "${cache_label}" != "${CONTAINER_LABEL}" || \
         "${cache_profile_label}" != "${PROFILE_VERSION}" || \
-        "${cache_model_revision_label}" != "${MODEL_REVISION}" ]]; then
+        "${cache_model_revision_label}" != "${MODEL_REVISION}" || \
+        "${cache_model_correction_label}" != "${MODEL_CORRECTION}" || \
+        "${cache_model_sha256_label}" != "${MODEL_SHA256}" ]]; then
     die "The expected cache-volume name belongs to an unrecognized volume." \
       "Volume: ${CACHE_VOLUME}" \
       "Expected project label: ${CONTAINER_LABEL}" \
@@ -53,6 +63,10 @@ if docker volume inspect "${CACHE_VOLUME}" >/dev/null 2>&1; then
       "Found profile label: ${cache_profile_label:-missing}" \
       "Expected model revision: ${MODEL_REVISION}" \
       "Found model revision: ${cache_model_revision_label:-missing}" \
+      "Expected model correction: ${MODEL_CORRECTION}" \
+      "Found model correction: ${cache_model_correction_label:-missing}" \
+      "Expected model SHA-256: ${MODEL_SHA256}" \
+      "Found model SHA-256: ${cache_model_sha256_label:-missing}" \
       "The volume was not modified or deleted."
   fi
 else
@@ -60,6 +74,8 @@ else
     --label "qwen38.project=${CONTAINER_LABEL}" \
     --label "qwen38.runtime.profile=${PROFILE_VERSION}" \
     --label "qwen38.model.revision=${MODEL_REVISION}" \
+    --label "qwen38.model.correction=${MODEL_CORRECTION}" \
+    --label "qwen38.model.sha256=${MODEL_SHA256}" \
     "${CACHE_VOLUME}" >/dev/null
 fi
 
@@ -89,9 +105,17 @@ docker run --detach \
   --label "qwen38.project=${CONTAINER_LABEL}" \
   --label "qwen38.runtime.profile=${PROFILE_VERSION}" \
   --label "qwen38.model.revision=${MODEL_REVISION}" \
+  --label "qwen38.model.official-revision=${OFFICIAL_MODEL_REVISION}" \
+  --label "qwen38.model.correction=${MODEL_CORRECTION}" \
+  --label "qwen38.model.sha256=${MODEL_SHA256}" \
+  --label "qwen38.model.manifest.sha256=${MODEL_MANIFEST_SHA256}" \
   --gpus all \
   --network host \
   --restart no \
+  --read-only \
+  --tmpfs "/root:${ROOT_TMPFS_OPTIONS}" \
+  --tmpfs "/tmp:${TMP_TMPFS_OPTIONS}" \
+  --tmpfs "/run:${RUN_TMPFS_OPTIONS}" \
   --shm-size 8g \
   --cap-drop ALL \
   --security-opt no-new-privileges:true \

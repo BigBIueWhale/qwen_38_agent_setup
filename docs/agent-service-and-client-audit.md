@@ -211,7 +211,7 @@ The live project-owned Responses probe passed non-streaming and SSE tool selecti
 strict typed arguments, `function_call_output` continuation, xhigh reasoning,
 completed response events, and semantic transport equivalence. vLLM's request model
 accepts Codex's extra metadata and `reasoning.encrypted_content` include request.
-The v10 request model also applies the pinned `thinking_token_budget=262144` and
+The v12 request model also applies the pinned `thinking_token_budget=262144` and
 `final_response_token_budget=131072` defaults to Responses requests. It accepts
 explicit smaller vLLM-extension values while retaining the server's final ceiling as
 a hard upper bound.

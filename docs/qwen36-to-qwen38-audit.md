@@ -288,7 +288,7 @@ launcher/sitecustomize registry that can drift between processes.
 
 ## Current-source changes that actually remain
 
-Eight reviewed diff artifacts reconstruct twenty-nine runtime-source changes, seven
+Nine reviewed diff artifacts reconstruct twenty-nine runtime-source changes, seven
 reviewed test changes, and one reviewed new workspace test:
 
 | Diff | Purpose | SHA-256 |
@@ -301,6 +301,7 @@ reviewed test changes, and one reviewed new workspace test:
 | `patches/vllm-anthropic-validation-http400.patch` | report Anthropic request-conversion validation failures as HTTP 400, not HTTP 500 | `030b64be104e6ef57a40f6bae740dfa9d4634a420c6c93a395f62bfb98d6d053` |
 | `patches/vllm-tool-truncation-finish-reason.patch` | preserve truncation terminals, fail Responses incomplete events closed, flush deferred batch content, and carry phase budgets through Responses | `1a220f6db9b40967d867b3cfb1a92d95d907ca059718ffe61772b4cb4409f551` |
 | `patches/vllm-qwen38-vision-runtime.patch` | enforce lossless static-PNG ingress, chronological tool media, full BF16 image processing, and exact reclaimable vision workspace without reducing context, graphs, or prefill chunking | `f92603724861da5b5a364f43e57d3f95ef43a9dded8ae645278373850db3140f` |
+| `patches/vllm-qwen38-numerical-audits.patch` | add exact TurboQuant K8V4, Qwen3.8 context/MRoPE, and real-checkpoint NVFP4 production-kernel audits to the immutable build | `a73aa2f2ae3f82010eb2bafcdf663c2fe14854c30165dbc4d8457725bc3b6632` |
 
 The separate final-response ceiling is deliberately a hard ceiling: EOS and configured
 stop sequences still win, but `min_tokens` cannot force generation past it. Multi-token
