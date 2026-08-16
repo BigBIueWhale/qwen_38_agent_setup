@@ -20,6 +20,8 @@ QWEN38_CONTEXT_UNIT_FILE="${PROJECT_DIR}/scripts/qwen38_context_unit.py"
 NVFP4_KERNEL_UNIT_FILE="${PROJECT_DIR}/scripts/nvfp4_kernel_unit.py"
 SOURCE_PATCH_DIR="${PROJECT_DIR}/patches/source_patch_v1"
 SOURCE_PATCH_MANIFEST="${SOURCE_PATCH_DIR}/manifest.sha256"
+DEPLOYMENT_INPUT_MANIFEST="${PROJECT_DIR}/config/deployment-inputs.sha256"
+RUNTIME_COMMON_CONTRACT_TEST="${PROJECT_DIR}/scripts/test-runtime-common-contract.sh"
 
 TURBOQUANT_PATCH_FILE="${PROJECT_DIR}/patches/vllm-turboquant-k8v4-direct-workspace.patch"
 TOOL_SCHEMA_PATCH_FILE="${PROJECT_DIR}/patches/vllm-enforce-auto-tool-schema.patch"
@@ -70,6 +72,21 @@ case "${MODE}" in
     ;;
 esac
 
+if [[ ! -f "${DEPLOYMENT_INPUT_MANIFEST}" || -L "${DEPLOYMENT_INPUT_MANIFEST}" ]]; then
+  echo "Deployment-input manifest is missing or is not a regular non-symlink file." >&2
+  exit 1
+fi
+if [[ "$(wc -l <"${DEPLOYMENT_INPUT_MANIFEST}")" != "68" ]]; then
+  echo "Deployment-input manifest must contain exactly 68 hashed files." >&2
+  exit 1
+fi
+(
+  cd "${PROJECT_DIR}"
+  sha256sum --check --strict \
+    "${DEPLOYMENT_INPUT_MANIFEST#"${PROJECT_DIR}"/}"
+)
+bash "${RUNTIME_COMMON_CONTRACT_TEST}"
+
 actual_commit="$(git -C "${VLLM_DIR}" rev-parse HEAD)"
 if [[ "${actual_commit}" != "${VLLM_COMMIT}" ]]; then
   echo "Refusing unexpected vLLM commit: ${actual_commit}" >&2
@@ -111,7 +128,7 @@ printf '%s  %s\n' \
 (
   cd "${PROJECT_DIR}"
   sha256sum --check --strict \
-    "${SOURCE_PATCH_MANIFEST#${PROJECT_DIR}/}"
+    "${SOURCE_PATCH_MANIFEST#"${PROJECT_DIR}"/}"
 )
 
 # The patcher and its failure tests execute inside the exact immutable Python
@@ -133,9 +150,20 @@ docker run --rm \
 # parsed as review evidence, but they never select mutation locations. The
 # private worktree is discarded on every failure and never becomes a runtime.
 VERIFY_WORKTREE="$(mktemp -d /tmp/qwen38-vllm-verify.XXXXXX)"
+remove_verify_worktree() {
+  if ! git -C "${VLLM_DIR}" worktree remove --force "${VERIFY_WORKTREE}"; then
+    printf 'ERROR: failed to remove the exact disposable verification worktree: %s\n' \
+      "${VERIFY_WORKTREE}" >&2
+    return 1
+  fi
+}
 cleanup_verify_worktree() {
-  git -C "${VLLM_DIR}" worktree remove --force "${VERIFY_WORKTREE}" \
-    >/dev/null 2>&1 || true
+  local status=$?
+  trap - EXIT
+  if ! remove_verify_worktree; then
+    status=1
+  fi
+  exit "${status}"
 }
 trap cleanup_verify_worktree EXIT
 git -C "${VLLM_DIR}" worktree add --detach "${VERIFY_WORKTREE}" \
@@ -169,7 +197,7 @@ while IFS= read -r status_line; do
     exit 1
   fi
 done <<<"${EXPECTED_STATUS}"
-cleanup_verify_worktree
+remove_verify_worktree
 trap - EXIT
 
 printf '%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n' \

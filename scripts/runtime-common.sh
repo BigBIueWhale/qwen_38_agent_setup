@@ -7,6 +7,7 @@ source "${PROJECT_DIR}/config/runtime-v1.sh"
 readonly COMMON_SCRIPT_DIR PROJECT_DIR
 readonly MODEL_DIR="${PROJECT_DIR}/${MODEL_DIR_NAME}"
 readonly MODEL_MANIFEST="${PROJECT_DIR}/manifests/${MODEL_MANIFEST_NAME}"
+readonly DEPLOYMENT_INPUT_MANIFEST="${PROJECT_DIR}/config/deployment-inputs.sha256"
 
 die() {
   printf '\nERROR: %s\n' "$1" >&2
@@ -45,10 +46,37 @@ require_command() {
       "Do not install an arbitrary replacement. Restore the pinned host prerequisite."
 }
 
+require_equal() {
+  local description="$1" observed="$2" expected="$3"
+  if [[ "${observed}" != "${expected}" ]]; then
+    die "${description} differs from the pinned contract." \
+      "Expected: ${expected}" \
+      "Found:    ${observed:-<empty>}"
+  fi
+}
+
+capture_child_wait_status() {
+  local child_pid="${1:-}" output_name="${2:-}" wait_status
+  if (($# != 2)) || [[ ! "${child_pid}" =~ ^[1-9][0-9]*$ ]] || \
+      [[ ! "${output_name}" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]]; then
+    die "capture_child_wait_status requires one numeric child PID and one shell variable name."
+  fi
+
+  # `wait` commonly returns 128+signal after an intentional termination.  It
+  # must be a conditional command: merely disabling `errexit` does not suppress
+  # an installed ERR trap.  The caller owns the meaning of the captured status.
+  if wait "${child_pid}"; then
+    wait_status=0
+  else
+    wait_status=$?
+  fi
+  printf -v "${output_name}" '%s' "${wait_status}"
+}
+
 check_host_prerequisites() {
   local command_name docker_client docker_server toolkit_line toolkit_version
   local gpu_report runtimes git_line sha256sum_line ss_line
-  for command_name in docker git nvidia-container-cli nvidia-smi sha256sum ss; do
+  for command_name in docker dockerd git nvidia-container-cli nvidia-smi sha256sum ss; do
     require_command "${command_name}"
   done
 
@@ -80,6 +108,13 @@ check_host_prerequisites() {
       "Expected client/server: ${EXPECTED_DOCKER_VERSION}/${EXPECTED_DOCKER_VERSION}" \
       "Found client/server:    ${docker_client}/${docker_server}"
   fi
+  require_equal "dockerd path" "$(command -v dockerd)" "${EXPECTED_DOCKERD_PATH}"
+  require_equal "dockerd binary SHA256" \
+    "$(sha256sum "${EXPECTED_DOCKERD_PATH}" | awk '{print $1}')" \
+    "${EXPECTED_DOCKERD_SHA256}"
+  require_equal "Docker security options" \
+    "$(docker info --format '{{json .SecurityOptions}}')" \
+    "${EXPECTED_DOCKER_SECURITY_OPTIONS}"
 
   IFS= read -r toolkit_line < <(nvidia-container-cli --version)
   toolkit_version="${toolkit_line#cli-version: }"
@@ -107,7 +142,63 @@ check_host_prerequisites() {
   fi
 }
 
+require_clean_committed_repository() {
+  local repository_status repository_branch
+  repository_status="$(
+    git -C "${PROJECT_DIR}" status \
+      --porcelain=v1 \
+      --untracked-files=all \
+      --ignore-submodules=dirty
+  )"
+  if [[ -n "${repository_status}" ]]; then
+    die "The backend deployment repository has uncommitted or untracked inputs." \
+      "Repository: ${PROJECT_DIR}" \
+      "Status:" \
+      "${repository_status}" \
+      "Commit the exact reviewed release inputs before operating the stack."
+  fi
+  git -C "${PROJECT_DIR}" diff --quiet --exit-code || \
+    die "Tracked backend files differ from HEAD."
+  git -C "${PROJECT_DIR}" diff --cached --quiet --exit-code || \
+    die "The backend index differs from HEAD."
+  repository_branch="$(git -C "${PROJECT_DIR}" symbolic-ref --quiet --short HEAD)" || \
+    die "The backend deployment repository is detached." \
+      "The only supported release branch is master."
+  if [[ "${repository_branch}" != "master" ]]; then
+    die "The backend deployment repository is on an unsupported branch." \
+      "Expected: master" \
+      "Found:    ${repository_branch}"
+  fi
+}
+
+require_published_release() {
+  local expected_remote actual_fetch_remote actual_push_remote repository_head published
+  require_clean_committed_repository
+  expected_remote="https://github.com/BigBIueWhale/qwen_38_agent_setup"
+  actual_fetch_remote="$(git -C "${PROJECT_DIR}" remote get-url origin)" || \
+    die "The exact origin fetch remote is unavailable."
+  actual_push_remote="$(git -C "${PROJECT_DIR}" remote get-url --push origin)" || \
+    die "The exact origin push remote is unavailable."
+  require_equal "origin fetch remote" "${actual_fetch_remote}" "${expected_remote}"
+  require_equal "origin push remote" "${actual_push_remote}" "${expected_remote}"
+  repository_head="$(git -C "${PROJECT_DIR}" rev-parse --verify HEAD)"
+  published="$(git -C "${PROJECT_DIR}" ls-remote --exit-code origin refs/heads/master | awk 'NR == 1 {print $1}')" || \
+    die "Could not query the exact GitHub master ref for the publication audit."
+  [[ "${published}" =~ ^[0-9a-f]{40}$ ]] || \
+    die "The queried GitHub master ref is not one exact commit: ${published:-<empty>}"
+  require_equal "published GitHub master release" "${published}" "${repository_head}"
+}
+
 check_pinned_build_inputs() {
+  require_clean_committed_repository
+  if [[ ! -f "${DEPLOYMENT_INPUT_MANIFEST}" || -L "${DEPLOYMENT_INPUT_MANIFEST}" ]]; then
+    die "The deployment-input manifest is missing or is not a regular non-symlink file." \
+      "Expected: ${DEPLOYMENT_INPUT_MANIFEST}"
+  fi
+  if [[ "$(wc -l <"${DEPLOYMENT_INPUT_MANIFEST}")" != "68" ]]; then
+    die "The deployment-input manifest does not contain the exact 68-file allowlist." \
+      "Manifest: ${DEPLOYMENT_INPUT_MANIFEST}"
+  fi
   "${COMMON_SCRIPT_DIR}/build-vllm.sh" check
 
   local image_id
@@ -119,6 +210,25 @@ check_pinned_build_inputs() {
       "Found ID:     ${image_id:-nothing}" \
       "Run ./scripts/restore-images.sh to restore the pinned offline archive."
   fi
+  local relay_image_id relay_profile relay_component relay_source relay_sandbox
+  relay_image_id="$(docker image inspect --format '{{.Id}}' "${RELAY_IMAGE_TAG}" 2>/dev/null || true)"
+  [[ "${relay_image_id}" == "${EXPECTED_RELAY_IMAGE_ID}" ]] || \
+    die "The exact fixed-relay image is missing or incorrect." \
+      "Expected tag: ${RELAY_IMAGE_TAG}" \
+      "Expected ID:  ${EXPECTED_RELAY_IMAGE_ID}" \
+      "Found ID:     ${relay_image_id:-nothing}" \
+      "Build the pinned paired agent_service repository before starting this component."
+  relay_profile="$(docker image inspect --format '{{index .Config.Labels "agent_service.profile"}}' "${RELAY_IMAGE_TAG}")"
+  relay_component="$(docker image inspect --format '{{index .Config.Labels "agent_service.component"}}' "${RELAY_IMAGE_TAG}")"
+  relay_source="$(docker image inspect --format '{{index .Config.Labels "agent_service.relay.source.sha256"}}' "${RELAY_IMAGE_TAG}")"
+  relay_sandbox="$(docker image inspect --format '{{index .Config.Labels "agent_service.relay.sandbox"}}' "${RELAY_IMAGE_TAG}")"
+  [[ "${relay_profile}" == "${AGENT_SERVICE_PROFILE}" && \
+     "${relay_component}" == "fixed-relay" && \
+     "${relay_source}" == "${RELAY_SOURCE_SHA256}" && \
+     "${relay_sandbox}" == "${RELAY_SANDBOX}" ]] || \
+    die "The fixed-relay image labels differ from the paired contract." \
+      "Expected profile/component/source/sandbox: ${AGENT_SERVICE_PROFILE}/fixed-relay/${RELAY_SOURCE_SHA256}/${RELAY_SANDBOX}" \
+      "Found profile/component/source/sandbox: ${relay_profile:-missing}/${relay_component:-missing}/${relay_source:-missing}/${relay_sandbox:-missing}"
 
   local archive="${PROJECT_DIR}/artifacts/${IMAGE_ARCHIVE_NAME}"
   if [[ ! -f "${archive}" ]]; then
@@ -160,7 +270,9 @@ check_model_files() {
 
   printf 'Verifying every pinned model, tokenizer, template, and configuration file; this intentionally takes several seconds...\n'
   (
-    cd -- "${MODEL_DIR}"
+    cd -- "${MODEL_DIR}" || \
+      die "Could not enter the pinned model directory for manifest verification." \
+        "Directory: ${MODEL_DIR}"
     sha256sum --check --strict "${MODEL_MANIFEST}"
   )
 }
@@ -203,8 +315,29 @@ container_exists() {
   docker container inspect "${CONTAINER_NAME}" >/dev/null 2>&1
 }
 
+relay_container_exists() {
+  docker container inspect "$1" >/dev/null 2>&1
+}
+
+assert_owned_model_relay() {
+  local name="$1" component="$2" profile observed_component image configured_image command
+  profile="$(docker inspect --format '{{index .Config.Labels "agent_service.profile"}}' "${name}")"
+  observed_component="$(docker inspect --format '{{index .Config.Labels "agent_service.component"}}' "${name}")"
+  image="$(docker inspect --format '{{.Image}}' "${name}")"
+  configured_image="$(docker inspect --format '{{.Config.Image}}' "${name}")"
+  command="$(docker inspect --format '{{json .Config.Cmd}}' "${name}")"
+  [[ "${profile}" == "${AGENT_SERVICE_PROFILE}" && \
+     "${observed_component}" == "${component}" && \
+     "${image}" == "${EXPECTED_RELAY_IMAGE_ID}" && \
+     "${configured_image}" == "${EXPECTED_RELAY_IMAGE_ID}" && \
+     "${command}" == "[\"${component}\"]" ]] || \
+    die "Refusing to modify unrecognized fixed relay container ${name}." \
+      "Expected profile/component/image/configured-image/command: ${AGENT_SERVICE_PROFILE}/${component}/${EXPECTED_RELAY_IMAGE_ID}/${EXPECTED_RELAY_IMAGE_ID}/[\"${component}\"]" \
+      "Found profile/component/image/configured-image/command: ${profile:-missing}/${observed_component:-missing}/${image:-missing}/${configured_image:-missing}/${command:-missing}"
+}
+
 assert_owned_container() {
-  local project_label profile_label
+  local project_label profile_label image configured_image
   project_label="$(
     docker inspect --format '{{index .Config.Labels "qwen38.project"}}' \
       "${CONTAINER_NAME}"
@@ -213,13 +346,115 @@ assert_owned_container() {
     docker inspect --format '{{index .Config.Labels "qwen38.runtime.profile"}}' \
       "${CONTAINER_NAME}"
   )"
+  image="$(docker inspect --format '{{.Image}}' "${CONTAINER_NAME}")"
+  configured_image="$(docker inspect --format '{{.Config.Image}}' "${CONTAINER_NAME}")"
   if [[ "${project_label}" != "${CONTAINER_LABEL}" || \
-        "${profile_label}" != "${PROFILE_VERSION}" ]]; then
+        "${profile_label}" != "${PROFILE_VERSION}" || \
+        "${image}" != "${EXPECTED_IMAGE_ID}" || \
+        "${configured_image}" != "${EXPECTED_IMAGE_ID}" ]]; then
     die "A container named ${CONTAINER_NAME} exists but is not the exact owned profile." \
       "Project label: ${project_label:-missing}" \
       "Profile label: ${profile_label:-missing}" \
+      "Image/configured image: ${image:-missing}/${configured_image:-missing}" \
       "It was not modified or removed."
   fi
+}
+
+assert_model_relay_profile() {
+  local backend_id name expected_role expected_network expected_rw expected_component expected_event
+  local running image configured_image user network read_only command
+  local cap_drop cap_add security memory memory_swap pids bindings mount_count
+  local mount_source mount_destination mount_rw profile component
+  local privileged restart apparmor devices device_requests pid_mode ipc_mode uts_mode pid status_file
+  backend_id="$(docker inspect --format '{{.Id}}' "${CONTAINER_NAME}")"
+  for name in "${MODEL_BRIDGE_NAME}" "${MODEL_INGRESS_NAME}"; do
+    relay_container_exists "${name}" || \
+      die "Required fixed model relay is absent: ${name}"
+    if [[ "${name}" == "${MODEL_BRIDGE_NAME}" ]]; then
+      expected_role=model-bridge
+      expected_network="container:${backend_id}"
+      expected_rw=true
+      expected_component=model-bridge
+      expected_event="RELAY_READY role=model-bridge sandbox=${RELAY_SANDBOX} listen=unix:/sock/relay.sock target=tcp:127.0.0.1:8000"
+    else
+      expected_role=model-ingress
+      expected_network=host
+      expected_rw=false
+      expected_component=model-ingress
+      expected_event="RELAY_READY role=model-ingress sandbox=${RELAY_SANDBOX} listen=tcp:127.0.0.1:8000 target=unix:/sock/relay.sock"
+    fi
+    running="$(docker inspect --format '{{.State.Running}}' "${name}")"
+    image="$(docker inspect --format '{{.Image}}' "${name}")"
+    configured_image="$(docker inspect --format '{{.Config.Image}}' "${name}")"
+    user="$(docker inspect --format '{{.Config.User}}' "${name}")"
+    network="$(docker inspect --format '{{.HostConfig.NetworkMode}}' "${name}")"
+    read_only="$(docker inspect --format '{{.HostConfig.ReadonlyRootfs}}' "${name}")"
+    command="$(docker inspect --format '{{json .Config.Cmd}}' "${name}")"
+    privileged="$(docker inspect --format '{{.HostConfig.Privileged}}' "${name}")"
+    restart="$(docker inspect --format '{{.HostConfig.RestartPolicy.Name}}' "${name}")"
+    cap_drop="$(docker inspect --format '{{json .HostConfig.CapDrop}}' "${name}")"
+    cap_add="$(docker inspect --format '{{json .HostConfig.CapAdd}}' "${name}")"
+    security="$(docker inspect --format '{{json .HostConfig.SecurityOpt}}' "${name}")"
+    apparmor="$(docker inspect --format '{{.AppArmorProfile}}' "${name}")"
+    devices="$(docker inspect --format '{{json .HostConfig.Devices}}' "${name}")"
+    device_requests="$(docker inspect --format '{{json .HostConfig.DeviceRequests}}' "${name}")"
+    pid_mode="$(docker inspect --format '{{.HostConfig.PidMode}}' "${name}")"
+    ipc_mode="$(docker inspect --format '{{.HostConfig.IpcMode}}' "${name}")"
+    uts_mode="$(docker inspect --format '{{.HostConfig.UTSMode}}' "${name}")"
+    memory="$(docker inspect --format '{{.HostConfig.Memory}}' "${name}")"
+    memory_swap="$(docker inspect --format '{{.HostConfig.MemorySwap}}' "${name}")"
+    pids="$(docker inspect --format '{{.HostConfig.PidsLimit}}' "${name}")"
+    bindings="$(docker inspect --format '{{json .HostConfig.PortBindings}}' "${name}")"
+    mount_count="$(docker inspect --format '{{len .Mounts}}' "${name}")"
+    mount_source="$(docker inspect --format '{{(index .Mounts 0).Source}}' "${name}")"
+    mount_destination="$(docker inspect --format '{{(index .Mounts 0).Destination}}' "${name}")"
+    mount_rw="$(docker inspect --format '{{(index .Mounts 0).RW}}' "${name}")"
+    profile="$(docker inspect --format '{{index .Config.Labels "agent_service.profile"}}' "${name}")"
+    component="$(docker inspect --format '{{index .Config.Labels "agent_service.component"}}' "${name}")"
+    [[ "${running}" == true && "${image}" == "${EXPECTED_RELAY_IMAGE_ID}" && \
+       "${configured_image}" == "${EXPECTED_RELAY_IMAGE_ID}" && \
+       "${user}" == 1000:1000 && "${network}" == "${expected_network}" && \
+       "${read_only}" == true && "${command}" == "[\"${expected_role}\"]" && \
+       "${privileged}" == false && "${restart}" == no && \
+       "${cap_drop}" == '["ALL"]' && "${cap_add}" == null && \
+       "${security}" == '["no-new-privileges:true"]' && \
+       "${apparmor}" == "${EXPECTED_CONTAINER_APPARMOR_PROFILE}" && \
+       "${devices}" == '[]' && "${device_requests}" == null && \
+       -z "${pid_mode}" && "${ipc_mode}" == private && -z "${uts_mode}" && \
+       "${memory}" == 33554432 && "${memory_swap}" == 33554432 && \
+       "${pids}" == "${RELAY_PIDS_LIMIT}" && "${bindings}" == '{}' && \
+       "${mount_count}" == 1 && "${mount_source}" == "${MODEL_SOCKET_DIR}" && \
+       "${mount_destination}" == /sock && "${mount_rw}" == "${expected_rw}" && \
+       "${profile}" == "${AGENT_SERVICE_PROFILE}" && \
+       "${component}" == "${expected_component}" ]] || \
+      die "Fixed relay ${name} differs from its exact ${expected_role} contract." \
+        "running/image/configured-image: ${running}/${image}/${configured_image}" \
+        "user/network/root/command: ${user}/${network}/${read_only}/${command}" \
+        "cap/security/memory/swap/pids: ${cap_drop}/${security}/${memory}/${memory_swap}/${pids}" \
+        "bindings/mount: ${bindings}/${mount_count}:${mount_source}:${mount_destination}:${mount_rw}" \
+        "labels: ${profile}/${component}"
+    pid="$(docker inspect --format '{{.State.Pid}}' "${name}")"
+    [[ "${pid}" =~ ^[1-9][0-9]*$ ]] || \
+      die "Fixed relay ${name} has an invalid host PID: ${pid}"
+    status_file="/proc/${pid}/status"
+    [[ -r "${status_file}" ]] || \
+      die "Cannot inspect fixed relay kernel sandbox status: ${status_file}"
+    require_equal "${name} kernel no_new_privs" \
+      "$(awk '$1 == "NoNewPrivs:" {print $2}' "${status_file}")" 1
+    require_equal "${name} kernel seccomp mode" \
+      "$(awk '$1 == "Seccomp:" {print $2}' "${status_file}")" 2
+    # One filter is Docker's pinned builtin profile; the relay stacks its
+    # socket-domain and no-new-bind filters on top of it.
+    require_equal "${name} stacked seccomp filter count" \
+      "$(awk '$1 == "Seccomp_filters:" {print $2}' "${status_file}")" 3
+    require_equal "${name} exact sandbox readiness count" \
+      "$(docker logs "${name}" 2>&1 | grep --fixed-strings --line-regexp --count "${expected_event}" || true)" 1
+  done
+  [[ -d "${MODEL_SOCKET_DIR}" && ! -L "${MODEL_SOCKET_DIR}" && \
+     -S "${MODEL_SOCKET_DIR}/relay.sock" ]] || \
+    die "Central model Unix socket is absent or unsafe: ${MODEL_SOCKET_DIR}/relay.sock"
+  require_equal "central model socket owner/mode" \
+    "$(stat -c '%u:%g:%a' "${MODEL_SOCKET_DIR}/relay.sock")" "1000:1000:660"
 }
 
 assert_runtime_versions() {
@@ -235,12 +470,44 @@ assert_runtime_versions() {
   fi
 }
 
+assert_backend_network_none_proc() {
+  local pid route_file ipv6_route_file dev_file interfaces namespace host_namespace
+  pid="$(docker inspect --format '{{.State.Pid}}' "${CONTAINER_NAME}")"
+  [[ "${pid}" =~ ^[1-9][0-9]*$ ]] || \
+    die "The network-none backend has an invalid host PID: ${pid}"
+  # Reading /proc/<other-uid>/ns/net is restricted on this host.  Coreutils is
+  # pinned in the runtime, so read the same namespace inode from within the
+  # container and compare it to the host namespace.  Route/interface contents
+  # remain independently inspected through the host's /proc/<pid>/net view.
+  namespace="$(docker exec "${CONTAINER_NAME}" \
+    /usr/bin/readlink /proc/self/ns/net)"
+  host_namespace="$(readlink /proc/self/ns/net)"
+  [[ -n "${namespace}" && "${namespace}" != "${host_namespace}" ]] || \
+    die "The backend does not have a distinct network namespace." \
+      "Backend namespace: ${namespace:-unreadable}" \
+      "Host namespace:    ${host_namespace:-unreadable}"
+  route_file="/proc/${pid}/net/route"
+  ipv6_route_file="/proc/${pid}/net/ipv6_route"
+  dev_file="/proc/${pid}/net/dev"
+  [[ -r "${route_file}" && "$(wc -l <"${route_file}")" == 1 ]] || \
+    die "The backend network namespace has an unexpected IPv4 route table."
+  if [[ -e "${ipv6_route_file}" && \
+        ( ! -r "${ipv6_route_file}" || -s "${ipv6_route_file}" ) ]]; then
+    die "The backend network namespace has an unexpected IPv6 route table."
+  fi
+  [[ -r "${dev_file}" ]] || \
+    die "Cannot inspect backend network devices: ${dev_file}"
+  interfaces="$(awk -F: 'NR > 2 {gsub(/[[:space:]]/, "", $1); if ($1 != "") print $1}' "${dev_file}")"
+  require_equal "backend network-none interfaces" "${interfaces}" lo
+}
+
 assert_running_profile() {
-  local running image_id network port_bindings published_ports cap_drop security_opts
-  local read_only_root root_tmpfs tmp_tmpfs run_tmpfs
+  local running image_id network port_bindings published_ports cap_drop cap_add security_opts
+  local privileged restart apparmor devices device_requests pid_mode ipc_mode uts_mode shm_size mount_count
+  local read_only_root tmp_tmpfs run_tmpfs
   local model_source model_rw model_revision_label model_official_revision_label
   local model_correction_label model_sha256_label model_manifest_sha256_label
-  local cache_name cache_type cache_project_label cache_profile_label
+  local cache_name cache_type cache_rw cache_label_count cache_project_label cache_profile_label
   local cache_model_revision_label cache_model_correction_label cache_model_sha256_label
   local actual_command expected_command
   local actual_environment wrapped_environment required_environment api
@@ -258,13 +525,18 @@ assert_running_profile() {
   [[ "${image_id}" == "${EXPECTED_IMAGE_ID}" ]] || \
     die "Running container image does not match." \
       "Expected: ${EXPECTED_IMAGE_ID}" "Found: ${image_id}"
+  require_equal "running backend configured immutable image ID" \
+    "$(docker inspect --format '{{.Config.Image}}' "${CONTAINER_NAME}")" \
+    "${EXPECTED_IMAGE_ID}"
+  require_equal "running backend non-root user" \
+    "$(docker inspect --format '{{.Config.User}}' "${CONTAINER_NAME}")" 2000:0
   image_profile_label="$(
     docker image inspect --format '{{index .Config.Labels "qwen38.runtime.profile"}}' \
       "${IMAGE_TAG}"
   )"
-  [[ "${image_profile_label}" == "${PROFILE_VERSION}" ]] || \
+  [[ "${image_profile_label}" == "${IMAGE_PROFILE_VERSION}" ]] || \
     die "Runtime image profile label does not match." \
-      "Expected: ${PROFILE_VERSION}" "Found: ${image_profile_label:-missing}"
+      "Expected: ${IMAGE_PROFILE_VERSION}" "Found: ${image_profile_label:-missing}"
 
   model_revision_label="$(
     docker inspect --format '{{index .Config.Labels "qwen38.model.revision"}}' \
@@ -299,9 +571,10 @@ assert_running_profile() {
       "Found official revision/correction/model/manifest: ${model_official_revision_label:-missing}/${model_correction_label:-missing}/${model_sha256_label:-missing}/${model_manifest_sha256_label:-missing}"
 
   network="$(docker inspect --format '{{.HostConfig.NetworkMode}}' "${CONTAINER_NAME}")"
-  [[ "${network}" == "host" ]] || \
+  [[ "${network}" == "none" ]] || \
     die "Running container has the wrong network mode." \
-      "Expected the single loopback profile's host network; found: ${network}"
+      "Expected network-none isolation; found: ${network}"
+  assert_backend_network_none_proc
 
   port_bindings="$(docker inspect --format '{{json .HostConfig.PortBindings}}' "${CONTAINER_NAME}")"
   [[ "${port_bindings}" == "{}" ]] || \
@@ -313,19 +586,33 @@ assert_running_profile() {
       "Found:" "${published_ports}"
 
   cap_drop="$(docker inspect --format '{{json .HostConfig.CapDrop}}' "${CONTAINER_NAME}")"
+  cap_add="$(docker inspect --format '{{json .HostConfig.CapAdd}}' "${CONTAINER_NAME}")"
   security_opts="$(docker inspect --format '{{json .HostConfig.SecurityOpt}}' "${CONTAINER_NAME}")"
-  [[ "${cap_drop}" == '["ALL"]' ]] || \
-    die "Container capabilities are not fully dropped." \
-      "Expected: [\"ALL\"]" "Found: ${cap_drop}"
-  [[ "${security_opts}" == '["no-new-privileges:true"]' ]] || \
-    die "Container no-new-privileges protection is missing." \
-      "Found: ${security_opts}"
+  privileged="$(docker inspect --format '{{.HostConfig.Privileged}}' "${CONTAINER_NAME}")"
+  restart="$(docker inspect --format '{{.HostConfig.RestartPolicy.Name}}' "${CONTAINER_NAME}")"
+  apparmor="$(docker inspect --format '{{.AppArmorProfile}}' "${CONTAINER_NAME}")"
+  devices="$(docker inspect --format '{{json .HostConfig.Devices}}' "${CONTAINER_NAME}")"
+  device_requests="$(docker inspect --format '{{json .HostConfig.DeviceRequests}}' "${CONTAINER_NAME}")"
+  pid_mode="$(docker inspect --format '{{.HostConfig.PidMode}}' "${CONTAINER_NAME}")"
+  ipc_mode="$(docker inspect --format '{{.HostConfig.IpcMode}}' "${CONTAINER_NAME}")"
+  uts_mode="$(docker inspect --format '{{.HostConfig.UTSMode}}' "${CONTAINER_NAME}")"
+  shm_size="$(docker inspect --format '{{.HostConfig.ShmSize}}' "${CONTAINER_NAME}")"
+  [[ "${cap_drop}" == '["ALL"]' && "${cap_add}" == null && \
+     "${security_opts}" == '["no-new-privileges:true"]' && \
+     "${privileged}" == false && "${restart}" == no && \
+     "${apparmor}" == "${EXPECTED_CONTAINER_APPARMOR_PROFILE}" && \
+     "${devices}" == '[]' && \
+     "${device_requests}" == '[{"Driver":"","Count":-1,"DeviceIDs":null,"Capabilities":[["gpu"]],"Options":{}}]' && \
+     -z "${pid_mode}" && "${ipc_mode}" == private && -z "${uts_mode}" && \
+     "${shm_size}" == 8589934592 ]] || \
+    die "Container hardening, namespace, or GPU-device contract differs." \
+      "cap-drop/cap-add/security: ${cap_drop}/${cap_add}/${security_opts}" \
+      "privileged/restart/AppArmor: ${privileged}/${restart}/${apparmor}" \
+      "devices/device-requests: ${devices}/${device_requests}" \
+      "pid/ipc/uts/shm: ${pid_mode:-private}/${ipc_mode}/${uts_mode:-private}/${shm_size}"
 
   read_only_root="$(
     docker inspect --format '{{.HostConfig.ReadonlyRootfs}}' "${CONTAINER_NAME}"
-  )"
-  root_tmpfs="$(
-    docker inspect --format '{{index .HostConfig.Tmpfs "/root"}}' "${CONTAINER_NAME}"
   )"
   tmp_tmpfs="$(
     docker inspect --format '{{index .HostConfig.Tmpfs "/tmp"}}' "${CONTAINER_NAME}"
@@ -336,12 +623,10 @@ assert_running_profile() {
   [[ "${read_only_root}" == "true" ]] || \
     die "Container root filesystem is writable." \
       "Expected read-only root; found: ${read_only_root:-missing}"
-  [[ "${root_tmpfs}" == "${ROOT_TMPFS_OPTIONS}" && \
+  [[ "$(docker inspect --format '{{len .HostConfig.Tmpfs}}' "${CONTAINER_NAME}")" == 2 && \
      "${tmp_tmpfs}" == "${TMP_TMPFS_OPTIONS}" && \
      "${run_tmpfs}" == "${RUN_TMPFS_OPTIONS}" ]] || \
     die "Container runtime tmpfs mounts differ from the exact profile." \
-      "Expected /root: ${ROOT_TMPFS_OPTIONS}" \
-      "Found /root: ${root_tmpfs:-missing}" \
       "Expected /tmp: ${TMP_TMPFS_OPTIONS}" \
       "Found /tmp: ${tmp_tmpfs:-missing}" \
       "Expected /run: ${RUN_TMPFS_OPTIONS}" \
@@ -349,17 +634,24 @@ assert_running_profile() {
 
   model_source="$(docker inspect --format '{{range .Mounts}}{{if eq .Destination "/model"}}{{.Source}}{{end}}{{end}}' "${CONTAINER_NAME}")"
   model_rw="$(docker inspect --format '{{range .Mounts}}{{if eq .Destination "/model"}}{{.RW}}{{end}}{{end}}' "${CONTAINER_NAME}")"
-  [[ "${model_source}" == "${MODEL_DIR}" && "${model_rw}" == "false" ]] || \
+  mount_count="$(docker inspect --format '{{len .Mounts}}' "${CONTAINER_NAME}")"
+  [[ "${mount_count}" == 2 && "${model_source}" == "${MODEL_DIR}" && "${model_rw}" == "false" ]] || \
     die "Model mount is not the exact read-only checkpoint mount." \
+      "Expected mount count: 2" "Found mount count: ${mount_count}" \
       "Expected source: ${MODEL_DIR}" "Found source: ${model_source:-missing}" \
       "Expected writable: false" "Found writable: ${model_rw:-missing}"
 
-  cache_name="$(docker inspect --format '{{range .Mounts}}{{if eq .Destination "/root/.cache/vllm"}}{{.Name}}{{end}}{{end}}' "${CONTAINER_NAME}")"
-  cache_type="$(docker inspect --format '{{range .Mounts}}{{if eq .Destination "/root/.cache/vllm"}}{{.Type}}{{end}}{{end}}' "${CONTAINER_NAME}")"
-  [[ "${cache_name}" == "${CACHE_VOLUME}" && "${cache_type}" == "volume" ]] || \
+  cache_name="$(docker inspect --format '{{range .Mounts}}{{if eq .Destination "/home/vllm/.cache/vllm"}}{{.Name}}{{end}}{{end}}' "${CONTAINER_NAME}")"
+  cache_type="$(docker inspect --format '{{range .Mounts}}{{if eq .Destination "/home/vllm/.cache/vllm"}}{{.Type}}{{end}}{{end}}' "${CONTAINER_NAME}")"
+  cache_rw="$(docker inspect --format '{{range .Mounts}}{{if eq .Destination "/home/vllm/.cache/vllm"}}{{.RW}}{{end}}{{end}}' "${CONTAINER_NAME}")"
+  [[ "${cache_name}" == "${CACHE_VOLUME}" && "${cache_type}" == "volume" && \
+     "${cache_rw}" == true ]] || \
     die "vLLM cache mount does not match the pinned named volume." \
-      "Expected: volume ${CACHE_VOLUME}" \
-      "Found: ${cache_type:-missing} ${cache_name:-missing}"
+      "Expected: writable volume ${CACHE_VOLUME}" \
+      "Found: ${cache_type:-missing} ${cache_name:-missing}, writable=${cache_rw:-missing}"
+  require_equal "mounted non-root vLLM cache owner/mode" \
+    "$(docker exec "${CONTAINER_NAME}" stat -c '%u:%g:%a' /home/vllm/.cache/vllm)" \
+    "2000:0:770"
   cache_project_label="$(
     docker volume inspect --format '{{index .Labels "qwen38.project"}}' \
       "${CACHE_VOLUME}"
@@ -380,14 +672,16 @@ assert_running_profile() {
     docker volume inspect --format '{{index .Labels "qwen38.model.sha256"}}' \
       "${CACHE_VOLUME}"
   )"
+  cache_label_count="$(docker volume inspect --format '{{len .Labels}}' "${CACHE_VOLUME}")"
   [[ "${cache_project_label}" == "${CONTAINER_LABEL}" && \
      "${cache_profile_label}" == "${PROFILE_VERSION}" && \
      "${cache_model_revision_label}" == "${MODEL_REVISION}" && \
      "${cache_model_correction_label}" == "${MODEL_CORRECTION}" && \
-     "${cache_model_sha256_label}" == "${MODEL_SHA256}" ]] || \
+     "${cache_model_sha256_label}" == "${MODEL_SHA256}" && \
+     "${cache_label_count}" == 5 ]] || \
     die "Pinned cache-volume labels do not match." \
       "Expected project/profile/revision/correction/model: ${CONTAINER_LABEL}/${PROFILE_VERSION}/${MODEL_REVISION}/${MODEL_CORRECTION}/${MODEL_SHA256}" \
-      "Found project/profile/revision/correction/model: ${cache_project_label:-missing}/${cache_profile_label:-missing}/${cache_model_revision_label:-missing}/${cache_model_correction_label:-missing}/${cache_model_sha256_label:-missing}"
+      "Found project/profile/revision/correction/model/count: ${cache_project_label:-missing}/${cache_profile_label:-missing}/${cache_model_revision_label:-missing}/${cache_model_correction_label:-missing}/${cache_model_sha256_label:-missing}/${cache_label_count:-missing}"
 
   actual_command="$(docker inspect --format '{{range .Config.Cmd}}{{println .}}{{end}}' "${CONTAINER_NAME}")"
   expected_command="$(printf '%s\n' "${VLLM_ARGS[@]}")"
@@ -403,6 +697,7 @@ assert_running_profile() {
         "Missing: ${required_environment}"
   done
 
+  assert_model_relay_profile
   assert_exact_loopback_listener
 
   docker exec "${CONTAINER_NAME}" curl --fail --silent \

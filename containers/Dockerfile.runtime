@@ -635,6 +635,16 @@ runpy.run_path("/opt/qwen38/vision_contract_unit.py", run_name="__main__")
 runpy.run_path("/opt/qwen38/vision_mlp_unit.py", run_name="__main__")
 PY
 
+# The upstream image already contains the fixed non-root `vllm` identity
+# (uid 2000, gid 0).  Create the persistent cache mountpoint with the runtime's
+# exact ownership.  The host lifecycle separately initializes a newly-created
+# named volume through this exact image and refuses drift; it deliberately does
+# not depend on Docker volume copy-up semantics.
+RUN test "$(getent passwd vllm)" = 'vllm:x:2000:0::/home/vllm:/bin/bash' \
+ && install --directory --owner=2000 --group=0 --mode=0770 \
+      /home/vllm/.cache/vllm \
+ && test "$(stat -c '%u:%g:%a' /home/vllm/.cache/vllm)" = '2000:0:770'
+
 LABEL org.opencontainers.image.revision="9df9b0b0a1816b6d0d0f6ecd0da563cc37fd72f5" \
       qwen38.base.image="sha256:fa4a002a88b7043a1a89966dea8a500fe9696f84e75730d9da916f916048d401" \
       qwen38.patch.turboquant.diff.sha256="a9721067f1a7ee9497a4bd51e47e3a474561189e881b4704bfc4beac8ea48380" \
@@ -665,6 +675,15 @@ LABEL org.opencontainers.image.revision="9df9b0b0a1816b6d0d0f6ecd0da563cc37fd72f
       qwen38.patch.tool-truncation.parser-engine-file.sha256="9ffce8a3aac1d885cbbd4de269201ef32bdd6089b5f92d61f94eebf1130a5faf" \
       qwen38.template.file.sha256="07d9cf1a50bc702b27832586af016188d4cb5787e9a88847a5611237f722343e" \
       qwen38.project="Qwen_best_model_ever" \
-      qwen38.runtime.profile="single-loopback-vision-k8v4-agent-v12"
+      qwen38.runtime.profile="socket-isolated-nonroot-vision-k8v4-agent-v13"
 
+ENV HOME=/home/vllm \
+    VLLM_CACHE_ROOT=/home/vllm/.cache/vllm \
+    XDG_CACHE_HOME=/home/vllm/.cache/vllm/xdg-cache \
+    XDG_CONFIG_HOME=/home/vllm/.cache/vllm/xdg-config \
+    CUDA_CACHE_PATH=/home/vllm/.cache/vllm/cuda \
+    HF_HOME=/home/vllm/.cache/vllm/huggingface \
+    PYTHONDONTWRITEBYTECODE=1
+
+USER 2000:0
 ENTRYPOINT ["vllm", "serve"]

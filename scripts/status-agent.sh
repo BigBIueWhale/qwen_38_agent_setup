@@ -12,7 +12,24 @@ check_host_prerequisites
 check_pinned_build_inputs
 check_model_files
 
+if [[ -e "${AGENT_SERVICE_RUNTIME_ROOT}" ]]; then
+  [[ -d "${AGENT_SERVICE_RUNTIME_ROOT}" && ! -L "${AGENT_SERVICE_RUNTIME_ROOT}" ]] || \
+    die "The agent-service runtime root is not a real directory." \
+      "Path: ${AGENT_SERVICE_RUNTIME_ROOT}"
+  require_equal "agent-service runtime root owner/mode" \
+    "$(stat -c '%u:%g:%a' "${AGENT_SERVICE_RUNTIME_ROOT}")" "1000:1000:700"
+fi
+
 if ! container_exists; then
+  if relay_container_exists "${MODEL_BRIDGE_NAME}" || \
+     relay_container_exists "${MODEL_INGRESS_NAME}" || \
+     [[ -e "${MODEL_SOCKET_DIR}/relay.sock" ]]; then
+    die "The backend is absent but fixed-relay/socket state remains." \
+      "Bridge present: $(relay_container_exists "${MODEL_BRIDGE_NAME}" && printf yes || printf no)" \
+      "Ingress present: $(relay_container_exists "${MODEL_INGRESS_NAME}" && printf yes || printf no)" \
+      "Socket present: $([[ -e "${MODEL_SOCKET_DIR}/relay.sock" ]] && printf yes || printf no)" \
+      "Run ./stop.sh for exact ownership-checked cleanup."
+  fi
   existing_listener="$(listener_output)"
   if [[ -n "${existing_listener}" ]]; then
     die "The project container is stopped, but TCP port ${LISTEN_PORT} is occupied." \
