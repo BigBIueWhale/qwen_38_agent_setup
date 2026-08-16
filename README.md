@@ -38,8 +38,8 @@ The deployment is complete and healthy. There is one supported mode:
 | Listener | 127.0.0.1:8000 only |
 | Agent client | Qwen Code 0.21.12 at b965d5f8c24f48e65fb0b17c7d45f34ca4ce8f38 |
 | Agent image | sha256:cc916c63598c5953810482e2e5f614eaa1e96695f5c07bfb2c3f2f894e9aa323 |
-| Agent-service source | d68af3f4410094affcb8ff7c1ff539a2b6bf6c92 |
-| Agent-service image | sha256:17d26b4923f626f74ed6da2aa89d2e76b2c60f951a7f85ea4ec26c99cd110ffc |
+| Agent-service source | b942b995043eea663bea19349fd82daac258bdee |
+| Agent-service image | sha256:af69927e9deb3cf969619c831b0977348fc2e07f4c60361f8fd726315fbbfdda |
 | Agent-service listener | 127.0.0.1:8090 only |
 | Runtime profile | single-loopback-vision-k8v4-agent-v12 |
 | Runtime image | sha256:5d545d85950310cb09bebacba9083a242e8943c92669428eb23468d959f4f2d5 |
@@ -694,7 +694,7 @@ rerun after every runtime-profile change before that image is accepted:
     readiness-boundary cancellation with exit 143, durable partial bundle, and zero
     owned session-container leftovers.
 25. Final paired-stack smoke at service commit
-    d68af3f4410094affcb8ff7c1ff539a2b6bf6c92: pass; the pinned Qwen Code
+    b942b995043eea663bea19349fd82daac258bdee: pass; the pinned Qwen Code
     0.21.12 client completed an exact native file-tool round trip, then launched and
     awaited one foreground Explore subagent before independent main-thread and
     byte-exact output verification. Both writes remained inside staged workspace
@@ -753,7 +753,7 @@ subagent turn:
   subagents.
 
 The service is the updated original `/home/user/Desktop/agent_service` at commit
-d68af3f4410094affcb8ff7c1ff539a2b6bf6c92, not a copied launcher. Its own README and
+b942b995043eea663bea19349fd82daac258bdee, not a copied launcher. Its own README and
 lock file are authoritative for Qwen Code source/patch,
 agent/service images, package snapshot, exact tools, copied-workspace envelope,
 stream-event validation, cancellation, bundles, and 127.0.0.1:8090 listener. Repeated
