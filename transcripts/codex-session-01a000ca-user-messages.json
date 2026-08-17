@@ -1,0 +1,772 @@
+{
+  "description": "All user-authored messages (and only user messages), in chronological order, from a Codex CLI session in this project.",
+  "session_id": "01a000ca-67f0-7643-a47a-b792468a8ec1",
+  "source_file": "/home/user/.codex/sessions/2026/08/14/rollout-2026-08-14T18-01-00-01a000ca-67f0-7643-a47a-b792468a8ec1.jsonl",
+  "session_started": "2026-08-14T15:01:00.016Z",
+  "session_cwd": "/home/user/Desktop/Qwen_best_model_ever",
+  "exported_at": "2026-08-17T19:47:53Z",
+  "notes": "Extracted from event_msg/user_message records. Synthetic user-role records injected by Codex (environment_context, internal goal-reminder context) are excluded. No messages carried image/audio attachments.",
+  "message_count": 152,
+  "messages": [
+    {
+      "index": 1,
+      "timestamp": "2026-08-14T15:01:31.088Z",
+      "text": "It came out, downloa dit fucking right now into the curernt working directory before somebody deletes it. This is literally the best model that ever cmae out. Fucking download it. Try to search, see if it it's uh the weights are available. Download before they delete it. Download as they are uploading if they are in the middle of uploading. Download the readme, odwnload everything into the current working directory. Of course, start by viewing the image."
+    },
+    {
+      "index": 2,
+      "timestamp": "2026-08-14T15:03:15.115Z",
+      "text": "Hey, I care aboutthe  F P eigth version as well."
+    },
+    {
+      "index": 3,
+      "timestamp": "2026-08-14T15:40:40.896Z",
+      "text": "The full weights are there?"
+    },
+    {
+      "index": 4,
+      "timestamp": "2026-08-14T15:42:34.138Z",
+      "text": "Calculate VRAM requirements under vllm for the FP8 version. Clone the latest version of vLLM into CWD"
+    },
+    {
+      "index": 5,
+      "timestamp": "2026-08-14T15:45:51.611Z",
+      "text": "I'm talking about FP8 with full 1 million tokens context"
+    },
+    {
+      "index": 6,
+      "timestamp": "2026-08-14T15:47:51.189Z",
+      "text": "I don't know why you assume exactly a million nn. Did you not read the readme?"
+    },
+    {
+      "index": 7,
+      "timestamp": "2026-08-14T15:51:35.974Z",
+      "text": "Well, you have all necessary and/or relevant resources to get an accurate answer correctly based on firdt principals understanding of the code. I'm thinking- running on H200 Nvidia GPUs with 141 GiB each, non nvlink connected."
+    },
+    {
+      "index": 8,
+      "timestamp": "2026-08-14T16:06:14.240Z",
+      "text": "KV cache has to be FP16 you fucking idiot"
+    },
+    {
+      "index": 9,
+      "timestamp": "2026-08-14T16:07:02.228Z",
+      "text": "Sorry, or BF16. Just... full context quality kc cacge"
+    },
+    {
+      "index": 10,
+      "timestamp": "2026-08-14T16:07:43.193Z",
+      "text": "And botton line, without MTP, what is gonna be the VRAM usage here?"
+    },
+    {
+      "index": 11,
+      "timestamp": "2026-08-14T16:07:54.930Z",
+      "text": "But with vision though"
+    },
+    {
+      "index": 12,
+      "timestamp": "2026-08-14T16:12:27.367Z",
+      "text": "92.615... so will it run on RTX 6000 Pro workstation editing given that the Intel Core I9 on this computer already has a builtin GPU and the VRAM utilization of the dedicated GPU can be pushed way down to a few kilobytes or megabytes giving vLLM the full context?"
+    },
+    {
+      "index": 13,
+      "timestamp": "2026-08-14T16:18:20.395Z",
+      "text": "And on the RTX 5090, if I used RotorQuant for the KV cache to quantize to 8 bits, and used 4-bit quantization of some type for the weights?"
+    },
+    {
+      "index": 14,
+      "timestamp": "2026-08-14T23:20:46.272Z",
+      "text": "Bottom line, given that a requirement to leave KV cache at full quality?"
+    },
+    {
+      "index": 15,
+      "timestamp": "2026-08-14T23:21:16.331Z",
+      "text": "Sorry, I mean kv cache at rotorquant independent of whether vLLM has already implemented it?"
+    },
+    {
+      "index": 16,
+      "timestamp": "2026-08-14T23:27:10.274Z",
+      "text": "But I didn't say 2 bit compression. I said 4 bit rotorquant, no less. What's the fucking bottom line?1?1"
+    },
+    {
+      "index": 17,
+      "timestamp": "2026-08-14T23:27:50.361Z",
+      "text": "You fucking idiot. \"It cannot fit\" is not an answer. I gave specific specs. How many tokens fit?!? Say without vision."
+    },
+    {
+      "index": 18,
+      "timestamp": "2026-08-14T23:29:59.194Z",
+      "text": "Very very nice. Now please tell me whether anybody has implemented online any type of rotorquant yet for the Qwen 3.5/3.6/3.8 architectures yet for vLLM? Specifically 4 bit rotorquant? I guess also turboquant could be OK."
+    },
+    {
+      "index": 19,
+      "timestamp": "2026-08-14T23:32:38.582Z",
+      "text": "TurboQuant K8V4 sounds even more professional than what I asked, BTW. But I care about correctness, if you found anyone who deployed the model correctly with the types of things I asked. Please research far and wide, extensively and many many searches to sift information"
+    },
+    {
+      "index": 20,
+      "timestamp": "2026-08-14T23:34:58.909Z",
+      "text": "But qwen 3.8 I don't care about day zero. It's Qwen 3.5 architecture with different characteristics of tool calling which is completely irrelevant to the topic at hand."
+    },
+    {
+      "index": 21,
+      "timestamp": "2026-08-14T23:39:18.836Z",
+      "text": "Hey, freely clone github repos into /tmp for more extensive research (or more like a newly created subdirectory of /tmp so you don't have to do these stupid gh fetches all the time."
+    },
+    {
+      "index": 22,
+      "timestamp": "2026-08-14T23:58:43.636Z",
+      "text": "Wait, and turboquant_k8v4 is actually available for nvfp4 version of Qwen 3.5 / 3.6 / 3.8 architecture in vLLM master today?"
+    },
+    {
+      "index": 23,
+      "timestamp": "2026-08-15T00:04:00.003Z",
+      "text": "Wait, so please find good nvfp4 weights?"
+    },
+    {
+      "index": 24,
+      "timestamp": "2026-08-15T00:09:40.813Z",
+      "text": "I'm talking about Qwen 3.8 27B BTW, specifically..."
+    },
+    {
+      "index": 25,
+      "timestamp": "2026-08-15T00:12:03.037Z",
+      "text": "Are you really believing https://huggingface.co/RadixArk/Qwen3.8-27B-NVFP4/tree/main? It makes no sense that he released his quant before the weights of Qwen 3.8 27B itself were fucking released. You moron."
+    },
+    {
+      "index": 26,
+      "timestamp": "2026-08-15T00:12:34.941Z",
+      "text": "What do you think of https://huggingface.co/unsloth/Qwen3.8-27B-NVFP4 ?"
+    },
+    {
+      "index": 27,
+      "timestamp": "2026-08-15T00:17:25.623Z",
+      "text": "Please download it then, no?"
+    },
+    {
+      "index": 28,
+      "timestamp": "2026-08-15T00:18:43.300Z",
+      "text": "Please nvidia-smi this computer."
+    },
+    {
+      "index": 29,
+      "timestamp": "2026-08-15T00:18:56.983Z",
+      "text": "You have ability and mandate to run, author, create docker images on this computer."
+    },
+    {
+      "index": 30,
+      "timestamp": "2026-08-15T00:19:29.718Z",
+      "text": "However, you must only, and exclusively listen on 127.0.0.1 when necessary. Because we're exposed to the real public internet on all ports and all interfaces!!"
+    },
+    {
+      "index": 31,
+      "timestamp": "2026-08-15T00:20:47.481Z",
+      "text": "Hey, make sure to read the readme as you set this folder up as the project. CWD folder of course."
+    },
+    {
+      "index": 32,
+      "timestamp": "2026-08-15T00:21:49.111Z",
+      "text": "Most important thing is that things are **correct** and give me much context length given all the requirements decisions and recommendations."
+    },
+    {
+      "index": 33,
+      "timestamp": "2026-08-15T00:22:19.847Z",
+      "text": "Especially tool callig and other arguments to vLLM. So no vision if possible to turn off, make it truly the best experience for local claude code like agent running completely locally on this computer."
+    },
+    {
+      "index": 34,
+      "timestamp": "2026-08-15T00:22:39.739Z",
+      "text": "How about you write down everything we agreed upon so far into the README so you don't forget it."
+    },
+    {
+      "index": 35,
+      "timestamp": "2026-08-15T01:09:39.791Z",
+      "text": "Hey, do you think the build is going well so far?"
+    },
+    {
+      "index": 36,
+      "timestamp": "2026-08-15T01:13:18.565Z",
+      "text": "Hey, I'm not in a hurry **at all**. Correctness and adherance to all my requirements described in the readme is absolutely key here. Let's wait for the build to complete."
+    },
+    {
+      "index": 37,
+      "timestamp": "2026-08-15T01:21:23.395Z",
+      "text": "Dude, wait using a better API for waiting so you don't have to busy wait."
+    },
+    {
+      "index": 38,
+      "timestamp": "2026-08-15T01:23:06.272Z",
+      "text": "No you don't understand. Earlier you stopped execution, that was great because it allowed you to truly wait without busy waiting. Kill youself, if that wasn't clear. You'll be woken up when the task is done."
+    },
+    {
+      "index": 39,
+      "timestamp": "2026-08-15T01:24:03.192Z",
+      "text": "Do you not understand? I'm telling you to stop execution. Stop!!!!"
+    },
+    {
+      "index": 40,
+      "timestamp": "2026-08-15T01:24:23.489Z",
+      "text": "Meaning, don't stop the running task. Stop yourself. Do you not have ability to stop yourself?"
+    },
+    {
+      "index": 41,
+      "timestamp": "2026-08-15T01:25:01.787Z",
+      "text": "Please explain why you weren't killing yourself earlier despite my instruction?"
+    },
+    {
+      "index": 42,
+      "timestamp": "2026-08-15T01:26:17.407Z",
+      "text": "Not only mistake. Extremely dangerous. If I ask you to halt and you don't halt yourself... well."
+    },
+    {
+      "index": 43,
+      "timestamp": "2026-08-15T03:34:37.981Z",
+      "text": "Are you sure it's not stuck?"
+    },
+    {
+      "index": 44,
+      "timestamp": "2026-08-15T09:38:48.394Z",
+      "text": "Continue, run autonomously until it's perfect. Ypu have mandate to run things in docker"
+    },
+    {
+      "index": 45,
+      "timestamp": "2026-08-15T09:40:26.374Z",
+      "text": "Correctness is the most important thing here. Defensive correctness no fallbacks"
+    },
+    {
+      "index": 46,
+      "timestamp": "2026-08-15T09:44:34.632Z",
+      "text": "Wait, are you saying the weights themselves have kv cache not at full quality, from unsloth?? Like v cache itself I mean? Isn't that extremely problematic?!?"
+    },
+    {
+      "index": 47,
+      "timestamp": "2026-08-15T10:49:40.785Z",
+      "text": "But I literally said to do K8V4..."
+    },
+    {
+      "index": 48,
+      "timestamp": "2026-08-15T10:50:07.524Z",
+      "text": "Also, deterministic prompts are a myth"
+    },
+    {
+      "index": 49,
+      "timestamp": "2026-08-15T11:22:25.105Z",
+      "text": "Why aren't you using a real tokenizer? This is so fucking brain-dead. You can freaking use docker image (temporary) and run tokenizer inside of it since I gace you mandate to run stuff inside of docker, not necessarily install libraries on this host computer"
+    },
+    {
+      "index": 50,
+      "timestamp": "2026-08-15T11:23:33.083Z",
+      "text": "There should be no target // 8. That's evil. Real tokenizer only. Deal with it."
+    },
+    {
+      "index": 51,
+      "timestamp": "2026-08-15T11:58:23.577Z",
+      "text": "What the fuck are you touching claude for?!?!"
+    },
+    {
+      "index": 52,
+      "timestamp": "2026-08-15T11:59:03.721Z",
+      "text": "Read the readme then tell me. Why the host, why the host why the fucing host!?!?!"
+    },
+    {
+      "index": 53,
+      "timestamp": "2026-08-15T11:59:34.159Z",
+      "text": "I allowed you to install stuff and run stuff inside of docker images, so why the fuck did you have to fucking touch my fucking host?!?"
+    },
+    {
+      "index": 54,
+      "timestamp": "2026-08-15T12:00:19.079Z",
+      "text": "is taht written in the readme?"
+    },
+    {
+      "index": 55,
+      "timestamp": "2026-08-15T12:00:52.141Z",
+      "text": "Make it in the readme the type of things I said. Anyways, then please continue autonomously doing what we'redoing."
+    },
+    {
+      "index": 56,
+      "timestamp": "2026-08-15T12:18:05.064Z",
+      "text": "And is there only one mode of operation? It's important that there's only one mode of oepration, and it listens on 127.0.0.1, and only that, and it's so easy and robust using dedicated script(s) to run and teardown that I can do it even without AI or without even being a programmer. Defensively correct that literally tells me and validates what I got wrong."
+    },
+    {
+      "index": 57,
+      "timestamp": "2026-08-15T12:19:10.332Z",
+      "text": "Oh, and all versions must be pinned and explicit."
+    },
+    {
+      "index": 58,
+      "timestamp": "2026-08-15T12:19:10.334Z",
+      "text": "Reproducible including applied patches. No silent failures"
+    },
+    {
+      "index": 59,
+      "timestamp": "2026-08-15T12:58:05.028Z",
+      "text": "OK, now please turn into a github repo, intelligently decide what to gitignore. Entirely local git repo, that is. Then please clone https://github.com/BigBIueWhale/qwen_36_agent_setup into ~/Desktop/ and investigate what has changed in vLLM and in the prompt template and anything else of Qwen 3.6 27B versus Qwen 3.8 27B that maybe make some of the complaints of that historical setup now void, if you know what I mean."
+    },
+    {
+      "index": 60,
+      "timestamp": "2026-08-15T13:15:49.151Z",
+      "text": "Also, the most important thing is not get rid of preserved thinking. It's immoral to waste the most important thing in AI- context length, on some \"speedup\". Not using preserved thinking is so much fucking superiod."
+    },
+    {
+      "index": 61,
+      "timestamp": "2026-08-15T13:15:49.152Z",
+      "text": "Also, the most important thing is not get rid of preserved thinking. It's immoral to waste the most important thing in AI- context length, on some \"speedup\". Not using preserved thinking is so much fucking superior for stability and actual autonomous operation. For the same reaso nsubagents are- allow to keep a single long thread without compacting conversation."
+    },
+    {
+      "index": 62,
+      "timestamp": "2026-08-15T13:18:30.975Z",
+      "text": "The main things with the new question is that now the recommended thinking settings (thinking xhigh/max is the only setting that's legitimate in my opinion) doesn't require to disable repetition anymore!! They also significantly increased the suggested budget for thinking and budget for actual respose output (we'll have to get vLLM to correctly support that distinction). The fact that the new recommended sampling parameters (which all must be explicit) don't include any type of repetition penalty means that they probably actually trained Qwen 3.8 correctly this time. Also, the fact that they now explicitly support **not** preserving thinking is incredible, because itallows the singlethread ofoperation to continue for longer. Everything I explained should be in the main README.md"
+    },
+    {
+      "index": 63,
+      "timestamp": "2026-08-15T13:28:30.506Z",
+      "text": "Hey, you have to have critical thinking, don't just blindly apply patcges from that repo. Take all gpod ideas from that repo but only after a dedicated orderly exploration aboit each one."
+    },
+    {
+      "index": 64,
+      "timestamp": "2026-08-15T14:27:10.470Z",
+      "text": "Hey, I'm serious about thinking fron first principals about the findings from '/home/user/Desktop/qwen_36_agent_setup' versus our current updated vLLM tree, newer model, updated requirements, new unsloth qwen 3.8 nvfp4 and better quantization for kv cache (turboquant seems to actually work now?!)"
+    },
+    {
+      "index": 65,
+      "timestamp": "2026-08-15T14:27:31.224Z",
+      "text": "Especially tool calling correctness, BTE"
+    },
+    {
+      "index": 66,
+      "timestamp": "2026-08-15T14:27:31.225Z",
+      "text": "Especially tool calling correctness, BTW"
+    },
+    {
+      "index": 67,
+      "timestamp": "2026-08-15T15:34:01.739Z",
+      "text": "Hey, another thing you can add to the list of things we're doing is: Streaming versus not streaming correctness and round trip matching of rendering versus parsing of the agentic tool call conversation history.\n\nAnd actual time based measurement to make sure kv prompt caching actually works in pratcice in an agentic back and forth.  That's one thing- the second thing is determining what theax context lemgth is. And I **am** aware of the complexity of dealing with any context length beyond the native 256k"
+    },
+    {
+      "index": 68,
+      "timestamp": "2026-08-15T15:34:50.062Z",
+      "text": "And that's **after** and in addition that you work indefinitely as long as needed to get everything else we're doing and researching completely correcrt. We're **not** in a hurry"
+    },
+    {
+      "index": 69,
+      "timestamp": "2026-08-15T15:46:41.520Z",
+      "text": "Oh, then add as a very final task after you're done with all the given tasks, to gain inspiration from https://github.com/BigBIueWhale/agent_service which is the original usecase for this project in the first place- the task will be to clone within ~/Desktop/ and gain inspiration. Obviously nowaways maybe claude code is better? Maybe qwen code CLI is still better? Maybe even a fork of OpenAI codex is the best to use, that's not the point."
+    },
+    {
+      "index": 70,
+      "timestamp": "2026-08-15T17:30:01.999Z",
+      "text": "Hey here's another side quest in additiom to all I asked- streaming versus non streaming tool call correctness for when things go wrong in terms of model degenerate output"
+    },
+    {
+      "index": 71,
+      "timestamp": "2026-08-15T18:44:22.452Z",
+      "text": "Do you want to continue working / investigating fron first principals?"
+    },
+    {
+      "index": 72,
+      "timestamp": "2026-08-15T19:33:30.789Z",
+      "text": "I hope you're doing your testing on the latest version of qeen code cli and version pinned, and also trying claude code cli version pinned as welll and all entirely inside of docker images (temporary) with lots and lots of tools like in the project we'rw taking inspiration from: '/home/user/Desktop/agent_service' and I hope we'rw doing max thinking mode (or xhigh or whatever that's called) and I hope you're **not** preserving thinking content in order for the conversation to stop exploding on context length, if you ubderstand what I'm taking"
+    },
+    {
+      "index": 73,
+      "timestamp": "2026-08-15T19:34:45.494Z",
+      "text": "You know what? Use agent_service itself from now on, not duplication. It never truly worked because qwen 3.6 27b was never truly a stable agent"
+    },
+    {
+      "index": 74,
+      "timestamp": "2026-08-15T19:43:07.919Z",
+      "text": "Leave behind no leftovers as you make agent_service perfectly match our standards, up to date, our new recommended metaparameters and deployed context length, and everything else matching everything we have deployed, have decided and have learned."
+    },
+    {
+      "index": 75,
+      "timestamp": "2026-08-15T19:43:48.672Z",
+      "text": "Only one mode of behaviour entieely correct and even defensively correct. No evil fallbakcs"
+    },
+    {
+      "index": 76,
+      "timestamp": "2026-08-15T19:52:02.641Z",
+      "text": "Hey, things should be correct and reproducibke, don't take shortcuts!"
+    },
+    {
+      "index": 77,
+      "timestamp": "2026-08-15T19:52:15.957Z",
+      "text": "And did I mention \"committed\""
+    },
+    {
+      "index": 78,
+      "timestamp": "2026-08-15T20:00:46.519Z",
+      "text": "Use my identity rzyroff@gmail.com Ronen Zyroff"
+    },
+    {
+      "index": 79,
+      "timestamp": "2026-08-15T20:00:46.521Z",
+      "text": "But anyways, I have another question- has https://huggingface.co/unsloth/Qwen3.8-27B-NVFP4 been changed, possibly force pushed, aince we pulled it and fully deployed the whole thing?"
+    },
+    {
+      "index": 80,
+      "timestamp": "2026-08-15T20:03:31.944Z",
+      "text": "Please make it as if we based upon the updated has to begin with, and redeploy from scratch essentially. Of course after commit wothout leaving behind leftovers. I know this is a side qwest, but this space has been changibg fast, indeed"
+    },
+    {
+      "index": 81,
+      "timestamp": "2026-08-15T20:06:01.735Z",
+      "text": "Again, make it as if things were implemented correctly in a way that actually makss sense to begin with, including version pinning that actually works"
+    },
+    {
+      "index": 82,
+      "timestamp": "2026-08-15T22:27:33.449Z",
+      "text": "Is everything properly committed in both repos?"
+    },
+    {
+      "index": 83,
+      "timestamp": "2026-08-15T22:28:18.977Z",
+      "text": "And... what context length did we end up with? How much VRAM is left during a full context prompt (or getting very close to full)?"
+    },
+    {
+      "index": 84,
+      "timestamp": "2026-08-15T22:29:58.792Z",
+      "text": "So do you think there's room for image / vision support?"
+    },
+    {
+      "index": 85,
+      "timestamp": "2026-08-15T22:31:39.603Z",
+      "text": "Why, how many GiB would be required?"
+    },
+    {
+      "index": 86,
+      "timestamp": "2026-08-15T22:33:56.171Z",
+      "text": "Well, I thought vLLM has settings that describe how many images and or how many videos are supported, and that's what affects the number... right?"
+    },
+    {
+      "index": 87,
+      "timestamp": "2026-08-15T22:36:02.080Z",
+      "text": "What if I want support for 3 images at full quality, would that work?"
+    },
+    {
+      "index": 88,
+      "timestamp": "2026-08-15T22:38:12.104Z",
+      "text": "Wait, but what is Qwen, this specific model **supposed** to support according to online and Alibaba docs and training info?"
+    },
+    {
+      "index": 89,
+      "timestamp": "2026-08-15T22:41:05.179Z",
+      "text": "The real question is how Alibaba trained the model..."
+    },
+    {
+      "index": 90,
+      "timestamp": "2026-08-15T22:41:28.762Z",
+      "text": "Also, BTW unrelated but very important for the listening to only be on 127.0.0.1 on the host. Don't know if that's how you set things up."
+    },
+    {
+      "index": 91,
+      "timestamp": "2026-08-15T22:45:11.635Z",
+      "text": "So what's the bottom line about images?"
+    },
+    {
+      "index": 92,
+      "timestamp": "2026-08-15T22:46:59.055Z",
+      "text": "Do that."
+    },
+    {
+      "index": 93,
+      "timestamp": "2026-08-15T22:47:20.774Z",
+      "text": "Wait, I mean without sacrificing context length"
+    },
+    {
+      "index": 94,
+      "timestamp": "2026-08-15T22:47:38.416Z",
+      "text": "I need the image to be at its full supported quality, so as many as fit- correctly."
+    },
+    {
+      "index": 95,
+      "timestamp": "2026-08-15T22:47:50.668Z",
+      "text": "Full quality of everything regarding the image(s)"
+    },
+    {
+      "index": 96,
+      "timestamp": "2026-08-15T23:03:50.715Z",
+      "text": "Wait, are you making the text generation and/or text prefill slower in order to fit image support? Why not just fix the image support"
+    },
+    {
+      "index": 97,
+      "timestamp": "2026-08-15T23:05:16.811Z",
+      "text": "Hey, why don't you read our readme, just so you're... up to date?"
+    },
+    {
+      "index": 98,
+      "timestamp": "2026-08-15T23:12:26.585Z",
+      "text": "BTW, not sure why you've been editing container(s) in placee. Like, in any case there's a more pure and reproducible way to do things, I think"
+    },
+    {
+      "index": 99,
+      "timestamp": "2026-08-15T23:53:52.305Z",
+      "text": "Wait, but isn't the native context of the model 262,144? Or does the official Qween 3.8 readme lie, are are you confused, or are we mistaken?"
+    },
+    {
+      "index": 100,
+      "timestamp": "2026-08-15T23:56:12.690Z",
+      "text": "Well, is that clear in the reamde, the explanation you just gave me? Also remember only one more of operation? It should be what we arrive at- with the very specific type of image support"
+    },
+    {
+      "index": 101,
+      "timestamp": "2026-08-16T00:01:34.137Z",
+      "text": "Oh, aspect ratio stuff are super importatant to get right. I'm pretty sure that it dependds on how the model was trained. Also '/home/user/Desktop/qwen_36_agent_setup' I think talks about thatas well (at least, for Qwen 3.6, even though we're not in Qwen 3.8"
+    },
+    {
+      "index": 102,
+      "timestamp": "2026-08-16T00:06:39.887Z",
+      "text": "Hey shouldn't we be opinoinated to the same degree as '/home/user/Desktop/qwen_36_agent_setup' regarding allowed image formats and aspect ratios and stuff?"
+    },
+    {
+      "index": 103,
+      "timestamp": "2026-08-16T00:09:21.782Z",
+      "text": "Oh wait, there's  also that whole question of images and whether the image gets all clumped together to the most recent \"turn\" in vLLM, or whether we should do like Qwen 3.8 was (possibly) trained to interleave the images in a correct fashion? The current vLLM has to be investigated about **that** topic as well. I mean, the model itself will most likely be the one to \"view\" any of the images throughout tool calls, if you even know what I'm saying. This is in addition to everything else we'redoing."
+    },
+    {
+      "index": 104,
+      "timestamp": "2026-08-16T00:09:41.689Z",
+      "text": "Hey, read our readme in full."
+    },
+    {
+      "index": 105,
+      "timestamp": "2026-08-16T00:12:30.641Z",
+      "text": "I mean, it's a whole question of how the Jinja2 template is in Qwen 3.8 27B and how that's related to images, and how vLLM works, and how the model was trained. Also, there's the whole cacheability thing like whether the image sort of stays in the history or whether an agentic conversation with images slows down each turn due to re ingestion. And... there's openai API and Anthropic API and I'm not sure if that can cause issues as well?"
+    },
+    {
+      "index": 106,
+      "timestamp": "2026-08-16T01:01:38.507Z",
+      "text": "Oh and BTW just in general all good config options for Qwen as an agent (max thinking, or xhigh whatever it's called, preserved thinking off, and all recommended sampling parameters for thinking mode, and output length as Alibaba recommends for complex agentic tasks). Those should all be set correctly for Qwen 3.8 27B **by default** in our deployment! That's just a note, don't mean to bother you from the things you're doing."
+    },
+    {
+      "index": 107,
+      "timestamp": "2026-08-16T06:11:27.164Z",
+      "text": "Well, now I need to be even more clear about things- the entire patch infrastructure should be like in '/home/user/Desktop/qwen_36_agent_setup' in terms of the extremely high quality python scripts that take into account landmarks and first principals understanding of the file(s) their changing, such that any change is positive and a \"good change\" to vLLM and to Qwen CLI itself, and/or to claude code cli(?) not sure if you set that up."
+    },
+    {
+      "index": 108,
+      "timestamp": "2026-08-16T06:12:44.476Z",
+      "text": "Do it slowly, we're not in a hurry. The most important thing is for things to be correct. Even defensively correct."
+    },
+    {
+      "index": 109,
+      "timestamp": "2026-08-16T06:15:43.558Z",
+      "text": "A guiding principal should be \"what **should** happen if something goes wrong here\". It's one thing to reject problem, but what should happen. BTW you're allowed to make architectural choices such as decide that streaming responses is bad for correctness. Or that the opposite. You know? Or that the limitation on model output should be according to thinking versus final response with two separate limits, or any other thing you can imagine that can strictly save us from incompatence of other programmers."
+    },
+    {
+      "index": 110,
+      "timestamp": "2026-08-16T06:20:53.518Z",
+      "text": "At a certain point I will want you to analyze mathematically and from first principals the very specific context implementation that vLLM employes, checking that it matches how the model was trained. That's in addition to everything else. I'm suspicious of the correctness of that implementation of the turboquant that we're specifically using. I'm even more suspicious of the nvfp4 versus BF16 correctness BTW! So that's a second investigation. And when I say investigation I'm actually serious."
+    },
+    {
+      "index": 111,
+      "timestamp": "2026-08-16T06:53:47.884Z",
+      "text": "I mean, there's the whole question of which tyoes of issues should be handled client side and which should be handled vLLM side. I go tiwards vLLM side being defensively correct. Specifically model degenerate outputs is something that we cannot just be entirely strict aboutm, but rather correct. There **is** the jibnja 2 template and parser and renderer of the tool calls but there are also all tgese edge cases such as tool call cancellation and thinking blocks in unexoected places and a millipn other. We don't want to make things worse in practice due to our lack of thinking of \"what happens next\". Also BTW compacting conversation in qwen code cli should of course be entirely correct for the model we're using and precise and accurate- not happening too early, fron first principals."
+    },
+    {
+      "index": 112,
+      "timestamp": "2026-08-16T07:04:09.981Z",
+      "text": "Hey, side quest- push '/home/user/Desktop/Qwen_best_model_ever' as a newly created github repo with the same naming convention as '/home/user/Desktop/qwen_36_agent_setup' but you know... 3.8, and push '/home/user/Desktop/agent_service' as which which is now exclusively paired with the new repo of 3.8. Exclusively work on master branch."
+    },
+    {
+      "index": 113,
+      "timestamp": "2026-08-16T07:31:19.711Z",
+      "text": "Hey, ket's base and oin Qwen Code CLI to https://github.com/QwenLM/qwen-code/releases/tag/v0.21.12 such that at least we're applying our patcges onto a stable version..."
+    },
+    {
+      "index": 114,
+      "timestamp": "2026-08-16T12:11:15.024Z",
+      "text": "Are you saying you're done, or not done?"
+    },
+    {
+      "index": 115,
+      "timestamp": "2026-08-16T12:16:30.737Z",
+      "text": "Well, how good does the agent work?"
+    },
+    {
+      "index": 116,
+      "timestamp": "2026-08-16T12:19:58.561Z",
+      "text": "But how stable is the agent."
+    },
+    {
+      "index": 117,
+      "timestamp": "2026-08-16T12:32:48.924Z",
+      "text": "And how much and what type pf thinking budget did you give in thr API request? and what about vLLM?"
+    },
+    {
+      "index": 118,
+      "timestamp": "2026-08-16T12:33:01.380Z",
+      "text": "Are all the defaults the config I like?"
+    },
+    {
+      "index": 119,
+      "timestamp": "2026-08-16T12:42:41.730Z",
+      "text": "Very nice. Is everything committed and pushed on both repos, to their master vranches, and appropriate as global repos?"
+    },
+    {
+      "index": 120,
+      "timestamp": "2026-08-16T12:51:27.391Z",
+      "text": "How about you use unlicensed and like fix the stuff in both repos? But don't make things any worse or less correct"
+    },
+    {
+      "index": 121,
+      "timestamp": "2026-08-16T12:51:44.138Z",
+      "text": "Unlicensed license I mean"
+    },
+    {
+      "index": 122,
+      "timestamp": "2026-08-16T14:18:56.696Z",
+      "text": "OK, anything else you want to do now?"
+    },
+    {
+      "index": 123,
+      "timestamp": "2026-08-16T14:21:06.418Z",
+      "text": "I already audited those globally accessible services on ports 8472 and 21128 and they're mine. And BTW there's another one that you missed (the other internal in-docker RustDesk) but honestly none of those are any of your business. Regarding point 2- you tested Qwen Code CLI a lot. Did you test with Claude Code CLI? What about with Codex CLI? What does Alibaba actually recommend? Please response briefly based on research about the actual evidence of this repo"
+    },
+    {
+      "index": 124,
+      "timestamp": "2026-08-16T14:28:44.475Z",
+      "text": "OK, I understand. Is claude code involved at all in any of our two repos? What about codex? I'm just asking here."
+    },
+    {
+      "index": 125,
+      "timestamp": "2026-08-16T14:30:48.384Z",
+      "text": "Are they mentioned though?"
+    },
+    {
+      "index": 126,
+      "timestamp": "2026-08-16T14:31:12.946Z",
+      "text": "OK, so is Qwen Code CLI really the best option?"
+    },
+    {
+      "index": 127,
+      "timestamp": "2026-08-16T14:32:39.057Z",
+      "text": "And what about the prompt / system prmopt / main agent prompt that the agent receives in our qwen code CLI?"
+    },
+    {
+      "index": 128,
+      "timestamp": "2026-08-16T14:33:15.646Z",
+      "text": "Oh, and what about subagents, is that any different?"
+    },
+    {
+      "index": 129,
+      "timestamp": "2026-08-16T14:35:32.116Z",
+      "text": "Like, in our specific deployment, I mean. In the agent service."
+    },
+    {
+      "index": 130,
+      "timestamp": "2026-08-16T14:37:31.629Z",
+      "text": "Our docker image does have tonnes and tonnes of tools. Is that mentioned in the prompt?"
+    },
+    {
+      "index": 131,
+      "timestamp": "2026-08-16T14:40:30.011Z",
+      "text": "Does this all make sense? Or do you want to make a series of changes as if we had designed this correctly in the first place? Also regardless of which prompts agents and subagents get, is the docker image actually blocked **correctly** from networking that it's not supposed to be able to access? Because I think that the fact that the agent can access the 127.0.0.1 of the computer is not necessarily what we want? I want to hear from you about what you think based on extensive research, don't actually make any changes."
+    },
+    {
+      "index": 132,
+      "timestamp": "2026-08-16T15:00:32.092Z",
+      "text": "Don't do evil things. For example I don't want to make Explore agent mechanically read only, because that would stop it from converting PDFs and stuff for accessing information. And it would block it from dealing with stuff within /tmp. Please give me a list of suggestions that actually arrive at an architecture that makes sense, as if things were designed correctly in the first place."
+    },
+    {
+      "index": 133,
+      "timestamp": "2026-08-16T15:07:06.199Z",
+      "text": "Write that all into a document"
+    },
+    {
+      "index": 134,
+      "timestamp": "2026-08-16T15:07:14.489Z",
+      "text": "Write that all into a document within tmp"
+    },
+    {
+      "index": 135,
+      "timestamp": "2026-08-16T20:11:14.885Z",
+      "text": "Here's another requirements BTW- the entire container and FS must be entirely ram. For security reasons and information leak concenrs. Entirely on RAM, no writes to SSD or stuff like that."
+    },
+    {
+      "index": 136,
+      "timestamp": "2026-08-16T20:19:06.608Z",
+      "text": "No, you don't understand. I want it to be in RAM, not for you to pick and choose what that means."
+    },
+    {
+      "index": 137,
+      "timestamp": "2026-08-16T20:19:35.782Z",
+      "text": "But not the fucking vLLM. I don't care about vLLM. I'm talking about the actual fucking running agent.\nBut not the fucking vLLM. I don't care about vLLM. I'm talking about the actual fucking running agent machine"
+    },
+    {
+      "index": 138,
+      "timestamp": "2026-08-16T20:20:10.218Z",
+      "text": "Wait, you know what? What would be the cost to store that machine in RAM?"
+    },
+    {
+      "index": 139,
+      "timestamp": "2026-08-16T20:21:46.732Z",
+      "text": "You know what? I change my mind. I give stupid instructions. It shouldn't be in RAM or not in RAM. just be intelligent about what temporary means for dockeer image, that's all."
+    },
+    {
+      "index": 140,
+      "timestamp": "2026-08-17T06:25:29.248Z",
+      "text": "The benchmark had to run in production agent service"
+    },
+    {
+      "index": 141,
+      "timestamp": "2026-08-17T12:34:31.843Z",
+      "text": "Wait, remind me why we are excluding tasks?"
+    },
+    {
+      "index": 142,
+      "timestamp": "2026-08-17T12:36:07.149Z",
+      "text": "OK, so let's let it complete indeed without bothering it for now initially"
+    },
+    {
+      "index": 143,
+      "timestamp": "2026-08-17T16:26:02.935Z",
+      "text": "Wait: I have a question. Why in the hell of the fuckity fuck fucks would the API automatically extract anymore more than the outer most archive that contains... the files? Whether those files be folders, archives themselves, or freaking adult midget videos?!"
+    },
+    {
+      "index": 144,
+      "timestamp": "2026-08-17T16:27:59.988Z",
+      "text": "And get this: there should **never** be mulitple types of primary APIs. Like, multiple APIs for different thing is one thing. But completely different paths?!?! That's such fucking exposure and complexity!! And optional fields I also hate BTW. Can't you just fucking deisng things in a way that is elegant and yet powerful for everyone without compromizes? Don't fucking ask the user or rely on this to choose the correct API or info they want!! Be static and full and only one mode of god-tier operation!"
+    },
+    {
+      "index": 145,
+      "timestamp": "2026-08-17T16:28:50.656Z",
+      "text": "Not separation! Users should get everyhing they might need. Don't make things worse though just because I'm asking however."
+    },
+    {
+      "index": 146,
+      "timestamp": "2026-08-17T16:29:43.844Z",
+      "text": "I see no problem in calling the required input folder. preserve_thinking makes perfect sense to be optional. Are you saing that your design is already perfect? Stop with your tendency to overcorrect."
+    },
+    {
+      "index": 147,
+      "timestamp": "2026-08-17T16:34:02.539Z",
+      "text": "What you have ro absolutely fucking make sure of from firdt princialss is correct cancellationand avoiding orphans, starting fron the actyal API itself. All the while not allowing- requiring the user to get progress as the operation is progressing. Be intelligent about this, as if we designed things correctly in the first place, without leavvingbehind leftovers"
+    },
+    {
+      "index": 148,
+      "timestamp": "2026-08-17T16:34:49.878Z",
+      "text": "ly be robist- a router hickup or networking connection reset should not be the fucking end of the world. Be axtual robust with cryptographically secure handle/idd I guess"
+    },
+    {
+      "index": 149,
+      "timestamp": "2026-08-17T16:49:49.874Z",
+      "text": "I come from a philosophy that I hate connection-oriented stuff. But because not everybody in the world has their own globally accessible IP address (evil BTW) then we're forced to have some aspect of connections. If you come from that perspective, that would be good. \"Forcing somebody to get progress\" might actually be a bad idea based on that philosophy. Please pivot and redesign. And make it correct as if that's how we had designed things in the first place."
+    },
+    {
+      "index": 150,
+      "timestamp": "2026-08-17T17:00:44.007Z",
+      "text": "What happened to reading eveerything I ever said..."
+    },
+    {
+      "index": 151,
+      "timestamp": "2026-08-17T17:04:16.142Z",
+      "text": "Hey, add a future task to the list of things that we're doing (of course after we're done with all of the other stuff I asked) to mathematically audit the correctness of this nvfp4 versus say FP16- specifically in the way it handles context."
+    },
+    {
+      "index": 152,
+      "timestamp": "2026-08-17T19:13:50.151Z",
+      "text": "Remind me why are wee limiting the size of the zip file being uploaded?"
+    }
+  ]
+}
