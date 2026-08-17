@@ -6,7 +6,7 @@
   "session_cwd": "/home/user/Desktop/Qwen_best_model_ever",
   "exported_at": "2026-08-17T19:47:53Z",
   "notes": "Extracted from event_msg/user_message records. Synthetic user-role records injected by Codex (environment_context, internal goal-reminder context) are excluded. No messages carried image/audio attachments. Messages with index >= 153 are later user directives appended verbatim by instruction; source_file describes indexes 1-152 only.",
-  "message_count": 154,
+  "message_count": 155,
   "messages": [
     {
       "index": 1,
@@ -777,6 +777,11 @@
       "index": 154,
       "timestamp": "2026-08-17T21:38:01Z",
       "text": "It shouldn't be the responsibility of our service to support only one user at at time?!?! In fact why the hell now? How do you know our service is not fucking pointing to a load balancer?!? Add that to the document that this ralph loop points at."
+    },
+    {
+      "index": 155,
+      "timestamp": "2026-08-17T21:44:47Z",
+      "text": "Also, making things only work on this computer is kind of sus, should be removed. The assertions are too versions pinned to specific types of host dependencies that don't actually matter. Add that to the documeent as well."
     }
   ]
 }
