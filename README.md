@@ -38,9 +38,9 @@ The deployment is complete and healthy. There is one supported mode:
 | Listener | 127.0.0.1:8000 only |
 | Agent client | Qwen Code 0.21.12 at b965d5f8c24f48e65fb0b17c7d45f34ca4ce8f38 |
 | Agent image | sha256:1dc84a6f4e03b62a9540794a353c0b1e175a07e6afbcfed6441fe5f2d0f7d1ec |
-| Agent-service implementation | bc67dae720894cbbcd62122a2a9ff6b56b042168 |
-| Agent-service release lock | 7a329f61665a7126e3f8cd9a4e3b7a6b66a639bc |
-| Agent-service image | sha256:8f8d4b2e68bf47c9d92c6c5c0f77fdbf60d0056ef32155a34ecc96357dfd41f4 |
+| Agent-service implementation | 99c2b729afcde161c4be4cfe285fa26253ad2ad4 |
+| Agent-service release lock | c9e9fec6c7550d19b7a7d35f29404c93ace510aa |
+| Agent-service image | sha256:589bd6e9b35714da2686afba4d877cfcc9764fd81a3c53b7b3e6ee913799fd89 |
 | Agent-service listener | 127.0.0.1:8090 only |
 | Runtime profile | socket-isolated-nonroot-vision-k8v4-agent-v13 |
 | Runtime image | sha256:587e8710c6630edd249f19b46837c12ebe5b5dcdc98486e215ac48a66644dc7f |
@@ -853,8 +853,14 @@ subagent turn:
   subagents.
 
 The service is the updated original `/home/user/Desktop/agent_service`, with release
-implementation commit bc67dae720894cbbcd62122a2a9ff6b56b042168 and release-lock
-commit 7a329f61665a7126e3f8cd9a4e3b7a6b66a639bc, not a copied launcher. Its own
+implementation commit 99c2b729afcde161c4be4cfe285fa26253ad2ad4 and release-lock
+commit c9e9fec6c7550d19b7a7d35f29404c93ace510aa, not a copied launcher. Its
+current release carries the workspace over the connection as a hash-committed
+zip (no shared-filesystem input paths and no host input mount), returns the
+result bundle over the connection with its own SHA-256 commitment, runs
+sessions concurrently because serving capacity is governed above the service,
+and asserts only functional host properties rather than one specific
+computer's software identities. Its own
 README and lock files are authoritative for Qwen Code source and
 transformation, the five exact component images, package snapshot, tools, copied
 workspace envelope, typed Docker broker, socket relays, stream capture, effect
