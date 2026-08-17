@@ -37,9 +37,10 @@ The deployment is complete and healthy. There is one supported mode:
 | Batching | One sequence; 2,048-token chunked prefill |
 | Listener | 127.0.0.1:8000 only |
 | Agent client | Qwen Code 0.21.12 at b965d5f8c24f48e65fb0b17c7d45f34ca4ce8f38 |
-| Agent image | sha256:156d67b5626b4d1418dbaa128cdc24bb91080ba6077251011d25cae9338c4f51 |
-| Agent-service source | b8271a608a8df9f35cf24d02ec3a3c62989f971d |
-| Agent-service image | sha256:7eb567207cd41a7f045073ea010e1a3f3fd14f9e118663dd69887560787b4e08 |
+| Agent image | sha256:1dc84a6f4e03b62a9540794a353c0b1e175a07e6afbcfed6441fe5f2d0f7d1ec |
+| Agent-service implementation | bc67dae720894cbbcd62122a2a9ff6b56b042168 |
+| Agent-service release lock | 7a329f61665a7126e3f8cd9a4e3b7a6b66a639bc |
+| Agent-service image | sha256:8f8d4b2e68bf47c9d92c6c5c0f77fdbf60d0056ef32155a34ecc96357dfd41f4 |
 | Agent-service listener | 127.0.0.1:8090 only |
 | Runtime profile | socket-isolated-nonroot-vision-k8v4-agent-v13 |
 | Runtime image | sha256:587e8710c6630edd249f19b46837c12ebe5b5dcdc98486e215ac48a66644dc7f |
@@ -465,7 +466,7 @@ On the exact final v13 live image:
 
 - immediately before the fifteen-image maximum-quality run: 31,647 MiB used,
   464 MiB free;
-- after the complete backend suite and current v8 agent acceptance: 31,797 MiB used,
+- after the complete backend suite and recorded v8 agent acceptance: 31,797 MiB used,
   314 MiB free;
 - total reported VRAM: 32,607 MiB.
 
@@ -675,7 +676,7 @@ The installed-image focused suites passed:
 - 382 Qwen streaming/replay cases;
 - vision workspace, image-contract, and vision-MLP units during the immutable build.
 
-### Validation record for v13 and paired agent v8
+### Validation record for v13 and the paired production agent
 
 The source/image invariants and numerical results below were obtained from the exact
 pinned v13 image. The protocol, cache, native-boundary, and full-image tests are
@@ -716,9 +717,9 @@ rerun after every runtime-profile change before that image is accepted:
 20. Pinned Qwen Code archive plus exact semantic reconstruction: pass; exactly 61
     changed/new files and 2,427 assertions across 23 focused test files; the full
     no-cache build reproduced agent image
-    sha256:156d67b5626b4d1418dbaa128cdc24bb91080ba6077251011d25cae9338c4f51.
-21. All pinned Rust component tests and clean release images: pass; 42 service,
-    8 broker, 3 relay, 2 capture, and 2 agent-exec tests. The same no-cache release
+    sha256:1dc84a6f4e03b62a9540794a353c0b1e175a07e6afbcfed6441fe5f2d0f7d1ec.
+21. All pinned Rust component tests and clean release images: pass; 44 service,
+    9 broker, 3 relay, 2 capture, and 2 agent-exec tests. The same no-cache release
     exactly reproduced the locked relay, capture, broker, and service image IDs.
 22. Real Qwen Code hostile-workspace text, full-resolution PNG vision, PTY shell,
     write/read, and final response: pass in seven turns. Ordinary QWEN.md and
@@ -730,7 +731,7 @@ rerun after every runtime-profile change before that image is accepted:
     upstream late `.env` load after tools; the accepted narrow source repair keeps
     environment/workspace loading disabled on every later auth validation. The full
     source matrix and a fresh hostile live session proved the marker absent.
-24. Real Qwen Code prefix and image caching: pass. The final v8 agent acceptance
+24. Real Qwen Code prefix and image caching: pass. The recorded v8 cache acceptance
     added 296,939 prompt tokens; vLLM recorded 241,280 local prefix hits, 55,659
     locally computed tokens, and 3 multimodal-cache hits across 20 requests.
 25. PTY and foreground subagent: pass. A separate real PTY session produced exact
@@ -748,6 +749,24 @@ rerun after every runtime-profile change before that image is accepted:
     terminated in 1,863 ms with zero turns, exit 143, an empty event stream, a
     complete nine-file bundle, no fabricated success, and no session-container
     leftovers.
+28. Late capture subscriber correctness: pass. A production benchmark run exposed
+    that Docker `logs --follow --since 0s` starts at relative "now" and can miss an
+    already-emitted `CAPTURE_COMPLETE`. The broker now uses exact Unix epoch `0`;
+    its new unit test freezes that replay contract. The service continued to fail
+    closed during the faulty run and retained its evidence instead of parsing
+    unproved output.
+29. Clean repaired production release: pass. The pinned build ran 44 service, 9
+    broker, 3 relay, 2 capture, and 2 agent-exec Rust tests, all 2,427 Qwen Code
+    assertions, and reproduced all five final image IDs. A fresh five-turn
+    production tool round trip then completed normally with a clean eleven-file
+    bundle and no session containers.
+30. Production-service SWE-rebench pilot: pass. Both history-policy variants ran
+    through real production session creation and `/wait`; neither Harbor nor the
+    evaluator called vLLM. The supported `preserve_thinking=false` run resolved all
+    11 evaluator checks in 61 turns. The explicit `true` diagnostic also resolved
+    all 11, in 83 turns and with 48.0% more aggregate input-token traffic. The two
+    earlier orchestration failures are retained as infrastructure evidence and are
+    not model scores.
 
 The supported status currently reports:
 
@@ -782,7 +801,7 @@ b965d5f8c24f48e65fb0b17c7d45f34ca4ce8f38. The official release archive is pinned
 by SHA-256 61beddff8bde1dd2654c8714f927b46ab7cf9822b8561d11e3a2b8e085b5e745,
 and the landmark-aware source transformation is independently pinned. It runs only
 inside immutable agent image
-sha256:156d67b5626b4d1418dbaa128cdc24bb91080ba6077251011d25cae9338c4f51.
+sha256:1dc84a6f4e03b62a9540794a353c0b1e175a07e6afbcfed6441fe5f2d0f7d1ec.
 The accepted service sends this exact outgoing policy on every main and foreground
 subagent turn:
 
@@ -802,14 +821,28 @@ subagent turn:
   subagents.
 
 The service is the updated original `/home/user/Desktop/agent_service`, with release
-implementation commit b8271a608a8df9f35cf24d02ec3a3c62989f971d, not a copied
-launcher. Its own README and lock files are authoritative for Qwen Code source and
+implementation commit bc67dae720894cbbcd62122a2a9ff6b56b042168 and release-lock
+commit 7a329f61665a7126e3f8cd9a4e3b7a6b66a639bc, not a copied launcher. Its own
+README and lock files are authoritative for Qwen Code source and
 transformation, the five exact component images, package snapshot, tools, copied
 workspace envelope, typed Docker broker, socket relays, stream capture, effect
 journals, cancellation, bundles, and 127.0.0.1:8090 listener. Repeated real
 tool-and-image sessions proved prefix and multimodal caching through Qwen Code; the
 frontend compatibility cache counter is deliberately not trusted over vLLM's
 authoritative counters.
+
+The final coding pilot likewise measured the deployed pair rather than bypassing it.
+The harness submitted the same pinned SWE-rebench task to real production
+`POST /v1/agent/sessions`, waited on the production notification endpoint, required
+the service's durable terminal bundle, and invoked the immutable evaluator only on
+that captured post-session workspace. The normal `preserve_thinking=false` session
+resolved all 11 evaluator checks in 61 turns and 1,090,658 ms. An explicitly typed
+`true` diagnostic also resolved all 11 in 83 turns and 1,081,835 ms, while sending
+1,636,513 more aggregate input tokens through Qwen Code. This single sampled pair
+supports the normal policy's context efficiency but is not a population-level
+quality or latency claim. Exact production release IDs, input hashes, failure
+classification, bundle/patch hashes, and replay procedure are recorded in
+`/home/user/Desktop/agent_service/docs/production-swe-rebench-pilot.md`.
 
 Codex Responses and Anthropic Messages protocol surfaces are proven on the server,
 but neither creates another supported client mode. Host Claude Code remains entirely
