@@ -37,12 +37,12 @@ The deployment is complete and healthy. There is one supported mode:
 | Batching | One sequence; 2,048-token chunked prefill |
 | Listener | 127.0.0.1:8000 only |
 | Agent client | Qwen Code 0.21.12 at b965d5f8c24f48e65fb0b17c7d45f34ca4ce8f38 |
-| Agent image | sha256:b58feacef0a13333d19f701a00ef1774c82a94c19325dd38fc1b5f7ff439d66f |
-| Agent-service source | a6547dfbcbbc6615998da4fe90ab8e8dc40565fe |
-| Agent-service image | sha256:e8fb724cd200010a51944d9050dbab99a1b65b3bfb077304ae70b5bab01ba4f8 |
+| Agent image | sha256:156d67b5626b4d1418dbaa128cdc24bb91080ba6077251011d25cae9338c4f51 |
+| Agent-service source | b8271a608a8df9f35cf24d02ec3a3c62989f971d |
+| Agent-service image | sha256:7eb567207cd41a7f045073ea010e1a3f3fd14f9e118663dd69887560787b4e08 |
 | Agent-service listener | 127.0.0.1:8090 only |
-| Runtime profile | single-loopback-vision-k8v4-agent-v12 |
-| Runtime image | sha256:5d545d85950310cb09bebacba9083a242e8943c92669428eb23468d959f4f2d5 |
+| Runtime profile | socket-isolated-nonroot-vision-k8v4-agent-v13 |
+| Runtime image | sha256:587e8710c6630edd249f19b46837c12ebe5b5dcdc98486e215ac48a66644dc7f |
 
 This is not a text-only profile with an optional vision switch. It is not a
 one-million-token profile. It has no MTP, eager-mode, lower-quality image, alternate
@@ -67,16 +67,18 @@ From this directory:
 All three take no arguments. A supplied mode, port, model, or tuning option is an
 error.
 
-- start.sh starts the one profile, waits on the exact vLLM readiness log event, then
-  validates the complete live configuration before reporting success. Re-running it
-  validates the existing owned container rather than starting a duplicate.
+- start.sh starts the one profile and its two fixed relays, waits on the exact vLLM
+  and relay readiness events, then validates the complete live configuration before
+  reporting success. Re-running it validates the existing owned topology rather than
+  starting a duplicate.
 - status.sh validates host prerequisites, nine ordered vLLM transformations, every reviewed
   source and test file, the model manifest, image archive, image identity and labels,
   command and environment, mounts, runtime packages, API identity, listener,
   hardening, and live health. HEALTHY means all checks passed.
-- stop.sh removes only the exact project-labelled container and verifies that port
-  8000 is free. It never kills an unknown process or deletes weights, images, caches,
-  patches, or test evidence.
+- stop.sh removes only the exact project-labelled ingress, bridge, and vLLM
+  containers, removes only its owned socket, and verifies that port 8000 is free. It
+  never kills an unknown process or deletes weights, images, caches, patches, or test
+  evidence.
 
 Startup uses a single event-driven log-follow deadline, not sleep-based busy waiting.
 A failed startup prints the final logs, removes only the exact failed project
@@ -96,18 +98,23 @@ the pinned image ID. Restore verifies the pinned local archive before loading it
 ### Security and host boundary
 
 The machine is assumed exposed to the public Internet on every non-loopback
-interface. The service therefore binds vLLM itself to 127.0.0.1:8000 under Docker
-host networking and publishes no Docker ports. status.sh requires exactly one
-port-8000 listener and rejects any local address other than 127.0.0.1:8000.
-docker port has no mappings.
+interface. vLLM therefore runs under Docker `--network none` and binds only its own
+private namespace loopback at 127.0.0.1:8000. A minimal fixed bridge sharing that
+namespace connects the private loopback to one project Unix socket. A separately
+pinned minimal ingress is the only host-network component; it binds exactly host
+127.0.0.1:8000 and connects only to that socket. Neither component has a dynamic
+target or configuration language. status.sh validates both relays, the socket,
+namespace identities, exact listener, and the absence of Docker port mappings.
 
-The container uses cap-drop ALL, no-new-privileges, restart=no, a read-only root, a
-read-only model mount, and a dedicated labelled cache volume. The only durable
-writable runtime state is that exact versioned cache volume. Ephemeral writes are
-confined to three bounded tmpfs mounts: `/root` is 4 GiB and executable for runtime
-JIT scratch, `/tmp` is 2 GiB and executable for controlled temporary programs, and
-`/run` is 64 MiB and non-executable. status.sh validates the root flag, every exact
-tmpfs option, and both exact mounts. The model checkpoint is never modified.
+The vLLM container runs as `2000:0` with cap-drop ALL, no-new-privileges, restart=no,
+a read-only root, a read-only model mount, and one dedicated labelled cache volume.
+The only durable writable runtime state is that exact v13 volume mounted at
+`/home/vllm/.cache/vllm`, owned `2000:0` mode 0770; all CUDA, Triton, TorchInductor,
+FlashInfer, Hugging Face, XDG, and vLLM caches are rooted beneath it. `/tmp` is a
+bounded 2 GiB executable tmpfs and `/run` is a bounded 64 MiB non-executable tmpfs.
+There is no writable `/root` mount. status.sh validates the user, root flag, exact
+mount source/options/ownership, cache environment, and absence of extra mounts. The
+model checkpoint is never modified.
 
 Docker is the dependency-execution boundary. Tokenizers, protocol clients, build
 tools, Python libraries, and integration tests run in the serving container or in
@@ -116,6 +123,15 @@ host Python/npm packages, editing host application configuration, or touching th
 user's host Claude Code installation, credentials, history, sessions, or settings.
 Host interaction is limited to project files, Docker lifecycle control, and explicit
 hardware/listener diagnostics such as nvidia-smi and ss.
+
+For the paired agent, “temporary” is a lifecycle and ownership guarantee, not a
+blanket RAM-only requirement. Each session container, staged workspace, scratch
+tree, and stream is fresh and never adopted from stale state; cleanup occurs only
+after required evidence is captured and terminal state is durable. Failed capture
+retains raw evidence. Bounded tmpfs is used only where the locked runtime calls for
+it, while Docker images, release artifacts, terminal records, and result bundles are
+deliberately durable. Storage medium is not treated as a substitute for namespace,
+mount, retention, and teardown correctness.
 
 The observed unrelated wildcard listeners on other ports predate this project and
 are outside its scope.
@@ -175,6 +191,12 @@ requires `FlashInferCutlassNvFp4LinearKernel`. Across M=1, 17, and 129 it stayed
 BF16 matmul. This establishes implementation correctness to a tight tolerance; it
 does not erase the model-quality cost of four-bit weights.
 
+The exact M=1/17/129 relative-L2 results were 0.003161705, 0.003603501, and
+0.003809735; cosine similarities were 0.999995470, 0.999993920, and 0.999993205.
+Maximum absolute error was 1.0 in BF16 output units and the independent packed-weight
+mismatch was 0.000003040. The selector check is mandatory: a generic or silently
+different linear kernel is not accepted as equivalent evidence.
+
 That exhaustive comparison found a separate conversion defect in 161 language
 RMSNorm tensors. Qwen stores offset weights and applies gain `1 + w`; the conversion
 path had rounded `1 + w` to BF16 before subtracting one. The deployable snapshot
@@ -225,21 +247,21 @@ Pinned build inputs and products:
 |---|---|
 | Immutable base tag | qwen38-vllm:main-9df9b0b |
 | Immutable base ID | sha256:fa4a002a88b7043a1a89966dea8a500fe9696f84e75730d9da916f916048d401 |
-| Runtime tag | qwen38-vllm:qwen38-27b-nvfp4-k8v4-runtime-v12 |
-| Runtime ID | sha256:5d545d85950310cb09bebacba9083a242e8943c92669428eb23468d959f4f2d5 |
-| Offline archive | artifacts/qwen38-vllm-images-runtime-v12.tar |
-| Archive size | 8,557,665,792 bytes, mode 0600 |
-| Archive SHA-256 | 7738cf9654f033c529e73e32611c48d85f92684eab5c34f712d95e8e1648e128 |
-| Runtime Dockerfile SHA-256 | 01ee13d532707172ad91f0df686eac7854eb1d3f906abfd4117337dcbcb8e3ed |
+| Runtime tag | qwen38-vllm:qwen38-27b-nvfp4-k8v4-runtime-v13 |
+| Runtime ID | sha256:587e8710c6630edd249f19b46837c12ebe5b5dcdc98486e215ac48a66644dc7f |
+| Offline archive | artifacts/qwen38-vllm-images-runtime-v13.tar |
+| Archive size | 8,557,675,008 bytes, mode 0600 |
+| Archive SHA-256 | a80766d9560a419b9c051fc84d9beca1f1a3ac9ab508c99cf29d218b71bef43c |
+| Runtime Dockerfile SHA-256 | 17f72538ee71292e4cf0a2ce804e52a4d26413a034286590aef76008fbd4fcec |
 | Docker context allowlist SHA-256 | a15c81d0be5c474d9f0cd5e8b1d3f89b5eb7266ce60d45476069de9499f6b103 |
-| Build verifier SHA-256 | 908f8a28bbfddb8929d838dda730cff4c4306cea7006a809e1d07b3847adfdda |
-| Runtime validator SHA-256 | 7b3d6d526357cc75bcf851c5ce24ab1c59b9d0005471abdaac56b01aec84e1c1 |
-| Runtime lock SHA-256 | e9c5b532ec8bf28b18c3a66f491e0c5e5a63df5fd42f8b35755383e755ba9c3c |
+| Build verifier SHA-256 | d231f88f8f3e1418ff2fb68498762c2d48cfec91b881728116acd64cba1a84a9 |
+| Runtime validator SHA-256 | 6954f0a81c1be056e2ad882f68249aa34e24d29aa325aa05fe04e477f8ef3781 |
+| Runtime lock SHA-256 | 6498c8fd4ac52306fd79360c80911b6e01f2eb7b2f562b18299f08277cb4aced |
 
 The final runtime layer does no package resolution or installation. It is built with
 pull=false, network=none, provenance=false, an exact base ID, an allowlisted context,
 upstream installed-file hashes, final installed-file hashes, and build-time invariant
-tests. Two offline builds produced the identical v12 image ID.
+tests. Independent offline builds produced the identical v13 image ID.
 
 The local repository identity is Ronen Zyroff <rzyroff@gmail.com>. Global Git
 configuration is untouched. Large checkpoint trees, image archives, caches,
@@ -420,6 +442,16 @@ with maximum absolute difference 0.00381172 and minimum cosine 0.999998331. Eigh
 value codes fell on floating-point rounding boundaries; all were within the stated
 `2e-5` boundary interval and differed by only one code step. All stable codes, key
 bytes, scales, and minima matched exactly.
+The accepted case used D=256, 24 query heads, 4 KV heads, 37 tokens, the exact
+388-byte per-head slot, and 18 independently classified rounding-boundary choices.
+
+The numerical runner itself was also treated fail-closed. An initial invocation while
+the serving engine still owned the GPU failed with CUDA OOM; subsequent runner
+attempts exposed a read-only `/home/vllm/.triton` target and then incorrect uid/exec
+tmpfs contracts. None was reported as a numerical result. The accepted audit ran
+only after exclusive GPU ownership, as non-root, with its executable cache/scratch
+mount explicitly owned by that user. This distinction preserves the failed evidence
+without mislabelling an orchestration failure as a TurboQuant or NVFP4 defect.
 
 Vision adds the complete BF16 tower and transient encoder/MLP activations. vLLM logs
 21.34 GiB loaded model memory, 6.45 GiB KV reservation, 1,024 MiB reclaimable
@@ -429,11 +461,12 @@ encoding, then restores them exactly. It does not change cache capacity, text
 prefill size, graphs, weight precision, or image precision. Logs from maximum images
 show release/restoration and no OOM, retry, preemption, or fallback.
 
-On the exact final v12 live image:
+On the exact final v13 live image:
 
-- immediately after startup and before the full suite: 31,223 MiB used, 888 MiB free;
-- after the fifteen-image/full-native-boundary/cache/protocol/agent-client suite:
-  31,809 MiB used, 302 MiB free;
+- immediately before the fifteen-image maximum-quality run: 31,647 MiB used,
+  464 MiB free;
+- after the complete backend suite and current v8 agent acceptance: 31,797 MiB used,
+  314 MiB free;
 - total reported VRAM: 32,607 MiB.
 
 The post-suite reading is an observed residency point, not a claim that generation
@@ -472,6 +505,12 @@ interleaved image placements and generated-token continuation, even when the
 transport feature list was deliberately reversed. Complete derivations, test code,
 results, and the limits of the claim are in
 `docs/qwen38-context-turboquant-audit.md`.
+
+The accepted context probe covered all 64 language layers, 16 cached full-attention
+layers, 256-dimensional heads, 64 rotary dimensions, and interleaved sections
+`[11,11,10]`; its 99-token mixed prompt produced the expected continuation delta of
+-38. The same first-principles calculation yields exactly 6,509,559,808 raw K8V4
+bytes, or 6.0625 GiB, at 262,144 tokens.
 
 ### Exact image-quality contract
 
@@ -577,17 +616,17 @@ different jobs:
 - the multimodal processor cache keys exact image bytes with SHA-256 and reuses the
   image preprocessing/encoder input independently.
 
-The final v12 measured cold history had zero prefix and multimodal hits and
-6.0440-second TTFT.
-A warm OpenAI continuation hit 14,560 prefix tokens and the image cache. The
-equivalent warm Anthropic stream hit the same 14,560 prefix tokens, hit the image
-cache, and reached first token in 0.3331 seconds: 18.146 times faster. Changing image
-bytes caused zero multimodal hits. Moving identical bytes caused a multimodal hit but
-zero prefix hit, which proves the caches are not being conflated. That deliberately
-moved history is a negative cache/render control: because its text contradicts its
-media chronology, semantic OCR is not treated as an acceptance invariant. Every
-chronologically valid OpenAI/Anthropic stream and non-stream request still required
-and returned the exact pixel-only value.
+The final v13 text-history probe sent a 65,529-token cold prompt with zero prefix
+hits, reused 64,480 tokens on the warm continuation, and reused zero tokens for an
+equivalent fresh-salt control. Warm TTFT was 32.233 times faster than cold. The final
+chronological image-history probe then hit 14,560 prefix tokens plus the multimodal
+cache and improved TTFT by 17.089 times. Changing image bytes caused zero
+multimodal hits. Moving identical bytes caused a multimodal hit but zero prefix hit,
+which proves the caches are not being conflated. That deliberately moved history is
+a negative cache/render control: because its text contradicts its media chronology,
+semantic OCR is not treated as an acceptance invariant. Every chronologically valid
+OpenAI/Anthropic stream and non-stream request still required and returned the exact
+pixel-only value.
 
 This cache behavior does not depend on preserving old hidden reasoning. Omitting
 completed hidden traces stabilizes the durable message prefix and gives the main
@@ -636,17 +675,18 @@ The installed-image focused suites passed:
 - 382 Qwen streaming/replay cases;
 - vision workspace, image-contract, and vision-MLP units during the immutable build.
 
-### Validation record for v12
+### Validation record for v13 and paired agent v8
 
 The source/image invariants and numerical results below were obtained from the exact
-pinned v12 image. The protocol, cache, native-boundary, and full-image tests are
+pinned v13 image. The protocol, cache, native-boundary, and full-image tests are
 rerun after every runtime-profile change before that image is accepted:
 
 1. Runtime source reconstruction and immutable offline build: pass; two builds
    produced the same ID.
 2. Full corrected model/tokenizer/template/processor manifest and exact 161-range
    official-norm repair proof: pass.
-3. Exact loopback-only listener and no published Docker ports: pass.
+3. Exact network-none vLLM namespace, fixed bridge/Unix socket, host-loopback-only
+   ingress, and no published Docker ports: pass.
 4. MTP/speculation absent, CPU offload zero, CUDA graphs retained: pass.
 5. Exact xhigh defaults, high/max alias identity, low/disabled rejection: pass.
 6. Default preserve_thinking=false and explicit diagnostic restoration: pass; omission
@@ -673,43 +713,41 @@ rerun after every runtime-profile change before that image is accepted:
     BF16 matmul at M=1/17/129: pass; required FlashInfer-CUTLASS selector.
 19. Exact text/image MRoPE implementation versus independent Transformers 5.15
     semantics and continuation positions: pass.
-20. Pinned Qwen Code archive plus exact semantic reconstruction: pass; sixteen
-    focused suites and 2,326 tests; two builds produced the identical agent image ID.
-21. Real Qwen Code text-read, original-PNG vision, shell, and final-response tool
-    loop: pass twice against a hostile configuration workspace; ordinary QWEN.md and
+20. Pinned Qwen Code archive plus exact semantic reconstruction: pass; exactly 61
+    changed/new files and 2,427 assertions across 23 focused test files; the full
+    no-cache build reproduced agent image
+    sha256:156d67b5626b4d1418dbaa128cdc24bb91080ba6077251011d25cae9338c4f51.
+21. All pinned Rust component tests and clean release images: pass; 42 service,
+    8 broker, 3 relay, 2 capture, and 2 agent-exec tests. The same no-cache release
+    exactly reproduced the locked relay, capture, broker, and service image IDs.
+22. Real Qwen Code hostile-workspace text, full-resolution PNG vision, PTY shell,
+    write/read, and final response: pass in seven turns. Ordinary QWEN.md and
     AGENTS.md guidance remained active while `.env`, MCP, hooks, skills, rules,
-    memory, output language, workspace settings, and slash commands remained inert.
-22. Qwen Code image chronology and caching: pass; the first four-turn run recorded
-    35,360 prefix-hit tokens and one of two multimodal hits, while the repeated run
-    recorded 45,760 prefix-hit tokens and two of two multimodal hits. Mean backend
-    TTFT fell from 1.129958153 to 0.279406309 seconds, 4.044140 times faster.
-23. Strict client image rejection and foreground subagent: pass; JPEG failed with a
-    typed missing-PNG-signature result and no conversion/retry; one Explore subagent
-    returned through correlated parent/child tool events and was verified by the
-    main thread.
-24. Live stack isolation and lifecycle: pass; backend root and agent roots read-only,
-    backend JIT/temp writes confined to exact bounded tmpfs, only the versioned vLLM
-    cache durable and writable, only loopback, no route/DNS/GPU/published ports in
-    agent sessions, sealed model proxy only, cap-drop-all, no-new-privileges, exact
-    readiness-boundary cancellation with exit 143, durable partial bundle, and zero
-    owned session-container leftovers.
-25. Final paired-stack smoke at service commit
-    b942b995043eea663bea19349fd82daac258bdee: pass; the pinned Qwen Code
-    0.21.12 client completed an exact native file-tool round trip, then launched and
-    awaited one foreground Explore subagent before independent main-thread and
-    byte-exact output verification. Both writes remained inside staged workspace
-    copies.
-26. Unlicense/reproducibility refresh at service commit
-    a6547dfbcbbc6615998da4fe90ab8e8dc40565fe: pass. Two independent no-cache agent
-    builds produced exact image ID
-    sha256:b58feacef0a13333d19f701a00ef1774c82a94c19325dd38fc1b5f7ff439d66f
-    after all sixteen focused Qwen Code suites and 2,326 tests; independent cached
-    and no-cache service builds produced exact image ID
-    sha256:e8fb724cd200010a51944d9050dbab99a1b65b3bfb077304ae70b5bab01ba4f8
-    after all fourteen Rust tests. The deployed paired stack passed its complete
-    loopback/image/source contract and a fresh five-turn native file-tool smoke;
-    the durable bundle contained the exact requested output, an unchanged input,
-    zero teardown diagnostics, and no owned session-container leftovers.
+    memory, output language, workspace settings, and slash commands remained inert;
+    the model read exact code `VISION_AGENT_PTY_4827` and the shell emitted exact
+    marker `QWEN38_AGENT_ISOLATION_OK`.
+23. Locked-mode authentication revalidation: pass. An earlier candidate exposed an
+    upstream late `.env` load after tools; the accepted narrow source repair keeps
+    environment/workspace loading disabled on every later auth validation. The full
+    source matrix and a fresh hostile live session proved the marker absent.
+24. Real Qwen Code prefix and image caching: pass. The final v8 agent acceptance
+    added 296,939 prompt tokens; vLLM recorded 241,280 local prefix hits, 55,659
+    locally computed tokens, and 3 multimodal-cache hits across 20 requests.
+25. PTY and foreground subagent: pass. A separate real PTY session produced exact
+    shell/file output. One Explore subagent returned through correlated parent/child
+    tool events, used native list/read plus a shell byte check, and was independently
+    verified by the main thread. Explore retained writable conversion/scratch tools;
+    its trusted effect journal proved zero workspace/artifact effects for that task.
+26. Live stack isolation and lifecycle: pass. vLLM and the service are network-none;
+    only two minimal fixed ingress relays use host networking. The service has no raw
+    Docker socket; a network-none typed broker is its sole holder. Backend and agent
+    roots are read-only, agents have no route/DNS/GPU/published port, model access is
+    through the exact socket relay, session output is unmounted from the agent, and
+    all components are capability-free with no-new-privileges.
+27. Readiness-boundary cancellation: pass. The request acknowledged in 785 ms and
+    terminated in 1,863 ms with zero turns, exit 143, an empty event stream, a
+    complete nine-file bundle, no fabricated success, and no session-container
+    leftovers.
 
 The supported status currently reports:
 
@@ -744,7 +782,7 @@ b965d5f8c24f48e65fb0b17c7d45f34ca4ce8f38. The official release archive is pinned
 by SHA-256 61beddff8bde1dd2654c8714f927b46ab7cf9822b8561d11e3a2b8e085b5e745,
 and the landmark-aware source transformation is independently pinned. It runs only
 inside immutable agent image
-sha256:b58feacef0a13333d19f701a00ef1774c82a94c19325dd38fc1b5f7ff439d66f.
+sha256:156d67b5626b4d1418dbaa128cdc24bb91080ba6077251011d25cae9338c4f51.
 The accepted service sends this exact outgoing policy on every main and foreground
 subagent turn:
 
@@ -763,14 +801,15 @@ subagent turn:
 - one long main thread with late exact compaction and only sequential foreground
   subagents.
 
-The service is the updated original `/home/user/Desktop/agent_service` at commit
-a6547dfbcbbc6615998da4fe90ab8e8dc40565fe, not a copied launcher. Its own README and
-lock file are authoritative for Qwen Code source/patch,
-agent/service images, package snapshot, exact tools, copied-workspace envelope,
-stream-event validation, cancellation, bundles, and 127.0.0.1:8090 listener. Repeated
-real tool-and-image sessions proved prefix and multimodal caching through Qwen Code;
-the frontend's compatibility cache-read counter remained zero and is deliberately
-not trusted over vLLM's authoritative counters.
+The service is the updated original `/home/user/Desktop/agent_service`, with release
+implementation commit b8271a608a8df9f35cf24d02ec3a3c62989f971d, not a copied
+launcher. Its own README and lock files are authoritative for Qwen Code source and
+transformation, the five exact component images, package snapshot, tools, copied
+workspace envelope, typed Docker broker, socket relays, stream capture, effect
+journals, cancellation, bundles, and 127.0.0.1:8090 listener. Repeated real
+tool-and-image sessions proved prefix and multimodal caching through Qwen Code; the
+frontend compatibility cache counter is deliberately not trusted over vLLM's
+authoritative counters.
 
 Codex Responses and Anthropic Messages protocol surfaces are proven on the server,
 but neither creates another supported client mode. Host Claude Code remains entirely
