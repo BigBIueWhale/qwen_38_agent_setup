@@ -53,3 +53,6 @@ Thumbs.db
 *.swo
 .idea/
 .vscode/
+
+# Claude Code session-local state.
+/.claude/
