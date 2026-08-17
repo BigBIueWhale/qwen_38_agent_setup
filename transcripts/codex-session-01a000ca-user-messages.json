@@ -1,12 +1,12 @@
 {
-  "description": "All user-authored messages (and only user messages), in chronological order, from a Codex CLI session in this project.",
+  "description": "All user-authored messages (and only user messages), in chronological order, directing this project: first from the Codex CLI session, then continued directives from the successor session.",
   "session_id": "01a000ca-67f0-7643-a47a-b792468a8ec1",
   "source_file": "/home/user/.codex/sessions/2026/08/14/rollout-2026-08-14T18-01-00-01a000ca-67f0-7643-a47a-b792468a8ec1.jsonl",
   "session_started": "2026-08-14T15:01:00.016Z",
   "session_cwd": "/home/user/Desktop/Qwen_best_model_ever",
   "exported_at": "2026-08-17T19:47:53Z",
-  "notes": "Extracted from event_msg/user_message records. Synthetic user-role records injected by Codex (environment_context, internal goal-reminder context) are excluded. No messages carried image/audio attachments.",
-  "message_count": 152,
+  "notes": "Extracted from event_msg/user_message records. Synthetic user-role records injected by Codex (environment_context, internal goal-reminder context) are excluded. No messages carried image/audio attachments. Messages with index >= 153 are later user directives appended verbatim by instruction; source_file describes indexes 1-152 only.",
+  "message_count": 153,
   "messages": [
     {
       "index": 1,
@@ -767,6 +767,11 @@
       "index": 152,
       "timestamp": "2026-08-17T19:13:50.151Z",
       "text": "Remind me why are wee limiting the size of the zip file being uploaded?"
+    },
+    {
+      "index": 153,
+      "timestamp": "2026-08-17T20:27:41Z",
+      "text": "hey, more important than that- the API is stupid because it's http. We shouldn't have chosen http. Please fix that mistake without leaving behind leftovers. Why do I say that? It was never legitimate to \"send\" the zip file via \"local file\". that's literally brain-dead. We need to design the API with a TCP baseed protocol that can actually send the full zip file. Maybe that's http, but definitely now our current API. Please fix now, and all usages as well- to our extremely high standards of course. Oh, and add this very message to the json that the ralph loop is all about."
     }
   ]
 }
