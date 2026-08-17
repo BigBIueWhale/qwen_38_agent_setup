@@ -513,6 +513,38 @@ layers, 256-dimensional heads, 64 rotary dimensions, and interleaved sections
 -38. The same first-principles calculation yields exactly 6,509,559,808 raw K8V4
 bytes, or 6.0625 GiB, at 262,144 tokens.
 
+### Final deferred audit: quantized-weight context correctness
+
+After every other service, lifecycle, benchmark, documentation, release, and
+deployment task is complete, the final task is a mathematical end-to-end audit of
+how this deployed mixed NVFP4/FP8 checkpoint handles context versus the exact
+official BF16 reference at revision
+`1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0`. This item is deliberately recorded as
+pending; the existing tensor reconstruction, isolated production-matmul, MRoPE, and
+TurboQuant tests are necessary evidence, but they do not by themselves establish
+end-to-end contextual equivalence.
+
+The audit must use identical real rendered/tokenized inputs and compare matched
+BF16-reference and deployed executions through multimodal token placement and
+MRoPE, chunked and unchunked prefill, every Gated DeltaNet recurrent state, every
+full-attention layer, K/V creation before cache compression, K8V4 storage and
+reconstruction, continuation hidden states/logits, and controlled long-context
+retrieval at multiple positions up to the native 262,144-token boundary. It must
+separate at least three causal conditions rather than report one blended score:
+
+1. official BF16 weights with BF16 K/V state as the reference;
+2. deployed mixed NVFP4/FP8 weights with BF16 K/V state, isolating weight
+   quantization and conversion error;
+3. the same deployed weights with TurboQuant K8V4, isolating the additional cache
+   error and any interaction with position or accumulated context length.
+
+The report must derive tolerances before observing results, include per-layer and
+end-to-end error growth rather than only aggregate cosine similarity, test text and
+chronologically interleaved full-quality images, and distinguish implementation
+correctness from model-quality equivalence. Any unavailable BF16 execution path,
+OOM, kernel substitution, shortened-context proxy, or incomparable rendering is a
+failed/incomplete audit condition, not permission to silently weaken the claim.
+
 ### Exact image-quality contract
 
 Qwen3.8-27B is natively trained and post-trained as a vision-language model. Alibaba
