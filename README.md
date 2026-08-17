@@ -881,24 +881,32 @@ but neither creates another supported client mode. Host Claude Code remains enti
 untouched. There is exactly one accepted local-agent behavior: the pinned Qwen Code
 container through the isolated service into this pinned vLLM backend.
 
-### Exact software/hardware compatibility record
+### Software/hardware record and the host contract
 
-The validated host/runtime record is:
+Host requirements are functional, not identity pins: the invoked tools must
+exist, Docker must respond with its NVIDIA runtime and the
+apparmor/seccomp/cgroupns isolation features active, and exactly one GPU with
+at least 32,607 MiB — the calibration floor of the locked VRAM/KV budget —
+must be present. Exact host software versions, binary hashes, and GPU/driver
+identity are deliberately not asserted; pinning them tied the deployment to
+one specific computer without making inference any more correct.
 
-- Bash 5.2.21(1)-release; Git 2.43.0; coreutils 9.4; iproute2 6.1.0;
-- Docker client/server 29.7.2; NVIDIA Container Toolkit 1.19.1;
-- NVIDIA driver 595.71.05; RTX 5090; 32,607 MiB; compute capability 12.0;
-- Ubuntu 24.04; glibc 2.39-0ubuntu8.8; container CUDA 13.0.3;
-- Python 3.12.3;
+Everything inside the pinned images remains exact. The container runtime
+record is:
+
+- container CUDA 13.0.3; Python 3.12.3;
 - vLLM 0.27.2rc1.dev106+g9df9b0b0a;
-- PyTorch 2.13.0+cu130 with CUDA 13.0;
+- PyTorch 2.13.0+cu130 with CUDA 13.0 (compute capability 12.0 kernels);
 - Transformers 5.15.0; Tokenizers 0.22.2; Safetensors 0.8.0;
 - Compressed Tensors 0.17.0; FlashInfer 0.6.16.post3;
 - Triton 3.7.1; NumPy 2.3.5; FastAPI 0.136.3; Uvicorn 0.52.3.
 
-An update to any locked component requires a new explicit profile/image version and
-the complete relevant acceptance suite. A version string in prose is not a pin; the
-immutable image IDs, hashes, labels, source reconstruction, and live checks are.
+The environment this profile was originally validated on ran Ubuntu 24.04
+with an RTX 5090 on driver 595.71.05 and Docker 29.7.2; that is a historical
+observation, not a gate. An update to any locked container component still
+requires a new explicit profile/image version and the complete relevant
+acceptance suite. A version string in prose is not a pin; the immutable
+image IDs, hashes, labels, source reconstruction, and live checks are.
 
 Known nonfatal log noise is documented rather than hidden:
 

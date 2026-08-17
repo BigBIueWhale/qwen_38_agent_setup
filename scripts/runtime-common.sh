@@ -74,55 +74,26 @@ capture_child_wait_status() {
 }
 
 check_host_prerequisites() {
-  local command_name docker_client docker_server toolkit_line toolkit_version
-  local gpu_report runtimes git_line sha256sum_line ss_line
-  for command_name in docker dockerd git nvidia-container-cli nvidia-smi sha256sum ss; do
+  # Functional requirements only. The tools this deployment actually invokes
+  # must exist, Docker must respond with its NVIDIA runtime configured, the
+  # container-isolation features the profile depends on must be active, and
+  # exactly one GPU with at least the memory the locked KV/VRAM budget was
+  # calibrated for must be present. Exact host software versions, binary
+  # hashes, and GPU/driver identity are deliberately not asserted: they tie
+  # the deployment to one specific computer without making inference any
+  # more correct. Everything inside the pinned images remains exact.
+  local command_name docker_server runtimes
+  local gpu_report gpu_count gpu_memory
+  for command_name in docker git nvidia-smi sha256sum ss; do
     require_command "${command_name}"
   done
 
-  if [[ "${BASH_VERSION}" != "${EXPECTED_BASH_VERSION}" ]]; then
-    die "Bash version does not match the validated host tools." \
-      "Expected: ${EXPECTED_BASH_VERSION}" \
-      "Found:    ${BASH_VERSION}"
-  fi
-  IFS= read -r git_line < <(git --version)
-  IFS= read -r sha256sum_line < <(sha256sum --version)
-  IFS= read -r ss_line < <(ss --version 2>&1)
-  if [[ "${git_line}" != "${EXPECTED_GIT_VERSION_REPORT}" || \
-        "${sha256sum_line}" != "${EXPECTED_SHA256SUM_VERSION_REPORT}" || \
-        "${ss_line}" != "${EXPECTED_SS_VERSION_REPORT}" ]]; then
-    die "Host command versions do not match the validated lock." \
-      "Expected git:       ${EXPECTED_GIT_VERSION_REPORT}" \
-      "Found git:          ${git_line}" \
-      "Expected sha256sum: ${EXPECTED_SHA256SUM_VERSION_REPORT}" \
-      "Found sha256sum:    ${sha256sum_line}" \
-      "Expected ss:        ${EXPECTED_SS_VERSION_REPORT}" \
-      "Found ss:           ${ss_line}"
-  fi
-
-  docker_client="$(docker version --format '{{.Client.Version}}')"
-  docker_server="$(docker version --format '{{.Server.Version}}')"
-  if [[ "${docker_client}" != "${EXPECTED_DOCKER_VERSION}" || \
-        "${docker_server}" != "${EXPECTED_DOCKER_VERSION}" ]]; then
-    die "Docker version does not match the validated profile." \
-      "Expected client/server: ${EXPECTED_DOCKER_VERSION}/${EXPECTED_DOCKER_VERSION}" \
-      "Found client/server:    ${docker_client}/${docker_server}"
-  fi
-  require_equal "dockerd path" "$(command -v dockerd)" "${EXPECTED_DOCKERD_PATH}"
-  require_equal "dockerd binary SHA256" \
-    "$(sha256sum "${EXPECTED_DOCKERD_PATH}" | awk '{print $1}')" \
-    "${EXPECTED_DOCKERD_SHA256}"
+  docker_server="$(docker version --format '{{.Server.Version}}')" ||
+    die "Docker server is not responding."
+  [[ -n "${docker_server}" ]] || die "Docker server reported an empty version."
   require_equal "Docker security options" \
     "$(docker info --format '{{json .SecurityOptions}}')" \
     "${EXPECTED_DOCKER_SECURITY_OPTIONS}"
-
-  IFS= read -r toolkit_line < <(nvidia-container-cli --version)
-  toolkit_version="${toolkit_line#cli-version: }"
-  if [[ "${toolkit_version}" != "${EXPECTED_NVIDIA_CONTAINER_CLI_VERSION}" ]]; then
-    die "NVIDIA Container Toolkit version does not match." \
-      "Expected: ${EXPECTED_NVIDIA_CONTAINER_CLI_VERSION}" \
-      "Found:    ${toolkit_version}"
-  fi
 
   runtimes="$(docker info --format '{{json .Runtimes}}')"
   if [[ "${runtimes}" != *'"nvidia"'* ]]; then
@@ -131,14 +102,17 @@ check_host_prerequisites() {
 
   gpu_report="$(
     nvidia-smi \
-      --query-gpu=name,memory.total,driver_version \
+      --query-gpu=memory.total \
       --format=csv,noheader,nounits
   )"
-  if [[ "${gpu_report}" != \
-        "${EXPECTED_GPU_NAME}, ${EXPECTED_GPU_MEMORY_MIB}, ${EXPECTED_DRIVER_VERSION}" ]]; then
-    die "GPU or NVIDIA driver does not match the validated profile." \
-      "Expected: ${EXPECTED_GPU_NAME}, ${EXPECTED_GPU_MEMORY_MIB}, ${EXPECTED_DRIVER_VERSION}" \
-      "Found:    ${gpu_report}"
+  gpu_count="$(wc -l <<<"${gpu_report}")"
+  require_equal "GPU count" "${gpu_count}" "1"
+  gpu_memory="${gpu_report//[[:space:]]/}"
+  [[ "${gpu_memory}" =~ ^[0-9]+$ ]] || die "nvidia-smi reported a non-numeric GPU memory total: ${gpu_report}"
+  if (( gpu_memory < MINIMUM_GPU_MEMORY_MIB )); then
+    die "GPU memory is below the locked VRAM budget's calibration floor." \
+      "Required: at least ${MINIMUM_GPU_MEMORY_MIB} MiB" \
+      "Found:    ${gpu_memory} MiB"
   fi
 }
 

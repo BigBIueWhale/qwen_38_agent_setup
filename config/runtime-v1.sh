@@ -131,19 +131,15 @@ readonly SOURCE_DATE_EPOCH="1786751423"
 readonly RUNTIME_DOCKERFILE_SHA256="17f72538ee71292e4cf0a2ce804e52a4d26413a034286590aef76008fbd4fcec"
 readonly DOCKERIGNORE_SHA256="a15c81d0be5c474d9f0cd5e8b1d3f89b5eb7266ce60d45476069de9499f6b103"
 
-readonly EXPECTED_DOCKER_VERSION="29.7.2"
-readonly EXPECTED_DOCKERD_PATH="/usr/bin/dockerd"
-readonly EXPECTED_DOCKERD_SHA256="e14a01198315d279c8615db9aa7edeb755caf46db925dba46f80c92115093c01"
+# Functional host contract only. Exact host software versions, binary
+# hashes, and GPU/driver identity are deliberately not pinned: they tie the
+# deployment to one specific computer without making inference any more
+# correct. The isolation features below and the GPU-memory calibration floor
+# for the locked VRAM budget are the properties the profile actually
+# depends on; everything inside the pinned images remains exact.
 readonly EXPECTED_DOCKER_SECURITY_OPTIONS='["name=apparmor","name=seccomp,profile=builtin","name=cgroupns"]'
 readonly EXPECTED_CONTAINER_APPARMOR_PROFILE="docker-default"
-readonly EXPECTED_NVIDIA_CONTAINER_CLI_VERSION="1.19.1"
-readonly EXPECTED_GPU_NAME="NVIDIA GeForce RTX 5090"
-readonly EXPECTED_GPU_MEMORY_MIB="32607"
-readonly EXPECTED_DRIVER_VERSION="595.71.05"
-readonly EXPECTED_BASH_VERSION="5.2.21(1)-release"
-readonly EXPECTED_GIT_VERSION_REPORT="git version 2.43.0"
-readonly EXPECTED_SHA256SUM_VERSION_REPORT="sha256sum (GNU coreutils) 9.4"
-readonly EXPECTED_SS_VERSION_REPORT="ss utility, iproute2-6.1.0"
+readonly MINIMUM_GPU_MEMORY_MIB="32607"
 
 readonly LISTEN_HOST="127.0.0.1"
 readonly LISTEN_PORT="8000"
