@@ -352,7 +352,10 @@ wait_for_relay_event() {
   # The pipeline must itself be conditional.  An inherited ERR trap fires for
   # a no-match inside grep even when pipefail is disabled, before PIPESTATUS can
   # otherwise be inspected and the relay logs reported.
-  if timeout --foreground 30s docker logs --follow --since 0s \
+  # Follow from the container's start, never from attach time: a relay that
+  # prints readiness before this pipeline attaches must still be seen, or
+  # the gate races against relay startup speed.
+  if timeout --foreground 30s docker logs --follow \
       "${relay_name}" 2>&1 |
       grep --fixed-strings --line-regexp --max-count=1 \
         "${event}" >/dev/null; then
