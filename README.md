@@ -38,9 +38,9 @@ The deployment is complete and healthy. There is one supported mode:
 | Listener | 127.0.0.1:8000 only |
 | Agent client | Qwen Code 0.21.12 at b965d5f8c24f48e65fb0b17c7d45f34ca4ce8f38 |
 | Agent image | sha256:1dc84a6f4e03b62a9540794a353c0b1e175a07e6afbcfed6441fe5f2d0f7d1ec |
-| Agent-service implementation | 66558292cda494d3b88b5af853795b3d66599cab |
-| Agent-service release lock | eff85a58bcb0e29c1234b3b5e4122a257ee4d93d |
-| Agent-service image | sha256:15cfc69a553e7ff71da209d1c23f7f4a1dd80019355250ed13b460acedd8dbea |
+| Agent-service implementation | a0ddc3dc815b658513c62661d650cf540ba869e8 |
+| Agent-service release lock | a8e5a63402f1c443a288d92b65e3fcdcfc9d7211 |
+| Agent-service image | sha256:0f3b8096b8c18207acd2483d046de20efce31a226ebd8fe6f8ff2e98e9463b6e |
 | Agent-service listener | 127.0.0.1:8090 only |
 | Runtime profile | socket-isolated-nonroot-vision-k8v4-agent-v13 |
 | Runtime image | sha256:587e8710c6630edd249f19b46837c12ebe5b5dcdc98486e215ac48a66644dc7f |
@@ -853,8 +853,8 @@ subagent turn:
   subagents.
 
 The service is the updated original `/home/user/Desktop/agent_service`, with release
-implementation commit 66558292cda494d3b88b5af853795b3d66599cab and release-lock
-commit eff85a58bcb0e29c1234b3b5e4122a257ee4d93d, not a copied launcher. Its
+implementation commit a0ddc3dc815b658513c62661d650cf540ba869e8 and release-lock
+commit a8e5a63402f1c443a288d92b65e3fcdcfc9d7211, not a copied launcher. Its
 current release carries the workspace over the connection as a hash-committed
 zip (no shared-filesystem input paths and no host input mount), returns the
 result bundle over the connection with its own SHA-256 commitment, runs
