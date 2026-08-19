@@ -169,8 +169,8 @@ check_pinned_build_inputs() {
     die "The deployment-input manifest is missing or is not a regular non-symlink file." \
       "Expected: ${DEPLOYMENT_INPUT_MANIFEST}"
   fi
-  if [[ "$(wc -l <"${DEPLOYMENT_INPUT_MANIFEST}")" != "68" ]]; then
-    die "The deployment-input manifest does not contain the exact 68-file allowlist." \
+  if [[ "$(wc -l <"${DEPLOYMENT_INPUT_MANIFEST}")" != "69" ]]; then
+    die "The deployment-input manifest does not contain the exact 69-file allowlist." \
       "Manifest: ${DEPLOYMENT_INPUT_MANIFEST}"
   fi
   "${COMMON_SCRIPT_DIR}/build-vllm.sh" check
