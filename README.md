@@ -37,7 +37,7 @@ The deployment is complete and healthy. There is one supported mode:
 | Batching | One sequence; 2,048-token chunked prefill |
 | Listener | 127.0.0.1:8000 only |
 | Agent client | Qwen Code 0.21.12 at b965d5f8c24f48e65fb0b17c7d45f34ca4ce8f38 |
-| Agent image | sha256:1dc84a6f4e03b62a9540794a353c0b1e175a07e6afbcfed6441fe5f2d0f7d1ec |
+| Agent image | sha256:9393fe2c53b34ba220ef86a930ab6ea2c6c7ad23a439af85f6c98cc446fe2f15 |
 | Agent-service implementation | a0ddc3dc815b658513c62661d650cf540ba869e8 |
 | Agent-service release lock | a8e5a63402f1c443a288d92b65e3fcdcfc9d7211 |
 | Agent-service image | sha256:0f3b8096b8c18207acd2483d046de20efce31a226ebd8fe6f8ff2e98e9463b6e |
@@ -513,6 +513,29 @@ layers, 256-dimensional heads, 64 rotary dimensions, and interleaved sections
 -38. The same first-principles calculation yields exactly 6,509,559,808 raw K8V4
 bytes, or 6.0625 GiB, at 262,144 tokens.
 
+### Verified: the norm repair restores exactly the official values
+
+The offset-RMSNorm damage mechanism and its repair are now empirically
+proven, not just derived. For every sampled repaired tensor, every element
+of the pinned Unsloth export satisfies
+
+    bf16(1 + w_official) - 1 == w_unsloth
+
+with a 100.0000% match — the export's norms are exactly the official norms
+passed through the exporter's `1 + w` BF16 round trip, and nothing else.
+Measured damage in the export this repair reverses: only 6–49% of elements
+per tensor survived identical, up to 3.9% of layer-0 input-norm weights
+were zeroed outright (|w| below the 2^-8 grid), and per-element error
+reached 0.0078 against |w| medians as low as 0.033. Because the corrected
+snapshot byte-restores the official ranges (and its manifest proves nothing
+else changed), the repair cannot damage the model: for these 161 tensors,
+corrected == official ground truth. The one residual assumption, stated
+honestly: the 161-name set covers every tensor the exporter's offset
+context touched; the set matches the architecture exactly (128 layer norms,
+the final norm, and q/k norms on the 16 full-attention layers), and every
+name was cross-verified against both checkpoints' indices with identical
+shapes and dtypes.
+
 ### Final deferred audit: quantized-weight context correctness
 
 After every other service, lifecycle, benchmark, documentation, release, and
@@ -749,7 +772,7 @@ rerun after every runtime-profile change before that image is accepted:
 20. Pinned Qwen Code archive plus exact semantic reconstruction: pass; exactly 61
     changed/new files and 2,427 assertions across 23 focused test files; the full
     no-cache build reproduced agent image
-    sha256:1dc84a6f4e03b62a9540794a353c0b1e175a07e6afbcfed6441fe5f2d0f7d1ec.
+    sha256:9393fe2c53b34ba220ef86a930ab6ea2c6c7ad23a439af85f6c98cc446fe2f15.
 21. All pinned Rust component tests and clean release images: pass; 44 service,
     9 broker, 3 relay, 2 capture, and 2 agent-exec tests. The same no-cache release
     exactly reproduced the locked relay, capture, broker, and service image IDs.
@@ -833,7 +856,7 @@ b965d5f8c24f48e65fb0b17c7d45f34ca4ce8f38. The official release archive is pinned
 by SHA-256 61beddff8bde1dd2654c8714f927b46ab7cf9822b8561d11e3a2b8e085b5e745,
 and the landmark-aware source transformation is independently pinned. It runs only
 inside immutable agent image
-sha256:1dc84a6f4e03b62a9540794a353c0b1e175a07e6afbcfed6441fe5f2d0f7d1ec.
+sha256:9393fe2c53b34ba220ef86a930ab6ea2c6c7ad23a439af85f6c98cc446fe2f15.
 The accepted service sends this exact outgoing policy on every main and foreground
 subagent turn:
 
