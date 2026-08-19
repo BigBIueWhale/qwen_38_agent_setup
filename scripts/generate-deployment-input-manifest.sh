@@ -4,7 +4,7 @@ set -Eeuo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
 readonly PROJECT_DIR
-readonly EXPECTED_INPUT_COUNT="68"
+readonly EXPECTED_INPUT_COUNT="69"
 
 if (($# != 0)); then
   printf 'ERROR: no arguments are supported. Usage: ./scripts/generate-deployment-input-manifest.sh\n' >&2

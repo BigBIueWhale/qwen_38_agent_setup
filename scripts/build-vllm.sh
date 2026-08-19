@@ -77,8 +77,8 @@ if [[ ! -f "${DEPLOYMENT_INPUT_MANIFEST}" || -L "${DEPLOYMENT_INPUT_MANIFEST}" ]
   echo "Deployment-input manifest is missing or is not a regular non-symlink file." >&2
   exit 1
 fi
-if [[ "$(wc -l <"${DEPLOYMENT_INPUT_MANIFEST}")" != "68" ]]; then
-  echo "Deployment-input manifest must contain exactly 68 hashed files." >&2
+if [[ "$(wc -l <"${DEPLOYMENT_INPUT_MANIFEST}")" != "69" ]]; then
+  echo "Deployment-input manifest must contain exactly 69 hashed files." >&2
   exit 1
 fi
 (
