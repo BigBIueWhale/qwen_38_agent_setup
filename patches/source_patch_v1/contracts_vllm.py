@@ -934,6 +934,49 @@ def _validate_numerical_audits_after(state: State) -> None:
         _require(needle in source, f"{label}: numerical oracle lacks {needle!r}")
 
 
+def _validate_tq_guards_before(state: State) -> None:
+    label = "turboquant fail-closed guards precondition"
+    store = "vllm/v1/attention/ops/triton_turboquant_store.py"
+    decode = "vllm/v1/attention/ops/triton_turboquant_decode.py"
+    backend = "vllm/v1/attention/backends/turboquant_attn.py"
+    forbid_text(state, store, "meta_ok", label=label)
+    forbid_text(state, decode, "Refusing a silent fp8e4b15", label=label)
+    forbid_text(
+        state, backend, "received non-finite K/V activations", label=label
+    )
+
+
+def _validate_tq_guards_after(state: State) -> None:
+    label = "turboquant fail-closed guards result"
+    store = "vllm/v1/attention/ops/triton_turboquant_store.py"
+    decode = "vllm/v1/attention/ops/triton_turboquant_decode.py"
+    backend = "vllm/v1/attention/backends/turboquant_attn.py"
+    # Insane value vectors poison both metadata fields with propagating
+    # NaN instead of laundering into finite codes; the predicate covers
+    # NaN inputs and fp16 metadata overflow and is bit-neutral otherwise.
+    require_text(
+        state, store, "sc_f16 = tl.where(meta_ok, v_scale, poison)", label=label
+    )
+    require_text(
+        state, store, "zr_f16 = tl.where(meta_ok, val_min, poison)", label=label
+    )
+    require_text(
+        state, store, "((val_max - val_min) < 982560.0)", label=label
+    )
+    # The stored-key byte contract is E4M3: SM < 8.9 refuses instead of a
+    # silent fp8e4b15 format switch.
+    require_text(state, decode, "Refusing a silent fp8e4b15", label=label)
+    forbid_text(state, decode, "1 if cap < (8, 9) else 0", label=label)
+    # Prefill chunks fail closed on non-finite activations before storing;
+    # the per-token decode path deliberately relies on kernel poisoning.
+    require_text(
+        state,
+        backend,
+        "turboquant store received non-finite K/V activations",
+        label=label,
+    )
+
+
 def validate_final(state: State) -> None:
     """Reassert every durable semantic invariant on the complete tree."""
     for name in (
@@ -946,6 +989,7 @@ def validate_final(state: State) -> None:
         "tool-truncation-finish-reason",
         "qwen38-vision-runtime",
         "qwen38-numerical-audits",
+        "turboquant-fail-closed-guards",
     ):
         CONTRACTS[name].validate_after(state)
 
@@ -1085,5 +1129,25 @@ CONTRACTS: Mapping[str, SemanticContract] = {
         ),
         validate_before=_validate_numerical_audits_before,
         validate_after=_validate_numerical_audits_after,
+    ),
+    "turboquant-fail-closed-guards": SemanticContract(
+        rationale=(
+            "A CPU-only mathematical audit of the deployed K8V4 numerics found "
+            "three silent hazards: NaN value vectors laundered into finite "
+            "quantized codes, unguarded fp16 metadata overflow for pathological "
+            "value ranges, and a silent switch to the incompatible fp8e4b15 key "
+            "format on SM < 8.9 hardware. All three now fail closed: insane "
+            "value vectors poison their stored metadata with propagating NaN, "
+            "prefill chunks refuse non-finite activations outright, and "
+            "pre-8.9 devices are rejected. Every guard is bit-neutral for "
+            "finite in-range inputs on the deployed hardware."
+        ),
+        removal_condition=(
+            "Remove only when pinned upstream turboquant fails closed on "
+            "non-finite inputs and refuses incompatible FP8 key formats "
+            "by itself."
+        ),
+        validate_before=_validate_tq_guards_before,
+        validate_after=_validate_tq_guards_after,
     ),
 }

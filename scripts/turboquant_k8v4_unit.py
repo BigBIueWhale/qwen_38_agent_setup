@@ -219,12 +219,50 @@ def main() -> None:
     )
     min_cosine = similarities.min().item()
     require(min_cosine > 0.999, f"fused/reference min cosine={min_cosine:.9f}")
+    # Fail-closed guard acceptance: a value vector containing NaN must
+    # poison its stored fp16 scale and minimum with NaN (propagating on
+    # reconstruction) instead of laundering into finite codes, and a sane
+    # sibling token in the same launch must be stored bit-normally.
+    poison_key = torch.randn(2, num_kv_heads, head_dim, device=device, dtype=torch.bfloat16)
+    poison_value = torch.randn_like(poison_key)
+    poison_value[1, 0, 7] = float("nan")
+    poison_cache = torch.zeros(
+        1, block_size, num_kv_heads, cfg.slot_size_aligned, device=device, dtype=torch.uint8
+    )
+    triton_turboquant_store(
+        poison_key,
+        poison_value,
+        poison_cache,
+        torch.arange(2, device=device, dtype=torch.int32),
+        identity,
+        midpoints,
+        mse_bits=cfg.key_mse_bits,
+        key_packed_size=cfg.key_packed_size,
+        value_quant_bits=cfg.effective_value_quant_bits,
+        key_fp8=cfg.key_fp8,
+    )
+    torch.cuda.synchronize()
+    meta = poison_cache[0, :2, 0, 384:388].cpu().contiguous()
+    sane_scale = meta[0, 0:2].view(torch.float16)[0]
+    sane_min = meta[0, 2:4].view(torch.float16)[0]
+    nan_scale = meta[1, 0:2].view(torch.float16)[0]
+    nan_min = meta[1, 2:4].view(torch.float16)[0]
+    require(
+        torch.isfinite(sane_scale) and torch.isfinite(sane_min),
+        "finite value vector must store finite quantization metadata",
+    )
+    require(
+        torch.isnan(nan_scale) and torch.isnan(nan_min),
+        "NaN value vector must poison its stored scale and minimum with NaN",
+    )
+
     print(
         "PASS turboquant_k8v4: "
         f"D={head_dim} Hq={num_query_heads} Hkv={num_kv_heads} "
         f"tokens={num_tokens} slot={cfg.slot_size} "
         f"boundary_choices={num_boundary_choices} "
-        f"max_abs={max_abs:.8f} min_cosine={min_cosine:.9f}"
+        f"max_abs={max_abs:.8f} min_cosine={min_cosine:.9f} "
+        "nan_poison=fail-closed"
     )
 
 

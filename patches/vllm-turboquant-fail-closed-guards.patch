@@ -1,0 +1,92 @@
+diff --git a/vllm/v1/attention/ops/triton_turboquant_store.py b/vllm/v1/attention/ops/triton_turboquant_store.py
+index e680f68..19dd4c9 100644
+--- a/vllm/v1/attention/ops/triton_turboquant_store.py
++++ b/vllm/vllm/v1/attention/ops/triton_turboquant_store.py
+@@ -120,14 +120,30 @@ def _store_quantized_value(
+         )
+ 
+         sc_offset = val_cache_offset + VAL_DATA_BYTES
+-        sc_f16 = v_scale.to(tl.float16)
++        # Fail closed on insane inputs instead of laundering them: a NaN or
++        # ±inf element makes val_min/val_max non-finite, and a range or
++        # minimum beyond fp16's finite grid would overflow the stored
++        # metadata. In every such case poison both metadata fields with NaN
++        # so reconstruction propagates NaN loudly (matching the FP8 key
++        # path's NaN propagation) rather than decoding finite garbage. For
++        # all finite in-range inputs the stored bytes are bit-identical to
++        # the unguarded form.
++        meta_ok = (
++            (val_min == val_min)
++            & (val_max == val_max)
++            & (val_min > -65504.0)
++            & (val_min < 65504.0)
++            & ((val_max - val_min) < 982560.0)
++        )
++        poison = float("nan")
++        sc_f16 = tl.where(meta_ok, v_scale, poison).to(tl.float16)
+         sc_u16 = sc_f16.to(tl.uint16, bitcast=True)
+         tl.store(KV_cache_ptr + slot_base + sc_offset, (sc_u16 & 0xFF).to(tl.uint8))
+         tl.store(
+             KV_cache_ptr + slot_base + sc_offset + 1,
+             ((sc_u16 >> 8) & 0xFF).to(tl.uint8),
+         )
+-        zr_f16 = val_min.to(tl.float16)
++        zr_f16 = tl.where(meta_ok, val_min, poison).to(tl.float16)
+         zr_u16 = zr_f16.to(tl.uint16, bitcast=True)
+         tl.store(KV_cache_ptr + slot_base + sc_offset + 2, (zr_u16 & 0xFF).to(tl.uint8))
+         tl.store(
+diff --git a/vllm/v1/attention/ops/triton_turboquant_decode.py b/vllm/v1/attention/ops/triton_turboquant_decode.py
+index 3adaf26..e91e2e4 100644
+--- a/vllm/v1/attention/ops/triton_turboquant_decode.py
++++ b/vllm/vllm/v1/attention/ops/triton_turboquant_decode.py
+@@ -23,13 +23,25 @@ _FP8_E4B15: dict[int, int] = {}
+ 
+ 
+ def _use_fp8_e4b15(device: int = 0) -> int:
+-    """Return 1 if device needs fp8e4b15 (Ampere/Ada, SM < 8.9), else 0.
+-    On non-CUDA platforms (e.g. XPU), always returns 0 (use e4nv format).
++    """Return 0 (E4M3/e4nv keys) or fail closed.
++
++    The stored-key byte contract of this deployment is E4M3: a silent
++    switch to fp8e4b15 (max magnitude ~1.75) on SM < 8.9 hardware would
++    destructively saturate post-norm keys and misread any cache written
++    under the other format. Refuse to run rather than change the numeric
++    contract with the hardware. On non-CUDA platforms e4nv is used.
+     """
+     if device not in _FP8_E4B15:
+         if current_platform.is_cuda_alike():
+             cap = torch.cuda.get_device_capability(device)
+-            _FP8_E4B15[device] = 1 if cap < (8, 9) else 0
++            if cap < (8, 9):
++                raise RuntimeError(
++                    "turboquant K8V4 requires FP8 E4M3 key support "
++                    f"(SM >= 8.9); device {device} reports SM "
++                    f"{cap[0]}.{cap[1]}. Refusing a silent fp8e4b15 "
++                    "format switch."
++                )
++            _FP8_E4B15[device] = 0
+         else:
+             _FP8_E4B15[device] = 0
+     return _FP8_E4B15[device]
+diff --git a/vllm/v1/attention/backends/turboquant_attn.py b/vllm/v1/attention/backends/turboquant_attn.py
+index 94d9ebd..8f06bc3 100644
+--- a/vllm/v1/attention/backends/turboquant_attn.py
++++ b/vllm/vllm/v1/attention/backends/turboquant_attn.py
+@@ -564,6 +564,17 @@ class TurboQuantAttentionImpl(AttentionImpl["TurboQuantMetadata"]):
+ 
+         k = key[:N].view(N, self.num_kv_heads, self.head_size)
+         v = value[:N].view(N, self.num_kv_heads, self.head_size)
++        if N > 1:
++            # Fail closed before quantization can encode non-finite
++            # activations: one fused reduction per prefill chunk. The
++            # per-token decode path is intentionally unguarded here — the
++            # store kernel's metadata poisoning covers it without adding a
++            # host synchronization to every decode step.
++            if not bool(torch.isfinite(k).all() and torch.isfinite(v).all()):
++                raise ValueError(
++                    "turboquant store received non-finite K/V activations "
++                    f"in a {N}-token prefill chunk"
++                )
+         # (B, H, N, C) -> (B, N, H, C) for TQ kernels
+         kv_cache = kv_cache.transpose(1, 2)
+         self._store_kv(k, v, kv_cache, slot_mapping, layer)
