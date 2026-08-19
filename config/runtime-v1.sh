@@ -21,7 +21,7 @@ readonly RELAY_PIDS_LIMIT="32"
 readonly BASE_IMAGE_TAG="qwen38-vllm:main-9df9b0b"
 readonly EXPECTED_BASE_IMAGE_ID="sha256:fa4a002a88b7043a1a89966dea8a500fe9696f84e75730d9da916f916048d401"
 readonly IMAGE_ARCHIVE_NAME="qwen38-vllm-images-runtime-v14.tar"
-readonly IMAGE_ARCHIVE_SHA256="fa6f766f5d6ed5042da57c07d36e939d315fa4837aa4cfebf3d697180bbcca2c"
+readonly IMAGE_ARCHIVE_SHA256="2f77dcce2b0b87a4d27c3e5d417fde3f7c406430f91cb9ae5eea6a832aa6e659"
 
 readonly MODEL_DIR_NAME="Qwen3.8-27B-NVFP4-Corrected"
 readonly MODEL_REPOSITORY="unsloth/Qwen3.8-27B-NVFP4"
