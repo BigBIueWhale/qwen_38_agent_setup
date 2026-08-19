@@ -100,8 +100,11 @@ defined by the checkpoint's static KV calibration scales.
 
 ## Prefill and decode behavior
 
-For prefill, attention consumes the incoming BF16 K/V through FlashAttention before
-the cache store quantizes them. Future decode steps read the compressed history.
+For prefill, the cache store quantizes the incoming chunk first and attention then
+consumes the same BF16 K/V tensors directly through FlashAttention — the store
+happens before attention in the deployed order, and the raw tensors, not the
+quantized copies, feed the current chunk's scores. Future decode steps read the
+compressed history.
 The fused TurboQuant decode path dequantizes keys and values for score, softmax, and
 value accumulation; the returned attention output is BF16. Continuations of at most
 128 tokens use the fused decode path. Larger attention queries use the dedicated
