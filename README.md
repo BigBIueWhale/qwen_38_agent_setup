@@ -529,12 +529,12 @@ were zeroed outright (|w| below the 2^-8 grid), and per-element error
 reached 0.0078 against |w| medians as low as 0.033. Because the corrected
 snapshot byte-restores the official ranges (and its manifest proves nothing
 else changed), the repair cannot damage the model: for these 161 tensors,
-corrected == official ground truth. The one residual assumption, stated
-honestly: the 161-name set covers every tensor the exporter's offset
-context touched; the set matches the architecture exactly (128 layer norms,
-the final norm, and q/k norms on the 16 full-attention layers), and every
-name was cross-verified against both checkpoints' indices with identical
-shapes and dtypes.
+corrected == official ground truth. Completeness is now also proven, not
+assumed: with the official BF16 checkpoint restored on disk, a sweep of
+all 783 BF16 tensors shared by the export and the official reference found
+622 byte-identical and exactly the 161 known norms carrying the round-trip
+signature — no unexpected damage anywhere, and nothing differing for any
+other reason. The repair set was exhaustive.
 
 ### Final deferred audit: quantized-weight context correctness
 
