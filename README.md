@@ -296,6 +296,8 @@ restore, and build verification. The exact server argument semantics are:
     --max-num-batched-tokens 2048
     --kv-cache-memory 6925634765
     --cpu-offload-gb 0
+    --kv-transfer-config '{"kv_connector":"OffloadingConnector","kv_role":"kv_both",
+      "kv_connector_extra_config":{"cpu_bytes_to_use":7747584000,"eviction_policy":"arc"}}'
     --enable-prefix-caching
     --enable-chunked-prefill
     --attention-config.flash_attn_version=2

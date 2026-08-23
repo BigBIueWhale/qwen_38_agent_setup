@@ -202,6 +202,28 @@ VLLM_ARGS=(
   --max-num-batched-tokens 2048
   --kv-cache-memory 6925634765
   --cpu-offload-gb 0
+  # Host-RAM KV offload. A foreground subagent's context competes for the same
+  # 264,115-token GPU pool as the session that launched it, so at long main
+  # contexts any subagent run evicts the main agent's blocks. On this hybrid
+  # model that is disproportionately expensive: losing the few GDN state blocks
+  # collapses the whole GPU prefix hit, forcing a full re-prefill rather than
+  # just the evicted tail. Offloading keeps those blocks in DDR5 and restores
+  # them by DMA instead.
+  #
+  # The copy is opaque bytes: the cache registers as int8 and whole pages move
+  # by pointer, and K8V4 keeps its fp16 scale and min inline in each 388-byte
+  # slot, so a token costs the same in DDR5 as in VRAM (24,832 B across the 16
+  # full-attention layers). Nothing is dequantized.
+  #
+  # 7,747,584,000 B = 150 chunks of 51,650,560 B: one complete 262,144-token
+  # context (129 chunks) plus churn. The region is an mmap in the container's
+  # existing 8 GiB /dev/shm, pre-faulted and page-locked, so it is budgeted as
+  # hard, unswappable host memory. ARC rather than LRU because a subagent's
+  # chunks are touched once and must be evicted before the main context's,
+  # which every main-agent request re-touches; plain LRU would need ~26.5 GB to
+  # be equally safe.
+  --kv-transfer-config
+  '{"kv_connector":"OffloadingConnector","kv_role":"kv_both","kv_connector_extra_config":{"cpu_bytes_to_use":7747584000,"eviction_policy":"arc"}}'
   --enable-prefix-caching
   --enable-chunked-prefill
   --attention-config.flash_attn_version=2
