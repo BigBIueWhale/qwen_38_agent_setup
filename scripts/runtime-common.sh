@@ -169,8 +169,8 @@ check_pinned_build_inputs() {
     die "The deployment-input manifest is missing or is not a regular non-symlink file." \
       "Expected: ${DEPLOYMENT_INPUT_MANIFEST}"
   fi
-  if [[ "$(wc -l <"${DEPLOYMENT_INPUT_MANIFEST}")" != "69" ]]; then
-    die "The deployment-input manifest does not contain the exact 69-file allowlist." \
+  if [[ "$(wc -l <"${DEPLOYMENT_INPUT_MANIFEST}")" != "70" ]]; then
+    die "The deployment-input manifest does not contain the exact 70-file allowlist." \
       "Manifest: ${DEPLOYMENT_INPUT_MANIFEST}"
   fi
   "${COMMON_SCRIPT_DIR}/build-vllm.sh" check
@@ -709,10 +709,11 @@ assert_running_profile() {
       /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/responses/streaming_events.py \
       /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/responses/utils.py \
       /usr/local/lib/python3.12/dist-packages/vllm/parser/engine/parser_engine.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/cpu/gpu_worker.py \
       /opt/qwen38/chat_template.jinja \
       /opt/qwen38/phase_budget_unit.py
   )"
-  expected_installed_report="$(printf '%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s' \
+  expected_installed_report="$(printf '%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s' \
     "${TURBOQUANT_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/attention/backends/turboquant_attn.py \
     "${TOOL_SCHEMA_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/tool_parsers/structural_tag_registry.py \
     "${MODEL_CONFIG_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/config/model.py \
@@ -733,6 +734,7 @@ assert_running_profile() {
     "${RESPONSES_STREAMING_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/responses/streaming_events.py \
     "${RESPONSES_UTILS_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/responses/utils.py \
     "${PARSER_ENGINE_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/engine/parser_engine.py \
+    "${KV_OFFLOAD_WORKER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/cpu/gpu_worker.py \
     "${AGENT_CHAT_TEMPLATE_SHA256}" /opt/qwen38/chat_template.jinja \
     "${PHASE_BUDGET_UNIT_SHA256}" /opt/qwen38/phase_budget_unit.py)"
   [[ "${installed_report}" == "${expected_installed_report}" ]] || \

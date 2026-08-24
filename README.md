@@ -218,7 +218,7 @@ The vLLM submodule is pinned at:
 
     9df9b0b0a1816b6d0d0f6ecd0da563cc37fd72f5
 
-It is intentionally reconstructed by nine ordered, reviewed semantic transformations:
+It is intentionally reconstructed by eleven ordered, reviewed semantic transformations:
 
 | Patch | SHA-256 |
 |---|---|
@@ -231,8 +231,10 @@ It is intentionally reconstructed by nine ordered, reviewed semantic transformat
 | patches/vllm-tool-truncation-finish-reason.patch | 1a220f6db9b40967d867b3cfb1a92d95d907ca059718ffe61772b4cb4409f551 |
 | patches/vllm-qwen38-vision-runtime.patch | f92603724861da5b5a364f43e57d3f95ef43a9dded8ae645278373850db3140f |
 | patches/vllm-qwen38-numerical-audits.patch | a73aa2f2ae3f82010eb2bafcdf663c2fe14854c30165dbc4d8457725bc3b6632 |
+| patches/vllm-turboquant-fail-closed-guards.patch | 0ecf95ab8ee25a76d5412ce44aafafe13992b2cb373d6010acf5bc119dc8f47b |
+| patches/vllm-kv-offload-pinning-fail-closed.patch | 1857071c38d081bb95e3cca12153cebce096649084950b99229104fdae029ca6 |
 
-The reconstructed tree has exactly twenty-nine reviewed runtime-source changes,
+The reconstructed tree has exactly thirty-two reviewed runtime-source changes,
 seven reviewed existing-test changes, and one reviewed new workspace test. The
 landmark-aware Python patcher calculates every mutation before writing, validates
 unique structural landmarks and complete pre/post hashes, performs atomic

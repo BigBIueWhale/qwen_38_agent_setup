@@ -136,6 +136,7 @@ ARG TURBOQUANT_K8V4_UNIT_SHA256
 ARG QWEN38_CONTEXT_UNIT_SHA256
 ARG NVFP4_KERNEL_UNIT_SHA256
 ARG NUMERICAL_AUDITS_PATCH_DIFF_SHA256
+ARG KV_OFFLOAD_PINNING_PATCH_DIFF_SHA256
 RUN install --directory --mode=0755 /opt/qwen38
 COPY --chmod=0644 \
   vllm/vllm/v1/attention/backends/turboquant_attn.py \
@@ -650,6 +651,7 @@ LABEL org.opencontainers.image.revision="9df9b0b0a1816b6d0d0f6ecd0da563cc37fd72f
       qwen38.patch.turboquant.diff.sha256="a9721067f1a7ee9497a4bd51e47e3a474561189e881b4704bfc4beac8ea48380" \
       qwen38.patch.turboquant.file.sha256="59faab97fa3331028ac76dc63732e6eca239d0f7a83b79e18fd30c6d9b92c2df" \
       qwen38.patch.numerical-audits.diff.sha256="${NUMERICAL_AUDITS_PATCH_DIFF_SHA256}" \
+      qwen38.patch.kv-offload-pinning.diff.sha256="${KV_OFFLOAD_PINNING_PATCH_DIFF_SHA256}" \
       qwen38.patch.workspace.file.sha256="b859dfdc5676f90a0b00718e34adcd0a02d266be1543ca146eebb724a9235c00" \
       qwen38.patch.gpu-model-runner.file.sha256="a7bed200b304fdc17320a30178ded7669d4677e787947470b872ef0ec14b6c8b" \
       qwen38.patch.api-utils.file.sha256="5c6fbd5ff02c042d6f96bfbe7f4d784f97dbfa8029bc09e059c66c16a807f74b" \

@@ -977,6 +977,42 @@ def _validate_tq_guards_after(state: State) -> None:
     )
 
 
+def _validate_kv_pin_before(state: State) -> None:
+    label = "KV offload host pinning precondition"
+    worker = "vllm/v1/kv_offload/cpu/gpu_worker.py"
+    forbid_text(state, worker, "Continuing would serve every offloaded KV", label=label)
+    require_text(
+        state,
+        worker,
+        "transfers will still work but may be slower (unpinned DMA)",
+        label=label,
+    )
+
+
+def _validate_kv_pin_after(state: State) -> None:
+    label = "KV offload host pinning result"
+    worker = "vllm/v1/kv_offload/cpu/gpu_worker.py"
+    # A failed registration is fatal, not a downgrade to unpinned DMA.
+    require_text(state, worker, "raise RuntimeError(", label=label)
+    require_text(
+        state, worker, "Continuing would serve every offloaded KV", label=label
+    )
+    forbid_text(
+        state,
+        worker,
+        "transfers will still work but may be slower (unpinned DMA)",
+        label=label,
+    )
+    # The platform check above it is a capability test, not a failure, and
+    # must keep returning quietly on non-CUDA builds.
+    require_text(
+        state,
+        worker,
+        "cudaHostRegister is only ",
+        label=label,
+    )
+
+
 def validate_final(state: State) -> None:
     """Reassert every durable semantic invariant on the complete tree."""
     for name in (
@@ -990,6 +1026,7 @@ def validate_final(state: State) -> None:
         "qwen38-vision-runtime",
         "qwen38-numerical-audits",
         "turboquant-fail-closed-guards",
+        "kv-offload-host-pinning-fail-closed",
     ):
         CONTRACTS[name].validate_after(state)
 
@@ -1149,5 +1186,26 @@ CONTRACTS: Mapping[str, SemanticContract] = {
         ),
         validate_before=_validate_tq_guards_before,
         validate_after=_validate_tq_guards_after,
+    ),
+    "kv-offload-host-pinning-fail-closed": SemanticContract(
+        rationale=(
+            "The CPU KV offload keeps evicted K8V4 pages in host RAM so a "
+            "returning subagent does not force re-ingestion, and its whole "
+            "value depends on that region being page-locked: unpinned DMA is "
+            "the slow path the offload exists to avoid. Upstream logged a "
+            "warning when cudaHostRegister failed and carried on, and nothing "
+            "downstream records which path was taken, so a failed "
+            "registration degraded every transfer for the life of the process "
+            "while the deployment still reported healthy. It now raises. The "
+            "non-CUDA early return above it is untouched: that is a platform "
+            "capability test, not a failure, and other backends legitimately "
+            "run the offload without host registration."
+        ),
+        removal_condition=(
+            "Remove only when pinned upstream refuses to start the CPU "
+            "offload rather than falling back to unpinned DMA."
+        ),
+        validate_before=_validate_kv_pin_before,
+        validate_after=_validate_kv_pin_after,
     ),
 }
