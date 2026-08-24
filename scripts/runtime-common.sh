@@ -774,6 +774,46 @@ assert_running_profile() {
       "Found:" "${additional_installed_report}"
 
   assert_runtime_versions
+  assert_kv_offload_pinned
+}
+
+# The CPU KV offload is only worth having if its host region is actually
+# pre-faulted and page-locked. vLLM degrades silently on both counts: a failed
+# cudaHostRegister logs a warning and continues on unpinned DMA, and an
+# unsupported MADV_POPULATE_WRITE falls back to per-page writes. Either one
+# leaves the deployment serving from a much slower path while every other
+# invariant still reports healthy, so readiness asserts them here rather than
+# trusting that nobody read past the warning. The expected region size comes
+# from the container's own argv, which assert_running_profile has already
+# proven equal to the reviewed profile, so there is no second source of truth.
+assert_kv_offload_pinned() {
+  local logs cpu_bytes established_count
+  logs="$(docker logs "${CONTAINER_NAME}" 2>&1)" || \
+    die "Cannot read backend logs to verify KV offload host pinning"
+
+  require_equal "backend cudaHostRegister failures" \
+    "$(printf '%s\n' "${logs}" | grep --fixed-strings --count 'cudaHostRegister failed' || true)" 0
+  require_equal "backend mmap pre-population fallbacks" \
+    "$(printf '%s\n' "${logs}" | grep --fixed-strings --count 'MADV_POPULATE_WRITE is not supported' || true)" 0
+
+  cpu_bytes="$(
+    docker inspect --format '{{json .Config.Cmd}}' "${CONTAINER_NAME}" |
+      jq -r '[.[] | select(test("cpu_bytes_to_use"))] | first // ""' |
+      jq -r '.kv_connector_extra_config.cpu_bytes_to_use // ""'
+  )" || die "Cannot read the backend KV offload size from the running container"
+  [[ "${cpu_bytes}" =~ ^[1-9][0-9]*$ ]] || \
+    die "Running backend carries no KV offload host budget; the profile requires one"
+
+  # A fresh region logs "Created mmap file"; one that survived in /dev/shm logs
+  # "Opened existing mmap file". Exactly one of the two must appear. The region
+  # size itself is not re-derived from log text: assert_running_profile has
+  # already compared the whole argv, including this byte count, to the reviewed
+  # profile.
+  established_count="$(
+    printf '%s\n' "${logs}" |
+      grep --extended-regexp --count '(Created|Opened existing) mmap file' || true
+  )"
+  require_equal "backend KV offload host regions established" "${established_count}" 1
 }
 
 print_healthy_summary() {
