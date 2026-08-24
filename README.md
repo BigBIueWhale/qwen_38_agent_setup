@@ -96,6 +96,21 @@ The check reconstructs the source tree from the pinned upstream commit through a
 landmark-aware transformations. The build runs offline from the exact base image and fails unless it produces
 the pinned image ID. Restore verifies the pinned local archive before loading it.
 
+The build is reproducible on a given host: layer timestamps are normalised to
+`SOURCE_DATE_EPOCH`, so re-deriving the source tree does not change the image
+ID. It is not bit-identical across hosts, and the offline archive rather than a
+rebuild is how a second machine obtains the pinned image. Two things prevent
+cross-host identity, both measured rather than assumed. Byte-compilation writes
+`.pyc` files whose headers embed each source file's mtime, so the one layer that
+runs Python differs while the other eighty-two match; normalising that would
+mean touching only the copied files, since every one of the base image's 4,821
+vLLM files postdates `SOURCE_DATE_EPOCH` and a blanket `find -newermt` would
+rewrite the whole tree into a new layer. Separately, the host Docker and buildx
+versions are deliberately not pinned, and differing builders can serialise
+identically-specified layers differently. The archive is the stronger guarantee
+in any case: it makes both machines byte-identical by construction rather than
+by two builds happening to agree.
+
 ### Security and host boundary
 
 The machine is assumed exposed to the public Internet on every non-loopback
