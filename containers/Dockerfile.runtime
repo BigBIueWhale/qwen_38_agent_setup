@@ -21,6 +21,7 @@ ARG RESPONSES_SERVING_UPSTREAM_FILE_SHA256=ac586de722ddada5032c760da0dfb8faae281
 ARG RESPONSES_STREAMING_UPSTREAM_FILE_SHA256=cf1d8f5e0619148374ce10be15b1a9f7640016d810f1fe766c2dd451a918aa1f
 ARG RESPONSES_UTILS_UPSTREAM_FILE_SHA256=577100edd0951f7f2936d2b37b7b4ec9a03d85088b35e49de6c0e9633a59adc2
 ARG PARSER_ENGINE_UPSTREAM_FILE_SHA256=3ac89a7f22f0e4f0d3f6f2365d79f64da9da217969793f6a33a6db9cf5ef60ff
+ARG KV_OFFLOAD_WORKER_UPSTREAM_FILE_SHA256=5105d0455682704e93c69e7f21554e0ec959225484af000184c1014456dd095a
 ARG WORKSPACE_UPSTREAM_FILE_SHA256=d0650393bc657064acc97fe2b227ebff8f85799a8f727a8c136098f1f79964df
 ARG GPU_MODEL_RUNNER_UPSTREAM_FILE_SHA256=7d5888ea176f34441553a4a0262f137433369e7b86076503ea54fbaee52d5554
 ARG API_UTILS_UPSTREAM_FILE_SHA256=14ca06f57d110b05f561812f84115bd7c380ad18e0fd0d0b2acaaab0e21fdd74
@@ -30,7 +31,7 @@ ARG MEDIA_CONNECTOR_UPSTREAM_FILE_SHA256=b368a50c80d8fe01cf150cea02f39477d9c0ff7
 ARG IMAGE_MEDIA_UPSTREAM_FILE_SHA256=2605d8ca98c29fa9f2b208358f1049e2c60948b7494fcb08c4b334fe8acb1a38
 ARG RENDER_PARAMS_UPSTREAM_FILE_SHA256=b9667d21614cc474e881124b44762db6a1d43efe21b9ec0350fc5c80229bf67d
 ARG QWEN3_VL_MODEL_UPSTREAM_FILE_SHA256=b7ae6775e74cbcdb6e62d7fca9284e848f1f653caf53912f4dec64dc16ab96e3
-RUN printf '%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n' \
+RUN printf '%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n' \
       "${TURBOQUANT_UPSTREAM_FILE_SHA256}" \
       /usr/local/lib/python3.12/dist-packages/vllm/v1/attention/backends/turboquant_attn.py \
       "${TOOL_SCHEMA_UPSTREAM_FILE_SHA256}" \
@@ -71,6 +72,8 @@ RUN printf '%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  
       /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/responses/utils.py \
       "${PARSER_ENGINE_UPSTREAM_FILE_SHA256}" \
       /usr/local/lib/python3.12/dist-packages/vllm/parser/engine/parser_engine.py \
+      "${KV_OFFLOAD_WORKER_UPSTREAM_FILE_SHA256}" \
+      /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/cpu/gpu_worker.py \
     | sha256sum --check --strict
 RUN printf '%s  %s\n%s  %s\n%s  %s\n' \
       "${WORKSPACE_UPSTREAM_FILE_SHA256}" \
@@ -118,6 +121,7 @@ ARG RESPONSES_SERVING_PATCHED_FILE_SHA256=ee5f461f39c7a03fb4147d6f045c127b311785
 ARG RESPONSES_STREAMING_PATCHED_FILE_SHA256=5400a68d6219ca3944edb8a6d077da5e0ad0c767c34759dec7d35463dd1090b2
 ARG RESPONSES_UTILS_PATCHED_FILE_SHA256=6c70148e6de4a9806f2e4e8fe3e02659780e86b6886601bb8a60b377235dc29d
 ARG PARSER_ENGINE_PATCHED_FILE_SHA256=9ffce8a3aac1d885cbbd4de269201ef32bdd6089b5f92d61f94eebf1130a5faf
+ARG KV_OFFLOAD_WORKER_PATCHED_FILE_SHA256=a9b23a271b81e19353b32f810a9cfe5fe5e658931b3c4004030da532b60f2b60
 ARG WORKSPACE_PATCHED_FILE_SHA256=b859dfdc5676f90a0b00718e34adcd0a02d266be1543ca146eebb724a9235c00
 ARG GPU_MODEL_RUNNER_PATCHED_FILE_SHA256=a7bed200b304fdc17320a30178ded7669d4677e787947470b872ef0ec14b6c8b
 ARG API_UTILS_PATCHED_FILE_SHA256=5c6fbd5ff02c042d6f96bfbe7f4d784f97dbfa8029bc09e059c66c16a807f74b
@@ -199,6 +203,9 @@ COPY --chmod=0644 \
   vllm/vllm/parser/engine/parser_engine.py \
   /usr/local/lib/python3.12/dist-packages/vllm/parser/engine/parser_engine.py
 COPY --chmod=0644 \
+  vllm/vllm/v1/kv_offload/cpu/gpu_worker.py \
+  /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/cpu/gpu_worker.py
+COPY --chmod=0644 \
   vllm/vllm/v1/worker/workspace.py \
   /usr/local/lib/python3.12/dist-packages/vllm/v1/worker/workspace.py
 COPY --chmod=0644 \
@@ -268,7 +275,7 @@ RUN printf '%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n' \
       "${VISION_CONTRACT_UNIT_SHA256}" \
       /opt/qwen38/vision_contract_unit.py \
     | sha256sum --check --strict
-RUN printf '%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n' \
+RUN printf '%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n' \
       "${TURBOQUANT_PATCHED_FILE_SHA256}" \
       /usr/local/lib/python3.12/dist-packages/vllm/v1/attention/backends/turboquant_attn.py \
       "${TOOL_SCHEMA_PATCHED_FILE_SHA256}" \
@@ -309,6 +316,8 @@ RUN printf '%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  
       /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/responses/utils.py \
       "${PARSER_ENGINE_PATCHED_FILE_SHA256}" \
       /usr/local/lib/python3.12/dist-packages/vllm/parser/engine/parser_engine.py \
+      "${KV_OFFLOAD_WORKER_PATCHED_FILE_SHA256}" \
+      /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/cpu/gpu_worker.py \
       "${AGENT_CHAT_TEMPLATE_SHA256}" \
       /opt/qwen38/chat_template.jinja \
       "${PHASE_BUDGET_UNIT_SHA256}" \
