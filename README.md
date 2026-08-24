@@ -42,7 +42,7 @@ The deployment is complete and healthy. There is one supported mode:
 | Agent-service release lock | a8e5a63402f1c443a288d92b65e3fcdcfc9d7211 |
 | Agent-service image | sha256:0f3b8096b8c18207acd2483d046de20efce31a226ebd8fe6f8ff2e98e9463b6e |
 | Agent-service listener | 127.0.0.1:8090 only |
-| Runtime profile | socket-isolated-nonroot-vision-k8v4-agent-v14 |
+| Runtime profile | socket-isolated-nonroot-vision-k8v4-agent-v15 |
 | Runtime image | sha256:dd70ee4a13f89ecaba05fcf627414f6e35489923155e4d7356d2c730b3baee44 |
 
 This is not a text-only profile with an optional vision switch. It is not a
@@ -109,7 +109,7 @@ namespace identities, exact listener, and the absence of Docker port mappings.
 
 The vLLM container runs as `2000:0` with cap-drop ALL, no-new-privileges, restart=no,
 a read-only root, a read-only model mount, and one dedicated labelled cache volume.
-The only durable writable runtime state is that exact v14 volume mounted at
+The only durable writable runtime state is that exact v15 volume mounted at
 `/home/vllm/.cache/vllm`, owned `2000:0` mode 0770; all CUDA, Triton, TorchInductor,
 FlashInfer, Hugging Face, XDG, and vLLM caches are rooted beneath it. `/tmp` is a
 bounded 2 GiB executable tmpfs and `/run` is a bounded 64 MiB non-executable tmpfs.
@@ -250,9 +250,9 @@ Pinned build inputs and products:
 |---|---|
 | Immutable base tag | qwen38-vllm:main-9df9b0b |
 | Immutable base ID | sha256:fa4a002a88b7043a1a89966dea8a500fe9696f84e75730d9da916f916048d401 |
-| Runtime tag | qwen38-vllm:qwen38-27b-nvfp4-k8v4-runtime-v14 |
+| Runtime tag | qwen38-vllm:qwen38-27b-nvfp4-k8v4-runtime-v15 |
 | Runtime ID | sha256:dd70ee4a13f89ecaba05fcf627414f6e35489923155e4d7356d2c730b3baee44 |
-| Offline archive | artifacts/qwen38-vllm-images-runtime-v14.tar |
+| Offline archive | artifacts/qwen38-vllm-images-runtime-v15.tar |
 | Archive size | 8,557,675,008 bytes, mode 0600 |
 | Archive SHA-256 | a80766d9560a419b9c051fc84d9beca1f1a3ac9ab508c99cf29d218b71bef43c |
 | Runtime Dockerfile SHA-256 | 17f72538ee71292e4cf0a2ce804e52a4d26413a034286590aef76008fbd4fcec |
