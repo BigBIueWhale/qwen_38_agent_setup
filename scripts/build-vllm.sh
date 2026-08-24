@@ -23,6 +23,26 @@ SOURCE_PATCH_MANIFEST="${SOURCE_PATCH_DIR}/manifest.sha256"
 DEPLOYMENT_INPUT_MANIFEST="${PROJECT_DIR}/config/deployment-inputs.sha256"
 RUNTIME_COMMON_CONTRACT_TEST="${PROJECT_DIR}/scripts/test-runtime-common-contract.sh"
 
+# The image is exported to a tarball and loaded, rather than tagged directly,
+# so that `rewrite-timestamp=true` can normalise every layer timestamp to
+# SOURCE_DATE_EPOCH. Without it the COPY layers keep the build context's file
+# mtimes, and two machines holding byte-identical trees produce different image
+# IDs purely because their checkouts happened at different moments -- which is
+# exactly what happened, and what made EXPECTED_IMAGE_ID unreachable anywhere
+# except the machine that first wrote the tree.
+BUILD_EXPORT_DIR="$(mktemp -d /tmp/qwen38-vllm-build.XXXXXX)"
+case "${BUILD_EXPORT_DIR}" in
+  /tmp/qwen38-vllm-build.*) ;;
+  *) echo "Unexpected temporary build-export directory: ${BUILD_EXPORT_DIR}" >&2; exit 1 ;;
+esac
+readonly BUILD_EXPORT_DIR
+cleanup_build_export() {
+  rm -rf -- "${BUILD_EXPORT_DIR}"
+}
+trap cleanup_build_export EXIT
+RUNTIME_ARCHIVE="${BUILD_EXPORT_DIR}/runtime.tar"
+readonly RUNTIME_ARCHIVE
+
 TURBOQUANT_PATCH_FILE="${PROJECT_DIR}/patches/vllm-turboquant-k8v4-direct-workspace.patch"
 TOOL_SCHEMA_PATCH_FILE="${PROJECT_DIR}/patches/vllm-enforce-auto-tool-schema.patch"
 AGENT_DEFAULTS_PATCH_FILE="${PROJECT_DIR}/patches/vllm-qwen38-agent-defaults-and-thinking.patch"
@@ -264,10 +284,13 @@ if [[ "${MODE}" == "check" ]]; then
   exit 0
 fi
 
-DOCKER_BUILDKIT=1 docker build --progress=plain \
+docker buildx build --progress=plain \
+  --builder default \
+  --platform linux/amd64 \
   --network none \
   --pull=false \
   --provenance=false \
+  --no-cache \
   --target runtime \
   --build-arg "BASE_IMAGE=${BASE_IMAGE_TAG}" \
   --build-arg "TURBOQUANT_UPSTREAM_FILE_SHA256=${TURBOQUANT_UPSTREAM_FILE_SHA256}" \
@@ -341,9 +364,10 @@ DOCKER_BUILDKIT=1 docker build --progress=plain \
   --build-arg "NUMERICAL_AUDITS_PATCH_DIFF_SHA256=${NUMERICAL_AUDITS_PATCH_DIFF_SHA256}" \
   --build-arg "KV_OFFLOAD_PINNING_PATCH_DIFF_SHA256=${KV_OFFLOAD_PINNING_PATCH_DIFF_SHA256}" \
   --build-arg "SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH}" \
-  --tag "${IMAGE_TAG}" \
+  --output "type=docker,dest=${RUNTIME_ARCHIVE},name=${IMAGE_TAG},rewrite-timestamp=true" \
   --file "${DOCKERFILE}" \
   "${PROJECT_DIR}"
+docker load --input "${RUNTIME_ARCHIVE}"
 
 actual_image_id="$(docker image inspect --format '{{.Id}}' "${IMAGE_TAG}")"
 actual_installed_report="$(
