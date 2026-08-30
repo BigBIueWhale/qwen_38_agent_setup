@@ -53,9 +53,18 @@ Bytes are derived inside vLLM at the point where the KV cache spec exists.
   that identity the contract instead of an accident.
 
   `gpu_memory_utilization` keeps exactly one role: the hardware budget
-  vLLM may claim. If `needed_bytes` exceeds what profiling leaves inside
-  that budget, startup fails with the per-user byte cost in the message.
-  Capacity is never silently clamped to "what fits".
+  vLLM may claim — and within it the declaration is authoritative,
+  exactly as the byte flag was. Profiling's conservative availability
+  estimate (which charges reclaimable allocator reservations and engine
+  headroom as spent, and preferred ~1.3 GiB less than the proven
+  production pool) is informational only; it can neither shrink nor veto
+  the declared pool. What refuses a declaration is the physical bound:
+  weights + the measured transient activation peak + the declared pool
+  (+ frontend reservations, + the CUDA-graph charge when opted in) must
+  fit within total x utilization, or startup fails with the per-user
+  byte cost in the message. "The estimate would prefer less" proceeds;
+  "this card physically cannot hold N contexts" refuses. Capacity is
+  never silently clamped to "what fits".
 
 - Host RAM: `kv_connector_extra_config.cpu_kv_cache_users: N` (required by
   `CPUOffloadingSpec`, inherited by `TieringOffloadingSpec`). Derivation in

@@ -44,7 +44,7 @@ The deployment is complete and healthy. There is one supported mode:
 | Agent-service image | sha256:0f3b8096b8c18207acd2483d046de20efce31a226ebd8fe6f8ff2e98e9463b6e |
 | Agent-service listener | 127.0.0.1:8090 only |
 | Runtime profile | socket-isolated-nonroot-vision-k8v4-agent-v16 |
-| Runtime image | sha256:da4a1f22f4c4e3efd4e26a8398178427b4faf4a8281b1e3da6d27f9af6119d64 |
+| Runtime image | sha256:ff4028cdc9256fbbf6f1a16f6512e87fa38608a458531c5c7712b9d3f1b589d4 |
 
 This is not a text-only profile with an optional vision switch. It is not a
 one-million-token profile. It has no MTP, eager-mode, lower-quality image, alternate
@@ -271,7 +271,7 @@ Pinned build inputs and products:
 | Immutable base tag | qwen38-vllm:main-9df9b0b |
 | Immutable base ID | sha256:fa4a002a88b7043a1a89966dea8a500fe9696f84e75730d9da916f916048d401 |
 | Runtime tag | qwen38-vllm:qwen38-27b-nvfp4-k8v4-runtime-v16 |
-| Runtime ID | sha256:da4a1f22f4c4e3efd4e26a8398178427b4faf4a8281b1e3da6d27f9af6119d64 |
+| Runtime ID | sha256:ff4028cdc9256fbbf6f1a16f6512e87fa38608a458531c5c7712b9d3f1b589d4 |
 | Offline archive | artifacts/qwen38-vllm-images-runtime-v16.tar |
 | Archive size | 8,557,675,008 bytes, mode 0600 |
 | Archive SHA-256 | a80766d9560a419b9c051fc84d9beca1f1a3ac9ab508c99cf29d218b71bef43c |
