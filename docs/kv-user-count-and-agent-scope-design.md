@@ -311,10 +311,12 @@ of deleted modules), `patches/vllm-kv-user-count-sizing-and-scope-eviction.patch
 
 ## 5. Interim state until the release step
 
-`config/runtime-v1.sh` now describes flags only the *next* image
-understands. `start.sh` against the still-pinned v15 image would pass the
-image-ID check and then fail vLLM argument parsing — loudly, before
-serving. That is the intended fail-closed posture for the window between
-authoring and the post-benchmark rebuild; the release step re-pins
-`EXPECTED_IMAGE_ID`, the archive pair, and the profile label together.
-Nothing in this change can be *silently* half-adopted.
+This section described the window between authoring and the
+post-benchmark rebuild, during which `config/runtime-v1.sh` named flags
+only the next image understood and `start.sh` failed closed at vLLM
+argument parsing. That window is closed: the v16 release step re-pinned
+`EXPECTED_IMAGE_ID`, the archive pair, and the profile label together,
+with the image rebuilt twice to prove the pinned ID reproducible. The
+v15 archive and cache volume are retained as a rollback path until the
+new stack is proven healthy. Nothing in this change could be *silently*
+half-adopted at any point.
