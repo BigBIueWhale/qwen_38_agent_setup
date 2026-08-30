@@ -267,6 +267,16 @@ VLLM_ARGS=(
   # Supplying the old byte or eviction knobs is a startup failure, not a
   # fallback.
   --kv-cache-users 1
+  # Ceiling on what the engine may claim of the card, not an allocation: the
+  # user-count declaration above decides the pool's real size and leaves the
+  # surplus unclaimed. It has to be stated because the superseded
+  # --kv-cache-memory byte constant used to override this budget entirely --
+  # with the override gone, a default 0.9 leaves 5.12 GiB for a pool that needs
+  # 6.4 GiB, and the engine correctly refuses to start. Non-KV residents
+  # (weights, activations, vision tower) measure 24,103 MiB here, so one
+  # 262,144-token context needs at least 0.940; 0.95 clears it with roughly
+  # 320 MiB of slack and still leaves ~1.6 GiB of the card untouched.
+  --gpu-memory-utilization 0.95
   --cpu-offload-gb 0
   # Host-RAM KV offload. A foreground subagent's context competes for the
   # one-context GPU pool of the session that launched it, so at long main
