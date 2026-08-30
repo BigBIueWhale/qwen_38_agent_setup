@@ -461,7 +461,7 @@ RUN printf '%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  
       "${TITOTO_PROTOCOL_PATCHED_FILE_SHA256}" \
         /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/scale_out/token_in_token_out/protocol.py \
       "${TITOTO_SERVING_PATCHED_FILE_SHA256}" \
-        /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/scale_out/token_in_token_out/serving.py
+        /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/scale_out/token_in_token_out/serving.py \
     | sha256sum --check --strict
 RUN printf '%s  %s\n%s  %s\n%s  %s\n%s  %s\n' \
       "${WORKSPACE_PATCHED_FILE_SHA256}" \
