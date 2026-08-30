@@ -14,7 +14,13 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
-from framework import PatchRefusedError, _parse_review_diff, sha256_bytes, sha256_text
+from framework import (
+    EMPTY_FILE_SHA256,
+    PatchRefusedError,
+    _parse_review_diff,
+    sha256_bytes,
+    sha256_text,
+)
 
 
 @dataclass(frozen=True)
@@ -43,6 +49,10 @@ def parse_args() -> argparse.Namespace:
 
 def read_text(path: Path) -> str:
     data = path.read_bytes()
+    if data == b"":
+        # Matches the framework: empty files are a well-defined fixed point
+        # (deletable package markers) with no line contract to enforce.
+        return ""
     try:
         text = data.decode("utf-8")
     except UnicodeDecodeError as exc:
@@ -61,9 +71,13 @@ def line_offset(text: str, one_based_line: int) -> int:
         raise PatchRefusedError(f"invalid one-based line {one_based_line}")
     lines = text.splitlines(keepends=True)
     if one_based_line > len(lines) + 1:
-        raise PatchRefusedError(
-            f"line {one_based_line} exceeds source length {len(lines)}"
-        )
+        # Hunk start lines are coordinates in the stage's ORIGINAL file, but
+        # hunks are applied sequentially: a large earlier deletion can leave
+        # the intermediate text shorter than a later hunk's original line.
+        # The offset is only a disambiguation hint — clamp it; uniqueness is
+        # still proven by the landmark checks, and the framework re-verifies
+        # every byte independently of these hints.
+        one_based_line = len(lines) + 1
     return sum(len(line) for line in lines[: one_based_line - 1])
 
 
@@ -87,6 +101,14 @@ def expand_to_unique_landmark(
     old_start: int,
 ) -> tuple[str, str]:
     offsets = occurrence_offsets(current, review_before)
+    if review_after == "":
+        # Deleted-file hunk: must already describe the complete file, and
+        # no landmark expansion can make an empty after block unique.
+        if review_before == current:
+            return review_before, review_after
+        raise PatchRefusedError(
+            "a deleted-file review hunk must describe the complete file"
+        )
     if len(offsets) == 1 and current.count(review_after) == 0:
         return review_before, review_after
     if review_before == "":
@@ -138,8 +160,12 @@ def main() -> None:
     for stage_arg in args.stage:
         review_file = artifact_root / stage_arg.review_path
         review_data = review_file.read_bytes()
-        parsed = _parse_review_diff(review_data, label=stage_arg.name)
-        touched = tuple(dict.fromkeys(edit.path for edit in parsed))
+        parsed, deleted_paths = _parse_review_diff(review_data, label=stage_arg.name)
+        touched = tuple(
+            dict.fromkeys(
+                [edit.path for edit in parsed] + sorted(deleted_paths)
+            )
+        )
         files: list[dict[str, str | None]] = []
         before_by_path: dict[str, str | None] = {}
         for relative in touched:
@@ -151,6 +177,19 @@ def main() -> None:
             before_digest = sha256_text(before) if exists_state[relative] else None
             before_by_path[relative] = before_digest
             all_first.setdefault(relative, before_digest)
+        for relative in deleted_paths:
+            if before_by_path[relative] is None:
+                raise PatchRefusedError(
+                    f"{stage_arg.name}: cannot delete nonexistent {relative}"
+                )
+            if (
+                before_by_path[relative] == EMPTY_FILE_SHA256
+                and any(edit.path == relative for edit in parsed)
+            ):
+                raise PatchRefusedError(
+                    f"{stage_arg.name}: empty-file deletion of {relative} "
+                    "must be hunkless"
+                )
 
         edits: list[dict[str, str]] = []
         per_path_index: dict[str, int] = {}
@@ -165,7 +204,17 @@ def main() -> None:
                 parsed_edit.old_start,
             )
             before_count = current.count(landmark_before)
-            after_count = current.count(landmark_after)
+            if landmark_after == "":
+                # Deleted-file hunk: identity is whole-file equality (the
+                # empty after block occurs everywhere by definition).
+                if landmark_before != current:
+                    raise PatchRefusedError(
+                        f"{stage_arg.name}:{parsed_edit.path}:landmark-{index}: "
+                        "deleted-file hunk does not describe the whole file"
+                    )
+                after_count = 0
+            else:
+                after_count = current.count(landmark_after)
             if before_count != 1 or after_count != 0:
                 raise PatchRefusedError(
                     f"{stage_arg.name}:{parsed_edit.path}:landmark-{index}: "
@@ -187,13 +236,29 @@ def main() -> None:
             )
 
         for relative in touched:
-            files.append(
-                {
-                    "path": relative,
-                    "before_sha256": before_by_path[relative],
-                    "after_sha256": sha256_text(state[relative]),
-                }
-            )
+            if relative in deleted_paths:
+                if state[relative] != "":
+                    raise PatchRefusedError(
+                        f"{stage_arg.name}: deletion hunks left residual "
+                        f"content in {relative}"
+                    )
+                files.append(
+                    {
+                        "path": relative,
+                        "before_sha256": before_by_path[relative],
+                        "after_sha256": None,
+                    }
+                )
+                del state[relative]
+                exists_state[relative] = False
+            else:
+                files.append(
+                    {
+                        "path": relative,
+                        "before_sha256": before_by_path[relative],
+                        "after_sha256": sha256_text(state[relative]),
+                    }
+                )
         stages.append(
             {
                 "name": stage_arg.name,
@@ -204,7 +269,9 @@ def main() -> None:
             }
         )
 
-    final_files = {path: sha256_text(state[path]) for path in sorted(all_first)}
+    final_files = {
+        path: sha256_text(state[path]) for path in sorted(all_first) if path in state
+    }
     output = (
         '"""Generated redundant landmark blocks; see compile_review_diff.py."""\n\n'
         f"SOURCE_REVISION = {args.source_revision!r}\n\n"

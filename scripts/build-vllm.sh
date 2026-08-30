@@ -2,7 +2,7 @@
 set -euo pipefail
 
 MODE="${1:-build}"
-EXPECTED_STATUS=$' M tests/entrypoints/anthropic/test_anthropic_messages_conversion.py\n M tests/entrypoints/serve/utils/test_api_utils.py\n M tests/entrypoints/unit_tests/test_chat_utils.py\n M tests/multimodal/media/test_connector.py\n M tests/multimodal/media/test_image.py\n M tests/quantization/test_turboquant.py\n M tests/v1/worker/test_gpu_model_runner_mm_gather.py\n M vllm/config/model.py\n M vllm/entrypoints/anthropic/api_router.py\n M vllm/entrypoints/anthropic/protocol.py\n M vllm/entrypoints/anthropic/serving.py\n M vllm/entrypoints/chat_utils.py\n M vllm/entrypoints/openai/chat_completion/protocol.py\n M vllm/entrypoints/openai/chat_completion/serving.py\n M vllm/entrypoints/openai/responses/context.py\n M vllm/entrypoints/openai/responses/protocol.py\n M vllm/entrypoints/openai/responses/serving.py\n M vllm/entrypoints/openai/responses/streaming_events.py\n M vllm/entrypoints/openai/responses/utils.py\n M vllm/entrypoints/serve/utils/api_utils.py\n M vllm/envs.py\n M vllm/model_executor/models/qwen3_vl.py\n M vllm/multimodal/media/connector.py\n M vllm/multimodal/media/image.py\n M vllm/parser/engine/parser_engine.py\n M vllm/parser/qwen3.py\n M vllm/renderers/params.py\n M vllm/sampling_params.py\n M vllm/tool_parsers/structural_tag_registry.py\n M vllm/v1/attention/backends/turboquant_attn.py\n M vllm/v1/attention/ops/triton_turboquant_decode.py\n M vllm/v1/attention/ops/triton_turboquant_store.py\n M vllm/v1/core/sched/utils.py\n M vllm/v1/engine/input_processor.py\n M vllm/v1/kv_offload/cpu/gpu_worker.py\n M vllm/v1/request.py\n M vllm/v1/structured_output/__init__.py\n M vllm/v1/worker/gpu_model_runner.py\n M vllm/v1/worker/workspace.py\n?? tests/v1/worker/test_workspace.py'
+EXPECTED_STATUS=$' M tests/config/test_config_utils.py\n M tests/distributed/test_rocm_quick_reduce.py\n M tests/engine/test_arg_utils.py\n M tests/entrypoints/anthropic/test_anthropic_messages_conversion.py\n M tests/entrypoints/serve/utils/test_api_utils.py\n M tests/entrypoints/unit_tests/test_chat_utils.py\n M tests/evals/gsm8k/test_gsm8k_offloading.py\n M tests/models/language/pooling/test_reward.py\n M tests/multimodal/media/test_connector.py\n M tests/multimodal/media/test_image.py\n M tests/quantization/test_turboquant.py\n M tests/v1/e2e/general/test_context_length.py\n M tests/v1/kv_connector/nixl_integration/run_multi_connector_accuracy_test.sh\n M tests/v1/kv_connector/nixl_integration/run_multi_connector_edge_case_test.sh\n M tests/v1/kv_connector/nixl_integration/spec_decode_acceptance_test.sh\n M tests/v1/kv_connector/unit/offloading_connector/test_events.py\n M tests/v1/kv_connector/unit/offloading_connector/test_scheduler.py\n M tests/v1/kv_connector/unit/offloading_connector/test_worker.py\n M tests/v1/kv_connector/unit/test_config.py\n M tests/v1/kv_connector/unit/test_hma_auto_config.py\n M tests/v1/kv_connector/unit/test_offloading_connector.py\n D tests/v1/kv_offload/cpu/policies/__init__.py\n D tests/v1/kv_offload/cpu/policies/test_factory.py\n M tests/v1/kv_offload/cpu/test_manager.py\n M tests/v1/kv_offload/test_factory.py\n M tests/v1/kv_offload/test_file_mapper.py\n M tests/v1/kv_offload/tiering/p2p/run_accuracy_test.sh\n M tests/v1/kv_offload/tiering/test_fs_tier.py\n M tests/v1/kv_offload/tiering/test_obj_tier.py\n M tests/v1/simple_kv_offload/test_integration.py\n M tests/v1/worker/test_gpu_model_runner_mm_gather.py\n M vllm/config/cache.py\n M vllm/config/model.py\n M vllm/config/vllm.py\n M vllm/distributed/kv_transfer/kv_connector/v1/offloading/config.py\n M vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py\n M vllm/engine/arg_utils.py\n M vllm/entrypoints/anthropic/api_router.py\n M vllm/entrypoints/anthropic/protocol.py\n M vllm/entrypoints/anthropic/serving.py\n M vllm/entrypoints/chat_utils.py\n M vllm/entrypoints/cohere/protocol.py\n M vllm/entrypoints/cohere/serving.py\n M vllm/entrypoints/llm.py\n M vllm/entrypoints/openai/chat_completion/protocol.py\n M vllm/entrypoints/openai/chat_completion/serving.py\n M vllm/entrypoints/openai/completion/protocol.py\n M vllm/entrypoints/openai/responses/context.py\n M vllm/entrypoints/openai/responses/protocol.py\n M vllm/entrypoints/openai/responses/serving.py\n M vllm/entrypoints/openai/responses/streaming_events.py\n M vllm/entrypoints/openai/responses/utils.py\n M vllm/entrypoints/scale_out/token_in_token_out/protocol.py\n M vllm/entrypoints/scale_out/token_in_token_out/serving.py\n M vllm/entrypoints/serve/utils/api_utils.py\n M vllm/envs.py\n M vllm/model_executor/models/qwen3_vl.py\n M vllm/multimodal/media/connector.py\n M vllm/multimodal/media/image.py\n M vllm/parser/engine/parser_engine.py\n M vllm/parser/qwen3.py\n M vllm/renderers/params.py\n M vllm/sampling_params.py\n M vllm/tool_parsers/structural_tag_registry.py\n M vllm/v1/attention/backends/turboquant_attn.py\n M vllm/v1/attention/ops/triton_turboquant_decode.py\n M vllm/v1/attention/ops/triton_turboquant_store.py\n M vllm/v1/core/kv_cache_utils.py\n M vllm/v1/core/sched/utils.py\n M vllm/v1/engine/input_processor.py\n M vllm/v1/kv_offload/base.py\n M vllm/v1/kv_offload/config.py\n M vllm/v1/kv_offload/cpu/gpu_worker.py\n M vllm/v1/kv_offload/cpu/manager.py\n D vllm/v1/kv_offload/cpu/policies/__init__.py\n D vllm/v1/kv_offload/cpu/policies/arc.py\n D vllm/v1/kv_offload/cpu/policies/base.py\n D vllm/v1/kv_offload/cpu/policies/factory.py\n D vllm/v1/kv_offload/cpu/policies/lru.py\n M vllm/v1/kv_offload/cpu/spec.py\n M vllm/v1/kv_offload/tiering/manager.py\n M vllm/v1/kv_offload/tiering/spec.py\n M vllm/v1/request.py\n M vllm/v1/structured_output/__init__.py\n M vllm/v1/worker/gpu_model_runner.py\n M vllm/v1/worker/gpu_worker.py\n M vllm/v1/worker/startup_plan.py\n M vllm/v1/worker/workspace.py\n?? tests/entrypoints/test_kv_scope_protocol.py\n?? tests/v1/core/test_kv_cache_users_sizing.py\n?? tests/v1/worker/test_workspace.py'
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
 # shellcheck source=../config/runtime-v1.sh
@@ -54,6 +54,7 @@ VISION_RUNTIME_PATCH_FILE="${PROJECT_DIR}/patches/vllm-qwen38-vision-runtime.pat
 NUMERICAL_AUDITS_PATCH_FILE="${PROJECT_DIR}/patches/vllm-qwen38-numerical-audits.patch"
 TURBOQUANT_GUARDS_PATCH_FILE="${PROJECT_DIR}/patches/vllm-turboquant-fail-closed-guards.patch"
 KV_OFFLOAD_PINNING_PATCH_FILE="${PROJECT_DIR}/patches/vllm-kv-offload-pinning-fail-closed.patch"
+KV_USERS_SCOPE_PATCH_FILE="${PROJECT_DIR}/patches/vllm-kv-user-count-sizing-and-scope-eviction.patch"
 
 TURBOQUANT_REL="vllm/v1/attention/backends/turboquant_attn.py"
 TOOL_SCHEMA_REL="vllm/tool_parsers/structural_tag_registry.py"
@@ -85,6 +86,26 @@ MEDIA_CONNECTOR_REL="vllm/multimodal/media/connector.py"
 IMAGE_MEDIA_REL="vllm/multimodal/media/image.py"
 RENDER_PARAMS_REL="vllm/renderers/params.py"
 QWEN3_VL_MODEL_REL="vllm/model_executor/models/qwen3_vl.py"
+CACHE_CONFIG_REL="vllm/config/cache.py"
+VLLM_CONFIG_REL="vllm/config/vllm.py"
+ARG_UTILS_REL="vllm/engine/arg_utils.py"
+LLM_ENTRYPOINT_REL="vllm/entrypoints/llm.py"
+KV_CACHE_UTILS_REL="vllm/v1/core/kv_cache_utils.py"
+GPU_WORKER_REL="vllm/v1/worker/gpu_worker.py"
+STARTUP_PLAN_REL="vllm/v1/worker/startup_plan.py"
+KV_OFFLOAD_CONFIG_REL="vllm/v1/kv_offload/config.py"
+KV_OFFLOAD_BASE_REL="vllm/v1/kv_offload/base.py"
+KV_OFFLOAD_CPU_SPEC_REL="vllm/v1/kv_offload/cpu/spec.py"
+KV_OFFLOAD_CPU_MANAGER_REL="vllm/v1/kv_offload/cpu/manager.py"
+KV_TIERING_SPEC_REL="vllm/v1/kv_offload/tiering/spec.py"
+KV_TIERING_MANAGER_REL="vllm/v1/kv_offload/tiering/manager.py"
+OFFLOAD_CONNECTOR_CONFIG_REL="vllm/distributed/kv_transfer/kv_connector/v1/offloading/config.py"
+OFFLOAD_CONNECTOR_SCHEDULER_REL="vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py"
+COMPLETION_PROTOCOL_REL="vllm/entrypoints/openai/completion/protocol.py"
+COHERE_PROTOCOL_REL="vllm/entrypoints/cohere/protocol.py"
+COHERE_SERVING_REL="vllm/entrypoints/cohere/serving.py"
+TITOTO_PROTOCOL_REL="vllm/entrypoints/scale_out/token_in_token_out/protocol.py"
+TITOTO_SERVING_REL="vllm/entrypoints/scale_out/token_in_token_out/serving.py"
 
 case "${MODE}" in
   build|check)
@@ -99,8 +120,8 @@ if [[ ! -f "${DEPLOYMENT_INPUT_MANIFEST}" || -L "${DEPLOYMENT_INPUT_MANIFEST}" ]
   echo "Deployment-input manifest is missing or is not a regular non-symlink file." >&2
   exit 1
 fi
-if [[ "$(wc -l <"${DEPLOYMENT_INPUT_MANIFEST}")" != "70" ]]; then
-  echo "Deployment-input manifest must contain exactly 70 hashed files." >&2
+if [[ "$(wc -l <"${DEPLOYMENT_INPUT_MANIFEST}")" != "71" ]]; then
+  echo "Deployment-input manifest must contain exactly 71 hashed files." >&2
   exit 1
 fi
 (
@@ -133,7 +154,7 @@ if [[ "${actual_status}" != "${EXPECTED_STATUS}" ]]; then
   exit 1
 fi
 
-printf '%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n' \
+printf '%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n' \
   "${TURBOQUANT_PATCH_DIFF_SHA256}" "${TURBOQUANT_PATCH_FILE}" \
   "${TOOL_SCHEMA_PATCH_DIFF_SHA256}" "${TOOL_SCHEMA_PATCH_FILE}" \
   "${AGENT_DEFAULTS_PATCH_DIFF_SHA256}" "${AGENT_DEFAULTS_PATCH_FILE}" \
@@ -144,7 +165,8 @@ printf '%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n
   "${VISION_RUNTIME_PATCH_DIFF_SHA256}" "${VISION_RUNTIME_PATCH_FILE}" \
   "${NUMERICAL_AUDITS_PATCH_DIFF_SHA256}" "${NUMERICAL_AUDITS_PATCH_FILE}" \
   "${TURBOQUANT_GUARDS_PATCH_DIFF_SHA256}" "${TURBOQUANT_GUARDS_PATCH_FILE}" \
-  "${KV_OFFLOAD_PINNING_PATCH_DIFF_SHA256}" "${KV_OFFLOAD_PINNING_PATCH_FILE}" | \
+  "${KV_OFFLOAD_PINNING_PATCH_DIFF_SHA256}" "${KV_OFFLOAD_PINNING_PATCH_FILE}" \
+  "${KV_USERS_SCOPE_PATCH_DIFF_SHA256}" "${KV_USERS_SCOPE_PATCH_FILE}" | \
   sha256sum --check --strict
 
 printf '%s  %s\n' \
@@ -215,6 +237,16 @@ if [[ "${reproduced_status}" != "${EXPECTED_STATUS}" ]]; then
 fi
 while IFS= read -r status_line; do
   relative_path="${status_line:3}"
+  if [[ "${status_line:0:2}" == " D" ]]; then
+    # A deletion is reproduced only when the path is absent on BOTH sides;
+    # cmp cannot say that, and a survivor on either side is drift.
+    if [[ -e "${VERIFY_WORKTREE}/${relative_path}" \
+       || -e "${VLLM_DIR}/${relative_path}" ]]; then
+      echo "Reviewed patches do not reproduce deletion of ${relative_path}." >&2
+      exit 1
+    fi
+    continue
+  fi
   if ! cmp -s \
     "${VERIFY_WORKTREE}/${relative_path}" \
     "${VLLM_DIR}/${relative_path}"; then
@@ -266,6 +298,29 @@ printf '%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n
   "${VISION_MLP_UNIT_SHA256}" "${VISION_MLP_UNIT_FILE}" | \
   sha256sum --check --strict
 
+printf '%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n' \
+  "${CACHE_CONFIG_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${CACHE_CONFIG_REL}" \
+  "${VLLM_CONFIG_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${VLLM_CONFIG_REL}" \
+  "${ARG_UTILS_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${ARG_UTILS_REL}" \
+  "${LLM_ENTRYPOINT_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${LLM_ENTRYPOINT_REL}" \
+  "${KV_CACHE_UTILS_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${KV_CACHE_UTILS_REL}" \
+  "${GPU_WORKER_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${GPU_WORKER_REL}" \
+  "${STARTUP_PLAN_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${STARTUP_PLAN_REL}" \
+  "${KV_OFFLOAD_CONFIG_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${KV_OFFLOAD_CONFIG_REL}" \
+  "${KV_OFFLOAD_BASE_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${KV_OFFLOAD_BASE_REL}" \
+  "${KV_OFFLOAD_CPU_SPEC_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${KV_OFFLOAD_CPU_SPEC_REL}" \
+  "${KV_OFFLOAD_CPU_MANAGER_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${KV_OFFLOAD_CPU_MANAGER_REL}" \
+  "${KV_TIERING_SPEC_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${KV_TIERING_SPEC_REL}" \
+  "${KV_TIERING_MANAGER_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${KV_TIERING_MANAGER_REL}" \
+  "${OFFLOAD_CONNECTOR_CONFIG_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${OFFLOAD_CONNECTOR_CONFIG_REL}" \
+  "${OFFLOAD_CONNECTOR_SCHEDULER_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${OFFLOAD_CONNECTOR_SCHEDULER_REL}" \
+  "${COMPLETION_PROTOCOL_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${COMPLETION_PROTOCOL_REL}" \
+  "${COHERE_PROTOCOL_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${COHERE_PROTOCOL_REL}" \
+  "${COHERE_SERVING_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${COHERE_SERVING_REL}" \
+  "${TITOTO_PROTOCOL_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${TITOTO_PROTOCOL_REL}" \
+  "${TITOTO_SERVING_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${TITOTO_SERVING_REL}"  | \
+  sha256sum --check --strict
+
 printf '%s  %s\n%s  %s\n' \
   "${RUNTIME_DOCKERFILE_SHA256}" "${DOCKERFILE}" \
   "${DOCKERIGNORE_SHA256}" "${DOCKERIGNORE}" | \
@@ -280,7 +335,7 @@ printf '%s  %s\n%s  %s\n%s  %s\n' \
 git -C "${VLLM_DIR}" diff --check
 
 if [[ "${MODE}" == "check" ]]; then
-  echo "Pinned base image, vLLM commit, transactional landmark patcher, twenty-nine reviewed runtime source files, seven reviewed modified test files, one reviewed new test file, nine review diffs, agent template, three numerical audit units, and all build units are exact."
+  echo "Pinned base image, vLLM commit, transactional landmark patcher, fifty reviewed runtime source files, five reviewed source deletions, twenty-nine reviewed modified test files, three reviewed new test files, two reviewed test deletions, twelve review diffs, agent template, three numerical audit units, and all build units are exact."
   exit 0
 fi
 
@@ -363,6 +418,52 @@ docker buildx build --progress=plain \
   --build-arg "NVFP4_KERNEL_UNIT_SHA256=${NVFP4_KERNEL_UNIT_SHA256}" \
   --build-arg "NUMERICAL_AUDITS_PATCH_DIFF_SHA256=${NUMERICAL_AUDITS_PATCH_DIFF_SHA256}" \
   --build-arg "KV_OFFLOAD_PINNING_PATCH_DIFF_SHA256=${KV_OFFLOAD_PINNING_PATCH_DIFF_SHA256}" \
+  --build-arg "KV_USERS_SCOPE_PATCH_DIFF_SHA256=${KV_USERS_SCOPE_PATCH_DIFF_SHA256}" \
+  --build-arg "CACHE_CONFIG_UPSTREAM_FILE_SHA256=${CACHE_CONFIG_UPSTREAM_FILE_SHA256}" \
+  --build-arg "VLLM_CONFIG_UPSTREAM_FILE_SHA256=${VLLM_CONFIG_UPSTREAM_FILE_SHA256}" \
+  --build-arg "ARG_UTILS_UPSTREAM_FILE_SHA256=${ARG_UTILS_UPSTREAM_FILE_SHA256}" \
+  --build-arg "LLM_ENTRYPOINT_UPSTREAM_FILE_SHA256=${LLM_ENTRYPOINT_UPSTREAM_FILE_SHA256}" \
+  --build-arg "KV_CACHE_UTILS_UPSTREAM_FILE_SHA256=${KV_CACHE_UTILS_UPSTREAM_FILE_SHA256}" \
+  --build-arg "GPU_WORKER_UPSTREAM_FILE_SHA256=${GPU_WORKER_UPSTREAM_FILE_SHA256}" \
+  --build-arg "STARTUP_PLAN_UPSTREAM_FILE_SHA256=${STARTUP_PLAN_UPSTREAM_FILE_SHA256}" \
+  --build-arg "KV_OFFLOAD_CONFIG_UPSTREAM_FILE_SHA256=${KV_OFFLOAD_CONFIG_UPSTREAM_FILE_SHA256}" \
+  --build-arg "KV_OFFLOAD_BASE_UPSTREAM_FILE_SHA256=${KV_OFFLOAD_BASE_UPSTREAM_FILE_SHA256}" \
+  --build-arg "KV_OFFLOAD_CPU_SPEC_UPSTREAM_FILE_SHA256=${KV_OFFLOAD_CPU_SPEC_UPSTREAM_FILE_SHA256}" \
+  --build-arg "KV_OFFLOAD_CPU_MANAGER_UPSTREAM_FILE_SHA256=${KV_OFFLOAD_CPU_MANAGER_UPSTREAM_FILE_SHA256}" \
+  --build-arg "KV_TIERING_SPEC_UPSTREAM_FILE_SHA256=${KV_TIERING_SPEC_UPSTREAM_FILE_SHA256}" \
+  --build-arg "KV_TIERING_MANAGER_UPSTREAM_FILE_SHA256=${KV_TIERING_MANAGER_UPSTREAM_FILE_SHA256}" \
+  --build-arg "OFFLOAD_CONNECTOR_CONFIG_UPSTREAM_FILE_SHA256=${OFFLOAD_CONNECTOR_CONFIG_UPSTREAM_FILE_SHA256}" \
+  --build-arg "OFFLOAD_CONNECTOR_SCHEDULER_UPSTREAM_FILE_SHA256=${OFFLOAD_CONNECTOR_SCHEDULER_UPSTREAM_FILE_SHA256}" \
+  --build-arg "COMPLETION_PROTOCOL_UPSTREAM_FILE_SHA256=${COMPLETION_PROTOCOL_UPSTREAM_FILE_SHA256}" \
+  --build-arg "COHERE_PROTOCOL_UPSTREAM_FILE_SHA256=${COHERE_PROTOCOL_UPSTREAM_FILE_SHA256}" \
+  --build-arg "COHERE_SERVING_UPSTREAM_FILE_SHA256=${COHERE_SERVING_UPSTREAM_FILE_SHA256}" \
+  --build-arg "TITOTO_PROTOCOL_UPSTREAM_FILE_SHA256=${TITOTO_PROTOCOL_UPSTREAM_FILE_SHA256}" \
+  --build-arg "TITOTO_SERVING_UPSTREAM_FILE_SHA256=${TITOTO_SERVING_UPSTREAM_FILE_SHA256}" \
+  --build-arg "POLICY_PKG_INIT_UPSTREAM_FILE_SHA256=${POLICY_PKG_INIT_UPSTREAM_FILE_SHA256}" \
+  --build-arg "POLICY_BASE_UPSTREAM_FILE_SHA256=${POLICY_BASE_UPSTREAM_FILE_SHA256}" \
+  --build-arg "POLICY_FACTORY_UPSTREAM_FILE_SHA256=${POLICY_FACTORY_UPSTREAM_FILE_SHA256}" \
+  --build-arg "POLICY_LRU_UPSTREAM_FILE_SHA256=${POLICY_LRU_UPSTREAM_FILE_SHA256}" \
+  --build-arg "POLICY_ARC_UPSTREAM_FILE_SHA256=${POLICY_ARC_UPSTREAM_FILE_SHA256}" \
+  --build-arg "CACHE_CONFIG_PATCHED_FILE_SHA256=${CACHE_CONFIG_PATCHED_FILE_SHA256}" \
+  --build-arg "VLLM_CONFIG_PATCHED_FILE_SHA256=${VLLM_CONFIG_PATCHED_FILE_SHA256}" \
+  --build-arg "ARG_UTILS_PATCHED_FILE_SHA256=${ARG_UTILS_PATCHED_FILE_SHA256}" \
+  --build-arg "LLM_ENTRYPOINT_PATCHED_FILE_SHA256=${LLM_ENTRYPOINT_PATCHED_FILE_SHA256}" \
+  --build-arg "KV_CACHE_UTILS_PATCHED_FILE_SHA256=${KV_CACHE_UTILS_PATCHED_FILE_SHA256}" \
+  --build-arg "GPU_WORKER_PATCHED_FILE_SHA256=${GPU_WORKER_PATCHED_FILE_SHA256}" \
+  --build-arg "STARTUP_PLAN_PATCHED_FILE_SHA256=${STARTUP_PLAN_PATCHED_FILE_SHA256}" \
+  --build-arg "KV_OFFLOAD_CONFIG_PATCHED_FILE_SHA256=${KV_OFFLOAD_CONFIG_PATCHED_FILE_SHA256}" \
+  --build-arg "KV_OFFLOAD_BASE_PATCHED_FILE_SHA256=${KV_OFFLOAD_BASE_PATCHED_FILE_SHA256}" \
+  --build-arg "KV_OFFLOAD_CPU_SPEC_PATCHED_FILE_SHA256=${KV_OFFLOAD_CPU_SPEC_PATCHED_FILE_SHA256}" \
+  --build-arg "KV_OFFLOAD_CPU_MANAGER_PATCHED_FILE_SHA256=${KV_OFFLOAD_CPU_MANAGER_PATCHED_FILE_SHA256}" \
+  --build-arg "KV_TIERING_SPEC_PATCHED_FILE_SHA256=${KV_TIERING_SPEC_PATCHED_FILE_SHA256}" \
+  --build-arg "KV_TIERING_MANAGER_PATCHED_FILE_SHA256=${KV_TIERING_MANAGER_PATCHED_FILE_SHA256}" \
+  --build-arg "OFFLOAD_CONNECTOR_CONFIG_PATCHED_FILE_SHA256=${OFFLOAD_CONNECTOR_CONFIG_PATCHED_FILE_SHA256}" \
+  --build-arg "OFFLOAD_CONNECTOR_SCHEDULER_PATCHED_FILE_SHA256=${OFFLOAD_CONNECTOR_SCHEDULER_PATCHED_FILE_SHA256}" \
+  --build-arg "COMPLETION_PROTOCOL_PATCHED_FILE_SHA256=${COMPLETION_PROTOCOL_PATCHED_FILE_SHA256}" \
+  --build-arg "COHERE_PROTOCOL_PATCHED_FILE_SHA256=${COHERE_PROTOCOL_PATCHED_FILE_SHA256}" \
+  --build-arg "COHERE_SERVING_PATCHED_FILE_SHA256=${COHERE_SERVING_PATCHED_FILE_SHA256}" \
+  --build-arg "TITOTO_PROTOCOL_PATCHED_FILE_SHA256=${TITOTO_PROTOCOL_PATCHED_FILE_SHA256}" \
+  --build-arg "TITOTO_SERVING_PATCHED_FILE_SHA256=${TITOTO_SERVING_PATCHED_FILE_SHA256}" \ \
   --build-arg "SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH}" \
   --output "type=docker,dest=${RUNTIME_ARCHIVE},name=${IMAGE_TAG},rewrite-timestamp=true" \
   --file "${DOCKERFILE}" \
@@ -471,6 +572,68 @@ if [[ "${additional_installed_report}" != "${expected_additional_installed_repor
   printf '%s\n' "${additional_installed_report}" >&2
   exit 1
 fi
+
+kv_users_installed_report="$(
+  docker run --rm --network none --entrypoint sha256sum "${IMAGE_TAG}" \
+    /usr/local/lib/python3.12/dist-packages/vllm/config/cache.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/config/vllm.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/engine/arg_utils.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/llm.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/v1/core/kv_cache_utils.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/v1/worker/gpu_worker.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/v1/worker/startup_plan.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/config.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/base.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/cpu/spec.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/cpu/manager.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/tiering/spec.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/tiering/manager.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/distributed/kv_transfer/kv_connector/v1/offloading/config.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/completion/protocol.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/cohere/protocol.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/cohere/serving.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/scale_out/token_in_token_out/protocol.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/scale_out/token_in_token_out/serving.py
+)"
+expected_kv_users_installed_report="$(printf '%s  %s\\n%s  %s\\n%s  %s\\n%s  %s\\n%s  %s\\n%s  %s\\n%s  %s\\n%s  %s\\n%s  %s\\n%s  %s\\n%s  %s\\n%s  %s\\n%s  %s\\n%s  %s\\n%s  %s\\n%s  %s\\n%s  %s\\n%s  %s\\n%s  %s\\n%s  %s' \
+  "${CACHE_CONFIG_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/config/cache.py \
+  "${VLLM_CONFIG_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/config/vllm.py \
+  "${ARG_UTILS_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/engine/arg_utils.py \
+  "${LLM_ENTRYPOINT_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/llm.py \
+  "${KV_CACHE_UTILS_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/core/kv_cache_utils.py \
+  "${GPU_WORKER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/worker/gpu_worker.py \
+  "${STARTUP_PLAN_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/worker/startup_plan.py \
+  "${KV_OFFLOAD_CONFIG_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/config.py \
+  "${KV_OFFLOAD_BASE_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/base.py \
+  "${KV_OFFLOAD_CPU_SPEC_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/cpu/spec.py \
+  "${KV_OFFLOAD_CPU_MANAGER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/cpu/manager.py \
+  "${KV_TIERING_SPEC_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/tiering/spec.py \
+  "${KV_TIERING_MANAGER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/tiering/manager.py \
+  "${OFFLOAD_CONNECTOR_CONFIG_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/distributed/kv_transfer/kv_connector/v1/offloading/config.py \
+  "${OFFLOAD_CONNECTOR_SCHEDULER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py \
+  "${COMPLETION_PROTOCOL_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/completion/protocol.py \
+  "${COHERE_PROTOCOL_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/cohere/protocol.py \
+  "${COHERE_SERVING_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/cohere/serving.py \
+  "${TITOTO_PROTOCOL_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/scale_out/token_in_token_out/protocol.py \
+  "${TITOTO_SERVING_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/scale_out/token_in_token_out/serving.py)"
+if [[ "${kv_users_installed_report}" != "${expected_kv_users_installed_report}" ]]; then
+  echo "Built image contains unexpected KV user-count/scope bytes." >&2
+  echo "Expected:" >&2
+  printf '%s\n' "${expected_kv_users_installed_report}" >&2
+  echo "Found:" >&2
+  printf '%s\n' "${kv_users_installed_report}" >&2
+  exit 1
+fi
+
+# The deleted eviction-policy package must be absent from the shipped image,
+# not merely unreferenced: a stranded importable copy is a selectable mode.
+if ! docker run --rm --network none --entrypoint test "${IMAGE_TAG}" \
+    '!' -e /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/cpu/policies; then
+  echo "Built image still contains the deleted policies package." >&2
+  exit 1
+fi
+
 if [[ "${actual_image_id}" != "${EXPECTED_IMAGE_ID}" ]]; then
   echo "Reproducible build ID mismatch." >&2
   echo "Expected: ${EXPECTED_IMAGE_ID}" >&2

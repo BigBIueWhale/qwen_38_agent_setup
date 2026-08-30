@@ -27,6 +27,71 @@ def _noop(_state) -> None:
     return None
 
 
+def _deletion_review(path: str, before: str) -> str:
+    """git-style deletion. An empty ``before`` is the hunkless form: the
+    'deleted file mode' header is then the entire review evidence."""
+    header = (
+        f"diff --git a/{path} b/{path}\n"
+        f"deleted file mode 100644\n"
+    )
+    if before == "":
+        return header
+    old_lines = before.count("\n")
+    old = "".join(f"-{line}" for line in before.splitlines(keepends=True))
+    return (
+        header
+        + f"--- a/{path}\n"
+        + "+++ /dev/null\n"
+        + f"@@ -1,{old_lines} +0,0 @@\n"
+        + old
+    )
+
+
+def _deletion_stage(
+    artifact_root: Path,
+    *,
+    name: str,
+    deletions: tuple[tuple[str, str], ...],
+    review_override: str | None = None,
+) -> PatchStage:
+    review_path = f"{name}.patch"
+    review = (
+        review_override
+        if review_override is not None
+        else "".join(_deletion_review(path, before) for path, before in deletions)
+    )
+    (artifact_root / review_path).write_text(review, encoding="utf-8", newline="\n")
+    return PatchStage(
+        name=name,
+        rationale="Synthetic deletion used to prove transaction failure semantics.",
+        removal_condition="Remove when this framework test is removed.",
+        review_patch=review_path,
+        review_sha256=sha256_bytes(review.encode("utf-8")),
+        files=tuple(
+            FileIdentity(
+                path=path,
+                before_sha256=sha256_text(before),
+                after_sha256=None,
+            )
+            for path, before in deletions
+        ),
+        edits=tuple(
+            LandmarkEdit(
+                name=f"{name}:{path}",
+                path=path,
+                before=before,
+                after="",
+                review_before=before,
+                review_after="",
+            )
+            for path, before in deletions
+            if before != ""
+        ),
+        validate_before=_noop,
+        validate_after=_noop,
+    )
+
+
 def _review(path: str, before: str, after: str) -> str:
     old_lines = before.count("\n")
     new_lines = after.count("\n")
@@ -349,3 +414,179 @@ class SourcePatchTransactionTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class DeletionTransactionTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.temporary = tempfile.TemporaryDirectory(prefix="source-patch-test-")
+        root = Path(self.temporary.name)
+        self.source = root / "source"
+        self.artifact = root / "artifact"
+        self.source.mkdir()
+        self.artifact.mkdir()
+        (self.source / "identity.txt").write_text(
+            "pinned-revision\n", encoding="utf-8"
+        )
+
+    def tearDown(self) -> None:
+        self.temporary.cleanup()
+
+    def test_nonempty_deletion_applies_and_is_idempotent(self) -> None:
+        doomed = "def dead_code():\n    return None\n"
+        (self.source / "doomed.py").write_text(doomed, encoding="utf-8")
+        stage = _deletion_stage(
+            self.artifact,
+            name="delete-doomed",
+            deletions=(("doomed.py", doomed),),
+        )
+        transaction = SourcePatchTransaction(
+            self.source, self.artifact, _patchset((stage,), final_files={})
+        )
+
+        first = transaction.apply()
+        second = transaction.apply()
+
+        self.assertEqual(first.state, "applied")
+        self.assertEqual(first.changed_files, ("doomed.py",))
+        self.assertEqual(second.state, "already-applied")
+        self.assertFalse((self.source / "doomed.py").exists())
+
+    def test_empty_file_deletion_is_hunkless_and_applies(self) -> None:
+        (self.source / "__init__.py").write_bytes(b"")
+        stage = _deletion_stage(
+            self.artifact,
+            name="delete-empty-marker",
+            deletions=(("__init__.py", ""),),
+        )
+        transaction = SourcePatchTransaction(
+            self.source, self.artifact, _patchset((stage,), final_files={})
+        )
+
+        result = transaction.apply()
+
+        self.assertEqual(result.state, "applied")
+        self.assertFalse((self.source / "__init__.py").exists())
+        self.assertEqual(transaction.apply().state, "already-applied")
+
+    def test_deletion_without_review_marker_is_refused(self) -> None:
+        doomed = "def dead_code():\n    return None\n"
+        (self.source / "doomed.py").write_text(doomed, encoding="utf-8")
+        # Review diff shows the emptying hunk but not the deleted-file
+        # header: the Python data and the review evidence disagree about
+        # whether the file ceases to exist.
+        review = (
+            f"diff --git a/doomed.py b/doomed.py\n"
+            f"--- a/doomed.py\n"
+            f"+++ /dev/null\n"
+            f"@@ -1,2 +0,0 @@\n"
+            + "".join(f"-{line}" for line in doomed.splitlines(keepends=True))
+        )
+        stage = _deletion_stage(
+            self.artifact,
+            name="delete-doomed",
+            deletions=(("doomed.py", doomed),),
+            review_override=review,
+        )
+        transaction = SourcePatchTransaction(
+            self.source, self.artifact, _patchset((stage,), final_files={})
+        )
+
+        with self.assertRaisesRegex(PatchRefusedError, "declares deletions"):
+            transaction.apply()
+        self.assertTrue((self.source / "doomed.py").exists())
+
+    def test_deletion_landmark_mismatch_refuses_without_writes(self) -> None:
+        expected = "def dead_code():\n    return None\n"
+        drifted = "def dead_code():\n    return 1\n"
+        (self.source / "doomed.py").write_text(drifted, encoding="utf-8")
+        stage = _deletion_stage(
+            self.artifact,
+            name="delete-doomed",
+            deletions=(("doomed.py", expected),),
+        )
+        transaction = SourcePatchTransaction(
+            self.source, self.artifact, _patchset((stage,), final_files={})
+        )
+
+        with self.assertRaises(PatchRefusedError):
+            transaction.apply()
+        self.assertEqual(
+            (self.source / "doomed.py").read_text(encoding="utf-8"), drifted
+        )
+
+    def test_resurrecting_a_deleted_file_is_refused(self) -> None:
+        doomed = "def dead_code():\n    return None\n"
+        reborn = "def dead_code():\n    return 2\n"
+        (self.source / "doomed.py").write_text(doomed, encoding="utf-8")
+        delete_stage = _deletion_stage(
+            self.artifact,
+            name="delete-doomed",
+            deletions=(("doomed.py", doomed),),
+        )
+        recreate_stage = _stage(
+            self.artifact,
+            name="recreate-doomed",
+            transformations=(("doomed.py", "", reborn),),
+        )
+        transaction = SourcePatchTransaction(
+            self.source,
+            self.artifact,
+            _patchset(
+                (delete_stage, recreate_stage),
+                final_files={"doomed.py": sha256_text(reborn)},
+            ),
+        )
+
+        with self.assertRaisesRegex(PatchRefusedError, "resurrected"):
+            transaction.apply()
+        self.assertEqual(
+            (self.source / "doomed.py").read_text(encoding="utf-8"), doomed
+        )
+
+    def test_failed_commit_restores_deleted_files(self) -> None:
+        doomed = "def dead_code():\n    return None\n"
+        kept_before = "def value():\n    return 1\n"
+        kept_after = "def value():\n    return 2\n"
+        (self.source / "doomed.py").write_text(doomed, encoding="utf-8")
+        (self.source / "kept.py").write_text(kept_before, encoding="utf-8")
+        delete_stage = _deletion_stage(
+            self.artifact,
+            name="delete-doomed",
+            deletions=(("doomed.py", doomed),),
+        )
+        edit_stage = _stage(
+            self.artifact,
+            name="edit-kept",
+            transformations=(("kept.py", kept_before, kept_after),),
+        )
+        transaction = SourcePatchTransaction(
+            self.source,
+            self.artifact,
+            _patchset(
+                (delete_stage, edit_stage),
+                final_files={"kept.py": sha256_text(kept_after)},
+            ),
+        )
+
+        real_replace = os.replace
+
+        def failing_replace(src, dst):
+            # The unlink of doomed.py happens first (changed_files order);
+            # failing the kept.py replacement must roll the deletion back.
+            # Rollback restores use a .qwen-rollback. temp name and must be
+            # allowed through, or the failure being tested would also break
+            # the recovery being asserted.
+            if str(dst).endswith("kept.py") and ".qwen-rollback." not in str(src):
+                raise OSError("synthetic replace failure")
+            return real_replace(src, dst)
+
+        with patch.object(framework.os, "replace", failing_replace):
+            with self.assertRaises(PatchWriteError):
+                transaction.apply()
+
+        self.assertEqual(
+            (self.source / "doomed.py").read_text(encoding="utf-8"), doomed
+        )
+        self.assertEqual(
+            (self.source / "kept.py").read_text(encoding="utf-8"), kept_before
+        )

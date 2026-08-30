@@ -1,0 +1,4476 @@
+diff --git a/tests/config/test_config_utils.py b/tests/config/test_config_utils.py
+--- a/tests/config/test_config_utils.py
++++ b/tests/config/test_config_utils.py
+@@ -212,7 +212,11 @@
+     and forces a full recompile.
+     """
+     base_hash = CacheConfig().compute_hash()
+-    assert CacheConfig(kv_cache_memory_bytes=1 << 30).compute_hash() == base_hash
++    sized = CacheConfig(kv_cache_users=8)
++    # Internal availability state (startup plan / CPU backend), set
++    # post-init; there is no constructor inlet any more.
++    sized.kv_cache_memory_bytes = 1 << 30
++    assert sized.compute_hash() == base_hash
+     assert CacheConfig(gpu_memory_utilization=0.5).compute_hash() == base_hash
+ 
+ 
+diff --git a/tests/distributed/test_rocm_quick_reduce.py b/tests/distributed/test_rocm_quick_reduce.py
+--- a/tests/distributed/test_rocm_quick_reduce.py
++++ b/tests/distributed/test_rocm_quick_reduce.py
+@@ -267,7 +267,7 @@
+ E2E_PREFILL_TOKENS = 1024
+ E2E_MAX_MODEL_LEN = 1536
+ E2E_GPU_MEMORY_UTILIZATION = 0.3
+-E2E_KV_CACHE_MEMORY_BYTES = 2 << 30
++E2E_KV_CACHE_USERS = 4
+ 
+ _BACKGROUND_LINE = (
+     "Background filler: this archived operations memo repeats a routine status "
+@@ -482,7 +482,7 @@
+         _log(
+             f"starting generation: backend={backend} quant={quant_mode} "
+             f"gpu_memory_utilization={E2E_GPU_MEMORY_UTILIZATION} "
+-            f"kv_cache_bytes={E2E_KV_CACHE_MEMORY_BYTES} model={model_path}"
++            f"kv_cache_users={E2E_KV_CACHE_USERS} model={model_path}"
+         )
+ 
+         try:
+@@ -496,7 +496,7 @@
+                 max_model_len=E2E_MAX_MODEL_LEN,
+                 max_num_seqs=len(E2E_PROMPTS),
+                 gpu_memory_utilization=E2E_GPU_MEMORY_UTILIZATION,
+-                kv_cache_memory_bytes=E2E_KV_CACHE_MEMORY_BYTES,
++                kv_cache_users=E2E_KV_CACHE_USERS,
+                 seed=0,
+             )
+ 
+diff --git a/tests/engine/test_arg_utils.py b/tests/engine/test_arg_utils.py
+--- a/tests/engine/test_arg_utils.py
++++ b/tests/engine/test_arg_utils.py
+@@ -580,15 +580,13 @@
+     args = parser.parse_args(["--max-num-scheduled-tokens", "10.5k"])
+     assert args.max_num_scheduled_tokens == 10500
+ 
+-    # Test kv_cache_memory_bytes (existing human-readable arg)
+-    args = parser.parse_args(["--kv-cache-memory-bytes", "100000"])
+-    assert args.kv_cache_memory_bytes == 100000
+-    args = parser.parse_args(["--kv-cache-memory-bytes", "100k"])
+-    assert args.kv_cache_memory_bytes == 100_000
+-    args = parser.parse_args(["--kv-cache-memory-bytes", "1M"])
+-    assert args.kv_cache_memory_bytes == 2**20
+-    args = parser.parse_args(["--kv-cache-memory-bytes", "1m"])
+-    assert args.kv_cache_memory_bytes == 1_000_000
++    # Byte-denominated KV sizing is gone: capacity is declared in user
++    # contexts, and the old flag must fail argument parsing outright
++    # rather than survive as an alias or fallback.
++    with pytest.raises(SystemExit):
++        parser.parse_args(["--kv-cache-memory-bytes", "100000"])
++    args = parser.parse_args(["--kv-cache-users", "3"])
++    assert args.kv_cache_users == 3
+ 
+     # Test max_num_batched_tokens (existing human-readable arg)
+     args = parser.parse_args(["--max-num-batched-tokens", "1024"])
+diff --git a/tests/evals/gsm8k/test_gsm8k_offloading.py b/tests/evals/gsm8k/test_gsm8k_offloading.py
+--- a/tests/evals/gsm8k/test_gsm8k_offloading.py
++++ b/tests/evals/gsm8k/test_gsm8k_offloading.py
+@@ -50,17 +50,23 @@
+ 
+ 
+ def _kv_transfer_config(
+-    connector: str, cpu_gib: int = 4, spec_name: str = "CPUOffloadingSpec"
++    connector: str,
++    cpu_gib: int = 4,
++    spec_name: str = "CPUOffloadingSpec",
++    cpu_kv_cache_users: int = 4,
+ ) -> str:
+     if connector == "OffloadingConnector":
++        # The native offloading spec sizes its CPU tier as a declared count
++        # of resident full-length user contexts (bytes are derived from
++        # max_model_len and the KV cache spec); cpu_gib only applies to
++        # SimpleCPUOffloadConnector, which keeps its own byte contract.
+         return json.dumps(
+             {
+                 "kv_connector": "OffloadingConnector",
+                 "kv_role": "kv_both",
+                 "kv_connector_extra_config": {
+                     "spec_name": spec_name,
+-                    "cpu_bytes_to_use": cpu_gib << 30,
+-                    "eviction_policy": "lru",
++                    "cpu_kv_cache_users": cpu_kv_cache_users,
+                 },
+             }
+         )
+@@ -246,6 +252,8 @@
+         "--enforce-eager",
+         "--max-model-len",
+         "4096",
++        "--kv-cache-users",
++        "4",
+         "--enable-prefix-caching",
+         "--no-disable-hybrid-kv-cache-manager",
+         "--kv-transfer-config",
+diff --git a/tests/models/language/pooling/test_reward.py b/tests/models/language/pooling/test_reward.py
+--- a/tests/models/language/pooling/test_reward.py
++++ b/tests/models/language/pooling/test_reward.py
+@@ -113,7 +113,7 @@
+         model,
+         max_model_len=1024,
+         dtype=dtype,
+-        kv_cache_memory_bytes=64 * MiB_bytes,
++        kv_cache_users=1,
+     ) as vllm_model:
+         assert vllm_model.llm.llm_engine.vllm_config.use_v2_model_runner
+         vllm_outputs = vllm_model.token_classify(math_step_prompts)
+@@ -161,7 +161,7 @@
+         model,
+         max_model_len=1024,
+         dtype=dtype,
+-        kv_cache_memory_bytes=64 * MiB_bytes,
++        kv_cache_users=1,
+     ) as vllm_model:
+         assert (
+             vllm_model.llm.llm_engine.vllm_config.use_v2_model_runner
+diff --git a/tests/v1/e2e/general/test_context_length.py b/tests/v1/e2e/general/test_context_length.py
+--- a/tests/v1/e2e/general/test_context_length.py
++++ b/tests/v1/e2e/general/test_context_length.py
+@@ -75,18 +75,17 @@
+     must see this reduced value and reject prompts that exceed it,
+     rather than accepting them and hanging."""
+ 
+-    # Use a small KV cache budget to force auto-fit to a small
+-    # max_model_len. Pin block_size=16 so the budget is independent
+-    # of the platform's default block size.
+-    kv_cache_bytes = 1_000_000  # 1 MB
+-
++    # Use a small utilization budget to force auto-fit to a reduced
++    # max_model_len for the single declared user. Pin block_size=16 so
++    # the budget is independent of the platform's default block size.
+     with vllm_runner(
+         model_name=model,
+         max_model_len=-1,
+         max_num_seqs=1,
+         enforce_eager=True,
+         block_size=16,
+-        kv_cache_memory_bytes=kv_cache_bytes,
++        kv_cache_users=1,
++        gpu_memory_utilization=0.02,
+         load_format="dummy",
+     ) as vllm_model:
+         auto_fitted_len = (
+diff --git a/tests/v1/kv_connector/nixl_integration/run_multi_connector_accuracy_test.sh b/tests/v1/kv_connector/nixl_integration/run_multi_connector_accuracy_test.sh
+--- a/tests/v1/kv_connector/nixl_integration/run_multi_connector_accuracy_test.sh
++++ b/tests/v1/kv_connector/nixl_integration/run_multi_connector_accuracy_test.sh
+@@ -65,7 +65,7 @@
+       {"kv_connector":"NixlConnector","kv_role":"kv_both",
+        "kv_buffer_device":"'$KV_BUFFER_DEVICE'"},
+       {"kv_connector":"OffloadingConnector","kv_role":"kv_both",
+-       "kv_connector_extra_config":{"cpu_bytes_to_use":1000000000}}
++       "kv_connector_extra_config":{"cpu_kv_cache_users":4}}
+     ]
+   }
+ }'
+@@ -82,7 +82,7 @@
+        "kv_buffer_device":"'$KV_BUFFER_DEVICE'",
+        "kv_connector_extra_config":{"enable_cross_layers_blocks":"True"}},
+       {"kv_connector":"OffloadingConnector","kv_role":"kv_both",
+-       "kv_connector_extra_config":{"cpu_bytes_to_use":1000000000}}
++       "kv_connector_extra_config":{"cpu_kv_cache_users":4}}
+     ]
+   }
+ }'
+@@ -146,6 +146,7 @@
+     --enforce-eager \
+     --block-size ${BLOCK_SIZE} \
+     --max-model-len ${MAX_MODEL_LEN} \
++    --kv-cache-users 2 \
+     --gpu-memory-utilization $GPU_MEMORY_UTILIZATION \
+     --tensor-parallel-size 1 \
+     --kv-transfer-config '$kv_config'"
+@@ -172,6 +173,7 @@
+     --enforce-eager \
+     --block-size ${BLOCK_SIZE} \
+     --max-model-len ${MAX_MODEL_LEN} \
++    --kv-cache-users 2 \
+     --gpu-memory-utilization $GPU_MEMORY_UTILIZATION \
+     --tensor-parallel-size 1 \
+     --kv-transfer-config '$kv_config'"
+diff --git a/tests/v1/kv_connector/nixl_integration/run_multi_connector_edge_case_test.sh b/tests/v1/kv_connector/nixl_integration/run_multi_connector_edge_case_test.sh
+--- a/tests/v1/kv_connector/nixl_integration/run_multi_connector_edge_case_test.sh
++++ b/tests/v1/kv_connector/nixl_integration/run_multi_connector_edge_case_test.sh
+@@ -17,7 +17,7 @@
+ #
+ # Environment variables:
+ #   MODEL_NAMES              - model to test (default: Qwen/Qwen3-0.6B)
+-#   KV_CACHE_MEMORY_BYTES    - GPU KV cache size in bytes (default: 268435456 = 256 MiB)
++#   KV_CACHE_USERS           - GPU KV capacity in resident full-length contexts (default: 2)
+ #   BLOCK_SIZE               - KV cache block size (default: 128)
+ #   ATTENTION_BACKEND        - optional attention backend for vllm serve
+ #   VLLM_SERVE_EXTRA_ARGS    - comma-separated extra args for vllm serve
+@@ -32,7 +32,7 @@
+   MODELS=("Qwen/Qwen3-0.6B")
+ fi
+ 
+-KV_CACHE_MEMORY_BYTES=${KV_CACHE_MEMORY_BYTES:-268435456}  # 256 MiB
++KV_CACHE_USERS=${KV_CACHE_USERS:-2}
+ MAX_MODEL_LEN=${MAX_MODEL_LEN:-2048}
+ BLOCK_SIZE=${BLOCK_SIZE:-128}
+ ATTENTION_BACKEND=${ATTENTION_BACKEND:-}
+@@ -50,7 +50,7 @@
+     "connectors":[
+       {"kv_connector":"NixlConnector","kv_role":"kv_both"},
+       {"kv_connector":"OffloadingConnector","kv_role":"kv_both",
+-       "kv_connector_extra_config":{"cpu_bytes_to_use":2147483648}}
++       "kv_connector_extra_config":{"cpu_kv_cache_users":4}}
+     ]
+   }
+ }'
+@@ -103,7 +103,7 @@
+     --enforce-eager \
+     --block-size ${BLOCK_SIZE} \
+     --max-model-len $MAX_MODEL_LEN \
+-    --kv-cache-memory-bytes $KV_CACHE_MEMORY_BYTES \
++    --kv-cache-users $KV_CACHE_USERS \
+     --tensor-parallel-size 1 \
+     --kv-transfer-config '$KV_CONFIG'"
+ 
+@@ -129,7 +129,7 @@
+     --enforce-eager \
+     --block-size ${BLOCK_SIZE} \
+     --max-model-len $MAX_MODEL_LEN \
+-    --kv-cache-memory-bytes $KV_CACHE_MEMORY_BYTES \
++    --kv-cache-users $KV_CACHE_USERS \
+     --tensor-parallel-size 1 \
+     --kv-transfer-config '$KV_CONFIG'"
+ 
+diff --git a/tests/v1/kv_connector/nixl_integration/spec_decode_acceptance_test.sh b/tests/v1/kv_connector/nixl_integration/spec_decode_acceptance_test.sh
+--- a/tests/v1/kv_connector/nixl_integration/spec_decode_acceptance_test.sh
++++ b/tests/v1/kv_connector/nixl_integration/spec_decode_acceptance_test.sh
+@@ -53,13 +53,13 @@
+ PREFILLER_TP_SIZE=${PREFILLER_TP_SIZE:-1}
+ DECODER_TP_SIZE=${DECODER_TP_SIZE:-1}
+ GPU_MEMORY_UTILIZATION=${GPU_MEMORY_UTILIZATION:-0.7}
+-KV_CACHE_MEMORY_BYTES=${KV_CACHE_MEMORY_BYTES:-}
++KV_CACHE_USERS=${KV_CACHE_USERS:-}
+ BLOCK_SIZE=${BLOCK_SIZE:-16}
+ SERVER_HOST="${SERVER_HOST:-127.0.0.1}"
+ NIXL_SIDE_CHANNEL_HOST="${NIXL_SIDE_CHANNEL_HOST:-$SERVER_HOST}"
+ 
+-if [[ -n "$KV_CACHE_MEMORY_BYTES" ]]; then
+-  KV_CACHE_ARGS=(--kv-cache-memory-bytes "$KV_CACHE_MEMORY_BYTES")
++if [[ -n "$KV_CACHE_USERS" ]]; then
++  KV_CACHE_ARGS=(--kv-cache-users "$KV_CACHE_USERS")
+ else
+   KV_CACHE_ARGS=(--gpu-memory-utilization "$GPU_MEMORY_UTILIZATION")
+ fi
+diff --git a/tests/v1/kv_connector/unit/offloading_connector/test_events.py b/tests/v1/kv_connector/unit/offloading_connector/test_events.py
+--- a/tests/v1/kv_connector/unit/offloading_connector/test_events.py
++++ b/tests/v1/kv_connector/unit/offloading_connector/test_events.py
+@@ -608,7 +608,7 @@
+         kv_role="kv_both",
+         kv_connector_extra_config={
+             "spec_name": "TieringOffloadingSpec",
+-            "cpu_bytes_to_use": 1 << 20,
++            "cpu_kv_cache_users": 1,
+             "self_describing_kv_events": True,
+             "secondary_tiers": [{"type": "example"}],
+         },
+diff --git a/tests/v1/kv_connector/unit/offloading_connector/test_scheduler.py b/tests/v1/kv_connector/unit/offloading_connector/test_scheduler.py
+--- a/tests/v1/kv_connector/unit/offloading_connector/test_scheduler.py
++++ b/tests/v1/kv_connector/unit/offloading_connector/test_scheduler.py
+@@ -24,6 +24,7 @@
+ )
+ from vllm.distributed.kv_transfer.kv_connector.v1.offloading.config import (
+     build_offloading_config,
++    get_sliding_window_size_in_chunks,
+ )
+ from vllm.distributed.kv_transfer.kv_connector.v1.offloading.metrics import (
+     OffloadingConnectorStats,
+@@ -32,7 +33,6 @@
+ from vllm.distributed.kv_transfer.kv_connector.v1.offloading.scheduler import (
+     OffloadingConnectorScheduler,
+     RequestOffloadState,
+-    get_sliding_window_size_in_chunks,
+     is_store_reachable_swa_chunk,
+ )
+ from vllm.v1.core.kv_cache_manager import KVCacheBlocks
+@@ -3363,3 +3363,67 @@
+     assert get_sliding_window_size_in_chunks(spec, tokens_per_chunk=1024) == 8
+     # Partial chunks round up, so the reachable tail is never understated.
+     assert get_sliding_window_size_in_chunks(spec, tokens_per_chunk=3000) == 3
++
++
++def _make_scoped_request(
++    req_id: str,
++    kv_scope: str | None,
++    kv_scope_release: list[str] | None,
++) -> MagicMock:
++    request = MagicMock()
++    request.request_id = req_id
++    request.kv_transfer_params = None
++    request.kv_scope = kv_scope
++    request.kv_scope_release = kv_scope_release
++    request.num_prompt_tokens = 4
++    request.num_tokens = 4
++    request.block_hashes = [BlockHash(b"h0")]
++    request.all_token_ids = list(range(4))
++    request.lora_request = None
++    request.is_finished.return_value = False
++    return request
++
++
++def test_on_new_request_applies_scope_releases_before_registration():
++    """kv_scope_release must reach the manager as release_scope calls, and
++    strictly before the releasing request registers: the parent's own
++    lookup has to run against a pool where the dead subagent occupies
++    nothing."""
++    scheduler = _make_partial_tail_scheduler()
++    manager = scheduler.manager
++    call_order: list[str] = []
++    manager.release_scope.side_effect = lambda scope: call_order.append(
++        f"release:{scope}"
++    )
++    original_on_new = manager.on_new_request.side_effect
++
++    def record_on_new(req_context):
++        call_order.append("on_new_request")
++        if original_on_new is not None:
++            return original_on_new(req_context)
++        return RequestOffloadingContext()
++
++    manager.on_new_request.side_effect = record_on_new
++
++    request = _make_scoped_request("parent", None, ["toolu_A", "toolu_B"])
++    scheduler.on_new_request(request)
++
++    assert call_order == ["release:toolu_A", "release:toolu_B", "on_new_request"]
++
++
++def test_on_new_request_without_releases_calls_no_release():
++    scheduler = _make_partial_tail_scheduler()
++    request = _make_scoped_request("sub", "toolu_A", None)
++    scheduler.on_new_request(request)
++    scheduler.manager.release_scope.assert_not_called()
++
++
++def test_req_context_carries_the_request_scope():
++    """Every manager call for a request must see its owning scope — that is
++    the identity whole-scope release keys on."""
++    scheduler = _make_partial_tail_scheduler()
++    scheduler.on_new_request(_make_scoped_request("sub", "toolu_A", None))
++    assert scheduler._req_status["sub"].req_context.kv_scope == "toolu_A"
++
++    scheduler.on_new_request(_make_scoped_request("main", None, None))
++    assert scheduler._req_status["main"].req_context.kv_scope is None
+diff --git a/tests/v1/kv_connector/unit/offloading_connector/test_worker.py b/tests/v1/kv_connector/unit/offloading_connector/test_worker.py
+--- a/tests/v1/kv_connector/unit/offloading_connector/test_worker.py
++++ b/tests/v1/kv_connector/unit/offloading_connector/test_worker.py
+@@ -181,7 +181,9 @@
+         enable_kv_cache_events=False,
+         extra_config={},
+         engine_id="test-engine",
+-        model=OffloadingModelConfig(name="test-model", dtype="float16"),
++        model=OffloadingModelConfig(
++            name="test-model", dtype="float16", max_model_len=128
++        ),
+         cache=OffloadingCacheConfig(tokens_per_hash=16, blocks_per_chunk=1),
+         parallel=OffloadingParallelConfig(
+             rank=rank,
+diff --git a/tests/v1/kv_connector/unit/test_config.py b/tests/v1/kv_connector/unit/test_config.py
+--- a/tests/v1/kv_connector/unit/test_config.py
++++ b/tests/v1/kv_connector/unit/test_config.py
+@@ -1,183 +1,63 @@
+ # SPDX-License-Identifier: Apache-2.0
+ # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
+ 
+ """Tests for KV cache offloading configuration."""
+ 
+ import pytest
+ 
+-from vllm.config import CacheConfig, KVTransferConfig, ParallelConfig, VllmConfig
+-from vllm.distributed.kv_transfer.kv_connector.factory import KVConnectorFactory
++from vllm.config import CacheConfig, KVTransferConfig, VllmConfig
+ 
+ pytestmark = pytest.mark.cpu_test
+ 
+ 
+-class _StubLMCacheMPConnector:
+-    """Stand-in for LMCacheMPConnector used in config-translation tests.
+-
+-    The real connector module hard-imports the optional ``lmcache`` package
+-    at module load time, which is not installed in the cpu_test image. This
+-    test only asserts on the connector *name* and the ``extra_config`` dict
+-    produced by ``VllmConfig``, never instantiates the connector, so a bare
+-    placeholder class is sufficient. Not subclassing ``SupportsHMA`` mirrors
+-    the real connector's HMA support (it does not support HMA either)."""
+-
+-
+-@pytest.fixture
+-def stub_lmcache_mp_connector(monkeypatch):
+-    """Replace the lazy loader so VllmConfig.__post_init__ does not import
+-    ``lmcache_mp_connector`` (and thus ``lmcache``) during config tests."""
+-    monkeypatch.setitem(
+-        KVConnectorFactory._registry,
+-        "LMCacheMPConnector",
+-        lambda: _StubLMCacheMPConnector,
+-    )
+-
+-
+-@pytest.mark.parametrize(
+-    "kv_offloading_backend,kv_offloading_size,tp,pp,expected_backend,expected_bytes",
+-    [
+-        ("native", 4.0, 1, 1, "OffloadingConnector", 4.0 * (1 << 30)),
+-        # bytes per rank: 8.0 GiB / (2 * 2) = 2.0 GiB
+-        ("native", 8.0, 2, 2, "OffloadingConnector", 8.0 * (1 << 30)),
+-        # ``lmcache`` backend now defaults to LMCacheMPConnector. The KV
+-        # storage capacity is owned by the standalone LMCache server, so
+-        # ``kv_offloading_size`` is intentionally not propagated.
+-        ("lmcache", 4.0, 1, 1, "LMCacheMPConnector", None),
+-        ("lmcache", 8.0, 2, 2, "LMCacheMPConnector", None),
+-        # When kv_offloading_size is None, offloading is disabled (backend is ignored)
+-        ("native", None, 1, 1, None, None),
+-    ],
+-)
+-def test_kv_connector(
+-    stub_lmcache_mp_connector,
+-    kv_offloading_backend,
+-    kv_offloading_size,
+-    tp,
+-    pp,
+-    expected_backend,
+-    expected_bytes,
+-):
+-    kv_transfer_config = (
+-        KVTransferConfig(kv_connector_extra_config={"existing_key": "existing_value"})
+-        if expected_backend is not None
+-        else None
+-    )
+-
+-    vllm_config = VllmConfig(
+-        cache_config=CacheConfig(
+-            kv_offloading_backend=kv_offloading_backend,
+-            kv_offloading_size=kv_offloading_size,
+-        ),
+-        kv_transfer_config=kv_transfer_config,
+-        parallel_config=ParallelConfig(
+-            tensor_parallel_size=tp, pipeline_parallel_size=pp
+-        ),
+-    )
+-
+-    # No KV transfer config expected
+-    if expected_backend is None:
+-        assert vllm_config.kv_transfer_config is expected_backend
+-        return
+-
+-    kv_transfer_config = vllm_config.kv_transfer_config
+-    kv_connector_extra_config = kv_transfer_config.kv_connector_extra_config
+-
+-    assert kv_transfer_config.kv_connector == expected_backend
+-    assert kv_transfer_config.kv_role == "kv_both"
+-
+-    if kv_offloading_backend == "native":
+-        assert kv_connector_extra_config["cpu_bytes_to_use"] == expected_bytes
+-        # Existing config should be preserved
+-        assert kv_connector_extra_config["existing_key"] == "existing_value"
+-    elif kv_offloading_backend == "lmcache":
+-        # MP mode does not push lmcache.local_cpu / max_local_cpu_size into
+-        # extra config (the LMCache server owns capacity). Pre-existing
+-        # extra config entries are preserved as-is.
+-        assert "lmcache.local_cpu" not in kv_connector_extra_config
+-        assert "lmcache.max_local_cpu_size" not in kv_connector_extra_config
+-        assert kv_connector_extra_config["existing_key"] == "existing_value"
+-
+-
+-def _build_config(
+-    *,
+-    kv_connector: str | None,
+-    enable_sleep_mode: bool = False,
+-    enable_cumem_allocator: bool = False,
+-) -> VllmConfig:
+-    """Build a VllmConfig that exercises _verify_kv_transfer_compat without
+-    requiring a real model (avoids HF downloads in CI)."""
+-    from types import SimpleNamespace
+-
+-    kv_transfer_config = (
+-        KVTransferConfig(kv_connector=kv_connector, kv_role="kv_both")
+-        if kv_connector is not None
+-        else None
+-    )
+-    cfg = VllmConfig.__new__(VllmConfig)
+-    cfg.kv_transfer_config = kv_transfer_config
+-    cfg.model_config = SimpleNamespace(
+-        enable_sleep_mode=enable_sleep_mode,
+-        enable_cumem_allocator=(enable_cumem_allocator or enable_sleep_mode),
+-    )
+-    cfg._verify_kv_transfer_compat()
+-    return cfg
++def test_byte_denominated_offloading_flags_are_gone():
++    """kv_offloading_size/kv_offloading_backend existed only to manufacture
++    a cpu_bytes_to_use entry for the native offloading spec. Capacity is now
++    declared as user contexts on the connector config itself, so the
++    convenience inlet must not quietly return."""
++    assert not hasattr(CacheConfig, "kv_offloading_size")
++    assert not hasattr(CacheConfig, "kv_offloading_backend")
+ 
+ 
+ @pytest.mark.parametrize(
+     "kv_connector", ["NixlConnector", "MooncakeConnectorV1", "SomeOOTConnector"]
+ )
+ def test_kv_connector_rejects_expandable_segments(monkeypatch, kv_connector):
+     """KV connectors that pin KV cache memory (e.g. via ibv_reg_mr) are
+     invalidated when expandable_segments lets the CUDA VMM allocator remap
+     the underlying physical pages. We can't enumerate every connector that
+     does this (especially OOT ones), so reject the combination whenever any
+     connector is configured."""
+     monkeypatch.setenv("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
+     with pytest.raises(ValueError, match="expandable_segments"):
+         _build_config(kv_connector=kv_connector)
+ 
+ 
+ def test_kv_connector_allows_expandable_segments_with_sleep_mode(monkeypatch):
+     """Sleep mode routes KV allocations through CuMemAllocator's pool, which
+     auto-disables expandable_segments (see #40812)."""
+     monkeypatch.setenv("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
+     _build_config(kv_connector="NixlConnector", enable_sleep_mode=True)
+ 
+ 
+ def test_kv_connector_allows_expandable_segments_with_cumem_allocator(
+     monkeypatch,
+ ):
+     """Manual CuMem allocation must also bypass expandable_segments."""
+     monkeypatch.setenv("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
+     _build_config(kv_connector="NixlConnector", enable_cumem_allocator=True)
+ 
+ 
+ def test_kv_connector_allows_other_alloc_conf(monkeypatch):
+     """Other PYTORCH_CUDA_ALLOC_CONF values must not be rejected."""
+     monkeypatch.setenv(
+         "PYTORCH_CUDA_ALLOC_CONF", "max_split_size_mb:512,expandable_segments:False"
+     )
+     _build_config(kv_connector="NixlConnector")
+ 
+ 
+ def test_no_kv_connector_ignores_expandable_segments(monkeypatch):
+     """The expandable_segments check only applies when a KV connector is
+     configured."""
+     monkeypatch.setenv("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
+     _build_config(kv_connector=None)
+-
+-
+-def test_kv_offloading_size_only_uses_native_default():
+-    """Test that setting only kv_offloading_size enables native offloading."""
+-    vllm_config = VllmConfig(
+-        cache_config=CacheConfig(
+-            kv_offloading_size=4.0,
+-            # kv_offloading_backend not set, should default to "native"
+-        ),
+-    )
+-
+-    kv_transfer_config = vllm_config.kv_transfer_config
+-    kv_connector_extra_config = kv_transfer_config.kv_connector_extra_config
+-    assert kv_transfer_config.kv_connector == "OffloadingConnector"
+-    assert kv_transfer_config.kv_role == "kv_both"
+-    assert kv_connector_extra_config["cpu_bytes_to_use"] == 4.0 * (1 << 30)
+diff --git a/tests/v1/kv_connector/unit/test_hma_auto_config.py b/tests/v1/kv_connector/unit/test_hma_auto_config.py
+--- a/tests/v1/kv_connector/unit/test_hma_auto_config.py
++++ b/tests/v1/kv_connector/unit/test_hma_auto_config.py
+@@ -48,7 +48,7 @@
+                         {
+                             "kv_connector": "OffloadingConnector",
+                             "kv_role": "kv_both",
+-                            "kv_connector_extra_config": {"cpu_bytes_to_use": 1 << 30},
++                            "kv_connector_extra_config": {"cpu_kv_cache_users": 1},
+                         },
+                     ]
+                 },
+diff --git a/tests/v1/kv_connector/unit/test_offloading_connector.py b/tests/v1/kv_connector/unit/test_offloading_connector.py
+--- a/tests/v1/kv_connector/unit/test_offloading_connector.py
++++ b/tests/v1/kv_connector/unit/test_offloading_connector.py
+@@ -242,7 +242,7 @@
+     Tests OffloadingConnector with CPUOffloadingSpec.
+     """
+     # configure OffloadingConnector (spec_name=CPUOffloadingSpec by default)
+-    extra_config: dict = {"cpu_bytes_to_use": 500 << 20}
++    extra_config: dict = {"cpu_kv_cache_users": 4}
+     if cpu_block_size is not None:
+         extra_config["block_size"] = cpu_block_size
+     kv_transfer_config = KVTransferConfig(
+@@ -274,6 +274,7 @@
+     llm = LLM(
+         model=model,
+         max_model_len=4096,
++        kv_cache_users=2,
+         gpu_memory_utilization=0.5,
+         kv_events_config=kv_events_config,
+         kv_transfer_config=kv_transfer_config,
+@@ -302,7 +303,7 @@
+     """Verify that offloading Prometheus metrics (new flat and deprecated
+     labeled) are emitted after stores and loads."""
+     extra_config: dict = {
+-        "cpu_bytes_to_use": 500 << 20,
++        "cpu_kv_cache_users": 4,
+         "block_size": CPU_BLOCK_SIZES,
+     }
+     kv_transfer_config = KVTransferConfig(
+@@ -314,6 +315,7 @@
+     llm = LLM(
+         model="meta-llama/Llama-3.2-1B-Instruct",
+         max_model_len=4096,
++        kv_cache_users=2,
+         gpu_memory_utilization=0.5,
+         kv_transfer_config=kv_transfer_config,
+         disable_log_stats=False,
+@@ -445,7 +447,7 @@
+ def test_tiering_offloading() -> None:
+     """Tests OffloadingConnector with TieringOffloadingSpec."""
+     extra_config: dict = {
+-        "cpu_bytes_to_use": 500 << 20,
++        "cpu_kv_cache_users": 4,
+         "block_size": CPU_BLOCK_SIZES,
+         "spec_name": "TieringOffloadingSpec",
+         "secondary_tiers": [{"type": "example"}],
+@@ -471,6 +473,7 @@
+     llm = LLM(
+         model="meta-llama/Llama-3.2-1B-Instruct",
+         max_model_len=4096,
++        kv_cache_users=2,
+         gpu_memory_utilization=0.5,
+         kv_events_config=kv_events_config,
+         kv_transfer_config=kv_transfer_config,
+@@ -491,7 +494,7 @@
+     """Tests OffloadingConnector with TieringOffloadingSpec
+     + fs secondary tier."""
+     extra_config: dict = {
+-        "cpu_bytes_to_use": 1 << 30,
++        "cpu_kv_cache_users": 4,
+         "block_size": CPU_BLOCK_SIZES,
+         "spec_name": "TieringOffloadingSpec",
+         "secondary_tiers": [{"type": "fs", "root_dir": str(tmp_path)}],
+@@ -517,6 +520,7 @@
+     llm = LLM(
+         model="meta-llama/Llama-3.2-1B-Instruct",
+         max_model_len=4096,
++        kv_cache_users=2,
+         gpu_memory_utilization=0.5,
+         kv_events_config=kv_events_config,
+         kv_transfer_config=kv_transfer_config,
+@@ -553,13 +557,14 @@
+         kv_connector="OffloadingConnector",
+         kv_role="kv_both",
+         kv_connector_extra_config={
+-            "cpu_bytes_to_use": 4 << 30,
++            "cpu_kv_cache_users": 4,
+             "block_size": block_size,
+         },
+     )
+     llm = LLM(
+         model=model,
+         max_model_len=block_size * 10,
++        kv_cache_users=2,
+         gpu_memory_utilization=0.85,
+         tensor_parallel_size=tp_size,
+         kv_transfer_config=kv_transfer_config,
+diff --git a/tests/v1/kv_offload/cpu/test_manager.py b/tests/v1/kv_offload/cpu/test_manager.py
+--- a/tests/v1/kv_offload/cpu/test_manager.py
++++ b/tests/v1/kv_offload/cpu/test_manager.py
+@@ -22,14 +22,17 @@
+     CPUOffloadingMetrics,
+ )
+ from vllm.v1.kv_offload.cpu.manager import CPUOffloadingManager
+-from vllm.v1.kv_offload.cpu.policies.arc import ARCCachePolicy
+ 
+ 
+ def make_req_context(
+-    req_id: str = "", kv_transfer_params: dict | None = None
++    req_id: str = "",
++    kv_transfer_params: dict | None = None,
++    kv_scope: str | None = None,
+ ) -> ReqContext:
+     """Create a ReqContext as production code would, from a request's params."""
+-    return ReqContext(req_id=req_id, kv_transfer_params=kv_transfer_params)
++    return ReqContext(
++        req_id=req_id, kv_transfer_params=kv_transfer_params, kv_scope=kv_scope
++    )
+ 
+ 
+ _EMPTY_REQ_CTX = make_req_context()
+@@ -37,16 +40,12 @@
+ 
+ def make_cpu_manager(
+     num_blocks: int = 4,
+-    cache_policy: str = "lru",
+-    cache_policy_module_path: str | None = None,
+     enable_events: bool = False,
+     store_threshold: int = 0,
+     max_tracker_size: int = 64_000,
+ ) -> CPUOffloadingManager:
+     return CPUOffloadingManager(
+         num_blocks=num_blocks,
+-        cache_policy=cache_policy,
+-        cache_policy_module_path=cache_policy_module_path,
+         enable_events=enable_events,
+         store_threshold=store_threshold,
+         max_tracker_size=max_tracker_size,
+@@ -163,12 +162,10 @@
+     assert all(event.medium == manager.medium for event in events)
+ 
+ 
+-@pytest.mark.parametrize("eviction_policy", ["lru", "arc"])
+-def test_already_stored_block_not_evicted_during_prepare_store(eviction_policy):
++def test_already_stored_block_not_evicted_during_prepare_store():
+     """
+     Regression test: a block that is already stored must not be evicted
+     by prepare_store() when it needs to make room for new blocks.
+-    Applies to both lru and arc policies.
+ 
+     Scenario:
+         - Store blocks [1, 2] and complete.
+@@ -181,7 +178,6 @@
+     """
+     manager = make_cpu_manager(
+         num_blocks=4,
+-        cache_policy=eviction_policy,
+         enable_events=True,
+     )
+ 
+@@ -216,7 +212,6 @@
+ def test_filter_reused_manager_reports_stores_skipped_counter():
+     manager = make_cpu_manager(
+         num_blocks=4,
+-        cache_policy="lru",
+         store_threshold=2,
+     )
+ 
+@@ -274,7 +269,7 @@
+ 
+ 
+ def test_cpu_manager_reports_allocation_size_histogram():
+-    manager = make_cpu_manager(num_blocks=4, cache_policy="lru")
++    manager = make_cpu_manager(num_blocks=4)
+ 
+     manager.prepare_store(to_keys([1, 2]), _EMPTY_REQ_CTX)
+     manager.complete_store(to_keys([1, 2]), _EMPTY_REQ_CTX)
+@@ -297,7 +292,7 @@
+ 
+ 
+ def test_cpu_manager_reports_allocation_size_on_allocation_failure(monkeypatch):
+-    manager = make_cpu_manager(num_blocks=4, cache_policy="lru")
++    manager = make_cpu_manager(num_blocks=4)
+ 
+     def fail_allocate_blocks(keys):
+         raise RuntimeError("allocation failed")
+@@ -316,7 +311,7 @@
+ 
+ 
+ def test_cpu_manager_reports_allocation_size_on_eviction_failure():
+-    manager = make_cpu_manager(num_blocks=1, cache_policy="lru")
++    manager = make_cpu_manager(num_blocks=1)
+ 
+     manager.prepare_store(to_keys([1]), _EMPTY_REQ_CTX)
+     manager.get_stats()
+@@ -367,10 +362,10 @@
+ 
+ def test_cpu_manager():
+     """
+-    Tests CPUOffloadingManager with lru policy.
++    Tests the CPUOffloadingManager end to end (single scope-aware mode).
+     """
+     # initialize a CPU manager with a capacity of 4 blocks
+-    cpu_manager = make_cpu_manager(num_blocks=4, cache_policy="lru", enable_events=True)
++    cpu_manager = make_cpu_manager(num_blocks=4, enable_events=True)
+ 
+     # prepare store [1, 2]
+     prepare_store_output = cpu_manager.prepare_store(to_keys([1, 2]), _EMPTY_REQ_CTX)
+@@ -483,7 +478,7 @@
+ 
+ def test_prepare_load_preserves_key_order():
+     """block_ids[i] must correspond to keys[i] (co-indexed invariant)."""
+-    manager = make_cpu_manager(num_blocks=4, cache_policy="lru")
++    manager = make_cpu_manager(num_blocks=4)
+ 
+     key_a, key_b, key_c = to_key(0), to_key(1), to_key(2)
+ 
+@@ -518,415 +513,12 @@
+     manager.complete_load([key_a, key_b, key_c], _EMPTY_REQ_CTX)  # order irrelevant
+ 
+ 
+-class TestARCPolicy:
+-    """Unit tests for CPUOffloadingManager with ARC eviction policy."""
+-
+-    def _make_manager(
+-        self, num_blocks: int = 4, enable_events: bool = True
+-    ) -> tuple[CPUOffloadingManager, ARCCachePolicy]:
+-        manager = make_cpu_manager(
+-            num_blocks=num_blocks,
+-            cache_policy="arc",
+-            enable_events=enable_events,
+-        )
+-        policy = manager._policy
+-        assert isinstance(policy, ARCCachePolicy)
+-        return manager, policy
+-
+-    def test_basic(self):
+-        """
+-        Tests CPUOffloadingManager with arc policy.
+-        Verifies that ARC handles store, load, and lookup operations correctly.
+-        """
+-        cpu_manager, arc_policy = self._make_manager()
+-
+-        # prepare store [1, 2]
+-        prepare_store_output = cpu_manager.prepare_store(
+-            to_keys([1, 2]), _EMPTY_REQ_CTX
+-        )
+-        verify_store_output(
+-            prepare_store_output,
+-            ExpectedPrepareStoreOutput(
+-                keys_to_store=[1, 2],
+-                store_block_ids=[0, 1],
+-                evicted_keys=[],
+-            ),
+-        )
+-
+-        # lookup [1, 2] -> write in-flight, not yet ready
+-        assert cpu_manager.lookup(to_key(1), _EMPTY_REQ_CTX) is LookupResult.HIT_PENDING
+-        assert cpu_manager.lookup(to_key(2), _EMPTY_REQ_CTX) is LookupResult.HIT_PENDING
+-
+-        # no events so far
+-        assert list(cpu_manager.take_events()) == []
+-
+-        # complete store [1, 2]
+-        cpu_manager.complete_store(to_keys([1, 2]), _EMPTY_REQ_CTX)
+-        verify_events(cpu_manager.take_events(), expected_stores=({1, 2},))
+-
+-        # lookup [1, 2]
+-        assert cpu_manager.lookup(to_key(1), _EMPTY_REQ_CTX) is LookupResult.HIT
+-        assert cpu_manager.lookup(to_key(2), _EMPTY_REQ_CTX) is LookupResult.HIT
+-        assert cpu_manager.lookup(to_key(3), _EMPTY_REQ_CTX) is LookupResult.MISS
+-
+-        # blocks should be in T1 (recent)
+-        assert len(arc_policy.t1) == 2
+-        assert len(arc_policy.t2) == 0
+-
+-    def test_t1_to_t2_promotion(self):
+-        """
+-        Tests that accessing a block in T1 promotes it to T2 (frequent).
+-        This is a key feature of ARC's adaptive behavior.
+-        """
+-        cpu_manager, arc_policy = self._make_manager(enable_events=False)
+-
+-        # store and complete block 1
+-        cpu_manager.prepare_store(to_keys([1]), _EMPTY_REQ_CTX)
+-        cpu_manager.complete_store(to_keys([1]), _EMPTY_REQ_CTX)
+-
+-        # block 1 starts in T1 (recent)
+-        assert to_keys([1])[0] in arc_policy.t1
+-        assert to_keys([1])[0] not in arc_policy.t2
+-
+-        # touch block 1 (simulate second access)
+-        cpu_manager.touch(to_keys([1]), _EMPTY_REQ_CTX)
+-
+-        # block 1 should now be in T2 (frequent)
+-        assert to_keys([1])[0] not in arc_policy.t1
+-        assert to_keys([1])[0] in arc_policy.t2
+-
+-    def test_eviction_with_load(self):
+-        """
+-        Tests ARC eviction behavior similar to LRU test.
+-        Verifies that blocks being loaded (ref_cnt > 0) cannot be evicted.
+-        """
+-        cpu_manager, _ = self._make_manager()
+-
+-        # prepare and complete store [1, 2, 3, 4]
+-        prepare_store_output = cpu_manager.prepare_store(
+-            to_keys([1, 2, 3, 4]), _EMPTY_REQ_CTX
+-        )
+-        verify_store_output(
+-            prepare_store_output,
+-            ExpectedPrepareStoreOutput(
+-                keys_to_store=[1, 2, 3, 4],
+-                store_block_ids=[0, 1, 2, 3],
+-                evicted_keys=[],
+-            ),
+-        )
+-        cpu_manager.complete_store(to_keys([1, 2, 3, 4]), _EMPTY_REQ_CTX)
+-
+-        # prepare load [2, 3] (increases ref_cnt)
+-        prepare_load_output = cpu_manager.prepare_load(to_keys([2, 3]), _EMPTY_REQ_CTX)
+-        verify_load_output(prepare_load_output, [1, 2])
+-
+-        # prepare store [5, 6, 7] with [2, 3] being loaded
+-        # should fail because [2, 3] have ref_cnt > 0
+-        assert cpu_manager.prepare_store(to_keys([5, 6, 7]), _EMPTY_REQ_CTX) is None
+-
+-        # complete load [2, 3]
+-        cpu_manager.complete_load(to_keys([2, 3]), _EMPTY_REQ_CTX)
+-
+-        # now prepare store [5, 6, 7] should succeed
+-        # ARC will evict blocks one at a time from T1 as needed
+-        prepare_store_output = cpu_manager.prepare_store(
+-            to_keys([5, 6, 7]), _EMPTY_REQ_CTX
+-        )
+-        assert prepare_store_output is not None
+-        # Should successfully evict enough blocks to make room (at least 1)
+-        assert len(prepare_store_output.evicted_keys) >= 1
+-
+-    def test_adaptive_target(self):
+-        """
+-        Tests ARC's adaptive target adjustment via ghost lists.
+-        When a block in B1 (ghost list) is accessed, target_t1_size increases.
+-        When a block in B2 is accessed, target_t1_size decreases.
+-        """
+-        cpu_manager, arc_policy = self._make_manager(num_blocks=2, enable_events=False)
+-
+-        # store blocks 1, 2 (fills cache)
+-        cpu_manager.prepare_store(to_keys([1, 2]), _EMPTY_REQ_CTX)
+-        cpu_manager.complete_store(to_keys([1, 2]), _EMPTY_REQ_CTX)
+-
+-        initial_target = arc_policy.target_t1_size
+-
+-        # store block 3, evicting block 1 (moves to B1 ghost list)
+-        cpu_manager.prepare_store(to_keys([3]), _EMPTY_REQ_CTX)
+-        cpu_manager.complete_store(to_keys([3]), _EMPTY_REQ_CTX)
+-
+-        # block 1 should be in B1 (ghost list)
+-        assert to_keys([1])[0] in arc_policy.b1
+-
+-        # touch block 1 (cache miss, but in B1)
+-        # this should increase target_t1_size (favor recency)
+-        cpu_manager.touch(to_keys([1]), _EMPTY_REQ_CTX)
+-
+-        # target should have increased
+-        assert arc_policy.target_t1_size > initial_target
+-
+-    def test_t1_t2_eviction_policy(self):
+-        """
+-        Tests that ARC evicts from T1 or T2 based on target_t1_size.
+-        If |T1| >= target_t1_size, evict from T1, otherwise from T2.
+-        """
+-        cpu_manager, arc_policy = self._make_manager(enable_events=False)
+-
+-        # store blocks 1, 2, 3, 4
+-        cpu_manager.prepare_store(to_keys([1, 2, 3, 4]), _EMPTY_REQ_CTX)
+-        cpu_manager.complete_store(to_keys([1, 2, 3, 4]), _EMPTY_REQ_CTX)
+-
+-        # promote blocks 3, 4 to T2 by touching them
+-        cpu_manager.touch(to_keys([3, 4]), _EMPTY_REQ_CTX)
+-
+-        # now: T1 = {1, 2}, T2 = {3, 4}
+-        assert len(arc_policy.t1) == 2
+-        assert len(arc_policy.t2) == 2
+-
+-        # set target_t1_size to prefer evicting from T1
+-        # (when |T1| >= target, evict from T1)
+-        arc_policy.target_t1_size = 1
+-
+-        # store block 5, should evict from T1 (block 1, LRU in T1)
+-        output = cpu_manager.prepare_store(to_keys([5]), _EMPTY_REQ_CTX)
+-        assert output is not None
+-        assert to_keys([1]) == output.evicted_keys
+-
+-        cpu_manager.complete_store(to_keys([5]), _EMPTY_REQ_CTX)
+-
+-        # block 1 should be in B1 (ghost list)
+-        assert to_keys([1])[0] in arc_policy.b1
+-        # block 5 should be in T1
+-        assert to_keys([5])[0] in arc_policy.t1
+-
+-    def test_batch_eviction_scans_t1_and_t2_once(self):
+-        """ARC batch eviction must preserve order without restarting scans."""
+-        cpu_manager, arc_policy = self._make_manager(
+-            num_blocks=256, enable_events=False
+-        )
+-        keys = to_keys(list(range(256)))
+-        cpu_manager.prepare_store(keys, _EMPTY_REQ_CTX)
+-        cpu_manager.complete_store(keys, _EMPTY_REQ_CTX)
+-
+-        cpu_manager.touch(keys[128:], _EMPTY_REQ_CTX)
+-        arc_policy.target_t1_size = 64
+-
+-        protected = {keys[0], keys[2], keys[255]}
+-        arc_policy.t1[keys[1]].ref_cnt = 1
+-        arc_policy.t2[keys[254]].ref_cnt = 1
+-
+-        num_evictions = 124
+-        num_t1_evictions = len(arc_policy.t1) - int(arc_policy.target_t1_size) + 1
+-        num_t2_evictions = num_evictions - num_t1_evictions
+-        t1_order = list(arc_policy.t1)
+-        t2_order = list(arc_policy.t2)
+-        expected_t1 = [
+-            key
+-            for key, block in arc_policy.t1.items()
+-            if block.ref_cnt == 0 and key not in protected
+-        ][:num_t1_evictions]
+-        expected_t2 = [
+-            key
+-            for key, block in arc_policy.t2.items()
+-            if block.ref_cnt == 0 and key not in protected
+-        ][:num_t2_evictions]
+-        expected_t1_scans = t1_order.index(expected_t1[-1]) + 1
+-        expected_t2_scans = t2_order.index(expected_t2[-1]) + 1
+-
+-        counting_t1 = _CountingOrderedDict(arc_policy.t1)
+-        counting_t2 = _CountingOrderedDict(arc_policy.t2)
+-        arc_policy.t1 = counting_t1
+-        arc_policy.t2 = counting_t2
+-
+-        evicted = arc_policy.evict(num_evictions, protected)
+-
+-        assert evicted is not None
+-        assert [key for key, _ in evicted] == expected_t1 + expected_t2
+-        assert counting_t1.items_yielded == expected_t1_scans
+-        assert counting_t2.items_yielded == expected_t2_scans
+-
+-    def test_batch_eviction_falls_back_after_t1_iterator_exhausted(self):
+-        """An exhausted T1 scan must keep falling back to T2."""
+-        cpu_manager, arc_policy = self._make_manager(num_blocks=8, enable_events=False)
+-        keys = to_keys(list(range(8)))
+-        cpu_manager.prepare_store(keys, _EMPTY_REQ_CTX)
+-        cpu_manager.complete_store(keys, _EMPTY_REQ_CTX)
+-
+-        cpu_manager.touch(keys[6:], _EMPTY_REQ_CTX)
+-        arc_policy.target_t1_size = 4
+-
+-        t1_order = list(arc_policy.t1)
+-        t2_order = list(arc_policy.t2)
+-        protected = set(t1_order[1:3])
+-        for key in t1_order[3:]:
+-            arc_policy.t1[key].ref_cnt = 1
+-
+-        # Selecting the sole eligible T1 entry leaves virtual_t1_size above
+-        # the target, so each remaining selection must retry T1 then use T2.
+-        eligible_t1 = [
+-            key
+-            for key, block in arc_policy.t1.items()
+-            if block.ref_cnt == 0 and key not in protected
+-        ]
+-        assert eligible_t1 == t1_order[:1]
+-        assert len(t1_order) - 1 >= int(arc_policy.target_t1_size)
+-
+-        counting_t1 = _CountingOrderedDict(arc_policy.t1)
+-        counting_t2 = _CountingOrderedDict(arc_policy.t2)
+-        arc_policy.t1 = counting_t1
+-        arc_policy.t2 = counting_t2
+-
+-        evicted = arc_policy.evict(3, protected)
+-
+-        assert evicted is not None
+-        assert [key for key, _ in evicted] == [t1_order[0], *t2_order]
+-        assert counting_t1.items_yielded == len(t1_order)
+-        assert counting_t2.items_yielded == len(t2_order)
+-
+-    def test_batch_eviction_failure_is_atomic(self):
+-        """Finding only some candidates must not partially evict the cache."""
+-        cpu_manager, arc_policy = self._make_manager(num_blocks=4, enable_events=False)
+-        keys = to_keys(list(range(4)))
+-        cpu_manager.prepare_store(keys, _EMPTY_REQ_CTX)
+-        cpu_manager.complete_store(keys, _EMPTY_REQ_CTX)
+-
+-        before_t1 = list(arc_policy.t1.items())
+-        protected = set(keys[1:])
+-
+-        assert arc_policy.evict(2, protected) is None
+-        assert list(arc_policy.t1.items()) == before_t1
+-        assert not arc_policy.t2
+-        assert not arc_policy.b1
+-        assert not arc_policy.b2
+-
+-    def test_ghost_list_bounds(self):
+-        """
+-        Tests that ghost lists (B1, B2) don't grow unbounded.
+-        They should be capped at cache_capacity.
+-        """
+-        cpu_manager, arc_policy = self._make_manager(num_blocks=2, enable_events=False)
+-
+-        # fill cache with blocks 1, 2
+-        cpu_manager.prepare_store(to_keys([1, 2]), _EMPTY_REQ_CTX)
+-        cpu_manager.complete_store(to_keys([1, 2]), _EMPTY_REQ_CTX)
+-
+-        # store many blocks to fill ghost lists
+-        for i in range(3, 20):
+-            cpu_manager.prepare_store(to_keys([i]), _EMPTY_REQ_CTX)
+-            cpu_manager.complete_store(to_keys([i]), _EMPTY_REQ_CTX)
+-
+-        # ghost lists should not exceed cache_capacity
+-        assert len(arc_policy.b1) <= arc_policy.cache_capacity
+-        assert len(arc_policy.b2) <= arc_policy.cache_capacity
+-
+-    def test_touch_ordering(self):
+-        """
+-        Tests that touch() correctly updates access patterns.
+-        Similar to LRU test but verifies T1/T2 ordering.
+-        """
+-        cpu_manager, arc_policy = self._make_manager()
+-
+-        # store blocks 1, 2, 3, 4
+-        cpu_manager.prepare_store(to_keys([1, 2, 3, 4]), _EMPTY_REQ_CTX)
+-        cpu_manager.complete_store(to_keys([1, 2, 3, 4]), _EMPTY_REQ_CTX)
+-
+-        # promote 3, 4 to T2
+-        cpu_manager.touch(to_keys([3, 4]), _EMPTY_REQ_CTX)
+-
+-        # T1 = {1, 2}, T2 = {3, 4}
+-        # touch [1, 3, 4] - should promote 1 to T2, and move 3,4 to end of T2
+-        cpu_manager.touch(to_keys([1, 3, 4]), _EMPTY_REQ_CTX)
+-
+-        # T1 = {2}, T2 = {1, 3, 4} (in that order, with 4 most recent)
+-        assert len(arc_policy.t1) == 1
+-        assert len(arc_policy.t2) == 3
+-
+-        # store block 5, should evict from T1 (block 2, only one in T1)
+-        prepare_store_output = cpu_manager.prepare_store(to_keys([5]), _EMPTY_REQ_CTX)
+-        verify_store_output(
+-            prepare_store_output,
+-            ExpectedPrepareStoreOutput(
+-                keys_to_store=[5],
+-                store_block_ids=[1],  # reuses block 2's storage
+-                evicted_keys=[2],
+-            ),
+-        )
+-
+-    def test_failed_store(self):
+-        """
+-        Tests that failed store operations clean up correctly.
+-        Similar to LRU test but for ARC.
+-        """
+-        cpu_manager, arc_policy = self._make_manager()
+-
+-        # store blocks 1, 2, 3, 4
+-        cpu_manager.prepare_store(to_keys([1, 2, 3, 4]), _EMPTY_REQ_CTX)
+-        cpu_manager.complete_store(to_keys([1, 2, 3, 4]), _EMPTY_REQ_CTX)
+-
+-        # prepare store block 5 (will evict block 1)
+-        prepare_store_output = cpu_manager.prepare_store(to_keys([5]), _EMPTY_REQ_CTX)
+-        assert prepare_store_output is not None
+-        assert len(prepare_store_output.evicted_keys) == 1
+-
+-        # complete store with failure
+-        cpu_manager.complete_store(to_keys([5]), _EMPTY_REQ_CTX, success=False)
+-
+-        # block 5 should not be in cache
+-        assert cpu_manager.lookup(to_key(5), _EMPTY_REQ_CTX) is LookupResult.MISS
+-        # block 5 should not be in T1 or T2
+-        assert to_keys([5])[0] not in arc_policy.t1
+-        assert to_keys([5])[0] not in arc_policy.t2
+-
+-        # evicted block should still be gone (in B1 ghost list)
+-        evicted_hash = prepare_store_output.evicted_keys[0]
+-        assert evicted_hash in arc_policy.b1
+-
+-    def test_full_scenario(self):
+-        """
+-        Comprehensive test covering multiple ARC operations in sequence.
+-        Similar to the full LRU test but adapted for ARC behavior.
+-        """
+-        cpu_manager, arc_policy = self._make_manager()
+-
+-        # store [1, 2]
+-        cpu_manager.prepare_store(to_keys([1, 2]), _EMPTY_REQ_CTX)
+-        cpu_manager.complete_store(to_keys([1, 2]), _EMPTY_REQ_CTX)
+-
+-        # store [3, 4, 5] -> evicts [1]
+-        prepare_store_output = cpu_manager.prepare_store(
+-            to_keys([3, 4, 5]), _EMPTY_REQ_CTX
+-        )
+-        assert prepare_store_output is not None
+-        assert len(prepare_store_output.evicted_keys) == 1
+-        cpu_manager.complete_store(to_keys([3, 4, 5]), _EMPTY_REQ_CTX)
+-
+-        # promote some blocks to T2
+-        cpu_manager.touch(to_keys([2, 3]), _EMPTY_REQ_CTX)
+-
+-        # T1 has {4, 5}, T2 has {2, 3}
+-        assert len(arc_policy.t1) == 2
+-        assert len(arc_policy.t2) == 2
+-
+-        # store [6] -> should evict from T1 (4 is oldest in T1)
+-        prepare_store_output = cpu_manager.prepare_store(to_keys([6]), _EMPTY_REQ_CTX)
+-        assert prepare_store_output is not None
+-        cpu_manager.complete_store(to_keys([6]), _EMPTY_REQ_CTX)
+-
+-        # verify blocks 2, 3 (in T2) are still present
+-        assert cpu_manager.lookup(to_key(2), _EMPTY_REQ_CTX) is LookupResult.HIT
+-        assert cpu_manager.lookup(to_key(3), _EMPTY_REQ_CTX) is LookupResult.HIT
+-
+-        # verify events
+-        events = list(cpu_manager.take_events())
+-        assert len(events) > 0  # should have store and eviction events
+-
+-
+ def test_filter_reused_manager():
+     """
+     Tests CPUOffloadingManager reuse filtering (store_threshold=2).
+     """
+     manager = make_cpu_manager(
+         num_blocks=4,
+-        cache_policy="lru",
+         enable_events=True,
+         store_threshold=2,
+         max_tracker_size=3,
+@@ -971,115 +563,227 @@
+ 
+ def test_evictable_cache_block_count():
+     """
+-    Verifies _num_evictable_cache_blocks is maintained correctly through the
++    Verifies the evictable (idle) set is maintained correctly through the
+     full store/load lifecycle, eviction, failed stores, concurrent loads,
+     reset_cache, and the early-exit fast path in prepare_store.
+     """
+-    manager = make_cpu_manager(num_blocks=4, cache_policy="lru")
++    manager = make_cpu_manager(num_blocks=4)
++
++    def evictable() -> int:
++        return len(manager._evictable_blocks)
+ 
+     # Initially no blocks allocated.
+-    assert manager._num_evictable_cache_blocks == 0
++    assert evictable() == 0
+ 
+     # Initial cache state [x, x, x, x]
+ 
+     # We get 3 blocks from the cache.
+     manager.prepare_store(to_keys([1, 2, 3]), _EMPTY_REQ_CTX)
+     # cache state [1', 2', 3', x] <- 1', 2', 3' are actively being used.
+-    assert manager._num_evictable_cache_blocks == 0
++    assert evictable() == 0
+ 
+     # Completing stores makes them idle.
+     manager.complete_store(to_keys([1, 2, 3]), _EMPTY_REQ_CTX)
+     # cache state [1, 2, 3, x] <- 1, 2, 3 blocks are idle.
+-    assert manager._num_evictable_cache_blocks == 3
++    assert evictable() == 3
+ 
+     # prepare_load pins a block: idle count decrements once even if the
+     # same block is loaded by two concurrent callers.
+     manager.prepare_load(to_keys([1]), _EMPTY_REQ_CTX)
+     # cache state [1', 2, 3, x] <- 2, 3 blocks are idle.
+-    assert manager._num_evictable_cache_blocks == 2
++    assert evictable() == 2
+     manager.prepare_load(to_keys([1]), _EMPTY_REQ_CTX)  # 2nd concurrent load
+     # cache state [1', 2, 3, x] <- 2, 3 blocks are idle.
+-    assert manager._num_evictable_cache_blocks == 2  # no double-decrement
++    assert evictable() == 2  # no double-remove
+ 
+     # First complete_load does not restore idle (ref_cnt still 1).
+     manager.complete_load(to_keys([1]), _EMPTY_REQ_CTX)
+     # cache state [1', 2, 3, x] <- 2, 3 blocks are idle.
+-    assert manager._num_evictable_cache_blocks == 2
++    assert evictable() == 2
+     # Second complete_load drops ref_cnt to 0 -> block becomes idle again.
+     manager.complete_load(to_keys([1]), _EMPTY_REQ_CTX)
+     # cache state [1, 2, 3, x] <- 1, 2, 3 blocks are idle.
+-    assert manager._num_evictable_cache_blocks == 3
++    assert evictable() == 3
+ 
+     # Eviction decrements idle count.
+     # Cache has 3 stored blocks and 1 free slot. Storing 3 new keys needs 2 eviction.
+     manager.prepare_store(to_keys([4, 5, 6]), _EMPTY_REQ_CTX)
+     # cache state [1, 4', 5', 6'] <- block 1 is idle
+-    assert manager._num_evictable_cache_blocks == 1
++    assert evictable() == 1
+ 
+     # Failed store does not increment idle count (block discarded from cache).
+     manager.complete_store(to_keys([4, 5, 6]), _EMPTY_REQ_CTX, success=False)
+     # cache state [1, x, x, x] <- block 1 is idle. Other returned to cache.
+-    assert manager._num_evictable_cache_blocks == 1
++    assert evictable() == 1
+ 
+     # reset_cache zeroes the count unconditionally.
+     manager.reset_cache()
+     # cache state [x, x, x, x]
+-    assert manager._num_evictable_cache_blocks == 0
++    assert evictable() == 0
+ 
+     # setup 3 blocks with loads so idle count drops to 0.
+     manager.prepare_store(to_keys([10, 11, 12]), _EMPTY_REQ_CTX)
+     manager.complete_store(to_keys([10, 11, 12]), _EMPTY_REQ_CTX)
+     manager.prepare_load(to_keys([10, 11, 12]), _EMPTY_REQ_CTX)
+     # cache state [10', 11', 12', x]
+-    assert manager._num_evictable_cache_blocks == 0
+-
+-    # prepare_store requiring eviction must return None immediately (fast exit).
+-    # Spy on policy.evict to confirm the fast path short-circuits before calling it.
+-    evict_called = False
+-    original_evict = manager._policy.evict
+-
+-    def spy_evict(*args, **kwargs):
+-        nonlocal evict_called
+-        evict_called = True
+-        return original_evict(*args, **kwargs)
+-
+-    manager._policy.evict = spy_evict  # type: ignore[method-assign]
++    assert evictable() == 0
++
++    # prepare_store requiring eviction must return None immediately: an
++    # empty evictable set short-circuits before any candidate scan.
+     # cache state [10', 11', 12', x] <- cannot evict anything
+     assert manager.prepare_store(to_keys([14, 15]), _EMPTY_REQ_CTX) is None
+-    assert not evict_called, (
+-        "_num_evictable_cache_blocks==0 should short-circuit before evict()"
+-    )
+ 
+     # After releasing the loads, eviction becomes possible again.
+     manager.complete_load(to_keys([10, 11, 12]), _EMPTY_REQ_CTX)
+     # cache state [10, 11, 12, x] <- 10, 11, 12 are idle
+-    assert manager._num_evictable_cache_blocks == 3
++    assert evictable() == 3
+     assert manager.prepare_store(to_keys([14, 15]), _EMPTY_REQ_CTX) is not None
+     # cache state [10, 11, 14', 15'] <- 10, 11 are idle
+-    assert manager._num_evictable_cache_blocks == 2
++    assert evictable() == 2
+     manager.complete_store(to_keys([14, 15]), _EMPTY_REQ_CTX)
+     # cache state [10, 11, 14, 15] <- all blocks idle
+-    assert manager._num_evictable_cache_blocks == 4
+-
+-
+-def test_touch_forwards_req_context_to_policy(monkeypatch):
+-    """Regression: CPUOffloadingManager.touch forwards ReqContext to policy."""
+-    manager = make_cpu_manager(num_blocks=4, cache_policy="lru")
+-    received = []
+-
+-    def spy_touch(keys: Iterable[OffloadKey], req_context: ReqContext) -> None:
+-        received.append((list(keys), req_context))
+-
+-    monkeypatch.setattr(manager._policy, "touch", spy_touch)
+-
+-    keys = to_keys([1, 2])
+-    ctx = make_req_context(
+-        req_id="test-req",
+-        kv_transfer_params={"test_param": "test_value"},
+-    )
+-
+-    manager.touch(keys, ctx)
+-
+-    assert len(received) == 1
+-    assert received[0][0] == keys
+-    assert received[0][1] is ctx
++    assert evictable() == 4
++
++
++def _scoped_ctx(scope: str | None, req_id: str = "req") -> ReqContext:
++    return make_req_context(req_id=req_id, kv_scope=scope)
++
++
++def _store(manager: CPUOffloadingManager, keys: list[int], scope: str | None):
++    ctx = _scoped_ctx(scope)
++    out = manager.prepare_store(to_keys(keys), ctx)
++    assert out is not None
++    manager.complete_store(to_keys(keys), ctx)
++    return ctx
++
++
++def test_release_scope_drops_idle_blocks_as_a_unit():
++    """The moment recency gets wrong: a finished subagent's blocks are the
++    most recently used thing in the cache, yet release must drop exactly
++    them — and only them — before the parent's next lookup."""
++    manager = make_cpu_manager(num_blocks=4, enable_events=True)
++
++    _store(manager, [1, 2], None)  # parent (main line)
++    _store(manager, [3, 4], "toolu_A")  # subagent, stored after the parent
++    list(manager.take_events())
++
++    manager.release_scope("toolu_A")
++
++    assert manager.lookup(to_key(3), _EMPTY_REQ_CTX) is LookupResult.MISS
++    assert manager.lookup(to_key(4), _EMPTY_REQ_CTX) is LookupResult.MISS
++    # The parent's older blocks survive despite being LRU.
++    assert manager.lookup(to_key(1), _EMPTY_REQ_CTX) is LookupResult.HIT
++    assert manager.lookup(to_key(2), _EMPTY_REQ_CTX) is LookupResult.HIT
++    verify_events(manager.take_events(), expected_evictions=({3, 4},))
++
++    # The freed slots are immediately reusable without touching the parent.
++    out = manager.prepare_store(to_keys([5, 6]), _scoped_ctx(None))
++    assert out is not None
++    assert out.evicted_keys == []
++
++
++def test_release_scope_unknown_scope_is_a_no_op():
++    manager = make_cpu_manager(num_blocks=4)
++    _store(manager, [1], None)
++    manager.release_scope("toolu_never_seen")
++    assert manager.lookup(to_key(1), _EMPTY_REQ_CTX) is LookupResult.HIT
++
++
++def test_touch_transfers_ownership_between_scopes():
++    """A prefix chunk shared with the parent must survive the subagent's
++    death if the parent used it after the subagent did."""
++    manager = make_cpu_manager(num_blocks=4)
++
++    _store(manager, [1, 2], "toolu_A")
++    # Parent touches the shared chunk 1; ownership moves to the main line.
++    manager.touch(to_keys([1]), _scoped_ctx(None))
++
++    manager.release_scope("toolu_A")
++
++    assert manager.lookup(to_key(1), _EMPTY_REQ_CTX) is LookupResult.HIT
++    assert manager.lookup(to_key(2), _EMPTY_REQ_CTX) is LookupResult.MISS
++
++
++def test_release_scope_defers_write_pending_blocks_to_completion():
++    """Release must never race the DMA engine: a block with an in-flight
++    store is reclaimed at complete_store, and — never having been announced
++    as stored — vanishes without an event."""
++    manager = make_cpu_manager(num_blocks=4, enable_events=True)
++
++    ctx = _scoped_ctx("toolu_A")
++    out = manager.prepare_store(to_keys([1]), ctx)
++    assert out is not None
++
++    manager.release_scope("toolu_A")
++    # Still write-pending: the slot must not be handed out yet.
++    assert manager.lookup(to_key(1), _EMPTY_REQ_CTX) is LookupResult.HIT_PENDING
++
++    manager.complete_store(to_keys([1]), ctx)
++    assert manager.lookup(to_key(1), _EMPTY_REQ_CTX) is LookupResult.MISS
++    verify_events(manager.take_events())  # neither stored nor removed
++
++    # The slot is free again.
++    out = manager.prepare_store(to_keys([2]), _scoped_ctx(None))
++    assert out is not None
++    assert out.evicted_keys == []
++
++
++def test_release_scope_defers_loaded_blocks_to_completion():
++    manager = make_cpu_manager(num_blocks=4, enable_events=True)
++
++    ctx = _scoped_ctx("toolu_A")
++    _store(manager, [1], "toolu_A")
++    list(manager.take_events())
++    manager.prepare_load(to_keys([1]), ctx)
++
++    manager.release_scope("toolu_A")
++    # Pinned by the in-flight load: still present.
++    assert manager.lookup(to_key(1), _EMPTY_REQ_CTX) is LookupResult.HIT
++
++    manager.complete_load(to_keys([1]), ctx)
++    # The deferred half of the release: announced stored earlier, so its
++    # disappearance is announced too.
++    assert manager.lookup(to_key(1), _EMPTY_REQ_CTX) is LookupResult.MISS
++    verify_events(manager.take_events(), expected_evictions=({1},))
++
++
++def test_live_touch_resurrects_a_deferred_release():
++    """A live scope touching a dead-pending block re-owns it: deadness
++    applied to the old owner, not to the bytes."""
++    manager = make_cpu_manager(num_blocks=4)
++
++    sub_ctx = _scoped_ctx("toolu_A")
++    _store(manager, [1], "toolu_A")
++    manager.prepare_load(to_keys([1]), sub_ctx)
++    manager.release_scope("toolu_A")
++
++    # The parent starts using the shared block while the load drains.
++    manager.touch(to_keys([1]), _scoped_ctx(None))
++
++    manager.complete_load(to_keys([1]), sub_ctx)
++    assert manager.lookup(to_key(1), _EMPTY_REQ_CTX) is LookupResult.HIT
++
++
++def test_capacity_eviction_stays_lru_among_live_scopes():
++    """With every owner alive, pressure resolves by recency — identity only
++    changes eviction when a scope has actually terminated."""
++    manager = make_cpu_manager(num_blocks=2)
++
++    _store(manager, [1], None)
++    _store(manager, [2], "toolu_A")
++    manager.touch(to_keys([1]), _scoped_ctx(None))  # 2 becomes LRU
++
++    out = manager.prepare_store(to_keys([3]), _scoped_ctx("toolu_B"))
++    assert out is not None
++    assert out.evicted_keys == to_keys([2])
++
++
++def test_reset_cache_clears_scope_state():
++    manager = make_cpu_manager(num_blocks=4)
++    _store(manager, [1, 2], "toolu_A")
++    manager.reset_cache()
++    assert manager._owner == {}
++    assert manager._scope_keys == {}
++    assert manager._dead_pending == set()
++    # Releasing after reset is a no-op, not a KeyError.
++    manager.release_scope("toolu_A")
+diff --git a/tests/v1/kv_offload/test_factory.py b/tests/v1/kv_offload/test_factory.py
+--- a/tests/v1/kv_offload/test_factory.py
++++ b/tests/v1/kv_offload/test_factory.py
+@@ -37,7 +37,8 @@
+ def _make_offloading_config(
+     *,
+     spec_name: str | None = "CPUOffloadingSpec",
+-    cpu_bytes_to_use: int | None = 65536,
++    cpu_kv_cache_users: int | None = 1,
++    max_model_len: int = 128,
+     worker_kv_bytes_per_block: int = 8,
+     groups: tuple[OffloadingGroupConfig, ...] | None = None,
+     tokens_per_hash: int = 16,
+@@ -58,8 +59,8 @@
+     normalized_extra_config = dict(extra_config or {})
+     if spec_name is not None:
+         normalized_extra_config["spec_name"] = spec_name
+-    if cpu_bytes_to_use is not None:
+-        normalized_extra_config["cpu_bytes_to_use"] = cpu_bytes_to_use
++    if cpu_kv_cache_users is not None:
++        normalized_extra_config["cpu_kv_cache_users"] = cpu_kv_cache_users
+ 
+     if groups is None:
+         groups = (OffloadingGroupConfig(16, ("layer",)),)
+@@ -70,7 +71,9 @@
+         enable_kv_cache_events=False,
+         extra_config=normalized_extra_config,
+         engine_id="test-engine",
+-        model=OffloadingModelConfig(name="test-model", dtype="float16"),
++        model=OffloadingModelConfig(
++            name="test-model", dtype="float16", max_model_len=max_model_len
++        ),
+         cache=OffloadingCacheConfig(
+             tokens_per_hash=tokens_per_hash,
+             blocks_per_chunk=blocks_per_chunk,
+@@ -144,8 +147,9 @@
+     # (matching the shared region), so kv_bytes_per_chunk picks up padding
+     # while cpu_page_size_per_worker stays the un-padded per-worker slot.
+     alignment = SharedOffloadRegion.BLOCK_SIZE_ALIGNMENT
+-    spec = _create_spec(
+-        cpu_bytes_to_use=alignment * 3,
++    # 96-token contexts over 32-token chunks: one declared user is 3 chunks.
++    spec = _create_spec(
++        max_model_len=96,
+         worker_kv_bytes_per_block=16,
+         blocks_per_chunk=2,
+         world_size=6,
+@@ -172,7 +176,7 @@
+     alignment = SharedOffloadRegion.BLOCK_SIZE_ALIGNMENT
+     spec = _create_spec(
+         spec_name="TieringOffloadingSpec",
+-        cpu_bytes_to_use=alignment * 3,
++        max_model_len=96,
+         worker_kv_bytes_per_block=16,
+         blocks_per_chunk=2,
+         world_size=6,
+@@ -189,9 +193,11 @@
+ @pytest.mark.parametrize("world_size", [2, 4, 8])
+ def test_tiering_spec_replicated_sizing_removes_world_factor(world_size: int):
+     worker_kv_bytes_per_block = SharedOffloadRegion.BLOCK_SIZE_ALIGNMENT
++    # Chunk-count capacity (128 tokens / 16-token blocks = 8 chunks/user) is
++    # topology-free by construction; the single-copy row math below is what
++    # the replicated layout must still get right.
+     spec = _create_spec(
+         spec_name="TieringOffloadingSpec",
+-        cpu_bytes_to_use=worker_kv_bytes_per_block * 8,
+         worker_kv_bytes_per_block=worker_kv_bytes_per_block,
+         world_size=world_size,
+         replicated_layout=True,
+@@ -210,7 +216,6 @@
+     worker_kv_bytes_per_block = SharedOffloadRegion.BLOCK_SIZE_ALIGNMENT
+     spec = _create_spec(
+         spec_name="TieringOffloadingSpec",
+-        cpu_bytes_to_use=worker_kv_bytes_per_block * 8,
+         worker_kv_bytes_per_block=worker_kv_bytes_per_block,
+         world_size=4,
+         replicated_layout=True,
+@@ -282,7 +287,6 @@
+     monkeypatch.setattr(cpu_spec_module.current_platform, "is_cuda_alike", lambda: True)
+     worker_kv_bytes_per_block = SharedOffloadRegion.BLOCK_SIZE_ALIGNMENT
+     spec = _create_spec(
+-        cpu_bytes_to_use=worker_kv_bytes_per_block * 8,
+         worker_kv_bytes_per_block=worker_kv_bytes_per_block,
+         world_size=world_size,
+         replicated_layout=True,
+@@ -310,7 +314,6 @@
+     )
+     worker_kv_bytes_per_block = SharedOffloadRegion.BLOCK_SIZE_ALIGNMENT
+     spec = _create_spec(
+-        cpu_bytes_to_use=worker_kv_bytes_per_block * world_size * 2,
+         worker_kv_bytes_per_block=worker_kv_bytes_per_block,
+         world_size=world_size,
+         replicated_layout=True,
+@@ -320,7 +323,9 @@
+     assert spec.replicated_layout is False
+     assert spec.cpu_page_size_per_worker == worker_kv_bytes_per_block
+     assert spec.kv_bytes_per_chunk == worker_kv_bytes_per_block * world_size
+-    assert spec.num_blocks == 2
++    # Capacity is a chunk count (8 per declared user for 128/16), unchanged
++    # by how many per-rank copies each chunk carries.
++    assert spec.num_blocks == 8
+ 
+ 
+ @pytest.mark.parametrize("config_replicated", [True, False])
+@@ -337,7 +342,6 @@
+     )
+     worker_kv_bytes_per_block = SharedOffloadRegion.BLOCK_SIZE_ALIGNMENT
+     spec = _create_spec(
+-        cpu_bytes_to_use=worker_kv_bytes_per_block * 8,
+         worker_kv_bytes_per_block=worker_kv_bytes_per_block,
+         world_size=4,
+         replicated_layout=config_replicated,
+@@ -352,7 +356,6 @@
+ 
+     worker_kv_bytes_per_block = SharedOffloadRegion.BLOCK_SIZE_ALIGNMENT
+     spec = _create_spec(
+-        cpu_bytes_to_use=worker_kv_bytes_per_block * 8,
+         worker_kv_bytes_per_block=worker_kv_bytes_per_block,
+         world_size=4,
+     )
+@@ -463,7 +466,6 @@
+     monkeypatch.setattr(cpu_spec_module.current_platform, "is_cuda_alike", lambda: True)
+     worker_kv_bytes_per_block = SharedOffloadRegion.BLOCK_SIZE_ALIGNMENT
+     spec = _create_spec(
+-        cpu_bytes_to_use=worker_kv_bytes_per_block * 8,
+         worker_kv_bytes_per_block=worker_kv_bytes_per_block,
+         world_size=world_size,
+         replicated_layout=replicated_layout,
+@@ -539,9 +541,59 @@
+         OffloadingSpecFactory.create_spec(config)
+ 
+ 
+-def test_cpu_spec_missing_cpu_bytes_to_use_raises():
+-    with pytest.raises(Exception, match="cpu_bytes_to_use must be specified"):
+-        _create_spec(cpu_bytes_to_use=None)
++def test_cpu_spec_missing_cpu_kv_cache_users_raises():
++    with pytest.raises(ValueError, match="cpu_kv_cache_users must be specified"):
++        _create_spec(cpu_kv_cache_users=None)
++
++
++@pytest.mark.parametrize("bad_users", [0, -1, 1.5, "1", True])
++def test_cpu_spec_rejects_non_positive_or_non_integer_users(bad_users):
++    with pytest.raises(ValueError, match="positive integer"):
++        _create_spec(cpu_kv_cache_users=bad_users)
++
++
++@pytest.mark.parametrize(
++    "superseded_key",
++    ["cpu_bytes_to_use", "eviction_policy", "cache_policy_module_path"],
++)
++def test_cpu_spec_superseded_keys_fail_startup(superseded_key):
++    # Supplying a replaced knob is a startup failure, not a legacy path:
++    # the error must name the key and point at the replacement.
++    with pytest.raises(ValueError, match=superseded_key):
++        _create_spec(extra_config={superseded_key: 1})
++
++
++def test_cpu_spec_unknown_extra_config_key_fails_startup():
++    with pytest.raises(ValueError, match="Unknown kv_connector_extra_config"):
++        _create_spec(extra_config={"definitely_not_a_knob": 1})
++
++
++def test_cpu_spec_user_count_scales_capacity():
++    # 128-token contexts over 16-token chunks: 8 chunks per declared user.
++    assert _create_spec(cpu_kv_cache_users=1).num_blocks == 8
++    assert _create_spec(cpu_kv_cache_users=4).num_blocks == 32
++
++
++def test_cpu_spec_windowed_group_counts_trailing_window_only():
++    # A full-attention group needs its whole prefix; a recurrent/windowed
++    # group is resident at the trailing window the load path reads. For a
++    # Mamba-style window of one chunk, one 128-token user is 8 + 1 chunks,
++    # not 8 + 8: counting every boundary snapshot would double the declared
++    # footprint for chunks a full-length re-entry never reads.
++    groups = (
++        OffloadingGroupConfig(16, ("full_layer",)),
++        OffloadingGroupConfig(16, ("mamba_layer",), sliding_window_size_in_chunks=1),
++    )
++    spec = _create_spec(groups=groups)
++    assert spec.num_blocks == 9
++
++
++def test_cpu_spec_window_wider_than_context_is_clamped():
++    groups = (
++        OffloadingGroupConfig(16, ("swa_layer",), sliding_window_size_in_chunks=99),
++    )
++    spec = _create_spec(groups=groups)
++    assert spec.num_blocks == 8
+ 
+ 
+ def test_duplicate_registration_raises():
+diff --git a/tests/v1/kv_offload/test_file_mapper.py b/tests/v1/kv_offload/test_file_mapper.py
+--- a/tests/v1/kv_offload/test_file_mapper.py
++++ b/tests/v1/kv_offload/test_file_mapper.py
+@@ -36,6 +36,7 @@
+         model=OffloadingModelConfig(
+             name=kwargs.get("model_name", "test-model"),
+             dtype=kwargs.get("dtype", "float16"),
++            max_model_len=kwargs.get("max_model_len", 128),
+         ),
+         cache=OffloadingCacheConfig(
+             tokens_per_hash=kwargs.get("tokens_per_hash", 16),
+diff --git a/tests/v1/kv_offload/tiering/p2p/run_accuracy_test.sh b/tests/v1/kv_offload/tiering/p2p/run_accuracy_test.sh
+--- a/tests/v1/kv_offload/tiering/p2p/run_accuracy_test.sh
++++ b/tests/v1/kv_offload/tiering/p2p/run_accuracy_test.sh
+@@ -26,7 +26,7 @@
+ #   MAX_MODEL_LEN               default 512
+ #   PREFILL_BLOCK_SIZE          default 128
+ #   DECODE_BLOCK_SIZE           default 128
+-#   CPU_BYTES                   default 209715200 (200 MB)
++#   CPU_KV_CACHE_USERS          default 2 (resident full-length contexts)
+ #   VLLM_SERVE_EXTRA_ARGS       comma-separated extra args for vllm serve
+ #   --decoder-first             toggle decoder-first proxy mode
+ #
+@@ -91,7 +91,7 @@
+ MAX_MODEL_LEN=${MAX_MODEL_LEN:-512}
+ PREFILL_BLOCK_SIZE=${PREFILL_BLOCK_SIZE:-128}
+ DECODE_BLOCK_SIZE=${DECODE_BLOCK_SIZE:-128}
+-CPU_BYTES=${CPU_BYTES:-209715200}
++CPU_KV_CACHE_USERS=${CPU_KV_CACHE_USERS:-2}
+ VLLM_SERVE_EXTRA_ARGS=${VLLM_SERVE_EXTRA_ARGS:-}
+ 
+ # Base ports — per-instance offsets layered on top.
+@@ -166,8 +166,8 @@
+ # Mirrors deploy_local.sh:131.
+ build_kv_config() {
+   local pd_port=$1
+-  printf '{"kv_connector":"OffloadingConnector","kv_role":"kv_both","kv_connector_extra_config":{"spec_name":"TieringOffloadingSpec","cpu_bytes_to_use":%s,"secondary_tiers":[{"type":"p2p","host":"%s","port":%s}]}}' \
+-    "${CPU_BYTES}" "${P2P_HOST}" "${pd_port}"
++  printf '{"kv_connector":"OffloadingConnector","kv_role":"kv_both","kv_connector_extra_config":{"spec_name":"TieringOffloadingSpec","cpu_kv_cache_users":%s,"secondary_tiers":[{"type":"p2p","host":"%s","port":%s}]}}' \
++    "${CPU_KV_CACHE_USERS}" "${P2P_HOST}" "${pd_port}"
+ }
+ 
+ # ---------------------------------------------------------------------------
+@@ -221,6 +221,7 @@
+     --block-size ${PREFILL_BLOCK_SIZE} \
+     --gpu-memory-utilization ${GPU_MEMORY_UTILIZATION} \
+     --max-model-len ${MAX_MODEL_LEN} \
++    --kv-cache-users 2 \
+     --tensor-parallel-size ${PREFILLER_TP_SIZE} \
+     --kv-transfer-config '${kv_cfg}'"
+ 
+@@ -261,6 +262,7 @@
+     --block-size ${DECODE_BLOCK_SIZE} \
+     --gpu-memory-utilization ${GPU_MEMORY_UTILIZATION} \
+     --max-model-len ${MAX_MODEL_LEN} \
++    --kv-cache-users 2 \
+     --kv-transfer-config '${kv_cfg}'"
+ 
+     # DP-EP attention mode: data-parallel + expert-parallel decode replicas
+diff --git a/tests/v1/kv_offload/tiering/test_fs_tier.py b/tests/v1/kv_offload/tiering/test_fs_tier.py
+--- a/tests/v1/kv_offload/tiering/test_fs_tier.py
++++ b/tests/v1/kv_offload/tiering/test_fs_tier.py
+@@ -71,7 +71,9 @@
+         enable_kv_cache_events=enable_kv_cache_events,
+         extra_config={},
+         engine_id="test-engine",
+-        model=OffloadingModelConfig(name="test-model", dtype="float32"),
++        model=OffloadingModelConfig(
++            name="test-model", dtype="float32", max_model_len=128
++        ),
+         cache=OffloadingCacheConfig(tokens_per_hash=16, blocks_per_chunk=1),
+         parallel=OffloadingParallelConfig(
+             rank=rank,
+diff --git a/tests/v1/kv_offload/tiering/test_obj_tier.py b/tests/v1/kv_offload/tiering/test_obj_tier.py
+--- a/tests/v1/kv_offload/tiering/test_obj_tier.py
++++ b/tests/v1/kv_offload/tiering/test_obj_tier.py
+@@ -64,7 +64,9 @@
+         enable_kv_cache_events=enable_kv_cache_events,
+         extra_config={},
+         engine_id="test-engine",
+-        model=OffloadingModelConfig(name="test/model", dtype="float16"),
++        model=OffloadingModelConfig(
++            name="test/model", dtype="float16", max_model_len=128
++        ),
+         cache=OffloadingCacheConfig(tokens_per_hash=16, blocks_per_chunk=1),
+         parallel=OffloadingParallelConfig(
+             rank=rank,
+diff --git a/tests/v1/simple_kv_offload/test_integration.py b/tests/v1/simple_kv_offload/test_integration.py
+--- a/tests/v1/simple_kv_offload/test_integration.py
++++ b/tests/v1/simple_kv_offload/test_integration.py
+@@ -37,7 +37,7 @@
+     )
+     return LLM(
+         model=model,
+-        kv_cache_memory_bytes=40 << 30,  # 40 GiB
++        kv_cache_users=4,
+         disable_hybrid_kv_cache_manager=False,
+         enable_prefix_caching=True,
+         kv_transfer_config=kv_transfer_config,
+diff --git a/vllm/config/cache.py b/vllm/config/cache.py
+--- a/vllm/config/cache.py
++++ b/vllm/config/cache.py
+@@ -38,7 +38,6 @@
+ MambaDType = Literal["auto", "float32", "float16", "bfloat16"]
+ MambaCacheMode = Literal["all", "align", "none"]
+ PrefixCachingHashAlgo = Literal["sha256", "sha256_cbor", "xxhash", "xxhash_cbor"]
+-KVOffloadingBackend = Literal["native", "lmcache"]
+ 
+ 
+ @config
+@@ -177,25 +176,24 @@
+     NOTE: KV cache sharing is not supported for MRv2 (v2 model runner).
+     """
+ 
+-    kv_cache_memory_bytes: int | None = None
+-    """Size of KV Cache per GPU in bytes. By default, this is set to None
+-    and vllm can automatically infer the kv cache size based on
+-    gpu_memory_utilization. However, users may want to manually specify
+-    the kv cache memory size. kv_cache_memory_bytes allows more fine-grain
+-    control of how much memory gets used when compared with using
+-    gpu_memory_utilization. Note that kv_cache_memory_bytes
+-    (when not-None) ignores gpu_memory_utilization"""
+-
+-    kv_offloading_size: float | None = None
+-    """Size of the KV cache offloading buffer in GiB. When TP > 1, this is
+-    the total buffer size summed across all TP ranks. By default, this is set
+-    to None, which means no KV offloading is enabled. When set, vLLM will
+-    enable KV cache offloading to CPU using the kv_offloading_backend."""
+-
+-    kv_offloading_backend: KVOffloadingBackend = "native"
+-    """The backend to use for KV cache offloading. Supported backends include
+-    'native' (vLLM native CPU offloading), 'lmcache'.
+-    KV offloading is only activated when kv_offloading_size is set."""
++    kv_cache_users: int | None = None
++    """GPU KV cache capacity, declared as a count of resident full-length
++    user contexts. Bytes are derived at engine initialization from
++    max_model_len and the KV cache spec — the only place page sizes and the
++    hybrid group structure exist — so the same declaration is correct on
++    any GPU and any TP layout. Required whenever the model has a KV cache;
++    engine initialization fails closed without it. There is deliberately no
++    byte-denominated companion: a byte value is only ever valid for the one
++    machine it was measured on."""
++
++    kv_cache_memory_bytes: int | None = field(default=None, init=False)
++    """Internal availability state, never a user declaration: the CPU
++    backend derives it from VLLM_CPU_KVCACHE_SPACE, and the startup-plan
++    cache re-applies a previously measured profiling result to skip
++    re-profiling. Either way it only bounds what is available — the demand
++    derived from kv_cache_users must still fit inside it. The former CLI
++    and constructor inlets were removed because a byte declaration encodes
++    one specific machine."""
+ 
+     def compute_hash(self) -> str:
+         """
+@@ -212,6 +210,7 @@
+         ignored_factors = {
+             # Runtime/derived knobs that don't affect compiled graph shape
+             "gpu_memory_utilization",
++            "kv_cache_users",
+             "kv_cache_memory_bytes",
+             "is_attention_free",
+             "num_gpu_blocks_override",
+diff --git a/vllm/config/vllm.py b/vllm/config/vllm.py
+--- a/vllm/config/vllm.py
++++ b/vllm/config/vllm.py
+@@ -944,42 +944,6 @@
+         )
+         speculative_config.num_speculative_tokens_per_batch_size = None
+ 
+-    def _post_init_kv_transfer_config(self) -> None:
+-        """Update KVTransferConfig based on top-level configs in VllmConfig.
+-
+-        Right now, this function reads the offloading settings from
+-        CacheConfig and configures the KVTransferConfig accordingly.
+-        """
+-        # KV offloading is only activated when kv_offloading_size is set.
+-        if (kv_offloading_size := self.cache_config.kv_offloading_size) is None:
+-            return
+-
+-        kv_offloading_backend = self.cache_config.kv_offloading_backend
+-
+-        # If no KVTransferConfig is provided, create a default one.
+-        if self.kv_transfer_config is None:
+-            self.kv_transfer_config = KVTransferConfig()
+-
+-        if kv_offloading_backend == "native":
+-            if envs.VLLM_USE_SIMPLE_KV_OFFLOAD:
+-                config_connector = "SimpleCPUOffloadConnector"
+-            else:
+-                config_connector = "OffloadingConnector"
+-            self.kv_transfer_config.kv_connector = config_connector
+-            self.kv_transfer_config.kv_connector_extra_config.update(
+-                {"cpu_bytes_to_use": kv_offloading_size * (1 << 30)}
+-            )
+-        elif kv_offloading_backend == "lmcache":
+-            # Default to LMCache multi-process (MP) mode. The actual KV
+-            # storage capacity is managed by the standalone LMCache server
+-            # process, so ``kv_offloading_size`` is not propagated here.
+-            # ``LMCacheMPConnector`` falls back to ``tcp://localhost:5555``
+-            # when host/port are not provided via extra_config.
+-            self.kv_transfer_config.kv_connector = "LMCacheMPConnector"
+-
+-        # This is the same for all backends
+-        self.kv_transfer_config.kv_role = "kv_both"
+-
+     def _verify_kv_transfer_compat(self) -> None:
+         """Reject configurations that silently corrupt KV transfers."""
+         if (
+@@ -1709,10 +1673,6 @@
+                     "Please check whether your reasoning parser has implemented "
+                     "the `reasoning_start_str` and `reasoning_end_str`."
+                 )
+-
+-        # Resolve kv_offloading-derived connector name into kv_transfer_config
+-        # before the HMA check below, which inspects the connector class.
+-        self._post_init_kv_transfer_config()
+ 
+         # Hybrid KV cache manager (HMA) runtime rules:
+         # - Explicit enable (--no-disable-kv-cache-manager): error if runtime
+diff --git a/vllm/distributed/kv_transfer/kv_connector/v1/offloading/config.py b/vllm/distributed/kv_transfer/kv_connector/v1/offloading/config.py
+--- a/vllm/distributed/kv_transfer/kv_connector/v1/offloading/config.py
++++ b/vllm/distributed/kv_transfer/kv_connector/v1/offloading/config.py
+@@ -4,11 +4,16 @@
+ 
+ from typing import TYPE_CHECKING
+ 
++from vllm.utils.math_utils import cdiv
+ from vllm.v1.core.kv_cache_utils import resolve_kv_cache_block_sizes
+ from vllm.v1.kv_cache_interface import (
+     AttentionSpec,
++    ChunkedLocalAttentionSpec,
+     FullAttentionSpec,
++    KVCacheSpec,
++    MambaSpec,
+     MLAAttentionSpec,
++    SlidingWindowSpec,
+ )
+ from vllm.v1.kv_offload.config import (
+     OffloadingCacheConfig,
+@@ -26,6 +31,36 @@
+ def is_kv_cache_tensor_packed(kv_cache_tensor: "KVCacheTensor") -> bool:
+     """Return whether a KV cache tensor uses a packed block stride."""
+     return bool(kv_cache_tensor.block_stride)
++
++
++def get_sliding_window_size_in_chunks(
++    kv_cache_spec: KVCacheSpec, tokens_per_chunk: int
++) -> int | None:
++    """Trailing chunks of a group that a load hit reads (None = full prefix).
++
++    This is the single classification both the scheduler's load planning and
++    the user-count capacity derivation consume, via
++    OffloadingGroupConfig.sliding_window_size_in_chunks. Keeping it at the
++    config boundary is load-bearing: if planning and sizing classified
++    windows independently, a drift between them would let a "resident user"
++    be declared while the tier physically cannot hold what that user's
++    full-length re-entry reads.
++    """
++    if isinstance(kv_cache_spec, SlidingWindowSpec):
++        assert kv_cache_spec.sliding_window > 0
++        return cdiv(kv_cache_spec.sliding_window, tokens_per_chunk)
++
++    if isinstance(kv_cache_spec, ChunkedLocalAttentionSpec):
++        # Attention never reaches back past one chunk
++        assert kv_cache_spec.attention_chunk_size > 0
++        return cdiv(kv_cache_spec.attention_chunk_size, tokens_per_chunk)
++
++    if isinstance(kv_cache_spec, MambaSpec):
++        # Mamba depends on a single state
++        return 1
++
++    assert isinstance(kv_cache_spec, FullAttentionSpec)
++    return None
+ 
+ 
+ def build_offloading_config(
+@@ -40,25 +75,20 @@
+     engine_id = kv_transfer_config.engine_id
+ 
+     parallel_config = vllm_config.parallel_config
+-    groups = tuple(
+-        OffloadingGroupConfig(
+-            tokens_per_block=(
+-                group.kv_cache_spec.block_size
+-                * (
+-                    parallel_config.decode_context_parallel_size
+-                    if isinstance(group.kv_cache_spec, AttentionSpec)
+-                    else 1
+-                )
+-            ),
+-            layer_names=tuple(group.layer_names),
++    group_tokens_per_block = tuple(
++        group.kv_cache_spec.block_size
++        * (
++            parallel_config.decode_context_parallel_size
++            if isinstance(group.kv_cache_spec, AttentionSpec)
++            else 1
+         )
+         for group in kv_cache_config.kv_cache_groups
+     )
+ 
+     _, tokens_per_hash = resolve_kv_cache_block_sizes(kv_cache_config, vllm_config)
+-    for group in groups:
+-        assert group.tokens_per_block % tokens_per_hash == 0, (
+-            f"tokens_per_block={group.tokens_per_block} not divisible by "
++    for group_tokens in group_tokens_per_block:
++        assert group_tokens % tokens_per_hash == 0, (
++            f"tokens_per_block={group_tokens} not divisible by "
+             f"tokens_per_hash={tokens_per_hash}. "
+             f"Hybrid models (e.g. Mamba+Attention) need "
+             f"--enable-prefix-caching to align block sizes."
+@@ -83,7 +113,7 @@
+     elif tokens_per_chunk is not None:
+         tokens_per_chunk_int = int(tokens_per_chunk)
+ 
+-        unique_tokens_per_block = {group.tokens_per_block for group in groups}
++        unique_tokens_per_block = set(group_tokens_per_block)
+ 
+         assert len(unique_tokens_per_block) == 1, (
+             "If 'block_size' is specified in kv_connector_extra_config, "
+@@ -94,6 +124,22 @@
+         tokens_per_block = unique_tokens_per_block.pop()
+         assert tokens_per_chunk_int % tokens_per_block == 0
+         blocks_per_chunk = tokens_per_chunk_int // tokens_per_block
++
++    # Group construction waits for blocks_per_chunk: the per-group hit
++    # window is denominated in chunks, and a chunk's token span is not
++    # known until the chunk coalescing factor is resolved above.
++    groups = tuple(
++        OffloadingGroupConfig(
++            tokens_per_block=group_tokens,
++            layer_names=tuple(group.layer_names),
++            sliding_window_size_in_chunks=get_sliding_window_size_in_chunks(
++                group.kv_cache_spec, group_tokens * blocks_per_chunk
++            ),
++        )
++        for group, group_tokens in zip(
++            kv_cache_config.kv_cache_groups, group_tokens_per_block
++        )
++    )
+ 
+     worker_kv_bytes_per_block = 0
+     if kv_cache_config.num_blocks > 0:
+@@ -200,6 +246,7 @@
+         model=OffloadingModelConfig(
+             name=vllm_config.model_config.model,
+             dtype=str(cache_dtype).removeprefix("torch."),
++            max_model_len=vllm_config.model_config.max_model_len,
+         ),
+         cache=OffloadingCacheConfig(
+             tokens_per_hash=tokens_per_hash,
+diff --git a/vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py b/vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py
+--- a/vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py
++++ b/vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py
+@@ -31,12 +31,8 @@
+ from vllm.v1.core.kv_cache_manager import KVCacheBlocks
+ from vllm.v1.core.sched.output import SchedulerOutput
+ from vllm.v1.kv_cache_interface import (
+-    ChunkedLocalAttentionSpec,
+-    FullAttentionSpec,
+     KVCacheConfig,
+-    KVCacheSpec,
+     MambaSpec,
+-    SlidingWindowSpec,
+ )
+ from vllm.v1.kv_offload.base import (
+     GPULoadStoreSpec,
+@@ -106,26 +102,6 @@
+     is_eagle_group: bool = False
+ 
+ 
+-def get_sliding_window_size_in_chunks(
+-    kv_cache_spec: KVCacheSpec, tokens_per_chunk: int
+-) -> int | None:
+-    if isinstance(kv_cache_spec, SlidingWindowSpec):
+-        assert kv_cache_spec.sliding_window > 0
+-        return cdiv(kv_cache_spec.sliding_window, tokens_per_chunk)
+-
+-    if isinstance(kv_cache_spec, ChunkedLocalAttentionSpec):
+-        # Attention never reaches back past one chunk
+-        assert kv_cache_spec.attention_chunk_size > 0
+-        return cdiv(kv_cache_spec.attention_chunk_size, tokens_per_chunk)
+-
+-    if isinstance(kv_cache_spec, MambaSpec):
+-        # Mamba depends on a single state
+-        return 1
+-
+-    assert isinstance(kv_cache_spec, FullAttentionSpec)
+-    return None
+-
+-
+ def is_store_reachable_swa_chunk(
+     absolute_chunk_index: int,
+     storable_chunk_count: int,
+@@ -191,10 +167,11 @@
+         # architectures like DeepSeek V4 (MLA + SWA groups).
+         full_attn_tokens_per_chunk: set[int] = set()
+         for idx, tokens_per_block in enumerate(spec.tokens_per_block):
+-            kv_spec = kv_cache_config.kv_cache_groups[idx].kv_cache_spec
+-            sw = get_sliding_window_size_in_chunks(
+-                kv_spec, tokens_per_block * spec.blocks_per_chunk
+-            )
++            # The hit window is classified once, at the offloading config
++            # boundary, and shared with the capacity derivation in the CPU
++            # spec; recomputing it here could let load planning and declared
++            # capacity disagree about what a full-length re-entry reads.
++            sw = spec.config.groups[idx].sliding_window_size_in_chunks
+             if sw is None:
+                 full_attn_tokens_per_chunk.add(tokens_per_block * spec.blocks_per_chunk)
+ 
+@@ -242,9 +219,7 @@
+         for idx, tokens_per_block in enumerate(spec.tokens_per_block):
+             kv_cache_group = kv_cache_config.kv_cache_groups[idx]
+             kv_spec = kv_cache_group.kv_cache_spec
+-            sw = get_sliding_window_size_in_chunks(
+-                kv_spec, tokens_per_block * spec.blocks_per_chunk
+-            )
++            sw = spec.config.groups[idx].sliding_window_size_in_chunks
+             kv_group_configs_list.append(
+                 GroupOffloadConfig(
+                     group_idx=idx,
+@@ -483,6 +458,7 @@
+         req_id=req.request_id,
+         kv_transfer_params=params,
+         load_tier_filter=load_filter,
++        kv_scope=req.kv_scope,
+     )
+ 
+ 
+@@ -923,6 +899,14 @@
+ 
+     def on_new_request(self, request: Request) -> None:
+         """Called when a new request is added to the scheduler."""
++        # Releases apply first, before this request registers or looks
++        # anything up: the releasing request is typically the parent
++        # resuming after a subagent's terminal result, and its own prefix
++        # lookup must run against a pool where the dead scope occupies
++        # nothing. The parent's chunks are never candidates — they are
++        # owned by a different (usually the null) scope.
++        for scope in request.kv_scope_release or ():
++            self.manager.release_scope(scope)
+         req_context = _create_req_context(request)
+         offloading_context = self.manager.on_new_request(req_context)
+         req_status = RequestOffloadState(
+diff --git a/vllm/engine/arg_utils.py b/vllm/engine/arg_utils.py
+--- a/vllm/engine/arg_utils.py
++++ b/vllm/engine/arg_utils.py
+@@ -69,7 +69,6 @@
+ )
+ from vllm.config.cache import (
+     CacheDType,
+-    KVOffloadingBackend,
+     MambaCacheMode,
+     MambaDType,
+     PrefixCachingHashAlgo,
+@@ -275,7 +274,7 @@
+     Based on :func:`human_readable_int` so that the ``k/m/g/t`` (decimal) and
+     ``K/M/G/T`` (binary) conventions work out the box.
+     Also works inside JSON config arguments such
+-    as ``--kv-transfer-config '{"cpu_bytes_to_use": 80m}'``.
++    as ``--mm-processor-kwargs '{"size": {"longest_edge": 16M}}'``.
+ 
+     Only bare (unquoted) tokens are replaced so that JSON string values
+     like ``"model_name"`` are never modified.
+@@ -365,7 +364,6 @@
+             human_readable_int_args = {
+                 "max_num_batched_tokens",
+                 "max_num_scheduled_tokens",
+-                "kv_cache_memory_bytes",
+                 "safetensors_prefetch_block_size",
+             }
+             if name == "max_model_len":
+@@ -532,7 +530,7 @@
+     offload_prefetch_step: int = PrefetchOffloadConfig.offload_prefetch_step
+     offload_params: set[str] = get_field(PrefetchOffloadConfig, "offload_params")
+     gpu_memory_utilization: float = CacheConfig.gpu_memory_utilization
+-    kv_cache_memory_bytes: int | None = CacheConfig.kv_cache_memory_bytes
++    kv_cache_users: int | None = CacheConfig.kv_cache_users
+     max_num_batched_tokens: int | None = None
+     max_num_scheduled_tokens: int | None = None
+     long_prefill_token_threshold: int = SchedulerConfig.long_prefill_token_threshold
+@@ -743,8 +741,6 @@
+     )
+     enable_fault_tolerance: bool = ParallelConfig.enable_fault_tolerance
+ 
+-    kv_offloading_size: float | None = CacheConfig.kv_offloading_size
+-    kv_offloading_backend: KVOffloadingBackend = CacheConfig.kv_offloading_backend
+     tokens_only: bool = False
+ 
+     shutdown_timeout: int = 0
+@@ -1208,7 +1204,7 @@
+             "--gpu-memory-utilization", **cache_kwargs["gpu_memory_utilization"]
+         )
+         cache_group.add_argument(
+-            "--kv-cache-memory-bytes", **cache_kwargs["kv_cache_memory_bytes"]
++            "--kv-cache-users", **cache_kwargs["kv_cache_users"]
+         )
+         cache_group.add_argument("--kv-cache-dtype", **cache_kwargs["cache_dtype"])
+         cache_group.add_argument(
+@@ -1249,12 +1245,6 @@
+             "--replayssm-buffer-len", **cache_kwargs["replayssm_buffer_len"]
+         )
+         cache_group.add_argument("--use-replayssm", **cache_kwargs["use_replayssm"])
+-        cache_group.add_argument(
+-            "--kv-offloading-size", **cache_kwargs["kv_offloading_size"]
+-        )
+-        cache_group.add_argument(
+-            "--kv-offloading-backend", **cache_kwargs["kv_offloading_backend"]
+-        )
+ 
+         # Model weight offload related configs
+         offload_kwargs = get_kwargs(OffloadConfig)
+@@ -1994,7 +1984,7 @@
+         cache_config = CacheConfig(
+             block_size=self.block_size,  # type: ignore[arg-type]
+             gpu_memory_utilization=self.gpu_memory_utilization,
+-            kv_cache_memory_bytes=self.kv_cache_memory_bytes,
++            kv_cache_users=self.kv_cache_users,
+             cache_dtype=resolved_cache_dtype,  # type: ignore[arg-type]
+             is_attention_free=model_config.is_attention_free,
+             num_gpu_blocks_override=self.num_gpu_blocks_override,
+@@ -2010,8 +2000,6 @@
+             mamba_cache_mode=self.mamba_cache_mode,
+             replayssm_buffer_len=self.replayssm_buffer_len,
+             use_replayssm=self.use_replayssm,
+-            kv_offloading_size=self.kv_offloading_size,
+-            kv_offloading_backend=self.kv_offloading_backend,
+         )
+ 
+         if resolved_cache_dtype.startswith("turboquant_"):
+diff --git a/vllm/entrypoints/anthropic/protocol.py b/vllm/entrypoints/anthropic/protocol.py
+--- a/vllm/entrypoints/anthropic/protocol.py
++++ b/vllm/entrypoints/anthropic/protocol.py
+@@ -188,6 +188,29 @@
+         default=None,
+         description="KVTransfer parameters used for disaggregated serving.",
+     )
++    kv_scope: str | None = Field(
++        default=None,
++        min_length=1,
++        description=(
++            "Agent scope that owns this request's KV cache: null for the "
++            "main session line, otherwise the tool_use id that spawned the "
++            "subagent (the harness's parent_tool_use_id convention). Scope "
++            "ownership is what lets the KV offload tier release a terminated "
++            "agent's blocks as a unit instead of retaining a dead context by "
++            "recency."
++        ),
++    )
++
++    kv_scope_release: list[str] | None = Field(
++        default=None,
++        description=(
++            "Agent scopes terminated since the previous request. Their "
++            "offloaded KV blocks are dropped as a unit before this request "
++            "is scheduled — typically sent on the parent's first request "
++            "after a subagent's terminal result."
++        ),
++    )
++
+     ec_transfer_params: dict[str, Any] | None = Field(
+         default=None,
+         description=(
+diff --git a/vllm/entrypoints/anthropic/serving.py b/vllm/entrypoints/anthropic/serving.py
+--- a/vllm/entrypoints/anthropic/serving.py
++++ b/vllm/entrypoints/anthropic/serving.py
+@@ -497,6 +497,8 @@
+             top_k=anthropic_request.top_k,
+             cache_salt=anthropic_request.cache_salt,
+             kv_transfer_params=anthropic_request.kv_transfer_params,
++            kv_scope=anthropic_request.kv_scope,
++            kv_scope_release=anthropic_request.kv_scope_release,
+             ec_transfer_params=anthropic_request.ec_transfer_params,
+             chat_template_kwargs=chat_template_kwargs or None,
+             **thinking_kwargs,
+diff --git a/vllm/entrypoints/cohere/protocol.py b/vllm/entrypoints/cohere/protocol.py
+--- a/vllm/entrypoints/cohere/protocol.py
++++ b/vllm/entrypoints/cohere/protocol.py
+@@ -174,6 +174,29 @@
+         default=None,
+         description="KVTransfer parameters used for disaggregated serving.",
+     )
++    kv_scope: str | None = Field(
++        default=None,
++        min_length=1,
++        description=(
++            "Agent scope that owns this request's KV cache: null for the "
++            "main session line, otherwise the tool_use id that spawned the "
++            "subagent (the harness's parent_tool_use_id convention). Scope "
++            "ownership is what lets the KV offload tier release a terminated "
++            "agent's blocks as a unit instead of retaining a dead context by "
++            "recency."
++        ),
++    )
++
++    kv_scope_release: list[str] | None = Field(
++        default=None,
++        description=(
++            "Agent scopes terminated since the previous request. Their "
++            "offloaded KV blocks are dropped as a unit before this request "
++            "is scheduled — typically sent on the parent's first request "
++            "after a subagent's terminal result."
++        ),
++    )
++
+     chat_template_kwargs: dict[str, Any] | None = Field(
+         default=None,
+         description=(
+diff --git a/vllm/entrypoints/cohere/serving.py b/vllm/entrypoints/cohere/serving.py
+--- a/vllm/entrypoints/cohere/serving.py
++++ b/vllm/entrypoints/cohere/serving.py
+@@ -501,6 +501,8 @@
+             logprobs=request.logprobs,
+             priority=request.priority or 0,
+             kv_transfer_params=request.kv_transfer_params,
++            kv_scope=request.kv_scope,
++            kv_scope_release=request.kv_scope_release,
+             chat_template_kwargs=request.chat_template_kwargs,
+         )
+ 
+diff --git a/vllm/entrypoints/llm.py b/vllm/entrypoints/llm.py
+--- a/vllm/entrypoints/llm.py
++++ b/vllm/entrypoints/llm.py
+@@ -112,14 +112,11 @@
+             values will increase the KV cache size and thus improve the model's
+             throughput. However, if the value is too high, it may cause out-of-
+             memory (OOM) errors.
+-        kv_cache_memory_bytes: Size of KV Cache per GPU in bytes. By default,
+-            this is set to None and vllm can automatically infer the kv cache
+-            size based on gpu_memory_utilization. However, users may want to
+-            manually specify the kv cache memory size. kv_cache_memory_bytes
+-            allows more fine-grain control of how much memory gets used when
+-            compared with using gpu_memory_utilization. Note that
+-            kv_cache_memory_bytes (when not-None) ignores
+-            gpu_memory_utilization
++        kv_cache_users: GPU KV cache capacity, declared as a count of
++            resident full-length user contexts. Bytes are derived at engine
++            initialization from max_model_len and the KV cache spec, so the
++            same declaration is correct on any GPU and any TP layout.
++            Required whenever the model has a KV cache.
+         cpu_offload_gb: The size (GiB) of CPU memory to use for offloading
+             the model weights. This virtually increases the GPU memory space
+             you can use to hold the model weights, at the cost of CPU-GPU data
+@@ -214,7 +211,7 @@
+         | None = None,
+         profiler_config: dict[str, Any] | ProfilerConfig | None = None,
+         attention_config: dict[str, Any] | AttentionConfig | None = None,
+-        kv_cache_memory_bytes: int | None = None,
++        kv_cache_users: int | None = None,
+         compilation_config: int | dict[str, Any] | CompilationConfig | None = None,
+         quantization_config: dict[str, Any] | QuantizationConfigArgs | None = None,
+         logits_processors: list[str | type[LogitsProcessor]] | None = None,
+@@ -312,7 +309,7 @@
+             tokenizer_revision=tokenizer_revision,
+             seed=seed,
+             gpu_memory_utilization=gpu_memory_utilization,
+-            kv_cache_memory_bytes=kv_cache_memory_bytes,
++            kv_cache_users=kv_cache_users,
+             cpu_offload_gb=cpu_offload_gb,
+             offload_group_size=offload_group_size,
+             offload_num_in_group=offload_num_in_group,
+diff --git a/vllm/entrypoints/openai/chat_completion/protocol.py b/vllm/entrypoints/openai/chat_completion/protocol.py
+--- a/vllm/entrypoints/openai/chat_completion/protocol.py
++++ b/vllm/entrypoints/openai/chat_completion/protocol.py
+@@ -484,6 +484,29 @@
+         description="KVTransfer parameters used for disaggregated serving.",
+     )
+ 
++    kv_scope: str | None = Field(
++        default=None,
++        min_length=1,
++        description=(
++            "Agent scope that owns this request's KV cache: null for the "
++            "main session line, otherwise the tool_use id that spawned the "
++            "subagent (the harness's parent_tool_use_id convention). Scope "
++            "ownership is what lets the KV offload tier release a terminated "
++            "agent's blocks as a unit instead of retaining a dead context by "
++            "recency."
++        ),
++    )
++
++    kv_scope_release: list[str] | None = Field(
++        default=None,
++        description=(
++            "Agent scopes terminated since the previous request. Their "
++            "offloaded KV blocks are dropped as a unit before this request "
++            "is scheduled — typically sent on the parent's first request "
++            "after a subagent's terminal result."
++        ),
++    )
++
+     ec_transfer_params: dict[str, Any] | None = Field(
+         default=None,
+         description=(
+@@ -818,6 +841,10 @@
+         if self.ec_transfer_params:
+             # Pass in ec_transfer_params via extra_args
+             extra_args["ec_transfer_params"] = self.ec_transfer_params
++        if self.kv_scope is not None:
++            extra_args["kv_scope"] = self.kv_scope
++        if self.kv_scope_release:
++            extra_args["kv_scope_release"] = self.kv_scope_release
+         return SamplingParams.from_optional(
+             n=self.n,
+             presence_penalty=presence_penalty,
+diff --git a/vllm/entrypoints/openai/completion/protocol.py b/vllm/entrypoints/openai/completion/protocol.py
+--- a/vllm/entrypoints/openai/completion/protocol.py
++++ b/vllm/entrypoints/openai/completion/protocol.py
+@@ -214,6 +214,29 @@
+         description="KVTransfer parameters used for disaggregated serving.",
+     )
+ 
++    kv_scope: str | None = Field(
++        default=None,
++        min_length=1,
++        description=(
++            "Agent scope that owns this request's KV cache: null for the "
++            "main session line, otherwise the tool_use id that spawned the "
++            "subagent (the harness's parent_tool_use_id convention). Scope "
++            "ownership is what lets the KV offload tier release a terminated "
++            "agent's blocks as a unit instead of retaining a dead context by "
++            "recency."
++        ),
++    )
++
++    kv_scope_release: list[str] | None = Field(
++        default=None,
++        description=(
++            "Agent scopes terminated since the previous request. Their "
++            "offloaded KV blocks are dropped as a unit before this request "
++            "is scheduled — typically sent on the parent's first request "
++            "after a subagent's terminal result."
++        ),
++    )
++
+     ec_transfer_params: dict[str, Any] | None = Field(
+         default=None,
+         description=(
+@@ -366,6 +389,10 @@
+         if self.ec_transfer_params:
+             # Pass in ec_transfer_params via extra_args
+             extra_args["ec_transfer_params"] = self.ec_transfer_params
++        if self.kv_scope is not None:
++            extra_args["kv_scope"] = self.kv_scope
++        if self.kv_scope_release:
++            extra_args["kv_scope_release"] = self.kv_scope_release
+         return SamplingParams.from_optional(
+             n=self.n,
+             presence_penalty=self.presence_penalty,
+diff --git a/vllm/entrypoints/openai/responses/protocol.py b/vllm/entrypoints/openai/responses/protocol.py
+--- a/vllm/entrypoints/openai/responses/protocol.py
++++ b/vllm/entrypoints/openai/responses/protocol.py
+@@ -314,6 +314,29 @@
+         default=None,
+         description="KVTransfer parameters used for disaggregated serving.",
+     )
++    kv_scope: str | None = Field(
++        default=None,
++        min_length=1,
++        description=(
++            "Agent scope that owns this request's KV cache: null for the "
++            "main session line, otherwise the tool_use id that spawned the "
++            "subagent (the harness's parent_tool_use_id convention). Scope "
++            "ownership is what lets the KV offload tier release a terminated "
++            "agent's blocks as a unit instead of retaining a dead context by "
++            "recency."
++        ),
++    )
++
++    kv_scope_release: list[str] | None = Field(
++        default=None,
++        description=(
++            "Agent scopes terminated since the previous request. Their "
++            "offloaded KV blocks are dropped as a unit before this request "
++            "is scheduled — typically sent on the parent's first request "
++            "after a subagent's terminal result."
++        ),
++    )
++
+     ec_transfer_params: dict[str, Any] | None = Field(
+         default=None,
+         description=(
+@@ -471,6 +494,10 @@
+             extra_args["kv_transfer_params"] = self.kv_transfer_params
+         if self.ec_transfer_params:
+             extra_args["ec_transfer_params"] = self.ec_transfer_params
++        if self.kv_scope is not None:
++            extra_args["kv_scope"] = self.kv_scope
++        if self.kv_scope_release:
++            extra_args["kv_scope_release"] = self.kv_scope_release
+ 
+         return SamplingParams.from_optional(
+             temperature=temperature,
+diff --git a/vllm/entrypoints/scale_out/token_in_token_out/protocol.py b/vllm/entrypoints/scale_out/token_in_token_out/protocol.py
+--- a/vllm/entrypoints/scale_out/token_in_token_out/protocol.py
++++ b/vllm/entrypoints/scale_out/token_in_token_out/protocol.py
+@@ -151,6 +151,28 @@
+         default=None,
+         description=(
+             "ECTransfer parameters used for encoder-cache disaggregated serving."
++        ),
++    )
++    kv_scope: str | None = Field(
++        default=None,
++        min_length=1,
++        description=(
++            "Agent scope that owns this request's KV cache: null for the "
++            "main session line, otherwise the tool_use id that spawned the "
++            "subagent (the harness's parent_tool_use_id convention). Scope "
++            "ownership is what lets the KV offload tier release a terminated "
++            "agent's blocks as a unit instead of retaining a dead context by "
++            "recency."
++        ),
++    )
++
++    kv_scope_release: list[str] | None = Field(
++        default=None,
++        description=(
++            "Agent scopes terminated since the previous request. Their "
++            "offloaded KV blocks are dropped as a unit before this request "
++            "is scheduled — typically sent on the parent's first request "
++            "after a subagent's terminal result."
+         ),
+     )
+ 
+diff --git a/vllm/entrypoints/scale_out/token_in_token_out/serving.py b/vllm/entrypoints/scale_out/token_in_token_out/serving.py
+--- a/vllm/entrypoints/scale_out/token_in_token_out/serving.py
++++ b/vllm/entrypoints/scale_out/token_in_token_out/serving.py
+@@ -221,6 +221,17 @@
+         if request.stream:
+             sampling_params.output_kind = RequestOutputKind.DELTA
+ 
++        # Token-in-token-out embeds SamplingParams directly, so the identity
++        # fields fold into extra_args here instead of a to_sampling_params
++        # conversion — same destination as every other protocol surface.
++        if request.kv_scope is not None or request.kv_scope_release:
++            extra_args = dict(sampling_params.extra_args or {})
++            if request.kv_scope is not None:
++                extra_args["kv_scope"] = request.kv_scope
++            if request.kv_scope_release:
++                extra_args["kv_scope_release"] = request.kv_scope_release
++            sampling_params.extra_args = extra_args
++
+         self._log_inputs(
+             request_id,
+             engine_input,
+diff --git a/vllm/envs.py b/vllm/envs.py
+--- a/vllm/envs.py
++++ b/vllm/envs.py
+@@ -2121,10 +2121,6 @@
+     "VLLM_XPU_USE_SAMPLER_KERNEL": lambda: bool(
+         int(os.getenv("VLLM_XPU_USE_SAMPLER_KERNEL", "1"))
+     ),
+-    # Enable simple KV offload.
+-    "VLLM_USE_SIMPLE_KV_OFFLOAD": lambda: bool(
+-        int(os.getenv("VLLM_USE_SIMPLE_KV_OFFLOAD", "0"))
+-    ),
+     # Direct DCP ops default on when applicable; set to 1 to enforce or 0 to disable.
+     "VLLM_USE_DIRECT_DCP_A2A": lambda: maybe_convert_bool(
+         os.getenv("VLLM_USE_DIRECT_DCP_A2A")
+diff --git a/vllm/v1/core/kv_cache_utils.py b/vllm/v1/core/kv_cache_utils.py
+--- a/vllm/v1/core/kv_cache_utils.py
++++ b/vllm/v1/core/kv_cache_utils.py
+@@ -2001,13 +2001,31 @@
+         )
+         return
+ 
+-    # Find the max_model_len that fits across all workers.
++    # Find the max_model_len that fits across all workers. Capacity is
++    # declared in resident user contexts, so the searched quantity is "the
++    # longest length whose N declared contexts plus the null block fit" —
++    # searching for one context and then demanding N of them would pick a
++    # length the admission check below immediately refuses.
++    declared_users = vllm_config.cache_config.kv_cache_users
++    assert declared_users is not None
+     auto_fit_max = original_max
+     limiting_worker_mem = available_memory[0]
+     for groups, avail_mem in zip(projected_groups_per_worker, available_memory):
+         if not groups:
+             continue
+-        worker_max = _estimate_max_model_len_from_groups(vllm_config, groups, avail_mem)
++        pool_bytes_per_block = _pool_bytes_per_block(vllm_config, groups)
++        # Rounded down to whole pool blocks: the admission check charges
++        # each context cdiv(bytes, block) whole blocks, so a byte-tight
++        # budget could still overflow by up to users-1 blocks of rounding.
++        per_context_budget = (
++            (avail_mem - pool_bytes_per_block)
++            // declared_users
++            // pool_bytes_per_block
++            * pool_bytes_per_block
++        )
++        worker_max = _estimate_max_model_len_from_groups(
++            vllm_config, groups, per_context_budget
++        )
+         if worker_max < auto_fit_max:
+             auto_fit_max = worker_max
+             limiting_worker_mem = avail_mem
+@@ -2159,27 +2177,32 @@
+         for worker_spec in kv_cache_specs
+     ]
+ 
+-    # If `num_gpu_blocks_override` is set, the cache size that will actually
+-    # be allocated is decoupled from the profiled `available_memory`:
+-    # `may_override_num_blocks` in `get_kv_cache_config_from_groups` clamps
+-    # `num_blocks` to the override. Reflect that in `available_memory` here so
+-    # auto-fit, the admission check, and the per-worker config builder all
+-    # plan against the same effective capacity.
+-    override = vllm_config.cache_config.num_gpu_blocks_override
+-    if override is not None:
+-        adjusted_memory: list[int] = []
+-        for groups, avail_mem in zip(projected_groups_per_worker, available_memory):
+-            if not groups:
+-                adjusted_memory.append(avail_mem)
+-                continue
+-            bytes_per_block = _pool_bytes_per_block(vllm_config, groups)
+-            logger.info(
+-                "Overriding num_gpu_blocks=%d with num_gpu_blocks_override=%d",
+-                avail_mem // bytes_per_block,
+-                override,
+-            )
+-            adjusted_memory.append(override * bytes_per_block)
+-        available_memory = adjusted_memory
++    # GPU KV capacity is declared as a count of resident full-length user
++    # contexts and derived here, where the spec exists. A block override
++    # is a second, block-denominated sizing channel; letting it clamp the
++    # pool below the declared count would silently break the declaration,
++    # so the combination is refused rather than reconciled.
++    if any(projected_groups_per_worker):
++        declared_users = vllm_config.cache_config.kv_cache_users
++        if declared_users is None:
++            raise ValueError(
++                "The model has a KV cache but --kv-cache-users was not "
++                "declared. GPU KV capacity is sized as a count of resident "
++                "full-length user contexts; bytes are derived internally "
++                "from max_model_len and the KV cache spec. There is no "
++                "byte-denominated alternative."
++            )
++        if declared_users < 1:
++            raise ValueError(
++                f"--kv-cache-users must be a positive integer, got "
++                f"{declared_users!r}."
++            )
++        if vllm_config.cache_config.num_gpu_blocks_override is not None:
++            raise ValueError(
++                "num_gpu_blocks_override cannot be combined with "
++                "--kv-cache-users: the declared user count is the only KV "
++                "sizing input."
++            )
+ 
+     if vllm_config.model_config.original_max_model_len == -1:
+         _auto_fit_max_model_len(
+@@ -2204,9 +2227,49 @@
+         assert sum(len(group.layer_names) for group in projected_groups) == len(
+             kv_cache_spec_one_worker
+         ), "Some layers are not assigned to any group."
++        if not projected_groups:
++            # Attention-free projection: only the null block exists and no
++            # capacity is declared or derived for this worker.
++            kv_cache_configs.append(
++                get_kv_cache_config_from_groups(
++                    vllm_config, projected_groups, available_memory_one_worker
++                )
++            )
++            continue
++        # Derive the pool from the declaration, not from what happens to be
++        # free: N declared users means exactly N full-length contexts plus
++        # the null block, per worker over its own projected groups (each PP
++        # stage holds N contexts of its layers; TP sharding is already in
++        # the per-worker page sizes). _pool_bytes_per_block mirrors the
++        # divisor of every layout branch in get_kv_cache_config_from_groups,
++        # so handing it needed_bytes reproduces needed_blocks exactly.
++        # Surplus VRAM stays unclaimed — a pool sized to "whatever fits"
++        # would revive the machine-specific capacity this flag removes.
++        users = vllm_config.cache_config.kv_cache_users
++        assert users is not None
++        per_user_bytes = _max_memory_usage_bytes_from_groups(
++            vllm_config, projected_groups
++        )
++        pool_bytes_per_block = _pool_bytes_per_block(vllm_config, projected_groups)
++        per_user_blocks = cdiv(per_user_bytes, pool_bytes_per_block)
++        needed_blocks = users * per_user_blocks + 1
++        needed_bytes = needed_blocks * pool_bytes_per_block
++        if needed_bytes > available_memory_one_worker:
++            raise ValueError(
++                f"--kv-cache-users {users} requires "
++                f"{format_gib(needed_bytes)} GiB of KV cache "
++                f"({format_gib(per_user_bytes)} GiB per "
++                f"{vllm_config.model_config.max_model_len}-token context), "
++                f"but only "
++                f"{format_gib(available_memory_one_worker)} GiB is available "
++                f"within gpu_memory_utilization="
++                f"{vllm_config.cache_config.gpu_memory_utilization}. Declare "
++                f"fewer users, reduce max_model_len, or raise the "
++                f"utilization budget."
++            )
+         kv_cache_configs.append(
+             get_kv_cache_config_from_groups(
+-                vllm_config, projected_groups, available_memory_one_worker
++                vllm_config, projected_groups, needed_bytes
+             )
+         )
+ 
+diff --git a/vllm/v1/engine/input_processor.py b/vllm/v1/engine/input_processor.py
+--- a/vllm/v1/engine/input_processor.py
++++ b/vllm/v1/engine/input_processor.py
+@@ -132,6 +132,32 @@
+                     "not configured. Please set --reasoning-parser "
+                     "and/or --reasoning-config to use phase-specific budgets."
+                 )
++            if params.extra_args is not None:
++                # Agent-scope identity drives whole-scope KV release, so a
++                # malformed value must die here as a client error rather
++                # than silently mis-scope blocks or reach the offload
++                # manager as an untyped surprise. The protocol layers
++                # already enforce this shape; this gate covers the direct
++                # SamplingParams(extra_args=...) path as well.
++                kv_scope = params.extra_args.get("kv_scope")
++                if kv_scope is not None and (
++                    not isinstance(kv_scope, str) or not kv_scope
++                ):
++                    raise VLLMValidationError(
++                        "kv_scope must be a non-empty string when provided."
++                    )
++                kv_scope_release = params.extra_args.get("kv_scope_release")
++                if kv_scope_release is not None and (
++                    not isinstance(kv_scope_release, list)
++                    or not all(
++                        isinstance(scope, str) and scope
++                        for scope in kv_scope_release
++                    )
++                ):
++                    raise VLLMValidationError(
++                        "kv_scope_release must be a list of non-empty "
++                        "strings when provided."
++                    )
+         elif isinstance(params, PoolingParams):
+             supported_pooling_tasks = [
+                 task for task in supported_tasks if task in POOLING_TASKS
+diff --git a/vllm/v1/kv_offload/base.py b/vllm/v1/kv_offload/base.py
+--- a/vllm/v1/kv_offload/base.py
++++ b/vllm/v1/kv_offload/base.py
+@@ -92,6 +92,12 @@
+     req_id: str
+     kv_transfer_params: dict[str, Any] | None = None
+     load_tier_filter: TierFilter = TierFilter.ALL
++    # Agent scope owning this request's KV, straight from the request
++    # (None = the shared main-session line, else a spawning tool_use id).
++    # Ownership is what makes whole-scope release exact instead of the
++    # recency approximation it replaces: a terminated scope's chunks are
++    # identified by this tag, not guessed from access order.
++    kv_scope: str | None = None
+     # Per-request scratch space keyed by value type, so a tier can parse
+     # kv_transfer_params once (in on_new_request) and read the result back
+     # on later calls for the same request.
+@@ -183,6 +189,11 @@
+         as well as a list of blocks that were evicted as a result.
+     complete_store() - marks a previous store as completed.
+         Following this call, the given blocks will become loadable.
++    release_scope() - drop every block owned by a terminated agent
++        scope as a unit. Identity-aware eviction: recency alone retains a
++        finished subagent's context (dead, yet most-recently-used) while
++        evicting the live parent's blocks; an explicit release inverts
++        that at the exact moment it matters.
+ """
+ 
+ 
+@@ -331,6 +342,29 @@
+             req_context: per-request context.
+         """
+         pass
++
++    def release_scope(self, scope: str) -> None:
++        """
++        Release every block owned by a terminated agent scope, as a unit.
++
++        Called by the scheduler-side connector when a request declares the
++        scope terminated (kv_scope_release), before that request registers
++        or looks anything up. Blocks currently pinned by in-flight
++        transfers must not be reclaimed synchronously — the implementation
++        defers them to the transfer's completion callback.
++
++        The default is a documented no-op for tiers that do not track
++        ownership (they have nothing to drop as a unit; their blocks age
++        out). The pinned serving profile's CPU manager implements the full
++        semantics; this default is not a configuration fallback and there
++        is no knob that selects between behaviors.
++
++        Args:
++            scope: the terminated scope id. Never None — the null (main
++                session) scope is shared bookkeeping across conversations
++                and is not releasable.
++        """
++        return
+ 
+     def on_request_finished(self, req_context: ReqContext) -> None:
+         """
+diff --git a/vllm/v1/kv_offload/config.py b/vllm/v1/kv_offload/config.py
+--- a/vllm/v1/kv_offload/config.py
++++ b/vllm/v1/kv_offload/config.py
+@@ -14,6 +14,15 @@
+     tokens_per_block: int
+     # Layer names belonging to this group.
+     layer_names: tuple[str, ...]
++    # How many trailing chunks of this group a load hit actually reads:
++    # None for full attention (the whole prefix), cdiv(window, chunk) for
++    # sliding/chunked-local attention, 1 for recurrent state. Classified
++    # once at the boundary (build_offloading_config) because two consumers
++    # must agree on it exactly: the scheduler's load planning and the
++    # user-count capacity derivation in the CPU spec. A local recomputation
++    # in either place could drift and make the declared capacity silently
++    # smaller than what a full-length re-entry reads.
++    sliding_window_size_in_chunks: int | None = None
+ 
+ 
+ @dataclass(frozen=True)
+@@ -22,6 +31,12 @@
+     name: str
+     # KV cache data type (e.g. "float16").
+     dtype: str
++    # Maximum context length in tokens. Capacity is declared in resident
++    # user contexts, so the byte derivation needs the context length here,
++    # inside the boundary where per-group chunk geometry also lives —
++    # deriving it engine-side and passing bytes would recreate the exact
++    # machine-specific constant this config exists to eliminate.
++    max_model_len: int
+ 
+ 
+ @dataclass(frozen=True)
+diff --git a/vllm/v1/kv_offload/cpu/gpu_worker.py b/vllm/v1/kv_offload/cpu/gpu_worker.py
+--- a/vllm/v1/kv_offload/cpu/gpu_worker.py
++++ b/vllm/v1/kv_offload/cpu/gpu_worker.py
+@@ -212,9 +212,9 @@
+             "transfer over unpinned DMA -- the slow path this offload exists "
+             "to avoid -- and nothing downstream reports which path was taken, "
+             "so the degradation would be invisible for the life of the "
+-            "process. Usual causes: RLIMIT_MEMLOCK below the configured "
+-            "cpu_bytes_to_use, insufficient free host memory, or a region "
+-            "larger than the driver will page-lock."
++            "process. Usual causes: RLIMIT_MEMLOCK below the region bytes "
++            "derived from cpu_kv_cache_users, insufficient free host memory, "
++            "or a region larger than the driver will page-lock."
+         )
+ 
+     logger.debug(
+diff --git a/vllm/v1/kv_offload/cpu/manager.py b/vllm/v1/kv_offload/cpu/manager.py
+--- a/vllm/v1/kv_offload/cpu/manager.py
++++ b/vllm/v1/kv_offload/cpu/manager.py
+@@ -1,5 +1,6 @@
+ # SPDX-License-Identifier: Apache-2.0
+ # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
++import ctypes
+ from collections import OrderedDict
+ from collections.abc import Collection, Iterable
+ 
+@@ -23,27 +24,60 @@
+     CPULoadStoreSpec,
+     CPUOffloadingMetrics,
+ )
+-from vllm.v1.kv_offload.cpu.policies.base import BlockStatus, CachePolicy
+-from vllm.v1.kv_offload.cpu.policies.factory import CachePolicyFactory
++
++
++class BlockStatus(ctypes.Structure):
++    """
++    Offloading status for a single block of KV data.
++    Holds the following information:
++
++    ref_cnt - the current number of transfers using this block as a source.
++        A value of -1 indicates the block is not yet ready to be read.
++    block_id - index of the physical CPU buffer slot.
++    """
++
++    _fields_ = [("ref_cnt", ctypes.c_int32), ("block_id", ctypes.c_int64)]
++
++    def __init__(self, block_id: int):
++        super().__init__()
++        # initialize block as "not ready" (ref_cnt = -1)
++        self.ref_cnt = -1
++        self.block_id = block_id
++
++    @property
++    def is_ready(self) -> bool:
++        """
++        Returns whether the block is ready to be read.
++        """
++        return self.ref_cnt >= 0
+ 
+ 
+ class CPUOffloadingManager(OffloadingManager):
+     """
+-    An OffloadingManager with a pluggable CachePolicy, resolved by name via
+-    CachePolicyFactory (built in: "lru", "arc"; external policies can either
+-    register their own or be loaded out-of-tree via cache_policy_module_path).
+-
+-    The manager owns all shared logic: ref-counting, event emission,
+-    block pool management, and the prepare_store/complete_store skeletons.
+-    Policy-specific block organization and eviction decisions are delegated
+-    to the CachePolicy implementation.
++    The one CPU-tier eviction mode: scope-owned blocks over a live LRU.
++
++    There is deliberately no policy selection. The pluggable LRU/ARC layer
++    this replaces existed to *approximate* one fact recency cannot see:
++    a finished subagent's context is dead while being the most recently
++    used thing in the cache, so any recency order protects the corpse and
++    evicts the live parent. The harness now states that fact exactly
++    (release_scope), which leaves nothing for ARC's ghost lists to guess.
++    Capacity pressure among blocks whose scopes are all still alive is the
++    one situation that genuinely is recency-shaped, so the live set keeps
++    a plain LRU order — as an internal structure, not a mode.
++
++    Ownership follows use: a block belongs to the scope that last stored
++    or touched it. That is what bounds a release to blocks only the dead
++    scope was keeping warm — a prefix chunk shared with the parent moves
++    back to the parent's scope the moment the parent touches it again.
++
++    The manager also owns the shared mechanics: ref-counting, event
++    emission, block pool management, and the prepare/complete skeletons.
+     """
+ 
+     def __init__(
+         self,
+         num_blocks: int,
+-        cache_policy: str = "lru",
+-        cache_policy_module_path: str | None = None,
+         enable_events: bool = False,
+         store_threshold: int = 1,
+         max_tracker_size: int = 64_000,
+@@ -53,12 +87,25 @@
+         self._num_allocated_blocks: int = 0
+         self._free_list: list[int] = []
+         self.events: list[OffloadingEvent] | None = [] if enable_events else None
+-        policy_cls = CachePolicyFactory.get_cache_policy_cls(
+-            cache_policy, cache_policy_module_path
+-        )
+-        self._policy: CachePolicy = policy_cls(cache_capacity=num_blocks)
+-        # Track the number of blocks in the cache that are evictable. i.e. ref_cnt 0.
+-        self._num_evictable_cache_blocks: int = 0
++
++        # All resident blocks, and the idle (ref_cnt 0) subset in LRU order.
++        self._blocks: dict[OffloadKey, BlockStatus] = {}
++        self._evictable_blocks: OrderedDict[OffloadKey, None] = OrderedDict()
++
++        # Scope ownership. The None bucket is every conversation's main
++        # line: it is never a release target (releases name a tool_use id),
++        # so its width across users is harmless — it exists only to keep
++        # ownership transfer symmetric.
++        self._owner: dict[OffloadKey, str | None] = {}
++        self._scope_keys: dict[str | None, set[OffloadKey]] = {}
++
++        # Blocks whose scope died while a transfer still pinned them.
++        # Release must never race the DMA engine, so these are reclaimed in
++        # the transfer's completion callback instead of synchronously. A
++        # live scope touching such a block un-marks it — the block has a
++        # living owner again and deadness no longer applies.
++        self._dead_pending: set[OffloadKey] = set()
++
+         # Track blocks with an in-flight store (ref_cnt -1, not yet completed).
+         self._num_write_pending_blocks: int = 0
+ 
+@@ -102,6 +149,40 @@
+         blocks: Iterable[BlockStatus],
+     ) -> CPULoadStoreSpec:
+         return CPULoadStoreSpec([block.block_id for block in blocks])
++
++    # --- scope ownership ---
++
++    def _set_owner(self, key: OffloadKey, scope: str | None) -> None:
++        if key in self._owner:
++            previous = self._owner[key]
++            if previous == scope:
++                self._dead_pending.discard(key)
++                return
++            previous_keys = self._scope_keys[previous]
++            previous_keys.discard(key)
++            if not previous_keys:
++                del self._scope_keys[previous]
++        self._owner[key] = scope
++        self._scope_keys.setdefault(scope, set()).add(key)
++        self._dead_pending.discard(key)
++
++    def _drop_owner(self, key: OffloadKey) -> None:
++        if key not in self._owner:
++            return
++        scope = self._owner.pop(key)
++        scope_keys = self._scope_keys.get(scope)
++        if scope_keys is not None:
++            scope_keys.discard(key)
++            if not scope_keys:
++                del self._scope_keys[scope]
++        self._dead_pending.discard(key)
++
++    def _remove_block(self, key: OffloadKey, block: BlockStatus) -> None:
++        """Forget a resident block and recycle its slot. Caller handles events."""
++        del self._blocks[key]
++        self._evictable_blocks.pop(key, None)
++        self._drop_owner(key)
++        self._free_block(block)
+ 
+     # --- OffloadingManager interface ---
+ 
+@@ -119,7 +200,7 @@
+                 if len(self.counts) >= self.max_tracker_size:
+                     self.counts.popitem(last=False)
+                 self.counts[key] = 1
+-        block = self._policy.get(key)
++        block = self._blocks.get(key)
+         if block is None:
+             return LookupResult.MISS
+         if not block.is_ready:
+@@ -134,33 +215,56 @@
+     ) -> LoadStoreSpec:
+         blocks = []
+         for key in keys:
+-            block = self._policy.get(key)
++            block = self._blocks.get(key)
+             assert block is not None, f"Block {key!r} not found in cache"
+             assert block.is_ready, f"Block {key!r} is not ready for reading"
+             if block.ref_cnt == 0:
+-                self._policy.mark_non_evictable(key)
+-                self._num_evictable_cache_blocks -= 1  # ref_cnt 0 -> 1
+-                assert self._num_evictable_cache_blocks >= 0
++                del self._evictable_blocks[key]
+             block.ref_cnt += 1
+             blocks.append(block)
+         return self._get_load_store_spec(keys, blocks)
+ 
+     @override
+     def touch(self, keys: Collection[OffloadKey], req_context: ReqContext) -> None:
+-        self._policy.touch(keys, req_context)
++        # Reversed so the request's first (prefix) keys end up most recent:
++        # under pressure the tail of a context goes before its prefix, and
++        # a prefix hit is what saves a re-prefill.
++        for key in reversed(list(keys)):
++            if key not in self._blocks:
++                continue
++            if key in self._evictable_blocks:
++                self._evictable_blocks.move_to_end(key)
++            # Active blocks keep their position; they re-enter the LRU when
++            # their transfers finish.
++            self._set_owner(key, req_context.kv_scope)
+ 
+     @override
+     def complete_load(
+         self, keys: Collection[OffloadKey], req_context: ReqContext
+     ) -> None:
++        dead_keys: list[OffloadKey] = []
+         for key in keys:
+-            block = self._policy.get(key)
++            block = self._blocks.get(key)
+             assert block is not None, f"Block {key!r} not found"
+             assert block.ref_cnt > 0, f"Block {key!r} ref_cnt is already 0"
+             block.ref_cnt -= 1
+             if block.ref_cnt == 0:
+-                self._num_evictable_cache_blocks += 1  # ref_cnt 1 -> 0
+-                self._policy.mark_evictable(key)
++                if key in self._dead_pending:
++                    # The owning scope died mid-load; the deferred half of
++                    # release_scope. The block was announced as stored, so
++                    # its disappearance is announced too.
++                    self._remove_block(key, block)
++                    dead_keys.append(key)
++                else:
++                    self._evictable_blocks[key] = None
++        if dead_keys and self.events is not None:
++            self.events.append(
++                OffloadingEvent(
++                    keys=dead_keys,
++                    medium=self.medium,
++                    removed=True,
++                )
++            )
+ 
+     @override
+     def prepare_store(
+@@ -173,7 +277,7 @@
+             keys = [k for k in keys if self.counts.get(k, 0) >= self.store_threshold]
+             self.stores_skipped_in_current_batch += num_keys - len(keys)
+         # filter out blocks that are already stored
+-        keys_to_store = [k for k in keys if self._policy.get(k) is None]
++        keys_to_store = [k for k in keys if k not in self._blocks]
+ 
+         if not keys_to_store:
+             return PrepareStoreOutput(
+@@ -187,25 +291,29 @@
+ 
+         to_evict: list[OffloadKey] = []
+         if num_blocks_to_evict > 0:
+-            if num_blocks_to_evict > self._num_evictable_cache_blocks:
++            if num_blocks_to_evict > len(self._evictable_blocks):
+                 # Eviction will fail.
+                 return None
+-            # There is a still a chance for eviction failure as some of the
+-            # idle blocks might be in the protected list.
+-
+-            # Blocks from the original input are excluded from eviction candidates:
+-            # a block that was already stored must remain in the cache after this call.
++
++            # Blocks from the original input are excluded from eviction
++            # candidates: a block that was already stored must remain in the
++            # cache after this call. Collect before mutating so a shortfall
++            # leaves the cache untouched.
+             protected = set(keys)
+-            evicted = self._policy.evict(num_blocks_to_evict, protected)
+-            if evicted is None:
++            candidates: list[tuple[OffloadKey, BlockStatus]] = []
++            for key in self._evictable_blocks:
++                if key in protected:
++                    continue
++                block = self._blocks[key]
++                assert block.ref_cnt == 0
++                candidates.append((key, block))
++                if len(candidates) == num_blocks_to_evict:
++                    break
++            if len(candidates) < num_blocks_to_evict:
+                 return None
+ 
+-            # cache-policy removes only idle blocks.
+-            self._num_evictable_cache_blocks -= len(evicted)
+-            assert self._num_evictable_cache_blocks >= 0
+-
+-            for key, block in evicted:
+-                self._free_block(block)
++            for key, block in candidates:
++                self._remove_block(key, block)
+                 to_evict.append(key)
+ 
+         if to_evict and self.events is not None:
+@@ -223,7 +331,8 @@
+         )
+ 
+         for key, block in zip(keys_to_store, blocks):
+-            self._policy.insert(key, block)
++            self._blocks[key] = block
++            self._set_owner(key, req_context.kv_scope)
+         self._num_write_pending_blocks += len(keys_to_store)
+ 
+         # build store specs for allocated blocks
+@@ -246,20 +355,25 @@
+ 
+         if success:
+             for key in keys:
+-                block = self._policy.get(key)
++                block = self._blocks.get(key)
+                 if block is not None and not block.is_ready:
++                    self._num_write_pending_blocks -= 1
++                    if key in self._dead_pending:
++                        # The owning scope died while the store was in
++                        # flight. The block was never announced as stored,
++                        # so it vanishes without an event — same treatment
++                        # as a failed store.
++                        self._remove_block(key, block)
++                        continue
+                     block.ref_cnt = 0
+-                    self._num_write_pending_blocks -= 1
+-                    self._num_evictable_cache_blocks += 1
+-                    self._policy.mark_evictable(key)
++                    self._evictable_blocks[key] = None
+                     stored_keys.append(key)
+         else:
+             for key in keys:
+-                block = self._policy.get(key)
++                block = self._blocks.get(key)
+                 if block is not None and not block.is_ready:
+                     self._num_write_pending_blocks -= 1
+-                    self._policy.remove(key)
+-                    self._free_block(block)
++                    self._remove_block(key, block)
+ 
+         if stored_keys and self.events is not None:
+             self.events.append(
+@@ -271,14 +385,43 @@
+             )
+ 
+     @override
++    def release_scope(self, scope: str) -> None:
++        # Idle blocks drop now; pinned blocks (in-flight store or load) are
++        # deferred to their completion callback — a synchronous reclaim here
++        # would hand their physical slots to new stores while the DMA engine
++        # still reads or writes them.
++        keys = self._scope_keys.get(scope)
++        if not keys:
++            return
++        removed_keys: list[OffloadKey] = []
++        for key in list(keys):
++            block = self._blocks[key]
++            if block.ref_cnt == 0:
++                self._remove_block(key, block)
++                removed_keys.append(key)
++            else:
++                self._dead_pending.add(key)
++        if removed_keys and self.events is not None:
++            self.events.append(
++                OffloadingEvent(
++                    keys=removed_keys,
++                    medium=self.medium,
++                    removed=True,
++                )
++            )
++
++    @override
+     def reset_cache(self) -> None:
+         # Clear ALL blocks unconditionally. The scheduler's _stale_job_threshold
+         # guarantees that complete_load / complete_store are never called for
+         # pre-reset jobs, so no lazy cleanup is needed. The scheduler also
+         # flushes in-flight load job IDs to the workers before any new stores
+         # can begin, preventing a cross-direction data race on reused offload block IDs.
+-        self._policy.clear()
+-        self._num_evictable_cache_blocks = 0
++        self._blocks.clear()
++        self._evictable_blocks.clear()
++        self._owner.clear()
++        self._scope_keys.clear()
++        self._dead_pending.clear()
+         self._num_write_pending_blocks = 0
+ 
+         self._free_list.clear()
+@@ -297,7 +440,7 @@
+         num_used = (
+             self._num_allocated_blocks
+             - len(self._free_list)
+-            - self._num_evictable_cache_blocks
++            - len(self._evictable_blocks)
+         )
+         usage = num_used / self._num_blocks if self._num_blocks > 0 else 0.0
+         stats.set_gauge(CPUOffloadingMetrics.CPU_CACHE_USAGE_PERC, usage)
+diff --git a/vllm/v1/kv_offload/cpu/spec.py b/vllm/v1/kv_offload/cpu/spec.py
+--- a/vllm/v1/kv_offload/cpu/spec.py
++++ b/vllm/v1/kv_offload/cpu/spec.py
+@@ -6,7 +6,7 @@
+ from typing_extensions import override
+ 
+ from vllm.platforms import current_platform
+-from vllm.utils.math_utils import round_up
++from vllm.utils.math_utils import cdiv, round_up
+ from vllm.v1.kv_offload.base import (
+     CanonicalKVCaches,
+     OffloadingCounterMetadata,
+@@ -27,6 +27,43 @@
+ class CPUOffloadingSpec(OffloadingSpec):
+     BLOCK_SIZE_ALIGNMENT = SharedOffloadRegion.BLOCK_SIZE_ALIGNMENT
+ 
++    # Exact acceptance surface of kv_connector_extra_config. Anything else
++    # is a startup failure, not a warning: an unknown key is either a typo
++    # (whose intent would otherwise be silently dropped) or a superseded
++    # knob (whose old behavior must not remain reachable). Subclasses and
++    # out-of-tree specs extend this set for their own documented keys.
++    EXTRA_CONFIG_KEYS: frozenset[str] = frozenset(
++        {
++            # OffloadingSpecFactory selection.
++            "spec_name",
++            "spec_module_path",
++            # Capacity, declared in resident full-length user contexts.
++            "cpu_kv_cache_users",
++            # Chunk geometry (mutually exclusive pair).
++            "blocks_per_chunk",
++            "block_size",
++            # Store filtering / tracking.
++            "store_threshold",
++            "max_tracker_size",
++            # OffloadingSpec base behavior.
++            "offload_prompt_only",
++            "self_describing_kv_events",
++            # Host byte-layout request, certified at worker registration.
++            "canonical_layout",
++        }
++    )
++
++    # Byte- and policy-denominated knobs this contract replaced. Named
++    # individually so the failure explains the replacement instead of
++    # looking like a typo report.
++    SUPERSEDED_CONFIG_KEYS: frozenset[str] = frozenset(
++        {
++            "cpu_bytes_to_use",
++            "eviction_policy",
++            "cache_policy_module_path",
++        }
++    )
++
+     @classmethod
+     def build_metric_definitions(
+         cls, extra_config: dict[str, Any]
+@@ -74,13 +111,48 @@
+             )
+         return definitions
+ 
++    @classmethod
++    def _validate_extra_config(cls, extra_config: dict[str, Any]) -> None:
++        superseded = sorted(set(extra_config) & cls.SUPERSEDED_CONFIG_KEYS)
++        if superseded:
++            raise ValueError(
++                f"kv_connector_extra_config keys {superseded} are no longer "
++                "accepted. Host-RAM KV capacity is declared as a user count "
++                "('cpu_kv_cache_users': resident full-length contexts; bytes "
++                "are derived from max_model_len and the KV cache spec), and "
++                "eviction is scope-aware with no selectable policy."
++            )
++        unknown = sorted(set(extra_config) - cls.EXTRA_CONFIG_KEYS)
++        if unknown:
++            raise ValueError(
++                f"Unknown kv_connector_extra_config keys {unknown}. "
++                f"Accepted keys: {sorted(cls.EXTRA_CONFIG_KEYS)}."
++            )
++
+     def __init__(self, config: OffloadingConfig):
+         super().__init__(config)
+ 
+-        cpu_bytes_to_use = self.extra_config.get("cpu_bytes_to_use")
+-        if not cpu_bytes_to_use:
+-            raise Exception(
+-                "cpu_bytes_to_use must be specified in kv_connector_extra_config"
++        self._validate_extra_config(dict(self.extra_config))
++
++        raw_users = self.extra_config.get("cpu_kv_cache_users")
++        if raw_users is None:
++            raise ValueError(
++                "cpu_kv_cache_users must be specified in "
++                "kv_connector_extra_config: the host-RAM KV tier is sized as "
++                "a declared count of resident full-length user contexts."
++            )
++        try:
++            cpu_kv_cache_users = int(raw_users)
++        except (TypeError, ValueError):
++            cpu_kv_cache_users = 0
++        if (
++            isinstance(raw_users, bool)
++            or cpu_kv_cache_users < 1
++            or cpu_kv_cache_users != raw_users
++        ):
++            raise ValueError(
++                f"cpu_kv_cache_users must be a positive integer, got "
++                f"{raw_users!r}."
+             )
+ 
+         world_size = config.parallel.world_size
+@@ -96,29 +168,43 @@
+             # calculate cpu_page_size_per_worker
+             self.cpu_page_size_per_worker = kv_bytes_per_chunk // num_copies
+ 
+-            # calculate num_blocks
+-            aligned_kv_bytes_per_chunk = round_up(
+-                kv_bytes_per_chunk, self.BLOCK_SIZE_ALIGNMENT
+-            )
+-            self.num_blocks = int(cpu_bytes_to_use) // aligned_kv_bytes_per_chunk
++            # One resident user context, in chunks. Full-attention groups
++            # need their whole prefix; windowed and recurrent groups are
++            # counted at the trailing window the load path actually reads
++            # (a Mamba 'align' context resumes from one state chunk), using
++            # the same per-group classification the connector scheduler
++            # plans loads with. Counting every boundary snapshot instead
++            # would roughly double the footprint for capacity a full-length
++            # re-entry never touches; snapshots beyond the window live in
++            # slack and age out. Chunk counts are topology-free — only
++            # kv_bytes_per_chunk above scales with world_size/num_copies —
++            # which is what makes the same declaration correct on one GPU
++            # and on a TP-8 node.
++            chunks_per_user = 0
++            for group in config.groups:
++                tokens_per_chunk = group.tokens_per_block * self.blocks_per_chunk
++                full_chunks = cdiv(config.model.max_model_len, tokens_per_chunk)
++                window = group.sliding_window_size_in_chunks
++                chunks_per_user += (
++                    full_chunks if window is None else min(window, full_chunks)
++                )
++            assert chunks_per_user > 0
++            self.num_blocks = cpu_kv_cache_users * chunks_per_user
+ 
+             # Expose aligned_kv_bytes_per_chunk as
+             # kv_bytes_per_chunk. Note that this might contain
+             # some padding. i.e. each offloaded block is of the form,
+             # |--- W0-B0---|---- W1-B0---| ... |---- Wn-B0---| *** maybe-pad *** |
+             # or |--- B0 (single copy) ---| *** maybe-pad *** |
+-            self.kv_bytes_per_chunk = aligned_kv_bytes_per_chunk
++            self.kv_bytes_per_chunk = round_up(
++                kv_bytes_per_chunk, self.BLOCK_SIZE_ALIGNMENT
++            )
+ 
+         # scheduler-side
+         self._manager: OffloadingManager | None = None
+ 
+         # worker-side
+         self._worker: CPUOffloadingWorker | None = None
+-
+-        self.eviction_policy: str = self.extra_config.get("eviction_policy", "lru")
+-        self.cache_policy_module_path: str | None = self.extra_config.get(
+-            "cache_policy_module_path"
+-        )
+ 
+     @override
+     def get_manager(self) -> OffloadingManager:
+@@ -133,8 +219,6 @@
+ 
+             self._manager = CPUOffloadingManager(
+                 num_blocks=self.num_blocks,
+-                cache_policy=self.eviction_policy,
+-                cache_policy_module_path=self.cache_policy_module_path,
+                 enable_events=self.kv_events_config.enable_kv_cache_events,
+                 store_threshold=store_threshold,
+                 max_tracker_size=max_tracker_size,
+diff --git a/vllm/v1/kv_offload/tiering/manager.py b/vllm/v1/kv_offload/tiering/manager.py
+--- a/vllm/v1/kv_offload/tiering/manager.py
++++ b/vllm/v1/kv_offload/tiering/manager.py
+@@ -95,14 +95,10 @@
+         self,
+         num_blocks: int,
+         mmap_region: SharedOffloadRegion,
+-        cache_policy: str = "lru",
+-        cache_policy_module_path: str | None = None,
+         enable_events: bool = False,
+     ):
+         super().__init__(
+             num_blocks=num_blocks,
+-            cache_policy=cache_policy,
+-            cache_policy_module_path=cache_policy_module_path,
+             enable_events=enable_events,
+         )
+         self._mmap_region = mmap_region
+@@ -527,6 +523,15 @@
+             tier.touch(keys, req_context)
+ 
+     @override
++    def release_scope(self, scope: str) -> None:
++        # Scope ownership lives in the primary tier, the only tier whose
++        # capacity a dead subagent's context contends for synchronously.
++        # Secondary tiers keep their own lifecycle (base-class default): a
++        # remote/persistent tier dropping data on an in-band release signal
++        # would turn a cache hint into data loss.
++        self.primary_tier.release_scope(scope)
++
++    @override
+     def complete_load(self, keys: Collection[OffloadKey], req_context: ReqContext):
+         """
+         Mark blocks as done loading from primary tier to GPU.
+diff --git a/vllm/v1/kv_offload/tiering/spec.py b/vllm/v1/kv_offload/tiering/spec.py
+--- a/vllm/v1/kv_offload/tiering/spec.py
++++ b/vllm/v1/kv_offload/tiering/spec.py
+@@ -7,15 +7,11 @@
+ and configurable secondary tiers (e.g., Storage, Network).
+ 
+ Configuration via kv_connector_extra_config:
+-  - cpu_bytes_to_use: (required) Bytes to allocate for CPU primary tier
++  - cpu_kv_cache_users: (required) CPU primary-tier capacity, declared as a
++    count of resident full-length user contexts. Bytes are derived from
++    max_model_len and the KV cache spec; the primary tier is scope-aware
++    like the plain CPU spec, with no selectable eviction policy.
+   - block_size: (optional) Block size for offloaded blocks (default: GPU block size)
+-  - eviction_policy: (optional) Primary tier eviction policy: built-in "lru"/
+-    "arc", or the name of a policy registered via CachePolicyFactory, or an
+-    out-of-tree CachePolicy class name paired with cache_policy_module_path
+-    (default: "lru")
+-  - cache_policy_module_path: (optional) Python import path to load
+-    eviction_policy from when it names an out-of-tree CachePolicy not
+-    registered via CachePolicyFactory
+   - secondary_tiers: (optional) List of secondary tier configurations
+     Each secondary tier config is a dict with:
+       - type: (required) Type of secondary tier (e.g., "example", "fs",
+@@ -29,9 +25,8 @@
+ 
+ Example configuration:
+ {
+-    "cpu_bytes_to_use": 10737418240,  # 10 GB
++    "cpu_kv_cache_users": 4,
+     "block_size": 16,
+-    "eviction_policy": "lru",
+     "secondary_tiers": [
+         {
+             "type": "example",
+@@ -42,7 +37,7 @@
+ 
+ Example out-of-tree tier configuration:
+ {
+-    "cpu_bytes_to_use": 10737418240,
++    "cpu_kv_cache_users": 4,
+     "secondary_tiers": [
+         {
+             "type": "MyCustomTier",
+@@ -86,7 +81,7 @@
+     Spec for multi-tier KV cache offloading.
+ 
+     Creates a TieringOffloadingManager with:
+-    - Primary tier: CPU (LRU or ARC eviction policy)
++    - Primary tier: CPU (scope-aware, the same single mode as the CPU spec)
+     - Secondary tiers: Configurable via extra_config
+ 
+     The CPU primary tier has direct GPU access and serves as the gateway for
+@@ -251,6 +246,10 @@
+             metrics.update(tier_cls.build_metric_definitions(tier_config))
+         return metrics
+ 
++    EXTRA_CONFIG_KEYS: frozenset[str] = CPUOffloadingSpec.EXTRA_CONFIG_KEYS | {
++        "secondary_tiers",
++    }
++
+     def __init__(self, config: OffloadingConfig):
+         super().__init__(config)
+         # Redeclare for mypy: parent sets this but `--follow-imports skip` hides it
+@@ -280,7 +279,7 @@
+         Get the TieringOffloadingManager.
+ 
+         Creates a TieringOffloadingManager with:
+-        - Primary tier: CPU (LRU or ARC)
++        - Primary tier: CPU (scope-aware)
+         - Secondary tiers: As configured in extra_config
+ 
+         Returns:
+@@ -310,8 +309,6 @@
+                 # Create primary tier (CPU-based)
+                 primary_tier = CPUPrimaryTierOffloadingManager(
+                     num_blocks=self.num_blocks,
+-                    cache_policy=self.eviction_policy,
+-                    cache_policy_module_path=self.cache_policy_module_path,
+                     enable_events=self.kv_events_config.enable_kv_cache_events,
+                     mmap_region=scheduler_mmap,
+                 )
+@@ -367,8 +364,7 @@
+ 
+             logger.info(
+                 "Created TieringOffloadingManager with primary tier "
+-                "(%s, %s blocks) and %s secondary tier(s)",
+-                self.eviction_policy,
++                "(%s blocks) and %s secondary tier(s)",
+                 self.num_blocks,
+                 len(secondary_tiers),
+             )
+diff --git a/vllm/v1/request.py b/vllm/v1/request.py
+--- a/vllm/v1/request.py
++++ b/vllm/v1/request.py
+@@ -106,6 +106,12 @@
+         self.kv_transfer_params: dict[str, Any] | None = None
+         # E/P/D: Connector-specific encoder-cache transfer parameters.
+         self.ec_transfer_params: dict[str, Any] | None = None
++        # Agent scope owning this request's KV (None = main session line),
++        # and scopes declared terminated by this request. Materialized here
++        # so the KV offload connector reads identity off the Request the
++        # same way it reads kv_transfer_params, on every protocol surface.
++        self.kv_scope: str | None = None
++        self.kv_scope_release: list[str] | None = None
+ 
+         if pooling_params is not None:
+             # Pooling models.
+@@ -123,6 +129,10 @@
+                 )
+                 self.ec_transfer_params = sampling_params.extra_args.get(
+                     "ec_transfer_params"
++                )
++                self.kv_scope = sampling_params.extra_args.get("kv_scope")
++                self.kv_scope_release = sampling_params.extra_args.get(
++                    "kv_scope_release"
+                 )
+                 self.kv_cache_report_mode = sampling_params.extra_args.get(
+                     "kv_cache_report_mode", "incremental"
+diff --git a/vllm/v1/worker/gpu_worker.py b/vllm/v1/worker/gpu_worker.py
+--- a/vllm/v1/worker/gpu_worker.py
++++ b/vllm/v1/worker/gpu_worker.py
+@@ -479,15 +479,11 @@
+ 
+             msg = (
+                 f"Initial free memory {format_gib(self.init_snapshot.free_memory)} "
+-                f"GiB, reserved {format_gib(kv_cache_memory_bytes)} GiB memory for "
+-                "KV Cache as specified by kv_cache_memory_bytes config and "
+-                "skipped memory profiling. This does not respect the "
+-                "gpu_memory_utilization config. Only use kv_cache_memory_bytes "
+-                "config when you want manual control of KV cache memory "
+-                "size. If OOM'ed, check the difference of initial free "
+-                "memory between the current run and the previous run "
+-                "where kv_cache_memory_bytes is suggested and update it "
+-                "correspondingly."
++                f"GiB, treating {format_gib(kv_cache_memory_bytes)} GiB as the "
++                "available KV cache memory recorded by a persisted startup "
++                "plan; memory re-profiling was skipped. This is availability "
++                "only — the capacity demanded by --kv-cache-users must still "
++                "fit inside it, and the engine fails closed if it does not."
+             )
+             logger.info(msg)
+             return reserve_mm_ipc_gpu_memory(
+@@ -776,14 +772,13 @@
+                 f"GiB for consumed memory (weights + non-torch), "
+                 f"{format_gib(self.peak_activation_memory)} GiB "
+                 f"for peak activation, and {format_gib(cuda_graph_memory_bytes)} "
+-                f"GiB for CUDAGraph memory. Replace gpu_memory_utilization "
+-                f"config with `--kv-cache-memory="
+-                f"{kv_cache_memory_bytes_to_requested_limit}` "
+-                f"({format_gib(kv_cache_memory_bytes_to_requested_limit)} GiB) to fit "
+-                f"into requested memory, or `--kv-cache-memory="
+-                f"{kv_cache_memory_bytes_to_gpu_limit}` "
+-                f"({format_gib(kv_cache_memory_bytes_to_gpu_limit)} GiB) to fully "
+-                f"utilize gpu memory. Current kv cache memory in use is "
++                f"GiB for CUDAGraph memory. Available KV cache memory within "
++                f"the requested budget is "
++                f"{format_gib(kv_cache_memory_bytes_to_requested_limit)} GiB "
++                f"({format_gib(kv_cache_memory_bytes_to_gpu_limit)} GiB to the "
++                f"GPU limit); the pool actually allocated is derived from "
++                f"--kv-cache-users, not from this headroom. Current kv cache "
++                f"memory in use is "
+                 f"{format_gib(self.available_kv_cache_memory_bytes)} GiB."
+             )
+ 
+diff --git a/vllm/v1/worker/startup_plan.py b/vllm/v1/worker/startup_plan.py
+--- a/vllm/v1/worker/startup_plan.py
++++ b/vllm/v1/worker/startup_plan.py
+@@ -132,9 +132,11 @@
+ 
+ 
+ def maybe_apply_startup_plan(worker: "Worker") -> None:
+-    """If enabled and ``--kv-cache-memory`` was not set explicitly, apply a
+-    persisted plan by setting ``worker.cache_config.kv_cache_memory_bytes``.
+-    No-op unless ``VLLM_ENABLE_STARTUP_PLAN=1``."""
++    """Apply a persisted availability plan by setting
++    ``worker.cache_config.kv_cache_memory_bytes`` (internal state — the
++    measured free-memory result of a previous boot's profiling, never a
++    user KV-size declaration). No-op unless ``VLLM_ENABLE_STARTUP_PLAN=1``
++    or if availability was already recorded."""
+     if (
+         not envs.VLLM_ENABLE_STARTUP_PLAN
+         or worker.cache_config.kv_cache_memory_bytes is not None
+diff --git a/tests/entrypoints/test_kv_scope_protocol.py b/tests/entrypoints/test_kv_scope_protocol.py
+new file mode 100644
+--- /dev/null
++++ b/tests/entrypoints/test_kv_scope_protocol.py
+@@ -0,0 +1,163 @@
++# SPDX-License-Identifier: Apache-2.0
++# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
++"""Agent-scope identity must land uniformly on every generation surface.
++
++Whole-scope KV release only works if every protocol can carry the identity:
++a surface without the field silently produces unscoped requests, and the
++offload tier then cannot tell a dead subagent's blocks from the main line's.
++These tests prove, offline, that all six generation protocols expose
++``kv_scope`` / ``kv_scope_release`` beside ``cache_salt`` /
++``kv_transfer_params``, validate them identically, and deliver them into
++``SamplingParams.extra_args`` — the one internal channel the engine reads.
++"""
++
++import pytest
++from pydantic import BaseModel, ValidationError
++
++from vllm.entrypoints.anthropic.protocol import AnthropicMessagesRequest
++from vllm.entrypoints.anthropic.serving import AnthropicServingMessages
++from vllm.entrypoints.cohere.protocol import CohereChatV2Request
++from vllm.entrypoints.cohere.serving import CohereServingChatV2
++from vllm.entrypoints.openai.chat_completion.protocol import ChatCompletionRequest
++from vllm.entrypoints.openai.completion.protocol import CompletionRequest
++from vllm.entrypoints.openai.responses.protocol import ResponsesRequest
++from vllm.entrypoints.scale_out.token_in_token_out.protocol import GenerateRequest
++from vllm.sampling_params import SamplingParams
++
++pytestmark = pytest.mark.cpu_test
++
++_SCOPE = "toolu_01AbCdEf"
++_RELEASED = ["toolu_01Dead", "toolu_02Dead"]
++
++
++def _minimal_payload(request_cls: type[BaseModel]) -> dict:
++    """Smallest valid payload per protocol, before the identity fields."""
++    if request_cls is ChatCompletionRequest:
++        return {"model": "m", "messages": [{"role": "user", "content": "hi"}]}
++    if request_cls is CompletionRequest:
++        return {"model": "m", "prompt": "hi"}
++    if request_cls is ResponsesRequest:
++        return {"model": "m", "input": "hi"}
++    if request_cls is AnthropicMessagesRequest:
++        return {
++            "model": "m",
++            "max_tokens": 16,
++            "messages": [{"role": "user", "content": "hi"}],
++        }
++    if request_cls is CohereChatV2Request:
++        return {"model": "m", "messages": [{"role": "user", "content": "hi"}]}
++    if request_cls is GenerateRequest:
++        return {
++            "request_id": "req-1",
++            "token_ids": [1, 2, 3],
++            "sampling_params": SamplingParams(),
++        }
++    raise AssertionError(f"unhandled protocol {request_cls}")
++
++
++ALL_GENERATION_REQUESTS = [
++    ChatCompletionRequest,
++    CompletionRequest,
++    ResponsesRequest,
++    AnthropicMessagesRequest,
++    CohereChatV2Request,
++    GenerateRequest,
++]
++
++
++@pytest.mark.parametrize("request_cls", ALL_GENERATION_REQUESTS)
++def test_every_surface_accepts_scope_fields(request_cls):
++    request = request_cls(
++        **_minimal_payload(request_cls),
++        kv_scope=_SCOPE,
++        kv_scope_release=_RELEASED,
++    )
++    assert request.kv_scope == _SCOPE
++    assert request.kv_scope_release == _RELEASED
++
++
++@pytest.mark.parametrize("request_cls", ALL_GENERATION_REQUESTS)
++def test_every_surface_defaults_scope_to_main_line(request_cls):
++    # Absent == null == the main session line (the harness's
++    # parent_tool_use_id convention); no surface may invent a default scope.
++    request = request_cls(**_minimal_payload(request_cls))
++    assert request.kv_scope is None
++    assert request.kv_scope_release is None
++
++
++@pytest.mark.parametrize("request_cls", ALL_GENERATION_REQUESTS)
++def test_every_surface_rejects_empty_scope(request_cls):
++    # An empty scope id is not "main line", it is a malformed identity; it
++    # must die at the protocol boundary, identically everywhere.
++    with pytest.raises(ValidationError):
++        request_cls(**_minimal_payload(request_cls), kv_scope="")
++
++
++@pytest.mark.parametrize(
++    "request_cls",
++    [ChatCompletionRequest, CompletionRequest, ResponsesRequest],
++)
++def test_openai_surfaces_deliver_scope_into_extra_args(request_cls):
++    request = request_cls(
++        **_minimal_payload(request_cls),
++        kv_scope=_SCOPE,
++        kv_scope_release=_RELEASED,
++    )
++    if request_cls is ResponsesRequest:
++        sampling = request.to_sampling_params(
++            default_max_tokens=32, default_sampling_params={}
++        )
++    else:
++        sampling = request.to_sampling_params(
++            max_tokens=32, default_sampling_params={}
++        )
++    assert sampling.extra_args is not None
++    assert sampling.extra_args["kv_scope"] == _SCOPE
++    assert sampling.extra_args["kv_scope_release"] == _RELEASED
++
++
++@pytest.mark.parametrize(
++    "request_cls",
++    [ChatCompletionRequest, CompletionRequest, ResponsesRequest],
++)
++def test_openai_surfaces_omit_absent_scope_from_extra_args(request_cls):
++    request = request_cls(**_minimal_payload(request_cls))
++    if request_cls is ResponsesRequest:
++        sampling = request.to_sampling_params(
++            default_max_tokens=32, default_sampling_params={}
++        )
++    else:
++        sampling = request.to_sampling_params(
++            max_tokens=32, default_sampling_params={}
++        )
++    extra_args = sampling.extra_args or {}
++    assert "kv_scope" not in extra_args
++    assert "kv_scope_release" not in extra_args
++
++
++def test_anthropic_translation_forwards_scope_fields():
++    # Anthropic rides the chat pipeline; the translation must pass identity
++    # through verbatim — Anthropic is one surface of six, not a special one.
++    request = AnthropicMessagesRequest(
++        **_minimal_payload(AnthropicMessagesRequest),
++        kv_scope=_SCOPE,
++        kv_scope_release=_RELEASED,
++    )
++    chat_request = AnthropicServingMessages._build_base_request(
++        request, [{"role": "user", "content": "hi"}]
++    )
++    assert chat_request.kv_scope == _SCOPE
++    assert chat_request.kv_scope_release == _RELEASED
++
++
++def test_cohere_translation_forwards_scope_fields():
++    request = CohereChatV2Request(
++        **_minimal_payload(CohereChatV2Request),
++        kv_scope=_SCOPE,
++        kv_scope_release=_RELEASED,
++    )
++    chat_request = CohereServingChatV2._build_base_chat_completion(
++        request, [{"role": "user", "content": "hi"}]
++    )
++    assert chat_request.kv_scope == _SCOPE
++    assert chat_request.kv_scope_release == _RELEASED
+diff --git a/tests/v1/core/test_kv_cache_users_sizing.py b/tests/v1/core/test_kv_cache_users_sizing.py
+new file mode 100644
+--- /dev/null
++++ b/tests/v1/core/test_kv_cache_users_sizing.py
+@@ -0,0 +1,121 @@
++# SPDX-License-Identifier: Apache-2.0
++# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
++"""GPU KV capacity is derived from --kv-cache-users, not from free memory.
++
++The pool must hold exactly N declared full-length contexts (plus the null
++block) on any machine: the same declaration has to produce the same block
++count on a laptop GPU and on a B200, with surplus VRAM left unclaimed and a
++shortfall failing closed at startup. Byte- and block-denominated sizing
++inputs are refused, not reconciled.
++"""
++
++import pytest
++import torch
++
++from vllm.config import ModelConfig, VllmConfig
++from vllm.utils.math_utils import cdiv
++from vllm.v1.core.kv_cache_utils import get_kv_cache_configs
++from vllm.v1.kv_cache_interface import FullAttentionSpec
++
++pytestmark = pytest.mark.cpu_test
++
++BLOCK_SIZE = 16
++
++
++def _spec() -> FullAttentionSpec:
++    return FullAttentionSpec(
++        block_size=BLOCK_SIZE,
++        num_kv_heads=2,
++        head_size=64,
++        dtype=torch.float32,
++    )
++
++
++def _vllm_config(max_model_len: int, kv_cache_users: int | None) -> VllmConfig:
++    vllm_config = VllmConfig(model_config=ModelConfig(max_model_len=max_model_len))
++    vllm_config.cache_config.kv_cache_users = kv_cache_users
++    return vllm_config
++
++
++def _blocks_per_user(max_model_len: int) -> int:
++    return cdiv(max_model_len, BLOCK_SIZE)
++
++
++@pytest.mark.parametrize("users", [1, 3])
++@pytest.mark.parametrize("max_model_len", [16, 48, 50])
++def test_pool_holds_declared_users_plus_null_block(users, max_model_len):
++    spec = _spec()
++    vllm_config = _vllm_config(max_model_len, users)
++    expected_blocks = users * _blocks_per_user(max_model_len) + 1
++
++    # Surplus availability must not inflate the pool: "whatever fits" is the
++    # machine-specific sizing this flag exists to remove.
++    surplus = spec.page_size_bytes * (expected_blocks + 1000)
++    (kv_cache_config,) = get_kv_cache_configs(
++        vllm_config, [{"layer1": spec}], [surplus]
++    )
++
++    assert kv_cache_config.num_blocks == expected_blocks
++    assert kv_cache_config.kv_cache_tensors[0].size == (
++        spec.page_size_bytes * expected_blocks
++    )
++
++
++def test_declared_users_that_do_not_fit_fail_closed():
++    spec = _spec()
++    vllm_config = _vllm_config(64, 4)
++    expected_blocks = 4 * _blocks_per_user(64) + 1
++
++    with pytest.raises(ValueError, match="--kv-cache-users 4 requires"):
++        get_kv_cache_configs(
++            vllm_config,
++            [{"layer1": spec}],
++            [spec.page_size_bytes * (expected_blocks - 1)],
++        )
++
++
++def test_missing_kv_cache_users_fails_closed():
++    spec = _spec()
++    vllm_config = _vllm_config(16, None)
++    with pytest.raises(ValueError, match="--kv-cache-users was not"):
++        get_kv_cache_configs(
++            vllm_config, [{"layer1": spec}], [spec.page_size_bytes * 100]
++        )
++
++
++@pytest.mark.parametrize("bad_users", [0, -2])
++def test_non_positive_kv_cache_users_fails_closed(bad_users):
++    spec = _spec()
++    vllm_config = _vllm_config(16, bad_users)
++    with pytest.raises(ValueError, match="positive integer"):
++        get_kv_cache_configs(
++            vllm_config, [{"layer1": spec}], [spec.page_size_bytes * 100]
++        )
++
++
++def test_num_gpu_blocks_override_is_refused_alongside_users():
++    spec = _spec()
++    vllm_config = _vllm_config(16, 1)
++    vllm_config.cache_config.num_gpu_blocks_override = 128
++    with pytest.raises(ValueError, match="num_gpu_blocks_override"):
++        get_kv_cache_configs(
++            vllm_config, [{"layer1": spec}], [spec.page_size_bytes * 100]
++        )
++
++
++def test_per_worker_derivation_uses_projected_groups():
++    # PP: each stage holds N contexts of its own layers; a stage with more
++    # spare memory must not grow past the declaration.
++    spec = _spec()
++    vllm_config = _vllm_config(64, 2)
++    expected_blocks = 2 * _blocks_per_user(64) + 1
++    (config_a, config_b) = get_kv_cache_configs(
++        vllm_config,
++        [{"layer1": spec}, {"layer2": spec}],
++        [
++            spec.page_size_bytes * expected_blocks,
++            spec.page_size_bytes * expected_blocks * 5,
++        ],
++    )
++    assert config_a.num_blocks == expected_blocks
++    assert config_b.num_blocks == expected_blocks
+diff --git a/tests/v1/kv_offload/cpu/policies/__init__.py b/tests/v1/kv_offload/cpu/policies/__init__.py
+deleted file mode 100644
+diff --git a/tests/v1/kv_offload/cpu/policies/test_factory.py b/tests/v1/kv_offload/cpu/policies/test_factory.py
+deleted file mode 100644
+--- a/tests/v1/kv_offload/cpu/policies/test_factory.py
++++ /dev/null
+@@ -1,111 +0,0 @@
+-# SPDX-License-Identifier: Apache-2.0
+-# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
+-from collections.abc import Iterable
+-
+-import pytest
+-
+-from vllm.v1.kv_offload.base import OffloadKey, ReqContext
+-from vllm.v1.kv_offload.cpu.manager import CPUOffloadingManager
+-from vllm.v1.kv_offload.cpu.policies.arc import ARCCachePolicy
+-from vllm.v1.kv_offload.cpu.policies.base import BlockStatus, CachePolicy
+-from vllm.v1.kv_offload.cpu.policies.factory import CachePolicyFactory
+-from vllm.v1.kv_offload.cpu.policies.lru import LRUCachePolicy
+-
+-
+-class _DummyCachePolicy(CachePolicy):
+-    """Minimal CachePolicy for CachePolicyFactory registration tests. Loaded
+-    by module path, so it must be importable at module scope (mirrors
+-    tests/v1/kv_offload/test_factory.py's SingleArgExternalOffloadingSpec)."""
+-
+-    def __init__(self, cache_capacity: int) -> None:
+-        self.cache_capacity = cache_capacity
+-
+-    def get(self, key: OffloadKey) -> BlockStatus | None:
+-        return None
+-
+-    def insert(self, key: OffloadKey, block: BlockStatus) -> None:
+-        pass
+-
+-    def remove(self, key: OffloadKey) -> None:
+-        pass
+-
+-    def touch(self, keys: Iterable[OffloadKey], req_context: ReqContext) -> None:
+-        pass
+-
+-    def evict(
+-        self, n: int, protected: set[OffloadKey]
+-    ) -> list[tuple[OffloadKey, BlockStatus]] | None:
+-        return None
+-
+-    def clear(self) -> None:
+-        pass
+-
+-
+-@pytest.fixture(autouse=True)
+-def restore_cache_policy_registry():
+-    """Save and restore CachePolicyFactory._registry between tests."""
+-    original = dict(CachePolicyFactory._registry)
+-    yield
+-    CachePolicyFactory._registry = original
+-
+-
+-class TestCachePolicyFactory:
+-    """Unit tests for CachePolicyFactory (registration/resolution by name)."""
+-
+-    def test_pre_registered_policies_can_be_imported(self):
+-        """If someone moves a policy module but forgets to update
+-        factory.py, CI fails."""
+-        for name in CachePolicyFactory._registry:
+-            cls = CachePolicyFactory._registry[name]()
+-            assert issubclass(cls, CachePolicy)
+-
+-    def test_lru_and_arc_registered(self):
+-        assert CachePolicyFactory.get_cache_policy_cls("lru") is LRUCachePolicy
+-        assert CachePolicyFactory.get_cache_policy_cls("arc") is ARCCachePolicy
+-
+-    def test_register_and_resolve_custom_policy(self):
+-        CachePolicyFactory.register_cache_policy(
+-            "dummy",
+-            "tests.v1.kv_offload.cpu.policies.test_factory",
+-            "_DummyCachePolicy",
+-        )
+-        policy_cls = CachePolicyFactory.get_cache_policy_cls("dummy")
+-        assert policy_cls is _DummyCachePolicy
+-
+-        manager = CPUOffloadingManager(num_blocks=4, cache_policy="dummy")
+-        assert isinstance(manager._policy, _DummyCachePolicy)
+-
+-    def test_unregistered_policy_raises(self):
+-        with pytest.raises(ValueError, match="Unknown cache policy"):
+-            CachePolicyFactory.get_cache_policy_cls("nonexistent")
+-
+-    def test_duplicate_registration_raises(self):
+-        with pytest.raises(ValueError, match="is already registered"):
+-            CachePolicyFactory.register_cache_policy("lru", "some.module", "SomeClass")
+-
+-    def test_dynamic_load_via_cache_policy_module_path(self):
+-        """Out-of-tree policy loaded via cache_policy_module_path, no
+-        register_cache_policy() call -- this is how external projects
+-        integrate a custom CachePolicy without forking/patching vLLM.
+-        Mirrors tests/v1/kv_offload/test_factory.py's
+-        test_dynamic_load_via_spec_module_path."""
+-        policy_cls = CachePolicyFactory.get_cache_policy_cls(
+-            "_DummyCachePolicy", "tests.v1.kv_offload.cpu.policies.test_factory"
+-        )
+-        assert policy_cls is _DummyCachePolicy
+-
+-    def test_manager_resolves_policy_via_module_path(self):
+-        """End-to-end: CPUOffloadingManager resolves an unregistered policy
+-        purely from cache_policy_module_path."""
+-        manager = CPUOffloadingManager(
+-            num_blocks=4,
+-            cache_policy="_DummyCachePolicy",
+-            cache_policy_module_path="tests.v1.kv_offload.cpu.policies.test_factory",
+-        )
+-        assert isinstance(manager._policy, _DummyCachePolicy)
+-
+-    def test_unregistered_policy_without_module_path_raises(self):
+-        """eviction_policy not in registry + no cache_policy_module_path ->
+-        ValueError, same shape as the OffloadingSpecFactory error path."""
+-        with pytest.raises(ValueError, match="Unknown cache policy"):
+-            CachePolicyFactory.get_cache_policy_cls("nonexistent", None)
+diff --git a/vllm/v1/kv_offload/cpu/policies/__init__.py b/vllm/v1/kv_offload/cpu/policies/__init__.py
+deleted file mode 100644
+diff --git a/vllm/v1/kv_offload/cpu/policies/arc.py b/vllm/v1/kv_offload/cpu/policies/arc.py
+deleted file mode 100644
+--- a/vllm/v1/kv_offload/cpu/policies/arc.py
++++ /dev/null
+@@ -1,170 +0,0 @@
+-# SPDX-License-Identifier: Apache-2.0
+-# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
+-from collections import OrderedDict
+-from collections.abc import Iterable, Iterator
+-
+-from typing_extensions import override
+-
+-from vllm.v1.kv_offload.base import OffloadKey, ReqContext
+-from vllm.v1.kv_offload.cpu.policies.base import BlockStatus, CachePolicy
+-
+-
+-class ARCCachePolicy(CachePolicy):
+-    """
+-    ARC (Adaptive Replacement Cache) cache policy.
+-
+-    Data Structures:
+-        T1: Recent cache containing blocks accessed once.
+-        T2: Frequent cache containing blocks accessed multiple times.
+-        B1/B2: Ghost lists tracking recently evicted blocks from T1/T2.
+-        target_t1_size: Adaptive target size for the T1 partition.
+-
+-    Algorithm Flow:
+-        1. Cache lookup (lookup):
+-           Searches T1 and T2 for block hashes and counts consecutive hits
+-           until a miss or non-ready block is encountered.
+-
+-        2. Cache touch (touch) - Adaptive Learning:
+-           For each key (in reverse order):
+-           - If in T1: Move to T2 (promotion from recent to frequent).
+-           - If in T2: Move to MRU position (end of queue).
+-           - If in B1 ghost list: Increase target_t1_size.
+-           - If in B2 ghost list: Decrease target_t1_size.
+-
+-        3. Block eviction (evict) - Adaptive Replacement:
+-           Determines eviction source based on adaptive target:
+-           - If T1 size >= target_t1_size: Evict from T1, add to B1.
+-           - Otherwise: Evict from T2, add to B2.
+-           Finally, bound each ghost list size.
+-
+-        4. Block insertion (insert):
+-           New blocks are always inserted into T1 and removed from B1/B2 if
+-           present. Blocks may later be promoted to T2 during touch operations.
+-
+-    Adaptive Behavior:
+-        The algorithm self-tunes the recency vs. frequency trade-off:
+-        - B1 hit: Recent access patterns matter more → increase T1.
+-        - B2 hit: Frequent access patterns matter more → decrease T1.
+-    """
+-
+-    def __init__(self, cache_capacity: int):
+-        super().__init__(cache_capacity)
+-        self.target_t1_size: float = 0.0
+-        self.t1: OrderedDict[OffloadKey, BlockStatus] = OrderedDict()
+-        self.t2: OrderedDict[OffloadKey, BlockStatus] = OrderedDict()
+-        # key -> None (only care about presence)
+-        self.b1: OrderedDict[OffloadKey, None] = OrderedDict()
+-        self.b2: OrderedDict[OffloadKey, None] = OrderedDict()
+-
+-    @override
+-    def get(self, key: OffloadKey) -> BlockStatus | None:
+-        return self.t1.get(key) or self.t2.get(key)
+-
+-    @override
+-    def insert(self, key: OffloadKey, block: BlockStatus) -> None:
+-        self.t1[key] = block
+-        self.b1.pop(key, None)
+-        self.b2.pop(key, None)
+-
+-    @override
+-    def remove(self, key: OffloadKey) -> None:
+-        if self.t1.pop(key, None) is None:
+-            self.t2.pop(key, None)
+-
+-    @override
+-    def touch(self, keys: Iterable[OffloadKey], req_context: ReqContext) -> None:
+-        for key in reversed(list(keys)):
+-            if key in self.t1:
+-                block = self.t1.pop(key)
+-                if not block.is_ready:
+-                    # block was just prepared to be stored, not really touched
+-                    # twice — keep it in T1 and mark as most recently used
+-                    self.t1[key] = block
+-                else:
+-                    self.t2[key] = block
+-
+-            elif key in self.t2:
+-                self.t2.move_to_end(key)
+-
+-            elif key in self.b1:
+-                delta = max(1, len(self.b2) / len(self.b1))
+-                self.target_t1_size = min(
+-                    self.target_t1_size + delta, self.cache_capacity
+-                )
+-                # move to MRU position (end) to keep it fresh in the ghost list
+-                self.b1.move_to_end(key)
+-
+-            elif key in self.b2:
+-                delta = max(1, len(self.b1) / len(self.b2))
+-                self.target_t1_size = max(self.target_t1_size - delta, 0)
+-                # move to MRU position (end) to keep it fresh in the ghost list
+-                self.b2.move_to_end(key)
+-
+-    @override
+-    def clear(self) -> None:
+-        self.t1.clear()
+-        self.t2.clear()
+-        self.b1.clear()
+-        self.b2.clear()
+-        self.target_t1_size = 0.0
+-
+-    @override
+-    def evict(
+-        self, n: int, protected: set[OffloadKey]
+-    ) -> list[tuple[OffloadKey, BlockStatus]] | None:
+-        if n == 0:
+-            return []
+-
+-        # Collect candidates atomically: simulate T1 size changes as we select,
+-        # but do not modify actual data structures until all n are found.
+-        candidates: list[
+-            tuple[OffloadKey, BlockStatus, bool]
+-        ] = []  # (key, block, from_t1)
+-        virtual_t1_size = len(self.t1)
+-        # Keep the scans monotonic: restarting from the LRU end after every
+-        # selection makes a batch eviction quadratic in the number of blocks.
+-        t1_iter = iter(self.t1.items())
+-        t2_iter = iter(self.t2.items())
+-
+-        def next_candidate(
+-            entries: Iterator[tuple[OffloadKey, BlockStatus]],
+-        ) -> tuple[OffloadKey, BlockStatus] | None:
+-            for key, block in entries:
+-                if block.ref_cnt == 0 and key not in protected:
+-                    return key, block
+-            return None
+-
+-        for _ in range(n):
+-            candidate: tuple[OffloadKey, BlockStatus, bool] | None = None
+-
+-            if virtual_t1_size >= int(self.target_t1_size):
+-                entry = next_candidate(t1_iter)
+-                if entry is not None:
+-                    candidate = (*entry, True)
+-                    virtual_t1_size -= 1
+-
+-            if candidate is None:
+-                entry = next_candidate(t2_iter)
+-                if entry is None:
+-                    return None
+-                candidate = (*entry, False)
+-
+-            candidates.append(candidate)
+-
+-        # Apply all evictions now that we know n candidates exist.
+-        result: list[tuple[OffloadKey, BlockStatus]] = []
+-        for key, block, from_t1 in candidates:
+-            if from_t1:
+-                del self.t1[key]
+-                self.b1[key] = None
+-            else:
+-                del self.t2[key]
+-                self.b2[key] = None
+-            result.append((key, block))
+-
+-        # Trim ghost lists to cache_capacity.
+-        for ghost in (self.b1, self.b2):
+-            for _ in range(len(ghost) - self.cache_capacity):
+-                ghost.popitem(last=False)
+-
+-        return result
+diff --git a/vllm/v1/kv_offload/cpu/policies/base.py b/vllm/v1/kv_offload/cpu/policies/base.py
+deleted file mode 100644
+--- a/vllm/v1/kv_offload/cpu/policies/base.py
++++ /dev/null
+@@ -1,98 +0,0 @@
+-# SPDX-License-Identifier: Apache-2.0
+-# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
+-import ctypes
+-from abc import ABC, abstractmethod
+-from collections.abc import Iterable
+-
+-from vllm.v1.kv_offload.base import OffloadKey, ReqContext
+-
+-
+-class BlockStatus(ctypes.Structure):
+-    """
+-    Offloading status for a single block of KV data.
+-    Holds the following information:
+-
+-    ref_cnt - the current number of transfers using this block as a source.
+-        A value of -1 indicates the block is not yet ready to be read.
+-    block_id - index of the physical CPU buffer slot.
+-    """
+-
+-    _fields_ = [("ref_cnt", ctypes.c_int32), ("block_id", ctypes.c_int64)]
+-
+-    def __init__(self, block_id: int):
+-        super().__init__()
+-        # initialize block as "not ready" (ref_cnt = -1)
+-        self.ref_cnt = -1
+-        self.block_id = block_id
+-
+-    @property
+-    def is_ready(self) -> bool:
+-        """
+-        Returns whether the block is ready to be read.
+-        """
+-        return self.ref_cnt >= 0
+-
+-
+-class CachePolicy(ABC):
+-    """
+-    Encapsulates both block organization (data structures) and replacement
+-    decisions (which block to evict). LRU and ARC differ in both dimensions —
+-    ARC's ghost lists and target_t1_size live at the intersection of storage
+-    and eviction, so they cannot be separated cleanly.
+-    """
+-
+-    def __init__(self, cache_capacity: int) -> None:
+-        self.cache_capacity = cache_capacity
+-
+-    @abstractmethod
+-    def get(self, key: OffloadKey) -> BlockStatus | None:
+-        """Find block in data structures. Returns None if not present."""
+-
+-    @abstractmethod
+-    def insert(self, key: OffloadKey, block: BlockStatus) -> None:
+-        """Add a newly allocated block. For ARC: also removes from ghost lists."""
+-
+-    @abstractmethod
+-    def remove(self, key: OffloadKey) -> None:
+-        """Remove a block (used to clean up after a failed store)."""
+-
+-    @abstractmethod
+-    def touch(self, keys: Iterable[OffloadKey], req_context: ReqContext) -> None:
+-        """
+-        Mark blocks as recently used.
+-
+-        Args:
+-            keys: Blocks to mark as recently used.
+-            req_context: Per-request context for the request touching these blocks.
+-        """
+-
+-    @abstractmethod
+-    def evict(
+-        self, n: int, protected: set[OffloadKey]
+-    ) -> list[tuple[OffloadKey, BlockStatus]] | None:
+-        """
+-        Evict exactly n blocks, skipping any in protected.
+-
+-        Returns a list of (key, block) for the evicted blocks,
+-        or None if n evictions cannot be satisfied. The operation is atomic:
+-        if None is returned, no state changes are made.
+-
+-        For ARC: ghost list cleanup (trimming to cache_capacity) is performed
+-        at the end of a successful eviction.
+-        """
+-
+-    @abstractmethod
+-    def clear(self) -> None:
+-        """
+-        Remove ALL blocks regardless of ref_cnt.
+-
+-        Ghost lists and adaptive state are also reset.
+-        """
+-
+-    def mark_evictable(self, key: OffloadKey) -> None:
+-        """Called when a block's ref_cnt transitions to 0."""
+-        return
+-
+-    def mark_non_evictable(self, key: OffloadKey) -> None:
+-        """Called when a block's ref_cnt transitions from 0."""
+-        return
+diff --git a/vllm/v1/kv_offload/cpu/policies/factory.py b/vllm/v1/kv_offload/cpu/policies/factory.py
+deleted file mode 100644
+--- a/vllm/v1/kv_offload/cpu/policies/factory.py
++++ /dev/null
+@@ -1,90 +0,0 @@
+-# SPDX-License-Identifier: Apache-2.0
+-# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
+-import importlib
+-from collections.abc import Callable
+-
+-from vllm.logger import init_logger
+-from vllm.v1.kv_offload.cpu.policies.base import CachePolicy
+-
+-logger = init_logger(__name__)
+-
+-
+-class CachePolicyFactory:
+-    """Registry for CachePolicy implementations, resolved by name.
+-
+-    Mirrors OffloadingSpecFactory (vllm/v1/kv_offload/factory.py): built-in
+-    policies are pre-registered below. External policies can either
+-    register_cache_policy() a friendly short name up front, or skip
+-    registration entirely and pass a module path at lookup time (out-of-tree,
+-    no vLLM fork/patch required) -- see get_cache_policy_cls.
+-    """
+-
+-    _registry: dict[str, Callable[[], type[CachePolicy]]] = {}
+-
+-    @classmethod
+-    def register_cache_policy(
+-        cls, name: str, module_path: str, class_name: str
+-    ) -> None:
+-        """Register a cache policy with a lazy-loading module and class name."""
+-        if name in cls._registry:
+-            raise ValueError(f"Cache policy '{name}' is already registered.")
+-
+-        def loader() -> type[CachePolicy]:
+-            module = importlib.import_module(module_path)
+-            return getattr(module, class_name)
+-
+-        cls._registry[name] = loader
+-
+-    @classmethod
+-    def get_cache_policy_cls(
+-        cls, name: str, module_path: str | None = None
+-    ) -> type[CachePolicy]:
+-        """Get a cache policy class by name.
+-
+-        Args:
+-            name: Name of the cache policy. Checked against the registry
+-                first; if it's not registered and `module_path` is given,
+-                `name` is imported from there instead -- an out-of-tree
+-                policy needs no register_cache_policy() call at all, just
+-                this module path passed through config (mirrors
+-                OffloadingSpecFactory.get_spec_cls's spec_module_path
+-                fallback).
+-            module_path: Python import path to load `name` from when it is
+-                not a registered policy.
+-
+-        Returns:
+-            The cache policy class.
+-
+-        Raises ValueError if the cache policy is neither registered nor
+-        resolvable via `module_path`.
+-        """
+-        if name in cls._registry:
+-            return cls._registry[name]()
+-        if module_path is None:
+-            raise ValueError(
+-                f"Unknown cache policy: {name!r}. Supported: {list(cls._registry)}. "
+-                "For an out-of-tree policy, also set cache_policy_module_path."
+-            )
+-        logger.warning_once(
+-            "Loading out-of-tree cache policy. This API is "
+-            "experimental and subject to change in the future "
+-            "as we iterate the design."
+-        )
+-        logger.info(
+-            "Loading out-of-tree cache policy '%s' from '%s'.",
+-            name,
+-            module_path,
+-        )
+-        module = importlib.import_module(module_path)
+-        policy_cls = getattr(module, name)
+-        assert issubclass(policy_cls, CachePolicy)
+-        return policy_cls
+-
+-
+-# Register built-in policies here.
+-CachePolicyFactory.register_cache_policy(
+-    "lru", "vllm.v1.kv_offload.cpu.policies.lru", "LRUCachePolicy"
+-)
+-CachePolicyFactory.register_cache_policy(
+-    "arc", "vllm.v1.kv_offload.cpu.policies.arc", "ARCCachePolicy"
+-)
+diff --git a/vllm/v1/kv_offload/cpu/policies/lru.py b/vllm/v1/kv_offload/cpu/policies/lru.py
+deleted file mode 100644
+--- a/vllm/v1/kv_offload/cpu/policies/lru.py
++++ /dev/null
+@@ -1,90 +0,0 @@
+-# SPDX-License-Identifier: Apache-2.0
+-# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
+-from collections import OrderedDict
+-from collections.abc import Iterable
+-
+-from typing_extensions import override
+-
+-from vllm.v1.kv_offload.base import OffloadKey, ReqContext
+-from vllm.v1.kv_offload.cpu.policies.base import BlockStatus, CachePolicy
+-
+-
+-class LRUCachePolicy(CachePolicy):
+-    """
+-    LRU Caching policy that keeps a dedicated evictable list for fast eviction.
+-    A use is indicated by,
+-     - First time the key is added (store).
+-     - Load job completion
+-     - touch
+-    """
+-
+-    def __init__(self, cache_capacity: int):
+-        super().__init__(cache_capacity)
+-        # Blocks with ref_cnt 0 (not participating in any loads/stores) ordered in LRU
+-        self.evictable_blocks: OrderedDict[OffloadKey, None] = OrderedDict()
+-        self.blocks: dict[OffloadKey, BlockStatus] = {}
+-
+-    @override
+-    def get(self, key: OffloadKey) -> BlockStatus | None:
+-        return self.blocks.get(key)
+-
+-    @override
+-    def insert(self, key: OffloadKey, block: BlockStatus) -> None:
+-        self.blocks[key] = block
+-        if block.ref_cnt == 0:
+-            self.evictable_blocks[key] = None
+-
+-    @override
+-    def remove(self, key: OffloadKey) -> None:
+-        del self.blocks[key]
+-        self.evictable_blocks.pop(key, None)
+-
+-    @override
+-    def touch(self, keys: Iterable[OffloadKey], req_context: ReqContext) -> None:
+-        for key in reversed(list(keys)):
+-            if key in self.evictable_blocks:
+-                self.evictable_blocks.move_to_end(key)
+-            # active blocks are untouched as they are non-evictable now. They
+-            # will eventually reach the end of evictable_blocks when they finish.
+-
+-    @override
+-    def clear(self) -> None:
+-        self.evictable_blocks.clear()
+-        self.blocks.clear()
+-
+-    @override
+-    def evict(
+-        self, n: int, protected: set[OffloadKey]
+-    ) -> list[tuple[OffloadKey, BlockStatus]] | None:
+-        if n == 0:
+-            return []
+-
+-        candidates: list[tuple[OffloadKey, BlockStatus]] = []
+-        for key, _ in self.evictable_blocks.items():
+-            if key in protected:
+-                continue
+-
+-            block = self.blocks[key]
+-            assert block.ref_cnt == 0
+-            candidates.append((key, block))
+-            if len(candidates) == n:
+-                break
+-
+-        if len(candidates) < n:
+-            return None
+-        for key, _ in candidates:
+-            del self.evictable_blocks[key]
+-            del self.blocks[key]
+-        return candidates
+-
+-    @override
+-    def mark_evictable(self, key: OffloadKey) -> None:
+-        # blocks can become evictable when,
+-        # store completes - i.e. ref_cnt -1 -> 0 # not in evictable list
+-        # all loads complete - i.e ref_cnt 1 -> 0  # not in evictable list
+-        self.evictable_blocks[key] = None
+-
+-    @override
+-    def mark_non_evictable(self, key: OffloadKey) -> None:
+-        # key must have been in the evictable list.
+-        del self.evictable_blocks[key]

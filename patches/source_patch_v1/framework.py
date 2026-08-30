@@ -39,6 +39,13 @@ def sha256_text(text: str) -> str:
     return sha256_bytes(text.encode("utf-8"))
 
 
+# Digest of the empty file. A deletion of an empty file cannot carry a
+# landmark hunk (its before and after blocks would both be empty), so it is
+# the one transformation evidenced purely by the review diff's
+# "deleted file mode" header instead of by hunks.
+EMPTY_FILE_SHA256 = sha256_text("")
+
+
 def _require(condition: object, message: str) -> None:
     if not condition:
         raise PatchRefusedError(message)
@@ -114,9 +121,11 @@ class LandmarkEdit:
 
 @dataclass(frozen=True)
 class FileIdentity:
+    """before None = file created; after None = file deleted."""
+
     path: str
     before_sha256: str | None
-    after_sha256: str
+    after_sha256: str | None
 
     def __post_init__(self) -> None:
         _safe_relative_path(self.path)
@@ -125,9 +134,14 @@ class FileIdentity:
                 bool(re.fullmatch(r"[0-9a-f]{64}", self.before_sha256)),
                 f"{self.path}: invalid before SHA-256",
             )
+        if self.after_sha256 is not None:
+            _require(
+                bool(re.fullmatch(r"[0-9a-f]{64}", self.after_sha256)),
+                f"{self.path}: invalid after SHA-256",
+            )
         _require(
-            bool(re.fullmatch(r"[0-9a-f]{64}", self.after_sha256)),
-            f"{self.path}: invalid after SHA-256",
+            self.before_sha256 is not None or self.after_sha256 is not None,
+            f"{self.path}: a file cannot be both absent before and after",
         )
 
 
@@ -164,10 +178,18 @@ class PatchStage:
             f"{self.name}: duplicate file identity",
         )
         edit_paths = {edit.path for edit in self.edits}
+        paths_requiring_edits = {
+            contract.path
+            for contract in self.files
+            if not (
+                contract.after_sha256 is None
+                and contract.before_sha256 == EMPTY_FILE_SHA256
+            )
+        }
         _require(
-            edit_paths == set(file_paths),
+            edit_paths == paths_requiring_edits,
             f"{self.name}: edit/file sets disagree: "
-            f"edits={sorted(edit_paths)!r} files={sorted(file_paths)!r}",
+            f"edits={sorted(edit_paths)!r} files={sorted(paths_requiring_edits)!r}",
         )
 
 
@@ -295,9 +317,12 @@ _DIFF_HEADER = re.compile(r"^diff --git a/(.+) b/(.+)$")
 _HUNK_HEADER = re.compile(
     r"^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@"
 )
+_DELETED_FILE_HEADER = re.compile(r"^deleted file mode \d+$")
 
 
-def _parse_review_diff(data: bytes, *, label: str) -> tuple[_ParsedReviewEdit, ...]:
+def _parse_review_diff(
+    data: bytes, *, label: str
+) -> tuple[tuple[_ParsedReviewEdit, ...], frozenset[str]]:
     try:
         text = data.decode("utf-8")
     except UnicodeDecodeError as exc:
@@ -305,6 +330,7 @@ def _parse_review_diff(data: bytes, *, label: str) -> tuple[_ParsedReviewEdit, .
     _require("\r" not in text, f"{label}: review diff contains CR bytes")
     lines = text.splitlines(keepends=True)
     edits: list[_ParsedReviewEdit] = []
+    deleted_paths: set[str] = set()
     current_path: str | None = None
     index = 0
     while index < len(lines):
@@ -317,6 +343,18 @@ def _parse_review_diff(data: bytes, *, label: str) -> tuple[_ParsedReviewEdit, .
             )
             current_path = match.group(1)
             _safe_relative_path(current_path)
+            index += 1
+            continue
+        if _DELETED_FILE_HEADER.match(raw.rstrip("\n")):
+            _require(
+                current_path is not None,
+                f"{label}: deleted-file header without file header",
+            )
+            _require(
+                current_path not in deleted_paths,
+                f"{label}: duplicate deleted-file header for {current_path}",
+            )
+            deleted_paths.add(current_path)
             index += 1
             continue
         hunk_match = _HUNK_HEADER.match(raw.rstrip("\n"))
@@ -357,8 +395,11 @@ def _parse_review_diff(data: bytes, *, label: str) -> tuple[_ParsedReviewEdit, .
             )
             continue
         index += 1
-    _require(edits, f"{label}: review diff contains no hunks")
-    return tuple(edits)
+    _require(
+        edits or deleted_paths,
+        f"{label}: review diff contains no hunks",
+    )
+    return tuple(edits), frozenset(deleted_paths)
 
 
 class SourcePatchTransaction:
@@ -411,6 +452,11 @@ class SourcePatchTransaction:
     def _read_text(self, relative: str) -> str:
         path = self._path(relative, existing=True)
         data = path.read_bytes()
+        if data == b"":
+            # An empty file is a well-defined fixed point with no line
+            # structure to police; refusing it would make empty pristine
+            # files (package __init__ markers) untouchable by deletions.
+            return ""
         _require(b"\x00" not in data, f"{relative}: NUL byte in text source")
         try:
             text = data.decode("utf-8")
@@ -419,6 +465,14 @@ class SourcePatchTransaction:
         _require("\r" not in text, f"{relative}: CR bytes are forbidden")
         _require(text.endswith("\n"), f"{relative}: no terminal newline")
         return text
+
+    def _deleted_paths(self) -> set[str]:
+        return {
+            contract.path
+            for stage in self.patchset.stages
+            for contract in stage.files
+            if contract.after_sha256 is None
+        }
 
     def _all_paths(self) -> tuple[str, ...]:
         paths: set[str] = set(self.patchset.identity_files)
@@ -429,15 +483,16 @@ class SourcePatchTransaction:
 
     def _read_state(self) -> dict[str, str]:
         state: dict[str, str] = {}
-        new_paths = {
+        absent_ok = {
             contract.path
             for stage in self.patchset.stages
             for contract in stage.files
             if contract.before_sha256 is None
         }
+        absent_ok |= self._deleted_paths()
         for path in self._all_paths():
             candidate = self.source_root.joinpath(*PurePosixPath(path).parts)
-            if not candidate.exists() and path in new_paths:
+            if not candidate.exists() and path in absent_ok:
                 continue
             state[path] = self._read_text(path)
         return state
@@ -461,11 +516,22 @@ class SourcePatchTransaction:
             f"{stage.name}: review diff SHA-256 drift; expected "
             f"{stage.review_sha256}, got {actual_digest}",
         )
-        parsed = _parse_review_diff(data, label=stage.name)
+        parsed, parsed_deleted = _parse_review_diff(data, label=stage.name)
         _require(
             len(parsed) == len(stage.edits),
             f"{stage.name}: review diff has {len(parsed)} hunks but the Python "
             f"patcher has {len(stage.edits)} landmark transformations",
+        )
+        stage_deleted = frozenset(
+            contract.path
+            for contract in stage.files
+            if contract.after_sha256 is None
+        )
+        _require(
+            parsed_deleted == stage_deleted,
+            f"{stage.name}: review diff declares deletions "
+            f"{sorted(parsed_deleted)!r} but the Python patcher declares "
+            f"{sorted(stage_deleted)!r}",
         )
         expected = tuple(
             _ParsedReviewEdit(
@@ -500,6 +566,13 @@ class SourcePatchTransaction:
     def _classify_mixed_state(self, state: Mapping[str, str]) -> str:
         pristine = self._overall_pristine()
         rows: list[str] = []
+        for path in sorted(self._deleted_paths()):
+            if path not in state:
+                rows.append(f"{path}=deleted")
+                continue
+            digest = sha256_text(state[path])
+            kind = "pristine" if pristine.get(path) == digest else "unknown"
+            rows.append(f"{path}={kind}:{digest}")
         for path in sorted(self.patchset.final_files):
             if path not in state:
                 rows.append(f"{path}=absent")
@@ -526,7 +599,10 @@ class SourcePatchTransaction:
         for stage in self.patchset.stages:
             self._verify_review_artifact(stage)
 
-        if self._matches(state, self.patchset.final_files):
+        deleted_paths = self._deleted_paths()
+        if self._matches(state, self.patchset.final_files) and all(
+            path not in state for path in deleted_paths
+        ):
             self.patchset.validate_final(state)
             return dict(state), PatchResult(
                 state="already-applied",
@@ -568,6 +644,21 @@ class SourcePatchTransaction:
 
             for edit in stage.edits:
                 current = planned.get(edit.path, "")
+                if edit.after == "":
+                    # Deleted-file hunk: by the LandmarkEdit grammar its
+                    # before block describes the complete file, so identity
+                    # is exact equality; the substring-count discipline is
+                    # meaningless against an empty after block (the empty
+                    # string occurs everywhere).
+                    _require(
+                        current == edit.before,
+                        f"{stage.name}:{edit.name}: deleted-file landmark "
+                        f"does not match the whole of {edit.path}; no "
+                        "writes performed",
+                    )
+                    planned[edit.path] = ""
+                    changed.add(edit.path)
+                    continue
                 before_count = current.count(edit.before)
                 after_count = current.count(edit.after)
                 _require(
@@ -586,6 +677,15 @@ class SourcePatchTransaction:
 
             for path, contract in contracts.items():
                 _require(path in planned, f"{stage.name}: failed to produce {path}")
+                if contract.after_sha256 is None:
+                    _require(
+                        planned[path] == "",
+                        f"{stage.name}: deletion of {path} left residual "
+                        "content; no writes performed",
+                    )
+                    del planned[path]
+                    changed.add(path)
+                    continue
                 actual = sha256_text(planned[path])
                 _require(
                     actual == contract.after_sha256,
@@ -604,6 +704,11 @@ class SourcePatchTransaction:
         _require(
             self._matches(planned, self.patchset.final_files),
             f"{self.patchset.name}: complete result does not match final manifest; "
+            "no writes performed",
+        )
+        _require(
+            all(path not in planned for path in deleted_paths),
+            f"{self.patchset.name}: a later stage resurrected a deleted file; "
             "no writes performed",
         )
         self.patchset.validate_final(planned)
@@ -648,6 +753,10 @@ class SourcePatchTransaction:
                     backups[relative] = _Backup(None, None)
 
             for relative in result.changed_files:
+                if relative not in planned:
+                    # Planned deletion: nothing to stage; the unlink happens
+                    # at the same optimistic-concurrency boundary as writes.
+                    continue
                 destination = self.source_root.joinpath(
                     *_safe_relative_path(relative).parts
                 )
@@ -695,7 +804,10 @@ class SourcePatchTransaction:
                 # so it is rechecked at the final mutation boundary as well.
                 for stage in self.patchset.stages:
                     self._verify_review_artifact(stage)
-                os.replace(temporary[relative], destination)
+                if relative not in planned:
+                    os.unlink(destination)
+                else:
+                    os.replace(temporary[relative], destination)
                 replaced.append(relative)
                 directory_fd = os.open(destination.parent, os.O_RDONLY)
                 try:
@@ -707,6 +819,10 @@ class SourcePatchTransaction:
             _require(
                 self._matches(verified, self.patchset.final_files),
                 f"{self.patchset.name}: post-write final manifest mismatch",
+            )
+            _require(
+                all(path not in verified for path in self._deleted_paths()),
+                f"{self.patchset.name}: post-write deletion still present",
             )
             self.patchset.validate_final(verified)
         except BaseException as exc:

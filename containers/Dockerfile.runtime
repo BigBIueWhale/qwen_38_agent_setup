@@ -99,6 +99,83 @@ RUN printf '%s  %s\n' \
       "${QWEN3_VL_MODEL_UPSTREAM_FILE_SHA256}" \
       /usr/local/lib/python3.12/dist-packages/vllm/model_executor/models/qwen3_vl.py \
     | sha256sum --check --strict
+ARG CACHE_CONFIG_UPSTREAM_FILE_SHA256
+ARG VLLM_CONFIG_UPSTREAM_FILE_SHA256
+ARG ARG_UTILS_UPSTREAM_FILE_SHA256
+ARG LLM_ENTRYPOINT_UPSTREAM_FILE_SHA256
+ARG KV_CACHE_UTILS_UPSTREAM_FILE_SHA256
+ARG GPU_WORKER_UPSTREAM_FILE_SHA256
+ARG STARTUP_PLAN_UPSTREAM_FILE_SHA256
+ARG KV_OFFLOAD_CONFIG_UPSTREAM_FILE_SHA256
+ARG KV_OFFLOAD_BASE_UPSTREAM_FILE_SHA256
+ARG KV_OFFLOAD_CPU_SPEC_UPSTREAM_FILE_SHA256
+ARG KV_OFFLOAD_CPU_MANAGER_UPSTREAM_FILE_SHA256
+ARG KV_TIERING_SPEC_UPSTREAM_FILE_SHA256
+ARG KV_TIERING_MANAGER_UPSTREAM_FILE_SHA256
+ARG OFFLOAD_CONNECTOR_CONFIG_UPSTREAM_FILE_SHA256
+ARG OFFLOAD_CONNECTOR_SCHEDULER_UPSTREAM_FILE_SHA256
+ARG COMPLETION_PROTOCOL_UPSTREAM_FILE_SHA256
+ARG COHERE_PROTOCOL_UPSTREAM_FILE_SHA256
+ARG COHERE_SERVING_UPSTREAM_FILE_SHA256
+ARG TITOTO_PROTOCOL_UPSTREAM_FILE_SHA256
+ARG TITOTO_SERVING_UPSTREAM_FILE_SHA256
+ARG POLICY_PKG_INIT_UPSTREAM_FILE_SHA256
+ARG POLICY_BASE_UPSTREAM_FILE_SHA256
+ARG POLICY_FACTORY_UPSTREAM_FILE_SHA256
+ARG POLICY_LRU_UPSTREAM_FILE_SHA256
+ARG POLICY_ARC_UPSTREAM_FILE_SHA256
+RUN printf '%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n' \
+      "${CACHE_CONFIG_UPSTREAM_FILE_SHA256}" \
+        /usr/local/lib/python3.12/dist-packages/vllm/config/cache.py \
+      "${VLLM_CONFIG_UPSTREAM_FILE_SHA256}" \
+        /usr/local/lib/python3.12/dist-packages/vllm/config/vllm.py \
+      "${ARG_UTILS_UPSTREAM_FILE_SHA256}" \
+        /usr/local/lib/python3.12/dist-packages/vllm/engine/arg_utils.py \
+      "${LLM_ENTRYPOINT_UPSTREAM_FILE_SHA256}" \
+        /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/llm.py \
+      "${KV_CACHE_UTILS_UPSTREAM_FILE_SHA256}" \
+        /usr/local/lib/python3.12/dist-packages/vllm/v1/core/kv_cache_utils.py \
+      "${GPU_WORKER_UPSTREAM_FILE_SHA256}" \
+        /usr/local/lib/python3.12/dist-packages/vllm/v1/worker/gpu_worker.py \
+      "${STARTUP_PLAN_UPSTREAM_FILE_SHA256}" \
+        /usr/local/lib/python3.12/dist-packages/vllm/v1/worker/startup_plan.py \
+      "${KV_OFFLOAD_CONFIG_UPSTREAM_FILE_SHA256}" \
+        /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/config.py \
+      "${KV_OFFLOAD_BASE_UPSTREAM_FILE_SHA256}" \
+        /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/base.py \
+      "${KV_OFFLOAD_CPU_SPEC_UPSTREAM_FILE_SHA256}" \
+        /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/cpu/spec.py \
+      "${KV_OFFLOAD_CPU_MANAGER_UPSTREAM_FILE_SHA256}" \
+        /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/cpu/manager.py \
+      "${KV_TIERING_SPEC_UPSTREAM_FILE_SHA256}" \
+        /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/tiering/spec.py \
+      "${KV_TIERING_MANAGER_UPSTREAM_FILE_SHA256}" \
+        /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/tiering/manager.py \
+      "${OFFLOAD_CONNECTOR_CONFIG_UPSTREAM_FILE_SHA256}" \
+        /usr/local/lib/python3.12/dist-packages/vllm/distributed/kv_transfer/kv_connector/v1/offloading/config.py \
+      "${OFFLOAD_CONNECTOR_SCHEDULER_UPSTREAM_FILE_SHA256}" \
+        /usr/local/lib/python3.12/dist-packages/vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py \
+      "${COMPLETION_PROTOCOL_UPSTREAM_FILE_SHA256}" \
+        /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/completion/protocol.py \
+      "${COHERE_PROTOCOL_UPSTREAM_FILE_SHA256}" \
+        /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/cohere/protocol.py \
+      "${COHERE_SERVING_UPSTREAM_FILE_SHA256}" \
+        /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/cohere/serving.py \
+      "${TITOTO_PROTOCOL_UPSTREAM_FILE_SHA256}" \
+        /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/scale_out/token_in_token_out/protocol.py \
+      "${TITOTO_SERVING_UPSTREAM_FILE_SHA256}" \
+        /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/scale_out/token_in_token_out/serving.py \
+      "${POLICY_PKG_INIT_UPSTREAM_FILE_SHA256}" \
+        /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/cpu/policies/__init__.py \
+      "${POLICY_BASE_UPSTREAM_FILE_SHA256}" \
+        /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/cpu/policies/base.py \
+      "${POLICY_FACTORY_UPSTREAM_FILE_SHA256}" \
+        /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/cpu/policies/factory.py \
+      "${POLICY_LRU_UPSTREAM_FILE_SHA256}" \
+        /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/cpu/policies/lru.py \
+      "${POLICY_ARC_UPSTREAM_FILE_SHA256}" \
+        /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/cpu/policies/arc.py
+    | sha256sum --check --strict
 
 FROM upstream-verifier AS runtime
 ARG TURBOQUANT_PATCHED_FILE_SHA256=1ae979841b20ffc2d0db63b30a9ecc4928548b9854983fd98aa9c2c0808e441d
@@ -141,6 +218,39 @@ ARG QWEN38_CONTEXT_UNIT_SHA256
 ARG NVFP4_KERNEL_UNIT_SHA256
 ARG NUMERICAL_AUDITS_PATCH_DIFF_SHA256
 ARG KV_OFFLOAD_PINNING_PATCH_DIFF_SHA256
+ARG KV_USERS_SCOPE_PATCH_DIFF_SHA256
+ARG CACHE_CONFIG_PATCHED_FILE_SHA256
+ARG VLLM_CONFIG_PATCHED_FILE_SHA256
+ARG ARG_UTILS_PATCHED_FILE_SHA256
+ARG LLM_ENTRYPOINT_PATCHED_FILE_SHA256
+ARG KV_CACHE_UTILS_PATCHED_FILE_SHA256
+ARG GPU_WORKER_PATCHED_FILE_SHA256
+ARG STARTUP_PLAN_PATCHED_FILE_SHA256
+ARG KV_OFFLOAD_CONFIG_PATCHED_FILE_SHA256
+ARG KV_OFFLOAD_BASE_PATCHED_FILE_SHA256
+ARG KV_OFFLOAD_CPU_SPEC_PATCHED_FILE_SHA256
+ARG KV_OFFLOAD_CPU_MANAGER_PATCHED_FILE_SHA256
+ARG KV_TIERING_SPEC_PATCHED_FILE_SHA256
+ARG KV_TIERING_MANAGER_PATCHED_FILE_SHA256
+ARG OFFLOAD_CONNECTOR_CONFIG_PATCHED_FILE_SHA256
+ARG OFFLOAD_CONNECTOR_SCHEDULER_PATCHED_FILE_SHA256
+ARG COMPLETION_PROTOCOL_PATCHED_FILE_SHA256
+ARG COHERE_PROTOCOL_PATCHED_FILE_SHA256
+ARG COHERE_SERVING_PATCHED_FILE_SHA256
+ARG TITOTO_PROTOCOL_PATCHED_FILE_SHA256
+ARG TITOTO_SERVING_PATCHED_FILE_SHA256
+# The verified pristine policy modules are removed, not replaced: the
+# scope-aware manager is the only eviction mode, and a stranded importable
+# copy of the pluggable LRU/ARC layer would be exactly the leftover this
+# stage exists to eliminate. Absence is asserted like any other hash.
+RUN rm /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/cpu/policies/__init__.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/cpu/policies/base.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/cpu/policies/factory.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/cpu/policies/lru.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/cpu/policies/arc.py \
+ && rm -rf /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/cpu/policies/__pycache__ \
+ && rmdir /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/cpu/policies \
+ && test ! -e /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/cpu/policies
 RUN install --directory --mode=0755 /opt/qwen38
 COPY --chmod=0644 \
   vllm/vllm/v1/attention/backends/turboquant_attn.py \
@@ -232,6 +342,66 @@ COPY --chmod=0644 \
 COPY --chmod=0644 \
   vllm/vllm/model_executor/models/qwen3_vl.py \
   /usr/local/lib/python3.12/dist-packages/vllm/model_executor/models/qwen3_vl.py
+COPY --chmod=0644 \
+  vllm/vllm/config/cache.py \
+  /usr/local/lib/python3.12/dist-packages/vllm/config/cache.py
+COPY --chmod=0644 \
+  vllm/vllm/config/vllm.py \
+  /usr/local/lib/python3.12/dist-packages/vllm/config/vllm.py
+COPY --chmod=0644 \
+  vllm/vllm/engine/arg_utils.py \
+  /usr/local/lib/python3.12/dist-packages/vllm/engine/arg_utils.py
+COPY --chmod=0644 \
+  vllm/vllm/entrypoints/llm.py \
+  /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/llm.py
+COPY --chmod=0644 \
+  vllm/vllm/v1/core/kv_cache_utils.py \
+  /usr/local/lib/python3.12/dist-packages/vllm/v1/core/kv_cache_utils.py
+COPY --chmod=0644 \
+  vllm/vllm/v1/worker/gpu_worker.py \
+  /usr/local/lib/python3.12/dist-packages/vllm/v1/worker/gpu_worker.py
+COPY --chmod=0644 \
+  vllm/vllm/v1/worker/startup_plan.py \
+  /usr/local/lib/python3.12/dist-packages/vllm/v1/worker/startup_plan.py
+COPY --chmod=0644 \
+  vllm/vllm/v1/kv_offload/config.py \
+  /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/config.py
+COPY --chmod=0644 \
+  vllm/vllm/v1/kv_offload/base.py \
+  /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/base.py
+COPY --chmod=0644 \
+  vllm/vllm/v1/kv_offload/cpu/spec.py \
+  /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/cpu/spec.py
+COPY --chmod=0644 \
+  vllm/vllm/v1/kv_offload/cpu/manager.py \
+  /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/cpu/manager.py
+COPY --chmod=0644 \
+  vllm/vllm/v1/kv_offload/tiering/spec.py \
+  /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/tiering/spec.py
+COPY --chmod=0644 \
+  vllm/vllm/v1/kv_offload/tiering/manager.py \
+  /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/tiering/manager.py
+COPY --chmod=0644 \
+  vllm/vllm/distributed/kv_transfer/kv_connector/v1/offloading/config.py \
+  /usr/local/lib/python3.12/dist-packages/vllm/distributed/kv_transfer/kv_connector/v1/offloading/config.py
+COPY --chmod=0644 \
+  vllm/vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py \
+  /usr/local/lib/python3.12/dist-packages/vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py
+COPY --chmod=0644 \
+  vllm/vllm/entrypoints/openai/completion/protocol.py \
+  /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/completion/protocol.py
+COPY --chmod=0644 \
+  vllm/vllm/entrypoints/cohere/protocol.py \
+  /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/cohere/protocol.py
+COPY --chmod=0644 \
+  vllm/vllm/entrypoints/cohere/serving.py \
+  /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/cohere/serving.py
+COPY --chmod=0644 \
+  vllm/vllm/entrypoints/scale_out/token_in_token_out/protocol.py \
+  /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/scale_out/token_in_token_out/protocol.py
+COPY --chmod=0644 \
+  vllm/vllm/entrypoints/scale_out/token_in_token_out/serving.py \
+  /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/scale_out/token_in_token_out/serving.py
 COPY --chmod=0644 chat_template.jinja /opt/qwen38/chat_template.jinja
 COPY --chmod=0644 scripts/phase_budget_unit.py /opt/qwen38/phase_budget_unit.py
 COPY --chmod=0644 scripts/vision_workspace_unit.py /opt/qwen38/vision_workspace_unit.py
@@ -250,6 +420,48 @@ RUN printf '%s  %s\n%s  %s\n' \
       /usr/local/lib/python3.12/dist-packages/vllm/model_executor/models/qwen3_vl.py \
       "${VISION_MLP_UNIT_SHA256}" \
       /opt/qwen38/vision_mlp_unit.py \
+    | sha256sum --check --strict
+RUN printf '%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n' \
+      "${CACHE_CONFIG_PATCHED_FILE_SHA256}" \
+        /usr/local/lib/python3.12/dist-packages/vllm/config/cache.py \
+      "${VLLM_CONFIG_PATCHED_FILE_SHA256}" \
+        /usr/local/lib/python3.12/dist-packages/vllm/config/vllm.py \
+      "${ARG_UTILS_PATCHED_FILE_SHA256}" \
+        /usr/local/lib/python3.12/dist-packages/vllm/engine/arg_utils.py \
+      "${LLM_ENTRYPOINT_PATCHED_FILE_SHA256}" \
+        /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/llm.py \
+      "${KV_CACHE_UTILS_PATCHED_FILE_SHA256}" \
+        /usr/local/lib/python3.12/dist-packages/vllm/v1/core/kv_cache_utils.py \
+      "${GPU_WORKER_PATCHED_FILE_SHA256}" \
+        /usr/local/lib/python3.12/dist-packages/vllm/v1/worker/gpu_worker.py \
+      "${STARTUP_PLAN_PATCHED_FILE_SHA256}" \
+        /usr/local/lib/python3.12/dist-packages/vllm/v1/worker/startup_plan.py \
+      "${KV_OFFLOAD_CONFIG_PATCHED_FILE_SHA256}" \
+        /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/config.py \
+      "${KV_OFFLOAD_BASE_PATCHED_FILE_SHA256}" \
+        /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/base.py \
+      "${KV_OFFLOAD_CPU_SPEC_PATCHED_FILE_SHA256}" \
+        /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/cpu/spec.py \
+      "${KV_OFFLOAD_CPU_MANAGER_PATCHED_FILE_SHA256}" \
+        /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/cpu/manager.py \
+      "${KV_TIERING_SPEC_PATCHED_FILE_SHA256}" \
+        /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/tiering/spec.py \
+      "${KV_TIERING_MANAGER_PATCHED_FILE_SHA256}" \
+        /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/tiering/manager.py \
+      "${OFFLOAD_CONNECTOR_CONFIG_PATCHED_FILE_SHA256}" \
+        /usr/local/lib/python3.12/dist-packages/vllm/distributed/kv_transfer/kv_connector/v1/offloading/config.py \
+      "${OFFLOAD_CONNECTOR_SCHEDULER_PATCHED_FILE_SHA256}" \
+        /usr/local/lib/python3.12/dist-packages/vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py \
+      "${COMPLETION_PROTOCOL_PATCHED_FILE_SHA256}" \
+        /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/completion/protocol.py \
+      "${COHERE_PROTOCOL_PATCHED_FILE_SHA256}" \
+        /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/cohere/protocol.py \
+      "${COHERE_SERVING_PATCHED_FILE_SHA256}" \
+        /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/cohere/serving.py \
+      "${TITOTO_PROTOCOL_PATCHED_FILE_SHA256}" \
+        /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/scale_out/token_in_token_out/protocol.py \
+      "${TITOTO_SERVING_PATCHED_FILE_SHA256}" \
+        /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/scale_out/token_in_token_out/serving.py
     | sha256sum --check --strict
 RUN printf '%s  %s\n%s  %s\n%s  %s\n%s  %s\n' \
       "${WORKSPACE_PATCHED_FILE_SHA256}" \
@@ -639,6 +851,73 @@ for rejected_context in (
     else:
         raise AssertionError(f"unsafe template configuration was accepted: {rejected_context}")
 
+# Agent-scope identity must ride every generation surface into the one
+# internal channel the engine reads, the superseded byte/policy knobs must
+# be refusals, and the deleted policy package must be gone from the
+# installed tree — not merely unimported.
+from vllm.entrypoints.openai.completion.protocol import CompletionRequest
+from vllm.entrypoints.openai.responses.protocol import ResponsesRequest
+from vllm.entrypoints.cohere.protocol import CohereChatV2Request
+from vllm.entrypoints.scale_out.token_in_token_out.protocol import GenerateRequest
+from vllm.sampling_params import SamplingParams
+from vllm.engine.arg_utils import EngineArgs
+from vllm.v1.kv_offload.cpu.manager import CPUOffloadingManager
+from vllm.v1.kv_offload.cpu.spec import CPUOffloadingSpec
+
+scoped = ChatCompletionRequest(
+    model="qwen3.8",
+    messages=[{"role": "user", "content": "test"}],
+    max_tokens=8,
+    kv_scope="toolu_scope",
+    kv_scope_release=["toolu_done"],
+)
+scoped_sampling = scoped.to_sampling_params(8, defaults)
+assert scoped_sampling.extra_args["kv_scope"] == "toolu_scope"
+assert scoped_sampling.extra_args["kv_scope_release"] == ["toolu_done"]
+for scoped_request in (
+    CompletionRequest(model="m", prompt="hi", kv_scope="toolu_scope"),
+    ResponsesRequest(model="m", input="hi", kv_scope="toolu_scope"),
+    AnthropicMessagesRequest(
+        model="m",
+        max_tokens=8,
+        messages=[{"role": "user", "content": "hi"}],
+        kv_scope="toolu_scope",
+    ),
+    CohereChatV2Request(
+        model="m",
+        messages=[{"role": "user", "content": "hi"}],
+        kv_scope="toolu_scope",
+    ),
+    GenerateRequest(
+        token_ids=[1], sampling_params=SamplingParams(), kv_scope="toolu_scope"
+    ),
+):
+    assert scoped_request.kv_scope == "toolu_scope"
+    assert scoped_request.kv_scope_release is None
+
+assert hasattr(EngineArgs, "kv_cache_users")
+assert not hasattr(EngineArgs, "kv_cache_memory_bytes")
+assert not hasattr(EngineArgs, "kv_offloading_size")
+assert hasattr(CPUOffloadingManager, "release_scope")
+for rejected_config in (
+    {"cpu_bytes_to_use": 1},
+    {"eviction_policy": "arc"},
+    {"cache_policy_module_path": "x"},
+    {"definitely_unknown_knob": 1},
+):
+    try:
+        CPUOffloadingSpec._validate_extra_config(rejected_config)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError(f"superseded offload knob accepted: {rejected_config}")
+try:
+    import vllm.v1.kv_offload.cpu.policies  # noqa: F401
+except ModuleNotFoundError:
+    pass
+else:
+    raise AssertionError("deleted policies package is still importable")
+
 runpy.run_path("/opt/qwen38/phase_budget_unit.py", run_name="__main__")
 runpy.run_path("/opt/qwen38/vision_workspace_unit.py", run_name="__main__")
 runpy.run_path("/opt/qwen38/vision_contract_unit.py", run_name="__main__")
@@ -661,6 +940,7 @@ LABEL org.opencontainers.image.revision="9df9b0b0a1816b6d0d0f6ecd0da563cc37fd72f
       qwen38.patch.turboquant.file.sha256="59faab97fa3331028ac76dc63732e6eca239d0f7a83b79e18fd30c6d9b92c2df" \
       qwen38.patch.numerical-audits.diff.sha256="${NUMERICAL_AUDITS_PATCH_DIFF_SHA256}" \
       qwen38.patch.kv-offload-pinning.diff.sha256="${KV_OFFLOAD_PINNING_PATCH_DIFF_SHA256}" \
+      qwen38.patch.kv-users-scope.diff.sha256="${KV_USERS_SCOPE_PATCH_DIFF_SHA256}" \
       qwen38.patch.workspace.file.sha256="b859dfdc5676f90a0b00718e34adcd0a02d266be1543ca146eebb724a9235c00" \
       qwen38.patch.gpu-model-runner.file.sha256="a7bed200b304fdc17320a30178ded7669d4677e787947470b872ef0ec14b6c8b" \
       qwen38.patch.api-utils.file.sha256="5c6fbd5ff02c042d6f96bfbe7f4d784f97dbfa8029bc09e059c66c16a807f74b" \

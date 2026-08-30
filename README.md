@@ -34,7 +34,7 @@ The deployment is complete and healthy. There is one supported mode:
 | Final-answer ceiling | 131,072 generated final tokens, subject to remaining context |
 | MTP/speculation | Disabled |
 | CPU weight offload | Zero |
-| KV offload | 7,747,584,000-byte (7.75 GB) pinned host tier, ARC eviction |
+| KV offload | One declared resident user context, pinned host tier in /dev/shm; scope-aware eviction |
 | Batching | One sequence; 2,048-token chunked prefill |
 | Listener | 127.0.0.1:8000 only |
 | Agent client | Qwen Code 0.21.12 at b965d5f8c24f48e65fb0b17c7d45f34ca4ce8f38 |
@@ -312,10 +312,10 @@ restore, and build verification. The exact server argument semantics are:
     --max-model-len 262144
     --max-num-seqs 1
     --max-num-batched-tokens 2048
-    --kv-cache-memory 6925634765
+    --kv-cache-users 1
     --cpu-offload-gb 0
     --kv-transfer-config '{"kv_connector":"OffloadingConnector","kv_role":"kv_both",
-      "kv_connector_extra_config":{"cpu_bytes_to_use":7747584000,"eviction_policy":"arc"}}'
+      "kv_connector_extra_config":{"cpu_kv_cache_users":1}}'
     --enable-prefix-caching
     --enable-chunked-prefill
     --attention-config.flash_attn_version=2
@@ -362,8 +362,11 @@ Consequences:
   TurboQuant path. FlashInfer autotuning is explicitly off so probe-OOM-and-fallback
   behavior cannot be mistaken for normal startup.
 - CPU weight offload is exactly zero. KV offload is not: the OffloadingConnector runs
-  in kv_both role with a 7,747,584,000-byte (7.75 GB) pinned host tier in /dev/shm
-  under ARC eviction, and that tier is live and serving hits.
+  in kv_both role with a pinned host tier in /dev/shm sized as one declared resident
+  user context (bytes derived in-engine from max_model_len and the KV cache spec).
+  Eviction is scope-aware: a request's kv_scope_release drops a terminated
+  subagent's blocks as a unit, and the live set ages by recency. That tier is live
+  and serving hits.
 - Multimodal profiling is mandatory and cannot be skipped to obtain a deceptively
   optimistic allocation.
 - All unquantized model computation, including the entire vision tower, uses BF16.

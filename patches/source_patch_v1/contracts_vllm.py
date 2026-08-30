@@ -1013,6 +1013,172 @@ def _validate_kv_pin_after(state: State) -> None:
     )
 
 
+def _validate_kv_users_before(state: State) -> None:
+    label = "KV user-count sizing precondition"
+    spec = "vllm/v1/kv_offload/cpu/spec.py"
+    manager = "vllm/v1/kv_offload/cpu/manager.py"
+    cache = "vllm/config/cache.py"
+    # The byte-denominated and policy-selecting world this stage replaces.
+    require_text(
+        state,
+        spec,
+        'cpu_bytes_to_use must be specified in kv_connector_extra_config',
+        label=label,
+    )
+    require_text(
+        state, spec, 'self.extra_config.get("eviction_policy", "lru")', label=label
+    )
+    require_text(state, manager, "CachePolicyFactory", count=3, label=label)
+    require_text(state, cache, "kv_offloading_size: float | None = None", label=label)
+    require_text(
+        state, "vllm/v1/kv_offload/cpu/policies/factory.py", '"arc"', label=label
+    )
+    for path in (
+        "vllm/entrypoints/openai/chat_completion/protocol.py",
+        "vllm/entrypoints/openai/completion/protocol.py",
+        "vllm/entrypoints/openai/responses/protocol.py",
+        "vllm/entrypoints/anthropic/protocol.py",
+        "vllm/entrypoints/cohere/protocol.py",
+        "vllm/entrypoints/scale_out/token_in_token_out/protocol.py",
+    ):
+        forbid_text(state, path, "kv_scope", label=label)
+
+
+def _validate_kv_users_after(state: State) -> None:
+    label = "KV user-count sizing result"
+    spec = "vllm/v1/kv_offload/cpu/spec.py"
+    manager = "vllm/v1/kv_offload/cpu/manager.py"
+    cache = "vllm/config/cache.py"
+    kv_utils = "vllm/v1/core/kv_cache_utils.py"
+
+    # One mode: the pluggable eviction layer is gone, not stranded. The
+    # deleted policies package must be absent from the final tree and
+    # unreferenced anywhere the stage can see.
+    for path in (
+        "vllm/v1/kv_offload/cpu/policies/__init__.py",
+        "vllm/v1/kv_offload/cpu/policies/base.py",
+        "vllm/v1/kv_offload/cpu/policies/factory.py",
+        "vllm/v1/kv_offload/cpu/policies/lru.py",
+        "vllm/v1/kv_offload/cpu/policies/arc.py",
+        "tests/v1/kv_offload/cpu/policies/__init__.py",
+        "tests/v1/kv_offload/cpu/policies/test_factory.py",
+    ):
+        _require(
+            path not in state,
+            f"{label}: superseded policy module survived deletion: {path}",
+        )
+    forbid_text(state, manager, "CachePolicyFactory", label=label)
+    # The superseded knobs survive in the spec only as named entries of its
+    # rejection list — never as read configuration.
+    forbid_text(state, spec, "self.eviction_policy", label=label)
+    forbid_text(state, spec, "self.cache_policy_module_path", label=label)
+    require_text(state, spec, '"eviction_policy",', label=label)
+    require_text(state, spec, '"cache_policy_module_path",', label=label)
+
+    # Fail-closed acceptance surface: superseded keys are named rejections,
+    # the user count is required, and the count drives the chunk math.
+    require_text(state, spec, '"cpu_bytes_to_use",', label=label)
+    require_text(
+        state,
+        spec,
+        "cpu_kv_cache_users must be specified",
+        label=label,
+    )
+    require_text(state, spec, "Unknown kv_connector_extra_config keys", label=label)
+    require_text(
+        state, spec, "self.num_blocks = cpu_kv_cache_users * chunks_per_user",
+        label=label,
+    )
+    require_python_symbols(
+        state,
+        manager,
+        {
+            "CPUOffloadingManager.__init__": [
+                "self",
+                "num_blocks",
+                "enable_events",
+                "store_threshold",
+                "max_tracker_size",
+            ],
+            "CPUOffloadingManager.release_scope": ["self", "scope"],
+        },
+        label=label,
+    )
+    require_text(state, manager, "self._dead_pending", count=8, label=label)
+
+    # GPU tier: the byte flag is gone, the count is required, and the pool
+    # is derived rather than filled to whatever memory happened to be free.
+    require_text(state, cache, "kv_cache_users: int | None = None", label=label)
+    forbid_text(state, cache, "kv_offloading_size", label=label)
+    require_text(
+        state,
+        "vllm/engine/arg_utils.py",
+        '"--kv-cache-users", **cache_kwargs["kv_cache_users"]',
+        label=label,
+    )
+    forbid_text(state, "vllm/engine/arg_utils.py", "kv-cache-memory-bytes", label=label)
+    forbid_text(state, "vllm/engine/arg_utils.py", "kv_offloading_size", label=label)
+    require_text(
+        state, kv_utils, "needed_blocks = users * per_user_blocks + 1", label=label
+    )
+    require_text(
+        state, kv_utils, "--kv-cache-users was not", label=label
+    )
+    require_text(
+        state,
+        kv_utils,
+        "num_gpu_blocks_override cannot be combined",
+        label=label,
+    )
+    forbid_text(state, "vllm/config/vllm.py", "cpu_bytes_to_use", label=label)
+
+    # Identity on every generation surface, none privileged, one internal
+    # channel. The scheduler applies releases before registration.
+    for path in (
+        "vllm/entrypoints/openai/chat_completion/protocol.py",
+        "vllm/entrypoints/openai/completion/protocol.py",
+        "vllm/entrypoints/openai/responses/protocol.py",
+        "vllm/entrypoints/anthropic/protocol.py",
+        "vllm/entrypoints/cohere/protocol.py",
+        "vllm/entrypoints/scale_out/token_in_token_out/protocol.py",
+    ):
+        require_text(state, path, "kv_scope: str | None = Field(", label=label)
+        require_text(
+            state, path, "kv_scope_release: list[str] | None = Field(", label=label
+        )
+    scheduler = "vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py"
+    require_text(
+        state,
+        scheduler,
+        "for scope in request.kv_scope_release or ():",
+        label=label,
+    )
+    require_text(
+        state, scheduler, "self.manager.release_scope(scope)", label=label
+    )
+    require_text(
+        state, "vllm/v1/request.py",
+        'self.kv_scope = sampling_params.extra_args.get("kv_scope")',
+        label=label,
+    )
+    require_text(
+        state,
+        "vllm/v1/kv_offload/base.py",
+        "kv_scope: str | None = None",
+        label=label,
+    )
+    # The window classification is derived once at the offloading boundary.
+    require_text(
+        state,
+        "vllm/distributed/kv_transfer/kv_connector/v1/offloading/config.py",
+        "def get_sliding_window_size_in_chunks(",
+        label=label,
+    )
+    forbid_text(
+        state, scheduler, "def get_sliding_window_size_in_chunks(", label=label
+    )
+
+
 def validate_final(state: State) -> None:
     """Reassert every durable semantic invariant on the complete tree."""
     for name in (
@@ -1027,6 +1193,7 @@ def validate_final(state: State) -> None:
         "qwen38-numerical-audits",
         "turboquant-fail-closed-guards",
         "kv-offload-host-pinning-fail-closed",
+        "kv-user-count-sizing-and-scope-eviction",
     ):
         CONTRACTS[name].validate_after(state)
 
@@ -1207,5 +1374,31 @@ CONTRACTS: Mapping[str, SemanticContract] = {
         ),
         validate_before=_validate_kv_pin_before,
         validate_after=_validate_kv_pin_after,
+    ),
+    "kv-user-count-sizing-and-scope-eviction": SemanticContract(
+        rationale=(
+            "Both KV tiers were sized in raw bytes measured on one machine "
+            "(--kv-cache-memory, cpu_bytes_to_use), and eviction was pure "
+            "recency (ARC) chosen to approximate the one fact recency cannot "
+            "see: a finished subagent's context is dead while being the most "
+            "recently used thing in the cache. Capacity is now declared as "
+            "counts of resident full-length user contexts on both tiers and "
+            "the bytes are derived post-engine-init from the KV cache spec; "
+            "agent identity (kv_scope, the harness's parent_tool_use_id) "
+            "rides every generation protocol beside cache_salt, and a "
+            "request's kv_scope_release drops a terminated scope's offloaded "
+            "blocks as a unit before the releasing request looks anything "
+            "up. The byte and policy knobs are refusals, not fallbacks, and "
+            "the pluggable policy package is deleted."
+        ),
+        removal_condition=(
+            "Remove only when pinned upstream sizes both KV tiers from "
+            "declared user-context counts, carries a per-request cache scope "
+            "on every generation protocol, and releases a terminated "
+            "scope's offloaded blocks as a unit with equivalent fail-closed "
+            "configuration handling."
+        ),
+        validate_before=_validate_kv_users_before,
+        validate_after=_validate_kv_users_after,
     ),
 }
