@@ -63,7 +63,16 @@ readonly NUMERICAL_AUDITS_PATCH_DIFF_SHA256="a73aa2f2ae3f82010eb2bafcdf663c2fe14
 readonly TURBOQUANT_GUARDS_PATCH_DIFF_SHA256="0ecf95ab8ee25a76d5412ce44aafafe13992b2cb373d6010acf5bc119dc8f47b"
 readonly KV_OFFLOAD_PINNING_PATCH_DIFF_SHA256="1857071c38d081bb95e3cca12153cebce096649084950b99229104fdae029ca6"
 readonly KV_USERS_SCOPE_PATCH_DIFF_SHA256="e9905e065913ba338da6ec1d61d2f350f48ac30eaa22de05dd491d2767521e66"
-readonly SOURCE_PATCH_MANIFEST_SHA256="7d975b00045e7f07fa50fdb35e591c35a43c9b38de74df0871ae56d90d5aca19"
+readonly SOURCE_PATCH_MANIFEST_SHA256="36fe80436b129714dfab7afdb9445beabae4b77f58f4c7b8002f745b303ffd73"
+# Cardinality of config/deployment-inputs.sha256. The hash manifest alone
+# proves the listed bytes but cannot see a quietly grown or shrunk allowlist,
+# so the reviewed file count is pinned as well. It is declared exactly once,
+# here: this value used to live independently in the generator and in the
+# runtime validator, and the two copies drifted the first time a build input
+# was added — the validator then refused a correct manifest. Every consumer
+# (build-vllm.sh, runtime-common.sh, generate-deployment-input-manifest.sh)
+# reads this declaration.
+readonly DEPLOYMENT_INPUT_FILE_COUNT="71"
 readonly TURBOQUANT_PATCHED_FILE_SHA256="ccda36577e4fb0052f370169dce4b649bad890b8b440a82e584acd3dd92a6d86"
 readonly TOOL_SCHEMA_PATCHED_FILE_SHA256="e88b5cd98ace7c76453552f5f08264e0be23d1a5bc9b9d15cc0f39ba75ec043e"
 readonly MODEL_CONFIG_PATCHED_FILE_SHA256="6a0b5fdcb292fef440ee59321b7db437dae2cd5fd80eb2372fa3647fb163a3cf"

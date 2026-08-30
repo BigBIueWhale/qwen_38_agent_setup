@@ -4,7 +4,8 @@ set -Eeuo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
 readonly PROJECT_DIR
-readonly EXPECTED_INPUT_COUNT="71"
+# shellcheck source=../config/runtime-v1.sh
+source "${PROJECT_DIR}/config/runtime-v1.sh"
 
 if (($# != 0)); then
   printf 'ERROR: no arguments are supported. Usage: ./scripts/generate-deployment-input-manifest.sh\n' >&2
@@ -74,9 +75,9 @@ done < <(
     stop.sh | LC_ALL=C sort -z
 )
 
-[[ "${count}" == "${EXPECTED_INPUT_COUNT}" ]] || {
+[[ "${count}" == "${DEPLOYMENT_INPUT_FILE_COUNT}" ]] || {
   printf 'ERROR: deployment-input allowlist contains %s files; expected exactly %s\n' \
-    "${count}" "${EXPECTED_INPUT_COUNT}" >&2
+    "${count}" "${DEPLOYMENT_INPUT_FILE_COUNT}" >&2
   exit 1
 }
 for required in \

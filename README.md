@@ -73,7 +73,7 @@ error.
   and relay readiness events, then validates the complete live configuration before
   reporting success. Re-running it validates the existing owned topology rather than
   starting a duplicate.
-- status.sh validates host prerequisites, eleven ordered vLLM transformations, every reviewed
+- status.sh validates host prerequisites, twelve ordered vLLM transformations, every reviewed
   source and test file, the model manifest, image archive, image identity and labels,
   command and environment, mounts, runtime packages, API identity, listener,
   hardening, and live health. HEALTHY means all checks passed.
@@ -93,7 +93,7 @@ Advanced reproducibility operations are deliberately separate from serving mode:
     ./scripts/build-vllm.sh build
     ./scripts/restore-images.sh
 
-The check reconstructs the source tree from the pinned upstream commit through all eleven
+The check reconstructs the source tree from the pinned upstream commit through all twelve
 landmark-aware transformations. The build runs offline from the exact base image and fails unless it produces
 the pinned image ID. Restore verifies the pinned local archive before loading it.
 
@@ -234,7 +234,7 @@ The vLLM submodule is pinned at:
 
     9df9b0b0a1816b6d0d0f6ecd0da563cc37fd72f5
 
-It is intentionally reconstructed by eleven ordered, reviewed semantic transformations:
+It is intentionally reconstructed by twelve ordered, reviewed semantic transformations:
 
 | Patch | SHA-256 |
 |---|---|
@@ -249,12 +249,16 @@ It is intentionally reconstructed by eleven ordered, reviewed semantic transform
 | patches/vllm-qwen38-numerical-audits.patch | a73aa2f2ae3f82010eb2bafcdf663c2fe14854c30165dbc4d8457725bc3b6632 |
 | patches/vllm-turboquant-fail-closed-guards.patch | 0ecf95ab8ee25a76d5412ce44aafafe13992b2cb373d6010acf5bc119dc8f47b |
 | patches/vllm-kv-offload-pinning-fail-closed.patch | 1857071c38d081bb95e3cca12153cebce096649084950b99229104fdae029ca6 |
+| patches/vllm-kv-user-count-sizing-and-scope-eviction.patch | e9905e065913ba338da6ec1d61d2f350f48ac30eaa22de05dd491d2767521e66 |
 
-The reconstructed tree has exactly thirty-two reviewed runtime-source changes,
-seven reviewed existing-test changes, and one reviewed new workspace test. The
-landmark-aware Python patcher calculates every mutation before writing, validates
-unique structural landmarks and complete pre/post hashes, performs atomic
-transactions with rollback, and is itself covered by seven failure-path tests. The
+The reconstructed tree has exactly fifty-two reviewed runtime-source changes, five
+reviewed runtime-source deletions, twenty-nine reviewed existing-test changes,
+three reviewed new tests, and two reviewed test deletions — the authoritative
+counts are derived and printed by ./scripts/build-vllm.sh check, never restated
+by hand there. The landmark-aware Python patcher calculates every mutation
+(including file deletions) before writing, validates unique structural landmarks
+and complete pre/post hashes, performs atomic transactions with rollback, and is
+itself covered by thirteen failure-path tests. The
 unified diffs remain review artifacts, but they do not select mutation locations.
 The build check rejects an extra dirty file, ambiguous landmark, missing hunk, wrong
 stage, changed final hash, whitespace error, partial intermediate state, concurrent

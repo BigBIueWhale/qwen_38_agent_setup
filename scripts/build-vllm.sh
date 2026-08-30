@@ -120,8 +120,9 @@ if [[ ! -f "${DEPLOYMENT_INPUT_MANIFEST}" || -L "${DEPLOYMENT_INPUT_MANIFEST}" ]
   echo "Deployment-input manifest is missing or is not a regular non-symlink file." >&2
   exit 1
 fi
-if [[ "$(wc -l <"${DEPLOYMENT_INPUT_MANIFEST}")" != "71" ]]; then
-  echo "Deployment-input manifest must contain exactly 71 hashed files." >&2
+if [[ "$(wc -l <"${DEPLOYMENT_INPUT_MANIFEST}")" != "${DEPLOYMENT_INPUT_FILE_COUNT}" ]]; then
+  echo "Deployment-input manifest must contain exactly" \
+    "${DEPLOYMENT_INPUT_FILE_COUNT} hashed files." >&2
   exit 1
 fi
 (
@@ -154,7 +155,7 @@ if [[ "${actual_status}" != "${EXPECTED_STATUS}" ]]; then
   exit 1
 fi
 
-printf '%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n' \
+printf '%s  %s\n' \
   "${TURBOQUANT_PATCH_DIFF_SHA256}" "${TURBOQUANT_PATCH_FILE}" \
   "${TOOL_SCHEMA_PATCH_DIFF_SHA256}" "${TOOL_SCHEMA_PATCH_FILE}" \
   "${AGENT_DEFAULTS_PATCH_DIFF_SHA256}" "${AGENT_DEFAULTS_PATCH_FILE}" \
@@ -257,7 +258,7 @@ done <<<"${EXPECTED_STATUS}"
 remove_verify_worktree
 trap - EXIT
 
-printf '%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n' \
+printf '%s  %s\n' \
   "${TURBOQUANT_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${TURBOQUANT_REL}" \
   "${TOOL_SCHEMA_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${TOOL_SCHEMA_REL}" \
   "${MODEL_CONFIG_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${MODEL_CONFIG_REL}" \
@@ -283,7 +284,7 @@ printf '%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n
   "${PHASE_BUDGET_UNIT_SHA256}" "${PHASE_BUDGET_UNIT_FILE}" | \
   sha256sum --check --strict
 
-printf '%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n' \
+printf '%s  %s\n' \
   "${WORKSPACE_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${WORKSPACE_REL}" \
   "${GPU_MODEL_RUNNER_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${GPU_MODEL_RUNNER_REL}" \
   "${API_UTILS_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${API_UTILS_REL}" \
@@ -298,7 +299,7 @@ printf '%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n
   "${VISION_MLP_UNIT_SHA256}" "${VISION_MLP_UNIT_FILE}" | \
   sha256sum --check --strict
 
-printf '%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n' \
+printf '%s  %s\n' \
   "${CACHE_CONFIG_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${CACHE_CONFIG_REL}" \
   "${VLLM_CONFIG_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${VLLM_CONFIG_REL}" \
   "${ARG_UTILS_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${ARG_UTILS_REL}" \
@@ -321,12 +322,12 @@ printf '%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n
   "${TITOTO_SERVING_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${TITOTO_SERVING_REL}"  | \
   sha256sum --check --strict
 
-printf '%s  %s\n%s  %s\n' \
+printf '%s  %s\n' \
   "${RUNTIME_DOCKERFILE_SHA256}" "${DOCKERFILE}" \
   "${DOCKERIGNORE_SHA256}" "${DOCKERIGNORE}" | \
   sha256sum --check --strict
 
-printf '%s  %s\n%s  %s\n%s  %s\n' \
+printf '%s  %s\n' \
   "${TURBOQUANT_K8V4_UNIT_SHA256}" "${TURBOQUANT_K8V4_UNIT_FILE}" \
   "${QWEN38_CONTEXT_UNIT_SHA256}" "${QWEN38_CONTEXT_UNIT_FILE}" \
   "${NVFP4_KERNEL_UNIT_SHA256}" "${NVFP4_KERNEL_UNIT_FILE}" | \
@@ -335,7 +336,25 @@ printf '%s  %s\n%s  %s\n%s  %s\n' \
 git -C "${VLLM_DIR}" diff --check
 
 if [[ "${MODE}" == "check" ]]; then
-  echo "Pinned base image, vLLM commit, transactional landmark patcher, fifty reviewed runtime source files, five reviewed source deletions, twenty-nine reviewed modified test files, three reviewed new test files, two reviewed test deletions, twelve review diffs, agent template, three numerical audit units, and all build units are exact."
+  # Every count below is derived from the objects this run just verified —
+  # EXPECTED_STATUS and the deployment-input manifest — never restated by
+  # hand: a hand count here is one more copy that can drift from the thing
+  # it describes.
+  modified_runtime_count="$(grep -c '^ M vllm/' <<<"${EXPECTED_STATUS}" || :)"
+  deleted_runtime_count="$(grep -c '^ D vllm/' <<<"${EXPECTED_STATUS}" || :)"
+  modified_test_count="$(grep -c '^ M tests/' <<<"${EXPECTED_STATUS}" || :)"
+  new_test_count="$(grep -c '^?? tests/' <<<"${EXPECTED_STATUS}" || :)"
+  deleted_test_count="$(grep -c '^ D tests/' <<<"${EXPECTED_STATUS}" || :)"
+  review_diff_count="$(grep -c '^[0-9a-f]\{64\}  patches/vllm-.*\.patch$' \
+    "${DEPLOYMENT_INPUT_MANIFEST}" || :)"
+  echo "Pinned base image, vLLM commit, transactional landmark patcher," \
+    "${modified_runtime_count} reviewed modified runtime source files," \
+    "${deleted_runtime_count} reviewed runtime source deletions," \
+    "${modified_test_count} reviewed modified test files," \
+    "${new_test_count} reviewed new test files," \
+    "${deleted_test_count} reviewed test deletions," \
+    "${review_diff_count} review diffs, agent template, numerical audit" \
+    "units, and all build units are exact."
   exit 0
 fi
 
@@ -497,7 +516,7 @@ actual_installed_report="$(
     /opt/qwen38/chat_template.jinja \
     /opt/qwen38/phase_budget_unit.py
 )"
-expected_installed_report="$(printf '%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s' \
+expected_installed_report="$(printf '%s  %s\n' \
   "${TURBOQUANT_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/attention/backends/turboquant_attn.py \
   "${TOOL_SCHEMA_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/tool_parsers/structural_tag_registry.py \
   "${MODEL_CONFIG_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/config/model.py \
@@ -548,7 +567,7 @@ additional_installed_report="$(
     /opt/qwen38/qwen38_context_unit.py \
     /opt/qwen38/nvfp4_kernel_unit.py
 )"
-expected_additional_installed_report="$(printf '%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s' \
+expected_additional_installed_report="$(printf '%s  %s\n' \
   "${WORKSPACE_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/worker/workspace.py \
   "${GPU_MODEL_RUNNER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/worker/gpu_model_runner.py \
   "${API_UTILS_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/serve/utils/api_utils.py \
@@ -596,7 +615,7 @@ kv_users_installed_report="$(
     /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/scale_out/token_in_token_out/protocol.py \
     /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/scale_out/token_in_token_out/serving.py
 )"
-expected_kv_users_installed_report="$(printf '%s  %s\\n%s  %s\\n%s  %s\\n%s  %s\\n%s  %s\\n%s  %s\\n%s  %s\\n%s  %s\\n%s  %s\\n%s  %s\\n%s  %s\\n%s  %s\\n%s  %s\\n%s  %s\\n%s  %s\\n%s  %s\\n%s  %s\\n%s  %s\\n%s  %s\\n%s  %s' \
+expected_kv_users_installed_report="$(printf '%s  %s\n' \
   "${CACHE_CONFIG_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/config/cache.py \
   "${VLLM_CONFIG_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/config/vllm.py \
   "${ARG_UTILS_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/engine/arg_utils.py \

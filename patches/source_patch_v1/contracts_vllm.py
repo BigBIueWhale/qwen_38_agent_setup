@@ -1180,22 +1180,17 @@ def _validate_kv_users_after(state: State) -> None:
 
 
 def validate_final(state: State) -> None:
-    """Reassert every durable semantic invariant on the complete tree."""
-    for name in (
-        "turboquant-k8v4-direct-workspace",
-        "enforce-auto-tool-schema",
-        "qwen38-agent-defaults-and-thinking",
-        "qwen38-separate-final-response-budget",
-        "qwen-implicit-tool-grammar-boundary",
-        "anthropic-validation-http400",
-        "tool-truncation-finish-reason",
-        "qwen38-vision-runtime",
-        "qwen38-numerical-audits",
-        "turboquant-fail-closed-guards",
-        "kv-offload-host-pinning-fail-closed",
-        "kv-user-count-sizing-and-scope-eviction",
-    ):
-        CONTRACTS[name].validate_after(state)
+    """Reassert every durable semantic invariant on the complete tree.
+
+    Iterates the registry itself rather than a restated name list: a
+    hand-list here was a second copy of the stage set, and a contract
+    missing from it would have had its final validation silently skipped —
+    drift with no failure. build_patchset separately requires the generated
+    stages and this registry to name identical sets, so registry iteration
+    is complete by construction.
+    """
+    for contract in CONTRACTS.values():
+        contract.validate_after(state)
 
 
 CONTRACTS: Mapping[str, SemanticContract] = {
