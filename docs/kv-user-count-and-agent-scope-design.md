@@ -52,19 +52,23 @@ Bytes are derived inside vLLM at the point where the KV cache spec exists.
   constant is `1 * blocks_per_user + 1` in disguise. The new flag makes
   that identity the contract instead of an accident.
 
-  `gpu_memory_utilization` keeps exactly one role: the hardware budget
-  vLLM may claim — and within it the declaration is authoritative,
-  exactly as the byte flag was. Profiling's conservative availability
-  estimate (which charges reclaimable allocator reservations and engine
-  headroom as spent, and preferred ~1.3 GiB less than the proven
-  production pool) is informational only; it can neither shrink nor veto
-  the declared pool. What refuses a declaration is the physical bound:
-  weights + the measured transient activation peak + the declared pool
-  (+ frontend reservations, + the CUDA-graph charge when opted in) must
-  fit within total x utilization, or startup fails with the per-user
-  byte cost in the message. "The estimate would prefer less" proceeds;
-  "this card physically cannot hold N contexts" refuses. Capacity is
-  never silently clamped to "what fits".
+  The declaration is authoritative, exactly as the byte flag was.
+  Profiling's conservative availability estimate (the utilization budget
+  minus every observed resident; it preferred ~1.3 GiB less than the
+  proven production pool) is informational only; it can neither shrink
+  nor veto the declared pool. What refuses a declaration is physical
+  capacity: the whole card minus every measured resident — weights,
+  non-torch allocations, the transient activation peak that recurs each
+  forward pass, frontend reservations, and the CUDA-graph charge when
+  opted in. The utilization factor is deliberately not charged against
+  the pool: its holdback is a discretionary reserve the superseded byte
+  flag also ignored, and the pinned production footprint (29.6 GiB of a
+  31.8 GiB card) sits beyond the 0.9 budget while fitting the card with
+  slack. `gpu_memory_utilization` keeps its real jobs — the startup
+  free-memory requirement and the estimate's budget. "The estimate would
+  prefer less" proceeds; "the card physically cannot hold N contexts"
+  refuses with the per-user byte cost in the message. Capacity is never
+  silently clamped to "what fits".
 
 - Host RAM: `kv_connector_extra_config.cpu_kv_cache_users: N` (required by
   `CPUOffloadingSpec`, inherited by `TieringOffloadingSpec`). Derivation in

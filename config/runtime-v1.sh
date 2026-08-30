@@ -6,7 +6,7 @@ readonly IMAGE_PROFILE_VERSION="socket-isolated-nonroot-vision-k8v4-agent-v16"
 readonly CONTAINER_NAME="qwen38-agent-native"
 readonly CONTAINER_LABEL="Qwen_best_model_ever"
 readonly IMAGE_TAG="qwen38-vllm:qwen38-27b-nvfp4-k8v4-runtime-v16"
-readonly EXPECTED_IMAGE_ID="sha256:ff4028cdc9256fbbf6f1a16f6512e87fa38608a458531c5c7712b9d3f1b589d4"
+readonly EXPECTED_IMAGE_ID="sha256:6752f7305dd63e143e40baeeb44cd78c3ec2d18db79dcb1c3a27cafb5f839dda"
 readonly RELAY_IMAGE_TAG="qwen38-fixed-relay:1.0.0"
 readonly EXPECTED_RELAY_IMAGE_ID="sha256:5153a46bc03fa920b0d09000eca1848af255010bda99cc50e8a6110ebcd02690"
 readonly RELAY_SOURCE_SHA256="051dc82af7b9b12e229f9a127183d051ef47a6d44f03d99346762e84bd69c815"
@@ -21,7 +21,7 @@ readonly RELAY_PIDS_LIMIT="32"
 readonly BASE_IMAGE_TAG="qwen38-vllm:main-9df9b0b"
 readonly EXPECTED_BASE_IMAGE_ID="sha256:fa4a002a88b7043a1a89966dea8a500fe9696f84e75730d9da916f916048d401"
 readonly IMAGE_ARCHIVE_NAME="qwen38-vllm-images-runtime-v16.tar"
-readonly IMAGE_ARCHIVE_SHA256="503ad5c490c9898f4b77317817ea8757d6adce2b1e977a95f8438c401274e4c1"
+readonly IMAGE_ARCHIVE_SHA256="5110f0862ffeb1515bb38ea01a181aecb4aafecf64abbaf54024824661a2e8a9"
 
 readonly MODEL_DIR_NAME="Qwen3.8-27B-NVFP4-Corrected"
 readonly MODEL_REPOSITORY="unsloth/Qwen3.8-27B-NVFP4"
@@ -62,8 +62,8 @@ readonly VISION_RUNTIME_PATCH_DIFF_SHA256="f92603724861da5b5a364f43e57d3f95ef43a
 readonly NUMERICAL_AUDITS_PATCH_DIFF_SHA256="a73aa2f2ae3f82010eb2bafcdf663c2fe14854c30165dbc4d8457725bc3b6632"
 readonly TURBOQUANT_GUARDS_PATCH_DIFF_SHA256="0ecf95ab8ee25a76d5412ce44aafafe13992b2cb373d6010acf5bc119dc8f47b"
 readonly KV_OFFLOAD_PINNING_PATCH_DIFF_SHA256="1857071c38d081bb95e3cca12153cebce096649084950b99229104fdae029ca6"
-readonly KV_USERS_SCOPE_PATCH_DIFF_SHA256="2833e7b3b8ef202b70cfe4e1d936467aa6e5144879adcaa00de8661e0295fc3a"
-readonly SOURCE_PATCH_MANIFEST_SHA256="0ae613e53bb23bfa620d2d4231b385b815ad6b4aa12369a67c0c6dda0d3f89ff"
+readonly KV_USERS_SCOPE_PATCH_DIFF_SHA256="4bd42075f3e6734537cd94735ea7bcd457709433a465c175428b9a7fdfc36822"
+readonly SOURCE_PATCH_MANIFEST_SHA256="4102e696eeff1afadc9c3165fd91eab4c3a16545b54d660c023c797f43736481"
 # Cardinality of config/deployment-inputs.sha256. The hash manifest alone
 # proves the listed bytes but cannot see a quietly grown or shrunk allowlist,
 # so the reviewed file count is pinned as well. It is declared exactly once,
@@ -107,8 +107,8 @@ readonly CACHE_CONFIG_PATCHED_FILE_SHA256="82ab839cacb2e30f62f485c9e3ea32440fbf2
 readonly VLLM_CONFIG_PATCHED_FILE_SHA256="30f612691ee2a5a1511484fbcece4bd89ade72c4309e786771826cf12fad38df"
 readonly ARG_UTILS_PATCHED_FILE_SHA256="88582e97c98ffcd16416e48eeea3db415cab1f33673c7ff8c1613fa83aad1eac"
 readonly LLM_ENTRYPOINT_PATCHED_FILE_SHA256="79f9bb1212884746964a347f7e4b39087b5ac084b1d72821a12efd2fb85bcb03"
-readonly KV_CACHE_UTILS_PATCHED_FILE_SHA256="27858bca4844a0ccc087a285c3a75766bb25a12680b52aa63c1ff0805b662834"
-readonly GPU_WORKER_PATCHED_FILE_SHA256="ccb8662d42289b75f94a3d92006b76aeb74333e937fef5742b086916c83d6f5c"
+readonly KV_CACHE_UTILS_PATCHED_FILE_SHA256="1d80e98548d099bfecc5a789a51a176889d2c77411a014faaf94f0075e90d8c9"
+readonly GPU_WORKER_PATCHED_FILE_SHA256="083561f27ca5f0ce4d5c3e133565e13631572947524757035051eb938a067a6e"
 readonly STARTUP_PLAN_PATCHED_FILE_SHA256="2f4f50c34201390e50e10b578bc4cd964a4f5729334225fc30d815bb704aa81f"
 readonly KV_OFFLOAD_CONFIG_PATCHED_FILE_SHA256="36187561239d7fc212f0376b35b110b6507af060c18f0fad9308b2a332c4f7be"
 readonly KV_OFFLOAD_BASE_PATCHED_FILE_SHA256="bbaf124d4360e5627f303a39a972f2f547b2eb9dd5deb6b6ae41d4e1e557b816"
@@ -268,14 +268,17 @@ VLLM_ARGS=(
   # fallback.
   --kv-cache-users 1
   # The declaration is authoritative over the pool size, exactly as the byte
-  # flag it replaced was: profiling's conservative availability estimate may
-  # prefer a smaller pool (it charges reclaimable allocator reservations as
-  # spent, and preferred ~1.3 GiB less than this pool through months of
-  # production) but cannot shrink or veto it. What CAN refuse the
-  # declaration is the physical bound at the default utilization budget:
-  # weights + measured activation peak + the declared pool must fit within
-  # total x 0.9, which the proven 30.7 GiB footprint does on this 32.6 GiB
-  # card. Utilization therefore stays at the vLLM default.
+  # flag it replaced was: profiling's conservative availability estimate
+  # (utilization budget minus every observed resident) may prefer a smaller
+  # pool — it preferred ~1.3 GiB less than this pool through months of
+  # production — but cannot shrink or veto it. What CAN refuse the
+  # declaration is physical capacity: the whole card minus every measured
+  # resident. Here weights 21.3 GiB + activation peak 1.9 GiB + this
+  # 6.4 GiB one-context pool total ~29.6 GiB on the 31.8 GiB card — inside
+  # the card, beyond the 0.9-utilization paper budget, exactly as the
+  # proven byte-flag profile ran. Utilization stays at the vLLM default;
+  # it governs the startup free-memory requirement and the informational
+  # estimate, not the declared pool.
   --cpu-offload-gb 0
   # Host-RAM KV offload. A foreground subagent's context competes for the
   # one-context GPU pool of the session that launched it, so at long main

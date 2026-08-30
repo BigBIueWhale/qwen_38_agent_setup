@@ -2600,7 +2600,41 @@ diff --git a/vllm/envs.py b/vllm/envs.py
 diff --git a/vllm/v1/core/kv_cache_utils.py b/vllm/v1/core/kv_cache_utils.py
 --- a/vllm/v1/core/kv_cache_utils.py
 +++ b/vllm/v1/core/kv_cache_utils.py
-@@ -2001,13 +2001,31 @@
+@@ -736,10 +736,11 @@
+ ):
+     if available_memory <= 0:
+         raise ValueError(
+-            "No available memory for the cache blocks. "
+-            "Try increasing `gpu_memory_utilization` when initializing the engine "
+-            "(this flag also controls CPU memory reservation on the CPU "
+-            "backend, despite its name). "
++            "No memory left for the cache blocks: the measured residents "
++            "(weights, activations, non-torch allocations) already exhaust "
++            "the device. Free device memory held by other processes or use "
++            "a larger device. (On the CPU backend the bound follows "
++            "`gpu_memory_utilization`.) "
+             "See https://docs.vllm.ai/en/latest/configuration/conserving_memory/ "
+             "for more details."
+         )
+@@ -758,11 +759,12 @@
+         raise ValueError(
+             f"To serve at least one request with the model's max seq len "
+             f"({max_model_len}), ({format_gib(needed_memory)} GiB KV "
+-            f"cache is needed, which is larger than the available KV cache "
+-            f"memory ({format_gib(available_memory)} GiB). {estimated_msg}"
+-            f"Try increasing `gpu_memory_utilization` (which also controls "
+-            f"CPU memory on the CPU backend) or decreasing `max_model_len` "
+-            f"when initializing the engine. "
++            f"cache is needed, which is larger than the device's physical "
++            f"KV bound ({format_gib(available_memory)} GiB — total memory "
++            f"minus every measured resident). {estimated_msg}"
++            f"Decrease `max_model_len`, free device memory held by other "
++            f"processes, or use a larger device. (On the CPU backend the "
++            f"bound follows `gpu_memory_utilization`.) "
+             f"See https://docs.vllm.ai/en/latest/configuration/conserving_memory/ "
+             f"for more details."
+         )
+@@ -2001,13 +2003,31 @@
          )
          return
  
@@ -2634,7 +2668,17 @@ diff --git a/vllm/v1/core/kv_cache_utils.py b/vllm/v1/core/kv_cache_utils.py
          if worker_max < auto_fit_max:
              auto_fit_max = worker_max
              limiting_worker_mem = avail_mem
-@@ -2159,27 +2177,32 @@
+@@ -2015,7 +2035,8 @@
+     if auto_fit_max <= 0:
+         raise ValueError(
+             "Cannot auto-fit max_model_len: not enough GPU memory available "
+-            "to serve even a single token. Try increasing `gpu_memory_utilization`."
++            "to serve even a single token: the measured residents already "
++            "exhaust the device's physical KV bound."
+         )
+ 
+     if auto_fit_max >= original_max:
+@@ -2159,27 +2180,32 @@
          for worker_spec in kv_cache_specs
      ]
  
@@ -2688,7 +2732,7 @@ diff --git a/vllm/v1/core/kv_cache_utils.py b/vllm/v1/core/kv_cache_utils.py
  
      if vllm_config.model_config.original_max_model_len == -1:
          _auto_fit_max_model_len(
-@@ -2204,9 +2227,63 @@
+@@ -2204,9 +2230,61 @@
          assert sum(len(group.layer_names) for group in projected_groups) == len(
              kv_cache_spec_one_worker
          ), "Some layers are not assigned to any group."
@@ -2712,15 +2756,15 @@ diff --git a/vllm/v1/core/kv_cache_utils.py b/vllm/v1/core/kv_cache_utils.py
 +        # would revive the machine-specific capacity this flag removes.
 +        #
 +        # The declaration is AUTHORITATIVE against the bound the workers
-+        # report, and that bound is the physical KV budget (total memory
-+        # times gpu_memory_utilization, minus weights, the measured
-+        # transient activation peak, and frontend reservations) — NOT the
-+        # conservative profiling estimate. The distinction is the crux: the
-+        # estimate charges reclaimable allocator reservations and engine
-+        # headroom as if permanently spent, and a declaration a heuristic
-+        # may overrule is not a declaration (the superseded byte flag
-+        # overrode the same estimate, ~1.3 GiB beyond it in months of
-+        # production). "The estimate would prefer less" proceeds; "this
++        # report, and that bound is physical capacity: the whole card minus
++        # every measured resident (weights, non-torch allocations, the
++        # transient activation peak, frontend reservations) — NOT the
++        # conservative profiling estimate, whose additional
++        # (1 - gpu_memory_utilization) holdback is a discretionary paper
++        # reserve. The distinction is the crux: a declaration a heuristic
++        # may overrule is not a declaration, and the superseded byte flag
++        # sat ~1.3 GiB beyond that estimate through months of production on
++        # the pinned card. "The estimate would prefer less" proceeds; "the
 +        # card physically cannot hold N contexts" refuses below.
 +        users = vllm_config.cache_config.kv_cache_users
 +        assert users is not None
@@ -2737,14 +2781,12 @@ diff --git a/vllm/v1/core/kv_cache_utils.py b/vllm/v1/core/kv_cache_utils.py
 +                f"{format_gib(needed_bytes)} GiB of KV cache "
 +                f"({format_gib(per_user_bytes)} GiB per "
 +                f"{vllm_config.model_config.max_model_len}-token context), "
-+                f"but the physical KV budget is only "
-+                f"{format_gib(available_memory_one_worker)} GiB — the "
-+                f"gpu_memory_utilization="
-+                f"{vllm_config.cache_config.gpu_memory_utilization} budget "
-+                f"minus model weights, the measured activation peak, and "
-+                f"frontend reservations. This card cannot hold the declared "
-+                f"contexts: declare fewer users, reduce max_model_len, or "
-+                f"raise the utilization budget."
++                f"but the card's physical KV bound is only "
++                f"{format_gib(available_memory_one_worker)} GiB — total "
++                f"device memory minus every measured resident (weights, "
++                f"non-torch allocations, the activation peak, frontend "
++                f"reservations). This card cannot hold the declared "
++                f"contexts: declare fewer users or reduce max_model_len."
 +            )
          kv_cache_configs.append(
              get_kv_cache_config_from_groups(
@@ -3625,7 +3667,7 @@ diff --git a/vllm/v1/worker/gpu_worker.py b/vllm/v1/worker/gpu_worker.py
              )
              logger.info(msg)
              return reserve_mm_ipc_gpu_memory(
-@@ -542,9 +538,40 @@
+@@ -542,8 +538,44 @@
              "To fix this, ensure consistent GPU memory allocation or "
              "isolate vLLM in its own container."
          )
@@ -3633,58 +3675,65 @@ diff --git a/vllm/v1/worker/gpu_worker.py b/vllm/v1/worker/gpu_worker.py
 +        # the crux of user-count sizing:
 +        #
 +        # 1) The conservative ESTIMATE (available_kv_cache_memory_bytes):
-+        #    requested budget minus everything profiling observed as
-+        #    consumed — weights, non-torch residents (NCCL, allocator cache
-+        #    retained after gc, workspace and vision reservations) — plus
-+        #    the transient activation peak. Informational only. It may
-+        #    prefer a smaller pool than the declaration; that preference
-+        #    must not shrink or veto the declared capacity, because much of
-+        #    what mem_get_info reports as consumed is reclaimable allocator
-+        #    reservation, and the reservations that are not reclaimable
-+        #    already live inside the budget's slack. The superseded
-+        #    --kv-cache-memory profile proved this in production: its pool
-+        #    exceeded this estimate by ~1.3 GiB on the pinned card and
-+        #    served for months.
++        #    the gpu_memory_utilization budget minus every resident
++        #    profiling observed (weights, non-torch allocations, retained
++        #    allocator reservations, the transient activation peak).
++        #    Informational only. It may prefer a smaller pool than the
++        #    declaration; that preference must not shrink or veto the
++        #    declared capacity. What separates it from the bound below is
++        #    exactly the (1 - utilization) holdback — a discretionary paper
++        #    reserve, not memory anything uses.
 +        #
-+        # 2) The AUTHORITATIVE physical bound (returned): the declared pool
-+        #    plus the truly irreducible residents must fit the utilization
-+        #    budget — weights are permanent bytes, the measured transient
-+        #    activation peak recurs on every forward pass, and the opted-in
-+        #    CUDA-graph charge is permanent once captured. A declaration
-+        #    that violates THIS bound cannot be served by the card and is
++        # 2) The AUTHORITATIVE physical bound (returned): the whole card
++        #    minus every measured resident — weights, non-torch consumers,
++        #    the transient activation peak that recurs on every forward
++        #    pass, and the opted-in CUDA-graph charge. A declaration beyond
++        #    THIS bound is memory the card genuinely cannot provide and is
 +        #    refused loudly at engine initialization; one that merely
 +        #    exceeds the estimate proceeds.
++        #
++        # The utilization factor is deliberately NOT charged against the
++        # declared pool. The superseded --kv-cache-memory byte flag ignored
++        # it outright, and the pinned production profile depended on that:
++        # on the 31.8 GiB card, weights 21.3 GiB + activation peak 1.9 GiB
++        # + the 6.4 GiB one-context pool total 29.6 GiB — comfortably
++        # inside the card, yet beyond the 28.9 GiB 0.9-utilization budget
++        # that served it for months. Charging the holdback would veto a
++        # configuration the card demonstrably holds; utilization keeps its
++        # real jobs (the startup free-memory requirement and the estimate's
++        # budget) and loses only the power to overrule the declaration.
          self.available_kv_cache_memory_bytes = (
              self.requested_memory
-             - profile_result.non_kv_cache_memory
++            - profile_result.non_kv_cache_memory
 +            - cudagraph_memory_estimate_applied
 +        )
 +        kv_physical_bound = (
-+            self.requested_memory
-+            - profile_result.weights_memory
-+            - profile_result.transient_peak_headroom
++            self.init_snapshot.total_memory
+             - profile_result.non_kv_cache_memory
              - cudagraph_memory_estimate_applied
          )
- 
-@@ -562,8 +589,16 @@
+@@ -562,8 +594,19 @@
          )
          logger.debug(profile_result)
          logger.info_once(
 -            "Available KV cache memory: %s GiB",
-+            "Available KV cache memory: %s GiB (conservative estimate); "
-+            "physical KV budget bound: %s GiB (weights %s GiB + activation "
-+            "peak %s GiB charged against the %s GiB utilization budget). "
-+            "The pool is sized by --kv-cache-users against the bound, not "
-+            "the estimate.",
++            "Available KV cache memory: %s GiB (conservative estimate under "
++            "the %s GiB utilization budget); physical KV bound: %s GiB "
++            "(the %s GiB card minus %s GiB of measured residents incl. "
++            "weights %s GiB and activation peak %s GiB). The pool is sized "
++            "by --kv-cache-users against the physical bound, not the "
++            "estimate.",
              format_gib(self.available_kv_cache_memory_bytes),
++            format_gib(self.requested_memory),
 +            format_gib(kv_physical_bound),
++            format_gib(self.init_snapshot.total_memory),
++            format_gib(profile_result.non_kv_cache_memory),
 +            format_gib(profile_result.weights_memory),
 +            format_gib(profile_result.transient_peak_headroom),
-+            format_gib(self.requested_memory),
          )
  
          if cudagraph_memory_estimate > 0:
-@@ -606,7 +641,7 @@
+@@ -606,7 +649,7 @@
                  )
  
          return reserve_mm_ipc_gpu_memory(
@@ -3693,7 +3742,7 @@ diff --git a/vllm/v1/worker/gpu_worker.py b/vllm/v1/worker/gpu_worker.py
              self.model_config.multimodal_config,
              getattr(self.parallel_config, "_api_process_count", 1),
          )
-@@ -776,20 +811,29 @@
+@@ -776,20 +819,29 @@
                  f"GiB for consumed memory (weights + non-torch), "
                  f"{format_gib(self.peak_activation_memory)} GiB "
                  f"for peak activation, and {format_gib(cuda_graph_memory_bytes)} "
@@ -3719,14 +3768,14 @@ diff --git a/vllm/v1/worker/gpu_worker.py b/vllm/v1/worker/gpu_worker.py
  
 -            maybe_save_startup_plan(self, kv_cache_memory_bytes_to_requested_limit)
 +            # Persist the same admission bound determine_available_memory
-+            # derived (requested budget minus weights and the measured
-+            # activation charge), so a plan-shortcut boot reaches the same
-+            # authoritative decision — persisting the conservative estimate
-+            # here would quietly re-subordinate the declaration to it.
++            # derived (the whole card minus every measured resident), so a
++            # plan-shortcut boot reaches the same authoritative decision —
++            # persisting the conservative estimate here would quietly
++            # re-subordinate the declaration to it.
 +            maybe_save_startup_plan(
 +                self,
-+                int(self.requested_memory)
-+                - int(self.model_runner.model_memory_usage)
++                int(self.init_snapshot.total_memory)
++                - int(self.total_consumed)
 +                - int(self.peak_activation_memory),
 +            )
  
@@ -3942,7 +3991,7 @@ diff --git a/tests/v1/core/test_kv_cache_users_sizing.py b/tests/v1/core/test_kv
 new file mode 100644
 --- /dev/null
 +++ b/tests/v1/core/test_kv_cache_users_sizing.py
-@@ -0,0 +1,127 @@
+@@ -0,0 +1,129 @@
 +# SPDX-License-Identifier: Apache-2.0
 +# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
 +"""GPU KV capacity is derived from --kv-cache-users, not from free memory.
@@ -3953,11 +4002,13 @@ new file mode 100644
 +shortfall failing closed at startup. Byte- and block-denominated sizing
 +inputs are refused, not reconciled.
 +
-+The per-worker number these tests pass is the worker's PHYSICAL KV budget
-+bound (total x utilization minus weights, the measured activation peak and
-+frontend reservations) — not profiling's conservative availability
-+estimate, which is informational and can neither shrink nor veto the
-+declaration. Only a declaration exceeding the physical bound is refused.
++The per-worker number these tests pass is the worker's PHYSICAL KV bound
++(the whole card minus every measured resident: weights, non-torch
++allocations, the activation peak, frontend reservations) — not profiling's
++conservative availability estimate, which additionally withholds the
++(1 - utilization) reserve, is informational, and can neither shrink nor
++veto the declaration. Only a declaration exceeding the physical bound is
++refused.
 +"""
 +
 +import pytest
