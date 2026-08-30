@@ -2253,51 +2253,91 @@ diff --git a/vllm/entrypoints/anthropic/serving.py b/vllm/entrypoints/anthropic/
              ec_transfer_params=anthropic_request.ec_transfer_params,
              chat_template_kwargs=chat_template_kwargs or None,
              **thinking_kwargs,
-diff --git a/vllm/entrypoints/cohere/protocol.py b/vllm/entrypoints/cohere/protocol.py
---- a/vllm/entrypoints/cohere/protocol.py
-+++ b/vllm/entrypoints/cohere/protocol.py
-@@ -174,6 +174,29 @@
-         default=None,
-         description="KVTransfer parameters used for disaggregated serving.",
-     )
-+    kv_scope: str | None = Field(
-+        default=None,
-+        min_length=1,
-+        description=(
-+            "Agent scope that owns this request's KV cache: null for the "
-+            "main session line, otherwise the tool_use id that spawned the "
-+            "subagent (the harness's parent_tool_use_id convention). Scope "
-+            "ownership is what lets the KV offload tier release a terminated "
-+            "agent's blocks as a unit instead of retaining a dead context by "
-+            "recency."
-+        ),
-+    )
-+
-+    kv_scope_release: list[str] | None = Field(
-+        default=None,
-+        description=(
-+            "Agent scopes terminated since the previous request. Their "
-+            "offloaded KV blocks are dropped as a unit before this request "
-+            "is scheduled — typically sent on the parent's first request "
-+            "after a subagent's terminal result."
-+        ),
-+    )
-+
-     chat_template_kwargs: dict[str, Any] | None = Field(
-         default=None,
-         description=(
-diff --git a/vllm/entrypoints/cohere/serving.py b/vllm/entrypoints/cohere/serving.py
---- a/vllm/entrypoints/cohere/serving.py
-+++ b/vllm/entrypoints/cohere/serving.py
-@@ -501,6 +501,8 @@
-             logprobs=request.logprobs,
-             priority=request.priority or 0,
-             kv_transfer_params=request.kv_transfer_params,
-+            kv_scope=request.kv_scope,
-+            kv_scope_release=request.kv_scope_release,
-             chat_template_kwargs=request.chat_template_kwargs,
-         )
+diff --git a/vllm/entrypoints/generate/api_router.py b/vllm/entrypoints/generate/api_router.py
+--- a/vllm/entrypoints/generate/api_router.py
++++ b/vllm/entrypoints/generate/api_router.py
+@@ -3,8 +3,6 @@
+ from typing import TYPE_CHECKING
  
+ from fastapi import FastAPI
+-
+-import vllm.envs as envs
+ 
+ if TYPE_CHECKING:
+     from argparse import Namespace
+@@ -43,12 +41,14 @@
+ 
+     register_anthropic_api_router(app)
+ 
+-    from vllm.entrypoints.cohere.api_router import (
+-        attach_router as register_cohere_api_router,
+-    )
+-
+-    register_cohere_api_router(app)
+-
++    # The Cohere HTTP surface is deliberately not registered. Upstream gates
++    # it on a try/except import of the optional `cohere` SDK plus an env
++    # flag — an endpoint whose existence is the accident of what happens to
++    # be installed. This image is built --network none without that SDK, so
++    # the surface could never be imported, mounted, or verified; leaving the
++    # guarded registration in place would keep a half-present mode that a
++    # stray package install could silently activate. Its absence is enforced
++    # here instead, and the image build asserts no /cohere route exists.
+     from .generative_scoring.api_router import register_generative_scoring_api_router
+ 
+     register_generative_scoring_api_router(app)
+@@ -63,22 +63,6 @@
+ ):
+     from vllm.entrypoints.anthropic.serving import AnthropicServingMessages
+     from vllm.entrypoints.chat_utils import load_chat_template
+-
+-    # The Cohere serving handler depends on the optional `cohere` SDK for
+-    # its wire-format protocol models, and is additionally gated on the
+-    # `VLLM_ENABLE_COHERE_API` env flag (see
+-    # `vllm.entrypoints.cohere.api_router.attach_router`). Skip the import
+-    # entirely when the endpoint isn't going to be exposed, both because
+-    # the SDK may not be installed and because the serving object holds
+-    # nontrivial state (chat handler, warmup) that would otherwise be
+-    # unused.
+-    if envs.VLLM_ENABLE_COHERE_API:
+-        try:
+-            from vllm.entrypoints.cohere.serving import CohereServingChatV2
+-        except ImportError:
+-            CohereServingChatV2 = None  # type: ignore[assignment,misc]
+-    else:
+-        CohereServingChatV2 = None  # type: ignore[assignment,misc]
+ 
+     from vllm.entrypoints.mcp.tool_server import (
+         DemoToolServer,
+@@ -212,28 +196,6 @@
+         if "generate" in supported_tasks
+         else None
+     )
+-    state.cohere_serving_chat_v2 = (
+-        CohereServingChatV2(
+-            engine_client,
+-            state.openai_serving_models,
+-            args.response_role,
+-            online_renderer=state.online_renderer,
+-            request_logger=request_logger,
+-            chat_template=resolved_chat_template,
+-            chat_template_content_format=args.chat_template_content_format,
+-            return_tokens_as_token_ids=args.return_tokens_as_token_ids,
+-            enable_auto_tools=args.enable_auto_tool_choice,
+-            tool_parser=args.tool_call_parser,
+-            reasoning_parser=args.structured_outputs_config.reasoning_parser,
+-            enable_prompt_tokens_details=args.enable_prompt_tokens_details,
+-            enable_force_include_usage=args.enable_force_include_usage,
+-            default_chat_template_kwargs=default_chat_template_kwargs,
+-            is_reasoning_model=args.cohere_is_reasoning_model,
+-        )
+-        if CohereServingChatV2 is not None and "generate" in supported_tasks
+-        else None
+-    )
+-
+     from .generative_scoring.serving import ServingGenerativeScoring
+ 
+     state.serving_generative_scoring = ServingGenerativeScoring(
 diff --git a/vllm/entrypoints/llm.py b/vllm/entrypoints/llm.py
 --- a/vllm/entrypoints/llm.py
 +++ b/vllm/entrypoints/llm.py
@@ -2383,6 +2423,25 @@ diff --git a/vllm/entrypoints/openai/chat_completion/protocol.py b/vllm/entrypoi
          return SamplingParams.from_optional(
              n=self.n,
              presence_penalty=presence_penalty,
+diff --git a/vllm/entrypoints/openai/cli_args.py b/vllm/entrypoints/openai/cli_args.py
+--- a/vllm/entrypoints/openai/cli_args.py
++++ b/vllm/entrypoints/openai/cli_args.py
+@@ -148,15 +148,6 @@
+     """If set to False, output deltas will not be logged. Relevant only if 
+     --enable-log-outputs is set.
+     """
+-    cohere_is_reasoning_model: bool = True
+-    """Cohere ``/cohere/v2/chat`` only. Whether the served model is a
+-    reasoning Command-family model. When True (default), the assistant's
+-    chain-of-thought is surfaced as a ``thinking`` content block (or
+-    ``content-*`` events on the stream). When False, reasoning is
+-    surfaced as Cohere's ``tool_plan`` field (or ``tool-plan-delta``
+-    events) whenever the model emits tool calls, matching older non-
+-    reasoning Command models. Has no effect on the non-Cohere
+-    endpoints."""
+     cohere_format: str = "cmd4"
+     """Cohere ``--tokenizer-mode cohere`` only. Which Cohere prompt
+     format to render: ``cmd4`` (current Command A+ models; default) or
 diff --git a/vllm/entrypoints/openai/completion/protocol.py b/vllm/entrypoints/openai/completion/protocol.py
 --- a/vllm/entrypoints/openai/completion/protocol.py
 +++ b/vllm/entrypoints/openai/completion/protocol.py
@@ -3596,7 +3655,7 @@ diff --git a/tests/entrypoints/test_kv_scope_protocol.py b/tests/entrypoints/tes
 new file mode 100644
 --- /dev/null
 +++ b/tests/entrypoints/test_kv_scope_protocol.py
-@@ -0,0 +1,163 @@
+@@ -0,0 +1,183 @@
 +# SPDX-License-Identifier: Apache-2.0
 +# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
 +"""Agent-scope identity must land uniformly on every generation surface.
@@ -3604,10 +3663,17 @@ new file mode 100644
 +Whole-scope KV release only works if every protocol can carry the identity:
 +a surface without the field silently produces unscoped requests, and the
 +offload tier then cannot tell a dead subagent's blocks from the main line's.
-+These tests prove, offline, that all six generation protocols expose
-+``kv_scope`` / ``kv_scope_release`` beside ``cache_salt`` /
-+``kv_transfer_params``, validate them identically, and deliver them into
-+``SamplingParams.extra_args`` — the one internal channel the engine reads.
++These tests prove, offline, that all five generation protocols this build
++can actually import expose ``kv_scope`` / ``kv_scope_release`` beside
++``cache_salt`` / ``kv_transfer_params``, validate them identically, and
++deliver them into ``SamplingParams.extra_args`` — the one internal channel
++the engine reads.
++
++The Cohere surface is deliberately not in this set: its protocol models
++hard-import the optional ``cohere`` SDK, which the --network none image
++cannot install, so upstream's endpoint existed only as the accident of a
++guarded import. The registration was excised rather than left guarded, and
++the absence of any /cohere route is asserted below as an enforced fact.
 +"""
 +
 +import pytest
@@ -3615,8 +3681,6 @@ new file mode 100644
 +
 +from vllm.entrypoints.anthropic.protocol import AnthropicMessagesRequest
 +from vllm.entrypoints.anthropic.serving import AnthropicServingMessages
-+from vllm.entrypoints.cohere.protocol import CohereChatV2Request
-+from vllm.entrypoints.cohere.serving import CohereServingChatV2
 +from vllm.entrypoints.openai.chat_completion.protocol import ChatCompletionRequest
 +from vllm.entrypoints.openai.completion.protocol import CompletionRequest
 +from vllm.entrypoints.openai.responses.protocol import ResponsesRequest
@@ -3643,8 +3707,6 @@ new file mode 100644
 +            "max_tokens": 16,
 +            "messages": [{"role": "user", "content": "hi"}],
 +        }
-+    if request_cls is CohereChatV2Request:
-+        return {"model": "m", "messages": [{"role": "user", "content": "hi"}]}
 +    if request_cls is GenerateRequest:
 +        return {
 +            "request_id": "req-1",
@@ -3659,7 +3721,6 @@ new file mode 100644
 +    CompletionRequest,
 +    ResponsesRequest,
 +    AnthropicMessagesRequest,
-+    CohereChatV2Request,
 +    GenerateRequest,
 +]
 +
@@ -3749,17 +3810,35 @@ new file mode 100644
 +    assert chat_request.kv_scope_release == _RELEASED
 +
 +
-+def test_cohere_translation_forwards_scope_fields():
-+    request = CohereChatV2Request(
-+        **_minimal_payload(CohereChatV2Request),
-+        kv_scope=_SCOPE,
-+        kv_scope_release=_RELEASED,
-+    )
-+    chat_request = CohereServingChatV2._build_base_chat_completion(
-+        request, [{"role": "user", "content": "hi"}]
-+    )
-+    assert chat_request.kv_scope == _SCOPE
-+    assert chat_request.kv_scope_release == _RELEASED
++def test_cohere_endpoint_absence_is_enforced_not_import_dependent():
++    # The generate router assembly must register every supported surface and
++    # must not contain a /cohere route under any installed-package state:
++    # a guarded registration would make the endpoint set depend on which
++    # optional SDKs happen to import, which is exactly the half-present
++    # shape this fork forbids.
++    from fastapi import FastAPI
++
++    from types import SimpleNamespace
++
++    from vllm.entrypoints.generate.api_router import register_generate_api_routers
++    from vllm.entrypoints.scale_out.factories import register_scale_out_api_routers
++
++    app = FastAPI()
++    # The token-in-token-out attach reads app.state.args (tokens_only
++    # servers mount an extra abort route); mirror the minimal real state.
++    app.state.args = SimpleNamespace(tokens_only=False)
++    register_generate_api_routers(app)
++    register_scale_out_api_routers(app, ("generate",))
++    paths = {getattr(route, "path", "") for route in app.routes}
++    assert not any(path.startswith("/cohere") for path in paths), paths
++    for required in (
++        "/v1/chat/completions",
++        "/v1/completions",
++        "/v1/responses",
++        "/v1/messages",
++        "/inference/v1/generate",
++    ):
++        assert required in paths, (required, sorted(paths))
 diff --git a/tests/v1/core/test_kv_cache_users_sizing.py b/tests/v1/core/test_kv_cache_users_sizing.py
 new file mode 100644
 --- /dev/null

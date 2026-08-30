@@ -2,7 +2,7 @@
 set -euo pipefail
 
 MODE="${1:-build}"
-EXPECTED_STATUS=$' M tests/config/test_config_utils.py\n M tests/distributed/test_rocm_quick_reduce.py\n M tests/engine/test_arg_utils.py\n M tests/entrypoints/anthropic/test_anthropic_messages_conversion.py\n M tests/entrypoints/serve/utils/test_api_utils.py\n M tests/entrypoints/unit_tests/test_chat_utils.py\n M tests/evals/gsm8k/test_gsm8k_offloading.py\n M tests/models/language/pooling/test_reward.py\n M tests/multimodal/media/test_connector.py\n M tests/multimodal/media/test_image.py\n M tests/quantization/test_turboquant.py\n M tests/v1/e2e/general/test_context_length.py\n M tests/v1/kv_connector/nixl_integration/run_multi_connector_accuracy_test.sh\n M tests/v1/kv_connector/nixl_integration/run_multi_connector_edge_case_test.sh\n M tests/v1/kv_connector/nixl_integration/spec_decode_acceptance_test.sh\n M tests/v1/kv_connector/unit/offloading_connector/test_events.py\n M tests/v1/kv_connector/unit/offloading_connector/test_scheduler.py\n M tests/v1/kv_connector/unit/offloading_connector/test_worker.py\n M tests/v1/kv_connector/unit/test_config.py\n M tests/v1/kv_connector/unit/test_hma_auto_config.py\n M tests/v1/kv_connector/unit/test_offloading_connector.py\n D tests/v1/kv_offload/cpu/policies/__init__.py\n D tests/v1/kv_offload/cpu/policies/test_factory.py\n M tests/v1/kv_offload/cpu/test_manager.py\n M tests/v1/kv_offload/test_factory.py\n M tests/v1/kv_offload/test_file_mapper.py\n M tests/v1/kv_offload/tiering/p2p/run_accuracy_test.sh\n M tests/v1/kv_offload/tiering/test_fs_tier.py\n M tests/v1/kv_offload/tiering/test_obj_tier.py\n M tests/v1/simple_kv_offload/test_integration.py\n M tests/v1/worker/test_gpu_model_runner_mm_gather.py\n M vllm/config/cache.py\n M vllm/config/model.py\n M vllm/config/vllm.py\n M vllm/distributed/kv_transfer/kv_connector/v1/offloading/config.py\n M vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py\n M vllm/engine/arg_utils.py\n M vllm/entrypoints/anthropic/api_router.py\n M vllm/entrypoints/anthropic/protocol.py\n M vllm/entrypoints/anthropic/serving.py\n M vllm/entrypoints/chat_utils.py\n M vllm/entrypoints/cohere/protocol.py\n M vllm/entrypoints/cohere/serving.py\n M vllm/entrypoints/llm.py\n M vllm/entrypoints/openai/chat_completion/protocol.py\n M vllm/entrypoints/openai/chat_completion/serving.py\n M vllm/entrypoints/openai/completion/protocol.py\n M vllm/entrypoints/openai/responses/context.py\n M vllm/entrypoints/openai/responses/protocol.py\n M vllm/entrypoints/openai/responses/serving.py\n M vllm/entrypoints/openai/responses/streaming_events.py\n M vllm/entrypoints/openai/responses/utils.py\n M vllm/entrypoints/scale_out/token_in_token_out/protocol.py\n M vllm/entrypoints/scale_out/token_in_token_out/serving.py\n M vllm/entrypoints/serve/utils/api_utils.py\n M vllm/envs.py\n M vllm/model_executor/models/qwen3_vl.py\n M vllm/multimodal/media/connector.py\n M vllm/multimodal/media/image.py\n M vllm/parser/engine/parser_engine.py\n M vllm/parser/qwen3.py\n M vllm/renderers/params.py\n M vllm/sampling_params.py\n M vllm/tool_parsers/structural_tag_registry.py\n M vllm/v1/attention/backends/turboquant_attn.py\n M vllm/v1/attention/ops/triton_turboquant_decode.py\n M vllm/v1/attention/ops/triton_turboquant_store.py\n M vllm/v1/core/kv_cache_utils.py\n M vllm/v1/core/sched/utils.py\n M vllm/v1/engine/input_processor.py\n M vllm/v1/kv_offload/base.py\n M vllm/v1/kv_offload/config.py\n M vllm/v1/kv_offload/cpu/gpu_worker.py\n M vllm/v1/kv_offload/cpu/manager.py\n D vllm/v1/kv_offload/cpu/policies/__init__.py\n D vllm/v1/kv_offload/cpu/policies/arc.py\n D vllm/v1/kv_offload/cpu/policies/base.py\n D vllm/v1/kv_offload/cpu/policies/factory.py\n D vllm/v1/kv_offload/cpu/policies/lru.py\n M vllm/v1/kv_offload/cpu/spec.py\n M vllm/v1/kv_offload/tiering/manager.py\n M vllm/v1/kv_offload/tiering/spec.py\n M vllm/v1/request.py\n M vllm/v1/structured_output/__init__.py\n M vllm/v1/worker/gpu_model_runner.py\n M vllm/v1/worker/gpu_worker.py\n M vllm/v1/worker/startup_plan.py\n M vllm/v1/worker/workspace.py\n?? tests/entrypoints/test_kv_scope_protocol.py\n?? tests/v1/core/test_kv_cache_users_sizing.py\n?? tests/v1/worker/test_workspace.py'
+EXPECTED_STATUS=$' M tests/config/test_config_utils.py\n M tests/distributed/test_rocm_quick_reduce.py\n M tests/engine/test_arg_utils.py\n M tests/entrypoints/anthropic/test_anthropic_messages_conversion.py\n M tests/entrypoints/serve/utils/test_api_utils.py\n M tests/entrypoints/unit_tests/test_chat_utils.py\n M tests/evals/gsm8k/test_gsm8k_offloading.py\n M tests/models/language/pooling/test_reward.py\n M tests/multimodal/media/test_connector.py\n M tests/multimodal/media/test_image.py\n M tests/quantization/test_turboquant.py\n M tests/v1/e2e/general/test_context_length.py\n M tests/v1/kv_connector/nixl_integration/run_multi_connector_accuracy_test.sh\n M tests/v1/kv_connector/nixl_integration/run_multi_connector_edge_case_test.sh\n M tests/v1/kv_connector/nixl_integration/spec_decode_acceptance_test.sh\n M tests/v1/kv_connector/unit/offloading_connector/test_events.py\n M tests/v1/kv_connector/unit/offloading_connector/test_scheduler.py\n M tests/v1/kv_connector/unit/offloading_connector/test_worker.py\n M tests/v1/kv_connector/unit/test_config.py\n M tests/v1/kv_connector/unit/test_hma_auto_config.py\n M tests/v1/kv_connector/unit/test_offloading_connector.py\n D tests/v1/kv_offload/cpu/policies/__init__.py\n D tests/v1/kv_offload/cpu/policies/test_factory.py\n M tests/v1/kv_offload/cpu/test_manager.py\n M tests/v1/kv_offload/test_factory.py\n M tests/v1/kv_offload/test_file_mapper.py\n M tests/v1/kv_offload/tiering/p2p/run_accuracy_test.sh\n M tests/v1/kv_offload/tiering/test_fs_tier.py\n M tests/v1/kv_offload/tiering/test_obj_tier.py\n M tests/v1/simple_kv_offload/test_integration.py\n M tests/v1/worker/test_gpu_model_runner_mm_gather.py\n M vllm/config/cache.py\n M vllm/config/model.py\n M vllm/config/vllm.py\n M vllm/distributed/kv_transfer/kv_connector/v1/offloading/config.py\n M vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py\n M vllm/engine/arg_utils.py\n M vllm/entrypoints/anthropic/api_router.py\n M vllm/entrypoints/anthropic/protocol.py\n M vllm/entrypoints/anthropic/serving.py\n M vllm/entrypoints/chat_utils.py\n M vllm/entrypoints/generate/api_router.py\n M vllm/entrypoints/llm.py\n M vllm/entrypoints/openai/chat_completion/protocol.py\n M vllm/entrypoints/openai/chat_completion/serving.py\n M vllm/entrypoints/openai/cli_args.py\n M vllm/entrypoints/openai/completion/protocol.py\n M vllm/entrypoints/openai/responses/context.py\n M vllm/entrypoints/openai/responses/protocol.py\n M vllm/entrypoints/openai/responses/serving.py\n M vllm/entrypoints/openai/responses/streaming_events.py\n M vllm/entrypoints/openai/responses/utils.py\n M vllm/entrypoints/scale_out/token_in_token_out/protocol.py\n M vllm/entrypoints/scale_out/token_in_token_out/serving.py\n M vllm/entrypoints/serve/utils/api_utils.py\n M vllm/envs.py\n M vllm/model_executor/models/qwen3_vl.py\n M vllm/multimodal/media/connector.py\n M vllm/multimodal/media/image.py\n M vllm/parser/engine/parser_engine.py\n M vllm/parser/qwen3.py\n M vllm/renderers/params.py\n M vllm/sampling_params.py\n M vllm/tool_parsers/structural_tag_registry.py\n M vllm/v1/attention/backends/turboquant_attn.py\n M vllm/v1/attention/ops/triton_turboquant_decode.py\n M vllm/v1/attention/ops/triton_turboquant_store.py\n M vllm/v1/core/kv_cache_utils.py\n M vllm/v1/core/sched/utils.py\n M vllm/v1/engine/input_processor.py\n M vllm/v1/kv_offload/base.py\n M vllm/v1/kv_offload/config.py\n M vllm/v1/kv_offload/cpu/gpu_worker.py\n M vllm/v1/kv_offload/cpu/manager.py\n D vllm/v1/kv_offload/cpu/policies/__init__.py\n D vllm/v1/kv_offload/cpu/policies/arc.py\n D vllm/v1/kv_offload/cpu/policies/base.py\n D vllm/v1/kv_offload/cpu/policies/factory.py\n D vllm/v1/kv_offload/cpu/policies/lru.py\n M vllm/v1/kv_offload/cpu/spec.py\n M vllm/v1/kv_offload/tiering/manager.py\n M vllm/v1/kv_offload/tiering/spec.py\n M vllm/v1/request.py\n M vllm/v1/structured_output/__init__.py\n M vllm/v1/worker/gpu_model_runner.py\n M vllm/v1/worker/gpu_worker.py\n M vllm/v1/worker/startup_plan.py\n M vllm/v1/worker/workspace.py\n?? tests/entrypoints/test_kv_scope_protocol.py\n?? tests/v1/core/test_kv_cache_users_sizing.py\n?? tests/v1/worker/test_workspace.py'
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
 # shellcheck source=../config/runtime-v1.sh
@@ -102,8 +102,8 @@ KV_TIERING_MANAGER_REL="vllm/v1/kv_offload/tiering/manager.py"
 OFFLOAD_CONNECTOR_CONFIG_REL="vllm/distributed/kv_transfer/kv_connector/v1/offloading/config.py"
 OFFLOAD_CONNECTOR_SCHEDULER_REL="vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py"
 COMPLETION_PROTOCOL_REL="vllm/entrypoints/openai/completion/protocol.py"
-COHERE_PROTOCOL_REL="vllm/entrypoints/cohere/protocol.py"
-COHERE_SERVING_REL="vllm/entrypoints/cohere/serving.py"
+GENERATE_API_ROUTER_REL="vllm/entrypoints/generate/api_router.py"
+CLI_ARGS_REL="vllm/entrypoints/openai/cli_args.py"
 TITOTO_PROTOCOL_REL="vllm/entrypoints/scale_out/token_in_token_out/protocol.py"
 TITOTO_SERVING_REL="vllm/entrypoints/scale_out/token_in_token_out/serving.py"
 
@@ -316,8 +316,8 @@ printf '%s  %s\n' \
   "${OFFLOAD_CONNECTOR_CONFIG_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${OFFLOAD_CONNECTOR_CONFIG_REL}" \
   "${OFFLOAD_CONNECTOR_SCHEDULER_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${OFFLOAD_CONNECTOR_SCHEDULER_REL}" \
   "${COMPLETION_PROTOCOL_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${COMPLETION_PROTOCOL_REL}" \
-  "${COHERE_PROTOCOL_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${COHERE_PROTOCOL_REL}" \
-  "${COHERE_SERVING_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${COHERE_SERVING_REL}" \
+  "${GENERATE_API_ROUTER_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${GENERATE_API_ROUTER_REL}" \
+  "${CLI_ARGS_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${CLI_ARGS_REL}" \
   "${TITOTO_PROTOCOL_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${TITOTO_PROTOCOL_REL}" \
   "${TITOTO_SERVING_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${TITOTO_SERVING_REL}"  | \
   sha256sum --check --strict
@@ -454,8 +454,8 @@ docker buildx build --progress=plain \
   --build-arg "OFFLOAD_CONNECTOR_CONFIG_UPSTREAM_FILE_SHA256=${OFFLOAD_CONNECTOR_CONFIG_UPSTREAM_FILE_SHA256}" \
   --build-arg "OFFLOAD_CONNECTOR_SCHEDULER_UPSTREAM_FILE_SHA256=${OFFLOAD_CONNECTOR_SCHEDULER_UPSTREAM_FILE_SHA256}" \
   --build-arg "COMPLETION_PROTOCOL_UPSTREAM_FILE_SHA256=${COMPLETION_PROTOCOL_UPSTREAM_FILE_SHA256}" \
-  --build-arg "COHERE_PROTOCOL_UPSTREAM_FILE_SHA256=${COHERE_PROTOCOL_UPSTREAM_FILE_SHA256}" \
-  --build-arg "COHERE_SERVING_UPSTREAM_FILE_SHA256=${COHERE_SERVING_UPSTREAM_FILE_SHA256}" \
+  --build-arg "GENERATE_API_ROUTER_UPSTREAM_FILE_SHA256=${GENERATE_API_ROUTER_UPSTREAM_FILE_SHA256}" \
+  --build-arg "CLI_ARGS_UPSTREAM_FILE_SHA256=${CLI_ARGS_UPSTREAM_FILE_SHA256}" \
   --build-arg "TITOTO_PROTOCOL_UPSTREAM_FILE_SHA256=${TITOTO_PROTOCOL_UPSTREAM_FILE_SHA256}" \
   --build-arg "TITOTO_SERVING_UPSTREAM_FILE_SHA256=${TITOTO_SERVING_UPSTREAM_FILE_SHA256}" \
   --build-arg "POLICY_PKG_INIT_UPSTREAM_FILE_SHA256=${POLICY_PKG_INIT_UPSTREAM_FILE_SHA256}" \
@@ -479,8 +479,8 @@ docker buildx build --progress=plain \
   --build-arg "OFFLOAD_CONNECTOR_CONFIG_PATCHED_FILE_SHA256=${OFFLOAD_CONNECTOR_CONFIG_PATCHED_FILE_SHA256}" \
   --build-arg "OFFLOAD_CONNECTOR_SCHEDULER_PATCHED_FILE_SHA256=${OFFLOAD_CONNECTOR_SCHEDULER_PATCHED_FILE_SHA256}" \
   --build-arg "COMPLETION_PROTOCOL_PATCHED_FILE_SHA256=${COMPLETION_PROTOCOL_PATCHED_FILE_SHA256}" \
-  --build-arg "COHERE_PROTOCOL_PATCHED_FILE_SHA256=${COHERE_PROTOCOL_PATCHED_FILE_SHA256}" \
-  --build-arg "COHERE_SERVING_PATCHED_FILE_SHA256=${COHERE_SERVING_PATCHED_FILE_SHA256}" \
+  --build-arg "GENERATE_API_ROUTER_PATCHED_FILE_SHA256=${GENERATE_API_ROUTER_PATCHED_FILE_SHA256}" \
+  --build-arg "CLI_ARGS_PATCHED_FILE_SHA256=${CLI_ARGS_PATCHED_FILE_SHA256}" \
   --build-arg "TITOTO_PROTOCOL_PATCHED_FILE_SHA256=${TITOTO_PROTOCOL_PATCHED_FILE_SHA256}" \
   --build-arg "TITOTO_SERVING_PATCHED_FILE_SHA256=${TITOTO_SERVING_PATCHED_FILE_SHA256}" \
   --build-arg "SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH}" \
@@ -610,8 +610,8 @@ kv_users_installed_report="$(
     /usr/local/lib/python3.12/dist-packages/vllm/distributed/kv_transfer/kv_connector/v1/offloading/config.py \
     /usr/local/lib/python3.12/dist-packages/vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py \
     /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/completion/protocol.py \
-    /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/cohere/protocol.py \
-    /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/cohere/serving.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/generate/api_router.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/cli_args.py \
     /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/scale_out/token_in_token_out/protocol.py \
     /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/scale_out/token_in_token_out/serving.py
 )"
@@ -632,8 +632,8 @@ expected_kv_users_installed_report="$(printf '%s  %s\n' \
   "${OFFLOAD_CONNECTOR_CONFIG_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/distributed/kv_transfer/kv_connector/v1/offloading/config.py \
   "${OFFLOAD_CONNECTOR_SCHEDULER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py \
   "${COMPLETION_PROTOCOL_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/completion/protocol.py \
-  "${COHERE_PROTOCOL_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/cohere/protocol.py \
-  "${COHERE_SERVING_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/cohere/serving.py \
+  "${GENERATE_API_ROUTER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/generate/api_router.py \
+  "${CLI_ARGS_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/cli_args.py \
   "${TITOTO_PROTOCOL_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/scale_out/token_in_token_out/protocol.py \
   "${TITOTO_SERVING_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/scale_out/token_in_token_out/serving.py)"
 if [[ "${kv_users_installed_report}" != "${expected_kv_users_installed_report}" ]]; then

@@ -1038,10 +1038,22 @@ def _validate_kv_users_before(state: State) -> None:
         "vllm/entrypoints/openai/completion/protocol.py",
         "vllm/entrypoints/openai/responses/protocol.py",
         "vllm/entrypoints/anthropic/protocol.py",
-        "vllm/entrypoints/cohere/protocol.py",
         "vllm/entrypoints/scale_out/token_in_token_out/protocol.py",
     ):
         forbid_text(state, path, "kv_scope", label=label)
+    generate_router = "vllm/entrypoints/generate/api_router.py"
+    require_text(
+        state, generate_router, "register_cohere_api_router(app)", label=label
+    )
+    require_text(
+        state, generate_router, "state.cohere_serving_chat_v2", label=label
+    )
+    require_text(
+        state,
+        "vllm/entrypoints/openai/cli_args.py",
+        "cohere_is_reasoning_model: bool = True",
+        label=label,
+    )
 
 
 def _validate_kv_users_after(state: State) -> None:
@@ -1139,13 +1151,31 @@ def _validate_kv_users_after(state: State) -> None:
         "vllm/entrypoints/openai/completion/protocol.py",
         "vllm/entrypoints/openai/responses/protocol.py",
         "vllm/entrypoints/anthropic/protocol.py",
-        "vllm/entrypoints/cohere/protocol.py",
         "vllm/entrypoints/scale_out/token_in_token_out/protocol.py",
     ):
         require_text(state, path, "kv_scope: str | None = Field(", label=label)
         require_text(
             state, path, "kv_scope_release: list[str] | None = Field(", label=label
         )
+    generate_router = "vllm/entrypoints/generate/api_router.py"
+    forbid_text(state, generate_router, "register_cohere_api_router", label=label)
+    forbid_text(state, generate_router, "CohereServingChatV2", label=label)
+    forbid_text(state, generate_router, "cohere_serving_chat_v2", label=label)
+    # The Cohere-model renderer format is a tokenizer-mode feature, not the
+    # HTTP endpoint; it must survive the endpoint excision.
+    require_text(state, generate_router, '"cohere_format"', count=3, label=label)
+    forbid_text(
+        state,
+        "vllm/entrypoints/openai/cli_args.py",
+        "cohere_is_reasoning_model",
+        label=label,
+    )
+    require_text(
+        state,
+        "vllm/entrypoints/openai/cli_args.py",
+        'cohere_format: str = "cmd4"',
+        label=label,
+    )
     scheduler = "vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py"
     require_text(
         state,
@@ -1380,7 +1410,12 @@ CONTRACTS: Mapping[str, SemanticContract] = {
             "counts of resident full-length user contexts on both tiers and "
             "the bytes are derived post-engine-init from the KV cache spec; "
             "agent identity (kv_scope, the harness's parent_tool_use_id) "
-            "rides every generation protocol beside cache_salt, and a "
+            "rides every generation protocol this --network none image can "
+            "import (chat, completion, responses, anthropic, "
+            "token-in-token-out) beside cache_salt; the Cohere surface "
+            "hard-imports the uninstallable cohere SDK, so its guarded "
+            "registration is excised and the endpoint's absence is an "
+            "enforced fact rather than an import accident. A "
             "request's kv_scope_release drops a terminated scope's offloaded "
             "blocks as a unit before the releasing request looks anything "
             "up. The byte and policy knobs are refusals, not fallbacks, and "

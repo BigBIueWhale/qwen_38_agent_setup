@@ -115,8 +115,8 @@ ARG KV_TIERING_MANAGER_UPSTREAM_FILE_SHA256
 ARG OFFLOAD_CONNECTOR_CONFIG_UPSTREAM_FILE_SHA256
 ARG OFFLOAD_CONNECTOR_SCHEDULER_UPSTREAM_FILE_SHA256
 ARG COMPLETION_PROTOCOL_UPSTREAM_FILE_SHA256
-ARG COHERE_PROTOCOL_UPSTREAM_FILE_SHA256
-ARG COHERE_SERVING_UPSTREAM_FILE_SHA256
+ARG GENERATE_API_ROUTER_UPSTREAM_FILE_SHA256
+ARG CLI_ARGS_UPSTREAM_FILE_SHA256
 ARG TITOTO_PROTOCOL_UPSTREAM_FILE_SHA256
 ARG TITOTO_SERVING_UPSTREAM_FILE_SHA256
 ARG POLICY_PKG_INIT_UPSTREAM_FILE_SHA256
@@ -157,10 +157,10 @@ RUN printf '%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  
         /usr/local/lib/python3.12/dist-packages/vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py \
       "${COMPLETION_PROTOCOL_UPSTREAM_FILE_SHA256}" \
         /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/completion/protocol.py \
-      "${COHERE_PROTOCOL_UPSTREAM_FILE_SHA256}" \
-        /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/cohere/protocol.py \
-      "${COHERE_SERVING_UPSTREAM_FILE_SHA256}" \
-        /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/cohere/serving.py \
+      "${GENERATE_API_ROUTER_UPSTREAM_FILE_SHA256}" \
+        /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/generate/api_router.py \
+      "${CLI_ARGS_UPSTREAM_FILE_SHA256}" \
+        /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/cli_args.py \
       "${TITOTO_PROTOCOL_UPSTREAM_FILE_SHA256}" \
         /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/scale_out/token_in_token_out/protocol.py \
       "${TITOTO_SERVING_UPSTREAM_FILE_SHA256}" \
@@ -235,8 +235,8 @@ ARG KV_TIERING_MANAGER_PATCHED_FILE_SHA256
 ARG OFFLOAD_CONNECTOR_CONFIG_PATCHED_FILE_SHA256
 ARG OFFLOAD_CONNECTOR_SCHEDULER_PATCHED_FILE_SHA256
 ARG COMPLETION_PROTOCOL_PATCHED_FILE_SHA256
-ARG COHERE_PROTOCOL_PATCHED_FILE_SHA256
-ARG COHERE_SERVING_PATCHED_FILE_SHA256
+ARG GENERATE_API_ROUTER_PATCHED_FILE_SHA256
+ARG CLI_ARGS_PATCHED_FILE_SHA256
 ARG TITOTO_PROTOCOL_PATCHED_FILE_SHA256
 ARG TITOTO_SERVING_PATCHED_FILE_SHA256
 # The verified pristine policy modules are removed, not replaced: the
@@ -391,11 +391,11 @@ COPY --chmod=0644 \
   vllm/vllm/entrypoints/openai/completion/protocol.py \
   /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/completion/protocol.py
 COPY --chmod=0644 \
-  vllm/vllm/entrypoints/cohere/protocol.py \
-  /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/cohere/protocol.py
+  vllm/vllm/entrypoints/generate/api_router.py \
+  /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/generate/api_router.py
 COPY --chmod=0644 \
-  vllm/vllm/entrypoints/cohere/serving.py \
-  /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/cohere/serving.py
+  vllm/vllm/entrypoints/openai/cli_args.py \
+  /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/cli_args.py
 COPY --chmod=0644 \
   vllm/vllm/entrypoints/scale_out/token_in_token_out/protocol.py \
   /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/scale_out/token_in_token_out/protocol.py
@@ -454,10 +454,10 @@ RUN printf '%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  
         /usr/local/lib/python3.12/dist-packages/vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py \
       "${COMPLETION_PROTOCOL_PATCHED_FILE_SHA256}" \
         /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/completion/protocol.py \
-      "${COHERE_PROTOCOL_PATCHED_FILE_SHA256}" \
-        /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/cohere/protocol.py \
-      "${COHERE_SERVING_PATCHED_FILE_SHA256}" \
-        /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/cohere/serving.py \
+      "${GENERATE_API_ROUTER_PATCHED_FILE_SHA256}" \
+        /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/generate/api_router.py \
+      "${CLI_ARGS_PATCHED_FILE_SHA256}" \
+        /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/cli_args.py \
       "${TITOTO_PROTOCOL_PATCHED_FILE_SHA256}" \
         /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/scale_out/token_in_token_out/protocol.py \
       "${TITOTO_SERVING_PATCHED_FILE_SHA256}" \
@@ -857,7 +857,6 @@ for rejected_context in (
 # installed tree — not merely unimported.
 from vllm.entrypoints.openai.completion.protocol import CompletionRequest
 from vllm.entrypoints.openai.responses.protocol import ResponsesRequest
-from vllm.entrypoints.cohere.protocol import CohereChatV2Request
 from vllm.entrypoints.scale_out.token_in_token_out.protocol import GenerateRequest
 from vllm.sampling_params import SamplingParams
 from vllm.engine.arg_utils import EngineArgs
@@ -880,11 +879,6 @@ for scoped_request in (
     AnthropicMessagesRequest(
         model="m",
         max_tokens=8,
-        messages=[{"role": "user", "content": "hi"}],
-        kv_scope="toolu_scope",
-    ),
-    CohereChatV2Request(
-        model="m",
         messages=[{"role": "user", "content": "hi"}],
         kv_scope="toolu_scope",
     ),
@@ -917,6 +911,33 @@ except ModuleNotFoundError:
     pass
 else:
     raise AssertionError("deleted policies package is still importable")
+
+# The Cohere HTTP surface must be absent as an enforced fact of the server
+# assembly, not as the accident of the uninstallable cohere SDK: register
+# every generate router in-image and prove no /cohere route exists while
+# the five importable identity surfaces are all mounted.
+from fastapi import FastAPI
+from vllm.entrypoints.generate.api_router import register_generate_api_routers
+
+from vllm.entrypoints.scale_out.factories import register_scale_out_api_routers
+from types import SimpleNamespace
+
+route_app = FastAPI()
+# The token-in-token-out attach reads app.state.args (tokens_only servers
+# mount an extra abort route); provide the minimal state a real server has.
+route_app.state.args = SimpleNamespace(tokens_only=False)
+register_generate_api_routers(route_app)
+register_scale_out_api_routers(route_app, ("generate",))
+route_paths = {getattr(route, "path", "") for route in route_app.routes}
+assert not any(path.startswith("/cohere") for path in route_paths), route_paths
+for required_path in (
+    "/v1/chat/completions",
+    "/v1/completions",
+    "/v1/responses",
+    "/v1/messages",
+    "/inference/v1/generate",
+):
+    assert required_path in route_paths, (required_path, sorted(route_paths))
 
 runpy.run_path("/opt/qwen38/phase_budget_unit.py", run_name="__main__")
 runpy.run_path("/opt/qwen38/vision_workspace_unit.py", run_name="__main__")

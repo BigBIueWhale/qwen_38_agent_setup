@@ -97,8 +97,19 @@ Bytes are derived inside vLLM at the point where the KV cache spec exists.
 ### 2.2 Identity: `kv_scope` on every generation protocol
 
 Two request fields, placed beside `cache_salt` / `kv_transfer_params` on
-all six generation surfaces (openai chat_completion, openai completion,
-openai responses, anthropic, cohere, scale_out token_in_token_out):
+every generation surface this image can import — the proven set is five:
+openai chat_completion, openai completion, openai responses, anthropic,
+and scale_out token_in_token_out. Cohere is deliberately not in the set:
+its protocol models hard-import the optional `cohere` SDK, which a
+`--network none` build cannot install, so upstream's `/cohere/v2/chat`
+existed only as a try/except-import accident. That guarded registration
+is excised from the server assembly (`generate/api_router.py`) along
+with the endpoint-only `--cohere-is-reasoning-model` knob, and the image
+build asserts that no `/cohere` route is registered — the endpoint's
+absence is an enforced fact, not an installation state. The
+`cohere_format` renderer flag survives: it serves `--tokenizer-mode
+cohere` model families over the OpenAI endpoints and is unrelated to
+the excised HTTP surface.
 
 - `kv_scope: str | null` — the agent scope owning this request's KV.
   Encodes the harness convention verbatim (agent_service commit 00be562):
@@ -275,7 +286,9 @@ vLLM worktree (runtime):
 | vllm/v1/kv_offload/tiering/spec.py, tiering/manager.py | follow the single mode; release forwards to primary |
 | .../kv_connector/v1/offloading/config.py | window classification moves here; new config fields |
 | .../kv_connector/v1/offloading/scheduler.py | consume stored windows; scope into ReqContext; release at on_new_request |
-| six protocol files | `kv_scope`, `kv_scope_release` beside `cache_salt`/`kv_transfer_params` |
+| five protocol files | `kv_scope`, `kv_scope_release` beside `cache_salt`/`kv_transfer_params` |
+| vllm/entrypoints/generate/api_router.py | Cohere registration and serving state excised; absence enforced |
+| vllm/entrypoints/openai/cli_args.py | − `--cohere-is-reasoning-model` (endpoint-only knob) |
 | vllm/v1/request.py | typed `kv_scope`/`kv_scope_release` attributes |
 | vllm/v1/engine/input_processor.py | fail-closed field validation |
 
@@ -285,7 +298,8 @@ spec/connector construction in `tests/v1/kv_offload/test_factory.py`,
 `tests/v1/kv_connector/unit/test_offloading_connector.py`,
 `offloading_connector/{utils,test_events,test_config}.py`,
 `test_hma_auto_config.py`; new `tests/entrypoints/test_kv_scope_protocol.py`
-proving both fields and their extra_args propagation on all six surfaces;
+proving both fields and their extra_args propagation on all five importable
+surfaces plus the enforced absence of any /cohere route;
 sizing-derivation unit coverage.
 
 Repo: `config/runtime-v1.sh` (VLLM_ARGS + hashes), `scripts/build-vllm.sh`
