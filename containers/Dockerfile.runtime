@@ -174,7 +174,7 @@ RUN printf '%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  
       "${POLICY_LRU_UPSTREAM_FILE_SHA256}" \
         /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/cpu/policies/lru.py \
       "${POLICY_ARC_UPSTREAM_FILE_SHA256}" \
-        /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/cpu/policies/arc.py
+        /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/cpu/policies/arc.py \
     | sha256sum --check --strict
 
 FROM upstream-verifier AS runtime
