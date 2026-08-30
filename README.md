@@ -33,7 +33,8 @@ The deployment is complete and healthy. There is one supported mode:
 | Reasoning ceiling | 262,144 generated reasoning tokens, subject to remaining context |
 | Final-answer ceiling | 131,072 generated final tokens, subject to remaining context |
 | MTP/speculation | Disabled |
-| CPU/KV offload | Zero |
+| CPU weight offload | Zero |
+| KV offload | 7,747,584,000-byte (7.75 GB) pinned host tier, ARC eviction |
 | Batching | One sequence; 2,048-token chunked prefill |
 | Listener | 127.0.0.1:8000 only |
 | Agent client | Qwen Code 0.21.12 at b965d5f8c24f48e65fb0b17c7d45f34ca4ce8f38 |
@@ -360,7 +361,9 @@ Consequences:
 - FlashAttention 2 is explicit because automatic selection otherwise changes the
   TurboQuant path. FlashInfer autotuning is explicitly off so probe-OOM-and-fallback
   behavior cannot be mistaken for normal startup.
-- CPU offload and KV offload are exactly zero.
+- CPU weight offload is exactly zero. KV offload is not: the OffloadingConnector runs
+  in kv_both role with a 7,747,584,000-byte (7.75 GB) pinned host tier in /dev/shm
+  under ARC eviction, and that tier is live and serving hits.
 - Multimodal profiling is mandatory and cannot be skipped to obtain a deceptively
   optimistic allocation.
 - All unquantized model computation, including the entire vision tower, uses BF16.
@@ -762,7 +765,8 @@ rerun after every runtime-profile change before that image is accepted:
    official-norm repair proof: pass.
 3. Exact network-none vLLM namespace, fixed bridge/Unix socket, host-loopback-only
    ingress, and no published Docker ports: pass.
-4. MTP/speculation absent, CPU offload zero, CUDA graphs retained: pass.
+4. MTP/speculation absent, CPU weight offload zero, KV offload confined to the
+   declared 7,747,584,000-byte ARC host tier, CUDA graphs retained: pass.
 5. Exact xhigh defaults, high/max alias identity, low/disabled rejection: pass.
 6. Default preserve_thinking=false and explicit diagnostic restoration: pass; omission
    saved 1,798 real tokens in the controlled history.
