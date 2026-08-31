@@ -5,6 +5,12 @@ This probe runs inside the serving image. It uses the installed vLLM parser,
 the real checkpoint tokenizer, the live render endpoint, and both live Chat
 Completions response modes. Assertions compare semantics where generation is
 stochastic and exact token IDs where rendering is expected to be identical.
+
+The synthetic history is the autonomous agent shape: one task prompt followed
+only by assistant reasoning/tool-call turns and their tool results, rendered
+mid-run. The rendered prompt must carry the assistant turn's reasoning in
+full, and parsing that turn back must recover it byte-exactly, so
+render -> parse -> render is a fixed point on exact token IDs.
 """
 
 from __future__ import annotations
@@ -205,7 +211,6 @@ def render_request(messages: list[dict[str, Any]]) -> dict[str, Any]:
         "max_tokens": 1,
         "chat_template_kwargs": {
             "enable_thinking": True,
-            "preserve_thinking": False,
             "reasoning_effort": "xhigh",
         },
     }

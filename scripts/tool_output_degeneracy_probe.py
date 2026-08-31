@@ -651,9 +651,8 @@ def responses_payload(budget: int, *, stream: bool) -> dict[str, Any]:
         "store": False,
         "reasoning": {"effort": "xhigh"},
         "thinking_token_budget": FAULT_INJECTION_THINKING_BUDGET,
-        "chat_template_kwargs": {
+"chat_template_kwargs": {
             "enable_thinking": True,
-            "preserve_thinking": False,
             "reasoning_effort": "xhigh",
         },
     }

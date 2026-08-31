@@ -31,7 +31,7 @@ BASE_URL = "http://127.0.0.1:8000"
 MODEL = "qwen3.8-27b-nvfp4-k8v4"
 FONT_PATH = "/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf"
 IMAGE_SIZE = 4096
-OLD_REASONING = "OLD_HIDDEN_TRACE_MUST_NOT_BE_REPLAYED_7B91"
+HISTORICAL_REASONING = "HISTORICAL_HIDDEN_TRACE_7B91"
 BEFORE = "BEGIN_ORIGINATING_TOOL_IMAGE_5C17"
 AFTER = "END_ORIGINATING_TOOL_IMAGE_8A42"
 ACK = "The tool result has been received; I will use its pixels when asked."
@@ -118,7 +118,7 @@ def openai_messages(data_url: str, *, moved: bool = False) -> list[dict[str, Any
         {
             "role": "assistant",
             "content": None,
-            "reasoning": OLD_REASONING,
+            "reasoning": HISTORICAL_REASONING,
             "tool_calls": [tool_call()],
         },
         {
@@ -144,7 +144,7 @@ def anthropic_payload(data_url: str, *, stream: bool, salt: str) -> dict[str, An
             {
                 "role": "assistant",
                 "content": [
-                    {"type": "thinking", "thinking": OLD_REASONING},
+                    {"type": "thinking", "thinking": HISTORICAL_REASONING},
                     {
                         "type": "tool_use",
                         "id": tool_call()["id"],
@@ -393,8 +393,8 @@ def render_proof(
     }
     if list(positions.values()) != sorted(positions.values()):
         raise AssertionError(f"Image/history chronology changed: {positions}")
-    if OLD_REASONING in decoded:
-        raise AssertionError("Default preserve_thinking=false replayed old reasoning")
+    if HISTORICAL_REASONING not in decoded:
+        raise AssertionError("Historical reasoning was missing from the rendered history")
     if "Reasoning effort is set to xhigh." not in decoded:
         raise AssertionError("Omitted reasoning controls did not resolve to xhigh")
 

@@ -451,13 +451,13 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    if model in _VLLM_STRUCTURAL_TAG_REGISTRY:\n'},)},
  {'name': 'qwen38-agent-defaults-and-thinking',
   'review_patch': 'patches/vllm-qwen38-agent-defaults-and-thinking.patch',
-  'review_sha256': '6428d2cfa77f28e57e117999d0ec8fab5430856c985ba530e04885c2f5c420b7',
+  'review_sha256': 'c3a7315c32f8b117066e851b123b7a1b446c2fcd4c8a1f2616774c8f9d668509',
   'files': ({'path': 'vllm/config/model.py',
              'before_sha256': '17c687232886184f0390f38fc1c2c8ae078eaf24ebd1960a6b0c6a0669a35a98',
              'after_sha256': '6a0b5fdcb292fef440ee59321b7db437dae2cd5fd80eb2372fa3647fb163a3cf'},
             {'path': 'vllm/entrypoints/anthropic/protocol.py',
              'before_sha256': 'a159978048c4cc8a409ca74b638618c5ccd2b1ffbc6a922702bc09b2918f9dc4',
-             'after_sha256': 'd7808b7aafdac29f3bbf5e8787dad83f913bba9b8626d52c2e6a92fb8ef87207'},
+             'after_sha256': 'b4841be67939294cfabbc5370452c3235f8c484fc9bcd2dea4821756db4df298'},
             {'path': 'vllm/entrypoints/anthropic/serving.py',
              'before_sha256': 'cc99303714b88b7138ff5411cc367a66f98bf851c55f63bff226f562f5b528ef',
              'after_sha256': 'b283dc7f47fe1cbb57f5a9cc4000a27ff5106e94d5caf152e5f7142e8a056e19'},
@@ -558,9 +558,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '        if self.type == "disabled":\n'
                       '            raise ValueError(\n'
                       '                "Thinking cannot be disabled in this '
-                      'correctness-first profile. "\n'
-                      '                "Use preserve_thinking=false to omit historical '
-                      'reasoning traces."\n'
+                      'correctness-first profile."\n'
                       '            )\n'
                       '        if self.type == "enabled" and self.budget_tokens is '
                       'None:\n'
@@ -617,9 +615,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '        if self.type == "disabled":\n'
                              '            raise ValueError(\n'
                              '                "Thinking cannot be disabled in this '
-                             'correctness-first profile. "\n'
-                             '                "Use preserve_thinking=false to omit '
-                             'historical reasoning traces."\n'
+                             'correctness-first profile."\n'
                              '            )\n'
                              '        if self.type == "enabled" and self.budget_tokens '
                              'is None:\n'
@@ -9178,8 +9174,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': '75636c2a7903738f0e8954394fcedfced318d30a41598a8aca533be2ea2c38c4',
              'after_sha256': '88582e97c98ffcd16416e48eeea3db415cab1f33673c7ff8c1613fa83aad1eac'},
             {'path': 'vllm/entrypoints/anthropic/protocol.py',
-             'before_sha256': 'd7808b7aafdac29f3bbf5e8787dad83f913bba9b8626d52c2e6a92fb8ef87207',
-             'after_sha256': 'aba739f2db3d34580fc558f91f9cbb712ed683012bb95767b625f1469ddaaac3'},
+             'before_sha256': 'b4841be67939294cfabbc5370452c3235f8c484fc9bcd2dea4821756db4df298',
+             'after_sha256': '27456d51cd30686c0b13507b99cc1568640168146b5e65076137d91f640ed0b8'},
             {'path': 'vllm/entrypoints/anthropic/serving.py',
              'before_sha256': '0e67a46639b5369fad8de21a31799b4fe2bfbbd93c5d1df02911f0f98a08a43c',
              'after_sha256': '5f6aea9c0fb658cac7ecded12e24bad63a27cc9c719a6dc1c4d0ca19104172d2'},
@@ -24322,7 +24318,7 @@ FINAL_FILES = {'tests/config/test_config_utils.py': '4f5ea0399cc3b4f9603df07e2cc
  'vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py': 'b343f5dc4a071a16820289d99dadfdb72e9afd8915b05a4a4b380e2b7071d704',
  'vllm/engine/arg_utils.py': '88582e97c98ffcd16416e48eeea3db415cab1f33673c7ff8c1613fa83aad1eac',
  'vllm/entrypoints/anthropic/api_router.py': '05d17ec4f7ef1f05bdf95b6ce0d04ab80d1f5f8d0bbc130a551ea0512897e56e',
- 'vllm/entrypoints/anthropic/protocol.py': 'aba739f2db3d34580fc558f91f9cbb712ed683012bb95767b625f1469ddaaac3',
+ 'vllm/entrypoints/anthropic/protocol.py': '27456d51cd30686c0b13507b99cc1568640168146b5e65076137d91f640ed0b8',
  'vllm/entrypoints/anthropic/serving.py': '5f6aea9c0fb658cac7ecded12e24bad63a27cc9c719a6dc1c4d0ca19104172d2',
  'vllm/entrypoints/chat_utils.py': 'ca23415158a124c1c53b21bee6e22ab0ee7b433f8c9389e208d32a52162fb947',
  'vllm/entrypoints/generate/api_router.py': '1971dbfd3f481b30db9491280aff517e05e6ac7ff8af4933c3eed24752dc582f',

@@ -189,7 +189,6 @@ def tokenizer_count(
         tokenize=True,
         add_generation_prompt=True,
         enable_thinking=True,
-        preserve_thinking=False,
         reasoning_effort="xhigh",
     )
     if hasattr(encoded, "keys"):
@@ -230,7 +229,6 @@ def server_token_count(messages: list[dict[str, Any]]) -> int:
             "tools": [tool()],
             "chat_template_kwargs": {
                 "enable_thinking": True,
-                "preserve_thinking": False,
                 "reasoning_effort": "xhigh",
             },
         },

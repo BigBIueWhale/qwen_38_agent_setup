@@ -162,7 +162,6 @@ model proxy inside the network-none agent namespace.
             "final_response_token_budget": 131072,
             "chat_template_kwargs": {
               "enable_thinking": true,
-              "preserve_thinking": false,
               "reasoning_effort": "xhigh",
               "add_vision_id": false
             }
@@ -255,8 +254,8 @@ The accepted Qwen Code contract is:
 2. the client container has no GPU, no Internet/DNS/default route, and reaches only
    the narrow model proxy; every published observer/API socket is loopback-only;
 3. model identity, 262,144 context, full-quality PNG vision, xhigh thinking,
-   `preserve_thinking=false`, all sampling parameters, both phase ceilings, and zero
-   silent retries/fallbacks are sealed into both client and server defaults;
+   all sampling parameters, both phase ceilings, and zero silent
+   retries/fallbacks are sealed into both client and server defaults;
 4. streamed and non-streamed tool turns have the same typed semantics, and complete
    tool-call/result history round-trips to identical model token IDs; partial deltas
    remain non-executable until the protocol's overall successful terminal, while

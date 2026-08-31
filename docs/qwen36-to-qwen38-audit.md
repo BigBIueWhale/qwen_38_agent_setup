@@ -59,20 +59,11 @@ Docker. The checks were not character-count estimates.
 - This deployment intentionally narrows that policy: Qwen `xhigh` is the only mode;
   Anthropic/OpenAI aliases `high` and `max` map to the exact same prompt; `medium`,
   `low`, and disabled thinking fail with HTTP 400 rather than silently degrading.
-- The selected Qwen3.8 template defaults to preserving old hidden reasoning traces.
-  This project deliberately changes the default to `preserve_thinking=false` to
-  conserve the physical context window. An explicit `true` restores the traces.
-- Omission applies to hidden traces from completed historical turns. Reasoning within
-  the current user/tool chain remains available to the model, and visible assistant
-  answers, tool calls, and tool results remain in history. This is context hygiene,
-  not conversation compaction and not deletion of the agent's observable work.
 - The Qwen3.8 template has stronger historical-tool-call validation: missing names or
   malformed argument types fail loudly. The project retains those checks.
 
 Live policy evidence from the final image:
 
-- default omission rendered 68 tokens versus 1,866 with explicit preservation for
-  the same synthetic history: 1,798 real tokenizer tokens saved;
 - `xhigh`, `high`, and `max` rendered identical token IDs;
 - OpenAI low/disabled and Anthropic low/disabled requests all returned HTTP 400;
 - Anthropic adaptive/max returned a thinking block;
@@ -133,8 +124,7 @@ Chat Completions request proved the alias is normalized.
 
 Narrow caveat: `/tokenize` uses its own `TokenizeChatRequest` model and bypasses the
 Chat Completions request normalizer. That diagnostic route is not inference ingress.
-Use `reasoning` there. The default `preserve_thinking=false` is unaffected because it
-intentionally omits old hidden traces.
+Use `reasoning` there.
 
 ### 5. `monkey_patch_tool_call_in_think_detector.py` — tool call before `</think>`
 
@@ -401,5 +391,5 @@ served tokenizer, `finish_reason="length"`, and
   current-source fixes or live long-context/tool validation.
 - The original `agent_service` now runs the pinned Qwen Code client with the exact
   vLLM tokenizer, full-quality chronological PNG tools, foreground-only subagents,
-  xhigh/unpreserved-thinking defaults, and live cache/lifecycle acceptance. It does
+  xhigh thinking defaults, and live cache/lifecycle acceptance. It does
   not resurrect the historical Qwen3.6 launcher or create a second model mode.

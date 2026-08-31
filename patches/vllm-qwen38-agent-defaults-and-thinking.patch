@@ -22,7 +22,7 @@ diff --git a/vllm/entrypoints/anthropic/protocol.py b/vllm/entrypoints/anthropic
 index 02b9356113..cf52797461 100644
 --- a/vllm/entrypoints/anthropic/protocol.py
 +++ b/vllm/entrypoints/anthropic/protocol.py
-@@ -117,6 +117,39 @@ class AnthropicOutputConfig(BaseModel):
+@@ -117,6 +117,38 @@ class AnthropicOutputConfig(BaseModel):
      effort: Literal["low", "medium", "high", "xhigh", "max"] | None = None
      format: AnthropicJsonOutputFormat | None = None
  
@@ -46,8 +46,7 @@ index 02b9356113..cf52797461 100644
 +    def validate_budget_shape(self) -> "AnthropicThinkingConfig":
 +        if self.type == "disabled":
 +            raise ValueError(
-+                "Thinking cannot be disabled in this correctness-first profile. "
-+                "Use preserve_thinking=false to omit historical reasoning traces."
++                "Thinking cannot be disabled in this correctness-first profile."
 +            )
 +        if self.type == "enabled" and self.budget_tokens is None:
 +            raise ValueError(

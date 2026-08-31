@@ -198,7 +198,6 @@ def serialized_count(tokenizer: Any, messages: list[dict[str, Any]]) -> int:
         tokenize=True,
         add_generation_prompt=True,
         enable_thinking=True,
-        preserve_thinking=False,
         reasoning_effort="xhigh",
     )
     if hasattr(encoded, "keys"):

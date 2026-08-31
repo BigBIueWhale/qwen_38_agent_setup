@@ -1,5 +1,14 @@
 #!/usr/bin/env python3
-"""Live fail-closed checks for the one Qwen3.8 agent policy."""
+"""Live fail-closed checks for the one Qwen3.8 agent policy.
+
+The history fixtures here deliberately contain a second interactive user turn
+(user -> assistant-with-reasoning -> user), so they exercise rendering across
+a completed conversational episode: historical reasoning must appear in the
+rendered prompt, and legacy `reasoning_content` on Chat Completions ingress
+must normalize to the canonical `reasoning` field with identical token
+accounting. Effort aliasing, weaker-mode rejection, and both phase-budget
+gates are asserted on single-turn requests.
+"""
 
 from __future__ import annotations
 
@@ -75,24 +84,27 @@ def main() -> None:
         {
             "role": "assistant",
             "content": "visible result",
-            "reasoning_content": hidden_marker,
             "reasoning": hidden_marker,
         },
         {"role": "user", "content": "second turn"},
     ]
+    stripped_history = [
+        history[0],
+        {"role": "assistant", "content": "visible result"},
+        history[2],
+    ]
 
     default_render = tokenize(history)
-    explicit_omit = tokenize(history, preserve_thinking=False)
-    explicit_preserve = tokenize(history, preserve_thinking=True)
-    if default_render["tokens"] != explicit_omit["tokens"]:
-        raise RuntimeError("server default is not exactly preserve_thinking=false")
-    if explicit_preserve["count"] <= default_render["count"] + 256:
+    stripped_render = tokenize(stripped_history)
+    if default_render["count"] <= stripped_render["count"] + 256:
         raise RuntimeError(
-            "preserve_thinking=true did not restore the hidden trace by the "
-            f"required margin: omitted={default_render['count']}, "
-            f"preserved={explicit_preserve['count']}"
+            "historical reasoning was not rendered into the prompt by the "
+            f"required margin: with={default_render['count']}, "
+            f"without={stripped_render['count']}"
         )
 
+    # /tokenize bypasses the Chat Completions ingress normalizer, so the
+    # legacy-alias check must go through a real Chat Completions request.
     legacy_history = [
         history[0],
         {
@@ -102,15 +114,19 @@ def main() -> None:
         },
         history[2],
     ]
-    legacy_default_tokens = chat_prompt_tokens(legacy_history)
-    legacy_preserved_tokens = chat_prompt_tokens(
-        legacy_history, preserve_thinking=True
-    )
-    if legacy_preserved_tokens <= legacy_default_tokens + 256:
+    canonical_tokens = chat_prompt_tokens(history)
+    legacy_tokens = chat_prompt_tokens(legacy_history)
+    stripped_tokens = chat_prompt_tokens(stripped_history)
+    if legacy_tokens != canonical_tokens:
         raise RuntimeError(
-            "Chat Completions failed to normalize legacy reasoning_content "
-            f"on ingress: omitted={legacy_default_tokens}, "
-            f"preserved={legacy_preserved_tokens}"
+            "Chat Completions did not normalize legacy reasoning_content to "
+            f"the canonical reasoning field: legacy={legacy_tokens}, "
+            f"canonical={canonical_tokens}"
+        )
+    if legacy_tokens <= stripped_tokens + 256:
+        raise RuntimeError(
+            "legacy reasoning_content ingress did not render the historical "
+            f"trace: legacy={legacy_tokens}, without={stripped_tokens}"
         )
 
     simple = [{"role": "user", "content": "Return POLICY_OK."}]
@@ -238,11 +254,8 @@ def main() -> None:
     print(
         json.dumps(
             {
-                "default_preserve_thinking": False,
-                "omitted_history_tokens": default_render["count"],
-                "preserved_history_tokens": explicit_preserve["count"],
-                "history_tokens_saved": explicit_preserve["count"]
-                - default_render["count"],
+                "historical_reasoning_tokens_rendered": default_render["count"]
+                - stripped_render["count"],
                 "legacy_reasoning_content_chat_ingress_normalized": True,
                 "xhigh_high_max_tokenization_identical": True,
                 "openai_low_rejected_http": openai_low_status,

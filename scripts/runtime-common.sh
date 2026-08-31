@@ -828,7 +828,7 @@ print_healthy_summary() {
   printf 'Context limit: %s tokens\n' "${MAX_MODEL_LEN}"
   printf 'Vision:         15 inline static PNG images; 16,777,216 pixels each; videos disabled\n'
   printf 'Image quality:  BF16 vision tower; <=30:1 proven aspect ratio; no request overrides\n'
-  printf 'Thinking:      xhigh; old traces omitted by default\n'
+  printf 'Thinking:      xhigh\n'
   printf 'Sampling:      explicit Qwen3.8 defaults; repetition penalty 1.0\n'
   printf 'Phase ceilings: reasoning 262144; final response 131072 tokens\n'
   printf 'Runtime image: %s\n' "${EXPECTED_IMAGE_ID}"

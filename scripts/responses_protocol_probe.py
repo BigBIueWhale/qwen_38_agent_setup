@@ -61,7 +61,6 @@ def base_payload(*, stream: bool) -> dict:
         "reasoning": {"effort": "xhigh"},
         "chat_template_kwargs": {
             "enable_thinking": True,
-            "preserve_thinking": False,
             "reasoning_effort": "xhigh",
         },
     }
@@ -193,7 +192,6 @@ def main() -> None:
                 "stream_nonstream_tool_semantics_equal": True,
                 "final_transport_contracts_passed": True,
                 "explicit_reasoning_effort": "xhigh",
-                "explicit_preserve_thinking": False,
             },
             ensure_ascii=False,
             indent=2,

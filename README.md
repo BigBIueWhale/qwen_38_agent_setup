@@ -29,7 +29,6 @@ The deployment is complete and healthy. There is one supported mode:
 | Images | At most 15 static inline PNGs, 16,777,216 pixels each, aspect ratio at most 30:1 |
 | Video/audio | Rejected |
 | Thinking | Always enabled at xhigh; high and max are exact aliases |
-| Historical thinking | Omitted by default and by the supported agent client |
 | Reasoning ceiling | 262,144 generated reasoning tokens, subject to remaining context |
 | Final-answer ceiling | 131,072 generated final tokens, subject to remaining context |
 | MTP/speculation | Disabled |
@@ -328,8 +327,7 @@ restore, and build verification. The exact server argument semantics are:
     --enable-auto-tool-choice
     --tool-call-parser qwen3_coder
     --default-chat-template-kwargs
-      {"enable_thinking":true,"preserve_thinking":false,
-       "reasoning_effort":"xhigh","add_vision_id":false}
+      {"enable_thinking":true,"reasoning_effort":"xhigh","add_vision_id":false}
     --limit-mm-per-prompt
       {"image":{"count":15,"width":4096,"height":4096},"video":0}
     --mm-processor-kwargs
@@ -386,7 +384,6 @@ omits Qwen-specific fields receives all of these server-side defaults:
 
     enable_thinking       = true
     reasoning_effort      = xhigh
-    preserve_thinking     = false
     add_vision_id         = false
 
     temperature           = 1.0
@@ -409,14 +406,6 @@ supported Anthropic high/max-style forms render the same xhigh model token IDs.
 Medium, low, disabled thinking, and incompatible Anthropic controls are rejected with
 HTTP 400. The supported agent client always sends xhigh and never asks for a weaker
 mode.
-
-preserve_thinking=false does not turn reasoning off. It removes completed hidden
-reasoning blocks from older turns while retaining visible answers, native tool calls,
-typed tool results, and the current unresolved user/tool chain. This is the selected
-single-long-thread policy: scarce context is spent on the task and its durable
-outcomes instead of replaying every old hidden trace. A direct diagnostic API request
-can explicitly test preserve_thinking=true, and that behavior was verified, but it is
-not the supported agent-service policy or another launch mode.
 
 Alibaba's 262,144 reasoning and 131,072 final ceilings are recommendations for
 frameworks that distinguish the phases within a much larger window. Locally they are
@@ -713,10 +702,6 @@ semantic OCR is not treated as an acceptance invariant. Every chronologically va
 OpenAI/Anthropic stream and non-stream request still required and returned the exact
 pixel-only value.
 
-This cache behavior does not depend on preserving old hidden reasoning. Omitting
-completed hidden traces stabilizes the durable message prefix and gives the main
-thread more useful lifetime; retained visible/tool/image history remains cacheable.
-
 ### Tool calling and protocol correctness
 
 The server explicitly selects the qwen3 reasoning parser and qwen3_coder tool parser.
@@ -775,83 +760,79 @@ rerun after every runtime-profile change before that image is accepted:
 4. MTP/speculation absent, CPU weight offload zero, KV offload confined to the
    declared 7,747,584,000-byte ARC host tier, CUDA graphs retained: pass.
 5. Exact xhigh defaults, high/max alias identity, low/disabled rejection: pass.
-6. Default preserve_thinking=false and explicit diagnostic restoration: pass; omission
-   saved 1,798 real tokens in the controlled history.
-7. Exact five-real-token final-response phase stop: pass.
-8. OpenAI/Anthropic tool loops, adversarial grammar, orphan rejection, and
+6. Exact five-real-token final-response phase stop: pass.
+7. OpenAI/Anthropic tool loops, adversarial grammar, orphan rejection, and
    streaming/non-streaming round trip: pass.
-9. Responses streaming/non-streaming tool loop and incomplete-output gates: pass.
-10. Fifteen full-pixel distinct-image transcription and sixteenth-image rejection:
+8. Responses streaming/non-streaming tool loop and incomplete-output gates: pass.
+9. Fifteen full-pixel distinct-image transcription and sixteenth-image rejection:
     pass.
-11. Portrait/landscape 30:1 far-end perception and 31:1 rejection: pass.
-12. Chronological OpenAI/Anthropic tool-result image parity: pass.
-13. Cold/warm image and prompt-cache counters plus time separation: pass.
-14. Exact 262,143-prompt-plus-one-output native boundary with fifteen images: pass;
+10. Portrait/landscape 30:1 far-end perception and 31:1 rejection: pass.
+11. Chronological OpenAI/Anthropic tool-result image parity: pass.
+12. Cold/warm image and prompt-cache counters plus time separation: pass.
+13. Exact 262,143-prompt-plus-one-output native boundary with fifteen images: pass;
     262,145 total rejected.
-15. Logs after maximum image/context work: no CUDA OOM, allocation retry, preemption,
+14. Logs after maximum image/context work: no CUDA OOM, allocation retry, preemption,
     semantic fallback, or failed restoration.
-16. Complete official-BF16 versus converted tensor audit: pass; 1,199 official and
+15. Complete official-BF16 versus converted tensor audit: pass; 1,199 official and
     1,968 converted tensors fully accounted, 233 FP8 and 168 NVFP4 tensors fully
     dequantized, and all 798 reference-precision tensors compared.
-17. Actual K8V4 Triton store/fused decode versus independently packed FP32 reference:
+16. Actual K8V4 Triton store/fused decode versus independently packed FP32 reference:
     pass; maximum absolute difference 0.00381172 and minimum cosine 0.999998331.
-18. Actual worst-layer NVFP4 production kernel versus independent dequantization and
+17. Actual worst-layer NVFP4 production kernel versus independent dequantization and
     BF16 matmul at M=1/17/129: pass; required FlashInfer-CUTLASS selector.
-19. Exact text/image MRoPE implementation versus independent Transformers 5.15
+18. Exact text/image MRoPE implementation versus independent Transformers 5.15
     semantics and continuation positions: pass.
-20. Pinned Qwen Code archive plus exact semantic reconstruction: pass; exactly 61
+19. Pinned Qwen Code archive plus exact semantic reconstruction: pass; exactly 61
     changed/new files and 2,427 assertions across 23 focused test files; the full
     no-cache build reproduced agent image
     sha256:9393fe2c53b34ba220ef86a930ab6ea2c6c7ad23a439af85f6c98cc446fe2f15.
-21. All pinned Rust component tests and clean release images: pass; 44 service,
+20. All pinned Rust component tests and clean release images: pass; 44 service,
     9 broker, 3 relay, 2 capture, and 2 agent-exec tests. The same no-cache release
     exactly reproduced the locked relay, capture, broker, and service image IDs.
-22. Real Qwen Code hostile-workspace text, full-resolution PNG vision, PTY shell,
+21. Real Qwen Code hostile-workspace text, full-resolution PNG vision, PTY shell,
     write/read, and final response: pass in seven turns. Ordinary QWEN.md and
     AGENTS.md guidance remained active while `.env`, MCP, hooks, skills, rules,
     memory, output language, workspace settings, and slash commands remained inert;
     the model read exact code `VISION_AGENT_PTY_4827` and the shell emitted exact
     marker `QWEN38_AGENT_ISOLATION_OK`.
-23. Locked-mode authentication revalidation: pass. An earlier candidate exposed an
+22. Locked-mode authentication revalidation: pass. An earlier candidate exposed an
     upstream late `.env` load after tools; the accepted narrow source repair keeps
     environment/workspace loading disabled on every later auth validation. The full
     source matrix and a fresh hostile live session proved the marker absent.
-24. Real Qwen Code prefix and image caching: pass. The recorded v8 cache acceptance
+23. Real Qwen Code prefix and image caching: pass. The recorded v8 cache acceptance
     added 296,939 prompt tokens; vLLM recorded 241,280 local prefix hits, 55,659
     locally computed tokens, and 3 multimodal-cache hits across 20 requests.
-25. PTY and foreground subagent: pass. A separate real PTY session produced exact
+24. PTY and foreground subagent: pass. A separate real PTY session produced exact
     shell/file output. One Explore subagent returned through correlated parent/child
     tool events, used native list/read plus a shell byte check, and was independently
     verified by the main thread. Explore retained writable conversion/scratch tools;
     its trusted effect journal proved zero workspace/artifact effects for that task.
-26. Live stack isolation and lifecycle: pass. vLLM and the service are network-none;
+25. Live stack isolation and lifecycle: pass. vLLM and the service are network-none;
     only two minimal fixed ingress relays use host networking. The service has no raw
     Docker socket; a network-none typed broker is its sole holder. Backend and agent
     roots are read-only, agents have no route/DNS/GPU/published port, model access is
     through the exact socket relay, session output is unmounted from the agent, and
     all components are capability-free with no-new-privileges.
-27. Readiness-boundary cancellation: pass. The request acknowledged in 785 ms and
+26. Readiness-boundary cancellation: pass. The request acknowledged in 785 ms and
     terminated in 1,863 ms with zero turns, exit 143, an empty event stream, a
     complete nine-file bundle, no fabricated success, and no session-container
     leftovers.
-28. Late capture subscriber correctness: pass. A production benchmark run exposed
+27. Late capture subscriber correctness: pass. A production benchmark run exposed
     that Docker `logs --follow --since 0s` starts at relative "now" and can miss an
     already-emitted `CAPTURE_COMPLETE`. The broker now uses exact Unix epoch `0`;
     its new unit test freezes that replay contract. The service continued to fail
     closed during the faulty run and retained its evidence instead of parsing
     unproved output.
-29. Clean repaired production release: pass. The pinned build ran 44 service, 9
+28. Clean repaired production release: pass. The pinned build ran 44 service, 9
     broker, 3 relay, 2 capture, and 2 agent-exec Rust tests, all 2,427 Qwen Code
     assertions, and reproduced all five final image IDs. A fresh five-turn
     production tool round trip then completed normally with a clean eleven-file
     bundle and no session containers.
-30. Production-service SWE-rebench pilot: pass. Both history-policy variants ran
-    through real production session creation and `/wait`; neither Harbor nor the
-    evaluator called vLLM. The supported `preserve_thinking=false` run resolved all
-    11 evaluator checks in 61 turns. The explicit `true` diagnostic also resolved
-    all 11, in 83 turns and with 48.0% more aggregate input-token traffic. The two
-    earlier orchestration failures are retained as infrastructure evidence and are
-    not model scores.
+29. Production-service SWE-rebench pilot: pass. The pilot task ran through real
+    production session creation and `/wait`; neither Harbor nor the evaluator
+    called vLLM. The production session resolved all 11 evaluator checks in 61
+    turns. The two earlier orchestration failures are retained as infrastructure
+    evidence and are not model scores.
 
 The supported status currently reports:
 
@@ -860,7 +841,7 @@ The supported status currently reports:
     262144 total-token context
     15 inline static PNG images, 16777216 pixels each
     BF16 vision tower, aspect ratio <= 30:1
-    xhigh thinking, old traces omitted by default
+    xhigh thinking
     explicit Qwen3.8 sampling
     reasoning/final ceilings 262144 / 131072
 
@@ -893,7 +874,6 @@ subagent turn:
 - contextWindowSize 262144;
 - exact server/model identity;
 - xhigh mandatory thinking;
-- preserveThinking false;
 - Alibaba thinking sampling tuple;
 - total generation ceiling 262144 and separate final ceiling 131072;
 - exact /tokenize count on the same rendered request before generation;
@@ -923,16 +903,14 @@ frontend compatibility cache counter is deliberately not trusted over vLLM's
 authoritative counters.
 
 The final coding pilot likewise measured the deployed pair rather than bypassing it.
-The harness submitted the same pinned SWE-rebench task to real production
+The harness submitted the pinned SWE-rebench task to real production
 `POST /v1/agent/sessions`, waited on the production notification endpoint, required
 the service's durable terminal bundle, and invoked the immutable evaluator only on
-that captured post-session workspace. The normal `preserve_thinking=false` session
-resolved all 11 evaluator checks in 61 turns and 1,090,658 ms. An explicitly typed
-`true` diagnostic also resolved all 11 in 83 turns and 1,081,835 ms, while sending
-1,636,513 more aggregate input tokens through Qwen Code. This single sampled pair
-supports the normal policy's context efficiency but is not a population-level
-quality or latency claim. Exact production release IDs, input hashes, failure
-classification, bundle/patch hashes, and replay procedure are recorded in
+that captured post-session workspace. The production session resolved all 11
+evaluator checks in 61 turns and 1,090,658 ms. One completed task is a lifecycle
+proof for the deployed pair, not a benchmark-suite score. Exact production release
+IDs, input hashes, failure classification, bundle/patch hashes, and replay
+procedure are recorded in
 `/home/user/Desktop/agent_service/docs/production-swe-rebench-pilot.md`.
 
 Codex Responses and Anthropic Messages protocol surfaces are proven on the server,

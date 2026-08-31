@@ -830,13 +830,8 @@ base_context = {
     "raise_exception": raise_exception,
 }
 rendered = template.render(**base_context, reasoning_effort="max")
-assert "OLD_HIDDEN_TRACE" not in rendered
-preserved = template.render(
-    **base_context,
-    reasoning_effort="high",
-    preserve_thinking=True,
-)
-assert "OLD_HIDDEN_TRACE" in preserved
+assert "OLD_HIDDEN_TRACE" in rendered
+assert template.render(**base_context, reasoning_effort="high") == rendered
 for rejected_context in (
     {"reasoning_effort": "medium"},
     {"reasoning_effort": "low"},

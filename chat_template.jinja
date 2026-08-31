@@ -56,7 +56,7 @@
 {%- set merged_system = sysns.text %}
 {%- set reasoning_instructions = '' %}
 {%- if enable_thinking is defined and enable_thinking is false %}
-    {{- raise_exception('Thinking cannot be disabled in this correctness-first profile. Use xhigh thinking and preserve_thinking=false to omit historical traces.') }}
+    {{- raise_exception('Thinking cannot be disabled in this correctness-first profile.') }}
 {%- else %}
     {%- set resolved_reasoning_effort = reasoning_effort|default('xhigh') %}
     {%- if resolved_reasoning_effort == 'high' or resolved_reasoning_effort == 'max' %}
@@ -114,8 +114,7 @@
             {%- set reasoning_content = message.reasoning_content %}
         {%- endif %}
         {%- set reasoning_content = reasoning_content|trim %}
-        {#- By default, omit old hidden traces while retaining reasoning from the current user/tool chain. Explicit preserve_thinking=true restores full-history traces. #}
-        {%- if preserve_thinking is true or loop.index0 > ns.last_query_index %}
+        {%- if preserve_thinking is undefined or preserve_thinking is true or loop.index0 > ns.last_query_index %}
             {{- '<|im_start|>' + message.role + '\n<think>\n' + reasoning_content + '\n</think>\n\n' + content }}
         {%- else %}
             {{- '<|im_start|>' + message.role + '\n' + content }}
@@ -176,4 +175,4 @@
     {{- '<|im_start|>assistant\n' }}
     {{- '<think>\n' }}
 {%- endif %}
-{#- Project-pinned agent template: developer roles, merged system messages, xhigh-only effort, historical thinking omitted by default, and fail-loud historical tool-call validation. #}
+{#- Project-pinned agent template: developer roles, merged system messages, xhigh-only effort, and fail-loud historical tool-call validation. #}

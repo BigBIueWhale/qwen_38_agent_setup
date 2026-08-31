@@ -95,7 +95,6 @@ def transformers_token_count(tokenizer, messages: list[dict]) -> int:
         tokenize=True,
         add_generation_prompt=True,
         enable_thinking=True,
-        preserve_thinking=True,
     )
     if hasattr(encoded, "keys"):
         return len(encoded["input_ids"])
