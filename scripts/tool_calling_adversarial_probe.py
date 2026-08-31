@@ -233,10 +233,34 @@ def real_tokenizer_and_grammar_probe() -> dict[str, Any]:
     extra_property = valid.replace(
         '"retries":2}', '"retries":2,"fallback":true}', 1
     )
+    # A span that omits a required parameter is a perfectly grammatical XML
+    # call describing a different request. Production forensics found exactly
+    # this shape: the model discharged a pending optional parameter into the
+    # prose channel and then closed a legal call without it, so the omission
+    # executed silently. For a parameter in ``required`` the grammar must
+    # make that serialization impossible in-span, or requiring parameters
+    # buys nothing at decode time.
+    missing_required = valid.replace(
+        '<parameter=paths>["a","b"]</parameter>\n', "", 1
+    )
+    # A repeated parameter name would reach the XML argument converter as a
+    # silent last-wins overwrite; it must never leave the sampler.
+    duplicate_parameter = valid.replace(
+        '<parameter=paths>["a","b"]</parameter>\n',
+        '<parameter=paths>["a","b"]</parameter>\n'
+        '<parameter=paths>["a","b"]</parameter>\n',
+        1,
+    )
     valid_ok, valid_reject = xgrammar_accepts(compiled, tokenizer, valid)
     unknown_ok, unknown_reject = xgrammar_accepts(compiled, tokenizer, unknown)
     wrong_type_ok, wrong_type_reject = xgrammar_accepts(compiled, tokenizer, wrong_type)
     extra_ok, extra_reject = xgrammar_accepts(compiled, tokenizer, extra_property)
+    missing_ok, missing_reject = xgrammar_accepts(
+        compiled, tokenizer, missing_required
+    )
+    duplicate_ok, duplicate_reject = xgrammar_accepts(
+        compiled, tokenizer, duplicate_parameter
+    )
     if not valid_ok or valid_reject is not None:
         raise AssertionError(f"Valid nested grammar rejected at {valid_reject}")
     if unknown_ok or unknown_reject is None:
@@ -245,6 +269,14 @@ def real_tokenizer_and_grammar_probe() -> dict[str, Any]:
         raise AssertionError("Schema-invalid nested type was not rejected by XGrammar")
     if extra_ok or extra_reject is None:
         raise AssertionError("additionalProperties:false was not enforced by XGrammar")
+    if missing_ok or missing_reject is None:
+        raise AssertionError(
+            "A call omitting a required parameter was not rejected by XGrammar"
+        )
+    if duplicate_ok or duplicate_reject is None:
+        raise AssertionError(
+            "A duplicated parameter name was not rejected by XGrammar"
+        )
 
     # Sensitivity control for the exact scheduler bug: without the structural
     # trigger token, triggered-tag grammar treats the remaining XML as ordinary
@@ -304,6 +336,8 @@ def real_tokenizer_and_grammar_probe() -> dict[str, Any]:
         "unknown_tool_rejected_at_token": unknown_reject,
         "wrong_nested_type_rejected_at_token": wrong_type_reject,
         "extra_property_rejected_at_token": extra_reject,
+        "missing_required_rejected_at_token": missing_reject,
+        "duplicate_parameter_rejected_at_token": duplicate_reject,
         "dropped_trigger_control_accepts_unknown_call": True,
         "fixed_trim_retains_trigger": True,
         "unified_parser_implicit_tool_call": True,
