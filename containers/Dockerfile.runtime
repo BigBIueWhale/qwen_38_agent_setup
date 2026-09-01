@@ -982,7 +982,7 @@ LABEL org.opencontainers.image.revision="9df9b0b0a1816b6d0d0f6ecd0da563cc37fd72f
       qwen38.patch.tool-truncation.parser-engine-file.sha256="9ffce8a3aac1d885cbbd4de269201ef32bdd6089b5f92d61f94eebf1130a5faf" \
       qwen38.template.file.sha256="07d9cf1a50bc702b27832586af016188d4cb5787e9a88847a5611237f722343e" \
       qwen38.project="Qwen_best_model_ever" \
-      qwen38.runtime.profile="socket-isolated-nonroot-vision-k8v4-agent-v16"
+      qwen38.runtime.profile="socket-isolated-nonroot-vision-k8v4-agent-v17"
 
 ENV HOME=/home/vllm \
     VLLM_CACHE_ROOT=/home/vllm/.cache/vllm \
