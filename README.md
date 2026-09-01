@@ -33,7 +33,7 @@ The deployment is complete and healthy. There is one supported mode:
 | Final-answer ceiling | 131,072 generated final tokens, subject to remaining context |
 | MTP/speculation | Disabled |
 | CPU weight offload | Zero |
-| KV offload | One declared resident user context, pinned host tier in /dev/shm; scope-aware eviction |
+| KV offload | One declared resident user context, pinned host tier in /dev/shm; recency-aged |
 | Batching | One sequence; 2,048-token chunked prefill |
 | Listener | 127.0.0.1:8000 only |
 | Agent client | Qwen Code 0.21.12 at b965d5f8c24f48e65fb0b17c7d45f34ca4ce8f38 |
@@ -366,9 +366,7 @@ Consequences:
 - CPU weight offload is exactly zero. KV offload is not: the OffloadingConnector runs
   in kv_both role with a pinned host tier in /dev/shm sized as one declared resident
   user context (bytes derived in-engine from max_model_len and the KV cache spec).
-  Eviction is scope-aware: a request's kv_scope_release drops a terminated
-  subagent's blocks as a unit, and the live set ages by recency. That tier is live
-  and serving hits.
+  Its live set ages by recency. That tier is live and serving hits.
 - Multimodal profiling is mandatory and cannot be skipped to obtain a deceptively
   optimistic allocation.
 - All unquantized model computation, including the entire vision tower, uses BF16.

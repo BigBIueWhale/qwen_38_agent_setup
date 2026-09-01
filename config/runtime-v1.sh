@@ -296,12 +296,9 @@ VLLM_ARGS=(
   # cpu_kv_cache_users:1 = one resident full-length context: every attention
   # chunk plus the trailing recurrent-state chunk a full-length re-entry
   # actually reads (~6.6 GB, inside the container's 8 GiB /dev/shm mmap,
-  # pre-faulted and page-locked — hard, unswappable host memory). Eviction is
-  # scope-aware, not a policy knob: each chunk is owned by the agent scope
-  # that last used it, and a request's kv_scope_release drops a terminated
-  # subagent's chunks as a unit. ARC existed to approximate exactly that
-  # deadness from recency; the harness now states it, so there is nothing
-  # left to select.
+  # pre-faulted and page-locked — hard, unswappable host memory). The tier
+  # holds exactly that one context, so its live set ages by recency and there
+  # is no eviction policy to select.
   --kv-transfer-config
   '{"kv_connector":"OffloadingConnector","kv_role":"kv_both","kv_connector_extra_config":{"cpu_kv_cache_users":1}}'
   --enable-prefix-caching

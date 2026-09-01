@@ -19,11 +19,11 @@ valid on one machine:
   (page sizes, hybrid group structure, TP sharding), which is why the
   operator had to bake measured constants.
 
-Eviction was pure recency (`eviction_policy: "arc"`). Recency fails at one
-provable moment: when a subagent finishes, its context is dead AND
-most-recently-used, so ARC/LRU protects a corpse and evicts the live main
-agent's blocks. ARC was chosen precisely to *approximate* that deadness;
-the harness can now *state* it.
+Recency alone fails at one provable moment: when a subagent finishes, its
+context is dead AND most-recently-used, so a recency policy protects a
+corpse and evicts the live main agent's blocks. A recency policy can only
+*approximate* that deadness, so the server accepts a protocol by which a
+client that tracks agent lifetimes can *state* it instead.
 
 ## 2. Decisions
 
@@ -250,7 +250,10 @@ deletion, so the transaction learns it end-to-end:
   a deleted path must be absent in both the patched verification worktree
   and the live tree.
 
-## 3. Subagent lifecycle, end to end
+## 3. Subagent lifecycle the protocol admits
+
+The sequence below is the contract the server implements; it is what a
+client that tracks agent lifetimes sends to use scope ownership.
 
 1. Main agent runs; its requests carry `kv_scope: null`. Stored/touched
    chunks are owned by the null scope.
