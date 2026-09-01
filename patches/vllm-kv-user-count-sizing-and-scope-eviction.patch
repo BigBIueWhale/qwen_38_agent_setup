@@ -293,22 +293,17 @@ diff --git a/tests/v1/kv_connector/unit/offloading_connector/test_scheduler.py b
      is_store_reachable_swa_chunk,
  )
  from vllm.v1.core.kv_cache_manager import KVCacheBlocks
-@@ -3363,3 +3363,67 @@
+@@ -3363,3 +3363,28 @@
      assert get_sliding_window_size_in_chunks(spec, tokens_per_chunk=1024) == 8
      # Partial chunks round up, so the reachable tail is never understated.
      assert get_sliding_window_size_in_chunks(spec, tokens_per_chunk=3000) == 3
 +
 +
-+def _make_scoped_request(
-+    req_id: str,
-+    kv_scope: str | None,
-+    kv_scope_release: list[str] | None,
-+) -> MagicMock:
++def _make_scoped_request(req_id: str, kv_scope: str | None) -> MagicMock:
 +    request = MagicMock()
 +    request.request_id = req_id
 +    request.kv_transfer_params = None
 +    request.kv_scope = kv_scope
-+    request.kv_scope_release = kv_scope_release
 +    request.num_prompt_tokens = 4
 +    request.num_tokens = 4
 +    request.block_hashes = [BlockHash(b"h0")]
@@ -318,48 +313,14 @@ diff --git a/tests/v1/kv_connector/unit/offloading_connector/test_scheduler.py b
 +    return request
 +
 +
-+def test_on_new_request_applies_scope_releases_before_registration():
-+    """kv_scope_release must reach the manager as release_scope calls, and
-+    strictly before the releasing request registers: the parent's own
-+    lookup has to run against a pool where the dead subagent occupies
-+    nothing."""
-+    scheduler = _make_partial_tail_scheduler()
-+    manager = scheduler.manager
-+    call_order: list[str] = []
-+    manager.release_scope.side_effect = lambda scope: call_order.append(
-+        f"release:{scope}"
-+    )
-+    original_on_new = manager.on_new_request.side_effect
-+
-+    def record_on_new(req_context):
-+        call_order.append("on_new_request")
-+        if original_on_new is not None:
-+            return original_on_new(req_context)
-+        return RequestOffloadingContext()
-+
-+    manager.on_new_request.side_effect = record_on_new
-+
-+    request = _make_scoped_request("parent", None, ["toolu_A", "toolu_B"])
-+    scheduler.on_new_request(request)
-+
-+    assert call_order == ["release:toolu_A", "release:toolu_B", "on_new_request"]
-+
-+
-+def test_on_new_request_without_releases_calls_no_release():
-+    scheduler = _make_partial_tail_scheduler()
-+    request = _make_scoped_request("sub", "toolu_A", None)
-+    scheduler.on_new_request(request)
-+    scheduler.manager.release_scope.assert_not_called()
-+
-+
 +def test_req_context_carries_the_request_scope():
-+    """Every manager call for a request must see its owning scope — that is
-+    the identity whole-scope release keys on."""
++    """Every manager call for a request must see its owning agent — that
++    is the identity the tier groups blocks by."""
 +    scheduler = _make_partial_tail_scheduler()
-+    scheduler.on_new_request(_make_scoped_request("sub", "toolu_A", None))
-+    assert scheduler._req_status["sub"].req_context.kv_scope == "toolu_A"
++    scheduler.on_new_request(_make_scoped_request("sub", "agent_A"))
++    assert scheduler._req_status["sub"].req_context.kv_scope == "agent_A"
 +
-+    scheduler.on_new_request(_make_scoped_request("main", None, None))
++    scheduler.on_new_request(_make_scoped_request("main", None))
 +    assert scheduler._req_status["main"].req_context.kv_scope is None
 diff --git a/tests/v1/kv_connector/unit/offloading_connector/test_worker.py b/tests/v1/kv_connector/unit/offloading_connector/test_worker.py
 --- a/tests/v1/kv_connector/unit/offloading_connector/test_worker.py
@@ -1205,7 +1166,7 @@ diff --git a/tests/v1/kv_offload/cpu/test_manager.py b/tests/v1/kv_offload/cpu/t
          enable_events=True,
          store_threshold=2,
          max_tracker_size=3,
-@@ -971,115 +563,227 @@
+@@ -971,115 +563,147 @@
  
  def test_evictable_cache_block_count():
      """
@@ -1285,7 +1246,8 @@ diff --git a/tests/v1/kv_offload/cpu/test_manager.py b/tests/v1/kv_offload/cpu/t
      manager.prepare_load(to_keys([10, 11, 12]), _EMPTY_REQ_CTX)
      # cache state [10', 11', 12', x]
 -    assert manager._num_evictable_cache_blocks == 0
--
++    assert evictable() == 0
+ 
 -    # prepare_store requiring eviction must return None immediately (fast exit).
 -    # Spy on policy.evict to confirm the fast path short-circuits before calling it.
 -    evict_called = False
@@ -1297,8 +1259,6 @@ diff --git a/tests/v1/kv_offload/cpu/test_manager.py b/tests/v1/kv_offload/cpu/t
 -        return original_evict(*args, **kwargs)
 -
 -    manager._policy.evict = spy_evict  # type: ignore[method-assign]
-+    assert evictable() == 0
-+
 +    # prepare_store requiring eviction must return None immediately: an
 +    # empty evictable set short-circuits before any candidate scan.
      # cache state [10', 11', 12', x] <- cannot evict anything
@@ -1319,174 +1279,87 @@ diff --git a/tests/v1/kv_offload/cpu/test_manager.py b/tests/v1/kv_offload/cpu/t
      manager.complete_store(to_keys([14, 15]), _EMPTY_REQ_CTX)
      # cache state [10, 11, 14, 15] <- all blocks idle
 -    assert manager._num_evictable_cache_blocks == 4
--
--
++    assert evictable() == 4
+ 
+ 
 -def test_touch_forwards_req_context_to_policy(monkeypatch):
 -    """Regression: CPUOffloadingManager.touch forwards ReqContext to policy."""
 -    manager = make_cpu_manager(num_blocks=4, cache_policy="lru")
 -    received = []
--
--    def spy_touch(keys: Iterable[OffloadKey], req_context: ReqContext) -> None:
--        received.append((list(keys), req_context))
--
--    monkeypatch.setattr(manager._policy, "touch", spy_touch)
--
--    keys = to_keys([1, 2])
--    ctx = make_req_context(
--        req_id="test-req",
--        kv_transfer_params={"test_param": "test_value"},
--    )
--
--    manager.touch(keys, ctx)
--
--    assert len(received) == 1
--    assert received[0][0] == keys
--    assert received[0][1] is ctx
-+    assert evictable() == 4
-+
-+
 +def _scoped_ctx(scope: str | None, req_id: str = "req") -> ReqContext:
 +    return make_req_context(req_id=req_id, kv_scope=scope)
-+
-+
+ 
+-    def spy_touch(keys: Iterable[OffloadKey], req_context: ReqContext) -> None:
+-        received.append((list(keys), req_context))
+ 
+-    monkeypatch.setattr(manager._policy, "touch", spy_touch)
 +def _store(manager: CPUOffloadingManager, keys: list[int], scope: str | None):
 +    ctx = _scoped_ctx(scope)
 +    out = manager.prepare_store(to_keys(keys), ctx)
 +    assert out is not None
 +    manager.complete_store(to_keys(keys), ctx)
 +    return ctx
+ 
+-    keys = to_keys([1, 2])
+-    ctx = make_req_context(
+-        req_id="test-req",
+-        kv_transfer_params={"test_param": "test_value"},
+-    )
+ 
+-    manager.touch(keys, ctx)
++def test_a_block_belongs_to_the_agent_that_stored_it():
++    """Ownership is a label fixed at store time. Another agent reading the
++    block moves it in the LRU order but does not take it over."""
++    manager = make_cpu_manager(num_blocks=4)
 +
++    _store(manager, [1], "agent_A")
++    manager.touch(to_keys([1]), _scoped_ctx("agent_B"))
 +
-+def test_release_scope_drops_idle_blocks_as_a_unit():
-+    """The moment recency gets wrong: a finished subagent's blocks are the
-+    most recently used thing in the cache, yet release must drop exactly
-+    them — and only them — before the parent's next lookup."""
-+    manager = make_cpu_manager(num_blocks=4, enable_events=True)
++    assert manager._owner[to_key(1)] == "agent_A"
 +
-+    _store(manager, [1, 2], None)  # parent (main line)
-+    _store(manager, [3, 4], "toolu_A")  # subagent, stored after the parent
-+    list(manager.take_events())
+ 
+-    assert len(received) == 1
+-    assert received[0][0] == keys
+-    assert received[0][1] is ctx
++def test_pressure_gives_up_one_whole_agent_before_touching_another():
++    """The property the tier exists for: what survives pressure is a whole
++    context. Interleaved by recency, blocks 1 and 2 would go and leave both
++    agents holding a partial cache that still has to be prefilled."""
++    manager = make_cpu_manager(num_blocks=4)
 +
-+    manager.release_scope("toolu_A")
++    _store(manager, [1], "agent_A")
++    _store(manager, [2], "agent_B")
++    _store(manager, [3], "agent_B")
++    _store(manager, [4], "agent_A")
 +
-+    assert manager.lookup(to_key(3), _EMPTY_REQ_CTX) is LookupResult.MISS
-+    assert manager.lookup(to_key(4), _EMPTY_REQ_CTX) is LookupResult.MISS
-+    # The parent's older blocks survive despite being LRU.
-+    assert manager.lookup(to_key(1), _EMPTY_REQ_CTX) is LookupResult.HIT
++    out = manager.prepare_store(to_keys([5, 6]), _scoped_ctx("agent_C"))
++
++    assert out is not None
++    # agent_A owns the oldest block, so agent_A is the one given up — whole.
++    assert sorted(out.evicted_keys) == sorted(to_keys([1, 4]))
 +    assert manager.lookup(to_key(2), _EMPTY_REQ_CTX) is LookupResult.HIT
-+    verify_events(manager.take_events(), expected_evictions=({3, 4},))
-+
-+    # The freed slots are immediately reusable without touching the parent.
-+    out = manager.prepare_store(to_keys([5, 6]), _scoped_ctx(None))
-+    assert out is not None
-+    assert out.evicted_keys == []
++    assert manager.lookup(to_key(3), _EMPTY_REQ_CTX) is LookupResult.HIT
 +
 +
-+def test_release_scope_unknown_scope_is_a_no_op():
-+    manager = make_cpu_manager(num_blocks=4)
-+    _store(manager, [1], None)
-+    manager.release_scope("toolu_never_seen")
-+    assert manager.lookup(to_key(1), _EMPTY_REQ_CTX) is LookupResult.HIT
-+
-+
-+def test_touch_transfers_ownership_between_scopes():
-+    """A prefix chunk shared with the parent must survive the subagent's
-+    death if the parent used it after the subagent did."""
++def test_a_lone_agent_under_pressure_gives_up_its_own_oldest():
++    """With one agent there is no other context to give up, so pressure
++    falls on its own oldest blocks — the tail it re-reads last."""
 +    manager = make_cpu_manager(num_blocks=4)
 +
-+    _store(manager, [1, 2], "toolu_A")
-+    # Parent touches the shared chunk 1; ownership moves to the main line.
-+    manager.touch(to_keys([1]), _scoped_ctx(None))
++    for key in (1, 2, 3, 4):
++        _store(manager, [key], "agent_A")
 +
-+    manager.release_scope("toolu_A")
++    out = manager.prepare_store(to_keys([5]), _scoped_ctx("agent_A"))
 +
-+    assert manager.lookup(to_key(1), _EMPTY_REQ_CTX) is LookupResult.HIT
-+    assert manager.lookup(to_key(2), _EMPTY_REQ_CTX) is LookupResult.MISS
-+
-+
-+def test_release_scope_defers_write_pending_blocks_to_completion():
-+    """Release must never race the DMA engine: a block with an in-flight
-+    store is reclaimed at complete_store, and — never having been announced
-+    as stored — vanishes without an event."""
-+    manager = make_cpu_manager(num_blocks=4, enable_events=True)
-+
-+    ctx = _scoped_ctx("toolu_A")
-+    out = manager.prepare_store(to_keys([1]), ctx)
 +    assert out is not None
-+
-+    manager.release_scope("toolu_A")
-+    # Still write-pending: the slot must not be handed out yet.
-+    assert manager.lookup(to_key(1), _EMPTY_REQ_CTX) is LookupResult.HIT_PENDING
-+
-+    manager.complete_store(to_keys([1]), ctx)
-+    assert manager.lookup(to_key(1), _EMPTY_REQ_CTX) is LookupResult.MISS
-+    verify_events(manager.take_events())  # neither stored nor removed
-+
-+    # The slot is free again.
-+    out = manager.prepare_store(to_keys([2]), _scoped_ctx(None))
-+    assert out is not None
-+    assert out.evicted_keys == []
++    assert out.evicted_keys == to_keys([1])
 +
 +
-+def test_release_scope_defers_loaded_blocks_to_completion():
-+    manager = make_cpu_manager(num_blocks=4, enable_events=True)
-+
-+    ctx = _scoped_ctx("toolu_A")
-+    _store(manager, [1], "toolu_A")
-+    list(manager.take_events())
-+    manager.prepare_load(to_keys([1]), ctx)
-+
-+    manager.release_scope("toolu_A")
-+    # Pinned by the in-flight load: still present.
-+    assert manager.lookup(to_key(1), _EMPTY_REQ_CTX) is LookupResult.HIT
-+
-+    manager.complete_load(to_keys([1]), ctx)
-+    # The deferred half of the release: announced stored earlier, so its
-+    # disappearance is announced too.
-+    assert manager.lookup(to_key(1), _EMPTY_REQ_CTX) is LookupResult.MISS
-+    verify_events(manager.take_events(), expected_evictions=({1},))
-+
-+
-+def test_live_touch_resurrects_a_deferred_release():
-+    """A live scope touching a dead-pending block re-owns it: deadness
-+    applied to the old owner, not to the bytes."""
++def test_reset_cache_clears_ownership():
 +    manager = make_cpu_manager(num_blocks=4)
-+
-+    sub_ctx = _scoped_ctx("toolu_A")
-+    _store(manager, [1], "toolu_A")
-+    manager.prepare_load(to_keys([1]), sub_ctx)
-+    manager.release_scope("toolu_A")
-+
-+    # The parent starts using the shared block while the load drains.
-+    manager.touch(to_keys([1]), _scoped_ctx(None))
-+
-+    manager.complete_load(to_keys([1]), sub_ctx)
-+    assert manager.lookup(to_key(1), _EMPTY_REQ_CTX) is LookupResult.HIT
-+
-+
-+def test_capacity_eviction_stays_lru_among_live_scopes():
-+    """With every owner alive, pressure resolves by recency — identity only
-+    changes eviction when a scope has actually terminated."""
-+    manager = make_cpu_manager(num_blocks=2)
-+
-+    _store(manager, [1], None)
-+    _store(manager, [2], "toolu_A")
-+    manager.touch(to_keys([1]), _scoped_ctx(None))  # 2 becomes LRU
-+
-+    out = manager.prepare_store(to_keys([3]), _scoped_ctx("toolu_B"))
-+    assert out is not None
-+    assert out.evicted_keys == to_keys([2])
-+
-+
-+def test_reset_cache_clears_scope_state():
-+    manager = make_cpu_manager(num_blocks=4)
-+    _store(manager, [1, 2], "toolu_A")
++    _store(manager, [1, 2], "agent_A")
 +    manager.reset_cache()
 +    assert manager._owner == {}
-+    assert manager._scope_keys == {}
-+    assert manager._dead_pending == set()
-+    # Releasing after reset is a no-op, not a KeyError.
-+    manager.release_scope("toolu_A")
 diff --git a/tests/v1/kv_offload/test_factory.py b/tests/v1/kv_offload/test_factory.py
 --- a/tests/v1/kv_offload/test_factory.py
 +++ b/tests/v1/kv_offload/test_factory.py
@@ -2107,21 +1980,6 @@ diff --git a/vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.p
      )
  
  
-@@ -923,6 +899,14 @@
- 
-     def on_new_request(self, request: Request) -> None:
-         """Called when a new request is added to the scheduler."""
-+        # Releases apply first, before this request registers or looks
-+        # anything up: the releasing request is typically the parent
-+        # resuming after a subagent's terminal result, and its own prefix
-+        # lookup must run against a pool where the dead scope occupies
-+        # nothing. The parent's chunks are never candidates — they are
-+        # owned by a different (usually the null) scope.
-+        for scope in request.kv_scope_release or ():
-+            self.manager.release_scope(scope)
-         req_context = _create_req_context(request)
-         offloading_context = self.manager.on_new_request(req_context)
-         req_status = RequestOffloadState(
 diff --git a/vllm/engine/arg_utils.py b/vllm/engine/arg_utils.py
 --- a/vllm/engine/arg_utils.py
 +++ b/vllm/engine/arg_utils.py
@@ -2211,7 +2069,7 @@ diff --git a/vllm/engine/arg_utils.py b/vllm/engine/arg_utils.py
 diff --git a/vllm/entrypoints/anthropic/protocol.py b/vllm/entrypoints/anthropic/protocol.py
 --- a/vllm/entrypoints/anthropic/protocol.py
 +++ b/vllm/entrypoints/anthropic/protocol.py
-@@ -188,6 +188,29 @@
+@@ -187,6 +187,19 @@
          default=None,
          description="KVTransfer parameters used for disaggregated serving.",
      )
@@ -2228,28 +2086,17 @@ diff --git a/vllm/entrypoints/anthropic/protocol.py b/vllm/entrypoints/anthropic
 +        ),
 +    )
 +
-+    kv_scope_release: list[str] | None = Field(
-+        default=None,
-+        description=(
-+            "Agent scopes terminated since the previous request. Their "
-+            "offloaded KV blocks are dropped as a unit before this request "
-+            "is scheduled — typically sent on the parent's first request "
-+            "after a subagent's terminal result."
-+        ),
-+    )
-+
      ec_transfer_params: dict[str, Any] | None = Field(
          default=None,
          description=(
 diff --git a/vllm/entrypoints/anthropic/serving.py b/vllm/entrypoints/anthropic/serving.py
 --- a/vllm/entrypoints/anthropic/serving.py
 +++ b/vllm/entrypoints/anthropic/serving.py
-@@ -497,6 +497,8 @@
+@@ -497,6 +497,7 @@
              top_k=anthropic_request.top_k,
              cache_salt=anthropic_request.cache_salt,
              kv_transfer_params=anthropic_request.kv_transfer_params,
 +            kv_scope=anthropic_request.kv_scope,
-+            kv_scope_release=anthropic_request.kv_scope_release,
              ec_transfer_params=anthropic_request.ec_transfer_params,
              chat_template_kwargs=chat_template_kwargs or None,
              **thinking_kwargs,
@@ -2382,7 +2229,7 @@ diff --git a/vllm/entrypoints/llm.py b/vllm/entrypoints/llm.py
 diff --git a/vllm/entrypoints/openai/chat_completion/protocol.py b/vllm/entrypoints/openai/chat_completion/protocol.py
 --- a/vllm/entrypoints/openai/chat_completion/protocol.py
 +++ b/vllm/entrypoints/openai/chat_completion/protocol.py
-@@ -484,6 +484,29 @@
+@@ -484,6 +484,19 @@
          description="KVTransfer parameters used for disaggregated serving.",
      )
  
@@ -2399,27 +2246,15 @@ diff --git a/vllm/entrypoints/openai/chat_completion/protocol.py b/vllm/entrypoi
 +        ),
 +    )
 +
-+    kv_scope_release: list[str] | None = Field(
-+        default=None,
-+        description=(
-+            "Agent scopes terminated since the previous request. Their "
-+            "offloaded KV blocks are dropped as a unit before this request "
-+            "is scheduled — typically sent on the parent's first request "
-+            "after a subagent's terminal result."
-+        ),
-+    )
-+
      ec_transfer_params: dict[str, Any] | None = Field(
          default=None,
          description=(
-@@ -818,6 +841,10 @@
+@@ -818,6 +831,8 @@
          if self.ec_transfer_params:
              # Pass in ec_transfer_params via extra_args
              extra_args["ec_transfer_params"] = self.ec_transfer_params
 +        if self.kv_scope is not None:
 +            extra_args["kv_scope"] = self.kv_scope
-+        if self.kv_scope_release:
-+            extra_args["kv_scope_release"] = self.kv_scope_release
          return SamplingParams.from_optional(
              n=self.n,
              presence_penalty=presence_penalty,
@@ -2445,7 +2280,7 @@ diff --git a/vllm/entrypoints/openai/cli_args.py b/vllm/entrypoints/openai/cli_a
 diff --git a/vllm/entrypoints/openai/completion/protocol.py b/vllm/entrypoints/openai/completion/protocol.py
 --- a/vllm/entrypoints/openai/completion/protocol.py
 +++ b/vllm/entrypoints/openai/completion/protocol.py
-@@ -214,6 +214,29 @@
+@@ -214,6 +214,19 @@
          description="KVTransfer parameters used for disaggregated serving.",
      )
  
@@ -2462,34 +2297,22 @@ diff --git a/vllm/entrypoints/openai/completion/protocol.py b/vllm/entrypoints/o
 +        ),
 +    )
 +
-+    kv_scope_release: list[str] | None = Field(
-+        default=None,
-+        description=(
-+            "Agent scopes terminated since the previous request. Their "
-+            "offloaded KV blocks are dropped as a unit before this request "
-+            "is scheduled — typically sent on the parent's first request "
-+            "after a subagent's terminal result."
-+        ),
-+    )
-+
      ec_transfer_params: dict[str, Any] | None = Field(
          default=None,
          description=(
-@@ -366,6 +389,10 @@
+@@ -366,6 +379,8 @@
          if self.ec_transfer_params:
              # Pass in ec_transfer_params via extra_args
              extra_args["ec_transfer_params"] = self.ec_transfer_params
 +        if self.kv_scope is not None:
 +            extra_args["kv_scope"] = self.kv_scope
-+        if self.kv_scope_release:
-+            extra_args["kv_scope_release"] = self.kv_scope_release
          return SamplingParams.from_optional(
              n=self.n,
              presence_penalty=self.presence_penalty,
 diff --git a/vllm/entrypoints/openai/responses/protocol.py b/vllm/entrypoints/openai/responses/protocol.py
 --- a/vllm/entrypoints/openai/responses/protocol.py
 +++ b/vllm/entrypoints/openai/responses/protocol.py
-@@ -314,6 +314,29 @@
+@@ -314,6 +314,19 @@
          default=None,
          description="KVTransfer parameters used for disaggregated serving.",
      )
@@ -2506,39 +2329,25 @@ diff --git a/vllm/entrypoints/openai/responses/protocol.py b/vllm/entrypoints/op
 +        ),
 +    )
 +
-+    kv_scope_release: list[str] | None = Field(
-+        default=None,
-+        description=(
-+            "Agent scopes terminated since the previous request. Their "
-+            "offloaded KV blocks are dropped as a unit before this request "
-+            "is scheduled — typically sent on the parent's first request "
-+            "after a subagent's terminal result."
-+        ),
-+    )
-+
      ec_transfer_params: dict[str, Any] | None = Field(
          default=None,
          description=(
-@@ -471,6 +494,10 @@
+@@ -471,6 +484,8 @@
              extra_args["kv_transfer_params"] = self.kv_transfer_params
          if self.ec_transfer_params:
              extra_args["ec_transfer_params"] = self.ec_transfer_params
 +        if self.kv_scope is not None:
 +            extra_args["kv_scope"] = self.kv_scope
-+        if self.kv_scope_release:
-+            extra_args["kv_scope_release"] = self.kv_scope_release
  
          return SamplingParams.from_optional(
              temperature=temperature,
 diff --git a/vllm/entrypoints/scale_out/token_in_token_out/protocol.py b/vllm/entrypoints/scale_out/token_in_token_out/protocol.py
 --- a/vllm/entrypoints/scale_out/token_in_token_out/protocol.py
 +++ b/vllm/entrypoints/scale_out/token_in_token_out/protocol.py
-@@ -151,6 +151,28 @@
-         default=None,
-         description=(
+@@ -153,6 +153,18 @@
              "ECTransfer parameters used for encoder-cache disaggregated serving."
-+        ),
-+    )
+         ),
+     )
 +    kv_scope: str | None = Field(
 +        default=None,
 +        min_length=1,
@@ -2551,33 +2360,23 @@ diff --git a/vllm/entrypoints/scale_out/token_in_token_out/protocol.py b/vllm/en
 +            "recency."
 +        ),
 +    )
-+
-+    kv_scope_release: list[str] | None = Field(
-+        default=None,
-+        description=(
-+            "Agent scopes terminated since the previous request. Their "
-+            "offloaded KV blocks are dropped as a unit before this request "
-+            "is scheduled — typically sent on the parent's first request "
-+            "after a subagent's terminal result."
-         ),
-     )
  
+     # Tracks which keys the caller explicitly set inside ``sampling_params``
+     # when the request was parsed from a JSON body. Lets the server tell
 diff --git a/vllm/entrypoints/scale_out/token_in_token_out/serving.py b/vllm/entrypoints/scale_out/token_in_token_out/serving.py
 --- a/vllm/entrypoints/scale_out/token_in_token_out/serving.py
 +++ b/vllm/entrypoints/scale_out/token_in_token_out/serving.py
-@@ -221,6 +221,17 @@
+@@ -221,6 +221,15 @@
          if request.stream:
              sampling_params.output_kind = RequestOutputKind.DELTA
  
 +        # Token-in-token-out embeds SamplingParams directly, so the identity
 +        # fields fold into extra_args here instead of a to_sampling_params
 +        # conversion — same destination as every other protocol surface.
-+        if request.kv_scope is not None or request.kv_scope_release:
++        if request.kv_scope is not None:
 +            extra_args = dict(sampling_params.extra_args or {})
 +            if request.kv_scope is not None:
 +                extra_args["kv_scope"] = request.kv_scope
-+            if request.kv_scope_release:
-+                extra_args["kv_scope_release"] = request.kv_scope_release
 +            sampling_params.extra_args = extra_args
 +
          self._log_inputs(
@@ -2798,7 +2597,7 @@ diff --git a/vllm/v1/core/kv_cache_utils.py b/vllm/v1/core/kv_cache_utils.py
 diff --git a/vllm/v1/engine/input_processor.py b/vllm/v1/engine/input_processor.py
 --- a/vllm/v1/engine/input_processor.py
 +++ b/vllm/v1/engine/input_processor.py
-@@ -132,6 +132,32 @@
+@@ -132,6 +132,20 @@
                      "not configured. Please set --reasoning-parser "
                      "and/or --reasoning-config to use phase-specific budgets."
                  )
@@ -2816,79 +2615,32 @@ diff --git a/vllm/v1/engine/input_processor.py b/vllm/v1/engine/input_processor.
 +                    raise VLLMValidationError(
 +                        "kv_scope must be a non-empty string when provided."
 +                    )
-+                kv_scope_release = params.extra_args.get("kv_scope_release")
-+                if kv_scope_release is not None and (
-+                    not isinstance(kv_scope_release, list)
-+                    or not all(
-+                        isinstance(scope, str) and scope
-+                        for scope in kv_scope_release
-+                    )
-+                ):
-+                    raise VLLMValidationError(
-+                        "kv_scope_release must be a list of non-empty "
-+                        "strings when provided."
-+                    )
          elif isinstance(params, PoolingParams):
              supported_pooling_tasks = [
                  task for task in supported_tasks if task in POOLING_TASKS
 diff --git a/vllm/v1/kv_offload/base.py b/vllm/v1/kv_offload/base.py
 --- a/vllm/v1/kv_offload/base.py
 +++ b/vllm/v1/kv_offload/base.py
-@@ -92,6 +92,12 @@
+@@ -92,6 +92,11 @@
      req_id: str
      kv_transfer_params: dict[str, Any] | None = None
      load_tier_filter: TierFilter = TierFilter.ALL
-+    # Agent scope owning this request's KV, straight from the request
-+    # (None = the shared main-session line, else a spawning tool_use id).
-+    # Ownership is what makes whole-scope release exact instead of the
-+    # recency approximation it replaces: a terminated scope's chunks are
-+    # identified by this tag, not guessed from access order.
++    # The agent this request belongs to, straight from the request. A tier
++    # that groups blocks by agent uses it to give up whole contexts under
++    # pressure rather than interleaving agents by access order. None is one
++    # shared label for agents that do not name themselves.
 +    kv_scope: str | None = None
      # Per-request scratch space keyed by value type, so a tier can parse
      # kv_transfer_params once (in on_new_request) and read the result back
      # on later calls for the same request.
-@@ -183,6 +189,11 @@
-         as well as a list of blocks that were evicted as a result.
-     complete_store() - marks a previous store as completed.
-         Following this call, the given blocks will become loadable.
-+    release_scope() - drop every block owned by a terminated agent
-+        scope as a unit. Identity-aware eviction: recency alone retains a
-+        finished subagent's context (dead, yet most-recently-used) while
-+        evicting the live parent's blocks; an explicit release inverts
-+        that at the exact moment it matters.
- """
- 
- 
-@@ -331,6 +342,29 @@
-             req_context: per-request context.
+@@ -332,6 +337,7 @@
          """
          pass
-+
-+    def release_scope(self, scope: str) -> None:
-+        """
-+        Release every block owned by a terminated agent scope, as a unit.
-+
-+        Called by the scheduler-side connector when a request declares the
-+        scope terminated (kv_scope_release), before that request registers
-+        or looks anything up. Blocks currently pinned by in-flight
-+        transfers must not be reclaimed synchronously — the implementation
-+        defers them to the transfer's completion callback.
-+
-+        The default is a documented no-op for tiers that do not track
-+        ownership (they have nothing to drop as a unit; their blocks age
-+        out). The pinned serving profile's CPU manager implements the full
-+        semantics; this default is not a configuration fallback and there
-+        is no knob that selects between behaviors.
-+
-+        Args:
-+            scope: the terminated scope id. Never None — the null (main
-+                session) scope is shared bookkeeping across conversations
-+                and is not releasable.
-+        """
-+        return
  
++
      def on_request_finished(self, req_context: ReqContext) -> None:
          """
+         Called when a request has finished.
 diff --git a/vllm/v1/kv_offload/config.py b/vllm/v1/kv_offload/config.py
 --- a/vllm/v1/kv_offload/config.py
 +++ b/vllm/v1/kv_offload/config.py
@@ -2947,7 +2699,7 @@ diff --git a/vllm/v1/kv_offload/cpu/manager.py b/vllm/v1/kv_offload/cpu/manager.
  from collections import OrderedDict
  from collections.abc import Collection, Iterable
  
-@@ -23,27 +24,60 @@
+@@ -23,27 +24,63 @@
      CPULoadStoreSpec,
      CPUOffloadingMetrics,
  )
@@ -2991,22 +2743,25 @@ diff --git a/vllm/v1/kv_offload/cpu/manager.py b/vllm/v1/kv_offload/cpu/manager.
 -    block pool management, and the prepare_store/complete_store skeletons.
 -    Policy-specific block organization and eviction decisions are delegated
 -    to the CachePolicy implementation.
-+    The one CPU-tier eviction mode: scope-owned blocks over a live LRU.
++    The one CPU-tier eviction mode: capacity pressure, resolved one agent
++    at a time.
 +
-+    There is deliberately no policy selection. The pluggable LRU/ARC layer
-+    this replaces existed to *approximate* one fact recency cannot see:
-+    a finished subagent's context is dead while being the most recently
-+    used thing in the cache, so any recency order protects the corpse and
-+    evicts the live parent. The harness now states that fact exactly
-+    (release_scope), which leaves nothing for ARC's ghost lists to guess.
-+    Capacity pressure among blocks whose scopes are all still alive is the
-+    one situation that genuinely is recency-shaped, so the live set keeps
-+    a plain LRU order — as an internal structure, not a mode.
++    There is deliberately no policy selection, and nothing here reacts to
++    an agent finishing. A context nobody is contending for costs nothing to
++    keep, so it stays; blocks leave only when another agent needs the room.
 +
-+    Ownership follows use: a block belongs to the scope that last stored
-+    or touched it. That is what bounds a release to blocks only the dead
-+    scope was keeping warm — a prefix chunk shared with the parent moves
-+    back to the parent's scope the moment the parent touches it again.
++    What pressure must not do is spread itself. Taking the globally oldest
++    blocks interleaves agents and leaves each of them holding part of a
++    context, which is the one shape that helps nobody: a partial context
++    still has to be prefilled. So the tier gives up whole agents. The
++    oldest evictable block names the agent to give up, that agent's blocks
++    go oldest-first until it is exhausted, and only then is another agent
++    considered. What survives is whole contexts, which is what makes a
++    full-length re-entry a copy out of host memory rather than a prefill.
++
++    Ownership is a label, not a lifetime: a block belongs to the agent
++    whose store put it here and keeps that label until the block is gone.
++    Nothing transfers, so nothing has to be reconciled later.
 +
 +    The manager also owns the shared mechanics: ref-counting, event
 +    emission, block pool management, and the prepare/complete skeletons.
@@ -3020,7 +2775,7 @@ diff --git a/vllm/v1/kv_offload/cpu/manager.py b/vllm/v1/kv_offload/cpu/manager.
          enable_events: bool = False,
          store_threshold: int = 1,
          max_tracker_size: int = 64_000,
-@@ -53,12 +87,25 @@
+@@ -53,12 +90,16 @@
          self._num_allocated_blocks: int = 0
          self._free_list: list[int] = []
          self.events: list[OffloadingEvent] | None = [] if enable_events else None
@@ -3035,65 +2790,31 @@ diff --git a/vllm/v1/kv_offload/cpu/manager.py b/vllm/v1/kv_offload/cpu/manager.
 +        self._blocks: dict[OffloadKey, BlockStatus] = {}
 +        self._evictable_blocks: OrderedDict[OffloadKey, None] = OrderedDict()
 +
-+        # Scope ownership. The None bucket is every conversation's main
-+        # line: it is never a release target (releases name a tool_use id),
-+        # so its width across users is harmless — it exists only to keep
-+        # ownership transfer symmetric.
++        # The agent each resident block belongs to, which is what lets
++        # pressure give up one whole agent at a time. Agents without an
++        # identity share the None label and are given up together.
 +        self._owner: dict[OffloadKey, str | None] = {}
-+        self._scope_keys: dict[str | None, set[OffloadKey]] = {}
-+
-+        # Blocks whose scope died while a transfer still pinned them.
-+        # Release must never race the DMA engine, so these are reclaimed in
-+        # the transfer's completion callback instead of synchronously. A
-+        # live scope touching such a block un-marks it — the block has a
-+        # living owner again and deadness no longer applies.
-+        self._dead_pending: set[OffloadKey] = set()
 +
          # Track blocks with an in-flight store (ref_cnt -1, not yet completed).
          self._num_write_pending_blocks: int = 0
  
-@@ -102,6 +149,40 @@
-         blocks: Iterable[BlockStatus],
+@@ -103,6 +144,15 @@
      ) -> CPULoadStoreSpec:
          return CPULoadStoreSpec([block.block_id for block in blocks])
-+
+ 
 +    # --- scope ownership ---
-+
-+    def _set_owner(self, key: OffloadKey, scope: str | None) -> None:
-+        if key in self._owner:
-+            previous = self._owner[key]
-+            if previous == scope:
-+                self._dead_pending.discard(key)
-+                return
-+            previous_keys = self._scope_keys[previous]
-+            previous_keys.discard(key)
-+            if not previous_keys:
-+                del self._scope_keys[previous]
-+        self._owner[key] = scope
-+        self._scope_keys.setdefault(scope, set()).add(key)
-+        self._dead_pending.discard(key)
-+
-+    def _drop_owner(self, key: OffloadKey) -> None:
-+        if key not in self._owner:
-+            return
-+        scope = self._owner.pop(key)
-+        scope_keys = self._scope_keys.get(scope)
-+        if scope_keys is not None:
-+            scope_keys.discard(key)
-+            if not scope_keys:
-+                del self._scope_keys[scope]
-+        self._dead_pending.discard(key)
 +
 +    def _remove_block(self, key: OffloadKey, block: BlockStatus) -> None:
 +        """Forget a resident block and recycle its slot. Caller handles events."""
 +        del self._blocks[key]
 +        self._evictable_blocks.pop(key, None)
-+        self._drop_owner(key)
++        self._owner.pop(key, None)
 +        self._free_block(block)
- 
++
      # --- OffloadingManager interface ---
  
-@@ -119,7 +200,7 @@
+     @override
+@@ -119,7 +169,7 @@
                  if len(self.counts) >= self.max_tracker_size:
                      self.counts.popitem(last=False)
                  self.counts[key] = 1
@@ -3102,7 +2823,7 @@ diff --git a/vllm/v1/kv_offload/cpu/manager.py b/vllm/v1/kv_offload/cpu/manager.
          if block is None:
              return LookupResult.MISS
          if not block.is_ready:
-@@ -134,33 +215,56 @@
+@@ -134,33 +184,39 @@
      ) -> LoadStoreSpec:
          blocks = []
          for key in keys:
@@ -3120,8 +2841,9 @@ diff --git a/vllm/v1/kv_offload/cpu/manager.py b/vllm/v1/kv_offload/cpu/manager.
          return self._get_load_store_spec(keys, blocks)
  
      @override
-     def touch(self, keys: Collection[OffloadKey], req_context: ReqContext) -> None:
+-    def touch(self, keys: Collection[OffloadKey], req_context: ReqContext) -> None:
 -        self._policy.touch(keys, req_context)
++    def touch(self, keys: Collection[OffloadKey], _req_context: ReqContext) -> None:
 +        # Reversed so the request's first (prefix) keys end up most recent:
 +        # under pressure the tail of a context goes before its prefix, and
 +        # a prefix hit is what saves a re-prefill.
@@ -3132,13 +2854,11 @@ diff --git a/vllm/v1/kv_offload/cpu/manager.py b/vllm/v1/kv_offload/cpu/manager.
 +                self._evictable_blocks.move_to_end(key)
 +            # Active blocks keep their position; they re-enter the LRU when
 +            # their transfers finish.
-+            self._set_owner(key, req_context.kv_scope)
  
      @override
      def complete_load(
          self, keys: Collection[OffloadKey], req_context: ReqContext
      ) -> None:
-+        dead_keys: list[OffloadKey] = []
          for key in keys:
 -            block = self._policy.get(key)
 +            block = self._blocks.get(key)
@@ -3148,26 +2868,11 @@ diff --git a/vllm/v1/kv_offload/cpu/manager.py b/vllm/v1/kv_offload/cpu/manager.
              if block.ref_cnt == 0:
 -                self._num_evictable_cache_blocks += 1  # ref_cnt 1 -> 0
 -                self._policy.mark_evictable(key)
-+                if key in self._dead_pending:
-+                    # The owning scope died mid-load; the deferred half of
-+                    # release_scope. The block was announced as stored, so
-+                    # its disappearance is announced too.
-+                    self._remove_block(key, block)
-+                    dead_keys.append(key)
-+                else:
-+                    self._evictable_blocks[key] = None
-+        if dead_keys and self.events is not None:
-+            self.events.append(
-+                OffloadingEvent(
-+                    keys=dead_keys,
-+                    medium=self.medium,
-+                    removed=True,
-+                )
-+            )
++                self._evictable_blocks[key] = None
  
      @override
      def prepare_store(
-@@ -173,7 +277,7 @@
+@@ -173,7 +229,7 @@
              keys = [k for k in keys if self.counts.get(k, 0) >= self.store_threshold]
              self.stores_skipped_in_current_batch += num_keys - len(keys)
          # filter out blocks that are already stored
@@ -3176,7 +2881,7 @@ diff --git a/vllm/v1/kv_offload/cpu/manager.py b/vllm/v1/kv_offload/cpu/manager.
  
          if not keys_to_store:
              return PrepareStoreOutput(
-@@ -187,25 +291,29 @@
+@@ -187,25 +243,41 @@
  
          to_evict: list[OffloadKey] = []
          if num_blocks_to_evict > 0:
@@ -3186,10 +2891,9 @@ diff --git a/vllm/v1/kv_offload/cpu/manager.py b/vllm/v1/kv_offload/cpu/manager.
                  return None
 -            # There is a still a chance for eviction failure as some of the
 -            # idle blocks might be in the protected list.
--
+ 
 -            # Blocks from the original input are excluded from eviction candidates:
 -            # a block that was already stored must remain in the cache after this call.
-+
 +            # Blocks from the original input are excluded from eviction
 +            # candidates: a block that was already stored must remain in the
 +            # cache after this call. Collect before mutating so a shortfall
@@ -3197,13 +2901,25 @@ diff --git a/vllm/v1/kv_offload/cpu/manager.py b/vllm/v1/kv_offload/cpu/manager.
              protected = set(keys)
 -            evicted = self._policy.evict(num_blocks_to_evict, protected)
 -            if evicted is None:
-+            candidates: list[tuple[OffloadKey, BlockStatus]] = []
++            # Group the evictable set by owning agent. Both the groups and
++            # the blocks inside them stay in LRU order, so the first group
++            # is the agent whose newest use is oldest, and draining a group
++            # before starting the next is what keeps a surviving context
++            # whole.
++            by_agent: dict[str | None, list[OffloadKey]] = {}
 +            for key in self._evictable_blocks:
 +                if key in protected:
 +                    continue
-+                block = self._blocks[key]
-+                assert block.ref_cnt == 0
-+                candidates.append((key, block))
++                by_agent.setdefault(self._owner.get(key), []).append(key)
++
++            candidates: list[tuple[OffloadKey, BlockStatus]] = []
++            for agent_keys in by_agent.values():
++                for key in agent_keys:
++                    block = self._blocks[key]
++                    assert block.ref_cnt == 0
++                    candidates.append((key, block))
++                    if len(candidates) == num_blocks_to_evict:
++                        break
 +                if len(candidates) == num_blocks_to_evict:
 +                    break
 +            if len(candidates) < num_blocks_to_evict:
@@ -3220,35 +2936,28 @@ diff --git a/vllm/v1/kv_offload/cpu/manager.py b/vllm/v1/kv_offload/cpu/manager.
                  to_evict.append(key)
  
          if to_evict and self.events is not None:
-@@ -223,7 +331,8 @@
+@@ -223,7 +295,8 @@
          )
  
          for key, block in zip(keys_to_store, blocks):
 -            self._policy.insert(key, block)
 +            self._blocks[key] = block
-+            self._set_owner(key, req_context.kv_scope)
++            self._owner[key] = req_context.kv_scope
          self._num_write_pending_blocks += len(keys_to_store)
  
          # build store specs for allocated blocks
-@@ -246,20 +355,25 @@
+@@ -246,20 +319,18 @@
  
          if success:
              for key in keys:
 -                block = self._policy.get(key)
 +                block = self._blocks.get(key)
                  if block is not None and not block.is_ready:
-+                    self._num_write_pending_blocks -= 1
-+                    if key in self._dead_pending:
-+                        # The owning scope died while the store was in
-+                        # flight. The block was never announced as stored,
-+                        # so it vanishes without an event — same treatment
-+                        # as a failed store.
-+                        self._remove_block(key, block)
-+                        continue
-                     block.ref_cnt = 0
--                    self._num_write_pending_blocks -= 1
+-                    block.ref_cnt = 0
+                     self._num_write_pending_blocks -= 1
 -                    self._num_evictable_cache_blocks += 1
 -                    self._policy.mark_evictable(key)
++                    block.ref_cnt = 0
 +                    self._evictable_blocks[key] = None
                      stored_keys.append(key)
          else:
@@ -3263,39 +2972,7 @@ diff --git a/vllm/v1/kv_offload/cpu/manager.py b/vllm/v1/kv_offload/cpu/manager.
  
          if stored_keys and self.events is not None:
              self.events.append(
-@@ -271,14 +385,43 @@
-             )
- 
-     @override
-+    def release_scope(self, scope: str) -> None:
-+        # Idle blocks drop now; pinned blocks (in-flight store or load) are
-+        # deferred to their completion callback — a synchronous reclaim here
-+        # would hand their physical slots to new stores while the DMA engine
-+        # still reads or writes them.
-+        keys = self._scope_keys.get(scope)
-+        if not keys:
-+            return
-+        removed_keys: list[OffloadKey] = []
-+        for key in list(keys):
-+            block = self._blocks[key]
-+            if block.ref_cnt == 0:
-+                self._remove_block(key, block)
-+                removed_keys.append(key)
-+            else:
-+                self._dead_pending.add(key)
-+        if removed_keys and self.events is not None:
-+            self.events.append(
-+                OffloadingEvent(
-+                    keys=removed_keys,
-+                    medium=self.medium,
-+                    removed=True,
-+                )
-+            )
-+
-+    @override
-     def reset_cache(self) -> None:
-         # Clear ALL blocks unconditionally. The scheduler's _stale_job_threshold
-         # guarantees that complete_load / complete_store are never called for
+@@ -277,8 +348,9 @@
          # pre-reset jobs, so no lazy cleanup is needed. The scheduler also
          # flushes in-flight load job IDs to the workers before any new stores
          # can begin, preventing a cross-direction data race on reused offload block IDs.
@@ -3304,12 +2981,10 @@ diff --git a/vllm/v1/kv_offload/cpu/manager.py b/vllm/v1/kv_offload/cpu/manager.
 +        self._blocks.clear()
 +        self._evictable_blocks.clear()
 +        self._owner.clear()
-+        self._scope_keys.clear()
-+        self._dead_pending.clear()
          self._num_write_pending_blocks = 0
  
          self._free_list.clear()
-@@ -297,7 +440,7 @@
+@@ -297,7 +369,7 @@
          num_used = (
              self._num_allocated_blocks
              - len(self._free_list)
@@ -3509,22 +3184,14 @@ diff --git a/vllm/v1/kv_offload/tiering/manager.py b/vllm/v1/kv_offload/tiering/
              enable_events=enable_events,
          )
          self._mmap_region = mmap_region
-@@ -527,6 +523,15 @@
+@@ -526,6 +522,7 @@
+         for tier in self.secondary_tiers:
              tier.touch(keys, req_context)
  
-     @override
-+    def release_scope(self, scope: str) -> None:
-+        # Scope ownership lives in the primary tier, the only tier whose
-+        # capacity a dead subagent's context contends for synchronously.
-+        # Secondary tiers keep their own lifecycle (base-class default): a
-+        # remote/persistent tier dropping data on an in-band release signal
-+        # would turn a cache hint into data loss.
-+        self.primary_tier.release_scope(scope)
 +
-+    @override
+     @override
      def complete_load(self, keys: Collection[OffloadKey], req_context: ReqContext):
          """
-         Mark blocks as done loading from primary tier to GPU.
 diff --git a/vllm/v1/kv_offload/tiering/spec.py b/vllm/v1/kv_offload/tiering/spec.py
 --- a/vllm/v1/kv_offload/tiering/spec.py
 +++ b/vllm/v1/kv_offload/tiering/spec.py
@@ -3619,7 +3286,7 @@ diff --git a/vllm/v1/kv_offload/tiering/spec.py b/vllm/v1/kv_offload/tiering/spe
 diff --git a/vllm/v1/request.py b/vllm/v1/request.py
 --- a/vllm/v1/request.py
 +++ b/vllm/v1/request.py
-@@ -106,6 +106,12 @@
+@@ -106,6 +106,11 @@
          self.kv_transfer_params: dict[str, Any] | None = None
          # E/P/D: Connector-specific encoder-cache transfer parameters.
          self.ec_transfer_params: dict[str, Any] | None = None
@@ -3628,21 +3295,17 @@ diff --git a/vllm/v1/request.py b/vllm/v1/request.py
 +        # so the KV offload connector reads identity off the Request the
 +        # same way it reads kv_transfer_params, on every protocol surface.
 +        self.kv_scope: str | None = None
-+        self.kv_scope_release: list[str] | None = None
  
          if pooling_params is not None:
              # Pooling models.
-@@ -123,6 +129,10 @@
-                 )
+@@ -124,6 +129,7 @@
                  self.ec_transfer_params = sampling_params.extra_args.get(
                      "ec_transfer_params"
-+                )
-+                self.kv_scope = sampling_params.extra_args.get("kv_scope")
-+                self.kv_scope_release = sampling_params.extra_args.get(
-+                    "kv_scope_release"
                  )
++                self.kv_scope = sampling_params.extra_args.get("kv_scope")
                  self.kv_cache_report_mode = sampling_params.extra_args.get(
                      "kv_cache_report_mode", "incremental"
+                 )
 diff --git a/vllm/v1/worker/gpu_worker.py b/vllm/v1/worker/gpu_worker.py
 --- a/vllm/v1/worker/gpu_worker.py
 +++ b/vllm/v1/worker/gpu_worker.py
@@ -3803,17 +3466,17 @@ diff --git a/tests/entrypoints/test_kv_scope_protocol.py b/tests/entrypoints/tes
 new file mode 100644
 --- /dev/null
 +++ b/tests/entrypoints/test_kv_scope_protocol.py
-@@ -0,0 +1,183 @@
+@@ -0,0 +1,174 @@
 +# SPDX-License-Identifier: Apache-2.0
 +# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
 +"""Agent-scope identity must land uniformly on every generation surface.
 +
-+Whole-scope KV release only works if every protocol can carry the identity:
-+a surface without the field silently produces unscoped requests, and the
-+offload tier then cannot tell a dead subagent's blocks from the main line's.
++Grouping the offload tier by agent only works if every protocol can carry
++the identity: a surface without the field silently produces unlabelled
++requests, and the tier then cannot tell one agent's blocks from another's.
 +These tests prove, offline, that all five generation protocols this build
-+can actually import expose ``kv_scope`` / ``kv_scope_release`` beside
-+``cache_salt`` / ``kv_transfer_params``, validate them identically, and
++can actually import expose ``kv_scope`` beside
++``cache_salt`` / ``kv_transfer_params``, validate it identically, and
 +deliver them into ``SamplingParams.extra_args`` — the one internal channel
 +the engine reads.
 +
@@ -3838,7 +3501,6 @@ new file mode 100644
 +pytestmark = pytest.mark.cpu_test
 +
 +_SCOPE = "toolu_01AbCdEf"
-+_RELEASED = ["toolu_01Dead", "toolu_02Dead"]
 +
 +
 +def _minimal_payload(request_cls: type[BaseModel]) -> dict:
@@ -3878,10 +3540,8 @@ new file mode 100644
 +    request = request_cls(
 +        **_minimal_payload(request_cls),
 +        kv_scope=_SCOPE,
-+        kv_scope_release=_RELEASED,
 +    )
 +    assert request.kv_scope == _SCOPE
-+    assert request.kv_scope_release == _RELEASED
 +
 +
 +@pytest.mark.parametrize("request_cls", ALL_GENERATION_REQUESTS)
@@ -3890,7 +3550,6 @@ new file mode 100644
 +    # parent_tool_use_id convention); no surface may invent a default scope.
 +    request = request_cls(**_minimal_payload(request_cls))
 +    assert request.kv_scope is None
-+    assert request.kv_scope_release is None
 +
 +
 +@pytest.mark.parametrize("request_cls", ALL_GENERATION_REQUESTS)
@@ -3909,7 +3568,6 @@ new file mode 100644
 +    request = request_cls(
 +        **_minimal_payload(request_cls),
 +        kv_scope=_SCOPE,
-+        kv_scope_release=_RELEASED,
 +    )
 +    if request_cls is ResponsesRequest:
 +        sampling = request.to_sampling_params(
@@ -3921,7 +3579,6 @@ new file mode 100644
 +        )
 +    assert sampling.extra_args is not None
 +    assert sampling.extra_args["kv_scope"] == _SCOPE
-+    assert sampling.extra_args["kv_scope_release"] == _RELEASED
 +
 +
 +@pytest.mark.parametrize(
@@ -3940,7 +3597,6 @@ new file mode 100644
 +        )
 +    extra_args = sampling.extra_args or {}
 +    assert "kv_scope" not in extra_args
-+    assert "kv_scope_release" not in extra_args
 +
 +
 +def test_anthropic_translation_forwards_scope_fields():
@@ -3949,13 +3605,11 @@ new file mode 100644
 +    request = AnthropicMessagesRequest(
 +        **_minimal_payload(AnthropicMessagesRequest),
 +        kv_scope=_SCOPE,
-+        kv_scope_release=_RELEASED,
 +    )
 +    chat_request = AnthropicServingMessages._build_base_request(
 +        request, [{"role": "user", "content": "hi"}]
 +    )
 +    assert chat_request.kv_scope == _SCOPE
-+    assert chat_request.kv_scope_release == _RELEASED
 +
 +
 +def test_cohere_endpoint_absence_is_enforced_not_import_dependent():

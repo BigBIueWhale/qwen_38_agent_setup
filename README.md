@@ -33,7 +33,7 @@ The deployment is complete and healthy. There is one supported mode:
 | Final-answer ceiling | 131,072 generated final tokens, subject to remaining context |
 | MTP/speculation | Disabled |
 | CPU weight offload | Zero |
-| KV offload | One declared resident user context, pinned host tier in /dev/shm; recency-aged |
+| KV offload | One declared resident user context, pinned host tier in /dev/shm; evicted a whole agent at a time |
 | Batching | One sequence; 2,048-token chunked prefill |
 | Listener | 127.0.0.1:8000 only |
 | Agent client | Qwen Code 0.21.12 at b965d5f8c24f48e65fb0b17c7d45f34ca4ce8f38 |
@@ -42,7 +42,7 @@ The deployment is complete and healthy. There is one supported mode:
 | Agent-service release lock | a8e5a63402f1c443a288d92b65e3fcdcfc9d7211 |
 | Agent-service image | sha256:0f3b8096b8c18207acd2483d046de20efce31a226ebd8fe6f8ff2e98e9463b6e |
 | Agent-service listener | 127.0.0.1:8090 only |
-| Runtime profile | socket-isolated-nonroot-vision-k8v4-agent-v17 |
+| Runtime profile | socket-isolated-nonroot-vision-k8v4-agent-v18 |
 | Runtime image | sha256:6752f7305dd63e143e40baeeb44cd78c3ec2d18db79dcb1c3a27cafb5f839dda |
 
 This is not a text-only profile with an optional vision switch. It is not a
@@ -269,9 +269,9 @@ Pinned build inputs and products:
 |---|---|
 | Immutable base tag | qwen38-vllm:main-9df9b0b |
 | Immutable base ID | sha256:fa4a002a88b7043a1a89966dea8a500fe9696f84e75730d9da916f916048d401 |
-| Runtime tag | qwen38-vllm:qwen38-27b-nvfp4-k8v4-runtime-v17 |
+| Runtime tag | qwen38-vllm:qwen38-27b-nvfp4-k8v4-runtime-v18 |
 | Runtime ID | sha256:6752f7305dd63e143e40baeeb44cd78c3ec2d18db79dcb1c3a27cafb5f839dda |
-| Offline archive | artifacts/qwen38-vllm-images-runtime-v17.tar |
+| Offline archive | artifacts/qwen38-vllm-images-runtime-v18.tar |
 | Archive size | 8,557,675,008 bytes, mode 0600 |
 | Archive SHA-256 | a80766d9560a419b9c051fc84d9beca1f1a3ac9ab508c99cf29d218b71bef43c |
 | Runtime Dockerfile SHA-256 | 17f72538ee71292e4cf0a2ce804e52a4d26413a034286590aef76008fbd4fcec |
@@ -366,7 +366,9 @@ Consequences:
 - CPU weight offload is exactly zero. KV offload is not: the OffloadingConnector runs
   in kv_both role with a pinned host tier in /dev/shm sized as one declared resident
   user context (bytes derived in-engine from max_model_len and the KV cache spec).
-  Its live set ages by recency. That tier is live and serving hits.
+  Blocks carry the agent that stored them, and pressure gives up whole agents
+  oldest-first rather than interleaving blocks, so a surviving context is
+  complete. That tier is live and serving hits.
 - Multimodal profiling is mandatory and cannot be skipped to obtain a deceptively
   optimistic allocation.
 - All unquantized model computation, including the entire vision tower, uses BF16.

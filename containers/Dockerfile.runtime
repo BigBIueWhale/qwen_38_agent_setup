@@ -862,32 +862,29 @@ scoped = ChatCompletionRequest(
     model="qwen3.8",
     messages=[{"role": "user", "content": "test"}],
     max_tokens=8,
-    kv_scope="toolu_scope",
-    kv_scope_release=["toolu_done"],
+    kv_scope="agent_scope",
 )
 scoped_sampling = scoped.to_sampling_params(8, defaults)
-assert scoped_sampling.extra_args["kv_scope"] == "toolu_scope"
-assert scoped_sampling.extra_args["kv_scope_release"] == ["toolu_done"]
+assert scoped_sampling.extra_args["kv_scope"] == "agent_scope"
 for scoped_request in (
-    CompletionRequest(model="m", prompt="hi", kv_scope="toolu_scope"),
-    ResponsesRequest(model="m", input="hi", kv_scope="toolu_scope"),
+    CompletionRequest(model="m", prompt="hi", kv_scope="agent_scope"),
+    ResponsesRequest(model="m", input="hi", kv_scope="agent_scope"),
     AnthropicMessagesRequest(
         model="m",
         max_tokens=8,
         messages=[{"role": "user", "content": "hi"}],
-        kv_scope="toolu_scope",
+        kv_scope="agent_scope",
     ),
     GenerateRequest(
-        token_ids=[1], sampling_params=SamplingParams(), kv_scope="toolu_scope"
+        token_ids=[1], sampling_params=SamplingParams(), kv_scope="agent_scope"
     ),
 ):
-    assert scoped_request.kv_scope == "toolu_scope"
-    assert scoped_request.kv_scope_release is None
+    assert scoped_request.kv_scope == "agent_scope"
 
 assert hasattr(EngineArgs, "kv_cache_users")
 assert not hasattr(EngineArgs, "kv_cache_memory_bytes")
 assert not hasattr(EngineArgs, "kv_offloading_size")
-assert hasattr(CPUOffloadingManager, "release_scope")
+assert not hasattr(CPUOffloadingManager, "release_scope")
 for rejected_config in (
     {"cpu_bytes_to_use": 1},
     {"eviction_policy": "arc"},
@@ -982,7 +979,7 @@ LABEL org.opencontainers.image.revision="9df9b0b0a1816b6d0d0f6ecd0da563cc37fd72f
       qwen38.patch.tool-truncation.parser-engine-file.sha256="9ffce8a3aac1d885cbbd4de269201ef32bdd6089b5f92d61f94eebf1130a5faf" \
       qwen38.template.file.sha256="07d9cf1a50bc702b27832586af016188d4cb5787e9a88847a5611237f722343e" \
       qwen38.project="Qwen_best_model_ever" \
-      qwen38.runtime.profile="socket-isolated-nonroot-vision-k8v4-agent-v17"
+      qwen38.runtime.profile="socket-isolated-nonroot-vision-k8v4-agent-v18"
 
 ENV HOME=/home/vllm \
     VLLM_CACHE_ROOT=/home/vllm/.cache/vllm \

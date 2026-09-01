@@ -1112,11 +1112,23 @@ def _validate_kv_users_after(state: State) -> None:
                 "store_threshold",
                 "max_tracker_size",
             ],
-            "CPUOffloadingManager.release_scope": ["self", "scope"],
         },
         label=label,
     )
-    require_text(state, manager, "self._dead_pending", count=8, label=label)
+    # Pressure resolves one agent at a time: the evictable set is grouped by
+    # owning agent and drained a group at a time, never interleaved.
+    require_text(
+        state, manager, "by_agent: dict[str | None, list[OffloadKey]] = {}",
+        label=label,
+    )
+    require_text(
+        state, manager, "for agent_keys in by_agent.values():", label=label
+    )
+    # Ownership is fixed where the block is written and nowhere else.
+    require_text(
+        state, manager, "self._owner[key] = req_context.kv_scope", count=1,
+        label=label,
+    )
 
     # GPU tier: the byte flag is gone, the count is required, and the pool
     # is derived rather than filled to whatever memory happened to be free.
@@ -1154,9 +1166,6 @@ def _validate_kv_users_after(state: State) -> None:
         "vllm/entrypoints/scale_out/token_in_token_out/protocol.py",
     ):
         require_text(state, path, "kv_scope: str | None = Field(", label=label)
-        require_text(
-            state, path, "kv_scope_release: list[str] | None = Field(", label=label
-        )
     generate_router = "vllm/entrypoints/generate/api_router.py"
     forbid_text(state, generate_router, "register_cohere_api_router", label=label)
     forbid_text(state, generate_router, "CohereServingChatV2", label=label)
@@ -1177,15 +1186,6 @@ def _validate_kv_users_after(state: State) -> None:
         label=label,
     )
     scheduler = "vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py"
-    require_text(
-        state,
-        scheduler,
-        "for scope in request.kv_scope_release or ():",
-        label=label,
-    )
-    require_text(
-        state, scheduler, "self.manager.release_scope(scope)", label=label
-    )
     require_text(
         state, "vllm/v1/request.py",
         'self.kv_scope = sampling_params.extra_args.get("kv_scope")',
@@ -1403,30 +1403,30 @@ CONTRACTS: Mapping[str, SemanticContract] = {
     "kv-user-count-sizing-and-scope-eviction": SemanticContract(
         rationale=(
             "Both KV tiers were sized in raw bytes measured on one machine "
-            "(--kv-cache-memory, cpu_bytes_to_use), and eviction was pure "
-            "recency (ARC) chosen to approximate the one fact recency cannot "
-            "see: a finished subagent's context is dead while being the most "
-            "recently used thing in the cache. Capacity is now declared as "
-            "counts of resident full-length user contexts on both tiers and "
-            "the bytes are derived post-engine-init from the KV cache spec; "
-            "agent identity (kv_scope, the harness's parent_tool_use_id) "
-            "rides every generation protocol this --network none image can "
-            "import (chat, completion, responses, anthropic, "
+            "(--kv-cache-memory, cpu_bytes_to_use), and eviction was block "
+            "recency, which spreads pressure across every resident agent and "
+            "leaves each of them holding a partial context that still has to "
+            "be prefilled. Capacity is now declared as counts of resident "
+            "full-length user contexts on both tiers and the bytes are "
+            "derived post-engine-init from the KV cache spec; agent identity "
+            "(kv_scope) rides every generation protocol this --network none "
+            "image can import (chat, completion, responses, anthropic, "
             "token-in-token-out) beside cache_salt; the Cohere surface "
             "hard-imports the uninstallable cohere SDK, so its guarded "
             "registration is excised and the endpoint's absence is an "
-            "enforced fact rather than an import accident. A "
-            "request's kv_scope_release drops a terminated scope's offloaded "
-            "blocks as a unit before the releasing request looks anything "
-            "up. The byte and policy knobs are refusals, not fallbacks, and "
-            "the pluggable policy package is deleted."
+            "enforced fact rather than an import accident. The host tier "
+            "labels each block with the agent whose store wrote it and gives "
+            "up whole agents under pressure, oldest agent first, so what "
+            "survives is a whole context. The byte and policy knobs are "
+            "refusals, not fallbacks, and the pluggable policy package is "
+            "deleted."
         ),
         removal_condition=(
             "Remove only when pinned upstream sizes both KV tiers from "
             "declared user-context counts, carries a per-request cache scope "
-            "on every generation protocol, and releases a terminated "
-            "scope's offloaded blocks as a unit with equivalent fail-closed "
-            "configuration handling."
+            "on every generation protocol, and resolves host-tier pressure "
+            "at agent granularity with equivalent fail-closed configuration "
+            "handling."
         ),
         validate_before=_validate_kv_users_before,
         validate_after=_validate_kv_users_after,

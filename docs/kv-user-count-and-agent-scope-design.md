@@ -125,18 +125,10 @@ cohere` model families over the OpenAI endpoints and is unrelated to
 the excised HTTP surface.
 
 - `kv_scope: str | null` — the agent scope owning this request's KV.
-  Encodes the harness convention verbatim (agent_service commit 00be562):
-  `null`/absent = the main session line, otherwise the spawning
-  `tool_use_id`. The null scope is shared bookkeeping for every main line;
-  it is never releasable, so its width is harmless — ownership is only
-  ever *acted on* through explicit release of a named scope, and
-  tool_use ids are unique.
-- `kv_scope_release: list[str] | null` — scopes terminated since the
-  previous request. The harness attaches these to the first request it
-  sends after observing a subagent's terminal result (in practice: the
-  parent's resume request). In-band release is sufficient: release only
-  matters when someone still runs to benefit from the freed space; if no
-  request ever follows, nothing competes.
+  The harness sends the session id for the main agent and the spawning
+  `tool_use_id` for a subagent — one identity per agent, with no
+  distinction between the two kinds. Absent means an agent that did not
+  name itself; those share one label and are given up together.
 
 Transport mirrors `kv_transfer_params` exactly: each protocol's sampling
 conversion writes the fields into `SamplingParams.extra_args`;
@@ -148,41 +140,30 @@ path — Anthropic gets the same two lines as everyone else.
 
 Delivery to the manager: `_create_req_context` copies `request.kv_scope`
 onto `ReqContext.kv_scope`; every existing manager call already carries
-the ReqContext. Release executes in
-`OffloadingConnectorScheduler.on_new_request` — before the manager
-registers the new request — via `OffloadingManager.release_scope(scope)`.
-The scheduler calls `connector.on_new_request(request)` when the request
-is added, before its first lookup, so a resuming parent sees the freed
-space in the same scheduling step.
+the ReqContext, so the label reaches the store that writes each block.
 
-### 2.3 One eviction mode: scope-owned live-LRU
+### 2.3 One eviction mode: agent-granular over a live LRU
 
 `CPUOffloadingManager` stops delegating to a pluggable `CachePolicy` and
 owns a single structure:
 
-- every chunk carries an owner scope: the scope of the request that last
-  stored or touched it. Touch transfers ownership, so a prefix chunk
-  shared by a subagent and its parent stays alive if the parent used it
-  after the subagent did; scope death only takes what the dead scope alone
-  was keeping warm.
-- `release_scope(s)`: drop the scope's idle chunks immediately (with
-  BlockRemoved events); chunks with an in-flight store or load are marked
-  dead and reclaimed at `complete_store` / `complete_load` — release is a
-  state transition, never a data race with the DMA engine.
-- capacity pressure among *live* chunks stays plain LRU (the ordered
-  evictable list the old LRU policy proved). Recency was only ever wrong
-  about dead scopes, and identity now states death exactly; ARC existed to
-  approximate that statement and has nothing left to approximate.
+- every chunk carries the agent that stored it. The label is fixed where
+  the block is written and never moves, so the grouping is a property of
+  the write path rather than of a later reconciliation.
+- capacity pressure resolves one agent at a time. The evictable set is
+  grouped by owning agent in LRU order; the agent owning the oldest block
+  is drained before another is considered. Taking the globally oldest
+  blocks instead would interleave agents and leave each of them with a
+  partial context, which still has to be prefilled — the whole point of
+  the tier is that a resident context is complete enough to copy.
+- nothing reacts to an agent finishing. A context nobody is contending for
+  costs nothing to keep, so it stays until someone needs the room.
 
 The manager keeps its existing ref-count / write-pending accounting,
 events, threshold tracker, and stats surface. `BlockStatus` moves into
 manager.py. The tiering primary tier (`CPUPrimaryTierOffloadingManager`)
-inherits the mode; `TieringOffloadingManager.release_scope` forwards to
-the primary tier — secondary (fs/obj/p2p) tiers have their own lifecycle
-and receive the base-class default. The base-class default is an explicit
-documented no-op *on the abstract manager only*: a tier without identity
-tracking has nothing to drop as a unit; it is not a configuration
-fallback, and the pinned profile's manager implements the full semantics.
+inherits the mode; secondary (fs/obj/p2p) tiers have their own lifecycle
+and are unaffected.
 
 ### 2.4 Supersede: what stops being accepted, what is deleted
 
@@ -250,37 +231,18 @@ deletion, so the transaction learns it end-to-end:
   a deleted path must be absent in both the patched verification worktree
   and the live tree.
 
-## 3. Subagent lifecycle the protocol admits
+## 3. What pressure does
 
-The sequence below is the contract the server implements; it is what a
-client that tracks agent lifetimes sends to use scope ownership.
-
-1. Main agent runs; its requests carry `kv_scope: null`. Stored/touched
-   chunks are owned by the null scope.
-2. Subagent spawned from `tool_use` `toolu_X`; its requests carry
-   `kv_scope: "toolu_X"`. Its stores are owned by `toolu_X`; any shared
-   prefix chunks it touches transfer to `toolu_X` (and transfer back the
-   moment the parent touches them again).
-3. Subagent finishes. Nothing happens yet — vLLM cannot know, and does
-   not guess.
-4. The parent's next request carries `kv_scope: null,
-   kv_scope_release: ["toolu_X"]`. At `on_new_request`, before lookup,
-   every chunk still owned by `toolu_X` is dropped as a unit (in-flight
-   transfers drain first). The parent's own chunks were never candidates:
-   they are owned by `null`.
-5. The parent's lookup then runs against a pool where the dead context
-   occupies nothing — the exact inversion of the ARC failure, on both
-   this box (1 declared user) and a DGX (32 declared users, where a dead
-   scope would otherwise squat on 1/32 of the durable tier indefinitely).
-
-The GPU tier keeps upstream recency: its pool is `N * blocks_per_user`
-deep, every offloaded chunk also exists in the CPU tier, and a dead
-scope's VRAM blocks are recycled within one pool cycle of allocation
-pressure — the tier self-heals, and reordering its eviction would buy a
-transient win at the cost of threading scope state through the core block
-pool. The durable tier is where corpses rot, and that is where identity
-now lives. Revisit only if a measured DGX workload shows the transient
-VRAM squat mattering.
+1. Two agents are resident: the main line and a subagent. Each block the
+   host tier holds is labelled with whichever of them stored it.
+2. A third context arrives and the tier is full. The oldest evictable
+   block names the agent to give up, and that agent's blocks go first,
+   oldest within the agent, until enough room exists.
+3. Nothing else is touched. The other agent's context stays whole, so its
+   next full-length re-entry is a copy out of host memory rather than a
+   prefill.
+4. When only one agent is resident, that rule falls on its own oldest
+   blocks — the tail it re-reads last, with its prefix kept warm.
 
 ## 4. File map
 
@@ -295,17 +257,17 @@ vLLM worktree (runtime):
 | vllm/v1/core/kv_cache_utils.py | user-count derivation + fail-closed gates in `get_kv_cache_configs` |
 | vllm/v1/worker/gpu_worker.py | profiling log rewritten (no dead-flag advice; plan still saved) |
 | vllm/v1/kv_offload/config.py | + `max_model_len`, per-group `sliding_window_size_in_chunks` |
-| vllm/v1/kv_offload/base.py | `ReqContext.kv_scope`; `OffloadingManager.release_scope` |
+| vllm/v1/kv_offload/base.py | `ReqContext.kv_scope` |
 | vllm/v1/kv_offload/cpu/spec.py | `cpu_kv_cache_users` derivation; exact-key allowlist; policy knobs gone |
-| vllm/v1/kv_offload/cpu/manager.py | scope-owned live-LRU; `release_scope`; `BlockStatus` moves in |
+| vllm/v1/kv_offload/cpu/manager.py | agent-labelled blocks, agent-granular eviction; `BlockStatus` moves in |
 | vllm/v1/kv_offload/cpu/policies/* | deleted |
 | vllm/v1/kv_offload/tiering/spec.py, tiering/manager.py | follow the single mode; release forwards to primary |
 | .../kv_connector/v1/offloading/config.py | window classification moves here; new config fields |
 | .../kv_connector/v1/offloading/scheduler.py | consume stored windows; scope into ReqContext; release at on_new_request |
-| five protocol files | `kv_scope`, `kv_scope_release` beside `cache_salt`/`kv_transfer_params` |
+| five protocol files | `kv_scope` beside `cache_salt`/`kv_transfer_params` |
 | vllm/entrypoints/generate/api_router.py | Cohere registration and serving state excised; absence enforced |
 | vllm/entrypoints/openai/cli_args.py | − `--cohere-is-reasoning-model` (endpoint-only knob) |
-| vllm/v1/request.py | typed `kv_scope`/`kv_scope_release` attributes |
+| vllm/v1/request.py | typed `kv_scope` attribute |
 | vllm/v1/engine/input_processor.py | fail-closed field validation |
 
 vLLM worktree (tests): rewrite `tests/v1/kv_offload/cpu/test_manager.py`
