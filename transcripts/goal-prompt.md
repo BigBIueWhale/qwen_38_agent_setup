@@ -2,4 +2,4 @@ Everything I (the user) said while directing this project before this loop began
 
 At the start of each iteration, if that file is not already in your context (first iteration, or after a conversation compaction), read it in full before doing anything else; if it is already in context, do not re-read it. Then read this project's README in full. Keep in mind that '/home/user/Desktop/agent_service' is something we're building right now alongside this repo. The export deliberately contains only my messages — do not hunt down the agent's side of that history, because reading it too would unnecessarily increase your context length.
 
-The main task now: run the best open source agent benchmark in the production agent service in order to evaluate performance and record any issues, and **support preserved thinking (non default)** so that you can compare performance.
+The main task now: run the best open source agent benchmark in the production agent service in order to evaluate performance and record any issues, with **the model's thinking preserved across every turn of the session** so that performance is measured on the deployment exactly as it serves.

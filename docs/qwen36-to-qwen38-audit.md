@@ -61,6 +61,24 @@ Docker. The checks were not character-count estimates.
   `low`, and disabled thinking fail with HTTP 400 rather than silently degrading.
 - The Qwen3.8 template has stronger historical-tool-call validation: missing names or
   malformed argument types fail loudly. The project retains those checks.
+- The template gates historical thinking on
+  `preserve_thinking is undefined or preserve_thinking is true or loop.index0 >
+  ns.last_query_index`. `ns.last_query_index` comes from a backwards scan for the
+  most recent `role: "user"` message whose rendered content is not wrapped in
+  `<tool_response>`; thinking is emitted only for assistant turns after it. The
+  wrapper test is written for chat clients that hand tool output back as user
+  turns, and it cannot fire for an OpenAI-protocol agent client: tool results
+  arrive as `role: "tool"` and keep that role through vLLM's chat parser, so the
+  template wraps them only while rendering, after the scan has run. Any other
+  user message an agent client injects between tool turns therefore becomes the
+  new `ns.last_query_index` and moves the cut — Qwen Code's active-todo reminder,
+  whose text opens with `<system-reminder>` and which the OpenAI converter emits
+  as its own `role: "user"` message every third tool turn, is exactly such a
+  message. How much reasoning a shedding render keeps is thus a function of the
+  client's tool-loop structure, not of a request field.
+- This deployment omits `preserve_thinking` from `--default-chat-template-kwargs`
+  and sends no per-request override, so the undefined clause applies and every
+  historical thinking block is rendered.
 
 Live policy evidence from the final image:
 
