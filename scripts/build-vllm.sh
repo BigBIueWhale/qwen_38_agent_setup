@@ -22,6 +22,8 @@ SOURCE_PATCH_DIR="${PROJECT_DIR}/patches/source_patch_v1"
 SOURCE_PATCH_MANIFEST="${SOURCE_PATCH_DIR}/manifest.sha256"
 DEPLOYMENT_INPUT_MANIFEST="${PROJECT_DIR}/config/deployment-inputs.sha256"
 RUNTIME_COMMON_CONTRACT_TEST="${PROJECT_DIR}/scripts/test-runtime-common-contract.sh"
+README_FILE="${PROJECT_DIR}/README.md"
+MODEL_MANIFEST_DIR="${PROJECT_DIR}/manifests"
 
 # The image is exported to a tarball and loaded, rather than tagged directly,
 # so that `rewrite-timestamp=true` can normalise every layer timestamp to
@@ -131,6 +133,37 @@ fi
     "${DEPLOYMENT_INPUT_MANIFEST#"${PROJECT_DIR}"/}"
 )
 bash "${RUNTIME_COMMON_CONTRACT_TEST}"
+
+# Every SHA-256 the README states is one this repository derives. A hash in the
+# README is provenance -- a claim that some file, image, or archive has exactly
+# these bytes -- and the deployment-input manifest, the runtime lock, and the
+# model manifests already fix every such value. A hash matching none of them
+# describes an artifact nobody has, which is a build failure and not a reading
+# error. It is checked here, above the manifest whose bytes it reads, so the
+# claim is measured against verified pins rather than against whatever the
+# working tree happens to hold.
+#
+# Identity this repository does not pin is named by its owning repository
+# instead of restated as a hash: a value with no local source has nothing to be
+# checked against, and an unowned copy is exactly what drifts.
+readme_pins="$(grep -ohE '\b[0-9a-f]{64}\b' "${README_FILE}" | sort -u || true)"
+if [[ -z "${readme_pins}" ]]; then
+  echo "The README states no pinned values; the provenance extractor no longer matches it." >&2
+  exit 1
+fi
+underived_pins="$(comm -23 <(printf '%s\n' "${readme_pins}") <(
+  {
+    cut -d' ' -f1 "${DEPLOYMENT_INPUT_MANIFEST}"
+    grep -ohE '\b[0-9a-f]{64}\b' \
+      "${PROJECT_DIR}/config/runtime-v1.sh" \
+      "${MODEL_MANIFEST_DIR}"/*.sha256
+  } | sort -u
+))"
+if [[ -n "${underived_pins}" ]]; then
+  echo "The README states values this repository does not derive:" >&2
+  printf '%s\n' "${underived_pins}" | sed 's/^/  /' >&2
+  exit 1
+fi
 
 actual_commit="$(git -C "${VLLM_DIR}" rev-parse HEAD)"
 if [[ "${actual_commit}" != "${VLLM_COMMIT}" ]]; then

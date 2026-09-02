@@ -37,13 +37,10 @@ The deployment is complete and healthy. There is one supported mode:
 | Batching | One sequence; 2,048-token chunked prefill |
 | Listener | 127.0.0.1:8000 only |
 | Agent client | Qwen Code 0.21.12 at b965d5f8c24f48e65fb0b17c7d45f34ca4ce8f38 |
-| Agent image | sha256:9393fe2c53b34ba220ef86a930ab6ea2c6c7ad23a439af85f6c98cc446fe2f15 |
-| Agent-service implementation | a0ddc3dc815b658513c62661d650cf540ba869e8 |
-| Agent-service release lock | a8e5a63402f1c443a288d92b65e3fcdcfc9d7211 |
-| Agent-service image | sha256:0f3b8096b8c18207acd2483d046de20efce31a226ebd8fe6f8ff2e98e9463b6e |
+| Agent-service release | Pinned by the agent-service release lock, which owns every agent and service image identity |
 | Agent-service listener | 127.0.0.1:8090 only |
 | Runtime profile | socket-isolated-nonroot-vision-k8v4-agent-v18 |
-| Runtime image | sha256:6752f7305dd63e143e40baeeb44cd78c3ec2d18db79dcb1c3a27cafb5f839dda |
+| Runtime image | sha256:1614fda9ee7b3dcad8645ed13f6bec47d7c555f0251427442b80861695fe792a |
 
 This is not a text-only profile with an optional vision switch. It is not a
 one-million-token profile. It has no MTP, eager-mode, lower-quality image, alternate
@@ -239,7 +236,7 @@ It is intentionally reconstructed by twelve ordered, reviewed semantic transform
 |---|---|
 | patches/vllm-turboquant-k8v4-direct-workspace.patch | a9721067f1a7ee9497a4bd51e47e3a474561189e881b4704bfc4beac8ea48380 |
 | patches/vllm-enforce-auto-tool-schema.patch | 4f75c793a9c2cdcfb2fd0768ba49a4e34748d3a37d8392b07d3592ca50939c07 |
-| patches/vllm-qwen38-agent-defaults-and-thinking.patch | 6428d2cfa77f28e57e117999d0ec8fab5430856c985ba530e04885c2f5c420b7 |
+| patches/vllm-qwen38-agent-defaults-and-thinking.patch | c3a7315c32f8b117066e851b123b7a1b446c2fcd4c8a1f2616774c8f9d668509 |
 | patches/vllm-qwen38-separate-final-response-budget.patch | f20d7dff41931248272842ed2c7a163c6f013e405ccf35733c40ff131a2fc503 |
 | patches/vllm-qwen-implicit-tool-grammar-boundary.patch | d231c6e2e7040c4cd4b38432cb8c794805afddbf2c6e4f7ff6febb78e3fd9f48 |
 | patches/vllm-anthropic-validation-http400.patch | 030b64be104e6ef57a40f6bae740dfa9d4634a420c6c93a395f62bfb98d6d053 |
@@ -248,7 +245,7 @@ It is intentionally reconstructed by twelve ordered, reviewed semantic transform
 | patches/vllm-qwen38-numerical-audits.patch | a73aa2f2ae3f82010eb2bafcdf663c2fe14854c30165dbc4d8457725bc3b6632 |
 | patches/vllm-turboquant-fail-closed-guards.patch | 0ecf95ab8ee25a76d5412ce44aafafe13992b2cb373d6010acf5bc119dc8f47b |
 | patches/vllm-kv-offload-pinning-fail-closed.patch | 1857071c38d081bb95e3cca12153cebce096649084950b99229104fdae029ca6 |
-| patches/vllm-kv-user-count-sizing-and-scope-eviction.patch | e9905e065913ba338da6ec1d61d2f350f48ac30eaa22de05dd491d2767521e66 |
+| patches/vllm-kv-user-count-sizing-and-scope-eviction.patch | 8691d7839d7c38c9d3a9894ee5620894e79fb757ff7d573066a10aaa8adda00c |
 
 The reconstructed tree has exactly fifty-two reviewed runtime-source changes, five
 reviewed runtime-source deletions, twenty-nine reviewed existing-test changes,
@@ -270,15 +267,15 @@ Pinned build inputs and products:
 | Immutable base tag | qwen38-vllm:main-9df9b0b |
 | Immutable base ID | sha256:fa4a002a88b7043a1a89966dea8a500fe9696f84e75730d9da916f916048d401 |
 | Runtime tag | qwen38-vllm:qwen38-27b-nvfp4-k8v4-runtime-v18 |
-| Runtime ID | sha256:6752f7305dd63e143e40baeeb44cd78c3ec2d18db79dcb1c3a27cafb5f839dda |
+| Runtime ID | sha256:1614fda9ee7b3dcad8645ed13f6bec47d7c555f0251427442b80861695fe792a |
 | Offline archive | artifacts/qwen38-vllm-images-runtime-v18.tar |
-| Archive size | 8,557,675,008 bytes, mode 0600 |
-| Archive SHA-256 | a80766d9560a419b9c051fc84d9beca1f1a3ac9ab508c99cf29d218b71bef43c |
-| Runtime Dockerfile SHA-256 | 17f72538ee71292e4cf0a2ce804e52a4d26413a034286590aef76008fbd4fcec |
+| Archive size | 8,558,429,696 bytes, mode 0600 |
+| Archive SHA-256 | fc71fa0cffa54469b50d96c8ff835b8f8e59ddd92286fb1ca52351dd8476063e |
+| Runtime Dockerfile SHA-256 | 8e7993cf2b8c4af06b5dfffba9fd5f29c10dd8444f39086db562c2a79a5196e3 |
 | Docker context allowlist SHA-256 | a15c81d0be5c474d9f0cd5e8b1d3f89b5eb7266ce60d45476069de9499f6b103 |
-| Build verifier SHA-256 | d231f88f8f3e1418ff2fb68498762c2d48cfec91b881728116acd64cba1a84a9 |
-| Runtime validator SHA-256 | 6954f0a81c1be056e2ad882f68249aa34e24d29aa325aa05fe04e477f8ef3781 |
-| Runtime lock SHA-256 | 6498c8fd4ac52306fd79360c80911b6e01f2eb7b2f562b18299f08277cb4aced |
+| Build verifier SHA-256 | d5d76e9cff602b17959ca759bedfea1e2df497b1ea8520c5f60cb189f1fe0de8 |
+| Runtime validator SHA-256 | bf807a973e9d19c6f6bfd0456f9f7c53f46cfcaa12514ebf137d736331f5110e |
+| Runtime lock SHA-256 | 29a1167e9eba6dfa5f4563d6467a37b0fe5551dab4e5889034bd05c5f55ffc5e |
 
 The final runtime layer does no package resolution or installation. It is built with
 pull=false, network=none, provenance=false, an exact base ID, an allowlisted context,
@@ -784,8 +781,7 @@ rerun after every runtime-profile change before that image is accepted:
     semantics and continuation positions: pass.
 19. Pinned Qwen Code archive plus exact semantic reconstruction: pass; exactly 61
     changed/new files and 2,427 assertions across 23 focused test files; the full
-    no-cache build reproduced agent image
-    sha256:9393fe2c53b34ba220ef86a930ab6ea2c6c7ad23a439af85f6c98cc446fe2f15.
+    no-cache build reproduced the agent image its own release lock pins.
 20. All pinned Rust component tests and clean release images: pass; 44 service,
     9 broker, 3 relay, 2 capture, and 2 agent-exec tests. The same no-cache release
     exactly reproduced the locked relay, capture, broker, and service image IDs.
@@ -863,11 +859,10 @@ proxying to loopback vLLM, cancellation, durable JSONL/bundles, labels, orphan
 recovery, and ordered teardown.
 
 The chosen and deployed client is pinned Qwen Code 0.21.12 at
-b965d5f8c24f48e65fb0b17c7d45f34ca4ce8f38. The official release archive is pinned
-by SHA-256 61beddff8bde1dd2654c8714f927b46ab7cf9822b8561d11e3a2b8e085b5e745,
-and the landmark-aware source transformation is independently pinned. It runs only
-inside immutable agent image
-sha256:9393fe2c53b34ba220ef86a930ab6ea2c6c7ad23a439af85f6c98cc446fe2f15.
+b965d5f8c24f48e65fb0b17c7d45f34ca4ce8f38. The agent-service repository pins the
+official release archive by SHA-256, pins the landmark-aware source
+transformation independently, and pins the immutable agent image the client runs
+inside; its release lock is the one place those identities are recorded.
 The accepted service sends this exact outgoing policy on every main and foreground
 subagent turn:
 
