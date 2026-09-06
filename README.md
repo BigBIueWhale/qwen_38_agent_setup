@@ -40,7 +40,7 @@ The deployment is complete and healthy. There is one supported mode:
 | Agent-service release | Pinned by the agent-service release lock, which owns every agent and service image identity |
 | Agent-service listener | 127.0.0.1:8090 only |
 | Runtime profile | socket-isolated-nonroot-vision-k8v4-agent-v19 |
-| Runtime image | sha256:39afd74fa47aa37dff1779cac745c462c3cd247e01ad4a58da068a0e2512ac73 |
+| Runtime image | sha256:9ca17cb2404beac5936a079b581133c5a8e18e8f9a7e7b9179058a0c92f4fb50 |
 
 This is not a text-only profile with an optional vision switch. It is not a
 one-million-token profile. It has no MTP, eager-mode, lower-quality image, alternate
@@ -267,15 +267,15 @@ Pinned build inputs and products:
 | Immutable base tag | qwen38-vllm:main-9df9b0b |
 | Immutable base ID | sha256:fa4a002a88b7043a1a89966dea8a500fe9696f84e75730d9da916f916048d401 |
 | Runtime tag | qwen38-vllm:qwen38-27b-nvfp4-k8v4-runtime-v19 |
-| Runtime ID | sha256:39afd74fa47aa37dff1779cac745c462c3cd247e01ad4a58da068a0e2512ac73 |
+| Runtime ID | sha256:9ca17cb2404beac5936a079b581133c5a8e18e8f9a7e7b9179058a0c92f4fb50 |
 | Offline archive | artifacts/qwen38-vllm-images-runtime-v19.tar |
-| Archive size | 8,558,429,696 bytes, mode 0600 |
-| Archive SHA-256 | 63ffd79898bd49c2dff70eea30934582a3696b1003af8b40dda2b13d79c86f97 |
-| Runtime Dockerfile SHA-256 | 09e8ef7a8264b610dead2af5ef8305a3df15b7e5541b1464e5571a6c95846523 |
+| Archive size | 8,558,427,648 bytes, mode 0600 |
+| Archive SHA-256 | dedbeb9446ef9d0fb95f34466261600160c419c0b53c1127248b7425bb813607 |
+| Runtime Dockerfile SHA-256 | 52571f5ae5a6a1d9b413c126477ca5a4c038dc7939b62268aab1456b516fb59e |
 | Docker context allowlist SHA-256 | a15c81d0be5c474d9f0cd5e8b1d3f89b5eb7266ce60d45476069de9499f6b103 |
-| Build verifier SHA-256 | d5d76e9cff602b17959ca759bedfea1e2df497b1ea8520c5f60cb189f1fe0de8 |
+| Build verifier SHA-256 | 3ae7ab14782765ee133577945bd8df99f342f50cd4adc3edbf66716f1db50c62 |
 | Runtime validator SHA-256 | bf807a973e9d19c6f6bfd0456f9f7c53f46cfcaa12514ebf137d736331f5110e |
-| Runtime lock SHA-256 | d0132dd784c51ef1b9c9c3f498365297d67abac10bb5e16c14efc4fd7c0d3404 |
+| Runtime lock SHA-256 | 1a50978ca81c72b299ee4f24e8c24c5ec9b433bd60fb0e5f5533500cabf66195 |
 
 The final runtime layer does no package resolution or installation. It is built with
 pull=false, network=none, provenance=false, an exact base ID, an allowlisted context,
