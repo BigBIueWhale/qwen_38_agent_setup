@@ -39,8 +39,8 @@ The deployment is complete and healthy. There is one supported mode:
 | Agent client | Qwen Code 0.21.12 at b965d5f8c24f48e65fb0b17c7d45f34ca4ce8f38 |
 | Agent-service release | Pinned by the agent-service release lock, which owns every agent and service image identity |
 | Agent-service listener | 127.0.0.1:8090 only |
-| Runtime profile | socket-isolated-nonroot-vision-k8v4-agent-v18 |
-| Runtime image | sha256:1614fda9ee7b3dcad8645ed13f6bec47d7c555f0251427442b80861695fe792a |
+| Runtime profile | socket-isolated-nonroot-vision-k8v4-agent-v19 |
+| Runtime image | sha256:39afd74fa47aa37dff1779cac745c462c3cd247e01ad4a58da068a0e2512ac73 |
 
 This is not a text-only profile with an optional vision switch. It is not a
 one-million-token profile. It has no MTP, eager-mode, lower-quality image, alternate
@@ -245,7 +245,7 @@ It is intentionally reconstructed by twelve ordered, reviewed semantic transform
 | patches/vllm-qwen38-numerical-audits.patch | a73aa2f2ae3f82010eb2bafcdf663c2fe14854c30165dbc4d8457725bc3b6632 |
 | patches/vllm-turboquant-fail-closed-guards.patch | 0ecf95ab8ee25a76d5412ce44aafafe13992b2cb373d6010acf5bc119dc8f47b |
 | patches/vllm-kv-offload-pinning-fail-closed.patch | 1857071c38d081bb95e3cca12153cebce096649084950b99229104fdae029ca6 |
-| patches/vllm-kv-user-count-sizing-and-scope-eviction.patch | 8691d7839d7c38c9d3a9894ee5620894e79fb757ff7d573066a10aaa8adda00c |
+| patches/vllm-kv-user-count-sizing-and-scope-eviction.patch | d4d18c5afc0af9ecdaff948d7e7f4b5d2e8f85eb15e7853aaddc44de62b17b56 |
 
 The reconstructed tree has exactly fifty-two reviewed runtime-source changes, five
 reviewed runtime-source deletions, twenty-nine reviewed existing-test changes,
@@ -266,16 +266,16 @@ Pinned build inputs and products:
 |---|---|
 | Immutable base tag | qwen38-vllm:main-9df9b0b |
 | Immutable base ID | sha256:fa4a002a88b7043a1a89966dea8a500fe9696f84e75730d9da916f916048d401 |
-| Runtime tag | qwen38-vllm:qwen38-27b-nvfp4-k8v4-runtime-v18 |
-| Runtime ID | sha256:1614fda9ee7b3dcad8645ed13f6bec47d7c555f0251427442b80861695fe792a |
-| Offline archive | artifacts/qwen38-vllm-images-runtime-v18.tar |
+| Runtime tag | qwen38-vllm:qwen38-27b-nvfp4-k8v4-runtime-v19 |
+| Runtime ID | sha256:39afd74fa47aa37dff1779cac745c462c3cd247e01ad4a58da068a0e2512ac73 |
+| Offline archive | artifacts/qwen38-vllm-images-runtime-v19.tar |
 | Archive size | 8,558,429,696 bytes, mode 0600 |
-| Archive SHA-256 | fc71fa0cffa54469b50d96c8ff835b8f8e59ddd92286fb1ca52351dd8476063e |
-| Runtime Dockerfile SHA-256 | 8e7993cf2b8c4af06b5dfffba9fd5f29c10dd8444f39086db562c2a79a5196e3 |
+| Archive SHA-256 | 63ffd79898bd49c2dff70eea30934582a3696b1003af8b40dda2b13d79c86f97 |
+| Runtime Dockerfile SHA-256 | 09e8ef7a8264b610dead2af5ef8305a3df15b7e5541b1464e5571a6c95846523 |
 | Docker context allowlist SHA-256 | a15c81d0be5c474d9f0cd5e8b1d3f89b5eb7266ce60d45476069de9499f6b103 |
 | Build verifier SHA-256 | d5d76e9cff602b17959ca759bedfea1e2df497b1ea8520c5f60cb189f1fe0de8 |
 | Runtime validator SHA-256 | bf807a973e9d19c6f6bfd0456f9f7c53f46cfcaa12514ebf137d736331f5110e |
-| Runtime lock SHA-256 | 29a1167e9eba6dfa5f4563d6467a37b0fe5551dab4e5889034bd05c5f55ffc5e |
+| Runtime lock SHA-256 | d0132dd784c51ef1b9c9c3f498365297d67abac10bb5e16c14efc4fd7c0d3404 |
 
 The final runtime layer does no package resolution or installation. It is built with
 pull=false, network=none, provenance=false, an exact base ID, an allowlisted context,

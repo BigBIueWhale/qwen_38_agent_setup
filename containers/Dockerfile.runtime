@@ -539,6 +539,7 @@ RUN printf '%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  
 from vllm.entrypoints.anthropic.protocol import AnthropicMessagesRequest
 from vllm.entrypoints.anthropic.serving import AnthropicServingMessages
 from vllm.entrypoints.openai.chat_completion.protocol import (
+    BatchChatCompletionRequest,
     ChatCompletionRequest,
     ChatCompletionToolsParam,
 )
@@ -857,6 +858,9 @@ from vllm.sampling_params import SamplingParams
 from vllm.engine.arg_utils import EngineArgs
 from vllm.v1.kv_offload.cpu.manager import CPUOffloadingManager
 from vllm.v1.kv_offload.cpu.spec import CPUOffloadingSpec
+from vllm.v1.kv_offload.base import ReqContext
+from vllm.v1.engine.input_processor import require_kv_scope
+from vllm.exceptions import VLLMValidationError
 
 scoped = ChatCompletionRequest(
     model="qwen3.8",
@@ -880,6 +884,55 @@ for scoped_request in (
     ),
 ):
     assert scoped_request.kv_scope == "agent_scope"
+
+# Generation requires an owning agent, and the requirement lives on the path
+# into the engine rather than on these models: /v1/chat/completions/render
+# renders through the very same ChatCompletionRequest while allocating
+# nothing, so a model-level requirement would demand an identity from an
+# endpoint that owns no context. Prove both directions here, plus the fact
+# that keeps them separable -- the shared model still builds unscoped.
+assert require_kv_scope(scoped_sampling) == "agent_scope"
+unscoped = ChatCompletionRequest(
+    model="qwen3.8",
+    messages=[{"role": "user", "content": "test"}],
+    max_tokens=8,
+)
+assert unscoped.kv_scope is None
+unscoped_sampling = unscoped.to_sampling_params(8, defaults)
+assert "kv_scope" not in (unscoped_sampling.extra_args or {})
+try:
+    require_kv_scope(unscoped_sampling)
+except VLLMValidationError as exc:
+    assert exc.parameter == "kv_scope", exc.parameter
+    assert "required for generation" in str(exc), str(exc)
+else:
+    raise AssertionError("generation admitted a request that names no agent")
+for malformed in ("", 0, [], {}):
+    try:
+        require_kv_scope(SamplingParams(max_tokens=1, extra_args={"kv_scope": malformed}))
+    except VLLMValidationError as exc:
+        assert exc.parameter == "kv_scope", exc.parameter
+    else:
+        raise AssertionError(f"malformed kv_scope accepted: {malformed!r}")
+
+# One batch is one caller: every conversation is submitted under its agent.
+batched = BatchChatCompletionRequest(
+    model="qwen3.8",
+    messages=[
+        [{"role": "user", "content": "a"}],
+        [{"role": "user", "content": "b"}],
+    ],
+    max_tokens=8,
+    kv_scope="agent_scope",
+)
+derived = [batched.to_chat_completion_request(m) for m in batched.messages]
+assert [d.kv_scope for d in derived] == ["agent_scope", "agent_scope"]
+assert require_kv_scope(derived[0].to_sampling_params(8, defaults)) == "agent_scope"
+
+# The host tier is where an unowned block would actually do damage: a label
+# matching no single context, given up all at once. Storing refuses it.
+_unowned_ctx = ReqContext(req_id="unowned")
+assert _unowned_ctx.kv_scope is None
 
 assert hasattr(EngineArgs, "kv_cache_users")
 assert not hasattr(EngineArgs, "kv_cache_memory_bytes")
@@ -922,8 +975,14 @@ register_generate_api_routers(route_app)
 register_scale_out_api_routers(route_app, ("generate",))
 route_paths = {getattr(route, "path", "") for route in route_app.routes}
 assert not any(path.startswith("/cohere") for path in route_paths), route_paths
+# /generative_scoring is withheld for the mirror-image reason: it reaches the
+# engine's generative path but names no agent, so its blocks could not be
+# filed under any single context. Every mounted generative route here is an
+# identity surface.
+assert "/generative_scoring" not in route_paths, sorted(route_paths)
 for required_path in (
     "/v1/chat/completions",
+    "/v1/chat/completions/batch",
     "/v1/completions",
     "/v1/responses",
     "/v1/messages",

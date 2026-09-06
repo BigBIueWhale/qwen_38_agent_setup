@@ -277,7 +277,7 @@ diff --git a/tests/v1/kv_connector/unit/offloading_connector/test_events.py b/te
 diff --git a/tests/v1/kv_connector/unit/offloading_connector/test_scheduler.py b/tests/v1/kv_connector/unit/offloading_connector/test_scheduler.py
 --- a/tests/v1/kv_connector/unit/offloading_connector/test_scheduler.py
 +++ b/tests/v1/kv_connector/unit/offloading_connector/test_scheduler.py
-@@ -24,6 +24,7 @@
+@@ -24,6 +24,7 @@ from vllm.distributed.kv_transfer.kv_connector.v1.offloading.common import (
  )
  from vllm.distributed.kv_transfer.kv_connector.v1.offloading.config import (
      build_offloading_config,
@@ -285,7 +285,7 @@ diff --git a/tests/v1/kv_connector/unit/offloading_connector/test_scheduler.py b
  )
  from vllm.distributed.kv_transfer.kv_connector.v1.offloading.metrics import (
      OffloadingConnectorStats,
-@@ -32,7 +33,6 @@
+@@ -32,7 +33,6 @@ from vllm.distributed.kv_transfer.kv_connector.v1.offloading.metrics import (
  from vllm.distributed.kv_transfer.kv_connector.v1.offloading.scheduler import (
      OffloadingConnectorScheduler,
      RequestOffloadState,
@@ -293,13 +293,13 @@ diff --git a/tests/v1/kv_connector/unit/offloading_connector/test_scheduler.py b
      is_store_reachable_swa_chunk,
  )
  from vllm.v1.core.kv_cache_manager import KVCacheBlocks
-@@ -3363,3 +3363,28 @@
+@@ -3363,3 +3363,30 @@ def test_chunked_local_attention_reports_its_chunk_window():
      assert get_sliding_window_size_in_chunks(spec, tokens_per_chunk=1024) == 8
      # Partial chunks round up, so the reachable tail is never understated.
      assert get_sliding_window_size_in_chunks(spec, tokens_per_chunk=3000) == 3
 +
 +
-+def _make_scoped_request(req_id: str, kv_scope: str | None) -> MagicMock:
++def _make_scoped_request(req_id: str, kv_scope: str) -> MagicMock:
 +    request = MagicMock()
 +    request.request_id = req_id
 +    request.kv_transfer_params = None
@@ -315,13 +315,15 @@ diff --git a/tests/v1/kv_connector/unit/offloading_connector/test_scheduler.py b
 +
 +def test_req_context_carries_the_request_scope():
 +    """Every manager call for a request must see its owning agent — that
-+    is the identity the tier groups blocks by."""
++    is the identity the tier groups blocks by. A main agent names itself by
++    its session and a subagent by the tool call that spawned it; neither is
++    anonymous, so the tier never has to group unrelated contexts together."""
 +    scheduler = _make_partial_tail_scheduler()
-+    scheduler.on_new_request(_make_scoped_request("sub", "agent_A"))
-+    assert scheduler._req_status["sub"].req_context.kv_scope == "agent_A"
++    scheduler.on_new_request(_make_scoped_request("sub", "call_a1b2"))
++    assert scheduler._req_status["sub"].req_context.kv_scope == "call_a1b2"
 +
-+    scheduler.on_new_request(_make_scoped_request("main", None))
-+    assert scheduler._req_status["main"].req_context.kv_scope is None
++    scheduler.on_new_request(_make_scoped_request("main", "s-9f3c"))
++    assert scheduler._req_status["main"].req_context.kv_scope == "s-9f3c"
 diff --git a/tests/v1/kv_connector/unit/offloading_connector/test_worker.py b/tests/v1/kv_connector/unit/offloading_connector/test_worker.py
 --- a/tests/v1/kv_connector/unit/offloading_connector/test_worker.py
 +++ b/tests/v1/kv_connector/unit/offloading_connector/test_worker.py
@@ -633,7 +635,15 @@ diff --git a/tests/v1/kv_connector/unit/test_offloading_connector.py b/tests/v1/
 diff --git a/tests/v1/kv_offload/cpu/test_manager.py b/tests/v1/kv_offload/cpu/test_manager.py
 --- a/tests/v1/kv_offload/cpu/test_manager.py
 +++ b/tests/v1/kv_offload/cpu/test_manager.py
-@@ -22,14 +22,17 @@
+@@ -7,6 +7,7 @@ from dataclasses import dataclass
+ import numpy as np
+ import pytest
+ 
++from vllm.exceptions import VLLMServerError
+ from vllm.v1.kv_offload.base import (
+     LoadStoreSpec,
+     LookupResult,
+@@ -22,14 +23,22 @@ from vllm.v1.kv_offload.cpu.common import (
      CPUOffloadingMetrics,
  )
  from vllm.v1.kv_offload.cpu.manager import CPUOffloadingManager
@@ -644,17 +654,23 @@ diff --git a/tests/v1/kv_offload/cpu/test_manager.py b/tests/v1/kv_offload/cpu/t
 -    req_id: str = "", kv_transfer_params: dict | None = None
 +    req_id: str = "",
 +    kv_transfer_params: dict | None = None,
-+    kv_scope: str | None = None,
++    kv_scope: str | None = "agent",
  ) -> ReqContext:
-     """Create a ReqContext as production code would, from a request's params."""
+-    """Create a ReqContext as production code would, from a request's params."""
 -    return ReqContext(req_id=req_id, kv_transfer_params=kv_transfer_params)
++    """Create a ReqContext as production code would, from a request's params.
++
++    The scope defaults to a named agent because every generative request has
++    one: the engine refuses to generate without it. Pass ``kv_scope=None``
++    only to exercise the tier's refusal to store an unowned block.
++    """
 +    return ReqContext(
 +        req_id=req_id, kv_transfer_params=kv_transfer_params, kv_scope=kv_scope
 +    )
  
  
  _EMPTY_REQ_CTX = make_req_context()
-@@ -37,16 +40,12 @@
+@@ -37,16 +46,12 @@ _EMPTY_REQ_CTX = make_req_context()
  
  def make_cpu_manager(
      num_blocks: int = 4,
@@ -671,7 +687,7 @@ diff --git a/tests/v1/kv_offload/cpu/test_manager.py b/tests/v1/kv_offload/cpu/t
          enable_events=enable_events,
          store_threshold=store_threshold,
          max_tracker_size=max_tracker_size,
-@@ -163,12 +162,10 @@
+@@ -163,12 +168,10 @@ def test_cpu_eviction_removed_precedes_stored():
      assert all(event.medium == manager.medium for event in events)
  
  
@@ -685,7 +701,7 @@ diff --git a/tests/v1/kv_offload/cpu/test_manager.py b/tests/v1/kv_offload/cpu/t
  
      Scenario:
          - Store blocks [1, 2] and complete.
-@@ -181,7 +178,6 @@
+@@ -181,7 +184,6 @@ def test_already_stored_block_not_evicted_during_prepare_store(eviction_policy):
      """
      manager = make_cpu_manager(
          num_blocks=4,
@@ -693,7 +709,7 @@ diff --git a/tests/v1/kv_offload/cpu/test_manager.py b/tests/v1/kv_offload/cpu/t
          enable_events=True,
      )
  
-@@ -216,7 +212,6 @@
+@@ -216,7 +218,6 @@ def test_already_stored_block_not_evicted_during_prepare_store(eviction_policy):
  def test_filter_reused_manager_reports_stores_skipped_counter():
      manager = make_cpu_manager(
          num_blocks=4,
@@ -701,7 +717,7 @@ diff --git a/tests/v1/kv_offload/cpu/test_manager.py b/tests/v1/kv_offload/cpu/t
          store_threshold=2,
      )
  
-@@ -274,7 +269,7 @@
+@@ -274,7 +275,7 @@ def test_cpu_manager_reports_cache_usage_gauge():
  
  
  def test_cpu_manager_reports_allocation_size_histogram():
@@ -710,7 +726,7 @@ diff --git a/tests/v1/kv_offload/cpu/test_manager.py b/tests/v1/kv_offload/cpu/t
  
      manager.prepare_store(to_keys([1, 2]), _EMPTY_REQ_CTX)
      manager.complete_store(to_keys([1, 2]), _EMPTY_REQ_CTX)
-@@ -297,7 +292,7 @@
+@@ -297,7 +298,7 @@ def test_cpu_manager_reports_allocation_size_histogram():
  
  
  def test_cpu_manager_reports_allocation_size_on_allocation_failure(monkeypatch):
@@ -719,7 +735,7 @@ diff --git a/tests/v1/kv_offload/cpu/test_manager.py b/tests/v1/kv_offload/cpu/t
  
      def fail_allocate_blocks(keys):
          raise RuntimeError("allocation failed")
-@@ -316,7 +311,7 @@
+@@ -316,7 +317,7 @@ def test_cpu_manager_reports_allocation_size_on_allocation_failure(monkeypatch):
  
  
  def test_cpu_manager_reports_allocation_size_on_eviction_failure():
@@ -728,7 +744,7 @@ diff --git a/tests/v1/kv_offload/cpu/test_manager.py b/tests/v1/kv_offload/cpu/t
  
      manager.prepare_store(to_keys([1]), _EMPTY_REQ_CTX)
      manager.get_stats()
-@@ -367,10 +362,10 @@
+@@ -367,10 +368,10 @@ def test_cpu_manager_clears_write_usage_after_failed_store():
  
  def test_cpu_manager():
      """
@@ -741,7 +757,7 @@ diff --git a/tests/v1/kv_offload/cpu/test_manager.py b/tests/v1/kv_offload/cpu/t
  
      # prepare store [1, 2]
      prepare_store_output = cpu_manager.prepare_store(to_keys([1, 2]), _EMPTY_REQ_CTX)
-@@ -483,7 +478,7 @@
+@@ -483,7 +484,7 @@ def test_cpu_manager():
  
  def test_prepare_load_preserves_key_order():
      """block_ids[i] must correspond to keys[i] (co-indexed invariant)."""
@@ -750,7 +766,7 @@ diff --git a/tests/v1/kv_offload/cpu/test_manager.py b/tests/v1/kv_offload/cpu/t
  
      key_a, key_b, key_c = to_key(0), to_key(1), to_key(2)
  
-@@ -518,415 +513,12 @@
+@@ -518,415 +519,12 @@ def test_prepare_load_preserves_key_order():
      manager.complete_load([key_a, key_b, key_c], _EMPTY_REQ_CTX)  # order irrelevant
  
  
@@ -1166,7 +1182,7 @@ diff --git a/tests/v1/kv_offload/cpu/test_manager.py b/tests/v1/kv_offload/cpu/t
          enable_events=True,
          store_threshold=2,
          max_tracker_size=3,
-@@ -971,115 +563,147 @@
+@@ -971,115 +569,161 @@ def test_filter_reused_manager():
  
  def test_evictable_cache_block_count():
      """
@@ -1286,19 +1302,33 @@ diff --git a/tests/v1/kv_offload/cpu/test_manager.py b/tests/v1/kv_offload/cpu/t
 -    """Regression: CPUOffloadingManager.touch forwards ReqContext to policy."""
 -    manager = make_cpu_manager(num_blocks=4, cache_policy="lru")
 -    received = []
-+def _scoped_ctx(scope: str | None, req_id: str = "req") -> ReqContext:
++def _scoped_ctx(scope: str, req_id: str = "req") -> ReqContext:
 +    return make_req_context(req_id=req_id, kv_scope=scope)
  
 -    def spy_touch(keys: Iterable[OffloadKey], req_context: ReqContext) -> None:
 -        received.append((list(keys), req_context))
  
 -    monkeypatch.setattr(manager._policy, "touch", spy_touch)
-+def _store(manager: CPUOffloadingManager, keys: list[int], scope: str | None):
++def _store(manager: CPUOffloadingManager, keys: list[int], scope: str):
 +    ctx = _scoped_ctx(scope)
 +    out = manager.prepare_store(to_keys(keys), ctx)
 +    assert out is not None
 +    manager.complete_store(to_keys(keys), ctx)
 +    return ctx
++
++
++def test_the_tier_refuses_to_store_a_block_that_names_no_agent():
++    """Storing is the only way in, so it is where ownership is required. An
++    unowned block would sit under a label matching no single context, and
++    giving that label up would shred several contexts at once -- the shape
++    whole-agent eviction exists to avoid."""
++    manager = make_cpu_manager(num_blocks=4)
++
++    with pytest.raises(VLLMServerError, match="names no owning agent"):
++        manager.prepare_store(to_keys([1]), make_req_context(kv_scope=None))
++
++    # Nothing was recorded: the refusal happens before any block is filed.
++    assert manager._owner == {}
  
 -    keys = to_keys([1, 2])
 -    ctx = make_req_context(
@@ -1317,10 +1347,7 @@ diff --git a/tests/v1/kv_offload/cpu/test_manager.py b/tests/v1/kv_offload/cpu/t
 +
 +    assert manager._owner[to_key(1)] == "agent_A"
 +
- 
--    assert len(received) == 1
--    assert received[0][0] == keys
--    assert received[0][1] is ctx
++
 +def test_pressure_gives_up_one_whole_agent_before_touching_another():
 +    """The property the tier exists for: what survives pressure is a whole
 +    context. Interleaved by recency, blocks 1 and 2 would go and leave both
@@ -1339,7 +1366,10 @@ diff --git a/tests/v1/kv_offload/cpu/test_manager.py b/tests/v1/kv_offload/cpu/t
 +    assert sorted(out.evicted_keys) == sorted(to_keys([1, 4]))
 +    assert manager.lookup(to_key(2), _EMPTY_REQ_CTX) is LookupResult.HIT
 +    assert manager.lookup(to_key(3), _EMPTY_REQ_CTX) is LookupResult.HIT
-+
+ 
+-    assert len(received) == 1
+-    assert received[0][0] == keys
+-    assert received[0][1] is ctx
 +
 +def test_a_lone_agent_under_pressure_gives_up_its_own_oldest():
 +    """With one agent there is no other context to give up, so pressure
@@ -2069,7 +2099,7 @@ diff --git a/vllm/engine/arg_utils.py b/vllm/engine/arg_utils.py
 diff --git a/vllm/entrypoints/anthropic/protocol.py b/vllm/entrypoints/anthropic/protocol.py
 --- a/vllm/entrypoints/anthropic/protocol.py
 +++ b/vllm/entrypoints/anthropic/protocol.py
-@@ -187,6 +187,19 @@
+@@ -187,6 +187,21 @@ class AnthropicMessagesRequest(BaseModel):
          default=None,
          description="KVTransfer parameters used for disaggregated serving.",
      )
@@ -2077,12 +2107,14 @@ diff --git a/vllm/entrypoints/anthropic/protocol.py b/vllm/entrypoints/anthropic
 +        default=None,
 +        min_length=1,
 +        description=(
-+            "Agent scope that owns this request's KV cache: null for the "
-+            "main session line, otherwise the tool_use id that spawned the "
-+            "subagent (the harness's parent_tool_use_id convention). Scope "
-+            "ownership is what lets the KV offload tier release a terminated "
-+            "agent's blocks as a unit instead of retaining a dead context by "
-+            "recency."
++            "The agent that owns this request's KV cache, as one stable id "
++            "per agent: the session id for a main agent, and the id of the "
++            "tool call that spawned a subagent. Required to generate -- the "
++            "host KV tier groups blocks by this id and gives up whole agents "
++            "under pressure, so generation for a request that names no agent "
++            "is refused rather than filed under a label that belongs to no "
++            "single context. Endpoints that only render a prompt allocate "
++            "nothing and need none."
 +        ),
 +    )
 +
@@ -2103,16 +2135,16 @@ diff --git a/vllm/entrypoints/anthropic/serving.py b/vllm/entrypoints/anthropic/
 diff --git a/vllm/entrypoints/generate/api_router.py b/vllm/entrypoints/generate/api_router.py
 --- a/vllm/entrypoints/generate/api_router.py
 +++ b/vllm/entrypoints/generate/api_router.py
-@@ -3,8 +3,6 @@
- from typing import TYPE_CHECKING
+@@ -4,8 +4,6 @@ from typing import TYPE_CHECKING
  
  from fastapi import FastAPI
--
--import vllm.envs as envs
  
+-import vllm.envs as envs
+-
  if TYPE_CHECKING:
      from argparse import Namespace
-@@ -43,12 +41,14 @@
+ 
+@@ -43,15 +41,23 @@ def register_generate_api_routers(app: FastAPI):
  
      register_anthropic_api_router(app)
  
@@ -2122,6 +2154,9 @@ diff --git a/vllm/entrypoints/generate/api_router.py b/vllm/entrypoints/generate
 -
 -    register_cohere_api_router(app)
 -
+-    from .generative_scoring.api_router import register_generative_scoring_api_router
+-
+-    register_generative_scoring_api_router(app)
 +    # The Cohere HTTP surface is deliberately not registered. Upstream gates
 +    # it on a try/except import of the optional `cohere` SDK plus an env
 +    # flag — an endpoint whose existence is the accident of what happens to
@@ -2130,14 +2165,22 @@ diff --git a/vllm/entrypoints/generate/api_router.py b/vllm/entrypoints/generate
 +    # guarded registration in place would keep a half-present mode that a
 +    # stray package install could silently activate. Its absence is enforced
 +    # here instead, and the image build asserts no /cohere route exists.
-     from .generative_scoring.api_router import register_generative_scoring_api_router
++    #
++    # /generative_scoring is withheld for the same reason, from the other
++    # direction: it reaches the engine's generative path, so its blocks land
++    # in the host KV tier, but its request model names no agent and there is
++    # no agent for a one-shot scoring call to name. Every mounted generative
++    # route on this server is an identity surface, and a route whose only
++    # possible answer is "you named no agent" is exactly the half-present
++    # mode the Cohere removal exists to prevent. The image build asserts no
++    # /generative_scoring route exists.
  
-     register_generative_scoring_api_router(app)
-@@ -63,22 +63,6 @@
- ):
+ 
+ async def init_generate_state(
+@@ -64,22 +70,6 @@ async def init_generate_state(
      from vllm.entrypoints.anthropic.serving import AnthropicServingMessages
      from vllm.entrypoints.chat_utils import load_chat_template
--
+ 
 -    # The Cohere serving handler depends on the optional `cohere` SDK for
 -    # its wire-format protocol models, and is additionally gated on the
 -    # `VLLM_ENABLE_COHERE_API` env flag (see
@@ -2153,10 +2196,11 @@ diff --git a/vllm/entrypoints/generate/api_router.py b/vllm/entrypoints/generate
 -            CohereServingChatV2 = None  # type: ignore[assignment,misc]
 -    else:
 -        CohereServingChatV2 = None  # type: ignore[assignment,misc]
- 
+-
      from vllm.entrypoints.mcp.tool_server import (
          DemoToolServer,
-@@ -212,28 +196,6 @@
+         MCPToolServer,
+@@ -212,32 +202,9 @@ async def init_generate_state(
          if "generate" in supported_tasks
          else None
      )
@@ -2181,10 +2225,19 @@ diff --git a/vllm/entrypoints/generate/api_router.py b/vllm/entrypoints/generate
 -        if CohereServingChatV2 is not None and "generate" in supported_tasks
 -        else None
 -    )
--
-     from .generative_scoring.serving import ServingGenerativeScoring
  
-     state.serving_generative_scoring = ServingGenerativeScoring(
+-    from .generative_scoring.serving import ServingGenerativeScoring
+-
+-    state.serving_generative_scoring = ServingGenerativeScoring(
+-        engine_client,
+-        state.openai_serving_models,
+-        request_logger=request_logger,
+-    )
++    # No serving_generative_scoring handler is built: /generative_scoring is
++    # not mounted, because it reaches the engine's generative path while its
++    # request model names no agent, and the host KV tier has no context to
++    # file such blocks under. Constructing the handler anyway would leave a
++    # reachable object for a stray registration to pick up.
 diff --git a/vllm/entrypoints/llm.py b/vllm/entrypoints/llm.py
 --- a/vllm/entrypoints/llm.py
 +++ b/vllm/entrypoints/llm.py
@@ -2229,7 +2282,7 @@ diff --git a/vllm/entrypoints/llm.py b/vllm/entrypoints/llm.py
 diff --git a/vllm/entrypoints/openai/chat_completion/protocol.py b/vllm/entrypoints/openai/chat_completion/protocol.py
 --- a/vllm/entrypoints/openai/chat_completion/protocol.py
 +++ b/vllm/entrypoints/openai/chat_completion/protocol.py
-@@ -484,6 +484,19 @@
+@@ -484,6 +484,21 @@ class ChatCompletionRequest(OpenAIBaseModel):
          description="KVTransfer parameters used for disaggregated serving.",
      )
  
@@ -2237,19 +2290,21 @@ diff --git a/vllm/entrypoints/openai/chat_completion/protocol.py b/vllm/entrypoi
 +        default=None,
 +        min_length=1,
 +        description=(
-+            "Agent scope that owns this request's KV cache: null for the "
-+            "main session line, otherwise the tool_use id that spawned the "
-+            "subagent (the harness's parent_tool_use_id convention). Scope "
-+            "ownership is what lets the KV offload tier release a terminated "
-+            "agent's blocks as a unit instead of retaining a dead context by "
-+            "recency."
++            "The agent that owns this request's KV cache, as one stable id "
++            "per agent: the session id for a main agent, and the id of the "
++            "tool call that spawned a subagent. Required to generate -- the "
++            "host KV tier groups blocks by this id and gives up whole agents "
++            "under pressure, so generation for a request that names no agent "
++            "is refused rather than filed under a label that belongs to no "
++            "single context. Endpoints that only render a prompt allocate "
++            "nothing and need none."
 +        ),
 +    )
 +
      ec_transfer_params: dict[str, Any] | None = Field(
          default=None,
          description=(
-@@ -818,6 +831,8 @@
+@@ -818,6 +833,8 @@ class ChatCompletionRequest(OpenAIBaseModel):
          if self.ec_transfer_params:
              # Pass in ec_transfer_params via extra_args
              extra_args["ec_transfer_params"] = self.ec_transfer_params
@@ -2258,6 +2313,27 @@ diff --git a/vllm/entrypoints/openai/chat_completion/protocol.py b/vllm/entrypoi
          return SamplingParams.from_optional(
              n=self.n,
              presence_penalty=presence_penalty,
+@@ -1219,6 +1236,20 @@ class BatchChatCompletionRequest(OpenAIBaseModel):
+     mm_processor_kwargs: dict[str, Any] | None = None
+     priority: int = Field(default=0, ge=_INT64_MIN, le=_INT64_MAX)
+     cache_salt: str | None = None
++    kv_scope: str | None = Field(
++        default=None,
++        min_length=1,
++        description=(
++            "The agent that owns this batch's KV cache, as one stable id per "
++            "agent: the session id for a main agent, and the id of the tool "
++            "call that spawned a subagent. Required to generate -- the host "
++            "KV tier groups blocks by this id and gives up whole agents "
++            "under pressure, so generation for a request that names no agent "
++            "is refused rather than filed under a label that belongs to no "
++            "single context. Every conversation in the batch is submitted "
++            "under it, because one batch is one caller."
++        ),
++    )
+     include_stop_str_in_output: bool = False
+     guided_decoding_backend: str | None = None
+     echo: bool = False
 diff --git a/vllm/entrypoints/openai/cli_args.py b/vllm/entrypoints/openai/cli_args.py
 --- a/vllm/entrypoints/openai/cli_args.py
 +++ b/vllm/entrypoints/openai/cli_args.py
@@ -2280,7 +2356,7 @@ diff --git a/vllm/entrypoints/openai/cli_args.py b/vllm/entrypoints/openai/cli_a
 diff --git a/vllm/entrypoints/openai/completion/protocol.py b/vllm/entrypoints/openai/completion/protocol.py
 --- a/vllm/entrypoints/openai/completion/protocol.py
 +++ b/vllm/entrypoints/openai/completion/protocol.py
-@@ -214,6 +214,19 @@
+@@ -214,6 +214,21 @@ class CompletionRequest(OpenAIBaseModel):
          description="KVTransfer parameters used for disaggregated serving.",
      )
  
@@ -2288,19 +2364,21 @@ diff --git a/vllm/entrypoints/openai/completion/protocol.py b/vllm/entrypoints/o
 +        default=None,
 +        min_length=1,
 +        description=(
-+            "Agent scope that owns this request's KV cache: null for the "
-+            "main session line, otherwise the tool_use id that spawned the "
-+            "subagent (the harness's parent_tool_use_id convention). Scope "
-+            "ownership is what lets the KV offload tier release a terminated "
-+            "agent's blocks as a unit instead of retaining a dead context by "
-+            "recency."
++            "The agent that owns this request's KV cache, as one stable id "
++            "per agent: the session id for a main agent, and the id of the "
++            "tool call that spawned a subagent. Required to generate -- the "
++            "host KV tier groups blocks by this id and gives up whole agents "
++            "under pressure, so generation for a request that names no agent "
++            "is refused rather than filed under a label that belongs to no "
++            "single context. Endpoints that only render a prompt allocate "
++            "nothing and need none."
 +        ),
 +    )
 +
      ec_transfer_params: dict[str, Any] | None = Field(
          default=None,
          description=(
-@@ -366,6 +379,8 @@
+@@ -366,6 +381,8 @@ class CompletionRequest(OpenAIBaseModel):
          if self.ec_transfer_params:
              # Pass in ec_transfer_params via extra_args
              extra_args["ec_transfer_params"] = self.ec_transfer_params
@@ -2312,7 +2390,7 @@ diff --git a/vllm/entrypoints/openai/completion/protocol.py b/vllm/entrypoints/o
 diff --git a/vllm/entrypoints/openai/responses/protocol.py b/vllm/entrypoints/openai/responses/protocol.py
 --- a/vllm/entrypoints/openai/responses/protocol.py
 +++ b/vllm/entrypoints/openai/responses/protocol.py
-@@ -314,6 +314,19 @@
+@@ -314,6 +314,21 @@ class ResponsesRequest(OpenAIBaseModel):
          default=None,
          description="KVTransfer parameters used for disaggregated serving.",
      )
@@ -2320,19 +2398,21 @@ diff --git a/vllm/entrypoints/openai/responses/protocol.py b/vllm/entrypoints/op
 +        default=None,
 +        min_length=1,
 +        description=(
-+            "Agent scope that owns this request's KV cache: null for the "
-+            "main session line, otherwise the tool_use id that spawned the "
-+            "subagent (the harness's parent_tool_use_id convention). Scope "
-+            "ownership is what lets the KV offload tier release a terminated "
-+            "agent's blocks as a unit instead of retaining a dead context by "
-+            "recency."
++            "The agent that owns this request's KV cache, as one stable id "
++            "per agent: the session id for a main agent, and the id of the "
++            "tool call that spawned a subagent. Required to generate -- the "
++            "host KV tier groups blocks by this id and gives up whole agents "
++            "under pressure, so generation for a request that names no agent "
++            "is refused rather than filed under a label that belongs to no "
++            "single context. Endpoints that only render a prompt allocate "
++            "nothing and need none."
 +        ),
 +    )
 +
      ec_transfer_params: dict[str, Any] | None = Field(
          default=None,
          description=(
-@@ -471,6 +484,8 @@
+@@ -471,6 +486,8 @@ class ResponsesRequest(OpenAIBaseModel):
              extra_args["kv_transfer_params"] = self.kv_transfer_params
          if self.ec_transfer_params:
              extra_args["ec_transfer_params"] = self.ec_transfer_params
@@ -2344,7 +2424,7 @@ diff --git a/vllm/entrypoints/openai/responses/protocol.py b/vllm/entrypoints/op
 diff --git a/vllm/entrypoints/scale_out/token_in_token_out/protocol.py b/vllm/entrypoints/scale_out/token_in_token_out/protocol.py
 --- a/vllm/entrypoints/scale_out/token_in_token_out/protocol.py
 +++ b/vllm/entrypoints/scale_out/token_in_token_out/protocol.py
-@@ -153,6 +153,18 @@
+@@ -153,6 +153,20 @@ class GenerateRequest(BaseModel):
              "ECTransfer parameters used for encoder-cache disaggregated serving."
          ),
      )
@@ -2352,12 +2432,14 @@ diff --git a/vllm/entrypoints/scale_out/token_in_token_out/protocol.py b/vllm/en
 +        default=None,
 +        min_length=1,
 +        description=(
-+            "Agent scope that owns this request's KV cache: null for the "
-+            "main session line, otherwise the tool_use id that spawned the "
-+            "subagent (the harness's parent_tool_use_id convention). Scope "
-+            "ownership is what lets the KV offload tier release a terminated "
-+            "agent's blocks as a unit instead of retaining a dead context by "
-+            "recency."
++            "The agent that owns this request's KV cache, as one stable id "
++            "per agent: the session id for a main agent, and the id of the "
++            "tool call that spawned a subagent. Required to generate -- the "
++            "host KV tier groups blocks by this id and gives up whole agents "
++            "under pressure, so generation for a request that names no agent "
++            "is refused rather than filed under a label that belongs to no "
++            "single context. Endpoints that only render a prompt allocate "
++            "nothing and need none."
 +        ),
 +    )
  
@@ -2597,43 +2679,72 @@ diff --git a/vllm/v1/core/kv_cache_utils.py b/vllm/v1/core/kv_cache_utils.py
 diff --git a/vllm/v1/engine/input_processor.py b/vllm/v1/engine/input_processor.py
 --- a/vllm/v1/engine/input_processor.py
 +++ b/vllm/v1/engine/input_processor.py
-@@ -132,6 +132,20 @@
+@@ -35,6 +35,38 @@ from vllm.v1.engine import EngineCoreRequest
+ logger = init_logger(__name__)
+ 
+ 
++def require_kv_scope(params: SamplingParams) -> str:
++    """Return the agent scope that owns this generative request's KV blocks.
++
++    Generation is the only thing that puts blocks in the KV offload tier, and
++    that tier gives up whole agents under pressure rather than interleaving
++    them, so every generative request names its owner. The requirement lives
++    here, on the one path into the engine, rather than on the request models:
++    ``/v1/chat/completions/render`` renders a prompt through the very same
++    ``ChatCompletionRequest`` while allocating nothing, and an endpoint that
++    owns no context has no agent to name. Enforcing it here also reaches the
++    direct ``SamplingParams(extra_args=...)`` callers, which no protocol
++    model covers.
++    """
++    scope = params.extra_args.get("kv_scope") if params.extra_args else None
++    if scope is None:
++        raise VLLMValidationError(
++            "kv_scope is required for generation: name the agent that owns "
++            "this request's KV cache, so the offload tier can release whole "
++            "agents under pressure instead of shredding several contexts at "
++            "once. Use one stable id per agent -- the session for a main "
++            "agent, the spawning tool-call id for a subagent.",
++            parameter="kv_scope",
++        )
++    if not isinstance(scope, str) or not scope:
++        raise VLLMValidationError(
++            "kv_scope must be a non-empty string naming the owning agent.",
++            parameter="kv_scope",
++            value=scope,
++        )
++    return scope
++
++
+ class InputProcessor:
+     def __init__(
+         self,
+@@ -132,6 +164,7 @@ class InputProcessor:
                      "not configured. Please set --reasoning-parser "
                      "and/or --reasoning-config to use phase-specific budgets."
                  )
-+            if params.extra_args is not None:
-+                # Agent-scope identity drives whole-scope KV release, so a
-+                # malformed value must die here as a client error rather
-+                # than silently mis-scope blocks or reach the offload
-+                # manager as an untyped surprise. The protocol layers
-+                # already enforce this shape; this gate covers the direct
-+                # SamplingParams(extra_args=...) path as well.
-+                kv_scope = params.extra_args.get("kv_scope")
-+                if kv_scope is not None and (
-+                    not isinstance(kv_scope, str) or not kv_scope
-+                ):
-+                    raise VLLMValidationError(
-+                        "kv_scope must be a non-empty string when provided."
-+                    )
++            require_kv_scope(params)
          elif isinstance(params, PoolingParams):
              supported_pooling_tasks = [
                  task for task in supported_tasks if task in POOLING_TASKS
 diff --git a/vllm/v1/kv_offload/base.py b/vllm/v1/kv_offload/base.py
 --- a/vllm/v1/kv_offload/base.py
 +++ b/vllm/v1/kv_offload/base.py
-@@ -92,6 +92,11 @@
+@@ -92,6 +92,14 @@ class ReqContext:
      req_id: str
      kv_transfer_params: dict[str, Any] | None = None
      load_tier_filter: TierFilter = TierFilter.ALL
 +    # The agent this request belongs to, straight from the request. A tier
 +    # that groups blocks by agent uses it to give up whole contexts under
-+    # pressure rather than interleaving agents by access order. None is one
-+    # shared label for agents that do not name themselves.
++    # pressure rather than interleaving agents by access order. Every
++    # generative request names one; it is absent only on a synthetic context
++    # that looks blocks up without storing any, which owns nothing to group.
++    # A tier that stores under this label requires it -- see
++    # CPUOffloadingManager.
 +    kv_scope: str | None = None
      # Per-request scratch space keyed by value type, so a tier can parse
      # kv_transfer_params once (in on_new_request) and read the result back
      # on later calls for the same request.
-@@ -332,6 +337,7 @@
+@@ -332,6 +340,7 @@ class OffloadingManager(ABC):
          """
          pass
  
@@ -2692,14 +2803,20 @@ diff --git a/vllm/v1/kv_offload/cpu/gpu_worker.py b/vllm/v1/kv_offload/cpu/gpu_w
 diff --git a/vllm/v1/kv_offload/cpu/manager.py b/vllm/v1/kv_offload/cpu/manager.py
 --- a/vllm/v1/kv_offload/cpu/manager.py
 +++ b/vllm/v1/kv_offload/cpu/manager.py
-@@ -1,5 +1,6 @@
+@@ -1,10 +1,12 @@
  # SPDX-License-Identifier: Apache-2.0
  # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
 +import ctypes
  from collections import OrderedDict
  from collections.abc import Collection, Iterable
  
-@@ -23,27 +24,63 @@
+ from typing_extensions import override
+ 
++from vllm.exceptions import VLLMServerError
+ from vllm.distributed.kv_transfer.kv_connector.v1.offloading.metrics import (
+     OffloadingConnectorStats,
+ )
+@@ -23,27 +25,66 @@ from vllm.v1.kv_offload.cpu.common import (
      CPULoadStoreSpec,
      CPUOffloadingMetrics,
  )
@@ -2761,7 +2878,10 @@ diff --git a/vllm/v1/kv_offload/cpu/manager.py b/vllm/v1/kv_offload/cpu/manager.
 +
 +    Ownership is a label, not a lifetime: a block belongs to the agent
 +    whose store put it here and keeps that label until the block is gone.
-+    Nothing transfers, so nothing has to be reconciled later.
++    Nothing transfers, so nothing has to be reconciled later. Every block
++    carries a real owner -- the engine refuses to generate for a request
++    that names no agent -- so a group here is always exactly one context,
++    and giving one up costs exactly one re-prefill.
 +
 +    The manager also owns the shared mechanics: ref-counting, event
 +    emission, block pool management, and the prepare/complete skeletons.
@@ -2775,7 +2895,7 @@ diff --git a/vllm/v1/kv_offload/cpu/manager.py b/vllm/v1/kv_offload/cpu/manager.
          enable_events: bool = False,
          store_threshold: int = 1,
          max_tracker_size: int = 64_000,
-@@ -53,12 +90,16 @@
+@@ -53,12 +94,18 @@ class CPUOffloadingManager(OffloadingManager):
          self._num_allocated_blocks: int = 0
          self._free_list: list[int] = []
          self.events: list[OffloadingEvent] | None = [] if enable_events else None
@@ -2791,14 +2911,16 @@ diff --git a/vllm/v1/kv_offload/cpu/manager.py b/vllm/v1/kv_offload/cpu/manager.
 +        self._evictable_blocks: OrderedDict[OffloadKey, None] = OrderedDict()
 +
 +        # The agent each resident block belongs to, which is what lets
-+        # pressure give up one whole agent at a time. Agents without an
-+        # identity share the None label and are given up together.
-+        self._owner: dict[OffloadKey, str | None] = {}
++        # pressure give up one whole agent at a time. Every resident block
++        # has a real owner: an unowned block would be a shared label that no
++        # single context corresponds to, and giving that label up would
++        # shred several contexts at once.
++        self._owner: dict[OffloadKey, str] = {}
 +
          # Track blocks with an in-flight store (ref_cnt -1, not yet completed).
          self._num_write_pending_blocks: int = 0
  
-@@ -103,6 +144,15 @@
+@@ -103,6 +150,15 @@ class CPUOffloadingManager(OffloadingManager):
      ) -> CPULoadStoreSpec:
          return CPULoadStoreSpec([block.block_id for block in blocks])
  
@@ -2814,7 +2936,7 @@ diff --git a/vllm/v1/kv_offload/cpu/manager.py b/vllm/v1/kv_offload/cpu/manager.
      # --- OffloadingManager interface ---
  
      @override
-@@ -119,7 +169,7 @@
+@@ -119,7 +175,7 @@ class CPUOffloadingManager(OffloadingManager):
                  if len(self.counts) >= self.max_tracker_size:
                      self.counts.popitem(last=False)
                  self.counts[key] = 1
@@ -2823,7 +2945,7 @@ diff --git a/vllm/v1/kv_offload/cpu/manager.py b/vllm/v1/kv_offload/cpu/manager.
          if block is None:
              return LookupResult.MISS
          if not block.is_ready:
-@@ -134,33 +184,39 @@
+@@ -134,33 +190,39 @@ class CPUOffloadingManager(OffloadingManager):
      ) -> LoadStoreSpec:
          blocks = []
          for key in keys:
@@ -2872,7 +2994,7 @@ diff --git a/vllm/v1/kv_offload/cpu/manager.py b/vllm/v1/kv_offload/cpu/manager.
  
      @override
      def prepare_store(
-@@ -173,7 +229,7 @@
+@@ -173,7 +235,7 @@ class CPUOffloadingManager(OffloadingManager):
              keys = [k for k in keys if self.counts.get(k, 0) >= self.store_threshold]
              self.stores_skipped_in_current_batch += num_keys - len(keys)
          # filter out blocks that are already stored
@@ -2881,7 +3003,7 @@ diff --git a/vllm/v1/kv_offload/cpu/manager.py b/vllm/v1/kv_offload/cpu/manager.
  
          if not keys_to_store:
              return PrepareStoreOutput(
-@@ -187,25 +243,41 @@
+@@ -187,25 +249,41 @@ class CPUOffloadingManager(OffloadingManager):
  
          to_evict: list[OffloadKey] = []
          if num_blocks_to_evict > 0:
@@ -2906,11 +3028,11 @@ diff --git a/vllm/v1/kv_offload/cpu/manager.py b/vllm/v1/kv_offload/cpu/manager.
 +            # is the agent whose newest use is oldest, and draining a group
 +            # before starting the next is what keeps a surviving context
 +            # whole.
-+            by_agent: dict[str | None, list[OffloadKey]] = {}
++            by_agent: dict[str, list[OffloadKey]] = {}
 +            for key in self._evictable_blocks:
 +                if key in protected:
 +                    continue
-+                by_agent.setdefault(self._owner.get(key), []).append(key)
++                by_agent.setdefault(self._owner[key], []).append(key)
 +
 +            candidates: list[tuple[OffloadKey, BlockStatus]] = []
 +            for agent_keys in by_agent.values():
@@ -2936,17 +3058,30 @@ diff --git a/vllm/v1/kv_offload/cpu/manager.py b/vllm/v1/kv_offload/cpu/manager.
                  to_evict.append(key)
  
          if to_evict and self.events is not None:
-@@ -223,7 +295,8 @@
+@@ -222,8 +300,21 @@ class CPUOffloadingManager(OffloadingManager):
+             "Block pool did not allocate the expected number of blocks"
          )
  
++        # Storing is the only way a block enters this tier, so it is the one
++        # place the owner has to exist. The engine refuses generation without
++        # a scope, so reaching here without one means a store path bypassed
++        # that gate -- a server defect, and one that would silently corrupt
++        # whole-agent eviction rather than fail.
++        owner = req_context.kv_scope
++        if not owner:
++            raise VLLMServerError(
++                "refusing to store KV blocks for a request that names no "
++                f"owning agent (req_id={req_context.req_id!r}): whole-agent "
++                "eviction has no group to put them in."
++            )
          for key, block in zip(keys_to_store, blocks):
 -            self._policy.insert(key, block)
 +            self._blocks[key] = block
-+            self._owner[key] = req_context.kv_scope
++            self._owner[key] = owner
          self._num_write_pending_blocks += len(keys_to_store)
  
          # build store specs for allocated blocks
-@@ -246,20 +319,18 @@
+@@ -246,20 +337,18 @@ class CPUOffloadingManager(OffloadingManager):
  
          if success:
              for key in keys:
@@ -2972,7 +3107,7 @@ diff --git a/vllm/v1/kv_offload/cpu/manager.py b/vllm/v1/kv_offload/cpu/manager.
  
          if stored_keys and self.events is not None:
              self.events.append(
-@@ -277,8 +348,9 @@
+@@ -277,8 +366,9 @@ class CPUOffloadingManager(OffloadingManager):
          # pre-reset jobs, so no lazy cleanup is needed. The scheduler also
          # flushes in-flight load job IDs to the workers before any new stores
          # can begin, preventing a cross-direction data race on reused offload block IDs.
@@ -2984,7 +3119,7 @@ diff --git a/vllm/v1/kv_offload/cpu/manager.py b/vllm/v1/kv_offload/cpu/manager.
          self._num_write_pending_blocks = 0
  
          self._free_list.clear()
-@@ -297,7 +369,7 @@
+@@ -297,7 +387,7 @@ class CPUOffloadingManager(OffloadingManager):
          num_used = (
              self._num_allocated_blocks
              - len(self._free_list)
@@ -3286,19 +3421,22 @@ diff --git a/vllm/v1/kv_offload/tiering/spec.py b/vllm/v1/kv_offload/tiering/spe
 diff --git a/vllm/v1/request.py b/vllm/v1/request.py
 --- a/vllm/v1/request.py
 +++ b/vllm/v1/request.py
-@@ -106,6 +106,11 @@
+@@ -106,6 +106,14 @@ class Request:
          self.kv_transfer_params: dict[str, Any] | None = None
          # E/P/D: Connector-specific encoder-cache transfer parameters.
          self.ec_transfer_params: dict[str, Any] | None = None
-+        # Agent scope owning this request's KV (None = main session line),
-+        # and scopes declared terminated by this request. Materialized here
-+        # so the KV offload connector reads identity off the Request the
-+        # same way it reads kv_transfer_params, on every protocol surface.
++        # The agent owning this request's KV. Every generative request names
++        # one -- the engine refuses to generate otherwise -- so the offload
++        # tier always has a whole agent to give up under pressure. It stays
++        # None only for a pooling request, which generates nothing and owns
++        # no reusable context. Materialized here so the KV offload connector
++        # reads identity off the Request the same way it reads
++        # kv_transfer_params, on every protocol surface.
 +        self.kv_scope: str | None = None
  
          if pooling_params is not None:
              # Pooling models.
-@@ -124,6 +129,7 @@
+@@ -124,6 +132,7 @@ class Request:
                  self.ec_transfer_params = sampling_params.extra_args.get(
                      "ec_transfer_params"
                  )
@@ -3466,25 +3604,35 @@ diff --git a/tests/entrypoints/test_kv_scope_protocol.py b/tests/entrypoints/tes
 new file mode 100644
 --- /dev/null
 +++ b/tests/entrypoints/test_kv_scope_protocol.py
-@@ -0,0 +1,174 @@
+@@ -0,0 +1,225 @@
 +# SPDX-License-Identifier: Apache-2.0
 +# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
 +"""Agent-scope identity must land uniformly on every generation surface.
 +
-+Grouping the offload tier by agent only works if every protocol can carry
-+the identity: a surface without the field silently produces unlabelled
-+requests, and the tier then cannot tell one agent's blocks from another's.
-+These tests prove, offline, that all five generation protocols this build
-+can actually import expose ``kv_scope`` beside
-+``cache_salt`` / ``kv_transfer_params``, validate it identically, and
-+deliver them into ``SamplingParams.extra_args`` — the one internal channel
-+the engine reads.
++Grouping the offload tier by agent only works if every request that reaches
++the engine names its owner: a request without one produces blocks the tier
++cannot file under any single context, and giving that label up would shred
++several contexts at once. These tests prove, offline, that every generation
++protocol this build can import exposes ``kv_scope`` beside ``cache_salt`` /
++``kv_transfer_params``, validates it identically, and delivers it into
++``SamplingParams.extra_args`` -- the one internal channel the engine reads.
 +
-+The Cohere surface is deliberately not in this set: its protocol models
-+hard-import the optional ``cohere`` SDK, which the --network none image
-+cannot install, so upstream's endpoint existed only as the accident of a
-+guarded import. The registration was excised rather than left guarded, and
-+the absence of any /cohere route is asserted below as an enforced fact.
++The requirement itself lives on the path into the engine, not on these
++models, and that placement is deliberate: ``/v1/chat/completions/render``
++renders a prompt through the very same ``ChatCompletionRequest`` while
++allocating nothing, so a model-level requirement would demand an agent
++identity from an endpoint that owns no context. Requiring it at the engine
++also covers the direct ``SamplingParams(extra_args=...)`` callers, which no
++protocol model can reach.
++
++Two surfaces are deliberately absent. Cohere's protocol models hard-import
++the optional ``cohere`` SDK, which the --network none image cannot install,
++so upstream's endpoint existed only as the accident of a guarded import.
++``/generative_scoring`` is withheld for the mirror-image reason: it reaches
++the engine's generative path but its request model names no agent, and a
++one-shot scoring call has no agent to name. Both registrations were excised
++rather than left guarded, and both absences are asserted below as enforced
++facts.
 +"""
 +
 +import pytest
@@ -3492,11 +3640,16 @@ new file mode 100644
 +
 +from vllm.entrypoints.anthropic.protocol import AnthropicMessagesRequest
 +from vllm.entrypoints.anthropic.serving import AnthropicServingMessages
-+from vllm.entrypoints.openai.chat_completion.protocol import ChatCompletionRequest
++from vllm.entrypoints.openai.chat_completion.protocol import (
++    BatchChatCompletionRequest,
++    ChatCompletionRequest,
++)
 +from vllm.entrypoints.openai.completion.protocol import CompletionRequest
 +from vllm.entrypoints.openai.responses.protocol import ResponsesRequest
 +from vllm.entrypoints.scale_out.token_in_token_out.protocol import GenerateRequest
++from vllm.exceptions import VLLMValidationError
 +from vllm.sampling_params import SamplingParams
++from vllm.v1.engine.input_processor import require_kv_scope
 +
 +pytestmark = pytest.mark.cpu_test
 +
@@ -3507,6 +3660,8 @@ new file mode 100644
 +    """Smallest valid payload per protocol, before the identity fields."""
 +    if request_cls is ChatCompletionRequest:
 +        return {"model": "m", "messages": [{"role": "user", "content": "hi"}]}
++    if request_cls is BatchChatCompletionRequest:
++        return {"model": "m", "messages": [[{"role": "user", "content": "hi"}]]}
 +    if request_cls is CompletionRequest:
 +        return {"model": "m", "prompt": "hi"}
 +    if request_cls is ResponsesRequest:
@@ -3528,11 +3683,22 @@ new file mode 100644
 +
 +ALL_GENERATION_REQUESTS = [
 +    ChatCompletionRequest,
++    BatchChatCompletionRequest,
 +    CompletionRequest,
 +    ResponsesRequest,
 +    AnthropicMessagesRequest,
 +    GenerateRequest,
 +]
++
++_OPENAI_SURFACES = [ChatCompletionRequest, CompletionRequest, ResponsesRequest]
++
++
++def _sampling_params_for(request):
++    if isinstance(request, ResponsesRequest):
++        return request.to_sampling_params(
++            default_max_tokens=32, default_sampling_params={}
++        )
++    return request.to_sampling_params(max_tokens=32, default_sampling_params={})
 +
 +
 +@pytest.mark.parametrize("request_cls", ALL_GENERATION_REQUESTS)
@@ -3545,63 +3711,84 @@ new file mode 100644
 +
 +
 +@pytest.mark.parametrize("request_cls", ALL_GENERATION_REQUESTS)
-+def test_every_surface_defaults_scope_to_main_line(request_cls):
-+    # Absent == null == the main session line (the harness's
-+    # parent_tool_use_id convention); no surface may invent a default scope.
++def test_no_surface_invents_a_scope(request_cls):
++    # A model may be built without one -- rendering shares these models and
++    # allocates nothing -- but no surface may fabricate an identity to fill
++    # the gap. What is absent here is refused later, at the engine.
 +    request = request_cls(**_minimal_payload(request_cls))
 +    assert request.kv_scope is None
 +
 +
 +@pytest.mark.parametrize("request_cls", ALL_GENERATION_REQUESTS)
 +def test_every_surface_rejects_empty_scope(request_cls):
-+    # An empty scope id is not "main line", it is a malformed identity; it
++    # An empty scope id is not "no agent", it is a malformed identity; it
 +    # must die at the protocol boundary, identically everywhere.
 +    with pytest.raises(ValidationError):
 +        request_cls(**_minimal_payload(request_cls), kv_scope="")
 +
 +
-+@pytest.mark.parametrize(
-+    "request_cls",
-+    [ChatCompletionRequest, CompletionRequest, ResponsesRequest],
-+)
++@pytest.mark.parametrize("request_cls", _OPENAI_SURFACES)
 +def test_openai_surfaces_deliver_scope_into_extra_args(request_cls):
-+    request = request_cls(
-+        **_minimal_payload(request_cls),
-+        kv_scope=_SCOPE,
-+    )
-+    if request_cls is ResponsesRequest:
-+        sampling = request.to_sampling_params(
-+            default_max_tokens=32, default_sampling_params={}
-+        )
-+    else:
-+        sampling = request.to_sampling_params(
-+            max_tokens=32, default_sampling_params={}
-+        )
++    request = request_cls(**_minimal_payload(request_cls), kv_scope=_SCOPE)
++    sampling = _sampling_params_for(request)
 +    assert sampling.extra_args is not None
 +    assert sampling.extra_args["kv_scope"] == _SCOPE
 +
 +
-+@pytest.mark.parametrize(
-+    "request_cls",
-+    [ChatCompletionRequest, CompletionRequest, ResponsesRequest],
-+)
++@pytest.mark.parametrize("request_cls", _OPENAI_SURFACES)
 +def test_openai_surfaces_omit_absent_scope_from_extra_args(request_cls):
++    # Absence is carried through as absence rather than as a placeholder,
++    # which is precisely what lets the engine gate see it and refuse.
 +    request = request_cls(**_minimal_payload(request_cls))
-+    if request_cls is ResponsesRequest:
-+        sampling = request.to_sampling_params(
-+            default_max_tokens=32, default_sampling_params={}
-+        )
-+    else:
-+        sampling = request.to_sampling_params(
-+            max_tokens=32, default_sampling_params={}
-+        )
-+    extra_args = sampling.extra_args or {}
++    extra_args = _sampling_params_for(request).extra_args or {}
 +    assert "kv_scope" not in extra_args
++
++
++@pytest.mark.parametrize("request_cls", _OPENAI_SURFACES)
++def test_the_engine_refuses_to_generate_for_a_request_naming_no_agent(request_cls):
++    # The rule, at the one place every generative request passes through.
++    request = request_cls(**_minimal_payload(request_cls))
++    with pytest.raises(VLLMValidationError) as excinfo:
++        require_kv_scope(_sampling_params_for(request))
++    assert excinfo.value.parameter == "kv_scope"
++    assert "required for generation" in str(excinfo.value)
++
++
++@pytest.mark.parametrize("request_cls", _OPENAI_SURFACES)
++def test_the_engine_admits_a_request_that_names_its_agent(request_cls):
++    request = request_cls(**_minimal_payload(request_cls), kv_scope=_SCOPE)
++    assert require_kv_scope(_sampling_params_for(request)) == _SCOPE
++
++
++@pytest.mark.parametrize("scope", ["", 0, [], {}, b"x"])
++def test_the_engine_refuses_a_scope_that_is_not_a_non_empty_string(scope):
++    # Reaches the gate only through the direct SamplingParams path; the
++    # protocol models reject these earlier. Both doors are shut.
++    params = SamplingParams(max_tokens=1, extra_args={"kv_scope": scope})
++    with pytest.raises(VLLMValidationError) as excinfo:
++        require_kv_scope(params)
++    assert excinfo.value.parameter == "kv_scope"
++
++
++def test_a_batch_submits_every_conversation_under_the_one_agent():
++    # One batch is one caller, so its conversations share the caller's
++    # identity rather than each becoming an anonymous context.
++    batch = BatchChatCompletionRequest(
++        model="m",
++        messages=[
++            [{"role": "user", "content": "a"}],
++            [{"role": "user", "content": "b"}],
++        ],
++        kv_scope=_SCOPE,
++    )
++    singles = [batch.to_chat_completion_request(m) for m in batch.messages]
++    assert [s.kv_scope for s in singles] == [_SCOPE, _SCOPE]
++    assert require_kv_scope(_sampling_params_for(singles[0])) == _SCOPE
 +
 +
 +def test_anthropic_translation_forwards_scope_fields():
 +    # Anthropic rides the chat pipeline; the translation must pass identity
-+    # through verbatim — Anthropic is one surface of six, not a special one.
++    # through verbatim — Anthropic is one surface among equals, not special.
 +    request = AnthropicMessagesRequest(
 +        **_minimal_payload(AnthropicMessagesRequest),
 +        kv_scope=_SCOPE,
@@ -3612,15 +3799,15 @@ new file mode 100644
 +    assert chat_request.kv_scope == _SCOPE
 +
 +
-+def test_cohere_endpoint_absence_is_enforced_not_import_dependent():
++def test_every_mounted_generative_route_is_an_identity_surface():
 +    # The generate router assembly must register every supported surface and
-+    # must not contain a /cohere route under any installed-package state:
-+    # a guarded registration would make the endpoint set depend on which
-+    # optional SDKs happen to import, which is exactly the half-present
-+    # shape this fork forbids.
-+    from fastapi import FastAPI
-+
++    # must not contain a route that reaches the engine without being able to
++    # name an agent. A guarded registration would make the endpoint set
++    # depend on which optional SDKs happen to import, which is exactly the
++    # half-present shape this fork forbids.
 +    from types import SimpleNamespace
++
++    from fastapi import FastAPI
 +
 +    from vllm.entrypoints.generate.api_router import register_generate_api_routers
 +    from vllm.entrypoints.scale_out.factories import register_scale_out_api_routers
@@ -3633,8 +3820,10 @@ new file mode 100644
 +    register_scale_out_api_routers(app, ("generate",))
 +    paths = {getattr(route, "path", "") for route in app.routes}
 +    assert not any(path.startswith("/cohere") for path in paths), paths
++    assert "/generative_scoring" not in paths, sorted(paths)
 +    for required in (
 +        "/v1/chat/completions",
++        "/v1/chat/completions/batch",
 +        "/v1/completions",
 +        "/v1/responses",
 +        "/v1/messages",

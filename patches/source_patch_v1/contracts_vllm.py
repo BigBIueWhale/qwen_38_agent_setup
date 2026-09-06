@@ -1118,16 +1118,28 @@ def _validate_kv_users_after(state: State) -> None:
     # Pressure resolves one agent at a time: the evictable set is grouped by
     # owning agent and drained a group at a time, never interleaved.
     require_text(
-        state, manager, "by_agent: dict[str | None, list[OffloadKey]] = {}",
+        state, manager, "by_agent: dict[str, list[OffloadKey]] = {}",
         label=label,
     )
     require_text(
         state, manager, "for agent_keys in by_agent.values():", label=label
     )
-    # Ownership is fixed where the block is written and nowhere else.
+    # Ownership is fixed where the block is written and nowhere else, and
+    # the write is the one place that refuses a request naming no agent: an
+    # unowned block would sit under a label no single context corresponds to.
     require_text(
-        state, manager, "self._owner[key] = req_context.kv_scope", count=1,
+        state, manager, "self._owner[key] = owner", count=1, label=label
+    )
+    require_text(state, manager, "self._owner: dict[OffloadKey, str] = {}", label=label)
+    _require_ordered(
+        _source(state, manager, label=label),
+        (
+            "owner = req_context.kv_scope",
+            "if not owner:",
+            "raise VLLMServerError(",
+        ),
         label=label,
+        location=manager,
     )
 
     # GPU tier: the byte flag is gone, the count is required, and the pool
@@ -1158,14 +1170,25 @@ def _validate_kv_users_after(state: State) -> None:
 
     # Identity on every generation surface, none privileged, one internal
     # channel. The scheduler applies releases before registration.
-    for path in (
-        "vllm/entrypoints/openai/chat_completion/protocol.py",
-        "vllm/entrypoints/openai/completion/protocol.py",
-        "vllm/entrypoints/openai/responses/protocol.py",
-        "vllm/entrypoints/anthropic/protocol.py",
-        "vllm/entrypoints/scale_out/token_in_token_out/protocol.py",
+    # Six identity surfaces over five modules: the chat module carries both
+    # the single-conversation request and the batch, and a batch is one
+    # caller, so its conversations are submitted under the one agent.
+    for path, surfaces in (
+        ("vllm/entrypoints/openai/chat_completion/protocol.py", 2),
+        ("vllm/entrypoints/openai/completion/protocol.py", 1),
+        ("vllm/entrypoints/openai/responses/protocol.py", 1),
+        ("vllm/entrypoints/anthropic/protocol.py", 1),
+        ("vllm/entrypoints/scale_out/token_in_token_out/protocol.py", 1),
     ):
-        require_text(state, path, "kv_scope: str | None = Field(", label=label)
+        require_text(
+            state, path, "kv_scope: str | None = Field(", count=surfaces, label=label
+        )
+    require_text(
+        state,
+        "vllm/entrypoints/openai/chat_completion/protocol.py",
+        "return ChatCompletionRequest.model_validate(data)",
+        label=label,
+    )
     generate_router = "vllm/entrypoints/generate/api_router.py"
     forbid_text(state, generate_router, "register_cohere_api_router", label=label)
     forbid_text(state, generate_router, "CohereServingChatV2", label=label)
@@ -1185,6 +1208,34 @@ def _validate_kv_users_after(state: State) -> None:
         'cohere_format: str = "cmd4"',
         label=label,
     )
+    # Generation requires an owning agent, enforced on the path into the
+    # engine rather than on the request models -- the render endpoints share
+    # those models and allocate nothing, so a model-level requirement would
+    # demand an identity from a caller that owns no context.
+    input_processor = "vllm/v1/engine/input_processor.py"
+    require_text(
+        state, input_processor, "def require_kv_scope(params: SamplingParams) -> str:",
+        label=label,
+    )
+    require_text(state, input_processor, "require_kv_scope(params)", count=1, label=label)
+    _require_ordered(
+        _source(state, input_processor, label=label),
+        (
+            'scope = params.extra_args.get("kv_scope") if params.extra_args else None',
+            "if scope is None:",
+            "kv_scope is required for generation",
+            'parameter="kv_scope",',
+        ),
+        label=label,
+        location=input_processor,
+    )
+    # No surface may be mounted that reaches the engine without being able to
+    # name an agent; /generative_scoring is excised for that reason, exactly
+    # as the Cohere surface is.
+    forbid_text(
+        state, generate_router, "register_generative_scoring_api_router", label=label
+    )
+    forbid_text(state, generate_router, "ServingGenerativeScoring", label=label)
     scheduler = "vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py"
     require_text(
         state, "vllm/v1/request.py",

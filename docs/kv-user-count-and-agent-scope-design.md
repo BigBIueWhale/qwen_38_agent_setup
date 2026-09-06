@@ -110,32 +110,48 @@ Bytes are derived inside vLLM at the point where the KV cache spec exists.
 ### 2.2 Identity: `kv_scope` on every generation protocol
 
 Two request fields, placed beside `cache_salt` / `kv_transfer_params` on
-every generation surface this image can import — the proven set is five:
-openai chat_completion, openai completion, openai responses, anthropic,
-and scale_out token_in_token_out. Cohere is deliberately not in the set:
+every generation surface this image can import — the proven set is six:
+openai chat_completion (single and batch), openai completion, openai
+responses, anthropic, and scale_out token_in_token_out. Every mounted
+generative route is one of them. Cohere is deliberately not in the set:
 its protocol models hard-import the optional `cohere` SDK, which a
 `--network none` build cannot install, so upstream's `/cohere/v2/chat`
 existed only as a try/except-import accident. That guarded registration
 is excised from the server assembly (`generate/api_router.py`) along
 with the endpoint-only `--cohere-is-reasoning-model` knob, and the image
 build asserts that no `/cohere` route is registered — the endpoint's
-absence is an enforced fact, not an installation state. The
+absence is an enforced fact, not an installation state.
+`/generative_scoring` is withheld for the mirror-image reason: it reaches
+the engine's generative path, so its blocks land in the host tier, but its
+request model names no agent and a one-shot scoring call has none to name;
+its absence is asserted the same way. The
 `cohere_format` renderer flag survives: it serves `--tokenizer-mode
 cohere` model families over the OpenAI endpoints and is unrelated to
 the excised HTTP surface.
 
-- `kv_scope: str | null` — the agent scope owning this request's KV.
-  The harness sends the session id for the main agent and the spawning
-  `tool_use_id` for a subagent — one identity per agent, with no
-  distinction between the two kinds. Absent means an agent that did not
-  name itself; those share one label and are given up together.
+- `kv_scope: str` — the agent owning this request's KV. The harness sends
+  the session id for the main agent and the spawning `tool_use_id` for a
+  subagent — one identity per agent, with no distinction between the two
+  kinds. Generation requires it: there is no anonymous agent, because a
+  label matching no single context is one whose eviction shreds several.
+
+The requirement is enforced on the path into the engine rather than on the
+request models, and the difference matters. `/v1/chat/completions/render`
+renders a prompt through the very same `ChatCompletionRequest` while
+allocating nothing, so a model-level requirement would demand an agent
+identity from an endpoint that owns no context. `require_kv_scope` in
+`InputProcessor` is the one place every generative request passes through,
+which also covers direct `SamplingParams(extra_args=...)` callers that no
+protocol model can reach. Pooling requests take the other branch and carry
+no scope at all: they generate nothing and own no reusable context.
 
 Transport mirrors `kv_transfer_params` exactly: each protocol's sampling
 conversion writes the fields into `SamplingParams.extra_args`;
 `Request.__init__` materializes them as typed attributes next to
-`kv_transfer_params`; `InputProcessor._validate_params` rejects non-string
-scopes, empty strings, and non-list releases (VLLMValidationError — a 400,
-not a crash). No new EngineCoreRequest plumbing, no per-endpoint privileged
+`kv_transfer_params`; `InputProcessor._validate_params` rejects a
+missing scope, non-string scopes, and empty strings (VLLMValidationError
+naming the `kv_scope` parameter — a 400, not a crash), and the host tier
+refuses to file a block for a request that named no agent. No new EngineCoreRequest plumbing, no per-endpoint privileged
 path — Anthropic gets the same two lines as everyone else.
 
 Delivery to the manager: `_create_req_context` copies `request.kv_scope`
