@@ -870,19 +870,22 @@ subagent turn:
 - exact server/model identity;
 - xhigh mandatory thinking;
 - Alibaba thinking sampling tuple;
-- total generation ceiling 262144 and separate final ceiling 131072;
-- exact /tokenize count on the same rendered request before generation;
+- server reasoning ceiling 262144 and separate final ceiling 131072, both above
+  the client's own per-turn output share of 32768;
+- exact /tokenize count on the same rendered request before generation, and
+  again on the request with and without the turn's pending tool results;
 - no character/image-token heuristic or tokenizer fallback;
 - splitToolMedia false so tool images stay in their originating tool result;
 - typed content parts and PNG-only image tools matching the strict backend;
 - no client retry/downgrade, XML recovery, implicit continuation, or partial-call
   execution;
-- one long main thread with late exact compaction and only sequential foreground
-  subagents.
+- one long main thread compacted when the exactly-counted request reaches its
+  share of the window, and only sequential foreground subagents.
 
-The service is the updated original `/home/user/Desktop/agent_service`, with release
-implementation commit a0ddc3dc815b658513c62661d650cf540ba869e8 and release-lock
-commit a8e5a63402f1c443a288d92b65e3fcdcfc9d7211, not a copied launcher. Its
+The service is the updated original `/home/user/Desktop/agent_service`, at the
+release its own `config/release.lock.json` records, not a copied launcher.
+Identity this repository does not derive is named by its owning repository
+rather than restated here, because an unowned copy is what drifts. Its
 current release carries the workspace over the connection as a hash-committed
 zip (no shared-filesystem input paths and no host input mount), returns the
 result bundle over the connection with its own SHA-256 commitment, runs

@@ -67,7 +67,8 @@ The original service's examples encourage subagents. Subagents can still be usef
 for genuinely independent work, but they create separate context and fragment a long
 thread. They must not be the default operating pattern for this deployment. The
 quality-first default is one continuous main thread, completed-thinking omission,
-prefix reuse, and compaction only when the physical window actually requires it.
+prefix reuse, and compaction when the exactly-counted request reaches the share of
+the window the history is allowed.
 
 ## Current client comparison
 
@@ -84,12 +85,20 @@ Several current behaviors materially supersede the historical `0.15.6` complaint
 - provider entries are arrays of `ModelConfig`; the obsolete wrapped provider shape
   is not accepted;
 - a complete history is retained rather than dropping an arbitrary tail;
-- the project patch makes output capacity use vLLM `/tokenize` on the exact rendered
-  messages, tool schemas, template kwargs, and image history, then clamps to the
-  physical remainder with no safety margin, padding, or minimum fabrication;
-- compaction has explicit warning/automatic/hard thresholds, a 20,000-token summary
-  reserve, state validation, truncation detection, and a three-consecutive-failure
-  circuit breaker instead of a permanent first-failure latch;
+- the project patch divides the served window into five shares that spend it
+  exactly -- 48/256 for a compaction's summary, 32/256 for one turn's output,
+  16/256 for the tool results that turn appends, 2/256 for the message a
+  compaction request adds, and the remainder for the history a turn may stand on
+  -- so a turn's output capacity is a property of the window rather than of how
+  full the conversation happens to be, with no safety margin, padding, or
+  minimum fabrication;
+- vLLM `/tokenize` on the exact rendered messages, tool schemas, template kwargs,
+  and image history decides whether a turn may be issued at all, and measures the
+  tool results it appends as the difference between the request with them and the
+  request without them;
+- compaction is due at one threshold, the history's own share, with state
+  validation and a three-consecutive-failure circuit breaker instead of a
+  permanent first-failure latch;
 - the project patch applies the same exact rendered-token count to compaction,
   retains visible/task state, and deliberately removes old raw images rather than
   detaching them into a false recent turn;
@@ -152,8 +161,7 @@ model proxy inside the network-none agent namespace.
             "top_k": 20,
             "min_p": 0.0,
             "presence_penalty": 0.0,
-            "repetition_penalty": 1.0,
-            "max_tokens": 262144
+            "repetition_penalty": 1.0
           },
           "extra_body": {
             "parallel_tool_calls": false,
@@ -173,15 +181,16 @@ model proxy inside the network-none agent namespace.
 }
 ```
 
-`max_tokens` is the total-generation ceiling, not the final-response phase ceiling.
-Setting it to 262,144 allows Qwen Code to clamp it to its prompt-dependent safe
-remainder using vLLM's exact rendered-request token count, with no heuristic margin;
-setting it to 131,072 would unnecessarily cut possible reasoning in half on a short
-prompt. The independent server-enforced
-`final_response_token_budget` still caps visible final output at 131,072. On the
-native 262,144-token profile the upstream one-million-context recommendation cannot
-simultaneously spend 262,144 reasoning tokens and 131,072 final tokens; prompt,
-reasoning, tools, and final output always share the one physical window.
+The sampling tuple declares no `max_tokens`. Every request carries the one the
+send path derives — the turn's 32,768-token share of the served window, or a
+lower configured ceiling — so a value here could only be a second bound on the
+same quantity, and one that names a single window at that: it would have to be
+rewritten by hand the day `max_model_len` moves. `thinking_token_budget` and
+`final_response_token_budget` are the server's own phase ceilings, above the
+turn's share and therefore not what stops a generation; the server enforces the
+131,072-token final-response half regardless. On the native 262,144-token profile
+prompt, reasoning, tools, and final output always share the one physical window,
+which is what the five shares divide.
 
 `maxRetries: 0` is deliberate. A transport error remains observable instead of
 silently replaying an ambiguous long generation; there is no orchestrator retry
@@ -261,15 +270,16 @@ The accepted Qwen Code contract is:
    remain non-executable until the protocol's overall successful terminal, while
    `length`, `max_tokens`, `response.incomplete`, missing terminals, and malformed
    output fail closed without executing a buffered call;
-5. API usage counts use the real tokenizer and govern output clamping/compaction;
+5. the real tokenizer counts every rendered request, and the compaction trigger
+   and the tool-result bound are both decided from those counts;
 6. a timed multi-turn run demonstrates actual prefix-cache hits and lower TTFT,
    instead of merely checking that prefix caching was enabled;
 7. cancellation, timeout, process failure, malformed events, and model/protocol
    mismatches all produce explicit terminal records and preserve forensics;
-8. the default is one long main thread. Compaction is delayed until the measured
-   window requires it, completed hidden thinking is omitted to preserve useful
-   context, and only sequential foreground `general-purpose`/`Explore` subagents are
-   permitted;
+8. the default is one long main thread. Compaction is due when the measured
+   request reaches the history's share of the window, completed hidden thinking is
+   omitted to preserve useful context, and only sequential foreground
+   `general-purpose`/`Explore` subagents are permitted;
 9. original static RGB/RGBA PNG bytes stay in their originating tool result, remain
    cacheable at that chronological position, and invalid media fails before egress;
 10. hostile workspace settings, environment, MCP, hooks, rules, skills, output
