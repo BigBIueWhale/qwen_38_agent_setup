@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Exercise exact-sized long-context retrieval against a local vLLM API.
 
-This script is intended to run *inside* the network-isolated serving container:
+This script runs inside the network-isolated serving container, launched as
+one agent by the probe launcher:
 
-    docker exec -i qwen38-agent-native python3 - \
-      --targets 32768 131072 261120 < scripts/long_context_probe.py
+    ./scripts/run-probe.sh long_context_probe.py --targets 32768 131072 261120
 
 The target is the requested tokenized input length. The default final target
 leaves 1,024 tokens for thinking plus the answer inside the 262,144-token native
@@ -19,6 +19,8 @@ import json
 import time
 import urllib.error
 import urllib.request
+
+from probe_scope import KV_SCOPE
 
 DEFAULT_URL = "http://127.0.0.1:8000"
 DEFAULT_MODEL = "qwen3.8-27b-nvfp4-k8v4"
@@ -158,6 +160,7 @@ def run_probe(
         "model": model,
         "messages": messages,
         "max_tokens": max_tokens,
+        "kv_scope": KV_SCOPE,
     }
     started = time.monotonic()
     response = post_json(

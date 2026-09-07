@@ -3,9 +3,12 @@
 
 from __future__ import annotations
 
+import argparse
 import json
 import urllib.error
 import urllib.request
+
+from probe_scope import KV_SCOPE
 
 
 BASE_URL = "http://127.0.0.1:8000"
@@ -58,6 +61,7 @@ def base_payload(*, stream: bool) -> dict:
         "max_output_tokens": 1_024,
         "stream": stream,
         "store": False,
+        "kv_scope": KV_SCOPE,
         "reasoning": {"effort": "xhigh"},
         "chat_template_kwargs": {
             "enable_thinking": True,
@@ -151,6 +155,7 @@ def assert_equivalent_final_responses(nonstream: dict, streamed: dict) -> None:
 
 
 def main() -> None:
+    argparse.ArgumentParser(description=__doc__).parse_args()
     nonstream_first = request(base_payload(stream=False))
     nonstream_calls = function_calls(nonstream_first["output"])
     if len(nonstream_calls) != 1:

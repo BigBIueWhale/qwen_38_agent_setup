@@ -518,6 +518,7 @@ def _validate_anthropic_400_before(state: State) -> None:
     path = "vllm/entrypoints/anthropic/api_router.py"
     source = _source(state, path, label=label)
     _require("except ValidationError as e:" not in source, f"{label}: fix already present")
+    _require("VLLMValidationError" not in source, f"{label}: fix already present")
     _require(source.count("except Exception as e:") >= 2, f"{label}: generic handlers drifted")
 
 
@@ -533,12 +534,22 @@ def _validate_anthropic_400_after(state: State) -> None:
         },
         label=label,
     )
+    # The engine's own request validation -- a generation that names no agent,
+    # for one -- is a client error exactly as typed request validation is, and
+    # it reaches this router as VLLMValidationError rather than pydantic's.
+    require_text(
+        state,
+        path,
+        "from vllm.exceptions import VLLMValidationError",
+        count=1,
+        label=label,
+    )
     for qualname in ("create_messages", "count_tokens"):
         source = _symbol_source(state, path, qualname, label=label)
         _require_ordered(
             source,
             (
-                "except ValidationError as e:",
+                "except (ValidationError, VLLMValidationError) as e:",
                 "status_code=HTTPStatus.BAD_REQUEST.value",
                 'type="invalid_request_error"',
                 "message=sanitize_message(str(e))",
@@ -1637,13 +1648,16 @@ CONTRACTS: Mapping[str, SemanticContract] = {
     ),
     "anthropic-validation-http400": SemanticContract(
         rationale=(
-            "Typed Pydantic request/translation validation is a client error and must be "
-            "returned as sanitized Anthropic invalid_request_error HTTP 400. Unexpected "
-            "server failures remain logged HTTP 500; the categories must not be merged."
+            "Typed Pydantic request/translation validation and the engine's own request "
+            "validation (VLLMValidationError on the path into the engine -- a generation "
+            "naming no kv_scope, for one) are client errors and must be returned as "
+            "sanitized Anthropic invalid_request_error HTTP 400. Unexpected server "
+            "failures remain logged HTTP 500; the categories must not be merged."
         ),
         removal_condition=(
-            "Remove when upstream maps Pydantic validation failures in both messages and "
-            "count_tokens to Anthropic HTTP 400 while preserving generic exception 500s."
+            "Remove when upstream maps Pydantic and VLLMValidationError failures in both "
+            "messages and count_tokens to Anthropic HTTP 400 while preserving generic "
+            "exception 500s."
         ),
         validate_before=_validate_anthropic_400_before,
         validate_after=_validate_anthropic_400_after,

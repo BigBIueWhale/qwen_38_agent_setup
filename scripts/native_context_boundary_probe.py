@@ -18,6 +18,8 @@ from typing import Any
 
 from transformers import AutoTokenizer
 
+from probe_scope import KV_SCOPE
+
 
 MODEL = "qwen3.8-27b-nvfp4-k8v4"
 BASE_URL = "http://127.0.0.1:8000"
@@ -159,6 +161,7 @@ def main() -> None:
             "messages": accepted_messages,
             "max_tokens": 1,
             "cache_salt": f"{args.salt}-accepted-cache",
+            "kv_scope": KV_SCOPE,
         },
         timeout=3_600,
     )
@@ -183,6 +186,7 @@ def main() -> None:
             "messages": rejected_messages,
             "max_tokens": 1,
             "cache_salt": f"{args.salt}-rejected-cache",
+            "kv_scope": KV_SCOPE,
         },
         timeout=300,
     )

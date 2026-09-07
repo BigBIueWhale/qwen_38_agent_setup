@@ -12,9 +12,12 @@ gates are asserted on single-turn requests.
 
 from __future__ import annotations
 
+import argparse
 import json
 import urllib.error
 import urllib.request
+
+from probe_scope import KV_SCOPE
 
 
 BASE_URL = "http://127.0.0.1:8000"
@@ -66,6 +69,7 @@ def chat_prompt_tokens(messages: list[dict], **template_kwargs) -> int:
         "model": MODEL,
         "messages": messages,
         "max_tokens": 1,
+        "kv_scope": KV_SCOPE,
     }
     if template_kwargs:
         payload["chat_template_kwargs"] = template_kwargs
@@ -78,6 +82,7 @@ def chat_prompt_tokens(messages: list[dict], **template_kwargs) -> int:
 
 
 def main() -> None:
+    argparse.ArgumentParser(description=__doc__).parse_args()
     hidden_marker = "HISTORICAL_HIDDEN_REASONING_" * 256
     history = [
         {"role": "user", "content": "first turn"},
@@ -136,7 +141,12 @@ def main() -> None:
     if not (xhigh["tokens"] == high["tokens"] == maximum["tokens"]):
         raise RuntimeError("high/max are not exact aliases for Qwen xhigh")
 
-    openai_base = {"model": MODEL, "messages": simple, "max_tokens": 128}
+    openai_base = {
+        "model": MODEL,
+        "messages": simple,
+        "max_tokens": 128,
+        "kv_scope": KV_SCOPE,
+    }
     openai_low = dict(openai_base, reasoning_effort="low")
     openai_disabled = dict(
         openai_base,
@@ -153,6 +163,7 @@ def main() -> None:
         "model": MODEL,
         "messages": simple,
         "max_tokens": 128,
+        "kv_scope": KV_SCOPE,
     }
     anthropic_disabled_status = require_rejected(
         "/v1/messages",
@@ -171,6 +182,7 @@ def main() -> None:
             "model": MODEL,
             "messages": simple,
             "max_tokens": 512,
+            "kv_scope": KV_SCOPE,
             "thinking": {"type": "adaptive"},
             "output_config": {"effort": "max"},
         },
@@ -187,6 +199,7 @@ def main() -> None:
             "model": MODEL,
             "messages": simple,
             "max_tokens": 256,
+            "kv_scope": KV_SCOPE,
             "thinking": {"type": "enabled", "budget_tokens": 32},
             "output_config": {"effort": "xhigh"},
         },
@@ -216,6 +229,7 @@ def main() -> None:
                 }
             ],
             "max_tokens": 1024,
+            "kv_scope": KV_SCOPE,
             "final_response_token_budget": 5,
         },
     )

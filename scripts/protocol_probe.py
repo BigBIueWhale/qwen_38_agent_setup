@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Repeated OpenAI and Anthropic tool-call protocol checks for the local server."""
+"""Repeated OpenAI and Anthropic tool-call protocol checks for the local server.
+
+The probe also proves the rule every caller lives under: generation names
+the agent that owns its KV cache, and a request naming none is refused with
+HTTP 400 on every mounted identity surface.
+"""
 
 from __future__ import annotations
 
@@ -9,11 +14,11 @@ import time
 import urllib.error
 import urllib.request
 
+from probe_scope import KV_SCOPE
+
 
 MODEL = "qwen3.8-27b-nvfp4-k8v4"
-# Every generative request names the agent whose KV cache it belongs to;
-# the backend refuses one that does not.
-KV_SCOPE = "protocol-probe"
+ANTHROPIC_HEADERS = {"anthropic-version": "2023-06-01"}
 PATH = "/workspace/README.md"
 HEADING = "Qwen3.8-27B NVFP4 — correctness-first local agent server"
 TOOL_RESULT = f"# {HEADING}\n\nMeasured configuration details follow."
@@ -60,6 +65,96 @@ def post_sse(url: str, payload: dict) -> list[dict]:
         body = error.read().decode("utf-8", errors="replace")
         raise RuntimeError(f"HTTP {error.code} from {url}: {body}") from error
     return events
+
+
+def post_status(
+    url: str, payload: dict, headers: dict | None = None
+) -> tuple[int, dict]:
+    """POST and return the status with the parsed body, refusal or not."""
+    request_headers = {"Content-Type": "application/json"}
+    request_headers.update(headers or {})
+    request = urllib.request.Request(
+        url,
+        data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+        headers=request_headers,
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=300) as response:
+            return response.status, json.load(response)
+    except urllib.error.HTTPError as error:
+        return error.code, json.loads(error.read().decode("utf-8", errors="replace"))
+
+
+def unscoped_refusals(base_url: str) -> dict[str, dict]:
+    """Prove that generation names its agent or does not happen.
+
+    Every mounted route that reaches the engine's generative path is sent a
+    request that is complete except for ``kv_scope``: the same one-line turn
+    everywhere, pre-rendered for the token-in-token-out surface as the
+    scale-out layer would send it. The refusal must be HTTP 400 naming the
+    field -- as ``error.param`` on the OpenAI-shaped surfaces, as an
+    ``invalid_request_error`` whose message names it on the Anthropic
+    surface -- never a 500, and never a generation. The render and tokenize
+    endpoints allocate nothing and need no agent, so they are not here.
+    """
+    turn = [{"role": "user", "content": "Reply with one word."}]
+    rendered = post_json(
+        f"{base_url}/tokenize", {"model": MODEL, "messages": turn}
+    )["tokens"]
+    surfaces: dict[str, tuple[dict, dict]] = {
+        "/v1/chat/completions": (
+            {"model": MODEL, "messages": turn, "max_tokens": 1},
+            {},
+        ),
+        "/v1/chat/completions/batch": (
+            {"model": MODEL, "messages": [turn], "max_tokens": 1},
+            {},
+        ),
+        "/v1/completions": (
+            {"model": MODEL, "prompt": turn[0]["content"], "max_tokens": 1},
+            {},
+        ),
+        "/v1/responses": (
+            {
+                "model": MODEL,
+                "input": turn[0]["content"],
+                "max_output_tokens": 1,
+                "store": False,
+            },
+            {},
+        ),
+        "/v1/messages": (
+            {"model": MODEL, "messages": turn, "max_tokens": 1},
+            ANTHROPIC_HEADERS,
+        ),
+        "/inference/v1/generate": (
+            {
+                "model": MODEL,
+                "token_ids": rendered,
+                "sampling_params": {"max_tokens": 1},
+            },
+            {},
+        ),
+    }
+    refusals: dict[str, dict] = {}
+    for path, (payload, headers) in surfaces.items():
+        status, body = post_status(f"{base_url}{path}", payload, headers)
+        error = body.get("error") if isinstance(body, dict) else None
+        if status != 400 or not isinstance(error, dict):
+            raise RuntimeError(
+                f"{path}: unscoped generation was not refused with HTTP 400: "
+                f"{status} {body}"
+            )
+        if path == "/v1/messages":
+            named = error.get("type") == "invalid_request_error" and "kv_scope" in str(
+                error.get("message")
+            )
+        else:
+            named = error.get("param") == "kv_scope"
+        if not named:
+            raise RuntimeError(f"{path}: the refusal does not name kv_scope: {body}")
+        refusals[path] = {"http_status": status, "error_type": error.get("type")}
+    return refusals
 
 
 def marker_token_ids(base_url: str) -> dict[str, int]:
@@ -248,7 +343,6 @@ def openai_trial(base_url: str, markers: dict[str, int]) -> dict:
 
 
 def anthropic_trial(base_url: str) -> dict:
-    headers = {"anthropic-version": "2023-06-01"}
     tool = {
         "name": "read_file",
         "description": "Read a UTF-8 text file from the local workspace.",
@@ -277,7 +371,7 @@ def anthropic_trial(base_url: str) -> dict:
             "max_tokens": 1_024,
             "kv_scope": KV_SCOPE,
         },
-        headers,
+        ANTHROPIC_HEADERS,
     )
     tool_blocks = [block for block in first["content"] if block["type"] == "tool_use"]
     if first.get("stop_reason") != "tool_use" or len(tool_blocks) != 1:
@@ -310,7 +404,7 @@ def anthropic_trial(base_url: str) -> dict:
             "max_tokens": 1_024,
             "kv_scope": KV_SCOPE,
         },
-        headers,
+        ANTHROPIC_HEADERS,
     )
     answer = "".join(
         block.get("text", "")
@@ -342,6 +436,7 @@ def main() -> None:
     base_url = args.url.rstrip("/")
     started = time.monotonic()
     markers = marker_token_ids(base_url)
+    refusals = unscoped_refusals(base_url)
     openai_results = [openai_trial(base_url, markers) for _ in range(args.trials)]
     anthropic_results = [anthropic_trial(base_url) for _ in range(args.trials)]
     print(
@@ -351,6 +446,8 @@ def main() -> None:
                 "openai_passed": len(openai_results),
                 "anthropic_passed": len(anthropic_results),
                 "elapsed_seconds": round(time.monotonic() - started, 3),
+                "kv_scope": KV_SCOPE,
+                "unscoped_generation_refused": refusals,
                 "marker_token_ids": markers,
                 "openai": openai_results,
                 "anthropic": anthropic_results,

@@ -10,6 +10,7 @@ an exact value that exists only in the historical tool-result image.
 
 from __future__ import annotations
 
+import argparse
 import base64
 import io
 import json
@@ -25,6 +26,8 @@ from transformers import AutoTokenizer
 
 from vllm.entrypoints.anthropic.protocol import AnthropicMessagesRequest
 from vllm.entrypoints.anthropic.serving import AnthropicServingMessages
+
+from probe_scope import KV_SCOPE
 
 
 BASE_URL = "http://127.0.0.1:8000"
@@ -180,6 +183,7 @@ def anthropic_payload(data_url: str, *, stream: bool, salt: str) -> dict[str, An
         "max_tokens": 16_384,
         "cache_salt": salt,
         "stream": stream,
+        "kv_scope": KV_SCOPE,
     }
 
 
@@ -192,6 +196,7 @@ def openai_payload(
         "max_tokens": 16_384,
         "cache_salt": salt,
         "stream": stream,
+        "kv_scope": KV_SCOPE,
     }
     if stream:
         payload["stream_options"] = {"include_usage": True}
@@ -420,7 +425,7 @@ def render_proof(
         {
             "prompt_tokens": len(openai_render["token_ids"]),
             "openai_anthropic_token_ids_equal": True,
-            "historical_reasoning_omitted_by_default": True,
+            "historical_reasoning_rendered": True,
             "xhigh_resolved_by_default": True,
             "chronological_positions": positions,
         },
@@ -584,6 +589,7 @@ def measured(fn, before: dict[str, int]) -> tuple[dict[str, Any], dict[str, int]
 
 
 def main() -> None:
+    argparse.ArgumentParser(description=__doc__).parse_args()
     run = uuid.uuid4().hex
     code = "VX-2749"
     changed_code = "CY-7247"

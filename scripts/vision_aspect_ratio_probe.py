@@ -13,6 +13,7 @@ from typing import Any
 from PIL import Image, ImageDraw, ImageFont
 from transformers import AutoTokenizer
 
+from probe_scope import KV_SCOPE
 from vision_quality_probe import IMAGE_PIXELS, MODEL, post_json
 
 
@@ -280,6 +281,7 @@ def main() -> None:
                 f"{image.width}x{image.height}"
             ),
             "stream": False,
+            "kv_scope": KV_SCOPE,
         }
         started = time.monotonic()
         status, response = post_json(

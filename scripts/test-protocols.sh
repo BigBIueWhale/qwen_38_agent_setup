@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -Eeuo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-docker exec -i qwen38-agent-native python3 - \
-  --trials "${1:-3}" < "${SCRIPT_DIR}/protocol_probe.py"
+exec "${SCRIPT_DIR}/run-probe.sh" protocol_probe.py --trials "${1:-3}"

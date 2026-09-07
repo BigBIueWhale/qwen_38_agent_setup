@@ -1,5 +1,5 @@
 diff --git a/vllm/entrypoints/anthropic/api_router.py b/vllm/entrypoints/anthropic/api_router.py
-index 7c6d23183d..f975f2e76d 100644
+index 7c6d23183d..c7b703e9bd 100644
 --- a/vllm/entrypoints/anthropic/api_router.py
 +++ b/vllm/entrypoints/anthropic/api_router.py
 @@ -6,6 +6,7 @@ from http import HTTPStatus
@@ -10,11 +10,19 @@ index 7c6d23183d..f975f2e76d 100644
  
  from vllm.entrypoints.anthropic.protocol import (
      AnthropicCountTokensRequest,
-@@ -69,6 +70,16 @@ async def create_messages(request: AnthropicMessagesRequest, raw_request: Reques
+@@ -23,6 +24,7 @@ from vllm.entrypoints.serve.utils.api_utils import (
+     validate_json_request,
+     with_cancellation,
+ )
++from vllm.exceptions import VLLMValidationError
+ from vllm.logger import init_logger
+ 
+ logger = init_logger(__name__)
+@@ -69,6 +71,16 @@ async def create_messages(request: AnthropicMessagesRequest, raw_request: Reques
  
      try:
          generator = await handler.create_messages(request, raw_request)
-+    except ValidationError as e:
++    except (ValidationError, VLLMValidationError) as e:
 +        return JSONResponse(
 +            status_code=HTTPStatus.BAD_REQUEST.value,
 +            content=AnthropicErrorResponse(
@@ -27,11 +35,11 @@ index 7c6d23183d..f975f2e76d 100644
      except Exception as e:
          logger.exception("Error in create_messages: %s", e)
          return JSONResponse(
-@@ -115,6 +126,16 @@ async def count_tokens(request: AnthropicCountTokensRequest, raw_request: Reques
+@@ -115,6 +127,16 @@ async def count_tokens(request: AnthropicCountTokensRequest, raw_request: Reques
  
      try:
          response = await handler.count_tokens(request, raw_request)
-+    except ValidationError as e:
++    except (ValidationError, VLLMValidationError) as e:
 +        return JSONResponse(
 +            status_code=HTTPStatus.BAD_REQUEST.value,
 +            content=AnthropicErrorResponse(

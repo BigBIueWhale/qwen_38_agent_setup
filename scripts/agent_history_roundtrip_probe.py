@@ -15,6 +15,7 @@ render -> parse -> render is a fixed point on exact token IDs.
 
 from __future__ import annotations
 
+import argparse
 import json
 import time
 import urllib.error
@@ -32,6 +33,8 @@ from vllm.entrypoints.openai.chat_completion.protocol import (
 )
 from vllm.parser.qwen3 import Qwen3Parser
 from vllm.tokenizers.detokenizer_utils import detokenize_incrementally
+
+from probe_scope import KV_SCOPE
 
 
 MODEL = "qwen3.8-27b-nvfp4-k8v4"
@@ -485,6 +488,7 @@ def live_call_payload(stream: bool) -> dict[str, Any]:
         "max_tokens": 1_024,
         "stream": stream,
         "return_prompt_text": True,
+        "kv_scope": KV_SCOPE,
         **({"stream_options": {"include_usage": True}} if stream else {}),
     }
 
@@ -597,6 +601,7 @@ def live_stream_nonstream() -> dict[str, Any]:
 
 
 def main() -> None:
+    argparse.ArgumentParser(description=__doc__).parse_args()
     started = time.monotonic()
     tokenizer = AutoTokenizer.from_pretrained(
         "/model",

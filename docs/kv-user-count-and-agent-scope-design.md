@@ -150,7 +150,10 @@ conversion writes the fields into `SamplingParams.extra_args`;
 `Request.__init__` materializes them as typed attributes next to
 `kv_transfer_params`; `InputProcessor._validate_params` rejects a
 missing scope, non-string scopes, and empty strings (VLLMValidationError
-naming the `kv_scope` parameter — a 400, not a crash), and the host tier
+naming the `kv_scope` parameter — a 400 on every surface, not a crash:
+the OpenAI-shaped routes map it through the shared exception handler,
+and the Anthropic router maps it to its own `invalid_request_error`
+exactly as it maps typed request validation), and the host tier
 refuses to file a block for a request that named no agent. No new EngineCoreRequest plumbing, no per-endpoint privileged
 path — Anthropic gets the same two lines as everyone else.
 

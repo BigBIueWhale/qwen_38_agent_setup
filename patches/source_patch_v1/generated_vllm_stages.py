@@ -2201,10 +2201,10 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '\n'})},
  {'name': 'anthropic-validation-http400',
   'review_patch': 'patches/vllm-anthropic-validation-http400.patch',
-  'review_sha256': '030b64be104e6ef57a40f6bae740dfa9d4634a420c6c93a395f62bfb98d6d053',
+  'review_sha256': 'b4c3327ca4e513b9a58edc3e9aca978d324a27032511f9868d5f941411941bcf',
   'files': ({'path': 'vllm/entrypoints/anthropic/api_router.py',
              'before_sha256': '0e5f655dd0ff66cfb5c53e5413ca90713eb5d5b16547e8ef01891845fb047e37',
-             'after_sha256': '05d17ec4f7ef1f05bdf95b6ce0d04ab80d1f5f8d0bbc130a551ea0512897e56e'},),
+             'after_sha256': 'b8dbd78c226490fc13209f7220b95b3f445711dcbee76c0b37a3f8860a015b78'},),
   'edits': ({'name': 'vllm/entrypoints/anthropic/api_router.py:landmark-1',
              'path': 'vllm/entrypoints/anthropic/api_router.py',
              'before': '\n'
@@ -2239,6 +2239,34 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    AnthropicCountTokensRequest,\n'},
             {'name': 'vllm/entrypoints/anthropic/api_router.py:landmark-2',
              'path': 'vllm/entrypoints/anthropic/api_router.py',
+             'before': '    validate_json_request,\n'
+                       '    with_cancellation,\n'
+                       ')\n'
+                       'from vllm.logger import init_logger\n'
+                       '\n'
+                       'logger = init_logger(__name__)\n',
+             'after': '    validate_json_request,\n'
+                      '    with_cancellation,\n'
+                      ')\n'
+                      'from vllm.exceptions import VLLMValidationError\n'
+                      'from vllm.logger import init_logger\n'
+                      '\n'
+                      'logger = init_logger(__name__)\n',
+             'review_before': '    validate_json_request,\n'
+                              '    with_cancellation,\n'
+                              ')\n'
+                              'from vllm.logger import init_logger\n'
+                              '\n'
+                              'logger = init_logger(__name__)\n',
+             'review_after': '    validate_json_request,\n'
+                             '    with_cancellation,\n'
+                             ')\n'
+                             'from vllm.exceptions import VLLMValidationError\n'
+                             'from vllm.logger import init_logger\n'
+                             '\n'
+                             'logger = init_logger(__name__)\n'},
+            {'name': 'vllm/entrypoints/anthropic/api_router.py:landmark-3',
+             'path': 'vllm/entrypoints/anthropic/api_router.py',
              'before': '\n'
                        '    try:\n'
                        '        generator = await handler.create_messages(request, '
@@ -2250,7 +2278,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '    try:\n'
                       '        generator = await handler.create_messages(request, '
                       'raw_request)\n'
-                      '    except ValidationError as e:\n'
+                      '    except (ValidationError, VLLMValidationError) as e:\n'
                       '        return JSONResponse(\n'
                       '            status_code=HTTPStatus.BAD_REQUEST.value,\n'
                       '            content=AnthropicErrorResponse(\n'
@@ -2275,7 +2303,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    try:\n'
                              '        generator = await '
                              'handler.create_messages(request, raw_request)\n'
-                             '    except ValidationError as e:\n'
+                             '    except (ValidationError, VLLMValidationError) as e:\n'
                              '        return JSONResponse(\n'
                              '            status_code=HTTPStatus.BAD_REQUEST.value,\n'
                              '            content=AnthropicErrorResponse(\n'
@@ -2289,7 +2317,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '        logger.exception("Error in create_messages: %s", '
                              'e)\n'
                              '        return JSONResponse(\n'},
-            {'name': 'vllm/entrypoints/anthropic/api_router.py:landmark-3',
+            {'name': 'vllm/entrypoints/anthropic/api_router.py:landmark-4',
              'path': 'vllm/entrypoints/anthropic/api_router.py',
              'before': '\n'
                        '    try:\n'
@@ -2302,7 +2330,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '    try:\n'
                       '        response = await handler.count_tokens(request, '
                       'raw_request)\n'
-                      '    except ValidationError as e:\n'
+                      '    except (ValidationError, VLLMValidationError) as e:\n'
                       '        return JSONResponse(\n'
                       '            status_code=HTTPStatus.BAD_REQUEST.value,\n'
                       '            content=AnthropicErrorResponse(\n'
@@ -2327,7 +2355,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    try:\n'
                              '        response = await handler.count_tokens(request, '
                              'raw_request)\n'
-                             '    except ValidationError as e:\n'
+                             '    except (ValidationError, VLLMValidationError) as e:\n'
                              '        return JSONResponse(\n'
                              '            status_code=HTTPStatus.BAD_REQUEST.value,\n'
                              '            content=AnthropicErrorResponse(\n'
@@ -26597,7 +26625,7 @@ FINAL_FILES = {'tests/config/test_config_utils.py': '4f5ea0399cc3b4f9603df07e2cc
  'vllm/distributed/kv_transfer/kv_connector/v1/offloading/config.py': '3e038d98736a4dfc5bd83508bc537fea386273b615e794cba7e56ef1ff95505c',
  'vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py': '10b880361bd447567d9695a180fc9cf057c420b5e5a3335ebd61e2854d5075ab',
  'vllm/engine/arg_utils.py': '88582e97c98ffcd16416e48eeea3db415cab1f33673c7ff8c1613fa83aad1eac',
- 'vllm/entrypoints/anthropic/api_router.py': '05d17ec4f7ef1f05bdf95b6ce0d04ab80d1f5f8d0bbc130a551ea0512897e56e',
+ 'vllm/entrypoints/anthropic/api_router.py': 'b8dbd78c226490fc13209f7220b95b3f445711dcbee76c0b37a3f8860a015b78',
  'vllm/entrypoints/anthropic/protocol.py': 'ca33754155c33ab877785a80192a82c4c27db897b5542b942d8157bdbf5241ad',
  'vllm/entrypoints/anthropic/serving.py': 'b5a15aaae06b874814558fe5cdffc4fc212a5c926c279a1ad654f1ccb3778c2e',
  'vllm/entrypoints/chat_utils.py': 'ca23415158a124c1c53b21bee6e22ab0ee7b433f8c9389e208d32a52162fb947',

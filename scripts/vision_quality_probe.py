@@ -22,6 +22,8 @@ from typing import Any
 
 from PIL import Image, ImageDraw, ImageFont
 
+from probe_scope import KV_SCOPE
+
 
 BASE_URL = "http://127.0.0.1:8000"
 MODEL = "qwen3.8-27b-nvfp4-k8v4"
@@ -186,6 +188,7 @@ def completion_payload(images: list[ProbeImage]) -> dict[str, Any]:
         "reasoning_effort": "xhigh",
         "max_tokens": 4_096,
         "stream": False,
+        "kv_scope": KV_SCOPE,
     }
 
 

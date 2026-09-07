@@ -9,6 +9,7 @@ Anthropic Messages, and OpenAI Responses.
 
 from __future__ import annotations
 
+import argparse
 import json
 import time
 import urllib.error
@@ -28,6 +29,8 @@ from vllm.entrypoints.openai.responses.streaming_events import (
 )
 from vllm.parser.qwen3 import Qwen3Parser
 from vllm.tokenizers.detokenizer_utils import detokenize_incrementally
+
+from probe_scope import KV_SCOPE
 
 
 BASE_URL = "http://127.0.0.1:8000"
@@ -388,6 +391,7 @@ def chat_payload(tool_choice: str, budget: int, *, stream: bool) -> dict[str, An
         "thinking_token_budget": FAULT_INJECTION_THINKING_BUDGET,
         "return_token_ids": True,
         "stream": stream,
+        "kv_scope": KV_SCOPE,
         **({"stream_options": {"include_usage": True}} if stream else {}),
     }
 
@@ -568,6 +572,7 @@ def anthropic_payload(budget: int, *, stream: bool) -> dict[str, Any]:
             "budget_tokens": FAULT_INJECTION_THINKING_BUDGET,
         },
         "stream": stream,
+        "kv_scope": KV_SCOPE,
     }
 
 
@@ -651,10 +656,11 @@ def responses_payload(budget: int, *, stream: bool) -> dict[str, Any]:
         "store": False,
         "reasoning": {"effort": "xhigh"},
         "thinking_token_budget": FAULT_INJECTION_THINKING_BUDGET,
-"chat_template_kwargs": {
+        "chat_template_kwargs": {
             "enable_thinking": True,
             "reasoning_effort": "xhigh",
         },
+        "kv_scope": KV_SCOPE,
     }
 
 
@@ -746,6 +752,7 @@ def responses_unit_boundary() -> dict[str, Any]:
 
 
 def main() -> None:
+    argparse.ArgumentParser(description=__doc__).parse_args()
     started = time.monotonic()
     tokenizer = AutoTokenizer.from_pretrained(
         "/model", local_files_only=True, trust_remote_code=False

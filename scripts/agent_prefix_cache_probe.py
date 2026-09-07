@@ -24,6 +24,8 @@ from typing import Any
 
 from transformers import AutoTokenizer
 
+from probe_scope import KV_SCOPE
+
 
 MODEL = "qwen3.8-27b-nvfp4-k8v4"
 BASE_URL = "http://127.0.0.1:8000"
@@ -347,6 +349,7 @@ def main() -> None:
         "stream": True,
         "stream_options": {"include_usage": True},
         "cache_salt": shared_salt,
+        "kv_scope": KV_SCOPE,
     }
     before = metric_snapshot()
     initial, after_initial, initial_delta = inference_delta(initial_payload, before)
@@ -389,6 +392,7 @@ def main() -> None:
         "max_tokens": 1,
         "stream": True,
         "stream_options": {"include_usage": True},
+        "kv_scope": KV_SCOPE,
     }
 
     cached_payload = {**continuation_base, "cache_salt": shared_salt}

@@ -2,4 +2,4 @@
 set -Eeuo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-exec "${SCRIPT_DIR}/run-probe.sh" tool_calling_adversarial_probe.py "$@"
+exec "${SCRIPT_DIR}/run-probe.sh" vision_aspect_ratio_probe.py "$@"

@@ -10,6 +10,7 @@ from typing import Any
 
 from transformers import AutoTokenizer
 
+from probe_scope import KV_SCOPE
 from vision_quality_probe import IMAGE_PIXELS, MAX_IMAGES, make_image, post_json
 
 
@@ -159,6 +160,7 @@ def completion_payload(
         "max_tokens": 1,
         "cache_salt": cache_salt,
         "stream": False,
+        "kv_scope": KV_SCOPE,
     }
 
 

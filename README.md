@@ -39,8 +39,8 @@ The deployment is complete and healthy. There is one supported mode:
 | Agent client | Qwen Code 0.21.12 at b965d5f8c24f48e65fb0b17c7d45f34ca4ce8f38 |
 | Agent-service release | Pinned by the agent-service release lock, which owns every agent and service image identity |
 | Agent-service listener | 127.0.0.1:8090 only |
-| Runtime profile | socket-isolated-nonroot-vision-k8v4-agent-v20 |
-| Runtime image | sha256:37017d4e5ec1c56bdb69d280992d62d405ec0bb0731a087d0ee8bbd96144af5c |
+| Runtime profile | socket-isolated-nonroot-vision-k8v4-agent-v21 |
+| Runtime image | sha256:ab6b0ec8346c221bde06d9014a0ac7a7800dfc0aaf57d93985b2ce440626629e |
 
 This is not a text-only profile with an optional vision switch. It is not a
 one-million-token profile. It has no MTP, eager-mode, lower-quality image, alternate
@@ -93,6 +93,21 @@ The check reconstructs the source tree from the pinned upstream commit through a
 landmark-aware transformations. The build runs offline from the exact base image and fails unless it produces
 the pinned image ID. Restore verifies the pinned local archive before loading it.
 
+The live probes are launched the same way, through one launcher for the whole
+suite:
+
+    ./scripts/run-probe.sh <name>_probe.py [probe arguments]
+
+Each `scripts/test-*.sh` runner is one probe with its canonical arguments. The
+launcher refuses a container that is not the locked name running the pinned
+image, stages the suite into that container's bounded scratch tmpfs, and runs
+the named probe by file. That is what lets a probe carry the identity the
+backend requires of every generative caller: `scripts/probe_scope.py` mints one
+`kv_scope` per run from the probe's own file name and a fresh run id — one
+stable id per agent for the life of the run, exactly as the harness names a
+session — and a probe fed to the interpreter any other way refuses to start
+rather than invent one.
+
 The build is reproducible on a given host: layer timestamps are normalised to
 `SOURCE_DATE_EPOCH`, so re-deriving the source tree does not change the image
 ID. It is not bit-identical across hosts, and the offline archive rather than a
@@ -121,7 +136,7 @@ namespace identities, exact listener, and the absence of Docker port mappings.
 
 The vLLM container runs as `2000:0` with cap-drop ALL, no-new-privileges, restart=no,
 a read-only root, a read-only model mount, and one dedicated labelled cache volume.
-The only durable writable runtime state is that exact v16 volume mounted at
+The only durable writable runtime state is that exact v21 volume mounted at
 `/home/vllm/.cache/vllm`, owned `2000:0` mode 0770; all CUDA, Triton, TorchInductor,
 FlashInfer, Hugging Face, XDG, and vLLM caches are rooted beneath it. `/tmp` is a
 bounded 2 GiB executable tmpfs and `/run` is a bounded 64 MiB non-executable tmpfs.
@@ -239,7 +254,7 @@ It is intentionally reconstructed by thirteen ordered, reviewed semantic transfo
 | patches/vllm-qwen38-agent-defaults-and-thinking.patch | c3a7315c32f8b117066e851b123b7a1b446c2fcd4c8a1f2616774c8f9d668509 |
 | patches/vllm-qwen38-separate-final-response-budget.patch | f20d7dff41931248272842ed2c7a163c6f013e405ccf35733c40ff131a2fc503 |
 | patches/vllm-qwen-implicit-tool-grammar-boundary.patch | d231c6e2e7040c4cd4b38432cb8c794805afddbf2c6e4f7ff6febb78e3fd9f48 |
-| patches/vllm-anthropic-validation-http400.patch | 030b64be104e6ef57a40f6bae740dfa9d4634a420c6c93a395f62bfb98d6d053 |
+| patches/vllm-anthropic-validation-http400.patch | b4c3327ca4e513b9a58edc3e9aca978d324a27032511f9868d5f941411941bcf |
 | patches/vllm-tool-truncation-finish-reason.patch | 1a220f6db9b40967d867b3cfb1a92d95d907ca059718ffe61772b4cb4409f551 |
 | patches/vllm-qwen38-vision-runtime.patch | f92603724861da5b5a364f43e57d3f95ef43a9dded8ae645278373850db3140f |
 | patches/vllm-qwen38-numerical-audits.patch | a73aa2f2ae3f82010eb2bafcdf663c2fe14854c30165dbc4d8457725bc3b6632 |
@@ -267,16 +282,16 @@ Pinned build inputs and products:
 |---|---|
 | Immutable base tag | qwen38-vllm:main-9df9b0b |
 | Immutable base ID | sha256:fa4a002a88b7043a1a89966dea8a500fe9696f84e75730d9da916f916048d401 |
-| Runtime tag | qwen38-vllm:qwen38-27b-nvfp4-k8v4-runtime-v20 |
-| Runtime ID | sha256:37017d4e5ec1c56bdb69d280992d62d405ec0bb0731a087d0ee8bbd96144af5c |
-| Offline archive | artifacts/qwen38-vllm-images-runtime-v20.tar |
+| Runtime tag | qwen38-vllm:qwen38-27b-nvfp4-k8v4-runtime-v21 |
+| Runtime ID | sha256:ab6b0ec8346c221bde06d9014a0ac7a7800dfc0aaf57d93985b2ce440626629e |
+| Offline archive | artifacts/qwen38-vllm-images-runtime-v21.tar |
 | Archive size | 8,558,567,424 bytes, mode 0600 |
-| Archive SHA-256 | 196307909f46378bddcc4e38e0a9ca47c5c5fffa113bdbbd84d4e779d3b44bf9 |
+| Archive SHA-256 | 89572451de771074cccf1b391fbda44ec25c775eba0e89db401a821076a25e9a |
 | Runtime Dockerfile SHA-256 | 49d1df791688a6afd091842e9fd18c0c43b93755cd574415a4c394acce84a231 |
 | Docker context allowlist SHA-256 | 2e3b84466fec6ab55f84c714144f362c2f4e4977d00b0361d068993dd70dcf76 |
 | Build verifier SHA-256 | e1c9c5f39684fba542c24a8109b6da6d5277ff39d6250cb4733b0308684811f4 |
 | Runtime validator SHA-256 | 94472f5a2c3d4b141e5d0a3a5717e815690319506ce55aff4ee05b2301552ec4 |
-| Runtime lock SHA-256 | 533d5275c95129bf74a19be6cc1a8c343502053cdb2be9a9ff0f548cdc27d2c3 |
+| Runtime lock SHA-256 | 834ebbe0c0ff5b12c1035aa8f5947c5b9a19e275fad6a8de4e277de597e1f1a9 |
 
 The final runtime layer does no package resolution or installation. It is built with
 pull=false, network=none, provenance=false, an exact base ID, an allowlisted context,
@@ -734,7 +749,18 @@ trials. OpenAI Chat, Anthropic Messages, and OpenAI Responses passed streaming a
 non-streaming tool calls plus typed tool-result continuation. Equivalent protocol
 histories passed render -> tokenize -> parse -> rerender with token-identical
 semantics. Anthropic validation problems return HTTP 400 invalid_request_error, not a
-misleading server 500.
+misleading server 500, whether they are typed request validation or the engine's own
+request validation.
+
+Generation names its agent or does not happen. The protocol probe sends every
+mounted identity surface — Chat Completions and its batch form, Completions,
+Responses, Anthropic Messages, and token-in-token-out generate — a request that is
+complete except for `kv_scope`, and each answers HTTP 400 naming the field: as
+`error.param` on the OpenAI-shaped surfaces, and as an `invalid_request_error`
+whose message names it on the Anthropic surface, because the Anthropic router maps
+the engine's request-validation error exactly as it maps typed request validation.
+Every other probe sends the identity `scripts/probe_scope.py` mints for its run on
+every generative request, so the suite runs under the rule it proves.
 
 The installed-image focused suites passed:
 
