@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # Single source of truth for the only supported serving profile.
 
-readonly PROFILE_VERSION="socket-isolated-nonroot-vision-k8v4-agent-v19"
-readonly IMAGE_PROFILE_VERSION="socket-isolated-nonroot-vision-k8v4-agent-v19"
+readonly PROFILE_VERSION="socket-isolated-nonroot-vision-k8v4-agent-v20"
+readonly IMAGE_PROFILE_VERSION="socket-isolated-nonroot-vision-k8v4-agent-v20"
 readonly CONTAINER_NAME="qwen38-agent-native"
 readonly CONTAINER_LABEL="Qwen_best_model_ever"
-readonly IMAGE_TAG="qwen38-vllm:qwen38-27b-nvfp4-k8v4-runtime-v19"
-readonly EXPECTED_IMAGE_ID="sha256:9ca17cb2404beac5936a079b581133c5a8e18e8f9a7e7b9179058a0c92f4fb50"
+readonly IMAGE_TAG="qwen38-vllm:qwen38-27b-nvfp4-k8v4-runtime-v20"
+readonly EXPECTED_IMAGE_ID="sha256:37017d4e5ec1c56bdb69d280992d62d405ec0bb0731a087d0ee8bbd96144af5c"
 readonly RELAY_IMAGE_TAG="qwen38-fixed-relay:1.0.0"
 readonly EXPECTED_RELAY_IMAGE_ID="sha256:5153a46bc03fa920b0d09000eca1848af255010bda99cc50e8a6110ebcd02690"
 readonly RELAY_SOURCE_SHA256="051dc82af7b9b12e229f9a127183d051ef47a6d44f03d99346762e84bd69c815"
@@ -20,8 +20,8 @@ readonly RELAY_MEMORY="32m"
 readonly RELAY_PIDS_LIMIT="32"
 readonly BASE_IMAGE_TAG="qwen38-vllm:main-9df9b0b"
 readonly EXPECTED_BASE_IMAGE_ID="sha256:fa4a002a88b7043a1a89966dea8a500fe9696f84e75730d9da916f916048d401"
-readonly IMAGE_ARCHIVE_NAME="qwen38-vllm-images-runtime-v19.tar"
-readonly IMAGE_ARCHIVE_SHA256="dedbeb9446ef9d0fb95f34466261600160c419c0b53c1127248b7425bb813607"
+readonly IMAGE_ARCHIVE_NAME="qwen38-vllm-images-runtime-v20.tar"
+readonly IMAGE_ARCHIVE_SHA256="196307909f46378bddcc4e38e0a9ca47c5c5fffa113bdbbd84d4e779d3b44bf9"
 
 readonly MODEL_DIR_NAME="Qwen3.8-27B-NVFP4-Corrected"
 readonly MODEL_REPOSITORY="unsloth/Qwen3.8-27B-NVFP4"
@@ -63,7 +63,8 @@ readonly NUMERICAL_AUDITS_PATCH_DIFF_SHA256="a73aa2f2ae3f82010eb2bafcdf663c2fe14
 readonly TURBOQUANT_GUARDS_PATCH_DIFF_SHA256="0ecf95ab8ee25a76d5412ce44aafafe13992b2cb373d6010acf5bc119dc8f47b"
 readonly KV_OFFLOAD_PINNING_PATCH_DIFF_SHA256="1857071c38d081bb95e3cca12153cebce096649084950b99229104fdae029ca6"
 readonly KV_USERS_SCOPE_PATCH_DIFF_SHA256="d4d18c5afc0af9ecdaff948d7e7f4b5d2e8f85eb15e7853aaddc44de62b17b56"
-readonly SOURCE_PATCH_MANIFEST_SHA256="ca8c849f0b377a2f882f1abcf263f6ddb1b9bb2c88f645906ff12bbbf51f6d59"
+readonly EXACT_REASONING_USAGE_PATCH_DIFF_SHA256="7991cca04345cf58a602a6b0630d2ebbf31f3da228e9034da591217956d37b31"
+readonly SOURCE_PATCH_MANIFEST_SHA256="71a6ea3228bca1cb34921e79ee1f504c44fccb5952350f59caabe1d8c799c2ac"
 # Cardinality of config/deployment-inputs.sha256. The hash manifest alone
 # proves the listed bytes but cannot see a quietly grown or shrunk allowlist,
 # so the reviewed file count is pinned as well. It is declared exactly once,
@@ -72,7 +73,7 @@ readonly SOURCE_PATCH_MANIFEST_SHA256="ca8c849f0b377a2f882f1abcf263f6ddb1b9bb2c8
 # was added — the validator then refused a correct manifest. Every consumer
 # (build-vllm.sh, runtime-common.sh, generate-deployment-input-manifest.sh)
 # reads this declaration.
-readonly DEPLOYMENT_INPUT_FILE_COUNT="71"
+readonly DEPLOYMENT_INPUT_FILE_COUNT="73"
 readonly TURBOQUANT_PATCHED_FILE_SHA256="ccda36577e4fb0052f370169dce4b649bad890b8b440a82e584acd3dd92a6d86"
 readonly TOOL_SCHEMA_PATCHED_FILE_SHA256="e88b5cd98ace7c76453552f5f08264e0be23d1a5bc9b9d15cc0f39ba75ec043e"
 readonly MODEL_CONFIG_PATCHED_FILE_SHA256="6a0b5fdcb292fef440ee59321b7db437dae2cd5fd80eb2372fa3647fb163a3cf"
@@ -86,13 +87,13 @@ readonly REQUEST_PATCHED_FILE_SHA256="6281dcb0f3562cf6cc365e8fa43b1fd8d4fe06e136
 readonly QWEN3_PARSER_PATCHED_FILE_SHA256="e5c192fda3ceba5c1686a790fd29b4ba663abdc9cbb7cc292634f4c503fd28e4"
 readonly STRUCTURED_OUTPUT_PATCHED_FILE_SHA256="f458a20495496d1bade5785addc50b6d655a81fd9d655912b703c4ed2e04314b"
 readonly ANTHROPIC_API_ROUTER_PATCHED_FILE_SHA256="05d17ec4f7ef1f05bdf95b6ce0d04ab80d1f5f8d0bbc130a551ea0512897e56e"
-readonly CHAT_SERVING_PATCHED_FILE_SHA256="da0922ec020e0d4cf0111af1bf00b534348ce13e6e19ac7ce50b3d6cbf58653a"
+readonly CHAT_SERVING_PATCHED_FILE_SHA256="57e7c8f804efd00f104c2780556194fb5567f5ac90e1915c7bf4a57491d126ed"
 readonly RESPONSES_CONTEXT_PATCHED_FILE_SHA256="45aabb486f12047609dac95a8f05bd48ce653e9c139cb1195f44c2df3b114423"
 readonly RESPONSES_PROTOCOL_PATCHED_FILE_SHA256="fca722667003b4b0157234f73cf16c1cdba35db6b71c0cd50bd2b60586c8d706"
 readonly RESPONSES_SERVING_PATCHED_FILE_SHA256="ee5f461f39c7a03fb4147d6f045c127b311785def7689e607002676de50f2f83"
 readonly RESPONSES_STREAMING_PATCHED_FILE_SHA256="5400a68d6219ca3944edb8a6d077da5e0ad0c767c34759dec7d35463dd1090b2"
 readonly RESPONSES_UTILS_PATCHED_FILE_SHA256="6c70148e6de4a9806f2e4e8fe3e02659780e86b6886601bb8a60b377235dc29d"
-readonly PARSER_ENGINE_PATCHED_FILE_SHA256="9ffce8a3aac1d885cbbd4de269201ef32bdd6089b5f92d61f94eebf1130a5faf"
+readonly PARSER_ENGINE_PATCHED_FILE_SHA256="006e92011b9ff73f5a99a578b9a836ce4ccc853f84aefa179c066fa4e386a4fd"
 readonly KV_OFFLOAD_WORKER_PATCHED_FILE_SHA256="0cd50f3deea7c8e91de072dde5d55f96edb6c0b35525c2d144ade7ae4e1b8a91"
 readonly WORKSPACE_PATCHED_FILE_SHA256="b859dfdc5676f90a0b00718e34adcd0a02d266be1543ca146eebb724a9235c00"
 readonly GPU_MODEL_RUNNER_PATCHED_FILE_SHA256="a7bed200b304fdc17320a30178ded7669d4677e787947470b872ef0ec14b6c8b"
@@ -123,6 +124,9 @@ readonly CLI_ARGS_PATCHED_FILE_SHA256="2c74b481652e1b7154df7836a98eb3ef1377092dc
 readonly COMPLETION_PROTOCOL_PATCHED_FILE_SHA256="b29459856339308677b0264ae30e405964455f378c0f6ccc2625600448da9cbc"
 readonly TITOTO_PROTOCOL_PATCHED_FILE_SHA256="75f3b76d41e269031d89d1d55144714abbfb6c2c88ff444809cea1e26760fbcf"
 readonly TITOTO_SERVING_PATCHED_FILE_SHA256="c055a75cd9148521bdf921110dcd54d7fa6fad17d2cfd552c23e775946beff7a"
+readonly ABSTRACT_PARSER_PATCHED_FILE_SHA256="87534a9739902c0e118819ac13c6593107bf2a5ae942af3269471557dd610577"
+readonly PARSER_ADAPTERS_PATCHED_FILE_SHA256="0d68474d291a7de76f795f6e2d64b15a15077860d1b9ba5711ffe0bfd0c3ca65"
+readonly ENGINE_PROTOCOL_PATCHED_FILE_SHA256="86001520ac9ec6e51d3dce8f0617461d497a75e83b2c2c7bb51e7459c8610dd0"
 readonly AGENT_CHAT_TEMPLATE_SHA256="32627db263a4742f37fc3ef87757c9b00f1cd7eb7af496914e7daa5e3bff173b"
 readonly PHASE_BUDGET_UNIT_SHA256="913266638d302de31cdeae1acfdc5a568a01513481a57e5a4e7e9cbe258a99df"
 readonly VISION_WORKSPACE_UNIT_SHA256="34f6ef1c477794de5e8b349c2da1dd491607a5618498358aa8b86085336a3df8"
@@ -131,6 +135,7 @@ readonly VISION_MLP_UNIT_SHA256="857ba547a099c6ba646210eb33dd7b159bf9a1972d1772e
 readonly TURBOQUANT_K8V4_UNIT_SHA256="2121146ae781bb94bd4ae257fb6a26c40ef7f3b212e626845d0939756fe8a494"
 readonly QWEN38_CONTEXT_UNIT_SHA256="77696c508ea77ffa8e63eed616783b648656bd81612b7d763ebf4505fdd9f5b2"
 readonly NVFP4_KERNEL_UNIT_SHA256="2fce56060c9589d46e50371c8de456a6b9a65b906d95d9e3e1079cc70f790302"
+readonly REASONING_USAGE_UNIT_SHA256="7e32b92442c02981bc7cefe1f280b7361af2b0fa24466c2aef7ca1e980ee62b2"
 readonly TURBOQUANT_UPSTREAM_FILE_SHA256="48994be137f3d25d4ee4f79ba2b89b0a6c3d988085079ffea1d241a34c2c755f"
 readonly TOOL_SCHEMA_UPSTREAM_FILE_SHA256="015b989c567c6794e6dbbba72af88694470421adab13775c95b50efe9eedd2b7"
 readonly MODEL_CONFIG_UPSTREAM_FILE_SHA256="17c687232886184f0390f38fc1c2c8ae078eaf24ebd1960a6b0c6a0669a35a98"
@@ -186,9 +191,12 @@ readonly POLICY_BASE_UPSTREAM_FILE_SHA256="a019b4b59ee4acacca12e6b4057ad27c80d99
 readonly POLICY_FACTORY_UPSTREAM_FILE_SHA256="3c8d4be50478408b434d65851bb5f67003dcab54748ae7f3eb8fc0439378e8c6"
 readonly POLICY_LRU_UPSTREAM_FILE_SHA256="d9fa56860f8a9d34ba7c16b9061da9d74c6fdefa2e538778add4fb582e0febfe"
 readonly POLICY_ARC_UPSTREAM_FILE_SHA256="ff12419f9cb4fb84c4029ff3346319d43d02365a8c74748c35fbbdb3066e91d6"
+readonly ABSTRACT_PARSER_UPSTREAM_FILE_SHA256="e567186750002ed7d0f5c5efeaffc9b9cfbec18060bdc080420b24cade713e13"
+readonly PARSER_ADAPTERS_UPSTREAM_FILE_SHA256="dc1c1317dbfb298e54b8d94ca0e66d2b0cb1e481c35cdcc60a815284bd8a6ef7"
+readonly ENGINE_PROTOCOL_UPSTREAM_FILE_SHA256="1c11f63c48fb3a48fdcc60371cb8eff4f03ed28ea7fc226450379b20bf8aa319"
 readonly SOURCE_DATE_EPOCH="1786751423"
-readonly RUNTIME_DOCKERFILE_SHA256="52571f5ae5a6a1d9b413c126477ca5a4c038dc7939b62268aab1456b516fb59e"
-readonly DOCKERIGNORE_SHA256="a15c81d0be5c474d9f0cd5e8b1d3f89b5eb7266ce60d45476069de9499f6b103"
+readonly RUNTIME_DOCKERFILE_SHA256="49d1df791688a6afd091842e9fd18c0c43b93755cd574415a4c394acce84a231"
+readonly DOCKERIGNORE_SHA256="2e3b84466fec6ab55f84c714144f362c2f4e4977d00b0361d068993dd70dcf76"
 
 # Functional host contract only. Exact host software versions, binary
 # hashes, and GPU/driver identity are deliberately not pinned: they tie the
@@ -205,7 +213,7 @@ readonly LISTEN_PORT="8000"
 readonly ENDPOINT="http://${LISTEN_HOST}:${LISTEN_PORT}"
 readonly SERVED_MODEL="qwen3.8-27b-nvfp4-k8v4"
 readonly MAX_MODEL_LEN="262144"
-readonly CACHE_VOLUME="qwen38-vllm-cache-socket-isolated-nonroot-vision-agent-v19"
+readonly CACHE_VOLUME="qwen38-vllm-cache-socket-isolated-nonroot-vision-agent-v20"
 readonly TMP_TMPFS_OPTIONS="rw,nosuid,nodev,exec,size=2g,mode=1777"
 readonly RUN_TMPFS_OPTIONS="rw,nosuid,nodev,noexec,size=64m,uid=2000,gid=0,mode=0700"
 readonly STARTUP_TIMEOUT_SECONDS="600"
@@ -309,6 +317,12 @@ VLLM_ARGS=(
   --reasoning-parser qwen3
   --enable-auto-tool-choice
   --tool-call-parser qwen3_coder
+  # Usage is served exactly or not at all: completion_tokens_details counts
+  # the generated ids before the reasoning-end id (the reviewed
+  # exact-reasoning-usage stage), and prompt_tokens_details reports the
+  # prefix-cached prompt tokens the scheduler actually reused. Without this
+  # flag vLLM omits the cached count and a client can only invent a zero.
+  --enable-prompt-tokens-details
   --default-chat-template-kwargs
   '{"enable_thinking":true,"reasoning_effort":"xhigh","add_vision_id":false}'
   --limit-mm-per-prompt

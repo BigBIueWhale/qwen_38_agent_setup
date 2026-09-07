@@ -1,0 +1,835 @@
+diff --git a/tests/parser/engine/test_reasoning_token_count.py b/tests/parser/engine/test_reasoning_token_count.py
+new file mode 100644
+index 0000000..931e805
+--- /dev/null
++++ b/tests/parser/engine/test_reasoning_token_count.py
+@@ -0,0 +1,256 @@
++# SPDX-License-Identifier: Apache-2.0
++# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
++"""The exact reasoning token count is the parser's own split, on token ids.
++
++Every count here is checked against the position of the boundary id in the
++generated id stream -- the only definition that cannot drift from the split
++the client received -- through the same composed parser the chat endpoint
++uses, on both the delta-by-delta and the batch path.
++"""
++
++from unittest.mock import MagicMock
++
++import pytest
++
++from tests.parser.engine.conftest import make_mock_tokenizer
++from vllm.entrypoints.openai.chat_completion.protocol import ChatCompletionRequest
++from vllm.parser import ParserManager
++from vllm.parser.engine.events import EventType
++from vllm.parser.engine.parser_engine import ParserEngine
++from vllm.parser.engine.parser_engine_config import (
++    ParserEngineConfig,
++    ParserState,
++    Transition,
++)
++from vllm.parser.qwen3 import (
++    THINK_END,
++    THINK_START,
++    TOOL_CALL_END,
++    TOOL_CALL_START,
++    Qwen3Parser,
++)
++
++END_OF_TURN = "<|im_end|>"
++VOCAB = {
++    THINK_START: 98,
++    THINK_END: 99,
++    TOOL_CALL_START: 100,
++    TOOL_CALL_END: 101,
++    END_OF_TURN: 102,
++}
++
++
++def tokens(*pieces: str) -> tuple[str, list[int]]:
++    """Text and ids for a sequence of markers and single-character tokens.
++
++    The mock tokenizer decodes an unknown ASCII id to its character, so a
++    plain token is one character with its code point as the id.
++    """
++    ids = [VOCAB[piece] if piece in VOCAB else ord(piece) for piece in pieces]
++    return "".join(pieces), ids
++
++
++@pytest.fixture
++def tokenizer():
++    return make_mock_tokenizer(VOCAB)
++
++
++@pytest.fixture
++def request_stub():
++    req = MagicMock(spec=ChatCompletionRequest)
++    req.tools = []
++    req.tool_choice = "auto"
++    req.include_reasoning = True
++    return req
++
++
++@pytest.fixture
++def composed_parser(tokenizer):
++    """The parser the chat endpoint builds for this deployment."""
++    parser_cls = ParserManager.get_parser(
++        tool_parser_name="qwen3_coder",
++        reasoning_parser_name="qwen3",
++        enable_auto_tools=True,
++    )
++    assert parser_cls is not None
++    return parser_cls(tokenizer, [], chat_template_kwargs={"enable_thinking": True})
++
++
++def stream(parser, request, deltas, *, prompt_token_ids=(1, 2, 3)):
++    outputs = []
++    for index, pieces in enumerate(deltas):
++        text, ids = tokens(*pieces)
++        outputs.append(
++            parser.parse_delta(
++                delta_text=text,
++                delta_token_ids=ids,
++                request=request,
++                prompt_token_ids=list(prompt_token_ids),
++                finished=index == len(deltas) - 1,
++            )
++        )
++    return outputs
++
++
++def joined(outputs, field):
++    return "".join(getattr(delta, field) or "" for delta in outputs if delta)
++
++
++class TestStreaming:
++    def test_counts_ids_before_the_explicit_end(self, composed_parser, request_stub):
++        deltas = [("A", "B"), ("C", THINK_END, "D"), ("E",)]
++        outputs = stream(composed_parser, request_stub, deltas)
++
++        assert joined(outputs, "reasoning") == "ABC"
++        assert joined(outputs, "content") == "DE"
++        assert composed_parser.reasoning_token_count == 3
++        assert composed_parser.generated_token_count == 6
++
++    def test_counts_ids_before_the_implicit_tool_call_end(
++        self, composed_parser, request_stub
++    ):
++        call = (
++            TOOL_CALL_START,
++            *"\n<function=f>\n<parameter=x>1</parameter>\n</function>\n",
++            TOOL_CALL_END,
++        )
++        deltas = [("A", "B"), ("C",), call]
++        outputs = stream(composed_parser, request_stub, deltas)
++
++        assert joined(outputs, "reasoning") == "ABC"
++        assert any(delta and delta.tool_calls for delta in outputs)
++        assert composed_parser.reasoning_token_count == 3
++        assert composed_parser.generated_token_count == 3 + len(call)
++
++    def test_counts_every_id_when_reasoning_never_ends(
++        self, composed_parser, request_stub
++    ):
++        # A generation cut by max_tokens inside reasoning is all reasoning,
++        # and a special token generated before the boundary is a generated
++        # id inside it, exactly as completion_tokens counts it.
++        deltas = [("A", THINK_START, "B"), ("C", END_OF_TURN)]
++        stream(composed_parser, request_stub, deltas)
++
++        assert composed_parser.reasoning_token_count == 5
++        assert composed_parser.generated_token_count == 5
++
++    def test_boundary_inside_a_merged_delta(self, composed_parser, request_stub):
++        # A lagging server merges several steps into one delta; the count
++        # still splits at the boundary id within it.
++        deltas = [("A", "B", "C", THINK_END, "D", "E", "F")]
++        outputs = stream(composed_parser, request_stub, deltas)
++
++        assert joined(outputs, "reasoning") == "ABC"
++        assert joined(outputs, "content") == "DEF"
++        assert composed_parser.reasoning_token_count == 3
++
++    def test_starts_at_zero_before_any_delta(self, composed_parser):
++        assert composed_parser.reasoning_token_count == 0
++        assert composed_parser.generated_token_count == 0
++
++
++class TestBatch:
++    def test_batch_split_is_made_on_ids_and_counted(
++        self, composed_parser, request_stub
++    ):
++        text, ids = tokens("A", "B", "C", THINK_END, "D", "E")
++
++        reasoning, content, tool_calls = composed_parser.parse(
++            text,
++            request_stub,
++            enable_auto_tools=True,
++            model_output_token_ids=ids,
++        )
++
++        assert reasoning == "ABC"
++        assert content == "DE"
++        assert not tool_calls
++        assert composed_parser.reasoning_token_count == 3
++        assert composed_parser.generated_token_count == len(ids)
++
++    def test_batch_and_stream_agree_on_the_same_generation(
++        self, tokenizer, request_stub
++    ):
++        pieces = ("A", "B", THINK_END, "C", "D")
++        parser_cls = ParserManager.get_parser(
++            tool_parser_name="qwen3_coder",
++            reasoning_parser_name="qwen3",
++            enable_auto_tools=True,
++        )
++        streamed = parser_cls(tokenizer, [])
++        batched = parser_cls(tokenizer, [])
++
++        outputs = stream(streamed, request_stub, [pieces[:1], pieces[1:3], pieces[3:]])
++        text, ids = tokens(*pieces)
++        reasoning, content, _ = batched.parse(
++            text, request_stub, enable_auto_tools=True, model_output_token_ids=ids
++        )
++
++        assert joined(outputs, "reasoning") == reasoning == "AB"
++        assert joined(outputs, "content") == content == "CD"
++        assert streamed.reasoning_token_count == batched.reasoning_token_count == 2
++
++    def test_whole_sequence_count_matches_the_incremental_count(
++        self, composed_parser, request_stub
++    ):
++        _, ids = tokens("A", "B", THINK_END, "C")
++        stream(composed_parser, request_stub, [("A", "B"), (THINK_END, "C")])
++
++        assert composed_parser.reasoning_parser.count_reasoning_tokens(ids) == 2
++        assert composed_parser.reasoning_token_count == 2
++
++
++class TestRefusals:
++    def test_text_fed_without_ids_refuses_the_count(self, tokenizer, request_stub):
++        engine = Qwen3Parser(tokenizer)
++        engine.extract_reasoning("AB" + THINK_END + "C", request_stub)
++
++        with pytest.raises(ValueError, match="without its token ids"):
++            engine.reasoning_token_count
++
++    def test_disabled_thinking_counts_nothing(self, tokenizer, request_stub):
++        engine = Qwen3Parser(tokenizer, chat_template_kwargs={"enable_thinking": False})
++        stream(engine, request_stub, [("A", "B")])
++
++        assert engine.reasoning_token_count == 0
++        assert engine.count_reasoning_tokens([65, 66]) == 0
++
++    @pytest.mark.parametrize(
++        ("transitions", "reason"),
++        [
++            (
++                {
++                    (ParserState.REASONING, "THINK_END"): Transition(
++                        ParserState.CONTENT, (EventType.REASONING_END,)
++                    ),
++                    (ParserState.CONTENT, "THINK_START"): Transition(
++                        ParserState.REASONING, (EventType.REASONING_START,)
++                    ),
++                },
++                "re-enters reasoning",
++            ),
++            (
++                {
++                    (ParserState.REASONING, "THINK_END"): Transition(
++                        ParserState.CONTENT, ()
++                    ),
++                },
++                "without announcing",
++            ),
++        ],
++    )
++    def test_a_grammar_without_one_id_boundary_serves_no_count(
++        self, tokenizer, transitions, reason
++    ):
++        config = ParserEngineConfig(
++            name="test-grammar",
++            initial_state=ParserState.REASONING,
++            terminals={"THINK_START": THINK_START, "THINK_END": THINK_END},
++            token_id_terminals={"THINK_START": THINK_START, "THINK_END": THINK_END},
++            transitions=transitions,
++        )
++        engine = ParserEngine(tokenizer, parser_engine_config=config)
++
++        assert engine.reasoning_token_count is None
++        with pytest.raises(ValueError, match=reason):
++            engine.count_reasoning_tokens([65, 99, 66])
+diff --git a/vllm/entrypoints/openai/chat_completion/serving.py b/vllm/entrypoints/openai/chat_completion/serving.py
+index 71c53db..8ba7be8 100644
+--- a/vllm/entrypoints/openai/chat_completion/serving.py
++++ b/vllm/entrypoints/openai/chat_completion/serving.py
+@@ -36,6 +36,7 @@ from vllm.entrypoints.openai.chat_completion.protocol import (
+     ChatMessage,
+ )
+ from vllm.entrypoints.openai.engine.protocol import (
++    CompletionTokenUsageInfo,
+     DeltaMessage,
+     ErrorResponse,
+     FunctionCall,
+@@ -105,6 +106,46 @@ def _make_prompt_tokens_details(
+     )
+ 
+ 
++def _reasoning_token_count(
++    parser: Parser | None, generated_token_count: int
++) -> int | None:
++    """Reasoning ids of one choice, from the parser that split it.
++
++    The count is the parser's own, taken on the token-id stream it split
++    reasoning from content on, never a re-tokenisation of the reasoning
++    text.  ``None`` when there is no parser or the parser has no exact id
++    boundary: usage then omits the count rather than fabricating one.  A
++    parser that was handed fewer or more ids than the choice generated has
++    split a different stream, and the request is refused rather than
++    reported with a count that does not describe it.
++    """
++    if parser is None:
++        return None
++    count = parser.reasoning_token_count
++    if count is None:
++        return None
++    if parser.generated_token_count != generated_token_count:
++        raise ValueError(
++            "reasoning token accounting refused: the parser was handed "
++            f"{parser.generated_token_count} generated ids but the choice "
++            f"generated {generated_token_count}"
++        )
++    return count
++
++
++def _make_completion_tokens_details(
++    reasoning_token_counts: GenericSequence[int | None],
++) -> CompletionTokenUsageInfo | None:
++    """Sum the choices' reasoning ids the way ``completion_tokens`` sums
++    their generated ids; absent as soon as one choice has no exact count."""
++    total = 0
++    for count in reasoning_token_counts:
++        if count is None:
++            return None
++        total += count
++    return CompletionTokenUsageInfo(reasoning_tokens=total)
++
++
+ class OpenAIServingChat(GenerateBaseServing):
+     def __init__(
+         self,
+@@ -537,6 +578,11 @@ class OpenAIServingChat(GenerateBaseServing):
+                                 prompt_tokens=num_prompt_tokens,
+                                 completion_tokens=0,
+                                 total_tokens=num_prompt_tokens,
++                                completion_tokens_details=(
++                                    _make_completion_tokens_details(
++                                        [_reasoning_token_count(parsers[i], 0)]
++                                    )
++                                ),
+                             )
+ 
+                         data = chunk.model_dump_json(exclude_unset=True)
+@@ -573,6 +619,11 @@ class OpenAIServingChat(GenerateBaseServing):
+                                         prompt_tokens=num_prompt_tokens,
+                                         completion_tokens=0,
+                                         total_tokens=num_prompt_tokens,
++                                        completion_tokens_details=(
++                                            _make_completion_tokens_details(
++                                                [_reasoning_token_count(parsers[i], 0)]
++                                            )
++                                        ),
+                                     )
+ 
+                                 data = chunk.model_dump_json(exclude_unset=True)
+@@ -765,19 +816,36 @@ class OpenAIServingChat(GenerateBaseServing):
+                             prompt_tokens=num_prompt_tokens,
+                             completion_tokens=completion_tokens,
+                             total_tokens=num_prompt_tokens + completion_tokens,
++                            completion_tokens_details=(
++                                _make_completion_tokens_details(
++                                    [_reasoning_token_count(parser, completion_tokens)]
++                                )
++                            ),
+                         )
+ 
+                     data = chunk.model_dump_json(exclude_unset=True)
+                     yield f"data: {data}\n\n"
+ 
+             # once the final token is handled, if stream_options.include_usage
+-            # is sent, send the usage
++            # is sent, send the usage.  The reasoning count is read from the
++            # per-choice parsers after their last delta, on the same id
++            # stream they split, and summed across choices exactly as
++            # completion_tokens is.
++            completion_tokens_details = _make_completion_tokens_details(
++                [
++                    _reasoning_token_count(parser, generated)
++                    for parser, generated in zip(
++                        parsers, previous_num_tokens, strict=True
++                    )
++                ]
++            )
+             if include_usage:
+                 completion_tokens = sum(previous_num_tokens)
+                 final_usage = UsageInfo(
+                     prompt_tokens=num_prompt_tokens,
+                     completion_tokens=completion_tokens,
+                     total_tokens=num_prompt_tokens + completion_tokens,
++                    completion_tokens_details=completion_tokens_details,
+                 )
+                 final_usage.prompt_tokens_details = _make_prompt_tokens_details(
+                     self.enable_prompt_tokens_details,
+@@ -822,6 +890,7 @@ class OpenAIServingChat(GenerateBaseServing):
+                 prompt_tokens=num_prompt_tokens,
+                 completion_tokens=num_completion_tokens,
+                 total_tokens=num_prompt_tokens + num_completion_tokens,
++                completion_tokens_details=completion_tokens_details,
+             )
+ 
+             # Log complete streaming response if output logging is enabled
+@@ -880,6 +949,9 @@ class OpenAIServingChat(GenerateBaseServing):
+             )
+ 
+         choices: list[ChatCompletionResponseChoice] = []
++        # One reasoning count per choice, read from the parser right after
++        # the parse that split that choice, before the next choice resets it.
++        reasoning_token_counts: list[int | None] = []
+ 
+         role = self.get_chat_request_role(request)
+         tool_parser_cls = (
+@@ -914,6 +986,9 @@ class OpenAIServingChat(GenerateBaseServing):
+                     enable_auto_tools=self.enable_auto_tools,
+                     model_output_token_ids=token_ids,
+                 )
++                reasoning_token_counts.append(
++                    _reasoning_token_count(parser, len(token_ids))
++                )
+                 suppress_metadata = not request.include_reasoning and parser is not None
+                 if not request.include_reasoning:
+                     reasoning = None
+@@ -924,6 +999,7 @@ class OpenAIServingChat(GenerateBaseServing):
+                 content = output.text
+                 tool_calls = []
+                 suppress_metadata = False
++                reasoning_token_counts.append(None)
+ 
+             auto_tools_called = False
+             is_named_tool_choice = (
+@@ -1070,6 +1146,9 @@ class OpenAIServingChat(GenerateBaseServing):
+             prompt_tokens=num_prompt_tokens,
+             completion_tokens=num_generated_tokens,
+             total_tokens=num_prompt_tokens + num_generated_tokens,
++            completion_tokens_details=_make_completion_tokens_details(
++                reasoning_token_counts
++            ),
+         )
+         usage.prompt_tokens_details = _make_prompt_tokens_details(
+             self.enable_prompt_tokens_details,
+diff --git a/vllm/entrypoints/openai/engine/protocol.py b/vllm/entrypoints/openai/engine/protocol.py
+index 4d07c29..72f1980 100644
+--- a/vllm/entrypoints/openai/engine/protocol.py
++++ b/vllm/entrypoints/openai/engine/protocol.py
+@@ -117,11 +117,23 @@ class PromptTokenUsageInfo(OpenAIBaseModel):
+     request has no multimodal input."""
+ 
+ 
++class CompletionTokenUsageInfo(OpenAIBaseModel):
++    reasoning_tokens: int
++    """Generated tokens the reasoning parser consumed inside reasoning:
++    the ids before the id at which it split reasoning from content, counted
++    on that same id stream.  Included in `completion_tokens`, which counts
++    every generated id -- the reasoning-end marker and any stop token among
++    them."""
++
++
+ class UsageInfo(OpenAIBaseModel):
+     prompt_tokens: int = 0
+     total_tokens: int = 0
+     completion_tokens: int | None = 0
+     prompt_tokens_details: PromptTokenUsageInfo | None = None
++    completion_tokens_details: CompletionTokenUsageInfo | None = None
++    """Present whenever a parser with an exact reasoning boundary split the
++    output; absent, never zero, when no such split was made."""
+ 
+ 
+ class PerRequestTimingMetrics(OpenAIBaseModel):
+diff --git a/vllm/parser/abstract_parser.py b/vllm/parser/abstract_parser.py
+index f7119d8..dfc2469 100644
+--- a/vllm/parser/abstract_parser.py
++++ b/vllm/parser/abstract_parser.py
+@@ -57,6 +57,11 @@ class StreamState:
+     # tracks whether function name has been fully returned in the stream yet
+     function_name_returned: bool = False
+     engine_based: bool = False
++    # Every generated id handed to ``parse_delta`` or ``parse``.  Usage
++    # reporting compares it with the generation's own count, so a count of
++    # reasoning ids is never read from a parser that missed part of the
++    # stream it claims to have split.
++    generated_token_count: int = 0
+ 
+     def advance(
+         self,
+@@ -176,6 +181,25 @@ class Parser:
+         state.history_tool_call_cnt = count_history_tool_calls(request)
+         state.history_tool_call_cnt_initialized = True
+ 
++    # ========== Exact Reasoning Usage ==========
++
++    @property
++    def reasoning_token_count(self) -> int | None:
++        """Generated ids this parser consumed inside reasoning.
++
++        Read after the last delta or after ``parse``, on the same token-id
++        stream the reasoning/content split was made on, so it is the count
++        at the split and never a re-tokenisation of the reasoning text.
++        ``None`` means the parser has no exact id boundary to count at, and
++        usage then carries no count rather than a fabricated one.
++        """
++        return None
++
++    @property
++    def generated_token_count(self) -> int:
++        """Every generated id handed to this parser for the current output."""
++        return self._stream_state.generated_token_count
++
+     # ========== Reasoning Parser Methods ==========
+ 
+     @abstractmethod
+@@ -386,11 +410,33 @@ class DelegatingParser(Parser):
+         self,
+         model_output: str,
+         request: ChatCompletionRequest | ResponsesRequest,
++        model_output_token_ids: Sequence[int] = (),
+     ) -> tuple[str | None, str | None]:
+         if self._reasoning_parser is None:
+             return None, model_output
++        if self._reasoning_parser.engine_based_streaming:
++            # An engine-backed reasoning parser splits on token ids when it
++            # has them, exactly as it does delta by delta; a batch split on
++            # text alone would classify a text lookalike of a marker
++            # differently from the streaming path and could not be counted.
++            return self._reasoning_parser.extract_reasoning(  # type: ignore[call-arg]
++                model_output,
++                request,
++                model_output_token_ids=model_output_token_ids,
++            )
+         return self._reasoning_parser.extract_reasoning(model_output, request)
+ 
++    @property
++    def reasoning_token_count(self) -> int | None:
++        reasoning_parser = self._reasoning_parser
++        if reasoning_parser is None:
++            # No reasoning channel is configured, so nothing the model
++            # generated was split off as reasoning: the count is zero.
++            return 0
++        if not reasoning_parser.engine_based_streaming:
++            return None
++        return reasoning_parser.reasoning_token_count  # type: ignore[attr-defined]
++
+     def _get_function_name(
+         self, request: ChatCompletionRequest | ResponsesRequest
+     ) -> str:
+@@ -790,7 +836,10 @@ class DelegatingParser(Parser):
+         model_output_token_ids: Sequence[int] = (),
+     ) -> tuple[str | None, str | None, list[FunctionCall] | None]:
+         self._initialize_history_tool_call_cnt(request)
+-        reasoning, content = self.extract_reasoning(model_output, request)
++        self._stream_state.generated_token_count = len(model_output_token_ids)
++        reasoning, content = self.extract_reasoning(
++            model_output, request, model_output_token_ids
++        )
+         tool_calls, content = self._extract_tool_calls(
+             content=content,
+             request=request,
+@@ -809,6 +858,7 @@ class DelegatingParser(Parser):
+     ) -> DeltaMessage | None:
+         self._initialize_history_tool_call_cnt(request)
+         state = self._stream_state
++        state.generated_token_count += len(delta_token_ids)
+ 
+         if not state.prompt_reasoning_checked and prompt_token_ids is not None:
+             state.prompt_reasoning_checked = True
+diff --git a/vllm/parser/engine/adapters.py b/vllm/parser/engine/adapters.py
+index b9c4e42..9420de3 100644
+--- a/vllm/parser/engine/adapters.py
++++ b/vllm/parser/engine/adapters.py
+@@ -70,8 +70,12 @@ class ParserEngineReasoningAdapter(ReasoningParser):
+         self,
+         model_output: str,
+         request: ChatCompletionRequest | ResponsesRequest,
++        model_output_token_ids: Sequence[int] = (),
+     ) -> tuple[str | None, str | None]:
+-        with self._skip_tool_parsing():
++        with (
++            self._skip_tool_parsing(),
++            self._parser_engine.batch_token_ids(model_output_token_ids),
++        ):
+             return self._parser_engine.extract_reasoning(model_output, request)
+ 
+     def extract_reasoning_streaming(
+@@ -124,6 +128,10 @@ class ParserEngineReasoningAdapter(ReasoningParser):
+     def count_reasoning_tokens(self, token_ids: Sequence[int]) -> int:
+         return self._parser_engine.count_reasoning_tokens(token_ids)
+ 
++    @property
++    def reasoning_token_count(self) -> int | None:
++        return self._parser_engine.reasoning_token_count
++
+ 
+ class ParserEngineToolAdapter(ToolParser):
+     """Adapts a :class:`ParserEngine` to the :class:`ToolParser` interface.
+diff --git a/vllm/parser/engine/parser_engine.py b/vllm/parser/engine/parser_engine.py
+index 2964adc..784622c 100644
+--- a/vllm/parser/engine/parser_engine.py
++++ b/vllm/parser/engine/parser_engine.py
+@@ -7,7 +7,8 @@ extraction with a single :class:`StreamingParserEngine`.
+ from __future__ import annotations
+ 
+ import json
+-from collections.abc import Sequence
++from collections.abc import Iterator, Sequence
++from contextlib import contextmanager
+ from functools import cached_property
+ from typing import TYPE_CHECKING
+ 
+@@ -148,6 +149,22 @@ class ParserEngine(Parser):
+         if end_text:
+             self._reasoning_end_token_id = vocab.get(end_text)
+ 
++        # Exact reasoning usage: the ids this grammar leaves reasoning at,
++        # resolved once from the transition table, and the running count of
++        # generated ids consumed before one of them.  See
++        # :meth:`_resolve_reasoning_boundary`.
++        (
++            self._reasoning_boundary_ids,
++            self._reasoning_boundary_refusal,
++        ) = self._resolve_reasoning_boundary()
++        self._reasoning_open: bool = (
++            self._reasoning_boundary_refusal is None
++            and parser_engine_config.initial_state is ParserState.REASONING
++        )
++        self._reasoning_token_count: int = 0
++        self._reasoning_fed_without_ids: bool = False
++        self._batch_token_ids: tuple[int, ...] = ()
++
+     @property
+     def reasoning_start_str(self) -> str | None:
+         return self.parser_engine_config.terminals.get("THINK_START")
+@@ -200,6 +217,17 @@ class ParserEngine(Parser):
+         self._deferred_reasoning = ""
+         self._content_has_nonws = False
+         self._prompt_streaming_prepared = False
++        effective_initial_state = (
++            initial_state
++            if initial_state is not None
++            else self.parser_engine_config.initial_state
++        )
++        self._reasoning_open = (
++            self._reasoning_boundary_refusal is None
++            and effective_initial_state is ParserState.REASONING
++        )
++        self._reasoning_token_count = 0
++        self._reasoning_fed_without_ids = False
+ 
+     def adjust_request(
+         self, request: ChatCompletionRequest | ResponsesRequest
+@@ -220,6 +248,7 @@ class ParserEngine(Parser):
+         delta_token_ids: Sequence[int],
+     ) -> list[SemanticEvent]:
+         delta_text, delta_token_ids = self._preprocess_feed(delta_text, delta_token_ids)
++        self._account_reasoning_tokens(delta_text, delta_token_ids)
+         return self._engine.feed(delta_text, delta_token_ids)
+ 
+     # ── Schema-aware type correction ─────────────────────────────────
+@@ -437,6 +466,7 @@ class ParserEngine(Parser):
+         finished: bool,
+     ) -> DeltaMessage | None:
+         self._initialize_history_tool_call_cnt(request)
++        self._stream_state.generated_token_count += len(delta_token_ids)
+         if not self._prompt_streaming_prepared and prompt_token_ids is not None:
+             # NOTE: call the hook BEFORE setting the flag, because the hook
+             # may invoke ``_reset`` (e.g. via ``initialize_streaming``) which
+@@ -496,7 +526,7 @@ class ParserEngine(Parser):
+         request: ChatCompletionRequest | ResponsesRequest,
+     ) -> tuple[str | None, str | None]:
+         self._reset()
+-        events = self._feed(model_output, [])
++        events = self._feed(model_output, self._batch_token_ids)
+         events.extend(self._engine.finish())
+ 
+         reasoning_parts: list[str] = []
+@@ -624,24 +654,148 @@ class ParserEngine(Parser):
+     ) -> str | None:
+         return None
+ 
+-    def count_reasoning_tokens(self, token_ids: Sequence[int]) -> int:
+-        start_id = self._reasoning_start_token_id
+-        end_id = self._reasoning_end_token_id
+-        if start_id is None or end_id is None:
+-            return 0
+-        count = 0
+-        depth = 0
+-        for token_id in token_ids:
+-            if token_id == start_id:
+-                depth += 1
++    # ── Exact reasoning usage ────────────────────────────────────────
++
++    def _resolve_reasoning_boundary(self) -> tuple[frozenset[int], str | None]:
++        """Find the token ids at which this grammar leaves reasoning.
++
++        Once it has seen token ids, the streaming engine changes state only
++        on the token-id terminals -- a text lookalike of ``</think>`` is
++        content -- so the reasoning/content split it makes is a position in
++        the id stream, and a count of the ids before that position is the
++        count at the split.  That is only well defined for a grammar of the
++        right shape, which is checked here, once, per grammar:
++
++        * reasoning is never re-entered, so there is one boundary;
++        * every transition out of ``REASONING`` is on a token-id terminal
++          that resolves in this vocabulary, so the boundary is an id and
++          not a text position;
++        * a transition leaves reasoning exactly when it announces
++          ``REASONING_END``, so the boundary is the same id whether or not
++          tool spans are being forwarded as text, which is how the
++          reasoning adapter runs this engine.
++
++        A grammar without that shape is refused with the reason, rather
++        than counted by a rule the engine does not follow.  The ids after
++        the boundary, and every id of a generation that never reaches it,
++        are what ``completion_tokens`` already counts; a stop token or any
++        other special token generated before the boundary is a generated
++        id inside reasoning and counts as one.
++        """
++        config = self.parser_engine_config
++        for (state, terminal), transition in config.transitions.items():
++            if (
++                state is not ParserState.REASONING
++                and transition.next_state is ParserState.REASONING
++            ):
++                return frozenset(), (
++                    f"{config.name} re-enters reasoning on {terminal} "
++                    f"from {state.name}"
++                )
++        boundary: set[int] = set()
++        for (state, terminal), transition in config.transitions.items():
++            if state is not ParserState.REASONING or transition.skip_in_token_id_mode:
+                 continue
+-            if token_id == end_id:
+-                if depth > 0:
+-                    depth -= 1
++            leaves = transition.next_state is not ParserState.REASONING
++            announces = EventType.REASONING_END in transition.events
++            if leaves != announces:
++                return frozenset(), (
++                    f"{config.name} leaves reasoning on {terminal} without "
++                    "announcing REASONING_END"
++                    if leaves
++                    else f"{config.name} announces REASONING_END on {terminal} "
++                    "without leaving reasoning"
++                )
++            if not leaves:
+                 continue
+-            if depth > 0:
+-                count += 1
+-        return count
++            token_text = config.token_id_terminals.get(terminal)
++            token_id = self.vocab.get(token_text) if token_text is not None else None
++            if token_id is None:
++                return frozenset(), (
++                    f"{config.name} leaves reasoning on {terminal}, which is "
++                    "not a token id in this vocabulary"
++                )
++            boundary.add(token_id)
++        return frozenset(boundary), None
++
++    def _account_reasoning_tokens(
++        self,
++        delta_text: str,
++        delta_token_ids: Sequence[int],
++    ) -> None:
++        """Advance the reasoning count over the ids the engine is about to see.
++
++        Every feed carries its ids through here, so the count and the
++        engine's split are taken from the same stream.  A feed that carries
++        text but no ids has no position in that stream, and a count taken
++        beside it would be a guess: it is remembered and refused when read.
++        """
++        if delta_text and not delta_token_ids:
++            self._reasoning_fed_without_ids = True
++        if not self._reasoning_open:
++            return
++        for token_id in delta_token_ids:
++            if token_id in self._reasoning_boundary_ids:
++                self._reasoning_open = False
++                return
++            self._reasoning_token_count += 1
++
++    @contextmanager
++    def batch_token_ids(self, token_ids: Sequence[int]) -> Iterator[None]:
++        """Supply a complete generation's ids to the next batch extraction.
++
++        ``extract_reasoning`` keeps the text-only signature the reasoning
++        parser interface shares with grammars that only post-process text,
++        so the ids ride beside the call rather than through it, scoped
++        exactly as the adapter scopes its tool-span forwarding.  With them
++        the batch split is made on token ids, as the streaming split is,
++        and the reasoning count is exact on both paths.
++        """
++        saved = self._batch_token_ids
++        self._batch_token_ids = tuple(token_ids)
++        try:
++            yield
++        finally:
++            self._batch_token_ids = saved
++
++    @property
++    def reasoning_token_count(self) -> int | None:
++        """Generated ids consumed inside reasoning since the last reset.
++
++        ``None`` when the grammar has no single id-marked boundary (see
++        :meth:`_resolve_reasoning_boundary`), so a caller reports no count
++        rather than a wrong one.  Raises when the engine was fed text
++        without its ids: the split it made then has no position in the id
++        stream, and the caller supplied text where it had ids.
++        """
++        if self._reasoning_boundary_refusal is not None:
++            return None
++        if self._reasoning_fed_without_ids:
++            raise ValueError(
++                "the exact reasoning token count is unavailable: the parser "
++                "engine was fed text without its token ids and cannot say "
++                "which ids it split at"
++            )
++        return self._reasoning_token_count
++
++    def count_reasoning_tokens(self, token_ids: Sequence[int]) -> int:
++        """Reasoning ids in a complete generation, by the same boundary.
++
++        The count :attr:`reasoning_token_count` accumulates delta by delta,
++        taken in one pass from the grammar's initial state; it is what a
++        caller that accumulates a whole generation's ids reads afterwards.
++        """
++        if self._reasoning_boundary_refusal is not None:
++            raise ValueError(
++                "the exact reasoning token count is unavailable: "
++                f"{self._reasoning_boundary_refusal}"
++            )
++        if self.parser_engine_config.initial_state is not ParserState.REASONING:
++            return 0
++        for index, token_id in enumerate(token_ids):
++            if token_id in self._reasoning_boundary_ids:
++                return index
++        return len(token_ids)
+ 
+     # ── Single-pass parse helper ────────────────────────────────────────
+ 
+@@ -686,6 +840,7 @@ class ParserEngine(Parser):
+     ) -> tuple[str | None, str | None, list[FunctionCall] | None]:
+         self._initialize_history_tool_call_cnt(request)
+         self._check_skip_tool_parsing(request)
++        self._stream_state.generated_token_count = len(model_output_token_ids)
+         reasoning, content, tool_call_info = self._single_pass_parse(
+             model_output,
+             model_output_token_ids,

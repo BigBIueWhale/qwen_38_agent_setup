@@ -2,7 +2,101 @@
 set -euo pipefail
 
 MODE="${1:-build}"
-EXPECTED_STATUS=$' M tests/config/test_config_utils.py\n M tests/distributed/test_rocm_quick_reduce.py\n M tests/engine/test_arg_utils.py\n M tests/entrypoints/anthropic/test_anthropic_messages_conversion.py\n M tests/entrypoints/serve/utils/test_api_utils.py\n M tests/entrypoints/unit_tests/test_chat_utils.py\n M tests/evals/gsm8k/test_gsm8k_offloading.py\n M tests/models/language/pooling/test_reward.py\n M tests/multimodal/media/test_connector.py\n M tests/multimodal/media/test_image.py\n M tests/quantization/test_turboquant.py\n M tests/v1/e2e/general/test_context_length.py\n M tests/v1/kv_connector/nixl_integration/run_multi_connector_accuracy_test.sh\n M tests/v1/kv_connector/nixl_integration/run_multi_connector_edge_case_test.sh\n M tests/v1/kv_connector/nixl_integration/spec_decode_acceptance_test.sh\n M tests/v1/kv_connector/unit/offloading_connector/test_events.py\n M tests/v1/kv_connector/unit/offloading_connector/test_scheduler.py\n M tests/v1/kv_connector/unit/offloading_connector/test_worker.py\n M tests/v1/kv_connector/unit/test_config.py\n M tests/v1/kv_connector/unit/test_hma_auto_config.py\n M tests/v1/kv_connector/unit/test_offloading_connector.py\n D tests/v1/kv_offload/cpu/policies/__init__.py\n D tests/v1/kv_offload/cpu/policies/test_factory.py\n M tests/v1/kv_offload/cpu/test_manager.py\n M tests/v1/kv_offload/test_factory.py\n M tests/v1/kv_offload/test_file_mapper.py\n M tests/v1/kv_offload/tiering/p2p/run_accuracy_test.sh\n M tests/v1/kv_offload/tiering/test_fs_tier.py\n M tests/v1/kv_offload/tiering/test_obj_tier.py\n M tests/v1/simple_kv_offload/test_integration.py\n M tests/v1/worker/test_gpu_model_runner_mm_gather.py\n M vllm/config/cache.py\n M vllm/config/model.py\n M vllm/config/vllm.py\n M vllm/distributed/kv_transfer/kv_connector/v1/offloading/config.py\n M vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py\n M vllm/engine/arg_utils.py\n M vllm/entrypoints/anthropic/api_router.py\n M vllm/entrypoints/anthropic/protocol.py\n M vllm/entrypoints/anthropic/serving.py\n M vllm/entrypoints/chat_utils.py\n M vllm/entrypoints/generate/api_router.py\n M vllm/entrypoints/llm.py\n M vllm/entrypoints/openai/chat_completion/protocol.py\n M vllm/entrypoints/openai/chat_completion/serving.py\n M vllm/entrypoints/openai/cli_args.py\n M vllm/entrypoints/openai/completion/protocol.py\n M vllm/entrypoints/openai/responses/context.py\n M vllm/entrypoints/openai/responses/protocol.py\n M vllm/entrypoints/openai/responses/serving.py\n M vllm/entrypoints/openai/responses/streaming_events.py\n M vllm/entrypoints/openai/responses/utils.py\n M vllm/entrypoints/scale_out/token_in_token_out/protocol.py\n M vllm/entrypoints/scale_out/token_in_token_out/serving.py\n M vllm/entrypoints/serve/utils/api_utils.py\n M vllm/envs.py\n M vllm/model_executor/models/qwen3_vl.py\n M vllm/multimodal/media/connector.py\n M vllm/multimodal/media/image.py\n M vllm/parser/engine/parser_engine.py\n M vllm/parser/qwen3.py\n M vllm/renderers/params.py\n M vllm/sampling_params.py\n M vllm/tool_parsers/structural_tag_registry.py\n M vllm/v1/attention/backends/turboquant_attn.py\n M vllm/v1/attention/ops/triton_turboquant_decode.py\n M vllm/v1/attention/ops/triton_turboquant_store.py\n M vllm/v1/core/kv_cache_utils.py\n M vllm/v1/core/sched/utils.py\n M vllm/v1/engine/input_processor.py\n M vllm/v1/kv_offload/base.py\n M vllm/v1/kv_offload/config.py\n M vllm/v1/kv_offload/cpu/gpu_worker.py\n M vllm/v1/kv_offload/cpu/manager.py\n D vllm/v1/kv_offload/cpu/policies/__init__.py\n D vllm/v1/kv_offload/cpu/policies/arc.py\n D vllm/v1/kv_offload/cpu/policies/base.py\n D vllm/v1/kv_offload/cpu/policies/factory.py\n D vllm/v1/kv_offload/cpu/policies/lru.py\n M vllm/v1/kv_offload/cpu/spec.py\n M vllm/v1/kv_offload/tiering/manager.py\n M vllm/v1/kv_offload/tiering/spec.py\n M vllm/v1/request.py\n M vllm/v1/structured_output/__init__.py\n M vllm/v1/worker/gpu_model_runner.py\n M vllm/v1/worker/gpu_worker.py\n M vllm/v1/worker/startup_plan.py\n M vllm/v1/worker/workspace.py\n?? tests/entrypoints/test_kv_scope_protocol.py\n?? tests/v1/core/test_kv_cache_users_sizing.py\n?? tests/v1/worker/test_workspace.py'
+EXPECTED_STATUS=$' M tests/config/test_config_utils.py
+ M tests/distributed/test_rocm_quick_reduce.py
+ M tests/engine/test_arg_utils.py
+ M tests/entrypoints/anthropic/test_anthropic_messages_conversion.py
+ M tests/entrypoints/serve/utils/test_api_utils.py
+ M tests/entrypoints/unit_tests/test_chat_utils.py
+ M tests/evals/gsm8k/test_gsm8k_offloading.py
+ M tests/models/language/pooling/test_reward.py
+ M tests/multimodal/media/test_connector.py
+ M tests/multimodal/media/test_image.py
+ M tests/quantization/test_turboquant.py
+ M tests/v1/e2e/general/test_context_length.py
+ M tests/v1/kv_connector/nixl_integration/run_multi_connector_accuracy_test.sh
+ M tests/v1/kv_connector/nixl_integration/run_multi_connector_edge_case_test.sh
+ M tests/v1/kv_connector/nixl_integration/spec_decode_acceptance_test.sh
+ M tests/v1/kv_connector/unit/offloading_connector/test_events.py
+ M tests/v1/kv_connector/unit/offloading_connector/test_scheduler.py
+ M tests/v1/kv_connector/unit/offloading_connector/test_worker.py
+ M tests/v1/kv_connector/unit/test_config.py
+ M tests/v1/kv_connector/unit/test_hma_auto_config.py
+ M tests/v1/kv_connector/unit/test_offloading_connector.py
+ D tests/v1/kv_offload/cpu/policies/__init__.py
+ D tests/v1/kv_offload/cpu/policies/test_factory.py
+ M tests/v1/kv_offload/cpu/test_manager.py
+ M tests/v1/kv_offload/test_factory.py
+ M tests/v1/kv_offload/test_file_mapper.py
+ M tests/v1/kv_offload/tiering/p2p/run_accuracy_test.sh
+ M tests/v1/kv_offload/tiering/test_fs_tier.py
+ M tests/v1/kv_offload/tiering/test_obj_tier.py
+ M tests/v1/simple_kv_offload/test_integration.py
+ M tests/v1/worker/test_gpu_model_runner_mm_gather.py
+ M vllm/config/cache.py
+ M vllm/config/model.py
+ M vllm/config/vllm.py
+ M vllm/distributed/kv_transfer/kv_connector/v1/offloading/config.py
+ M vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py
+ M vllm/engine/arg_utils.py
+ M vllm/entrypoints/anthropic/api_router.py
+ M vllm/entrypoints/anthropic/protocol.py
+ M vllm/entrypoints/anthropic/serving.py
+ M vllm/entrypoints/chat_utils.py
+ M vllm/entrypoints/generate/api_router.py
+ M vllm/entrypoints/llm.py
+ M vllm/entrypoints/openai/chat_completion/protocol.py
+ M vllm/entrypoints/openai/chat_completion/serving.py
+ M vllm/entrypoints/openai/cli_args.py
+ M vllm/entrypoints/openai/completion/protocol.py
+ M vllm/entrypoints/openai/engine/protocol.py
+ M vllm/entrypoints/openai/responses/context.py
+ M vllm/entrypoints/openai/responses/protocol.py
+ M vllm/entrypoints/openai/responses/serving.py
+ M vllm/entrypoints/openai/responses/streaming_events.py
+ M vllm/entrypoints/openai/responses/utils.py
+ M vllm/entrypoints/scale_out/token_in_token_out/protocol.py
+ M vllm/entrypoints/scale_out/token_in_token_out/serving.py
+ M vllm/entrypoints/serve/utils/api_utils.py
+ M vllm/envs.py
+ M vllm/model_executor/models/qwen3_vl.py
+ M vllm/multimodal/media/connector.py
+ M vllm/multimodal/media/image.py
+ M vllm/parser/abstract_parser.py
+ M vllm/parser/engine/adapters.py
+ M vllm/parser/engine/parser_engine.py
+ M vllm/parser/qwen3.py
+ M vllm/renderers/params.py
+ M vllm/sampling_params.py
+ M vllm/tool_parsers/structural_tag_registry.py
+ M vllm/v1/attention/backends/turboquant_attn.py
+ M vllm/v1/attention/ops/triton_turboquant_decode.py
+ M vllm/v1/attention/ops/triton_turboquant_store.py
+ M vllm/v1/core/kv_cache_utils.py
+ M vllm/v1/core/sched/utils.py
+ M vllm/v1/engine/input_processor.py
+ M vllm/v1/kv_offload/base.py
+ M vllm/v1/kv_offload/config.py
+ M vllm/v1/kv_offload/cpu/gpu_worker.py
+ M vllm/v1/kv_offload/cpu/manager.py
+ D vllm/v1/kv_offload/cpu/policies/__init__.py
+ D vllm/v1/kv_offload/cpu/policies/arc.py
+ D vllm/v1/kv_offload/cpu/policies/base.py
+ D vllm/v1/kv_offload/cpu/policies/factory.py
+ D vllm/v1/kv_offload/cpu/policies/lru.py
+ M vllm/v1/kv_offload/cpu/spec.py
+ M vllm/v1/kv_offload/tiering/manager.py
+ M vllm/v1/kv_offload/tiering/spec.py
+ M vllm/v1/request.py
+ M vllm/v1/structured_output/__init__.py
+ M vllm/v1/worker/gpu_model_runner.py
+ M vllm/v1/worker/gpu_worker.py
+ M vllm/v1/worker/startup_plan.py
+ M vllm/v1/worker/workspace.py
+?? tests/entrypoints/test_kv_scope_protocol.py
+?? tests/parser/engine/test_reasoning_token_count.py
+?? tests/v1/core/test_kv_cache_users_sizing.py
+?? tests/v1/worker/test_workspace.py'
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
 # shellcheck source=../config/runtime-v1.sh
@@ -18,6 +112,7 @@ VISION_MLP_UNIT_FILE="${PROJECT_DIR}/scripts/vision_mlp_unit.py"
 TURBOQUANT_K8V4_UNIT_FILE="${PROJECT_DIR}/scripts/turboquant_k8v4_unit.py"
 QWEN38_CONTEXT_UNIT_FILE="${PROJECT_DIR}/scripts/qwen38_context_unit.py"
 NVFP4_KERNEL_UNIT_FILE="${PROJECT_DIR}/scripts/nvfp4_kernel_unit.py"
+REASONING_USAGE_UNIT_FILE="${PROJECT_DIR}/scripts/reasoning_usage_unit.py"
 SOURCE_PATCH_DIR="${PROJECT_DIR}/patches/source_patch_v1"
 SOURCE_PATCH_MANIFEST="${SOURCE_PATCH_DIR}/manifest.sha256"
 DEPLOYMENT_INPUT_MANIFEST="${PROJECT_DIR}/config/deployment-inputs.sha256"
@@ -57,6 +152,7 @@ NUMERICAL_AUDITS_PATCH_FILE="${PROJECT_DIR}/patches/vllm-qwen38-numerical-audits
 TURBOQUANT_GUARDS_PATCH_FILE="${PROJECT_DIR}/patches/vllm-turboquant-fail-closed-guards.patch"
 KV_OFFLOAD_PINNING_PATCH_FILE="${PROJECT_DIR}/patches/vllm-kv-offload-pinning-fail-closed.patch"
 KV_USERS_SCOPE_PATCH_FILE="${PROJECT_DIR}/patches/vllm-kv-user-count-sizing-and-scope-eviction.patch"
+EXACT_REASONING_USAGE_PATCH_FILE="${PROJECT_DIR}/patches/vllm-exact-reasoning-usage.patch"
 
 TURBOQUANT_REL="vllm/v1/attention/backends/turboquant_attn.py"
 TOOL_SCHEMA_REL="vllm/tool_parsers/structural_tag_registry.py"
@@ -108,6 +204,9 @@ GENERATE_API_ROUTER_REL="vllm/entrypoints/generate/api_router.py"
 CLI_ARGS_REL="vllm/entrypoints/openai/cli_args.py"
 TITOTO_PROTOCOL_REL="vllm/entrypoints/scale_out/token_in_token_out/protocol.py"
 TITOTO_SERVING_REL="vllm/entrypoints/scale_out/token_in_token_out/serving.py"
+ABSTRACT_PARSER_REL="vllm/parser/abstract_parser.py"
+PARSER_ADAPTERS_REL="vllm/parser/engine/adapters.py"
+ENGINE_PROTOCOL_REL="vllm/entrypoints/openai/engine/protocol.py"
 
 case "${MODE}" in
   build|check)
@@ -200,7 +299,8 @@ printf '%s  %s\n' \
   "${NUMERICAL_AUDITS_PATCH_DIFF_SHA256}" "${NUMERICAL_AUDITS_PATCH_FILE}" \
   "${TURBOQUANT_GUARDS_PATCH_DIFF_SHA256}" "${TURBOQUANT_GUARDS_PATCH_FILE}" \
   "${KV_OFFLOAD_PINNING_PATCH_DIFF_SHA256}" "${KV_OFFLOAD_PINNING_PATCH_FILE}" \
-  "${KV_USERS_SCOPE_PATCH_DIFF_SHA256}" "${KV_USERS_SCOPE_PATCH_FILE}" | \
+  "${KV_USERS_SCOPE_PATCH_DIFF_SHA256}" "${KV_USERS_SCOPE_PATCH_FILE}" \
+  "${EXACT_REASONING_USAGE_PATCH_DIFF_SHA256}" "${EXACT_REASONING_USAGE_PATCH_FILE}" | \
   sha256sum --check --strict
 
 printf '%s  %s\n' \
@@ -352,7 +452,10 @@ printf '%s  %s\n' \
   "${GENERATE_API_ROUTER_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${GENERATE_API_ROUTER_REL}" \
   "${CLI_ARGS_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${CLI_ARGS_REL}" \
   "${TITOTO_PROTOCOL_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${TITOTO_PROTOCOL_REL}" \
-  "${TITOTO_SERVING_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${TITOTO_SERVING_REL}"  | \
+  "${TITOTO_SERVING_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${TITOTO_SERVING_REL}" \
+  "${ABSTRACT_PARSER_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${ABSTRACT_PARSER_REL}" \
+  "${PARSER_ADAPTERS_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${PARSER_ADAPTERS_REL}" \
+  "${ENGINE_PROTOCOL_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${ENGINE_PROTOCOL_REL}" | \
   sha256sum --check --strict
 
 printf '%s  %s\n' \
@@ -363,7 +466,8 @@ printf '%s  %s\n' \
 printf '%s  %s\n' \
   "${TURBOQUANT_K8V4_UNIT_SHA256}" "${TURBOQUANT_K8V4_UNIT_FILE}" \
   "${QWEN38_CONTEXT_UNIT_SHA256}" "${QWEN38_CONTEXT_UNIT_FILE}" \
-  "${NVFP4_KERNEL_UNIT_SHA256}" "${NVFP4_KERNEL_UNIT_FILE}" | \
+  "${NVFP4_KERNEL_UNIT_SHA256}" "${NVFP4_KERNEL_UNIT_FILE}" \
+  "${REASONING_USAGE_UNIT_SHA256}" "${REASONING_USAGE_UNIT_FILE}" | \
   sha256sum --check --strict
 
 git -C "${VLLM_DIR}" diff --check
@@ -430,6 +534,9 @@ docker buildx build --progress=plain \
   --build-arg "IMAGE_MEDIA_UPSTREAM_FILE_SHA256=${IMAGE_MEDIA_UPSTREAM_FILE_SHA256}" \
   --build-arg "RENDER_PARAMS_UPSTREAM_FILE_SHA256=${RENDER_PARAMS_UPSTREAM_FILE_SHA256}" \
   --build-arg "QWEN3_VL_MODEL_UPSTREAM_FILE_SHA256=${QWEN3_VL_MODEL_UPSTREAM_FILE_SHA256}" \
+  --build-arg "ABSTRACT_PARSER_UPSTREAM_FILE_SHA256=${ABSTRACT_PARSER_UPSTREAM_FILE_SHA256}" \
+  --build-arg "PARSER_ADAPTERS_UPSTREAM_FILE_SHA256=${PARSER_ADAPTERS_UPSTREAM_FILE_SHA256}" \
+  --build-arg "ENGINE_PROTOCOL_UPSTREAM_FILE_SHA256=${ENGINE_PROTOCOL_UPSTREAM_FILE_SHA256}" \
   --build-arg "TURBOQUANT_PATCHED_FILE_SHA256=${TURBOQUANT_PATCHED_FILE_SHA256}" \
   --build-arg "TOOL_SCHEMA_PATCHED_FILE_SHA256=${TOOL_SCHEMA_PATCHED_FILE_SHA256}" \
   --build-arg "MODEL_CONFIG_PATCHED_FILE_SHA256=${MODEL_CONFIG_PATCHED_FILE_SHA256}" \
@@ -468,9 +575,20 @@ docker buildx build --progress=plain \
   --build-arg "TURBOQUANT_K8V4_UNIT_SHA256=${TURBOQUANT_K8V4_UNIT_SHA256}" \
   --build-arg "QWEN38_CONTEXT_UNIT_SHA256=${QWEN38_CONTEXT_UNIT_SHA256}" \
   --build-arg "NVFP4_KERNEL_UNIT_SHA256=${NVFP4_KERNEL_UNIT_SHA256}" \
+  --build-arg "REASONING_USAGE_UNIT_SHA256=${REASONING_USAGE_UNIT_SHA256}" \
+  --build-arg "TURBOQUANT_PATCH_DIFF_SHA256=${TURBOQUANT_PATCH_DIFF_SHA256}" \
+  --build-arg "TOOL_SCHEMA_PATCH_DIFF_SHA256=${TOOL_SCHEMA_PATCH_DIFF_SHA256}" \
+  --build-arg "AGENT_DEFAULTS_PATCH_DIFF_SHA256=${AGENT_DEFAULTS_PATCH_DIFF_SHA256}" \
+  --build-arg "PHASE_BUDGET_PATCH_DIFF_SHA256=${PHASE_BUDGET_PATCH_DIFF_SHA256}" \
+  --build-arg "IMPLICIT_TOOL_GRAMMAR_PATCH_DIFF_SHA256=${IMPLICIT_TOOL_GRAMMAR_PATCH_DIFF_SHA256}" \
+  --build-arg "ANTHROPIC_VALIDATION_PATCH_DIFF_SHA256=${ANTHROPIC_VALIDATION_PATCH_DIFF_SHA256}" \
+  --build-arg "TOOL_TRUNCATION_PATCH_DIFF_SHA256=${TOOL_TRUNCATION_PATCH_DIFF_SHA256}" \
+  --build-arg "VISION_RUNTIME_PATCH_DIFF_SHA256=${VISION_RUNTIME_PATCH_DIFF_SHA256}" \
   --build-arg "NUMERICAL_AUDITS_PATCH_DIFF_SHA256=${NUMERICAL_AUDITS_PATCH_DIFF_SHA256}" \
+  --build-arg "TURBOQUANT_GUARDS_PATCH_DIFF_SHA256=${TURBOQUANT_GUARDS_PATCH_DIFF_SHA256}" \
   --build-arg "KV_OFFLOAD_PINNING_PATCH_DIFF_SHA256=${KV_OFFLOAD_PINNING_PATCH_DIFF_SHA256}" \
   --build-arg "KV_USERS_SCOPE_PATCH_DIFF_SHA256=${KV_USERS_SCOPE_PATCH_DIFF_SHA256}" \
+  --build-arg "EXACT_REASONING_USAGE_PATCH_DIFF_SHA256=${EXACT_REASONING_USAGE_PATCH_DIFF_SHA256}" \
   --build-arg "IMAGE_PROFILE_VERSION=${IMAGE_PROFILE_VERSION}" \
   --build-arg "CACHE_CONFIG_UPSTREAM_FILE_SHA256=${CACHE_CONFIG_UPSTREAM_FILE_SHA256}" \
   --build-arg "VLLM_CONFIG_UPSTREAM_FILE_SHA256=${VLLM_CONFIG_UPSTREAM_FILE_SHA256}" \
@@ -517,6 +635,9 @@ docker buildx build --progress=plain \
   --build-arg "CLI_ARGS_PATCHED_FILE_SHA256=${CLI_ARGS_PATCHED_FILE_SHA256}" \
   --build-arg "TITOTO_PROTOCOL_PATCHED_FILE_SHA256=${TITOTO_PROTOCOL_PATCHED_FILE_SHA256}" \
   --build-arg "TITOTO_SERVING_PATCHED_FILE_SHA256=${TITOTO_SERVING_PATCHED_FILE_SHA256}" \
+  --build-arg "ABSTRACT_PARSER_PATCHED_FILE_SHA256=${ABSTRACT_PARSER_PATCHED_FILE_SHA256}" \
+  --build-arg "PARSER_ADAPTERS_PATCHED_FILE_SHA256=${PARSER_ADAPTERS_PATCHED_FILE_SHA256}" \
+  --build-arg "ENGINE_PROTOCOL_PATCHED_FILE_SHA256=${ENGINE_PROTOCOL_PATCHED_FILE_SHA256}" \
   --build-arg "SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH}" \
   --output "type=docker,dest=${RUNTIME_ARCHIVE},name=${IMAGE_TAG},rewrite-timestamp=true" \
   --file "${DOCKERFILE}" \
@@ -679,11 +800,43 @@ if [[ "${kv_users_installed_report}" != "${expected_kv_users_installed_report}" 
   exit 1
 fi
 
+reasoning_usage_installed_report="$(
+  docker run --rm --network none --entrypoint sha256sum "${IMAGE_TAG}" \
+    /usr/local/lib/python3.12/dist-packages/vllm/parser/abstract_parser.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/parser/engine/adapters.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/engine/protocol.py \
+    /opt/qwen38/reasoning_usage_unit.py
+)"
+expected_reasoning_usage_installed_report="$(printf '%s  %s\n' \
+  "${ABSTRACT_PARSER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/abstract_parser.py \
+  "${PARSER_ADAPTERS_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/engine/adapters.py \
+  "${ENGINE_PROTOCOL_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/engine/protocol.py \
+  "${REASONING_USAGE_UNIT_SHA256}" /opt/qwen38/reasoning_usage_unit.py)"
+if [[ "${reasoning_usage_installed_report}" != "${expected_reasoning_usage_installed_report}" ]]; then
+  echo "Built image contains unexpected reasoning-usage bytes." >&2
+  echo "Expected:" >&2
+  printf '%s\n' "${expected_reasoning_usage_installed_report}" >&2
+  echo "Found:" >&2
+  printf '%s\n' "${reasoning_usage_installed_report}" >&2
+  exit 1
+fi
+
 # The deleted eviction-policy package must be absent from the shipped image,
 # not merely unreferenced: a stranded importable copy is a selectable mode.
 if ! docker run --rm --network none --entrypoint test "${IMAGE_TAG}" \
     '!' -e /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/cpu/policies; then
   echo "Built image still contains the deleted policies package." >&2
+  exit 1
+fi
+
+actual_profile_label="$(
+  docker image inspect --format '{{index .Config.Labels "qwen38.runtime.profile"}}' \
+    "${IMAGE_TAG}"
+)"
+if [[ "${actual_profile_label}" != "${IMAGE_PROFILE_VERSION}" ]]; then
+  echo "Built image carries the wrong runtime profile label." >&2
+  echo "Expected: ${IMAGE_PROFILE_VERSION}" >&2
+  echo "Found:    ${actual_profile_label:-missing}" >&2
   exit 1
 fi
 

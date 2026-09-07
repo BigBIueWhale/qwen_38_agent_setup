@@ -8,6 +8,7 @@
 !scripts/turboquant_k8v4_unit.py
 !scripts/qwen38_context_unit.py
 !scripts/nvfp4_kernel_unit.py
+!scripts/reasoning_usage_unit.py
 !containers/
 !containers/Dockerfile.runtime
 !vllm/
@@ -29,6 +30,8 @@
 !vllm/vllm/entrypoints/serve/utils/
 !vllm/vllm/entrypoints/serve/utils/api_utils.py
 !vllm/vllm/entrypoints/openai/
+!vllm/vllm/entrypoints/openai/engine/
+!vllm/vllm/entrypoints/openai/engine/protocol.py
 !vllm/vllm/entrypoints/openai/chat_completion/
 !vllm/vllm/entrypoints/openai/chat_completion/protocol.py
 !vllm/vllm/entrypoints/openai/chat_completion/serving.py
@@ -62,6 +65,8 @@
 !vllm/vllm/tool_parsers/
 !vllm/vllm/tool_parsers/structural_tag_registry.py
 !vllm/vllm/parser/
+!vllm/vllm/parser/abstract_parser.py
 !vllm/vllm/parser/qwen3.py
 !vllm/vllm/parser/engine/
+!vllm/vllm/parser/engine/adapters.py
 !vllm/vllm/parser/engine/parser_engine.py

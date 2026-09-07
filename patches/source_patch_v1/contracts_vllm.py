@@ -1260,6 +1260,291 @@ def _validate_kv_users_after(state: State) -> None:
     )
 
 
+def _validate_reasoning_usage_before(state: State) -> None:
+    label = "exact reasoning usage precondition"
+    parser = "vllm/parser/engine/parser_engine.py"
+    abstract = "vllm/parser/abstract_parser.py"
+    adapters = "vllm/parser/engine/adapters.py"
+    protocol = "vllm/entrypoints/openai/engine/protocol.py"
+    chat = "vllm/entrypoints/openai/chat_completion/serving.py"
+    # The counter this stage replaces: a depth count between a generated
+    # <think> and </think>, which is zero for a prompt that pre-fills the
+    # opener and blind to Qwen's implicit <tool_call> end.
+    require_text(
+        state,
+        parser,
+        "if token_id == start_id:\n                depth += 1",
+        label=label,
+    )
+    forbid_text(state, parser, "_resolve_reasoning_boundary", label=label)
+    forbid_text(state, parser, "reasoning_token_count", label=label)
+    # The batch split drops the generated ids it is handed.
+    require_text(
+        state,
+        abstract,
+        "reasoning, content = self.extract_reasoning(model_output, request)",
+        label=label,
+    )
+    forbid_text(state, abstract, "generated_token_count", label=label)
+    forbid_text(state, adapters, "batch_token_ids", label=label)
+    forbid_text(state, protocol, "CompletionTokenUsageInfo", label=label)
+    forbid_text(state, chat, "completion_tokens_details", label=label)
+    _require(
+        "tests/parser/engine/test_reasoning_token_count.py" not in state,
+        f"{label}: new reasoning-count test unexpectedly exists",
+    )
+
+
+def _validate_reasoning_usage_after(state: State) -> None:
+    label = "exact reasoning usage result"
+    parser = "vllm/parser/engine/parser_engine.py"
+    abstract = "vllm/parser/abstract_parser.py"
+    adapters = "vllm/parser/engine/adapters.py"
+    protocol = "vllm/entrypoints/openai/engine/protocol.py"
+    chat = "vllm/entrypoints/openai/chat_completion/serving.py"
+    test = "tests/parser/engine/test_reasoning_token_count.py"
+
+    # One boundary, resolved from the grammar; one count, advanced on every
+    # feed; the depth counter gone rather than kept beside it.
+    require_python_symbols(
+        state,
+        parser,
+        {
+            "ParserEngine._resolve_reasoning_boundary": ("self",),
+            "ParserEngine._account_reasoning_tokens": (
+                "self",
+                "delta_text",
+                "delta_token_ids",
+            ),
+            "ParserEngine.batch_token_ids": ("self", "token_ids"),
+            "ParserEngine.reasoning_token_count": ("self",),
+            "ParserEngine.count_reasoning_tokens": ("self", "token_ids"),
+        },
+        label=label,
+    )
+    forbid_text(state, parser, "if token_id == start_id:", label=label)
+    forbid_text(state, parser, "if depth > 0:", label=label)
+    boundary = _symbol_source(
+        state, parser, "ParserEngine._resolve_reasoning_boundary", label=label
+    )
+    _require_ordered(
+        boundary,
+        (
+            "transition.next_state is ParserState.REASONING",
+            "re-enters reasoning",
+            "leaves = transition.next_state is not ParserState.REASONING",
+            "announces = EventType.REASONING_END in transition.events",
+            "if leaves != announces:",
+            "not a token id in this vocabulary",
+        ),
+        label=label,
+        location=f"{parser}:ParserEngine._resolve_reasoning_boundary",
+    )
+    _require_in_symbol(
+        state,
+        parser,
+        "ParserEngine._feed",
+        ("self._account_reasoning_tokens(delta_text, delta_token_ids)",),
+        label=label,
+    )
+    _require_in_symbol(
+        state,
+        parser,
+        "ParserEngine._account_reasoning_tokens",
+        (
+            "self._reasoning_fed_without_ids = True",
+            "if token_id in self._reasoning_boundary_ids:",
+        ),
+        label=label,
+    )
+    _require_in_symbol(
+        state,
+        parser,
+        "ParserEngine.extract_reasoning",
+        ("self._feed(model_output, self._batch_token_ids)",),
+        label=label,
+    )
+    _require_in_symbol(
+        state,
+        parser,
+        "ParserEngine.reasoning_token_count",
+        (
+            "if self._reasoning_boundary_refusal is not None:",
+            "return None",
+            "if self._reasoning_fed_without_ids:",
+            "raise ValueError(",
+        ),
+        label=label,
+    )
+    _require_in_symbol(
+        state,
+        parser,
+        "ParserEngine.parse_delta",
+        ("self._stream_state.generated_token_count += len(delta_token_ids)",),
+        label=label,
+    )
+    _require_in_symbol(
+        state,
+        parser,
+        "ParserEngine.parse",
+        ("self._stream_state.generated_token_count = len(model_output_token_ids)",),
+        label=label,
+    )
+
+    # The composed parser the endpoint runs: ids reach the reasoning engine
+    # on the batch path too, every delta is counted, and the count is read
+    # through one property on every Parser.
+    require_text(
+        state, abstract, "    generated_token_count: int = 0\n", label=label
+    )
+    require_python_symbols(
+        state,
+        abstract,
+        {
+            "Parser.reasoning_token_count": ("self",),
+            "Parser.generated_token_count": ("self",),
+            "DelegatingParser.extract_reasoning": (
+                "self",
+                "model_output",
+                "request",
+                "model_output_token_ids",
+            ),
+            "DelegatingParser.reasoning_token_count": ("self",),
+        },
+        label=label,
+    )
+    forbid_text(
+        state,
+        abstract,
+        "reasoning, content = self.extract_reasoning(model_output, request)",
+        label=label,
+    )
+    _require_in_symbol(
+        state,
+        abstract,
+        "DelegatingParser.parse",
+        (
+            "self._stream_state.generated_token_count = len(model_output_token_ids)",
+            "model_output, request, model_output_token_ids",
+        ),
+        label=label,
+    )
+    _require_in_symbol(
+        state,
+        abstract,
+        "DelegatingParser.parse_delta",
+        ("state.generated_token_count += len(delta_token_ids)",),
+        label=label,
+    )
+    _require_in_symbol(
+        state,
+        abstract,
+        "DelegatingParser.extract_reasoning",
+        (
+            "if self._reasoning_parser.engine_based_streaming:",
+            "model_output_token_ids=model_output_token_ids",
+        ),
+        label=label,
+    )
+    require_python_symbols(
+        state,
+        adapters,
+        {
+            "ParserEngineReasoningAdapter.extract_reasoning": (
+                "self",
+                "model_output",
+                "request",
+                "model_output_token_ids",
+            ),
+            "ParserEngineReasoningAdapter.reasoning_token_count": ("self",),
+        },
+        label=label,
+    )
+    require_text(
+        state,
+        adapters,
+        "self._parser_engine.batch_token_ids(model_output_token_ids)",
+        label=label,
+    )
+
+    # The wire field is OpenAI's own shape and is absent, never zero, when
+    # no exact split was made.
+    require_python_symbols(
+        state, protocol, {"CompletionTokenUsageInfo": None}, label=label
+    )
+    require_text(state, protocol, "    reasoning_tokens: int\n", label=label)
+    require_text(
+        state,
+        protocol,
+        "completion_tokens_details: CompletionTokenUsageInfo | None = None",
+        label=label,
+    )
+
+    # Both chat paths report it from the parsers that split the choices,
+    # refuse a parser that missed generated ids, and never estimate.
+    require_python_symbols(
+        state,
+        chat,
+        {
+            "_reasoning_token_count": ("parser", "generated_token_count"),
+            "_make_completion_tokens_details": ("reasoning_token_counts",),
+        },
+        label=label,
+    )
+    _require_in_symbol(
+        state,
+        chat,
+        "_reasoning_token_count",
+        (
+            "count = parser.reasoning_token_count",
+            "if parser.generated_token_count != generated_token_count:",
+            "reasoning token accounting refused",
+        ),
+        label=label,
+    )
+    require_text(state, chat, "completion_tokens_details=", count=6, label=label)
+    _require_in_symbol(
+        state,
+        chat,
+        "OpenAIServingChat.chat_completion_stream_generator",
+        (
+            "completion_tokens_details = _make_completion_tokens_details(",
+            "parsers, previous_num_tokens, strict=True",
+            "completion_tokens_details=completion_tokens_details,",
+        ),
+        label=label,
+    )
+    _require_in_symbol(
+        state,
+        chat,
+        "OpenAIServingChat.chat_completion_full_generator",
+        (
+            "reasoning_token_counts: list[int | None] = []",
+            "_reasoning_token_count(parser, len(token_ids))",
+            "reasoning_token_counts.append(None)",
+            "completion_tokens_details=_make_completion_tokens_details(",
+        ),
+        label=label,
+    )
+    for absent in ("estimate", "len(reasoning)", "tokenizer.encode(reasoning"):
+        forbid_text(state, chat, absent, label=label)
+
+    require_python_symbols(
+        state,
+        test,
+        {
+            "TestStreaming.test_counts_ids_before_the_explicit_end": None,
+            "TestStreaming.test_counts_ids_before_the_implicit_tool_call_end": None,
+            "TestStreaming.test_counts_every_id_when_reasoning_never_ends": None,
+            "TestBatch.test_batch_split_is_made_on_ids_and_counted": None,
+            "TestBatch.test_batch_and_stream_agree_on_the_same_generation": None,
+            "TestRefusals.test_text_fed_without_ids_refuses_the_count": None,
+            "TestRefusals.test_a_grammar_without_one_id_boundary_serves_no_count": None,
+        },
+        label=label,
+    )
+
+
 def validate_final(state: State) -> None:
     """Reassert every durable semantic invariant on the complete tree.
 
@@ -1481,5 +1766,33 @@ CONTRACTS: Mapping[str, SemanticContract] = {
         ),
         validate_before=_validate_kv_users_before,
         validate_after=_validate_kv_users_after,
+    ),
+    "exact-reasoning-usage": SemanticContract(
+        rationale=(
+            "The client could only estimate the share of a completion that "
+            "was hidden reasoning: Chat Completions served no "
+            "completion_tokens_details, and the one reasoning counter in the "
+            "tree counted ids between a generated <think> and </think>, which "
+            "is zero for this deployment's template -- it pre-fills the "
+            "opener into the prompt -- and blind to Qwen's implicit "
+            "<tool_call> end. The parser engine already splits reasoning from "
+            "content at a token id, so the count is taken there: the ids "
+            "before the id the grammar leaves reasoning at, resolved once "
+            "from the transition table, advanced on every feed, summed across "
+            "choices exactly as completion_tokens is, and served on both chat "
+            "paths -- the batch split now receives the generated ids it used "
+            "to drop. A grammar without one id-marked boundary, a parser fed "
+            "text without its ids, or a parser that missed generated ids "
+            "yields no count or a refusal, never an estimate; the field is "
+            "absent, not zero, when no exact split was made."
+        ),
+        removal_condition=(
+            "Remove only when pinned upstream serves completion_tokens_details."
+            "reasoning_tokens on Chat Completions from the parser's own token-id "
+            "boundary, with the prompt-side opener and the implicit tool-call "
+            "end both counted correctly, on the streaming and batch paths."
+        ),
+        validate_before=_validate_reasoning_usage_before,
+        validate_after=_validate_reasoning_usage_after,
     ),
 }

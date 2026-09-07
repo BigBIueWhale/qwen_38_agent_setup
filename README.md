@@ -39,8 +39,8 @@ The deployment is complete and healthy. There is one supported mode:
 | Agent client | Qwen Code 0.21.12 at b965d5f8c24f48e65fb0b17c7d45f34ca4ce8f38 |
 | Agent-service release | Pinned by the agent-service release lock, which owns every agent and service image identity |
 | Agent-service listener | 127.0.0.1:8090 only |
-| Runtime profile | socket-isolated-nonroot-vision-k8v4-agent-v19 |
-| Runtime image | sha256:9ca17cb2404beac5936a079b581133c5a8e18e8f9a7e7b9179058a0c92f4fb50 |
+| Runtime profile | socket-isolated-nonroot-vision-k8v4-agent-v20 |
+| Runtime image | sha256:37017d4e5ec1c56bdb69d280992d62d405ec0bb0731a087d0ee8bbd96144af5c |
 
 This is not a text-only profile with an optional vision switch. It is not a
 one-million-token profile. It has no MTP, eager-mode, lower-quality image, alternate
@@ -69,7 +69,7 @@ error.
   and relay readiness events, then validates the complete live configuration before
   reporting success. Re-running it validates the existing owned topology rather than
   starting a duplicate.
-- status.sh validates host prerequisites, twelve ordered vLLM transformations, every reviewed
+- status.sh validates host prerequisites, thirteen ordered vLLM transformations, every reviewed
   source and test file, the model manifest, image archive, image identity and labels,
   command and environment, mounts, runtime packages, API identity, listener,
   hardening, and live health. HEALTHY means all checks passed.
@@ -89,7 +89,7 @@ Advanced reproducibility operations are deliberately separate from serving mode:
     ./scripts/build-vllm.sh build
     ./scripts/restore-images.sh
 
-The check reconstructs the source tree from the pinned upstream commit through all twelve
+The check reconstructs the source tree from the pinned upstream commit through all thirteen
 landmark-aware transformations. The build runs offline from the exact base image and fails unless it produces
 the pinned image ID. Restore verifies the pinned local archive before loading it.
 
@@ -99,7 +99,7 @@ ID. It is not bit-identical across hosts, and the offline archive rather than a
 rebuild is how a second machine obtains the pinned image. Two things prevent
 cross-host identity, both measured rather than assumed. Byte-compilation writes
 `.pyc` files whose headers embed each source file's mtime, so the one layer that
-runs Python differs while the other eighty-two match; normalising that would
+runs Python differs while every other layer matches; normalising that would
 mean touching only the copied files, since every one of the base image's 4,821
 vLLM files postdates `SOURCE_DATE_EPOCH` and a blanket `find -newermt` would
 rewrite the whole tree into a new layer. Separately, the host Docker and buildx
@@ -230,7 +230,7 @@ The vLLM submodule is pinned at:
 
     9df9b0b0a1816b6d0d0f6ecd0da563cc37fd72f5
 
-It is intentionally reconstructed by twelve ordered, reviewed semantic transformations:
+It is intentionally reconstructed by thirteen ordered, reviewed semantic transformations:
 
 | Patch | SHA-256 |
 |---|---|
@@ -246,10 +246,11 @@ It is intentionally reconstructed by twelve ordered, reviewed semantic transform
 | patches/vllm-turboquant-fail-closed-guards.patch | 0ecf95ab8ee25a76d5412ce44aafafe13992b2cb373d6010acf5bc119dc8f47b |
 | patches/vllm-kv-offload-pinning-fail-closed.patch | 1857071c38d081bb95e3cca12153cebce096649084950b99229104fdae029ca6 |
 | patches/vllm-kv-user-count-sizing-and-scope-eviction.patch | d4d18c5afc0af9ecdaff948d7e7f4b5d2e8f85eb15e7853aaddc44de62b17b56 |
+| patches/vllm-exact-reasoning-usage.patch | 7991cca04345cf58a602a6b0630d2ebbf31f3da228e9034da591217956d37b31 |
 
-The reconstructed tree has exactly fifty-two reviewed runtime-source changes, five
+The reconstructed tree has exactly fifty-five reviewed runtime-source changes, five
 reviewed runtime-source deletions, twenty-nine reviewed existing-test changes,
-three reviewed new tests, and two reviewed test deletions — the authoritative
+four reviewed new tests, and two reviewed test deletions — the authoritative
 counts are derived and printed by ./scripts/build-vllm.sh check, never restated
 by hand there. The landmark-aware Python patcher calculates every mutation
 (including file deletions) before writing, validates unique structural landmarks
@@ -266,16 +267,16 @@ Pinned build inputs and products:
 |---|---|
 | Immutable base tag | qwen38-vllm:main-9df9b0b |
 | Immutable base ID | sha256:fa4a002a88b7043a1a89966dea8a500fe9696f84e75730d9da916f916048d401 |
-| Runtime tag | qwen38-vllm:qwen38-27b-nvfp4-k8v4-runtime-v19 |
-| Runtime ID | sha256:9ca17cb2404beac5936a079b581133c5a8e18e8f9a7e7b9179058a0c92f4fb50 |
-| Offline archive | artifacts/qwen38-vllm-images-runtime-v19.tar |
-| Archive size | 8,558,427,648 bytes, mode 0600 |
-| Archive SHA-256 | dedbeb9446ef9d0fb95f34466261600160c419c0b53c1127248b7425bb813607 |
-| Runtime Dockerfile SHA-256 | 52571f5ae5a6a1d9b413c126477ca5a4c038dc7939b62268aab1456b516fb59e |
-| Docker context allowlist SHA-256 | a15c81d0be5c474d9f0cd5e8b1d3f89b5eb7266ce60d45476069de9499f6b103 |
-| Build verifier SHA-256 | 3ae7ab14782765ee133577945bd8df99f342f50cd4adc3edbf66716f1db50c62 |
-| Runtime validator SHA-256 | bf807a973e9d19c6f6bfd0456f9f7c53f46cfcaa12514ebf137d736331f5110e |
-| Runtime lock SHA-256 | 1a50978ca81c72b299ee4f24e8c24c5ec9b433bd60fb0e5f5533500cabf66195 |
+| Runtime tag | qwen38-vllm:qwen38-27b-nvfp4-k8v4-runtime-v20 |
+| Runtime ID | sha256:37017d4e5ec1c56bdb69d280992d62d405ec0bb0731a087d0ee8bbd96144af5c |
+| Offline archive | artifacts/qwen38-vllm-images-runtime-v20.tar |
+| Archive size | 8,558,567,424 bytes, mode 0600 |
+| Archive SHA-256 | 196307909f46378bddcc4e38e0a9ca47c5c5fffa113bdbbd84d4e779d3b44bf9 |
+| Runtime Dockerfile SHA-256 | 49d1df791688a6afd091842e9fd18c0c43b93755cd574415a4c394acce84a231 |
+| Docker context allowlist SHA-256 | 2e3b84466fec6ab55f84c714144f362c2f4e4977d00b0361d068993dd70dcf76 |
+| Build verifier SHA-256 | e1c9c5f39684fba542c24a8109b6da6d5277ff39d6250cb4733b0308684811f4 |
+| Runtime validator SHA-256 | 94472f5a2c3d4b141e5d0a3a5717e815690319506ce55aff4ee05b2301552ec4 |
+| Runtime lock SHA-256 | 533d5275c95129bf74a19be6cc1a8c343502053cdb2be9a9ff0f548cdc27d2c3 |
 
 The final runtime layer does no package resolution or installation. It is built with
 pull=false, network=none, provenance=false, an exact base ID, an allowlisted context,
@@ -323,6 +324,7 @@ restore, and build verification. The exact server argument semantics are:
     --reasoning-parser qwen3
     --enable-auto-tool-choice
     --tool-call-parser qwen3_coder
+    --enable-prompt-tokens-details
     --default-chat-template-kwargs
       {"enable_thinking":true,"reasoning_effort":"xhigh","add_vision_id":false}
     --limit-mm-per-prompt
@@ -741,6 +743,27 @@ The installed-image focused suites passed:
   generic-policy deselections replaced by project-specific assertions;
 - 382 Qwen streaming/replay cases;
 - vision workspace, image-contract, and vision-MLP units during the immutable build.
+
+### Exact served usage
+
+Every Chat Completions response — non-streaming, and streaming with
+`stream_options.include_usage` — carries
+`usage.completion_tokens_details.reasoning_tokens`: the number of generated token
+ids before the id at which the reasoning parser left its reasoning state
+(`</think>`, or the implicit `<tool_call>` that ends reasoning on this grammar),
+or every generated id when the generation never left it. It is read from the
+parser engine's own token-id split, the same walk that decides where reasoning
+ends in the streamed deltas; it is never a re-tokenisation of the reasoning text
+and never a character estimate. `completion_tokens` counts every generated id,
+so `completion_tokens - reasoning_tokens` is the exact content-plus-marker count.
+The count is defined only for a grammar whose reasoning state is entered once and
+left on a token-id terminal; the engine refuses any other grammar statically, and
+the field is then absent rather than approximate. `--enable-prompt-tokens-details`
+serves `prompt_tokens_details.cached_tokens`, the prompt tokens the scheduler
+actually reused from the prefix cache, so a client never has to invent a zero for
+it. The exact-reasoning-usage build unit exercises the composed qwen3 parsers on
+CPU inside the immutable build, and the protocol probe holds both fields to the
+returned token ids on every trial, streamed and unstreamed.
 
 ### Validation record for v13 and the paired production agent
 

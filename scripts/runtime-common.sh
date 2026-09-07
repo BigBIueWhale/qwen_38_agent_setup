@@ -487,6 +487,7 @@ assert_running_profile() {
   local actual_environment wrapped_environment required_environment api
   local installed_report expected_installed_report
   local additional_installed_report expected_additional_installed_report
+  local reasoning_usage_installed_report expected_reasoning_usage_installed_report
   local image_profile_label
 
   assert_owned_container
@@ -774,6 +775,23 @@ assert_running_profile() {
     die "Running vision/runtime bytes do not match the reviewed profile." \
       "Expected:" "${expected_additional_installed_report}" \
       "Found:" "${additional_installed_report}"
+
+  reasoning_usage_installed_report="$(
+    docker exec "${CONTAINER_NAME}" sha256sum \
+      /usr/local/lib/python3.12/dist-packages/vllm/parser/abstract_parser.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/parser/engine/adapters.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/engine/protocol.py \
+      /opt/qwen38/reasoning_usage_unit.py
+  )"
+  expected_reasoning_usage_installed_report="$(printf '%s  %s\n%s  %s\n%s  %s\n%s  %s' \
+    "${ABSTRACT_PARSER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/abstract_parser.py \
+    "${PARSER_ADAPTERS_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/engine/adapters.py \
+    "${ENGINE_PROTOCOL_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/engine/protocol.py \
+    "${REASONING_USAGE_UNIT_SHA256}" /opt/qwen38/reasoning_usage_unit.py)"
+  [[ "${reasoning_usage_installed_report}" == "${expected_reasoning_usage_installed_report}" ]] || \
+    die "Running reasoning-usage bytes do not match the reviewed profile." \
+      "Expected:" "${expected_reasoning_usage_installed_report}" \
+      "Found:" "${reasoning_usage_installed_report}"
 
   assert_runtime_versions
   assert_kv_offload_pinned
