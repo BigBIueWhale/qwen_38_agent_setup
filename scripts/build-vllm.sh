@@ -338,12 +338,18 @@ remove_verify_worktree() {
     return 1
   fi
 }
+# The verification worktree exists only inside this section, so its cleanup
+# takes the EXIT trap over from the export directory's and hands it back
+# afterwards: a trap that merely replaced the earlier one would leave the
+# export directory -- and, in build mode, the runtime archive written into
+# it -- behind on every run.
 cleanup_verify_worktree() {
   local status=$?
   trap - EXIT
   if ! remove_verify_worktree; then
     status=1
   fi
+  cleanup_build_export
   exit "${status}"
 }
 trap cleanup_verify_worktree EXIT
@@ -389,7 +395,7 @@ while IFS= read -r status_line; do
   fi
 done <<<"${EXPECTED_STATUS}"
 remove_verify_worktree
-trap - EXIT
+trap cleanup_build_export EXIT
 
 printf '%s  %s\n' \
   "${TURBOQUANT_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${TURBOQUANT_REL}" \

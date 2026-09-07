@@ -289,7 +289,7 @@ Pinned build inputs and products:
 | Archive SHA-256 | 89572451de771074cccf1b391fbda44ec25c775eba0e89db401a821076a25e9a |
 | Runtime Dockerfile SHA-256 | 49d1df791688a6afd091842e9fd18c0c43b93755cd574415a4c394acce84a231 |
 | Docker context allowlist SHA-256 | 2e3b84466fec6ab55f84c714144f362c2f4e4977d00b0361d068993dd70dcf76 |
-| Build verifier SHA-256 | e1c9c5f39684fba542c24a8109b6da6d5277ff39d6250cb4733b0308684811f4 |
+| Build verifier SHA-256 | b748ac58c91599b08a2ea617cecef0420e300606362cfcfcc717d87a4cadb5a2 |
 | Runtime validator SHA-256 | 94472f5a2c3d4b141e5d0a3a5717e815690319506ce55aff4ee05b2301552ec4 |
 | Runtime lock SHA-256 | 834ebbe0c0ff5b12c1035aa8f5947c5b9a19e275fad6a8de4e277de597e1f1a9 |
 
