@@ -437,6 +437,42 @@ def render_proof(
     )
 
 
+def _absorb_anthropic_usage(store: dict[str, int], usage: dict[str, Any] | None) -> None:
+    """Keep the latest value the stream reports for each prompt-token field.
+
+    message_start reports input_tokens as the whole prompt with no cache split;
+    message_delta reports the authoritative split -- a smaller input_tokens plus
+    cache_read_input_tokens and cache_creation_input_tokens. Taking the latest of
+    each field independently reconstructs the whole prompt from either event.
+    """
+    if not usage:
+        return
+    for field in (
+        "input_tokens",
+        "cache_read_input_tokens",
+        "cache_creation_input_tokens",
+    ):
+        value = usage.get(field)
+        if value is not None:
+            store[field] = int(value)
+
+
+def _anthropic_prompt_tokens(usage: dict[str, Any]) -> int:
+    """The whole prompt Anthropic reports split across cached and uncached inputs.
+
+    vLLM's prompt_tokens is the total; the Anthropic surface reports it as
+    input_tokens = total - cache_read - cache_creation, so the prefix cache saw
+    input_tokens + cache_read + cache_creation queries -- the same whole-prompt
+    count every prefix-cache metric delta here is attributed against, exactly as
+    OpenAI's prompt_tokens is on that surface.
+    """
+    return (
+        int(usage.get("input_tokens") or 0)
+        + int(usage.get("cache_read_input_tokens") or 0)
+        + int(usage.get("cache_creation_input_tokens") or 0)
+    )
+
+
 def collect_openai_stream(
     payload: dict[str, Any], code: str | None
 ) -> dict[str, Any]:
@@ -492,7 +528,7 @@ def collect_anthropic_stream(payload: dict[str, Any], code: str) -> dict[str, An
     stop_reason = None
     first_semantic = None
     terminal = None
-    input_tokens = None
+    prompt_usage: dict[str, int] = {}
     output_tokens = None
     saw_stop = False
     for elapsed, event_name, event in iter_sse(
@@ -506,8 +542,8 @@ def collect_anthropic_stream(payload: dict[str, Any], code: str) -> dict[str, An
         if event_type == "error":
             raise AssertionError(f"Anthropic stream error: {event}")
         if event_type == "message_start":
-            input_tokens = ((event.get("message") or {}).get("usage") or {}).get(
-                "input_tokens"
+            _absorb_anthropic_usage(
+                prompt_usage, (event.get("message") or {}).get("usage")
             )
         elif event_type == "content_block_delta":
             delta = event.get("delta") or {}
@@ -518,7 +554,9 @@ def collect_anthropic_stream(payload: dict[str, Any], code: str) -> dict[str, An
             text += delta.get("text") or ""
         elif event_type == "message_delta":
             stop_reason = (event.get("delta") or {}).get("stop_reason") or stop_reason
-            output_tokens = (event.get("usage") or {}).get("output_tokens")
+            usage = event.get("usage") or {}
+            output_tokens = usage.get("output_tokens")
+            _absorb_anthropic_usage(prompt_usage, usage)
         elif event_type == "message_stop":
             saw_stop = True
     if not saw_stop or stop_reason != "end_turn" or code not in text:
@@ -529,7 +567,7 @@ def collect_anthropic_stream(payload: dict[str, Any], code: str) -> dict[str, An
     return {
         "ttft_seconds": first_semantic,
         "terminal_seconds": terminal,
-        "prompt_tokens": int(input_tokens),
+        "prompt_tokens": _anthropic_prompt_tokens(prompt_usage),
         "completion_tokens": int(output_tokens),
         "reasoning_present": bool(thinking),
         "answer": text,
@@ -570,7 +608,7 @@ def nonstream_anthropic(payload: dict[str, Any], code: str) -> dict[str, Any]:
         raise AssertionError(f"Anthropic non-stream failed: {response}")
     return {
         "elapsed_seconds": elapsed,
-        "prompt_tokens": int(response["usage"]["input_tokens"]),
+        "prompt_tokens": _anthropic_prompt_tokens(response["usage"]),
         "completion_tokens": int(response["usage"]["output_tokens"]),
         "reasoning_present": any(
             block.get("type") == "thinking" for block in response["content"]

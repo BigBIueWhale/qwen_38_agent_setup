@@ -20,6 +20,21 @@ FILLER = " The multimodal boundary ledger contains an inert archive entry."
 FINE_PADDING = " x"
 
 
+def ledger(repetitions: int, fine_padding: int) -> str:
+    """The inert ledger at an exact size.
+
+    Fine padding sits between filler units rather than against the closing
+    tag: at the tag the tokenizer merges the boundary differently once a
+    padding unit is present, so some exact sizes become unreachable and the
+    search below oscillates around them. Between two space-led words every
+    padding unit is exactly one token.
+    """
+    padding = FINE_PADDING * fine_padding
+    if repetitions:
+        return FILLER * (repetitions - 1) + padding + FILLER
+    return padding
+
+
 def messages_for(
     images: list[Any], repetitions: int, fine_padding: int, salt: str
 ) -> list[dict[str, Any]]:
@@ -36,8 +51,7 @@ def messages_for(
             "type": "text",
             "text": (
                 f"Boundary salt: {salt}. <ledger>"
-                + FILLER * repetitions
-                + FINE_PADDING * fine_padding
+                + ledger(repetitions, fine_padding)
                 + "</ledger> Produce any one token."
             ),
         }
