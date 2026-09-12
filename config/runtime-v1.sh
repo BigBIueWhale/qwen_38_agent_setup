@@ -9,7 +9,7 @@ readonly IMAGE_TAG="qwen38-vllm:qwen38-27b-nvfp4-k8v4-runtime-v22"
 # AWAITING ADOPTION for the v22 image. ./scripts/build-vllm.sh builds it and
 # refuses at this check, reporting the ID it produced; adopt that ID here.
 # The refusal is what keeps the stale value from being deployable.
-readonly EXPECTED_IMAGE_ID="sha256:ab6b0ec8346c221bde06d9014a0ac7a7800dfc0aaf57d93985b2ce440626629e"
+readonly EXPECTED_IMAGE_ID="sha256:695780692e2d9ea863f7081520e02ade0997ee7486a78e05968d2d62efe4b839"
 readonly RELAY_IMAGE_TAG="qwen38-fixed-relay:1.0.0"
 readonly EXPECTED_RELAY_IMAGE_ID="sha256:5153a46bc03fa920b0d09000eca1848af255010bda99cc50e8a6110ebcd02690"
 readonly RELAY_SOURCE_SHA256="051dc82af7b9b12e229f9a127183d051ef47a6d44f03d99346762e84bd69c815"

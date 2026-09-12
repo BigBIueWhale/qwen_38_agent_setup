@@ -40,7 +40,7 @@ The deployment is complete and healthy. There is one supported mode:
 | Agent-service release | Pinned by the agent-service release lock, which owns every agent and service image identity |
 | Agent-service listener | 127.0.0.1:8090 only |
 | Runtime profile | socket-isolated-nonroot-vision-k8v4-agent-v22 |
-| Runtime image | sha256:ab6b0ec8346c221bde06d9014a0ac7a7800dfc0aaf57d93985b2ce440626629e |
+| Runtime image | sha256:695780692e2d9ea863f7081520e02ade0997ee7486a78e05968d2d62efe4b839 |
 
 This is not a text-only profile with an optional vision switch. It is not a
 one-million-token profile. It has no MTP, eager-mode, lower-quality image, alternate
@@ -283,7 +283,7 @@ Pinned build inputs and products:
 | Immutable base tag | qwen38-vllm:main-9df9b0b |
 | Immutable base ID | sha256:fa4a002a88b7043a1a89966dea8a500fe9696f84e75730d9da916f916048d401 |
 | Runtime tag | qwen38-vllm:qwen38-27b-nvfp4-k8v4-runtime-v22 |
-| Runtime ID | sha256:ab6b0ec8346c221bde06d9014a0ac7a7800dfc0aaf57d93985b2ce440626629e |
+| Runtime ID | sha256:695780692e2d9ea863f7081520e02ade0997ee7486a78e05968d2d62efe4b839 |
 | Offline archive | artifacts/qwen38-vllm-images-runtime-v22.tar |
 | Archive size | 8,558,567,424 bytes, mode 0600 |
 | Archive SHA-256 | 89572451de771074cccf1b391fbda44ec25c775eba0e89db401a821076a25e9a |
@@ -291,7 +291,7 @@ Pinned build inputs and products:
 | Docker context allowlist SHA-256 | 2e3b84466fec6ab55f84c714144f362c2f4e4977d00b0361d068993dd70dcf76 |
 | Build verifier SHA-256 | 23897dde0f0fc9340ebe7f400cb7f1dba876be7ac1b62a0a90f4f9679e62b905 |
 | Runtime validator SHA-256 | 94472f5a2c3d4b141e5d0a3a5717e815690319506ce55aff4ee05b2301552ec4 |
-| Runtime lock SHA-256 | 9924beebd7579eb417d6c301168201d5a6f81a6558b7249209fba1e7f1f71d0e |
+| Runtime lock SHA-256 | a68415e455d3b32d5143faac069bf78cf65bfbe254bb2deff84009d44d7ff742 |
 
 The final runtime layer does no package resolution or installation. It is built with
 pull=false, network=none, provenance=false, an exact base ID, an allowlisted context,
