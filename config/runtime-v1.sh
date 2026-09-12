@@ -78,7 +78,7 @@ readonly SOURCE_PATCH_MANIFEST_SHA256="914736b292c8db4001b3b5b04c4e84f2f090971b4
 # was added — the validator then refused a correct manifest. Every consumer
 # (build-vllm.sh, runtime-common.sh, generate-deployment-input-manifest.sh)
 # reads this declaration.
-readonly DEPLOYMENT_INPUT_FILE_COUNT="82"
+readonly DEPLOYMENT_INPUT_FILE_COUNT="83"
 readonly TURBOQUANT_PATCHED_FILE_SHA256="ccda36577e4fb0052f370169dce4b649bad890b8b440a82e584acd3dd92a6d86"
 readonly TOOL_SCHEMA_PATCHED_FILE_SHA256="e88b5cd98ace7c76453552f5f08264e0be23d1a5bc9b9d15cc0f39ba75ec043e"
 readonly MODEL_CONFIG_PATCHED_FILE_SHA256="6a0b5fdcb292fef440ee59321b7db437dae2cd5fd80eb2372fa3647fb163a3cf"
@@ -204,7 +204,7 @@ readonly ABSTRACT_PARSER_UPSTREAM_FILE_SHA256="e567186750002ed7d0f5c5efeaffc9b9c
 readonly PARSER_ADAPTERS_UPSTREAM_FILE_SHA256="dc1c1317dbfb298e54b8d94ca0e66d2b0cb1e481c35cdcc60a815284bd8a6ef7"
 readonly ENGINE_PROTOCOL_UPSTREAM_FILE_SHA256="1c11f63c48fb3a48fdcc60371cb8eff4f03ed28ea7fc226450379b20bf8aa319"
 readonly SOURCE_DATE_EPOCH="1786751423"
-readonly RUNTIME_DOCKERFILE_SHA256="49d1df791688a6afd091842e9fd18c0c43b93755cd574415a4c394acce84a231"
+readonly RUNTIME_DOCKERFILE_SHA256="3e99f8f5f1cdcd1d1c0729185195d32a5fa69d3b3545527b3feb1373f46ef4a3"
 readonly DOCKERIGNORE_SHA256="2e3b84466fec6ab55f84c714144f362c2f4e4977d00b0361d068993dd70dcf76"
 
 # Functional host contract only. Exact host software versions, binary
