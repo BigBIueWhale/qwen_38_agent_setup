@@ -750,6 +750,7 @@ additional_installed_report="$(
     /opt/qwen38/vision_mlp_unit.py \
     /opt/qwen38/turboquant_k8v4_unit.py \
     /opt/qwen38/qwen38_context_unit.py \
+    /opt/qwen38/chat_template_retention_unit.py \
     /opt/qwen38/nvfp4_kernel_unit.py
 )"
 expected_additional_installed_report="$(printf '%s  %s\n' \
