@@ -285,13 +285,13 @@ Pinned build inputs and products:
 | Runtime tag | qwen38-vllm:qwen38-27b-nvfp4-k8v4-runtime-v22 |
 | Runtime ID | sha256:695780692e2d9ea863f7081520e02ade0997ee7486a78e05968d2d62efe4b839 |
 | Offline archive | artifacts/qwen38-vllm-images-runtime-v22.tar |
-| Archive size | 8,558,567,424 bytes, mode 0600 |
-| Archive SHA-256 | 89572451de771074cccf1b391fbda44ec25c775eba0e89db401a821076a25e9a |
+| Archive size | 8,558,573,056 bytes, mode 0600 |
+| Archive SHA-256 | 3a0a9e2aa84df4adf3993aa47d922bfc925850e72f7049347722a5406f7cbc31 |
 | Runtime Dockerfile SHA-256 | 31a851427d29dc7a2282a3ce83e5d9084b705369ddb615590dec41f1ebd27fd6 |
 | Docker context allowlist SHA-256 | 2e3b84466fec6ab55f84c714144f362c2f4e4977d00b0361d068993dd70dcf76 |
 | Build verifier SHA-256 | 23897dde0f0fc9340ebe7f400cb7f1dba876be7ac1b62a0a90f4f9679e62b905 |
 | Runtime validator SHA-256 | 94472f5a2c3d4b141e5d0a3a5717e815690319506ce55aff4ee05b2301552ec4 |
-| Runtime lock SHA-256 | a68415e455d3b32d5143faac069bf78cf65bfbe254bb2deff84009d44d7ff742 |
+| Runtime lock SHA-256 | 6fcfd4bf3ce9d820be16853a24b4ea9b512daa267920f16b52f5be775dd75080 |
 
 The final runtime layer does no package resolution or installation. It is built with
 pull=false, network=none, provenance=false, an exact base ID, an allowlisted context,

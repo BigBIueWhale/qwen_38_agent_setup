@@ -26,7 +26,7 @@ readonly EXPECTED_BASE_IMAGE_ID="sha256:fa4a002a88b7043a1a89966dea8a500fe9696f84
 readonly IMAGE_ARCHIVE_NAME="qwen38-vllm-images-runtime-v22.tar"
 # AWAITING ADOPTION, like EXPECTED_IMAGE_ID: the restore path verifies this
 # hash before docker load, so a stale value fails on the bytes.
-readonly IMAGE_ARCHIVE_SHA256="89572451de771074cccf1b391fbda44ec25c775eba0e89db401a821076a25e9a"
+readonly IMAGE_ARCHIVE_SHA256="3a0a9e2aa84df4adf3993aa47d922bfc925850e72f7049347722a5406f7cbc31"
 
 readonly MODEL_DIR_NAME="Qwen3.8-27B-NVFP4-Corrected"
 readonly MODEL_REPOSITORY="unsloth/Qwen3.8-27B-NVFP4"
