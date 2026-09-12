@@ -448,7 +448,7 @@ COPY --chmod=0644 scripts/qwen38_context_unit.py /opt/qwen38/qwen38_context_unit
 COPY --chmod=0644 scripts/chat_template_retention_unit.py /opt/qwen38/chat_template_retention_unit.py
 COPY --chmod=0644 scripts/nvfp4_kernel_unit.py /opt/qwen38/nvfp4_kernel_unit.py
 COPY --chmod=0644 scripts/reasoning_usage_unit.py /opt/qwen38/reasoning_usage_unit.py
-RUN printf '%s  %s\n%s  %s\n%s  %s\n%s  %s\n' \
+RUN printf '%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n' \
       "${TURBOQUANT_K8V4_UNIT_SHA256}" /opt/qwen38/turboquant_k8v4_unit.py \
       "${QWEN38_CONTEXT_UNIT_SHA256}" /opt/qwen38/qwen38_context_unit.py \
       "${CHAT_TEMPLATE_RETENTION_UNIT_SHA256}" /opt/qwen38/chat_template_retention_unit.py \
