@@ -111,6 +111,7 @@ VISION_CONTRACT_UNIT_FILE="${PROJECT_DIR}/scripts/vision_contract_unit.py"
 VISION_MLP_UNIT_FILE="${PROJECT_DIR}/scripts/vision_mlp_unit.py"
 TURBOQUANT_K8V4_UNIT_FILE="${PROJECT_DIR}/scripts/turboquant_k8v4_unit.py"
 QWEN38_CONTEXT_UNIT_FILE="${PROJECT_DIR}/scripts/qwen38_context_unit.py"
+CHAT_TEMPLATE_RETENTION_UNIT_FILE="${PROJECT_DIR}/scripts/chat_template_retention_unit.py"
 NVFP4_KERNEL_UNIT_FILE="${PROJECT_DIR}/scripts/nvfp4_kernel_unit.py"
 REASONING_USAGE_UNIT_FILE="${PROJECT_DIR}/scripts/reasoning_usage_unit.py"
 SOURCE_PATCH_DIR="${PROJECT_DIR}/patches/source_patch_v1"
@@ -326,6 +327,27 @@ docker run --rm \
   "${BASE_IMAGE_TAG}" \
   -m unittest -v patches.source_patch_v1.test_framework
 
+# The served chat template is the fourteenth landmark-aware transformation, and
+# it is proved here on the same terms as the other thirteen: reconstructed from
+# the model's own template through named stages and refused if it does not
+# reproduce the published bytes. Before this existed the template's differences
+# from the model's were pinned but not derived -- the bytes were fixed and
+# nothing could say what change produced them.
+docker run --rm \
+  --network none \
+  --read-only \
+  --user "$(id -u):$(id -g)" \
+  --tmpfs /tmp:rw,nodev,nosuid,size=64m \
+  --env PYTHONPYCACHEPREFIX=/tmp/pycache \
+  --entrypoint python3 \
+  --volume "${PROJECT_DIR}:/project:ro" \
+  --workdir /project \
+  "${BASE_IMAGE_TAG}" \
+  scripts/derive-chat-template.py \
+    --project /project \
+    --model "/project/${MODEL_DIR_NAME}" \
+    --check
+
 # Prove that the landmark-aware transaction recreates this exact worktree from
 # the pinned upstream commit. The reviewed diffs are independently hashed and
 # parsed as review evidence, but they never select mutation locations. The
@@ -472,6 +494,7 @@ printf '%s  %s\n' \
 printf '%s  %s\n' \
   "${TURBOQUANT_K8V4_UNIT_SHA256}" "${TURBOQUANT_K8V4_UNIT_FILE}" \
   "${QWEN38_CONTEXT_UNIT_SHA256}" "${QWEN38_CONTEXT_UNIT_FILE}" \
+  "${CHAT_TEMPLATE_RETENTION_UNIT_SHA256}" "${CHAT_TEMPLATE_RETENTION_UNIT_FILE}" \
   "${NVFP4_KERNEL_UNIT_SHA256}" "${NVFP4_KERNEL_UNIT_FILE}" \
   "${REASONING_USAGE_UNIT_SHA256}" "${REASONING_USAGE_UNIT_FILE}" | \
   sha256sum --check --strict
@@ -580,6 +603,7 @@ docker buildx build --progress=plain \
   --build-arg "VISION_MLP_UNIT_SHA256=${VISION_MLP_UNIT_SHA256}" \
   --build-arg "TURBOQUANT_K8V4_UNIT_SHA256=${TURBOQUANT_K8V4_UNIT_SHA256}" \
   --build-arg "QWEN38_CONTEXT_UNIT_SHA256=${QWEN38_CONTEXT_UNIT_SHA256}" \
+  --build-arg "CHAT_TEMPLATE_RETENTION_UNIT_SHA256=${CHAT_TEMPLATE_RETENTION_UNIT_SHA256}" \
   --build-arg "NVFP4_KERNEL_UNIT_SHA256=${NVFP4_KERNEL_UNIT_SHA256}" \
   --build-arg "REASONING_USAGE_UNIT_SHA256=${REASONING_USAGE_UNIT_SHA256}" \
   --build-arg "TURBOQUANT_PATCH_DIFF_SHA256=${TURBOQUANT_PATCH_DIFF_SHA256}" \
@@ -743,6 +767,7 @@ expected_additional_installed_report="$(printf '%s  %s\n' \
   "${VISION_MLP_UNIT_SHA256}" /opt/qwen38/vision_mlp_unit.py \
   "${TURBOQUANT_K8V4_UNIT_SHA256}" /opt/qwen38/turboquant_k8v4_unit.py \
   "${QWEN38_CONTEXT_UNIT_SHA256}" /opt/qwen38/qwen38_context_unit.py \
+  "${CHAT_TEMPLATE_RETENTION_UNIT_SHA256}" /opt/qwen38/chat_template_retention_unit.py \
   "${NVFP4_KERNEL_UNIT_SHA256}" /opt/qwen38/nvfp4_kernel_unit.py)"
 if [[ "${additional_installed_report}" != "${expected_additional_installed_report}" ]]; then
   echo "Built image contains unexpected vision/runtime bytes." >&2

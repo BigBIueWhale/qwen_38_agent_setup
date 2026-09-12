@@ -204,6 +204,17 @@ def make_history(
     return messages
 
 
+# One dict for both renders compared below, so that comparison tests the
+# Anthropic/OpenAI conversion rather than the coincidence of two requests
+# carrying different kwargs. Retention is absent deliberately: the served
+# template enforces it and accepts no other value, so a probe that named it
+# would be restating a guarantee rather than testing one.
+TEMPLATE_KWARGS: dict[str, Any] = {
+    "enable_thinking": True,
+    "reasoning_effort": "xhigh",
+}
+
+
 def render_request(messages: list[dict[str, Any]]) -> dict[str, Any]:
     payload = {
         "model": MODEL,
@@ -212,10 +223,7 @@ def render_request(messages: list[dict[str, Any]]) -> dict[str, Any]:
         "tool_choice": "required",
         "parallel_tool_calls": True,
         "max_tokens": 1,
-        "chat_template_kwargs": {
-            "enable_thinking": True,
-            "reasoning_effort": "xhigh",
-        },
+        "chat_template_kwargs": dict(TEMPLATE_KWARGS),
     }
     return post_json("/v1/chat/completions/render", payload)
 
@@ -450,6 +458,11 @@ def synthetic_roundtrip(tokenizer: Any) -> dict[str, Any]:
         by_alias=True,
         exclude_none=True,
     )
+    # The Anthropic request carries no template kwargs of its own, so without
+    # this the converted side would inherit the deployment default while the
+    # OpenAI side states one, and the token-ID comparison below would be
+    # measuring that difference instead of the conversion.
+    converted_payload["chat_template_kwargs"] = dict(TEMPLATE_KWARGS)
     anthropic_render = post_json(
         "/v1/chat/completions/render",
         converted_payload,

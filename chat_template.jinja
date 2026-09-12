@@ -55,6 +55,9 @@
 {%- set num_sys = sysns.count %}
 {%- set merged_system = sysns.text %}
 {%- set reasoning_instructions = '' %}
+{%- if preserve_thinking is defined and preserve_thinking is not true %}
+    {{- raise_exception('Historical thinking cannot be discarded in this correctness-first profile. Every assistant turn in the conversation is rendered with its reasoning, and preserve_thinking accepts only true.') }}
+{%- endif %}
 {%- if enable_thinking is defined and enable_thinking is false %}
     {{- raise_exception('Thinking cannot be disabled in this correctness-first profile.') }}
 {%- else %}
@@ -114,11 +117,7 @@
             {%- set reasoning_content = message.reasoning_content %}
         {%- endif %}
         {%- set reasoning_content = reasoning_content|trim %}
-        {%- if preserve_thinking is undefined or preserve_thinking is true or loop.index0 > ns.last_query_index %}
-            {{- '<|im_start|>' + message.role + '\n<think>\n' + reasoning_content + '\n</think>\n\n' + content }}
-        {%- else %}
-            {{- '<|im_start|>' + message.role + '\n' + content }}
-        {%- endif %}
+        {{- '<|im_start|>' + message.role + '\n<think>\n' + reasoning_content + '\n</think>\n\n' + content }}
         {%- if message.tool_calls and message.tool_calls is iterable and message.tool_calls is not mapping %}
             {%- for tool_call in message.tool_calls %}
                 {%- if tool_call.function is defined %}

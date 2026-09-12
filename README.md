@@ -39,7 +39,7 @@ The deployment is complete and healthy. There is one supported mode:
 | Agent client | Qwen Code 0.21.12 at b965d5f8c24f48e65fb0b17c7d45f34ca4ce8f38 |
 | Agent-service release | Pinned by the agent-service release lock, which owns every agent and service image identity |
 | Agent-service listener | 127.0.0.1:8090 only |
-| Runtime profile | socket-isolated-nonroot-vision-k8v4-agent-v21 |
+| Runtime profile | socket-isolated-nonroot-vision-k8v4-agent-v22 |
 | Runtime image | sha256:ab6b0ec8346c221bde06d9014a0ac7a7800dfc0aaf57d93985b2ce440626629e |
 
 This is not a text-only profile with an optional vision switch. It is not a
@@ -282,16 +282,16 @@ Pinned build inputs and products:
 |---|---|
 | Immutable base tag | qwen38-vllm:main-9df9b0b |
 | Immutable base ID | sha256:fa4a002a88b7043a1a89966dea8a500fe9696f84e75730d9da916f916048d401 |
-| Runtime tag | qwen38-vllm:qwen38-27b-nvfp4-k8v4-runtime-v21 |
+| Runtime tag | qwen38-vllm:qwen38-27b-nvfp4-k8v4-runtime-v22 |
 | Runtime ID | sha256:ab6b0ec8346c221bde06d9014a0ac7a7800dfc0aaf57d93985b2ce440626629e |
-| Offline archive | artifacts/qwen38-vllm-images-runtime-v21.tar |
+| Offline archive | artifacts/qwen38-vllm-images-runtime-v22.tar |
 | Archive size | 8,558,567,424 bytes, mode 0600 |
 | Archive SHA-256 | 89572451de771074cccf1b391fbda44ec25c775eba0e89db401a821076a25e9a |
 | Runtime Dockerfile SHA-256 | 49d1df791688a6afd091842e9fd18c0c43b93755cd574415a4c394acce84a231 |
 | Docker context allowlist SHA-256 | 2e3b84466fec6ab55f84c714144f362c2f4e4977d00b0361d068993dd70dcf76 |
-| Build verifier SHA-256 | b748ac58c91599b08a2ea617cecef0420e300606362cfcfcc717d87a4cadb5a2 |
+| Build verifier SHA-256 | 12a7ee842af94b27f4fd1c1faf0453076c93f3af5c45357c8a2bf08fe641eeda |
 | Runtime validator SHA-256 | 94472f5a2c3d4b141e5d0a3a5717e815690319506ce55aff4ee05b2301552ec4 |
-| Runtime lock SHA-256 | 834ebbe0c0ff5b12c1035aa8f5947c5b9a19e275fad6a8de4e277de597e1f1a9 |
+| Runtime lock SHA-256 | 0a1de2e47d1ff6164753a9759869a5916b11cbb89f4c2b9d7947c1e3c85a29ab |
 
 The final runtime layer does no package resolution or installation. It is built with
 pull=false, network=none, provenance=false, an exact base ID, an allowlisted context,

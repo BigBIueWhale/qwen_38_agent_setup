@@ -76,9 +76,33 @@ Docker. The checks were not character-count estimates.
   as its own `role: "user"` message every third tool turn, is exactly such a
   message. How much reasoning a shedding render keeps is thus a function of the
   client's tool-loop structure, not of a request field.
-- This deployment omits `preserve_thinking` from `--default-chat-template-kwargs`
-  and sends no per-request override, so the undefined clause applies and every
-  historical thinking block is rendered.
+- This deployment does not rely on that clause. The served template is
+  **derived** from the model's own by `scripts/derive-chat-template.py` through
+  named, landmark-anchored stages, and `./scripts/build-vllm.sh check` refuses if
+  it cannot reproduce the published bytes; before this, the template's
+  differences from the model's were pinned but not derived — the bytes were fixed
+  and nothing said what change produced them. One stage makes historical
+  reasoning unconditional and refuses any request that asks to discard it, in the
+  same shape as this profile's existing refusals of `enable_thinking: false` and
+  non-xhigh effort. The guarantee is in the served artifact rather than in a
+  launch argument, so it holds for every caller of this model, not only for
+  callers who share this repository's configuration. `--default-chat-template-kwargs`
+  consequently states nothing about retention: there is no default to inherit.
+  The refusal also covers `null`, which cannot currently reach the template:
+  vLLM filters request kwargs through `unset_values = (None, "auto")` before the
+  merge (`vllm/renderers/params.py:29-41`), so a client that serialises an unset
+  field as `null` is treated as having omitted it — measured at 2071 tokens,
+  identical to omission, where `false` renders 1259 and survives the filter. The
+  branch is therefore belt-and-braces against a layer changing underneath, not a
+  behaviour change, and should not be relaxed on the assumption that some client
+  is being rejected by it.
+- A shedding rule was built first and rejected. It kept the reasoning of the last
+  assistant turn, counted its cut in assistant turns so no injected message could
+  move it, emitted no empty thinking blocks, and rendered one prompt for every
+  value of the kwarg — it worked exactly as specified. It was removed because
+  discarding historical thinking is incompatible with how this model was trained,
+  and because the cut it would have replaced was being set by a client's own
+  re-injected reminders rather than by any policy.
 
 Live policy evidence from the final image:
 

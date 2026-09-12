@@ -226,6 +226,7 @@ ARG VISION_CONTRACT_UNIT_SHA256
 ARG VISION_MLP_UNIT_SHA256
 ARG TURBOQUANT_K8V4_UNIT_SHA256
 ARG QWEN38_CONTEXT_UNIT_SHA256
+ARG CHAT_TEMPLATE_RETENTION_UNIT_SHA256
 ARG NVFP4_KERNEL_UNIT_SHA256
 ARG TURBOQUANT_PATCH_DIFF_SHA256
 ARG TOOL_SCHEMA_PATCH_DIFF_SHA256
@@ -444,11 +445,13 @@ COPY --chmod=0644 scripts/vision_contract_unit.py /opt/qwen38/vision_contract_un
 COPY --chmod=0644 scripts/vision_mlp_unit.py /opt/qwen38/vision_mlp_unit.py
 COPY --chmod=0644 scripts/turboquant_k8v4_unit.py /opt/qwen38/turboquant_k8v4_unit.py
 COPY --chmod=0644 scripts/qwen38_context_unit.py /opt/qwen38/qwen38_context_unit.py
+COPY --chmod=0644 scripts/chat_template_retention_unit.py /opt/qwen38/chat_template_retention_unit.py
 COPY --chmod=0644 scripts/nvfp4_kernel_unit.py /opt/qwen38/nvfp4_kernel_unit.py
 COPY --chmod=0644 scripts/reasoning_usage_unit.py /opt/qwen38/reasoning_usage_unit.py
 RUN printf '%s  %s\n%s  %s\n%s  %s\n%s  %s\n' \
       "${TURBOQUANT_K8V4_UNIT_SHA256}" /opt/qwen38/turboquant_k8v4_unit.py \
       "${QWEN38_CONTEXT_UNIT_SHA256}" /opt/qwen38/qwen38_context_unit.py \
+      "${CHAT_TEMPLATE_RETENTION_UNIT_SHA256}" /opt/qwen38/chat_template_retention_unit.py \
       "${NVFP4_KERNEL_UNIT_SHA256}" /opt/qwen38/nvfp4_kernel_unit.py \
       "${REASONING_USAGE_UNIT_SHA256}" /opt/qwen38/reasoning_usage_unit.py \
     | sha256sum --check --strict
@@ -612,6 +615,7 @@ assert stat.S_IMODE(os.stat("/opt/qwen38/vision_contract_unit.py").st_mode) == 0
 assert stat.S_IMODE(os.stat("/opt/qwen38/vision_mlp_unit.py").st_mode) == 0o644
 assert stat.S_IMODE(os.stat("/opt/qwen38/turboquant_k8v4_unit.py").st_mode) == 0o644
 assert stat.S_IMODE(os.stat("/opt/qwen38/qwen38_context_unit.py").st_mode) == 0o644
+assert stat.S_IMODE(os.stat("/opt/qwen38/chat_template_retention_unit.py").st_mode) == 0o644
 assert stat.S_IMODE(os.stat("/opt/qwen38/nvfp4_kernel_unit.py").st_mode) == 0o644
 assert stat.S_IMODE(os.stat("/opt/qwen38/reasoning_usage_unit.py").st_mode) == 0o644
 
@@ -1036,6 +1040,7 @@ for required_path in (
 ):
     assert required_path in route_paths, (required_path, sorted(route_paths))
 
+runpy.run_path("/opt/qwen38/chat_template_retention_unit.py", run_name="__main__")
 runpy.run_path("/opt/qwen38/phase_budget_unit.py", run_name="__main__")
 runpy.run_path("/opt/qwen38/reasoning_usage_unit.py", run_name="__main__")
 runpy.run_path("/opt/qwen38/vision_workspace_unit.py", run_name="__main__")

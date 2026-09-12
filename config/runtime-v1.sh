@@ -2,10 +2,13 @@
 # Single source of truth for the only supported serving profile.
 
 readonly PROFILE_VERSION="socket-isolated-nonroot-vision-k8v4-agent-v21"
-readonly IMAGE_PROFILE_VERSION="socket-isolated-nonroot-vision-k8v4-agent-v21"
+readonly IMAGE_PROFILE_VERSION="socket-isolated-nonroot-vision-k8v4-agent-v22"
 readonly CONTAINER_NAME="qwen38-agent-native"
 readonly CONTAINER_LABEL="Qwen_best_model_ever"
-readonly IMAGE_TAG="qwen38-vllm:qwen38-27b-nvfp4-k8v4-runtime-v21"
+readonly IMAGE_TAG="qwen38-vllm:qwen38-27b-nvfp4-k8v4-runtime-v22"
+# AWAITING ADOPTION for the v22 image. ./scripts/build-vllm.sh builds it and
+# refuses at this check, reporting the ID it produced; adopt that ID here.
+# The refusal is what keeps the stale value from being deployable.
 readonly EXPECTED_IMAGE_ID="sha256:ab6b0ec8346c221bde06d9014a0ac7a7800dfc0aaf57d93985b2ce440626629e"
 readonly RELAY_IMAGE_TAG="qwen38-fixed-relay:1.0.0"
 readonly EXPECTED_RELAY_IMAGE_ID="sha256:5153a46bc03fa920b0d09000eca1848af255010bda99cc50e8a6110ebcd02690"
@@ -20,7 +23,9 @@ readonly RELAY_MEMORY="32m"
 readonly RELAY_PIDS_LIMIT="32"
 readonly BASE_IMAGE_TAG="qwen38-vllm:main-9df9b0b"
 readonly EXPECTED_BASE_IMAGE_ID="sha256:fa4a002a88b7043a1a89966dea8a500fe9696f84e75730d9da916f916048d401"
-readonly IMAGE_ARCHIVE_NAME="qwen38-vllm-images-runtime-v21.tar"
+readonly IMAGE_ARCHIVE_NAME="qwen38-vllm-images-runtime-v22.tar"
+# AWAITING ADOPTION, like EXPECTED_IMAGE_ID: the restore path verifies this
+# hash before docker load, so a stale value fails on the bytes.
 readonly IMAGE_ARCHIVE_SHA256="89572451de771074cccf1b391fbda44ec25c775eba0e89db401a821076a25e9a"
 
 readonly MODEL_DIR_NAME="Qwen3.8-27B-NVFP4-Corrected"
@@ -73,7 +78,7 @@ readonly SOURCE_PATCH_MANIFEST_SHA256="914736b292c8db4001b3b5b04c4e84f2f090971b4
 # was added — the validator then refused a correct manifest. Every consumer
 # (build-vllm.sh, runtime-common.sh, generate-deployment-input-manifest.sh)
 # reads this declaration.
-readonly DEPLOYMENT_INPUT_FILE_COUNT="79"
+readonly DEPLOYMENT_INPUT_FILE_COUNT="82"
 readonly TURBOQUANT_PATCHED_FILE_SHA256="ccda36577e4fb0052f370169dce4b649bad890b8b440a82e584acd3dd92a6d86"
 readonly TOOL_SCHEMA_PATCHED_FILE_SHA256="e88b5cd98ace7c76453552f5f08264e0be23d1a5bc9b9d15cc0f39ba75ec043e"
 readonly MODEL_CONFIG_PATCHED_FILE_SHA256="6a0b5fdcb292fef440ee59321b7db437dae2cd5fd80eb2372fa3647fb163a3cf"
@@ -127,12 +132,16 @@ readonly TITOTO_SERVING_PATCHED_FILE_SHA256="c055a75cd9148521bdf921110dcd54d7fa6
 readonly ABSTRACT_PARSER_PATCHED_FILE_SHA256="87534a9739902c0e118819ac13c6593107bf2a5ae942af3269471557dd610577"
 readonly PARSER_ADAPTERS_PATCHED_FILE_SHA256="0d68474d291a7de76f795f6e2d64b15a15077860d1b9ba5711ffe0bfd0c3ca65"
 readonly ENGINE_PROTOCOL_PATCHED_FILE_SHA256="86001520ac9ec6e51d3dce8f0617461d497a75e83b2c2c7bb51e7459c8610dd0"
-readonly AGENT_CHAT_TEMPLATE_SHA256="32627db263a4742f37fc3ef87757c9b00f1cd7eb7af496914e7daa5e3bff173b"
+# Derived, not edited: scripts/derive-chat-template.py reconstructs these
+# bytes from the model's own template through named stages, and
+# ./scripts/build-vllm.sh check refuses if it cannot reproduce them.
+readonly AGENT_CHAT_TEMPLATE_SHA256="07f545cd8ed9232f2b24d79010fad187f92e5b25b532448eb9017c0f8b8c2088"
 readonly PHASE_BUDGET_UNIT_SHA256="913266638d302de31cdeae1acfdc5a568a01513481a57e5a4e7e9cbe258a99df"
 readonly VISION_WORKSPACE_UNIT_SHA256="34f6ef1c477794de5e8b349c2da1dd491607a5618498358aa8b86085336a3df8"
 readonly VISION_CONTRACT_UNIT_SHA256="3a35831a58641f360ebc8c2c961c44deac1024e0a3431363ab68f803d86b4740"
 readonly VISION_MLP_UNIT_SHA256="857ba547a099c6ba646210eb33dd7b159bf9a1972d1772ea396071c8d8e4f2e3"
 readonly TURBOQUANT_K8V4_UNIT_SHA256="2121146ae781bb94bd4ae257fb6a26c40ef7f3b212e626845d0939756fe8a494"
+readonly CHAT_TEMPLATE_RETENTION_UNIT_SHA256="2baf37580ecf709b3c9d615ea08e3a337738ab0ea20fb35439e01b669e25ba2d"
 readonly QWEN38_CONTEXT_UNIT_SHA256="77696c508ea77ffa8e63eed616783b648656bd81612b7d763ebf4505fdd9f5b2"
 readonly NVFP4_KERNEL_UNIT_SHA256="2fce56060c9589d46e50371c8de456a6b9a65b906d95d9e3e1079cc70f790302"
 readonly REASONING_USAGE_UNIT_SHA256="7e32b92442c02981bc7cefe1f280b7361af2b0fa24466c2aef7ca1e980ee62b2"
