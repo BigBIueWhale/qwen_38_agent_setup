@@ -424,13 +424,24 @@ mode.
 Reasoning already in the conversation is never dropped. Every assistant turn is
 rendered with its reasoning, and `preserve_thinking` accepts only `true`: omitting
 it renders exactly as `true`, and any other value that reaches the template is
-rejected with HTTP 400. The model's own template
-drops reasoning from turns before the latest user message when the field is `false`,
-and an agent client that injects reminders as user messages moves that cut on every
-injection, so how much reasoning survived was an accident of the client's loop.
-Discarding historical reasoning is also not how this model is meant to see its own
-history. The guarantee lives in the served template rather than in a launch default,
-so it holds for every caller: `scripts/derive-chat-template.py` derives that
+rejected with HTTP 400.
+
+Dropping reasoning from earlier turns is a good idea when it is correctly
+implemented: it trades compute for slower context growth and stability. For
+Qwen3.8-27B it is not correctly implemented, even though the upstream card below
+documents `preserve_thinking: false` as supported. The model's own template keeps
+thinking only for assistant turns after the latest `role: "user"` message. A
+one-prompt agent task therefore sheds nothing, and an agent client that injects
+reminders as user messages moves the cut into the middle of the current task; Qwen
+Code does so every third tool turn (`ACTIVE_TODO_REMINDER_REFRESH_TURNS = 3`). What
+survives depends on when the client injects a message, not on any rule. Inventing a
+rule instead, such as keeping the last K assistant turns, is no fix: it renders a
+history the model was never trained on. Qwen3.8-27B was trained with preserved
+thinking, as nearly all current models are, and there is no correct off switch for
+it.
+
+The guarantee therefore lives in the served template rather than in a launch
+default, so it holds for every caller: `scripts/derive-chat-template.py` derives that
 template from the model's own through landmark-anchored stages, and
 `./scripts/build-vllm.sh check` refuses unless it reproduces the served bytes.
 `--default-chat-template-kwargs` accordingly names no retention field, and the

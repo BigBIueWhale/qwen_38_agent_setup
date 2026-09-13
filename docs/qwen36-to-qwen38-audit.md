@@ -65,17 +65,19 @@ Docker. The checks were not character-count estimates.
   `preserve_thinking is undefined or preserve_thinking is true or loop.index0 >
   ns.last_query_index`. `ns.last_query_index` comes from a backwards scan for the
   most recent `role: "user"` message whose rendered content is not wrapped in
-  `<tool_response>`; thinking is emitted only for assistant turns after it. The
-  wrapper test is written for chat clients that hand tool output back as user
-  turns, and it cannot fire for an OpenAI-protocol agent client: tool results
-  arrive as `role: "tool"` and keep that role through vLLM's chat parser, so the
-  template wraps them only while rendering, after the scan has run. Any other
-  user message an agent client injects between tool turns therefore becomes the
-  new `ns.last_query_index` and moves the cut — Qwen Code's active-todo reminder,
-  whose text opens with `<system-reminder>` and which the OpenAI converter emits
-  as its own `role: "user"` message every third tool turn, is exactly such a
-  message. How much reasoning a shedding render keeps is thus a function of the
-  client's tool-loop structure, not of a request field.
+  `<tool_response>`; with `false`, thinking is emitted only for assistant turns
+  after it. The wrapper test is written for chat clients that hand tool output
+  back as user turns, and it cannot fire for an OpenAI-protocol agent client:
+  tool results arrive as `role: "tool"` and keep that role through vLLM's chat
+  parser, so the template wraps them only while rendering, after the scan has
+  run. A one-prompt agent task therefore sheds nothing, while any user message an
+  agent client injects between tool turns becomes the new `ns.last_query_index`
+  and moves the cut into the middle of the task — Qwen Code's active-todo
+  reminder, whose text opens with `<system-reminder>` and which the OpenAI
+  converter emits as its own `role: "user"` message every third tool turn, is
+  exactly such a message. What a `false` render keeps thus depends on when the
+  client injects a message, not on any rule, so the off switch the model card
+  documents is not correctly implemented.
 - This deployment does not rely on that clause. The served template is
   **derived** from the model's own by `scripts/derive-chat-template.py` through
   named, landmark-anchored stages, and `./scripts/build-vllm.sh check` refuses if
@@ -99,10 +101,8 @@ Docker. The checks were not character-count estimates.
 - A shedding rule was built first and rejected. It kept the reasoning of the last
   assistant turn, counted its cut in assistant turns so no injected message could
   move it, emitted no empty thinking blocks, and rendered one prompt for every
-  value of the kwarg — it worked exactly as specified. It was removed because
-  discarding historical thinking is incompatible with how this model was trained,
-  and because the cut it would have replaced was being set by a client's own
-  re-injected reminders rather than by any policy.
+  value of the kwarg — it worked exactly as specified. It was removed because an
+  invented rule is no fix: it renders a history the model was never trained on.
 
 Live policy evidence from the final image:
 
