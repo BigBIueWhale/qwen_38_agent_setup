@@ -973,9 +973,11 @@ the service's durable terminal bundle, and invoked the immutable evaluator only 
 that captured post-session workspace. The production session resolved all 11
 evaluator checks in 61 turns and 1,090,658 ms. One completed task is a lifecycle
 proof for the deployed pair, not a benchmark-suite score. Exact production release
-IDs, input hashes, failure classification, bundle/patch hashes, and replay
-procedure are recorded in
-`/home/user/Desktop/agent_service/docs/production-swe-rebench-pilot.md`.
+IDs, input hashes, failure classification, and bundle/patch hashes are recorded in
+`/home/user/Desktop/agent_service/docs/production-swe-rebench-pilot.md`. That
+harness cannot be replayed: it is pinned to the agent-service release it ran
+against, and the service has since removed the folder-path submission and the
+notification endpoint it depended on.
 
 Codex Responses and Anthropic Messages protocol surfaces are proven on the server,
 but neither creates another supported client mode. Host Claude Code remains entirely
