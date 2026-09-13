@@ -46,10 +46,9 @@ DERIVED_TEMPLATE_SHA256 = (
 
 # A shedding rule was built here and removed. It worked exactly as designed --
 # the reasoning of the last assistant turn kept, the cut immovable by injected
-# reminders, no empty think blocks -- and was rejected because discarding
-# historical thinking is incompatible with how this model was trained, and
-# because the cut it replaced was being moved by a client's own injected
-# messages rather than by any policy. Stage B below enforces the opposite.
+# reminders, no empty think blocks -- and was still no fix: an invented rule
+# renders a history this model was never trained on. Stage B below enforces the
+# opposite; the README's agent defaults give the reasons.
 
 MANIFEST_LINE = re.compile(r"^([0-9a-f]{64})  ([^\0]+)$")
 
@@ -183,8 +182,8 @@ STAGE_A_GENERATION_PROMPT = (
 # The model's template renders a historical assistant turn's reasoning unless a
 # request asks otherwise, and this profile does not accept that request. The
 # condition is removed rather than defaulted: a guarantee that depends on a
-# value being set correctly is one deletion away from being lost, and that has
-# happened here once already. With the clause gone there is nothing to set.
+# value being set correctly is one deletion away from being lost. With the
+# clause gone there is nothing to set.
 #
 # The refusal is the same discipline stage A applies to `enable_thinking` and to
 # reasoning effort: a request this profile cannot honour is an error, never a
