@@ -2,8 +2,8 @@
 """Derive this deployment's chat template from the model's own template.
 
 The served template is not the model's. It rejects `enable_thinking: false`,
-accepts only `xhigh` reasoning effort, and keeps the reasoning of the last
-assistant turn while rendering older assistant turns without a thinking block.
+accepts only `xhigh` reasoning effort, and renders every assistant turn in the
+history with its reasoning, refusing any `preserve_thinking` other than `true`.
 Those differences were previously carried as an edited file whose bytes were
 pinned but whose derivation existed nowhere, so nothing could answer "what did
 we change, and is the served template still exactly that change applied to the
