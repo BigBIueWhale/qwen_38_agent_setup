@@ -421,6 +421,23 @@ Medium, low, disabled thinking, and incompatible Anthropic controls are rejected
 HTTP 400. The supported agent client always sends xhigh and never asks for a weaker
 mode.
 
+Reasoning already in the conversation is never dropped. Every assistant turn is
+rendered with its reasoning, and `preserve_thinking` accepts only `true`: omitting
+it renders exactly as `true`, and any other value that reaches the template is
+rejected with HTTP 400. The model's own template
+drops reasoning from turns before the latest user message when the field is `false`,
+and an agent client that injects reminders as user messages moves that cut on every
+injection, so how much reasoning survived was an accident of the client's loop.
+Discarding historical reasoning is also not how this model is meant to see its own
+history. The guarantee lives in the served template rather than in a launch default,
+so it holds for every caller: `scripts/derive-chat-template.py` derives that
+template from the model's own through landmark-anchored stages, and
+`./scripts/build-vllm.sh check` refuses unless it reproduces the served bytes.
+`--default-chat-template-kwargs` accordingly names no retention field, and the
+upstream card's "Disable Preserved Thinking" section below does not apply to this
+deployment. The derivation and the rejected alternative are recorded in
+`docs/qwen36-to-qwen38-audit.md`.
+
 Alibaba's 262,144 reasoning and 131,072 final ceilings are recommendations for
 frameworks that distinguish the phases within a much larger window. Locally they are
 hard server defaults but not reservations and not additive capacity. The usable
