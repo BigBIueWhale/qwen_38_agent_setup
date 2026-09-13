@@ -291,7 +291,7 @@ Pinned build inputs and products:
 | Docker context allowlist SHA-256 | 2e3b84466fec6ab55f84c714144f362c2f4e4977d00b0361d068993dd70dcf76 |
 | Build verifier SHA-256 | 23897dde0f0fc9340ebe7f400cb7f1dba876be7ac1b62a0a90f4f9679e62b905 |
 | Runtime validator SHA-256 | 94472f5a2c3d4b141e5d0a3a5717e815690319506ce55aff4ee05b2301552ec4 |
-| Runtime lock SHA-256 | 6fcfd4bf3ce9d820be16853a24b4ea9b512daa267920f16b52f5be775dd75080 |
+| Runtime lock SHA-256 | 570910a459c98ba851bb5d74078cc8d81c13c0bfb01fbd550cc7f85ed653ca51 |
 
 The final runtime layer does no package resolution or installation. It is built with
 pull=false, network=none, provenance=false, an exact base ID, an allowlisted context,

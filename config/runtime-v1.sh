@@ -11,7 +11,7 @@ readonly IMAGE_TAG="qwen38-vllm:qwen38-27b-nvfp4-k8v4-runtime-v22"
 # The refusal is what keeps the stale value from being deployable.
 readonly EXPECTED_IMAGE_ID="sha256:695780692e2d9ea863f7081520e02ade0997ee7486a78e05968d2d62efe4b839"
 readonly RELAY_IMAGE_TAG="qwen38-fixed-relay:1.0.0"
-readonly EXPECTED_RELAY_IMAGE_ID="sha256:5153a46bc03fa920b0d09000eca1848af255010bda99cc50e8a6110ebcd02690"
+readonly EXPECTED_RELAY_IMAGE_ID="sha256:0e1c8be9644e7a5e09b1fbdf697be22c11b6c106b9cd167d3f046f78f9aa3657"
 readonly RELAY_SOURCE_SHA256="051dc82af7b9b12e229f9a127183d051ef47a6d44f03d99346762e84bd69c815"
 readonly RELAY_SANDBOX="landlock-net-v4+seccomp-socket-v2"
 readonly AGENT_SERVICE_PROFILE="qwen38-agent-service-v3"
