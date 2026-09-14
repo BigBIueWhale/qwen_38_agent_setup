@@ -85,13 +85,13 @@ Several current behaviors materially supersede the historical `0.15.6` complaint
 - provider entries are arrays of `ModelConfig`; the obsolete wrapped provider shape
   is not accepted;
 - a complete history is retained rather than dropping an arbitrary tail;
-- the project patch divides the served window into five shares that spend it
-  exactly -- 48/256 for a compaction's summary, 32/256 for one turn's output,
-  16/256 for the tool results that turn appends, 2/256 for the message a
-  compaction request adds, and the remainder for the history a turn may stand on
-  -- so a turn's output capacity is a property of the window rather than of how
-  full the conversation happens to be, with no safety margin, padding, or
-  minimum fabrication;
+- the project patch holds back two shares of the served window -- 48/256 as the
+  generation reserve, the least room any turn or snapshot is issued with, and
+  2/256 for the message a compaction request adds -- and issues every turn with
+  the window's remainder after its prompt; compaction summarises the prompt the
+  last turn was issued against and carries that turn verbatim behind the
+  snapshot, so no turn is ever cut short at a number the window did not
+  require, with no safety margin, padding, or minimum fabrication;
 - vLLM `/tokenize` on the exact rendered messages, tool schemas, template kwargs,
   and image history decides whether a turn may be issued at all, and measures the
   tool results it appends as the difference between the request with them and the
@@ -181,16 +181,16 @@ model proxy inside the network-none agent namespace.
 }
 ```
 
-The sampling tuple declares no `max_tokens`. Every request carries the one the
-send path derives — the turn's 32,768-token share of the served window, or a
-lower configured ceiling — so a value here could only be a second bound on the
+The sampling tuple declares no `max_tokens`, and the client refuses one. Every
+request carries the one limit the send path derives — the window's remainder
+after the rendered prompt — so a value here could only be a second bound on the
 same quantity, and one that names a single window at that: it would have to be
 rewritten by hand the day `max_model_len` moves. `thinking_token_budget` and
-`final_response_token_budget` are the server's own phase ceilings, above the
-turn's share and therefore not what stops a generation; the server enforces the
-131,072-token final-response half regardless. On the native 262,144-token profile
-prompt, reasoning, tools, and final output always share the one physical window,
-which is what the five shares divide.
+`final_response_token_budget` are the server's own phase ceilings; the
+final-response half is the one bound a turn can meet before the window, and the
+server enforces it regardless. On the native 262,144-token profile prompt,
+reasoning, tools, and final output always share the one physical window, which
+is what the shares divide.
 
 `maxRetries: 0` is deliberate. A transport error remains observable instead of
 silently replaying an ambiguous long generation; there is no orchestrator retry

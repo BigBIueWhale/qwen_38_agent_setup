@@ -947,8 +947,9 @@ subagent turn:
 - exact server/model identity;
 - xhigh mandatory thinking;
 - Alibaba thinking sampling tuple;
-- server reasoning ceiling 262144 and separate final ceiling 131072, both above
-  the client's own per-turn output share of 32768;
+- server reasoning ceiling 262144 and separate final ceiling 131072; the client
+  issues every turn with the window's remainder after its prompt as its limit
+  and admits no configured ceiling of its own;
 - exact /tokenize count on the same rendered request before generation, and
   again on the request with and without the turn's pending tool results;
 - no character/image-token heuristic or tokenizer fallback;
