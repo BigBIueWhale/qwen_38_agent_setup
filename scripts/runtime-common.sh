@@ -628,6 +628,9 @@ assert_running_profile() {
   require_equal "mounted non-root vLLM cache owner/mode" \
     "$(docker exec "${CONTAINER_NAME}" stat -c '%u:%g:%a' /home/vllm/.cache/vllm)" \
     "2000:0:770"
+  docker exec "${CONTAINER_NAME}" test "!" -e /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/scale_out/token_in_token_out/mm_serde.py || \
+    die "Running image contains the retired multimodal tensor serializer."
+
   cache_project_label="$(
     docker volume inspect --format '{{index .Labels "qwen38.project"}}' \
       "${CACHE_VOLUME}"
@@ -713,6 +716,10 @@ assert_running_profile() {
       /usr/local/lib/python3.12/dist-packages/vllm/v1/structured_output/__init__.py \
       /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/anthropic/api_router.py \
       /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/chat_completion/serving.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/scale_out/derender/serving.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/multimodal/processing/inputs.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/multimodal/processing/processor.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/renderers/base.py \
       /usr/local/lib/python3.12/dist-packages/vllm/renderers/online_derenderer.py \
       /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/completion/serving.py \
       /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/scale_out/render/serving.py \
@@ -749,6 +756,10 @@ assert_running_profile() {
     "${STRUCTURED_OUTPUT_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/structured_output/__init__.py \
     "${ANTHROPIC_API_ROUTER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/anthropic/api_router.py \
     "${CHAT_SERVING_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/chat_completion/serving.py \
+    "${DERENDER_SERVING_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/scale_out/derender/serving.py \
+    "${MM_PROCESSOR_INPUTS_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/multimodal/processing/inputs.py \
+    "${MM_PROCESSOR_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/multimodal/processing/processor.py \
+    "${BASE_RENDERER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/renderers/base.py \
     "${ONLINE_DERENDERER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/renderers/online_derenderer.py \
     "${COMPLETION_SERVING_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/completion/serving.py \
     "${RENDER_SERVING_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/scale_out/render/serving.py \
@@ -837,6 +848,7 @@ assert_running_profile() {
       /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/cpu/common.py \
       /usr/local/lib/python3.12/dist-packages/vllm/v1/simple_kv_offload/manager.py \
       /opt/qwen38/shared_prefix_cache_unit.py \
+      /opt/qwen38/raw_media_unit.py \
       /opt/qwen38/generate_result_unit.py \
       /usr/local/lib/python3.12/dist-packages/vllm/config/cache.py \
       /usr/local/lib/python3.12/dist-packages/vllm/config/vllm.py \
@@ -869,6 +881,7 @@ assert_running_profile() {
     "${KV_OFFLOAD_CPU_COMMON_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/cpu/common.py \
     "${SIMPLE_KV_OFFLOAD_MANAGER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/simple_kv_offload/manager.py \
     "${SHARED_PREFIX_CACHE_UNIT_SHA256}" /opt/qwen38/shared_prefix_cache_unit.py \
+    "${RAW_MEDIA_UNIT_SHA256}" /opt/qwen38/raw_media_unit.py \
     "${GENERATE_RESULT_UNIT_SHA256}" /opt/qwen38/generate_result_unit.py \
     "${CACHE_CONFIG_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/config/cache.py \
     "${VLLM_CONFIG_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/config/vllm.py \

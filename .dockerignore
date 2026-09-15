@@ -137,3 +137,10 @@
 !vllm/vllm/entrypoints/scale_out/render/serving.py
 !vllm/vllm/renderers/online_derenderer.py
 !scripts/generate_result_unit.py
+!vllm/vllm/entrypoints/scale_out/derender/
+!vllm/vllm/entrypoints/scale_out/derender/serving.py
+!vllm/vllm/multimodal/processing/
+!vllm/vllm/multimodal/processing/inputs.py
+!vllm/vllm/multimodal/processing/processor.py
+!vllm/vllm/renderers/base.py
+!scripts/raw_media_unit.py

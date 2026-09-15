@@ -14,8 +14,11 @@ EXPECTED_STATUS=$' M tests/config/test_config_utils.py
  M tests/entrypoints/openai/responses/test_serving_responses.py
  M tests/entrypoints/openai/test_render_token_offsets.py
  M tests/entrypoints/scale_out/derender/test_derender.py
+ M tests/entrypoints/scale_out/render/test_render_multimodal.py
  M tests/entrypoints/scale_out/token_in_token_out/test_generate_stream.py
+ D tests/entrypoints/scale_out/token_in_token_out/test_mm_serde.py
  M tests/entrypoints/scale_out/token_in_token_out/test_protocol.py
+ M tests/entrypoints/scale_out/token_in_token_out/test_serving_multimodal_tokens.py
  M tests/entrypoints/serve/exception_handling/test_validation_exception_handler.py
  M tests/entrypoints/serve/lora/test_lora_adapters.py
  M tests/entrypoints/serve/utils/test_api_utils.py
@@ -88,7 +91,9 @@ EXPECTED_STATUS=$' M tests/config/test_config_utils.py
  M vllm/entrypoints/openai/responses/serving.py
  M vllm/entrypoints/openai/responses/streaming_events.py
  M vllm/entrypoints/openai/responses/utils.py
+ M vllm/entrypoints/scale_out/derender/serving.py
  M vllm/entrypoints/scale_out/render/serving.py
+ D vllm/entrypoints/scale_out/token_in_token_out/mm_serde.py
  M vllm/entrypoints/scale_out/token_in_token_out/protocol.py
  M vllm/entrypoints/scale_out/token_in_token_out/serving.py
  M vllm/entrypoints/serve/exception_handling/error_response.py
@@ -102,6 +107,8 @@ EXPECTED_STATUS=$' M tests/config/test_config_utils.py
  M vllm/model_executor/models/qwen3_vl.py
  M vllm/multimodal/media/connector.py
  M vllm/multimodal/media/image.py
+ M vllm/multimodal/processing/inputs.py
+ M vllm/multimodal/processing/processor.py
  M vllm/parser/abstract_parser.py
  M vllm/parser/engine/adapters.py
  M vllm/parser/engine/events.py
@@ -110,6 +117,7 @@ EXPECTED_STATUS=$' M tests/config/test_config_utils.py
  M vllm/parser/engine/streaming_parser_engine.py
  M vllm/parser/engine/token_id_scanner.py
  M vllm/parser/qwen3.py
+ M vllm/renderers/base.py
  M vllm/renderers/online_derenderer.py
  M vllm/renderers/params.py
  M vllm/sampling_params.py
@@ -148,6 +156,8 @@ EXPECTED_STATUS=$' M tests/config/test_config_utils.py
 ?? tests/entrypoints/openai/chat_completion/test_parallel_tool_call_integrity.py
 ?? tests/entrypoints/openai/test_beam_search_boundary.py
 ?? tests/entrypoints/scale_out/derender/test_terminal_metadata.py
+?? tests/entrypoints/scale_out/token_in_token_out/test_raw_images.py
+?? tests/entrypoints/scale_out/token_in_token_out/test_raw_media_boundary.py
 ?? tests/entrypoints/test_kv_scope_protocol.py
 ?? tests/parser/engine/test_reasoning_token_count.py
 ?? tests/v1/core/test_kv_cache_users_sizing.py
@@ -208,6 +218,7 @@ QWEN_LANGUAGE_PATCH_FILE="${PROJECT_DIR}/patches/vllm-qwen-exact-tool-language.p
 PNG_SOURCE_PATCH_FILE="${PROJECT_DIR}/patches/vllm-png-source-admission.patch"
 SAMPLING_BOUNDARY_PATCH_FILE="${PROJECT_DIR}/patches/vllm-sampling-decoding-boundary.patch"
 GENERATE_RESULT_PATCH_FILE="${PROJECT_DIR}/patches/vllm-token-generation-result-integrity.patch"
+RAW_IMAGE_TRANSPORT_PATCH_FILE="${PROJECT_DIR}/patches/vllm-raw-image-token-transport.patch"
 SAMPLING_RESOLUTION_PATCH_FILE="${PROJECT_DIR}/patches/vllm-generation-sampling-resolution.patch"
 ANTHROPIC_TERMINAL_PATCH_FILE="${PROJECT_DIR}/patches/vllm-anthropic-terminal-metadata.patch"
 RESPONSES_IDENTITY_PATCH_FILE="${PROJECT_DIR}/patches/vllm-responses-stream-identity.patch"
@@ -376,6 +387,7 @@ printf '%s  %s\n' \
   "${RESPONSES_IDENTITY_PATCH_DIFF_SHA256}" "${RESPONSES_IDENTITY_PATCH_FILE}" \
   "${ANTHROPIC_TERMINAL_PATCH_DIFF_SHA256}" "${ANTHROPIC_TERMINAL_PATCH_FILE}" \
   "${SAMPLING_RESOLUTION_PATCH_DIFF_SHA256}" "${SAMPLING_RESOLUTION_PATCH_FILE}" \
+  "${RAW_IMAGE_TRANSPORT_PATCH_DIFF_SHA256}" "${RAW_IMAGE_TRANSPORT_PATCH_FILE}" \
   "${GENERATE_RESULT_PATCH_DIFF_SHA256}" "${GENERATE_RESULT_PATCH_FILE}" \
   "${SAMPLING_BOUNDARY_PATCH_DIFF_SHA256}" "${SAMPLING_BOUNDARY_PATCH_FILE}" \
   "${TOOL_TRUNCATION_PATCH_DIFF_SHA256}" "${TOOL_TRUNCATION_PATCH_FILE}" \
@@ -591,6 +603,7 @@ printf '%s  %s\n' \
   "${KV_OFFLOAD_CPU_COMMON_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/v1/kv_offload/cpu/common.py" \
   "${SIMPLE_KV_OFFLOAD_MANAGER_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/v1/simple_kv_offload/manager.py" \
   "${SHARED_PREFIX_CACHE_UNIT_SHA256}" "${PROJECT_DIR}/scripts/shared_prefix_cache_unit.py" \
+  "${RAW_MEDIA_UNIT_SHA256}" "${PROJECT_DIR}/scripts/raw_media_unit.py" \
   "${GENERATE_RESULT_UNIT_SHA256}" "${PROJECT_DIR}/scripts/generate_result_unit.py" | sha256sum --check --strict
 
 printf '%s  %s\n' \
@@ -600,6 +613,13 @@ printf '%s  %s\n' \
 
 printf '%s  %s\n' \
   "${ONLINE_DERENDERER_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/renderers/online_derenderer.py" \
+  | sha256sum --check --strict
+
+printf '%s  %s\n' \
+  "${DERENDER_SERVING_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/entrypoints/scale_out/derender/serving.py" \
+  "${MM_PROCESSOR_INPUTS_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/multimodal/processing/inputs.py" \
+  "${MM_PROCESSOR_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/multimodal/processing/processor.py" \
+  "${BASE_RENDERER_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/renderers/base.py" \
   | sha256sum --check --strict
 
 printf '%s  %s\n' \
@@ -637,7 +657,7 @@ while IFS= read -r status_line; do
       ;;
   esac
 done <<<"${EXPECTED_STATUS}"
-for unit in tool_output_parser_unit vision_contract_unit reasoning_usage_unit shared_prefix_cache_unit phase_budget_unit generate_result_unit; do
+for unit in tool_output_parser_unit vision_contract_unit reasoning_usage_unit shared_prefix_cache_unit phase_budget_unit generate_result_unit raw_media_unit; do
   docker run --rm --network none --read-only --user "$(id -u):$(id -g)" \
     --tmpfs /tmp:rw,nodev,nosuid,size=256m \
     --env PYTHONDONTWRITEBYTECODE=1 --env CUDA_VISIBLE_DEVICES= \
@@ -697,6 +717,7 @@ docker buildx build --progress=plain \
   --build-arg "SIMPLE_KV_OFFLOAD_MANAGER_UPSTREAM_FILE_SHA256=${SIMPLE_KV_OFFLOAD_MANAGER_UPSTREAM_FILE_SHA256}" \
   --build-arg "SIMPLE_KV_OFFLOAD_MANAGER_PATCHED_FILE_SHA256=${SIMPLE_KV_OFFLOAD_MANAGER_PATCHED_FILE_SHA256}" \
   --build-arg "SHARED_PREFIX_CACHE_UNIT_SHA256=${SHARED_PREFIX_CACHE_UNIT_SHA256}" \
+  --build-arg "RAW_MEDIA_UNIT_SHA256=${RAW_MEDIA_UNIT_SHA256}" \
   --build-arg "GENERATE_RESULT_UNIT_SHA256=${GENERATE_RESULT_UNIT_SHA256}" \
   --build-arg "TURBOQUANT_UPSTREAM_FILE_SHA256=${TURBOQUANT_UPSTREAM_FILE_SHA256}" \
   --build-arg "TURBOQUANT_DECODE_UPSTREAM_FILE_SHA256=${TURBOQUANT_DECODE_UPSTREAM_FILE_SHA256}" \
@@ -809,6 +830,16 @@ docker buildx build --progress=plain \
   --build-arg "RESPONSES_IDENTITY_PATCH_DIFF_SHA256=${RESPONSES_IDENTITY_PATCH_DIFF_SHA256}" \
   --build-arg "ANTHROPIC_TERMINAL_PATCH_DIFF_SHA256=${ANTHROPIC_TERMINAL_PATCH_DIFF_SHA256}" \
   --build-arg "SAMPLING_RESOLUTION_PATCH_DIFF_SHA256=${SAMPLING_RESOLUTION_PATCH_DIFF_SHA256}" \
+  --build-arg "DERENDER_SERVING_UPSTREAM_FILE_SHA256=${DERENDER_SERVING_UPSTREAM_FILE_SHA256}" \
+  --build-arg "DERENDER_SERVING_PATCHED_FILE_SHA256=${DERENDER_SERVING_PATCHED_FILE_SHA256}" \
+  --build-arg "MM_PROCESSOR_INPUTS_UPSTREAM_FILE_SHA256=${MM_PROCESSOR_INPUTS_UPSTREAM_FILE_SHA256}" \
+  --build-arg "MM_PROCESSOR_INPUTS_PATCHED_FILE_SHA256=${MM_PROCESSOR_INPUTS_PATCHED_FILE_SHA256}" \
+  --build-arg "MM_PROCESSOR_UPSTREAM_FILE_SHA256=${MM_PROCESSOR_UPSTREAM_FILE_SHA256}" \
+  --build-arg "MM_PROCESSOR_PATCHED_FILE_SHA256=${MM_PROCESSOR_PATCHED_FILE_SHA256}" \
+  --build-arg "BASE_RENDERER_UPSTREAM_FILE_SHA256=${BASE_RENDERER_UPSTREAM_FILE_SHA256}" \
+  --build-arg "BASE_RENDERER_PATCHED_FILE_SHA256=${BASE_RENDERER_PATCHED_FILE_SHA256}" \
+  --build-arg "RAW_IMAGE_TRANSPORT_PATCH_DIFF_SHA256=${RAW_IMAGE_TRANSPORT_PATCH_DIFF_SHA256}" \
+  --build-arg "MM_SERDE_UPSTREAM_FILE_SHA256=${MM_SERDE_UPSTREAM_FILE_SHA256}" \
   --build-arg "ONLINE_DERENDERER_UPSTREAM_FILE_SHA256=${ONLINE_DERENDERER_UPSTREAM_FILE_SHA256}" \
   --build-arg "ONLINE_DERENDERER_PATCHED_FILE_SHA256=${ONLINE_DERENDERER_PATCHED_FILE_SHA256}" \
   --build-arg "GENERATE_RESULT_PATCH_DIFF_SHA256=${GENERATE_RESULT_PATCH_DIFF_SHA256}" \
@@ -908,6 +939,10 @@ actual_installed_report="$(
     /usr/local/lib/python3.12/dist-packages/vllm/v1/structured_output/__init__.py \
     /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/anthropic/api_router.py \
     /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/chat_completion/serving.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/scale_out/derender/serving.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/multimodal/processing/inputs.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/multimodal/processing/processor.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/renderers/base.py \
     /usr/local/lib/python3.12/dist-packages/vllm/renderers/online_derenderer.py \
     /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/completion/serving.py \
     /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/scale_out/render/serving.py \
@@ -944,6 +979,10 @@ expected_installed_report="$(printf '%s  %s\n' \
   "${STRUCTURED_OUTPUT_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/structured_output/__init__.py \
   "${ANTHROPIC_API_ROUTER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/anthropic/api_router.py \
   "${CHAT_SERVING_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/chat_completion/serving.py \
+  "${DERENDER_SERVING_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/scale_out/derender/serving.py \
+  "${MM_PROCESSOR_INPUTS_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/multimodal/processing/inputs.py \
+  "${MM_PROCESSOR_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/multimodal/processing/processor.py \
+  "${BASE_RENDERER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/renderers/base.py \
   "${ONLINE_DERENDERER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/renderers/online_derenderer.py \
   "${COMPLETION_SERVING_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/completion/serving.py \
   "${RENDER_SERVING_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/scale_out/render/serving.py \
@@ -1023,6 +1062,7 @@ kv_users_installed_report="$(
     /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/cpu/common.py \
     /usr/local/lib/python3.12/dist-packages/vllm/v1/simple_kv_offload/manager.py \
     /opt/qwen38/shared_prefix_cache_unit.py \
+    /opt/qwen38/raw_media_unit.py \
     /opt/qwen38/generate_result_unit.py \
     /usr/local/lib/python3.12/dist-packages/vllm/config/cache.py \
     /usr/local/lib/python3.12/dist-packages/vllm/config/vllm.py \
@@ -1055,6 +1095,7 @@ expected_kv_users_installed_report="$(printf '%s  %s\n' \
   "${KV_OFFLOAD_CPU_COMMON_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/cpu/common.py \
   "${SIMPLE_KV_OFFLOAD_MANAGER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/simple_kv_offload/manager.py \
   "${SHARED_PREFIX_CACHE_UNIT_SHA256}" /opt/qwen38/shared_prefix_cache_unit.py \
+  "${RAW_MEDIA_UNIT_SHA256}" /opt/qwen38/raw_media_unit.py \
   "${GENERATE_RESULT_UNIT_SHA256}" /opt/qwen38/generate_result_unit.py \
   "${CACHE_CONFIG_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/config/cache.py \
   "${VLLM_CONFIG_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/config/vllm.py \
@@ -1119,7 +1160,8 @@ fi
 # Superseded runtime code must be absent from the shipped image.
 for obsolete in \
   /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/cpu/policies \
-  /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/serve/utils/tool_calls_utils.py; do
+  /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/serve/utils/tool_calls_utils.py \
+  /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/scale_out/token_in_token_out/mm_serde.py; do
   if ! docker run --rm --network none --entrypoint test "${IMAGE_TAG}" '!' -e "${obsolete}"; then
     printf 'Built image still contains superseded runtime code: %s\n' "${obsolete}" >&2
     exit 1

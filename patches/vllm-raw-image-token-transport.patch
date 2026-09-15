@@ -1,0 +1,1716 @@
+diff --git a/tests/entrypoints/scale_out/render/test_render_multimodal.py b/tests/entrypoints/scale_out/render/test_render_multimodal.py
+--- a/tests/entrypoints/scale_out/render/test_render_multimodal.py
++++ b/tests/entrypoints/scale_out/render/test_render_multimodal.py
+@@ -84,31 +84,11 @@
+     assert isinstance(data["token_ids"], list)
+     assert len(data["token_ids"]) > 0
+ 
+-    # Verify multimodal features are populated
+-    assert "features" in data
+-    features = data["features"]
+-    assert features is not None
+-
+-    # mm_hashes: should have an "image" key with a list of hash strings
+-    assert "mm_hashes" in features
+-    assert "image" in features["mm_hashes"]
+-    image_hashes = features["mm_hashes"]["image"]
+-    assert isinstance(image_hashes, list)
+-    assert len(image_hashes) > 0
+-    assert all(isinstance(h, str) for h in image_hashes)
+-
+-    # mm_placeholders: should have an "image" key with offset/length dicts
+-    assert "mm_placeholders" in features
+-    assert "image" in features["mm_placeholders"]
+-    image_placeholders = features["mm_placeholders"]["image"]
+-    assert isinstance(image_placeholders, list)
+-    assert len(image_placeholders) > 0
+-    for p in image_placeholders:
+-        assert "offset" in p
+-        assert "length" in p
+-        assert isinstance(p["offset"], int)
+-        assert isinstance(p["length"], int)
+-        assert p["length"] > 0
++    # Rendering retains the original admitted PNG, with exact model tokens.
++    assert data["content_parts"] == [{
++        "type": "image_url", "image_url": {"url": data_url, "detail": "auto"},
++    }]
++    assert "features" not in data
+ 
+ 
+ @pytest.mark.asyncio
+diff --git a/tests/entrypoints/scale_out/token_in_token_out/test_raw_images.py b/tests/entrypoints/scale_out/token_in_token_out/test_raw_images.py
+--- /dev/null
++++ b/tests/entrypoints/scale_out/token_in_token_out/test_raw_images.py
+@@ -0,0 +1,322 @@
++# SPDX-License-Identifier: Apache-2.0
++# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
++"""Raw image inputs and exact rendered token geometry, without a model run."""
++from types import SimpleNamespace
++from unittest.mock import AsyncMock
++
++import pytest
++
++from vllm.entrypoints.scale_out.token_in_token_out.protocol import GenerateRequest
++from vllm.exceptions import VLLMValidationError
++from vllm.model_executor.models.qwen3_vl import Qwen3VLMultiModalProcessor
++from vllm.multimodal.processing.context import TimingContext
++from vllm.multimodal.processing.inputs import ProcessorInputs, RenderedPromptTokens
++from vllm.multimodal.processing.processor import MultiModalProcessingInfo, PromptReplacement
++from vllm.renderers.base import BaseRenderer
++
++PNG = 'data:image/png;base64,aGVsbG8='
++IMAGE, START, END, VIDEO = 101, 102, 103, 104
++
++
++def request(**fields):
++    return GenerateRequest.model_validate(dict(
++        token_ids=[1], sampling_params={}, kv_scope='agent', **fields))
++
++
++
++def processor(lengths):
++    instance = object.__new__(Qwen3VLMultiModalProcessor)
++    instance.info = SimpleNamespace(
++        get_tokenizer=lambda: None,
++        get_hf_config=lambda: SimpleNamespace(
++            image_token_id=IMAGE, vision_start_token_id=START,
++            vision_end_token_id=END, video_token_id=VIDEO),
++    )
++    updates = {'image': [[PromptReplacement('image', [IMAGE], [IMAGE] * n).resolve(i)]
++                         for i, n in enumerate(lengths)]}
++    info = MultiModalProcessingInfo(
++        kwargs={'image': [None] * len(lengths)},
++        hashes={'image': [f'native-{i}' for i in range(len(lengths))]},
++        prompt_updates=updates,
++    )
++    instance._cached_apply_hf_processor = lambda inputs, timing: (
++        list(inputs.prompt.token_ids if isinstance(inputs.prompt, RenderedPromptTokens) else inputs.prompt),
++        info, False,
++    )
++    items = SimpleNamespace(get_all_counts=lambda: {'image': len(lengths)})
++    return instance, items
++
++
++@pytest.mark.parametrize('lengths', [[1], [2], [2, 3], [3, 2], [1, 1, 1]])
++def test_rendered_image_tokens_are_validated_without_second_expansion(lengths):
++    instance, items = processor(lengths)
++    original = [9]
++    rendered = [9]
++    spans = []
++    for n in lengths:
++        original += [START, IMAGE, END, 8]
++        spans.append((len(rendered) + 1, n))
++        rendered += [START, *([IMAGE] * n), END, 8]
++    context = TimingContext(enabled=False)
++    first = instance.apply(ProcessorInputs(original, items), context)
++    assert first['prompt_token_ids'] == rendered
++    incoming = ProcessorInputs(RenderedPromptTokens(rendered), items)
++    second = instance.apply(incoming, context)
++    assert second['prompt_token_ids'] == rendered
++    assert second['mm_hashes'] == first['mm_hashes']
++    assert [(p.offset, p.length) for p in second['mm_placeholders']['image']] == spans
++    assert incoming.prompt.token_ids == rendered
++
++
++@pytest.mark.parametrize('tokens,lengths', [
++    ([START, IMAGE, END], [2]),
++    ([START, IMAGE, IMAGE, IMAGE, END], [2]),
++    ([START, IMAGE, IMAGE, END, START, IMAGE, END], [2]),
++    ([START, IMAGE, IMAGE, END, IMAGE], [2]),
++    ([START, IMAGE, IMAGE, END, END], [2]),
++    ([START, IMAGE, IMAGE], [2]),
++    ([START, END], [2]),
++    ([START, IMAGE, 7, IMAGE, END], [2]),
++    ([START, IMAGE, START, IMAGE, END], [2]),
++    ([START, VIDEO, VIDEO, END], [2]),
++    ([START, IMAGE, IMAGE, IMAGE, IMAGE, IMAGE, END], [2, 3]),
++    ([START, IMAGE, IMAGE, IMAGE, END, START, IMAGE, IMAGE, END], [2, 3]),
++])
++def test_rendered_image_geometry_refuses_incomplete_or_unmatched_spans(tokens, lengths):
++    instance, items = processor(lengths)
++    with pytest.raises(VLLMValidationError) as exc:
++        instance.apply(ProcessorInputs(RenderedPromptTokens(tokens), items), TimingContext(enabled=False))
++    assert exc.value.parameter == 'token_ids'
++
++
++@pytest.mark.asyncio
++async def test_rendered_media_handoff_preserves_salt_and_uses_full_remote_inputs():
++    async def resolve(prompt, media, **kwargs):
++        assert isinstance(prompt, RenderedPromptTokens)
++        assert prompt.token_ids == [1, START, IMAGE, END]
++        assert media == {'image': ['raw']}
++        assert kwargs == dict(mm_uuids=None, mm_processor_kwargs=None,
++                              tokenization_kwargs=None, skip_mm_cache=True)
++        return {'type': 'multimodal', 'prompt_token_ids': prompt.token_ids}
++
++    renderer = SimpleNamespace(model_config=SimpleNamespace(is_encoder_decoder=False),
++        _process_multimodal_async=AsyncMock(side_effect=resolve))
++    result = await BaseRenderer.process_rendered_multimodal_async(
++        renderer, [1, START, IMAGE, END], {'image': ['raw']}, cache_salt='salt')
++    assert result['cache_salt'] == 'salt'
++
++
++@pytest.fixture
++def image_model(monkeypatch):
++    from vllm.config.multimodal import MultiModalConfig
++    from vllm.entrypoints.chat_utils import BaseMultiModalItemTracker
++
++    monkeypatch.setenv('VLLM_QWEN38_STRICT_IMAGE_CONTRACT', '1')
++    monkeypatch.setenv('VLLM_MAX_IMAGE_PIXELS', '16777216')
++    monkeypatch.delenv('VLLM_MEDIA_CACHE', raising=False)
++    # Model metadata is supplied locally; media decoding remains real.
++    info = SimpleNamespace(validate_num_items=lambda modality, count: None)
++    monkeypatch.setattr(BaseMultiModalItemTracker, 'mm_processor', property(
++        lambda tracker: SimpleNamespace(info=info)))
++    monkeypatch.setattr(BaseMultiModalItemTracker, 'model_cls', property(
++        lambda tracker: SimpleNamespace(get_placeholder_str=lambda modality, count: '<image>')))
++    return SimpleNamespace(
++        max_model_len=1000, is_encoder_decoder=False, is_multimodal_model=True,
++        hf_config=SimpleNamespace(use_unified_vision_chunk=False),
++        multimodal_config=MultiModalConfig(), allowed_local_media_path='',
++        allowed_media_domains=None,
++    )
++
++
++def png_source(color):
++    import base64
++    from io import BytesIO
++    from PIL import Image
++
++    buffer = BytesIO()
++    Image.new('RGB', (32, 32), color=color).save(buffer, 'PNG')
++    data = buffer.getvalue()
++    return data, 'data:image/png;base64,' + base64.b64encode(data).decode()
++
++
++def serving_tokens(model, process_images):
++    from unittest.mock import MagicMock
++    from vllm.entrypoints.scale_out.token_in_token_out.serving import ServingTokens
++    from vllm.outputs import CompletionOutput, RequestOutput
++
++    serving = object.__new__(ServingTokens)
++    serving.model_config = model
++    serving.default_sampling_params = {}
++    serving.override_max_tokens = None
++    serving.force_no_detokenize = False
++    serving.enable_prompt_tokens_details = False
++    serving.enable_log_outputs = False
++    serving._check_model = AsyncMock(return_value=None)
++    serving._maybe_get_adapters = MagicMock(return_value=None)
++    serving.models = SimpleNamespace(model_name=lambda adapter: 'model')
++    serving._base_request_id = MagicMock(return_value='request')
++    serving._log_inputs = MagicMock()
++    serving._get_data_parallel_rank = MagicMock(return_value=None)
++    serving._get_session_id_from_headers = MagicMock(return_value=None)
++    serving.online_renderer = SimpleNamespace(renderer=SimpleNamespace(
++        process_rendered_multimodal_async=AsyncMock(side_effect=process_images)))
++    dispatched = []
++
++    async def generate(prompt, params, request_id, **kwargs):
++        dispatched.append((prompt, params))
++        yield RequestOutput(
++            request_id=request_id, prompt=None, prompt_token_ids=prompt['prompt_token_ids'],
++            prompt_logprobs=None, finished=True, outputs=[CompletionOutput(
++                index=0, text='', token_ids=[9], cumulative_logprob=None,
++                logprobs=None, finish_reason='stop')])
++
++    serving.engine_client = SimpleNamespace(errored=False, generate=generate,
++        vllm_config=SimpleNamespace(scheduler_config=SimpleNamespace(max_num_seqs=10)))
++    return serving, dispatched
++
++
++@pytest.mark.asyncio
++@pytest.mark.parametrize('stream', [False, True])
++async def test_render_json_generate_preserves_source_images_tokens_salt_and_identity(image_model, stream):
++    from vllm.entrypoints.openai.chat_completion.protocol import ChatCompletionRequest
++    from vllm.entrypoints.scale_out.render.serving import ServingRender
++    from vllm.multimodal.hasher import MultiModalHasher
++
++    sources = [png_source('red'), png_source('blue')]
++    parts = [{'type': 'image_url', 'image_url': {'url': url, 'detail': 'high'}}
++             for _, url in sources]
++    tokens = [9, START, IMAGE, IMAGE, END, 8, START, IMAGE, IMAGE, IMAGE, END]
++    rendered = object.__new__(ServingRender)
++    rendered.model_config = image_model
++    rendered.default_sampling_params = {}
++    rendered.override_max_tokens = None
++    rendered._check_model = AsyncMock(return_value=None)
++    rendered.online_renderer = SimpleNamespace(render_chat=AsyncMock(return_value=(
++        [], [{'type': 'multimodal', 'prompt_token_ids': tokens}]
++    )))
++    chat = ChatCompletionRequest(model='model', stream=stream, kv_scope='agent',
++        cache_salt='salt', messages=[{'role': 'user', 'content': parts}])
++    outgoing = await rendered.render_chat_request(chat)
++    incoming = GenerateRequest.model_validate_json(outgoing.model_dump_json())
++    assert incoming.token_ids == tokens
++    assert [part.model_dump() for part in incoming.content_parts] == parts
++    assert 'features' not in incoming.model_dump()
++    seen_hashes = []
++
++    async def process_images(ids, media, *, cache_salt):
++        assert ids == tokens and cache_salt == 'salt'
++        assert [item.original_bytes for item in media['image']] == [data for data, _ in sources]
++        hashes = [MultiModalHasher.hash_kwargs('sha256', image=item) for item in media['image']]
++        seen_hashes.append(hashes)
++        return dict(type='multimodal', prompt_token_ids=ids, mm_hashes={'image': hashes},
++                    cache_salt=cache_salt)
++
++    serving, dispatched = serving_tokens(image_model, process_images)
++    for _ in range(2):
++        response = await serving.serve_tokens(incoming)
++        if stream:
++            events = [event async for event in response]
++            assert events[-1] == 'data: [DONE]\n\n'
++        else:
++            assert response.choices[0].finish_reason == 'stop'
++    assert len(dispatched) == 2
++    assert seen_hashes[0] == seen_hashes[1]
++    assert seen_hashes[0][0] != seen_hashes[0][1]
++    assert all(prompt['cache_salt'] == 'salt' for prompt, _ in dispatched)
++    assert all(params.extra_args['kv_scope'] == 'agent' for _, params in dispatched)
++
++
++@pytest.mark.asyncio
++@pytest.mark.parametrize('stream', [False, True])
++async def test_direct_generate_decodes_source_before_processing_or_engine(image_model, stream):
++    serving, dispatched = serving_tokens(image_model, AsyncMock())
++    req = request(stream=stream, content_parts=[
++        {'type': 'image_url', 'image_url': {'url': PNG}}])
++    with pytest.raises(ValueError, match='Failed to load image'):
++        await serving.serve_tokens(req)
++    assert not dispatched
++    serving.online_renderer.renderer.process_rendered_multimodal_async.assert_not_called()
++
++
++def test_rendered_prompt_processes_only_media_without_retokenization():
++    from unittest.mock import MagicMock
++
++    instance, items = processor([2])
++    instance._apply_hf_processor_tokens_only = MagicMock(side_effect=AssertionError('already rendered'))
++    instance._apply_hf_processor_mm_only = MagicMock(return_value={'pixels': 'processed'})
++    tokens = [START, IMAGE, IMAGE, END]
++    prompt_ids, processed, updated = instance._apply_hf_processor_main(
++        RenderedPromptTokens(tokens), items, {}, {}, enable_hf_prompt_update=True)
++    assert prompt_ids == tokens and prompt_ids is not tokens
++    assert processed == {'pixels': 'processed'} and updated is False
++    instance._apply_hf_processor_tokens_only.assert_not_called()
++    instance._apply_hf_processor_mm_only.assert_called_once()
++
++
++@pytest.mark.parametrize('cached', [False, True])
++def test_native_image_processing_retains_exact_spans_and_full_cache_data(image_model, cached):
++    from io import BytesIO
++    from PIL import Image
++    from transformers import BatchFeature, Qwen2VLImageProcessor
++    from vllm.multimodal.cache import MultiModalProcessorOnlyCache
++    from vllm.multimodal.media import ImageMediaIO
++    from vllm.multimodal.parse import MultiModalDataParser
++
++    # The actual image processor uses the served patch/merge geometry and
++    # pixel limits. No language model or weights are instantiated.
++    image_processor = Qwen2VLImageProcessor(
++        size={'shortest_edge': 65536, 'longest_edge': 16777216},
++        patch_size=16, temporal_patch_size=2, merge_size=2,
++        image_mean=[0.5] * 3, image_std=[0.5] * 3,
++    )
++    media = []
++    for size, color in (((64, 64), 'red'), ((320, 512), 'blue')):
++        buffer = BytesIO()
++        Image.new('RGB', size, color).save(buffer, 'PNG')
++        media.append(ImageMediaIO().load_bytes(buffer.getvalue()))
++    mm_items = MultiModalDataParser().parse_mm_data({'image': media})
++    native = image_processor.preprocess([item.media for item in media], return_tensors='pt')
++    lengths = [int(grid.prod()) // 4 for grid in native['image_grid_thw']]
++    assert lengths[0] != lengths[1]
++    tokens = [9]
++    expected_spans = []
++    for length in lengths:
++        expected_spans.append((len(tokens) + 1, length))
++        tokens.extend([START, *([IMAGE] * length), END, 8])
++
++    instance = object.__new__(Qwen3VLMultiModalProcessor)
++    cache_config = SimpleNamespace(mm_processor_cache_gb=0.02, mm_hasher_algorithm='sha256')
++    instance.cache = (MultiModalProcessorOnlyCache(SimpleNamespace(
++        get_multimodal_config=lambda: cache_config)) if cached else None)
++    instance.info = SimpleNamespace(
++        model_id='local-image-processor',
++        parse_mm_data=lambda data, **kwargs: MultiModalDataParser().parse_mm_data(data),
++        ctx=SimpleNamespace(get_mm_config=lambda: cache_config),
++        get_tokenizer=lambda: None,
++        get_image_processor=lambda **kwargs: image_processor,
++        get_hf_processor=lambda **kwargs: SimpleNamespace(image_token_id=IMAGE, image_token='<image>'),
++        get_hf_config=lambda: SimpleNamespace(
++            image_token_id=IMAGE, vision_start_token_id=START,
++            vision_end_token_id=END, video_token_id=VIDEO,
++            vision_config=SimpleNamespace(spatial_merge_size=2)),
++    )
++    processed_counts = []
++
++    def process_images(*, mm_items, **kwargs):
++        images = mm_items['image'].get_all() if 'image' in mm_items else []
++        processed_counts.append(len(images))
++        return (image_processor.preprocess(images, return_tensors='pt') if images else BatchFeature({}))
++
++    instance._apply_hf_processor_mm_only = process_images
++    context = TimingContext(enabled=False)
++    results = [instance.apply(ProcessorInputs(RenderedPromptTokens(tokens), mm_items), context)
++               for _ in range(2)]
++    assert processed_counts == ([2, 0] if cached else [2, 2])
++    assert results[0]['mm_hashes'] == results[1]['mm_hashes']
++    assert results[0]['mm_hashes']['image'][0] != results[0]['mm_hashes']['image'][1]
++    for result in results:
++        assert result['prompt_token_ids'] == tokens
++        assert [(p.offset, p.length) for p in result['mm_placeholders']['image']] == expected_spans
++        assert all(item is not None for item in result['mm_kwargs']['image'])
++        for item, length in zip(result['mm_kwargs']['image'], lengths):
++            assert item['pixel_values'].data.shape[0] == length * 4
+diff --git a/tests/entrypoints/scale_out/token_in_token_out/test_raw_media_boundary.py b/tests/entrypoints/scale_out/token_in_token_out/test_raw_media_boundary.py
+--- /dev/null
++++ b/tests/entrypoints/scale_out/token_in_token_out/test_raw_media_boundary.py
+@@ -0,0 +1,50 @@
++# SPDX-License-Identifier: Apache-2.0
++# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
++import pytest
++from pydantic import ValidationError
++from vllm.entrypoints.scale_out.token_in_token_out.protocol import GenerateRequest
++
++PNG = 'data:image/png;base64,aGVsbG8='
++
++def request(**fields):
++    return GenerateRequest.model_validate(dict(
++        token_ids=[1], sampling_params={}, kv_scope='agent', **fields))
++
++@pytest.mark.parametrize('stream', [False, True])
++@pytest.mark.parametrize('extra', [
++    {'features': {'mm_hashes': {'image': ['caller']}, 'mm_placeholders': {
++        'image': [{'offset': 0, 'length': 1}]}, 'kwargs_data': {'image': [None]}}},
++    {'mm_hashes': {'image': ['caller']}}, {'kwargs_data': {'image': ['tensor']}},
++    {'multi_modal_uuids': {'image': ['caller']}},
++])
++def test_generate_refuses_untrusted_media_payloads(stream, extra):
++    with pytest.raises(ValidationError, match='Extra inputs'):
++        request(stream=stream, **extra)
++
++
++@pytest.mark.parametrize('stream', [False, True])
++@pytest.mark.parametrize('part', [
++    {'type': 'audio_url', 'url': PNG}, {'type': 'video_url', 'url': PNG},
++    {'type': 'image_embeds', 'image_embeds': 'tensor'},
++    {'type': 'unknown', 'url': PNG}, {'type': 'image_url', 'url': PNG},
++    {'type': 'image_url', 'uuid': 'caller', 'image_url': {'url': PNG}},
++    {'type': 'image_url', 'uuid': None, 'image_url': {'url': PNG}},
++    {'type': 'image_url', 'image_url': {'url': PNG, 'uuid': 'caller'}},
++    {'type': 'image_url', 'image_url': {'url': PNG, 'detail': 'low'}},
++    {'type': 'image_url', 'image_url': {'url': 'https://example.invalid/image.png'}},
++    {'type': 'image_url', 'image_url': {'url': 'data:image/jpeg;base64,AA=='}},
++])
++def test_generate_refuses_unsupported_image_parts(stream, part):
++    with pytest.raises(ValidationError):
++        request(stream=stream, content_parts=[part])
++
++
++def test_raw_png_transport_preserves_original_data_url():
++    supplied = {'type': 'image_url', 'image_url': {'url': PNG, 'detail': 'high'}}
++    parsed = GenerateRequest.model_validate_json(
++        request(content_parts=[supplied]).model_dump_json())
++    assert parsed.content_parts[0].model_dump() == supplied
++    schema = GenerateRequest.model_json_schema()
++    assert 'features' not in schema['properties']
++    assert schema['additionalProperties'] is False
++
+diff --git a/tests/entrypoints/scale_out/token_in_token_out/test_serving_multimodal_tokens.py b/tests/entrypoints/scale_out/token_in_token_out/test_serving_multimodal_tokens.py
+--- a/tests/entrypoints/scale_out/token_in_token_out/test_serving_multimodal_tokens.py
++++ b/tests/entrypoints/scale_out/token_in_token_out/test_serving_multimodal_tokens.py
+@@ -92,34 +92,14 @@
+     assert len(render_data["token_ids"]) > 0
+     assert all(isinstance(t, int) for t in render_data["token_ids"])
+ 
+-    assert "features" in render_data
+-    features = render_data["features"]
+-    assert features is not None
+-    assert isinstance(features, dict)
+-
+-    assert "mm_hashes" in features
+-    assert "image" in features["mm_hashes"]
+-    image_hashes = features["mm_hashes"]["image"]
+-    assert isinstance(image_hashes, list)
+-    assert len(image_hashes) > 0
+-    assert all(isinstance(h, str) and h for h in image_hashes)
+-
+-    assert "mm_placeholders" in features
+-    assert "image" in features["mm_placeholders"]
+-    image_placeholders = features["mm_placeholders"]["image"]
+-    assert isinstance(image_placeholders, list)
+-    assert len(image_placeholders) > 0
+-    for p in image_placeholders:
+-        assert isinstance(p.get("offset"), int)
+-        assert isinstance(p.get("length"), int)
+-        assert p["length"] > 0
+-
+-    assert "kwargs_data" in features
+-    assert "image" in features["kwargs_data"]
+-    assert len(features["kwargs_data"]["image"]) > 0
++    assert render_data["content_parts"] == [{
++        "type": "image_url", "image_url": {"url": data_url, "detail": "auto"},
++    }]
++    assert "features" not in render_data
+ 
+     # Build generate request from render output
+     generate_payload = render_data
++    generate_payload["kv_scope"] = "raw-image-roundtrip"
+     generate_payload["sampling_params"] = {
+         "max_tokens": 10,
+         "temperature": 0.0,
+@@ -180,7 +160,8 @@
+         GEN_ENDPOINT,
+         json={
+             "token_ids": token_ids,
+-            "content_parts": [{"type": "image_url", "url": data_url}],
++            "content_parts": [{"type": "image_url", "image_url": {"url": data_url}}],
++            "kv_scope": "raw-image-input",
+             "sampling_params": {"max_tokens": 10, "temperature": 0.0},
+         },
+     )
+@@ -223,7 +204,8 @@
+         GEN_ENDPOINT,
+         json={
+             "token_ids": token_ids,
+-            "content_parts": [{"type": "image_url", "url": data_url}],
++            "content_parts": [{"type": "image_url", "image_url": {"url": data_url}}],
++            "kv_scope": "raw-image-input",
+             "sampling_params": {"max_tokens": 8, "temperature": 0.0},
+             "stream": True,
+         },
+diff --git a/vllm/entrypoints/scale_out/derender/serving.py b/vllm/entrypoints/scale_out/derender/serving.py
+--- a/vllm/entrypoints/scale_out/derender/serving.py
++++ b/vllm/entrypoints/scale_out/derender/serving.py
+@@ -1,376 +1,327 @@
+ # SPDX-License-Identifier: Apache-2.0
+ # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
+ import time
+-from typing import cast
+ 
+ import vllm.envs as envs
+ from vllm.entrypoints.openai.chat_completion.protocol import (
+     ChatCompletionResponse,
+     ChatCompletionStreamResponse,
+ )
+ from vllm.entrypoints.openai.completion.protocol import (
+     CompletionResponse,
+     CompletionStreamResponse,
+ )
+ from vllm.entrypoints.openai.engine.protocol import (
+     ErrorResponse,
+     UsageInfo,
+ )
+ from vllm.entrypoints.openai.models.serving import (
+     OpenAIModelRegistry,
+     OpenAIServingModels,
+ )
+ from vllm.entrypoints.serve.engine.serving import BaseServing
+ from vllm.entrypoints.serve.utils.request_logger import RequestLogger
+-from vllm.inputs import (
+-    EngineInput,
+-    MultiModalHashes,
+-    MultiModalInput,
+-    MultiModalPlaceholders,
+-)
+ from vllm.logger import init_logger
+ from vllm.renderers.online_derenderer import OnlineDerenderer
+ 
+-from ..token_in_token_out.mm_serde import encode_mm_kwargs_item
+ from ..token_in_token_out.protocol import (
+     DerenderChatRequest,
+     DerenderChatStreamRequest,
+     DerenderCompletionRequest,
+     DerenderCompletionStreamRequest,
+     DerenderStreamState,
+     GenerateResponse,
+-    MultiModalFeatures,
+-    PlaceholderRangeInfo,
+ )
+ 
+ logger = init_logger(__name__)
+ 
+ 
+ class ServingDerender(BaseServing):
+     def __init__(
+         self,
+         models: OpenAIServingModels | OpenAIModelRegistry,
+         online_derenderer: "OnlineDerenderer",
+         *,
+         request_logger: RequestLogger | None = None,
+     ) -> None:
+         super().__init__(
+             models=models,
+             model_config=models.model_config,
+             request_logger=request_logger,
+         )
+ 
+         self.online_derenderer = online_derenderer
+ 
+     def _validate_derender_bounds(
+         self,
+         generate_responses: list[GenerateResponse],
+     ) -> ErrorResponse | None:
+         """Reject derender payloads that exceed resource bounds.
+ 
+         Runs before any tokenizer.decode() or parser invocation to prevent
+         CPU/memory exhaustion from oversized caller-supplied token structures.
+         """
+         max_n = envs.VLLM_MAX_N_SEQUENCES
+         max_model_len = self.model_config.max_model_len
+         # See ModelConfig.max_logprobs for semantics and default value.
+         max_logprobs = self.model_config.max_logprobs
+ 
+         if len(generate_responses) > max_n:
+             return self.create_error_response(
+                 f"generate_responses count ({len(generate_responses)}) "
+                 f"exceeds server maximum ({max_n}). "
+                 f"Set VLLM_MAX_N_SEQUENCES to increase this limit."
+             )
+ 
+         for gen in generate_responses:
+             if len(gen.choices) > max_n:
+                 return self.create_error_response(
+                     f"choices count ({len(gen.choices)}) in response "
+                     f"'{gen.request_id}' exceeds server maximum ({max_n})."
+                 )
+ 
+             for choice in gen.choices:
+                 if choice.token_ids and len(choice.token_ids) > max_model_len:
+                     return self.create_error_response(
+                         f"token_ids length ({len(choice.token_ids)}) in "
+                         f"choice {choice.index} exceeds "
+                         f"max_model_len ({max_model_len})."
+                     )
+                 if choice.logprobs and choice.logprobs.content:
+                     if len(choice.logprobs.content) > max_model_len:
+                         return self.create_error_response(
+                             f"logprobs.content length "
+                             f"({len(choice.logprobs.content)}) in "
+                             f"choice {choice.index} exceeds "
+                             f"max_model_len ({max_model_len})."
+                         )
+                     for entry in choice.logprobs.content:
+                         if (
+                             max_logprobs >= 0
+                             and entry.top_logprobs
+                             and len(entry.top_logprobs) > max_logprobs
+                         ):
+                             return self.create_error_response(
+                                 f"top_logprobs count "
+                                 f"({len(entry.top_logprobs)}) in "
+                                 f"choice {choice.index} exceeds "
+                                 f"max_logprobs ({max_logprobs})."
+                             )
+ 
+             if gen.prompt_logprobs and len(gen.prompt_logprobs) > max_model_len:
+                 return self.create_error_response(
+                     f"prompt_logprobs length ({len(gen.prompt_logprobs)}) "
+                     f"in response '{gen.request_id}' exceeds "
+                     f"max_model_len ({max_model_len})."
+                 )
+ 
+         return None
+ 
+     async def derender_chat_response(
+         self,
+         request: DerenderChatRequest,
+     ) -> ChatCompletionResponse | ErrorResponse:
+         """Postprocess a GenerateResponse into a ChatCompletionResponse.
+ 
+         Non-streaming only: expects the complete GenerateResponse with all
+         token IDs present.  Uses ``parser.parse()`` for one-shot extraction.
+ 
+         When ``request.chat_request`` is provided, the parser splits the
+         output into (reasoning, content, tool_calls).  Otherwise falls
+         back to plain detokenization.
+         """
+         error_check_ret = await self._check_model(request)
+         if error_check_ret is not None:
+             return error_check_ret
+ 
+         bounds_error = self._validate_derender_bounds([request.generate_response])
+         if bounds_error is not None:
+             return bounds_error
+ 
+         try:
+             choices = await self.online_derenderer.derender_chat(
+                 request.generate_response, request.chat_request
+             )
+         except ValueError as exc:
+             return self.create_error_response(str(exc))
+ 
+         prompt_tokens = (
+             request.prompt_tokens if request.prompt_tokens is not None else 0
+         )
+         gen = request.generate_response
+         completion_tokens = sum(len(ch.token_ids) for ch in gen.choices if ch.token_ids)
+         usage = UsageInfo(
+             prompt_tokens=prompt_tokens,
+             completion_tokens=completion_tokens,
+             total_tokens=prompt_tokens + completion_tokens,
+         )
+ 
+         model_name = request.model or self.models.model_name()
+         logger.debug(
+             "derender_chat request_id=%s model=%s choices=%d completion_tokens=%d",
+             gen.request_id,
+             model_name,
+             len(choices),
+             completion_tokens,
+         )
+         return ChatCompletionResponse(
+             id=gen.request_id,
+             model=model_name,
+             created=int(time.time()),
+             choices=choices,
+             usage=usage,
+             prompt_logprobs=gen.prompt_logprobs,
+             kv_transfer_params=gen.kv_transfer_params,
+         )
+ 
+     async def derender_completion_response(
+         self,
+         request: DerenderCompletionRequest,
+     ) -> CompletionResponse | ErrorResponse:
+         """Postprocess a list of GenerateResponses into a CompletionResponse.
+ 
+         Non-streaming only.  Mirrors the multi-prompt completions case: one
+         GenerateResponse per prompt, parallel to the list[GenerateRequest]
+         from /v1/completions/render.
+         """
+         error_check_ret = await self._check_model(request)
+         if error_check_ret is not None:
+             return error_check_ret
+ 
+         if not request.generate_responses:
+             return self.create_error_response("generate_responses must not be empty")
+ 
+         bounds_error = self._validate_derender_bounds(request.generate_responses)
+         if bounds_error is not None:
+             return bounds_error
+ 
+         (
+             choices,
+             total_prompt_tokens,
+             total_completion_tokens,
+         ) = await self.online_derenderer.derender_completion(
+             request.generate_responses,
+             request.prompt_tokens,
+             completion_request=request.completion_request,
+         )
+ 
+         first = request.generate_responses[0]
+         kv_params = first.kv_transfer_params
+         if any(
+             r.kv_transfer_params != kv_params for r in request.generate_responses[1:]
+         ):
+             logger.warning(
+                 "derender_completion: kv_transfer_params differ across responses; "
+                 "setting to None on the aggregated response"
+             )
+             kv_params = None
+ 
+         usage = UsageInfo(
+             prompt_tokens=total_prompt_tokens,
+             completion_tokens=total_completion_tokens,
+             total_tokens=total_prompt_tokens + total_completion_tokens,
+         )
+ 
+         model_name = request.model or self.models.model_name()
+         logger.debug(
+             "derender_completion request_id=%s model=%s choices=%d"
+             " completion_tokens=%d",
+             first.request_id,
+             model_name,
+             len(choices),
+             total_completion_tokens,
+         )
+         return CompletionResponse(
+             id=first.request_id,
+             model=model_name,
+             created=int(time.time()),
+             choices=choices,
+             usage=usage,
+             kv_transfer_params=kv_params,
+         )
+ 
+     async def derender_chat_stream_response(
+         self,
+         request: DerenderChatStreamRequest,
+     ) -> tuple[ChatCompletionStreamResponse, DerenderStreamState] | ErrorResponse:
+         """Streaming counterpart to ``derender_chat_response``.
+ 
+         Processes one ``GenerateStreamResponse`` chunk and returns the
+         derendered chunk together with the updated client carried state.
+ 
+         ``parser is None`` or no ``chat_request`` until reasoning/tool call
+         functionality added in future PR.
+         """
+         error_check_ret = await self._check_model(request)
+         if error_check_ret is not None:
+             return error_check_ret
+ 
+         model_name = request.model or self.models.model_name()
+         try:
+             chunk, updated_state = await self.online_derenderer.derender_chat_stream(
+                 model=model_name,
+                 generate_chunk=request.generate_chunk,
+                 state=request.stream_state,
+                 chat_request=request.chat_request,
+                 prompt_tokens=request.prompt_tokens,
+             )
+         except NotImplementedError as exc:
+             return self.create_error_response(exc)
+         except ValueError as exc:
+             return self.create_error_response(str(exc))
+         except (KeyError, IndexError) as exc:
+             return self.create_error_response(
+                 f"invalid stream_state: detokenization failed ({exc!r})"
+             )
+ 
+         logger.debug(
+             "derender_chat_stream request_id=%s model=%s delta_tokens=%d",
+             request.generate_chunk.request_id,
+             model_name,
+             sum(
+                 len(c.token_ids) for c in request.generate_chunk.choices if c.token_ids
+             ),
+         )
+         return chunk, updated_state
+ 
+     async def derender_completion_stream_response(
+         self,
+         request: DerenderCompletionStreamRequest,
+     ) -> tuple[CompletionStreamResponse, DerenderStreamState] | ErrorResponse:
+         """Streaming counterpart to ``derender_completion_response``.
+ 
+         Processes one ``GenerateStreamResponse`` chunk (one output sequence's
+         delta) and returns the derendered chunk and updated state.
+         """
+         error_check_ret = await self._check_model(request)
+         if error_check_ret is not None:
+             return error_check_ret
+ 
+         model_name = request.model or self.models.model_name()
+         try:
+             (
+                 chunk,
+                 updated_state,
+             ) = await self.online_derenderer.derender_completion_stream(
+                 model=model_name,
+                 generate_chunk=request.generate_chunk,
+                 state=request.stream_state,
+                 prompt_tokens=request.prompt_tokens,
+                 completion_request=request.completion_request,
+             )
+         except ValueError as exc:
+             return self.create_error_response(str(exc))
+         except (KeyError, IndexError) as exc:
+             return self.create_error_response(
+                 f"invalid stream_state: detokenization failed ({exc!r})"
+             )
+ 
+         logger.debug(
+             "derender_completion_stream request_id=%s model=%s delta_tokens=%d",
+             request.generate_chunk.request_id,
+             model_name,
+             sum(
+                 len(c.token_ids) for c in request.generate_chunk.choices if c.token_ids
+             ),
+         )
+         return chunk, updated_state
+-
+-    @staticmethod
+-    def _extract_mm_features(
+-        engine_input: EngineInput,
+-    ) -> MultiModalFeatures | None:
+-        """Extract multimodal metadata from a rendered engine prompt.
+-
+-        Returns ``None`` for text-only prompts.
+-        """
+-        if engine_input.get("type") != "multimodal":
+-            return None
+-
+-        # At this point engine_input is a MultiModalInput TypedDict.
+-        mm_engine_input = cast(MultiModalInput, engine_input)
+-        mm_hashes: MultiModalHashes = mm_engine_input["mm_hashes"]
+-        raw_placeholders: MultiModalPlaceholders = mm_engine_input["mm_placeholders"]
+-
+-        mm_placeholders = {
+-            modality: [
+-                PlaceholderRangeInfo(offset=p.offset, length=p.length) for p in ranges
+-            ]
+-            for modality, ranges in raw_placeholders.items()
+-        }
+-
+-        # Serialize tensor data per modality.
+-        kwargs_data: dict[str, list[str | None]] | None = None
+-        if raw_mm_kwargs := mm_engine_input.get("mm_kwargs"):
+-            kwargs_data = {}
+-            for modality, items in raw_mm_kwargs.items():
+-                kwargs_data[modality] = [
+-                    encode_mm_kwargs_item(item) if item is not None else None
+-                    for item in items
+-                ]
+-
+-        return MultiModalFeatures(
+-            mm_hashes=mm_hashes,
+-            mm_placeholders=mm_placeholders,
+-            kwargs_data=kwargs_data,
+-        )
+diff --git a/vllm/entrypoints/scale_out/render/serving.py b/vllm/entrypoints/scale_out/render/serving.py
+--- a/vllm/entrypoints/scale_out/render/serving.py
++++ b/vllm/entrypoints/scale_out/render/serving.py
+@@ -1,243 +1,200 @@
+ # SPDX-License-Identifier: Apache-2.0
+ # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
+-from typing import cast
+ 
+ from vllm.entrypoints.openai.chat_completion.protocol import ChatCompletionRequest
+ from vllm.entrypoints.openai.completion.protocol import CompletionRequest
+ from vllm.entrypoints.openai.engine.protocol import ErrorResponse
+ from vllm.entrypoints.openai.models.serving import (
+     OpenAIModelRegistry,
+     OpenAIServingModels,
+ )
+-from vllm.entrypoints.scale_out.token_in_token_out.mm_serde import encode_mm_kwargs_item
+ from vllm.entrypoints.scale_out.token_in_token_out.protocol import (
+     GenerateRequest,
+-    MultiModalFeatures,
+-    PlaceholderRangeInfo,
++    InlinePNGPart,
+ )
+ from vllm.entrypoints.serve.engine.serving import BaseServing
+ from vllm.entrypoints.serve.utils.api_utils import get_max_tokens
+ from vllm.entrypoints.serve.utils.request_logger import RequestLogger
+-from vllm.inputs import (
+-    EngineInput,
+-    MultiModalHashes,
+-    MultiModalInput,
+-    MultiModalPlaceholders,
+-)
+ from vllm.logger import init_logger
+ from vllm.renderers.inputs.preprocess import (
+     extract_prompt_components,
+     extract_prompt_len,
+ )
+ from vllm.renderers.online_renderer import OnlineRenderer
+ from vllm.utils import random_uuid
+ 
+ logger = init_logger(__name__)
+ 
+ 
+ class ServingRender(BaseServing):
+     def __init__(
+         self,
+         models: OpenAIServingModels | OpenAIModelRegistry,
+         online_renderer: "OnlineRenderer",
+         *,
+         request_logger: RequestLogger | None = None,
+     ) -> None:
+         super().__init__(
+             models=models,
+             model_config=online_renderer.model_config,
+             request_logger=request_logger,
+         )
+ 
+         self.online_renderer = online_renderer
+ 
+         self.default_sampling_params = (
+             online_renderer.model_config.get_diff_sampling_param()
+         )
+         mc = online_renderer.model_config
+         self.override_max_tokens = (
+             self.default_sampling_params.get("max_tokens")
+             if mc.generation_config not in ("auto", "vllm")
+             else getattr(mc, "override_generation_config", {}).get("max_new_tokens")
+         )
+ 
+     async def render_chat_request(
+         self,
+         request: ChatCompletionRequest,
+     ) -> GenerateRequest | ErrorResponse:
+         """Validate the model and preprocess a chat completion request.
+ 
+         This is the authoritative implementation used directly by the
+         GPU-less render server and delegated to by OpenAIServingChat.
+         """
+         error_check_ret = await self._check_model(request)
+         if error_check_ret is not None:
+             logger.error("Error with model %s", error_check_ret)
+             return error_check_ret
+ 
+         result = await self.online_renderer.render_chat(request, skip_mm_cache=True)
+         if isinstance(result, ErrorResponse):
+             return result
+ 
+         _, engine_inputs = result
+ 
+         if len(engine_inputs) != 1:
+             return self.create_error_response(
+                 f"Expected exactly 1 engine prompt, got {len(engine_inputs)}"
+             )
+ 
+         engine_input = engine_inputs[0]
+ 
+         prompt_components = extract_prompt_components(self.model_config, engine_input)
+         token_ids = prompt_components.token_ids
+         if not token_ids:
+             return self.create_error_response("No token_ids rendered")
+         token_ids = list(token_ids)
+ 
+         input_length = extract_prompt_len(self.model_config, engine_input)
+         max_tokens = get_max_tokens(
+             self.model_config.max_model_len,
+             request.max_completion_tokens
+             if request.max_completion_tokens is not None
+             else request.max_tokens,
+             input_length,
+             self.default_sampling_params,
+             self.override_max_tokens,
+             truncate_prompt_tokens=request.truncate_prompt_tokens,
+         )
+         params = request.to_sampling_params(max_tokens, self.default_sampling_params)
+ 
+         assistant_tokens_mask: list[int] | None = engine_input.get(  # type: ignore[assignment]
+             "assistant_tokens_mask"
+         )
+         if assistant_tokens_mask is not None and len(assistant_tokens_mask) != len(
+             token_ids
+         ):
+             logger.warning(
+                 "assistant_tokens_mask length (%d) != token_ids length (%d); "
+                 "this can happen with multimodal inputs where "
+                 "placeholder expansion changes the token count. "
+                 "The mask may be positionally misaligned.",
+                 len(assistant_tokens_mask),
+                 len(token_ids),
+             )
+             if len(assistant_tokens_mask) < len(token_ids):
+                 assistant_tokens_mask.extend(
+                     [0] * (len(token_ids) - len(assistant_tokens_mask))
+                 )
+             else:
+                 assistant_tokens_mask = assistant_tokens_mask[: len(token_ids)]
+ 
+         request_id = f"chatcmpl-{random_uuid()}"
+ 
+         return GenerateRequest(
+             request_id=request_id,
+             token_ids=token_ids,
+             assistant_tokens_mask=assistant_tokens_mask,
+-            features=self._extract_mm_features(engine_input),
++            content_parts=[
++                InlinePNGPart.model_validate(part)
++                for message in request.messages
++                if isinstance(message.get("content"), list)
++                for part in message["content"]
++                if part.get("type") == "image_url"
++            ] or None,
+             sampling_params=params,
+             model=request.model,
+             stream=bool(request.stream),
+             stream_options=(request.stream_options if request.stream else None),
+             cache_salt=request.cache_salt,
+             priority=request.priority,
+             token_offsets=engine_input.get("prompt_token_offsets"),
+         )
+ 
+     async def render_completion_request(
+         self,
+         request: CompletionRequest,
+     ) -> list[GenerateRequest] | ErrorResponse:
+         """Validate the model and preprocess a completion request.
+ 
+         This is the authoritative implementation used directly by the
+         GPU-less render server and delegated to by OpenAIServingCompletion.
+         """
+         error_check_ret = await self._check_model(request)
+         if error_check_ret is not None:
+             return error_check_ret
+         result = await self.online_renderer.render_completion(
+             request, skip_mm_cache=True
+         )
+         if isinstance(result, ErrorResponse):
+             return result
+         generate_requests: list[GenerateRequest] = []
+         for engine_input in result:
+             prompt_components = extract_prompt_components(
+                 self.model_config, engine_input
+             )
+             token_ids = prompt_components.token_ids
+             if not token_ids:
+                 return self.create_error_response("No token_ids rendered")
+             token_ids = list(token_ids)
+ 
+             input_length = extract_prompt_len(self.model_config, engine_input)
+             max_tokens = get_max_tokens(
+                 self.model_config.max_model_len,
+                 request.max_tokens,
+                 input_length,
+                 self.default_sampling_params,
+                 self.override_max_tokens,
+                 truncate_prompt_tokens=request.truncate_prompt_tokens,
+             )
+             params = request.to_sampling_params(
+                 max_tokens, self.default_sampling_params
+             )
+ 
+             request_id = f"cmpl-{random_uuid()}"
+ 
+             generate_requests.append(
+                 GenerateRequest(
+                     request_id=request_id,
+                     token_ids=token_ids,
+-                    features=self._extract_mm_features(engine_input),
+                     sampling_params=params,
+                     model=request.model,
+                     stream=bool(request.stream),
+                     stream_options=(request.stream_options if request.stream else None),
+                     cache_salt=request.cache_salt,
+                     priority=request.priority,
+                     token_offsets=engine_input.get("prompt_token_offsets"),
+                 )
+             )
+ 
+         return generate_requests
+-
+-    @staticmethod
+-    def _extract_mm_features(
+-        engine_input: EngineInput,
+-    ) -> MultiModalFeatures | None:
+-        """Extract multimodal metadata from a rendered engine prompt.
+-
+-        Returns ``None`` for text-only prompts.
+-        """
+-        if engine_input.get("type") != "multimodal":
+-            return None
+-
+-        # At this point engine_input is a MultiModalInput TypedDict.
+-        mm_engine_input = cast(MultiModalInput, engine_input)
+-        mm_hashes: MultiModalHashes = mm_engine_input["mm_hashes"]
+-        raw_placeholders: MultiModalPlaceholders = mm_engine_input["mm_placeholders"]
+-
+-        mm_placeholders = {
+-            modality: [
+-                PlaceholderRangeInfo(offset=p.offset, length=p.length) for p in ranges
+-            ]
+-            for modality, ranges in raw_placeholders.items()
+-        }
+-
+-        # Serialize tensor data per modality.
+-        kwargs_data: dict[str, list[str | None]] | None = None
+-        if raw_mm_kwargs := mm_engine_input.get("mm_kwargs"):
+-            kwargs_data = {}
+-            for modality, items in raw_mm_kwargs.items():
+-                kwargs_data[modality] = [
+-                    encode_mm_kwargs_item(item) if item is not None else None
+-                    for item in items
+-                ]
+-
+-        return MultiModalFeatures(
+-            mm_hashes=mm_hashes,
+-            mm_placeholders=mm_placeholders,
+-            kwargs_data=kwargs_data,
+-        )
+diff --git a/vllm/entrypoints/scale_out/token_in_token_out/protocol.py b/vllm/entrypoints/scale_out/token_in_token_out/protocol.py
+--- a/vllm/entrypoints/scale_out/token_in_token_out/protocol.py
++++ b/vllm/entrypoints/scale_out/token_in_token_out/protocol.py
+@@ -7,6 +7,7 @@
+ 
+ from pydantic import (
+     BaseModel,
++    ConfigDict,
+     Field,
+     GetCoreSchemaHandler,
+     field_validator,
+@@ -40,42 +41,18 @@
+ ####### Tokens IN <> Tokens OUT #######
+ 
+ 
+-class PlaceholderRangeInfo(BaseModel):
+-    """Serializable placeholder location for a single multi-modal item."""
+-
+-    offset: int
+-    """Start index of the placeholder tokens in the prompt."""
+-
+-    length: int
+-    """Number of placeholder tokens."""
+-
+-    # TODO: add ``is_embed: list[bool] | None`` once the /generate side
+-    # consumes features — some models (e.g. Qwen-VL) use sparse
+-    # placeholder masks that cannot be recomputed from offset+length alone.
+-
+-
+-class MultiModalFeatures(BaseModel):
+-    """Lightweight multimodal metadata produced by the render step.
+-
+-    Carries hashes (for cache lookup / identification) and placeholder
+-    positions so the downstream `/generate` service knows *where* in
+-    the token sequence each multimodal item lives.
+-    """
+-
+-    mm_hashes: dict[str, list[str]]
+-    """Per-modality item hashes, e.g. `{"image": ["abc", "def"]}`."""
+-
+-    mm_placeholders: dict[str, list[PlaceholderRangeInfo]]
+-    """Per-modality placeholder ranges in the token sequence."""
+-
+-    kwargs_data: dict[str, list[str | None]] | None = None
+-    """Per-modality serialized tensor data.
+-
+-    Each value is a list parallel to ``mm_hashes[modality]``.  A ``str``
+-    entry is a base64-encoded ``MultiModalKwargsItem``; ``None`` means
+-    the item should be resolved from cache.  The entire field is
+-    ``None`` for metadata-only (cache-hit) responses.
+-    """
++class InlinePNGSource(BaseModel):
++    """Original encoded image bytes, with the deployment's full image detail."""
++
++    model_config = ConfigDict(extra="forbid")
++    url: str = Field(pattern=r"^data:image/png;base64,")
++    detail: Literal["auto", "high"] = "auto"
++
++
++class InlinePNGPart(BaseModel):
++    model_config = ConfigDict(extra="forbid")
++    type: Literal["image_url"]
++    image_url: InlinePNGSource
+ 
+ 
+ class SamplingParamsInput(dict[str, Any]):
+@@ -120,6 +97,8 @@
+ 
+ 
+ class GenerateRequest(BaseModel):
++    model_config = ConfigDict(extra="forbid")
++
+     request_id: str = Field(
+         default_factory=lambda: f"{random_uuid()}",
+         description=(
+@@ -153,18 +132,10 @@
+     them (Fast tokenizer, text input, no multimodal data). List length
+     equals `token_ids` length when present. None otherwise."""
+ 
+-    features: MultiModalFeatures | None = None
+-    """Multimodal hashes and placeholder positions (populated for MM inputs)."""
+-
+-    content_parts: list[dict[str, Any]] | None = None
+-    """Raw multimodal input; server resolves media. Mutually exclusive
+-    with ``features``."""
+-
+-    @model_validator(mode="after")
+-    def _check_mm_fields_exclusive(self) -> "GenerateRequest":
+-        if self.content_parts and self.features:
+-            raise ValueError("content_parts and features are mutually exclusive")
+-        return self
++    content_parts: list[InlinePNGPart] | None = None
++    """Original PNG inputs in image order. Token IDs already contain the full
++    rendered image spans; the server validates them against the decoded images.
++    """
+ 
+     sampling_params: SamplingParamsInput
+     """The sampling parameters for the model."""
+diff --git a/vllm/entrypoints/scale_out/token_in_token_out/serving.py b/vllm/entrypoints/scale_out/token_in_token_out/serving.py
+--- a/vllm/entrypoints/scale_out/token_in_token_out/serving.py
++++ b/vllm/entrypoints/scale_out/token_in_token_out/serving.py
+@@ -31,21 +31,16 @@
+ from vllm.entrypoints.openai.models.serving import OpenAIServingModels
+ from vllm.entrypoints.serve.utils.api_utils import get_max_tokens, should_include_usage
+ from vllm.entrypoints.serve.utils.request_logger import RequestLogger
+-from vllm.inputs import EngineInput, TokensPrompt, mm_input
++from vllm.exceptions import VLLMServerError
++from vllm.inputs import EngineInput
+ from vllm.logger import init_logger
+ from vllm.logprobs import Logprob
+-from vllm.multimodal.inputs import (
+-    MultiModalKwargsItem,
+-    MultiModalKwargsItems,
+-    PlaceholderRange,
+-)
+ from vllm.outputs import CompletionOutput, RequestOutput
+ from vllm.renderers.online_renderer import OnlineRenderer
+ from vllm.sampling_params import SamplingParams
+ from vllm.utils.collection_utils import as_list
+ from vllm.utils.serial_utils import numpy2base64
+ 
+-from .mm_serde import decode_mm_kwargs_item
+ from .protocol import (
+     GenerateRequest,
+     GenerateResponse,
+@@ -181,51 +176,14 @@
+             tracker = AsyncMultiModalItemTracker(self.model_config)
+             mm_parser = tracker.create_parser()
+             for part in request.content_parts:
+-                ptype = part.get("type", "")
+-                url = part.get("url")
+-                uuid = part.get("uuid")
+-                if ptype == "image_url":
+-                    mm_parser.parse_image(url, uuid)
+-                elif ptype == "audio_url":
+-                    mm_parser.parse_audio(url, uuid)
+-                elif ptype == "video_url":
+-                    mm_parser.parse_video(url, uuid)
+-            mm_data, mm_uuids = await tracker.resolve_items()
+-            prompt = TokensPrompt(prompt_token_ids=request.token_ids)
+-            if mm_data:
+-                prompt["multi_modal_data"] = mm_data
+-            if mm_uuids:
+-                prompt["multi_modal_uuids"] = mm_uuids
+-            (engine_input,) = await self.online_renderer.renderer.render_cmpl_async(
+-                [prompt]
+-            )
+-        elif features := request.features:
+-            # Convert PlaceholderRangeInfo → PlaceholderRange per modality.
+-            mm_placeholders: dict[str, list[PlaceholderRange]] = {
+-                modality: [
+-                    PlaceholderRange(offset=p.offset, length=p.length) for p in ranges
+-                ]
+-                for modality, ranges in features.mm_placeholders.items()
+-            }
+-
+-            # Deserialize tensor data when present; None → cache hit.
+-            mm_kwargs: dict[str, list[MultiModalKwargsItem | None]] = {}
+-            if features.kwargs_data is not None:
+-                for modality, items in features.kwargs_data.items():
+-                    mm_kwargs[modality] = [
+-                        decode_mm_kwargs_item(item) if item is not None else None
+-                        for item in items
+-                    ]
+-            else:
+-                for modality, hashes in features.mm_hashes.items():
+-                    mm_kwargs[modality] = [None] * len(hashes)
+-
+-            engine_input = mm_input(
+-                prompt_token_ids=request.token_ids,
+-                mm_kwargs=MultiModalKwargsItems(mm_kwargs),
+-                mm_hashes=features.mm_hashes,
+-                mm_placeholders=mm_placeholders,
+-                cache_salt=request.cache_salt,
++                mm_parser.parse_image(part.image_url.url)
++            mm_data, _ = await tracker.resolve_items()
++            if not mm_data:
++                raise VLLMServerError("Accepted image inputs produced no media data")
++            engine_input = (
++                await self.online_renderer.renderer.process_rendered_multimodal_async(
++                    request.token_ids, mm_data, cache_salt=request.cache_salt,
++                )
+             )
+         else:
+             (engine_input,) = await self.online_renderer.preprocess_completion(
+diff --git a/vllm/model_executor/models/qwen3_vl.py b/vllm/model_executor/models/qwen3_vl.py
+--- a/vllm/model_executor/models/qwen3_vl.py
++++ b/vllm/model_executor/models/qwen3_vl.py
+@@ -60,6 +60,7 @@
+     VideoPruningMethod,
+ )
+ from vllm.distributed import get_pp_group, parallel_state
++from vllm.exceptions import VLLMValidationError
+ from vllm.inputs import MultiModalDataDict
+ from vllm.logger import init_logger
+ from vllm.model_executor.layers.activation import _ACTIVATION_REGISTRY
+@@ -93,6 +94,10 @@
+     PromptReplacement,
+     PromptUpdate,
+     PromptUpdateDetails,
++)
++from vllm.multimodal.processing.processor import (
++    MultiModalPromptUpdates,
++    PlaceholderFeaturesInfo,
+ )
+ from vllm.multimodal.video_prune.evs import (
+     compute_mrope_for_media,
+@@ -1488,6 +1493,49 @@
+             self.info.get_hf_config().vision_config.spatial_merge_size
+         )(hf_inputs)
+ 
++    def _find_rendered_prompt_placeholders(
++        self,
++        prompt_ids: list[int],
++        mm_prompt_updates: MultiModalPromptUpdates,
++    ) -> Mapping[str, list[PlaceholderFeaturesInfo]]:
++        placeholders = super()._find_rendered_prompt_placeholders(
++            prompt_ids, mm_prompt_updates,
++        )
++        config = self.info.get_hf_config()
++        image_id = config.image_token_id
++        start_id = config.vision_start_token_id
++        end_id = config.vision_end_token_id
++        spans: list[tuple[int, int]] = []
++        i = 0
++        while i < len(prompt_ids):
++            token = prompt_ids[i]
++            if token == start_id:
++                end = i + 1
++                while end < len(prompt_ids) and prompt_ids[end] == image_id:
++                    end += 1
++                if end == i + 1 or end == len(prompt_ids) or prompt_ids[end] != end_id:
++                    raise VLLMValidationError(
++                        "Rendered image spans must contain a complete image token run",
++                        parameter="token_ids",
++                    )
++                spans.append((i + 1, end - i - 1))
++                i = end + 1
++            elif token in (image_id, end_id, config.video_token_id):
++                raise VLLMValidationError(
++                    "Rendered media tokens must belong to a complete image span",
++                    parameter="token_ids",
++                )
++            else:
++                i += 1
++        expected = [(item.start_idx, item.length)
++                    for item in placeholders.get("image", [])]
++        if spans != expected:
++            raise VLLMValidationError(
++                "Rendered image token spans do not match the supplied images",
++                parameter="token_ids",
++            )
++        return placeholders
++
+     def _get_prompt_updates(
+         self,
+         mm_items: MultiModalDataItems,
+diff --git a/vllm/multimodal/processing/inputs.py b/vllm/multimodal/processing/inputs.py
+--- a/vllm/multimodal/processing/inputs.py
++++ b/vllm/multimodal/processing/inputs.py
+@@ -10,6 +10,13 @@
+ from ..parse import MultiModalDataItems, MultiModalUUIDItems
+ 
+ 
++@dataclass(frozen=True)
++class RenderedPromptTokens:
++    """Exact model tokens whose multimodal placeholders are already expanded."""
++
++    token_ids: list[int]
++
++
+ @dataclass
+ class ProcessorInputs:
+     """
+@@ -17,7 +24,7 @@
+     [`vllm.multimodal.processing.BaseMultiModalProcessor.apply`][].
+     """
+ 
+-    prompt: str | list[int]
++    prompt: str | list[int] | RenderedPromptTokens
+     mm_data_items: MultiModalDataItems
+     mm_uuid_items: MultiModalUUIDItems | None = None
+     hf_processor_mm_kwargs: Mapping[str, object] = field(default_factory=dict)
+diff --git a/vllm/multimodal/processing/processor.py b/vllm/multimodal/processing/processor.py
+--- a/vllm/multimodal/processing/processor.py
++++ b/vllm/multimodal/processing/processor.py
+@@ -19,6 +19,7 @@
+ import torch
+ from typing_extensions import TypeVar, assert_never
+ 
++from vllm.exceptions import VLLMValidationError
+ from vllm.inputs import (
+     MultiModalEncDecInput,
+     MultiModalHashes,
+@@ -46,7 +47,7 @@
+ )
+ from .context import BaseProcessingInfo, TimingContext
+ from .dummy_inputs import BaseDummyInputsBuilder
+-from .inputs import ProcessorInputs
++from .inputs import ProcessorInputs, RenderedPromptTokens
+ 
+ if TYPE_CHECKING:
+     from transformers.feature_extraction_utils import BatchFeature
+@@ -1405,7 +1406,7 @@
+ 
+     def _apply_hf_processor_main(
+         self,
+-        prompt: str | list[int],
++        prompt: str | list[int] | RenderedPromptTokens,
+         mm_items: MultiModalDataItems,
+         hf_processor_mm_kwargs: Mapping[str, object],
+         tokenization_kwargs: Mapping[str, object],
+@@ -1423,7 +1424,9 @@
+             to perform prompt updates if available; HF processor requires
+             that the prompt corresponds to multi-modal items.
+         """
+-        if isinstance(prompt, str):
++        if isinstance(prompt, RenderedPromptTokens):
++            prompt_ids = list(prompt.token_ids)
++        elif isinstance(prompt, str):
+             if enable_hf_prompt_update:
+                 return self._apply_hf_processor_text_mm(
+                     prompt_text=prompt,
+@@ -1824,6 +1827,20 @@
+ 
+         return prompt_ids, mm_placeholders
+ 
++    def _find_rendered_prompt_placeholders(
++        self,
++        prompt_ids: list[int],
++        mm_prompt_updates: MultiModalPromptUpdates,
++    ) -> Mapping[str, list[PlaceholderFeaturesInfo]]:
++        placeholders = self._find_mm_placeholders(prompt_ids, mm_prompt_updates)
++        if any(len(placeholders.get(modality, [])) != len(items)
++               for modality, items in mm_prompt_updates.items()):
++            raise VLLMValidationError(
++                "Rendered image token spans do not match the supplied images",
++                parameter="token_ids",
++            )
++        return placeholders
++
+     def apply(
+         self,
+         inputs: ProcessorInputs,
+@@ -1836,12 +1853,11 @@
+ 
+         1. Apply HF Processor on prompt text and multi-modal data together,
+            outputting token IDs and processed tensors.
+-        2. Find and update sequences in the token IDs with placeholder tokens.
+-           The number of placeholder tokens equals the feature size of the
+-           multi-modal data outputted by the multi-modal encoder.
+-        3. Extract information about the placeholder tokens from the
+-           processed token IDs.
+-        """
++        2. Expand placeholders in raw prompt tokens, or validate the complete
++           spans in RenderedPromptTokens without changing those token IDs.
++        3. Associate every media item with its native feature placeholders.
++        """
++        rendered = inputs.prompt if isinstance(inputs.prompt, RenderedPromptTokens) else None
+         (
+             prompt_ids,
+             mm_info,
+@@ -1850,13 +1866,21 @@
+ 
+         # NOTE: tokenization_kwargs are not required to init processor
+         with timing_ctx.record("apply_prompt_updates"):
+-            prompt_ids, mm_placeholders = self._maybe_apply_prompt_updates(
+-                mm_items=inputs.mm_data_items,
+-                prompt_ids=prompt_ids,
+-                mm_kwargs=mm_info.kwargs,
+-                mm_prompt_updates=mm_info.prompt_updates,
+-                is_update_applied=is_update_applied,
+-            )
++            if rendered is not None:
++                mm_item_counts = inputs.mm_data_items.get_all_counts()
++                self._validate_mm_kwargs(mm_info.kwargs, mm_item_counts)
++                self._validate_mm_updates(mm_info.prompt_updates, mm_item_counts)
++                mm_placeholders = self._find_rendered_prompt_placeholders(
++                    prompt_ids, mm_info.prompt_updates,
++                )
++            else:
++                prompt_ids, mm_placeholders = self._maybe_apply_prompt_updates(
++                    mm_items=inputs.mm_data_items,
++                    prompt_ids=prompt_ids,
++                    mm_kwargs=mm_info.kwargs,
++                    mm_prompt_updates=mm_info.prompt_updates,
++                    is_update_applied=is_update_applied,
++                )
+ 
+         mm_placeholder_ranges = {
+             modality: [item.to_range() for item in placeholders]
+@@ -1929,6 +1953,11 @@
+         2. Apply the HF processor on encoder prompt.
+         3. Copy the input prompt text as decoder prompt inputs.
+         """
++        if isinstance(inputs.prompt, RenderedPromptTokens):
++            raise VLLMValidationError(
++                "Rendered multimodal token input requires a decoder-only model",
++                parameter="token_ids",
++            )
+         encoder_prompt = self.create_encoder_prompt(
+             inputs.prompt,
+             inputs.mm_data_items,
+diff --git a/vllm/renderers/base.py b/vllm/renderers/base.py
+--- a/vllm/renderers/base.py
++++ b/vllm/renderers/base.py
+@@ -37,6 +37,7 @@
+ )
+ from vllm.multimodal.processing import BaseMultiModalProcessor
+ from vllm.multimodal.processing import ProcessorInputs as MMProcessorInputs
++from vllm.multimodal.processing.inputs import RenderedPromptTokens
+ from vllm.multimodal.registry import MultiModalTimingRegistry
+ from vllm.tokenizers import TokenizerLike
+ from vllm.utils.async_utils import make_async
+@@ -728,7 +729,7 @@
+     # TODO: Remove str and tokenization_kwargs after deprecating InputPreprocessor
+     def _process_multimodal(
+         self,
+-        prompt: list[int] | str,
++        prompt: list[int] | str | RenderedPromptTokens,
+         mm_data: MultiModalDataDict,
+         mm_uuids: MultiModalUUIDDict | None,
+         mm_processor_kwargs: Mapping[str, object] | None,
+@@ -765,6 +766,23 @@
+         self.update_mm_cache_stats()
+ 
+         return mm_inputs
++
++    async def process_rendered_multimodal_async(
++        self,
++        token_ids: list[int],
++        mm_data: MultiModalDataDict,
++        *,
++        cache_salt: str | None = None,
++    ) -> MultiModalInput:
++        """Resolve raw media against exact, already-rendered model tokens."""
++        engine_input = await self._process_multimodal_async(
++            RenderedPromptTokens(list(token_ids)), mm_data,
++            mm_uuids=None, mm_processor_kwargs=None, tokenization_kwargs=None,
++            skip_mm_cache=True,
++        )
++        if cache_salt is not None:
++            engine_input["cache_salt"] = cache_salt
++        return engine_input
+ 
+     def _process_tokens(
+         self,
+diff --git a/vllm/entrypoints/scale_out/token_in_token_out/mm_serde.py b/vllm/entrypoints/scale_out/token_in_token_out/mm_serde.py
+deleted file mode 100644
+--- a/vllm/entrypoints/scale_out/token_in_token_out/mm_serde.py
++++ /dev/null
+@@ -1,27 +0,0 @@
+-# SPDX-License-Identifier: Apache-2.0
+-# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
+-"""Encode/decode utilities for multimodal tensors and field metadata
+-over JSON/HTTP, used by the disaggregated generate endpoint."""
+-
+-from __future__ import annotations
+-
+-import pybase64
+-
+-from vllm.multimodal.inputs import MultiModalKwargsItem
+-from vllm.v1.serial_utils import MsgpackDecoder, MsgpackEncoder
+-
+-_encoder = MsgpackEncoder(size_threshold=2**62)  # force all tensors inline
+-_decoder = MsgpackDecoder(t=MultiModalKwargsItem)
+-
+-
+-def encode_mm_kwargs_item(item: MultiModalKwargsItem) -> str:
+-    """Serialize a MultiModalKwargsItem to a base64 string."""
+-    bufs = _encoder.encode(item)
+-    assert len(bufs) == 1, "All tensors should be inline"
+-    return pybase64.b64encode(bufs[0]).decode("ascii")
+-
+-
+-def decode_mm_kwargs_item(data: str) -> MultiModalKwargsItem:
+-    """Deserialize a base64 string back to a MultiModalKwargsItem."""
+-    raw = pybase64.b64decode(data)
+-    return _decoder.decode(raw)
+diff --git a/tests/entrypoints/scale_out/token_in_token_out/test_mm_serde.py b/tests/entrypoints/scale_out/token_in_token_out/test_mm_serde.py
+deleted file mode 100644
+--- a/tests/entrypoints/scale_out/token_in_token_out/test_mm_serde.py
++++ /dev/null
+@@ -1,114 +0,0 @@
+-# SPDX-License-Identifier: Apache-2.0
+-# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
+-"""
+-Roundtrip tests for multimodal serde used by the
+-token_in_token_out generate endpoint.
+-"""
+-
+-import torch
+-
+-from vllm.entrypoints.scale_out.token_in_token_out.mm_serde import (
+-    decode_mm_kwargs_item,
+-    encode_mm_kwargs_item,
+-)
+-from vllm.entrypoints.scale_out.token_in_token_out.protocol import (
+-    MultiModalFeatures,
+-    PlaceholderRangeInfo,
+-)
+-from vllm.multimodal.inputs import (
+-    MultiModalBatchedField,
+-    MultiModalFieldElem,
+-    MultiModalFlatField,
+-    MultiModalKwargsItem,
+-    MultiModalSharedField,
+-)
+-
+-
+-def test_mm_kwargs_item_roundtrip():
+-    """Full roundtrip test with all three field types and multiple dtypes."""
+-    e1 = MultiModalFieldElem(
+-        data=torch.zeros(1000, dtype=torch.bfloat16),
+-        field=MultiModalBatchedField(),
+-    )
+-    e2 = MultiModalFieldElem(
+-        data=torch.ones(100, dtype=torch.int32),
+-        field=MultiModalSharedField(batch_size=4),
+-    )
+-    e3 = MultiModalFieldElem(
+-        data=torch.randn(20, dtype=torch.float32),
+-        field=MultiModalFlatField(slices=[slice(0, 10), slice(10, 20)], dim=0),
+-    )
+-
+-    item = MultiModalKwargsItem({"pixel_values": e1, "grid_thw": e2, "embeds": e3})
+-    encoded = encode_mm_kwargs_item(item)
+-
+-    # Encoded result is a base64 string
+-    assert isinstance(encoded, str)
+-
+-    decoded = decode_mm_kwargs_item(encoded)
+-
+-    assert set(decoded.keys()) == {"pixel_values", "grid_thw", "embeds"}
+-    assert torch.equal(item["pixel_values"].data, decoded["pixel_values"].data)
+-    assert torch.equal(item["grid_thw"].data, decoded["grid_thw"].data)
+-    assert torch.equal(item["embeds"].data, decoded["embeds"].data)
+-    assert isinstance(decoded["pixel_values"].field, MultiModalBatchedField)
+-    assert isinstance(decoded["grid_thw"].field, MultiModalSharedField)
+-    assert isinstance(decoded["embeds"].field, MultiModalFlatField)
+-
+-
+-def test_mm_kwargs_item_none_data():
+-    """Roundtrip with None data field."""
+-    elem = MultiModalFieldElem(
+-        data=None,
+-        field=MultiModalSharedField(batch_size=2),
+-    )
+-    item = MultiModalKwargsItem({"empty": elem})
+-    encoded = encode_mm_kwargs_item(item)
+-    decoded = decode_mm_kwargs_item(encoded)
+-
+-    assert decoded["empty"].data is None
+-    assert isinstance(decoded["empty"].field, MultiModalSharedField)
+-
+-
+-def test_mm_kwargs_item_nested_tensors():
+-    """Roundtrip with nested tensor data."""
+-    nested = [torch.randn(3, 4), torch.randn(5, 4)]
+-    elem = MultiModalFieldElem(
+-        data=nested,
+-        field=MultiModalBatchedField(),
+-    )
+-    item = MultiModalKwargsItem({"nested": elem})
+-    encoded = encode_mm_kwargs_item(item)
+-    decoded = decode_mm_kwargs_item(encoded)
+-
+-    decoded_data = decoded["nested"].data
+-    assert len(decoded_data) == 2
+-    assert torch.equal(nested[0], decoded_data[0])
+-    assert torch.equal(nested[1], decoded_data[1])
+-
+-
+-def test_mm_features_with_kwargs_data():
+-    """Test that MultiModalFeatures can carry serialized tensor data."""
+-    elem = MultiModalFieldElem(
+-        data=torch.randn(5, 3, dtype=torch.float32),
+-        field=MultiModalBatchedField(),
+-    )
+-    item = MultiModalKwargsItem({"pixel_values": elem})
+-    encoded = encode_mm_kwargs_item(item)
+-
+-    features = MultiModalFeatures(
+-        mm_hashes={"image": ["abc123"]},
+-        mm_placeholders={"image": [PlaceholderRangeInfo(offset=0, length=10)]},
+-        kwargs_data={"image": [encoded]},
+-    )
+-
+-    # JSON roundtrip
+-    json_str = features.model_dump_json()
+-    features2 = MultiModalFeatures.model_validate_json(json_str)
+-
+-    assert features2.mm_hashes == {"image": ["abc123"]}
+-    assert features2.kwargs_data is not None
+-    assert len(features2.kwargs_data["image"]) == 1
+-
+-    decoded = decode_mm_kwargs_item(features2.kwargs_data["image"][0])
+-    assert torch.equal(elem.data, decoded["pixel_values"].data)

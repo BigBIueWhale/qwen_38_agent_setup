@@ -75,7 +75,7 @@ error.
   and relay readiness events, then validates the complete live configuration before
   reporting success. Re-running it validates the existing owned topology rather than
   starting a duplicate.
-- status.sh validates host prerequisites, twenty-four ordered vLLM transformations, every reviewed
+- status.sh validates host prerequisites, twenty-five ordered vLLM transformations, every reviewed
   source and test file, the model manifest, image archive, image identity and labels,
   command and environment, mounts, runtime packages, API identity, listener,
   hardening, and live health. HEALTHY means all checks passed.
@@ -95,7 +95,7 @@ Advanced reproducibility operations are deliberately separate from serving mode:
     ./scripts/build-vllm.sh build
     ./scripts/restore-images.sh
 
-The check reconstructs the source tree from the pinned upstream commit through all twenty-four
+The check reconstructs the source tree from the pinned upstream commit through all twenty-five
 landmark-aware transformations. The build runs offline from the exact base image and fails unless it produces
 the pinned image ID. Restore verifies the pinned local archive before loading it.
 
@@ -251,7 +251,7 @@ The vLLM submodule is pinned at:
 
     9df9b0b0a1816b6d0d0f6ecd0da563cc37fd72f5
 
-It is intentionally reconstructed by twenty-four ordered, reviewed semantic transformations:
+It is intentionally reconstructed by twenty-five ordered, reviewed semantic transformations:
 
 | Patch | SHA-256 |
 |---|---|
@@ -279,10 +279,11 @@ It is intentionally reconstructed by twenty-four ordered, reviewed semantic tran
 | patches/vllm-generation-sampling-resolution.patch | a70b88b8e1fa3801e7d5e0a2c6a66f8608ab6e8534b67aafd832bf566d2d2c7a |
 | patches/vllm-sampling-decoding-boundary.patch | aaed899245dcfa877d8c1c19f2834317a7326695372c6810267b21dd3337f913 |
 | patches/vllm-token-generation-result-integrity.patch | c9d4e45adbb475c3e9796d1e0907b2f0d98cc384a34829a34e05ccdd33cc65c1 |
+| patches/vllm-raw-image-token-transport.patch | cab095d4b4fce8ee0e34d4b4cd18a066afdeb14da98ff09e1b57072e3cb565fd |
 
-The reconstructed tree has 75 reviewed runtime-source changes, 1 new runtime source,
-6 runtime-source deletions, 60 existing-test changes, 8 new tests,
-and 2 test deletions. The authoritative
+The reconstructed tree has 79 reviewed runtime-source changes, 1 new runtime source,
+7 runtime-source deletions, 62 existing-test changes, 10 new tests,
+and 3 test deletions. The authoritative
 counts are derived and printed by ./scripts/build-vllm.sh check, never restated
 by hand there. The landmark-aware Python patcher calculates every mutation
 (including file deletions) before writing, validates unique structural landmarks
@@ -304,11 +305,11 @@ Pinned build inputs and products:
 | Offline archive | artifacts/qwen38-vllm-images-runtime-v23.tar |
 | Archive size | Awaiting adoption after the v23 export |
 | Archive SHA-256 | Awaiting adoption after the v23 export |
-| Runtime Dockerfile SHA-256 | b3ff4986efd1ed3f22212d0718f9452ccc48e867eac49ab66e100ce90d73836f |
-| Docker context allowlist SHA-256 | d6af20f75899e6e3a24851984a86845971854ea4aa370c684afe2e225a5783d3 |
-| Build verifier SHA-256 | 356a4862ee9d652dd86d16e2b93eaa7667bbb5b610bd47caec41706ab63a69c4 |
-| Runtime validator SHA-256 | 5f357f425bf05d09867d4667e553a4d23ecf0afcec963a47e669769b15a22aed |
-| Runtime lock SHA-256 | 75dacce9a46c6b1290d8b1b80934d7870dd7c1cb66c033a1ea5faad5b0c5f154 |
+| Runtime Dockerfile SHA-256 | b7098fda88c3869af4940388516a8dcee9debb4cac56dc4b68126d0fa102280c |
+| Docker context allowlist SHA-256 | 5e4ac9be61d79bdf3f7f7463d8838b4c745a5f2bff850059d58d978a4abc8adc |
+| Build verifier SHA-256 | 290f41bf51ebb56d17efef93976dc1a709d0821780c5449fb4db57485782e887 |
+| Runtime validator SHA-256 | 68cdb7c8d0a9d0b556a11eeac0bfeef8fc3b85eaec5022f6ed5a0cf8a45d6868 |
+| Runtime lock SHA-256 | 8dd4421c8e272ae55c61b47f5a4df8a424302ac6b7cb678c916de79e7839aa2c |
 
 Every reviewed runtime file, including both TurboQuant kernels, is copied and
 hash-checked against its upstream and patched identities. A CPU Triton-interpreter
@@ -635,7 +636,7 @@ geometry, 256-dimensional heads, 0.25 partial RoPE, 10,000,000 theta, and interl
 MRoPE sections `[11,11,10]`. An independent implementation of the released
 Transformers 5.15 image-position algorithm matched vLLM element-for-element for
 interleaved image placements and generated-token continuation, even when the
-transport feature list was deliberately reversed. Complete derivations, test code,
+internal engine feature list was deliberately reversed. Complete derivations, test code,
 results, and the limits of the claim are in
 `docs/qwen38-context-turboquant-audit.md`.
 
@@ -746,6 +747,17 @@ The transport/decoder contract is intentionally narrower and fail-closed:
 - image dimensions declared by the serving limit are 4,096 by 4,096, while other
   shapes within the same pixel/aspect contract are accepted and processed on the
   official grid.
+
+The token generation API uses the same raw-image boundary. `/render` carries the
+original accepted inline PNG parts in `content_parts`, in image order, beside the
+fully rendered `token_ids`. `/generate` decodes and processes those images through
+the native processor, computes their hashes, and validates every complete image
+span against the supplied tokens. It preserves the exact tokens without a second
+placeholder expansion. Processor cache hits still provide complete image data to
+the engine. Caller-supplied tensors, hashes, placeholder positions, UUIDs and
+unknown content parts are refused at the request boundary. The render result can
+be sent directly to `/generate`, including its sampling settings and cache salt;
+generation requires an agent ID as described in the cache contract.
 
 Full quality here has a precise meaning: maximum released processor pixel budget,
 complete BF16 vision weights and activations, lossless transport, official dynamic

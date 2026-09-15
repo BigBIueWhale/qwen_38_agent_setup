@@ -252,7 +252,25 @@ RUN printf '%s  %s\n' \
   "${ONLINE_DERENDERER_UPSTREAM_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/renderers/online_derenderer.py \
   | sha256sum --check --strict
 
+ARG DERENDER_SERVING_UPSTREAM_FILE_SHA256
+ARG MM_PROCESSOR_INPUTS_UPSTREAM_FILE_SHA256
+ARG MM_PROCESSOR_UPSTREAM_FILE_SHA256
+ARG BASE_RENDERER_UPSTREAM_FILE_SHA256
+RUN printf '%s  %s\n' \
+  "${DERENDER_SERVING_UPSTREAM_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/scale_out/derender/serving.py \
+  "${MM_PROCESSOR_INPUTS_UPSTREAM_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/multimodal/processing/inputs.py \
+  "${MM_PROCESSOR_UPSTREAM_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/multimodal/processing/processor.py \
+  "${BASE_RENDERER_UPSTREAM_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/renderers/base.py \
+  | sha256sum --check --strict
+
+ARG MM_SERDE_UPSTREAM_FILE_SHA256
+RUN printf '%s  %s\n' "${MM_SERDE_UPSTREAM_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/scale_out/token_in_token_out/mm_serde.py | sha256sum --check --strict
+
 FROM upstream-verifier AS runtime
+ARG DERENDER_SERVING_PATCHED_FILE_SHA256
+ARG MM_PROCESSOR_INPUTS_PATCHED_FILE_SHA256
+ARG MM_PROCESSOR_PATCHED_FILE_SHA256
+ARG BASE_RENDERER_PATCHED_FILE_SHA256
 ARG ONLINE_DERENDERER_PATCHED_FILE_SHA256
 ARG COMPLETION_SERVING_PATCHED_FILE_SHA256
 ARG RENDER_SERVING_PATCHED_FILE_SHA256
@@ -327,6 +345,7 @@ ARG RESPONSES_HISTORY_PATCH_DIFF_SHA256
 ARG RESPONSES_IDENTITY_PATCH_DIFF_SHA256
 ARG ANTHROPIC_TERMINAL_PATCH_DIFF_SHA256
 ARG SAMPLING_RESOLUTION_PATCH_DIFF_SHA256
+ARG RAW_IMAGE_TRANSPORT_PATCH_DIFF_SHA256
 ARG GENERATE_RESULT_PATCH_DIFF_SHA256
 ARG SAMPLING_BOUNDARY_PATCH_DIFF_SHA256
 ARG TOOL_TRUNCATION_PATCH_DIFF_SHA256
@@ -367,6 +386,7 @@ ARG ENGINE_PROTOCOL_PATCHED_FILE_SHA256
 ARG REASONING_USAGE_UNIT_SHA256
 ARG TOOL_OUTPUT_PARSER_UNIT_SHA256
 ARG SHARED_PREFIX_CACHE_UNIT_SHA256
+ARG RAW_MEDIA_UNIT_SHA256
 ARG GENERATE_RESULT_UNIT_SHA256
 # The verified pristine policy modules are removed, not replaced: the
 # scope-aware manager is the only eviction mode, and a stranded importable
@@ -599,6 +619,19 @@ COPY --chmod=0644 vllm/vllm/renderers/online_derenderer.py /usr/local/lib/python
 RUN printf '%s  %s\n' \
   "${ONLINE_DERENDERER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/renderers/online_derenderer.py \
   | sha256sum --check --strict
+COPY --chmod=0644 vllm/vllm/entrypoints/scale_out/derender/serving.py /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/scale_out/derender/serving.py
+COPY --chmod=0644 vllm/vllm/multimodal/processing/inputs.py /usr/local/lib/python3.12/dist-packages/vllm/multimodal/processing/inputs.py
+COPY --chmod=0644 vllm/vllm/multimodal/processing/processor.py /usr/local/lib/python3.12/dist-packages/vllm/multimodal/processing/processor.py
+COPY --chmod=0644 vllm/vllm/renderers/base.py /usr/local/lib/python3.12/dist-packages/vllm/renderers/base.py
+RUN printf '%s  %s\n' \
+  "${DERENDER_SERVING_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/scale_out/derender/serving.py \
+  "${MM_PROCESSOR_INPUTS_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/multimodal/processing/inputs.py \
+  "${MM_PROCESSOR_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/multimodal/processing/processor.py \
+  "${BASE_RENDERER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/renderers/base.py \
+  | sha256sum --check --strict
+RUN rm /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/scale_out/token_in_token_out/mm_serde.py \
+ && rm -f /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/scale_out/token_in_token_out/__pycache__/mm_serde.*.pyc \
+ && test ! -e /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/scale_out/token_in_token_out/mm_serde.py
 COPY --chmod=0644 chat_template.jinja /opt/qwen38/chat_template.jinja
 COPY --chmod=0644 scripts/phase_budget_unit.py /opt/qwen38/phase_budget_unit.py
 COPY --chmod=0644 scripts/vision_workspace_unit.py /opt/qwen38/vision_workspace_unit.py
@@ -612,8 +645,10 @@ COPY --chmod=0644 scripts/nvfp4_kernel_unit.py /opt/qwen38/nvfp4_kernel_unit.py
 COPY --chmod=0644 scripts/reasoning_usage_unit.py /opt/qwen38/reasoning_usage_unit.py
 COPY --chmod=0644 scripts/tool_output_parser_unit.py /opt/qwen38/tool_output_parser_unit.py
 COPY --chmod=0644 scripts/shared_prefix_cache_unit.py /opt/qwen38/shared_prefix_cache_unit.py
+COPY --chmod=0644 scripts/raw_media_unit.py /opt/qwen38/raw_media_unit.py
 COPY --chmod=0644 scripts/generate_result_unit.py /opt/qwen38/generate_result_unit.py
 RUN printf '%s  %s\n' "${SHARED_PREFIX_CACHE_UNIT_SHA256}" /opt/qwen38/shared_prefix_cache_unit.py | sha256sum --check --strict
+RUN printf '%s  %s\n' "${RAW_MEDIA_UNIT_SHA256}" /opt/qwen38/raw_media_unit.py | sha256sum --check --strict
 RUN printf '%s  %s\n' "${GENERATE_RESULT_UNIT_SHA256}" /opt/qwen38/generate_result_unit.py | sha256sum --check --strict
 RUN printf '%s  %s\n' \
       "${TURBOQUANT_STORE_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/attention/ops/triton_turboquant_store.py \
@@ -1213,6 +1248,7 @@ PY
 # named volume through this exact image and refuses drift; it deliberately does
 # not depend on Docker volume copy-up semantics.
 RUN CUDA_VISIBLE_DEVICES= python3 /opt/qwen38/shared_prefix_cache_unit.py
+RUN CUDA_VISIBLE_DEVICES= python3 /opt/qwen38/raw_media_unit.py
 RUN CUDA_VISIBLE_DEVICES= python3 /opt/qwen38/generate_result_unit.py
 RUN CUDA_VISIBLE_DEVICES= python3 /opt/qwen38/tool_output_parser_unit.py
 RUN CUDA_VISIBLE_DEVICES= TRITON_INTERPRET=1 python3 /opt/qwen38/turboquant_guard_unit.py
@@ -1280,6 +1316,7 @@ LABEL org.opencontainers.image.revision="9df9b0b0a1816b6d0d0f6ecd0da563cc37fd72f
       qwen38.patch.generation-sampling-resolution.diff.sha256="${SAMPLING_RESOLUTION_PATCH_DIFF_SHA256}" \
       qwen38.patch.sampling-decoding-boundary.diff.sha256="${SAMPLING_BOUNDARY_PATCH_DIFF_SHA256}" \
       qwen38.patch.token-generation-result-integrity.diff.sha256="${GENERATE_RESULT_PATCH_DIFF_SHA256}" \
+      qwen38.patch.raw-image-token-transport.diff.sha256="${RAW_IMAGE_TRANSPORT_PATCH_DIFF_SHA256}" \
       qwen38.template.file.sha256="${AGENT_CHAT_TEMPLATE_SHA256}" \
       qwen38.project="Qwen_best_model_ever" \
       qwen38.runtime.profile="${IMAGE_PROFILE_VERSION}"

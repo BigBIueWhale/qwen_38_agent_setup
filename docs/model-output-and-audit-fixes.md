@@ -5,6 +5,33 @@ The independent triage and handling policy supplied with the implementation brie
 decide the resolutions. Source validation here does not certify a built image or a
 live release. The v23 image and archive are awaiting adoption.
 
+## Finding 20: raw images through the token generation boundary
+
+`vllm-raw-image-token-transport.patch` gives render and generate one media
+contract: original inline PNG parts, in image order, alongside the fully rendered
+token IDs. Generate decodes and processes the images, computes native hashes, and
+validates their complete Qwen image spans without tokenizing or expanding the
+prompt again. Processor-only caching supplies complete native image data even on
+a cache hit. Cache salt and required generation identity survive the handoff.
+Caller tensors, hashes, placeholder positions, UUIDs, unsupported media and extra
+request fields are refused. The tensor serializer, its tests, both extractor
+methods and the old feature protocol are deleted.
+
+Validation: 216 offline CPU cases pass, including real render/JSON/generate methods
+on both transports, native PNG decoding and hashes, complete span rejection, and
+the actual image processor with unequal image sizes, both cached and uncached.
+Thirty controls against the previous runtime fail because it admits the removed
+media representations. The updated live media tests consume this same contract;
+their source is reconstructed but those live tests were not run. No model,
+weights, GPU or service was used. The installed raw-media unit checks the request
+boundary and exact rendered-token geometry. Four newly modified runtime modules
+join all image COPY, upstream/final hash, context and runtime checks. The image
+recipe removes the obsolete serializer and compiled bytecode and verifies its
+absence.
+
+The integrated generator and `build-vllm.sh check` pass with 25 reviewed stages,
+101 deployment inputs, 19 framework/recipe tests and all installed CPU units.
+
 ## Token generation: complete results and preserved terminal causes
 
 `vllm-token-generation-result-integrity.patch` makes the transport select the

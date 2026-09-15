@@ -2031,6 +2031,68 @@ def _validate_generate_result_after(state: State) -> None:
         }, label=label)
 
 
+def _validate_raw_image_before(state: State) -> None:
+    require_text(state,
+        "vllm/entrypoints/scale_out/token_in_token_out/protocol.py",
+        "features: MultiModalFeatures | None = None",
+        label="raw image transport baseline")
+
+
+def _validate_raw_image_after(state: State) -> None:
+    label = "raw image token transport"
+    protocol = "vllm/entrypoints/scale_out/token_in_token_out/protocol.py"
+    _require_in_symbol(state, protocol, "GenerateRequest", (
+        'model_config = ConfigDict(extra="forbid")',
+        "content_parts: list[InlinePNGPart] | None",
+    ), label=label)
+    _require_in_symbol(state, protocol, "InlinePNGSource", (
+        'model_config = ConfigDict(extra="forbid")',
+        '^data:image/png;base64,', 'Literal["auto", "high"]',
+    ), label=label)
+    serving = "vllm/entrypoints/scale_out/token_in_token_out/serving.py"
+    _require_in_symbol(state, serving, "ServingTokens.serve_tokens", (
+        "mm_parser.parse_image(part.image_url.url)",
+        "process_rendered_multimodal_async(",
+        "request.token_ids, mm_data, cache_salt=request.cache_salt",
+    ), label=label)
+    for path in (protocol, serving,
+                 "vllm/entrypoints/scale_out/render/serving.py",
+                 "vllm/entrypoints/scale_out/derender/serving.py"):
+        for obsolete in ("MultiModalFeatures", "PlaceholderRangeInfo",
+                         "mm_serde", "_extract_mm_features"):
+            forbid_text(state, path, obsolete, label=label)
+    for path in ("vllm/entrypoints/scale_out/token_in_token_out/mm_serde.py",
+                 "tests/entrypoints/scale_out/token_in_token_out/test_mm_serde.py"):
+        _require(path not in state, f"{label}: obsolete serializer remains: {path}")
+    _require_in_symbol(state, "vllm/renderers/base.py",
+        "BaseRenderer.process_rendered_multimodal_async", (
+            "RenderedPromptTokens(list(token_ids))",
+            "skip_mm_cache=True", 'engine_input["cache_salt"] = cache_salt',
+        ), label=label)
+    processor = "vllm/multimodal/processing/processor.py"
+    _require_in_symbol(state, processor,
+        "BaseMultiModalProcessor._apply_hf_processor_main", (
+            "isinstance(prompt, RenderedPromptTokens)",
+            "prompt_ids = list(prompt.token_ids)",
+        ), label=label)
+    _require_in_symbol(state, processor, "BaseMultiModalProcessor.apply", (
+        "self._find_rendered_prompt_placeholders(",
+        "self._maybe_apply_prompt_updates(",
+    ), label=label)
+    _require_in_symbol(state, "vllm/model_executor/models/qwen3_vl.py",
+        "Qwen3VLMultiModalProcessor._find_rendered_prompt_placeholders", (
+            "spans != expected", "VLLMValidationError(",
+            "config.image_token_id", "config.vision_start_token_id",
+            "config.vision_end_token_id",
+        ), label=label)
+    require_python_symbols(state,
+        "tests/entrypoints/scale_out/token_in_token_out/test_raw_images.py", {
+            "test_rendered_image_tokens_are_validated_without_second_expansion": None,
+            "test_render_json_generate_preserves_source_images_tokens_salt_and_identity": None,
+            "test_native_image_processing_retains_exact_spans_and_full_cache_data": None,
+        }, label=label)
+
+
 def validate_final(state: State) -> None:
     """Reassert every durable semantic invariant on the complete tree.
 
@@ -2046,6 +2108,21 @@ def validate_final(state: State) -> None:
 
 
 CONTRACTS: Mapping[str, SemanticContract] = {
+    "raw-image-token-transport": SemanticContract(
+        rationale=(
+            "Caller tensor/hash/cache-only features bypass image admission. Carry "
+            "the original PNG through render/generate and derive native features "
+            "and identity from admitted bytes. Validate already-rendered image "
+            "spans completely without a second expansion or caller positions."
+        ),
+        removal_condition=(
+            "Remove when upstream supplies the same raw-image-only transport and "
+            "complete processed-prompt validation, with no caller cache/tensor "
+            "bypass and complete data on processor cache hits."
+        ),
+        validate_before=_validate_raw_image_before,
+        validate_after=_validate_raw_image_after,
+    ),
     "token-generation-result-integrity": SemanticContract(
         rationale=(
             "The raw-token endpoint must preserve all choices and actual terminal "
