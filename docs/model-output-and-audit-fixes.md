@@ -171,6 +171,30 @@ streaming/batch response generators supplied with deterministic output. The
 installed-parser build unit also exercises the grammar call limit. No engine,
 model, network listener or GPU was started.
 
+## Findings 7 and 14: Responses history integrity
+
+`vllm-responses-history-integrity.patch` adds the nineteenth runtime source stage.
+Chat's transport-ID validation now lives in the shared chat utility and also runs
+after Responses history construction, before rendering. The same ordered,
+complete call/result sequence is required for every rendered protocol. Boundary
+refusals use `VLLMValidationError`, including encrypted reasoning that cannot be
+rendered, so they do not depend on broad Python exception classification.
+
+Responses converts every supplied text and reasoning block in order, preserving
+whitespace and concatenating text without invented separators. Mixed content
+retains its complete part list for the shared content parser. Empty messages
+remain empty. Previous-response reconstruction uses the same conversion as
+explicit replay, including thinking and tool calls, without mutating supplied
+history. Summary-only reasoning keeps all supplied summary blocks with the
+existing explicit warning; a summary is the available representation when the
+caller provides no full reasoning text.
+
+Validation: 91 utility/boundary tests pass in the offline CPU container. They
+cover typed, dictionary and easy-input replay, both stream settings, every
+malformed call/result sequence on Chat and Responses, mixed content, empty
+content, preserved thinking, nonmutating reconstruction and the real Responses
+request method refusing invalid history before its renderer is called.
+
 ## Remaining implementation
 
 Parser language, stop handling, schema conversion, protocol translation, image

@@ -337,6 +337,11 @@ def _validate_defaults_after(state: State) -> None:
     correlation = _symbol_source(
         state, chat, "ChatCompletionRequest._validate_tool_result_correlation", label=label
     )
+    if "validate_tool_result_correlation(self.messages)" in correlation:
+        correlation = _symbol_source(
+            state, "vllm/entrypoints/chat_utils.py",
+            "validate_tool_result_correlation", label=label,
+        )
     for invariant in (
         "is orphaned",
         "is missing its transport id",
@@ -1767,6 +1772,44 @@ def _validate_single_call_after(state: State) -> None:
         }, label=label)
 
 
+def _validate_responses_history_before(state: State) -> None:
+    label = "Responses history precondition"
+    require_text(state, "vllm/entrypoints/openai/responses/utils.py",
+                 "output_text = item.content[0].text", label=label)
+    forbid_text(state, "vllm/entrypoints/chat_utils.py",
+                "def validate_tool_result_correlation(", label=label)
+
+
+def _validate_responses_history_after(state: State) -> None:
+    label = "Responses history result"
+    utils = "vllm/entrypoints/openai/responses/utils.py"
+    _require_in_symbol(state, utils, "construct_input_messages", (
+        "list(prev_response_output or [])", "validate_tool_result_correlation(messages)",
+        "construct_chat_messages_with_tool_call(new_items)",
+    ), label=label)
+    _require_in_symbol(state, utils, "_construct_message_from_response_item", (
+        '"".join(block.text for block in item.content)',
+        '"".join(block.text for block in item.summary)',
+        "_assistant_content(item.content)", "return deepcopy(item)",
+    ), label=label)
+    forbid_text(state, utils, "item.content[0]", label=label)
+    forbid_text(state, utils, "item.summary[0]", label=label)
+    _require_in_symbol(state, "vllm/entrypoints/openai/chat_completion/protocol.py",
+                       "ChatCompletionRequest._validate_tool_result_correlation", (
+        "validate_tool_result_correlation(self.messages)",
+    ), label=label)
+    _require_in_symbol(state, "vllm/entrypoints/chat_utils.py",
+                       "validate_tool_result_correlation", (
+        "raise VLLMValidationError(", "result_id != expected_id", "pending_ids.pop(0)",
+    ), label=label)
+    require_python_symbols(state,
+        "tests/entrypoints/openai/responses/test_responses_utils.py", {
+            "test_replayed_blocks_preserve_every_byte_and_reasoning": None,
+            "test_tool_history_correlation_is_shared_across_surfaces": None,
+            "test_responses_history_is_validated_before_rendering": None,
+        }, label=label)
+
+
 def validate_final(state: State) -> None:
     """Reassert every durable semantic invariant on the complete tree.
 
@@ -1782,6 +1825,19 @@ def validate_final(state: State) -> None:
 
 
 CONTRACTS: Mapping[str, SemanticContract] = {
+    "responses-history-integrity": SemanticContract(
+        rationale=(
+            "Responses replay dropped all but the first text/reasoning block and "
+            "bypassed Chat's tool ID correlation. Preserve the supplied content and "
+            "validate every positional tool history through one shared boundary."
+        ),
+        removal_condition=(
+            "Remove when upstream preserves all Responses history blocks and "
+            "enforces the same tool-result correlation on every rendered surface."
+        ),
+        validate_before=_validate_responses_history_before,
+        validate_after=_validate_responses_history_after,
+    ),
     "qwen-single-call-grammar": SemanticContract(
         rationale=(
             "A response filter silently removed model-produced calls when parallel "

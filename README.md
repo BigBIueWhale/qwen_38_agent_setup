@@ -75,7 +75,7 @@ error.
   and relay readiness events, then validates the complete live configuration before
   reporting success. Re-running it validates the existing owned topology rather than
   starting a duplicate.
-- status.sh validates host prerequisites, eighteen ordered vLLM transformations, every reviewed
+- status.sh validates host prerequisites, nineteen ordered vLLM transformations, every reviewed
   source and test file, the model manifest, image archive, image identity and labels,
   command and environment, mounts, runtime packages, API identity, listener,
   hardening, and live health. HEALTHY means all checks passed.
@@ -95,7 +95,7 @@ Advanced reproducibility operations are deliberately separate from serving mode:
     ./scripts/build-vllm.sh build
     ./scripts/restore-images.sh
 
-The check reconstructs the source tree from the pinned upstream commit through all eighteen
+The check reconstructs the source tree from the pinned upstream commit through all nineteen
 landmark-aware transformations. The build runs offline from the exact base image and fails unless it produces
 the pinned image ID. Restore verifies the pinned local archive before loading it.
 
@@ -251,7 +251,7 @@ The vLLM submodule is pinned at:
 
     9df9b0b0a1816b6d0d0f6ecd0da563cc37fd72f5
 
-It is intentionally reconstructed by eighteen ordered, reviewed semantic transformations:
+It is intentionally reconstructed by nineteen ordered, reviewed semantic transformations:
 
 | Patch | SHA-256 |
 |---|---|
@@ -273,9 +273,10 @@ It is intentionally reconstructed by eighteen ordered, reviewed semantic transfo
 | patches/vllm-png-source-admission.patch | b9091c5c227151ec00131a854d927a9405396244a9a59bd4d6e297dd67ea3306 |
 | patches/vllm-kv-physical-free-memory.patch | 21f8993033c78971d4f7a660fe9906e054ec658139e83fc37b7121f1d8d91289 |
 | patches/vllm-qwen-single-call-grammar.patch | cb01f9cafc25301e67cea7b6a81b4708973964b5f772e8193465f1b487838f68 |
+| patches/vllm-responses-history-integrity.patch | b54c7c98b80dd00f824dc7a8dff094f8be8419aa5883d4c35e25483af65b0ab0 |
 
 The reconstructed tree has exactly sixty-five reviewed runtime-source changes, six
-reviewed runtime-source deletions, forty-two reviewed existing-test changes,
+reviewed runtime-source deletions, forty-three reviewed existing-test changes,
 five reviewed new tests, and two reviewed test deletions — the authoritative
 counts are derived and printed by ./scripts/build-vllm.sh check, never restated
 by hand there. The landmark-aware Python patcher calculates every mutation
@@ -298,11 +299,11 @@ Pinned build inputs and products:
 | Offline archive | artifacts/qwen38-vllm-images-runtime-v23.tar |
 | Archive size | Awaiting adoption after the v23 export |
 | Archive SHA-256 | Awaiting adoption after the v23 export |
-| Runtime Dockerfile SHA-256 | 710881fd06e19b1d68c34d585fcaa91933078d11b6a6a1275a285773fc491263 |
+| Runtime Dockerfile SHA-256 | ff15d0d58cf93f0f63e5dbba6f864597a8cf910a71fdf88eba1b8ea20a4c215e |
 | Docker context allowlist SHA-256 | 515845d3b7c06cbbfbccf1b8d04336d345a66c582a56c5d598a609febd8edcfa |
-| Build verifier SHA-256 | a1eecda6a0e7abcf9a8a71267ab542c0df2a053a512c2d5af057aa77b0109981 |
+| Build verifier SHA-256 | 0d52faa2f611331d24e3090bf2ad73c36fe52ab2d5f1b4a9d211b61e66662207 |
 | Runtime validator SHA-256 | 605ba10d3907e5ca9976438ec4b9e6f64e6872bc85aed96cd74b40f75a26e983 |
-| Runtime lock SHA-256 | 83980c19a2340a95a2ebc57e8a5cd56ed74db0cc6e6b83e655fe9b7d620a51ed |
+| Runtime lock SHA-256 | 6924f2e00178e8c14a23bfd5a061d88b40b720532440aa1037cb3b2474fe5c5b |
 
 Every reviewed runtime file, including both TurboQuant kernels, is copied and
 hash-checked against its upstream and patched identities. A CPU Triton-interpreter
@@ -731,6 +732,15 @@ The patched Anthropic converter retains a tool_result's text/image/text sequence
 the corresponding tool response instead of inventing a later user image turn. The
 Qwen template emits each vision marker at that content position. Transport-only tool
 IDs are validated and correlated, while Qwen's positional tool XML remains ordered.
+
+Chat, Anthropic and Responses replay share the same ordered tool-history gate.
+Every declared call requires one result with its transport ID, in call order,
+before the next turn. Orphaned, missing, duplicate and mismatched results are
+request errors before rendering. Responses preserves every supplied reasoning,
+summary and assistant text block in order; text blocks concatenate without
+trimming or invented separators. Mixed text/media/refusal parts remain available
+to the shared content parser. Summary-only reasoning retains all summary text;
+encrypted reasoning is unsupported and refused explicitly.
 
 OpenAI and Anthropic representations of the same history produced exactly identical
 16,562 prompt-token IDs. Marker ordering proved:

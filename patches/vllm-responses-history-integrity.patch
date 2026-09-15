@@ -1,0 +1,550 @@
+diff --git a/tests/entrypoints/openai/responses/test_responses_utils.py b/tests/entrypoints/openai/responses/test_responses_utils.py
+--- a/tests/entrypoints/openai/responses/test_responses_utils.py
++++ b/tests/entrypoints/openai/responses/test_responses_utils.py
+@@ -1,7 +1,9 @@
+ # SPDX-License-Identifier: Apache-2.0
+ # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
+ 
+-from unittest.mock import patch
++from copy import deepcopy
++from types import SimpleNamespace
++from unittest.mock import AsyncMock, patch
+ 
+ import pytest
+ from openai.types.responses.response_function_tool_call import ResponseFunctionToolCall
+@@ -10,6 +12,7 @@
+ )
+ from openai.types.responses.response_output_message import ResponseOutputMessage
+ from openai.types.responses.response_output_text import ResponseOutputText
++from openai.types.responses.response_output_refusal import ResponseOutputRefusal
+ from openai.types.responses.response_reasoning_item import (
+     Content,
+     ResponseReasoningItem,
+@@ -22,6 +25,10 @@
+     construct_input_messages,
+     should_continue_final_message,
+ )
++from vllm.entrypoints.openai.chat_completion.protocol import ChatCompletionRequest
++from vllm.entrypoints.openai.responses.protocol import ResponsesRequest
++from vllm.entrypoints.openai.responses.serving import OpenAIServingResponses
++from vllm.exceptions import VLLMValidationError
+ 
+ 
+ def _single_chat_message(item):
+@@ -223,7 +230,7 @@
+             encrypted_content="TOP_SECRET_MESSAGE",
+             status=None,
+         )
+-        with pytest.raises(ValueError):
++        with pytest.raises(VLLMValidationError):
+             construct_chat_messages_with_tool_call([item])
+ 
+         output_item = ResponseOutputMessage(
+@@ -350,7 +357,7 @@
+         assert formatted["reasoning"] == ""
+ 
+     def test_encrypted_content_raises(self):
+-        """Encrypted content should still raise ValueError."""
++        """Encrypted content must refuse as caller input, even with clear text."""
+         item = ResponseReasoningItem(
+             id="reasoning_6",
+             summary=[
+@@ -369,12 +376,12 @@
+             encrypted_content="ENCRYPTED",
+             status=None,
+         )
+-        with pytest.raises(ValueError):
++        with pytest.raises(VLLMValidationError):
+             construct_chat_messages_with_tool_call([item])
+ 
+     @patch("vllm.entrypoints.openai.responses.utils.logger")
+-    def test_summary_with_multiple_entries_uses_first(self, mock_logger):
+-        """When multiple summary entries exist, the first one is used."""
++    def test_summary_with_multiple_entries_preserves_all(self, mock_logger):
++        """Summary-only history preserves each supplied block in order."""
+         item = ResponseReasoningItem(
+             id="reasoning_7",
+             summary=[
+@@ -393,7 +400,7 @@
+             status=None,
+         )
+         formatted = _single_chat_message(item)
+-        assert formatted["reasoning"] == "First summary"
++        assert formatted["reasoning"] == "First summarySecond summary"
+         mock_logger.warning.assert_called_once()
+         assert (
+             "summary text as reasoning content" in mock_logger.warning.call_args[0][0]
+@@ -900,3 +907,139 @@
+         assert len(msgs) == 2
+         assert msgs[0] == {"role": "system", "content": "be helpful"}
+         assert msgs[1] == {"role": "user", "content": "hello"}
++
++
++@pytest.mark.parametrize("stream", [False, True])
++@pytest.mark.parametrize("representation", ["typed", "dict", "easy_input"])
++def test_replayed_blocks_preserve_every_byte_and_reasoning(stream, representation):
++    reasoning = make_reasoning_item(content=[
++        Content(type="reasoning_text", text=" first\n"),
++        Content(type="reasoning_text", text="second "),
++    ])
++    output = make_output_message(" one\n")
++    output.content.append(ResponseOutputText(
++        type="output_text", text="two ", annotations=[],
++    ))
++    items = [reasoning, output]
++    if representation != "typed":
++        items = [item.model_dump() for item in items]
++    if representation == "easy_input":
++        items[1] = {"role": "assistant", "content": [
++            {"type": "input_text", "text": " one\n"},
++            {"type": "input_text", "text": "two "},
++        ]}
++    request = ResponsesRequest(input=items, stream=stream)
++    messages = construct_input_messages(request_input=request.input)
++    assert messages == [{
++        "role": "assistant", "reasoning": " first\nsecond ",
++        "content": " one\ntwo ",
++    }]
++
++
++def test_mixed_assistant_blocks_reach_shared_content_parsing_intact():
++    output = make_output_message("before")
++    output.content.append(ResponseOutputRefusal(type="refusal", refusal="refused"))
++    output.content.append(ResponseOutputText(
++        type="output_text", text="after", annotations=[],
++    ))
++    message = _single_chat_message(output)
++    assert message["content"] == [part.model_dump() for part in output.content]
++    image = {"type": "input_image", "image_url": "data:image/png;base64,unchanged"}
++    parts = [{"type": "input_text", "text": "before"}, image,
++             {"type": "input_text", "text": "after"}]
++    assert _single_chat_message({"role": "assistant", "content": parts}) == {
++        "role": "assistant", "content": parts,
++    }
++
++
++@pytest.mark.parametrize("item", [make_output_message(""),
++                                  {"role": "assistant", "content": []}])
++def test_empty_assistant_content_is_preserved(item):
++    if isinstance(item, ResponseOutputMessage):
++        item = item.model_copy(update={"content": []})
++    assert _single_chat_message(item) == {"role": "assistant", "content": ""}
++
++
++def _history(calls, results):
++    return [make_function_call(call_id=call) for call in calls] + [
++        make_function_call_output(call_id=result) if isinstance(result, str) else result
++        for result in results
++    ]
++
++
++@pytest.mark.parametrize("stream", [False, True])
++@pytest.mark.parametrize("surface", ["chat", "responses"])
++@pytest.mark.parametrize("items,match", [
++    (_history([], ["orphan"]), "orphaned"),
++    (_history(["a"], ["b"]), "expected 'a'"),
++    (_history(["a"], ["a", "a"]), "orphaned"),
++    (_history(["a"], []), "no complete result sequence"),
++    (_history(["a"], [{"role": "user", "content": "continue"}]), "before all results"),
++    (_history(["a", "b"], ["b", "a"]), "expected 'a'"),
++    (_history(["a", "a"], ["a", "a"]), "repeats transport id"),
++    (_history([""], [""]), "missing its transport id"),
++    (_history(["a"], [""]), "missing tool_call_id"),
++])
++def test_tool_history_correlation_is_shared_across_surfaces(
++    stream, surface, items, match,
++):
++    with pytest.raises(VLLMValidationError, match=match):
++        if surface == "chat":
++            ChatCompletionRequest(
++                messages=construct_chat_messages_with_tool_call(items), stream=stream,
++            )
++        else:
++            request = ResponsesRequest(input=items, stream=stream)
++            construct_input_messages(request_input=request.input)
++
++
++def test_previous_response_preserves_thinking_calls_and_all_text_blocks():
++    output = [make_reasoning_item(content_text="thinking"),
++              make_output_message("before"), make_function_call(call_id="a")]
++    previous = [{"role": "user", "content": "question"}]
++    supplied = [make_function_call_output(call_id="a"),
++                {"role": "user", "content": "continue"}]
++    frozen = deepcopy((previous, output, supplied))
++    messages = construct_input_messages(
++        request_input=supplied, prev_msg=previous, prev_response_output=output,
++    )
++    assert messages[1]["reasoning"] == "thinking"
++    assert messages[1]["content"] == "before"
++    assert messages[1]["tool_calls"][0]["id"] == "a"
++    assert messages[2]["tool_call_id"] == "a"
++    assert (previous, output, supplied) == frozen
++
++
++def test_conversion_does_not_mutate_replayed_easy_input():
++    items = [{"role": "assistant", "content": None},
++             make_reasoning_item(content_text="thinking"),
++             make_function_call(call_id="a"), make_function_call_output(call_id="a")]
++    frozen = deepcopy(items)
++    construct_input_messages(request_input=items)
++    assert items == frozen
++
++
++@pytest.mark.asyncio
++@pytest.mark.parametrize("stream", [False, True])
++@pytest.mark.parametrize("valid", [False, True])
++async def test_responses_history_is_validated_before_rendering(stream, valid):
++    renderer = SimpleNamespace(
++        exclude_tools_when_tool_choice_none=False,
++        preprocess_chat=AsyncMock(return_value=(None, ["engine input"])),
++    )
++    serving = object.__new__(OpenAIServingResponses)
++    serving.online_renderer = renderer
++    serving.chat_template = None
++    serving.chat_template_content_format = "string"
++    serving.parser = None
++    serving._effective_chat_template_kwargs = lambda request: {}
++    items = _history(["a", "b"], ["a", "b"] if valid else ["b", "a"])
++    request = ResponsesRequest(input=items, stream=stream)
++    if valid:
++        messages, _ = await serving._make_request(request, None)
++        assert [message["tool_call_id"] for message in messages[1:]] == ["a", "b"]
++        renderer.preprocess_chat.assert_awaited_once()
++    else:
++        with pytest.raises(VLLMValidationError, match="expected 'a'"):
++            await serving._make_request(request, None)
++        renderer.preprocess_chat.assert_not_awaited()
+diff --git a/vllm/entrypoints/chat_utils.py b/vllm/entrypoints/chat_utils.py
+--- a/vllm/entrypoints/chat_utils.py
++++ b/vllm/entrypoints/chat_utils.py
+@@ -2143,6 +2143,89 @@
+     return "random"
+ 
+ 
++def validate_tool_result_correlation(
++    messages: list[ChatCompletionMessageParam],
++) -> None:
++    """Validate transport IDs before rendering positional Qwen tool history.
++
++    Chat and converted Responses messages share this boundary. Every call must
++    have exactly one result in the declared order; never guess or reorder it.
++    """
++    pending_ids: list[str] = []
++    pending_message_index: int | None = None
++
++    for message_index, message in enumerate(messages):
++        if not isinstance(message, dict):
++            continue
++        role = message.get("role")
++        tool_calls = message.get("tool_calls") or []
++
++        if role == "tool":
++            result_id = message.get("tool_call_id")
++            if not pending_ids:
++                raise VLLMValidationError(
++                    f"Tool result at messages[{message_index}] is orphaned; "
++                    "no preceding assistant tool call is awaiting a result."
++                )
++            expected_id = pending_ids[0]
++            if not result_id:
++                raise VLLMValidationError(
++                    f"Tool result at messages[{message_index}] is missing "
++                    f"tool_call_id; expected {expected_id!r}."
++                )
++            if result_id != expected_id:
++                raise VLLMValidationError(
++                    f"Tool result at messages[{message_index}] has "
++                    f"tool_call_id {result_id!r}; expected {expected_id!r} "
++                    "to preserve declared parallel-call order."
++                )
++            pending_ids.pop(0)
++            if not pending_ids:
++                pending_message_index = None
++            continue
++
++        if pending_ids:
++            raise VLLMValidationError(
++                f"Message at messages[{message_index}] has role {role!r} "
++                f"before all results for assistant message "
++                f"messages[{pending_message_index}] were supplied; still "
++                f"awaiting {pending_ids!r}."
++            )
++
++        if not tool_calls:
++            continue
++        if role != "assistant":
++            raise VLLMValidationError(
++                f"Message at messages[{message_index}] declares tool_calls "
++                f"with non-assistant role {role!r}."
++            )
++
++        call_ids: list[str] = []
++        for call_index, tool_call in enumerate(tool_calls):
++            call_id = (
++                tool_call.get("id") if isinstance(tool_call, dict) else None
++            )
++            if not call_id:
++                raise VLLMValidationError(
++                    f"Tool call messages[{message_index}].tool_calls"
++                    f"[{call_index}] is missing its transport id."
++                )
++            if call_id in call_ids:
++                raise VLLMValidationError(
++                    f"Tool call messages[{message_index}].tool_calls"
++                    f"[{call_index}] repeats transport id {call_id!r}."
++                )
++            call_ids.append(call_id)
++        pending_ids = call_ids
++        pending_message_index = message_index
++
++    if pending_ids:
++        raise VLLMValidationError(
++            f"Assistant tool-call message messages[{pending_message_index}] "
++            f"has no complete result sequence; still awaiting {pending_ids!r}."
++        )
++
++
+ def make_tool_call_id(id_type: str = "random", func_name=None, idx=None):
+     if id_type == "kimi_k2":
+         return f"functions.{func_name}:{idx}"
+diff --git a/vllm/entrypoints/openai/chat_completion/protocol.py b/vllm/entrypoints/openai/chat_completion/protocol.py
+--- a/vllm/entrypoints/openai/chat_completion/protocol.py
++++ b/vllm/entrypoints/openai/chat_completion/protocol.py
+@@ -22,6 +22,7 @@
+ from vllm.entrypoints.chat_utils import (
+     ChatCompletionMessageParam,
+     ChatTemplateContentFormatOption,
++    validate_tool_result_correlation,
+ )
+ from vllm.entrypoints.openai.engine.protocol import (
+     AnyResponseFormat,
+@@ -583,88 +584,7 @@
+ 
+     @model_validator(mode="after")
+     def _validate_tool_result_correlation(self) -> "ChatCompletionRequest":
+-        """Reject tool histories that the Qwen template cannot correlate safely.
+-
+-        Qwen's XML history format preserves tool-call order but does not render
+-        OpenAI/Anthropic transport IDs into the model prompt. Accepting an
+-        orphan, mismatched, duplicate, missing, or out-of-order result would
+-        therefore silently attach tool output to the wrong call. This
+-        correctness-first runtime rejects the malformed history instead of
+-        guessing, reordering, or continuing with corrupted context.
+-        """
+-        pending_ids: list[str] = []
+-        pending_message_index: int | None = None
+-
+-        for message_index, message in enumerate(self.messages):
+-            if not isinstance(message, dict):
+-                continue
+-            role = message.get("role")
+-            tool_calls = message.get("tool_calls") or []
+-
+-            if role == "tool":
+-                result_id = message.get("tool_call_id")
+-                if not pending_ids:
+-                    raise ValueError(
+-                        f"Tool result at messages[{message_index}] is orphaned; "
+-                        "no preceding assistant tool call is awaiting a result."
+-                    )
+-                expected_id = pending_ids[0]
+-                if not result_id:
+-                    raise ValueError(
+-                        f"Tool result at messages[{message_index}] is missing "
+-                        f"tool_call_id; expected {expected_id!r}."
+-                    )
+-                if result_id != expected_id:
+-                    raise ValueError(
+-                        f"Tool result at messages[{message_index}] has "
+-                        f"tool_call_id {result_id!r}; expected {expected_id!r} "
+-                        "to preserve declared parallel-call order."
+-                    )
+-                pending_ids.pop(0)
+-                if not pending_ids:
+-                    pending_message_index = None
+-                continue
+-
+-            if pending_ids:
+-                raise ValueError(
+-                    f"Message at messages[{message_index}] has role {role!r} "
+-                    f"before all results for assistant message "
+-                    f"messages[{pending_message_index}] were supplied; still "
+-                    f"awaiting {pending_ids!r}."
+-                )
+-
+-            if not tool_calls:
+-                continue
+-            if role != "assistant":
+-                raise ValueError(
+-                    f"Message at messages[{message_index}] declares tool_calls "
+-                    f"with non-assistant role {role!r}."
+-                )
+-
+-            call_ids: list[str] = []
+-            for call_index, tool_call in enumerate(tool_calls):
+-                call_id = (
+-                    tool_call.get("id") if isinstance(tool_call, dict) else None
+-                )
+-                if not call_id:
+-                    raise ValueError(
+-                        f"Tool call messages[{message_index}].tool_calls"
+-                        f"[{call_index}] is missing its transport id."
+-                    )
+-                if call_id in call_ids:
+-                    raise ValueError(
+-                        f"Tool call messages[{message_index}].tool_calls"
+-                        f"[{call_index}] repeats transport id {call_id!r}."
+-                    )
+-                call_ids.append(call_id)
+-            pending_ids = call_ids
+-            pending_message_index = message_index
+-
+-        if pending_ids:
+-            raise ValueError(
+-                f"Assistant tool-call message messages[{pending_message_index}] "
+-                f"has no complete result sequence; still awaiting {pending_ids!r}."
+-            )
++        validate_tool_result_correlation(self.messages)
+         return self
+ 
+     _grammar_from_parser: bool = PrivateAttr(default=False)
+diff --git a/vllm/entrypoints/openai/responses/utils.py b/vllm/entrypoints/openai/responses/utils.py
+--- a/vllm/entrypoints/openai/responses/utils.py
++++ b/vllm/entrypoints/openai/responses/utils.py
+@@ -2,6 +2,7 @@
+ # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
+ 
+ from collections.abc import Iterable
++from copy import deepcopy
+ from typing import Any
+ 
+ from openai.types.chat import (
+@@ -30,13 +31,17 @@
+ from openai.types.responses.tool import Tool
+ 
+ from vllm import envs
+-from vllm.entrypoints.chat_utils import make_tool_call_id
++from vllm.entrypoints.chat_utils import (
++    make_tool_call_id,
++    validate_tool_result_correlation,
++)
+ from vllm.entrypoints.openai.chat_completion.protocol import (
+     ChatCompletionMessageParam,
+     ChatCompletionToolsParam,
+ )
+ from vllm.entrypoints.openai.engine.protocol import FunctionCall, FunctionDefinition
+ from vllm.entrypoints.openai.responses.protocol import ResponseInputOutputItem
++from vllm.exceptions import VLLMValidationError
+ from vllm.logger import init_logger
+ from vllm.tool_parsers.utils import (
+     build_responses_tool_call_name_map,
+@@ -181,27 +186,17 @@
+         # Filter out system messages from previous conversation -- per the
+         # OpenAI spec, instructions should NOT carry over across responses.
+         # The current request's instructions (if any) were already added above.
+-        messages.extend(m for m in prev_msg if m.get("role") != "system")
+-    if prev_response_output is not None:
+-        # Add the previous output.
+-        for output_item in prev_response_output:
+-            # NOTE: We skip the reasoning output.
+-            if isinstance(output_item, ResponseOutputMessage):
+-                for content in output_item.content:
+-                    messages.append(
+-                        {
+-                            "role": "assistant",
+-                            "content": content.text,
+-                        }
+-                    )
++        messages.extend(deepcopy(m) for m in prev_msg if m.get("role") != "system")
+ 
+     # Append the new input.
+     # Responses API supports simple text inputs without chat format.
++    new_items: list[ResponseInputOutputItem] = list(prev_response_output or [])
+     if isinstance(request_input, str):
+-        messages.append({"role": "user", "content": request_input})
++        new_items.append({"role": "user", "content": request_input})
+     else:
+-        input_messages = construct_chat_messages_with_tool_call(request_input)
+-        messages.extend(input_messages)
++        new_items.extend(request_input)
++    messages.extend(construct_chat_messages_with_tool_call(new_items))
++    validate_tool_result_correlation(messages)
+     return messages
+ 
+ 
+@@ -221,6 +216,23 @@
+             messages.append(message)
+ 
+     return messages
++
++
++def _assistant_content(content):
++    """Concatenate text blocks exactly; retain mixed parts for shared parsing."""
++    if not isinstance(content, list):
++        return content
++    parts = [
++        part.model_dump() if hasattr(part, "model_dump") else part for part in content
++    ]
++    if all(
++        isinstance(part, dict)
++        and part.get("type") in ("text", "input_text", "output_text")
++        and isinstance(part.get("text"), str)
++        for part in parts
++    ):
++        return "".join(part["text"] for part in parts)
++    return parts
+ 
+ 
+ def _construct_message_from_response_item(
+@@ -275,11 +287,13 @@
+     elif isinstance(item, ResponseReasoningItem):
+         reasoning = ""
+         if item.encrypted_content:
+-            raise ValueError("Encrypted content is not supported.")
++            raise VLLMValidationError(
++                "Encrypted reasoning content is not supported.", parameter="input"
++            )
+         elif item.content and len(item.content) >= 1:
+-            reasoning = item.content[0].text
++            reasoning = "".join(block.text for block in item.content)
+         elif len(item.summary) >= 1:
+-            reasoning = item.summary[0].text
++            reasoning = "".join(block.text for block in item.summary)
+             logger.warning(
+                 "Using summary text as reasoning content for item %s. "
+                 "Please use content instead of summary for "
+@@ -297,7 +311,7 @@
+             "reasoning": reasoning,
+         }
+     elif isinstance(item, ResponseOutputMessage):
+-        output_text = item.content[0].text
++        output_text = _assistant_content(item.content)
+         if prev_assistant_msg:
+             previous_content = prev_assistant_msg.get("content")
+             if previous_content is None:
+@@ -321,20 +335,15 @@
+             tool_call_id=item.get("call_id"),
+         )
+     elif isinstance(item, dict) and item.get("role") == "assistant":
+-        content = item.get("content")
+-        text: str | None = None
+-        if isinstance(content, str):
+-            text = content
+-        elif isinstance(content, list) and content:
+-            text = content[0].get("text")
+-        if text is not None:
++        content = _assistant_content(item.get("content"))
++        if content is not None:
+             if prev_assistant_msg:
+                 previous_content = prev_assistant_msg.get("content")
+                 if previous_content is None:
+-                    prev_assistant_msg["content"] = text
++                    prev_assistant_msg["content"] = content
+                     return None
+-            return {"role": "assistant", "content": text}
+-    return item  # type: ignore[arg-type]
++            return {"role": "assistant", "content": content}
++    return deepcopy(item)  # type: ignore[arg-type]
+ 
+ 
+ def extract_function_tool_names(tools: list[Tool]) -> frozenset[str]:
