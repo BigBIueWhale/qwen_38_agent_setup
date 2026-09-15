@@ -168,6 +168,7 @@ AGENT_DEFAULTS_PATCH_FILE="${PROJECT_DIR}/patches/vllm-qwen38-agent-defaults-and
 PHASE_BUDGET_PATCH_FILE="${PROJECT_DIR}/patches/vllm-qwen38-separate-final-response-budget.patch"
 IMPLICIT_TOOL_GRAMMAR_PATCH_FILE="${PROJECT_DIR}/patches/vllm-qwen-implicit-tool-grammar-boundary.patch"
 QWEN_LANGUAGE_PATCH_FILE="${PROJECT_DIR}/patches/vllm-qwen-exact-tool-language.patch"
+PNG_SOURCE_PATCH_FILE="${PROJECT_DIR}/patches/vllm-png-source-admission.patch"
 ANTHROPIC_INPUTS_PATCH_FILE="${PROJECT_DIR}/patches/vllm-anthropic-input-fidelity.patch"
 ANTHROPIC_VALIDATION_PATCH_FILE="${PROJECT_DIR}/patches/vllm-anthropic-validation-http400.patch"
 TOOL_TRUNCATION_PATCH_FILE="${PROJECT_DIR}/patches/vllm-tool-truncation-finish-reason.patch"
@@ -323,6 +324,7 @@ printf '%s  %s\n' \
   "${ANTHROPIC_VALIDATION_PATCH_DIFF_SHA256}" "${ANTHROPIC_VALIDATION_PATCH_FILE}" \
   "${ANTHROPIC_INPUTS_PATCH_DIFF_SHA256}" "${ANTHROPIC_INPUTS_PATCH_FILE}" \
   "${QWEN_LANGUAGE_PATCH_DIFF_SHA256}" "${QWEN_LANGUAGE_PATCH_FILE}" \
+  "${PNG_SOURCE_PATCH_DIFF_SHA256}" "${PNG_SOURCE_PATCH_FILE}" \
   "${TOOL_TRUNCATION_PATCH_DIFF_SHA256}" "${TOOL_TRUNCATION_PATCH_FILE}" \
   "${VISION_RUNTIME_PATCH_DIFF_SHA256}" "${VISION_RUNTIME_PATCH_FILE}" \
   "${NUMERICAL_AUDITS_PATCH_DIFF_SHA256}" "${NUMERICAL_AUDITS_PATCH_FILE}" \
@@ -550,16 +552,18 @@ docker run --rm --network none --read-only \
   --volume "${VLLM_DIR}/vllm/v1/attention/ops/triton_turboquant_decode.py:/usr/local/lib/python3.12/dist-packages/vllm/v1/attention/ops/triton_turboquant_decode.py:ro" \
   --entrypoint python3 "${BASE_IMAGE_TAG}" /project/scripts/turboquant_guard_unit.py
 
-# Execute the installed-parser unit against the complete reviewed runtime overlay.
+# Execute CPU contract units against the complete reviewed runtime overlay.
 parser_unit_mounts=()
 while IFS= read -r path; do
   parser_unit_mounts+=(--volume "${VLLM_DIR}/${path}:/usr/local/lib/python3.12/dist-packages/${path}:ro")
 done < <(git -C "${VLLM_DIR}" diff --name-only --diff-filter=M -- vllm)
-docker run --rm --network none --read-only --user "$(id -u):$(id -g)" \
-  --tmpfs /tmp:rw,nodev,nosuid,size=256m \
-  --env PYTHONDONTWRITEBYTECODE=1 --env CUDA_VISIBLE_DEVICES= \
-  --volume "${PROJECT_DIR}:/project:ro" "${parser_unit_mounts[@]}" \
-  --entrypoint python3 "${BASE_IMAGE_TAG}" /project/scripts/tool_output_parser_unit.py
+for unit in tool_output_parser_unit vision_contract_unit reasoning_usage_unit; do
+  docker run --rm --network none --read-only --user "$(id -u):$(id -g)" \
+    --tmpfs /tmp:rw,nodev,nosuid,size=256m \
+    --env PYTHONDONTWRITEBYTECODE=1 --env CUDA_VISIBLE_DEVICES= \
+    --volume "${PROJECT_DIR}:/project:ro" "${parser_unit_mounts[@]}" \
+    --entrypoint python3 "${BASE_IMAGE_TAG}" "/project/scripts/${unit}.py"
+done
 
 git -C "${VLLM_DIR}" diff --check
 
@@ -696,6 +700,7 @@ docker buildx build --progress=plain \
   --build-arg "ANTHROPIC_VALIDATION_PATCH_DIFF_SHA256=${ANTHROPIC_VALIDATION_PATCH_DIFF_SHA256}" \
   --build-arg "ANTHROPIC_INPUTS_PATCH_DIFF_SHA256=${ANTHROPIC_INPUTS_PATCH_DIFF_SHA256}" \
   --build-arg "QWEN_LANGUAGE_PATCH_DIFF_SHA256=${QWEN_LANGUAGE_PATCH_DIFF_SHA256}" \
+  --build-arg "PNG_SOURCE_PATCH_DIFF_SHA256=${PNG_SOURCE_PATCH_DIFF_SHA256}" \
   --build-arg "TOOL_TRUNCATION_PATCH_DIFF_SHA256=${TOOL_TRUNCATION_PATCH_DIFF_SHA256}" \
   --build-arg "VISION_RUNTIME_PATCH_DIFF_SHA256=${VISION_RUNTIME_PATCH_DIFF_SHA256}" \
   --build-arg "NUMERICAL_AUDITS_PATCH_DIFF_SHA256=${NUMERICAL_AUDITS_PATCH_DIFF_SHA256}" \

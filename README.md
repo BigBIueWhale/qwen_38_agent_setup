@@ -75,7 +75,7 @@ error.
   and relay readiness events, then validates the complete live configuration before
   reporting success. Re-running it validates the existing owned topology rather than
   starting a duplicate.
-- status.sh validates host prerequisites, fifteen ordered vLLM transformations, every reviewed
+- status.sh validates host prerequisites, sixteen ordered vLLM transformations, every reviewed
   source and test file, the model manifest, image archive, image identity and labels,
   command and environment, mounts, runtime packages, API identity, listener,
   hardening, and live health. HEALTHY means all checks passed.
@@ -95,7 +95,7 @@ Advanced reproducibility operations are deliberately separate from serving mode:
     ./scripts/build-vllm.sh build
     ./scripts/restore-images.sh
 
-The check reconstructs the source tree from the pinned upstream commit through all fifteen
+The check reconstructs the source tree from the pinned upstream commit through all sixteen
 landmark-aware transformations. The build runs offline from the exact base image and fails unless it produces
 the pinned image ID. Restore verifies the pinned local archive before loading it.
 
@@ -251,7 +251,7 @@ The vLLM submodule is pinned at:
 
     9df9b0b0a1816b6d0d0f6ecd0da563cc37fd72f5
 
-It is intentionally reconstructed by fifteen ordered, reviewed semantic transformations:
+It is intentionally reconstructed by sixteen ordered, reviewed semantic transformations:
 
 | Patch | SHA-256 |
 |---|---|
@@ -270,6 +270,7 @@ It is intentionally reconstructed by fifteen ordered, reviewed semantic transfor
 | patches/vllm-exact-reasoning-usage.patch | 7991cca04345cf58a602a6b0630d2ebbf31f3da228e9034da591217956d37b31 |
 | patches/vllm-anthropic-input-fidelity.patch | c2063d509fc90929f7d6018796f753da6445f12a4b4b19181e377f772b923a49 |
 | patches/vllm-qwen-exact-tool-language.patch | fe4e46cb7444c80646537da63ab1ac12c54e7eebb04c0735a4243d8b7e7943d2 |
+| patches/vllm-png-source-admission.patch | b9091c5c227151ec00131a854d927a9405396244a9a59bd4d6e297dd67ea3306 |
 
 The reconstructed tree has exactly sixty-four reviewed runtime-source changes, five
 reviewed runtime-source deletions, forty reviewed existing-test changes,
@@ -295,11 +296,11 @@ Pinned build inputs and products:
 | Offline archive | artifacts/qwen38-vllm-images-runtime-v23.tar |
 | Archive size | Awaiting adoption after the v23 export |
 | Archive SHA-256 | Awaiting adoption after the v23 export |
-| Runtime Dockerfile SHA-256 | b34e37131783bba3cb0fa1b84940a85ec0f6c07887da07c1dbf183b6115e5f99 |
+| Runtime Dockerfile SHA-256 | 4a39668cb049f18f941998f4867689fda5e97963cade7472e45e5aacb3eaf31f |
 | Docker context allowlist SHA-256 | 1bef547518b88ff9c592d411e0fbf1582f82a6f27166b0ba956892e72797ca7a |
-| Build verifier SHA-256 | 313884f5e9f6c47aeeddb5d353c2c8571a2006adc96a5e23c08a82f337f0e891 |
+| Build verifier SHA-256 | 8d4ec62792a7fa386ae73a699a53a1e531dbf5168a3181f2b61c55f82307b509 |
 | Runtime validator SHA-256 | e8f3fd0f85e903ae461e89dfe63872a4d9037518ac0fd7f8460b065721ea6f4f |
-| Runtime lock SHA-256 | a5ad05269c20c786b342ba4f301c02235d4c776645dc3c22f572688e747ca34b |
+| Runtime lock SHA-256 | b1a4cf2345f6816d31c9fd11b91ec18fd7fad3b4dbc9ce122554139240a97348 |
 
 Every reviewed runtime file, including both TurboQuant kernels, is copied and
 hash-checked against its upstream and patched identities. A CPU Triton-interpreter
@@ -557,7 +558,7 @@ upstream card, exact tokenizer, vLLM request accounting, and the live boundary a
     262143 prompt + 1 output = 262144 total  -> accepted
     262144 prompt + 1 output = 262145 total -> HTTP 400
 
-The accepted multimodal boundary included all fifteen maximum-size images and
+The accepted multimodal boundary included all sixteen maximum-size images and
 245,745 tokens of multimodal expansion. No YaRN, long-context environment override,
 or nominal one-million setting is enabled.
 

@@ -35320,7 +35320,199 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '\n'
                              '    def is_reasoning_end(self, input_ids: list[int]) -> '
                              'bool:\n'
-                             '        if super().is_reasoning_end(input_ids):\n'})})
+                             '        if super().is_reasoning_end(input_ids):\n'})},
+ {'name': 'png-source-admission',
+  'review_patch': 'patches/vllm-png-source-admission.patch',
+  'review_sha256': 'b9091c5c227151ec00131a854d927a9405396244a9a59bd4d6e297dd67ea3306',
+  'files': ({'path': 'tests/multimodal/media/test_image.py',
+             'before_sha256': '384cc3865d8b2d564441b41e53332e29fa8d90619c90480395539e5b15f65b04',
+             'after_sha256': '831b02dacd0e67302231010b814956751a644413e2e8a7d58a5efe6deafd7d1c'},
+            {'path': 'vllm/multimodal/media/image.py',
+             'before_sha256': '4ef1af2c5ede9651d2ae490934cf798cab512a56dd7800978cafcb8ab6e1b8f9',
+             'after_sha256': '0ad95048460398831c58ace5c4f1d400eb127c4c2d2afb5b3df8cafb8c66f85f'}),
+  'edits': ({'name': 'tests/multimodal/media/test_image.py:landmark-1',
+             'path': 'tests/multimodal/media/test_image.py',
+             'before': '    with BytesIO() as buffer:\n'
+                       '        image.save(buffer, format="PNG", **save_kwargs)\n'
+                       '        return buffer.getvalue()\n'
+                       '\n'
+                       '\n'
+                       'def '
+                       'test_qwen38_strict_image_contract_accepts_rgb_and_rgba(monkeypatch):\n',
+             'after': '    with BytesIO() as buffer:\n'
+                      '        image.save(buffer, format="PNG", **save_kwargs)\n'
+                      '        return buffer.getvalue()\n'
+                      '\n'
+                      '\n'
+                      '@pytest.mark.parametrize("color_type,channels", [(2, 3), (4, '
+                      '2), (6, 4)])\n'
+                      'def '
+                      'test_qwen38_rejects_sixteen_bit_source_before_pillow_reduces_it(\n'
+                      '    monkeypatch, color_type, channels\n'
+                      '):\n'
+                      '    import struct\n'
+                      '    import zlib\n'
+                      '\n'
+                      '    def chunk(kind, payload):\n'
+                      '        return (\n'
+                      '            struct.pack(">I", len(payload)) + kind + payload\n'
+                      '            + struct.pack(">I", zlib.crc32(kind + payload))\n'
+                      '        )\n'
+                      '\n'
+                      '    data = (\n'
+                      '        b"\\x89PNG\\r\\n\\x1a\\n"\n'
+                      '        + chunk(b"IHDR", struct.pack(">IIBBBBB", 1, 1, 16, '
+                      'color_type, 0, 0, 0))\n'
+                      '        + chunk(b"IDAT", zlib.compress(b"\\x00" + b"\\x12\\x34" '
+                      '* channels))\n'
+                      '        + chunk(b"IEND", b"")\n'
+                      '    )\n'
+                      '    image = Image.open(BytesIO(data))\n'
+                      '    image.load()\n'
+                      '    assert image.mode in ("RGB", "RGBA")  # The old mode-only '
+                      'check accepted it.\n'
+                      '    monkeypatch.setenv("VLLM_QWEN38_STRICT_IMAGE_CONTRACT", '
+                      '"1")\n'
+                      '    monkeypatch.setenv("VLLM_MAX_IMAGE_PIXELS", "16777216")\n'
+                      '    with pytest.raises(ValueError, match="IHDR bit depth 16"):\n'
+                      '        ImageMediaIO().load_bytes(data)\n'
+                      '\n'
+                      '\n'
+                      'def '
+                      'test_qwen38_strict_image_contract_accepts_rgb_and_rgba(monkeypatch):\n',
+             'review_before': '    with BytesIO() as buffer:\n'
+                              '        image.save(buffer, format="PNG", '
+                              '**save_kwargs)\n'
+                              '        return buffer.getvalue()\n'
+                              '\n'
+                              '\n'
+                              'def '
+                              'test_qwen38_strict_image_contract_accepts_rgb_and_rgba(monkeypatch):\n',
+             'review_after': '    with BytesIO() as buffer:\n'
+                             '        image.save(buffer, format="PNG", **save_kwargs)\n'
+                             '        return buffer.getvalue()\n'
+                             '\n'
+                             '\n'
+                             '@pytest.mark.parametrize("color_type,channels", [(2, 3), '
+                             '(4, 2), (6, 4)])\n'
+                             'def '
+                             'test_qwen38_rejects_sixteen_bit_source_before_pillow_reduces_it(\n'
+                             '    monkeypatch, color_type, channels\n'
+                             '):\n'
+                             '    import struct\n'
+                             '    import zlib\n'
+                             '\n'
+                             '    def chunk(kind, payload):\n'
+                             '        return (\n'
+                             '            struct.pack(">I", len(payload)) + kind + '
+                             'payload\n'
+                             '            + struct.pack(">I", zlib.crc32(kind + '
+                             'payload))\n'
+                             '        )\n'
+                             '\n'
+                             '    data = (\n'
+                             '        b"\\x89PNG\\r\\n\\x1a\\n"\n'
+                             '        + chunk(b"IHDR", struct.pack(">IIBBBBB", 1, 1, '
+                             '16, color_type, 0, 0, 0))\n'
+                             '        + chunk(b"IDAT", zlib.compress(b"\\x00" + '
+                             'b"\\x12\\x34" * channels))\n'
+                             '        + chunk(b"IEND", b"")\n'
+                             '    )\n'
+                             '    image = Image.open(BytesIO(data))\n'
+                             '    image.load()\n'
+                             '    assert image.mode in ("RGB", "RGBA")  # The old '
+                             'mode-only check accepted it.\n'
+                             '    '
+                             'monkeypatch.setenv("VLLM_QWEN38_STRICT_IMAGE_CONTRACT", '
+                             '"1")\n'
+                             '    monkeypatch.setenv("VLLM_MAX_IMAGE_PIXELS", '
+                             '"16777216")\n'
+                             '    with pytest.raises(ValueError, match="IHDR bit depth '
+                             '16"):\n'
+                             '        ImageMediaIO().load_bytes(data)\n'
+                             '\n'
+                             '\n'
+                             'def '
+                             'test_qwen38_strict_image_contract_accepts_rgb_and_rgba(monkeypatch):\n'},
+            {'name': 'vllm/multimodal/media/image.py:landmark-1',
+             'path': 'vllm/multimodal/media/image.py',
+             'before': '                        "The Qwen3.8 image contract accepts '
+                       'only static, "\n'
+                       '                        "single-frame PNG files; animated PNG '
+                       'is forbidden."\n'
+                       '                    )\n'
+                       '                if image.mode not in ("RGB", "RGBA"):\n'
+                       '                    raise ValueError(\n'
+                       '                        "The Qwen3.8 image contract accepts '
+                       'only 8-bit RGB or "\n',
+             'after': '                        "The Qwen3.8 image contract accepts '
+                      'only static, "\n'
+                      '                        "single-frame PNG files; animated PNG '
+                      'is forbidden."\n'
+                      '                    )\n'
+                      '                # Pillow exposes 16-bit truecolour and '
+                      'grey+alpha PNGs as\n'
+                      '                # RGB/RGBA after reducing them to eight bits. '
+                      'Admission is a\n'
+                      '                # property of the encoded source, before that '
+                      'conversion.\n'
+                      '                if data[:16] != '
+                      'b"\\x89PNG\\r\\n\\x1a\\n\\x00\\x00\\x00\\rIHDR":\n'
+                      '                    raise ValueError("PNG source must begin '
+                      'with a 13-byte IHDR chunk.")\n'
+                      '                bit_depth, color_type = data[24:26]\n'
+                      '                if bit_depth != 8 or color_type not in (2, 6):\n'
+                      '                    raise ValueError(\n'
+                      '                        "The Qwen3.8 image contract accepts '
+                      'only 8-bit RGB or "\n'
+                      '                        "RGBA PNG source pixels; detected IHDR '
+                      '"\n'
+                      '                        f"bit depth {bit_depth}, color type '
+                      '{color_type}."\n'
+                      '                    )\n'
+                      '                if image.mode not in ("RGB", "RGBA"):\n'
+                      '                    raise ValueError(\n'
+                      '                        "The Qwen3.8 image contract accepts '
+                      'only 8-bit RGB or "\n',
+             'review_before': '                        "The Qwen3.8 image contract '
+                              'accepts only static, "\n'
+                              '                        "single-frame PNG files; '
+                              'animated PNG is forbidden."\n'
+                              '                    )\n'
+                              '                if image.mode not in ("RGB", "RGBA"):\n'
+                              '                    raise ValueError(\n'
+                              '                        "The Qwen3.8 image contract '
+                              'accepts only 8-bit RGB or "\n',
+             'review_after': '                        "The Qwen3.8 image contract '
+                             'accepts only static, "\n'
+                             '                        "single-frame PNG files; '
+                             'animated PNG is forbidden."\n'
+                             '                    )\n'
+                             '                # Pillow exposes 16-bit truecolour and '
+                             'grey+alpha PNGs as\n'
+                             '                # RGB/RGBA after reducing them to eight '
+                             'bits. Admission is a\n'
+                             '                # property of the encoded source, before '
+                             'that conversion.\n'
+                             '                if data[:16] != '
+                             'b"\\x89PNG\\r\\n\\x1a\\n\\x00\\x00\\x00\\rIHDR":\n'
+                             '                    raise ValueError("PNG source must '
+                             'begin with a 13-byte IHDR chunk.")\n'
+                             '                bit_depth, color_type = data[24:26]\n'
+                             '                if bit_depth != 8 or color_type not in '
+                             '(2, 6):\n'
+                             '                    raise ValueError(\n'
+                             '                        "The Qwen3.8 image contract '
+                             'accepts only 8-bit RGB or "\n'
+                             '                        "RGBA PNG source pixels; '
+                             'detected IHDR "\n'
+                             '                        f"bit depth {bit_depth}, color '
+                             'type {color_type}."\n'
+                             '                    )\n'
+                             '                if image.mode not in ("RGB", "RGBA"):\n'
+                             '                    raise ValueError(\n'
+                             '                        "The Qwen3.8 image contract '
+                             'accepts only 8-bit RGB or "\n'})})
 
 FINAL_FILES = {'tests/config/test_config_utils.py': '4f5ea0399cc3b4f9603df07e2cc26d32e1eddf6b98a36c0f30d580321879c038',
  'tests/distributed/test_rocm_quick_reduce.py': 'bf6f8a5708568b1f4d96dcc59f42258f8680e5b03bb4abdddcb0c7ead9d414bd',
@@ -35333,7 +35525,7 @@ FINAL_FILES = {'tests/config/test_config_utils.py': '4f5ea0399cc3b4f9603df07e2cc
  'tests/evals/gsm8k/test_gsm8k_offloading.py': 'a7ced3b714c418120c2e4d5cfb55690d3b11baa96083256c2bb640dc80eec3f6',
  'tests/models/language/pooling/test_reward.py': '768653da76744a46273b18aad25342b48a7accd8be31b4cfaad71bd0e7f7f6e0',
  'tests/multimodal/media/test_connector.py': 'bee62bcbe6d87246087ead9b713bffb287d80059b04add8306d9ef0ccc8e96f8',
- 'tests/multimodal/media/test_image.py': '384cc3865d8b2d564441b41e53332e29fa8d90619c90480395539e5b15f65b04',
+ 'tests/multimodal/media/test_image.py': '831b02dacd0e67302231010b814956751a644413e2e8a7d58a5efe6deafd7d1c',
  'tests/parser/engine/replay_harness.py': '6bacf71a93469ca49bbdbfed3b109f82861f9ae3b5298e0d548c5440b0df13fe',
  'tests/parser/engine/test_delegating_replay.py': '80c003e55e34023cd4ffb9c7ea60149fbd9f167bb2a617584ce2c3842d150d66',
  'tests/parser/engine/test_nemotron_v3.py': '65b1be9ad64bd16e08cea6d6886a33169aae31933c918587ea9e4ea8167975c5',
@@ -35399,7 +35591,7 @@ FINAL_FILES = {'tests/config/test_config_utils.py': '4f5ea0399cc3b4f9603df07e2cc
  'vllm/envs.py': '44dcae7ec3cf943de5c2e11125adf7e75676b12e627ed02c213e8dd38049f371',
  'vllm/model_executor/models/qwen3_vl.py': 'e271b7bbda10dc047d36b96fdbe9a7fd1806f1390bf7bb0aa3d3948f7f037cfa',
  'vllm/multimodal/media/connector.py': '8b3998c4427fac24e5b92ac0b7f85950c13c43d9b43f17d4b464a9776e1bfaa5',
- 'vllm/multimodal/media/image.py': '4ef1af2c5ede9651d2ae490934cf798cab512a56dd7800978cafcb8ab6e1b8f9',
+ 'vllm/multimodal/media/image.py': '0ad95048460398831c58ace5c4f1d400eb127c4c2d2afb5b3df8cafb8c66f85f',
  'vllm/parser/abstract_parser.py': 'c3ab24e70dcabf75cd8cb662e56bd369dfcb6a9e66814e1e35f2840bc3920c4d',
  'vllm/parser/engine/adapters.py': 'cda9c48f5b64c60224961bd75c8a5667caaa1494da581f5bb7ab10cec07ecd8b',
  'vllm/parser/engine/events.py': 'd0ed492bbe28c19b6ec0446770a21754bfa844a70888ef5706587b0bbea51405',

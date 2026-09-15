@@ -1,0 +1,60 @@
+diff --git a/tests/multimodal/media/test_image.py b/tests/multimodal/media/test_image.py
+--- a/tests/multimodal/media/test_image.py
++++ b/tests/multimodal/media/test_image.py
+@@ -293,6 +293,34 @@
+     with BytesIO() as buffer:
+         image.save(buffer, format="PNG", **save_kwargs)
+         return buffer.getvalue()
++
++
++@pytest.mark.parametrize("color_type,channels", [(2, 3), (4, 2), (6, 4)])
++def test_qwen38_rejects_sixteen_bit_source_before_pillow_reduces_it(
++    monkeypatch, color_type, channels
++):
++    import struct
++    import zlib
++
++    def chunk(kind, payload):
++        return (
++            struct.pack(">I", len(payload)) + kind + payload
++            + struct.pack(">I", zlib.crc32(kind + payload))
++        )
++
++    data = (
++        b"\x89PNG\r\n\x1a\n"
++        + chunk(b"IHDR", struct.pack(">IIBBBBB", 1, 1, 16, color_type, 0, 0, 0))
++        + chunk(b"IDAT", zlib.compress(b"\x00" + b"\x12\x34" * channels))
++        + chunk(b"IEND", b"")
++    )
++    image = Image.open(BytesIO(data))
++    image.load()
++    assert image.mode in ("RGB", "RGBA")  # The old mode-only check accepted it.
++    monkeypatch.setenv("VLLM_QWEN38_STRICT_IMAGE_CONTRACT", "1")
++    monkeypatch.setenv("VLLM_MAX_IMAGE_PIXELS", "16777216")
++    with pytest.raises(ValueError, match="IHDR bit depth 16"):
++        ImageMediaIO().load_bytes(data)
+ 
+ 
+ def test_qwen38_strict_image_contract_accepts_rgb_and_rgba(monkeypatch):
+diff --git a/vllm/multimodal/media/image.py b/vllm/multimodal/media/image.py
+--- a/vllm/multimodal/media/image.py
++++ b/vllm/multimodal/media/image.py
+@@ -114,6 +114,18 @@
+                         "The Qwen3.8 image contract accepts only static, "
+                         "single-frame PNG files; animated PNG is forbidden."
+                     )
++                # Pillow exposes 16-bit truecolour and grey+alpha PNGs as
++                # RGB/RGBA after reducing them to eight bits. Admission is a
++                # property of the encoded source, before that conversion.
++                if data[:16] != b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR":
++                    raise ValueError("PNG source must begin with a 13-byte IHDR chunk.")
++                bit_depth, color_type = data[24:26]
++                if bit_depth != 8 or color_type not in (2, 6):
++                    raise ValueError(
++                        "The Qwen3.8 image contract accepts only 8-bit RGB or "
++                        "RGBA PNG source pixels; detected IHDR "
++                        f"bit depth {bit_depth}, color type {color_type}."
++                    )
+                 if image.mode not in ("RGB", "RGBA"):
+                     raise ValueError(
+                         "The Qwen3.8 image contract accepts only 8-bit RGB or "

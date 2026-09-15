@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import asyncio
 import os
+import struct
+import zlib
 from io import BytesIO
 from types import SimpleNamespace
 
@@ -52,6 +54,24 @@ def test_decoder() -> str:
     rgba = image_io.load_bytes(png_bytes("RGBA", color=(0, 0, 0, 0))).media
     assert rgba.mode == "RGB"
     assert rgba.getpixel((0, 0)) == (255, 255, 255)
+
+    def chunk(kind: bytes, payload: bytes) -> bytes:
+        return (
+            struct.pack(">I", len(payload)) + kind + payload
+            + struct.pack(">I", zlib.crc32(kind + payload))
+        )
+
+    for color_type, channels in ((2, 3), (4, 2), (6, 4)):
+        encoded = (
+            b"\x89PNG\r\n\x1a\n"
+            + chunk(b"IHDR", struct.pack(">IIBBBBB", 1, 1, 16, color_type, 0, 0, 0))
+            + chunk(b"IDAT", zlib.compress(b"\x00" + b"\x12\x34" * channels))
+            + chunk(b"IEND", b"")
+        )
+        image = Image.open(BytesIO(encoded))
+        image.load()
+        assert image.mode in ("RGB", "RGBA")
+        expect(ValueError, "IHDR bit depth 16", lambda: image_io.load_bytes(encoded))
 
     expect(ValueError, "requires image_mode='RGB'", lambda: ImageMediaIO(None))
     expect(
@@ -207,6 +227,7 @@ def test_request_surfaces() -> None:
 def test_anthropic_tool_image_interleave() -> None:
     block = SimpleNamespace(
         tool_use_id="call_001",
+        is_error=False,
         content=[
             {"type": "text", "text": "before"},
             {

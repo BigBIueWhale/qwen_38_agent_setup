@@ -115,6 +115,24 @@ the old mock assigned several letters the same IDs as reserved markers.
 This stage does not finish caller stop suppression, EOS promotion, schema type
 conversion or context-dependent scanner alignment. They remain open.
 
+## Finding 11: admit encoded PNG source pixels
+
+`vllm-png-source-admission.patch` adds the sixteenth runtime source stage.
+The decoder checks the source IHDR chunk before normalization or loading:
+bit depth must be 8, and color type must be RGB (2) or RGBA (6). Pillow's
+decoded mode remains a separate consistency check. A 16-bit source is refused
+with its bit depth and color type instead of being silently reduced to 8 bits.
+
+Validation: five image admission tests pass, including hand-encoded valid
+16-bit RGB, RGBA and grayscale-with-alpha PNGs that Pillow exposes as RGB/RGBA.
+The existing CPU vision-contract build unit now exercises those three cases
+alongside accepted 8-bit RGB/RGBA, white alpha compositing, animation refusal,
+image size/aspect checks, inline URL validation and tool-image ordering.
+The unit passes without network, engine or GPU use. Its Anthropic fixture now
+includes the `is_error` field required by the real input model. Backend `check`
+now executes the parser, vision and reasoning CPU contract units against the
+complete reviewed runtime overlay as well as its existing kernel guards.
+
 ## Remaining implementation
 
 Parser language, stop handling, schema conversion, protocol translation, image

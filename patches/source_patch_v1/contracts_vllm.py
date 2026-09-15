@@ -1693,6 +1693,27 @@ def _validate_qwen_language_after(state: State) -> None:
         }, label=label)
 
 
+def _validate_png_source_before(state: State) -> None:
+    forbid_text(state, "vllm/multimodal/media/image.py", "bit_depth, color_type",
+                label="PNG source admission precondition")
+
+
+def _validate_png_source_after(state: State) -> None:
+    label = "PNG source admission result"
+    _require_in_symbol(state, "vllm/multimodal/media/image.py", "ImageMediaIO.load_bytes", (
+        'bit_depth, color_type = data[24:26]',
+        'if bit_depth != 8 or color_type not in (2, 6):',
+        'detected IHDR',
+    ), label=label)
+    source = _symbol_source(state, "vllm/multimodal/media/image.py",
+                            "ImageMediaIO.load_bytes", label=label)
+    _require_ordered(source, ('bit_depth, color_type', 'image = normalize_image(image)',
+                             'image.load()'), label=label, location="PNG source gate")
+    require_python_symbols(state, "tests/multimodal/media/test_image.py", {
+        "test_qwen38_rejects_sixteen_bit_source_before_pillow_reduces_it": None,
+    }, label=label)
+
+
 def validate_final(state: State) -> None:
     """Reassert every durable semantic invariant on the complete tree.
 
@@ -1708,6 +1729,19 @@ def validate_final(state: State) -> None:
 
 
 CONTRACTS: Mapping[str, SemanticContract] = {
+    "png-source-admission": SemanticContract(
+        rationale=(
+            "Pillow presents 16-bit truecolour and grey+alpha PNGs as RGB/RGBA, "
+            "silently bypassing the source-pixel contract. Admit only the encoded "
+            "IHDR bit depth 8 and colour types 2 or 6 before image conversion."
+        ),
+        removal_condition=(
+            "Remove when pinned upstream validates encoded PNG bit depth and colour "
+            "type before Pillow can silently reduce disallowed source samples."
+        ),
+        validate_before=_validate_png_source_before,
+        validate_after=_validate_png_source_after,
+    ),
     "qwen-exact-tool-language": SemanticContract(
         rationale=(
             "The parser invented calls from unarmed prose, consumed reserved markup "
