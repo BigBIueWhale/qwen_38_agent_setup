@@ -240,7 +240,16 @@ RUN printf '%s  %s\n' \
     | sha256sum --check --strict
 RUN test ! -e /usr/local/lib/python3.12/dist-packages/vllm/v1/core/prefix_cache.py
 
+ARG COMPLETION_SERVING_UPSTREAM_FILE_SHA256
+ARG RENDER_SERVING_UPSTREAM_FILE_SHA256
+RUN printf '%s  %s\n' \
+  "${COMPLETION_SERVING_UPSTREAM_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/completion/serving.py \
+  "${RENDER_SERVING_UPSTREAM_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/scale_out/render/serving.py \
+  | sha256sum --check --strict
+
 FROM upstream-verifier AS runtime
+ARG COMPLETION_SERVING_PATCHED_FILE_SHA256
+ARG RENDER_SERVING_PATCHED_FILE_SHA256
 ARG OFFLOADING_CONNECTOR_PATCHED_FILE_SHA256
 ARG BLOCK_POOL_PATCHED_FILE_SHA256
 ARG KV_CACHE_COORDINATOR_PATCHED_FILE_SHA256
@@ -312,6 +321,7 @@ ARG RESPONSES_HISTORY_PATCH_DIFF_SHA256
 ARG RESPONSES_IDENTITY_PATCH_DIFF_SHA256
 ARG ANTHROPIC_TERMINAL_PATCH_DIFF_SHA256
 ARG SAMPLING_RESOLUTION_PATCH_DIFF_SHA256
+ARG SAMPLING_BOUNDARY_PATCH_DIFF_SHA256
 ARG TOOL_TRUNCATION_PATCH_DIFF_SHA256
 ARG VISION_RUNTIME_PATCH_DIFF_SHA256
 ARG NUMERICAL_AUDITS_PATCH_DIFF_SHA256
@@ -571,6 +581,12 @@ RUN printf '%s  %s\n' \
       "${KV_OFFLOAD_CPU_COMMON_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/cpu/common.py \
       "${SIMPLE_KV_OFFLOAD_MANAGER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/simple_kv_offload/manager.py \
     | sha256sum --check --strict
+COPY --chmod=0644 vllm/vllm/entrypoints/openai/completion/serving.py /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/completion/serving.py
+COPY --chmod=0644 vllm/vllm/entrypoints/scale_out/render/serving.py /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/scale_out/render/serving.py
+RUN printf '%s  %s\n' \
+  "${COMPLETION_SERVING_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/completion/serving.py \
+  "${RENDER_SERVING_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/scale_out/render/serving.py \
+  | sha256sum --check --strict
 COPY --chmod=0644 chat_template.jinja /opt/qwen38/chat_template.jinja
 COPY --chmod=0644 scripts/phase_budget_unit.py /opt/qwen38/phase_budget_unit.py
 COPY --chmod=0644 scripts/vision_workspace_unit.py /opt/qwen38/vision_workspace_unit.py
@@ -1247,6 +1263,7 @@ LABEL org.opencontainers.image.revision="9df9b0b0a1816b6d0d0f6ecd0da563cc37fd72f
       qwen38.patch.responses-stream-identity.diff.sha256="${RESPONSES_IDENTITY_PATCH_DIFF_SHA256}" \
       qwen38.patch.anthropic-terminal-metadata.diff.sha256="${ANTHROPIC_TERMINAL_PATCH_DIFF_SHA256}" \
       qwen38.patch.generation-sampling-resolution.diff.sha256="${SAMPLING_RESOLUTION_PATCH_DIFF_SHA256}" \
+      qwen38.patch.sampling-decoding-boundary.diff.sha256="${SAMPLING_BOUNDARY_PATCH_DIFF_SHA256}" \
       qwen38.template.file.sha256="${AGENT_CHAT_TEMPLATE_SHA256}" \
       qwen38.project="Qwen_best_model_ever" \
       qwen38.runtime.profile="${IMAGE_PROFILE_VERSION}"

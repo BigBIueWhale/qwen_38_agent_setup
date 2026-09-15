@@ -5,6 +5,30 @@ The independent triage and handling policy supplied with the implementation brie
 decide the resolutions. Source validation here does not certify a built image or a
 live release. The v23 image and archive are awaiting adoption.
 
+## Finding 22: refuse unsupported decoding at the request boundary
+
+`vllm-sampling-decoding-boundary.patch` declares beam search unsupported through
+one shared request field type. Chat, Completions, batch Chat and render requests
+refuse true before any rendering or engine call. The native HTTP 400 identifies
+`use_beam_search`; it cannot misreport missing cache identity. JSON schemas expose
+false as the sole supported value. The former Chat/Completion beam conversion
+methods, dispatch branches and scattered capability checks are deleted.
+
+Validation: 193 offline CPU tests pass, including the same boundary error on both
+stream settings, native error-envelope conversion, request schemas, default and
+explicit sampling selection, the request-input bounds and sampling/render suites.
+Eight negative controls against the previous runtime admit the unsupported flag
+and fail. Five live logprob cases were deliberately deselected; no service, model,
+GPU or listener was started. Existing live beam-success tests are replaced by
+boundary coverage; the LoRA test verifies refusal before adapter lookup and batch
+Completion coverage now uses supported sampling. Source-only edits to live tests
+are parsed and included in exact reconstruction but have not been run live.
+
+The two newly modified serving modules join every image copy, upstream/final hash,
+context, build and installed-runtime check. The installed phase-budget unit checks
+this refusal on both transports. Integrated generator and `build-vllm.sh check`
+pass with 23 stages, 97 deployment inputs and all installed CPU units.
+
 ## Finding 19: resolve sampling policy before engine validation
 
 `vllm-generation-sampling-resolution.patch` supplies one typed representation of

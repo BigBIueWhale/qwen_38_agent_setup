@@ -132,3 +132,6 @@
 !vllm/vllm/v1/simple_kv_offload/
 !vllm/vllm/v1/simple_kv_offload/manager.py
 !scripts/shared_prefix_cache_unit.py
+!vllm/vllm/entrypoints/openai/completion/serving.py
+!vllm/vllm/entrypoints/scale_out/render/
+!vllm/vllm/entrypoints/scale_out/render/serving.py

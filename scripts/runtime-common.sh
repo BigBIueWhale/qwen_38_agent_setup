@@ -713,6 +713,8 @@ assert_running_profile() {
       /usr/local/lib/python3.12/dist-packages/vllm/v1/structured_output/__init__.py \
       /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/anthropic/api_router.py \
       /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/chat_completion/serving.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/completion/serving.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/scale_out/render/serving.py \
       /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/responses/context.py \
       /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/responses/protocol.py \
       /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/responses/serving.py \
@@ -746,6 +748,8 @@ assert_running_profile() {
     "${STRUCTURED_OUTPUT_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/structured_output/__init__.py \
     "${ANTHROPIC_API_ROUTER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/anthropic/api_router.py \
     "${CHAT_SERVING_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/chat_completion/serving.py \
+    "${COMPLETION_SERVING_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/completion/serving.py \
+    "${RENDER_SERVING_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/scale_out/render/serving.py \
     "${RESPONSES_CONTEXT_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/responses/context.py \
     "${RESPONSES_PROTOCOL_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/responses/protocol.py \
     "${RESPONSES_SERVING_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/responses/serving.py \

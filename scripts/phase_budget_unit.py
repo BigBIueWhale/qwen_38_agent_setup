@@ -181,4 +181,17 @@ for request in (chat_request(), responses_request(), completion, supplied):
     for key, value in policy.items():
         assert getattr(params, key) == value, (type(request).__name__, key)
 
+for request_type, prompt in (
+    (ChatCompletionRequest, {"messages": [{"role": "user", "content": "test"}]}),
+    (CompletionRequest, {"prompt": "test"}),
+):
+    for stream in (False, True):
+        try:
+            request_type(model="qwen3.8", use_beam_search=True, stream=stream, **prompt)
+        except VLLMValidationError as exc:
+            assert exc.parameter == "use_beam_search"
+            assert "Beam search is not supported" in str(exc)
+        else:
+            raise AssertionError("beam decoding bypassed the sampling policy boundary")
+
 print("phase-budget-unit: PASS")

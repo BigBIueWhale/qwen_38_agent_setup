@@ -1940,6 +1940,46 @@ def _validate_sampling_resolution_after(state: State) -> None:
         }, label=label)
 
 
+def _validate_sampling_boundary_before(state: State) -> None:
+    label = "sampling decoding boundary precondition"
+    for surface in ("chat_completion", "completion"):
+        require_text(state, f"vllm/entrypoints/openai/{surface}/serving.py",
+            "if request.use_beam_search:", label=label)
+
+
+def _validate_sampling_boundary_after(state: State) -> None:
+    label = "sampling decoding boundary result"
+    protocol = "vllm/entrypoints/openai/engine/protocol.py"
+    _require_in_symbol(state, protocol, "_reject_beam_search", (
+        "if value is True:", "raise VLLMValidationError(",
+        '"Beam search is not supported by this deployment."',
+        'parameter="use_beam_search"',
+    ), label=label)
+    require_text(state, protocol,
+        "Literal[False], BeforeValidator(_reject_beam_search)", label=label)
+    for surface, names in (
+        ("chat_completion", ("ChatCompletionRequest", "BatchChatCompletionRequest")),
+        ("completion", ("CompletionRequest",)),
+    ):
+        path = f"vllm/entrypoints/openai/{surface}/protocol.py"
+        for name in names:
+            _require_in_symbol(state, path, name,
+                ("use_beam_search: BeamSearchDisabled = False",), label=label)
+        forbid_text(state, path, "to_beam_search_params", label=label)
+        serving = f"vllm/entrypoints/openai/{surface}/serving.py"
+        for obsolete in ("use_beam_search", "BeamSearchParams", "self.beam_search("):
+            forbid_text(state, serving, obsolete, label=label)
+        require_text(state, serving, "self.engine_client.generate(", label=label)
+    forbid_text(state, "vllm/entrypoints/scale_out/render/serving.py",
+        "use_beam_search", label=label)
+    require_python_symbols(state,
+        "tests/entrypoints/openai/test_beam_search_boundary.py", {
+            "test_unsupported_beam_search_returns_the_same_boundary_error": None,
+            "test_supported_sampling_does_not_require_a_decoding_flag": None,
+            "test_request_schema_advertises_the_supported_decoding_value": None,
+        }, label=label)
+
+
 def validate_final(state: State) -> None:
     """Reassert every durable semantic invariant on the complete tree.
 
@@ -1955,6 +1995,21 @@ def validate_final(state: State) -> None:
 
 
 CONTRACTS: Mapping[str, SemanticContract] = {
+    "sampling-decoding-boundary": SemanticContract(
+        rationale=(
+            "The beam loop bypasses phase budgets, grammar and parsing and drops "
+            "the required agent identity, producing a misleading kv_scope error. "
+            "Represent supported decoding at request validation and remove the "
+            "unreachable Chat/Completion beam conversion and dispatch paths."
+        ),
+        removal_condition=(
+            "Remove when served beam decoding honors the same complete generation "
+            "policy, or upstream provides the same truthful shared refusal and "
+            "request schema on Chat, Completion, batch and render requests."
+        ),
+        validate_before=_validate_sampling_boundary_before,
+        validate_after=_validate_sampling_boundary_after,
+    ),
     "generation-sampling-resolution": SemanticContract(
         rationale=(
             "Constructing engine settings before model defaults and prompt length "

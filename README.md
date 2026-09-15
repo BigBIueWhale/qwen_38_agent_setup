@@ -75,7 +75,7 @@ error.
   and relay readiness events, then validates the complete live configuration before
   reporting success. Re-running it validates the existing owned topology rather than
   starting a duplicate.
-- status.sh validates host prerequisites, twenty-two ordered vLLM transformations, every reviewed
+- status.sh validates host prerequisites, twenty-three ordered vLLM transformations, every reviewed
   source and test file, the model manifest, image archive, image identity and labels,
   command and environment, mounts, runtime packages, API identity, listener,
   hardening, and live health. HEALTHY means all checks passed.
@@ -95,7 +95,7 @@ Advanced reproducibility operations are deliberately separate from serving mode:
     ./scripts/build-vllm.sh build
     ./scripts/restore-images.sh
 
-The check reconstructs the source tree from the pinned upstream commit through all twenty-two
+The check reconstructs the source tree from the pinned upstream commit through all twenty-three
 landmark-aware transformations. The build runs offline from the exact base image and fails unless it produces
 the pinned image ID. Restore verifies the pinned local archive before loading it.
 
@@ -251,7 +251,7 @@ The vLLM submodule is pinned at:
 
     9df9b0b0a1816b6d0d0f6ecd0da563cc37fd72f5
 
-It is intentionally reconstructed by twenty-two ordered, reviewed semantic transformations:
+It is intentionally reconstructed by twenty-three ordered, reviewed semantic transformations:
 
 | Patch | SHA-256 |
 |---|---|
@@ -277,9 +277,10 @@ It is intentionally reconstructed by twenty-two ordered, reviewed semantic trans
 | patches/vllm-responses-stream-identity.patch | eccec34b8dd211f444065ef60b6b8075161efc790b61db4640104e3747763478 |
 | patches/vllm-anthropic-terminal-metadata.patch | 7885e27d8f9259e106bd8c2f3ccdefa3fd276649658ea521b50ecf85d83113c5 |
 | patches/vllm-generation-sampling-resolution.patch | a70b88b8e1fa3801e7d5e0a2c6a66f8608ab6e8534b67aafd832bf566d2d2c7a |
+| patches/vllm-sampling-decoding-boundary.patch | aaed899245dcfa877d8c1c19f2834317a7326695372c6810267b21dd3337f913 |
 
-The reconstructed tree has 72 reviewed runtime-source changes, 1 new runtime source,
-6 runtime-source deletions, 53 existing-test changes, 6 new tests,
+The reconstructed tree has 74 reviewed runtime-source changes, 1 new runtime source,
+6 runtime-source deletions, 59 existing-test changes, 7 new tests,
 and 2 test deletions. The authoritative
 counts are derived and printed by ./scripts/build-vllm.sh check, never restated
 by hand there. The landmark-aware Python patcher calculates every mutation
@@ -302,11 +303,11 @@ Pinned build inputs and products:
 | Offline archive | artifacts/qwen38-vllm-images-runtime-v23.tar |
 | Archive size | Awaiting adoption after the v23 export |
 | Archive SHA-256 | Awaiting adoption after the v23 export |
-| Runtime Dockerfile SHA-256 | 099bbc1ee6f447ce98ddb989a0eeaf6521feeb6385abe91abaf3286d883d1655 |
-| Docker context allowlist SHA-256 | 00b93440d4684980fc932594c0353e72bdb1d12b69165dd7898b28e03119f00d |
-| Build verifier SHA-256 | 224d6608542c703310e470afc0c1b6b723737405222569a2d1285440414752ea |
-| Runtime validator SHA-256 | bab63263005f7bde7a6a66f7372d2f043545598fd56563bc5f8766301723d4e2 |
-| Runtime lock SHA-256 | 7d6370a9a6bee172493ab78c01cfb7471bc1d7a2179ec08d0215db93014dec44 |
+| Runtime Dockerfile SHA-256 | 0a0a8494096b9d52d3e3b40304b18d47838942c65863f98753a09c2dcce9d9fd |
+| Docker context allowlist SHA-256 | c54b1b8e98295ab3935ac2a4cbf084abe2700fde9ee660423fd70540c793be5c |
+| Build verifier SHA-256 | a2d42ba141edc863be17f3653a344b968dd77bb19d38bfbf4725e19e3d3ed0bc |
+| Runtime validator SHA-256 | 9a157c310bc829adce496eed5d191164aa95b96e806bfc80b973b2b54d3c6cee |
+| Runtime lock SHA-256 | 606fe111812b5f9bce3b0986bdb290614a9badf9bf1376714f83283c919f2f3b |
 
 Every reviewed runtime file, including both TurboQuant kernels, is copied and
 hash-checked against its upstream and patched identities. A CPU Triton-interpreter
@@ -516,6 +517,12 @@ configured maximum. Explicit neutral sampling values keep their meaning, includi
 through the render-to-generate JSON boundary. `/generate` preserves supplied fields
 until resolution, then constructs a fresh validated engine request; a temporary
 engine default cannot reject an otherwise valid request or truncate its output.
+
+Beam search is unsupported. Chat, Completions, batch Chat and their render requests
+refuse `use_beam_search: true` as HTTP 400 with parameter `use_beam_search`, before
+rendering or engine dispatch, for both stream settings. Their schemas admit only
+false or omission. The served generation path applies sampling, grammar, phase
+budgets and output parsing together.
 
 Prompts are not claimed deterministic. Correctness tests compare structure, typed
 semantics, exact rendering, and repeated pass rates rather than pretending a fixed

@@ -6,12 +6,17 @@ EXPECTED_STATUS=$' M tests/config/test_config_utils.py
  M tests/distributed/test_rocm_quick_reduce.py
  M tests/engine/test_arg_utils.py
  M tests/entrypoints/anthropic/test_anthropic_messages_conversion.py
+ M tests/entrypoints/multimodal/openai/chat_completion/test_video.py
+ M tests/entrypoints/multimodal/openai/chat_completion/test_vision.py
+ M tests/entrypoints/openai/chat_completion/test_logprob_token_ids.py
+ M tests/entrypoints/openai/completion/test_completion.py
  M tests/entrypoints/openai/responses/test_responses_utils.py
  M tests/entrypoints/openai/responses/test_serving_responses.py
  M tests/entrypoints/openai/test_render_token_offsets.py
  M tests/entrypoints/scale_out/token_in_token_out/test_generate_stream.py
  M tests/entrypoints/scale_out/token_in_token_out/test_protocol.py
  M tests/entrypoints/serve/exception_handling/test_validation_exception_handler.py
+ M tests/entrypoints/serve/lora/test_lora_adapters.py
  M tests/entrypoints/serve/utils/test_api_utils.py
  M tests/entrypoints/unit_tests/test_chat_utils.py
  M tests/evals/gsm8k/test_gsm8k_offloading.py
@@ -29,6 +34,7 @@ EXPECTED_STATUS=$' M tests/config/test_config_utils.py
  M tests/parser/engine/test_token_id_scanner.py
  M tests/parser/engine/trace_builder.py
  M tests/quantization/test_turboquant.py
+ M tests/test_request_input_bounds.py
  M tests/tool_parsers/test_structural_tag_registry.py
  M tests/v1/core/test_prefix_caching.py
  M tests/v1/core/test_single_type_kv_cache_manager.py
@@ -74,12 +80,14 @@ EXPECTED_STATUS=$' M tests/config/test_config_utils.py
  M vllm/entrypoints/openai/chat_completion/serving.py
  M vllm/entrypoints/openai/cli_args.py
  M vllm/entrypoints/openai/completion/protocol.py
+ M vllm/entrypoints/openai/completion/serving.py
  M vllm/entrypoints/openai/engine/protocol.py
  M vllm/entrypoints/openai/responses/context.py
  M vllm/entrypoints/openai/responses/protocol.py
  M vllm/entrypoints/openai/responses/serving.py
  M vllm/entrypoints/openai/responses/streaming_events.py
  M vllm/entrypoints/openai/responses/utils.py
+ M vllm/entrypoints/scale_out/render/serving.py
  M vllm/entrypoints/scale_out/token_in_token_out/protocol.py
  M vllm/entrypoints/scale_out/token_in_token_out/serving.py
  M vllm/entrypoints/serve/exception_handling/error_response.py
@@ -136,6 +144,7 @@ EXPECTED_STATUS=$' M tests/config/test_config_utils.py
  M vllm/v1/worker/startup_plan.py
  M vllm/v1/worker/workspace.py
 ?? tests/entrypoints/openai/chat_completion/test_parallel_tool_call_integrity.py
+?? tests/entrypoints/openai/test_beam_search_boundary.py
 ?? tests/entrypoints/test_kv_scope_protocol.py
 ?? tests/parser/engine/test_reasoning_token_count.py
 ?? tests/v1/core/test_kv_cache_users_sizing.py
@@ -194,6 +203,7 @@ PHASE_BUDGET_PATCH_FILE="${PROJECT_DIR}/patches/vllm-qwen38-separate-final-respo
 IMPLICIT_TOOL_GRAMMAR_PATCH_FILE="${PROJECT_DIR}/patches/vllm-qwen-implicit-tool-grammar-boundary.patch"
 QWEN_LANGUAGE_PATCH_FILE="${PROJECT_DIR}/patches/vllm-qwen-exact-tool-language.patch"
 PNG_SOURCE_PATCH_FILE="${PROJECT_DIR}/patches/vllm-png-source-admission.patch"
+SAMPLING_BOUNDARY_PATCH_FILE="${PROJECT_DIR}/patches/vllm-sampling-decoding-boundary.patch"
 SAMPLING_RESOLUTION_PATCH_FILE="${PROJECT_DIR}/patches/vllm-generation-sampling-resolution.patch"
 ANTHROPIC_TERMINAL_PATCH_FILE="${PROJECT_DIR}/patches/vllm-anthropic-terminal-metadata.patch"
 RESPONSES_IDENTITY_PATCH_FILE="${PROJECT_DIR}/patches/vllm-responses-stream-identity.patch"
@@ -362,6 +372,7 @@ printf '%s  %s\n' \
   "${RESPONSES_IDENTITY_PATCH_DIFF_SHA256}" "${RESPONSES_IDENTITY_PATCH_FILE}" \
   "${ANTHROPIC_TERMINAL_PATCH_DIFF_SHA256}" "${ANTHROPIC_TERMINAL_PATCH_FILE}" \
   "${SAMPLING_RESOLUTION_PATCH_DIFF_SHA256}" "${SAMPLING_RESOLUTION_PATCH_FILE}" \
+  "${SAMPLING_BOUNDARY_PATCH_DIFF_SHA256}" "${SAMPLING_BOUNDARY_PATCH_FILE}" \
   "${TOOL_TRUNCATION_PATCH_DIFF_SHA256}" "${TOOL_TRUNCATION_PATCH_FILE}" \
   "${VISION_RUNTIME_PATCH_DIFF_SHA256}" "${VISION_RUNTIME_PATCH_FILE}" \
   "${NUMERICAL_AUDITS_PATCH_DIFF_SHA256}" "${NUMERICAL_AUDITS_PATCH_FILE}" \
@@ -577,6 +588,11 @@ printf '%s  %s\n' \
   "${SHARED_PREFIX_CACHE_UNIT_SHA256}" "${PROJECT_DIR}/scripts/shared_prefix_cache_unit.py" | sha256sum --check --strict
 
 printf '%s  %s\n' \
+  "${COMPLETION_SERVING_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/entrypoints/openai/completion/serving.py" \
+  "${RENDER_SERVING_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/entrypoints/scale_out/render/serving.py" \
+  | sha256sum --check --strict
+
+printf '%s  %s\n' \
   "${RUNTIME_DOCKERFILE_SHA256}" "${DOCKERFILE}" \
   "${DOCKERIGNORE_SHA256}" "${DOCKERIGNORE}" | \
   sha256sum --check --strict
@@ -782,6 +798,11 @@ docker buildx build --progress=plain \
   --build-arg "RESPONSES_IDENTITY_PATCH_DIFF_SHA256=${RESPONSES_IDENTITY_PATCH_DIFF_SHA256}" \
   --build-arg "ANTHROPIC_TERMINAL_PATCH_DIFF_SHA256=${ANTHROPIC_TERMINAL_PATCH_DIFF_SHA256}" \
   --build-arg "SAMPLING_RESOLUTION_PATCH_DIFF_SHA256=${SAMPLING_RESOLUTION_PATCH_DIFF_SHA256}" \
+  --build-arg "COMPLETION_SERVING_UPSTREAM_FILE_SHA256=${COMPLETION_SERVING_UPSTREAM_FILE_SHA256}" \
+  --build-arg "COMPLETION_SERVING_PATCHED_FILE_SHA256=${COMPLETION_SERVING_PATCHED_FILE_SHA256}" \
+  --build-arg "RENDER_SERVING_UPSTREAM_FILE_SHA256=${RENDER_SERVING_UPSTREAM_FILE_SHA256}" \
+  --build-arg "RENDER_SERVING_PATCHED_FILE_SHA256=${RENDER_SERVING_PATCHED_FILE_SHA256}" \
+  --build-arg "SAMPLING_BOUNDARY_PATCH_DIFF_SHA256=${SAMPLING_BOUNDARY_PATCH_DIFF_SHA256}" \
   --build-arg "TOOL_TRUNCATION_PATCH_DIFF_SHA256=${TOOL_TRUNCATION_PATCH_DIFF_SHA256}" \
   --build-arg "VISION_RUNTIME_PATCH_DIFF_SHA256=${VISION_RUNTIME_PATCH_DIFF_SHA256}" \
   --build-arg "NUMERICAL_AUDITS_PATCH_DIFF_SHA256=${NUMERICAL_AUDITS_PATCH_DIFF_SHA256}" \
@@ -873,6 +894,8 @@ actual_installed_report="$(
     /usr/local/lib/python3.12/dist-packages/vllm/v1/structured_output/__init__.py \
     /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/anthropic/api_router.py \
     /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/chat_completion/serving.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/completion/serving.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/scale_out/render/serving.py \
     /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/responses/context.py \
     /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/responses/protocol.py \
     /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/responses/serving.py \
@@ -906,6 +929,8 @@ expected_installed_report="$(printf '%s  %s\n' \
   "${STRUCTURED_OUTPUT_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/structured_output/__init__.py \
   "${ANTHROPIC_API_ROUTER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/anthropic/api_router.py \
   "${CHAT_SERVING_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/chat_completion/serving.py \
+  "${COMPLETION_SERVING_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/completion/serving.py \
+  "${RENDER_SERVING_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/scale_out/render/serving.py \
   "${RESPONSES_CONTEXT_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/responses/context.py \
   "${RESPONSES_PROTOCOL_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/responses/protocol.py \
   "${RESPONSES_SERVING_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/responses/serving.py \

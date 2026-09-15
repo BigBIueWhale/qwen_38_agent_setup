@@ -1,0 +1,832 @@
+diff --git a/tests/entrypoints/multimodal/openai/chat_completion/test_video.py b/tests/entrypoints/multimodal/openai/chat_completion/test_video.py
+--- a/tests/entrypoints/multimodal/openai/chat_completion/test_video.py
++++ b/tests/entrypoints/multimodal/openai/chat_completion/test_video.py
+@@ -225,30 +225,6 @@
+ @pytest.mark.asyncio
+ @pytest.mark.parametrize("model_name", [MODEL_NAME])
+ @pytest.mark.parametrize("video_url", TEST_VIDEO_URLS)
+-async def test_single_chat_session_video_beamsearch(
+-    client: openai.AsyncOpenAI, model_name: str, video_url: str
+-):
+-    messages = dummy_messages_from_video_url(video_url)
+-
+-    chat_completion = await client.chat.completions.create(
+-        model=model_name,
+-        messages=messages,
+-        n=2,
+-        max_completion_tokens=10,
+-        logprobs=True,
+-        top_logprobs=5,
+-        extra_body=dict(use_beam_search=True),
+-    )
+-    assert len(chat_completion.choices) == 2
+-    assert (
+-        chat_completion.choices[0].message.content
+-        != chat_completion.choices[1].message.content
+-    )
+-
+-
+-@pytest.mark.asyncio
+-@pytest.mark.parametrize("model_name", [MODEL_NAME])
+-@pytest.mark.parametrize("video_url", TEST_VIDEO_URLS)
+ async def test_single_chat_session_video_base64encoded(
+     client: openai.AsyncOpenAI,
+     model_name: str,
+@@ -290,31 +266,6 @@
+     )
+     message = chat_completion.choices[0].message
+     assert message.content is not None and len(message.content) >= 0
+-
+-
+-@pytest.mark.asyncio
+-@pytest.mark.parametrize("model_name", [MODEL_NAME])
+-@pytest.mark.parametrize("video_url", TEST_VIDEO_URLS)
+-async def test_single_chat_session_video_base64encoded_beamsearch(
+-    client: openai.AsyncOpenAI,
+-    model_name: str,
+-    video_url: str,
+-    url_encoded_video: dict[str, str],
+-):
+-    messages = dummy_messages_from_video_url(url_encoded_video[video_url])
+-
+-    chat_completion = await client.chat.completions.create(
+-        model=model_name,
+-        messages=messages,
+-        n=2,
+-        max_completion_tokens=10,
+-        extra_body=dict(use_beam_search=True),
+-    )
+-    assert len(chat_completion.choices) == 2
+-    assert (
+-        chat_completion.choices[0].message.content
+-        != chat_completion.choices[1].message.content
+-    )
+ 
+ 
+ @pytest.mark.asyncio
+diff --git a/tests/entrypoints/multimodal/openai/chat_completion/test_vision.py b/tests/entrypoints/multimodal/openai/chat_completion/test_vision.py
+--- a/tests/entrypoints/multimodal/openai/chat_completion/test_vision.py
++++ b/tests/entrypoints/multimodal/openai/chat_completion/test_vision.py
+@@ -16,33 +16,6 @@
+ 
+ MODEL_NAME = "microsoft/Phi-3.5-vision-instruct"
+ MAXIMUM_IMAGES = 2
+-
+-# Required terms for beam search validation
+-# Each entry is a list of term groups - ALL groups must match
+-# Each group is a list of alternatives - at least ONE term in the group must appear
+-# This provides semantic validation while allowing wording variation
+-REQUIRED_BEAM_SEARCH_TERMS = [
+-    # Boardwalk image: must have "boardwalk" AND ("wooden" or "wood")
+-    [["boardwalk"], ["wooden", "wood"]],
+-    # Parrots image: must have ("parrot" or "bird") AND "two"
+-    [["parrot", "bird"], ["two"]],
+-    # Venn diagram: must have "venn" AND "diagram"
+-    [["venn"], ["diagram"]],
+-    # Gradient image: must have "gradient" AND ("color" or "spectrum")
+-    [["gradient"], ["color", "spectrum"]],
+-]
+-
+-
+-def check_output_matches_terms(content: str, term_groups: list[list[str]]) -> bool:
+-    """
+-    Check if content matches all required term groups.
+-    Each term group requires at least one of its terms to be present.
+-    All term groups must be satisfied.
+-    """
+-    content_lower = content.lower()
+-    return all(
+-        any(term.lower() in content_lower for term in group) for group in term_groups
+-    )
+ 
+ 
+ def assert_non_empty_content(chat_completion, *, context: str = "") -> str:
+@@ -301,36 +274,6 @@
+ 
+ @pytest.mark.asyncio
+ @pytest.mark.parametrize("model_name", [MODEL_NAME])
+-@pytest.mark.parametrize("image_url", TEST_IMAGE_ASSETS, indirect=True)
+-async def test_single_chat_session_image_beamsearch(
+-    client: openai.AsyncOpenAI, model_name: str, image_url: str
+-):
+-    content_text = "What's in this image?"
+-    messages = dummy_messages_from_image_url(image_url, content_text)
+-
+-    chat_completion = await client.chat.completions.create(
+-        model=model_name,
+-        messages=messages,
+-        n=2,
+-        max_completion_tokens=10,
+-        logprobs=True,
+-        top_logprobs=5,
+-        extra_body=dict(use_beam_search=True),
+-    )
+-    assert len(chat_completion.choices) == 2, (
+-        f"Expected 2 beam search choices, got {len(chat_completion.choices)}"
+-    )
+-
+-    content_0 = chat_completion.choices[0].message.content
+-    content_1 = chat_completion.choices[1].message.content
+-    assert content_0 != content_1, (
+-        f"Beam search should produce different outputs for {image_url}, "
+-        f"but both returned: {content_0!r}"
+-    )
+-
+-
+-@pytest.mark.asyncio
+-@pytest.mark.parametrize("model_name", [MODEL_NAME])
+ @pytest.mark.parametrize("raw_image_url", TEST_IMAGE_ASSETS)
+ @pytest.mark.parametrize("image_url", TEST_IMAGE_ASSETS, indirect=True)
+ async def test_single_chat_session_image_base64encoded(
+@@ -396,68 +339,6 @@
+         max_completion_tokens=10,
+         temperature=0.0,
+     )
+-
+-
+-@pytest.mark.asyncio
+-@pytest.mark.parametrize("model_name", [MODEL_NAME])
+-@pytest.mark.parametrize("image_idx", list(range(len(TEST_IMAGE_ASSETS))))
+-async def test_single_chat_session_image_base64encoded_beamsearch(
+-    client: openai.AsyncOpenAI,
+-    model_name: str,
+-    image_idx: int,
+-    url_encoded_image: dict[str, str],
+-):
+-    # NOTE: This test validates that we pass MM data through beam search
+-    raw_image_url = TEST_IMAGE_ASSETS[image_idx]
+-    required_terms = REQUIRED_BEAM_SEARCH_TERMS[image_idx]
+-
+-    messages = dummy_messages_from_image_url(url_encoded_image[raw_image_url])
+-
+-    chat_completion = await client.chat.completions.create(
+-        model=model_name,
+-        messages=messages,
+-        n=2,
+-        max_completion_tokens=10,
+-        temperature=0.0,
+-        extra_body=dict(use_beam_search=True),
+-    )
+-    assert len(chat_completion.choices) == 2, (
+-        f"Expected 2 beam search choices for image {image_idx} "
+-        f"({raw_image_url}), got {len(chat_completion.choices)}"
+-    )
+-
+-    # Verify beam search produces two different non-empty outputs
+-    content_0 = chat_completion.choices[0].message.content
+-    content_1 = chat_completion.choices[1].message.content
+-
+-    # Emit beam search outputs for debugging
+-    print(
+-        f"Beam search outputs for image {image_idx} ({raw_image_url}): "
+-        f"Output 0: {content_0!r}, Output 1: {content_1!r}"
+-    )
+-
+-    assert content_0, (
+-        f"First beam output is empty for image {image_idx} ({raw_image_url}). "
+-        f"finish_reason={chat_completion.choices[0].finish_reason!r}"
+-    )
+-    assert content_1, (
+-        f"Second beam output is empty for image {image_idx} "
+-        f"({raw_image_url}). "
+-        f"finish_reason={chat_completion.choices[1].finish_reason!r}"
+-    )
+-    assert content_0 != content_1, (
+-        f"Beam search produced identical outputs for image {image_idx} "
+-        f"({raw_image_url}): {content_0!r}"
+-    )
+-
+-    # Verify each output contains the required terms for this image
+-    for i, content in enumerate([content_0, content_1]):
+-        assert check_output_matches_terms(content, required_terms), (
+-            f"Beam output {i} for image {image_idx} ({raw_image_url}) "
+-            f"doesn't match required terms.\n"
+-            f"  content: {content!r}\n"
+-            f"  required (all groups, >=1 per group): {required_terms}"
+-        )
+ 
+ 
+ @pytest.mark.asyncio
+diff --git a/tests/entrypoints/openai/chat_completion/test_logprob_token_ids.py b/tests/entrypoints/openai/chat_completion/test_logprob_token_ids.py
+--- a/tests/entrypoints/openai/chat_completion/test_logprob_token_ids.py
++++ b/tests/entrypoints/openai/chat_completion/test_logprob_token_ids.py
+@@ -15,7 +15,6 @@
+ 
+ import pytest
+ 
+-from tests.utils import RemoteOpenAIServer
+ from vllm.entrypoints.openai.chat_completion.protocol import ChatCompletionRequest
+ from vllm.entrypoints.openai.completion.protocol import CompletionRequest
+ from vllm.exceptions import VLLMValidationError
+@@ -25,6 +24,8 @@
+ 
+ @pytest.fixture(scope="module")
+ def server():
++    from tests.utils import RemoteOpenAIServer
++
+     args = [
+         "--max-model-len",
+         "1024",
+@@ -99,7 +100,7 @@
+ 
+ 
+ def test_requests_reject_explicit_token_ids_with_beam_search():
+-    with pytest.raises(VLLMValidationError, match="not supported with beam search"):
++    with pytest.raises(VLLMValidationError, match="Beam search is not supported"):
+         ChatCompletionRequest(
+             model=MODEL_NAME,
+             messages=[{"role": "user", "content": "Hello"}],
+@@ -108,7 +109,7 @@
+             use_beam_search=True,
+         )
+ 
+-    with pytest.raises(VLLMValidationError, match="not supported with beam search"):
++    with pytest.raises(VLLMValidationError, match="Beam search is not supported"):
+         CompletionRequest(
+             model=MODEL_NAME,
+             prompt="Hello",
+diff --git a/tests/entrypoints/openai/completion/test_completion.py b/tests/entrypoints/openai/completion/test_completion.py
+--- a/tests/entrypoints/openai/completion/test_completion.py
++++ b/tests/entrypoints/openai/completion/test_completion.py
+@@ -633,22 +633,9 @@
+             n=2,
+             max_tokens=5,
+             temperature=0.0,
+-            extra_body=dict(
+-                # NOTE: this has to be true for n > 1 in vLLM, but
+-                # not necessary for official client.
+-                use_beam_search=True
+-            ),
+         )
+         assert len(batch.choices) == 4
+-        assert batch.choices[0].text != batch.choices[1].text, (
+-            "beam search should be different"
+-        )
+-        assert batch.choices[0].text == batch.choices[2].text, (
+-            "two copies of the same prompt should be the same"
+-        )
+-        assert batch.choices[1].text == batch.choices[3].text, (
+-            "two copies of the same prompt should be the same"
+-        )
++        assert all(choice.text == batch.choices[0].text for choice in batch.choices)
+ 
+         # test streaming
+         batch = await client.completions.create(
+diff --git a/tests/entrypoints/openai/test_beam_search_boundary.py b/tests/entrypoints/openai/test_beam_search_boundary.py
+--- /dev/null
++++ b/tests/entrypoints/openai/test_beam_search_boundary.py
+@@ -0,0 +1,75 @@
++# SPDX-License-Identifier: Apache-2.0
++# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
++"""Unsupported decoding is refused before rendering on either transport."""
++
++import json
++from types import SimpleNamespace
++
++import pytest
++
++from vllm.entrypoints.openai.chat_completion.protocol import (
++    BatchChatCompletionRequest,
++    ChatCompletionRequest,
++)
++from vllm.entrypoints.openai.completion.protocol import CompletionRequest
++from vllm.entrypoints.serve.exception_handling.handlers.vllm_error import (
++    vllm_error_handler,
++)
++from vllm.exceptions import VLLMValidationError
++
++
++SURFACES = [
++    (ChatCompletionRequest, "/v1/chat/completions"),
++    (ChatCompletionRequest, "/v1/chat/completions/render"),
++    (CompletionRequest, "/v1/completions"),
++    (CompletionRequest, "/v1/completions/render"),
++    (BatchChatCompletionRequest, "/v1/chat/completions/batch"),
++]
++
++
++def payload(request_type, **kwargs):
++    if request_type is CompletionRequest:
++        prompt = {"prompt": "hello"}
++    elif request_type is BatchChatCompletionRequest:
++        prompt = {"messages": [[{"role": "user", "content": "hello"}]]}
++    else:
++        prompt = {"messages": [{"role": "user", "content": "hello"}]}
++    return {"model": "m", "kv_scope": "opaque agent", **prompt, **kwargs}
++
++
++@pytest.mark.asyncio
++@pytest.mark.parametrize("request_type, path", SURFACES)
++@pytest.mark.parametrize("stream", [False, True])
++async def test_unsupported_beam_search_returns_the_same_boundary_error(
++    request_type, path, stream,
++):
++    with pytest.raises(VLLMValidationError, match="Beam search is not supported") as error:
++        request_type.model_validate(payload(request_type, use_beam_search=True, stream=stream))
++    assert error.value.parameter == "use_beam_search"
++    request = SimpleNamespace(
++        scope={"type": "http", "path": path}, state=SimpleNamespace(),
++        app=SimpleNamespace(state=SimpleNamespace(args=SimpleNamespace(log_error_stack=False))),
++    )
++    response = await vllm_error_handler(request, error.value)
++    body = json.loads(response.body)
++    assert response.status_code == 400
++    assert body["error"]["param"] == "use_beam_search"
++    assert "Beam search is not supported" in body["error"]["message"]
++    assert "kv_scope" not in body["error"]["message"]
++
++
++@pytest.mark.parametrize("request_type, _path", SURFACES)
++@pytest.mark.parametrize("explicit", [False, True])
++def test_supported_sampling_does_not_require_a_decoding_flag(request_type, _path, explicit):
++    kwargs = {"use_beam_search": False} if explicit else {}
++    request = request_type.model_validate(payload(request_type, **kwargs))
++    assert request.use_beam_search is False
++    restored = request_type.model_validate_json(request.model_dump_json())
++    assert restored.use_beam_search is False
++
++
++@pytest.mark.parametrize("request_type", [ChatCompletionRequest, CompletionRequest, BatchChatCompletionRequest])
++def test_request_schema_advertises_the_supported_decoding_value(request_type):
++    flag = request_type.model_json_schema()["properties"]["use_beam_search"]
++    assert flag["const"] is False
++    assert flag["default"] is False
+diff --git a/tests/entrypoints/serve/lora/test_lora_adapters.py b/tests/entrypoints/serve/lora/test_lora_adapters.py
+--- a/tests/entrypoints/serve/lora/test_lora_adapters.py
++++ b/tests/entrypoints/serve/lora/test_lora_adapters.py
+@@ -339,32 +339,10 @@
+ 
+ 
+ @pytest.mark.asyncio
+-async def test_beam_search_with_lora_adapters(
+-    client: openai.AsyncOpenAI,
+-    tmp_path,
+-    qwen3_lora_files,
+-):
+-    """Validate that async beam search can be used with lora."""
+-
+-    async def load_and_run_adapter(adapter_name: str):
+-        await client.post(
+-            "load_lora_adapter",
+-            cast_to=str,
+-            body={"lora_name": adapter_name, "lora_path": str(qwen3_lora_files)},
+-        )
+-        for _ in range(3):
+-            await client.completions.create(
+-                model=adapter_name,
+-                prompt=["Hello there", "Foo bar bazz buzz"],
+-                max_tokens=5,
+-                extra_body=dict(use_beam_search=True),
+-            )
+-
+-    lora_tasks = []
+-    for i in range(3):
+-        lora_tasks.append(asyncio.create_task(load_and_run_adapter(f"adapter_{i}")))
+-
+-    results, _ = await asyncio.wait(lora_tasks)
+-
+-    for r in results:
+-        assert not isinstance(r, Exception), f"Got exception {r}"
++async def test_beam_search_refuses_before_adapter_lookup(client: openai.AsyncOpenAI):
++    with pytest.raises(openai.BadRequestError, match="Beam search is not supported"):
++        await client.completions.create(
++            model="adapter",
++            prompt="Hello there",
++            extra_body={"use_beam_search": True, "kv_scope": "agent"},
++        )
+diff --git a/tests/test_request_input_bounds.py b/tests/test_request_input_bounds.py
+--- a/tests/test_request_input_bounds.py
++++ b/tests/test_request_input_bounds.py
+@@ -178,41 +178,6 @@
+ 
+     with pytest.raises(VLLMValidationError, match="beam_width must be at most 4"):
+         BeamSearchParams(beam_width=5, max_tokens=1)
+-
+-
+-def test_chat_beam_conversion_rejects_n_before_stream_state_allocation(
+-    monkeypatch: pytest.MonkeyPatch,
+-):
+-    _set_max_n(monkeypatch, 4)
+-    request = ChatCompletionRequest(
+-        model="test-model",
+-        messages=[{"role": "user", "content": "test"}],
+-        n=5,
+-        stream=True,
+-        use_beam_search=True,
+-        max_tokens=1,
+-    )
+-
+-    with pytest.raises(VLLMValidationError, match="beam_width must be at most 4"):
+-        request.to_beam_search_params(max_tokens=1, default_sampling_params={})
+-
+-
+-def test_chat_beam_conversion_accepts_n_at_sequence_cap(
+-    monkeypatch: pytest.MonkeyPatch,
+-):
+-    _set_max_n(monkeypatch, 4)
+-    request = ChatCompletionRequest(
+-        model="test-model",
+-        messages=[{"role": "user", "content": "test"}],
+-        n=4,
+-        stream=True,
+-        use_beam_search=True,
+-        max_tokens=1,
+-    )
+-
+-    params = request.to_beam_search_params(max_tokens=1, default_sampling_params={})
+-
+-    assert params.beam_width == 4
+ 
+ 
+ # --- DeepSeek encoders: the last-user scan runs once per conversation ------
+diff --git a/vllm/entrypoints/openai/chat_completion/protocol.py b/vllm/entrypoints/openai/chat_completion/protocol.py
+--- a/vllm/entrypoints/openai/chat_completion/protocol.py
++++ b/vllm/entrypoints/openai/chat_completion/protocol.py
+@@ -26,6 +26,7 @@
+ )
+ from vllm.entrypoints.openai.engine.protocol import (
+     AnyResponseFormat,
++    BeamSearchDisabled,
+     DeltaMessage,
+     FunctionCall,
+     FunctionDefinition,
+@@ -44,7 +45,6 @@
+ from vllm.logprobs import Logprob
+ from vllm.renderers import ChatParams, TokenizeParams, merge_kwargs
+ from vllm.sampling_params import (
+-    BeamSearchParams,
+     FinalResponseTokenBudget,
+     resolve_final_response_token_budget,
+     RepetitionDetectionParams,
+@@ -267,7 +267,7 @@
+     user: str | None = None
+ 
+     # --8<-- [start:chat-completion-sampling-params]
+-    use_beam_search: bool = False
++    use_beam_search: BeamSearchDisabled = False
+     top_k: int | None = None
+     min_p: float | None = None
+     repetition_penalty: float | None = None
+@@ -655,24 +655,6 @@
+         "top_k": 0,
+         "min_p": 0.0,
+     }
+-
+-    def to_beam_search_params(
+-        self, max_tokens: int, default_sampling_params: dict
+-    ) -> BeamSearchParams:
+-        n = self.n if self.n is not None else 1
+-        if (temperature := self.temperature) is None:
+-            temperature = default_sampling_params.get(
+-                "temperature", self._DEFAULT_SAMPLING_PARAMS["temperature"]
+-            )
+-
+-        return BeamSearchParams(
+-            beam_width=n,
+-            max_tokens=max_tokens,
+-            ignore_eos=self.ignore_eos,
+-            temperature=temperature,
+-            length_penalty=self.length_penalty,
+-            include_stop_str_in_output=self.include_stop_str_in_output,
+-        )
+ 
+     def extract_structured_outputs(self) -> StructuredOutputsParams | None:
+         """Normalize request constraints into ``StructuredOutputsParams``."""
+@@ -840,12 +822,6 @@
+     def check_logprobs(cls, data):
+         if not isinstance(data, dict):
+             return data
+-        if data.get("logprob_token_ids") and data.get("use_beam_search"):
+-            raise VLLMValidationError(
+-                "`logprob_token_ids` is not supported with beam search.",
+-                parameter="logprob_token_ids",
+-            )
+-
+         if data.get("logprob_token_ids") and not data.get("logprobs"):
+             raise VLLMValidationError(
+                 "when using `logprob_token_ids`, `logprobs` must be set to true.",
+@@ -1133,7 +1109,7 @@
+ 
+     # vLLM extensions
+     best_of: int | None = None
+-    use_beam_search: bool = False
++    use_beam_search: BeamSearchDisabled = False
+     top_k: int | None = None
+     min_p: float | None = None
+     repetition_penalty: float | None = None
+@@ -1177,12 +1153,6 @@
+             data = data.model_dump(exclude_unset=True)
+         if not isinstance(data, dict):
+             return data
+-        if data.get("use_beam_search"):
+-            raise VLLMValidationError(
+-                "Batch chat completions do not support beam search. "
+-                "Please set `use_beam_search` to False.",
+-                parameter="use_beam_search",
+-            )
+         if data.get("logprob_token_ids") and not data.get("logprobs"):
+             raise VLLMValidationError(
+                 "when using `logprob_token_ids`, `logprobs` must be set to true.",
+diff --git a/vllm/entrypoints/openai/chat_completion/serving.py b/vllm/entrypoints/openai/chat_completion/serving.py
+--- a/vllm/entrypoints/openai/chat_completion/serving.py
++++ b/vllm/entrypoints/openai/chat_completion/serving.py
+@@ -56,7 +56,7 @@
+ from vllm.parser import ParserManager
+ from vllm.parser.abstract_parser import Parser
+ from vllm.renderers.online_renderer import OnlineRenderer
+-from vllm.sampling_params import BeamSearchParams, SamplingParams
++from vllm.sampling_params import SamplingParams
+ from vllm.tokenizers import TokenizerLike
+ from vllm.utils.collection_utils import as_list
+ from vllm.utils.serial_utils import numpy2base64
+@@ -331,16 +331,10 @@
+                 truncate_prompt_tokens=request.truncate_prompt_tokens,
+             )
+ 
+-            sampling_params: SamplingParams | BeamSearchParams
+-            if request.use_beam_search:
+-                sampling_params = request.to_beam_search_params(
+-                    max_tokens, self.default_sampling_params
+-                )
+-            else:
+-                sampling_params = request.to_sampling_params(
+-                    max_tokens,
+-                    self.default_sampling_params,
+-                )
++            sampling_params = request.to_sampling_params(
++                max_tokens,
++                self.default_sampling_params,
++            )
+ 
+             self._log_inputs(
+                 sub_request_id,
+@@ -356,44 +350,34 @@
+             )
+             session_id = self._get_session_id(request, raw_request)
+ 
+-            if isinstance(sampling_params, BeamSearchParams):
+-                generator = self.beam_search(
+-                    prompt=engine_input,
+-                    request_id=sub_request_id,
+-                    params=sampling_params,
+-                    lora_request=lora_request,
+-                    trace_headers=trace_headers,
+-                    session_id=session_id,
+-                )
++            if not request.include_reasoning:
++                reasoning_ended = True
++            elif request._grammar_from_parser:
++                # The Mistral grammar already includes an optional
++                # `think?` rule that handles both reasoning and
++                # non-reasoning outputs.
++                reasoning_ended = True
++            elif parser is not None and parser.reasoning_parser is not None:
++                reasoning_ended = parser.is_reasoning_end(prompt_token_ids or [])
+             else:
+-                if not request.include_reasoning:
+-                    reasoning_ended = True
+-                elif request._grammar_from_parser:
+-                    # The Mistral grammar already includes an optional
+-                    # `think?` rule that handles both reasoning and
+-                    # non-reasoning outputs.
+-                    reasoning_ended = True
+-                elif parser is not None and parser.reasoning_parser is not None:
+-                    reasoning_ended = parser.is_reasoning_end(prompt_token_ids or [])
+-                else:
+-                    reasoning_ended = None
+-
+-                generator = self.engine_client.generate(
+-                    engine_input,
+-                    sampling_params,
+-                    sub_request_id,
+-                    lora_request=lora_request,
+-                    trace_headers=trace_headers,
+-                    priority=self._get_priority(request, raw_request),
+-                    data_parallel_rank=data_parallel_rank,
+-                    session_id=session_id,
+-                    reasoning_ended=reasoning_ended,
+-                    reasoning_parser_kwargs={
+-                        "chat_template_kwargs": chat_template_kwargs,
+-                    }
+-                    if parser is not None and parser.reasoning_parser is not None
+-                    else None,
+-                )
++                reasoning_ended = None
++
++            generator = self.engine_client.generate(
++                engine_input,
++                sampling_params,
++                sub_request_id,
++                lora_request=lora_request,
++                trace_headers=trace_headers,
++                priority=self._get_priority(request, raw_request),
++                data_parallel_rank=data_parallel_rank,
++                session_id=session_id,
++                reasoning_ended=reasoning_ended,
++                reasoning_parser_kwargs={
++                    "chat_template_kwargs": chat_template_kwargs,
++                }
++                if parser is not None and parser.reasoning_parser is not None
++                else None,
++            )
+ 
+             generators.append(generator)
+ 
+diff --git a/vllm/entrypoints/openai/completion/protocol.py b/vllm/entrypoints/openai/completion/protocol.py
+--- a/vllm/entrypoints/openai/completion/protocol.py
++++ b/vllm/entrypoints/openai/completion/protocol.py
+@@ -12,6 +12,7 @@
+ from vllm.config import ModelConfig
+ from vllm.entrypoints.openai.engine.protocol import (
+     AnyResponseFormat,
++    BeamSearchDisabled,
+     OpenAIBaseModel,
+     PerRequestTimingMetrics,
+     StopParam,
+@@ -26,7 +27,6 @@
+ from vllm.logprobs import Logprob
+ from vllm.renderers import TokenizeParams
+ from vllm.sampling_params import (
+-    BeamSearchParams,
+     FinalResponseTokenBudget,
+     resolve_final_response_token_budget,
+     RepetitionDetectionParams,
+@@ -73,7 +73,7 @@
+     user: str | None = None
+ 
+     # --8<-- [start:completion-sampling-params]
+-    use_beam_search: bool = False
++    use_beam_search: BeamSearchDisabled = False
+     top_k: int | None = None
+     min_p: float | None = None
+     repetition_penalty: float | None = None
+@@ -299,27 +299,6 @@
+         "top_k": 0,
+         "min_p": 0.0,
+     }
+-
+-    def to_beam_search_params(
+-        self,
+-        max_tokens: int,
+-        default_sampling_params: dict | None = None,
+-    ) -> BeamSearchParams:
+-        if default_sampling_params is None:
+-            default_sampling_params = {}
+-        n = self.n if self.n is not None else 1
+-
+-        if (temperature := self.temperature) is None:
+-            temperature = default_sampling_params.get("temperature", 1.0)
+-
+-        return BeamSearchParams(
+-            beam_width=n,
+-            max_tokens=max_tokens,
+-            ignore_eos=self.ignore_eos,
+-            temperature=temperature,
+-            length_penalty=self.length_penalty,
+-            include_stop_str_in_output=self.include_stop_str_in_output,
+-        )
+ 
+     def extract_structured_outputs(self) -> StructuredOutputsParams | None:
+         """Normalize request constraints into ``StructuredOutputsParams``."""
+@@ -494,12 +473,6 @@
+     @model_validator(mode="before")
+     @classmethod
+     def check_logprobs(cls, data):
+-        if data.get("logprob_token_ids") and data.get("use_beam_search"):
+-            raise VLLMValidationError(
+-                "`logprob_token_ids` is not supported with beam search.",
+-                parameter="logprob_token_ids",
+-            )
+-
+         if (
+             data.get("logprob_token_ids")
+             and data.get("echo")
+diff --git a/vllm/entrypoints/openai/completion/serving.py b/vllm/entrypoints/openai/completion/serving.py
+--- a/vllm/entrypoints/openai/completion/serving.py
++++ b/vllm/entrypoints/openai/completion/serving.py
+@@ -41,7 +41,7 @@
+ from vllm.logprobs import Logprob
+ from vllm.outputs import RequestOutput
+ from vllm.renderers.online_renderer import OnlineRenderer
+-from vllm.sampling_params import BeamSearchParams, SamplingParams
++from vllm.sampling_params import SamplingParams
+ from vllm.tokenizers import TokenizerLike
+ from vllm.utils.async_utils import merge_async_iterators
+ from vllm.utils.collection_utils import as_list
+@@ -131,11 +131,6 @@
+         request: CompletionRequest,
+         raw_request: Request | None = None,
+     ) -> AsyncGenerator[str, None] | CompletionResponse | ErrorResponse:
+-        if request.stream and request.use_beam_search:
+-            return self.create_error_response(
+-                "Streaming is not currently supported with beam search"
+-            )
+-
+         result = await self.render_completion_request(request)
+         if isinstance(result, ErrorResponse):
+             return result
+@@ -167,16 +162,10 @@
+                 truncate_prompt_tokens=request.truncate_prompt_tokens,
+             )
+ 
+-            sampling_params: SamplingParams | BeamSearchParams
+-            if request.use_beam_search:
+-                sampling_params = request.to_beam_search_params(
+-                    max_tokens, self.default_sampling_params
+-                )
+-            else:
+-                sampling_params = request.to_sampling_params(
+-                    max_tokens,
+-                    self.default_sampling_params,
+-                )
++            sampling_params = request.to_sampling_params(
++                max_tokens,
++                self.default_sampling_params,
++            )
+ 
+             request_id_item = f"{request_id}-{i}"
+ 
+@@ -194,26 +183,16 @@
+             )
+             session_id = self._get_session_id(request, raw_request)
+ 
+-            if isinstance(sampling_params, BeamSearchParams):
+-                generator = self.beam_search(
+-                    prompt=engine_input,
+-                    request_id=request_id,
+-                    params=sampling_params,
+-                    lora_request=lora_request,
+-                    trace_headers=trace_headers,
+-                    session_id=session_id,
+-                )
+-            else:
+-                generator = self.engine_client.generate(
+-                    engine_input,
+-                    sampling_params,
+-                    request_id_item,
+-                    lora_request=lora_request,
+-                    trace_headers=trace_headers,
+-                    priority=self._get_priority(request, raw_request),
+-                    data_parallel_rank=data_parallel_rank,
+-                    session_id=session_id,
+-                )
++            generator = self.engine_client.generate(
++                engine_input,
++                sampling_params,
++                request_id_item,
++                lora_request=lora_request,
++                trace_headers=trace_headers,
++                priority=self._get_priority(request, raw_request),
++                data_parallel_rank=data_parallel_rank,
++                session_id=session_id,
++            )
+ 
+             generators.append(generator)
+ 
+diff --git a/vllm/entrypoints/openai/engine/protocol.py b/vllm/entrypoints/openai/engine/protocol.py
+--- a/vllm/entrypoints/openai/engine/protocol.py
++++ b/vllm/entrypoints/openai/engine/protocol.py
+@@ -11,6 +11,7 @@
+ import regex as re
+ from pydantic import (
+     BaseModel,
++    BeforeValidator,
+     ConfigDict,
+     Field,
+     model_serializer,
+@@ -31,6 +32,20 @@
+ StopParam: TypeAlias = (
+     str | Annotated[list[str], Field(max_length=envs.VLLM_MAX_STOP_STRINGS)] | None
+ )
++
++
++def _reject_beam_search(value: Any) -> Any:
++    if value is True:
++        raise VLLMValidationError(
++            "Beam search is not supported by this deployment.",
++            parameter="use_beam_search",
++        )
++    return value
++
++
++BeamSearchDisabled: TypeAlias = Annotated[
++    Literal[False], BeforeValidator(_reject_beam_search)
++]
+ 
+ 
+ class OpenAIBaseModel(BaseModel):
+diff --git a/vllm/entrypoints/scale_out/render/serving.py b/vllm/entrypoints/scale_out/render/serving.py
+--- a/vllm/entrypoints/scale_out/render/serving.py
++++ b/vllm/entrypoints/scale_out/render/serving.py
+@@ -74,11 +74,6 @@
+         if error_check_ret is not None:
+             logger.error("Error with model %s", error_check_ret)
+             return error_check_ret
+-
+-        if request.use_beam_search:
+-            return self.create_error_response(
+-                "Beam search is not supported by the render endpoint"
+-            )
+ 
+         result = await self.online_renderer.render_chat(request, skip_mm_cache=True)
+         if isinstance(result, ErrorResponse):
