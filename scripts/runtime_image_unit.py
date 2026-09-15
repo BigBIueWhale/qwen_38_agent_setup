@@ -12,6 +12,30 @@ from patches.source_patch_v1.generated_vllm_stages import FINAL_FILES, GENERATED
 
 
 class RuntimeImageTest(unittest.TestCase):
+    def test_recipe_hashes_match_the_reviewed_source_identities(self):
+        recipe = (ROOT / "containers/Dockerfile.runtime").read_text().replace("\\\n", " ")
+        pins = dict(re.findall(
+            r'readonly (\w+)="([0-9a-f]{64})"',
+            (ROOT / "config/runtime-v1.sh").read_text(),
+        ))
+        upstream = {}
+        for stage in GENERATED_STAGES:
+            for entry in stage["files"]:
+                upstream.setdefault(entry["path"], entry["before_sha256"])
+        checked = set()
+        for name, kind, path in re.findall(
+            r'"\$\{(\w+_(UPSTREAM|PATCHED)_FILE_SHA256)\}"\s+'
+            r'/usr/local/lib/python3.12/dist-packages/(\S+)', recipe,
+        ):
+            with self.subTest(name=name, path=path):
+                expected = upstream[path] if kind == "UPSTREAM" else FINAL_FILES[path]
+                self.assertEqual(pins[name], expected)
+                checked.add((kind, path))
+        for path in FINAL_FILES:
+            if path.startswith("vllm/"):
+                for kind in ("UPSTREAM", "PATCHED"):
+                    self.assertIn((kind, path), checked)
+
     def test_every_reviewed_runtime_file_is_copied_and_verified(self):
         recipe = (ROOT / "containers/Dockerfile.runtime").read_text()
         joined = recipe.replace("\\\n", " ")
@@ -50,6 +74,13 @@ class RuntimeImageTest(unittest.TestCase):
         self.assertIn(
             "RUN CUDA_VISIBLE_DEVICES= TRITON_INTERPRET=1 "
             "python3 /opt/qwen38/turboquant_guard_unit.py", recipe,
+        )
+
+    def test_parser_unit_is_executed_during_build(self):
+        recipe = (ROOT / "containers/Dockerfile.runtime").read_text()
+        self.assertIn(
+            "RUN CUDA_VISIBLE_DEVICES= "
+            "python3 /opt/qwen38/tool_output_parser_unit.py", recipe,
         )
 
 

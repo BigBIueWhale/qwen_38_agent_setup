@@ -13,6 +13,16 @@ EXPECTED_STATUS=$' M tests/config/test_config_utils.py
  M tests/models/language/pooling/test_reward.py
  M tests/multimodal/media/test_connector.py
  M tests/multimodal/media/test_image.py
+ M tests/parser/engine/replay_harness.py
+ M tests/parser/engine/test_delegating_replay.py
+ M tests/parser/engine/test_nemotron_v3.py
+ M tests/parser/engine/test_parser_engine.py
+ M tests/parser/engine/test_qwen3.py
+ M tests/parser/engine/test_qwen3_reasoning.py
+ M tests/parser/engine/test_replay.py
+ M tests/parser/engine/test_seed_oss.py
+ M tests/parser/engine/test_token_id_scanner.py
+ M tests/parser/engine/trace_builder.py
  M tests/quantization/test_turboquant.py
  M tests/v1/e2e/general/test_context_length.py
  M tests/v1/kv_connector/nixl_integration/run_multi_connector_accuracy_test.sh
@@ -70,7 +80,11 @@ EXPECTED_STATUS=$' M tests/config/test_config_utils.py
  M vllm/multimodal/media/image.py
  M vllm/parser/abstract_parser.py
  M vllm/parser/engine/adapters.py
+ M vllm/parser/engine/events.py
  M vllm/parser/engine/parser_engine.py
+ M vllm/parser/engine/parser_engine_config.py
+ M vllm/parser/engine/streaming_parser_engine.py
+ M vllm/parser/engine/token_id_scanner.py
  M vllm/parser/qwen3.py
  M vllm/renderers/params.py
  M vllm/sampling_params.py
@@ -119,6 +133,7 @@ TURBOQUANT_K8V4_UNIT_FILE="${PROJECT_DIR}/scripts/turboquant_k8v4_unit.py"
 QWEN38_CONTEXT_UNIT_FILE="${PROJECT_DIR}/scripts/qwen38_context_unit.py"
 CHAT_TEMPLATE_RETENTION_UNIT_FILE="${PROJECT_DIR}/scripts/chat_template_retention_unit.py"
 NVFP4_KERNEL_UNIT_FILE="${PROJECT_DIR}/scripts/nvfp4_kernel_unit.py"
+TOOL_OUTPUT_PARSER_UNIT_FILE="${PROJECT_DIR}/scripts/tool_output_parser_unit.py"
 REASONING_USAGE_UNIT_FILE="${PROJECT_DIR}/scripts/reasoning_usage_unit.py"
 SOURCE_PATCH_DIR="${PROJECT_DIR}/patches/source_patch_v1"
 SOURCE_PATCH_MANIFEST="${SOURCE_PATCH_DIR}/manifest.sha256"
@@ -152,6 +167,7 @@ TOOL_SCHEMA_PATCH_FILE="${PROJECT_DIR}/patches/vllm-enforce-auto-tool-schema.pat
 AGENT_DEFAULTS_PATCH_FILE="${PROJECT_DIR}/patches/vllm-qwen38-agent-defaults-and-thinking.patch"
 PHASE_BUDGET_PATCH_FILE="${PROJECT_DIR}/patches/vllm-qwen38-separate-final-response-budget.patch"
 IMPLICIT_TOOL_GRAMMAR_PATCH_FILE="${PROJECT_DIR}/patches/vllm-qwen-implicit-tool-grammar-boundary.patch"
+QWEN_LANGUAGE_PATCH_FILE="${PROJECT_DIR}/patches/vllm-qwen-exact-tool-language.patch"
 ANTHROPIC_INPUTS_PATCH_FILE="${PROJECT_DIR}/patches/vllm-anthropic-input-fidelity.patch"
 ANTHROPIC_VALIDATION_PATCH_FILE="${PROJECT_DIR}/patches/vllm-anthropic-validation-http400.patch"
 TOOL_TRUNCATION_PATCH_FILE="${PROJECT_DIR}/patches/vllm-tool-truncation-finish-reason.patch"
@@ -306,6 +322,7 @@ printf '%s  %s\n' \
   "${IMPLICIT_TOOL_GRAMMAR_PATCH_DIFF_SHA256}" "${IMPLICIT_TOOL_GRAMMAR_PATCH_FILE}" \
   "${ANTHROPIC_VALIDATION_PATCH_DIFF_SHA256}" "${ANTHROPIC_VALIDATION_PATCH_FILE}" \
   "${ANTHROPIC_INPUTS_PATCH_DIFF_SHA256}" "${ANTHROPIC_INPUTS_PATCH_FILE}" \
+  "${QWEN_LANGUAGE_PATCH_DIFF_SHA256}" "${QWEN_LANGUAGE_PATCH_FILE}" \
   "${TOOL_TRUNCATION_PATCH_DIFF_SHA256}" "${TOOL_TRUNCATION_PATCH_FILE}" \
   "${VISION_RUNTIME_PATCH_DIFF_SHA256}" "${VISION_RUNTIME_PATCH_FILE}" \
   "${NUMERICAL_AUDITS_PATCH_DIFF_SHA256}" "${NUMERICAL_AUDITS_PATCH_FILE}" \
@@ -501,6 +518,10 @@ printf '%s  %s\n' \
   "${TITOTO_SERVING_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${TITOTO_SERVING_REL}" \
   "${ABSTRACT_PARSER_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${ABSTRACT_PARSER_REL}" \
   "${PARSER_ADAPTERS_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${PARSER_ADAPTERS_REL}" \
+  "${PARSER_EVENTS_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/parser/engine/events.py" \
+  "${PARSER_ENGINE_CONFIG_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/parser/engine/parser_engine_config.py" \
+  "${STREAMING_PARSER_ENGINE_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/parser/engine/streaming_parser_engine.py" \
+  "${TOKEN_ID_SCANNER_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/parser/engine/token_id_scanner.py" \
   "${ENGINE_PROTOCOL_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${ENGINE_PROTOCOL_REL}" | \
   sha256sum --check --strict
 
@@ -515,6 +536,7 @@ printf '%s  %s\n' \
   "${QWEN38_CONTEXT_UNIT_SHA256}" "${QWEN38_CONTEXT_UNIT_FILE}" \
   "${CHAT_TEMPLATE_RETENTION_UNIT_SHA256}" "${CHAT_TEMPLATE_RETENTION_UNIT_FILE}" \
   "${NVFP4_KERNEL_UNIT_SHA256}" "${NVFP4_KERNEL_UNIT_FILE}" \
+  "${TOOL_OUTPUT_PARSER_UNIT_SHA256}" "${TOOL_OUTPUT_PARSER_UNIT_FILE}" \
   "${REASONING_USAGE_UNIT_SHA256}" "${REASONING_USAGE_UNIT_FILE}" | \
   sha256sum --check --strict
 
@@ -527,6 +549,17 @@ docker run --rm --network none --read-only \
   --volume "${VLLM_DIR}/vllm/v1/attention/ops/triton_turboquant_store.py:/usr/local/lib/python3.12/dist-packages/vllm/v1/attention/ops/triton_turboquant_store.py:ro" \
   --volume "${VLLM_DIR}/vllm/v1/attention/ops/triton_turboquant_decode.py:/usr/local/lib/python3.12/dist-packages/vllm/v1/attention/ops/triton_turboquant_decode.py:ro" \
   --entrypoint python3 "${BASE_IMAGE_TAG}" /project/scripts/turboquant_guard_unit.py
+
+# Execute the installed-parser unit against the complete reviewed runtime overlay.
+parser_unit_mounts=()
+while IFS= read -r path; do
+  parser_unit_mounts+=(--volume "${VLLM_DIR}/${path}:/usr/local/lib/python3.12/dist-packages/${path}:ro")
+done < <(git -C "${VLLM_DIR}" diff --name-only --diff-filter=M -- vllm)
+docker run --rm --network none --read-only --user "$(id -u):$(id -g)" \
+  --tmpfs /tmp:rw,nodev,nosuid,size=256m \
+  --env PYTHONDONTWRITEBYTECODE=1 --env CUDA_VISIBLE_DEVICES= \
+  --volume "${PROJECT_DIR}:/project:ro" "${parser_unit_mounts[@]}" \
+  --entrypoint python3 "${BASE_IMAGE_TAG}" /project/scripts/tool_output_parser_unit.py
 
 git -C "${VLLM_DIR}" diff --check
 
@@ -601,6 +634,10 @@ docker buildx build --progress=plain \
   --build-arg "QWEN3_VL_MODEL_UPSTREAM_FILE_SHA256=${QWEN3_VL_MODEL_UPSTREAM_FILE_SHA256}" \
   --build-arg "ABSTRACT_PARSER_UPSTREAM_FILE_SHA256=${ABSTRACT_PARSER_UPSTREAM_FILE_SHA256}" \
   --build-arg "PARSER_ADAPTERS_UPSTREAM_FILE_SHA256=${PARSER_ADAPTERS_UPSTREAM_FILE_SHA256}" \
+  --build-arg "PARSER_EVENTS_UPSTREAM_FILE_SHA256=${PARSER_EVENTS_UPSTREAM_FILE_SHA256}" \
+  --build-arg "PARSER_ENGINE_CONFIG_UPSTREAM_FILE_SHA256=${PARSER_ENGINE_CONFIG_UPSTREAM_FILE_SHA256}" \
+  --build-arg "STREAMING_PARSER_ENGINE_UPSTREAM_FILE_SHA256=${STREAMING_PARSER_ENGINE_UPSTREAM_FILE_SHA256}" \
+  --build-arg "TOKEN_ID_SCANNER_UPSTREAM_FILE_SHA256=${TOKEN_ID_SCANNER_UPSTREAM_FILE_SHA256}" \
   --build-arg "ENGINE_PROTOCOL_UPSTREAM_FILE_SHA256=${ENGINE_PROTOCOL_UPSTREAM_FILE_SHA256}" \
   --build-arg "TURBOQUANT_PATCHED_FILE_SHA256=${TURBOQUANT_PATCHED_FILE_SHA256}" \
   --build-arg "TURBOQUANT_DECODE_PATCHED_FILE_SHA256=${TURBOQUANT_DECODE_PATCHED_FILE_SHA256}" \
@@ -650,6 +687,7 @@ docker buildx build --progress=plain \
   --build-arg "CHAT_TEMPLATE_RETENTION_UNIT_SHA256=${CHAT_TEMPLATE_RETENTION_UNIT_SHA256}" \
   --build-arg "NVFP4_KERNEL_UNIT_SHA256=${NVFP4_KERNEL_UNIT_SHA256}" \
   --build-arg "REASONING_USAGE_UNIT_SHA256=${REASONING_USAGE_UNIT_SHA256}" \
+  --build-arg "TOOL_OUTPUT_PARSER_UNIT_SHA256=${TOOL_OUTPUT_PARSER_UNIT_SHA256}" \
   --build-arg "TURBOQUANT_PATCH_DIFF_SHA256=${TURBOQUANT_PATCH_DIFF_SHA256}" \
   --build-arg "TOOL_SCHEMA_PATCH_DIFF_SHA256=${TOOL_SCHEMA_PATCH_DIFF_SHA256}" \
   --build-arg "AGENT_DEFAULTS_PATCH_DIFF_SHA256=${AGENT_DEFAULTS_PATCH_DIFF_SHA256}" \
@@ -657,6 +695,7 @@ docker buildx build --progress=plain \
   --build-arg "IMPLICIT_TOOL_GRAMMAR_PATCH_DIFF_SHA256=${IMPLICIT_TOOL_GRAMMAR_PATCH_DIFF_SHA256}" \
   --build-arg "ANTHROPIC_VALIDATION_PATCH_DIFF_SHA256=${ANTHROPIC_VALIDATION_PATCH_DIFF_SHA256}" \
   --build-arg "ANTHROPIC_INPUTS_PATCH_DIFF_SHA256=${ANTHROPIC_INPUTS_PATCH_DIFF_SHA256}" \
+  --build-arg "QWEN_LANGUAGE_PATCH_DIFF_SHA256=${QWEN_LANGUAGE_PATCH_DIFF_SHA256}" \
   --build-arg "TOOL_TRUNCATION_PATCH_DIFF_SHA256=${TOOL_TRUNCATION_PATCH_DIFF_SHA256}" \
   --build-arg "VISION_RUNTIME_PATCH_DIFF_SHA256=${VISION_RUNTIME_PATCH_DIFF_SHA256}" \
   --build-arg "NUMERICAL_AUDITS_PATCH_DIFF_SHA256=${NUMERICAL_AUDITS_PATCH_DIFF_SHA256}" \
@@ -712,6 +751,10 @@ docker buildx build --progress=plain \
   --build-arg "TITOTO_SERVING_PATCHED_FILE_SHA256=${TITOTO_SERVING_PATCHED_FILE_SHA256}" \
   --build-arg "ABSTRACT_PARSER_PATCHED_FILE_SHA256=${ABSTRACT_PARSER_PATCHED_FILE_SHA256}" \
   --build-arg "PARSER_ADAPTERS_PATCHED_FILE_SHA256=${PARSER_ADAPTERS_PATCHED_FILE_SHA256}" \
+  --build-arg "PARSER_EVENTS_PATCHED_FILE_SHA256=${PARSER_EVENTS_PATCHED_FILE_SHA256}" \
+  --build-arg "PARSER_ENGINE_CONFIG_PATCHED_FILE_SHA256=${PARSER_ENGINE_CONFIG_PATCHED_FILE_SHA256}" \
+  --build-arg "STREAMING_PARSER_ENGINE_PATCHED_FILE_SHA256=${STREAMING_PARSER_ENGINE_PATCHED_FILE_SHA256}" \
+  --build-arg "TOKEN_ID_SCANNER_PATCHED_FILE_SHA256=${TOKEN_ID_SCANNER_PATCHED_FILE_SHA256}" \
   --build-arg "ENGINE_PROTOCOL_PATCHED_FILE_SHA256=${ENGINE_PROTOCOL_PATCHED_FILE_SHA256}" \
   --build-arg "SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH}" \
   --output "type=docker,dest=${RUNTIME_ARCHIVE},name=${IMAGE_TAG},rewrite-timestamp=true" \
@@ -897,13 +940,23 @@ reasoning_usage_installed_report="$(
   docker run --rm --network none --entrypoint sha256sum "${IMAGE_TAG}" \
     /usr/local/lib/python3.12/dist-packages/vllm/parser/abstract_parser.py \
     /usr/local/lib/python3.12/dist-packages/vllm/parser/engine/adapters.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/parser/engine/events.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/parser/engine/parser_engine_config.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/parser/engine/streaming_parser_engine.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/parser/engine/token_id_scanner.py \
     /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/engine/protocol.py \
+    /opt/qwen38/tool_output_parser_unit.py \
     /opt/qwen38/reasoning_usage_unit.py
 )"
 expected_reasoning_usage_installed_report="$(printf '%s  %s\n' \
   "${ABSTRACT_PARSER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/abstract_parser.py \
   "${PARSER_ADAPTERS_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/engine/adapters.py \
+  "${PARSER_EVENTS_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/engine/events.py \
+  "${PARSER_ENGINE_CONFIG_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/engine/parser_engine_config.py \
+  "${STREAMING_PARSER_ENGINE_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/engine/streaming_parser_engine.py \
+  "${TOKEN_ID_SCANNER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/engine/token_id_scanner.py \
   "${ENGINE_PROTOCOL_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/engine/protocol.py \
+  "${TOOL_OUTPUT_PARSER_UNIT_SHA256}" /opt/qwen38/tool_output_parser_unit.py \
   "${REASONING_USAGE_UNIT_SHA256}" /opt/qwen38/reasoning_usage_unit.py)"
 if [[ "${reasoning_usage_installed_report}" != "${expected_reasoning_usage_installed_report}" ]]; then
   echo "Built image contains unexpected reasoning-usage bytes." >&2

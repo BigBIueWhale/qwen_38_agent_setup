@@ -795,13 +795,23 @@ assert_running_profile() {
     docker exec "${CONTAINER_NAME}" sha256sum \
       /usr/local/lib/python3.12/dist-packages/vllm/parser/abstract_parser.py \
       /usr/local/lib/python3.12/dist-packages/vllm/parser/engine/adapters.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/parser/engine/events.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/parser/engine/parser_engine_config.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/parser/engine/streaming_parser_engine.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/parser/engine/token_id_scanner.py \
       /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/engine/protocol.py \
+      /opt/qwen38/tool_output_parser_unit.py \
       /opt/qwen38/reasoning_usage_unit.py
   )"
   expected_reasoning_usage_installed_report="$(printf '%s  %s\n' \
     "${ABSTRACT_PARSER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/abstract_parser.py \
     "${PARSER_ADAPTERS_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/engine/adapters.py \
+    "${PARSER_EVENTS_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/engine/events.py \
+    "${PARSER_ENGINE_CONFIG_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/engine/parser_engine_config.py \
+    "${STREAMING_PARSER_ENGINE_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/engine/streaming_parser_engine.py \
+    "${TOKEN_ID_SCANNER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/engine/token_id_scanner.py \
     "${ENGINE_PROTOCOL_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/engine/protocol.py \
+    "${TOOL_OUTPUT_PARSER_UNIT_SHA256}" /opt/qwen38/tool_output_parser_unit.py \
     "${REASONING_USAGE_UNIT_SHA256}" /opt/qwen38/reasoning_usage_unit.py)"
   [[ "${reasoning_usage_installed_report}" == "${expected_reasoning_usage_installed_report}" ]] || \
     die "Running reasoning-usage bytes do not match the reviewed profile." \

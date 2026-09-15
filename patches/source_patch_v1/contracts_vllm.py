@@ -662,11 +662,20 @@ def _validate_truncation_after(state: State) -> None:
             label=label,
         )
     )
-    _require(
-        "self._deferred_content and (finished or not seen_tool_event or "
-        "(not tool_call_deltas))" in parser_terminal,
-        f"{label}: batch terminal parse can strand deferred content",
-    )
+    if "earlier_deferred" in parser_terminal:
+        _require(
+            "if finished or not seen_tool_event or (not tool_call_deltas):"
+            in parser_terminal
+            and "content_parts.insert(0, earlier_deferred)" in parser_terminal
+            and "content_parts.append(deferred_after_call)" in parser_terminal,
+            f"{label}: terminal parse must release all text in generation order",
+        )
+    else:
+        _require(
+            "self._deferred_content and (finished or not seen_tool_event or "
+            "(not tool_call_deltas))" in parser_terminal,
+            f"{label}: batch terminal parse can strand deferred content",
+        )
 
 
 def _validate_vision_before(state: State) -> None:
@@ -1627,6 +1636,63 @@ def _validate_anthropic_inputs_after(state: State) -> None:
         }, label=label)
 
 
+def _validate_qwen_language_before(state: State) -> None:
+    forbid_text(state, "vllm/parser/qwen3.py", 'tool_preamble_text="\\n"',
+                label="Qwen exact tool language precondition")
+
+
+def _validate_qwen_language_after(state: State) -> None:
+    label = "Qwen exact tool language result"
+    qwen = "vllm/parser/qwen3.py"
+    engine = "vllm/parser/engine/streaming_parser_engine.py"
+    parser = "vllm/parser/engine/parser_engine.py"
+    abstract = "vllm/parser/abstract_parser.py"
+    for text in ('tool_preamble_text="\\n"', 'validate_tool_names=True',
+                 '(ParserState.TOOL_PARAM_VALUE, "PARAM_END")',
+                 'batch_tool_pass_uses_ids = True'):
+        require_text(state, qwen, text, label=label)
+    for text in ('(ParserState.CONTENT, "FUNC_PREFIX")',
+                 '(ParserState.TOOL_BETWEEN, "FUNC_PREFIX")',
+                 '(ParserState.TOOL_NAME, "FUNC_END")'):
+        forbid_text(state, qwen, text, label=label)
+    _require_in_symbol(state, qwen, "Qwen3Parser._check_skip_tool_parsing", (
+        'tool_choice == "none" or not tools', 'self.skip_tool_parsing = True',
+    ), label=label)
+    _require_in_symbol(state, qwen, "Qwen3Parser.extract_batch_content_ids", (
+        'boundary = self.reasoning_token_count', 'offset = boundary - token_offset',
+        'return token_ids[offset:]',
+    ), label=label)
+    _require_in_symbol(state, engine, "StreamingParserEngine._on_terminal", (
+        'self._preamble_text == self.config.tool_preamble_text',
+        'self._in_skipped_parameter_value', 'terminal == "PARAM_END"',
+    ), label=label)
+    _require_in_symbol(state, engine, "StreamingParserEngine.finish", (
+        'events.extend(self._abandon_preamble())',
+        'events.extend(self._abandon_call_header(""))',
+    ), label=label)
+    _require_in_symbol(state, parser, "ParserEngine._events_to_delta", (
+        'content_parts.append(deferred_after_call)',
+        'content_parts.insert(0, earlier_deferred)',
+        'case EventType.TOOL_CALL_CLOSED:', 'case EventType.TOOL_CALL_ABANDONED:',
+    ), label=label)
+    _require_in_symbol(state, abstract, "DelegatingParser.parse", (
+        'content_token_ids=self._content_token_ids(model_output_token_ids)',
+    ), label=label)
+    _require_in_symbol(state, abstract, "DelegatingParser.parse_delta", (
+        'state.reasoning_content_token_ids.extend(',
+        'token_offset=state.generated_token_count - len(delta_token_ids)',
+        'state.reasoning_content_token_ids = []',
+    ), label=label)
+    require_python_symbols(state,
+        "tests/parser/engine/test_delegating_replay.py", {
+            "test_qwen_value_markup_is_identical_in_batch_and_stream": None,
+        }, label=label)
+    require_python_symbols(state,
+        "tests/parser/engine/test_reasoning_token_count.py", {
+            "TestStreaming.test_boundary_ids_wait_for_detokenized_text": None,
+        }, label=label)
+
+
 def validate_final(state: State) -> None:
     """Reassert every durable semantic invariant on the complete tree.
 
@@ -1642,6 +1708,21 @@ def validate_final(state: State) -> None:
 
 
 CONTRACTS: Mapping[str, SemanticContract] = {
+    "qwen-exact-tool-language": SemanticContract(
+        rationale=(
+            "The parser invented calls from unarmed prose, consumed reserved markup "
+            "inside valid parameter values, and diverged in batch. Match the exact "
+            "trigger, keep disabled-tool output, carry the exact content IDs through "
+            "the reasoning split, and preserve content order and wrapper closure."
+        ),
+        removal_condition=(
+            "Remove when upstream matches the Qwen grammar's trigger and parameter "
+            "language, preserves disabled-tool text, and provides equivalent batch "
+            "and streaming results with exact reasoning-to-content token handoff."
+        ),
+        validate_before=_validate_qwen_language_before,
+        validate_after=_validate_qwen_language_after,
+    ),
     "anthropic-input-fidelity": SemanticContract(
         rationale=(
             "Anthropic tool results silently lost unsupported content and is_error; "

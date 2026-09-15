@@ -1,0 +1,1741 @@
+diff --git a/tests/parser/engine/replay_harness.py b/tests/parser/engine/replay_harness.py
+--- a/tests/parser/engine/replay_harness.py
++++ b/tests/parser/engine/replay_harness.py
+@@ -146,6 +146,7 @@
+         full_text,
+         request,
+         enable_auto_tools=True,
++        model_output_token_ids=[tid for tid, _ in sample.tokens],
+     )
+     tc_list: list[dict] = []
+     if tool_calls:
+@@ -191,7 +192,7 @@
+     all_ids = [tid for tid, _ in tokens]
+     all_texts = [text for _, text in tokens]
+ 
+-    request = _test_request(tools=tools)
++    request = _test_request(tools=tools if tools is not None else getattr(parser, "_tools", None))
+     first_prompt_ids = prompt_token_ids if prompt_token_ids is not None else []
+ 
+     if holdback_chars <= 0:
+@@ -282,7 +283,7 @@
+     ``replay_streaming`` (which keeps text and IDs aligned) does not.
+     """
+     results: list[DeltaMessage | None] = []
+-    request = _test_request(tools=tools)
++    request = _test_request(tools=tools if tools is not None else getattr(parser, "_tools", None))
+     first_prompt_ids = prompt_token_ids if prompt_token_ids is not None else []
+ 
+     n = len(tokens)
+diff --git a/tests/parser/engine/test_delegating_replay.py b/tests/parser/engine/test_delegating_replay.py
+--- a/tests/parser/engine/test_delegating_replay.py
++++ b/tests/parser/engine/test_delegating_replay.py
+@@ -13,6 +13,7 @@
+ 
+ from __future__ import annotations
+ 
++import json
+ from typing import NamedTuple
+ 
+ import pytest
+@@ -41,6 +42,7 @@
+     ParserEngineToolAdapter,
+ )
+ from vllm.parser.mistral import MistralParser
++from vllm.parser.qwen3 import Qwen3Parser
+ 
+ _TOOLS_VALIDATOR = TypeAdapter(list[ChatCompletionToolsParam])
+ 
+@@ -194,7 +196,20 @@
+         f"Expected no tool calls but got {output.tool_calls}"
+     )
+ 
+-    cfg = parser._tool_parser._parser_engine.parser_engine_config
++    tool_engine = parser._tool_parser._parser_engine
++    if isinstance(tool_engine, Qwen3Parser):
++        # These parsers accept exactly their decoder grammar's call syntax.
++        # With tool_choice='none' no grammar constrained the output and the
++        # caller forbade calls, so the call-shaped span is forwarded as the
++        # text it was: every marker of the span is present, verbatim.
++        full_text = "".join(text for _, text in sample.tokens)
++        assert output.content is not None
++        assert output.content in full_text
++        assert tool_engine.TOOL_START in output.content
++        assert tool_engine.TOOL_END in output.content
++        return
++
++    cfg = tool_engine.parser_engine_config
+     terminals = sorted(
+         v
+         for v in set(cfg.terminals.values()) | set(cfg.token_id_terminals.values())
+@@ -205,3 +220,48 @@
+         terminals,
+         context=f"parser={parser_name}",
+     )
++
++
++@pytest.mark.parametrize("chunk_size", [1, 3, 13, None])
++@pytest.mark.parametrize("value", [
++    "before</function>after", "before</tool_call></think>after",
++    "before<parameter=literal>after", "before< /parameter >after",
++    "before</parameter >after", "before</tool_call><tool_call></think>after",
++])
++def test_qwen_value_markup_is_identical_in_batch_and_stream(chunk_size, value):
++    """Only the exact parameter closer is structural within a value."""
++    parser_cls = next(p.parser_cls for p in _PAIRINGS if p.name == "qwen3")
++    vocab = {text: 20000 + n for n, text in enumerate([
++        "<think>", "</think>", "<tool_call>", "</tool_call>",
++    ])}
++    text = ("plan</think>before<tool_call>\n<function=write>\n<parameter=text>"
++            + value + "</parameter>\n</function>\n</tool_call>after")
++    tokens = []
++    offset = 0
++    while offset < len(text):
++        marker = next((m for m in vocab if text.startswith(m, offset)), None)
++        piece = marker if marker is not None else text[offset]
++        tokens.append((vocab[marker] if marker else ord(piece), piece))
++        offset += len(piece)
++    tools = [{"type": "function", "function": {
++        "name": "write", "parameters": {"type": "object", "properties": {
++            "text": {"type": "string"}}, "required": ["text"]},
++    }}]
++    validated = _TOOLS_VALIDATOR.validate_python(tools)
++    tok = MockTokenizer(vocab, tokens)
++    batch = parser_cls(tok, validated)
++    reasoning, content, calls = batch.parse(
++        text, _test_request(tools=tools), enable_auto_tools=True,
++        model_output_token_ids=[tid for tid, _ in tokens],
++    )
++    assert reasoning == "plan"
++    assert content == "beforeafter"
++    assert len(calls) == 1
++    assert json.loads(calls[0].arguments) == {"text": value}
++    stream = parser_cls(tok, validated)
++    result = collect_output(replay_streaming(
++        stream, tokens, chunk_size=chunk_size, finished_on_last=True, tools=tools,
++    ))
++    assert result.reasoning == reasoning
++    assert result.content == content
++    assert json.loads(result.tool_calls[0]["arguments"]) == {"text": value}
+diff --git a/tests/parser/engine/test_nemotron_v3.py b/tests/parser/engine/test_nemotron_v3.py
+--- a/tests/parser/engine/test_nemotron_v3.py
++++ b/tests/parser/engine/test_nemotron_v3.py
+@@ -22,6 +22,7 @@
+ )
+ from vllm.entrypoints.openai.chat_completion.protocol import (
+     ChatCompletionRequest,
++    ChatCompletionToolsParam,
+ )
+ from vllm.parser.nemotron_v3 import NemotronV3Parser
+ 
+@@ -41,7 +42,9 @@
+ 
+ def _make_request(**chat_template_kwargs):
+     request = MagicMock(spec=ChatCompletionRequest)
+-    request.tools = []
++    request.tools = [ChatCompletionToolsParam.model_validate({
++        "type": "function", "function": {"name": name, "parameters": {"type": "object"}},
++    }) for name in ("Bash", "get_time", "get_weather", "test")]
+     request.tool_choice = "auto"
+     request.include_reasoning = True
+     request.chat_template_kwargs = chat_template_kwargs or None
+diff --git a/tests/parser/engine/test_parser_engine.py b/tests/parser/engine/test_parser_engine.py
+--- a/tests/parser/engine/test_parser_engine.py
++++ b/tests/parser/engine/test_parser_engine.py
+@@ -508,9 +508,17 @@
+         assert deferred.content == "\nHere is the result"
+         assert not deferred.tool_calls
+ 
+-    def test_text_after_tool_deferred_even_when_finished(self):
+-        engine = _make_engine()
++    def test_text_after_tool_released_in_order_when_finished(self):
++        """A finished parse has no later delta to hold text back for.
++
++        The text that preceded the call comes first and the text that
++        followed it comes last -- the order the model produced, and the
++        order streaming delivered them in.
++        """
++        engine = _make_engine()
++        engine._content_has_nonws = True
+         events = [
++            SemanticEvent(EventType.TEXT_CHUNK, "before "),
+             SemanticEvent(EventType.TOOL_CALL_START, tool_index=0),
+             SemanticEvent(EventType.TOOL_NAME, "f", tool_index=0),
+             SemanticEvent(EventType.ARG_VALUE_CHUNK, "{}", tool_index=0),
+@@ -520,7 +528,23 @@
+         delta = engine._events_to_delta(events, finished=True)
+         assert delta is not None
+         assert delta.tool_calls
+-        assert delta.content is None
++        assert delta.content == "before done"
++
++    def test_text_held_back_by_an_earlier_delta_comes_first(self):
++        engine = _make_engine()
++        engine._content_has_nonws = True
++        first = [
++            SemanticEvent(EventType.TOOL_CALL_START, tool_index=0),
++            SemanticEvent(EventType.TOOL_NAME, "f", tool_index=0),
++            SemanticEvent(EventType.ARG_VALUE_CHUNK, "{}", tool_index=0),
++            SemanticEvent(EventType.TOOL_CALL_END, tool_index=0),
++            SemanticEvent(EventType.TEXT_CHUNK, "after "),
++        ]
++        assert engine._events_to_delta(first).content is None
++        second = [SemanticEvent(EventType.TEXT_CHUNK, "the call")]
++        assert engine._events_to_delta(second, finished=True).content == (
++            "after the call"
++        )
+ 
+     def test_text_before_tool_not_deferred(self):
+         engine = _make_engine()
+@@ -819,25 +843,27 @@
+     so that token-ID-based strict terminal matching is active."""
+ 
+     def test_literal_tool_tag_in_content_preserved_with_token_ids(self, mock_request):
+-        engine = _make_engine(_hermes_config())
++        # Ids decode to their own text, as a tokenizer's do; the scanner
++        # relies on that to place each real token where its ids say it is.
++        pieces = {
++            65: "Use ",
++            66: "<tool_call>",
++            67: " to",
++            68: " call",
++            69: " tools.",
++            72: '{"name": "f", ',
++            73: '"arguments": ',
++            74: '{"a": 1}}',
++        }
++        tokenizer = make_mock_tokenizer(_VOCAB)
++        table = {tid: text for text, tid in _VOCAB.items()} | pieces
++        tokenizer.decode.side_effect = lambda ids: "".join(table[i] for i in ids)
++        engine = ParserEngine(tokenizer, parser_engine_config=_hermes_config())
+         text = (
+             "Use <tool_call> to call tools."
+             '<tool_call>{"name": "f", "arguments": {"a": 1}}</tool_call>'
+         )
+-        token_ids = [
+-            65,
+-            66,
+-            67,
+-            68,
+-            69,
+-            70,
+-            71,  # "Use <tool_call> to call tools."
+-            202,  # real <tool_call>
+-            72,
+-            73,
+-            74,  # '{"name": "f", ...}'
+-            203,  # real </tool_call>
+-        ]
++        token_ids = [65, 66, 67, 68, 69, 202, 72, 73, 74, 203]
+ 
+         _, content, tool_calls = engine.parse(
+             text, mock_request, model_output_token_ids=token_ids
+diff --git a/tests/parser/engine/test_qwen3.py b/tests/parser/engine/test_qwen3.py
+--- a/tests/parser/engine/test_qwen3.py
++++ b/tests/parser/engine/test_qwen3.py
+@@ -233,7 +233,14 @@
+         args1 = json.loads(result.tool_calls[1].function.arguments)
+         assert "/workspace/main.py" in args1["file_path"]
+ 
+-    def test_consecutive_tool_calls_without_tool_end(self, parser, mock_request):
++    def test_text_between_a_call_and_its_closer_is_kept(self, parser, mock_request):
++        """The grammar closes every call with ``</function>\\n</tool_call>``.
++
++        A second opener where the closer belongs is a shape the grammar
++        never produces; the parser does not repair it into two calls.  The
++        first call is the one call, closed by the closer that eventually
++        came, and what the model put in between is kept as its text.
++        """
+         text = (
+             "<tool_call>\n"
+             "<function=get_weather>\n"
+@@ -247,12 +254,69 @@
+         )
+         result = parser.extract_tool_calls(text, mock_request)
+ 
+-        assert result.tools_called is True
+-        assert len(result.tool_calls) == 2
+-        args0 = json.loads(result.tool_calls[0].function.arguments)
+-        assert args0 == {"city": "Tokyo"}
+-        args1 = json.loads(result.tool_calls[1].function.arguments)
+-        assert args1 == {"city": "Paris"}
++        assert len(result.tool_calls) == 1
++        assert json.loads(result.tool_calls[0].function.arguments) == {
++            "city": "Tokyo"
++        }
++        assert result.content == (
++            "<tool_call>\n<function=get_weather>\n"
++            "<parameter=city>Paris</parameter>\n</function>"
++        )
++        assert parser.tool_calls_complete is True
++
++    def test_call_cut_before_its_closer_is_not_complete(self, parser, mock_request):
++        text = (
++            "<tool_call>\n"
++            "<function=get_weather>\n"
++            "<parameter=city>Tokyo</parameter>\n"
++            "</function>\n"
++        )
++        result = parser.extract_tool_calls(text, mock_request)
++
++        assert len(result.tool_calls) == 1
++        assert parser.tool_calls_complete is False
++
++    def test_bare_function_markup_is_content(self, parser, mock_request):
++        """A ``<function=`` the trigger did not arm is text, never a call."""
++        text = (
++            "The format is <function=run>\n<parameter=cmd>ls</parameter>\n"
++            "</function> and nothing else."
++        )
++        result = parser.extract_tool_calls(text, mock_request)
++
++        assert result.tools_called is False
++        assert result.tool_calls == []
++        assert result.content == text
++
++    def test_opener_without_the_trigger_is_content(self, parser, mock_request):
++        for text in (
++            "<tool_call> is how a call starts.",
++            "<tool_call></tool_call>",
++            "<tool_call>\n\n<function=get_weather>\n</function>\n</tool_call>",
++            "<tool_call>",
++        ):
++            result = parser.extract_tool_calls(text, mock_request)
++            assert result.tools_called is False, text
++            assert result.content == text
++
++    def test_markup_inside_a_value_is_the_value(self, parser, mock_request):
++        """Only ``</parameter>`` ends a value, as in the grammar."""
++        text = (
++            "<tool_call>\n<function=write_file>\n"
++            "<parameter=path>t.jinja</parameter>\n"
++            "<parameter=content>{{ x }}</function>\n<parameter=y>\n"
++            "</tool_call></parameter>\n"
++            "</function>\n</tool_call>"
++        )
++        result = parser.extract_tool_calls(text, mock_request)
++
++        assert [tc.function.name for tc in result.tool_calls] == ["write_file"]
++        assert json.loads(result.tool_calls[0].function.arguments) == {
++            "path": "t.jinja",
++            "content": "{{ x }}</function>\n<parameter=y>\n</tool_call>",
++        }
++        assert parser.tool_calls_complete is True
++        assert result.content is None
+ 
+     def test_nested_json_array_parameter(self, parser, mock_request):
+         text = (
+@@ -389,6 +453,89 @@
+             )
+         }
+ 
++    def test_streaming_bare_function_markup_is_content(self, parser, mock_request):
++        chunks = [
++            "The format is ",
++            "<function=run>\n",
++            "<parameter=cmd>ls</parameter>\n",
++            "</function>",
++            " and nothing else.",
++        ]
++        results = simulate_tool_streaming(parser, mock_request, chunks)
++
++        assert collect_function_name(results) is None
++        assert collect_content(results) == "".join(chunks)
++
++    def test_streaming_opener_without_the_trigger_is_content(
++        self, parser, mock_request
++    ):
++        chunks = ["<tool_call>", " is how ", "a call starts."]
++        results = simulate_tool_streaming(parser, mock_request, chunks)
++        final = parser.finish_streaming()
++
++        assert collect_function_name(results) is None
++        assert collect_content(results) + ((final and final.content) or "") == (
++            "".join(chunks)
++        )
++
++    def test_streaming_call_closed_by_its_wrapper_is_complete(
++        self, parser, mock_request
++    ):
++        chunks = [
++            "<tool_call>",
++            "\n<function=get_weather>\n",
++            "<parameter=city>Tokyo</parameter>\n",
++            "</function>\n",
++            "</tool_call>",
++        ]
++        simulate_tool_streaming(parser, mock_request, chunks)
++        parser.finish_streaming()
++
++        assert parser.tool_calls_complete is True
++
++    def test_streaming_call_cut_before_its_wrapper_is_open(self, parser, mock_request):
++        """A stop string or a limit that cut the call leaves it open.
++
++        The name and the safe prefix of its arguments were streamed as they
++        arrived; the serving layer reports the engine's own terminal, never
++        ``tool_calls``, so the client knows it holds a partial call.
++        """
++        chunks = [
++            "<tool_call>",
++            "\n<function=get_weather>\n",
++            "<parameter=city>Tok",
++        ]
++        results = simulate_tool_streaming(parser, mock_request, chunks)
++        final = parser.finish_streaming()
++
++        assert collect_function_name(results) == "get_weather"
++        assert final is not None and final.tool_calls
++        assert parser.tool_calls_complete is False
++
++    def test_streaming_markup_inside_a_value_is_the_value(self, parser, mock_request):
++        chunks = [
++            "<tool_call>",
++            "\n<function=write_file>\n",
++            "<parameter=content>{{ x }}</function>\n",
++            "<parameter=y>\n</tool_call></parameter>\n",
++            "</function>\n",
++            "</tool_call>",
++        ]
++        results = simulate_tool_streaming(parser, mock_request, chunks)
++        final = parser.finish_streaming()
++        args_text = collect_tool_arguments(results) + (
++            "".join(
++                tc.function.arguments
++                for tc in (final.tool_calls if final and final.tool_calls else [])
++                if tc.function and tc.function.arguments
++            )
++        )
++
++        assert json.loads(args_text) == {
++            "content": "{{ x }}</function>\n<parameter=y>\n</tool_call>"
++        }
++        assert parser.tool_calls_complete is True
++
+     def test_streaming_text_before_tool(self, parser, mock_request):
+         chunks = [
+             "Let me check ",
+@@ -443,7 +590,7 @@
+         chunks = [
+             "<tool_call>\n",
+             "<function=search>\n",
+-            "<parameter=query>hello ",
++            "<parameter=query>hello </parameter>\n",
+             "<param",
+             "eter=limit>10</parameter>\n",
+             "</function>\n",
+diff --git a/tests/parser/engine/test_qwen3_reasoning.py b/tests/parser/engine/test_qwen3_reasoning.py
+--- a/tests/parser/engine/test_qwen3_reasoning.py
++++ b/tests/parser/engine/test_qwen3_reasoning.py
+@@ -157,6 +157,27 @@
+         assert reasoning == "Reasoning here."
+         assert content == "Content here.More content."
+ 
++    def test_marker_inside_a_forwarded_tool_span_is_kept(self, parser):
++        """A marker the grammar allows inside a value is the value's text.
++
++        The batch reasoning pass forwards a tool span for the tool engine
++        to parse; a ``</think>`` inside a parameter value must reach that
++        engine exactly as it does in streaming, not be absorbed first.
++        """
++        text = (
++            "Plan.</think><tool_call>\n<function=write>\n"
++            "<parameter=body>a</think>b</parameter>\n"
++            "</function>\n</tool_call>"
++        )
++        parser.skip_tool_parsing = True
++        reasoning, content = parser.extract_reasoning(text, None)
++        assert reasoning == "Plan."
++        assert content == (
++            "<tool_call>\n<function=write>\n"
++            "<parameter=body>a</think>b</parameter>\n"
++            "</function>\n</tool_call>"
++        )
++
+ 
+ class TestIsReasoningEnd:
+     def test_think_end_token(self, parser):
+diff --git a/tests/parser/engine/test_reasoning_token_count.py b/tests/parser/engine/test_reasoning_token_count.py
+--- a/tests/parser/engine/test_reasoning_token_count.py
++++ b/tests/parser/engine/test_reasoning_token_count.py
+@@ -31,12 +31,14 @@
+ )
+ 
+ END_OF_TURN = "<|im_end|>"
++# Marker ids lie outside the ASCII range that single-character tokens use
++# as their ids, so no character can masquerade as a marker.
+ VOCAB = {
+-    THINK_START: 98,
+-    THINK_END: 99,
+-    TOOL_CALL_START: 100,
+-    TOOL_CALL_END: 101,
+-    END_OF_TURN: 102,
++    THINK_START: 998,
++    THINK_END: 999,
++    TOOL_CALL_START: 1000,
++    TOOL_CALL_END: 1001,
++    END_OF_TURN: 1002,
+ }
+ 
+ 
+@@ -58,7 +60,10 @@
+ @pytest.fixture
+ def request_stub():
+     req = MagicMock(spec=ChatCompletionRequest)
+-    req.tools = []
++    from vllm.entrypoints.openai.chat_completion.protocol import ChatCompletionToolsParam
++    req.tools = [ChatCompletionToolsParam.model_validate({
++        "type": "function", "function": {"name": "f", "parameters": {"type": "object"}},
++    })]
+     req.tool_choice = "auto"
+     req.include_reasoning = True
+     return req
+@@ -97,6 +102,30 @@
+ 
+ 
+ class TestStreaming:
++    @pytest.mark.parametrize("implicit", [False, True])
++    def test_boundary_ids_wait_for_detokenized_text(
++        self, composed_parser, request_stub, implicit
++    ):
++        call = (
++            TOOL_CALL_START,
++            *"\n<function=f>\n<parameter=x>1</parameter>\n</function>\n",
++            TOOL_CALL_END,
++        )
++        boundary = TOOL_CALL_START if implicit else THINK_END
++        _, delayed_ids = tokens("A", boundary)
++        first = composed_parser.parse_delta(
++            "A", delayed_ids, request_stub, prompt_token_ids=[1, 2, 3], finished=False
++        )
++        tail = call[1:] if implicit else call
++        tail_text, tail_ids = tokens(*tail)
++        last = composed_parser.parse_delta(
++            boundary + tail_text, tail_ids, request_stub, finished=True
++        )
++        assert joined([first, last], "reasoning") == "A"
++        assert last and last.tool_calls
++        assert composed_parser.reasoning_token_count == 1
++        assert composed_parser.generated_token_count == len(delayed_ids) + len(tail_ids)
++
+     def test_counts_ids_before_the_explicit_end(self, composed_parser, request_stub):
+         deltas = [("A", "B"), ("C", THINK_END, "D"), ("E",)]
+         outputs = stream(composed_parser, request_stub, deltas)
+diff --git a/tests/parser/engine/test_replay.py b/tests/parser/engine/test_replay.py
+--- a/tests/parser/engine/test_replay.py
++++ b/tests/parser/engine/test_replay.py
+@@ -130,6 +130,17 @@
+ _REPLAY_SAMPLES = [(p.parser_cls, s, p.terminals) for p in _PARSERS for s in p.samples]
+ 
+ 
++def _terminals_not_expected(sample, terminals: list[str]) -> list[str]:
++    """Terminals whose text a sample's expected content does not carry.
++
++    An opener the grammar's trigger did not follow is content for the
++    parsers that accept exactly their grammar, so a sample expecting that
++    text is checked for leakage of the other terminals only.
++    """
++    expected_text = sample.expected_content or ""
++    return [t for t in terminals if t not in expected_text]
++
++
+ @pytest.mark.parametrize("holdback", HOLDBACK_CONFIGS, ids=lambda h: f"holdback{h}")
+ @pytest.mark.parametrize("chunk_size", [3, 5, 10], ids=lambda c: f"chunk{c}")
+ @pytest.mark.parametrize(
+@@ -155,7 +166,7 @@
+         assert_parse_output(output, sample)
+         assert_no_terminal_leakage(
+             output,
+-            terminals,
++            _terminals_not_expected(sample, terminals),
+             context=f"chunk_size={chunk_size}, holdback={holdback}",
+         )
+ 
+@@ -191,7 +202,7 @@
+         assert_parse_output(output, sample)
+         assert_no_terminal_leakage(
+             output,
+-            terminals,
++            _terminals_not_expected(sample, terminals),
+             context=f"text_delay={delay}",
+         )
+ 
+@@ -219,7 +230,7 @@
+         output = collect_output(deltas)
+ 
+         assert_parse_output(output, sample)
+-        assert_no_terminal_leakage(output, terminals)
++        assert_no_terminal_leakage(output, _terminals_not_expected(sample, terminals))
+ 
+ 
+ _DEFERRAL_SAMPLES = [
+@@ -248,7 +259,7 @@
+         tokenizer = make_mock_tokenizer(sample)
+         parser = _make_parser(parser_cls, tokenizer, sample)
+ 
+-        request = _test_request()
++        request = _test_request(tools=sample.tools)
+ 
+         all_ids = [tid for tid, _ in sample.tokens]
+         all_texts = [text for _, text in sample.tokens]
+@@ -318,18 +329,31 @@
+ ]
+ 
+ 
++def _forbidden_calls_stay_text(parser_cls) -> bool:
++    """Parsers that accept exactly their decoder grammar's call syntax.
++
++    With ``tool_choice='none'`` no grammar constrained the output and the
++    caller forbade calls, so these parsers forward a call-shaped span as the
++    text it was instead of consuming it: the caller sees what the model did.
++    """
++    from vllm.parser.qwen3 import Qwen3Parser
++
++    return issubclass(parser_cls, Qwen3Parser)
++
++
+ def _tool_suppression_expectations(
+     sample, think_end: str, tool_start: str, *, include_tool_block: bool
+ ) -> tuple[str, str]:
+     """Expected (reasoning, content) when tool calls are not extracted.
+ 
+     With ``include_tool_block=True`` (skip_tool_parsing / reasoning
+-    adapter first pass), tool terminal text is preserved as content so
+-    a second-pass parser can see it.
++    adapter first pass, and tool_choice='none' for the parsers named by
++    ``_forbidden_calls_stay_text``), tool terminal text is preserved as
++    content so a second-pass parser, or the caller, can see it.
+ 
+     With ``include_tool_block=False`` (_suppress_tool_calls /
+-    tool_choice='none'), the state machine consumes tool blocks and
+-    only non-tool content survives.
++    tool_choice='none' elsewhere), the state machine consumes tool blocks
++    and only non-tool content survives.
+     """
+     full_text = "".join(text for _, text in sample.tokens)
+     reasoning = sample.expected_reasoning
+@@ -412,7 +436,9 @@
+ 
+         output = collect_output(results)
+ 
+-        include_block = mode == "skip_tool_parsing"
++        include_block = mode == "skip_tool_parsing" or _forbidden_calls_stay_text(
++            parser_cls
++        )
+         expected_reasoning, expected_content = _tool_suppression_expectations(
+             sample, think_end, tool_start, include_tool_block=include_block
+         )
+@@ -455,7 +481,10 @@
+         output = parse_non_streaming(parser, sample, request)
+ 
+         expected_reasoning, expected_content = _tool_suppression_expectations(
+-            sample, think_end, tool_start, include_tool_block=False
++            sample,
++            think_end,
++            tool_start,
++            include_tool_block=_forbidden_calls_stay_text(parser_cls),
+         )
+         assert output.reasoning == expected_reasoning, (
+             f"Reasoning mismatch:\n"
+diff --git a/tests/parser/engine/test_seed_oss.py b/tests/parser/engine/test_seed_oss.py
+--- a/tests/parser/engine/test_seed_oss.py
++++ b/tests/parser/engine/test_seed_oss.py
+@@ -28,6 +28,7 @@
+     SeedOssParserToolAdapter,
+ )
+ from vllm.parser.seed_oss import SeedOssParser
++from vllm.entrypoints.openai.chat_completion.protocol import ChatCompletionToolsParam
+ 
+ TOOL_CALL_START = "<seed:tool_call>"
+ TOOL_CALL_END = "</seed:tool_call>"
+@@ -46,6 +47,14 @@
+ 
+ 
+ @pytest.fixture
++def mock_request(mock_request):
++    mock_request.tools = [ChatCompletionToolsParam.model_validate({
++        "type": "function", "function": {"name": name, "parameters": {"type": "object"}},
++    }) for name in ("get_weather", "read")]
++    return mock_request
++
++
++@pytest.fixture
+ def mock_tokenizer():
+     return make_mock_tokenizer(_SEED_OSS_VOCAB)
+ 
+@@ -81,9 +90,15 @@
+     assert json.loads(result.tool_calls[0].function.arguments) == {"city": "Tokyo"}
+ 
+ 
+-def test_malformed_function_end_does_not_drop_siblings(tool_parser, mock_request):
+-    """Regression for #46314: a malformed ``</function>`` with no closing ``>``
+-    on the header must not discard the other, well-formed calls."""
++def test_malformed_function_header_is_text_and_siblings_survive(
++    tool_parser, mock_request
++):
++    """A header with no closing ``>`` never becomes a call (#46314 revisited).
++
++    The grammar never produces that shape; the span is given back as the
++    text it was, nothing is invented from it, and the well-formed call that
++    follows is parsed on its own.
++    """
+     text = (
+         f"{TOOL_CALL_START}\n<function=broken</function>\n{TOOL_CALL_END}"
+         f"{TOOL_CALL_START}\n<function=get_weather>\n"
+@@ -92,14 +107,21 @@
+     )
+     result = tool_parser.extract_tool_calls(text, mock_request)
+ 
+-    weather = next(tc for tc in result.tool_calls if tc.function.name == "get_weather")
+-    assert json.loads(weather.function.arguments) == {"city": "Tokyo"}
++    assert [tc.function.name for tc in result.tool_calls] == ["get_weather"]
++    assert json.loads(result.tool_calls[0].function.arguments) == {"city": "Tokyo"}
++    assert result.content == (
++        f"{TOOL_CALL_START}\n<function=broken</function>\n{TOOL_CALL_END}"
++    )
++    assert tool_parser.tool_calls_complete is True
+ 
+ 
+ def test_basic_streaming(tool_parser, mock_request):
++    # The streaming helper carries ids only for the wrapper tokens, and the
++    # scanner attributes a chunk's text to its ids, so a wrapper token gets a
++    # chunk of its own here, as it does in the qwen3 streaming tests.
+     chunks = [
+-        f"{TOOL_CALL_START}\n",
+-        "<function=get_weather>\n",
++        f"{TOOL_CALL_START}",
++        "\n<function=get_weather>\n",
+         "<parameter=city>Tokyo",
+         "</parameter>\n",
+         "</function>\n",
+diff --git a/tests/parser/engine/test_token_id_scanner.py b/tests/parser/engine/test_token_id_scanner.py
+--- a/tests/parser/engine/test_token_id_scanner.py
++++ b/tests/parser/engine/test_token_id_scanner.py
+@@ -872,41 +872,49 @@
+ 
+ 
+ class TestRebuildFromAnchorsLiteralLookalike:
+-    """Literal token text in prose must not be consumed as an anchor."""
+-
+-    @pytest.fixture
+-    def tool_scanner(self):
++    """Literal token text in prose must not be consumed as an anchor.
++
++    The anchor fallback runs when the individually decoded tokens do not
++    join into the delta text (context-dependent decoding).  Each token's
++    text is then still expected where the tokens before it end, so a
++    literal lookalike elsewhere in the prose -- before or after the real
++    token -- is text, and a token whose place lies past the end of a
++    cut-short text is deferred rather than bound to a lookalike.
++    """
++
++    def _scanner(self, pieces: dict[int, str]):
+         tok = MagicMock()
+         tok.get_vocab.return_value = {
+             TOOL_START: TOOL_START_ID,
+             TOOL_END: TOOL_END_ID,
+         }
+-        tok.decode.side_effect = lambda ids: {
+-            TOOL_START_ID: TOOL_START,
+-            TOOL_END_ID: TOOL_END,
+-        }.get(ids[0], f"t{ids[0]}")
++        table = {TOOL_START_ID: TOOL_START, TOOL_END_ID: TOOL_END, **pieces}
++        tok.decode.side_effect = lambda ids: table[ids[0]]
+         return TokenIDScanner(
+             {TOOL_START_ID: "TOOL_START", TOOL_END_ID: "TOOL_END"},
+             tok,
+         )
+ 
+-    def test_literal_before_real_anchor(self, tool_scanner):
++    def test_literal_before_real_anchor(self):
++        # Token 1 decodes without its leading space on its own, so the
++        # joined tokens do not match the text and the fallback runs.
++        scanner = self._scanner(
++            {1: "Use", 2: " ", 3: "<tool_call>", 4: " like this: ", 5: '{"name":"f"}'}
++        )
+         delta_text = 'Use <tool_call> like this: <tool_call>{"name":"f"}</tool_call>'
+-        delta_token_ids = [1, 2, 3, 4, 5, TOOL_START_ID, 6, 7, TOOL_END_ID]
+-        items = tool_scanner.scan(delta_text, delta_token_ids)
++        delta_token_ids = [1, 2, 3, 4, TOOL_START_ID, 5, TOOL_END_ID]
++        items = scanner.scan(delta_text, delta_token_ids)
+ 
+         text_parts = [it.text for it in items if isinstance(it, TextChunk)]
+         terminals = [it for it in items if isinstance(it, PreLexedTerminal)]
+ 
+-        assert len(terminals) == 2
+-        assert terminals[0].terminal == "TOOL_START"
+-        assert terminals[1].terminal == "TOOL_END"
+-
+-        joined_text = "".join(text_parts)
+-        assert "<tool_call>" in joined_text
+-        assert '{"name":"f"}' in joined_text
+-
+-    def test_multiple_tool_calls_with_literal_between(self, tool_scanner):
++        assert [t.terminal for t in terminals] == ["TOOL_START", "TOOL_END"]
++        assert "".join(text_parts) == 'Use <tool_call> like this: {"name":"f"}'
++
++    def test_multiple_tool_calls_with_literal_between(self):
++        scanner = self._scanner(
++            {1: '{"name":"a"}', 2: "see", 3: " <tool_call> ", 4: "syntax ", 5: '{"name":"b"}'}
++        )
+         delta_text = (
+             '<tool_call>{"name":"a"}</tool_call>'
+             " see <tool_call> syntax "
+@@ -923,14 +931,43 @@
+             5,
+             TOOL_END_ID,
+         ]
+-        items = tool_scanner.scan(delta_text, delta_token_ids)
++        items = scanner.scan(delta_text, delta_token_ids)
+ 
+         terminals = [it for it in items if isinstance(it, PreLexedTerminal)]
+         assert len(terminals) == 4
+ 
+         text_parts = [it.text for it in items if isinstance(it, TextChunk)]
+-        joined_text = "".join(text_parts)
+-        assert "<tool_call> syntax" in joined_text
++        assert "".join(text_parts) == '{"name":"a"} see <tool_call> syntax {"name":"b"}'
++
++    def test_literal_after_real_anchor(self):
++        scanner = self._scanner({1: '{"name":"a"}', 2: "then", 3: " <tool_call> as text"})
++        delta_text = '<tool_call>{"name":"a"}</tool_call> then <tool_call> as text'
++        delta_token_ids = [TOOL_START_ID, 1, TOOL_END_ID, 2, 3]
++        items = scanner.scan(delta_text, delta_token_ids)
++
++        terminals = [it for it in items if isinstance(it, PreLexedTerminal)]
++        assert [t.terminal for t in terminals] == ["TOOL_START", "TOOL_END"]
++        text_parts = [it.text for it in items if isinstance(it, TextChunk)]
++        assert "".join(text_parts) == '{"name":"a"} then <tool_call> as text'
++
++    def test_token_cut_off_by_a_stop_string_is_not_bound_to_a_lookalike(self):
++        """A stop string removed the real token's text but not its id.
++
++        The token's place lies past the end of the kept text, so it is
++        deferred; the lookalike that mentions the token earlier stays text.
++        """
++        scanner = self._scanner({1: "Example:", 2: " <tool_call> is a delimiter. ", 3: "HALT"})
++        delta_text = "Example: <tool_call> is a delimiter. "
++        delta_token_ids = [1, 2, 3, TOOL_START_ID]
++        items = list(scanner.scan(delta_text, delta_token_ids))
++        # The text before a deferred token waits with it and comes out first
++        # when the stream ends, still ahead of the token.
++        items.extend(scanner.flush_pending())
++
++        kinds = [type(it).__name__ for it in items]
++        assert kinds == ["TextChunk", "PreLexedTerminal"]
++        assert items[0].text == delta_text
++        assert items[1].terminal == "TOOL_START"
+ 
+ 
+ class TestRebuildFromAnchorsCascadingDeferral:
+diff --git a/tests/parser/engine/trace_builder.py b/tests/parser/engine/trace_builder.py
+--- a/tests/parser/engine/trace_builder.py
++++ b/tests/parser/engine/trace_builder.py
+@@ -378,6 +378,21 @@
+     return scenario.content
+ 
+ 
++def _qwen3_grammar_expected_content(
++    scenario: Scenario, tool_start: str, tool_end: str
++) -> str | None:
++    """Expected content for the parsers that accept exactly the Qwen grammar.
++
++    An opener the grammar's trigger does not follow is not a call: the
++    engine gives the opener, and the closer that follows it, back as content
++    rather than repairing an empty block away.
++    """
++    content = _qwen3_expected_content(scenario)
++    if scenario.tool_calls is not None and not scenario.tool_calls:
++        return tool_start + tool_end + (content or "")
++    return content
++
++
+ def _build_qwen3(
+     scenario: Scenario,
+     name: str = "qwen3",
+@@ -400,7 +415,9 @@
+         vocab=_QWEN3_VOCAB,
+         segments=_qwen3_segments(scenario),
+         expected_reasoning=expected_reasoning,
+-        expected_content=_qwen3_expected_content(scenario),
++        expected_content=_qwen3_grammar_expected_content(
++            scenario, "<tool_call>", "</tool_call>"
++        ),
+         expected_tool_calls=_expected_tc(scenario),
+         tools=_expected_tools(scenario),
+     )
+@@ -638,7 +655,9 @@
+         vocab=_SEED_OSS_VOCAB,
+         segments=_seed_oss_segments(scenario),
+         expected_reasoning=scenario.reasoning if scenario.reasoning is not None else "",
+-        expected_content=_qwen3_expected_content(scenario),
++        expected_content=_qwen3_grammar_expected_content(
++            scenario, "<seed:tool_call>", "</seed:tool_call>"
++        ),
+         expected_tool_calls=_expected_tc(scenario),
+         tools=_expected_tools(scenario),
+     )
+diff --git a/vllm/parser/abstract_parser.py b/vllm/parser/abstract_parser.py
+--- a/vllm/parser/abstract_parser.py
++++ b/vllm/parser/abstract_parser.py
+@@ -62,6 +62,9 @@
+     # reasoning ids is never read from a parser that missed part of the
+     # stream it claims to have split.
+     generated_token_count: int = 0
++    # IDs after the reasoning boundary can precede their detokenized text.
++    # Retain them until the reasoning engine confirms the visible transition.
++    reasoning_content_token_ids: list[int] = field(default_factory=list)
+ 
+     def advance(
+         self,
+@@ -199,6 +202,19 @@
+     def generated_token_count(self) -> int:
+         """Every generated id handed to this parser for the current output."""
+         return self._stream_state.generated_token_count
++
++    @property
++    def tool_calls_complete(self) -> bool:
++        """Whether every parsed tool call reached its closing syntax.
++
++        Read after the last delta or after ``parse``.  The serving layer
++        promotes a generation to a ``tool_calls`` terminal only when this is
++        true and the engine ended the generation itself; a call cut off by a
++        limit or a stop string keeps the engine's own finish reason so no
++        client mistakes it for a complete call.  A parser that cannot tell
++        reports true, which is the pre-existing behaviour for text parsers.
++        """
++        return True
+ 
+     # ========== Reasoning Parser Methods ==========
+ 
+@@ -460,11 +476,39 @@
+         state.history_tool_call_cnt += 1
+         return tool_call_id
+ 
++    @property
++    def tool_calls_complete(self) -> bool:
++        tool_parser = self._tool_parser
++        if tool_parser is None or not getattr(
++            tool_parser, "engine_based_streaming", False
++        ):
++            return True
++        return tool_parser.tool_calls_complete  # type: ignore[attr-defined]
++
++    def _content_token_ids(
++        self, model_output_token_ids: Sequence[int]
++    ) -> Sequence[int]:
++        """The generated ids the content came from, for the batch tool pass.
++
++        The reasoning pass splits on ids; the tool pass must split on the
++        same ids after that boundary, or a text lookalike of a marker would
++        be a call in batch and content in streaming.
++        """
++        reasoning_parser = self._reasoning_parser
++        if not model_output_token_ids:
++            return ()
++        if reasoning_parser is None:
++            return model_output_token_ids
++        if not getattr(reasoning_parser, "batch_tool_pass_uses_ids", False):
++            return ()
++        return reasoning_parser.extract_batch_content_ids(model_output_token_ids)  # type: ignore[attr-defined]
++
+     def _extract_tool_calls(
+         self,
+         content: str | None,
+         request: ChatCompletionRequest | ResponsesRequest,
+         enable_auto_tools: bool = False,
++        content_token_ids: Sequence[int] = (),
+     ) -> tuple[list[FunctionCall] | None, str | None]:
+         tool_parser = self._tool_parser
+         if tool_parser is None:
+@@ -472,7 +516,11 @@
+ 
+         if request.tool_choice == "none":
+             if self._engine_based:
+-                result = self.extract_tool_calls(content or "", request=request)
++                result = self.extract_tool_calls(
++                    content or "",
++                    request=request,
++                    model_output_token_ids=content_token_ids,
++                )
+                 return [], result.content
+             return [], content
+ 
+@@ -527,6 +575,7 @@
+             tool_call_info = self.extract_tool_calls(
+                 content if content is not None else "",
+                 request=request,
++                model_output_token_ids=content_token_ids,
+             )
+             if tool_call_info is not None and tool_call_info.tools_called:
+                 tool_calls.extend(
+@@ -627,6 +676,7 @@
+         self,
+         model_output: str,
+         request: ChatCompletionRequest | ResponsesRequest,
++        model_output_token_ids: Sequence[int] = (),
+     ) -> ExtractedToolCallInformation:
+         if self._tool_parser is None:
+             return ExtractedToolCallInformation(
+@@ -635,10 +685,17 @@
+         result = None
+         is_tool_called: bool | Exception = False
+         try:
+-            result = self._tool_parser.extract_tool_calls(
+-                model_output,
+-                request=request,  # type: ignore[arg-type]
+-            )
++            if getattr(self._tool_parser, "engine_based_streaming", False):
++                result = self._tool_parser.extract_tool_calls(
++                    model_output,
++                    request=request,  # type: ignore[arg-type]
++                    model_output_token_ids=model_output_token_ids,  # type: ignore[call-arg]
++                )
++            else:
++                result = self._tool_parser.extract_tool_calls(
++                    model_output,
++                    request=request,  # type: ignore[arg-type]
++                )
+             is_tool_called = bool(result.tools_called)
+         except Exception as e:
+             is_tool_called = e
+@@ -844,6 +901,7 @@
+             content=content,
+             request=request,
+             enable_auto_tools=enable_auto_tools,
++            content_token_ids=self._content_token_ids(model_output_token_ids),
+         )
+         return reasoning, content, tool_calls
+ 
+@@ -889,6 +947,16 @@
+                 delta_token_ids=delta_token_ids,
+             )
+             reasoning_parser = self._reasoning_parser
++            exact_content_ids = getattr(
++                reasoning_parser, "batch_tool_pass_uses_ids", False
++            )
++            if exact_content_ids:
++                state.reasoning_content_token_ids.extend(
++                    reasoning_parser.extract_batch_content_ids(
++                        delta_token_ids,
++                        token_offset=state.generated_token_count - len(delta_token_ids),
++                    )
++                )
+             if reasoning_parser is not None and reasoning_parser.engine_based_streaming:
+                 should_transition = (
+                     reasoning_parser.has_engine_confirmed_reasoning_end()
+@@ -900,7 +968,12 @@
+             if should_transition:
+                 state.reasoning_ended = True
+                 reasoning_transitioned = True
+-                current_token_ids = self.extract_content_ids(delta_token_ids)
++                current_token_ids = (
++                    state.reasoning_content_token_ids
++                    if exact_content_ids
++                    else self.extract_content_ids(delta_token_ids)
++                )
++                state.reasoning_content_token_ids = []
+                 # Flush whenever the reasoning parser is engine-based (not only
+                 # when _engine_based is True): it buffers the post-marker text
+                 # (e.g. the "<" of "<tool_call>"), surfaced via finish_streaming().
+diff --git a/vllm/parser/engine/adapters.py b/vllm/parser/engine/adapters.py
+--- a/vllm/parser/engine/adapters.py
++++ b/vllm/parser/engine/adapters.py
+@@ -59,6 +59,17 @@
+ 
+     def is_reasoning_end(self, input_ids: Sequence[int]) -> bool:
+         return self._parser_engine.is_reasoning_end(list(input_ids))
++
++    @property
++    def batch_tool_pass_uses_ids(self) -> bool:
++        return self._parser_engine.batch_tool_pass_uses_ids
++
++    def extract_batch_content_ids(
++        self, token_ids: Sequence[int], *, token_offset: int = 0
++    ) -> Sequence[int]:
++        return self._parser_engine.extract_batch_content_ids(
++            token_ids, token_offset=token_offset
++        )
+ 
+     def adjust_initial_state_from_prompt(self, prompt_token_ids: Sequence[int]) -> None:
+         self._parser_engine.adjust_initial_state_from_prompt(prompt_token_ids)
+@@ -167,10 +178,15 @@
+         self,
+         model_output: str,
+         request: ChatCompletionRequest,
++        model_output_token_ids: Sequence[int] = (),
+     ) -> ExtractedToolCallInformation:
+         return self._parser_engine.extract_tool_calls_from_content(
+-            model_output, request
++            model_output, request, content_token_ids=model_output_token_ids
+         )
++
++    @property
++    def tool_calls_complete(self) -> bool:
++        return self._parser_engine.tool_calls_complete
+ 
+     def extract_tool_calls_streaming(
+         self,
+diff --git a/vllm/parser/engine/events.py b/vllm/parser/engine/events.py
+--- a/vllm/parser/engine/events.py
++++ b/vllm/parser/engine/events.py
+@@ -17,6 +17,14 @@
+     TOOL_NAME = auto()
+     ARG_VALUE_CHUNK = auto()
+     TOOL_CALL_END = auto()
++    # The format's closing wrapper was observed after TOOL_CALL_END: the call
++    # is syntactically complete.  A call ended by ``finish()`` instead was cut
++    # off, and stays open for the serving layer to report as such.
++    TOOL_CALL_CLOSED = auto()
++    # A call that had started was not a call after all -- its header never
++    # closed the way the format requires -- and its text was given back as
++    # content.  Nothing about it had been reported yet.
++    TOOL_CALL_ABANDONED = auto()
+ 
+ 
+ @dataclass(slots=True)
+diff --git a/vllm/parser/engine/parser_engine.py b/vllm/parser/engine/parser_engine.py
+--- a/vllm/parser/engine/parser_engine.py
++++ b/vllm/parser/engine/parser_engine.py
+@@ -55,6 +55,7 @@
+         "name_sent",
+         "string_keys",
+         "streamed_json",
++        "closed",
+     )
+ 
+     def __init__(self) -> None:
+@@ -65,6 +66,9 @@
+         self.name_sent: bool = False
+         self.string_keys: set[str] | None = None
+         self.streamed_json: str = ""
++        # The format's closing wrapper was observed; a call ``finish()`` had
++        # to close was cut off and is never reported as complete.
++        self.closed: bool = False
+ 
+     @property
+     def args(self) -> str:
+@@ -83,6 +87,18 @@
+     Subclasses set the ``ParserEngineConfig`` in ``__init__`` to define the
+     complete output format for a model (reasoning + tool calls).
+     """
++
++    # True for a grammar whose reasoning pass forwards everything after the
++    # reasoning boundary byte for byte, so the batch tool pass can be given
++    # the generated ids after that boundary and split on them exactly as
++    # the streaming tool pass does.  A grammar that rewrites the forwarded
++    # text keeps the text-only batch tool pass.
++    batch_tool_pass_uses_ids: bool = False
++
++    def extract_batch_content_ids(
++        self, token_ids: Sequence[int], *, token_offset: int = 0
++    ) -> Sequence[int]:
++        raise NotImplementedError("This parser does not forward a batch token boundary")
+ 
+     def __init__(
+         self,
+@@ -190,6 +206,17 @@
+     @property
+     def reasoning_ended(self) -> bool:
+         return self._reasoning_ended
++
++    @property
++    def tool_calls_complete(self) -> bool:
++        """Whether every call this engine emitted reached its closing wrapper.
++
++        False when generation ended inside a call: the serving layer then
++        reports the engine's own terminal instead of promoting the call.
++        """
++        return all(
++            slot.closed for slot in self._tool_slots if slot.name or slot.args
++        )
+ 
+     def initialize_streaming(
+         self,
+@@ -587,17 +614,21 @@
+         self,
+         content: str,
+         request: ChatCompletionRequest,
++        content_token_ids: Sequence[int] = (),
+     ) -> ExtractedToolCallInformation:
+         """Extract tool calls from reasoning-stripped content.
+ 
+         Unlike :meth:`extract_tool_calls` which re-parses the full model
+         output, this method starts the parser engine in ``CONTENT`` state
+         so it can parse content that has already had reasoning stripped.
++        With ``content_token_ids`` -- the generated ids the content came
++        from -- the split is made on ids exactly as it is delta by delta, so
++        a text lookalike of a marker is content on both paths.
+         """
+         self._check_skip_tool_parsing(request)
+         _, parsed_content, tool_call_info = self._single_pass_parse(
+             content,
+-            [],
++            content_token_ids,
+             initial_state=ParserState.CONTENT,
+         )
+         if parsed_content is not None and tool_call_info.content is None:
+@@ -873,13 +904,20 @@
+         content_parts: list[str] = []
+         reasoning_parts: list[str] = []
+ 
++        # Text held back by an earlier delta precedes this delta's text;
++        # text that follows a call inside this delta is held back until the
++        # call's own deltas have gone out, and follows this delta's text.
++        earlier_deferred = self._deferred_content
++        self._deferred_content = ""
++        deferred_after_call = ""
++
+         seen_tool_event = False
+         suppress = self._suppress_tool_calls
+         for event in events:
+             match event.type:
+                 case EventType.TEXT_CHUNK:
+                     if seen_tool_event:
+-                        self._deferred_content += event.value
++                        deferred_after_call += event.value
+                     else:
+                         content_parts.append(event.value)
+                 case EventType.REASONING_CHUNK:
+@@ -902,21 +940,34 @@
+                     if not suppress:
+                         seen_tool_event = True
+                         self._handle_tool_end(event, tool_call_deltas)
++                case EventType.TOOL_CALL_CLOSED:
++                    if not suppress:
++                        seen_tool_event = True
++                        if 0 <= event.tool_index < len(self._tool_slots):
++                            self._tool_slots[event.tool_index].closed = True
++                case EventType.TOOL_CALL_ABANDONED:
++                    if not suppress and event.tool_index == len(self._tool_slots) - 1:
++                        # Nothing about this slot was reported; it never was
++                        # a call.  The text it held follows as content.
++                        self._tool_slots.pop()
++                        seen_tool_event = bool(self._tool_slots)
+                 case EventType.REASONING_START:
+                     pass  # no delta-level effect
+ 
+         if len(tool_call_deltas) > 1:
+             tool_call_deltas = self._coalesce_tool_call_deltas(tool_call_deltas)
+ 
+-        # In batch mode, text following a tool call is observed in the same
+-        # event list that created the call, so the ordinary cross-delta
+-        # deferral condition would strand it forever.  A finished parse has no
+-        # later delta to wait for and must flush exactly as streaming does.
+-        if self._deferred_content and (
+-            finished or not seen_tool_event or not tool_call_deltas
+-        ):
+-            content_parts.insert(0, self._deferred_content)
+-            self._deferred_content = ""
++        # A finished parse has no later delta to wait for and releases
++        # everything in the order the model produced it, which is the order
++        # streaming delivered it: earlier held-back text, this text, then the
++        # text that followed the call.
++        if finished or not seen_tool_event or not tool_call_deltas:
++            if earlier_deferred:
++                content_parts.insert(0, earlier_deferred)
++            if deferred_after_call:
++                content_parts.append(deferred_after_call)
++        else:
++            self._deferred_content = earlier_deferred + deferred_after_call
+ 
+         content_str = "".join(content_parts)
+ 
+diff --git a/vllm/parser/engine/parser_engine_config.py b/vllm/parser/engine/parser_engine_config.py
+--- a/vllm/parser/engine/parser_engine_config.py
++++ b/vllm/parser/engine/parser_engine_config.py
+@@ -32,6 +32,9 @@
+     TOOL_PREAMBLE = auto()
+     TOOL_NAME = auto()
+     TOOL_ARGS = auto()
++    # Inside one parameter's value: only the value closer ends it, so the
++    # format's other markup may appear in the value as ordinary text.
++    TOOL_PARAM_VALUE = auto()
+     TOOL_BETWEEN = auto()
+ 
+ 
+@@ -68,10 +71,17 @@
+             ParserState.REASONING: EventType.REASONING_CHUNK,
+             ParserState.TOOL_NAME: EventType.TOOL_NAME,
+             ParserState.TOOL_ARGS: EventType.ARG_VALUE_CHUNK,
++            ParserState.TOOL_PARAM_VALUE: EventType.ARG_VALUE_CHUNK,
+         },
+     )
+ 
+     initial_state: ParserState = ParserState.CONTENT
++
++    # The exact text the format puts between the tool-call opener and the
++    # function opener.  When set, an opener that this text and the function
++    # opener do not follow is not a call: the opener and whatever followed it
++    # are content.  ``None`` accepts any preamble.
++    tool_preamble_text: str | None = None
+ 
+     arg_converter: Callable[[str, bool], str] | None = None
+ 
+diff --git a/vllm/parser/engine/streaming_parser_engine.py b/vllm/parser/engine/streaming_parser_engine.py
+--- a/vllm/parser/engine/streaming_parser_engine.py
++++ b/vllm/parser/engine/streaming_parser_engine.py
+@@ -174,6 +174,18 @@
+         self._args_in_string: bool = False
+         self._args_escape_next: bool = False
+ 
++    def _reset_preamble_state(self) -> None:
++        # The opener text and what followed it while the engine waits to see
++        # whether the function opener completes the format's trigger, and the
++        # header text while the name is being read, so that a call that never
++        # forms can be given back as the text it was.
++        self._preamble_opener: str = ""
++        self._preamble_text: str = ""
++        self._header_opener: str = ""
++        self._header_name: str = ""
++        self._between_text: str = ""
++        self._between_text_open: bool = False
++
+     def reset(self, initial_state: ParserState | None = None) -> None:
+         """Reset mutable state for reuse across requests.
+ 
+@@ -194,7 +206,9 @@
+         self._lexer.reset()
+         self._message_header_buffer = ""
+         self._in_skipped_tool_span = False
++        self._in_skipped_parameter_value = False
+         self._reset_args_state()
++        self._reset_preamble_state()
+ 
+     def feed(
+         self,
+@@ -259,12 +273,26 @@
+             self._args_buffer = ""
+             self._args_safe_end = 0
+ 
+-        if self.state in (
++        if (
++            self.state == ParserState.TOOL_PREAMBLE
++            and self.config.tool_preamble_text is not None
++        ):
++            # The opener was never followed by the trigger: it was text.
++            events.extend(self._abandon_preamble())
++        elif (
++            self.state == ParserState.TOOL_NAME
++            and self.config.tool_preamble_text is not None
++        ):
++            events.extend(self._abandon_call_header(""))
++        elif self.state in (
+             ParserState.TOOL_PREAMBLE,
+             ParserState.TOOL_ARGS,
++            ParserState.TOOL_PARAM_VALUE,
+             ParserState.TOOL_NAME,
+             ParserState.TOOL_BETWEEN,
+         ):
++            # A call cut before its closing wrapper ends here without
++            # TOOL_CALL_CLOSED, so it is reported as open, never as complete.
+             if self.tool_index >= 0:
+                 events.append(
+                     SemanticEvent(
+@@ -313,17 +341,105 @@
+             ParserState.TOOL_PREAMBLE,
+             ParserState.TOOL_NAME,
+             ParserState.TOOL_ARGS,
++            ParserState.TOOL_PARAM_VALUE,
+             ParserState.TOOL_BETWEEN,
+         }
+     )
+ 
++    def _abandon_preamble(self) -> list[SemanticEvent]:
++        """Give back an opener the trigger did not follow, as content."""
++        text = self._preamble_opener + self._preamble_text
++        self._reset_preamble_state()
++        self.state = ParserState.CONTENT
++        return self._emit_for_state(text) if text else []
++
++    def _abandon_call_header(self, terminal_text: str) -> list[SemanticEvent]:
++        """Give back a call whose header never closed, as content.
++
++        The name was still being read when something other than the header
++        closer arrived, so this was never a call.  Nothing about it has been
++        reported: the name goes out only once the header closes.
++        """
++        text = (
++            self._preamble_opener
++            + self._preamble_text
++            + self._header_opener
++            + self._header_name
++            + terminal_text
++        )
++        self._reset_preamble_state()
++        self._header_opener = ""
++        self._header_name = ""
++        self.state = ParserState.CONTENT
++        events = [
++            SemanticEvent(EventType.TOOL_CALL_ABANDONED, tool_index=self.tool_index)
++        ]
++        self.tool_index -= 1
++        events.extend(self._emit_for_state(text))
++        return events
++
+     def _on_terminal(self, terminal: str, value: str) -> list[SemanticEvent]:
++        if (
++            self.skip_tool_parsing
++            and self._in_skipped_tool_span
++            and self.config.tool_preamble_text is not None
++        ):
++            if terminal == "PARAM_START":
++                self._in_skipped_parameter_value = True
++            if self._in_skipped_parameter_value:
++                if terminal == "PARAM_END":
++                    self._in_skipped_parameter_value = False
++                return self._emit_for_state(value)
++
++        if self._has_drops and terminal == DROP_TERMINAL:
++            return []
++
++        if (
++            self.skip_tool_parsing
++            and self._in_skipped_tool_span
++            and terminal not in self._tool_terminals
++        ):
++            # Inside a forwarded tool span a marker the current state would
++            # merely absorb (a duplicate ``</think>``) is the span's text: it
++            # reaches the tool engine exactly as it does in streaming, where
++            # only that engine sees the span.
++            transition = self.config.transitions.get((self.state, terminal))
++            if (
++                transition is not None
++                and transition.next_state == self.state
++                and not transition.events
++            ):
++                return self._emit_for_state(value)
++
++        if (
++            self.state == ParserState.TOOL_PREAMBLE
++            and self.config.tool_preamble_text is not None
++        ):
++            transition = self.config.transitions.get((self.state, terminal))
++            if (
++                transition is not None
++                and self._preamble_text == self.config.tool_preamble_text
++            ):
++                # Keep the opener text: the header may still turn out not
++                # to be a call, and then the whole span is content.
++                self._header_opener = value
++                return self._apply_transition(transition, value)
++            events = self._abandon_preamble()
++            events.extend(self._on_terminal(terminal, value))
++            return events
++
++        if (
++            self.state == ParserState.TOOL_NAME
++            and self.config.tool_preamble_text is not None
++            and (self.state, terminal) not in self.config.transitions
++        ):
++            events = self._abandon_call_header(value)
++            return events
++
+         key = (self.state, terminal)
+         transition = self.config.transitions.get(key)
+ 
+         if transition is None:
+-            if self._has_drops and terminal == DROP_TERMINAL:
+-                return []
+             # The projected skip state may not define the wrapper closer.
+             if self.skip_tool_parsing and terminal in self._tool_exit_terminals:
+                 self._in_skipped_tool_span = False
+@@ -389,6 +505,31 @@
+         if self.state == ParserState.MESSAGE_HEADER:
+             self._message_header_buffer += text
+             return []
++        if (
++            self.state == ParserState.TOOL_PREAMBLE
++            and self.config.tool_preamble_text is not None
++        ):
++            self._preamble_text += text
++            if not self.config.tool_preamble_text.startswith(self._preamble_text):
++                return self._abandon_preamble()
++            return []
++        if self.state == ParserState.TOOL_NAME:
++            self._header_name += text
++        if (
++            self.state == ParserState.TOOL_BETWEEN
++            and self.config.tool_preamble_text is not None
++        ):
++            # Between a call's end and its closer the format allows only the
++            # newline.  It is held until the closer discards it; anything
++            # else the model put there is its text, kept whole.
++            self._between_text += text
++            if not self._between_text.strip():
++                return []
++            kept, self._between_text = self._between_text, ""
++            self._between_text_open = True
++            return [
++                SemanticEvent(EventType.TEXT_CHUNK, value=kept, tool_index=self.tool_index)
++            ]
+         if self.state == ParserState.TOOL_ARGS:
+             if self.config.tool_args_json:
+                 return self._feed_args_text(text)
+@@ -417,10 +558,11 @@
+         events: list[SemanticEvent] = []
+         previous_state = self.state
+         message_header = ""
+-
+-        if (
+-            self.state == ParserState.TOOL_ARGS
+-            and transition.next_state != ParserState.TOOL_ARGS
++        arg_states = (ParserState.TOOL_ARGS, ParserState.TOOL_PARAM_VALUE)
++
++        if (
++            self.state in arg_states
++            and transition.next_state not in arg_states
+             and self._args_buffer
+         ):
+             events.append(
+@@ -437,6 +579,16 @@
+             self._message_header_buffer = ""
+ 
+         self.state = transition.next_state
++        if self.state == ParserState.TOOL_PREAMBLE:
++            self._reset_preamble_state()
++            self._preamble_opener = value
++        elif self.state == ParserState.TOOL_ARGS:
++            # The header closed: the call is real and its text is spoken for.
++            self._reset_preamble_state()
++        elif previous_state == ParserState.TOOL_BETWEEN:
++            # The closer arrived: the format's own newline before it is not text.
++            self._between_text = ""
++            self._between_text_open = False
+ 
+         for event_type in transition.events:
+             if event_type == EventType.TOOL_CALL_START:
+@@ -457,7 +609,7 @@
+                 )
+             )
+ 
+-        if self.state == ParserState.TOOL_ARGS:
++        if self.state == ParserState.TOOL_ARGS and previous_state not in arg_states:
+             self._args_brace_depth = 0
+             self._args_in_string = False
+             self._args_escape_next = False
+diff --git a/vllm/parser/engine/token_id_scanner.py b/vllm/parser/engine/token_id_scanner.py
+--- a/vllm/parser/engine/token_id_scanner.py
++++ b/vllm/parser/engine/token_id_scanner.py
+@@ -211,10 +211,36 @@
+             return [TextChunk(delta_text)] + results
+ 
+         pos = delta_text.find(reconstructed)
+-        if pos > 0:
+-            return [TextChunk(delta_text[:pos])] + results
+-        if pos == 0:
+-            return results
++        if pos >= 0:
++            recovered: list[LexerInput] = []
++            if pos:
++                recovered.append(TextChunk(delta_text[:pos]))
++            recovered.extend(results)
++            rest = delta_text[pos + len(reconstructed):]
++            if rest:
++                recovered.append(TextChunk(rest))
++            return recovered
++
++        if reconstructed.startswith(delta_text):
++            # A stop string or detokenizer holdback removed an exact suffix.
++            # Its terminals keep their known positions; a prose lookalike
++            # earlier in the retained prefix cannot stand in for one of them.
++            recovered = []
++            remaining = len(delta_text)
++            for item in results:
++                if len(item.text) <= remaining:
++                    recovered.append(item)
++                    remaining -= len(item.text)
++                elif isinstance(item, TextChunk):
++                    if remaining:
++                        recovered.append(TextChunk(item.text[:remaining]))
++                    remaining = 0
++                else:
++                    if remaining:
++                        self._deferred_post_text += item.text[:remaining]
++                    remaining = 0
++                    self._deferred_terminals.append(item)
++            return recovered
+ 
+         # Fallback: SentencePiece context-dependent decoding mismatch.
+         # Rebuild from delta_text using PreLexedTerminals as split anchors.
+diff --git a/vllm/parser/qwen3.py b/vllm/parser/qwen3.py
+--- a/vllm/parser/qwen3.py
++++ b/vllm/parser/qwen3.py
+@@ -47,13 +47,16 @@
+ PARAM_START = "<parameter="
+ PARAM_END = "</parameter>"
+ 
++# A value ends only at its own closer.  The grammar excludes ``</parameter>``
++# from values and nothing else, so any other markup inside a value is the
++# value's text; a value with no closer is the final, cut-off one.
+ _PARAM_RE = re.compile(
+-    r"<\s*parameter\s*=\s*([^>]*)>"
++    r"<parameter=([^>]*)>"
+     r"(.*?)"
+-    r"(?:<\s*/\s*parameter\s*>|(?=<\s*parameter\s*=))",
++    r"</parameter>",
+     re.DOTALL,
+ )
+-_PARTIAL_PARAM_RE = re.compile(r"<\s*parameter\s*=\s*([^>]+)>(.*)$", re.DOTALL)
++_PARTIAL_PARAM_RE = re.compile(r"<parameter=([^>]+)>(.*)$", re.DOTALL)
+ 
+ 
+ def _trim_wrapping_newlines(value: str) -> str:
+@@ -121,6 +124,12 @@
+             "TOOL_START": tool_start,
+             "TOOL_END": tool_end,
+         },
++        # The accepted language is exactly the decoder grammar's: a call is
++        # ``<tool_call>\n<function=NAME>`` ... ``</function>\n</tool_call>``
++        # and nothing else.  Every shape the grammar leaves as free text -- a
++        # bare ``<function=``, a ``<tool_call>`` the trigger does not follow,
++        # markup inside a parameter value -- is content here too, so no call
++        # reaches a client that the grammar did not constrain.
+         transitions={
+             # -- Reasoning transitions --
+             (ParserState.REASONING, "THINK_START"): Transition(
+@@ -137,64 +146,45 @@
+                 ParserState.CONTENT,
+                 (),
+             ),
+-            # Tool call directly from reasoning (implicit end)
++            # The opener ends reasoning where the grammar does, whether or
++            # not a call follows it; the call itself starts at the function
++            # opener, once the preamble proves the opener was the trigger.
+             (ParserState.REASONING, "TOOL_START"): Transition(
+                 ParserState.TOOL_PREAMBLE,
+-                (EventType.REASONING_END, EventType.TOOL_CALL_START),
++                (EventType.REASONING_END,),
+             ),
+             # -- Tool call transitions --
+             (ParserState.CONTENT, "TOOL_START"): Transition(
+                 ParserState.TOOL_PREAMBLE,
+-                (EventType.REASONING_END, EventType.TOOL_CALL_START),
+-            ),
+-            # Fallback: <function= without a preceding <tool_call>
+-            (ParserState.CONTENT, "FUNC_PREFIX"): Transition(
++                (),
++            ),
++            (ParserState.TOOL_PREAMBLE, "FUNC_PREFIX"): Transition(
+                 ParserState.TOOL_NAME,
+                 (EventType.TOOL_CALL_START,),
+-            ),
+-            (ParserState.TOOL_PREAMBLE, "TOOL_END"): Transition(
+-                ParserState.CONTENT,
+-                (EventType.TOOL_CALL_END,),
+-            ),
+-            (ParserState.TOOL_PREAMBLE, "FUNC_PREFIX"): Transition(
+-                ParserState.TOOL_NAME,
+-                (),
+             ),
+             (ParserState.TOOL_NAME, "CLOSE_ANGLE"): Transition(
+                 ParserState.TOOL_ARGS,
+                 (),
+             ),
+-            # Malformed: </function> while still in TOOL_NAME (no closing >)
+-            (ParserState.TOOL_NAME, "FUNC_END"): Transition(
+-                ParserState.TOOL_BETWEEN,
+-                (EventType.TOOL_CALL_END,),
+-            ),
+             (ParserState.TOOL_ARGS, "FUNC_END"): Transition(
+                 ParserState.TOOL_BETWEEN,
+                 (EventType.TOOL_CALL_END,),
+             ),
+             (ParserState.TOOL_ARGS, "PARAM_START"): Transition(
++                ParserState.TOOL_PARAM_VALUE,
++                (EventType.ARG_VALUE_CHUNK,),
++            ),
++            (ParserState.TOOL_PARAM_VALUE, "PARAM_END"): Transition(
+                 ParserState.TOOL_ARGS,
+                 (EventType.ARG_VALUE_CHUNK,),
+             ),
+-            (ParserState.TOOL_ARGS, "PARAM_END"): Transition(
+-                ParserState.TOOL_ARGS,
+-                (EventType.ARG_VALUE_CHUNK,),
+-            ),
+             (ParserState.TOOL_BETWEEN, "TOOL_END"): Transition(
+                 ParserState.CONTENT,
+-                (),
+-            ),
+-            # Consecutive tool call without closing </tool_call>
+-            (ParserState.TOOL_BETWEEN, "TOOL_START"): Transition(
+-                ParserState.TOOL_PREAMBLE,
+-                (EventType.TOOL_CALL_START,),
+-            ),
+-            (ParserState.TOOL_BETWEEN, "FUNC_PREFIX"): Transition(
+-                ParserState.TOOL_NAME,
+-                (EventType.TOOL_CALL_START,),
++                (EventType.TOOL_CALL_CLOSED,),
+             ),
+         },
++        tool_preamble_text="\n",
++        validate_tool_names=True,
+         arg_converter=_qwen3_arg_converter,
+         stream_arg_deltas=True,
+         strip_trailing_reasoning_whitespace=False,
+@@ -208,6 +198,10 @@
+ 
+     - ``<tool_call>`` as implicit reasoning end
+     - Unpaired ``<tool_call>`` token ID detection for ``is_reasoning_end``
++    - Accepts exactly the decoder grammar's call syntax; a call the grammar
++      never armed is content, and a call cut before ``</tool_call>`` stays
++      open (``tool_calls_complete`` is false) rather than being closed
++      into an executable one
+ 
+     Subclasses that share the grammar but differ only in the four wrapper
+     token strings (reasoning + tool-call) override the class attributes
+@@ -219,6 +213,28 @@
+     THINK_END = THINK_END
+     TOOL_START = TOOL_CALL_START
+     TOOL_END = TOOL_CALL_END
++    # The reasoning pass forwards a tool span verbatim, so the batch tool
++    # pass splits on the same ids the streaming tool pass sees.
++    batch_tool_pass_uses_ids = True
++
++    def extract_batch_content_ids(self, token_ids, *, token_offset: int = 0):
++        if not token_ids:
++            return ()
++        if not self.thinking_enabled:
++            return token_ids
++        if self._reasoning_open:
++            return ()
++        # The first observed boundary ended reasoning. A later marker inside
++        # a tool value cannot move that boundary; the counter records it exactly.
++        boundary = self.reasoning_token_count
++        if boundary is None:
++            raise RuntimeError("Qwen batch reasoning boundary was not counted")
++        offset = boundary - token_offset
++        if offset < 0:
++            return token_ids
++        if offset < len(token_ids) and token_ids[offset] == self._reasoning_end_token_id:
++            offset += 1
++        return token_ids[offset:]
+ 
+     def __init__(
+         self,
+@@ -256,6 +272,25 @@
+         if not self.thinking_enabled:
+             return None, model_output
+         return super().extract_reasoning(model_output, request)
++
++    def _check_skip_tool_parsing(
++        self,
++        request: ChatCompletionRequest | ResponsesRequest,
++    ) -> None:
++        """With ``tool_choice: "none"`` nothing the model emits is a call.
++
++        The caller forbade calls this turn, and no grammar constrained what
++        the model wrote, so a call-shaped span is forwarded as the text it
++        was -- the caller sees what the model did -- rather than parsed and
++        deleted.
++        """
++        tools = getattr(request, "tools", None)
++        if tools:
++            self._tools = tools
++        if not self.skip_tool_parsing:
++            tool_choice = getattr(request, "tool_choice", None)
++            if tool_choice == "none" or not tools:
++                self.skip_tool_parsing = True
+ 
+     def is_reasoning_end(self, input_ids: list[int]) -> bool:
+         if super().is_reasoning_end(input_ids):

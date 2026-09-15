@@ -81,6 +81,40 @@ engine or model is started. The five newly patched shared error modules are
 copied and checked against their upstream and final hashes in the image recipe,
 build verifier and installed runtime verifier.
 
+## Finding 13, S11, D2 and batch parity: the Qwen parser's tool language
+
+`vllm-qwen-exact-tool-language.patch` adds the fifteenth runtime source stage.
+Only a real `<tool_call>` token followed by exactly `\n<function=` starts a
+call. Bare function markup, stray openers, empty wrappers and unfinished
+function headers return as content. With no declared tools or `tool_choice:
+none`, the model's call-shaped text remains visible and produces no call.
+
+A parameter value ends only at the exact `</parameter>` delimiter.
+`</function>`, `</tool_call>`, `</think>`, `<parameter=` and variations such as
+`</parameter >` remain part of that value. The format cannot carry the exact
+parameter closer inside a string; tool authors needing that sequence must use
+another representation, such as encoded input decoded by their tool.
+
+The batch tool pass receives the generated IDs after the parser's first exact
+reasoning boundary. Streaming retains those IDs when detokenization delays
+the corresponding text. Later markers inside a value cannot move the boundary.
+Content before and after calls keeps its order, and the parser exposes whether
+each call reached its actual closing wrapper. The remaining serving-layer EOS
+and stop-control work must use this observation before promotion is complete.
+
+Validation: 3,833 parser-engine tests pass, including the preserved regression
+tests, 24 adversarial value/chunk combinations and two delayed-boundary cases.
+The build now runs five CPU tests against the installed parser, covering exact
+triggers, disabled tools, reserved value markup, token/text lookalikes, batch
+parity and observed closure. `build-vllm.sh check` runs that unit against the
+reviewed runtime overlay. The four newly patched engine modules are copied and
+verified in the image, build and runtime checks. The older reasoning-usage build
+unit now declares its test tool and uses marker IDs outside the ASCII range;
+the old mock assigned several letters the same IDs as reserved markers.
+
+This stage does not finish caller stop suppression, EOS promotion, schema type
+conversion or context-dependent scanner alignment. They remain open.
+
 ## Remaining implementation
 
 Parser language, stop handling, schema conversion, protocol translation, image

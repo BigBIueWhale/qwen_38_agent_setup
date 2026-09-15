@@ -144,6 +144,16 @@ ARG POLICY_LRU_UPSTREAM_FILE_SHA256
 ARG POLICY_ARC_UPSTREAM_FILE_SHA256
 ARG ABSTRACT_PARSER_UPSTREAM_FILE_SHA256
 ARG PARSER_ADAPTERS_UPSTREAM_FILE_SHA256
+ARG PARSER_EVENTS_UPSTREAM_FILE_SHA256
+ARG PARSER_ENGINE_CONFIG_UPSTREAM_FILE_SHA256
+ARG STREAMING_PARSER_ENGINE_UPSTREAM_FILE_SHA256
+ARG TOKEN_ID_SCANNER_UPSTREAM_FILE_SHA256
+RUN printf '%s  %s\n' \
+      "${PARSER_EVENTS_UPSTREAM_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/engine/events.py \
+      "${PARSER_ENGINE_CONFIG_UPSTREAM_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/engine/parser_engine_config.py \
+      "${STREAMING_PARSER_ENGINE_UPSTREAM_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/engine/streaming_parser_engine.py \
+      "${TOKEN_ID_SCANNER_UPSTREAM_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/engine/token_id_scanner.py \
+    | sha256sum --check --strict
 ARG ENGINE_PROTOCOL_UPSTREAM_FILE_SHA256
 RUN printf '%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n' \
       "${CACHE_CONFIG_UPSTREAM_FILE_SHA256}" \
@@ -261,6 +271,7 @@ ARG PHASE_BUDGET_PATCH_DIFF_SHA256
 ARG IMPLICIT_TOOL_GRAMMAR_PATCH_DIFF_SHA256
 ARG ANTHROPIC_VALIDATION_PATCH_DIFF_SHA256
 ARG ANTHROPIC_INPUTS_PATCH_DIFF_SHA256
+ARG QWEN_LANGUAGE_PATCH_DIFF_SHA256
 ARG TOOL_TRUNCATION_PATCH_DIFF_SHA256
 ARG VISION_RUNTIME_PATCH_DIFF_SHA256
 ARG NUMERICAL_AUDITS_PATCH_DIFF_SHA256
@@ -291,8 +302,13 @@ ARG TITOTO_PROTOCOL_PATCHED_FILE_SHA256
 ARG TITOTO_SERVING_PATCHED_FILE_SHA256
 ARG ABSTRACT_PARSER_PATCHED_FILE_SHA256
 ARG PARSER_ADAPTERS_PATCHED_FILE_SHA256
+ARG PARSER_EVENTS_PATCHED_FILE_SHA256
+ARG PARSER_ENGINE_CONFIG_PATCHED_FILE_SHA256
+ARG STREAMING_PARSER_ENGINE_PATCHED_FILE_SHA256
+ARG TOKEN_ID_SCANNER_PATCHED_FILE_SHA256
 ARG ENGINE_PROTOCOL_PATCHED_FILE_SHA256
 ARG REASONING_USAGE_UNIT_SHA256
+ARG TOOL_OUTPUT_PARSER_UNIT_SHA256
 # The verified pristine policy modules are removed, not replaced: the
 # scope-aware manager is the only eviction mode, and a stranded importable
 # copy of the pluggable LRU/ARC layer would be exactly the leftover this
@@ -479,6 +495,16 @@ RUN printf '%s  %s\n' \
       "${VALIDATION_EXCEPTION_HANDLER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/serve/exception_handling/handlers/validation.py \
       "${VLLM_ERROR_EXCEPTION_HANDLER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/serve/exception_handling/handlers/vllm_error.py \
     | sha256sum --check --strict
+COPY --chmod=0644 vllm/vllm/parser/engine/events.py /usr/local/lib/python3.12/dist-packages/vllm/parser/engine/events.py
+COPY --chmod=0644 vllm/vllm/parser/engine/parser_engine_config.py /usr/local/lib/python3.12/dist-packages/vllm/parser/engine/parser_engine_config.py
+COPY --chmod=0644 vllm/vllm/parser/engine/streaming_parser_engine.py /usr/local/lib/python3.12/dist-packages/vllm/parser/engine/streaming_parser_engine.py
+COPY --chmod=0644 vllm/vllm/parser/engine/token_id_scanner.py /usr/local/lib/python3.12/dist-packages/vllm/parser/engine/token_id_scanner.py
+RUN printf '%s  %s\n' \
+      "${PARSER_EVENTS_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/engine/events.py \
+      "${PARSER_ENGINE_CONFIG_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/engine/parser_engine_config.py \
+      "${STREAMING_PARSER_ENGINE_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/engine/streaming_parser_engine.py \
+      "${TOKEN_ID_SCANNER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/engine/token_id_scanner.py \
+    | sha256sum --check --strict
 COPY --chmod=0644 chat_template.jinja /opt/qwen38/chat_template.jinja
 COPY --chmod=0644 scripts/phase_budget_unit.py /opt/qwen38/phase_budget_unit.py
 COPY --chmod=0644 scripts/vision_workspace_unit.py /opt/qwen38/vision_workspace_unit.py
@@ -490,6 +516,7 @@ COPY --chmod=0644 scripts/qwen38_context_unit.py /opt/qwen38/qwen38_context_unit
 COPY --chmod=0644 scripts/chat_template_retention_unit.py /opt/qwen38/chat_template_retention_unit.py
 COPY --chmod=0644 scripts/nvfp4_kernel_unit.py /opt/qwen38/nvfp4_kernel_unit.py
 COPY --chmod=0644 scripts/reasoning_usage_unit.py /opt/qwen38/reasoning_usage_unit.py
+COPY --chmod=0644 scripts/tool_output_parser_unit.py /opt/qwen38/tool_output_parser_unit.py
 RUN printf '%s  %s\n' \
       "${TURBOQUANT_STORE_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/attention/ops/triton_turboquant_store.py \
       "${TURBOQUANT_DECODE_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/attention/ops/triton_turboquant_decode.py \
@@ -501,6 +528,7 @@ RUN printf '%s  %s\n' \
       "${CHAT_TEMPLATE_RETENTION_UNIT_SHA256}" /opt/qwen38/chat_template_retention_unit.py \
       "${NVFP4_KERNEL_UNIT_SHA256}" /opt/qwen38/nvfp4_kernel_unit.py \
       "${REASONING_USAGE_UNIT_SHA256}" /opt/qwen38/reasoning_usage_unit.py \
+      "${TOOL_OUTPUT_PARSER_UNIT_SHA256}" /opt/qwen38/tool_output_parser_unit.py \
     | sha256sum --check --strict
 RUN printf '%s  %s\n%s  %s\n%s  %s\n' \
       "${ABSTRACT_PARSER_PATCHED_FILE_SHA256}" \
@@ -1100,6 +1128,7 @@ PY
 # exact ownership.  The host lifecycle separately initializes a newly-created
 # named volume through this exact image and refuses drift; it deliberately does
 # not depend on Docker volume copy-up semantics.
+RUN CUDA_VISIBLE_DEVICES= python3 /opt/qwen38/tool_output_parser_unit.py
 RUN CUDA_VISIBLE_DEVICES= TRITON_INTERPRET=1 python3 /opt/qwen38/turboquant_guard_unit.py
 RUN test "$(getent passwd vllm)" = 'vllm:x:2000:0::/home/vllm:/bin/bash' \
  && install --directory --owner=2000 --group=0 --mode=0770 \
@@ -1150,6 +1179,11 @@ LABEL org.opencontainers.image.revision="9df9b0b0a1816b6d0d0f6ecd0da563cc37fd72f
       qwen38.patch.http-exception-handler.file.sha256="${HTTP_EXCEPTION_HANDLER_PATCHED_FILE_SHA256}" \
       qwen38.patch.validation-exception-handler.file.sha256="${VALIDATION_EXCEPTION_HANDLER_PATCHED_FILE_SHA256}" \
       qwen38.patch.vllm-error-exception-handler.file.sha256="${VLLM_ERROR_EXCEPTION_HANDLER_PATCHED_FILE_SHA256}" \
+      qwen38.patch.qwen-exact-tool-language.diff.sha256="${QWEN_LANGUAGE_PATCH_DIFF_SHA256}" \
+      qwen38.patch.parser-events.file.sha256="${PARSER_EVENTS_PATCHED_FILE_SHA256}" \
+      qwen38.patch.parser-engine-config.file.sha256="${PARSER_ENGINE_CONFIG_PATCHED_FILE_SHA256}" \
+      qwen38.patch.streaming-parser-engine.file.sha256="${STREAMING_PARSER_ENGINE_PATCHED_FILE_SHA256}" \
+      qwen38.patch.token-id-scanner.file.sha256="${TOKEN_ID_SCANNER_PATCHED_FILE_SHA256}" \
       qwen38.template.file.sha256="${AGENT_CHAT_TEMPLATE_SHA256}" \
       qwen38.project="Qwen_best_model_ever" \
       qwen38.runtime.profile="${IMAGE_PROFILE_VERSION}"

@@ -34,11 +34,11 @@ from vllm.parser.qwen3 import (
 # The deployed grammar's markers under the ids the mock tokenizer resolves;
 # every other token is one ASCII character carrying its code point.
 VOCAB = {
-    THINK_START: 98,
-    THINK_END: 99,
-    TOOL_CALL_START: 100,
-    TOOL_CALL_END: 101,
-    "<|im_end|>": 102,
+    THINK_START: 998,
+    THINK_END: 999,
+    TOOL_CALL_START: 1000,
+    TOOL_CALL_END: 1001,
+    "<|im_end|>": 1002,
 }
 ID_TO_TEXT = {token_id: text for text, token_id in VOCAB.items()}
 
@@ -64,7 +64,10 @@ def tokens(*pieces: str) -> tuple[str, list[int]]:
 
 def make_request() -> MagicMock:
     request = MagicMock(spec=ChatCompletionRequest)
-    request.tools = []
+    from vllm.entrypoints.openai.chat_completion.protocol import ChatCompletionToolsParam
+    request.tools = [ChatCompletionToolsParam.model_validate({
+        "type": "function", "function": {"name": "f", "parameters": {"type": "object"}},
+    })]
     request.tool_choice = "auto"
     request.include_reasoning = True
     return request

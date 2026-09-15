@@ -116,3 +116,8 @@
 !vllm/vllm/entrypoints/serve/exception_handling/handlers/http.py
 !vllm/vllm/entrypoints/serve/exception_handling/handlers/validation.py
 !vllm/vllm/entrypoints/serve/exception_handling/handlers/vllm_error.py
+!vllm/vllm/parser/engine/events.py
+!vllm/vllm/parser/engine/parser_engine_config.py
+!vllm/vllm/parser/engine/streaming_parser_engine.py
+!vllm/vllm/parser/engine/token_id_scanner.py
+!scripts/tool_output_parser_unit.py
