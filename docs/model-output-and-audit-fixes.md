@@ -471,6 +471,30 @@ required backend check passes for all 28 reviewed stages and 104 deployment
 inputs, with AsyncLLM included in upstream, final, image and installed hashes.
 The v23 image and archive remain awaiting adoption.
 
+## Shared prefixes: generative scoring admission
+
+The shared-prefix transformation includes `/generative_scoring` in the served
+generation APIs. Its typed request requires a nonblank string `kv_scope` and
+passes the exact opaque ID to every scored item's sampling parameters. Each
+item keeps a distinct engine request ID. HTTP admission rejects a missing,
+blank or non-string ID with HTTP 400 and `body.kv_scope` before any item starts.
+The existing birth-only cache matching and shared-reference rules apply.
+
+Validation: 26 native scoring tests and 72 generation-protocol tests pass in
+offline CPU containers. The real in-memory HTTP route exercises admission,
+request-schema declarations, exact Unicode/whitespace IDs, per-item dispatch,
+scores and usage. Against the previous source, 17 new cases fail and nine
+unaffected cases pass. The installed shared-prefix unit checks the registered
+route, required identity and engine admission of each item's sampling parameters.
+Native live scoring tests use the same request field; they were updated but
+were not run because validation here starts no model, service or listener.
+
+The reviewed shared-prefix stage, semantic contracts, source tests and comments
+all define the supported scoring API directly. Both newly modified scorer
+modules join the upstream/final image hashes, copies, context allowlist and
+installed verification. The required generator and backend check pass for all
+28 stages and 104 deployment inputs. Image and archive adoption remain pending.
+
 ## Remaining implementation
 
 Parser language, stop handling, schema conversion, protocol translation, image

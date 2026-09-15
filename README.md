@@ -266,7 +266,7 @@ It is intentionally reconstructed by twenty-eight ordered, reviewed semantic tra
 | patches/vllm-qwen38-numerical-audits.patch | a73aa2f2ae3f82010eb2bafcdf663c2fe14854c30165dbc4d8457725bc3b6632 |
 | patches/vllm-turboquant-fail-closed-guards.patch | 7282d1d4d7a17b40ab8626c82f478bbb938c548451b7793df8233562a9e24c7c |
 | patches/vllm-kv-offload-pinning-fail-closed.patch | 1857071c38d081bb95e3cca12153cebce096649084950b99229104fdae029ca6 |
-| patches/vllm-shared-prefix-cache-and-user-capacity.patch | 736183bab22bb200053d38990ef0a51d7721a711542f241bde07f723aa2ce892 |
+| patches/vllm-shared-prefix-cache-and-user-capacity.patch | 77f85a4b77919819fd2809ec1444fb7c71485bccede2846334540385b2eee227 |
 | patches/vllm-exact-reasoning-usage.patch | c6a880c0a15056792286f74bf32a4e554f70de05a82615522086ef4ca1cf2db3 |
 | patches/vllm-anthropic-input-fidelity.patch | c2063d509fc90929f7d6018796f753da6445f12a4b4b19181e377f772b923a49 |
 | patches/vllm-qwen-exact-tool-language.patch | fe4e46cb7444c80646537da63ab1ac12c54e7eebb04c0735a4243d8b7e7943d2 |
@@ -284,9 +284,9 @@ It is intentionally reconstructed by twenty-eight ordered, reviewed semantic tra
 | patches/vllm-phase-aware-parser-terminals.patch | cc79995955bc36f6ef383983efe5359b0170895ad8c682593c1435c12dd66ceb |
 | patches/vllm-input-stream-agent-identity.patch | f812362220f83b904d56e55e9c359918990c55e39d7a0750d1011840d377dfb4 |
 
-The reconstructed tree has 88 reviewed runtime-source changes, 1 new runtime source,
-7 runtime-source deletions, 65 existing-test changes, 12 new tests,
-and 3 test deletions. The authoritative
+The reconstructed tree has 90 reviewed runtime-source changes, 1 new runtime source,
+7 runtime-source deletions, 67 existing-test changes, 12 new tests,
+3 test deletions, and 1 serving-documentation change. The authoritative
 counts are derived and printed by ./scripts/build-vllm.sh check, never restated
 by hand there. The landmark-aware Python patcher calculates every mutation
 (including file deletions) before writing, validates unique structural landmarks
@@ -308,11 +308,11 @@ Pinned build inputs and products:
 | Offline archive | artifacts/qwen38-vllm-images-runtime-v23.tar |
 | Archive size | Awaiting adoption after the v23 export |
 | Archive SHA-256 | Awaiting adoption after the v23 export |
-| Runtime Dockerfile SHA-256 | 346e56547d5b030ac00dca0ff62e0f64b1327c9221db1f38e8afd786c1e0db44 |
-| Docker context allowlist SHA-256 | e9535d6b3248b73d22f35114f6916e99a224ee38e8d18246fb6da47fecd0bd6b |
-| Build verifier SHA-256 | dd055b40560614b3d06f1f07548391d9db6b7d3c9d57ac3202d4a89603479dfa |
-| Runtime validator SHA-256 | b467f9d7a8009407c4cf16c5c62b0f56d2ac0fa127dff7b206133046e9935b27 |
-| Runtime lock SHA-256 | 80d5f8ab23aa908589cd8dd4ac967038695559f6bbd478e276ffc0ddd9e373d4 |
+| Runtime Dockerfile SHA-256 | ee1d62a80a1952936cf8a475415ff29d20678c800608390e6e39492b5dcfd843 |
+| Docker context allowlist SHA-256 | 88fb939665c75f79b5507bcc09789ac134ca72fee89400e1e65afcb910582c00 |
+| Build verifier SHA-256 | 5a0c1e26a09ace4b5424cf00eebe6d33f0e5bb37efd937725f896ce3e9775bcf |
+| Runtime validator SHA-256 | 23580fe37398535cf5debcad6ec8a2bd33fe8ff65fb732f91f2b23d67131c5b1 |
+| Runtime lock SHA-256 | 46beaba5c993d327fac657fa2483c2f5f283ff84d43f64f231e14bfc6375e347 |
 
 Every reviewed runtime file, including both TurboQuant kernels, is copied and
 hash-checked against its upstream and patched identities. A CPU Triton-interpreter
@@ -432,6 +432,9 @@ If all its cached blocks are evicted, the no-cache rule applies again.
 An input stream keeps one agent ID across all its chunks. Changing that ID is
 refused before the chunk is dispatched; a different agent starts a new generation
 request and goes through the same cache lookup rules.
+The `/generative_scoring` API requires the same ID and preserves it across
+all item generations in the request. Missing or invalid IDs receive HTTP 400
+before dispatch, with `body.kv_scope` identifying the field.
 
 Shared blocks have references from each agent that uses them. Releasing one
 agent preserves references held by surviving contexts. Request completion

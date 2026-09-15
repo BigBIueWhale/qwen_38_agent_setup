@@ -81,8 +81,63 @@ async def check_stream_identity():
         assert not requests[-1].resumable
 
 
+async def check_scoring_identity():
+    from fastapi import FastAPI
+    from pydantic import ValidationError
+
+    from vllm.entrypoints.generate.api_router import register_generate_api_routers
+    from vllm.entrypoints.generate.generative_scoring.serving import (
+        GenerativeScoringRequest, GenerativeScoringResponse, ServingGenerativeScoring,
+    )
+    from vllm.logprobs import Logprob
+    from vllm.outputs import CompletionOutput, RequestOutput
+
+    app = FastAPI()
+    register_generate_api_routers(app)
+    assert '/generative_scoring' in {route.path for route in app.routes}
+
+    body = dict(query=[10], items=[[11], [12]], label_token_ids=[20])
+    for fields in ({}, {'kv_scope': None}, {'kv_scope': ''}, {'kv_scope': ' \t'},
+                   {'kv_scope': 7}, {'kv_scope': False}):
+        try:
+            GenerativeScoringRequest(**body, **fields)
+        except ValidationError as error:
+            assert error.errors()[0]['loc'] == ('kv_scope',)
+        else:
+            raise AssertionError('Scoring accepted a missing or invalid agent ID')
+
+    serving = object.__new__(ServingGenerativeScoring)
+    serving._check_model = AsyncMock(return_value=None)
+    serving.model_config = SimpleNamespace(get_vocab_size=lambda: 100, max_model_len=100)
+    serving.renderer = SimpleNamespace(tokenizer=MagicMock())
+    serving._maybe_get_adapters = MagicMock(return_value=None)
+    serving._log_inputs = MagicMock()
+    serving.models = SimpleNamespace(model_name=lambda lora: 'model')
+    seen = []
+
+    async def generate(prompt, params, request_id, **kwargs):
+        seen.append(require_kv_scope(params))
+        yield RequestOutput(
+            request_id=request_id, prompt=None,
+            prompt_token_ids=prompt['prompt_token_ids'], prompt_logprobs=None,
+            outputs=[CompletionOutput(
+                index=0, text='', token_ids=[20], cumulative_logprob=-0.5,
+                logprobs=[{20: Logprob(logprob=-0.5)}], finish_reason='length',
+            )], finished=True,
+        )
+
+    serving.engine_client = SimpleNamespace(errored=False, generate=generate)
+    response = await serving.create_generative_scoring(
+        GenerativeScoringRequest(**body, kv_scope=' opaque: scoring-agent '),
+    )
+    assert isinstance(response, GenerativeScoringResponse)
+    assert seen == [' opaque: scoring-agent ', ' opaque: scoring-agent ']
+    assert [item.score for item in response.data] == [1.0, 1.0]
+
+
 def main():
     asyncio.run(check_stream_identity())
+    asyncio.run(check_scoring_identity())
     index = PrefixCacheIndex()
     gpu = object()
     index.register_tier(gpu, 4)

@@ -293,7 +293,19 @@ RUN printf '%s  %s\n' \
   "${ASYNC_LLM_UPSTREAM_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/async_llm.py \
   | sha256sum --check --strict
 
+ARG GENERATIVE_SCORING_SERVING_UPSTREAM_FILE_SHA256
+RUN printf '%s  %s\n' \
+  "${GENERATIVE_SCORING_SERVING_UPSTREAM_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/generate/generative_scoring/serving.py \
+  | sha256sum --check --strict
+
+ARG GENERATIVE_SCORING_ROUTER_UPSTREAM_FILE_SHA256
+RUN printf '%s  %s\n' \
+  "${GENERATIVE_SCORING_ROUTER_UPSTREAM_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/generate/generative_scoring/api_router.py \
+  | sha256sum --check --strict
+
 FROM upstream-verifier AS runtime
+ARG GENERATIVE_SCORING_ROUTER_PATCHED_FILE_SHA256
+ARG GENERATIVE_SCORING_SERVING_PATCHED_FILE_SHA256
 ARG ASYNC_LLM_PATCHED_FILE_SHA256
 ARG GEMMA4_PARSER_PATCHED_FILE_SHA256
 ARG GLM47_PARSER_PATCHED_FILE_SHA256
@@ -694,6 +706,14 @@ RUN printf '%s  %s\n' \
 COPY --chmod=0644 vllm/vllm/v1/engine/async_llm.py /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/async_llm.py
 RUN printf '%s  %s\n' \
   "${ASYNC_LLM_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/async_llm.py \
+  | sha256sum --check --strict
+COPY --chmod=0644 vllm/vllm/entrypoints/generate/generative_scoring/serving.py /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/generate/generative_scoring/serving.py
+RUN printf '%s  %s\n' \
+  "${GENERATIVE_SCORING_SERVING_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/generate/generative_scoring/serving.py \
+  | sha256sum --check --strict
+COPY --chmod=0644 vllm/vllm/entrypoints/generate/generative_scoring/api_router.py /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/generate/generative_scoring/api_router.py
+RUN printf '%s  %s\n' \
+  "${GENERATIVE_SCORING_ROUTER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/generate/generative_scoring/api_router.py \
   | sha256sum --check --strict
 COPY --chmod=0644 chat_template.jinja /opt/qwen38/chat_template.jinja
 COPY --chmod=0644 scripts/phase_budget_unit.py /opt/qwen38/phase_budget_unit.py

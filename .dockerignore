@@ -98,6 +98,7 @@
 !vllm/vllm/entrypoints/openai/completion/
 !vllm/vllm/entrypoints/openai/completion/protocol.py
 !vllm/vllm/entrypoints/generate/
+!vllm/vllm/entrypoints/generate/generative_scoring/
 !vllm/vllm/entrypoints/generate/api_router.py
 !vllm/vllm/entrypoints/openai/cli_args.py
 !vllm/vllm/entrypoints/scale_out/
@@ -153,3 +154,5 @@
 !vllm/vllm/parser/minimax_m2.py
 !vllm/vllm/parser/mistral.py
 !vllm/vllm/v1/engine/async_llm.py
+!vllm/vllm/entrypoints/generate/generative_scoring/serving.py
+!vllm/vllm/entrypoints/generate/generative_scoring/api_router.py

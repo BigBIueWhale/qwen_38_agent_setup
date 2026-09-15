@@ -1086,6 +1086,7 @@ def _validate_shared_prefix_cache_before(state: State) -> None:
         "vllm/entrypoints/openai/responses/protocol.py",
         "vllm/entrypoints/anthropic/protocol.py",
         "vllm/entrypoints/scale_out/token_in_token_out/protocol.py",
+        "vllm/entrypoints/generate/generative_scoring/serving.py",
     ):
         forbid_text(state, path, "kv_scope", label=label)
     generate_router = "vllm/entrypoints/generate/api_router.py"
@@ -1250,13 +1251,32 @@ def _validate_shared_prefix_cache_after(state: State) -> None:
         label=label,
         location=input_processor,
     )
-    # No surface may be mounted that reaches the engine without being able to
-    # name an agent; /generative_scoring is excised for that reason, exactly
-    # as the Cohere surface is.
-    forbid_text(
-        state, generate_router, "register_generative_scoring_api_router", label=label
+    require_text(
+        state, generate_router, "register_generative_scoring_api_router(app)", label=label
     )
-    forbid_text(state, generate_router, "ServingGenerativeScoring", label=label)
+    require_text(
+        state, generate_router,
+        "state.serving_generative_scoring = ServingGenerativeScoring(", label=label,
+    )
+    scoring = "vllm/entrypoints/generate/generative_scoring/serving.py"
+    _require_ordered(
+        _source(state, scoring, label=label),
+        (
+            "kv_scope: str = Field(",
+            "strict=True,",
+            "min_length=1,",
+            'pattern=r"\\S",',
+            'extra_args={"kv_scope": request.kv_scope},',
+        ),
+        label=label,
+        location=scoring,
+    )
+    scoring_router = "vllm/entrypoints/generate/generative_scoring/api_router.py"
+    require_text(
+        state, scoring_router,
+        "request: GenerativeScoringRequest, raw_request: Request", label=label,
+    )
+    forbid_text(state, scoring_router, "await raw_request.json()", label=label)
     scheduler = "vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py"
     require_text(
         state, "vllm/v1/request.py",

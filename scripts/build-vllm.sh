@@ -2,10 +2,13 @@
 set -euo pipefail
 
 MODE="${1:-build}"
-EXPECTED_STATUS=$' M tests/config/test_config_utils.py
+EXPECTED_STATUS=$' M docs/serving/online_serving/generative_scoring.md
+ M tests/config/test_config_utils.py
  M tests/distributed/test_rocm_quick_reduce.py
  M tests/engine/test_arg_utils.py
  M tests/entrypoints/anthropic/test_anthropic_messages_conversion.py
+ M tests/entrypoints/generate/generative_scoring/test_generative_scoring.py
+ M tests/entrypoints/generate/generative_scoring/test_generative_scoring_e2e.py
  M tests/entrypoints/multimodal/openai/chat_completion/test_video.py
  M tests/entrypoints/multimodal/openai/chat_completion/test_vision.py
  M tests/entrypoints/openai/chat_completion/test_logprob_token_ids.py
@@ -82,6 +85,8 @@ EXPECTED_STATUS=$' M tests/config/test_config_utils.py
  M vllm/entrypoints/anthropic/serving.py
  M vllm/entrypoints/chat_utils.py
  M vllm/entrypoints/generate/api_router.py
+ M vllm/entrypoints/generate/generative_scoring/api_router.py
+ M vllm/entrypoints/generate/generative_scoring/serving.py
  M vllm/entrypoints/llm.py
  M vllm/entrypoints/openai/chat_completion/protocol.py
  M vllm/entrypoints/openai/chat_completion/serving.py
@@ -661,6 +666,14 @@ printf '%s  %s\n' \
   | sha256sum --check --strict
 
 printf '%s  %s\n' \
+  "${GENERATIVE_SCORING_SERVING_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/entrypoints/generate/generative_scoring/serving.py" \
+  | sha256sum --check --strict
+
+printf '%s  %s\n' \
+  "${GENERATIVE_SCORING_ROUTER_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/entrypoints/generate/generative_scoring/api_router.py" \
+  | sha256sum --check --strict
+
+printf '%s  %s\n' \
   "${RUNTIME_DOCKERFILE_SHA256}" "${DOCKERFILE}" \
   "${DOCKERIGNORE_SHA256}" "${DOCKERIGNORE}" | \
   sha256sum --check --strict
@@ -716,6 +729,7 @@ if [[ "${MODE}" == "check" ]]; then
   modified_test_count="$(grep -c '^ M tests/' <<<"${EXPECTED_STATUS}" || :)"
   new_test_count="$(grep -c '^?? tests/' <<<"${EXPECTED_STATUS}" || :)"
   deleted_test_count="$(grep -c '^ D tests/' <<<"${EXPECTED_STATUS}" || :)"
+  modified_doc_count="$(grep -c '^ M docs/' <<<"${EXPECTED_STATUS}" || :)"
   review_diff_count="$(grep -c '^[0-9a-f]\{64\}  patches/vllm-.*\.patch$' \
     "${DEPLOYMENT_INPUT_MANIFEST}" || :)"
   echo "Pinned base image, vLLM commit, transactional landmark patcher," \
@@ -725,6 +739,7 @@ if [[ "${MODE}" == "check" ]]; then
     "${modified_test_count} reviewed modified test files," \
     "${new_test_count} reviewed new test files," \
     "${deleted_test_count} reviewed test deletions," \
+    "${modified_doc_count} reviewed modified documentation files," \
     "${review_diff_count} review diffs, agent template, numerical audit" \
     "units, and all build units are exact."
   exit 0
@@ -957,6 +972,10 @@ docker buildx build --progress=plain \
   --build-arg "OFFLOAD_CONNECTOR_SCHEDULER_PATCHED_FILE_SHA256=${OFFLOAD_CONNECTOR_SCHEDULER_PATCHED_FILE_SHA256}" \
   --build-arg "COMPLETION_PROTOCOL_PATCHED_FILE_SHA256=${COMPLETION_PROTOCOL_PATCHED_FILE_SHA256}" \
   --build-arg "GENERATE_API_ROUTER_PATCHED_FILE_SHA256=${GENERATE_API_ROUTER_PATCHED_FILE_SHA256}" \
+  --build-arg "GENERATIVE_SCORING_ROUTER_UPSTREAM_FILE_SHA256=${GENERATIVE_SCORING_ROUTER_UPSTREAM_FILE_SHA256}" \
+  --build-arg "GENERATIVE_SCORING_ROUTER_PATCHED_FILE_SHA256=${GENERATIVE_SCORING_ROUTER_PATCHED_FILE_SHA256}" \
+  --build-arg "GENERATIVE_SCORING_SERVING_UPSTREAM_FILE_SHA256=${GENERATIVE_SCORING_SERVING_UPSTREAM_FILE_SHA256}" \
+  --build-arg "GENERATIVE_SCORING_SERVING_PATCHED_FILE_SHA256=${GENERATIVE_SCORING_SERVING_PATCHED_FILE_SHA256}" \
   --build-arg "CLI_ARGS_PATCHED_FILE_SHA256=${CLI_ARGS_PATCHED_FILE_SHA256}" \
   --build-arg "TITOTO_PROTOCOL_PATCHED_FILE_SHA256=${TITOTO_PROTOCOL_PATCHED_FILE_SHA256}" \
   --build-arg "TITOTO_SERVING_PATCHED_FILE_SHA256=${TITOTO_SERVING_PATCHED_FILE_SHA256}" \
@@ -1158,6 +1177,8 @@ kv_users_installed_report="$(
     /usr/local/lib/python3.12/dist-packages/vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py \
     /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/completion/protocol.py \
     /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/generate/api_router.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/generate/generative_scoring/api_router.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/generate/generative_scoring/serving.py \
     /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/cli_args.py \
     /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/scale_out/token_in_token_out/protocol.py \
     /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/scale_out/token_in_token_out/serving.py
@@ -1191,6 +1212,8 @@ expected_kv_users_installed_report="$(printf '%s  %s\n' \
   "${OFFLOAD_CONNECTOR_SCHEDULER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py \
   "${COMPLETION_PROTOCOL_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/completion/protocol.py \
   "${GENERATE_API_ROUTER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/generate/api_router.py \
+  "${GENERATIVE_SCORING_ROUTER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/generate/generative_scoring/api_router.py \
+  "${GENERATIVE_SCORING_SERVING_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/generate/generative_scoring/serving.py \
   "${CLI_ARGS_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/cli_args.py \
   "${TITOTO_PROTOCOL_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/scale_out/token_in_token_out/protocol.py \
   "${TITOTO_SERVING_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/scale_out/token_in_token_out/serving.py)"

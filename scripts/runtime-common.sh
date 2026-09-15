@@ -885,6 +885,8 @@ assert_running_profile() {
       /usr/local/lib/python3.12/dist-packages/vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py \
       /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/completion/protocol.py \
       /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/generate/api_router.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/generate/generative_scoring/api_router.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/generate/generative_scoring/serving.py \
       /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/cli_args.py \
       /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/scale_out/token_in_token_out/protocol.py \
       /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/scale_out/token_in_token_out/serving.py
@@ -918,6 +920,8 @@ assert_running_profile() {
     "${OFFLOAD_CONNECTOR_SCHEDULER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py \
     "${COMPLETION_PROTOCOL_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/completion/protocol.py \
     "${GENERATE_API_ROUTER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/generate/api_router.py \
+    "${GENERATIVE_SCORING_ROUTER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/generate/generative_scoring/api_router.py \
+    "${GENERATIVE_SCORING_SERVING_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/generate/generative_scoring/serving.py \
     "${CLI_ARGS_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/cli_args.py \
     "${TITOTO_PROTOCOL_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/scale_out/token_in_token_out/protocol.py \
     "${TITOTO_SERVING_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/scale_out/token_in_token_out/serving.py)"

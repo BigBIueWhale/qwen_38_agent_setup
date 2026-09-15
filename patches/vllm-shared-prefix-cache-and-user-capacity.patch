@@ -271,7 +271,6 @@ new file mode 100644
 +    register_scale_out_api_routers(app, ("generate",))
 +    paths = {getattr(route, "path", "") for route in app.routes}
 +    assert not any(path.startswith("/cohere") for path in paths), paths
-+    assert "/generative_scoring" not in paths, sorted(paths)
 +    for required in (
 +        "/v1/chat/completions",
 +        "/v1/chat/completions/batch",
@@ -279,6 +278,7 @@ new file mode 100644
 +        "/v1/responses",
 +        "/v1/messages",
 +        "/inference/v1/generate",
++        "/generative_scoring",
 +    ):
 +        assert required in paths, (required, sorted(paths))
 +
@@ -6523,7 +6523,7 @@ diff --git a/vllm/entrypoints/generate/api_router.py b/vllm/entrypoints/generate
  
  if TYPE_CHECKING:
      from argparse import Namespace
-@@ -43,15 +41,23 @@
+@@ -43,15 +41,18 @@
  
      register_anthropic_api_router(app)
  
@@ -6533,9 +6533,10 @@ diff --git a/vllm/entrypoints/generate/api_router.py b/vllm/entrypoints/generate
 -
 -    register_cohere_api_router(app)
 -
--    from .generative_scoring.api_router import register_generative_scoring_api_router
--
--    register_generative_scoring_api_router(app)
+     from .generative_scoring.api_router import register_generative_scoring_api_router
+ 
+     register_generative_scoring_api_router(app)
++
 +    # The Cohere HTTP surface is deliberately not registered. Upstream gates
 +    # it on a try/except import of the optional `cohere` SDK plus an env
 +    # flag — an endpoint whose existence is the accident of what happens to
@@ -6544,19 +6545,10 @@ diff --git a/vllm/entrypoints/generate/api_router.py b/vllm/entrypoints/generate
 +    # guarded registration in place would keep a half-present mode that a
 +    # stray package install could silently activate. Its absence is enforced
 +    # here instead, and the image build asserts no /cohere route exists.
-+    #
-+    # /generative_scoring is withheld for the same reason, from the other
-+    # direction: it reaches the engine's generative path, so its blocks land
-+    # in the host KV tier, but its request model names no agent and there is
-+    # no agent for a one-shot scoring call to name. Every mounted generative
-+    # route on this server is an identity surface, and a route whose only
-+    # possible answer is "you named no agent" is exactly the half-present
-+    # mode the Cohere removal exists to prevent. The image build asserts no
-+    # /generative_scoring route exists.
  
  
  async def init_generate_state(
-@@ -63,22 +69,6 @@
+@@ -63,22 +64,6 @@
  ):
      from vllm.entrypoints.anthropic.serving import AnthropicServingMessages
      from vllm.entrypoints.chat_utils import load_chat_template
@@ -6579,7 +6571,7 @@ diff --git a/vllm/entrypoints/generate/api_router.py b/vllm/entrypoints/generate
  
      from vllm.entrypoints.mcp.tool_server import (
          DemoToolServer,
-@@ -212,32 +202,9 @@
+@@ -212,27 +197,6 @@
          if "generate" in supported_tasks
          else None
      )
@@ -6604,20 +6596,9 @@ diff --git a/vllm/entrypoints/generate/api_router.py b/vllm/entrypoints/generate
 -        if CohereServingChatV2 is not None and "generate" in supported_tasks
 -        else None
 -    )
--
--    from .generative_scoring.serving import ServingGenerativeScoring
--
--    state.serving_generative_scoring = ServingGenerativeScoring(
--        engine_client,
--        state.openai_serving_models,
--        request_logger=request_logger,
--    )
-+
-+    # No serving_generative_scoring handler is built: /generative_scoring is
-+    # not mounted, because it reaches the engine's generative path while its
-+    # request model names no agent, and the host KV tier has no context to
-+    # file such blocks under. Constructing the handler anyway would leave a
-+    # reachable object for a stray registration to pick up.
+ 
+     from .generative_scoring.serving import ServingGenerativeScoring
+ 
 diff --git a/vllm/entrypoints/llm.py b/vllm/entrypoints/llm.py
 --- a/vllm/entrypoints/llm.py
 +++ b/vllm/entrypoints/llm.py
@@ -9826,3 +9807,382 @@ diff --git a/vllm/v1/worker/startup_plan.py b/vllm/v1/worker/startup_plan.py
      if (
          not envs.VLLM_ENABLE_STARTUP_PLAN
          or worker.cache_config.kv_cache_memory_bytes is not None
+diff --git a/docs/serving/online_serving/generative_scoring.md b/docs/serving/online_serving/generative_scoring.md
+--- a/docs/serving/online_serving/generative_scoring.md
++++ b/docs/serving/online_serving/generative_scoring.md
+@@ -6,9 +6,12 @@
+ 
+ **Requirements:**
+ 
++- `kv_scope` is a required, nonblank, stable agent ID. Every item uses that exact ID for generation and shared KV cache accounting.
+ - The `label_token_ids` parameter is **required** and must contain **at least 1 token ID**.
+ - When 2 label tokens are provided, the score equals `P(label_token_ids[0]) / (P(label_token_ids[0]) + P(label_token_ids[1]))` (softmax over the two labels).
+ - When more labels are provided, the score is the softmax-normalized probability of the first label token across all label tokens.
++
++An ID with no cached blocks in either GPU or CPU may acquire a matching shared prefix. Once it has cached blocks, it matches only its acquired or computed cache and extends it. The client declares no parent or lineage. Shared references preserve surviving contexts when another agent is evicted. A fresh ID can observe initial cache-hit timing; the ID provides no authentication or confidentiality boundary, and the server adds no timing padding.
+ 
+ ## How it works
+ 
+@@ -38,6 +41,7 @@
+   -H "Content-Type: application/json" \
+   -d '{
+     "model": "Qwen/Qwen3-0.6B",
++    "kv_scope": "city-scoring-agent",
+     "query": "Is this city the capital of France?",
+     "items": ["Paris", "London", "Berlin"],
+     "label_token_ids": [9454, 2753]
+diff --git a/tests/entrypoints/generate/generative_scoring/test_generative_scoring.py b/tests/entrypoints/generate/generative_scoring/test_generative_scoring.py
+--- a/tests/entrypoints/generate/generative_scoring/test_generative_scoring.py
++++ b/tests/entrypoints/generate/generative_scoring/test_generative_scoring.py
+@@ -12,12 +12,17 @@
+ 
+ import math
+ from dataclasses import dataclass, field
++from types import SimpleNamespace
+ from typing import Any
+-from unittest.mock import MagicMock
+-
++from unittest.mock import AsyncMock, MagicMock
++
++import httpx
+ import pytest
++from fastapi import FastAPI
++from pydantic import ValidationError
+ 
+ from vllm.config.multimodal import MultiModalConfig
++from vllm.entrypoints.generate.generative_scoring.api_router import router
+ from vllm.entrypoints.generate.generative_scoring.serving import (
+     GenerativeScoringItemResult,
+     GenerativeScoringRequest,
+@@ -27,10 +32,11 @@
+ from vllm.entrypoints.openai.engine.protocol import ErrorResponse
+ from vllm.entrypoints.openai.models.protocol import BaseModelPath
+ from vllm.entrypoints.openai.models.serving import OpenAIServingModels
++from vllm.entrypoints.serve.exception_handling.register import init_exception_handler
+ from vllm.logprobs import Logprob
+ from vllm.outputs import CompletionOutput, RequestOutput
+-from vllm.tokenizers import get_tokenizer
+ from vllm.v1.engine.async_llm import AsyncLLM
++from vllm.v1.engine.input_processor import require_kv_scope
+ 
+ MODEL_NAME = "Qwen/Qwen3-0.6B"
+ BASE_MODEL_PATHS = [BaseModelPath(name=MODEL_NAME, model_path=MODEL_NAME)]
+@@ -73,13 +79,12 @@
+ def _create_mock_engine():
+     """Create a mock AsyncLLM engine."""
+     mock_engine = MagicMock(spec=AsyncLLM)
+-    mock_engine.get_tokenizer.return_value = get_tokenizer(MODEL_NAME)
+     mock_engine.errored = False
+     mock_engine.model_config = MockModelConfig()
+     mock_engine.input_processor = MagicMock()
+ 
+     mock_renderer = MagicMock()
+-    mock_renderer.tokenizer = get_tokenizer(MODEL_NAME)
++    mock_renderer.tokenizer = MagicMock()
+     mock_engine.renderer = mock_renderer
+ 
+     return mock_engine
+@@ -125,6 +130,7 @@
+         """Test request construction with all field types and response structure."""
+         # Test request with string inputs
+         req_str = GenerativeScoringRequest(
++            kv_scope="scoring-agent",
+             query="Is this the capital?",
+             items=["Paris", "London"],
+             label_token_ids=[9454, 2753],
+@@ -138,6 +144,7 @@
+ 
+         # Test request with pre-tokenized inputs and custom options
+         req_tok = GenerativeScoringRequest(
++            kv_scope="scoring-agent",
+             query=[100, 200, 300],
+             items=[[400, 500], [600, 700]],
+             label_token_ids=[1234, 5678],
+@@ -167,6 +174,17 @@
+         assert response.data[0].object == "score"
+         assert response.data[1].score == 0.4
+         assert response.usage.prompt_tokens == 10
++
++    @pytest.mark.parametrize("agent_id", [None, "", " \t\n", 7, False, b"agent"])
++    def test_rejects_invalid_agent_id(self, agent_id):
++        with pytest.raises(ValidationError, match="kv_scope"):
++            GenerativeScoringRequest(
++                kv_scope=agent_id, query=[10], items=[[11]], label_token_ids=[20]
++            )
++
++    def test_requires_agent_id(self):
++        with pytest.raises(ValidationError, match="kv_scope"):
++            GenerativeScoringRequest(query=[10], items=[[11]], label_token_ids=[20])
+ 
+ 
+ class TestProbabilityComputation:
+@@ -250,7 +268,9 @@
+         """Test that invalid inputs return appropriate errors."""
+         mock_engine = _create_mock_engine()
+         serving = _create_serving(mock_engine)
+-        request = GenerativeScoringRequest(model=MODEL_NAME, **request_kwargs)
++        request = GenerativeScoringRequest(
++            model=MODEL_NAME, kv_scope="scoring-agent", **request_kwargs
++        )
+         result = await serving.create_generative_scoring(request, None)
+ 
+         assert isinstance(result, ErrorResponse)
+@@ -275,6 +295,7 @@
+         serving = _create_serving(mock_engine)
+ 
+         request = GenerativeScoringRequest(
++            kv_scope="scoring-agent",
+             query=[100, 101],
+             items=[[200, 201], [300, 301]],
+             label_token_ids=[500, 501],
+@@ -292,23 +313,30 @@
+     """Tests for the full generation flow with mocked engine."""
+ 
+     @pytest.mark.asyncio
+-    async def test_successful_generation(self):
+-        """Test successful score generation returns valid response."""
++    @pytest.mark.parametrize("agent_id", ["scoring-agent", " opaque: agent/子 \t"])
++    async def test_successful_generation(self, agent_id):
++        """Every scored item carries the exact caller ID through admission."""
+         mock_engine = _create_mock_engine()
+         serving = _create_serving(mock_engine)
+ 
+         mock_logprobs = {1234: -0.5, 5678: -2.0, 100: -3.0}
+         mock_output = _create_mock_request_output(mock_logprobs)
+ 
+-        async def mock_generate(*args, **kwargs):
++        agent_ids = []
++        request_ids = []
++
++        async def mock_generate(prompt, params, request_id, **kwargs):
++            agent_ids.append(require_kv_scope(params))
++            request_ids.append(request_id)
+             yield mock_output
+ 
+         mock_engine.generate = mock_generate
+ 
+         request = GenerativeScoringRequest(
+             model=MODEL_NAME,
+-            query="Is Paris the capital?",
+-            items=["Yes", "No"],
++            kv_scope=agent_id,
++            query=[10, 11],
++            items=[[12], [13]],
+             label_token_ids=[1234, 5678],
+         )
+         result = await serving.create_generative_scoring(request, None)
+@@ -317,6 +345,84 @@
+         assert len(result.data) == 2
+         for item_result in result.data:
+             assert 0.0 <= item_result.score <= 1.0
++        assert agent_ids == [agent_id, agent_id]
++        assert len(set(request_ids)) == 2
++
++
++class TestHTTPAdmission:
++    @pytest.mark.asyncio
++    async def test_exact_wire_id_reaches_every_item(self):
++        engine = _create_mock_engine()
++        seen = []
++
++        async def generate(prompt, params, *args, **kwargs):
++            seen.append(require_kv_scope(params))
++            yield _create_mock_request_output({20: -0.5})
++
++        engine.generate = generate
++        app = FastAPI()
++        app.state.args = SimpleNamespace(log_error_stack=False)
++        app.state.serving_generative_scoring = _create_serving(engine)
++        init_exception_handler(app)
++        app.include_router(router)
++        async with httpx.AsyncClient(
++            transport=httpx.ASGITransport(app=app), base_url="http://scoring.invalid"
++        ) as client:
++            response = await client.post(
++                "/generative_scoring", json={
++                    "kv_scope": " wire: agent/子 ", "query": [10],
++                    "items": [[11], [12]], "label_token_ids": [20],
++                },
++            )
++        assert response.status_code == 200, response.text
++        assert seen == [" wire: agent/子 ", " wire: agent/子 "]
++        assert len(response.json()["data"]) == 2
++        usage = response.json()["usage"]
++        assert {key: usage[key] for key in (
++            "prompt_tokens", "completion_tokens", "total_tokens"
++        )} == {
++            "prompt_tokens": 4, "completion_tokens": 2, "total_tokens": 6,
++        }
++
++    @pytest.mark.asyncio
++    @pytest.mark.parametrize(
++        "fields",
++        [
++            {}, {"kv_scope": None}, {"kv_scope": ""},
++            {"kv_scope": " \t"}, {"kv_scope": 7}, {"kv_scope": False},
++        ],
++    )
++    async def test_refuses_invalid_id_before_dispatch(self, fields):
++        app = FastAPI()
++        app.state.args = SimpleNamespace(log_error_stack=False)
++        handler = AsyncMock()
++        app.state.serving_generative_scoring = handler
++        init_exception_handler(app)
++        app.include_router(router)
++        async with httpx.AsyncClient(
++            transport=httpx.ASGITransport(app=app), base_url="http://scoring.invalid"
++        ) as client:
++            response = await client.post(
++                "/generative_scoring", json={
++                    "query": [10], "items": [[11]], "label_token_ids": [20], **fields,
++                },
++            )
++        assert response.status_code == 400
++        handler.create_generative_scoring.assert_not_awaited()
++        error = response.json()["error"]
++        assert error["code"] == 400
++        assert error["param"] == "body.kv_scope"
++
++    def test_request_schema_declares_the_required_id(self):
++        app = FastAPI()
++        app.include_router(router)
++        schema = app.openapi()
++        request = schema["paths"]["/generative_scoring"]["post"]["requestBody"]
++        assert request["required"] is True
++        ref = request["content"]["application/json"]["schema"]["$ref"]
++        model = schema["components"]["schemas"][ref.rsplit("/", 1)[1]]
++        assert "kv_scope" in model["required"]
++        assert model["properties"]["kv_scope"]["type"] == "string"
+ 
+ 
+ if __name__ == "__main__":
+diff --git a/tests/entrypoints/generate/generative_scoring/test_generative_scoring_e2e.py b/tests/entrypoints/generate/generative_scoring/test_generative_scoring_e2e.py
+--- a/tests/entrypoints/generate/generative_scoring/test_generative_scoring_e2e.py
++++ b/tests/entrypoints/generate/generative_scoring/test_generative_scoring_e2e.py
+@@ -38,6 +38,7 @@
+             server.url_for("generative_scoring"),
+             json={
+                 "model": MODEL_NAME,
++                "kv_scope": "scoring-api-agent",
+                 "query": "Is Paris the capital of France? Answer Yes or No: ",
+                 "items": ["Paris is beautiful.", "London is rainy."],
+                 "label_token_ids": [9454, 2753],
+@@ -74,6 +75,7 @@
+             server.url_for("generative_scoring"),
+             json={
+                 "model": MODEL_NAME,
++                "kv_scope": "scoring-api-agent",
+                 "query": "Is this city a capital? ",
+                 "items": ["Paris", "London", "Berlin", "New York", "Tokyo"],
+                 "label_token_ids": [9454, 2753],
+@@ -90,11 +92,12 @@
+             server.url_for("generative_scoring"),
+             json={
+                 "model": MODEL_NAME,
++                "kv_scope": "scoring-api-agent",
+                 "query": "Test query",
+                 "items": ["item1", "item2"],
+             },
+         )
+-        # Missing required field returns 400 (manual JSON parsing)
++        # Missing required fields use the shared request-validation response
+         assert response.status_code == 400
+ 
+     @pytest.mark.asyncio
+@@ -104,6 +107,7 @@
+             server.url_for("generative_scoring"),
+             json={
+                 "model": MODEL_NAME,
++                "kv_scope": "scoring-api-agent",
+                 "query": "Test query",
+                 "items": [],
+                 "label_token_ids": [100, 200],
+@@ -127,6 +131,7 @@
+             server.url_for("generative_scoring"),
+             json={
+                 "model": MODEL_NAME,
++                "kv_scope": "scoring-api-agent",
+                 "query": "Test query",
+                 "items": ["item1"],
+                 "label_token_ids": label_token_ids,
+@@ -139,6 +144,7 @@
+         """Test that scores are deterministic across identical requests."""
+         request_body = {
+             "model": MODEL_NAME,
++            "kv_scope": "scoring-api-agent",
+             "query": "Is this consistent? ",
+             "items": ["Yes it is."],
+             "label_token_ids": [100, 200],
+diff --git a/vllm/entrypoints/generate/generative_scoring/api_router.py b/vllm/entrypoints/generate/generative_scoring/api_router.py
+--- a/vllm/entrypoints/generate/generative_scoring/api_router.py
++++ b/vllm/entrypoints/generate/generative_scoring/api_router.py
+@@ -6,6 +6,7 @@
+ from fastapi.responses import JSONResponse
+ 
+ from vllm.entrypoints.generate.generative_scoring.serving import (
++    GenerativeScoringRequest,
+     GenerativeScoringResponse,
+     ServingGenerativeScoring,
+ )
+@@ -36,21 +37,16 @@
+ )
+ @with_cancellation
+ @load_aware_call
+-async def create_generative_scoring(raw_request: Request):
++async def create_generative_scoring(
++    request: GenerativeScoringRequest, raw_request: Request
++):
+     handler = generative_scoring(raw_request)
+     if handler is None:
+         raise NotImplementedError(
+             "The model does not support the Generative Scoring API"
+         )
+ 
+-    raw_body = await raw_request.json()
+-
+-    from vllm.entrypoints.generate.generative_scoring.serving import (
+-        GenerativeScoringRequest,
+-    )
+-
+-    gen_request = GenerativeScoringRequest(**raw_body)
+-    result = await handler.create_generative_scoring(gen_request, raw_request)
++    result = await handler.create_generative_scoring(request, raw_request)
+ 
+     if isinstance(result, ErrorResponse):
+         return JSONResponse(content=result.model_dump(), status_code=result.error.code)
+diff --git a/vllm/entrypoints/generate/generative_scoring/serving.py b/vllm/entrypoints/generate/generative_scoring/serving.py
+--- a/vllm/entrypoints/generate/generative_scoring/serving.py
++++ b/vllm/entrypoints/generate/generative_scoring/serving.py
+@@ -52,6 +52,7 @@
+ 
+     Attributes:
+         model: The model to use for scoring. Optional, follows existing patterns.
++        kv_scope: Stable, opaque agent ID for all item generations.
+         query: The query text or pre-tokenized query token IDs.
+         items: The item text(s) or pre-tokenized item token IDs.
+         label_token_ids: List of token IDs to compute probabilities for.
+@@ -63,6 +64,16 @@
+     """
+ 
+     model: str | None = None
++    kv_scope: str = Field(
++        strict=True,
++        min_length=1,
++        pattern=r"\S",
++        description=(
++            "Required stable, opaque agent ID for shared KV cache accounting. "
++            "An ID with no cached blocks may acquire a shared prefix; an ID "
++            "with cached blocks matches only its acquired or computed cache."
++        ),
++    )
+     query: str | list[int] = Field(
+         ...,
+         description="The query text or pre-tokenized query token IDs.",
+@@ -254,6 +265,7 @@
+             logprobs=len(request.label_token_ids),
+             logprob_token_ids=request.label_token_ids,
+             n=1,
++            extra_args={"kv_scope": request.kv_scope},
+         )
+ 
+         # Get trace headers
