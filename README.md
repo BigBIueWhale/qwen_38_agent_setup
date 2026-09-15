@@ -17,6 +17,10 @@ workstation.
 
 The v23 source revision awaits its offline image build, adoption and release
 validation. Prior live results below describe the versions that earned them.
+The audit resolution record in `docs/model-output-and-audit-fixes.md` lists the
+source fixes and their container validation. Anthropic tool results now refuse
+unsupported nested content, preserve `is_error` in the rendered result, and return
+request rejections as native Anthropic errors on both Messages routes.
 There is one supported mode:
 
 | Property | Locked value |
@@ -71,7 +75,7 @@ error.
   and relay readiness events, then validates the complete live configuration before
   reporting success. Re-running it validates the existing owned topology rather than
   starting a duplicate.
-- status.sh validates host prerequisites, thirteen ordered vLLM transformations, every reviewed
+- status.sh validates host prerequisites, fourteen ordered vLLM transformations, every reviewed
   source and test file, the model manifest, image archive, image identity and labels,
   command and environment, mounts, runtime packages, API identity, listener,
   hardening, and live health. HEALTHY means all checks passed.
@@ -91,7 +95,7 @@ Advanced reproducibility operations are deliberately separate from serving mode:
     ./scripts/build-vllm.sh build
     ./scripts/restore-images.sh
 
-The check reconstructs the source tree from the pinned upstream commit through all thirteen
+The check reconstructs the source tree from the pinned upstream commit through all fourteen
 landmark-aware transformations. The build runs offline from the exact base image and fails unless it produces
 the pinned image ID. Restore verifies the pinned local archive before loading it.
 
@@ -247,7 +251,7 @@ The vLLM submodule is pinned at:
 
     9df9b0b0a1816b6d0d0f6ecd0da563cc37fd72f5
 
-It is intentionally reconstructed by thirteen ordered, reviewed semantic transformations:
+It is intentionally reconstructed by fourteen ordered, reviewed semantic transformations:
 
 | Patch | SHA-256 |
 |---|---|
@@ -264,9 +268,10 @@ It is intentionally reconstructed by thirteen ordered, reviewed semantic transfo
 | patches/vllm-kv-offload-pinning-fail-closed.patch | 1857071c38d081bb95e3cca12153cebce096649084950b99229104fdae029ca6 |
 | patches/vllm-kv-user-count-sizing-and-scope-eviction.patch | d4d18c5afc0af9ecdaff948d7e7f4b5d2e8f85eb15e7853aaddc44de62b17b56 |
 | patches/vllm-exact-reasoning-usage.patch | 7991cca04345cf58a602a6b0630d2ebbf31f3da228e9034da591217956d37b31 |
+| patches/vllm-anthropic-input-fidelity.patch | c2063d509fc90929f7d6018796f753da6445f12a4b4b19181e377f772b923a49 |
 
-The reconstructed tree has exactly fifty-five reviewed runtime-source changes, five
-reviewed runtime-source deletions, twenty-nine reviewed existing-test changes,
+The reconstructed tree has exactly sixty reviewed runtime-source changes, five
+reviewed runtime-source deletions, thirty reviewed existing-test changes,
 four reviewed new tests, and two reviewed test deletions — the authoritative
 counts are derived and printed by ./scripts/build-vllm.sh check, never restated
 by hand there. The landmark-aware Python patcher calculates every mutation
@@ -289,11 +294,11 @@ Pinned build inputs and products:
 | Offline archive | artifacts/qwen38-vllm-images-runtime-v23.tar |
 | Archive size | Awaiting adoption after the v23 export |
 | Archive SHA-256 | Awaiting adoption after the v23 export |
-| Runtime Dockerfile SHA-256 | e40fce53d48020435ca54abf4262db15ee87553a4448b2aba3cec9e611b23980 |
-| Docker context allowlist SHA-256 | 1689850e105f36863a99bd97669a878db6dd60acb41649bef3e5e9f50a6dfbc7 |
-| Build verifier SHA-256 | f03ed8c74c755aaaea64f4699462f16d4840dc5295c6b16cfeee064b9ee21957 |
-| Runtime validator SHA-256 | 086bb442a844598736007e8c8e76b6363410e3affa5e167cc80beaf2e47d7566 |
-| Runtime lock SHA-256 | 554d661fe6ab96b82ff3bf20e9a4f9902701929fc4fc1f4004e8b318cf19e43a |
+| Runtime Dockerfile SHA-256 | a4755606afd9017126bd4c0f7ff8ffd653e56ac4368aec72c1f9566a9356b4ca |
+| Docker context allowlist SHA-256 | 1c13a873ec66c21dea76eac74aea7b35ff6df76904632d3f2380e0dfff7a5322 |
+| Build verifier SHA-256 | 80447e445b41bb5f70d0e3f40e56327705d6f68d8a476466c0c79284bf20d05d |
+| Runtime validator SHA-256 | 28e489c8a0cad1c0ba2b88731978efe1600521f9db85b05e70108361dc81d806 |
+| Runtime lock SHA-256 | 89ed99ee774ece0b5b1c845a170910e45442ee035f820631e237344c5dcf1c82 |
 
 Every reviewed runtime file, including both TurboQuant kernels, is copied and
 hash-checked against its upstream and patched identities. A CPU Triton-interpreter

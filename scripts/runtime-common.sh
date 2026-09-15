@@ -698,6 +698,11 @@ assert_running_profile() {
       /usr/local/lib/python3.12/dist-packages/vllm/config/model.py \
       /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/anthropic/protocol.py \
       /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/anthropic/serving.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/serve/exception_handling/error_response.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/serve/exception_handling/handlers/exception.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/serve/exception_handling/handlers/http.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/serve/exception_handling/handlers/validation.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/serve/exception_handling/handlers/vllm_error.py \
       /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/chat_completion/protocol.py \
       /usr/local/lib/python3.12/dist-packages/vllm/sampling_params.py \
       /usr/local/lib/python3.12/dist-packages/vllm/v1/core/sched/utils.py \
@@ -725,6 +730,11 @@ assert_running_profile() {
     "${MODEL_CONFIG_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/config/model.py \
     "${ANTHROPIC_PROTOCOL_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/anthropic/protocol.py \
     "${ANTHROPIC_SERVING_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/anthropic/serving.py \
+    "${ERROR_RESPONSE_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/serve/exception_handling/error_response.py \
+    "${EXCEPTION_EXCEPTION_HANDLER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/serve/exception_handling/handlers/exception.py \
+    "${HTTP_EXCEPTION_HANDLER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/serve/exception_handling/handlers/http.py \
+    "${VALIDATION_EXCEPTION_HANDLER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/serve/exception_handling/handlers/validation.py \
+    "${VLLM_ERROR_EXCEPTION_HANDLER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/serve/exception_handling/handlers/vllm_error.py \
     "${CHAT_PROTOCOL_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/chat_completion/protocol.py \
     "${SAMPLING_PARAMS_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/sampling_params.py \
     "${SCHED_UTILS_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/core/sched/utils.py \

@@ -1,0 +1,995 @@
+diff --git a/tests/entrypoints/anthropic/test_anthropic_messages_conversion.py b/tests/entrypoints/anthropic/test_anthropic_messages_conversion.py
+--- a/tests/entrypoints/anthropic/test_anthropic_messages_conversion.py
++++ b/tests/entrypoints/anthropic/test_anthropic_messages_conversion.py
+@@ -22,12 +22,13 @@
+ from fastapi.exceptions import RequestValidationError
+ from fastapi.testclient import TestClient
+ 
+-from vllm.entrypoints.anthropic.api_router import attach_router
++from vllm.entrypoints.anthropic.api_router import attach_router, translate_error_response
+ from vllm.entrypoints.anthropic.protocol import (
+     AnthropicMessagesRequest,
+ )
+ from vllm.entrypoints.anthropic.serving import (
+     AnthropicServingMessages,
++    TOOL_RESULT_ERROR_LINE,
+     _build_anthropic_usage,
+ )
+ from vllm.entrypoints.openai.chat_completion.protocol import (
+@@ -38,6 +39,8 @@
+     ChatMessage,
+ )
+ from vllm.entrypoints.openai.engine.protocol import (
++    ErrorInfo,
++    ErrorResponse,
+     DeltaFunctionCall,
+     DeltaMessage,
+     DeltaToolCall,
+@@ -47,6 +50,8 @@
+ from vllm.entrypoints.serve.exception_handling.handlers.validation import (
+     validation_exception_handler,
+ )
++
++from vllm.exceptions import VLLMValidationError
+ 
+ _convert = AnthropicServingMessages._convert_anthropic_to_openai_request
+ _img_url = AnthropicServingMessages._convert_image_source_to_url
+@@ -93,25 +98,28 @@
+         }
+         assert _img_url(source) == "https://example.com/image.jpg"
+ 
+-    def test_missing_type_defaults_to_base64(self):
+-        """When 'type' is absent, treat as base64."""
++    def test_missing_type_is_refused(self):
+         source = {
+             "media_type": "image/webp",
+             "data": "UklGR",
+         }
+-        assert _img_url(source) == "data:image/webp;base64,UklGR"
+-
+-    def test_missing_media_type_defaults_to_jpeg(self):
++        with pytest.raises(VLLMValidationError):
++            _img_url(source)
++
++    def test_missing_media_type_is_refused(self):
+         source = {"type": "base64", "data": "abc123"}
+-        assert _img_url(source) == "data:image/jpeg;base64,abc123"
+-
+-    def test_url_source_missing_url_returns_empty(self):
++        with pytest.raises(VLLMValidationError):
++            _img_url(source)
++
++    def test_url_source_missing_url_is_refused(self):
+         source = {"type": "url"}
+-        assert _img_url(source) == ""
+-
+-    def test_empty_source_returns_data_uri_shell(self):
++        with pytest.raises(VLLMValidationError):
++            _img_url(source)
++
++    def test_empty_source_is_refused(self):
+         source: dict = {}
+-        assert _img_url(source) == "data:image/jpeg;base64,"
++        with pytest.raises(VLLMValidationError):
++            _img_url(source)
+ 
+ 
+ # ======================================================================
+@@ -1440,3 +1448,274 @@
+ 
+         assert response.status_code == HTTPStatus.BAD_REQUEST
+         handler.create_messages.assert_not_awaited()
++
++
++class TestToolResultFidelity:
++    """A tool result reaches the model whole, or the request is refused.
++
++    The rendering carries text, image and tool_reference items; anything
++    else -- a document, a search result -- cannot be rendered, and dropping
++    it would tell the model the tool returned less than it did.  The
++    ``is_error`` flag has no field in the rendering and is stated in the
++    result's text instead.
++    """
++
++    def _request(self, tool_result_content, **block) -> AnthropicMessagesRequest:
++        return _make_request(
++            [
++                {
++                    "role": "assistant",
++                    "content": [
++                        {
++                            "type": "tool_use",
++                            "id": "call_001",
++                            "name": "read_file",
++                            "input": {"path": "/tmp/report.pdf"},
++                        }
++                    ],
++                },
++                {
++                    "role": "user",
++                    "content": [
++                        {
++                            "type": "tool_result",
++                            "tool_use_id": "call_001",
++                            "content": tool_result_content,
++                            **block,
++                        }
++                    ],
++                },
++            ]
++        )
++
++    @pytest.mark.parametrize(
++        "item",
++        [
++            {
++                "type": "document",
++                "source": {"type": "base64", "media_type": "application/pdf", "data": "AAAA"},
++            },
++            {"type": "search_result", "source": "https://example.com", "title": "t"},
++        ],
++        ids=["document", "search_result"],
++    )
++    def test_an_item_the_rendering_cannot_carry_is_refused(self, item):
++        request = self._request([{"type": "text", "text": "kept"}, item])
++
++        with pytest.raises(VLLMValidationError) as refusal:
++            _convert(request)
++
++        assert "tool_result 'call_001' content[1]" in str(refusal.value)
++        assert "parameter=messages" in str(refusal.value)
++
++    def test_a_tool_reference_without_a_name_is_refused(self):
++        request = self._request([{"type": "tool_reference"}])
++
++        with pytest.raises(VLLMValidationError):
++            _convert(request)
++
++    @pytest.mark.parametrize(
++        "source",
++        [None, {"type": "url"}, {"type": "base64", "media_type": "image/png"}],
++        ids=["no-source", "url-without-url", "base64-without-data"],
++    )
++    def test_an_image_item_that_names_no_image_is_refused(self, source):
++        item = {"type": "image"} if source is None else {"type": "image", "source": source}
++        request = self._request([item])
++
++        with pytest.raises(VLLMValidationError) as refusal:
++            _convert(request)
++
++        assert "names no image" in str(refusal.value)
++
++    def test_a_user_image_block_that_names_no_image_is_refused(self):
++        request = _make_request(
++            [{"role": "user", "content": [{"type": "image", "source": {"type": "url"}}]}]
++        )
++
++        with pytest.raises(VLLMValidationError) as refusal:
++            _convert(request)
++
++        assert "an image block in a user message names no image" in str(refusal.value)
++
++    def test_is_error_is_stated_before_string_content(self):
++        request = self._request("ENOENT: no such file", is_error=True)
++        result = _convert(request)
++
++        tool_msg = [m for m in result.messages if m["role"] == "tool"][0]
++        assert tool_msg["content"] == f"{TOOL_RESULT_ERROR_LINE}\nENOENT: no such file"
++
++    def test_is_error_with_no_content_is_the_statement_alone(self):
++        request = self._request(None, is_error=True)
++        result = _convert(request)
++
++        tool_msg = [m for m in result.messages if m["role"] == "tool"][0]
++        assert tool_msg["content"] == TOOL_RESULT_ERROR_LINE
++
++    def test_is_error_is_stated_before_media_parts(self):
++        request = self._request(
++            [
++                {"type": "text", "text": "screenshot of the failure"},
++                {
++                    "type": "image",
++                    "source": {"type": "base64", "media_type": "image/png", "data": "AAAA"},
++                },
++            ],
++            is_error=True,
++        )
++        result = _convert(request)
++
++        tool_msg = [m for m in result.messages if m["role"] == "tool"][0]
++        assert tool_msg["content"] == [
++            {"type": "text", "text": TOOL_RESULT_ERROR_LINE},
++            {"type": "text", "text": "screenshot of the failure"},
++            {"type": "image_url", "image_url": {"url": "data:image/png;base64,AAAA"}},
++        ]
++
++    @pytest.mark.parametrize("block", [{}, {"is_error": False}], ids=["absent", "false"])
++    def test_a_result_that_is_not_an_error_is_unchanged(self, block):
++        request = self._request("fine", **block)
++        result = _convert(request)
++
++        tool_msg = [m for m in result.messages if m["role"] == "tool"][0]
++        assert tool_msg["content"] == "fine"
++
++
++
++
++class TestErrorEnvelope:
++    @staticmethod
++    def _make_api_app(side_effect: Exception):
++        app = FastAPI()
++        attach_router(app)
++        app.state.args = Namespace(log_error_stack=False)
++        app.exception_handler(RequestValidationError)(validation_exception_handler)
++
++        handler = MagicMock(spec=AnthropicServingMessages)
++        handler.create_messages.side_effect = side_effect
++        handler.count_tokens.side_effect = side_effect
++        app.state.anthropic_serving_messages = handler
++        return app
++
++    _body = {
++        "model": "test-model",
++        "max_tokens": 1,
++        "messages": [{"role": "user", "content": "Hello"}],
++    }
++
++    @pytest.mark.parametrize(
++        ("exc", "status", "error_type"),
++        [
++            (ValueError("the template refused this history"), 400, "invalid_request_error"),
++            (TypeError("a content part of the wrong shape"), 400, "invalid_request_error"),
++            (
++                VLLMValidationError("kv_scope is required", parameter="kv_scope"),
++                400,
++                "invalid_request_error",
++            ),
++            (NotImplementedError("beam search is not supported"), 501, "api_error"),
++            (RuntimeError("something the server did"), 500, "api_error"),
++        ],
++        ids=["ValueError", "TypeError", "VLLMValidationError", "NotImplemented", "Runtime"],
++    )
++    @pytest.mark.parametrize("route", ["/v1/messages", "/v1/messages/count_tokens"])
++    @pytest.mark.parametrize("stream", [False, True])
++    def test_a_refusal_is_classified_as_the_openai_surface_classifies_it(
++        self, route, stream, exc, status, error_type
++    ):
++        """A prompt the template refuses, an image the media gate refuses, a
++        prompt longer than the window: all are ValueErrors, all are the
++        caller's, and all are HTTP 400 here as they are on the OpenAI paths."""
++        app = self._make_api_app(exc)
++        with TestClient(app, raise_server_exceptions=False) as client:
++            response = client.post(route, json=self._body | {"stream": stream})
++
++        assert response.status_code == status
++        body = response.json()
++        assert body["type"] == "error"
++        assert body["error"]["type"] == error_type
++        assert str(exc).split(" ")[0] in body["error"]["message"]
++
++    def test_body_validation_is_answered_in_the_anthropic_envelope(self):
++        app = self._make_api_app(AssertionError("must not be reached"))
++        with TestClient(app, raise_server_exceptions=False) as client:
++            response = client.post("/v1/messages", json=self._body | {"max_tokens": 0})
++
++        assert response.status_code == HTTPStatus.BAD_REQUEST
++        body = response.json()
++        assert body["type"] == "error"
++        assert body["error"]["type"] == "invalid_request_error"
++        assert "max_tokens" in body["error"]["message"]
++
++    @pytest.mark.parametrize(
++        ("code", "error_type"),
++        [
++            (400, "invalid_request_error"),
++            (404, "not_found_error"),
++            (413, "request_too_large"),
++            (422, "invalid_request_error"),
++            (429, "rate_limit_error"),
++            (500, "api_error"),
++            (503, "api_error"),
++            (529, "overloaded_error"),
++        ],
++    )
++    def test_an_engine_refusal_is_typed_by_its_status(self, code, error_type):
++        translated = translate_error_response(
++            ErrorResponse(
++                error=ErrorInfo(message="why", type="BadRequestError", code=code)
++            )
++        )
++
++        assert translated.status_code == code
++        assert json.loads(translated.body) == {
++            "type": "error",
++            "error": {"type": error_type, "message": "why"},
++        }
++
++    @pytest.mark.asyncio
++    @pytest.mark.parametrize("code,kind", [(400, "invalid_request_error"), (500, "api_error")])
++    async def test_stream_forwards_the_classified_error_and_never_reports_success(self, code, kind):
++        async def upstream():
++            yield _make_stream_chunk(delta=DeltaMessage(role="assistant"))
++            yield 'data: ' + ErrorResponse(
++                error=ErrorInfo(message="why", type="OpenAIError", code=code)
++            ).model_dump_json() + '\n\n'
++            yield 'data: [DONE]\n\n'
++
++        events = _parse_sse_events([
++            event async for event in _make_stream_converter().message_stream_converter(upstream())
++        ])
++        assert events[-1] == ("error", {"type": "error", "error": {"type": kind, "message": "why"}})
++        assert not any(kind in ("message_delta", "message_stop") for kind, _ in events)
++
++    @pytest.mark.parametrize("route", ["/v1/messages", "/v1/messages/count_tokens"])
++    @pytest.mark.parametrize("stream", [False, True])
++    @pytest.mark.parametrize("gate", ["template", "image", "length"])
++    def test_real_request_gates_return_400_before_streaming(self, route, stream, gate, monkeypatch):
++        from vllm.entrypoints.serve.utils.api_utils import get_max_tokens
++        from vllm.multimodal.media.image import ImageMediaIO
++        from vllm.renderers.hf import safe_apply_chat_template
++        import jinja2
++
++        monkeypatch.setenv("VLLM_QWEN38_STRICT_IMAGE_CONTRACT", "1")
++
++        async def reject(*args):
++            if gate == "length":
++                get_max_tokens(32, 1, 33, {})
++            elif gate == "image":
++                ImageMediaIO(image_mode="RGBA")
++            else:
++                tokenizer = MagicMock()
++                tokenizer.apply_chat_template.side_effect = jinja2.TemplateError("history refused")
++                safe_apply_chat_template(
++                    MagicMock(), tokenizer, [{"role": "user", "content": "hi"}],
++                    chat_template="{{ messages }}", tokenize=False,
++                )
++
++        app = self._make_api_app(reject)
++        with TestClient(app, raise_server_exceptions=False) as client:
++            response = client.post(route, json=self._body | {"stream": stream})
++        assert response.status_code == 400
++        assert response.json()["error"]["type"] == "invalid_request_error"
++        assert response.headers["content-type"] == "application/json"
+diff --git a/tests/entrypoints/serve/exception_handling/test_validation_exception_handler.py b/tests/entrypoints/serve/exception_handling/test_validation_exception_handler.py
+--- a/tests/entrypoints/serve/exception_handling/test_validation_exception_handler.py
++++ b/tests/entrypoints/serve/exception_handling/test_validation_exception_handler.py
+@@ -22,14 +22,18 @@
+ )
+ 
+ 
+-def _fake_request(log_error_stack: bool = False) -> SimpleNamespace:
++def _fake_request(
++    log_error_stack: bool = False, path: str = "/v1/chat/completions"
++) -> SimpleNamespace:
+     """Minimal stand-in for a FastAPI Request - just enough for the
+-    handler to read req.app.state.args.log_error_stack."""
++    handler to read req.app.state.args.log_error_stack and the route path
++    that selects the error envelope."""
+     return SimpleNamespace(
+         app=SimpleNamespace(
+             state=SimpleNamespace(args=SimpleNamespace(log_error_stack=log_error_stack))
+         ),
+         state=SimpleNamespace(),  # no request_metadata -> hasattr(...) is False
++        scope={"type": "http", "path": path},
+     )
+ 
+ 
+@@ -66,6 +70,56 @@
+         body = json.loads(response.body)
+ 
+         assert body["error"]["param"] is None
++
++
++class TestErrorEnvelopeFollowsTheApi:
++    """A refusal is answered in the vocabulary of the API that was called:
++    the OpenAI envelope with ``param`` on the OpenAI-compatible paths, the
++    Anthropic Messages envelope on ``/v1/messages`` and below it."""
++
++    _errors = [{"type": "missing", "loc": ("body", "messages"), "msg": "Field required"}]
++
++    @pytest.mark.asyncio
++    async def test_openai_path_keeps_the_openai_envelope(self):
++        response = await validation_exception_handler(
++            _fake_request(), RequestValidationError(self._errors)
++        )
++        body = json.loads(response.body)
++
++        assert response.status_code == 400
++        assert body["error"]["type"] == "Bad Request"
++        assert body["error"]["param"] == "body.messages"
++
++    @pytest.mark.parametrize(
++        "path", ["/v1/messages", "/v1/messages/count_tokens"]
++    )
++    @pytest.mark.asyncio
++    async def test_anthropic_paths_get_the_anthropic_envelope(self, path: str):
++        response = await validation_exception_handler(
++            _fake_request(path=path), RequestValidationError(self._errors)
++        )
++        body = json.loads(response.body)
++
++        assert response.status_code == 400
++        assert body["type"] == "error"
++        assert body["error"] == {
++            "type": "invalid_request_error",
++            "message": body["error"]["message"],
++        }
++        assert "Field required" in body["error"]["message"]
++
++    @pytest.mark.asyncio
++    async def test_a_root_path_does_not_hide_the_anthropic_api(self):
++        request = _fake_request(path="/proxy/v1/messages")
++        request.scope["root_path"] = "/proxy"
++
++        response = await validation_exception_handler(
++            request, RequestValidationError(self._errors)
++        )
++        body = json.loads(response.body)
++
++        assert body["type"] == "error"
++        assert body["error"]["type"] == "invalid_request_error"
+ 
+ 
+ class TestCleanLocForParam:
+diff --git a/vllm/entrypoints/anthropic/api_router.py b/vllm/entrypoints/anthropic/api_router.py
+--- a/vllm/entrypoints/anthropic/api_router.py
++++ b/vllm/entrypoints/anthropic/api_router.py
+@@ -6,25 +6,25 @@
+ 
+ from fastapi import APIRouter, Depends, FastAPI, Request
+ from fastapi.responses import JSONResponse, StreamingResponse
+-from pydantic import ValidationError
+ 
+ from vllm.entrypoints.anthropic.protocol import (
++    ANTHROPIC_API_PATH_PREFIX,
+     AnthropicCountTokensRequest,
+     AnthropicCountTokensResponse,
+-    AnthropicError,
+     AnthropicErrorResponse,
+     AnthropicMessagesRequest,
+     AnthropicMessagesResponse,
+ )
+ from vllm.entrypoints.anthropic.serving import AnthropicServingMessages
+ from vllm.entrypoints.openai.engine.protocol import ErrorResponse
+-from vllm.entrypoints.serve.exception_handling.utils import sanitize_message
++from vllm.entrypoints.serve.exception_handling.error_response import (
++    create_error_response,
++)
+ from vllm.entrypoints.serve.utils.api_utils import (
+     load_aware_call,
+     validate_json_request,
+     with_cancellation,
+ )
+-from vllm.exceptions import VLLMValidationError
+ from vllm.logger import init_logger
+ 
+ logger = init_logger(__name__)
+@@ -37,19 +37,37 @@
+ 
+ 
+ def translate_error_response(response: ErrorResponse) -> JSONResponse:
+-    anthropic_error = AnthropicErrorResponse(
+-        error=AnthropicError(
+-            type=response.error.type,
+-            message=response.error.message,
+-        )
+-    )
++    """Answer a refusal in the Messages API's own error vocabulary.
++
++    The status decides the Anthropic error type; the OpenAI-shaped type
++    names (``BadRequestError`` and its kin) never reach an Anthropic client.
++    """
+     return JSONResponse(
+-        status_code=response.error.code, content=anthropic_error.model_dump()
++        status_code=response.error.code,
++        content=AnthropicErrorResponse.for_status(
++            response.error.code, response.error.message
++        ).model_dump(),
+     )
+ 
+ 
++def refuse(exc: Exception, *, route: str) -> JSONResponse:
++    """Classify a failure exactly as the OpenAI surfaces classify it.
++
++    A rejected request -- typed validation, the engine's own request
++    validation, a prompt the template refuses to render, an image the media
++    gate refuses, a prompt longer than the window -- is a client error on
++    every surface, and it is answered here as HTTP 400
++    ``invalid_request_error``; only a failure the classifier cannot lay at
++    the client's door is a logged 500 ``api_error``.
++    """
++    error = create_error_response(exc)
++    if error.error.code >= HTTPStatus.INTERNAL_SERVER_ERROR.value:
++        logger.exception("Error in %s: %s", route, exc)
++    return translate_error_response(error)
++
++
+ @router.post(
+-    "/v1/messages",
++    ANTHROPIC_API_PATH_PREFIX,
+     dependencies=[Depends(validate_json_request)],
+     responses={
+         HTTPStatus.OK.value: {"content": {"text/event-stream": {}}},
+@@ -71,27 +89,8 @@
+ 
+     try:
+         generator = await handler.create_messages(request, raw_request)
+-    except (ValidationError, VLLMValidationError) as e:
+-        return JSONResponse(
+-            status_code=HTTPStatus.BAD_REQUEST.value,
+-            content=AnthropicErrorResponse(
+-                error=AnthropicError(
+-                    type="invalid_request_error",
+-                    message=sanitize_message(str(e)),
+-                )
+-            ).model_dump(),
+-        )
+     except Exception as e:
+-        logger.exception("Error in create_messages: %s", e)
+-        return JSONResponse(
+-            status_code=HTTPStatus.INTERNAL_SERVER_ERROR.value,
+-            content=AnthropicErrorResponse(
+-                error=AnthropicError(
+-                    type="internal_error",
+-                    message=sanitize_message(str(e)),
+-                )
+-            ).model_dump(),
+-        )
++        return refuse(e, route="create_messages")
+ 
+     if isinstance(generator, ErrorResponse):
+         return translate_error_response(generator)
+@@ -105,7 +104,7 @@
+ 
+ 
+ @router.post(
+-    "/v1/messages/count_tokens",
++    f"{ANTHROPIC_API_PATH_PREFIX}/count_tokens",
+     dependencies=[Depends(validate_json_request)],
+     responses={
+         HTTPStatus.OK.value: {"model": AnthropicCountTokensResponse},
+@@ -127,27 +126,8 @@
+ 
+     try:
+         response = await handler.count_tokens(request, raw_request)
+-    except (ValidationError, VLLMValidationError) as e:
+-        return JSONResponse(
+-            status_code=HTTPStatus.BAD_REQUEST.value,
+-            content=AnthropicErrorResponse(
+-                error=AnthropicError(
+-                    type="invalid_request_error",
+-                    message=sanitize_message(str(e)),
+-                )
+-            ).model_dump(),
+-        )
+     except Exception as e:
+-        logger.exception("Error in count_tokens: %s", e)
+-        return JSONResponse(
+-            status_code=HTTPStatus.INTERNAL_SERVER_ERROR.value,
+-            content=AnthropicErrorResponse(
+-                error=AnthropicError(
+-                    type="internal_error",
+-                    message=sanitize_message(str(e)),
+-                )
+-            ).model_dump(),
+-        )
++        return refuse(e, route="count_tokens")
+ 
+     if isinstance(response, ErrorResponse):
+         return translate_error_response(response)
+diff --git a/vllm/entrypoints/anthropic/protocol.py b/vllm/entrypoints/anthropic/protocol.py
+--- a/vllm/entrypoints/anthropic/protocol.py
++++ b/vllm/entrypoints/anthropic/protocol.py
+@@ -10,6 +10,44 @@
+ import vllm.envs as envs
+ 
+ 
++ANTHROPIC_API_PATH_PREFIX = "/v1/messages"
++
++
++def is_anthropic_api_path(path: str) -> bool:
++    """Whether a request path belongs to the Anthropic Messages API.
++
++    Every refusal on these paths -- typed request validation, prompt
++    rendering, the engine's own request validation -- is answered in the
++    Messages API's error envelope, never in the OpenAI-compatible one.
++    """
++    return path == ANTHROPIC_API_PATH_PREFIX or path.startswith(
++        ANTHROPIC_API_PATH_PREFIX + "/"
++    )
++
++
++# The Messages API's documented error types, by the HTTP status each one
++# is defined for.  Statuses outside the table map to the nearest class:
++# any other client error is an invalid request, any other server error is
++# an API error.
++_ERROR_TYPES_BY_STATUS = {
++    400: "invalid_request_error",
++    401: "authentication_error",
++    403: "permission_error",
++    404: "not_found_error",
++    413: "request_too_large",
++    429: "rate_limit_error",
++    500: "api_error",
++    529: "overloaded_error",
++}
++
++
++def anthropic_error_type(status_code: int) -> str:
++    """The Anthropic error type that stands for an HTTP status."""
++    if status_code in _ERROR_TYPES_BY_STATUS:
++        return _ERROR_TYPES_BY_STATUS[status_code]
++    return "invalid_request_error" if status_code < 500 else "api_error"
++
++
+ class AnthropicError(BaseModel):
+     """Error structure for Anthropic API"""
+ 
+@@ -22,6 +60,16 @@
+ 
+     type: Literal["error"] = "error"
+     error: AnthropicError
++
++    @classmethod
++    def for_status(cls, status_code: int, message: str) -> "AnthropicErrorResponse":
++        """The envelope for a refusal already classified by HTTP status."""
++        return cls(
++            error=AnthropicError(
++                type=anthropic_error_type(status_code),
++                message=message,
++            )
++        )
+ 
+ 
+ class AnthropicUsage(BaseModel):
+diff --git a/vllm/entrypoints/anthropic/serving.py b/vllm/entrypoints/anthropic/serving.py
+--- a/vllm/entrypoints/anthropic/serving.py
++++ b/vllm/entrypoints/anthropic/serving.py
+@@ -23,6 +23,7 @@
+     AnthropicCountTokensResponse,
+     AnthropicDelta,
+     AnthropicError,
++    AnthropicErrorResponse,
+     AnthropicMessagesRequest,
+     AnthropicMessagesResponse,
+     AnthropicOutputConfig,
+@@ -48,9 +49,13 @@
+ from vllm.entrypoints.openai.models.serving import OpenAIServingModels
+ from vllm.entrypoints.serve.exception_handling.utils import sanitize_message
+ from vllm.entrypoints.serve.utils.request_logger import RequestLogger
++from vllm.exceptions import VLLMValidationError
+ from vllm.renderers.online_renderer import OnlineRenderer
+ 
+ logger = logging.getLogger(__name__)
++
++# State the caller's error flag in the rendered tool result.
++TOOL_RESULT_ERROR_LINE = "Tool result flagged is_error: true."
+ 
+ 
+ def _build_anthropic_usage(
+@@ -170,7 +175,7 @@
+             return True
+ 
+     @staticmethod
+-    def _convert_image_source_to_url(source: dict[str, Any]) -> str:
++    def _convert_image_source_to_url(source: Any, *, where: str = "image") -> str:
+         """Convert an Anthropic image source to an OpenAI-compatible URL.
+ 
+         Anthropic supports two image source types:
+@@ -180,15 +185,35 @@
+         For base64 sources, this constructs a proper data URI that
+         downstream processors (e.g. vLLM's media connector) can handle.
+         """
+-        source_type = source.get("type")
+-        if source_type == "url":
+-            return source.get("url", "")
+-        # Default to base64 processing if type is "base64"
+-        # or missing, ensuring a proper data URI is always
+-        # constructed for non-URL sources.
+-        media_type = source.get("media_type", "image/jpeg")
+-        data = source.get("data", "")
+-        return f"data:{media_type};base64,{data}"
++        if isinstance(source, dict):
++            if (
++                source.get("type") == "url"
++                and isinstance(source.get("url"), str) and source["url"]
++            ):
++                return source["url"]
++            if (
++                source.get("type") == "base64"
++                and isinstance(source.get("data"), str) and source["data"]
++                and isinstance(source.get("media_type"), str) and source["media_type"]
++            ):
++                return f"data:{source['media_type']};base64,{source['data']}"
++        raise VLLMValidationError(
++            f"{where} names no image: an image source must specify a url source "
++            "with a nonempty url, or a base64 source with media_type and data.",
++            parameter="messages",
++        )
++
++    @classmethod
++    def _image_part(cls, source: Any, *, where: str) -> dict[str, Any]:
++        """The OpenAI image part for an Anthropic image source, or a refusal.
++
++        An image whose source names no image cannot be rendered; it is
++        refused rather than dropped from the prompt behind the caller's back.
++        """
++        return {
++            "type": "image_url",
++            "image_url": {"url": cls._convert_image_source_to_url(source, where=where)},
++        }
+ 
+     @classmethod
+     def _convert_anthropic_to_openai_request(
+@@ -353,9 +378,10 @@
+         """Convert individual content block"""
+         if block.type == "text" and block.text:
+             content_parts.append({"type": "text", "text": block.text})
+-        elif block.type == "image" and block.source:
+-            image_url = cls._convert_image_source_to_url(block.source)
+-            content_parts.append({"type": "image_url", "image_url": {"url": image_url}})
++        elif block.type == "image":
++            content_parts.append(
++                cls._image_part(block.source, where=f"an image block in a {role} message")
++            )
+         elif block.type == "thinking" and block.thinking is not None:
+             reasoning_parts.append(block.thinking)
+         elif block.type == "redacted_thinking":
+@@ -413,39 +439,62 @@
+         appears inside the originating ``<tool_response>``.  Moving images to a
+         synthetic later user message changes the trained prompt structure,
+         multimodal marker positions, and prefix-cache identity.
++
++        Every item the caller put in the result is rendered, or the request
++        is refused: an item this rendering cannot carry (a document, a search
++        result) would otherwise vanish from the prompt and the model would be
++        told the tool returned less than it did.  ``is_error`` has no field
++        in the rendered result, so it is stated as the result's first line.
+         """
+         tool_text = ""
+         tool_content_parts: list[dict[str, Any]] = []
+         has_image = False
+         tool_reference: list[dict[str, Any]] = []
++        where = f"tool_result {block.tool_use_id or ''!r}"
+ 
+         if isinstance(block.content, str):
+             tool_text = block.content
+         elif isinstance(block.content, list):
+             text_parts: list[str] = []
+-            for item in block.content:
+-                if not isinstance(item, dict):
+-                    continue
+-                item_type = item.get("type")
++            for position, item in enumerate(block.content):
++                item_type = item.get("type") if isinstance(item, dict) else None
++                item_where = f"{where} content[{position}]"
+                 if item_type == "text":
+-                    text = item.get("text", "")
++                    text = item.get("text")
++                    if not isinstance(text, str):
++                        raise VLLMValidationError(
++                            f"{item_where} requires a text string.", parameter="messages"
++                        )
+                     text_parts.append(text)
+                     tool_content_parts.append({"type": "text", "text": text})
+                 elif item_type == "image":
+-                    source = item.get("source", {})
+-                    url = cls._convert_image_source_to_url(source)
+-                    if url:
+-                        has_image = True
+-                        tool_content_parts.append(
+-                            {"type": "image_url", "image_url": {"url": url}}
+-                        )
++                    has_image = True
++                    tool_content_parts.append(
++                        cls._image_part(item.get("source"), where=item_where)
++                    )
+                 elif item_type == "tool_reference":
+                     ref_name = item.get("tool_name") or item.get("name")
+-                    if ref_name:
+-                        tool_reference.append(
+-                            {"type": "tool_reference", "name": ref_name}
++                    if not isinstance(ref_name, str) or not ref_name:
++                        raise VLLMValidationError(
++                            f"{item_where} is a tool_reference that names no tool.",
++                            parameter="messages",
+                         )
++                    tool_reference.append({"type": "tool_reference", "name": ref_name})
++                else:
++                    raise VLLMValidationError(
++                        f"{item_where} is a {item_type!r} item; this model's "
++                        "tool-result rendering carries text, image and "
++                        "tool_reference items only, so the result is refused "
++                        "rather than rendered with the item silently missing.",
++                        parameter="messages",
++                    )
+             tool_text = "\n".join(text_parts)
++
++        if block.is_error:
++            tool_content_parts.insert(
++                0, {"type": "text", "text": TOOL_RESULT_ERROR_LINE}
++            )
++            tool_text = "\n".join(filter(None, (TOOL_RESULT_ERROR_LINE, tool_text)))
+ 
+         openai_messages.append(
+             {
+@@ -803,9 +852,15 @@
+                         )
+                         yield wrap_data_with_event(data, "message_stop")
+                     else:
+-                        origin_chunk = ChatCompletionStreamResponse.model_validate_json(
+-                            data_str
+-                        )
++                        payload = json.loads(data_str)
++                        if "error" in payload:
++                            failure = ErrorResponse.model_validate(payload)
++                            error = AnthropicErrorResponse.for_status(
++                                failure.error.code, failure.error.message
++                            )
++                            yield wrap_data_with_event(error.model_dump_json(), "error")
++                            return
++                        origin_chunk = ChatCompletionStreamResponse.model_validate(payload)
+ 
+                         if first_item:
+                             chunk = AnthropicStreamEvent(
+@@ -991,7 +1046,7 @@
+                     error_response = AnthropicStreamEvent(
+                         type="error",
+                         error=AnthropicError(
+-                            type="internal_error",
++                            type="api_error",
+                             message="Invalid data format received",
+                         ),
+                     )
+@@ -1003,7 +1058,7 @@
+             error_response = AnthropicStreamEvent(
+                 type="error",
+                 error=AnthropicError(
+-                    type="internal_error", message=sanitize_message(str(e))
++                    type="api_error", message=sanitize_message(str(e))
+                 ),
+             )
+             data = error_response.model_dump_json(exclude_unset=True)
+diff --git a/vllm/entrypoints/serve/exception_handling/error_response.py b/vllm/entrypoints/serve/exception_handling/error_response.py
+--- a/vllm/entrypoints/serve/exception_handling/error_response.py
++++ b/vllm/entrypoints/serve/exception_handling/error_response.py
+@@ -2,6 +2,14 @@
+ # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
+ from http import HTTPStatus
+ 
++from starlette.requests import Request
++from starlette.responses import JSONResponse
++from starlette.routing import get_route_path
++
++from vllm.entrypoints.anthropic.protocol import (
++    AnthropicErrorResponse,
++    is_anthropic_api_path,
++)
+ from vllm.entrypoints.openai.engine.protocol import (
+     ErrorInfo,
+     ErrorResponse,
+@@ -12,6 +20,22 @@
+ from .utils import sanitize_message
+ 
+ logger = init_logger(__name__)
++
++
++def error_json_response(request: Request, error: ErrorResponse) -> JSONResponse:
++    """Serialize a refusal in the vocabulary of the API the request used.
++
++    The Anthropic Messages API answers every refusal, typed request
++    validation included, in its own envelope; the OpenAI-compatible
++    surfaces answer in theirs.  The status is the same either way.
++    """
++    if is_anthropic_api_path(get_route_path(request.scope)):
++        content = AnthropicErrorResponse.for_status(
++            error.error.code, error.error.message
++        ).model_dump()
++    else:
++        content = error.model_dump()
++    return JSONResponse(content, status_code=error.error.code)
+ 
+ 
+ def create_error_response(
+diff --git a/vllm/entrypoints/serve/exception_handling/handlers/exception.py b/vllm/entrypoints/serve/exception_handling/handlers/exception.py
+--- a/vllm/entrypoints/serve/exception_handling/handlers/exception.py
++++ b/vllm/entrypoints/serve/exception_handling/handlers/exception.py
+@@ -2,11 +2,10 @@
+ # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
+ 
+ from fastapi import Request
+-from starlette.responses import JSONResponse
+ 
+ from vllm.logger import init_logger
+ 
+-from ..error_response import create_error_response
++from ..error_response import create_error_response, error_json_response
+ 
+ logger = init_logger(__name__)
+ 
+@@ -21,4 +20,4 @@
+         )
+ 
+     err = create_error_response(exc)
+-    return JSONResponse(err.model_dump(), status_code=err.error.code)
++    return error_json_response(req, err)
+diff --git a/vllm/entrypoints/serve/exception_handling/handlers/http.py b/vllm/entrypoints/serve/exception_handling/handlers/http.py
+--- a/vllm/entrypoints/serve/exception_handling/handlers/http.py
++++ b/vllm/entrypoints/serve/exception_handling/handlers/http.py
+@@ -3,11 +3,11 @@
+ from http import HTTPStatus
+ 
+ from fastapi import HTTPException, Request
+-from starlette.responses import JSONResponse
+ 
+ from vllm.entrypoints.openai.engine.protocol import ErrorInfo, ErrorResponse
+ from vllm.logger import init_logger
+ 
++from ..error_response import error_json_response
+ from ..utils import sanitize_message
+ 
+ logger = init_logger(__name__)
+@@ -28,4 +28,4 @@
+             code=exc.status_code,
+         )
+     )
+-    return JSONResponse(err.model_dump(), status_code=exc.status_code)
++    return error_json_response(req, err)
+diff --git a/vllm/entrypoints/serve/exception_handling/handlers/validation.py b/vllm/entrypoints/serve/exception_handling/handlers/validation.py
+--- a/vllm/entrypoints/serve/exception_handling/handlers/validation.py
++++ b/vllm/entrypoints/serve/exception_handling/handlers/validation.py
+@@ -6,12 +6,12 @@
+ import regex as re
+ from fastapi import Request
+ from fastapi.exceptions import RequestValidationError
+-from starlette.responses import JSONResponse
+ 
+ from vllm.entrypoints.openai.engine.protocol import ErrorInfo, ErrorResponse
+ from vllm.exceptions import VLLMValidationError
+ from vllm.logger import init_logger
+ 
++from ..error_response import error_json_response
+ from ..utils import sanitize_message
+ 
+ logger = init_logger(__name__)
+@@ -135,4 +135,4 @@
+             param=param,
+         )
+     )
+-    return JSONResponse(err.model_dump(), status_code=HTTPStatus.BAD_REQUEST)
++    return error_json_response(req, err)
+diff --git a/vllm/entrypoints/serve/exception_handling/handlers/vllm_error.py b/vllm/entrypoints/serve/exception_handling/handlers/vllm_error.py
+--- a/vllm/entrypoints/serve/exception_handling/handlers/vllm_error.py
++++ b/vllm/entrypoints/serve/exception_handling/handlers/vllm_error.py
+@@ -2,7 +2,6 @@
+ # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
+ 
+ from fastapi import Request
+-from starlette.responses import JSONResponse
+ 
+ from vllm.entrypoints.launcher import terminate_if_errored
+ from vllm.entrypoints.openai.engine.protocol import GenerationError
+@@ -10,7 +9,7 @@
+ from vllm.logger import init_logger
+ from vllm.v1.engine.exceptions import EngineDeadError, EngineGenerateError
+ 
+-from ..error_response import create_error_response
++from ..error_response import create_error_response, error_json_response
+ from .exception import exception_handler
+ 
+ logger = init_logger(__name__)
+@@ -66,7 +65,7 @@
+         engine=req.app.state.engine_client,
+     )
+     err = create_error_response(exc)
+-    return JSONResponse(err.model_dump(), status_code=err.error.code)
++    return error_json_response(req, err)
+ 
+ 
+ async def generation_error_handler(req: Request, exc: GenerationError):
+@@ -77,4 +76,4 @@
+     server logs with stack traces.
+     """
+     err = create_error_response(exc)
+-    return JSONResponse(err.model_dump(), status_code=err.error.code)
++    return error_json_response(req, err)

@@ -45,6 +45,42 @@ The full `turboquant_k8v4_unit.py` GPU store/fused-decode numerical acceptance
 remains required at release. CPU interpretation proves these guards and the
 packaging regression; it does not prove GPU code generation or performance.
 
+## Findings 5, 3, 6 and new A: Anthropic input and error fidelity
+
+`vllm-anthropic-input-fidelity.patch` adds the fourteenth runtime source stage.
+The tool-result converter refuses documents, search results and unknown items
+with `VLLMValidationError` before rendering. Missing image sources and malformed
+text/reference items are also refused. Supported text and media retain their
+order inside the originating tool response. When the caller sets `is_error`, the
+result begins with `Tool result flagged is_error: true.`; the caller's content
+follows it unchanged. This represents a caller-supplied status the template has
+no separate field for.
+
+Both `/v1/messages` and `/v1/messages/count_tokens` use the same exception
+classification as OpenAI. Template, image-gate and prompt-length rejections are
+HTTP 400 `invalid_request_error`. Framework validation, HTTP errors and engine
+errors use Anthropic envelopes on these paths, including deployments with an
+ASGI root path. Other protocols retain their own envelope. OpenAI error chunks
+forwarded through the Anthropic stream keep their classified status semantics;
+the converter emits an `error` and stops without a success terminal.
+
+The existing shared classifier still handles raw `ValueError`, `TypeError` and
+`OverflowError` as client rejections. This is necessary while the pinned renderer
+and input utilities themselves raise those types; duplicating a narrower local
+classifier caused the original 500 defect. Unclassified server failures remain
+500 `api_error`. HTTP statuses without a dedicated Anthropic error name retain
+their HTTP status and use the corresponding client/server error family.
+
+Validation: 122 tests in the extended Anthropic conversion and validation-handler
+suites pass in a disposable, network-disabled base-image container using the
+preexisting offline pytest packages. The tests exercise both stream settings and
+both routes, real template/image/length rejection code, nested-content refusal,
+error markers with text/media, returned engine errors, framework validation with
+root paths, OpenAI envelope preservation, and terminal stream errors. No listener,
+engine or model is started. The five newly patched shared error modules are
+copied and checked against their upstream and final hashes in the image recipe,
+build verifier and installed runtime verifier.
+
 ## Remaining implementation
 
 Parser language, stop handling, schema conversion, protocol translation, image

@@ -6,6 +6,7 @@ EXPECTED_STATUS=$' M tests/config/test_config_utils.py
  M tests/distributed/test_rocm_quick_reduce.py
  M tests/engine/test_arg_utils.py
  M tests/entrypoints/anthropic/test_anthropic_messages_conversion.py
+ M tests/entrypoints/serve/exception_handling/test_validation_exception_handler.py
  M tests/entrypoints/serve/utils/test_api_utils.py
  M tests/entrypoints/unit_tests/test_chat_utils.py
  M tests/evals/gsm8k/test_gsm8k_offloading.py
@@ -57,6 +58,11 @@ EXPECTED_STATUS=$' M tests/config/test_config_utils.py
  M vllm/entrypoints/openai/responses/utils.py
  M vllm/entrypoints/scale_out/token_in_token_out/protocol.py
  M vllm/entrypoints/scale_out/token_in_token_out/serving.py
+ M vllm/entrypoints/serve/exception_handling/error_response.py
+ M vllm/entrypoints/serve/exception_handling/handlers/exception.py
+ M vllm/entrypoints/serve/exception_handling/handlers/http.py
+ M vllm/entrypoints/serve/exception_handling/handlers/validation.py
+ M vllm/entrypoints/serve/exception_handling/handlers/vllm_error.py
  M vllm/entrypoints/serve/utils/api_utils.py
  M vllm/envs.py
  M vllm/model_executor/models/qwen3_vl.py
@@ -146,6 +152,7 @@ TOOL_SCHEMA_PATCH_FILE="${PROJECT_DIR}/patches/vllm-enforce-auto-tool-schema.pat
 AGENT_DEFAULTS_PATCH_FILE="${PROJECT_DIR}/patches/vllm-qwen38-agent-defaults-and-thinking.patch"
 PHASE_BUDGET_PATCH_FILE="${PROJECT_DIR}/patches/vllm-qwen38-separate-final-response-budget.patch"
 IMPLICIT_TOOL_GRAMMAR_PATCH_FILE="${PROJECT_DIR}/patches/vllm-qwen-implicit-tool-grammar-boundary.patch"
+ANTHROPIC_INPUTS_PATCH_FILE="${PROJECT_DIR}/patches/vllm-anthropic-input-fidelity.patch"
 ANTHROPIC_VALIDATION_PATCH_FILE="${PROJECT_DIR}/patches/vllm-anthropic-validation-http400.patch"
 TOOL_TRUNCATION_PATCH_FILE="${PROJECT_DIR}/patches/vllm-tool-truncation-finish-reason.patch"
 VISION_RUNTIME_PATCH_FILE="${PROJECT_DIR}/patches/vllm-qwen38-vision-runtime.patch"
@@ -298,6 +305,7 @@ printf '%s  %s\n' \
   "${PHASE_BUDGET_PATCH_DIFF_SHA256}" "${PHASE_BUDGET_PATCH_FILE}" \
   "${IMPLICIT_TOOL_GRAMMAR_PATCH_DIFF_SHA256}" "${IMPLICIT_TOOL_GRAMMAR_PATCH_FILE}" \
   "${ANTHROPIC_VALIDATION_PATCH_DIFF_SHA256}" "${ANTHROPIC_VALIDATION_PATCH_FILE}" \
+  "${ANTHROPIC_INPUTS_PATCH_DIFF_SHA256}" "${ANTHROPIC_INPUTS_PATCH_FILE}" \
   "${TOOL_TRUNCATION_PATCH_DIFF_SHA256}" "${TOOL_TRUNCATION_PATCH_FILE}" \
   "${VISION_RUNTIME_PATCH_DIFF_SHA256}" "${VISION_RUNTIME_PATCH_FILE}" \
   "${NUMERICAL_AUDITS_PATCH_DIFF_SHA256}" "${NUMERICAL_AUDITS_PATCH_FILE}" \
@@ -330,8 +338,8 @@ docker run --rm \
   "${BASE_IMAGE_TAG}" \
   -m unittest -v patches.source_patch_v1.test_framework scripts.runtime_image_unit
 
-# The served chat template is the fourteenth landmark-aware transformation, and
-# it is proved here on the same terms as the other thirteen: reconstructed from
+# The served chat template is a landmark-aware transformation, and
+# it is proved here on the same terms as the runtime source stages: reconstructed from
 # the model's own template through named stages and refused if it does not
 # reproduce the published bytes. Before this existed the template's differences
 # from the model's were pinned but not derived -- the bytes were fixed and
@@ -430,6 +438,11 @@ printf '%s  %s\n' \
   "${MODEL_CONFIG_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${MODEL_CONFIG_REL}" \
   "${ANTHROPIC_PROTOCOL_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${ANTHROPIC_PROTOCOL_REL}" \
   "${ANTHROPIC_SERVING_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${ANTHROPIC_SERVING_REL}" \
+  "${ERROR_RESPONSE_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/entrypoints/serve/exception_handling/error_response.py" \
+  "${EXCEPTION_EXCEPTION_HANDLER_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/entrypoints/serve/exception_handling/handlers/exception.py" \
+  "${HTTP_EXCEPTION_HANDLER_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/entrypoints/serve/exception_handling/handlers/http.py" \
+  "${VALIDATION_EXCEPTION_HANDLER_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/entrypoints/serve/exception_handling/handlers/validation.py" \
+  "${VLLM_ERROR_EXCEPTION_HANDLER_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/entrypoints/serve/exception_handling/handlers/vllm_error.py" \
   "${CHAT_PROTOCOL_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${CHAT_PROTOCOL_REL}" \
   "${SAMPLING_PARAMS_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${SAMPLING_PARAMS_REL}" \
   "${SCHED_UTILS_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${SCHED_UTILS_REL}" \
@@ -556,6 +569,11 @@ docker buildx build --progress=plain \
   --build-arg "MODEL_CONFIG_UPSTREAM_FILE_SHA256=${MODEL_CONFIG_UPSTREAM_FILE_SHA256}" \
   --build-arg "ANTHROPIC_PROTOCOL_UPSTREAM_FILE_SHA256=${ANTHROPIC_PROTOCOL_UPSTREAM_FILE_SHA256}" \
   --build-arg "ANTHROPIC_SERVING_UPSTREAM_FILE_SHA256=${ANTHROPIC_SERVING_UPSTREAM_FILE_SHA256}" \
+  --build-arg "ERROR_RESPONSE_UPSTREAM_FILE_SHA256=${ERROR_RESPONSE_UPSTREAM_FILE_SHA256}" \
+  --build-arg "EXCEPTION_EXCEPTION_HANDLER_UPSTREAM_FILE_SHA256=${EXCEPTION_EXCEPTION_HANDLER_UPSTREAM_FILE_SHA256}" \
+  --build-arg "HTTP_EXCEPTION_HANDLER_UPSTREAM_FILE_SHA256=${HTTP_EXCEPTION_HANDLER_UPSTREAM_FILE_SHA256}" \
+  --build-arg "VALIDATION_EXCEPTION_HANDLER_UPSTREAM_FILE_SHA256=${VALIDATION_EXCEPTION_HANDLER_UPSTREAM_FILE_SHA256}" \
+  --build-arg "VLLM_ERROR_EXCEPTION_HANDLER_UPSTREAM_FILE_SHA256=${VLLM_ERROR_EXCEPTION_HANDLER_UPSTREAM_FILE_SHA256}" \
   --build-arg "CHAT_PROTOCOL_UPSTREAM_FILE_SHA256=${CHAT_PROTOCOL_UPSTREAM_FILE_SHA256}" \
   --build-arg "SAMPLING_PARAMS_UPSTREAM_FILE_SHA256=${SAMPLING_PARAMS_UPSTREAM_FILE_SHA256}" \
   --build-arg "SCHED_UTILS_UPSTREAM_FILE_SHA256=${SCHED_UTILS_UPSTREAM_FILE_SHA256}" \
@@ -591,6 +609,11 @@ docker buildx build --progress=plain \
   --build-arg "MODEL_CONFIG_PATCHED_FILE_SHA256=${MODEL_CONFIG_PATCHED_FILE_SHA256}" \
   --build-arg "ANTHROPIC_PROTOCOL_PATCHED_FILE_SHA256=${ANTHROPIC_PROTOCOL_PATCHED_FILE_SHA256}" \
   --build-arg "ANTHROPIC_SERVING_PATCHED_FILE_SHA256=${ANTHROPIC_SERVING_PATCHED_FILE_SHA256}" \
+  --build-arg "ERROR_RESPONSE_PATCHED_FILE_SHA256=${ERROR_RESPONSE_PATCHED_FILE_SHA256}" \
+  --build-arg "EXCEPTION_EXCEPTION_HANDLER_PATCHED_FILE_SHA256=${EXCEPTION_EXCEPTION_HANDLER_PATCHED_FILE_SHA256}" \
+  --build-arg "HTTP_EXCEPTION_HANDLER_PATCHED_FILE_SHA256=${HTTP_EXCEPTION_HANDLER_PATCHED_FILE_SHA256}" \
+  --build-arg "VALIDATION_EXCEPTION_HANDLER_PATCHED_FILE_SHA256=${VALIDATION_EXCEPTION_HANDLER_PATCHED_FILE_SHA256}" \
+  --build-arg "VLLM_ERROR_EXCEPTION_HANDLER_PATCHED_FILE_SHA256=${VLLM_ERROR_EXCEPTION_HANDLER_PATCHED_FILE_SHA256}" \
   --build-arg "CHAT_PROTOCOL_PATCHED_FILE_SHA256=${CHAT_PROTOCOL_PATCHED_FILE_SHA256}" \
   --build-arg "SAMPLING_PARAMS_PATCHED_FILE_SHA256=${SAMPLING_PARAMS_PATCHED_FILE_SHA256}" \
   --build-arg "SCHED_UTILS_PATCHED_FILE_SHA256=${SCHED_UTILS_PATCHED_FILE_SHA256}" \
@@ -633,6 +656,7 @@ docker buildx build --progress=plain \
   --build-arg "PHASE_BUDGET_PATCH_DIFF_SHA256=${PHASE_BUDGET_PATCH_DIFF_SHA256}" \
   --build-arg "IMPLICIT_TOOL_GRAMMAR_PATCH_DIFF_SHA256=${IMPLICIT_TOOL_GRAMMAR_PATCH_DIFF_SHA256}" \
   --build-arg "ANTHROPIC_VALIDATION_PATCH_DIFF_SHA256=${ANTHROPIC_VALIDATION_PATCH_DIFF_SHA256}" \
+  --build-arg "ANTHROPIC_INPUTS_PATCH_DIFF_SHA256=${ANTHROPIC_INPUTS_PATCH_DIFF_SHA256}" \
   --build-arg "TOOL_TRUNCATION_PATCH_DIFF_SHA256=${TOOL_TRUNCATION_PATCH_DIFF_SHA256}" \
   --build-arg "VISION_RUNTIME_PATCH_DIFF_SHA256=${VISION_RUNTIME_PATCH_DIFF_SHA256}" \
   --build-arg "NUMERICAL_AUDITS_PATCH_DIFF_SHA256=${NUMERICAL_AUDITS_PATCH_DIFF_SHA256}" \
@@ -705,6 +729,11 @@ actual_installed_report="$(
     /usr/local/lib/python3.12/dist-packages/vllm/config/model.py \
     /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/anthropic/protocol.py \
     /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/anthropic/serving.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/serve/exception_handling/error_response.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/serve/exception_handling/handlers/exception.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/serve/exception_handling/handlers/http.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/serve/exception_handling/handlers/validation.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/serve/exception_handling/handlers/vllm_error.py \
     /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/chat_completion/protocol.py \
     /usr/local/lib/python3.12/dist-packages/vllm/sampling_params.py \
     /usr/local/lib/python3.12/dist-packages/vllm/v1/core/sched/utils.py \
@@ -732,6 +761,11 @@ expected_installed_report="$(printf '%s  %s\n' \
   "${MODEL_CONFIG_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/config/model.py \
   "${ANTHROPIC_PROTOCOL_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/anthropic/protocol.py \
   "${ANTHROPIC_SERVING_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/anthropic/serving.py \
+  "${ERROR_RESPONSE_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/serve/exception_handling/error_response.py \
+  "${EXCEPTION_EXCEPTION_HANDLER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/serve/exception_handling/handlers/exception.py \
+  "${HTTP_EXCEPTION_HANDLER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/serve/exception_handling/handlers/http.py \
+  "${VALIDATION_EXCEPTION_HANDLER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/serve/exception_handling/handlers/validation.py \
+  "${VLLM_ERROR_EXCEPTION_HANDLER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/serve/exception_handling/handlers/vllm_error.py \
   "${CHAT_PROTOCOL_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/chat_completion/protocol.py \
   "${SAMPLING_PARAMS_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/sampling_params.py \
   "${SCHED_UTILS_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/core/sched/utils.py \

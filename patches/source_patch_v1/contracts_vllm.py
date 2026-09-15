@@ -534,6 +534,12 @@ def _validate_anthropic_400_after(state: State) -> None:
         },
         label=label,
     )
+    # The later fidelity stage routes these same validation failures through
+    # the shared exception classifier. Reassert that stronger contract when
+    # validating the final tree; the initial stage still has its local catches.
+    if "def refuse(" in _source(state, path, label=label):
+        _validate_anthropic_inputs_after(state)
+        return
     # The engine's own request validation -- a generation that names no agent,
     # for one -- is a client error exactly as typed request validation is, and
     # it reaches this router as VLLMValidationError rather than pydantic's.
@@ -1561,6 +1567,66 @@ def _validate_reasoning_usage_after(state: State) -> None:
     )
 
 
+def _validate_anthropic_inputs_before(state: State) -> None:
+    forbid_text(
+        state, "vllm/entrypoints/anthropic/protocol.py",
+        "def for_status(", label="Anthropic input fidelity precondition",
+    )
+
+
+def _validate_anthropic_inputs_after(state: State) -> None:
+    label = "Anthropic input fidelity result"
+    router = "vllm/entrypoints/anthropic/api_router.py"
+    serving = "vllm/entrypoints/anthropic/serving.py"
+    protocol = "vllm/entrypoints/anthropic/protocol.py"
+    errors = "vllm/entrypoints/serve/exception_handling/error_response.py"
+    for name in ("create_messages", "count_tokens"):
+        _require_in_symbol(state, router, name, (
+            "except Exception as e:", f'return refuse(e, route="{name}")',
+        ), label=label)
+    _require_in_symbol(state, router, "refuse", (
+        "error = create_error_response(exc)", "return translate_error_response(error)",
+    ), label=label)
+    _require_in_symbol(state, router, "translate_error_response", (
+        "status_code=response.error.code", "AnthropicErrorResponse.for_status(",
+    ), label=label)
+    _require_in_symbol(state, errors, "error_json_response", (
+        "is_anthropic_api_path(get_route_path(request.scope))",
+        "AnthropicErrorResponse.for_status(", "content = error.model_dump()",
+        "status_code=error.error.code",
+    ), label=label)
+    for name in ("exception", "http", "validation", "vllm_error"):
+        path = f"vllm/entrypoints/serve/exception_handling/handlers/{name}.py"
+        require_text(state, path, "return error_json_response(req, err)",
+                     count=2 if name == "vllm_error" else 1, label=label)
+        forbid_text(state, path, "return JSONResponse(", label=label)
+    for needle in (
+        '400: "invalid_request_error"', '500: "api_error"',
+        '529: "overloaded_error"', "def for_status(",
+    ):
+        require_text(state, protocol, needle, label=label)
+    _require_in_symbol(state, serving, "AnthropicServingMessages._convert_user_tool_result", (
+        "raise VLLMValidationError(", "if block.is_error:", "TOOL_RESULT_ERROR_LINE",
+        "tool_content_parts.insert(", "item_where",
+    ), label=label)
+    _require_in_symbol(state, serving, "AnthropicServingMessages._convert_image_source_to_url", (
+        'source.get("type") == "url"', 'source.get("type") == "base64"',
+        "raise VLLMValidationError(",
+    ), label=label)
+    _require_in_symbol(state, serving, "AnthropicServingMessages.message_stream_converter", (
+        "failure = ErrorResponse.model_validate(payload)",
+        "AnthropicErrorResponse.for_status(", 'type="api_error"',
+    ), label=label)
+    forbid_text(state, serving, 'type="internal_error"', label=label)
+    require_python_symbols(state,
+        "tests/entrypoints/anthropic/test_anthropic_messages_conversion.py", {
+            "TestToolResultFidelity.test_an_item_the_rendering_cannot_carry_is_refused": None,
+            "TestToolResultFidelity.test_is_error_is_stated_before_media_parts": None,
+            "TestErrorEnvelope.test_real_request_gates_return_400_before_streaming": None,
+            "TestErrorEnvelope.test_stream_forwards_the_classified_error_and_never_reports_success": None,
+        }, label=label)
+
+
 def validate_final(state: State) -> None:
     """Reassert every durable semantic invariant on the complete tree.
 
@@ -1576,6 +1642,21 @@ def validate_final(state: State) -> None:
 
 
 CONTRACTS: Mapping[str, SemanticContract] = {
+    "anthropic-input-fidelity": SemanticContract(
+        rationale=(
+            "Anthropic tool results silently lost unsupported content and is_error; "
+            "renderer ValueErrors became 500s and framework errors used OpenAI "
+            "envelopes. Refuse unrenderable input, render the caller's failure flag, "
+            "and preserve the shared HTTP classification in Anthropic errors."
+        ),
+        removal_condition=(
+            "Remove when pinned upstream preserves all supported tool-result input "
+            "or refuses it and uses the same exception classification with native "
+            "Anthropic envelopes at request and streaming boundaries."
+        ),
+        validate_before=_validate_anthropic_inputs_before,
+        validate_after=_validate_anthropic_inputs_after,
+    ),
     "turboquant-k8v4-direct-workspace": SemanticContract(
         rationale=(
             "The pinned K8V4 continuation-prefill path dequantized into two reserved "
