@@ -29,9 +29,31 @@ exact sampled IDs. The installed parser unit has 12 tests plus 126 subtests.
 The build check reconstructs and verifies every runtime file and runs the
 installed unit. No model, service or GPU was run.
 
-Still open in the owner's order: the #17 one-way thinking boundary; schema
+Still open in the owner's order: schema
 #2/#18; token/text provenance #23; precise error classification; the written
 client commit review; final agent pins, final check and implementation report.
+
+## Finding #17: one-way thinking boundary on V1
+
+`vllm-one-way-thinking-boundary.patch` exposes the atomic boundary already
+derived by the parser for exact reasoning usage. Qwen ends thinking at its
+natural closer or implicit tool-start token. The V1 thinking-budget holder
+latches that boundary and stops forcing. A later thinking opener in answer
+text or a tool value cannot reopen the phase. The forced closing sequence
+remains distinct from the tokens that naturally end thinking.
+
+The grammar detects the first boundary in the newly generated IDs and keeps
+the implicit tool trigger. Earlier prompt history cannot make it trim that
+trigger away. Existing final-response counting is unchanged. The correction
+touches seven runtime files in the parser, reasoning configuration, V1
+budget holder and structured-output manager.
+
+Validation: 64 CPU budget/manager cases pass, including 20 new Qwen cases;
+3,998 parser cases and 62 native stop/OutputProcessor cases also pass. The
+installed phase-budget unit exercises natural and implicit boundaries,
+retained output, chunking, prompt history, unchanged logits and native
+grammar acceptance of a call with literal thinking markers in its value.
+No model or GPU was run.
 
 ## Qwen terminal recognition follows the grammar phase
 

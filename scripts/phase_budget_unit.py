@@ -194,4 +194,92 @@ for request_type, prompt in (
         else:
             raise AssertionError("beam decoding bypassed the sampling policy boundary")
 
+def check_one_way_thinking_boundary():
+    from pathlib import Path
+    import runpy
+    from types import SimpleNamespace
+    from unittest.mock import MagicMock, patch
+
+    import torch
+    import xgrammar as xgr
+
+    from vllm.config import ReasoningConfig
+    from vllm.reasoning import ReasoningParserManager
+    from vllm.tool_parsers.structural_tag_registry import get_model_structural_tag
+    from vllm.v1.sample.logits_processor import BatchUpdate
+    from vllm.v1.sample.thinking_budget_state import ThinkingBudgetStateHolder
+    from vllm.v1.structured_output import StructuredOutputManager
+    from vllm.sampling_params import StructuredOutputsParams
+
+    helpers = runpy.run_path(
+        str(Path(__file__).with_name("tool_output_parser_unit.py"))
+    )
+    markers, tool_schema = helpers["MARKERS"], helpers["TOOL"]
+    call, decode, encode = (helpers[name] for name in ("call", "decode", "encode"))
+    tokenizer = MagicMock()
+    tokenizer.get_vocab.return_value = markers
+    tokenizer.decode.side_effect = decode
+    tokenizer.encode.side_effect = lambda text, **_: encode(text)
+    tokenizer.all_special_tokens = list(markers)
+    tokenizer.all_special_ids = list(markers.values())
+    config = ReasoningConfig(reasoning_parser="qwen3")
+    with patch(
+        "vllm.config.reasoning.cached_tokenizer_from_config", return_value=tokenizer
+    ):
+        config.initialize_token_ids(SimpleNamespace())
+    reasoner_cls = ReasoningParserManager.get_reasoning_parser("qwen3")
+    tools = ChatCompletionRequest(messages=[], tools=[tool_schema]).tools
+    tag = get_model_structural_tag("qwen_3_coder", tools, "auto", False)
+    compiled = xgr.GrammarCompiler(xgr.TokenizerInfo([])).compile_structural_tag(tag)
+    start, end, tool = (markers[m] for m in ("<think>", "</think>", "<tool_call>"))
+    assert config.reasoning_boundary_token_ids == frozenset({end, tool})
+    value = "literal <think></think></tool_call> " + "x" * 100
+    content = encode(call(value))
+
+    with patch("vllm.utils.torch_utils.PIN_MEMORY", False):
+        for implicit in (False, True):
+            for resumed in (False, True):
+                for chunk_size in (1, 1000):
+                    prompt = [start, 10, end, 20, start]
+                    output = [10] + ([] if implicit else [end]) + content
+                    holder = ThinkingBudgetStateHolder(
+                        config, 1, 0, torch.device("cpu"), False
+                    )
+                    holder.sync_batch(BatchUpdate(
+                        batch_size=1, removed=(), moved=(),
+                        added=[(0, SamplingParams(thinking_token_budget=8),
+                                prompt, output if resumed else [])],
+                    ))
+                    prefixes = ([output] if resumed else [
+                        output[:i] for i in range(
+                            chunk_size, len(output) + chunk_size, chunk_size
+                        )
+                    ])
+                    for prefix in prefixes:
+                        holder.update_state([prefix], None)
+                        logits = torch.zeros((1, max(markers.values()) + 1))
+                        logits[:, end] = -float("inf")
+                        before = logits.clone()
+                        holder.apply_to_logits(logits, False, None)
+                        torch.testing.assert_close(logits, before)
+
+                    params = SamplingParams(structured_outputs=StructuredOutputsParams(
+                        structural_tag=tag.model_dump_json()
+                    ))
+                    request = Request("thinking-boundary", prompt, params, None,
+                                      reasoning_ended=False)
+                    request.append_output_token_ids(output)
+                    manager = StructuredOutputManager.__new__(StructuredOutputManager)
+                    manager.reasoner_cls = reasoner_cls
+                    manager.tokenizer = tokenizer
+                    manager.enable_in_reasoning = False
+                    assert manager.should_advance(request, new_token_ids=output)
+                    trimmed = manager.trim_reasoning_for_advance(request, output)
+                    assert trimmed == content
+                    matcher = xgr.GrammarMatcher(compiled)
+                    assert matcher.accept_string(decode(trimmed))
+                    assert matcher.is_completed()
+
+
+check_one_way_thinking_boundary()
 print("phase-budget-unit: PASS")

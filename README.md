@@ -75,7 +75,7 @@ error.
   and relay readiness events, then validates the complete live configuration before
   reporting success. Re-running it validates the existing owned topology rather than
   starting a duplicate.
-- status.sh validates host prerequisites, twenty-nine ordered vLLM transformations, every reviewed
+- status.sh validates host prerequisites, thirty ordered vLLM transformations, every reviewed
   source and test file, the model manifest, image archive, image identity and labels,
   command and environment, mounts, runtime packages, API identity, listener,
   hardening, and live health. HEALTHY means all checks passed.
@@ -95,7 +95,7 @@ Advanced reproducibility operations are deliberately separate from serving mode:
     ./scripts/build-vllm.sh build
     ./scripts/restore-images.sh
 
-The check reconstructs the source tree from the pinned upstream commit through all twenty-nine
+The check reconstructs the source tree from the pinned upstream commit through all thirty
 landmark-aware transformations. The build runs offline from the exact base image and fails unless it produces
 the pinned image ID. Restore verifies the pinned local archive before loading it.
 
@@ -251,7 +251,7 @@ The vLLM submodule is pinned at:
 
     9df9b0b0a1816b6d0d0f6ecd0da563cc37fd72f5
 
-It is intentionally reconstructed by twenty-nine ordered, reviewed semantic transformations:
+It is intentionally reconstructed by thirty ordered, reviewed semantic transformations:
 
 | Patch | SHA-256 |
 |---|---|
@@ -284,9 +284,10 @@ It is intentionally reconstructed by twenty-nine ordered, reviewed semantic tran
 | patches/vllm-phase-aware-parser-terminals.patch | cc79995955bc36f6ef383983efe5359b0170895ad8c682593c1435c12dd66ceb |
 | patches/vllm-input-stream-agent-identity.patch | f812362220f83b904d56e55e9c359918990c55e39d7a0750d1011840d377dfb4 |
 | patches/vllm-tool-output-completion.patch | 9945b84b32a0c33b624e3ed1720aa9cc320f63a0fed5dce35761eb392d0849a5 |
+| patches/vllm-one-way-thinking-boundary.patch | 8c6a2ecae7785fffbfec61ec1a7f42428263feb07d1d3a6ff6ea126b366e0144 |
 
-The reconstructed tree has 95 reviewed runtime-source changes, 2 new runtime sources,
-7 runtime-source deletions, 70 existing-test changes, 12 new tests,
+The reconstructed tree has 98 reviewed runtime-source changes, 2 new runtime sources,
+7 runtime-source deletions, 71 existing-test changes, 12 new tests,
 3 test deletions, and 1 serving-documentation change. The authoritative
 counts are derived and printed by ./scripts/build-vllm.sh check, never restated
 by hand there. The landmark-aware Python patcher calculates every mutation
@@ -309,11 +310,11 @@ Pinned build inputs and products:
 | Offline archive | artifacts/qwen38-vllm-images-runtime-v23.tar |
 | Archive size | Awaiting adoption after the v23 export |
 | Archive SHA-256 | Awaiting adoption after the v23 export |
-| Runtime Dockerfile SHA-256 | 2389c3b4d51de3b20100631ffae2e44516f64afcd6b332e76ce7a5850fab8c6d |
-| Docker context allowlist SHA-256 | 80e89fa27fa19db3b11998be46886c2372bab0d252da26dada094940a4a2ff01 |
-| Build verifier SHA-256 | 9cfd1c9859e86f4e913b07acbcecbce7e1d08ba9d1ca7adbcb8b36769575d06a |
-| Runtime validator SHA-256 | 965934e0ac166fcc8ac47a634efa09e35b882a018938dc239adc57415189f9fe |
-| Runtime lock SHA-256 | 3249fefff0fddfe8dd232e9adbfc90d520b3e655222fda65b6b553d916d00217 |
+| Runtime Dockerfile SHA-256 | 19411bfec6d6e74cd17720700cde55ce737a13735351190fb8554218d0b069af |
+| Docker context allowlist SHA-256 | 63554730631a8a1c34c46354907d7e0d6d92e12260c2c31493cbd4b0d5ec27cb |
+| Build verifier SHA-256 | a5c454f9777b6b6b0453961980eb73d703d4a2b403576b60d4afc9ea66a4dbb5 |
+| Runtime validator SHA-256 | b1494063436314011942408e24f04d2683ccdef2e3794649cc40735c5288e461 |
+| Runtime lock SHA-256 | dfc8ee5bc0239c63f8b3c278791371d377d2dad1dd9f3e0f3e06594f0320c229 |
 
 Every reviewed runtime file, including both TurboQuant kernels, is copied and
 hash-checked against its upstream and patched identities. A CPU Triton-interpreter
@@ -869,6 +870,13 @@ that boundary, tool wrappers are recognized through either added tokens or
 ordinary text tokens, matching XGrammar's text language. Ordinary-token thinking
 marker spellings inside reasoning remain reasoning. Both tokenizations are
 checked with native XGrammar and through streaming and batch parsing.
+
+Qwen's natural `</think>` token or implicit `<tool_call>` token ends thinking
+once per generation. The deployed V1 thinking-budget tracker and grammar
+use that parser-derived boundary. Later marker text in a response or a tool
+value cannot restart the budget or inject a forced closer into the call.
+The implicit trigger itself belongs to grammar content. The existing final
+response counter still starts only at the explicit reasoning closer.
 
 Only a call with its observed `</tool_call>` wrapper and a model EOS terminal
 becomes an executable call. Both configured Qwen EOS tokens have that meaning.

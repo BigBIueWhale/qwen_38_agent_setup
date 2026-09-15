@@ -70,6 +70,7 @@ EXPECTED_STATUS=$' M docs/serving/online_serving/generative_scoring.md
  M tests/v1/kv_offload/tiering/test_fs_tier.py
  M tests/v1/kv_offload/tiering/test_obj_tier.py
  M tests/v1/kv_offload/tiering/test_tiering_offloading.py
+ M tests/v1/logits_processors/test_correctness.py
  M tests/v1/simple_kv_offload/test_integration.py
  M tests/v1/simple_kv_offload/test_scheduler.py
  M tests/v1/streaming_input/test_async_llm_streaming.py
@@ -78,6 +79,7 @@ EXPECTED_STATUS=$' M docs/serving/online_serving/generative_scoring.md
  M tests/v1/worker/test_gpu_worker.py
  M vllm/config/cache.py
  M vllm/config/model.py
+ M vllm/config/reasoning.py
  M vllm/config/vllm.py
  M vllm/distributed/kv_transfer/kv_connector/v1/offloading/config.py
  M vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py
@@ -136,6 +138,7 @@ EXPECTED_STATUS=$' M docs/serving/online_serving/generative_scoring.md
  M vllm/parser/minimax_m2.py
  M vllm/parser/mistral.py
  M vllm/parser/qwen3.py
+ M vllm/reasoning/abs_reasoning_parsers.py
  M vllm/renderers/base.py
  M vllm/renderers/online_derenderer.py
  M vllm/renderers/params.py
@@ -170,6 +173,7 @@ EXPECTED_STATUS=$' M docs/serving/online_serving/generative_scoring.md
  M vllm/v1/kv_offload/tiering/manager.py
  M vllm/v1/kv_offload/tiering/spec.py
  M vllm/v1/request.py
+ M vllm/v1/sample/thinking_budget_state.py
  M vllm/v1/simple_kv_offload/manager.py
  M vllm/v1/structured_output/__init__.py
  M vllm/v1/structured_output/backend_types.py
@@ -249,6 +253,7 @@ GENERATE_RESULT_PATCH_FILE="${PROJECT_DIR}/patches/vllm-token-generation-result-
 RAW_IMAGE_TRANSPORT_PATCH_FILE="${PROJECT_DIR}/patches/vllm-raw-image-token-transport.patch"
 XML_TEXT_FIDELITY_PATCH_FILE="${PROJECT_DIR}/patches/vllm-xml-text-fidelity.patch"
 INPUT_STREAM_AGENT_IDENTITY_PATCH_FILE="${PROJECT_DIR}/patches/vllm-input-stream-agent-identity.patch"
+ONE_WAY_THINKING_BOUNDARY_PATCH_FILE="${PROJECT_DIR}/patches/vllm-one-way-thinking-boundary.patch"
 TOOL_OUTPUT_COMPLETION_PATCH_FILE="${PROJECT_DIR}/patches/vllm-tool-output-completion.patch"
 PHASE_AWARE_PARSER_TERMINALS_PATCH_FILE="${PROJECT_DIR}/patches/vllm-phase-aware-parser-terminals.patch"
 SAMPLING_RESOLUTION_PATCH_FILE="${PROJECT_DIR}/patches/vllm-generation-sampling-resolution.patch"
@@ -421,6 +426,7 @@ printf '%s  %s\n' \
   "${SAMPLING_RESOLUTION_PATCH_DIFF_SHA256}" "${SAMPLING_RESOLUTION_PATCH_FILE}" \
   "${PHASE_AWARE_PARSER_TERMINALS_PATCH_DIFF_SHA256}" "${PHASE_AWARE_PARSER_TERMINALS_PATCH_FILE}" \
   "${TOOL_OUTPUT_COMPLETION_PATCH_DIFF_SHA256}" "${TOOL_OUTPUT_COMPLETION_PATCH_FILE}" \
+  "${ONE_WAY_THINKING_BOUNDARY_PATCH_DIFF_SHA256}" "${ONE_WAY_THINKING_BOUNDARY_PATCH_FILE}" \
   "${INPUT_STREAM_AGENT_IDENTITY_PATCH_DIFF_SHA256}" "${INPUT_STREAM_AGENT_IDENTITY_PATCH_FILE}" \
   "${XML_TEXT_FIDELITY_PATCH_DIFF_SHA256}" "${XML_TEXT_FIDELITY_PATCH_FILE}" \
   "${RAW_IMAGE_TRANSPORT_PATCH_DIFF_SHA256}" "${RAW_IMAGE_TRANSPORT_PATCH_FILE}" \
@@ -709,6 +715,18 @@ printf '%s  %s\n' \
   | sha256sum --check --strict
 
 printf '%s  %s\n' \
+  "${REASONING_CONFIG_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/config/reasoning.py" \
+  | sha256sum --check --strict
+
+printf '%s  %s\n' \
+  "${BASE_REASONING_PARSER_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/reasoning/abs_reasoning_parsers.py" \
+  | sha256sum --check --strict
+
+printf '%s  %s\n' \
+  "${V1_THINKING_BUDGET_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/v1/sample/thinking_budget_state.py" \
+  | sha256sum --check --strict
+
+printf '%s  %s\n' \
   "${RUNTIME_DOCKERFILE_SHA256}" "${DOCKERFILE}" \
   "${DOCKERIGNORE_SHA256}" "${DOCKERIGNORE}" | \
   sha256sum --check --strict
@@ -873,6 +891,12 @@ docker buildx build --progress=plain \
   --build-arg "REQUEST_PATCHED_FILE_SHA256=${REQUEST_PATCHED_FILE_SHA256}" \
   --build-arg "QWEN3_PARSER_PATCHED_FILE_SHA256=${QWEN3_PARSER_PATCHED_FILE_SHA256}" \
   --build-arg "STRUCTURED_OUTPUT_PATCHED_FILE_SHA256=${STRUCTURED_OUTPUT_PATCHED_FILE_SHA256}" \
+  --build-arg "V1_THINKING_BUDGET_PATCHED_FILE_SHA256=${V1_THINKING_BUDGET_PATCHED_FILE_SHA256}" \
+  --build-arg "V1_THINKING_BUDGET_UPSTREAM_FILE_SHA256=${V1_THINKING_BUDGET_UPSTREAM_FILE_SHA256}" \
+  --build-arg "BASE_REASONING_PARSER_PATCHED_FILE_SHA256=${BASE_REASONING_PARSER_PATCHED_FILE_SHA256}" \
+  --build-arg "BASE_REASONING_PARSER_UPSTREAM_FILE_SHA256=${BASE_REASONING_PARSER_UPSTREAM_FILE_SHA256}" \
+  --build-arg "REASONING_CONFIG_PATCHED_FILE_SHA256=${REASONING_CONFIG_PATCHED_FILE_SHA256}" \
+  --build-arg "REASONING_CONFIG_UPSTREAM_FILE_SHA256=${REASONING_CONFIG_UPSTREAM_FILE_SHA256}" \
   --build-arg "STRUCTURAL_TAG_STOP_CHECKER_PATCHED_FILE_SHA256=${STRUCTURAL_TAG_STOP_CHECKER_PATCHED_FILE_SHA256}" \
   --build-arg "XGRAMMAR_BACKEND_PATCHED_FILE_SHA256=${XGRAMMAR_BACKEND_PATCHED_FILE_SHA256}" \
   --build-arg "XGRAMMAR_BACKEND_UPSTREAM_FILE_SHA256=${XGRAMMAR_BACKEND_UPSTREAM_FILE_SHA256}" \
@@ -939,6 +963,7 @@ docker buildx build --progress=plain \
   --build-arg "MISTRAL_PARSER_PATCHED_FILE_SHA256=${MISTRAL_PARSER_PATCHED_FILE_SHA256}" \
   --build-arg "PHASE_AWARE_PARSER_TERMINALS_PATCH_DIFF_SHA256=${PHASE_AWARE_PARSER_TERMINALS_PATCH_DIFF_SHA256}" \
   --build-arg "TOOL_OUTPUT_COMPLETION_PATCH_DIFF_SHA256=${TOOL_OUTPUT_COMPLETION_PATCH_DIFF_SHA256}" \
+  --build-arg "ONE_WAY_THINKING_BOUNDARY_PATCH_DIFF_SHA256=${ONE_WAY_THINKING_BOUNDARY_PATCH_DIFF_SHA256}" \
   --build-arg "INPUT_STREAM_AGENT_IDENTITY_PATCH_DIFF_SHA256=${INPUT_STREAM_AGENT_IDENTITY_PATCH_DIFF_SHA256}" \
   --build-arg "ASYNC_LLM_UPSTREAM_FILE_SHA256=${ASYNC_LLM_UPSTREAM_FILE_SHA256}" \
   --build-arg "ASYNC_LLM_PATCHED_FILE_SHA256=${ASYNC_LLM_PATCHED_FILE_SHA256}" \
@@ -1064,6 +1089,9 @@ actual_installed_report="$(
     /usr/local/lib/python3.12/dist-packages/vllm/v1/structured_output/__init__.py \
     /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/anthropic/api_router.py \
     /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/chat_completion/serving.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/v1/sample/thinking_budget_state.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/reasoning/abs_reasoning_parsers.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/config/reasoning.py \
     /usr/local/lib/python3.12/dist-packages/vllm/v1/structured_output/stop_checker.py \
     /usr/local/lib/python3.12/dist-packages/vllm/v1/structured_output/backend_xgrammar.py \
     /usr/local/lib/python3.12/dist-packages/vllm/v1/structured_output/backend_types.py \
@@ -1119,6 +1147,9 @@ expected_installed_report="$(printf '%s  %s\n' \
   "${STRUCTURED_OUTPUT_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/structured_output/__init__.py \
   "${ANTHROPIC_API_ROUTER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/anthropic/api_router.py \
   "${CHAT_SERVING_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/chat_completion/serving.py \
+  "${V1_THINKING_BUDGET_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/sample/thinking_budget_state.py \
+  "${BASE_REASONING_PARSER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/reasoning/abs_reasoning_parsers.py \
+  "${REASONING_CONFIG_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/config/reasoning.py \
   "${STRUCTURAL_TAG_STOP_CHECKER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/structured_output/stop_checker.py \
   "${XGRAMMAR_BACKEND_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/structured_output/backend_xgrammar.py \
   "${STRUCTURED_OUTPUT_BACKEND_TYPES_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/structured_output/backend_types.py \

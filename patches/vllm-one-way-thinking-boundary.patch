@@ -1,0 +1,436 @@
+diff --git a/tests/v1/logits_processors/test_correctness.py b/tests/v1/logits_processors/test_correctness.py
+--- a/tests/v1/logits_processors/test_correctness.py
++++ b/tests/v1/logits_processors/test_correctness.py
+@@ -103,8 +103,9 @@
+     """Minimal reasoning config for ``ThinkingBudgetStateHolder`` tests."""
+ 
+     reasoning_start_token_ids = [THINK_START_TOKEN_ID]
+     reasoning_end_token_ids = [THINK_END_TOKEN_ID]
++    reasoning_boundary_token_ids = frozenset()
+     enabled = True
+ 
+ 
+ def _generate_fake_sampling_metadata(
+@@ -868,8 +869,9 @@
+     """Reasoning config with no end token ids (disables enforcement in holder)."""
+ 
+     reasoning_start_token_ids = [THINK_START_TOKEN_ID]
+     reasoning_end_token_ids: list[int] = []
++    reasoning_boundary_token_ids = frozenset()
+ 
+ 
+ def test_maybe_create_thinking_budget_holder_without_reasoning():
+     cfg = VllmConfig()
+@@ -1286,8 +1288,9 @@
+     def _make_holder(end_token_ids: list[int]) -> ThinkingBudgetStateHolder:
+         class FakeReasoningConfig:
+             reasoning_start_token_ids = [TestThinkingBudgetReentry.THINK_START]
+             reasoning_end_token_ids: list[int] = []
++            reasoning_boundary_token_ids = frozenset()
+             enabled = True
+ 
+         cfg = FakeReasoningConfig()
+         cfg.reasoning_end_token_ids = end_token_ids
+@@ -1423,8 +1426,9 @@
+         @dataclass
+         class FakeReasoningConfig:
+             reasoning_start_token_ids: list[int]
+             reasoning_end_token_ids: list[int]
++            reasoning_boundary_token_ids: frozenset[int] = frozenset()
+             enabled: bool = True
+ 
+         cfg = FakeReasoningConfig(
+             reasoning_start_token_ids=[TestThinkingBudgetNaturalEndReentry.THINK_START],
+@@ -1726,8 +1730,9 @@
+         @dataclass
+         class FakeReasoningConfig:
+             reasoning_start_token_ids: list[int]
+             reasoning_end_token_ids: list[int]
++            reasoning_boundary_token_ids: frozenset[int] = frozenset()
+             enabled: bool = True
+ 
+         cfg = FakeReasoningConfig(
+             reasoning_start_token_ids=[self.THINK_START],
+@@ -1784,4 +1789,153 @@
+             "Block 2 after natural end of prompt-prefill session must be enforced"
+         )
+ 
+     # --- Forced-end re-entry tests ---
++
++
++class TestQwenThinkingBoundary:
++    """The deployed holder and grammar use Qwen's one-way token boundary."""
++
++    @pytest.fixture
++    def qwen(self, monkeypatch):
++        from types import SimpleNamespace
++        from unittest.mock import MagicMock
++
++        import vllm.config.reasoning as config_module
++        import vllm.utils.torch_utils as tensor_utils
++        from vllm.reasoning import ReasoningParserManager
++
++        monkeypatch.setattr(tensor_utils, "PIN_MEMORY", False)
++        markers = {
++            "<think>": 128, "</think>": 129,
++            "<tool_call>": 130, "</tool_call>": 131,
++        }
++        vocabulary = [chr(i) for i in range(128)] + list(markers) + ["<eos>"]
++        tokenizer = MagicMock()
++        tokenizer.get_vocab.return_value = markers
++        tokenizer.decode.side_effect = lambda ids: "".join(vocabulary[i] for i in ids)
++        tokenizer.encode.side_effect = lambda text, **kwargs: (
++            [markers[text]] if text in markers else [ord(c) for c in text]
++        )
++        tokenizer.all_special_tokens = []
++        tokenizer.all_special_ids = []
++        monkeypatch.setattr(
++            config_module, "cached_tokenizer_from_config", lambda **_: tokenizer
++        )
++        config = config_module.ReasoningConfig(reasoning_parser="qwen3")
++        config.initialize_token_ids(SimpleNamespace())
++        reasoner_cls = ReasoningParserManager.get_reasoning_parser("qwen3")
++        return tokenizer, config, reasoner_cls
++
++    @pytest.mark.parametrize("boundary", [129, 130])
++    @pytest.mark.parametrize("forced_prefix", [False, True])
++    @pytest.mark.parametrize("chunk_size", [1, 1000])
++    def test_budget_never_forces_after_a_natural_boundary(
++        self, qwen, boundary, forced_prefix, chunk_size
++    ):
++        _, config, _ = qwen
++        if forced_prefix:
++            config._reasoning_end_token_ids = [ord("!"), 129]
++        holder = ThinkingBudgetStateHolder(config, 1, 0, torch.device("cpu"), False)
++        holder.sync_batch(BatchUpdate(
++            batch_size=1, removed=(), moved=(),
++            added=[(0, SamplingParams(thinking_token_budget=8), [128], [])],
++        ))
++        output = [ord(c) for c in "plan"] + [boundary]
++        output += list(map(ord, "\n<function=write>\n<parameter=text>value"))
++        # Both thinking markers and the wrapper closer are grammar-legal
++        # literal value text. They cannot reopen thinking or move its boundary.
++        output += [129, 131, 128] + [ord("x")] * 20
++        for end in range(chunk_size, len(output) + chunk_size, chunk_size):
++            holder.update_state([output[:end]], None)
++            logits = torch.zeros((1, 133))
++            logits[:, 129] = -float("inf")
++            before = logits.clone()
++            holder.apply_to_logits(logits, False, None)
++            torch.testing.assert_close(logits, before)
++
++    @pytest.mark.parametrize("boundary", [129, 130])
++    def test_grammar_sees_the_first_boundary_even_with_a_later_start(
++        self, qwen, boundary
++    ):
++        tokenizer, _, reasoner_cls = qwen
++        reasoner = reasoner_cls(tokenizer)
++        output = [ord("p"), boundary, 128]
++        assert reasoner.is_reasoning_end_streaming([128] + output, output)
++
++    def test_configuration_uses_the_parser_boundary_not_the_forced_phrase(self, qwen):
++        _, config, _ = qwen
++        assert config.reasoning_boundary_token_ids == frozenset({129, 130})
++        assert config.natural_reasoning_end_token_ids == [129]
++        assert config.reasoning_end_token_ids == [129]
++
++    @pytest.mark.parametrize("boundary", [129, 130])
++    def test_prefill_after_the_boundary_cannot_start_a_new_budget(self, qwen, boundary):
++        _, config, _ = qwen
++        holder = ThinkingBudgetStateHolder(config, 1, 0, torch.device("cpu"), False)
++        holder.sync_batch(BatchUpdate(
++            batch_size=1, removed=(), moved=(),
++            added=[(0, SamplingParams(thinking_token_budget=2), [128, 10, boundary], [])],
++        ))
++        holder.update_state([[128, 10, 10, 10]], None)
++        logits = torch.zeros((1, 133))
++        holder.apply_to_logits(logits, False, None)
++        assert torch.count_nonzero(logits) == 0
++
++    @pytest.mark.parametrize("boundary", [129, 130])
++    def test_resumed_request_retains_its_completed_thinking_phase(self, qwen, boundary):
++        _, config, _ = qwen
++        holder = ThinkingBudgetStateHolder(config, 1, 0, torch.device("cpu"), False)
++        output = [10, boundary, 128] + [10] * 10
++        holder.sync_batch(BatchUpdate(
++            batch_size=1, removed=(), moved=(),
++            added=[(0, SamplingParams(thinking_token_budget=2), [128], output)],
++        ))
++        holder.update_state([output], None)
++        logits = torch.zeros((1, 133))
++        holder.apply_to_logits(logits, False, None)
++        assert torch.count_nonzero(logits) == 0
++
++    def test_budget_forces_once_and_never_reopens_after_the_closer(self, qwen):
++        _, config, _ = qwen
++        holder = ThinkingBudgetStateHolder(config, 1, 0, torch.device("cpu"), False)
++        holder.sync_batch(BatchUpdate(
++            batch_size=1, removed=(), moved=(),
++            added=[(0, SamplingParams(thinking_token_budget=2), [128], [])],
++        ))
++        output = [10, 10]
++        holder.update_state([output], None)
++        logits = torch.zeros((1, 133))
++        holder.apply_to_logits(logits, False, None)
++        assert logits[0, 129] > 0
++        output += [129, 128, 10, 10, 10]
++        holder.update_state([output], None)
++        logits.zero_()
++        holder.apply_to_logits(logits, False, None)
++        assert torch.count_nonzero(logits) == 0
++
++    @pytest.mark.parametrize("implicit", [False, True])
++    @pytest.mark.parametrize("history", [False, True])
++    def test_grammar_keeps_the_current_tool_trigger_with_prompt_history(
++        self, qwen, implicit, history
++    ):
++        from vllm.sampling_params import StructuredOutputsParams
++        from vllm.v1.request import Request
++        from vllm.v1.structured_output import StructuredOutputManager
++
++        tokenizer, _, reasoner_cls = qwen
++        prompt = ([128, 10, 129, 20] if history else []) + [128]
++        params = SamplingParams(
++            structured_outputs=StructuredOutputsParams(json_object=True),
++            extra_args={"kv_scope": "thinking-test"},
++        )
++        request = Request("thinking-test", prompt, params, None, reasoning_ended=False)
++        content = [130] + list(map(ord, "\n<function=write>\n<parameter=text>"))
++        content += [128] + list(map(ord, "value</parameter>\n</function>\n")) + [131]
++        output = [ord("p")] + ([] if implicit else [129]) + content
++        request.append_output_token_ids(output)
++        manager = StructuredOutputManager.__new__(StructuredOutputManager)
++        manager.reasoner_cls = reasoner_cls
++        manager.tokenizer = tokenizer
++        manager.enable_in_reasoning = False
++        assert manager.should_advance(request, new_token_ids=output)
++        assert manager.trim_reasoning_for_advance(request, output) == content
+diff --git a/vllm/config/reasoning.py b/vllm/config/reasoning.py
+--- a/vllm/config/reasoning.py
++++ b/vllm/config/reasoning.py
+@@ -43,8 +43,12 @@
+     _enabled: bool = field(default=False, init=False, repr=False)
+     """Private field indicating whether reasoning token IDs have been initialized.
+     Set to True by `initialize_token_ids` once token IDs are initialized."""
+ 
++    _reasoning_boundary_token_ids: frozenset[int] | None = field(
++        default=None, init=False, repr=False
++    )
++
+     @property
+     def enabled(self) -> bool:
+         """Returns True if reasoning is enabled (i.e. if token IDs have been
+         initialized), False otherwise."""
+@@ -65,27 +69,37 @@
+     def natural_reasoning_end_token_ids(self) -> list[int] | None:
+         """Token IDs that indicate the model naturally ended reasoning."""
+         return self._natural_reasoning_end_token_ids
+ 
++    @property
++    def reasoning_boundary_token_ids(self) -> frozenset[int]:
++        """Parser-derived atomic exits from a single reasoning phase."""
++        return self._reasoning_boundary_token_ids or frozenset()
++
+     def initialize_token_ids(self, model_config: ModelConfig) -> None:
+         """Initialize reasoning token IDs from strings using the tokenizer."""
+         if (
+             self._reasoning_start_token_ids is not None
+             and self._reasoning_end_token_ids is not None
+             and self._natural_reasoning_end_token_ids is not None
++            and self._reasoning_boundary_token_ids is not None
+         ):
+             self._enabled = True
+             return  # Already initialized
+ 
+         tokenizer = cached_tokenizer_from_config(model_config=model_config)
+         reasoning_start_str = self.reasoning_start_str
+         reasoning_end_str = self.reasoning_end_str
+         natural_reasoning_end_str = ""
++        self._reasoning_boundary_token_ids = frozenset()
+         if self.reasoning_parser:
+             parser_cls = ReasoningParserManager.get_reasoning_parser(
+                 self.reasoning_parser
+             )
+             reasoning_parser = parser_cls(tokenizer)
++            self._reasoning_boundary_token_ids = (
++                reasoning_parser.reasoning_boundary_token_ids
++            )
+             start_token = reasoning_parser.reasoning_start_str
+             if start_token and not reasoning_start_str:
+                 reasoning_start_str = start_token
+ 
+diff --git a/vllm/parser/engine/adapters.py b/vllm/parser/engine/adapters.py
+--- a/vllm/parser/engine/adapters.py
++++ b/vllm/parser/engine/adapters.py
+@@ -9,9 +9,9 @@
+ """
+ 
+ from __future__ import annotations
+ 
+-from collections.abc import Iterator, Sequence
++from collections.abc import Iterable, Iterator, Sequence
+ from contextlib import contextmanager
+ from typing import TYPE_CHECKING
+ 
+ from vllm.parser.engine.parser_engine_config import ParserState
+@@ -58,8 +58,19 @@
+             self._parser_engine.skip_tool_parsing = saved
+ 
+     def is_reasoning_end(self, input_ids: Sequence[int]) -> bool:
+         return self._parser_engine.is_reasoning_end(list(input_ids))
++
++    def is_reasoning_end_streaming(
++        self, input_ids: Sequence[int], delta_ids: Iterable[int]
++    ) -> bool:
++        return self._parser_engine.is_reasoning_end_streaming(
++            list(input_ids), list(delta_ids)
++        )
++
++    @property
++    def reasoning_boundary_token_ids(self) -> frozenset[int]:
++        return self._parser_engine.reasoning_boundary_token_ids
+ 
+     @property
+     def batch_tool_pass_uses_ids(self) -> bool:
+         return self._parser_engine.batch_tool_pass_uses_ids
+diff --git a/vllm/parser/engine/parser_engine.py b/vllm/parser/engine/parser_engine.py
+--- a/vllm/parser/engine/parser_engine.py
++++ b/vllm/parser/engine/parser_engine.py
+@@ -651,8 +651,13 @@
+         events = self._feed(delta_text, delta_token_ids)
+         return self._strip_trailing_reasoning(self._events_to_delta(events))
+ 
+     # ── Reasoning state queries ───────────────────────────────────────
++
++    @property
++    def reasoning_boundary_token_ids(self) -> frozenset[int]:
++        """The same one-way boundary used for exact reasoning-token usage."""
++        return self._reasoning_boundary_ids
+ 
+     def is_reasoning_end(self, input_ids: list[int]) -> bool:
+         end_id = self._reasoning_end_token_id
+         start_id = self._reasoning_start_token_id
+diff --git a/vllm/parser/qwen3.py b/vllm/parser/qwen3.py
+--- a/vllm/parser/qwen3.py
++++ b/vllm/parser/qwen3.py
+@@ -308,8 +308,15 @@
+                         continue
+                     return True
+         return False
+ 
++    def is_reasoning_end_streaming(
++        self, input_ids: list[int], delta_ids: list[int]
++    ) -> bool:
++        return not self.thinking_enabled or any(
++            token in self.reasoning_boundary_token_ids for token in delta_ids
++        )
++
+     def extract_content_ids(self, input_ids: list[int]) -> list[int]:
+         """Keep an implicit ``<tool_call>`` boundary in generated content.
+ 
+         The structured-output scheduler must skip unconstrained reasoning
+diff --git a/vllm/reasoning/abs_reasoning_parsers.py b/vllm/reasoning/abs_reasoning_parsers.py
+--- a/vllm/reasoning/abs_reasoning_parsers.py
++++ b/vllm/reasoning/abs_reasoning_parsers.py
+@@ -57,8 +57,16 @@
+         """Set `reasoning_end_str` to the strings that delimit
+         the reasoning block (e.g. `""</seed:think>""` and `"</think>"`).
+         """
+         return None
++
++    @property
++    def reasoning_boundary_token_ids(self) -> frozenset[int]:
++        """Atomic tokens that end a single, non-reentrant reasoning phase.
++
++        An empty set means this parser does not declare that grammar shape.
++        """
++        return frozenset()
+ 
+     def has_engine_confirmed_reasoning_end(self) -> bool:
+         """Whether the engine has confirmed the reasoning end transition.
+ 
+diff --git a/vllm/v1/sample/thinking_budget_state.py b/vllm/v1/sample/thinking_budget_state.py
+--- a/vllm/v1/sample/thinking_budget_state.py
++++ b/vllm/v1/sample/thinking_budget_state.py
+@@ -55,13 +55,17 @@
+ 
+         if reasoning_config is None:
+             self.think_start_token_ids = []
+             self.think_end_token_ids = []
++            self.reasoning_boundary_token_ids = frozenset()
+         else:
+             rs = reasoning_config.reasoning_start_token_ids
+             re = reasoning_config.reasoning_end_token_ids
+             self.think_start_token_ids = rs if rs else []
+             self.think_end_token_ids = re if re else []
++            self.reasoning_boundary_token_ids = (
++                reasoning_config.reasoning_boundary_token_ids
++            )
+ 
+         self.device = device
+         self._state: dict[int, dict[str, Any]] = {}
+         self.cu_num_tokens: dict[int, int] = {}
+@@ -190,8 +194,19 @@
+             )
+             last_end = self._find_last_sequence_index(
+                 prompt_tok_ids, self.think_end_token_ids
+             )
++            last_end = max(
++                last_end,
++                next(
++                    (
++                        index
++                        for index in range(len(prompt_tok_ids) - 1, -1, -1)
++                        if prompt_tok_ids[index] in self.reasoning_boundary_token_ids
++                    ),
++                    -1,
++                ),
++            )
+             in_think = last_start > last_end
+             # load metrics such as think count, start thinking
+             # if request is in thinking mode, already
+             if in_think:
+@@ -224,11 +239,25 @@
+             "in_spec_mode": False,
+             "bonus_token_forced": False,
+             "continue_thinking": continue_thinking,
+             "scan_offset": 0,
++            "reasoning_ended": last_end >= 0 and last_end > last_start,
++            "boundary_scan_offset": 0,
+         }
+ 
+     def _update_think_state(self, state: dict[str, Any]) -> None:
++        if self.reasoning_boundary_token_ids:
++            output = state["output_tok_ids"]
++            if not state["reasoning_ended"]:
++                state["reasoning_ended"] = any(
++                    token in self.reasoning_boundary_token_ids
++                    for token in output[state["boundary_scan_offset"] :]
++                )
++                state["boundary_scan_offset"] = len(output)
++            if state["reasoning_ended"]:
++                state["in_think"] = state["in_end"] = False
++                state["force_index"] = []
++                return
+         if state.get("thinking_token_budget", -1) == -1:
+             return
+         if len(self.think_end_token_ids) == 0:
+             state["thinking_token_budget"] = -1
+diff --git a/vllm/v1/structured_output/__init__.py b/vllm/v1/structured_output/__init__.py
+--- a/vllm/v1/structured_output/__init__.py
++++ b/vllm/v1/structured_output/__init__.py
+@@ -504,9 +504,13 @@
+                 # In that case the trigger belongs to grammar content and must
+                 # not be trimmed with the reasoning prefix.
+                 extract_content_ids = getattr(reasoner, "extract_content_ids", None)
+                 content_ids = (
+-                    extract_content_ids(prefix)
++                    extract_content_ids(
++                        [token]
++                        if token in reasoner.reasoning_boundary_token_ids
++                        else prefix
++                    )
+                     if callable(extract_content_ids)
+                     else []
+                 )
+                 step_prefix_len = idx - start + 1

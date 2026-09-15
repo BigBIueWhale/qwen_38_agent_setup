@@ -2281,6 +2281,57 @@ def _validate_tool_completion_after(state: State) -> None:
         }, label=label)
 
 
+def _validate_thinking_boundary_before(state: State) -> None:
+    label = "V1 thinking-boundary baseline"
+    path = "vllm/v1/sample/thinking_budget_state.py"
+    _require_in_symbol(state, path, "ThinkingBudgetStateHolder.__init__", (
+        "self.think_end_token_ids",
+    ), label=label)
+    forbid_text(state, path, "self.reasoning_boundary_token_ids", label=label)
+
+
+def _validate_thinking_boundary_after(state: State) -> None:
+    label = "One-way V1 thinking boundary"
+    _require_in_symbol(state, "vllm/parser/engine/parser_engine.py",
+        "ParserEngine.reasoning_boundary_token_ids", (
+            "return self._reasoning_boundary_ids",
+        ), label=label)
+    _require_in_symbol(state, "vllm/parser/engine/adapters.py",
+        "ParserEngineReasoningAdapter.is_reasoning_end_streaming", (
+            "self._parser_engine.is_reasoning_end_streaming(",
+        ), label=label)
+    _require_in_symbol(state, "vllm/config/reasoning.py",
+        "ReasoningConfig.initialize_token_ids", (
+            "reasoning_parser.reasoning_boundary_token_ids",
+        ), label=label)
+    _require_in_symbol(state, "vllm/parser/qwen3.py",
+        "Qwen3Parser.is_reasoning_end_streaming", (
+            "token in self.reasoning_boundary_token_ids for token in delta_ids",
+        ), label=label)
+    source = _require_in_symbol(state, "vllm/v1/sample/thinking_budget_state.py",
+        "ThinkingBudgetStateHolder._update_think_state", (
+            'if not state["reasoning_ended"]:',
+            'token in self.reasoning_boundary_token_ids',
+            'if state["reasoning_ended"]:',
+            'state["in_think"] = state["in_end"] = False',
+            'state["force_index"] = []',
+        ), label=label)
+    _require(
+        source.index('if state["reasoning_ended"]:')
+        < source.index('if state.get("thinking_token_budget", -1) == -1:'),
+        f"{label}: the completed phase must bypass budget forcing",
+    )
+    _require_in_symbol(state, "vllm/v1/structured_output/__init__.py",
+        "StructuredOutputManager._find_reasoning_end_index", (
+            "if token in reasoner.reasoning_boundary_token_ids",
+        ), label=label)
+    require_python_symbols(state, "tests/v1/logits_processors/test_correctness.py", {
+        "TestQwenThinkingBoundary.test_budget_never_forces_after_a_natural_boundary": None,
+        "TestQwenThinkingBoundary.test_resumed_request_retains_its_completed_thinking_phase": None,
+        "TestQwenThinkingBoundary.test_grammar_keeps_the_current_tool_trigger_with_prompt_history": None,
+    }, label=label)
+
+
 def validate_final(state: State) -> None:
     """Reassert every durable semantic invariant on the complete tree.
 
@@ -2296,6 +2347,21 @@ def validate_final(state: State) -> None:
 
 
 CONTRACTS: Mapping[str, SemanticContract] = {
+    "one-way-thinking-boundary": SemanticContract(
+        rationale=(
+            "Qwen ends thinking once, at its natural closer or implicit tool "
+            "boundary. The deployed V1 budget holder must stop forcing there, "
+            "and the grammar must receive the current tool trigger even when "
+            "history contains earlier reasoning markers. Use the parser's "
+            "existing atomic boundary metadata for both consumers."
+        ),
+        removal_condition=(
+            "Remove when upstream uses the same parser-derived one-way boundary "
+            "for V1 thinking budgets and structured-output advancement."
+        ),
+        validate_before=_validate_thinking_boundary_before,
+        validate_after=_validate_thinking_boundary_after,
+    ),
     "tool-output-completion": SemanticContract(
         rationale=(
             "Only observed closed wrappers at model EOS are executable calls. "

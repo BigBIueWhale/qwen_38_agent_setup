@@ -162,3 +162,8 @@
 !vllm/vllm/v1/structured_output/backend_types.py
 !vllm/vllm/v1/structured_output/backend_xgrammar.py
 !vllm/vllm/v1/structured_output/stop_checker.py
+!vllm/vllm/config/reasoning.py
+!vllm/vllm/reasoning/
+!vllm/vllm/reasoning/abs_reasoning_parsers.py
+!vllm/vllm/v1/sample/
+!vllm/vllm/v1/sample/thinking_budget_state.py
