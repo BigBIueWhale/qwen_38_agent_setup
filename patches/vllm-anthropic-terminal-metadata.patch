@@ -1,0 +1,352 @@
+diff --git a/tests/entrypoints/anthropic/test_anthropic_messages_conversion.py b/tests/entrypoints/anthropic/test_anthropic_messages_conversion.py
+--- a/tests/entrypoints/anthropic/test_anthropic_messages_conversion.py
++++ b/tests/entrypoints/anthropic/test_anthropic_messages_conversion.py
+@@ -936,11 +936,6 @@
+ 
+ def _make_stream_converter():
+     obj = MagicMock(spec=AnthropicServingMessages)
+-    obj.stop_reason_map = {
+-        "stop": "end_turn",
+-        "length": "max_tokens",
+-        "tool_calls": "tool_use",
+-    }
+     obj.message_stream_converter = (
+         AnthropicServingMessages.message_stream_converter.__get__(obj)
+     )
+@@ -962,6 +957,7 @@
+     *,
+     delta: DeltaMessage | None = None,
+     finish_reason: str | None = None,
++    stop_reason: str | int | None = None,
+     choices: list[ChatCompletionResponseStreamChoice] | None = None,
+     usage: UsageInfo | None = None,
+ ) -> str:
+@@ -971,6 +967,7 @@
+                 index=0,
+                 delta=delta or DeltaMessage(),
+                 finish_reason=finish_reason,
++                stop_reason=stop_reason,
+             )
+         ]
+     chunk = ChatCompletionStreamResponse(
+@@ -1083,7 +1080,8 @@
+     async def test_buffered_content_flushed_on_done_without_usage_chunk(self):
+         """Content buffered during tool_use must be emitted even if the
+         stream jumps straight from finish_reason to [DONE], skipping the
+-        empty-choices usage chunk."""
++        empty-choices usage chunk. Missing terminal usage is a server error;
++        the diagnostic prefix must remain visible without a success terminal."""
+ 
+         async def sse_input():
+             yield _make_stream_chunk(
+@@ -1131,7 +1129,8 @@
+         assert "tool_use" in block_starts
+         assert "text" in block_starts
+ 
+-        assert events[-1][0] == "message_stop"
++        assert events[-1][0] == "error"
++        assert all(event_type != "message_stop" for event_type, _ in events)
+ 
+ 
+ class TestMessageStartIncludesTypeAndRole:
+@@ -1719,3 +1718,145 @@
+         assert response.status_code == 400
+         assert response.json()["error"]["type"] == "invalid_request_error"
+         assert response.headers["content-type"] == "application/json"
++
++
++class TestAnthropicTerminalMetadata:
++    @pytest.mark.asyncio
++    @pytest.mark.parametrize(
++        'finish, stop, tool, expected, sequence',
++        [
++            ('stop', None, False, 'end_turn', None),
++            ('stop', 151645, False, 'end_turn', None),
++            ('stop', '\n HALT \n', False, 'stop_sequence', '\n HALT \n'),
++            ('stop', None, True, 'tool_use', None),
++            ('stop', 151645, True, 'tool_use', None),
++            ('tool_calls', None, True, 'tool_use', None),
++            ('stop', 'HALT', True, 'stop_sequence', 'HALT'),
++            ('length', None, False, 'max_tokens', None),
++            ('length', None, True, 'max_tokens', None),
++            ('length', 'final_response_token_budget', True, 'max_tokens', None),
++        ],
++    )
++    async def test_stream_and_batch_report_observed_cause(
++        self, finish, stop, tool, expected, sequence,
++    ):
++        usage = UsageInfo(prompt_tokens=10, completion_tokens=5, total_tokens=15)
++        tool_calls = ([{
++            'id': 'call-terminal', 'type': 'function',
++            'function': {'name': 'lookup', 'arguments': '{"key":"value"}'},
++        }] if tool else [])
++        response = ChatCompletionResponse(
++            id='chatcmpl-terminal', model='test-model', usage=usage,
++            choices=[ChatCompletionResponseChoice(
++                index=0, finish_reason=finish, stop_reason=stop,
++                message=ChatMessage(role='assistant', content='visible',
++                                    tool_calls=tool_calls),
++            )],
++        )
++        batch = _make_full_converter().messages_full_converter(response)
++        assert (batch.stop_reason, batch.stop_sequence) == (expected, sequence)
++        assert [block.type for block in batch.content] == (
++            ['text', 'tool_use'] if tool else ['text']
++        )
++        assert batch.content[0].text == 'visible'
++        if tool:
++            assert batch.content[1].id == 'call-terminal'
++            assert batch.content[1].input == {'key': 'value'}
++
++        async def source():
++            # The first chunk is allowed to contain content alongside the role.
++            yield _make_stream_chunk(delta=DeltaMessage(role='assistant', content='visible'))
++            if tool:
++                yield _make_stream_chunk(delta=DeltaMessage(tool_calls=[
++                    _tc(id='call-terminal', name='lookup', args='{"key":'),
++                ]))
++                yield _make_stream_chunk(delta=DeltaMessage(tool_calls=[
++                    _tc(args='"value"}'),
++                ]))
++            yield _make_stream_chunk(finish_reason=finish, stop_reason=stop)
++            yield _make_stream_chunk(choices=[], usage=usage)
++            yield 'data: [DONE]'
++
++        events = _parse_sse_events([
++            item async for item in _make_stream_converter().message_stream_converter(source())
++        ])
++        assert not any(kind == 'error' for kind, _ in events)
++        assert [kind for kind, _ in events][-2:] == ['message_delta', 'message_stop']
++        terminal = next(data for kind, data in events if kind == 'message_delta')
++        assert terminal['delta'] == {
++            'stop_reason': expected, 'stop_sequence': sequence,
++        }
++        assert terminal['usage'] == batch.usage.model_dump(exclude_unset=True)
++        starts = [data['content_block'] for kind, data in events
++                  if kind == 'content_block_start']
++        assert [block['type'] for block in starts] == [block.type for block in batch.content]
++        text = ''.join(data['delta']['text'] for kind, data in events
++                       if kind == 'content_block_delta' and data['delta']['type'] == 'text_delta')
++        assert text == batch.content[0].text
++        if tool:
++            assert starts[1]['id'] == batch.content[1].id
++            args = ''.join(data['delta']['partial_json'] for kind, data in events
++                           if kind == 'content_block_delta'
++                           and data['delta']['type'] == 'input_json_delta')
++            assert json.loads(args) == batch.content[1].input
++
++    @pytest.mark.asyncio
++    @pytest.mark.parametrize('finish', [None, 'abort', 'error', 'tool_calls'])
++    async def test_invalid_completion_cause_is_never_reported_as_success(self, finish):
++        from vllm.entrypoints.openai.engine.protocol import GenerationError
++
++        usage = UsageInfo(prompt_tokens=10, completion_tokens=1, total_tokens=11)
++        response = ChatCompletionResponse(
++            id='chatcmpl-invalid', model='test-model', usage=usage,
++            choices=[ChatCompletionResponseChoice(
++                index=0, finish_reason=finish,
++                message=ChatMessage(role='assistant', content='diagnostic'),
++            )],
++        )
++        with pytest.raises(GenerationError):
++            _make_full_converter().messages_full_converter(response)
++
++        async def source():
++            yield _make_stream_chunk(delta=DeltaMessage(content='diagnostic'))
++            yield _make_stream_chunk(finish_reason=finish)
++            yield _make_stream_chunk(choices=[], usage=usage)
++            yield 'data: [DONE]'
++
++        events = _parse_sse_events([
++            item async for item in _make_stream_converter().message_stream_converter(source())
++        ])
++        assert events[-1][0] == 'error'
++        assert not any(kind in ('message_delta', 'message_stop') for kind, _ in events)
++        assert any(data.get('delta', {}).get('text') == 'diagnostic' for _, data in events)
++
++    @pytest.mark.asyncio
++    @pytest.mark.parametrize('ending', ['missing_usage', 'missing_finish', 'missing_done',
++                                         'repeated_usage', 'content_after_finish',
++                                         'content_after_usage', 'invalid_frame'])
++    async def test_incomplete_or_invalid_stream_has_no_success_terminal(self, ending):
++        usage = UsageInfo(prompt_tokens=10, completion_tokens=1, total_tokens=11)
++
++        async def source():
++            yield _make_stream_chunk(delta=DeltaMessage(role='assistant', content='diagnostic'))
++            if ending != 'missing_finish':
++                yield _make_stream_chunk(finish_reason='stop')
++            if ending == 'content_after_finish':
++                yield _make_stream_chunk(delta=DeltaMessage(content='too late'))
++            if ending != 'missing_usage':
++                yield _make_stream_chunk(choices=[], usage=usage)
++            if ending == 'repeated_usage':
++                yield _make_stream_chunk(choices=[], usage=usage)
++            if ending == 'content_after_usage':
++                yield _make_stream_chunk(delta=DeltaMessage(content='too late'))
++            if ending == 'invalid_frame':
++                yield 'invalid chat frame'
++            if ending != 'missing_done':
++                yield 'data: [DONE]'
++
++        events = _parse_sse_events([
++            item async for item in _make_stream_converter().message_stream_converter(source())
++        ])
++        assert events[-1][0] == 'error'
++        assert not any(kind == 'message_stop' for kind, _ in events)
++        assert any(data.get('delta', {}).get('text') == 'diagnostic' for _, data in events)
++        assert not any(data.get('delta', {}).get('text') == 'too late' for _, data in events)
+diff --git a/vllm/entrypoints/anthropic/serving.py b/vllm/entrypoints/anthropic/serving.py
+--- a/vllm/entrypoints/anthropic/serving.py
++++ b/vllm/entrypoints/anthropic/serving.py
+@@ -41,6 +41,7 @@
+ from vllm.entrypoints.openai.chat_completion.serving import OpenAIServingChat
+ from vllm.entrypoints.openai.engine.protocol import (
+     ErrorResponse,
++    GenerationError,
+     JsonSchemaResponseFormat,
+     ResponseFormat,
+     StreamOptions,
+@@ -56,6 +57,25 @@
+ 
+ # State the caller's error flag in the rendered tool result.
+ TOOL_RESULT_ERROR_LINE = "Tool result flagged is_error: true."
++
++
++def _anthropic_stop_metadata(
++    finish_reason: str | None,
++    stop_reason: str | int | None,
++    has_tool_use: bool,
++) -> AnthropicDelta:
++    """Translate the observed completion cause and output into native fields."""
++    if finish_reason == "length":
++        return AnthropicDelta(stop_reason="max_tokens", stop_sequence=None)
++    if finish_reason not in ("stop", "tool_calls"):
++        raise GenerationError(f"Chat generation ended with {finish_reason!r}")
++    if isinstance(stop_reason, str):
++        return AnthropicDelta(stop_reason="stop_sequence", stop_sequence=stop_reason)
++    if finish_reason == "tool_calls" and not has_tool_use:
++        raise GenerationError("Chat reported tool calls without tool-use output")
++    return AnthropicDelta(
++        stop_reason="tool_use" if has_tool_use else "end_turn", stop_sequence=None,
++    )
+ 
+ 
+ def _build_anthropic_usage(
+@@ -138,11 +158,6 @@
+             enable_force_include_usage=enable_force_include_usage,
+             default_chat_template_kwargs=default_chat_template_kwargs,
+         )
+-        self.stop_reason_map = {
+-            "stop": "end_turn",
+-            "length": "max_tokens",
+-            "tool_calls": "tool_use",
+-        }
+         self._merge_inline_system = self._detect_merge_inline_system(chat_template)
+ 
+     @staticmethod
+@@ -690,12 +705,11 @@
+             ec_transfer_params=generator.ec_transfer_params,
+         )
+         choice = generator.choices[0]
+-        if choice.finish_reason == "stop":
+-            result.stop_reason = "end_turn"
+-        elif choice.finish_reason == "length":
+-            result.stop_reason = "max_tokens"
+-        elif choice.finish_reason == "tool_calls":
+-            result.stop_reason = "tool_use"
++        stop = _anthropic_stop_metadata(
++            choice.finish_reason, choice.stop_reason, bool(choice.message.tool_calls),
++        )
++        result.stop_reason = stop.stop_reason
++        result.stop_sequence = stop.stop_sequence
+ 
+         content: list[AnthropicContentBlock] = []
+         if choice.message.reasoning:
+@@ -775,6 +789,9 @@
+ 
+             first_item = True
+             finish_reason = None
++            matched_stop: str | int | None = None
++            has_tool_use = False
++            sent_message_delta = False
+             state = _ActiveBlockState()
+             # Map from tool call index to tool_use_id
+             tool_index_to_id: dict[int, str] = {}
+@@ -844,6 +861,10 @@
+                     if data_str == "[DONE]":
+                         for event in stop_and_flush():
+                             yield event
++                        if not sent_message_delta:
++                            raise GenerationError(
++                                "Chat stream ended without terminal metadata and usage"
++                            )
+                         stop_message = AnthropicStreamEvent(
+                             type="message_stop",
+                         )
+@@ -851,6 +872,7 @@
+                             exclude_unset=True, exclude_none=True
+                         )
+                         yield wrap_data_with_event(data, "message_stop")
++                        return
+                     else:
+                         payload = json.loads(data_str)
+                         if "error" in payload:
+@@ -884,27 +906,35 @@
+                             first_item = False
+                             data = chunk.model_dump_json(exclude_unset=True)
+                             yield wrap_data_with_event(data, "message_start")
+-                            continue
+ 
+                         # last chunk including usage info
+                         if len(origin_chunk.choices) == 0:
+                             for event in stop_and_flush():
+                                 yield event
+-                            stop_reason = self.stop_reason_map.get(
+-                                finish_reason or "stop"
++                            if origin_chunk.usage is None or sent_message_delta:
++                                raise GenerationError(
++                                    "Chat stream has missing or repeated terminal usage"
++                                )
++                            stop = _anthropic_stop_metadata(
++                                finish_reason, matched_stop, has_tool_use,
+                             )
+                             chunk = AnthropicStreamEvent(
+                                 type="message_delta",
+-                                delta=AnthropicDelta(stop_reason=stop_reason),
++                                delta=stop,
+                                 usage=_build_anthropic_usage(origin_chunk.usage),
+                             )
+                             data = chunk.model_dump_json(exclude_unset=True)
+                             yield wrap_data_with_event(data, "message_delta")
++                            sent_message_delta = True
+                             continue
+ 
++                        if finish_reason is not None or sent_message_delta:
++                            raise GenerationError(
++                                "Chat stream contains output after its completion"
++                            )
+                         if origin_chunk.choices[0].finish_reason is not None:
+                             finish_reason = origin_chunk.choices[0].finish_reason
+-                            # continue
++                            matched_stop = origin_chunk.choices[0].stop_reason
+ 
+                         # thinking / text content
+                         reasoning_delta = origin_chunk.choices[0].delta.reasoning
+@@ -993,6 +1023,7 @@
+                                                 input={},
+                                             )
+                                         )
++                                        has_tool_use = True
+                                         yield start_event
+                                     # Handle initial arguments if present
+                                     if (
+@@ -1052,6 +1083,9 @@
+                     )
+                     data = error_response.model_dump_json(exclude_unset=True)
+                     yield wrap_data_with_event(data, "error")
++                    return
++
++            raise GenerationError("Chat stream ended without its terminal marker")
+ 
+         except Exception as e:
+             logger.exception("Error in message stream converter.")

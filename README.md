@@ -75,7 +75,7 @@ error.
   and relay readiness events, then validates the complete live configuration before
   reporting success. Re-running it validates the existing owned topology rather than
   starting a duplicate.
-- status.sh validates host prerequisites, twenty ordered vLLM transformations, every reviewed
+- status.sh validates host prerequisites, twenty-one ordered vLLM transformations, every reviewed
   source and test file, the model manifest, image archive, image identity and labels,
   command and environment, mounts, runtime packages, API identity, listener,
   hardening, and live health. HEALTHY means all checks passed.
@@ -95,7 +95,7 @@ Advanced reproducibility operations are deliberately separate from serving mode:
     ./scripts/build-vllm.sh build
     ./scripts/restore-images.sh
 
-The check reconstructs the source tree from the pinned upstream commit through all twenty
+The check reconstructs the source tree from the pinned upstream commit through all twenty-one
 landmark-aware transformations. The build runs offline from the exact base image and fails unless it produces
 the pinned image ID. Restore verifies the pinned local archive before loading it.
 
@@ -251,7 +251,7 @@ The vLLM submodule is pinned at:
 
     9df9b0b0a1816b6d0d0f6ecd0da563cc37fd72f5
 
-It is intentionally reconstructed by twenty ordered, reviewed semantic transformations:
+It is intentionally reconstructed by twenty-one ordered, reviewed semantic transformations:
 
 | Patch | SHA-256 |
 |---|---|
@@ -275,6 +275,7 @@ It is intentionally reconstructed by twenty ordered, reviewed semantic transform
 | patches/vllm-qwen-single-call-grammar.patch | 2ae587bdde25b974cd88c5c351162fe809ee92b11d22ac0037f38411c8467b8b |
 | patches/vllm-responses-history-integrity.patch | 117c17c114d7e91e57045a8e80b6eeac283c1ab56bdaf135019ad3c372a42186 |
 | patches/vllm-responses-stream-identity.patch | eccec34b8dd211f444065ef60b6b8075161efc790b61db4640104e3747763478 |
+| patches/vllm-anthropic-terminal-metadata.patch | 7885e27d8f9259e106bd8c2f3ccdefa3fd276649658ea521b50ecf85d83113c5 |
 
 The reconstructed tree has 72 reviewed runtime-source changes, 1 new runtime source,
 6 runtime-source deletions, 50 existing-test changes, 6 new tests,
@@ -300,11 +301,11 @@ Pinned build inputs and products:
 | Offline archive | artifacts/qwen38-vllm-images-runtime-v23.tar |
 | Archive size | Awaiting adoption after the v23 export |
 | Archive SHA-256 | Awaiting adoption after the v23 export |
-| Runtime Dockerfile SHA-256 | eb0f0baddef109dbe25f6a92f8a2b84ad9c18647892131411bb8f298646c9234 |
+| Runtime Dockerfile SHA-256 | 4d06ba0006859495da7e8101670fa4cd7f55fc4175706b081134ff4069e1c8b6 |
 | Docker context allowlist SHA-256 | 00b93440d4684980fc932594c0353e72bdb1d12b69165dd7898b28e03119f00d |
-| Build verifier SHA-256 | 74ae156149873952b4a7639f421e3ee41465716956f8f306ddec3f93458afc84 |
+| Build verifier SHA-256 | b6881f95cf3ecea0e3417345915c1226be02f03af899390bd9637caffeee6028 |
 | Runtime validator SHA-256 | bab63263005f7bde7a6a66f7372d2f043545598fd56563bc5f8766301723d4e2 |
-| Runtime lock SHA-256 | b10427112b861023022109fad29ecbd0613aa6c768185434055098d17eab1808 |
+| Runtime lock SHA-256 | 9340920331aefa85297e5dbbc01c99f4e0f6015b19584584a19bc30358f0d5cd |
 
 Every reviewed runtime file, including both TurboQuant kernels, is copied and
 hash-checked against its upstream and patched identities. A CPU Triton-interpreter
@@ -826,6 +827,13 @@ never promoted into a successful executable call:
 - Anthropic preserves stop_reason=max_tokens;
 - Responses marks the response and function item incomplete, emits no executable
   arguments-done/completed terminal, and ends with response.incomplete.
+
+Anthropic streaming and batch responses derive their terminal metadata from the
+same observed completion cause and output. A matched stop string is reported as
+`stop_reason: stop_sequence` with the exact string in `stop_sequence`. Completed
+tool-use output reports `tool_use`, including a named call that Chat reports as
+`stop`. Token limits retain `max_tokens`. A stream that lacks its completion
+metadata, usage or terminal marker ends with an API error and no `message_stop`.
 
 Thirty controlled real-token prefix cuts produced the same typed semantics in
 streaming and non-streaming parser paths. Live independently sampled fault injection

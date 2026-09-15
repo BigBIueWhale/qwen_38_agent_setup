@@ -1821,6 +1821,47 @@ def _validate_responses_identity_after(state: State) -> None:
         }, label=label)
 
 
+def _validate_anthropic_terminal_before(state: State) -> None:
+    require_text(state, "vllm/entrypoints/anthropic/serving.py",
+                 "self.stop_reason_map = {",
+                 label="Anthropic terminal metadata precondition")
+
+
+def _validate_anthropic_terminal_after(state: State) -> None:
+    label = "Anthropic terminal metadata result"
+    serving = "vllm/entrypoints/anthropic/serving.py"
+    stop = _require_in_symbol(state, serving, "_anthropic_stop_metadata", (
+        'finish_reason == "length"',
+        'stop_reason="max_tokens", stop_sequence=None',
+        'isinstance(stop_reason, str)',
+        'stop_reason="stop_sequence", stop_sequence=stop_reason',
+        'stop_reason="tool_use" if has_tool_use else "end_turn"',
+        "raise GenerationError(",
+    ), label=label)
+    _require_ordered(stop, (
+        'finish_reason == "length"', 'isinstance(stop_reason, str)',
+        'stop_reason="tool_use" if has_tool_use else "end_turn"',
+    ), label=label, location="_anthropic_stop_metadata")
+    _require_in_symbol(state, serving, "AnthropicServingMessages.messages_full_converter", (
+        "_anthropic_stop_metadata(", "choice.finish_reason, choice.stop_reason",
+        "bool(choice.message.tool_calls)", "result.stop_sequence = stop.stop_sequence",
+    ), label=label)
+    _require_in_symbol(state, serving, "AnthropicServingMessages.message_stream_converter", (
+        "_anthropic_stop_metadata(", "finish_reason, matched_stop, has_tool_use",
+        "matched_stop = origin_chunk.choices[0].stop_reason",
+        "has_tool_use = True", "if not sent_message_delta:",
+        "origin_chunk.usage is None or sent_message_delta",
+        'raise GenerationError("Chat stream ended without its terminal marker")',
+    ), label=label)
+    forbid_text(state, serving, "stop_reason_map", label=label)
+    require_python_symbols(state,
+        "tests/entrypoints/anthropic/test_anthropic_messages_conversion.py", {
+            "TestAnthropicTerminalMetadata.test_stream_and_batch_report_observed_cause": None,
+            "TestAnthropicTerminalMetadata.test_invalid_completion_cause_is_never_reported_as_success": None,
+            "TestAnthropicTerminalMetadata.test_incomplete_or_invalid_stream_has_no_success_terminal": None,
+        }, label=label)
+
+
 def validate_final(state: State) -> None:
     """Reassert every durable semantic invariant on the complete tree.
 
@@ -1836,6 +1877,21 @@ def validate_final(state: State) -> None:
 
 
 CONTRACTS: Mapping[str, SemanticContract] = {
+    "anthropic-terminal-metadata": SemanticContract(
+        rationale=(
+            "Mapping only Chat finish_reason loses matched stop sequences and "
+            "reports a forced tool call as end_turn. Both transports must derive "
+            "native terminal metadata from the observed cause and tool-use output, "
+            "and an incomplete stream must never receive a success terminal."
+        ),
+        removal_condition=(
+            "Remove when upstream preserves matched stop strings, reports named "
+            "tool output as tool_use, gives truncation precedence, and ends "
+            "streaming and batch responses with the same observed metadata."
+        ),
+        validate_before=_validate_anthropic_terminal_before,
+        validate_after=_validate_anthropic_terminal_after,
+    ),
     "responses-stream-identity": SemanticContract(
         rationale=(
             "Reparsing streamed output minted replacement item and call IDs in "

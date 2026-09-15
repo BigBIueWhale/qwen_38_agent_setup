@@ -58204,12 +58204,1224 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '        | None = None,\n'
                              '    ) -> list[StreamingResponsesResponse]:\n'
                              '        """Emit incremental events for the current state '
-                             'from the delta."""\n'})})
+                             'from the delta."""\n'})},
+ {'name': 'anthropic-terminal-metadata',
+  'review_patch': 'patches/vllm-anthropic-terminal-metadata.patch',
+  'review_sha256': '7885e27d8f9259e106bd8c2f3ccdefa3fd276649658ea521b50ecf85d83113c5',
+  'files': ({'path': 'tests/entrypoints/anthropic/test_anthropic_messages_conversion.py',
+             'before_sha256': 'ac944717d2a35cc81edf291739eb26965355b25d71ec6514f9735d4271fd4b8d',
+             'after_sha256': 'b95347f4b85b4a63be849c5ac3e10bcd22228cb5d51d903fa4bd6d0aa1f6049e'},
+            {'path': 'vllm/entrypoints/anthropic/serving.py',
+             'before_sha256': '01b02c09a64be7e0de8921694c1537a4972d37c4e6c861716df461c2b0debc5c',
+             'after_sha256': '09a97d1ac1a258e75b497906b998625beec1d9974dae6577b1da971dbb0211a3'}),
+  'edits': ({'name': 'tests/entrypoints/anthropic/test_anthropic_messages_conversion.py:landmark-1',
+             'path': 'tests/entrypoints/anthropic/test_anthropic_messages_conversion.py',
+             'before': '\n'
+                       'def _make_stream_converter():\n'
+                       '    obj = MagicMock(spec=AnthropicServingMessages)\n'
+                       '    obj.stop_reason_map = {\n'
+                       '        "stop": "end_turn",\n'
+                       '        "length": "max_tokens",\n'
+                       '        "tool_calls": "tool_use",\n'
+                       '    }\n'
+                       '    obj.message_stream_converter = (\n'
+                       '        '
+                       'AnthropicServingMessages.message_stream_converter.__get__(obj)\n'
+                       '    )\n',
+             'after': '\n'
+                      'def _make_stream_converter():\n'
+                      '    obj = MagicMock(spec=AnthropicServingMessages)\n'
+                      '    obj.message_stream_converter = (\n'
+                      '        '
+                      'AnthropicServingMessages.message_stream_converter.__get__(obj)\n'
+                      '    )\n',
+             'review_before': '\n'
+                              'def _make_stream_converter():\n'
+                              '    obj = MagicMock(spec=AnthropicServingMessages)\n'
+                              '    obj.stop_reason_map = {\n'
+                              '        "stop": "end_turn",\n'
+                              '        "length": "max_tokens",\n'
+                              '        "tool_calls": "tool_use",\n'
+                              '    }\n'
+                              '    obj.message_stream_converter = (\n'
+                              '        '
+                              'AnthropicServingMessages.message_stream_converter.__get__(obj)\n'
+                              '    )\n',
+             'review_after': '\n'
+                             'def _make_stream_converter():\n'
+                             '    obj = MagicMock(spec=AnthropicServingMessages)\n'
+                             '    obj.message_stream_converter = (\n'
+                             '        '
+                             'AnthropicServingMessages.message_stream_converter.__get__(obj)\n'
+                             '    )\n'},
+            {'name': 'tests/entrypoints/anthropic/test_anthropic_messages_conversion.py:landmark-2',
+             'path': 'tests/entrypoints/anthropic/test_anthropic_messages_conversion.py',
+             'before': '    *,\n'
+                       '    delta: DeltaMessage | None = None,\n'
+                       '    finish_reason: str | None = None,\n'
+                       '    choices: list[ChatCompletionResponseStreamChoice] | None = '
+                       'None,\n'
+                       '    usage: UsageInfo | None = None,\n'
+                       ') -> str:\n',
+             'after': '    *,\n'
+                      '    delta: DeltaMessage | None = None,\n'
+                      '    finish_reason: str | None = None,\n'
+                      '    stop_reason: str | int | None = None,\n'
+                      '    choices: list[ChatCompletionResponseStreamChoice] | None = '
+                      'None,\n'
+                      '    usage: UsageInfo | None = None,\n'
+                      ') -> str:\n',
+             'review_before': '    *,\n'
+                              '    delta: DeltaMessage | None = None,\n'
+                              '    finish_reason: str | None = None,\n'
+                              '    choices: list[ChatCompletionResponseStreamChoice] | '
+                              'None = None,\n'
+                              '    usage: UsageInfo | None = None,\n'
+                              ') -> str:\n',
+             'review_after': '    *,\n'
+                             '    delta: DeltaMessage | None = None,\n'
+                             '    finish_reason: str | None = None,\n'
+                             '    stop_reason: str | int | None = None,\n'
+                             '    choices: list[ChatCompletionResponseStreamChoice] | '
+                             'None = None,\n'
+                             '    usage: UsageInfo | None = None,\n'
+                             ') -> str:\n'},
+            {'name': 'tests/entrypoints/anthropic/test_anthropic_messages_conversion.py:landmark-3',
+             'path': 'tests/entrypoints/anthropic/test_anthropic_messages_conversion.py',
+             'before': '                index=0,\n'
+                       '                delta=delta or DeltaMessage(),\n'
+                       '                finish_reason=finish_reason,\n'
+                       '            )\n'
+                       '        ]\n'
+                       '    chunk = ChatCompletionStreamResponse(\n',
+             'after': '                index=0,\n'
+                      '                delta=delta or DeltaMessage(),\n'
+                      '                finish_reason=finish_reason,\n'
+                      '                stop_reason=stop_reason,\n'
+                      '            )\n'
+                      '        ]\n'
+                      '    chunk = ChatCompletionStreamResponse(\n',
+             'review_before': '                index=0,\n'
+                              '                delta=delta or DeltaMessage(),\n'
+                              '                finish_reason=finish_reason,\n'
+                              '            )\n'
+                              '        ]\n'
+                              '    chunk = ChatCompletionStreamResponse(\n',
+             'review_after': '                index=0,\n'
+                             '                delta=delta or DeltaMessage(),\n'
+                             '                finish_reason=finish_reason,\n'
+                             '                stop_reason=stop_reason,\n'
+                             '            )\n'
+                             '        ]\n'
+                             '    chunk = ChatCompletionStreamResponse(\n'},
+            {'name': 'tests/entrypoints/anthropic/test_anthropic_messages_conversion.py:landmark-4',
+             'path': 'tests/entrypoints/anthropic/test_anthropic_messages_conversion.py',
+             'before': '    async def '
+                       'test_buffered_content_flushed_on_done_without_usage_chunk(self):\n'
+                       '        """Content buffered during tool_use must be emitted '
+                       'even if the\n'
+                       '        stream jumps straight from finish_reason to [DONE], '
+                       'skipping the\n'
+                       '        empty-choices usage chunk."""\n'
+                       '\n'
+                       '        async def sse_input():\n'
+                       '            yield _make_stream_chunk(\n',
+             'after': '    async def '
+                      'test_buffered_content_flushed_on_done_without_usage_chunk(self):\n'
+                      '        """Content buffered during tool_use must be emitted '
+                      'even if the\n'
+                      '        stream jumps straight from finish_reason to [DONE], '
+                      'skipping the\n'
+                      '        empty-choices usage chunk. Missing terminal usage is a '
+                      'server error;\n'
+                      '        the diagnostic prefix must remain visible without a '
+                      'success terminal."""\n'
+                      '\n'
+                      '        async def sse_input():\n'
+                      '            yield _make_stream_chunk(\n',
+             'review_before': '    async def '
+                              'test_buffered_content_flushed_on_done_without_usage_chunk(self):\n'
+                              '        """Content buffered during tool_use must be '
+                              'emitted even if the\n'
+                              '        stream jumps straight from finish_reason to '
+                              '[DONE], skipping the\n'
+                              '        empty-choices usage chunk."""\n'
+                              '\n'
+                              '        async def sse_input():\n'
+                              '            yield _make_stream_chunk(\n',
+             'review_after': '    async def '
+                             'test_buffered_content_flushed_on_done_without_usage_chunk(self):\n'
+                             '        """Content buffered during tool_use must be '
+                             'emitted even if the\n'
+                             '        stream jumps straight from finish_reason to '
+                             '[DONE], skipping the\n'
+                             '        empty-choices usage chunk. Missing terminal '
+                             'usage is a server error;\n'
+                             '        the diagnostic prefix must remain visible '
+                             'without a success terminal."""\n'
+                             '\n'
+                             '        async def sse_input():\n'
+                             '            yield _make_stream_chunk(\n'},
+            {'name': 'tests/entrypoints/anthropic/test_anthropic_messages_conversion.py:landmark-5',
+             'path': 'tests/entrypoints/anthropic/test_anthropic_messages_conversion.py',
+             'before': '        assert "tool_use" in block_starts\n'
+                       '        assert "text" in block_starts\n'
+                       '\n'
+                       '        assert events[-1][0] == "message_stop"\n'
+                       '\n'
+                       '\n'
+                       'class TestMessageStartIncludesTypeAndRole:\n',
+             'after': '        assert "tool_use" in block_starts\n'
+                      '        assert "text" in block_starts\n'
+                      '\n'
+                      '        assert events[-1][0] == "error"\n'
+                      '        assert all(event_type != "message_stop" for event_type, '
+                      '_ in events)\n'
+                      '\n'
+                      '\n'
+                      'class TestMessageStartIncludesTypeAndRole:\n',
+             'review_before': '        assert "tool_use" in block_starts\n'
+                              '        assert "text" in block_starts\n'
+                              '\n'
+                              '        assert events[-1][0] == "message_stop"\n'
+                              '\n'
+                              '\n'
+                              'class TestMessageStartIncludesTypeAndRole:\n',
+             'review_after': '        assert "tool_use" in block_starts\n'
+                             '        assert "text" in block_starts\n'
+                             '\n'
+                             '        assert events[-1][0] == "error"\n'
+                             '        assert all(event_type != "message_stop" for '
+                             'event_type, _ in events)\n'
+                             '\n'
+                             '\n'
+                             'class TestMessageStartIncludesTypeAndRole:\n'},
+            {'name': 'tests/entrypoints/anthropic/test_anthropic_messages_conversion.py:landmark-6',
+             'path': 'tests/entrypoints/anthropic/test_anthropic_messages_conversion.py',
+             'before': '        assert response.status_code == 400\n'
+                       '        assert response.json()["error"]["type"] == '
+                       '"invalid_request_error"\n'
+                       '        assert response.headers["content-type"] == '
+                       '"application/json"\n',
+             'after': '        assert response.status_code == 400\n'
+                      '        assert response.json()["error"]["type"] == '
+                      '"invalid_request_error"\n'
+                      '        assert response.headers["content-type"] == '
+                      '"application/json"\n'
+                      '\n'
+                      '\n'
+                      'class TestAnthropicTerminalMetadata:\n'
+                      '    @pytest.mark.asyncio\n'
+                      '    @pytest.mark.parametrize(\n'
+                      "        'finish, stop, tool, expected, sequence',\n"
+                      '        [\n'
+                      "            ('stop', None, False, 'end_turn', None),\n"
+                      "            ('stop', 151645, False, 'end_turn', None),\n"
+                      "            ('stop', '\\n HALT \\n', False, 'stop_sequence', "
+                      "'\\n HALT \\n'),\n"
+                      "            ('stop', None, True, 'tool_use', None),\n"
+                      "            ('stop', 151645, True, 'tool_use', None),\n"
+                      "            ('tool_calls', None, True, 'tool_use', None),\n"
+                      "            ('stop', 'HALT', True, 'stop_sequence', 'HALT'),\n"
+                      "            ('length', None, False, 'max_tokens', None),\n"
+                      "            ('length', None, True, 'max_tokens', None),\n"
+                      "            ('length', 'final_response_token_budget', True, "
+                      "'max_tokens', None),\n"
+                      '        ],\n'
+                      '    )\n'
+                      '    async def test_stream_and_batch_report_observed_cause(\n'
+                      '        self, finish, stop, tool, expected, sequence,\n'
+                      '    ):\n'
+                      '        usage = UsageInfo(prompt_tokens=10, '
+                      'completion_tokens=5, total_tokens=15)\n'
+                      '        tool_calls = ([{\n'
+                      "            'id': 'call-terminal', 'type': 'function',\n"
+                      "            'function': {'name': 'lookup', 'arguments': "
+                      '\'{"key":"value"}\'},\n'
+                      '        }] if tool else [])\n'
+                      '        response = ChatCompletionResponse(\n'
+                      "            id='chatcmpl-terminal', model='test-model', "
+                      'usage=usage,\n'
+                      '            choices=[ChatCompletionResponseChoice(\n'
+                      '                index=0, finish_reason=finish, '
+                      'stop_reason=stop,\n'
+                      "                message=ChatMessage(role='assistant', "
+                      "content='visible',\n"
+                      '                                    tool_calls=tool_calls),\n'
+                      '            )],\n'
+                      '        )\n'
+                      '        batch = '
+                      '_make_full_converter().messages_full_converter(response)\n'
+                      '        assert (batch.stop_reason, batch.stop_sequence) == '
+                      '(expected, sequence)\n'
+                      '        assert [block.type for block in batch.content] == (\n'
+                      "            ['text', 'tool_use'] if tool else ['text']\n"
+                      '        )\n'
+                      "        assert batch.content[0].text == 'visible'\n"
+                      '        if tool:\n'
+                      "            assert batch.content[1].id == 'call-terminal'\n"
+                      "            assert batch.content[1].input == {'key': 'value'}\n"
+                      '\n'
+                      '        async def source():\n'
+                      '            # The first chunk is allowed to contain content '
+                      'alongside the role.\n'
+                      '            yield '
+                      "_make_stream_chunk(delta=DeltaMessage(role='assistant', "
+                      "content='visible'))\n"
+                      '            if tool:\n'
+                      '                yield '
+                      '_make_stream_chunk(delta=DeltaMessage(tool_calls=[\n'
+                      "                    _tc(id='call-terminal', name='lookup', "
+                      'args=\'{"key":\'),\n'
+                      '                ]))\n'
+                      '                yield '
+                      '_make_stream_chunk(delta=DeltaMessage(tool_calls=[\n'
+                      '                    _tc(args=\'"value"}\'),\n'
+                      '                ]))\n'
+                      '            yield _make_stream_chunk(finish_reason=finish, '
+                      'stop_reason=stop)\n'
+                      '            yield _make_stream_chunk(choices=[], usage=usage)\n'
+                      "            yield 'data: [DONE]'\n"
+                      '\n'
+                      '        events = _parse_sse_events([\n'
+                      '            item async for item in '
+                      '_make_stream_converter().message_stream_converter(source())\n'
+                      '        ])\n'
+                      "        assert not any(kind == 'error' for kind, _ in events)\n"
+                      '        assert [kind for kind, _ in events][-2:] == '
+                      "['message_delta', 'message_stop']\n"
+                      '        terminal = next(data for kind, data in events if kind '
+                      "== 'message_delta')\n"
+                      "        assert terminal['delta'] == {\n"
+                      "            'stop_reason': expected, 'stop_sequence': "
+                      'sequence,\n'
+                      '        }\n'
+                      "        assert terminal['usage'] == "
+                      'batch.usage.model_dump(exclude_unset=True)\n'
+                      "        starts = [data['content_block'] for kind, data in "
+                      'events\n'
+                      "                  if kind == 'content_block_start']\n"
+                      "        assert [block['type'] for block in starts] == "
+                      '[block.type for block in batch.content]\n'
+                      "        text = ''.join(data['delta']['text'] for kind, data in "
+                      'events\n'
+                      "                       if kind == 'content_block_delta' and "
+                      "data['delta']['type'] == 'text_delta')\n"
+                      '        assert text == batch.content[0].text\n'
+                      '        if tool:\n'
+                      "            assert starts[1]['id'] == batch.content[1].id\n"
+                      "            args = ''.join(data['delta']['partial_json'] for "
+                      'kind, data in events\n'
+                      "                           if kind == 'content_block_delta'\n"
+                      "                           and data['delta']['type'] == "
+                      "'input_json_delta')\n"
+                      '            assert json.loads(args) == batch.content[1].input\n'
+                      '\n'
+                      '    @pytest.mark.asyncio\n'
+                      "    @pytest.mark.parametrize('finish', [None, 'abort', 'error', "
+                      "'tool_calls'])\n"
+                      '    async def '
+                      'test_invalid_completion_cause_is_never_reported_as_success(self, '
+                      'finish):\n'
+                      '        from vllm.entrypoints.openai.engine.protocol import '
+                      'GenerationError\n'
+                      '\n'
+                      '        usage = UsageInfo(prompt_tokens=10, '
+                      'completion_tokens=1, total_tokens=11)\n'
+                      '        response = ChatCompletionResponse(\n'
+                      "            id='chatcmpl-invalid', model='test-model', "
+                      'usage=usage,\n'
+                      '            choices=[ChatCompletionResponseChoice(\n'
+                      '                index=0, finish_reason=finish,\n'
+                      "                message=ChatMessage(role='assistant', "
+                      "content='diagnostic'),\n"
+                      '            )],\n'
+                      '        )\n'
+                      '        with pytest.raises(GenerationError):\n'
+                      '            '
+                      '_make_full_converter().messages_full_converter(response)\n'
+                      '\n'
+                      '        async def source():\n'
+                      '            yield '
+                      "_make_stream_chunk(delta=DeltaMessage(content='diagnostic'))\n"
+                      '            yield _make_stream_chunk(finish_reason=finish)\n'
+                      '            yield _make_stream_chunk(choices=[], usage=usage)\n'
+                      "            yield 'data: [DONE]'\n"
+                      '\n'
+                      '        events = _parse_sse_events([\n'
+                      '            item async for item in '
+                      '_make_stream_converter().message_stream_converter(source())\n'
+                      '        ])\n'
+                      "        assert events[-1][0] == 'error'\n"
+                      "        assert not any(kind in ('message_delta', "
+                      "'message_stop') for kind, _ in events)\n"
+                      "        assert any(data.get('delta', {}).get('text') == "
+                      "'diagnostic' for _, data in events)\n"
+                      '\n'
+                      '    @pytest.mark.asyncio\n'
+                      "    @pytest.mark.parametrize('ending', ['missing_usage', "
+                      "'missing_finish', 'missing_done',\n"
+                      "                                         'repeated_usage', "
+                      "'content_after_finish',\n"
+                      "                                         'content_after_usage', "
+                      "'invalid_frame'])\n"
+                      '    async def '
+                      'test_incomplete_or_invalid_stream_has_no_success_terminal(self, '
+                      'ending):\n'
+                      '        usage = UsageInfo(prompt_tokens=10, '
+                      'completion_tokens=1, total_tokens=11)\n'
+                      '\n'
+                      '        async def source():\n'
+                      '            yield '
+                      "_make_stream_chunk(delta=DeltaMessage(role='assistant', "
+                      "content='diagnostic'))\n"
+                      "            if ending != 'missing_finish':\n"
+                      "                yield _make_stream_chunk(finish_reason='stop')\n"
+                      "            if ending == 'content_after_finish':\n"
+                      '                yield '
+                      "_make_stream_chunk(delta=DeltaMessage(content='too late'))\n"
+                      "            if ending != 'missing_usage':\n"
+                      '                yield _make_stream_chunk(choices=[], '
+                      'usage=usage)\n'
+                      "            if ending == 'repeated_usage':\n"
+                      '                yield _make_stream_chunk(choices=[], '
+                      'usage=usage)\n'
+                      "            if ending == 'content_after_usage':\n"
+                      '                yield '
+                      "_make_stream_chunk(delta=DeltaMessage(content='too late'))\n"
+                      "            if ending == 'invalid_frame':\n"
+                      "                yield 'invalid chat frame'\n"
+                      "            if ending != 'missing_done':\n"
+                      "                yield 'data: [DONE]'\n"
+                      '\n'
+                      '        events = _parse_sse_events([\n'
+                      '            item async for item in '
+                      '_make_stream_converter().message_stream_converter(source())\n'
+                      '        ])\n'
+                      "        assert events[-1][0] == 'error'\n"
+                      "        assert not any(kind == 'message_stop' for kind, _ in "
+                      'events)\n'
+                      "        assert any(data.get('delta', {}).get('text') == "
+                      "'diagnostic' for _, data in events)\n"
+                      "        assert not any(data.get('delta', {}).get('text') == "
+                      "'too late' for _, data in events)\n",
+             'review_before': '        assert response.status_code == 400\n'
+                              '        assert response.json()["error"]["type"] == '
+                              '"invalid_request_error"\n'
+                              '        assert response.headers["content-type"] == '
+                              '"application/json"\n',
+             'review_after': '        assert response.status_code == 400\n'
+                             '        assert response.json()["error"]["type"] == '
+                             '"invalid_request_error"\n'
+                             '        assert response.headers["content-type"] == '
+                             '"application/json"\n'
+                             '\n'
+                             '\n'
+                             'class TestAnthropicTerminalMetadata:\n'
+                             '    @pytest.mark.asyncio\n'
+                             '    @pytest.mark.parametrize(\n'
+                             "        'finish, stop, tool, expected, sequence',\n"
+                             '        [\n'
+                             "            ('stop', None, False, 'end_turn', None),\n"
+                             "            ('stop', 151645, False, 'end_turn', None),\n"
+                             "            ('stop', '\\n HALT \\n', False, "
+                             "'stop_sequence', '\\n HALT \\n'),\n"
+                             "            ('stop', None, True, 'tool_use', None),\n"
+                             "            ('stop', 151645, True, 'tool_use', None),\n"
+                             "            ('tool_calls', None, True, 'tool_use', "
+                             'None),\n'
+                             "            ('stop', 'HALT', True, 'stop_sequence', "
+                             "'HALT'),\n"
+                             "            ('length', None, False, 'max_tokens', "
+                             'None),\n'
+                             "            ('length', None, True, 'max_tokens', None),\n"
+                             "            ('length', 'final_response_token_budget', "
+                             "True, 'max_tokens', None),\n"
+                             '        ],\n'
+                             '    )\n'
+                             '    async def '
+                             'test_stream_and_batch_report_observed_cause(\n'
+                             '        self, finish, stop, tool, expected, sequence,\n'
+                             '    ):\n'
+                             '        usage = UsageInfo(prompt_tokens=10, '
+                             'completion_tokens=5, total_tokens=15)\n'
+                             '        tool_calls = ([{\n'
+                             "            'id': 'call-terminal', 'type': 'function',\n"
+                             "            'function': {'name': 'lookup', 'arguments': "
+                             '\'{"key":"value"}\'},\n'
+                             '        }] if tool else [])\n'
+                             '        response = ChatCompletionResponse(\n'
+                             "            id='chatcmpl-terminal', model='test-model', "
+                             'usage=usage,\n'
+                             '            choices=[ChatCompletionResponseChoice(\n'
+                             '                index=0, finish_reason=finish, '
+                             'stop_reason=stop,\n'
+                             "                message=ChatMessage(role='assistant', "
+                             "content='visible',\n"
+                             '                                    '
+                             'tool_calls=tool_calls),\n'
+                             '            )],\n'
+                             '        )\n'
+                             '        batch = '
+                             '_make_full_converter().messages_full_converter(response)\n'
+                             '        assert (batch.stop_reason, batch.stop_sequence) '
+                             '== (expected, sequence)\n'
+                             '        assert [block.type for block in batch.content] '
+                             '== (\n'
+                             "            ['text', 'tool_use'] if tool else ['text']\n"
+                             '        )\n'
+                             "        assert batch.content[0].text == 'visible'\n"
+                             '        if tool:\n'
+                             '            assert batch.content[1].id == '
+                             "'call-terminal'\n"
+                             "            assert batch.content[1].input == {'key': "
+                             "'value'}\n"
+                             '\n'
+                             '        async def source():\n'
+                             '            # The first chunk is allowed to contain '
+                             'content alongside the role.\n'
+                             '            yield '
+                             "_make_stream_chunk(delta=DeltaMessage(role='assistant', "
+                             "content='visible'))\n"
+                             '            if tool:\n'
+                             '                yield '
+                             '_make_stream_chunk(delta=DeltaMessage(tool_calls=[\n'
+                             "                    _tc(id='call-terminal', "
+                             'name=\'lookup\', args=\'{"key":\'),\n'
+                             '                ]))\n'
+                             '                yield '
+                             '_make_stream_chunk(delta=DeltaMessage(tool_calls=[\n'
+                             '                    _tc(args=\'"value"}\'),\n'
+                             '                ]))\n'
+                             '            yield '
+                             '_make_stream_chunk(finish_reason=finish, '
+                             'stop_reason=stop)\n'
+                             '            yield _make_stream_chunk(choices=[], '
+                             'usage=usage)\n'
+                             "            yield 'data: [DONE]'\n"
+                             '\n'
+                             '        events = _parse_sse_events([\n'
+                             '            item async for item in '
+                             '_make_stream_converter().message_stream_converter(source())\n'
+                             '        ])\n'
+                             "        assert not any(kind == 'error' for kind, _ in "
+                             'events)\n'
+                             '        assert [kind for kind, _ in events][-2:] == '
+                             "['message_delta', 'message_stop']\n"
+                             '        terminal = next(data for kind, data in events if '
+                             "kind == 'message_delta')\n"
+                             "        assert terminal['delta'] == {\n"
+                             "            'stop_reason': expected, 'stop_sequence': "
+                             'sequence,\n'
+                             '        }\n'
+                             "        assert terminal['usage'] == "
+                             'batch.usage.model_dump(exclude_unset=True)\n'
+                             "        starts = [data['content_block'] for kind, data "
+                             'in events\n'
+                             "                  if kind == 'content_block_start']\n"
+                             "        assert [block['type'] for block in starts] == "
+                             '[block.type for block in batch.content]\n'
+                             "        text = ''.join(data['delta']['text'] for kind, "
+                             'data in events\n'
+                             "                       if kind == 'content_block_delta' "
+                             "and data['delta']['type'] == 'text_delta')\n"
+                             '        assert text == batch.content[0].text\n'
+                             '        if tool:\n'
+                             "            assert starts[1]['id'] == "
+                             'batch.content[1].id\n'
+                             "            args = ''.join(data['delta']['partial_json'] "
+                             'for kind, data in events\n'
+                             '                           if kind == '
+                             "'content_block_delta'\n"
+                             "                           and data['delta']['type'] == "
+                             "'input_json_delta')\n"
+                             '            assert json.loads(args) == '
+                             'batch.content[1].input\n'
+                             '\n'
+                             '    @pytest.mark.asyncio\n'
+                             "    @pytest.mark.parametrize('finish', [None, 'abort', "
+                             "'error', 'tool_calls'])\n"
+                             '    async def '
+                             'test_invalid_completion_cause_is_never_reported_as_success(self, '
+                             'finish):\n'
+                             '        from vllm.entrypoints.openai.engine.protocol '
+                             'import GenerationError\n'
+                             '\n'
+                             '        usage = UsageInfo(prompt_tokens=10, '
+                             'completion_tokens=1, total_tokens=11)\n'
+                             '        response = ChatCompletionResponse(\n'
+                             "            id='chatcmpl-invalid', model='test-model', "
+                             'usage=usage,\n'
+                             '            choices=[ChatCompletionResponseChoice(\n'
+                             '                index=0, finish_reason=finish,\n'
+                             "                message=ChatMessage(role='assistant', "
+                             "content='diagnostic'),\n"
+                             '            )],\n'
+                             '        )\n'
+                             '        with pytest.raises(GenerationError):\n'
+                             '            '
+                             '_make_full_converter().messages_full_converter(response)\n'
+                             '\n'
+                             '        async def source():\n'
+                             '            yield '
+                             "_make_stream_chunk(delta=DeltaMessage(content='diagnostic'))\n"
+                             '            yield '
+                             '_make_stream_chunk(finish_reason=finish)\n'
+                             '            yield _make_stream_chunk(choices=[], '
+                             'usage=usage)\n'
+                             "            yield 'data: [DONE]'\n"
+                             '\n'
+                             '        events = _parse_sse_events([\n'
+                             '            item async for item in '
+                             '_make_stream_converter().message_stream_converter(source())\n'
+                             '        ])\n'
+                             "        assert events[-1][0] == 'error'\n"
+                             "        assert not any(kind in ('message_delta', "
+                             "'message_stop') for kind, _ in events)\n"
+                             "        assert any(data.get('delta', {}).get('text') == "
+                             "'diagnostic' for _, data in events)\n"
+                             '\n'
+                             '    @pytest.mark.asyncio\n'
+                             "    @pytest.mark.parametrize('ending', ['missing_usage', "
+                             "'missing_finish', 'missing_done',\n"
+                             '                                         '
+                             "'repeated_usage', 'content_after_finish',\n"
+                             '                                         '
+                             "'content_after_usage', 'invalid_frame'])\n"
+                             '    async def '
+                             'test_incomplete_or_invalid_stream_has_no_success_terminal(self, '
+                             'ending):\n'
+                             '        usage = UsageInfo(prompt_tokens=10, '
+                             'completion_tokens=1, total_tokens=11)\n'
+                             '\n'
+                             '        async def source():\n'
+                             '            yield '
+                             "_make_stream_chunk(delta=DeltaMessage(role='assistant', "
+                             "content='diagnostic'))\n"
+                             "            if ending != 'missing_finish':\n"
+                             '                yield '
+                             "_make_stream_chunk(finish_reason='stop')\n"
+                             "            if ending == 'content_after_finish':\n"
+                             '                yield '
+                             "_make_stream_chunk(delta=DeltaMessage(content='too "
+                             "late'))\n"
+                             "            if ending != 'missing_usage':\n"
+                             '                yield _make_stream_chunk(choices=[], '
+                             'usage=usage)\n'
+                             "            if ending == 'repeated_usage':\n"
+                             '                yield _make_stream_chunk(choices=[], '
+                             'usage=usage)\n'
+                             "            if ending == 'content_after_usage':\n"
+                             '                yield '
+                             "_make_stream_chunk(delta=DeltaMessage(content='too "
+                             "late'))\n"
+                             "            if ending == 'invalid_frame':\n"
+                             "                yield 'invalid chat frame'\n"
+                             "            if ending != 'missing_done':\n"
+                             "                yield 'data: [DONE]'\n"
+                             '\n'
+                             '        events = _parse_sse_events([\n'
+                             '            item async for item in '
+                             '_make_stream_converter().message_stream_converter(source())\n'
+                             '        ])\n'
+                             "        assert events[-1][0] == 'error'\n"
+                             "        assert not any(kind == 'message_stop' for kind, "
+                             '_ in events)\n'
+                             "        assert any(data.get('delta', {}).get('text') == "
+                             "'diagnostic' for _, data in events)\n"
+                             "        assert not any(data.get('delta', {}).get('text') "
+                             "== 'too late' for _, data in events)\n"},
+            {'name': 'vllm/entrypoints/anthropic/serving.py:landmark-1',
+             'path': 'vllm/entrypoints/anthropic/serving.py',
+             'before': 'from vllm.entrypoints.openai.chat_completion.serving import '
+                       'OpenAIServingChat\n'
+                       'from vllm.entrypoints.openai.engine.protocol import (\n'
+                       '    ErrorResponse,\n'
+                       '    JsonSchemaResponseFormat,\n'
+                       '    ResponseFormat,\n'
+                       '    StreamOptions,\n',
+             'after': 'from vllm.entrypoints.openai.chat_completion.serving import '
+                      'OpenAIServingChat\n'
+                      'from vllm.entrypoints.openai.engine.protocol import (\n'
+                      '    ErrorResponse,\n'
+                      '    GenerationError,\n'
+                      '    JsonSchemaResponseFormat,\n'
+                      '    ResponseFormat,\n'
+                      '    StreamOptions,\n',
+             'review_before': 'from vllm.entrypoints.openai.chat_completion.serving '
+                              'import OpenAIServingChat\n'
+                              'from vllm.entrypoints.openai.engine.protocol import (\n'
+                              '    ErrorResponse,\n'
+                              '    JsonSchemaResponseFormat,\n'
+                              '    ResponseFormat,\n'
+                              '    StreamOptions,\n',
+             'review_after': 'from vllm.entrypoints.openai.chat_completion.serving '
+                             'import OpenAIServingChat\n'
+                             'from vllm.entrypoints.openai.engine.protocol import (\n'
+                             '    ErrorResponse,\n'
+                             '    GenerationError,\n'
+                             '    JsonSchemaResponseFormat,\n'
+                             '    ResponseFormat,\n'
+                             '    StreamOptions,\n'},
+            {'name': 'vllm/entrypoints/anthropic/serving.py:landmark-2',
+             'path': 'vllm/entrypoints/anthropic/serving.py',
+             'before': '\n'
+                       "# State the caller's error flag in the rendered tool result.\n"
+                       'TOOL_RESULT_ERROR_LINE = "Tool result flagged is_error: '
+                       'true."\n'
+                       '\n'
+                       '\n'
+                       'def _build_anthropic_usage(\n',
+             'after': '\n'
+                      "# State the caller's error flag in the rendered tool result.\n"
+                      'TOOL_RESULT_ERROR_LINE = "Tool result flagged is_error: true."\n'
+                      '\n'
+                      '\n'
+                      'def _anthropic_stop_metadata(\n'
+                      '    finish_reason: str | None,\n'
+                      '    stop_reason: str | int | None,\n'
+                      '    has_tool_use: bool,\n'
+                      ') -> AnthropicDelta:\n'
+                      '    """Translate the observed completion cause and output into '
+                      'native fields."""\n'
+                      '    if finish_reason == "length":\n'
+                      '        return AnthropicDelta(stop_reason="max_tokens", '
+                      'stop_sequence=None)\n'
+                      '    if finish_reason not in ("stop", "tool_calls"):\n'
+                      '        raise GenerationError(f"Chat generation ended with '
+                      '{finish_reason!r}")\n'
+                      '    if isinstance(stop_reason, str):\n'
+                      '        return AnthropicDelta(stop_reason="stop_sequence", '
+                      'stop_sequence=stop_reason)\n'
+                      '    if finish_reason == "tool_calls" and not has_tool_use:\n'
+                      '        raise GenerationError("Chat reported tool calls without '
+                      'tool-use output")\n'
+                      '    return AnthropicDelta(\n'
+                      '        stop_reason="tool_use" if has_tool_use else "end_turn", '
+                      'stop_sequence=None,\n'
+                      '    )\n'
+                      '\n'
+                      '\n'
+                      'def _build_anthropic_usage(\n',
+             'review_before': '\n'
+                              "# State the caller's error flag in the rendered tool "
+                              'result.\n'
+                              'TOOL_RESULT_ERROR_LINE = "Tool result flagged is_error: '
+                              'true."\n'
+                              '\n'
+                              '\n'
+                              'def _build_anthropic_usage(\n',
+             'review_after': '\n'
+                             "# State the caller's error flag in the rendered tool "
+                             'result.\n'
+                             'TOOL_RESULT_ERROR_LINE = "Tool result flagged is_error: '
+                             'true."\n'
+                             '\n'
+                             '\n'
+                             'def _anthropic_stop_metadata(\n'
+                             '    finish_reason: str | None,\n'
+                             '    stop_reason: str | int | None,\n'
+                             '    has_tool_use: bool,\n'
+                             ') -> AnthropicDelta:\n'
+                             '    """Translate the observed completion cause and '
+                             'output into native fields."""\n'
+                             '    if finish_reason == "length":\n'
+                             '        return AnthropicDelta(stop_reason="max_tokens", '
+                             'stop_sequence=None)\n'
+                             '    if finish_reason not in ("stop", "tool_calls"):\n'
+                             '        raise GenerationError(f"Chat generation ended '
+                             'with {finish_reason!r}")\n'
+                             '    if isinstance(stop_reason, str):\n'
+                             '        return '
+                             'AnthropicDelta(stop_reason="stop_sequence", '
+                             'stop_sequence=stop_reason)\n'
+                             '    if finish_reason == "tool_calls" and not '
+                             'has_tool_use:\n'
+                             '        raise GenerationError("Chat reported tool calls '
+                             'without tool-use output")\n'
+                             '    return AnthropicDelta(\n'
+                             '        stop_reason="tool_use" if has_tool_use else '
+                             '"end_turn", stop_sequence=None,\n'
+                             '    )\n'
+                             '\n'
+                             '\n'
+                             'def _build_anthropic_usage(\n'},
+            {'name': 'vllm/entrypoints/anthropic/serving.py:landmark-3',
+             'path': 'vllm/entrypoints/anthropic/serving.py',
+             'before': '            '
+                       'enable_force_include_usage=enable_force_include_usage,\n'
+                       '            '
+                       'default_chat_template_kwargs=default_chat_template_kwargs,\n'
+                       '        )\n'
+                       '        self.stop_reason_map = {\n'
+                       '            "stop": "end_turn",\n'
+                       '            "length": "max_tokens",\n'
+                       '            "tool_calls": "tool_use",\n'
+                       '        }\n'
+                       '        self._merge_inline_system = '
+                       'self._detect_merge_inline_system(chat_template)\n'
+                       '\n'
+                       '    @staticmethod\n',
+             'after': '            '
+                      'enable_force_include_usage=enable_force_include_usage,\n'
+                      '            '
+                      'default_chat_template_kwargs=default_chat_template_kwargs,\n'
+                      '        )\n'
+                      '        self._merge_inline_system = '
+                      'self._detect_merge_inline_system(chat_template)\n'
+                      '\n'
+                      '    @staticmethod\n',
+             'review_before': '            '
+                              'enable_force_include_usage=enable_force_include_usage,\n'
+                              '            '
+                              'default_chat_template_kwargs=default_chat_template_kwargs,\n'
+                              '        )\n'
+                              '        self.stop_reason_map = {\n'
+                              '            "stop": "end_turn",\n'
+                              '            "length": "max_tokens",\n'
+                              '            "tool_calls": "tool_use",\n'
+                              '        }\n'
+                              '        self._merge_inline_system = '
+                              'self._detect_merge_inline_system(chat_template)\n'
+                              '\n'
+                              '    @staticmethod\n',
+             'review_after': '            '
+                             'enable_force_include_usage=enable_force_include_usage,\n'
+                             '            '
+                             'default_chat_template_kwargs=default_chat_template_kwargs,\n'
+                             '        )\n'
+                             '        self._merge_inline_system = '
+                             'self._detect_merge_inline_system(chat_template)\n'
+                             '\n'
+                             '    @staticmethod\n'},
+            {'name': 'vllm/entrypoints/anthropic/serving.py:landmark-4',
+             'path': 'vllm/entrypoints/anthropic/serving.py',
+             'before': '            ec_transfer_params=generator.ec_transfer_params,\n'
+                       '        )\n'
+                       '        choice = generator.choices[0]\n'
+                       '        if choice.finish_reason == "stop":\n'
+                       '            result.stop_reason = "end_turn"\n'
+                       '        elif choice.finish_reason == "length":\n'
+                       '            result.stop_reason = "max_tokens"\n'
+                       '        elif choice.finish_reason == "tool_calls":\n'
+                       '            result.stop_reason = "tool_use"\n'
+                       '\n'
+                       '        content: list[AnthropicContentBlock] = []\n'
+                       '        if choice.message.reasoning:\n',
+             'after': '            ec_transfer_params=generator.ec_transfer_params,\n'
+                      '        )\n'
+                      '        choice = generator.choices[0]\n'
+                      '        stop = _anthropic_stop_metadata(\n'
+                      '            choice.finish_reason, choice.stop_reason, '
+                      'bool(choice.message.tool_calls),\n'
+                      '        )\n'
+                      '        result.stop_reason = stop.stop_reason\n'
+                      '        result.stop_sequence = stop.stop_sequence\n'
+                      '\n'
+                      '        content: list[AnthropicContentBlock] = []\n'
+                      '        if choice.message.reasoning:\n',
+             'review_before': '            '
+                              'ec_transfer_params=generator.ec_transfer_params,\n'
+                              '        )\n'
+                              '        choice = generator.choices[0]\n'
+                              '        if choice.finish_reason == "stop":\n'
+                              '            result.stop_reason = "end_turn"\n'
+                              '        elif choice.finish_reason == "length":\n'
+                              '            result.stop_reason = "max_tokens"\n'
+                              '        elif choice.finish_reason == "tool_calls":\n'
+                              '            result.stop_reason = "tool_use"\n'
+                              '\n'
+                              '        content: list[AnthropicContentBlock] = []\n'
+                              '        if choice.message.reasoning:\n',
+             'review_after': '            '
+                             'ec_transfer_params=generator.ec_transfer_params,\n'
+                             '        )\n'
+                             '        choice = generator.choices[0]\n'
+                             '        stop = _anthropic_stop_metadata(\n'
+                             '            choice.finish_reason, choice.stop_reason, '
+                             'bool(choice.message.tool_calls),\n'
+                             '        )\n'
+                             '        result.stop_reason = stop.stop_reason\n'
+                             '        result.stop_sequence = stop.stop_sequence\n'
+                             '\n'
+                             '        content: list[AnthropicContentBlock] = []\n'
+                             '        if choice.message.reasoning:\n'},
+            {'name': 'vllm/entrypoints/anthropic/serving.py:landmark-5',
+             'path': 'vllm/entrypoints/anthropic/serving.py',
+             'before': '\n'
+                       '            first_item = True\n'
+                       '            finish_reason = None\n'
+                       '            state = _ActiveBlockState()\n'
+                       '            # Map from tool call index to tool_use_id\n'
+                       '            tool_index_to_id: dict[int, str] = {}\n',
+             'after': '\n'
+                      '            first_item = True\n'
+                      '            finish_reason = None\n'
+                      '            matched_stop: str | int | None = None\n'
+                      '            has_tool_use = False\n'
+                      '            sent_message_delta = False\n'
+                      '            state = _ActiveBlockState()\n'
+                      '            # Map from tool call index to tool_use_id\n'
+                      '            tool_index_to_id: dict[int, str] = {}\n',
+             'review_before': '\n'
+                              '            first_item = True\n'
+                              '            finish_reason = None\n'
+                              '            state = _ActiveBlockState()\n'
+                              '            # Map from tool call index to tool_use_id\n'
+                              '            tool_index_to_id: dict[int, str] = {}\n',
+             'review_after': '\n'
+                             '            first_item = True\n'
+                             '            finish_reason = None\n'
+                             '            matched_stop: str | int | None = None\n'
+                             '            has_tool_use = False\n'
+                             '            sent_message_delta = False\n'
+                             '            state = _ActiveBlockState()\n'
+                             '            # Map from tool call index to tool_use_id\n'
+                             '            tool_index_to_id: dict[int, str] = {}\n'},
+            {'name': 'vllm/entrypoints/anthropic/serving.py:landmark-6',
+             'path': 'vllm/entrypoints/anthropic/serving.py',
+             'before': '                    if data_str == "[DONE]":\n'
+                       '                        for event in stop_and_flush():\n'
+                       '                            yield event\n'
+                       '                        stop_message = AnthropicStreamEvent(\n'
+                       '                            type="message_stop",\n'
+                       '                        )\n',
+             'after': '                    if data_str == "[DONE]":\n'
+                      '                        for event in stop_and_flush():\n'
+                      '                            yield event\n'
+                      '                        if not sent_message_delta:\n'
+                      '                            raise GenerationError(\n'
+                      '                                "Chat stream ended without '
+                      'terminal metadata and usage"\n'
+                      '                            )\n'
+                      '                        stop_message = AnthropicStreamEvent(\n'
+                      '                            type="message_stop",\n'
+                      '                        )\n',
+             'review_before': '                    if data_str == "[DONE]":\n'
+                              '                        for event in stop_and_flush():\n'
+                              '                            yield event\n'
+                              '                        stop_message = '
+                              'AnthropicStreamEvent(\n'
+                              '                            type="message_stop",\n'
+                              '                        )\n',
+             'review_after': '                    if data_str == "[DONE]":\n'
+                             '                        for event in stop_and_flush():\n'
+                             '                            yield event\n'
+                             '                        if not sent_message_delta:\n'
+                             '                            raise GenerationError(\n'
+                             '                                "Chat stream ended '
+                             'without terminal metadata and usage"\n'
+                             '                            )\n'
+                             '                        stop_message = '
+                             'AnthropicStreamEvent(\n'
+                             '                            type="message_stop",\n'
+                             '                        )\n'},
+            {'name': 'vllm/entrypoints/anthropic/serving.py:landmark-7',
+             'path': 'vllm/entrypoints/anthropic/serving.py',
+             'before': '                            exclude_unset=True, '
+                       'exclude_none=True\n'
+                       '                        )\n'
+                       '                        yield wrap_data_with_event(data, '
+                       '"message_stop")\n'
+                       '                    else:\n'
+                       '                        payload = json.loads(data_str)\n'
+                       '                        if "error" in payload:\n',
+             'after': '                            exclude_unset=True, '
+                      'exclude_none=True\n'
+                      '                        )\n'
+                      '                        yield wrap_data_with_event(data, '
+                      '"message_stop")\n'
+                      '                        return\n'
+                      '                    else:\n'
+                      '                        payload = json.loads(data_str)\n'
+                      '                        if "error" in payload:\n',
+             'review_before': '                            exclude_unset=True, '
+                              'exclude_none=True\n'
+                              '                        )\n'
+                              '                        yield '
+                              'wrap_data_with_event(data, "message_stop")\n'
+                              '                    else:\n'
+                              '                        payload = json.loads(data_str)\n'
+                              '                        if "error" in payload:\n',
+             'review_after': '                            exclude_unset=True, '
+                             'exclude_none=True\n'
+                             '                        )\n'
+                             '                        yield wrap_data_with_event(data, '
+                             '"message_stop")\n'
+                             '                        return\n'
+                             '                    else:\n'
+                             '                        payload = json.loads(data_str)\n'
+                             '                        if "error" in payload:\n'},
+            {'name': 'vllm/entrypoints/anthropic/serving.py:landmark-8',
+             'path': 'vllm/entrypoints/anthropic/serving.py',
+             'before': '                            first_item = False\n'
+                       '                            data = '
+                       'chunk.model_dump_json(exclude_unset=True)\n'
+                       '                            yield wrap_data_with_event(data, '
+                       '"message_start")\n'
+                       '                            continue\n'
+                       '\n'
+                       '                        # last chunk including usage info\n'
+                       '                        if len(origin_chunk.choices) == 0:\n'
+                       '                            for event in stop_and_flush():\n'
+                       '                                yield event\n'
+                       '                            stop_reason = '
+                       'self.stop_reason_map.get(\n'
+                       '                                finish_reason or "stop"\n'
+                       '                            )\n'
+                       '                            chunk = AnthropicStreamEvent(\n'
+                       '                                type="message_delta",\n'
+                       '                                '
+                       'delta=AnthropicDelta(stop_reason=stop_reason),\n'
+                       '                                '
+                       'usage=_build_anthropic_usage(origin_chunk.usage),\n'
+                       '                            )\n'
+                       '                            data = '
+                       'chunk.model_dump_json(exclude_unset=True)\n'
+                       '                            yield wrap_data_with_event(data, '
+                       '"message_delta")\n'
+                       '                            continue\n'
+                       '\n'
+                       '                        if '
+                       'origin_chunk.choices[0].finish_reason is not None:\n'
+                       '                            finish_reason = '
+                       'origin_chunk.choices[0].finish_reason\n'
+                       '                            # continue\n'
+                       '\n'
+                       '                        # thinking / text content\n'
+                       '                        reasoning_delta = '
+                       'origin_chunk.choices[0].delta.reasoning\n',
+             'after': '                            first_item = False\n'
+                      '                            data = '
+                      'chunk.model_dump_json(exclude_unset=True)\n'
+                      '                            yield wrap_data_with_event(data, '
+                      '"message_start")\n'
+                      '\n'
+                      '                        # last chunk including usage info\n'
+                      '                        if len(origin_chunk.choices) == 0:\n'
+                      '                            for event in stop_and_flush():\n'
+                      '                                yield event\n'
+                      '                            if origin_chunk.usage is None or '
+                      'sent_message_delta:\n'
+                      '                                raise GenerationError(\n'
+                      '                                    "Chat stream has missing or '
+                      'repeated terminal usage"\n'
+                      '                                )\n'
+                      '                            stop = _anthropic_stop_metadata(\n'
+                      '                                finish_reason, matched_stop, '
+                      'has_tool_use,\n'
+                      '                            )\n'
+                      '                            chunk = AnthropicStreamEvent(\n'
+                      '                                type="message_delta",\n'
+                      '                                delta=stop,\n'
+                      '                                '
+                      'usage=_build_anthropic_usage(origin_chunk.usage),\n'
+                      '                            )\n'
+                      '                            data = '
+                      'chunk.model_dump_json(exclude_unset=True)\n'
+                      '                            yield wrap_data_with_event(data, '
+                      '"message_delta")\n'
+                      '                            sent_message_delta = True\n'
+                      '                            continue\n'
+                      '\n'
+                      '                        if finish_reason is not None or '
+                      'sent_message_delta:\n'
+                      '                            raise GenerationError(\n'
+                      '                                "Chat stream contains output '
+                      'after its completion"\n'
+                      '                            )\n'
+                      '                        if '
+                      'origin_chunk.choices[0].finish_reason is not None:\n'
+                      '                            finish_reason = '
+                      'origin_chunk.choices[0].finish_reason\n'
+                      '                            matched_stop = '
+                      'origin_chunk.choices[0].stop_reason\n'
+                      '\n'
+                      '                        # thinking / text content\n'
+                      '                        reasoning_delta = '
+                      'origin_chunk.choices[0].delta.reasoning\n',
+             'review_before': '                            first_item = False\n'
+                              '                            data = '
+                              'chunk.model_dump_json(exclude_unset=True)\n'
+                              '                            yield '
+                              'wrap_data_with_event(data, "message_start")\n'
+                              '                            continue\n'
+                              '\n'
+                              '                        # last chunk including usage '
+                              'info\n'
+                              '                        if len(origin_chunk.choices) == '
+                              '0:\n'
+                              '                            for event in '
+                              'stop_and_flush():\n'
+                              '                                yield event\n'
+                              '                            stop_reason = '
+                              'self.stop_reason_map.get(\n'
+                              '                                finish_reason or '
+                              '"stop"\n'
+                              '                            )\n'
+                              '                            chunk = '
+                              'AnthropicStreamEvent(\n'
+                              '                                type="message_delta",\n'
+                              '                                '
+                              'delta=AnthropicDelta(stop_reason=stop_reason),\n'
+                              '                                '
+                              'usage=_build_anthropic_usage(origin_chunk.usage),\n'
+                              '                            )\n'
+                              '                            data = '
+                              'chunk.model_dump_json(exclude_unset=True)\n'
+                              '                            yield '
+                              'wrap_data_with_event(data, "message_delta")\n'
+                              '                            continue\n'
+                              '\n'
+                              '                        if '
+                              'origin_chunk.choices[0].finish_reason is not None:\n'
+                              '                            finish_reason = '
+                              'origin_chunk.choices[0].finish_reason\n'
+                              '                            # continue\n'
+                              '\n'
+                              '                        # thinking / text content\n'
+                              '                        reasoning_delta = '
+                              'origin_chunk.choices[0].delta.reasoning\n',
+             'review_after': '                            first_item = False\n'
+                             '                            data = '
+                             'chunk.model_dump_json(exclude_unset=True)\n'
+                             '                            yield '
+                             'wrap_data_with_event(data, "message_start")\n'
+                             '\n'
+                             '                        # last chunk including usage '
+                             'info\n'
+                             '                        if len(origin_chunk.choices) == '
+                             '0:\n'
+                             '                            for event in '
+                             'stop_and_flush():\n'
+                             '                                yield event\n'
+                             '                            if origin_chunk.usage is '
+                             'None or sent_message_delta:\n'
+                             '                                raise GenerationError(\n'
+                             '                                    "Chat stream has '
+                             'missing or repeated terminal usage"\n'
+                             '                                )\n'
+                             '                            stop = '
+                             '_anthropic_stop_metadata(\n'
+                             '                                finish_reason, '
+                             'matched_stop, has_tool_use,\n'
+                             '                            )\n'
+                             '                            chunk = '
+                             'AnthropicStreamEvent(\n'
+                             '                                type="message_delta",\n'
+                             '                                delta=stop,\n'
+                             '                                '
+                             'usage=_build_anthropic_usage(origin_chunk.usage),\n'
+                             '                            )\n'
+                             '                            data = '
+                             'chunk.model_dump_json(exclude_unset=True)\n'
+                             '                            yield '
+                             'wrap_data_with_event(data, "message_delta")\n'
+                             '                            sent_message_delta = True\n'
+                             '                            continue\n'
+                             '\n'
+                             '                        if finish_reason is not None or '
+                             'sent_message_delta:\n'
+                             '                            raise GenerationError(\n'
+                             '                                "Chat stream contains '
+                             'output after its completion"\n'
+                             '                            )\n'
+                             '                        if '
+                             'origin_chunk.choices[0].finish_reason is not None:\n'
+                             '                            finish_reason = '
+                             'origin_chunk.choices[0].finish_reason\n'
+                             '                            matched_stop = '
+                             'origin_chunk.choices[0].stop_reason\n'
+                             '\n'
+                             '                        # thinking / text content\n'
+                             '                        reasoning_delta = '
+                             'origin_chunk.choices[0].delta.reasoning\n'},
+            {'name': 'vllm/entrypoints/anthropic/serving.py:landmark-9',
+             'path': 'vllm/entrypoints/anthropic/serving.py',
+             'before': '                                                input={},\n'
+                       '                                            )\n'
+                       '                                        )\n'
+                       '                                        yield start_event\n'
+                       '                                    # Handle initial arguments '
+                       'if present\n'
+                       '                                    if (\n',
+             'after': '                                                input={},\n'
+                      '                                            )\n'
+                      '                                        )\n'
+                      '                                        has_tool_use = True\n'
+                      '                                        yield start_event\n'
+                      '                                    # Handle initial arguments '
+                      'if present\n'
+                      '                                    if (\n',
+             'review_before': '                                                '
+                              'input={},\n'
+                              '                                            )\n'
+                              '                                        )\n'
+                              '                                        yield '
+                              'start_event\n'
+                              '                                    # Handle initial '
+                              'arguments if present\n'
+                              '                                    if (\n',
+             'review_after': '                                                '
+                             'input={},\n'
+                             '                                            )\n'
+                             '                                        )\n'
+                             '                                        has_tool_use = '
+                             'True\n'
+                             '                                        yield '
+                             'start_event\n'
+                             '                                    # Handle initial '
+                             'arguments if present\n'
+                             '                                    if (\n'},
+            {'name': 'vllm/entrypoints/anthropic/serving.py:landmark-10',
+             'path': 'vllm/entrypoints/anthropic/serving.py',
+             'before': '                    )\n'
+                       '                    data = '
+                       'error_response.model_dump_json(exclude_unset=True)\n'
+                       '                    yield wrap_data_with_event(data, "error")\n'
+                       '\n'
+                       '        except Exception as e:\n'
+                       '            logger.exception("Error in message stream '
+                       'converter.")\n',
+             'after': '                    )\n'
+                      '                    data = '
+                      'error_response.model_dump_json(exclude_unset=True)\n'
+                      '                    yield wrap_data_with_event(data, "error")\n'
+                      '                    return\n'
+                      '\n'
+                      '            raise GenerationError("Chat stream ended without '
+                      'its terminal marker")\n'
+                      '\n'
+                      '        except Exception as e:\n'
+                      '            logger.exception("Error in message stream '
+                      'converter.")\n',
+             'review_before': '                    )\n'
+                              '                    data = '
+                              'error_response.model_dump_json(exclude_unset=True)\n'
+                              '                    yield wrap_data_with_event(data, '
+                              '"error")\n'
+                              '\n'
+                              '        except Exception as e:\n'
+                              '            logger.exception("Error in message stream '
+                              'converter.")\n',
+             'review_after': '                    )\n'
+                             '                    data = '
+                             'error_response.model_dump_json(exclude_unset=True)\n'
+                             '                    yield wrap_data_with_event(data, '
+                             '"error")\n'
+                             '                    return\n'
+                             '\n'
+                             '            raise GenerationError("Chat stream ended '
+                             'without its terminal marker")\n'
+                             '\n'
+                             '        except Exception as e:\n'
+                             '            logger.exception("Error in message stream '
+                             'converter.")\n'})})
 
 FINAL_FILES = {'tests/config/test_config_utils.py': '4f5ea0399cc3b4f9603df07e2cc26d32e1eddf6b98a36c0f30d580321879c038',
  'tests/distributed/test_rocm_quick_reduce.py': 'bf6f8a5708568b1f4d96dcc59f42258f8680e5b03bb4abdddcb0c7ead9d414bd',
  'tests/engine/test_arg_utils.py': '858f15c077a1fa031228bcf8e2d92a7a479a07f2d7da32b106f8eab419b7901b',
- 'tests/entrypoints/anthropic/test_anthropic_messages_conversion.py': 'ac944717d2a35cc81edf291739eb26965355b25d71ec6514f9735d4271fd4b8d',
+ 'tests/entrypoints/anthropic/test_anthropic_messages_conversion.py': 'b95347f4b85b4a63be849c5ac3e10bcd22228cb5d51d903fa4bd6d0aa1f6049e',
  'tests/entrypoints/openai/chat_completion/test_parallel_tool_call_integrity.py': 'a4a6547338dbf625e3041e2578f2a8e314aa14d1520468c69ee17ff22998d9a2',
  'tests/entrypoints/openai/responses/test_responses_utils.py': '2e7a06573c2fc1d83caebbb97470f2f9f5e3f90cb02d416d358f43578af0b62c',
  'tests/entrypoints/openai/responses/test_serving_responses.py': 'd33a9d234290aa87aa8911ca2212cba9e9bf6621bf8e2e100c4c197a0abf55aa',
@@ -58271,7 +59483,7 @@ FINAL_FILES = {'tests/config/test_config_utils.py': '4f5ea0399cc3b4f9603df07e2cc
  'vllm/engine/arg_utils.py': '88582e97c98ffcd16416e48eeea3db415cab1f33673c7ff8c1613fa83aad1eac',
  'vllm/entrypoints/anthropic/api_router.py': '8d7d742f6e7d9f2fa9bbe1e57d6adbd4f2753075a083c7a7f93d39fc5ab474b6',
  'vllm/entrypoints/anthropic/protocol.py': '4f648cfd2ddfb8fab0f611de597b2943e0041de679887ed9bb0292234bdf96cd',
- 'vllm/entrypoints/anthropic/serving.py': '01b02c09a64be7e0de8921694c1537a4972d37c4e6c861716df461c2b0debc5c',
+ 'vllm/entrypoints/anthropic/serving.py': '09a97d1ac1a258e75b497906b998625beec1d9974dae6577b1da971dbb0211a3',
  'vllm/entrypoints/chat_utils.py': '9d939e56e812a583becfa18b5421488adc2087fba9922bd4e69dbccb012ca89a',
  'vllm/entrypoints/generate/api_router.py': 'dffeda2c3ccc6cfe3d4945720a7378bab34e7c7c9959d020a9643675895a3ffd',
  'vllm/entrypoints/llm.py': '79f9bb1212884746964a347f7e4b39087b5ac084b1d72821a12efd2fb85bcb03',

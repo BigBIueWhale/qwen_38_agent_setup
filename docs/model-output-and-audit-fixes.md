@@ -256,6 +256,28 @@ sparse fills. The required backend check passes, including exact reconstruction,
 the 94-file deployment-input manifest and the installed shared-prefix CPU unit.
 The v23 image and archive remain awaiting adoption.
 
+## Findings 4 and 12: Anthropic terminal metadata
+
+`vllm-anthropic-terminal-metadata.patch` makes streaming and batch responses use
+one translation of the observed Chat completion cause and actual tool-use
+output. A matched stop string becomes `stop_sequence` with its exact contents.
+Named tools report `tool_use` even when Chat reports `stop`; Chat's named-tool
+behavior remains correct. Token limits take precedence and retain `max_tokens`.
+The obsolete finish-reason map is deleted.
+
+Streaming retains content carried in the first chunk, captures the matched stop
+alongside the finish reason, and requires terminal usage and the terminal marker
+before reporting a completed message. Missing, repeated or out-of-order terminal
+data produces a native API error with no success marker.
+
+Validation: 127 offline CPU tests pass, including the streaming/batch terminal
+matrix, exact stop-string preservation, named calls, length precedence and
+incomplete-stream errors. A four-case control against the previous runtime
+reproduces incorrect `end_turn` metadata for stop strings and named tool calls.
+The reviewed source stage compiles with only the two intended source/test changes.
+The required backend check passes for all twenty-one source stages, the 95-file
+deployment-input manifest and installed CPU units. Image adoption remains pending.
+
 ## Remaining implementation
 
 Parser language, stop handling, schema conversion, protocol translation, image
