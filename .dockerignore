@@ -135,3 +135,5 @@
 !vllm/vllm/entrypoints/openai/completion/serving.py
 !vllm/vllm/entrypoints/scale_out/render/
 !vllm/vllm/entrypoints/scale_out/render/serving.py
+!vllm/vllm/renderers/online_derenderer.py
+!scripts/generate_result_unit.py

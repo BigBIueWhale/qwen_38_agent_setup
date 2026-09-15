@@ -75,7 +75,7 @@ error.
   and relay readiness events, then validates the complete live configuration before
   reporting success. Re-running it validates the existing owned topology rather than
   starting a duplicate.
-- status.sh validates host prerequisites, twenty-three ordered vLLM transformations, every reviewed
+- status.sh validates host prerequisites, twenty-four ordered vLLM transformations, every reviewed
   source and test file, the model manifest, image archive, image identity and labels,
   command and environment, mounts, runtime packages, API identity, listener,
   hardening, and live health. HEALTHY means all checks passed.
@@ -95,7 +95,7 @@ Advanced reproducibility operations are deliberately separate from serving mode:
     ./scripts/build-vllm.sh build
     ./scripts/restore-images.sh
 
-The check reconstructs the source tree from the pinned upstream commit through all twenty-three
+The check reconstructs the source tree from the pinned upstream commit through all twenty-four
 landmark-aware transformations. The build runs offline from the exact base image and fails unless it produces
 the pinned image ID. Restore verifies the pinned local archive before loading it.
 
@@ -251,7 +251,7 @@ The vLLM submodule is pinned at:
 
     9df9b0b0a1816b6d0d0f6ecd0da563cc37fd72f5
 
-It is intentionally reconstructed by twenty-three ordered, reviewed semantic transformations:
+It is intentionally reconstructed by twenty-four ordered, reviewed semantic transformations:
 
 | Patch | SHA-256 |
 |---|---|
@@ -278,9 +278,10 @@ It is intentionally reconstructed by twenty-three ordered, reviewed semantic tra
 | patches/vllm-anthropic-terminal-metadata.patch | 7885e27d8f9259e106bd8c2f3ccdefa3fd276649658ea521b50ecf85d83113c5 |
 | patches/vllm-generation-sampling-resolution.patch | a70b88b8e1fa3801e7d5e0a2c6a66f8608ab6e8534b67aafd832bf566d2d2c7a |
 | patches/vllm-sampling-decoding-boundary.patch | aaed899245dcfa877d8c1c19f2834317a7326695372c6810267b21dd3337f913 |
+| patches/vllm-token-generation-result-integrity.patch | c9d4e45adbb475c3e9796d1e0907b2f0d98cc384a34829a34e05ccdd33cc65c1 |
 
-The reconstructed tree has 74 reviewed runtime-source changes, 1 new runtime source,
-6 runtime-source deletions, 59 existing-test changes, 7 new tests,
+The reconstructed tree has 75 reviewed runtime-source changes, 1 new runtime source,
+6 runtime-source deletions, 60 existing-test changes, 8 new tests,
 and 2 test deletions. The authoritative
 counts are derived and printed by ./scripts/build-vllm.sh check, never restated
 by hand there. The landmark-aware Python patcher calculates every mutation
@@ -303,11 +304,11 @@ Pinned build inputs and products:
 | Offline archive | artifacts/qwen38-vllm-images-runtime-v23.tar |
 | Archive size | Awaiting adoption after the v23 export |
 | Archive SHA-256 | Awaiting adoption after the v23 export |
-| Runtime Dockerfile SHA-256 | 0a0a8494096b9d52d3e3b40304b18d47838942c65863f98753a09c2dcce9d9fd |
-| Docker context allowlist SHA-256 | c54b1b8e98295ab3935ac2a4cbf084abe2700fde9ee660423fd70540c793be5c |
-| Build verifier SHA-256 | a2d42ba141edc863be17f3653a344b968dd77bb19d38bfbf4725e19e3d3ed0bc |
-| Runtime validator SHA-256 | 9a157c310bc829adce496eed5d191164aa95b96e806bfc80b973b2b54d3c6cee |
-| Runtime lock SHA-256 | 606fe111812b5f9bce3b0986bdb290614a9badf9bf1376714f83283c919f2f3b |
+| Runtime Dockerfile SHA-256 | b3ff4986efd1ed3f22212d0718f9452ccc48e867eac49ab66e100ce90d73836f |
+| Docker context allowlist SHA-256 | d6af20f75899e6e3a24851984a86845971854ea4aa370c684afe2e225a5783d3 |
+| Build verifier SHA-256 | 356a4862ee9d652dd86d16e2b93eaa7667bbb5b610bd47caec41706ab63a69c4 |
+| Runtime validator SHA-256 | 5f357f425bf05d09867d4667e553a4d23ecf0afcec963a47e669769b15a22aed |
+| Runtime lock SHA-256 | 75dacce9a46c6b1290d8b1b80934d7870dd7c1cb66c033a1ea5faad5b0c5f154 |
 
 Every reviewed runtime file, including both TurboQuant kernels, is copied and
 hash-checked against its upstream and patched identities. A CPU Triton-interpreter
@@ -517,6 +518,16 @@ configured maximum. Explicit neutral sampling values keep their meaning, includi
 through the render-to-generate JSON boundary. `/generate` preserves supplied fields
 until resolution, then constructs a fresh validated engine request; a temporary
 engine default cannot reject an otherwise valid request or truncate its output.
+
+The token-generation transport selects delta output for streaming and complete
+output for batch requests; `output_kind` is an internal engine setting. Both
+transports require an observed terminal for every requested choice and preserve
+`stop_reason`, including a matched string, stop token ID or final-budget cause.
+An empty token list can carry a valid terminal. Parallel choices retain their
+own token sequences and contribute to the same total usage. Missing, repeated or
+contradictory engine terminals are server errors. A streaming error ends with its
+error event and no `[DONE]` marker. Derender preserves the supplied terminal cause
+and accepts a completed empty answer on both Chat and Completions.
 
 Beam search is unsupported. Chat, Completions, batch Chat and their render requests
 refuse `use_beam_search: true` as HTTP 400 with parameter `use_beam_search`, before

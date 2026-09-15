@@ -1,0 +1,739 @@
+diff --git a/tests/entrypoints/scale_out/derender/test_derender.py b/tests/entrypoints/scale_out/derender/test_derender.py
+--- a/tests/entrypoints/scale_out/derender/test_derender.py
++++ b/tests/entrypoints/scale_out/derender/test_derender.py
+@@ -268,7 +268,7 @@
+ 
+ @pytest.mark.asyncio
+ async def test_derender_chat_empty_token_ids(client):
+-    """Empty token_ids list returns 400."""
++    """A completed empty generation remains an empty answer."""
+     response = await client.post(
+         "/v1/chat/completions/derender",
+         json={
+@@ -276,7 +276,10 @@
+             "generate_response": _make_generate_response([]),
+         },
+     )
+-    assert response.status_code == 400
++    assert response.status_code == 200
++    choice = response.json()["choices"][0]
++    assert choice["message"]["content"] == ""
++    assert choice["finish_reason"] == "stop"
+ 
+ 
+ @pytest.mark.asyncio
+diff --git a/tests/entrypoints/scale_out/derender/test_terminal_metadata.py b/tests/entrypoints/scale_out/derender/test_terminal_metadata.py
+--- /dev/null
++++ b/tests/entrypoints/scale_out/derender/test_terminal_metadata.py
+@@ -0,0 +1,52 @@
++# SPDX-License-Identifier: Apache-2.0
++# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
++"""The raw-token contract carries the observed cause into either API shape."""
++from types import SimpleNamespace
++
++import pytest
++
++from vllm.entrypoints.scale_out.token_in_token_out.protocol import (
++    GenerateResponse, GenerateStreamResponse,
++)
++from vllm.renderers.online_derenderer import OnlineDerenderer
++
++
++@pytest.mark.asyncio
++@pytest.mark.parametrize('surface', ['chat', 'completion'])
++@pytest.mark.parametrize('stream', [False, True])
++@pytest.mark.parametrize('tokens', [[], [65, 66]])
++@pytest.mark.parametrize('finish,stop', [
++    ('stop', None), ('stop', 'END'), ('stop', 99),
++    ('length', None), ('length', 'final_response_token_budget'), ('abort', None),
++])
++async def test_derender_keeps_empty_output_and_observed_terminal(surface, stream, tokens, finish, stop):
++    renderer = object.__new__(OnlineDerenderer)
++    renderer.parser = None
++    renderer.renderer = SimpleNamespace(get_tokenizer=lambda: SimpleNamespace(
++        decode=lambda ids, **kwargs: ''.join(map(chr, ids))))
++    # This test isolates the token-transport boundary from the independent
++    # incremental Unicode decoder (covered by test_derender_stream.py).
++    renderer._detokenize_delta = lambda tokenizer, ids, state, **kwargs: (
++        ''.join(map(chr, ids)), state)
++    payload = dict(request_id='request', choices=[dict(
++        index=0, token_ids=tokens, finish_reason=finish, stop_reason=stop)])
++    if stream:
++        incoming = GenerateStreamResponse.model_validate_json(
++            GenerateStreamResponse.model_validate(payload).model_dump_json())
++        method = getattr(renderer, f'derender_{surface}_stream')
++        response, _ = await method('model', incoming)
++        choice = response.choices[0]
++        text = choice.delta.content or '' if surface == 'chat' else choice.text
++    else:
++        incoming = GenerateResponse.model_validate_json(
++            GenerateResponse.model_validate(payload).model_dump_json())
++        if surface == 'chat':
++            choice = renderer._derender_chat(incoming)[0]
++            text = choice.message.content
++        else:
++            choices, _, _ = renderer._derender_completion([incoming])
++            choice = choices[0]
++            text = choice.text
++    assert text == ''.join(map(chr, tokens))
++    assert choice.finish_reason == finish
++    assert choice.stop_reason == stop
+diff --git a/tests/entrypoints/scale_out/token_in_token_out/test_generate_stream.py b/tests/entrypoints/scale_out/token_in_token_out/test_generate_stream.py
+--- a/tests/entrypoints/scale_out/token_in_token_out/test_generate_stream.py
++++ b/tests/entrypoints/scale_out/token_in_token_out/test_generate_stream.py
+@@ -266,7 +266,7 @@
+ 
+ @pytest.mark.asyncio
+ async def test_stream_error_mid_generation():
+-    """finish_reason='error' mid-stream yields error chunk then [DONE]."""
++    """finish_reason='error' mid-stream yields an error without a success terminal."""
+     engine = _mock_engine()
+ 
+     async def mock_generate(*args, **kwargs):
+@@ -294,7 +294,7 @@
+     assert any("Internal server error" in chunk for chunk in chunks), (
+         f"Expected error message in chunks: {chunks}"
+     )
+-    assert chunks[-1] == "data: [DONE]\n\n"
++    assert "data: [DONE]\n\n" not in chunks
+ 
+ 
+ @pytest.mark.asyncio
+@@ -326,7 +326,7 @@
+     assert any("Internal server error" in chunk for chunk in chunks), (
+         f"Expected error message in chunks: {chunks}"
+     )
+-    assert chunks[-1] == "data: [DONE]\n\n"
++    assert "data: [DONE]\n\n" not in chunks
+ 
+ 
+ @pytest.mark.asyncio
+@@ -573,3 +573,188 @@
+     # Zero cached tokens must be present, not omitted
+     assert usage_chunk["usage"]["prompt_tokens_details"] is not None
+     assert usage_chunk["usage"]["prompt_tokens_details"]["cached_tokens"] == 0
++
++
++@pytest.mark.asyncio
++@pytest.mark.parametrize('stream', [False, True])
++@pytest.mark.parametrize('finish_reason,stop_reason', [
++    ('stop', None), ('stop', 'END'), ('stop', 42),
++    ('length', None), ('length', 'final_response_token_budget'), ('abort', None),
++])
++async def test_terminal_cause_survives_empty_completion(stream, finish_reason, stop_reason):
++    engine = _mock_engine()
++
++    async def generate(*args, **kwargs):
++        res = _make_request_output('req', [], finish_reason, True, logprobs=[])
++        res.outputs[0].stop_reason = stop_reason
++        yield res
++
++    engine.generate = MagicMock(side_effect=generate)
++    serving = _build_serving_tokens(engine)
++    request = GenerateRequest(token_ids=[1], sampling_params={'logprobs': 0}, stream=stream)
++    response = await serving.serve_tokens(request)
++    if stream:
++        events = _parse_sse_chunks([event async for event in response])
++        assert events[-1] == '[DONE]'
++        assert len(events) == 2
++        choice = events[0]['choices'][0]
++    else:
++        choice = response.choices[0].model_dump()
++    assert choice['token_ids'] == []
++    assert choice['finish_reason'] == finish_reason
++    assert choice['stop_reason'] == stop_reason
++    assert choice['logprobs']['content'] == []
++
++
++@pytest.mark.asyncio
++@pytest.mark.parametrize('stream', [False, True])
++async def test_parallel_sampling_keeps_staggered_choices_and_total_usage(stream):
++    from types import SimpleNamespace
++    from vllm.sampling_params import RequestOutputKind
++    from vllm.v1.engine.parallel_sampling import ParentRequest
++
++    engine = _mock_engine()
++
++    async def generate(prompt, params, request_id, **kwargs):
++        assert params.output_kind == (
++            RequestOutputKind.DELTA if stream else RequestOutputKind.FINAL_ONLY)
++        parent = ParentRequest(SimpleNamespace(
++            params=params, request_id=request_id, external_req_id=request_id))
++        children = [parent.get_child_info(i)[0] for i in range(params.n)]
++        steps = [(1, [81], None), (0, [90], 'stop'), (1, [82], 'length')]
++        for index, tokens, reason in steps:
++            if not stream and reason is None:
++                continue
++            if not stream and index == 1:
++                tokens = [81, 82]
++            res = _make_request_output(request_id, tokens, reason, index=index)
++            res.outputs[0].stop_reason = 'final_response_token_budget' if reason == 'length' else None
++            outputs, finished = parent.get_outputs(children[index], res.outputs[0])
++            if outputs:
++                res.outputs, res.finished = outputs, finished
++                yield res
++
++    engine.generate = MagicMock(side_effect=generate)
++    serving = _build_serving_tokens(engine)
++    request = GenerateRequest(
++        token_ids=[1, 2, 3], sampling_params={'n': 2}, stream=stream,
++        stream_options=StreamOptions(include_usage=True, continuous_usage_stats=True))
++    response = await serving.serve_tokens(request)
++    if stream:
++        events = _parse_sse_chunks([event async for event in response])
++        assert events[-1] == '[DONE]'
++        chunks = [event for event in events[:-1] if event['choices']]
++        assert [event['usage']['completion_tokens'] for event in chunks] == [1, 2, 3]
++        tokens = {i: [] for i in range(2)}
++        terminals = {}
++        for event in chunks:
++            for choice in event['choices']:
++                tokens[choice['index']].extend(choice['token_ids'])
++                if choice['finish_reason'] is not None:
++                    terminals[choice['index']] = (choice['finish_reason'], choice['stop_reason'])
++        usage = events[-2]['usage']
++    else:
++        assert [choice.index for choice in response.choices] == [0, 1]
++        tokens = {choice.index: choice.token_ids for choice in response.choices}
++        terminals = {choice.index: (choice.finish_reason, choice.stop_reason) for choice in response.choices}
++        usage = response.usage.model_dump()
++    assert tokens == {0: [90], 1: [81, 82]}
++    assert terminals == {0: ('stop', None), 1: ('length', 'final_response_token_budget')}
++    assert usage['prompt_tokens'] == 3
++    assert usage['completion_tokens'] == 3
++    assert usage['total_tokens'] == 6
++
++
++@pytest.mark.asyncio
++@pytest.mark.parametrize('stream', [False, True])
++@pytest.mark.parametrize('fault', [
++    'empty_iterator', 'missing_terminal', 'missing_choice', 'missing_request_terminal',
++    'engine_error', 'empty_engine_error', 'duplicate_choice', 'out_of_range',
++    'after_request_terminal', 'after_choice_terminal', 'unknown_cause',
++    'stop_without_finish', 'missing_prompt',
++])
++async def test_generation_integrity_failures_are_errors_on_both_transports(stream, fault):
++    from vllm.entrypoints.openai.engine.protocol import ErrorResponse
++
++    engine = _mock_engine()
++    n = 2 if fault in ('missing_choice', 'after_choice_terminal') else 1
++    res = _make_request_output('req', [9], 'stop', True)
++    outputs = [res]
++    if fault == 'empty_iterator':
++        outputs = []
++    elif fault == 'missing_terminal':
++        res.outputs[0].finish_reason = None
++    elif fault == 'missing_choice':
++        pass
++    elif fault == 'missing_request_terminal':
++        res.finished = False
++    elif fault in ('engine_error', 'empty_engine_error'):
++        res.outputs[0].finish_reason = 'error'
++        if fault == 'empty_engine_error':
++            res.outputs[0].token_ids = []
++    elif fault == 'duplicate_choice':
++        res.outputs.append(res.outputs[0])
++    elif fault == 'out_of_range':
++        res.outputs[0].index = 1
++    elif fault == 'after_request_terminal':
++        outputs.append(res)
++    elif fault == 'after_choice_terminal':
++        res.finished = False
++        outputs.append(_make_request_output('req', [8], 'stop', False))
++    elif fault == 'unknown_cause':
++        res.outputs[0].finish_reason = 'invented'
++    elif fault == 'stop_without_finish':
++        res.finished = False
++        res.outputs[0].finish_reason = None
++        res.outputs[0].stop_reason = 'END'
++    elif fault == 'missing_prompt':
++        res.prompt_token_ids = None
++
++    async def generate(*args, **kwargs):
++        for output in outputs:
++            yield output
++
++    engine.generate = MagicMock(side_effect=generate)
++    serving = _build_serving_tokens(engine)
++    request = GenerateRequest(token_ids=[1], sampling_params={'n': n}, stream=stream,
++        stream_options=StreamOptions(include_usage=True))
++    response = await serving.serve_tokens(request)
++    if stream:
++        events = _parse_sse_chunks([event async for event in response])
++        assert '[DONE]' not in events
++        assert events[-1]['error']['code'] == 500
++        assert all(not e.get('usage') for e in events)
++    else:
++        assert isinstance(response, ErrorResponse)
++        assert response.error.code == 500
++
++
++@pytest.mark.parametrize('stream', [False, True])
++def test_generate_transport_owns_output_kind(stream):
++    from pydantic import ValidationError
++    from vllm.sampling_params import RequestOutputKind
++
++    for kind in RequestOutputKind:
++        with pytest.raises(ValidationError, match='output_kind'):
++            GenerateRequest(token_ids=[1], stream=stream, sampling_params={'output_kind': kind})
++        request = GenerateRequest(token_ids=[1], stream=stream,
++            sampling_params=SamplingParams(output_kind=kind), kv_scope='agent')
++        encoded = request.model_dump_json()
++        assert 'output_kind' not in encoded
++        decoded = GenerateRequest.model_validate_json(encoded)
++        assert decoded.to_sampling_params(99, {'output_kind': kind}).output_kind == (
++            RequestOutputKind.DELTA if stream else RequestOutputKind.FINAL_ONLY)
++
++
++def test_full_token_response_requires_a_terminal_and_tokens():
++    from pydantic import ValidationError
++    from vllm.entrypoints.scale_out.token_in_token_out.protocol import GenerateResponseChoice
++
++    for missing in ('finish_reason', 'token_ids'):
++        fields = dict(index=0, finish_reason='stop', token_ids=[])
++        del fields[missing]
++        with pytest.raises(ValidationError, match=missing):
++            GenerateResponseChoice(**fields)
++    for reason in (None, 'error', 'invented'):
++        with pytest.raises(ValidationError, match='finish_reason'):
++            GenerateResponseChoice(index=0, token_ids=[], finish_reason=reason)
+diff --git a/tests/entrypoints/scale_out/token_in_token_out/test_protocol.py b/tests/entrypoints/scale_out/token_in_token_out/test_protocol.py
+--- a/tests/entrypoints/scale_out/token_in_token_out/test_protocol.py
++++ b/tests/entrypoints/scale_out/token_in_token_out/test_protocol.py
+@@ -157,7 +157,7 @@
+     assert (params.top_p, params.top_k, params.min_p) == (1.0, 0, 0.0)
+ 
+ 
+-@pytest.mark.parametrize("key", ["_eos_token_id", "skip_clone", "output_text_buffer_length", "unknown"])
++@pytest.mark.parametrize("key", ["_eos_token_id", "skip_clone", "output_text_buffer_length", "output_kind", "unknown"])
+ def test_engine_internal_fields_are_not_request_settings(key):
+     with pytest.raises(ValidationError):
+         generate({key: 1})
+@@ -250,8 +250,9 @@
+     assert params.top_k == settings.get("top_k", DEFAULTS["top_k"])
+     assert params.thinking_token_budget == settings.get("thinking_token_budget", 200)
+     assert params.extra_args["kv_scope"] == "agent"
+-    if stream:
+-        assert params.output_kind == RequestOutputKind.DELTA
++    assert params.output_kind == (
++        RequestOutputKind.DELTA if stream else RequestOutputKind.FINAL_ONLY
++    )
+     assert request.model_dump_json() == before
+ 
+ 
+@@ -321,7 +322,7 @@
+     assert "default" not in sampling["properties"]["max_tokens"]
+     assert {"temperature", "top_p", "top_k", "thinking_token_budget",
+             "final_response_token_budget", "structured_outputs"} <= sampling["properties"].keys()
+-    assert not {"skip_clone", "output_text_buffer_length", "_eos_token_id"} & sampling["properties"].keys()
++    assert not {"skip_clone", "output_text_buffer_length", "output_kind", "_eos_token_id"} & sampling["properties"].keys()
+ 
+ 
+ @pytest.mark.parametrize("value", [-2, 0, True, 1.0])
+diff --git a/vllm/entrypoints/scale_out/token_in_token_out/protocol.py b/vllm/entrypoints/scale_out/token_in_token_out/protocol.py
+--- a/vllm/entrypoints/scale_out/token_in_token_out/protocol.py
++++ b/vllm/entrypoints/scale_out/token_in_token_out/protocol.py
+@@ -30,6 +30,7 @@
+ from vllm.renderers import TokenizeParams
+ from vllm.sampling_params import (
+     FinalResponseTokenBudget,
++    RequestOutputKind,
+     SamplingParams,
+     ThinkingTokenBudget,
+     resolve_final_response_token_budget,
+@@ -88,7 +89,7 @@
+     def __get_pydantic_core_schema__(
+         cls, source_type: Any, handler: GetCoreSchemaHandler,
+     ) -> core_schema.CoreSchema:
+-        excluded = {"skip_clone", "output_text_buffer_length"}
++        excluded = {"skip_clone", "output_text_buffer_length", "output_kind"}
+         hints = get_type_hints(SamplingParams)
+         fields = {
+             field.name: hints[field.name]
+@@ -224,6 +225,9 @@
+         """Resolve one fresh, validated engine request from supplied settings."""
+         values = deepcopy({**default_sampling_params, **self.sampling_params})
+         values["max_tokens"] = max_tokens
++        values["output_kind"] = (
++            RequestOutputKind.DELTA if self.stream else RequestOutputKind.FINAL_ONLY
++        )
+         values["final_response_token_budget"] = resolve_final_response_token_budget(
+             self.sampling_params.get("final_response_token_budget"),
+             default_sampling_params.get("final_response_token_budget"),
+@@ -250,12 +254,15 @@
+         )
+ 
+ 
++GenerateFinishReason = Literal["stop", "length", "abort"]
++
++
+ class GenerateResponseChoice(BaseModel):
+     index: int
+     logprobs: ChatCompletionLogProbs | None = None
+-    # per OpenAI spec this is the default
+-    finish_reason: str | None = "stop"
+-    token_ids: list[int] | None = None
++    finish_reason: GenerateFinishReason
++    stop_reason: int | str | None = None
++    token_ids: list[int]
+     # Per-token expert routing decisions, base64-encoded ``.npy`` bytes
+     # (numpy serialization). Shape after decode:
+     #   (num_tokens - 1, num_layers, num_experts_per_tok) dtype uint8/uint16/int32
+@@ -270,8 +277,8 @@
+ 
+     @field_validator("token_ids")
+     @classmethod
+-    def validate_token_ids(cls, v: list[int] | None) -> list[int] | None:
+-        if v is not None and any(t < 0 for t in v):
++    def validate_token_ids(cls, v: list[int]) -> list[int]:
++        if any(t < 0 for t in v):
+             raise ValueError("token_ids must not contain negative values")
+         return v
+ 
+@@ -279,8 +286,9 @@
+ class GenerateResponseStreamChoice(BaseModel):
+     index: int
+     logprobs: ChatCompletionLogProbs | None = None
+-    finish_reason: str | None = None
+-    token_ids: list[int] | None = None
++    finish_reason: GenerateFinishReason | None = None
++    stop_reason: int | str | None = None
++    token_ids: list[int]
+     routed_experts: str | None = None
+     sampling_mask: list[list[int]] | None = None
+ 
+diff --git a/vllm/entrypoints/scale_out/token_in_token_out/serving.py b/vllm/entrypoints/scale_out/token_in_token_out/serving.py
+--- a/vllm/entrypoints/scale_out/token_in_token_out/serving.py
++++ b/vllm/entrypoints/scale_out/token_in_token_out/serving.py
+@@ -39,9 +39,9 @@
+     MultiModalKwargsItems,
+     PlaceholderRange,
+ )
+-from vllm.outputs import RequestOutput
++from vllm.outputs import CompletionOutput, RequestOutput
+ from vllm.renderers.online_renderer import OnlineRenderer
+-from vllm.sampling_params import RequestOutputKind, SamplingParams
++from vllm.sampling_params import SamplingParams
+ from vllm.utils.collection_utils import as_list
+ from vllm.utils.serial_utils import numpy2base64
+ 
+@@ -55,6 +55,55 @@
+ )
+ 
+ logger = init_logger(__name__)
++
++
++class _GenerateOutputState:
++    """Evidence for a complete engine result, shared by both transports."""
++
++    def __init__(self, n: int, *, final_only: bool):
++        self.n = n
++        self.final_only = final_only
++        self.terminals: set[int] = set()
++        self.finished = False
++        self.prompt_tokens: int | None = None
++        self.cached_tokens: int | None = None
++
++    def accept(self, res: RequestOutput) -> None:
++        if self.finished:
++            raise GenerationError("Engine output arrived after request completion")
++        if self.prompt_tokens is None:
++            if res.prompt_token_ids is None:
++                raise GenerationError("Engine output is missing prompt token IDs")
++            self.prompt_tokens = len(res.prompt_token_ids)
++            if res.encoder_prompt_token_ids is not None:
++                self.prompt_tokens += len(res.encoder_prompt_token_ids)
++            self.cached_tokens = res.num_cached_tokens
++
++        indices: set[int] = set()
++        terminals = set(self.terminals)
++        for output in res.outputs:
++            i = output.index
++            if not 0 <= i < self.n or i in indices or i in terminals:
++                raise GenerationError("Engine output has an invalid or repeated choice")
++            indices.add(i)
++            reason = output.finish_reason
++            if reason == "error":
++                raise GenerationError("Internal server error")
++            if reason is None:
++                if self.final_only or output.stop_reason is not None:
++                    raise GenerationError("Engine output is missing a terminal cause")
++            elif reason in ("stop", "length", "abort"):
++                terminals.add(i)
++            else:
++                raise GenerationError("Engine output has an unknown terminal cause")
++        if res.finished != (len(terminals) == self.n):
++            raise GenerationError("Engine completion disagrees with choice terminals")
++        self.terminals = terminals
++        self.finished = res.finished
++
++    def finish(self) -> None:
++        if not self.finished:
++            raise GenerationError("Engine output ended before all choices completed")
+ 
+ 
+ class ServingTokens(GenerateBaseServing):
+@@ -212,8 +261,6 @@
+ 
+         if self.force_no_detokenize:
+             sampling_params.detokenize = False
+-        if request.stream:
+-            sampling_params.output_kind = RequestOutputKind.DELTA
+ 
+         self._log_inputs(
+             request_id,
+@@ -271,27 +318,34 @@
+     ) -> ErrorResponse | GenerateResponse:
+         created_time = int(time.time())
+         final_res: RequestOutput | None = None
+-
++        state = _GenerateOutputState(sampling_params.n, final_only=True)
++        outputs: dict[int, CompletionOutput] = {}
+         try:
+             async for res in result_generator:
++                state.accept(res)
++                outputs.update((output.index, output) for output in res.outputs)
+                 final_res = res
++            state.finish()
+         except asyncio.CancelledError:
+             return self.create_error_response("Client disconnected")
++        except GenerationError as exc:
++            return self.create_error_response(exc)
+ 
+         assert final_res is not None
+ 
+         choices: list[GenerateResponseChoice] = []
+         num_generated_tokens = 0
+-        for output in final_res.outputs:
++        for _, output in sorted(outputs.items()):
+             token_ids = output.token_ids
+             out_logprobs = output.logprobs
+ 
+             # This is top_logprobs in completions API
+             if sampling_params.logprobs is not None:
+-                assert out_logprobs is not None, "Did not output logprobs"
++                if out_logprobs is None and token_ids:
++                    raise GenerationError("Engine output is missing requested logprobs")
+                 logprobs = self._create_tokens_logprobs(
+                     token_ids=token_ids,
+-                    top_logprobs=out_logprobs,
++                    top_logprobs=out_logprobs or [],
+                     num_output_top_logprobs=sampling_params.logprobs,
+                 )
+             else:
+@@ -310,7 +364,8 @@
+             choice_data = GenerateResponseChoice(
+                 index=output.index,
+                 logprobs=logprobs,
+-                finish_reason=output.finish_reason if output.finish_reason else "stop",
++                finish_reason=output.finish_reason,
++                stop_reason=output.stop_reason,
+                 token_ids=as_list(output.token_ids),
+                 routed_experts=routed_experts_b64,
+                 sampling_mask=sampling_mask,
+@@ -319,10 +374,8 @@
+             choices.append(choice_data)
+             num_generated_tokens += len(output.token_ids)
+ 
+-        assert final_res.prompt_token_ids is not None
+-        num_prompt_tokens = len(final_res.prompt_token_ids)
+-        if final_res.encoder_prompt_token_ids is not None:
+-            num_prompt_tokens += len(final_res.encoder_prompt_token_ids)
++        assert state.prompt_tokens is not None
++        num_prompt_tokens = state.prompt_tokens
+ 
+         usage = UsageInfo(
+             prompt_tokens=num_prompt_tokens,
+@@ -331,11 +384,11 @@
+         )
+         if (
+             self.enable_prompt_tokens_details
+-            and final_res.num_cached_tokens is not None
++            and state.cached_tokens is not None
+         ):
+             # This info is not available at the /coordinator level
+             usage.prompt_tokens_details = PromptTokenUsageInfo(
+-                cached_tokens=final_res.num_cached_tokens
++                cached_tokens=state.cached_tokens
+             )
+ 
+         request_metadata.final_usage_info = usage
+@@ -354,10 +407,7 @@
+         # Log complete response if output logging is enabled
+         if self.enable_log_outputs and self.request_logger:
+             for choice in choices:
+-                # Get the corresponding output token IDs
+-                output_token_ids = None
+-                if choice.index < len(final_res.outputs):
+-                    output_token_ids = final_res.outputs[choice.index].token_ids
++                output_token_ids = choice.token_ids
+ 
+                 if output_token_ids:
+                     # Log token_ids only.
+@@ -381,10 +431,8 @@
+         request_metadata: RequestResponseMetadata,
+         sampling_params: SamplingParams,
+     ) -> AsyncGenerator[str, None]:
+-        num_prompt_tokens = 0
+-        num_generated_tokens: list[int] = []
+-        first_iteration = True
+-        num_cached_tokens = None
++        state = _GenerateOutputState(sampling_params.n, final_only=False)
++        num_generated_tokens = [0] * sampling_params.n
+ 
+         include_usage, include_continuous_usage = should_include_usage(
+             request.stream_options, False
+@@ -392,14 +440,9 @@
+ 
+         try:
+             async for res in result_generator:
+-                if first_iteration:
+-                    if res.prompt_token_ids is not None:
+-                        num_prompt_tokens = len(res.prompt_token_ids)
+-                    if res.encoder_prompt_token_ids is not None:
+-                        num_prompt_tokens += len(res.encoder_prompt_token_ids)
+-                    num_cached_tokens = res.num_cached_tokens
+-                    num_generated_tokens = [0] * len(res.outputs)
+-                    first_iteration = False
++                state.accept(res)
++                assert state.prompt_tokens is not None
++                num_prompt_tokens = state.prompt_tokens
+ 
+                 for output in res.outputs:
+                     i = output.index
+@@ -407,17 +450,16 @@
+                     num_generated_tokens[i] += len(delta_token_ids)
+ 
+                     finish_reason = output.finish_reason
+-                    self._raise_if_error(finish_reason, request_id)
+-
+-                    if not delta_token_ids:
++                    if not delta_token_ids and finish_reason is None:
+                         continue
+ 
+                     if sampling_params.logprobs is not None:
+                         out_logprobs = output.logprobs
+-                        assert out_logprobs is not None, "Did not output logprobs"
++                        if out_logprobs is None and delta_token_ids:
++                            raise GenerationError("Engine output is missing requested logprobs")
+                         logprobs = self._create_tokens_logprobs(
+                             token_ids=delta_token_ids,
+-                            top_logprobs=out_logprobs,
++                            top_logprobs=out_logprobs or [],
+                             num_output_top_logprobs=sampling_params.logprobs,
+                         )
+                     else:
+@@ -436,20 +478,28 @@
+                                 index=i,
+                                 logprobs=logprobs,
+                                 finish_reason=finish_reason,
++                                stop_reason=output.stop_reason,
+                                 token_ids=as_list(delta_token_ids),
+                                 routed_experts=routed_experts_b64,
++                                sampling_mask=(
++                                    output.sampling_mask.token_ids
++                                    if output.sampling_mask is not None else None
++                                ),
+                             )
+                         ],
+                     )
+                     if include_continuous_usage:
+                         chunk.usage = UsageInfo(
+                             prompt_tokens=num_prompt_tokens,
+-                            completion_tokens=num_generated_tokens[i],
+-                            total_tokens=(num_prompt_tokens + num_generated_tokens[i]),
++                            completion_tokens=sum(num_generated_tokens),
++                            total_tokens=(num_prompt_tokens + sum(num_generated_tokens)),
+                         )
+ 
+                     yield f"data: {chunk.model_dump_json()}\n\n"
+ 
++            state.finish()
++            assert state.prompt_tokens is not None
++            num_prompt_tokens = state.prompt_tokens
+             total_completion_tokens = sum(num_generated_tokens)
+             final_usage_info = UsageInfo(
+                 prompt_tokens=num_prompt_tokens,
+@@ -457,9 +507,9 @@
+                 total_tokens=num_prompt_tokens + total_completion_tokens,
+             )
+ 
+-            if self.enable_prompt_tokens_details and num_cached_tokens is not None:
++            if self.enable_prompt_tokens_details and state.cached_tokens is not None:
+                 final_usage_info.prompt_tokens_details = PromptTokenUsageInfo(
+-                    cached_tokens=num_cached_tokens
++                    cached_tokens=state.cached_tokens
+                 )
+ 
+             if include_usage:
+@@ -476,10 +526,12 @@
+             yield (
+                 f"data: {self._convert_generation_error_to_streaming_response(e)}\n\n"
+             )
++            return
+         except Exception as e:
+             logger.exception("Error in token generation stream.")
+             data = self.create_streaming_error_response(e)
+             yield f"data: {data}\n\n"
++            return
+         yield "data: [DONE]\n\n"
+ 
+     def _create_tokens_logprobs(
+diff --git a/vllm/renderers/online_derenderer.py b/vllm/renderers/online_derenderer.py
+--- a/vllm/renderers/online_derenderer.py
++++ b/vllm/renderers/online_derenderer.py
+@@ -109,9 +109,6 @@
+         choices: list[ChatCompletionResponseChoice] = []
+ 
+         for choice in generate_response.choices:
+-            if not choice.token_ids:
+-                raise ValueError(f"choice {choice.index} has empty or null token_ids")
+-
+             resolved_logprobs = (
+                 _resolve_logprobs(choice.logprobs, tokenizer)
+                 if choice.logprobs is not None
+@@ -196,6 +193,7 @@
+                     message=message,
+                     logprobs=resolved_logprobs,
+                     finish_reason=choice.finish_reason,
++                    stop_reason=choice.stop_reason,
+                 )
+             )
+ 
+@@ -347,6 +345,7 @@
+                     index=choice.index,
+                     delta=delta,
+                     finish_reason=choice.finish_reason,
++                    stop_reason=choice.stop_reason,
+                 )
+             )
+ 
+@@ -403,12 +402,6 @@
+ 
+         for gen, pt in zip(generate_responses, prompt_tokens_list):
+             for choice in gen.choices:
+-                if not choice.token_ids:
+-                    raise ValueError(
+-                        f"choice {choice.index} in response {gen.request_id} "
+-                        "has empty or null token_ids"
+-                    )
+-
+                 decoded_text = tokenizer.decode(
+                     choice.token_ids, skip_special_tokens=skip_special
+                 )
+@@ -423,6 +416,7 @@
+                         index=index,
+                         text=decoded_text,
+                         finish_reason=choice.finish_reason,
++                        stop_reason=choice.stop_reason,
+                         logprobs=completion_logprobs,
+                     )
+                 )
+@@ -492,6 +486,7 @@
+                     index=choice.index,
+                     text=new_text,
+                     finish_reason=choice.finish_reason,
++                    stop_reason=choice.stop_reason,
+                 )
+             )
+ 

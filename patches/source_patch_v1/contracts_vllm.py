@@ -1891,7 +1891,7 @@ def _validate_sampling_resolution_after(state: State) -> None:
             "get_type_hints(SamplingParams)", "required=False",
             "isinstance(value, SamplingParams)",
             "return {name: getattr(value, name) for name in fields}",
-            'excluded = {"skip_clone", "output_text_buffer_length"}',
+            'excluded = {"skip_clone", "output_text_buffer_length"',
             'extra_behavior="forbid"',
         ), label=label)
     _require_in_symbol(state, protocol, "GenerateRequest.to_sampling_params", (
@@ -1980,6 +1980,57 @@ def _validate_sampling_boundary_after(state: State) -> None:
         }, label=label)
 
 
+def _validate_generate_result_before(state: State) -> None:
+    label = "token generation result baseline"
+    require_text(state,
+        "vllm/entrypoints/scale_out/token_in_token_out/serving.py",
+        'finish_reason=output.finish_reason if output.finish_reason else "stop"',
+        label=label)
+
+
+def _validate_generate_result_after(state: State) -> None:
+    label = "token generation result integrity"
+    protocol = "vllm/entrypoints/scale_out/token_in_token_out/protocol.py"
+    serving = "vllm/entrypoints/scale_out/token_in_token_out/serving.py"
+    _require_in_symbol(state, protocol, "GenerateRequest.to_sampling_params", (
+        'values["output_kind"]',
+        "RequestOutputKind.DELTA if self.stream else RequestOutputKind.FINAL_ONLY",
+    ), label=label)
+    _require_in_symbol(state, protocol,
+        "SamplingParamsInput.__get_pydantic_core_schema__", (
+            '"output_text_buffer_length", "output_kind"}',
+        ), label=label)
+    _require_in_symbol(state, protocol, "GenerateResponseChoice", (
+        "finish_reason: GenerateFinishReason",
+        "stop_reason: int | str | None = None",
+        "token_ids: list[int]",
+    ), label=label)
+    _require_in_symbol(state, serving, "_GenerateOutputState.accept", (
+        "raise GenerationError(", "i in indices or i in terminals",
+        "res.finished != (len(terminals) == self.n)",
+    ), label=label)
+    for method in ("serve_tokens_full_generator", "serve_tokens_stream_generator"):
+        _require_in_symbol(state, serving, f"ServingTokens.{method}", (
+            "state.accept(res)", "state.finish()", "stop_reason=output.stop_reason",
+        ), label=label)
+    forbid_text(state, serving,
+        'output.finish_reason if output.finish_reason else "stop"', label=label)
+    forbid_text(state, serving, "[0] * len(res.outputs)", label=label)
+    derender = "vllm/renderers/online_derenderer.py"
+    for method in ("_derender_chat", "_derender_completion",
+                   "derender_chat_stream", "derender_completion_stream"):
+        _require_in_symbol(state, derender, f"OnlineDerenderer.{method}", (
+            "stop_reason=choice.stop_reason",
+        ), label=label)
+    forbid_text(state, derender, "has empty or null token_ids", label=label)
+    require_python_symbols(state,
+        "tests/entrypoints/scale_out/token_in_token_out/test_generate_stream.py", {
+            "test_terminal_cause_survives_empty_completion": None,
+            "test_parallel_sampling_keeps_staggered_choices_and_total_usage": None,
+            "test_generation_integrity_failures_are_errors_on_both_transports": None,
+        }, label=label)
+
+
 def validate_final(state: State) -> None:
     """Reassert every durable semantic invariant on the complete tree.
 
@@ -1995,6 +2046,20 @@ def validate_final(state: State) -> None:
 
 
 CONTRACTS: Mapping[str, SemanticContract] = {
+    "token-generation-result-integrity": SemanticContract(
+        rationale=(
+            "The raw-token endpoint must preserve all choices and actual terminal "
+            "causes. Transport-owned engine output, complete terminal evidence and "
+            "empty-output forwarding prevent lost choices and false success; "
+            "derender preserves the same stop cause on both API transports."
+        ),
+        removal_condition=(
+            "Remove when upstream provides the same complete token result contract, "
+            "including sparse parallel updates, terminal errors and stop metadata."
+        ),
+        validate_before=_validate_generate_result_before,
+        validate_after=_validate_generate_result_after,
+    ),
     "sampling-decoding-boundary": SemanticContract(
         rationale=(
             "The beam loop bypasses phase budgets, grammar and parsing and drops "

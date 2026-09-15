@@ -5,6 +5,33 @@ The independent triage and handling policy supplied with the implementation brie
 decide the resolutions. Source validation here does not certify a built image or a
 live release. The v23 image and archive are awaiting adoption.
 
+## Token generation: complete results and preserved terminal causes
+
+`vllm-token-generation-result-integrity.patch` makes the transport select the
+engine's DELTA or FINAL_ONLY output and removes `output_kind` from supplied
+sampling settings. Shared validation requires each requested choice's terminal
+and the request's completion event. It detects missing, repeated, out-of-range or
+contradictory choices and engine errors. Batch errors return HTTP 500; streaming
+errors emit an error event without a final usage report or `[DONE]`. There is no
+invented default `stop` cause.
+
+Empty-token terminal choices are preserved, sparse parallel output is indexed by
+the requested `n`, and continuous usage totals every choice. The token protocol
+carries `stop_reason` through all four Chat/Completion derender paths. A complete
+empty answer remains empty; null or absent token lists are invalid input.
+
+Validation: 160 offline CPU cases pass, including real `ParentRequest` aggregation,
+serving methods on both transports, all terminal causes, empty output, broken
+engine sequences, render serialization and derender JSON round trips. Sixteen
+controls against the previous runtime fail on the corrected behavior. A live
+derender test's obsolete empty-output refusal is replaced by its correct success
+expectation; that live test is included in source reconstruction but is not run.
+The installed `generate_result_unit.py` verifies transport ownership, parallel
+empty terminals, stop causes and refusal of incomplete output. The newly modified
+derenderer joins every upstream/final image hash, COPY, context and runtime check.
+The integrated generator and `build-vllm.sh check` pass with 24 reviewed stages,
+99 deployment inputs, 19 framework/recipe tests and every installed CPU unit.
+
 ## Finding 22: refuse unsupported decoding at the request boundary
 
 `vllm-sampling-decoding-boundary.patch` declares beam search unsupported through
