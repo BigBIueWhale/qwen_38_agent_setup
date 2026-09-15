@@ -419,7 +419,7 @@ def _validate_phase_after(state: State) -> None:
     require_python_symbols(
         state,
         scheduler,
-        {"check_stop": ("request", "max_model_len")},
+        {"check_stop": None},
         label=label,
     )
     validator = _symbol_source(
@@ -435,7 +435,7 @@ def _validate_phase_after(state: State) -> None:
             "if request.final_response_start_index is None:",
             "for end_sequence in sampling_params._reasoning_end_token_sequences:",
             "request.num_output_tokens < sampling_params.min_tokens",
-            "if last_token_id == sampling_params.eos_token_id:",
+            "request.status = RequestStatus.FINISHED_STOPPED",
             "if final_budget_reached:",
             'request.stop_reason = "final_response_token_budget"',
             "request.num_tokens >= max_model_len",
@@ -1657,7 +1657,7 @@ def _validate_qwen_language_after(state: State) -> None:
     engine = "vllm/parser/engine/streaming_parser_engine.py"
     parser = "vllm/parser/engine/parser_engine.py"
     abstract = "vllm/parser/abstract_parser.py"
-    for text in ('tool_preamble_text="\\n"', 'validate_tool_names=True',
+    for text in ('tool_preamble_text="\\n"',
                  '(ParserState.TOOL_PARAM_VALUE, "PARAM_END")',
                  'batch_tool_pass_uses_ids = True'):
         require_text(state, qwen, text, label=label)
@@ -2212,6 +2212,75 @@ def _validate_stream_identity_after(state: State) -> None:
         }, label=label)
 
 
+def _validate_tool_completion_before(state: State) -> None:
+    label = "Tool completion baseline"
+    require_text(state, "vllm/sampling_params.py", "_eos_token_id: int | None", label=label)
+    forbid_text(state, "vllm/parser/abstract_parser.py", "def parse_output(", label=label)
+
+
+def _validate_tool_completion_after(state: State) -> None:
+    label = "EOS tool commitment and structural text stops"
+    abstract = "vllm/parser/abstract_parser.py"
+    parser = "vllm/parser/engine/parser_engine.py"
+    _require_in_symbol(state, parser, "ParserEngine._completed_tool_events", (
+        'terminal[0] == "length"', 'if span.closed',
+        'terminal == ("stop", None)', 'value=raw_calls[withheld].text',
+    ), label=label)
+    _require_in_symbol(state, abstract, "Parser.parse_output_delta", (
+        'self.tool_calls_complete is None', 'state.withholding',
+        'if not finished:', 'self.parse_output(', 'state.emitted_content',
+    ), label=label)
+    require_text(state, "vllm/parser/qwen3.py", "validate_tool_names=False", label=label)
+    forbid_text(state, parser, "slot.name.strip()", label=label)
+    for path, symbol, method in (
+        ("vllm/entrypoints/openai/chat_completion/serving.py",
+         "OpenAIServingChat.chat_completion_full_generator", "parser.parse_output("),
+        ("vllm/entrypoints/openai/chat_completion/serving.py",
+         "OpenAIServingChat.chat_completion_stream_generator", "parser.parse_output_delta("),
+        ("vllm/renderers/online_derenderer.py", "OnlineDerenderer._derender_chat",
+         "parser.parse_output("),
+    ):
+        _require_in_symbol(state, path, symbol, (method, "stop_reason"), label=label)
+    require_text(state, "vllm/entrypoints/openai/responses/serving.py",
+                 "parser.parse_output_delta(", label=label)
+    require_text(state, "vllm/entrypoints/openai/responses/context.py",
+                 "parser.parse_output(", label=label)
+    _require_in_symbol(state, "vllm/sampling_params.py",
+        "SamplingParams.update_from_generation_config", (
+            "self._eos_token_ids", "set(self.stop_token_ids or ())",
+        ), label=label)
+    forbid_text(state, "vllm/sampling_params.py", "_eos_token_id:", label=label)
+    _require_in_symbol(state, "vllm/v1/core/sched/utils.py", "check_stop", (
+        "not sampling_params.ignore_eos",
+        "last_token_id in sampling_params.eos_token_ids",
+        "if allow_stop_token and", "request.stop_reason = last_token_id",
+    ), label=label)
+    _require_in_symbol(state, "vllm/v1/core/sched/scheduler.py",
+        "Scheduler._update_request_with_output", (
+            "self.structured_output_manager.allows_stop_token(",
+        ), label=label)
+    _require_in_symbol(state, "vllm/v1/structured_output/backend_xgrammar.py",
+        "XgrammarGrammar.allows_text_stop", (
+            "self.matcher.is_completed()", "self.matcher.fork()",
+            "probe.accept_string(", "probe.is_completed()",
+        ), label=label)
+    _require_in_symbol(state, "vllm/v1/structured_output/stop_checker.py",
+        "StructuralTagStopChecker.feed", (
+            "self.reasoner.is_reasoning_end_streaming(",
+            "self.reasoner.extract_content_ids(", "self.matcher.accept_string(char)",
+            "if not complete or not next_complete:",
+        ), label=label)
+    _require_in_symbol(state, "vllm/v1/engine/detokenizer.py", "check_stop_strings", (
+        "protected_spans", "stop_index = output_text.find(stop_str, stop_index + 1)",
+    ), label=label)
+    require_python_symbols(state,
+        "tests/v1/structured_output/test_backend_xgrammar_stop_tokens.py", {
+            "test_structural_stop_tokens_remain_valid_values_and_resume_in_text": None,
+            "test_structural_stop_cannot_remove_the_closing_wrapper": None,
+            "test_structural_stop_through_qwen_output_processor": None,
+        }, label=label)
+
+
 def validate_final(state: State) -> None:
     """Reassert every durable semantic invariant on the complete tree.
 
@@ -2227,6 +2296,21 @@ def validate_final(state: State) -> None:
 
 
 CONTRACTS: Mapping[str, SemanticContract] = {
+    "tool-output-completion": SemanticContract(
+        rationale=(
+            "Only observed closed wrappers at model EOS are executable calls. "
+            "Keep slips verbatim, length diagnostic, and caller stops distinct. "
+            "Suspend text controls inside the native grammar's armed tags so "
+            "they cannot truncate a call or forbid literal argument values."
+        ),
+        removal_condition=(
+            "Remove when upstream commits calls identically on the deployed "
+            "batch and streaming APIs, preserves model EOS identity, and "
+            "suspends caller text controls at the same native grammar boundary."
+        ),
+        validate_before=_validate_tool_completion_before,
+        validate_after=_validate_tool_completion_after,
+    ),
     "input-stream-agent-identity": SemanticContract(
         rationale=(
             "An input stream resumes one live request and its acquired KV. "

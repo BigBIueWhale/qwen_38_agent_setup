@@ -156,3 +156,9 @@
 !vllm/vllm/v1/engine/async_llm.py
 !vllm/vllm/entrypoints/generate/generative_scoring/serving.py
 !vllm/vllm/entrypoints/generate/generative_scoring/api_router.py
+!vllm/vllm/v1/core/sched/scheduler.py
+!vllm/vllm/v1/engine/detokenizer.py
+!vllm/vllm/v1/engine/output_processor.py
+!vllm/vllm/v1/structured_output/backend_types.py
+!vllm/vllm/v1/structured_output/backend_xgrammar.py
+!vllm/vllm/v1/structured_output/stop_checker.py

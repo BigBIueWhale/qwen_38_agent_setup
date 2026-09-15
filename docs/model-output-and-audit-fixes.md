@@ -5,6 +5,34 @@ The independent triage and handling policy supplied with the implementation brie
 decide the resolutions. Source validation here does not certify a built image or a
 live release. The v23 image and archive are awaiting adoption.
 
+## Findings #1 and #13: tool commitment and caller text stops
+
+`vllm-tool-output-completion.patch` commits Qwen calls only when the actual
+closing wrapper was observed and generation ended at model EOS. EOS-cut and
+malformed spans remain verbatim text; length keeps its diagnostic prefix.
+The parser preserves unknown and padded names for client error feedback.
+Chat, Responses and batch derender use the same terminal-aware parser methods.
+Streaming holds call entries and subsequent content until the terminal;
+preceding content and reasoning still stream.
+
+Sampling parameters distinguish all configured EOS IDs from caller stops.
+The deployed V1 scheduler probes the native grammar before allowing a caller
+stop token. A text matcher for the same structural grammar protects stop
+strings during detokenization, including overlaps with a closing wrapper.
+It is created only for requests with structural output and stop strings.
+There is no wrapper-depth heuristic, new wire protocol, or retry path.
+
+Validation: 4,358 parser, Chat, Responses, derender, stop and EOS tests pass
+in offline CPU containers. This includes 40 tests through the real output
+processor and the pinned Qwen tokenizer, checking batch/stream output and
+exact sampled IDs. The installed parser unit has 12 tests plus 126 subtests.
+The build check reconstructs and verifies every runtime file and runs the
+installed unit. No model, service or GPU was run.
+
+Still open in the owner's order: the #17 one-way thinking boundary; schema
+#2/#18; token/text provenance #23; precise error classification; the written
+client commit review; final agent pins, final check and implementation report.
+
 ## Qwen terminal recognition follows the grammar phase
 
 `vllm-phase-aware-parser-terminals.patch` represents token authority in each

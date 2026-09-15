@@ -716,6 +716,12 @@ assert_running_profile() {
       /usr/local/lib/python3.12/dist-packages/vllm/v1/structured_output/__init__.py \
       /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/anthropic/api_router.py \
       /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/chat_completion/serving.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/v1/structured_output/stop_checker.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/v1/structured_output/backend_xgrammar.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/v1/structured_output/backend_types.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/output_processor.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/detokenizer.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/v1/core/sched/scheduler.py \
       /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/async_llm.py \
       /usr/local/lib/python3.12/dist-packages/vllm/parser/gemma4.py \
       /usr/local/lib/python3.12/dist-packages/vllm/parser/glm47_moe.py \
@@ -765,6 +771,12 @@ assert_running_profile() {
     "${STRUCTURED_OUTPUT_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/structured_output/__init__.py \
     "${ANTHROPIC_API_ROUTER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/anthropic/api_router.py \
     "${CHAT_SERVING_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/chat_completion/serving.py \
+    "${STRUCTURAL_TAG_STOP_CHECKER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/structured_output/stop_checker.py \
+    "${XGRAMMAR_BACKEND_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/structured_output/backend_xgrammar.py \
+    "${STRUCTURED_OUTPUT_BACKEND_TYPES_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/structured_output/backend_types.py \
+    "${V1_OUTPUT_PROCESSOR_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/output_processor.py \
+    "${V1_DETOKENIZER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/detokenizer.py \
+    "${V1_SCHEDULER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/core/sched/scheduler.py \
     "${ASYNC_LLM_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/async_llm.py \
     "${GEMMA4_PARSER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/gemma4.py \
     "${GLM47_PARSER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/glm47_moe.py \

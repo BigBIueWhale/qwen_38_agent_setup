@@ -303,7 +303,40 @@ RUN printf '%s  %s\n' \
   "${GENERATIVE_SCORING_ROUTER_UPSTREAM_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/generate/generative_scoring/api_router.py \
   | sha256sum --check --strict
 
+ARG V1_SCHEDULER_UPSTREAM_FILE_SHA256
+RUN printf '%s  %s\n' \
+  "${V1_SCHEDULER_UPSTREAM_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/core/sched/scheduler.py \
+  | sha256sum --check --strict
+
+ARG V1_DETOKENIZER_UPSTREAM_FILE_SHA256
+RUN printf '%s  %s\n' \
+  "${V1_DETOKENIZER_UPSTREAM_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/detokenizer.py \
+  | sha256sum --check --strict
+
+ARG V1_OUTPUT_PROCESSOR_UPSTREAM_FILE_SHA256
+RUN printf '%s  %s\n' \
+  "${V1_OUTPUT_PROCESSOR_UPSTREAM_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/output_processor.py \
+  | sha256sum --check --strict
+
+ARG STRUCTURED_OUTPUT_BACKEND_TYPES_UPSTREAM_FILE_SHA256
+RUN printf '%s  %s\n' \
+  "${STRUCTURED_OUTPUT_BACKEND_TYPES_UPSTREAM_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/structured_output/backend_types.py \
+  | sha256sum --check --strict
+
+ARG XGRAMMAR_BACKEND_UPSTREAM_FILE_SHA256
+RUN printf '%s  %s\n' \
+  "${XGRAMMAR_BACKEND_UPSTREAM_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/structured_output/backend_xgrammar.py \
+  | sha256sum --check --strict
+
+RUN test ! -e /usr/local/lib/python3.12/dist-packages/vllm/v1/structured_output/stop_checker.py
+
 FROM upstream-verifier AS runtime
+ARG STRUCTURAL_TAG_STOP_CHECKER_PATCHED_FILE_SHA256
+ARG XGRAMMAR_BACKEND_PATCHED_FILE_SHA256
+ARG STRUCTURED_OUTPUT_BACKEND_TYPES_PATCHED_FILE_SHA256
+ARG V1_OUTPUT_PROCESSOR_PATCHED_FILE_SHA256
+ARG V1_DETOKENIZER_PATCHED_FILE_SHA256
+ARG V1_SCHEDULER_PATCHED_FILE_SHA256
 ARG GENERATIVE_SCORING_ROUTER_PATCHED_FILE_SHA256
 ARG GENERATIVE_SCORING_SERVING_PATCHED_FILE_SHA256
 ARG ASYNC_LLM_PATCHED_FILE_SHA256
@@ -394,6 +427,7 @@ ARG RESPONSES_IDENTITY_PATCH_DIFF_SHA256
 ARG ANTHROPIC_TERMINAL_PATCH_DIFF_SHA256
 ARG SAMPLING_RESOLUTION_PATCH_DIFF_SHA256
 ARG PHASE_AWARE_PARSER_TERMINALS_PATCH_DIFF_SHA256
+ARG TOOL_OUTPUT_COMPLETION_PATCH_DIFF_SHA256
 ARG INPUT_STREAM_AGENT_IDENTITY_PATCH_DIFF_SHA256
 ARG XML_TEXT_FIDELITY_PATCH_DIFF_SHA256
 ARG RAW_IMAGE_TRANSPORT_PATCH_DIFF_SHA256
@@ -714,6 +748,30 @@ RUN printf '%s  %s\n' \
 COPY --chmod=0644 vllm/vllm/entrypoints/generate/generative_scoring/api_router.py /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/generate/generative_scoring/api_router.py
 RUN printf '%s  %s\n' \
   "${GENERATIVE_SCORING_ROUTER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/generate/generative_scoring/api_router.py \
+  | sha256sum --check --strict
+COPY --chmod=0644 vllm/vllm/v1/core/sched/scheduler.py /usr/local/lib/python3.12/dist-packages/vllm/v1/core/sched/scheduler.py
+RUN printf '%s  %s\n' \
+  "${V1_SCHEDULER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/core/sched/scheduler.py \
+  | sha256sum --check --strict
+COPY --chmod=0644 vllm/vllm/v1/engine/detokenizer.py /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/detokenizer.py
+RUN printf '%s  %s\n' \
+  "${V1_DETOKENIZER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/detokenizer.py \
+  | sha256sum --check --strict
+COPY --chmod=0644 vllm/vllm/v1/engine/output_processor.py /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/output_processor.py
+RUN printf '%s  %s\n' \
+  "${V1_OUTPUT_PROCESSOR_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/output_processor.py \
+  | sha256sum --check --strict
+COPY --chmod=0644 vllm/vllm/v1/structured_output/backend_types.py /usr/local/lib/python3.12/dist-packages/vllm/v1/structured_output/backend_types.py
+RUN printf '%s  %s\n' \
+  "${STRUCTURED_OUTPUT_BACKEND_TYPES_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/structured_output/backend_types.py \
+  | sha256sum --check --strict
+COPY --chmod=0644 vllm/vllm/v1/structured_output/backend_xgrammar.py /usr/local/lib/python3.12/dist-packages/vllm/v1/structured_output/backend_xgrammar.py
+RUN printf '%s  %s\n' \
+  "${XGRAMMAR_BACKEND_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/structured_output/backend_xgrammar.py \
+  | sha256sum --check --strict
+COPY --chmod=0644 vllm/vllm/v1/structured_output/stop_checker.py /usr/local/lib/python3.12/dist-packages/vllm/v1/structured_output/stop_checker.py
+RUN printf '%s  %s\n' \
+  "${STRUCTURAL_TAG_STOP_CHECKER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/structured_output/stop_checker.py \
   | sha256sum --check --strict
 COPY --chmod=0644 chat_template.jinja /opt/qwen38/chat_template.jinja
 COPY --chmod=0644 scripts/phase_budget_unit.py /opt/qwen38/phase_budget_unit.py
@@ -1403,6 +1461,7 @@ LABEL org.opencontainers.image.revision="9df9b0b0a1816b6d0d0f6ecd0da563cc37fd72f
       qwen38.patch.xml-text-fidelity.diff.sha256="${XML_TEXT_FIDELITY_PATCH_DIFF_SHA256}" \
       qwen38.patch.phase-aware-parser-terminals.diff.sha256="${PHASE_AWARE_PARSER_TERMINALS_PATCH_DIFF_SHA256}" \
       qwen38.patch.input-stream-agent-identity.diff.sha256="${INPUT_STREAM_AGENT_IDENTITY_PATCH_DIFF_SHA256}" \
+      qwen38.patch.tool-output-completion.diff.sha256="${TOOL_OUTPUT_COMPLETION_PATCH_DIFF_SHA256}" \
       qwen38.template.file.sha256="${AGENT_CHAT_TEMPLATE_SHA256}" \
       qwen38.project="Qwen_best_model_ever" \
       qwen38.runtime.profile="${IMAGE_PROFILE_VERSION}"

@@ -58,7 +58,8 @@ def call(value):
     )
 
 
-def parse(text, chunk_size, *, tools=None, choice="auto", ids=None):
+def parse(text, chunk_size, *, tools=None, choice="auto", ids=None,
+          finish="stop", stop=None):
     request = ChatCompletionRequest(
         model="unit", messages=[{"role": "user", "content": "test"}],
         tools=[TOOL] if tools is None else tools or None,
@@ -74,8 +75,9 @@ def parse(text, chunk_size, *, tools=None, choice="auto", ids=None):
     )
     ids = encode(text) if ids is None else ids
     if chunk_size is None:
-        reasoning, content, calls = parser.parse(
+        reasoning, content, calls = parser.parse_output(
             text, request, enable_auto_tools=True, model_output_token_ids=ids,
+            finish_reason=finish, stop_reason=stop,
         )
         return (
             reasoning or "", content or "",
@@ -84,9 +86,10 @@ def parse(text, chunk_size, *, tools=None, choice="auto", ids=None):
     reasoning, content, calls = "", "", {}
     for start in range(0, len(ids), chunk_size):
         group = ids[start:start + chunk_size]
-        delta = parser.parse_delta(
+        last = start + chunk_size >= len(ids)
+        delta = parser.parse_output_delta(
             decode(group), group, request, prompt_token_ids=[1, 2, 3],
-            finished=start + chunk_size >= len(ids),
+            finish_reason=finish if last else None, stop_reason=stop if last else None,
         )
         if not delta:
             continue
@@ -231,8 +234,69 @@ class ToolOutputParserTest(unittest.TestCase):
         for chunk in (1, 13, None):
             with self.subTest(chunk=chunk):
                 result = parse("plan</think>" + body, chunk)
-                self.assertEqual(len(result[2]), 1)
+                self.assertEqual(result[:3], ("plan", body, []))
                 self.assertFalse(result[3])
+
+    def test_caller_stop_and_length_keep_their_distinct_meaning(self):
+        body = call("complete value")
+        for chunk in (1, 13, None):
+            for stop in ("HALT", 42):
+                with self.subTest(chunk=chunk, stop=stop):
+                    result = parse("plan</think>" + body, chunk, stop=stop)
+                    self.assertEqual(result[:3], ("plan", body, []))
+            result = parse("plan</think>" + body[:-5], chunk, finish="length")
+            self.assertEqual(len(result[2]), 1)
+            self.assertFalse(result[3])
+
+    def test_unknown_and_padded_names_are_not_deleted_or_renamed(self):
+        for name in ("unknown", " write "):
+            body = call("kept").replace("function=write", "function=" + name)
+            for chunk in (1, 13, None):
+                with self.subTest(name=name, chunk=chunk):
+                    result = parse("plan</think>" + body, chunk)
+                    self.assertEqual(result[2], [(name, '{"text": "kept"}')])
+
+    def test_native_grammar_suspends_text_stops_inside_values(self):
+        from vllm import SamplingParams
+        from vllm.sampling_params import StructuredOutputsParams
+        from vllm.tool_parsers.structural_tag_registry import get_model_structural_tag
+        from vllm.v1.engine import EngineCoreRequest
+        from vllm.v1.engine.detokenizer import BaseIncrementalDetokenizer
+        from vllm.v1.structured_output.stop_checker import StructuralTagStopChecker
+
+        tools = ChatCompletionRequest(messages=[], tools=[TOOL]).tools
+        tag = get_model_structural_tag("qwen_3_coder", tools, "auto", False)
+        params = SamplingParams(stop=["HALT"], structured_outputs=StructuredOutputsParams(
+            structural_tag=tag.model_dump_json()))
+        request = EngineCoreRequest(
+            request_id="unit", prompt_token_ids=[], mm_features=None,
+            sampling_params=params, pooling_params=None, arrival_time=0,
+            lora_request=None, cache_salt=None, data_parallel_rank=None,
+        )
+
+        class TextDetokenizer(BaseIncrementalDetokenizer):
+            def decode_next(self, token):
+                return chr(token)
+
+        body = call("HALT </tool_call> HALT")
+        detok = TextDetokenizer(request)
+        detok.stop_checker = StructuralTagStopChecker(MagicMock(), request, None)
+        self.assertEqual(detok.update(list(map(ord, body + " after HALT")), False), "HALT")
+        self.assertEqual(detok.output_text, body + " after ")
+
+    def test_every_model_eos_is_an_eos_terminal(self):
+        from vllm import SamplingParams
+        from vllm.v1.core.sched.utils import check_stop
+        from vllm.v1.request import Request
+
+        for token in (248046, 248044):
+            params = SamplingParams(stop_token_ids=[7], extra_args={"kv_scope": "unit"})
+            params.update_from_generation_config({"eos_token_id": [248046, 248044]}, 248046)
+            request = Request("unit", [1], params, None)
+            request.append_output_token_ids(token)
+            self.assertTrue(check_stop(request, 1024))
+            self.assertIsNone(request.stop_reason)
+            self.assertEqual(params.stop_token_ids, [7])
 
 
 if __name__ == "__main__":

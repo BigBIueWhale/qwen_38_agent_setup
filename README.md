@@ -75,7 +75,7 @@ error.
   and relay readiness events, then validates the complete live configuration before
   reporting success. Re-running it validates the existing owned topology rather than
   starting a duplicate.
-- status.sh validates host prerequisites, twenty-eight ordered vLLM transformations, every reviewed
+- status.sh validates host prerequisites, twenty-nine ordered vLLM transformations, every reviewed
   source and test file, the model manifest, image archive, image identity and labels,
   command and environment, mounts, runtime packages, API identity, listener,
   hardening, and live health. HEALTHY means all checks passed.
@@ -95,7 +95,7 @@ Advanced reproducibility operations are deliberately separate from serving mode:
     ./scripts/build-vllm.sh build
     ./scripts/restore-images.sh
 
-The check reconstructs the source tree from the pinned upstream commit through all twenty-eight
+The check reconstructs the source tree from the pinned upstream commit through all twenty-nine
 landmark-aware transformations. The build runs offline from the exact base image and fails unless it produces
 the pinned image ID. Restore verifies the pinned local archive before loading it.
 
@@ -251,7 +251,7 @@ The vLLM submodule is pinned at:
 
     9df9b0b0a1816b6d0d0f6ecd0da563cc37fd72f5
 
-It is intentionally reconstructed by twenty-eight ordered, reviewed semantic transformations:
+It is intentionally reconstructed by twenty-nine ordered, reviewed semantic transformations:
 
 | Patch | SHA-256 |
 |---|---|
@@ -283,9 +283,10 @@ It is intentionally reconstructed by twenty-eight ordered, reviewed semantic tra
 | patches/vllm-xml-text-fidelity.patch | 999d6f471a4f480f5fd93b087c17c463417a8080206e952f3686510d57c9abd6 |
 | patches/vllm-phase-aware-parser-terminals.patch | cc79995955bc36f6ef383983efe5359b0170895ad8c682593c1435c12dd66ceb |
 | patches/vllm-input-stream-agent-identity.patch | f812362220f83b904d56e55e9c359918990c55e39d7a0750d1011840d377dfb4 |
+| patches/vllm-tool-output-completion.patch | 9945b84b32a0c33b624e3ed1720aa9cc320f63a0fed5dce35761eb392d0849a5 |
 
-The reconstructed tree has 90 reviewed runtime-source changes, 1 new runtime source,
-7 runtime-source deletions, 67 existing-test changes, 12 new tests,
+The reconstructed tree has 95 reviewed runtime-source changes, 2 new runtime sources,
+7 runtime-source deletions, 70 existing-test changes, 12 new tests,
 3 test deletions, and 1 serving-documentation change. The authoritative
 counts are derived and printed by ./scripts/build-vllm.sh check, never restated
 by hand there. The landmark-aware Python patcher calculates every mutation
@@ -308,11 +309,11 @@ Pinned build inputs and products:
 | Offline archive | artifacts/qwen38-vllm-images-runtime-v23.tar |
 | Archive size | Awaiting adoption after the v23 export |
 | Archive SHA-256 | Awaiting adoption after the v23 export |
-| Runtime Dockerfile SHA-256 | ee1d62a80a1952936cf8a475415ff29d20678c800608390e6e39492b5dcfd843 |
-| Docker context allowlist SHA-256 | 88fb939665c75f79b5507bcc09789ac134ca72fee89400e1e65afcb910582c00 |
-| Build verifier SHA-256 | 5a0c1e26a09ace4b5424cf00eebe6d33f0e5bb37efd937725f896ce3e9775bcf |
-| Runtime validator SHA-256 | 23580fe37398535cf5debcad6ec8a2bd33fe8ff65fb732f91f2b23d67131c5b1 |
-| Runtime lock SHA-256 | 46beaba5c993d327fac657fa2483c2f5f283ff84d43f64f231e14bfc6375e347 |
+| Runtime Dockerfile SHA-256 | 2389c3b4d51de3b20100631ffae2e44516f64afcd6b332e76ce7a5850fab8c6d |
+| Docker context allowlist SHA-256 | 80e89fa27fa19db3b11998be46886c2372bab0d252da26dada094940a4a2ff01 |
+| Build verifier SHA-256 | 9cfd1c9859e86f4e913b07acbcecbce7e1d08ba9d1ca7adbcb8b36769575d06a |
+| Runtime validator SHA-256 | 965934e0ac166fcc8ac47a634efa09e35b882a018938dc239adc57415189f9fe |
+| Runtime lock SHA-256 | 3249fefff0fddfe8dd232e9adbfc90d520b3e655222fda65b6b553d916d00217 |
 
 Every reviewed runtime file, including both TurboQuant kernels, is copied and
 hash-checked against its upstream and patched identities. A CPU Triton-interpreter
@@ -868,6 +869,21 @@ that boundary, tool wrappers are recognized through either added tokens or
 ordinary text tokens, matching XGrammar's text language. Ordinary-token thinking
 marker spellings inside reasoning remain reasoning. Both tokenizations are
 checked with native XGrammar and through streaming and batch parsing.
+
+Only a call with its observed `</tool_call>` wrapper and a model EOS terminal
+becomes an executable call. Both configured Qwen EOS tokens have that meaning.
+An EOS-cut or malformed span stays verbatim text. A caller stop returns the
+raw span with its stop cause; a length terminal retains a diagnostic prefix.
+Streaming holds call entries and following content until the terminal makes
+that decision, while preceding content and reasoning continue to stream.
+
+Caller stop strings and stop-token IDs apply to text outside armed calls.
+The native structural grammar suspends them inside a call, including literal
+wrapper text in parameter values. A stop overlapping the closing wrapper
+cannot remove part of the call. Stop tokens remain available as literal
+argument content; only model EOS tokens serve as grammar terminators.
+Unknown emitted names and their whitespace remain exact for client error
+feedback. The parser does not silently delete or rename them.
 
 XML string parameters retain their exact leading and trailing whitespace,
 including newlines. The derived instruction example and historical tool calls put

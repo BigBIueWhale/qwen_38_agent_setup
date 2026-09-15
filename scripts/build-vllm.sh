@@ -44,10 +44,12 @@ EXPECTED_STATUS=$' M docs/serving/online_serving/generative_scoring.md
  M tests/parser/engine/trace_builder.py
  M tests/quantization/test_turboquant.py
  M tests/test_request_input_bounds.py
+ M tests/test_sampling_params.py
  M tests/tool_parsers/test_structural_tag_registry.py
  M tests/v1/core/test_prefix_caching.py
  M tests/v1/core/test_single_type_kv_cache_manager.py
  M tests/v1/e2e/general/test_context_length.py
+ M tests/v1/engine/test_output_processor.py
  M tests/v1/kv_connector/nixl_integration/run_multi_connector_accuracy_test.sh
  M tests/v1/kv_connector/nixl_integration/run_multi_connector_edge_case_test.sh
  M tests/v1/kv_connector/nixl_integration/spec_decode_acceptance_test.sh
@@ -71,6 +73,7 @@ EXPECTED_STATUS=$' M docs/serving/online_serving/generative_scoring.md
  M tests/v1/simple_kv_offload/test_integration.py
  M tests/v1/simple_kv_offload/test_scheduler.py
  M tests/v1/streaming_input/test_async_llm_streaming.py
+ M tests/v1/structured_output/test_backend_xgrammar_stop_tokens.py
  M tests/v1/worker/test_gpu_model_runner_mm_gather.py
  M tests/v1/worker/test_gpu_worker.py
  M vllm/config/cache.py
@@ -146,10 +149,13 @@ EXPECTED_STATUS=$' M docs/serving/online_serving/generative_scoring.md
  M vllm/v1/core/kv_cache_coordinator.py
  M vllm/v1/core/kv_cache_manager.py
  M vllm/v1/core/kv_cache_utils.py
+ M vllm/v1/core/sched/scheduler.py
  M vllm/v1/core/sched/utils.py
  M vllm/v1/core/single_type_kv_cache_manager.py
  M vllm/v1/engine/async_llm.py
+ M vllm/v1/engine/detokenizer.py
  M vllm/v1/engine/input_processor.py
+ M vllm/v1/engine/output_processor.py
  M vllm/v1/kv_offload/base.py
  M vllm/v1/kv_offload/config.py
  M vllm/v1/kv_offload/cpu/common.py
@@ -166,6 +172,8 @@ EXPECTED_STATUS=$' M docs/serving/online_serving/generative_scoring.md
  M vllm/v1/request.py
  M vllm/v1/simple_kv_offload/manager.py
  M vllm/v1/structured_output/__init__.py
+ M vllm/v1/structured_output/backend_types.py
+ M vllm/v1/structured_output/backend_xgrammar.py
  M vllm/v1/worker/gpu_model_runner.py
  M vllm/v1/worker/gpu_worker.py
  M vllm/v1/worker/startup_plan.py
@@ -182,7 +190,8 @@ EXPECTED_STATUS=$' M docs/serving/online_serving/generative_scoring.md
 ?? tests/v1/core/test_kv_cache_users_sizing.py
 ?? tests/v1/core/test_prefix_cache.py
 ?? tests/v1/worker/test_workspace.py
-?? vllm/v1/core/prefix_cache.py'
+?? vllm/v1/core/prefix_cache.py
+?? vllm/v1/structured_output/stop_checker.py'
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
 # shellcheck source=../config/runtime-v1.sh
@@ -240,6 +249,7 @@ GENERATE_RESULT_PATCH_FILE="${PROJECT_DIR}/patches/vllm-token-generation-result-
 RAW_IMAGE_TRANSPORT_PATCH_FILE="${PROJECT_DIR}/patches/vllm-raw-image-token-transport.patch"
 XML_TEXT_FIDELITY_PATCH_FILE="${PROJECT_DIR}/patches/vllm-xml-text-fidelity.patch"
 INPUT_STREAM_AGENT_IDENTITY_PATCH_FILE="${PROJECT_DIR}/patches/vllm-input-stream-agent-identity.patch"
+TOOL_OUTPUT_COMPLETION_PATCH_FILE="${PROJECT_DIR}/patches/vllm-tool-output-completion.patch"
 PHASE_AWARE_PARSER_TERMINALS_PATCH_FILE="${PROJECT_DIR}/patches/vllm-phase-aware-parser-terminals.patch"
 SAMPLING_RESOLUTION_PATCH_FILE="${PROJECT_DIR}/patches/vllm-generation-sampling-resolution.patch"
 ANTHROPIC_TERMINAL_PATCH_FILE="${PROJECT_DIR}/patches/vllm-anthropic-terminal-metadata.patch"
@@ -410,6 +420,7 @@ printf '%s  %s\n' \
   "${ANTHROPIC_TERMINAL_PATCH_DIFF_SHA256}" "${ANTHROPIC_TERMINAL_PATCH_FILE}" \
   "${SAMPLING_RESOLUTION_PATCH_DIFF_SHA256}" "${SAMPLING_RESOLUTION_PATCH_FILE}" \
   "${PHASE_AWARE_PARSER_TERMINALS_PATCH_DIFF_SHA256}" "${PHASE_AWARE_PARSER_TERMINALS_PATCH_FILE}" \
+  "${TOOL_OUTPUT_COMPLETION_PATCH_DIFF_SHA256}" "${TOOL_OUTPUT_COMPLETION_PATCH_FILE}" \
   "${INPUT_STREAM_AGENT_IDENTITY_PATCH_DIFF_SHA256}" "${INPUT_STREAM_AGENT_IDENTITY_PATCH_FILE}" \
   "${XML_TEXT_FIDELITY_PATCH_DIFF_SHA256}" "${XML_TEXT_FIDELITY_PATCH_FILE}" \
   "${RAW_IMAGE_TRANSPORT_PATCH_DIFF_SHA256}" "${RAW_IMAGE_TRANSPORT_PATCH_FILE}" \
@@ -674,6 +685,30 @@ printf '%s  %s\n' \
   | sha256sum --check --strict
 
 printf '%s  %s\n' \
+  "${V1_SCHEDULER_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/v1/core/sched/scheduler.py" \
+  | sha256sum --check --strict
+
+printf '%s  %s\n' \
+  "${V1_DETOKENIZER_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/v1/engine/detokenizer.py" \
+  | sha256sum --check --strict
+
+printf '%s  %s\n' \
+  "${V1_OUTPUT_PROCESSOR_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/v1/engine/output_processor.py" \
+  | sha256sum --check --strict
+
+printf '%s  %s\n' \
+  "${STRUCTURED_OUTPUT_BACKEND_TYPES_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/v1/structured_output/backend_types.py" \
+  | sha256sum --check --strict
+
+printf '%s  %s\n' \
+  "${XGRAMMAR_BACKEND_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/v1/structured_output/backend_xgrammar.py" \
+  | sha256sum --check --strict
+
+printf '%s  %s\n' \
+  "${STRUCTURAL_TAG_STOP_CHECKER_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/v1/structured_output/stop_checker.py" \
+  | sha256sum --check --strict
+
+printf '%s  %s\n' \
   "${RUNTIME_DOCKERFILE_SHA256}" "${DOCKERFILE}" \
   "${DOCKERIGNORE_SHA256}" "${DOCKERIGNORE}" | \
   sha256sum --check --strict
@@ -838,6 +873,17 @@ docker buildx build --progress=plain \
   --build-arg "REQUEST_PATCHED_FILE_SHA256=${REQUEST_PATCHED_FILE_SHA256}" \
   --build-arg "QWEN3_PARSER_PATCHED_FILE_SHA256=${QWEN3_PARSER_PATCHED_FILE_SHA256}" \
   --build-arg "STRUCTURED_OUTPUT_PATCHED_FILE_SHA256=${STRUCTURED_OUTPUT_PATCHED_FILE_SHA256}" \
+  --build-arg "STRUCTURAL_TAG_STOP_CHECKER_PATCHED_FILE_SHA256=${STRUCTURAL_TAG_STOP_CHECKER_PATCHED_FILE_SHA256}" \
+  --build-arg "XGRAMMAR_BACKEND_PATCHED_FILE_SHA256=${XGRAMMAR_BACKEND_PATCHED_FILE_SHA256}" \
+  --build-arg "XGRAMMAR_BACKEND_UPSTREAM_FILE_SHA256=${XGRAMMAR_BACKEND_UPSTREAM_FILE_SHA256}" \
+  --build-arg "STRUCTURED_OUTPUT_BACKEND_TYPES_PATCHED_FILE_SHA256=${STRUCTURED_OUTPUT_BACKEND_TYPES_PATCHED_FILE_SHA256}" \
+  --build-arg "STRUCTURED_OUTPUT_BACKEND_TYPES_UPSTREAM_FILE_SHA256=${STRUCTURED_OUTPUT_BACKEND_TYPES_UPSTREAM_FILE_SHA256}" \
+  --build-arg "V1_OUTPUT_PROCESSOR_PATCHED_FILE_SHA256=${V1_OUTPUT_PROCESSOR_PATCHED_FILE_SHA256}" \
+  --build-arg "V1_OUTPUT_PROCESSOR_UPSTREAM_FILE_SHA256=${V1_OUTPUT_PROCESSOR_UPSTREAM_FILE_SHA256}" \
+  --build-arg "V1_DETOKENIZER_PATCHED_FILE_SHA256=${V1_DETOKENIZER_PATCHED_FILE_SHA256}" \
+  --build-arg "V1_DETOKENIZER_UPSTREAM_FILE_SHA256=${V1_DETOKENIZER_UPSTREAM_FILE_SHA256}" \
+  --build-arg "V1_SCHEDULER_PATCHED_FILE_SHA256=${V1_SCHEDULER_PATCHED_FILE_SHA256}" \
+  --build-arg "V1_SCHEDULER_UPSTREAM_FILE_SHA256=${V1_SCHEDULER_UPSTREAM_FILE_SHA256}" \
   --build-arg "ANTHROPIC_API_ROUTER_PATCHED_FILE_SHA256=${ANTHROPIC_API_ROUTER_PATCHED_FILE_SHA256}" \
   --build-arg "CHAT_SERVING_PATCHED_FILE_SHA256=${CHAT_SERVING_PATCHED_FILE_SHA256}" \
   --build-arg "RESPONSES_CONTEXT_PATCHED_FILE_SHA256=${RESPONSES_CONTEXT_PATCHED_FILE_SHA256}" \
@@ -892,6 +938,7 @@ docker buildx build --progress=plain \
   --build-arg "MISTRAL_PARSER_UPSTREAM_FILE_SHA256=${MISTRAL_PARSER_UPSTREAM_FILE_SHA256}" \
   --build-arg "MISTRAL_PARSER_PATCHED_FILE_SHA256=${MISTRAL_PARSER_PATCHED_FILE_SHA256}" \
   --build-arg "PHASE_AWARE_PARSER_TERMINALS_PATCH_DIFF_SHA256=${PHASE_AWARE_PARSER_TERMINALS_PATCH_DIFF_SHA256}" \
+  --build-arg "TOOL_OUTPUT_COMPLETION_PATCH_DIFF_SHA256=${TOOL_OUTPUT_COMPLETION_PATCH_DIFF_SHA256}" \
   --build-arg "INPUT_STREAM_AGENT_IDENTITY_PATCH_DIFF_SHA256=${INPUT_STREAM_AGENT_IDENTITY_PATCH_DIFF_SHA256}" \
   --build-arg "ASYNC_LLM_UPSTREAM_FILE_SHA256=${ASYNC_LLM_UPSTREAM_FILE_SHA256}" \
   --build-arg "ASYNC_LLM_PATCHED_FILE_SHA256=${ASYNC_LLM_PATCHED_FILE_SHA256}" \
@@ -1017,6 +1064,12 @@ actual_installed_report="$(
     /usr/local/lib/python3.12/dist-packages/vllm/v1/structured_output/__init__.py \
     /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/anthropic/api_router.py \
     /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/chat_completion/serving.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/v1/structured_output/stop_checker.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/v1/structured_output/backend_xgrammar.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/v1/structured_output/backend_types.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/output_processor.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/detokenizer.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/v1/core/sched/scheduler.py \
     /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/async_llm.py \
     /usr/local/lib/python3.12/dist-packages/vllm/parser/gemma4.py \
     /usr/local/lib/python3.12/dist-packages/vllm/parser/glm47_moe.py \
@@ -1066,6 +1119,12 @@ expected_installed_report="$(printf '%s  %s\n' \
   "${STRUCTURED_OUTPUT_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/structured_output/__init__.py \
   "${ANTHROPIC_API_ROUTER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/anthropic/api_router.py \
   "${CHAT_SERVING_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/chat_completion/serving.py \
+  "${STRUCTURAL_TAG_STOP_CHECKER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/structured_output/stop_checker.py \
+  "${XGRAMMAR_BACKEND_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/structured_output/backend_xgrammar.py \
+  "${STRUCTURED_OUTPUT_BACKEND_TYPES_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/structured_output/backend_types.py \
+  "${V1_OUTPUT_PROCESSOR_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/output_processor.py \
+  "${V1_DETOKENIZER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/detokenizer.py \
+  "${V1_SCHEDULER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/core/sched/scheduler.py \
   "${ASYNC_LLM_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/async_llm.py \
   "${GEMMA4_PARSER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/gemma4.py \
   "${GLM47_PARSER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/glm47_moe.py \
