@@ -8,6 +8,9 @@ EXPECTED_STATUS=$' M tests/config/test_config_utils.py
  M tests/entrypoints/anthropic/test_anthropic_messages_conversion.py
  M tests/entrypoints/openai/responses/test_responses_utils.py
  M tests/entrypoints/openai/responses/test_serving_responses.py
+ M tests/entrypoints/openai/test_render_token_offsets.py
+ M tests/entrypoints/scale_out/token_in_token_out/test_generate_stream.py
+ M tests/entrypoints/scale_out/token_in_token_out/test_protocol.py
  M tests/entrypoints/serve/exception_handling/test_validation_exception_handler.py
  M tests/entrypoints/serve/utils/test_api_utils.py
  M tests/entrypoints/unit_tests/test_chat_utils.py
@@ -191,6 +194,7 @@ PHASE_BUDGET_PATCH_FILE="${PROJECT_DIR}/patches/vllm-qwen38-separate-final-respo
 IMPLICIT_TOOL_GRAMMAR_PATCH_FILE="${PROJECT_DIR}/patches/vllm-qwen-implicit-tool-grammar-boundary.patch"
 QWEN_LANGUAGE_PATCH_FILE="${PROJECT_DIR}/patches/vllm-qwen-exact-tool-language.patch"
 PNG_SOURCE_PATCH_FILE="${PROJECT_DIR}/patches/vllm-png-source-admission.patch"
+SAMPLING_RESOLUTION_PATCH_FILE="${PROJECT_DIR}/patches/vllm-generation-sampling-resolution.patch"
 ANTHROPIC_TERMINAL_PATCH_FILE="${PROJECT_DIR}/patches/vllm-anthropic-terminal-metadata.patch"
 RESPONSES_IDENTITY_PATCH_FILE="${PROJECT_DIR}/patches/vllm-responses-stream-identity.patch"
 RESPONSES_HISTORY_PATCH_FILE="${PROJECT_DIR}/patches/vllm-responses-history-integrity.patch"
@@ -357,6 +361,7 @@ printf '%s  %s\n' \
   "${RESPONSES_HISTORY_PATCH_DIFF_SHA256}" "${RESPONSES_HISTORY_PATCH_FILE}" \
   "${RESPONSES_IDENTITY_PATCH_DIFF_SHA256}" "${RESPONSES_IDENTITY_PATCH_FILE}" \
   "${ANTHROPIC_TERMINAL_PATCH_DIFF_SHA256}" "${ANTHROPIC_TERMINAL_PATCH_FILE}" \
+  "${SAMPLING_RESOLUTION_PATCH_DIFF_SHA256}" "${SAMPLING_RESOLUTION_PATCH_FILE}" \
   "${TOOL_TRUNCATION_PATCH_DIFF_SHA256}" "${TOOL_TRUNCATION_PATCH_FILE}" \
   "${VISION_RUNTIME_PATCH_DIFF_SHA256}" "${VISION_RUNTIME_PATCH_FILE}" \
   "${NUMERICAL_AUDITS_PATCH_DIFF_SHA256}" "${NUMERICAL_AUDITS_PATCH_FILE}" \
@@ -606,7 +611,7 @@ while IFS= read -r status_line; do
       ;;
   esac
 done <<<"${EXPECTED_STATUS}"
-for unit in tool_output_parser_unit vision_contract_unit reasoning_usage_unit shared_prefix_cache_unit; do
+for unit in tool_output_parser_unit vision_contract_unit reasoning_usage_unit shared_prefix_cache_unit phase_budget_unit; do
   docker run --rm --network none --read-only --user "$(id -u):$(id -g)" \
     --tmpfs /tmp:rw,nodev,nosuid,size=256m \
     --env PYTHONDONTWRITEBYTECODE=1 --env CUDA_VISIBLE_DEVICES= \
@@ -776,6 +781,7 @@ docker buildx build --progress=plain \
   --build-arg "RESPONSES_HISTORY_PATCH_DIFF_SHA256=${RESPONSES_HISTORY_PATCH_DIFF_SHA256}" \
   --build-arg "RESPONSES_IDENTITY_PATCH_DIFF_SHA256=${RESPONSES_IDENTITY_PATCH_DIFF_SHA256}" \
   --build-arg "ANTHROPIC_TERMINAL_PATCH_DIFF_SHA256=${ANTHROPIC_TERMINAL_PATCH_DIFF_SHA256}" \
+  --build-arg "SAMPLING_RESOLUTION_PATCH_DIFF_SHA256=${SAMPLING_RESOLUTION_PATCH_DIFF_SHA256}" \
   --build-arg "TOOL_TRUNCATION_PATCH_DIFF_SHA256=${TOOL_TRUNCATION_PATCH_DIFF_SHA256}" \
   --build-arg "VISION_RUNTIME_PATCH_DIFF_SHA256=${VISION_RUNTIME_PATCH_DIFF_SHA256}" \
   --build-arg "NUMERICAL_AUDITS_PATCH_DIFF_SHA256=${NUMERICAL_AUDITS_PATCH_DIFF_SHA256}" \

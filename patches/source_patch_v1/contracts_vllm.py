@@ -357,10 +357,21 @@ def _validate_defaults_after(state: State) -> None:
         'default_sampling_params.get("presence_penalty", 0.0)',
         "thinking_token_budget = default_sampling_params.get(",
         '"thinking_token_budget"',
-        "min(\n                    final_response_token_budget, server_final_response_budget",
         "final_response_token_budget=final_response_token_budget",
     ):
         _require(needle in sampling, f"{label}: sampling default/clamp missing {needle!r}")
+    if "resolve_final_response_token_budget(" in sampling:
+        _require_in_symbol(state, "vllm/sampling_params.py",
+            "resolve_final_response_token_budget", (
+                "validate_final_response_token_budget(requested)",
+                "validate_final_response_token_budget(server_budget)",
+                "server_budget if requested is None else min(requested, server_budget)",
+            ), label=label)
+    else:
+        _require(
+            "min(\n                    final_response_token_budget, server_final_response_budget" in sampling,
+            f"{label}: missing final-response ceiling",
+        )
     _require(
         "max(\n                    final_response_token_budget" not in sampling,
         f"{label}: client can raise the server final-response ceiling",
@@ -1862,6 +1873,73 @@ def _validate_anthropic_terminal_after(state: State) -> None:
         }, label=label)
 
 
+def _validate_sampling_resolution_before(state: State) -> None:
+    label = "generation sampling resolution precondition"
+    require_text(state,
+        "vllm/entrypoints/scale_out/token_in_token_out/protocol.py",
+        "def is_sampling_param_provided(", label=label)
+    require_text(state, "vllm/entrypoints/openai/completion/protocol.py",
+        "max_tokens: int | None = 16", label=label)
+
+
+def _validate_sampling_resolution_after(state: State) -> None:
+    label = "generation sampling resolution result"
+    protocol = "vllm/entrypoints/scale_out/token_in_token_out/protocol.py"
+    serving = "vllm/entrypoints/scale_out/token_in_token_out/serving.py"
+    _require_in_symbol(state, protocol,
+        "SamplingParamsInput.__get_pydantic_core_schema__", (
+            "get_type_hints(SamplingParams)", "required=False",
+            "isinstance(value, SamplingParams)",
+            "return {name: getattr(value, name) for name in fields}",
+            'excluded = {"skip_clone", "output_text_buffer_length"}',
+            'extra_behavior="forbid"',
+        ), label=label)
+    _require_in_symbol(state, protocol, "GenerateRequest.to_sampling_params", (
+        "deepcopy({**default_sampling_params, **self.sampling_params})",
+        "resolve_final_response_token_budget(",
+        'extra_args["kv_scope"] = self.kv_scope',
+        "return SamplingParams(**values)",
+    ), label=label)
+    source = _symbol_source(state, serving, "ServingTokens.serve_tokens", label=label)
+    _require_ordered(source, (
+        "max_tokens = get_max_tokens(",
+        "sampling_params = request.to_sampling_params(",
+        "sampling_params.n > max_num_seqs",
+        "msgspec.msgpack.encode(sampling_params)",
+        "self.engine_client.generate(",
+    ), label=label, location="ServingTokens.serve_tokens")
+    for path in (protocol, serving):
+        for obsolete in ("is_sampling_param_provided", "_sampling_params_provided_keys"):
+            forbid_text(state, path, obsolete, label=label)
+    for surface, request_type in (
+        ("chat_completion", "ChatCompletionRequest"),
+        ("completion", "CompletionRequest"),
+        ("responses", "ResponsesRequest"),
+    ):
+        path = f"vllm/entrypoints/openai/{surface}/protocol.py"
+        _require_in_symbol(state, path, f"{request_type}.to_sampling_params", (
+            "resolve_final_response_token_budget(",
+            'default_sampling_params.get("presence_penalty", 0.0)',
+            '"thinking_token_budget"',
+            "final_response_token_budget=final_response_token_budget",
+        ), label=label)
+    completion = "vllm/entrypoints/openai/completion/protocol.py"
+    require_text(state, completion, "max_tokens: int | None = None", label=label)
+    forbid_text(state, completion, "normalize_null_max_tokens", label=label)
+    for surface in ("chat_completion", "completion"):
+        require_text(state, f"vllm/entrypoints/openai/{surface}/protocol.py",
+            "presence_penalty: float | None = None", label=label)
+    require_text(state, "vllm/entrypoints/openai/responses/protocol.py",
+        'min_p=default_sampling_params.get("min_p", 0.0)', label=label)
+    require_python_symbols(state,
+        "tests/entrypoints/scale_out/token_in_token_out/test_protocol.py", {
+            "test_omitted_settings_remain_omitted_until_resolution": None,
+            "test_configured_sampling_policy_reaches_every_generation_surface": None,
+            "test_rendered_requests_keep_resolved_sampling_through_generate_json": None,
+            "test_serving_resolves_once_before_dispatch_on_both_transports": None,
+        }, label=label)
+
+
 def validate_final(state: State) -> None:
     """Reassert every durable semantic invariant on the complete tree.
 
@@ -1877,6 +1955,22 @@ def validate_final(state: State) -> None:
 
 
 CONTRACTS: Mapping[str, SemanticContract] = {
+    "generation-sampling-resolution": SemanticContract(
+        rationale=(
+            "Constructing engine settings before model defaults and prompt length "
+            "rejects valid input against a temporary 16-token cap and loses omitted "
+            "settings. Serializing default-valued engine fields loses explicit "
+            "request semantics. Preserve supplied values until resolution, then "
+            "construct one fresh engine request with consistent server defaults."
+        ),
+        removal_condition=(
+            "Remove when every generation surface resolves configured sampling "
+            "and phase ceilings before engine validation, and render-to-generate "
+            "serialization preserves all resolved values including neutral ones."
+        ),
+        validate_before=_validate_sampling_resolution_before,
+        validate_after=_validate_sampling_resolution_after,
+    ),
     "anthropic-terminal-metadata": SemanticContract(
         rationale=(
             "Mapping only Chat finish_reason loses matched stop sequences and "

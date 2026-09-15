@@ -144,4 +144,41 @@ for invalid in (0, -2, True, 1.5):
     else:
         raise AssertionError(f"invalid final response budget accepted: {invalid!r}")
 
+# Every generation protocol resolves the configured sampling policy before
+# constructing the engine request. Render output preserves explicit values.
+from vllm.entrypoints.openai.completion.protocol import CompletionRequest
+from vllm.entrypoints.scale_out.token_in_token_out.protocol import GenerateRequest
+
+completion = CompletionRequest(model="qwen3.8", prompt="test", kv_scope="agent")
+assert completion.max_tokens is None
+completion_params = completion.to_sampling_params(200_000, defaults)
+assert completion_params.thinking_token_budget == 262_144
+assert completion_params.final_response_token_budget == 131_072
+assert completion_params.top_p == 0.95 and completion_params.top_k == 20
+
+supplied = GenerateRequest.model_validate({
+    "token_ids": [1, 2, 3], "kv_scope": "agent", "sampling_params": {"min_tokens": 64},
+})
+resolved = supplied.to_sampling_params(200_000, defaults)
+assert resolved.max_tokens == 200_000 and resolved.min_tokens == 64
+assert resolved.top_p == 0.95 and resolved.top_k == 20
+assert resolved.final_response_token_budget == 131_072
+assert supplied.sampling_params == {"min_tokens": 64}
+
+rendered = GenerateRequest(
+    token_ids=[1, 2, 3], kv_scope="agent", sampling_params=SamplingParams(max_tokens=16),
+)
+restored = GenerateRequest.model_validate_json(rendered.model_dump_json())
+assert restored.sampling_params["max_tokens"] == 16
+resolved = restored.to_sampling_params(16, defaults)
+assert resolved.max_tokens == 16 and resolved.top_p == 1.0 and resolved.top_k == 0
+assert resolved.final_response_token_budget == 131_072
+assert resolved.extra_args["kv_scope"] == "agent"
+
+policy = {**defaults, "presence_penalty": 0.3, "min_p": 0.01}
+for request in (chat_request(), responses_request(), completion, supplied):
+    params = request.to_sampling_params(200_000, policy)
+    for key, value in policy.items():
+        assert getattr(params, key) == value, (type(request).__name__, key)
+
 print("phase-budget-unit: PASS")

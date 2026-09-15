@@ -1,0 +1,933 @@
+diff --git a/tests/entrypoints/openai/test_render_token_offsets.py b/tests/entrypoints/openai/test_render_token_offsets.py
+--- a/tests/entrypoints/openai/test_render_token_offsets.py
++++ b/tests/entrypoints/openai/test_render_token_offsets.py
+@@ -72,9 +72,6 @@
+     )
+     dumped = req.model_dump()
+     assert dumped["token_offsets"] == [(0, 1), (1, 3)]
+-    # Re-validate from the dumped dict (sampling_params doesn't round-trip
+-    # cleanly via dump, so re-inject a fresh instance).
+-    again = GenerateRequest.model_validate(
+-        {**dumped, "sampling_params": SamplingParams()}
+-    )
++    again = GenerateRequest.model_validate(dumped)
+     assert again.token_offsets == [(0, 1), (1, 3)]
++    assert again.sampling_params == req.sampling_params
+diff --git a/tests/entrypoints/scale_out/token_in_token_out/test_generate_stream.py b/tests/entrypoints/scale_out/token_in_token_out/test_generate_stream.py
+--- a/tests/entrypoints/scale_out/token_in_token_out/test_generate_stream.py
++++ b/tests/entrypoints/scale_out/token_in_token_out/test_generate_stream.py
+@@ -19,7 +19,6 @@
+ from vllm.entrypoints.scale_out.token_in_token_out.serving import ServingTokens
+ from vllm.logprobs import Logprob
+ from vllm.outputs import CompletionOutput, RequestOutput
+-from vllm.renderers import renderer_from_config
+ from vllm.renderers.online_renderer import OnlineRenderer
+ from vllm.sampling_params import SamplingParams
+ from vllm.v1.engine.async_llm import AsyncLLM
+@@ -79,12 +78,6 @@
+     model_config: MockModelConfig
+     parallel_config: MockParallelConfig
+     scheduler_config: MockSchedulerConfig = field(default_factory=MockSchedulerConfig)
+-
+-
+-def _build_renderer(model_config: MockModelConfig):
+-    return renderer_from_config(
+-        MockVllmConfig(model_config, parallel_config=MockParallelConfig()),
+-    )
+ 
+ 
+ def _build_serving_tokens(engine: AsyncLLM, **kwargs) -> ServingTokens:
+@@ -158,7 +151,9 @@
+         engine.model_config, parallel_config=MockParallelConfig()
+     )
+     engine.input_processor = MagicMock()
+-    engine.renderer = _build_renderer(engine.model_config)
++    # The preprocessing seam is stubbed below; these stream tests consume
++    # token IDs and do not need model configuration or a tokenizer download.
++    engine.renderer = MagicMock()
+     return engine
+ 
+ 
+diff --git a/tests/entrypoints/scale_out/token_in_token_out/test_protocol.py b/tests/entrypoints/scale_out/token_in_token_out/test_protocol.py
+--- a/tests/entrypoints/scale_out/token_in_token_out/test_protocol.py
++++ b/tests/entrypoints/scale_out/token_in_token_out/test_protocol.py
+@@ -1,70 +1,336 @@
+ # SPDX-License-Identifier: Apache-2.0
+ # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
+-"""Unit tests for the token_in_token_out request/response protocol.
+-
+-These tests intentionally avoid spinning up a server — they exercise the
+-pydantic validators on ``GenerateRequest`` directly so they run fast and
+-fail loudly if the validator semantics ever drift.
+-"""
++"""Request defaults are resolved before engine validation on every surface."""
+ 
+ import json
+ 
++import pytest
++from pydantic import ValidationError
++
++from vllm.entrypoints.anthropic.protocol import AnthropicMessagesRequest
++from vllm.entrypoints.anthropic.serving import AnthropicServingMessages
++from vllm.entrypoints.openai.chat_completion.protocol import ChatCompletionRequest
++from vllm.entrypoints.openai.completion.protocol import CompletionRequest
++from vllm.entrypoints.openai.responses.protocol import ResponsesRequest
+ from vllm.entrypoints.scale_out.token_in_token_out.protocol import GenerateRequest
++from vllm.exceptions import VLLMValidationError
+ from vllm.sampling_params import SamplingParams
+ 
+-
+-def _base_payload() -> dict:
+-    return {"token_ids": [1, 2, 3], "sampling_params": {}}
+-
+-
+-def test_omitted_max_tokens_is_not_provided():
+-    """Body without ``max_tokens`` must surface as 'not provided' so the
+-    server can apply its own default instead of the dataclass 16."""
+-    req = GenerateRequest.model_validate(_base_payload())
+-    # SamplingParams' dataclass default leaks through the parsed instance —
+-    # this is exactly the bug the server-side defaulting works around.
+-    assert req.sampling_params.max_tokens == 16
+-    assert not req.is_sampling_param_provided("max_tokens")
+-
+-
+-def test_explicit_max_tokens_is_provided():
+-    """Even when the client picks the same value as the dataclass default,
+-    it must register as explicitly set so the server won't override it."""
+-    payload = _base_payload()
+-    payload["sampling_params"] = {"max_tokens": 16}
+-    req = GenerateRequest.model_validate(payload)
+-    assert req.sampling_params.max_tokens == 16
+-    assert req.is_sampling_param_provided("max_tokens")
+-
+-    payload["sampling_params"] = {"max_tokens": 256}
+-    req = GenerateRequest.model_validate(payload)
+-    assert req.sampling_params.max_tokens == 256
+-    assert req.is_sampling_param_provided("max_tokens")
+-
+-
+-def test_other_fields_tracked_independently():
+-    payload = _base_payload()
+-    payload["sampling_params"] = {"temperature": 0.0}
+-    req = GenerateRequest.model_validate(payload)
+-    assert not req.is_sampling_param_provided("max_tokens")
+-    assert req.is_sampling_param_provided("temperature")
+-
+-
+-def test_json_roundtrip_preserves_provided_keys():
+-    payload = _base_payload()
+-    payload["sampling_params"] = {"temperature": 0.5}
+-    req = GenerateRequest.model_validate_json(json.dumps(payload))
+-    assert not req.is_sampling_param_provided("max_tokens")
+-    assert req.is_sampling_param_provided("temperature")
+-
+-
+-def test_internal_instance_construction_treats_all_as_provided():
+-    """When internal callers build ``GenerateRequest`` from a pre-resolved
+-    ``SamplingParams`` instance, every field is considered explicitly set
+-    so server-side defaulting can't clobber values resolved upstream."""
+-    sp = SamplingParams(max_tokens=500, temperature=0.0)
+-    req = GenerateRequest(token_ids=[1, 2, 3], sampling_params=sp)
+-    assert req.is_sampling_param_provided("max_tokens")
+-    assert req.is_sampling_param_provided("temperature")
+-    # And keys we never touched should also count as provided in this path.
+-    assert req.is_sampling_param_provided("top_p")
++DEFAULTS = {
++    "temperature": 0.8, "top_p": 0.95, "top_k": 20, "min_p": 0.01,
++    "presence_penalty": 0.3, "repetition_penalty": 1.1,
++    "thinking_token_budget": 200, "final_response_token_budget": 100,
++}
++
++
++def generate(settings):
++    return GenerateRequest.model_validate({
++        "token_ids": [1, 2, 3], "sampling_params": settings, "kv_scope": "agent",
++    })
++
++
++def test_omitted_settings_remain_omitted_until_resolution():
++    request = generate({"min_tokens": 64})
++    assert json.loads(request.model_dump_json())["sampling_params"] == {"min_tokens": 64}
++    resolved = request.to_sampling_params(509, DEFAULTS)
++    assert resolved.max_tokens == 509 and resolved.min_tokens == 64
++    for key, value in DEFAULTS.items():
++        assert getattr(resolved, key) == value
++    assert resolved.extra_args["kv_scope"] == "agent"
++    assert request.sampling_params == {"min_tokens": 64}
++
++
++def test_explicit_neutral_values_survive_json_transport():
++    settings = {
++        "max_tokens": 16, "temperature": 1.0, "top_p": 1.0, "top_k": 0,
++        "min_p": 0.0, "presence_penalty": 0.0, "repetition_penalty": 1.0,
++        "thinking_token_budget": None,
++    }
++    request = GenerateRequest.model_validate_json(generate(settings).model_dump_json())
++    assert request.sampling_params == settings
++    resolved = request.to_sampling_params(16, DEFAULTS)
++    for key, value in settings.items():
++        assert getattr(resolved, key) == value
++    assert resolved.final_response_token_budget == 100
++
++
++def test_rendered_params_keep_default_valued_settings_after_serialization():
++    source = SamplingParams(max_tokens=16, thinking_token_budget=None)
++    rendered = GenerateRequest(token_ids=[1, 2, 3], sampling_params=source, kv_scope="agent")
++    serialized = json.loads(rendered.model_dump_json())
++    assert serialized["sampling_params"]["max_tokens"] == 16
++    assert serialized["sampling_params"]["temperature"] == 1.0
++    assert serialized["sampling_params"]["top_p"] == 1.0
++    assert serialized["sampling_params"]["thinking_token_budget"] is None
++    assert "output_text_buffer_length" not in serialized["sampling_params"]
++    assert "skip_clone" not in serialized["sampling_params"]
++    request = GenerateRequest.model_validate(serialized)
++    resolved = request.to_sampling_params(16, DEFAULTS)
++    assert resolved.max_tokens == source.max_tokens
++    assert resolved.temperature == source.temperature
++    assert resolved.top_p == source.top_p
++    assert resolved.thinking_token_budget is None
++    assert resolved.final_response_token_budget == 100
++    assert source.final_response_token_budget is None
++    assert source.extra_args is None
++
++
++@pytest.mark.parametrize("supplied, expected", [(None, 100), (50, 50), (500, 100)])
++@pytest.mark.parametrize("surface", ["chat", "completion", "responses", "generate"])
++def test_every_surface_applies_the_same_final_answer_ceiling(surface, supplied, expected):
++    common = {"final_response_token_budget": supplied, "kv_scope": "agent"}
++    if surface == "chat":
++        request = ChatCompletionRequest(model="m", messages=[{"role": "user", "content": "hi"}], **common)
++        params = request.to_sampling_params(509, DEFAULTS)
++    elif surface == "completion":
++        params = CompletionRequest(model="m", prompt="hi", **common).to_sampling_params(509, DEFAULTS)
++    elif surface == "responses":
++        params = ResponsesRequest(model="m", input="hi", **common).to_sampling_params(509, DEFAULTS)
++    else:
++        params = generate({"final_response_token_budget": supplied}).to_sampling_params(509, DEFAULTS)
++    assert params.final_response_token_budget == expected
++
++
++def test_anthropic_inherits_the_server_final_answer_ceiling():
++    request = AnthropicMessagesRequest(
++        model="m", messages=[{"role": "user", "content": "hi"}],
++        max_tokens=509, kv_scope="agent",
++    )
++    chat = AnthropicServingMessages._convert_anthropic_to_openai_request(request)
++    assert chat.to_sampling_params(509, DEFAULTS).final_response_token_budget == 100
++
++
++@pytest.mark.parametrize("thinking", [None, -1, 0, 50])
++def test_completion_and_generate_preserve_explicit_thinking_budget(thinking):
++    completion = CompletionRequest(model="m", prompt="hi", thinking_token_budget=thinking)
++    expected = None if thinking == -1 else thinking
++    assert completion.to_sampling_params(509, DEFAULTS).thinking_token_budget == expected
++    assert generate({"thinking_token_budget": thinking}).to_sampling_params(509, DEFAULTS).thinking_token_budget == expected
++
++
++def test_completion_uses_model_defaults_when_settings_are_omitted():
++    request = CompletionRequest(model="m", prompt="hi")
++    assert request.max_tokens is None
++    params = request.to_sampling_params(509, DEFAULTS)
++    for key, value in DEFAULTS.items():
++        assert getattr(params, key) == value
++
++
++@pytest.mark.parametrize("surface", ["chat", "completion", "responses", "anthropic", "generate"])
++def test_configured_sampling_policy_reaches_every_generation_surface(surface):
++    if surface == "chat":
++        request = ChatCompletionRequest(model="m", messages=[{"role": "user", "content": "hi"}])
++    elif surface == "completion":
++        request = CompletionRequest(model="m", prompt="hi")
++    elif surface == "responses":
++        request = ResponsesRequest(model="m", input="hi")
++    elif surface == "anthropic":
++        request = AnthropicServingMessages._convert_anthropic_to_openai_request(
++            AnthropicMessagesRequest(model="m", messages=[{"role": "user", "content": "hi"}], max_tokens=509)
++        )
++    else:
++        request = generate({})
++    params = request.to_sampling_params(509, DEFAULTS)
++    for key, value in DEFAULTS.items():
++        assert getattr(params, key) == value, (surface, key)
++
++
++@pytest.mark.parametrize("surface", ["chat", "completion", "responses", "generate"])
++def test_explicit_presence_neutral_value_overrides_model_default(surface):
++    if surface == "chat":
++        request = ChatCompletionRequest(model="m", messages=[{"role": "user", "content": "hi"}], presence_penalty=0.0)
++    elif surface == "completion":
++        request = CompletionRequest(model="m", prompt="hi", presence_penalty=0.0)
++    elif surface == "responses":
++        request = ResponsesRequest(model="m", input="hi", presence_penalty=0.0)
++    else:
++        request = generate({"presence_penalty": 0.0})
++    assert request.to_sampling_params(509, DEFAULTS).presence_penalty == 0.0
++
++
++def test_validation_uses_resolved_window_and_greedy_mode():
++    request = generate({"min_tokens": 64})
++    with pytest.raises(VLLMValidationError):
++        request.to_sampling_params(32, DEFAULTS)
++    params = generate({"temperature": 0.0}).to_sampling_params(509, DEFAULTS)
++    assert params.temperature == 0.0
++    assert (params.top_p, params.top_k, params.min_p) == (1.0, 0, 0.0)
++
++
++@pytest.mark.parametrize("key", ["_eos_token_id", "skip_clone", "output_text_buffer_length", "unknown"])
++def test_engine_internal_fields_are_not_request_settings(key):
++    with pytest.raises(ValidationError):
++        generate({key: 1})
++
++
++def test_stop_ids_and_transport_metadata_survive_resolution_without_mutation():
++    original = {"stop_token_ids": [7, 8], "extra_args": {"custom": "value"}}
++    request = generate(original)
++    request.kv_transfer_params = {"remote": "kv"}
++    request.ec_transfer_params = {"remote": "encoder"}
++    defaults = {**DEFAULTS, "stop_token_ids": [8, 9]}
++    params = request.to_sampling_params(509, defaults)
++    assert params.stop_token_ids == [7, 8, 9]
++    assert params.extra_args == {
++        "custom": "value", "kv_scope": "agent", "kv_transfer_params": {"remote": "kv"},
++        "ec_transfer_params": {"remote": "encoder"},
++    }
++    assert original["extra_args"] == {"custom": "value"}
++    assert defaults["stop_token_ids"] == [8, 9]
++
++
++@pytest.mark.asyncio
++@pytest.mark.parametrize("stream", [False, True])
++@pytest.mark.parametrize("settings, expected_max", [
++    ({"min_tokens": 64}, 509),
++    ({"max_tokens": 16, "temperature": 1.0, "top_p": 1.0, "top_k": 0}, 16),
++    ({"max_tokens": None, "thinking_token_budget": None}, 509),
++])
++async def test_serving_resolves_once_before_dispatch_on_both_transports(
++    stream, settings, expected_max,
++):
++    from types import SimpleNamespace
++    from unittest.mock import AsyncMock, MagicMock
++
++    from vllm.entrypoints.scale_out.token_in_token_out.serving import ServingTokens
++    from vllm.outputs import CompletionOutput, RequestOutput
++    from vllm.sampling_params import RequestOutputKind
++
++    serving = object.__new__(ServingTokens)
++    serving.model_config = SimpleNamespace(max_model_len=512, is_encoder_decoder=False)
++    serving.default_sampling_params = dict(DEFAULTS)
++    serving.override_max_tokens = None
++    serving.force_no_detokenize = False
++    serving.enable_prompt_tokens_details = False
++    serving.enable_log_outputs = False
++    serving._check_model = AsyncMock(return_value=None)
++    serving._maybe_get_adapters = MagicMock(return_value=None)
++    serving.models = SimpleNamespace(model_name=lambda _adapter: "model")
++    serving._base_request_id = MagicMock(return_value="request")
++    serving._log_inputs = MagicMock()
++    serving._get_data_parallel_rank = MagicMock(return_value=None)
++    serving._get_session_id_from_headers = MagicMock(return_value=None)
++    serving.online_renderer = SimpleNamespace(preprocess_completion=AsyncMock(
++        return_value=[{"type": "token", "prompt_token_ids": [1, 2, 3]}],
++    ))
++    captured = []
++
++    async def engine_generate(prompt, params, request_id, **kwargs):
++        captured.append(params)
++        yield RequestOutput(
++            request_id=request_id, prompt=None, prompt_token_ids=[1, 2, 3],
++            prompt_logprobs=None, finished=True,
++            outputs=[CompletionOutput(
++                index=0, text="answer", token_ids=[4], cumulative_logprob=None,
++                logprobs=None, finish_reason="stop",
++            )],
++        )
++
++    serving.engine_client = SimpleNamespace(
++        errored=False, generate=engine_generate,
++        vllm_config=SimpleNamespace(scheduler_config=SimpleNamespace(max_num_seqs=1)),
++    )
++    request = generate(settings)
++    request.stream = stream
++    before = request.model_dump_json()
++    response = await serving.serve_tokens(request)
++    if stream:
++        events = [event async for event in response]
++        assert events[-1].strip() == "data: [DONE]"
++        assert any('"finish_reason":"stop"' in event for event in events)
++    else:
++        assert response.choices[0].finish_reason == "stop"
++        assert response.choices[0].token_ids == [4]
++    assert len(captured) == 1
++    params = captured[0]
++    assert params.max_tokens == expected_max
++    assert params.final_response_token_budget == DEFAULTS["final_response_token_budget"]
++    assert params.temperature == settings.get("temperature", DEFAULTS["temperature"])
++    assert params.top_p == settings.get("top_p", DEFAULTS["top_p"])
++    assert params.top_k == settings.get("top_k", DEFAULTS["top_k"])
++    assert params.thinking_token_budget == settings.get("thinking_token_budget", 200)
++    assert params.extra_args["kv_scope"] == "agent"
++    if stream:
++        assert params.output_kind == RequestOutputKind.DELTA
++    assert request.model_dump_json() == before
++
++
++def test_resolved_nested_settings_do_not_alias_the_request():
++    request = generate({
++        "structured_outputs": {"json": {"type": "object", "properties": {}}},
++        "extra_args": {"custom": {"value": "original"}},
++    })
++    request.kv_transfer_params = {"remote": {"value": "original"}}
++    request.ec_transfer_params = {"remote": {"value": "original"}}
++    before = request.model_dump_json()
++    params = request.to_sampling_params(509, DEFAULTS)
++    params.extra_args["custom"]["value"] = "engine"
++    params.extra_args["kv_transfer_params"]["remote"]["value"] = "engine"
++    params.extra_args["ec_transfer_params"]["remote"]["value"] = "engine"
++    params.structured_outputs.json["properties"]["added"] = {"type": "string"}
++    assert request.model_dump_json() == before
++
++
++@pytest.mark.asyncio
++@pytest.mark.parametrize("surface", ["chat", "completion"])
++@pytest.mark.parametrize("requested_max, expected_max", [(None, 509), (16, 16)])
++async def test_rendered_requests_keep_resolved_sampling_through_generate_json(
++    surface, requested_max, expected_max,
++):
++    from types import SimpleNamespace
++    from unittest.mock import AsyncMock
++
++    from vllm.entrypoints.scale_out.render.serving import ServingRender
++
++    render = object.__new__(ServingRender)
++    render.model_config = SimpleNamespace(max_model_len=512, is_encoder_decoder=False)
++    render.default_sampling_params = dict(DEFAULTS)
++    render.override_max_tokens = None
++    render._check_model = AsyncMock(return_value=None)
++    prompt = {"type": "token", "prompt_token_ids": [1, 2, 3]}
++    render.online_renderer = SimpleNamespace(
++        render_chat=AsyncMock(return_value=(None, [prompt])),
++        render_completion=AsyncMock(return_value=[prompt]),
++    )
++    kwargs = {"model": "model", "max_tokens": requested_max, "temperature": 1.0,
++              "top_p": 1.0, "top_k": 0, "thinking_token_budget": None,
++              "kv_scope": "agent"}
++    if surface == "chat":
++        request = ChatCompletionRequest(messages=[{"role": "user", "content": "hi"}], **kwargs)
++        rendered = await render.render_chat_request(request)
++    else:
++        request = CompletionRequest(prompt="hi", **kwargs)
++        rendered, = await render.render_completion_request(request)
++    payload = rendered.model_dump_json()
++    incoming = GenerateRequest.model_validate_json(payload)
++    assert incoming.sampling_params["max_tokens"] == expected_max
++    params = incoming.to_sampling_params(expected_max, {**DEFAULTS, "top_p": 0.2})
++    assert params.max_tokens == expected_max
++    assert (params.temperature, params.top_p, params.top_k) == (1.0, 1.0, 0)
++    assert params.thinking_token_budget is None
++    assert params.final_response_token_budget == 100
++    assert params.extra_args["kv_scope"] == "agent"
++
++
++def test_sampling_schema_preserves_omission_and_exposes_only_request_inputs():
++    schema = GenerateRequest.model_json_schema()
++    sampling = schema["properties"]["sampling_params"]
++    assert sampling["type"] == "object"
++    assert sampling["additionalProperties"] is False
++    assert not sampling.get("required")
++    assert "default" not in sampling["properties"]["max_tokens"]
++    assert {"temperature", "top_p", "top_k", "thinking_token_budget",
++            "final_response_token_budget", "structured_outputs"} <= sampling["properties"].keys()
++    assert not {"skip_clone", "output_text_buffer_length", "_eos_token_id"} & sampling["properties"].keys()
++
++
++@pytest.mark.parametrize("value", [-2, 0, True, 1.0])
++def test_final_ceiling_rejects_invalid_supplied_values(value):
++    with pytest.raises((ValidationError, VLLMValidationError)):
++        generate({"final_response_token_budget": value})
++
++
++def test_unset_final_budget_sentinel_cannot_remove_the_server_ceiling():
++    assert generate({"final_response_token_budget": -1}).to_sampling_params(
++        509, DEFAULTS,
++    ).final_response_token_budget == 100
+diff --git a/tests/entrypoints/test_kv_scope_protocol.py b/tests/entrypoints/test_kv_scope_protocol.py
+--- a/tests/entrypoints/test_kv_scope_protocol.py
++++ b/tests/entrypoints/test_kv_scope_protocol.py
+@@ -63,7 +63,9 @@
+     GenerateRequest,
+ ]
+ 
+-_OPENAI_SURFACES = [ChatCompletionRequest, CompletionRequest, ResponsesRequest]
++_OPENAI_SURFACES = [
++    ChatCompletionRequest, CompletionRequest, ResponsesRequest, GenerateRequest,
++]
+ 
+ 
+ def _sampling_params_for(request):
+diff --git a/vllm/entrypoints/openai/chat_completion/protocol.py b/vllm/entrypoints/openai/chat_completion/protocol.py
+--- a/vllm/entrypoints/openai/chat_completion/protocol.py
++++ b/vllm/entrypoints/openai/chat_completion/protocol.py
+@@ -46,6 +46,7 @@
+ from vllm.sampling_params import (
+     BeamSearchParams,
+     FinalResponseTokenBudget,
++    resolve_final_response_token_budget,
+     RepetitionDetectionParams,
+     RequestOutputKind,
+     SamplingParams,
+@@ -228,7 +229,7 @@
+     )
+     max_completion_tokens: int | None = None
+     n: int | None = 1
+-    presence_penalty: float | None = 0.0
++    presence_penalty: float | None = None
+     response_format: AnyResponseFormat | None = None
+     seed: int | None = Field(None, ge=_INT64_MIN, le=_INT64_MAX)
+     stop: StopParam = []
+@@ -717,17 +718,10 @@
+             thinking_token_budget = default_sampling_params.get(
+                 "thinking_token_budget"
+             )
+-        final_response_token_budget = self.final_response_token_budget
+-        server_final_response_budget = default_sampling_params.get(
+-            "final_response_token_budget"
++        final_response_token_budget = resolve_final_response_token_budget(
++            self.final_response_token_budget,
++            default_sampling_params.get("final_response_token_budget"),
+         )
+-        if server_final_response_budget is not None:
+-            if final_response_token_budget is None:
+-                final_response_token_budget = server_final_response_budget
+-            else:
+-                final_response_token_budget = min(
+-                    final_response_token_budget, server_final_response_budget
+-                )
+ 
+         # Merge server-default stop_token_ids (e.g., model-specific tokens
+         # like </call> for gpt-oss) with any request-specified ones
+diff --git a/vllm/entrypoints/openai/completion/protocol.py b/vllm/entrypoints/openai/completion/protocol.py
+--- a/vllm/entrypoints/openai/completion/protocol.py
++++ b/vllm/entrypoints/openai/completion/protocol.py
+@@ -27,6 +27,8 @@
+ from vllm.renderers import TokenizeParams
+ from vllm.sampling_params import (
+     BeamSearchParams,
++    FinalResponseTokenBudget,
++    resolve_final_response_token_budget,
+     RepetitionDetectionParams,
+     RequestOutputKind,
+     SamplingParams,
+@@ -58,9 +60,9 @@
+     frequency_penalty: float | None = 0.0
+     logit_bias: dict[str, float] | None = None
+     logprobs: int | None = None
+-    max_tokens: int | None = 16
++    max_tokens: int | None = None
+     n: int = 1
+-    presence_penalty: float | None = 0.0
++    presence_penalty: float | None = None
+     seed: int | None = Field(None, ge=_INT64_MIN, le=_INT64_MAX)
+     stop: StopParam = []
+     stream: bool | None = False
+@@ -253,6 +255,8 @@
+         "can detect such behavior and terminate early, saving time and tokens.",
+     )
+ 
++    final_response_token_budget: FinalResponseTokenBudget = None
++
+     thinking_token_budget: ThinkingTokenBudget = Field(
+         default=None,
+         description=(
+@@ -333,6 +337,15 @@
+             default_sampling_params = {}
+ 
+         # Default parameters
++        if (presence_penalty := self.presence_penalty) is None:
++            presence_penalty = default_sampling_params.get("presence_penalty", 0.0)
++        thinking_token_budget = self.thinking_token_budget
++        if "thinking_token_budget" not in self.model_fields_set:
++            thinking_token_budget = default_sampling_params.get("thinking_token_budget")
++        final_response_token_budget = resolve_final_response_token_budget(
++            self.final_response_token_budget,
++            default_sampling_params.get("final_response_token_budget"),
++        )
+         if (repetition_penalty := self.repetition_penalty) is None:
+             repetition_penalty = default_sampling_params.get(
+                 "repetition_penalty",
+@@ -384,7 +397,7 @@
+             extra_args["kv_scope"] = self.kv_scope
+         return SamplingParams.from_optional(
+             n=self.n,
+-            presence_penalty=self.presence_penalty,
++            presence_penalty=presence_penalty,
+             frequency_penalty=self.frequency_penalty,
+             repetition_penalty=repetition_penalty,
+             temperature=temperature,
+@@ -414,17 +427,10 @@
+             extra_args=extra_args or None,
+             skip_clone=True,  # Created fresh per request, safe to skip clone
+             repetition_detection=self.repetition_detection,
+-            thinking_token_budget=self.thinking_token_budget,
++            thinking_token_budget=thinking_token_budget,
++            final_response_token_budget=final_response_token_budget,
+             routed_experts_prompt_start=self.routed_experts_prompt_start,
+         )
+-
+-    @model_validator(mode="before")
+-    @classmethod
+-    def normalize_null_max_tokens(cls, data):
+-        if isinstance(data, dict) and data.get("max_tokens") is None:
+-            data = data.copy()
+-            data["max_tokens"] = cls.model_fields["max_tokens"].default
+-        return data
+ 
+     @model_validator(mode="before")
+     @classmethod
+diff --git a/vllm/entrypoints/openai/responses/protocol.py b/vllm/entrypoints/openai/responses/protocol.py
+--- a/vllm/entrypoints/openai/responses/protocol.py
++++ b/vllm/entrypoints/openai/responses/protocol.py
+@@ -69,6 +69,7 @@
+ from vllm.renderers import ChatParams, TokenizeParams, merge_kwargs
+ from vllm.sampling_params import (
+     FinalResponseTokenBudget,
++    resolve_final_response_token_budget,
+     RequestOutputKind,
+     SamplingParams,
+     StructuredOutputsParams,
+@@ -464,17 +465,10 @@
+             thinking_token_budget = default_sampling_params.get(
+                 "thinking_token_budget"
+             )
+-        final_response_token_budget = self.final_response_token_budget
+-        server_final_response_budget = default_sampling_params.get(
+-            "final_response_token_budget"
++        final_response_token_budget = resolve_final_response_token_budget(
++            self.final_response_token_budget,
++            default_sampling_params.get("final_response_token_budget"),
+         )
+-        if server_final_response_budget is not None:
+-            if final_response_token_budget is None:
+-                final_response_token_budget = server_final_response_budget
+-            else:
+-                final_response_token_budget = min(
+-                    final_response_token_budget, server_final_response_budget
+-                )
+ 
+         stop = self.stop if self.stop else []
+         if isinstance(stop, str):
+@@ -492,6 +486,7 @@
+             temperature=temperature,
+             top_p=top_p,
+             top_k=top_k,
++            min_p=default_sampling_params.get("min_p", 0.0),
+             max_tokens=max_tokens,
+             logprobs=self.top_logprobs if self.is_include_output_logprobs() else None,
+             stop=stop,
+diff --git a/vllm/entrypoints/scale_out/token_in_token_out/protocol.py b/vllm/entrypoints/scale_out/token_in_token_out/protocol.py
+--- a/vllm/entrypoints/scale_out/token_in_token_out/protocol.py
++++ b/vllm/entrypoints/scale_out/token_in_token_out/protocol.py
+@@ -1,14 +1,19 @@
+ # SPDX-License-Identifier: Apache-2.0
+ # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
+-from typing import Any, Literal, TypeAlias
++from copy import deepcopy
++from typing import Any, Literal, TypeAlias, get_type_hints
++
++import msgspec
+ 
+ from pydantic import (
+     BaseModel,
+     Field,
+-    PrivateAttr,
++    GetCoreSchemaHandler,
+     field_validator,
+     model_validator,
+ )
++
++from pydantic_core import core_schema
+ 
+ from vllm.config import ModelConfig
+ from vllm.entrypoints.openai.chat_completion.protocol import (
+@@ -23,7 +28,12 @@
+ from vllm.entrypoints.openai.engine.protocol import StreamOptions, UsageInfo
+ from vllm.logprobs import Logprob
+ from vllm.renderers import TokenizeParams
+-from vllm.sampling_params import SamplingParams
++from vllm.sampling_params import (
++    FinalResponseTokenBudget,
++    SamplingParams,
++    ThinkingTokenBudget,
++    resolve_final_response_token_budget,
++)
+ from vllm.utils import random_uuid
+ 
+ ####### Tokens IN <> Tokens OUT #######
+@@ -65,6 +75,47 @@
+     the item should be resolved from cache.  The entire field is
+     ``None`` for metadata-only (cache-hit) responses.
+     """
++
++
++class SamplingParamsInput(dict[str, Any]):
++    """Supplied settings, before model defaults and prompt length are known.
++
++    Presence is part of the request: an explicit neutral value must survive
++    serialization, and omitted values must stay omitted until resolution.
++    """
++
++    @classmethod
++    def __get_pydantic_core_schema__(
++        cls, source_type: Any, handler: GetCoreSchemaHandler,
++    ) -> core_schema.CoreSchema:
++        excluded = {"skip_clone", "output_text_buffer_length"}
++        hints = get_type_hints(SamplingParams)
++        fields = {
++            field.name: hints[field.name]
++            for field in msgspec.structs.fields(SamplingParams)
++            if not field.name.startswith("_") and field.name not in excluded
++        }
++        fields["thinking_token_budget"] = ThinkingTokenBudget
++        fields["final_response_token_budget"] = FinalResponseTokenBudget
++
++        def supplied_values(value: Any) -> Any:
++            if isinstance(value, SamplingParams):
++                # A renderer has already resolved this object. Include every
++                # public value, even those equal to the engine's defaults.
++                return {name: getattr(value, name) for name in fields}
++            return value
++
++        return core_schema.no_info_after_validator_function(
++            cls,
++            core_schema.no_info_before_validator_function(
++                supplied_values,
++                core_schema.typed_dict_schema({
++                    name: core_schema.typed_dict_field(
++                        handler.generate_schema(hint), required=False,
++                    ) for name, hint in fields.items()
++                }, extra_behavior="forbid"),
++            ),
++        )
+ 
+ 
+ class GenerateRequest(BaseModel):
+@@ -114,7 +165,7 @@
+             raise ValueError("content_parts and features are mutually exclusive")
+         return self
+ 
+-    sampling_params: SamplingParams
++    sampling_params: SamplingParamsInput
+     """The sampling parameters for the model."""
+ 
+     model: str | None = None
+@@ -167,38 +218,30 @@
+         ),
+     )
+ 
+-    # Tracks which keys the caller explicitly set inside ``sampling_params``
+-    # when the request was parsed from a JSON body. Lets the server tell
+-    # "client said max_tokens=16" from "client said nothing → dataclass
+-    # default 16" so it can apply server-side defaulting only in the latter
+-    # case. ``None`` means the request was constructed with a pre-built
+-    # ``SamplingParams`` instance (e.g. from internal callers that have
+-    # already resolved values), in which case all fields are considered set.
+-    _sampling_params_provided_keys: set[str] | None = PrivateAttr(default=None)
+-
+-    @model_validator(mode="wrap")
+-    @classmethod
+-    def _capture_sampling_params_provided_keys(cls, data: Any, handler):
+-        provided: set[str] | None = None
+-        if isinstance(data, dict):
+-            sp = data.get("sampling_params")
+-            if isinstance(sp, dict):
+-                provided = set(sp.keys())
+-        instance = handler(data)
+-        instance._sampling_params_provided_keys = provided
+-        return instance
+-
+-    def is_sampling_param_provided(self, name: str) -> bool:
+-        """Whether the caller explicitly set ``sampling_params.<name>``.
+-
+-        For requests parsed from a JSON body, this reflects the raw input
+-        dict. For requests constructed with a pre-built ``SamplingParams``
+-        instance, all fields are considered provided so server-side defaults
+-        do not clobber values already resolved upstream.
+-        """
+-        if self._sampling_params_provided_keys is None:
+-            return True
+-        return name in self._sampling_params_provided_keys
++    def to_sampling_params(
++        self, max_tokens: int, default_sampling_params: dict[str, Any],
++    ) -> SamplingParams:
++        """Resolve one fresh, validated engine request from supplied settings."""
++        values = deepcopy({**default_sampling_params, **self.sampling_params})
++        values["max_tokens"] = max_tokens
++        values["final_response_token_budget"] = resolve_final_response_token_budget(
++            self.sampling_params.get("final_response_token_budget"),
++            default_sampling_params.get("final_response_token_budget"),
++        )
++        default_stops = default_sampling_params.get("stop_token_ids")
++        if default_stops:
++            values["stop_token_ids"] = list(dict.fromkeys([
++                *(self.sampling_params.get("stop_token_ids") or []), *default_stops,
++            ]))
++        extra_args = dict(values.get("extra_args") or {})
++        if self.kv_scope is not None:
++            extra_args["kv_scope"] = self.kv_scope
++        if self.kv_transfer_params:
++            extra_args["kv_transfer_params"] = deepcopy(self.kv_transfer_params)
++        if self.ec_transfer_params:
++            extra_args["ec_transfer_params"] = deepcopy(self.ec_transfer_params)
++        values["extra_args"] = extra_args or None
++        return SamplingParams(**values)
+ 
+     def build_tok_params(self, model_config: ModelConfig) -> TokenizeParams:
+         return TokenizeParams(
+diff --git a/vllm/entrypoints/scale_out/token_in_token_out/serving.py b/vllm/entrypoints/scale_out/token_in_token_out/serving.py
+--- a/vllm/entrypoints/scale_out/token_in_token_out/serving.py
++++ b/vllm/entrypoints/scale_out/token_in_token_out/serving.py
+@@ -88,10 +88,8 @@
+                 "step for incoming requests."
+             )
+ 
+-        # Mirrors ``OpenAIServingChat`` so we can apply server-side
+-        # ``max_tokens`` defaulting when the client omits it. Without this,
+-        # ``SamplingParams.max_tokens`` falls back to its dataclass default
+-        # of 16 and silently truncates every generation.
++        # Resolve supplied settings against the same model defaults and
++        # prompt/window limits as the other generation surfaces.
+         self.default_sampling_params = self.model_config.get_diff_sampling_param()
+         mc = self.model_config
+         self.override_max_tokens = (
+@@ -128,18 +126,6 @@
+         request_metadata = RequestResponseMetadata(request_id=request_id)
+         if raw_request:
+             raw_request.state.request_metadata = request_metadata
+-
+-        sampling_params = request.sampling_params
+-        max_num_seqs = self.engine_client.vllm_config.scheduler_config.max_num_seqs
+-        if sampling_params.n > max_num_seqs:
+-            return self.create_error_response(
+-                f"sampling_params.n must be at most the server's max_num_seqs "
+-                f"({max_num_seqs}), got {sampling_params.n}."
+-            )
+-        try:
+-            msgspec.msgpack.encode(sampling_params)
+-        except (OverflowError, TypeError, ValueError) as e:
+-            return self.create_error_response(e)
+ 
+         engine_input: EngineInput
+         if request.content_parts:
+@@ -203,32 +189,31 @@
+         # Schedule the request and get the result generator.
+         result_generator: AsyncGenerator[RequestOutput, None] | None = None
+ 
+-        # Apply server-side ``max_tokens`` defaulting when the client did
+-        # not set it, matching the OpenAI-compat endpoints. ``SamplingParams``
+-        # defaults ``max_tokens`` to 16, which would otherwise silently cap
+-        # every generation that omits the field.
+-        if not request.is_sampling_param_provided("max_tokens"):
+-            sampling_params.max_tokens = get_max_tokens(
+-                max_model_len=self.model_config.max_model_len,
+-                max_tokens=None,
+-                input_length=self._extract_prompt_len(engine_input),
+-                default_sampling_params=self.default_sampling_params,
+-                override_max_tokens=self.override_max_tokens,
+-            )
++        max_tokens = get_max_tokens(
++            max_model_len=self.model_config.max_model_len,
++            max_tokens=request.sampling_params.get("max_tokens"),
++            input_length=self._extract_prompt_len(engine_input),
++            default_sampling_params=self.default_sampling_params,
++            override_max_tokens=self.override_max_tokens,
++        )
++        sampling_params = request.to_sampling_params(
++            max_tokens, self.default_sampling_params,
++        )
++        max_num_seqs = self.engine_client.vllm_config.scheduler_config.max_num_seqs
++        if sampling_params.n > max_num_seqs:
++            return self.create_error_response(
++                f"sampling_params.n must be at most the server's max_num_seqs "
++                f"({max_num_seqs}), got {sampling_params.n}."
++            )
++        try:
++            msgspec.msgpack.encode(sampling_params)
++        except (OverflowError, TypeError, ValueError) as e:
++            return self.create_error_response(e)
+ 
+         if self.force_no_detokenize:
+             sampling_params.detokenize = False
+         if request.stream:
+             sampling_params.output_kind = RequestOutputKind.DELTA
+-
+-        # Token-in-token-out embeds SamplingParams directly, so the identity
+-        # fields fold into extra_args here instead of a to_sampling_params
+-        # conversion — same destination as every other protocol surface.
+-        if request.kv_scope is not None:
+-            extra_args = dict(sampling_params.extra_args or {})
+-            if request.kv_scope is not None:
+-                extra_args["kv_scope"] = request.kv_scope
+-            sampling_params.extra_args = extra_args
+ 
+         self._log_inputs(
+             request_id,
+@@ -267,10 +252,12 @@
+                 request_id,
+                 model_name,
+                 request_metadata,
++                sampling_params,
+             )
+ 
+         return await self.serve_tokens_full_generator(
+-            request, result_generator, request_id, model_name, request_metadata
++            request, result_generator, request_id, model_name, request_metadata,
++            sampling_params,
+         )
+ 
+     async def serve_tokens_full_generator(
+@@ -280,10 +267,10 @@
+         request_id: str,
+         model_name: str,
+         request_metadata: RequestResponseMetadata,
++        sampling_params: SamplingParams,
+     ) -> ErrorResponse | GenerateResponse:
+         created_time = int(time.time())
+         final_res: RequestOutput | None = None
+-        sampling_params: SamplingParams = request.sampling_params
+ 
+         try:
+             async for res in result_generator:
+@@ -392,12 +379,12 @@
+         request_id: str,
+         model_name: str,
+         request_metadata: RequestResponseMetadata,
++        sampling_params: SamplingParams,
+     ) -> AsyncGenerator[str, None]:
+         num_prompt_tokens = 0
+         num_generated_tokens: list[int] = []
+         first_iteration = True
+         num_cached_tokens = None
+-        sampling_params: SamplingParams = request.sampling_params
+ 
+         include_usage, include_continuous_usage = should_include_usage(
+             request.stream_options, False
+diff --git a/vllm/sampling_params.py b/vllm/sampling_params.py
+--- a/vllm/sampling_params.py
++++ b/vllm/sampling_params.py
+@@ -241,6 +241,17 @@
+ 
+ def _get_llg_tokenizer(tokenizer: TokenizerLike) -> Any:
+     return tokenizer.llg_tokenizer if is_mistral_tokenizer(tokenizer) else None
++
++
++def resolve_final_response_token_budget(
++    requested: int | None, server_budget: int | None,
++) -> int | None:
++    """Resolve the final-answer ceiling shared by generation protocols."""
++    requested = validate_final_response_token_budget(requested)
++    server_budget = validate_final_response_token_budget(server_budget)
++    if server_budget is None:
++        return requested
++    return server_budget if requested is None else min(requested, server_budget)
+ 
+ 
+ class SamplingParams(

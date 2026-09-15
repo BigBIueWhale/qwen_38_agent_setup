@@ -75,7 +75,7 @@ error.
   and relay readiness events, then validates the complete live configuration before
   reporting success. Re-running it validates the existing owned topology rather than
   starting a duplicate.
-- status.sh validates host prerequisites, twenty-one ordered vLLM transformations, every reviewed
+- status.sh validates host prerequisites, twenty-two ordered vLLM transformations, every reviewed
   source and test file, the model manifest, image archive, image identity and labels,
   command and environment, mounts, runtime packages, API identity, listener,
   hardening, and live health. HEALTHY means all checks passed.
@@ -95,7 +95,7 @@ Advanced reproducibility operations are deliberately separate from serving mode:
     ./scripts/build-vllm.sh build
     ./scripts/restore-images.sh
 
-The check reconstructs the source tree from the pinned upstream commit through all twenty-one
+The check reconstructs the source tree from the pinned upstream commit through all twenty-two
 landmark-aware transformations. The build runs offline from the exact base image and fails unless it produces
 the pinned image ID. Restore verifies the pinned local archive before loading it.
 
@@ -251,7 +251,7 @@ The vLLM submodule is pinned at:
 
     9df9b0b0a1816b6d0d0f6ecd0da563cc37fd72f5
 
-It is intentionally reconstructed by twenty-one ordered, reviewed semantic transformations:
+It is intentionally reconstructed by twenty-two ordered, reviewed semantic transformations:
 
 | Patch | SHA-256 |
 |---|---|
@@ -276,9 +276,10 @@ It is intentionally reconstructed by twenty-one ordered, reviewed semantic trans
 | patches/vllm-responses-history-integrity.patch | 117c17c114d7e91e57045a8e80b6eeac283c1ab56bdaf135019ad3c372a42186 |
 | patches/vllm-responses-stream-identity.patch | eccec34b8dd211f444065ef60b6b8075161efc790b61db4640104e3747763478 |
 | patches/vllm-anthropic-terminal-metadata.patch | 7885e27d8f9259e106bd8c2f3ccdefa3fd276649658ea521b50ecf85d83113c5 |
+| patches/vllm-generation-sampling-resolution.patch | a70b88b8e1fa3801e7d5e0a2c6a66f8608ab6e8534b67aafd832bf566d2d2c7a |
 
 The reconstructed tree has 72 reviewed runtime-source changes, 1 new runtime source,
-6 runtime-source deletions, 50 existing-test changes, 6 new tests,
+6 runtime-source deletions, 53 existing-test changes, 6 new tests,
 and 2 test deletions. The authoritative
 counts are derived and printed by ./scripts/build-vllm.sh check, never restated
 by hand there. The landmark-aware Python patcher calculates every mutation
@@ -301,11 +302,11 @@ Pinned build inputs and products:
 | Offline archive | artifacts/qwen38-vllm-images-runtime-v23.tar |
 | Archive size | Awaiting adoption after the v23 export |
 | Archive SHA-256 | Awaiting adoption after the v23 export |
-| Runtime Dockerfile SHA-256 | 4d06ba0006859495da7e8101670fa4cd7f55fc4175706b081134ff4069e1c8b6 |
+| Runtime Dockerfile SHA-256 | 099bbc1ee6f447ce98ddb989a0eeaf6521feeb6385abe91abaf3286d883d1655 |
 | Docker context allowlist SHA-256 | 00b93440d4684980fc932594c0353e72bdb1d12b69165dd7898b28e03119f00d |
-| Build verifier SHA-256 | b6881f95cf3ecea0e3417345915c1226be02f03af899390bd9637caffeee6028 |
+| Build verifier SHA-256 | 224d6608542c703310e470afc0c1b6b723737405222569a2d1285440414752ea |
 | Runtime validator SHA-256 | bab63263005f7bde7a6a66f7372d2f043545598fd56563bc5f8766301723d4e2 |
-| Runtime lock SHA-256 | 9340920331aefa85297e5dbbc01c99f4e0f6015b19584584a19bc30358f0d5cd |
+| Runtime lock SHA-256 | 7d6370a9a6bee172493ab78c01cfb7471bc1d7a2179ec08d0215db93014dec44 |
 
 Every reviewed runtime file, including both TurboQuant kernels, is copied and
 hash-checked against its upstream and patched identities. A CPU Triton-interpreter
@@ -503,10 +504,18 @@ prompt can use extensive reasoning; a nearly full prompt cannot.
 
 The final counter starts only after the explicit reasoning-end marker. Tool XML is a
 structured tool phase, not visible final prose. EOS and stop sequences may end
-earlier; min_tokens cannot cross a hard phase ceiling. Chat, Anthropic Messages, and
-Responses all inherit the same defaults. Clients may lower a phase ceiling for a
+earlier; min_tokens cannot cross a hard phase ceiling. Chat, Completions, Responses,
+Anthropic Messages, and `/generate` all inherit the configured sampling and phase
+defaults. Clients may lower a phase ceiling for a
 deliberate request but cannot null or raise the server's final-response ceiling. A
 live five-real-token final-ceiling probe stopped at exactly five final tokens.
+
+Generation settings resolve after the rendered prompt length and server defaults
+are known. Omitting the total token limit uses the remaining window subject to the
+configured maximum. Explicit neutral sampling values keep their meaning, including
+through the render-to-generate JSON boundary. `/generate` preserves supplied fields
+until resolution, then constructs a fresh validated engine request; a temporary
+engine default cannot reject an otherwise valid request or truncate its output.
 
 Prompts are not claimed deterministic. Correctness tests compare structure, typed
 semantics, exact rendering, and repeated pass rates rather than pretending a fixed

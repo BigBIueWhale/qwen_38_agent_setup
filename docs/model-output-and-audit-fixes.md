@@ -5,6 +5,40 @@ The independent triage and handling policy supplied with the implementation brie
 decide the resolutions. Source validation here does not certify a built image or a
 live release. The v23 image and archive are awaiting adoption.
 
+## Finding 19: resolve sampling policy before engine validation
+
+`vllm-generation-sampling-resolution.patch` supplies one typed representation of
+the settings sent to `/generate`. Omitted fields remain omitted until the server
+knows the model defaults and exact prompt length. Resolution creates a fresh
+`SamplingParams` and passes it explicitly to both output converters. It preserves
+stop-ID merging, required opaque agent identity and transfer metadata without
+mutating the input. The former provided-key tracking and post-construction
+defaulting are deleted.
+
+Render output serializes every resolved public setting, including default-valued
+ones. Thus an explicit maximum of 16 tokens or neutral sampling value survives
+JSON transport. Internal engine bookkeeping fields are not request settings.
+Completions uses the remaining window when the total limit is omitted and inherits
+configured presence, thinking and final budgets. Chat also leaves an omitted
+presence penalty available for model defaulting; Responses applies configured
+`min_p`. All five generation surfaces inherit the same configured sampling policy.
+A shared resolver enforces the server's final-answer ceiling even when a caller
+sends null or the unset sentinel.
+
+Validation: 148 offline CPU tests pass, including actual streaming and batch
+`ServingTokens` dispatch, Chat/Completion render JSON round trips, all-surface
+defaults, explicit neutral values, nested-object independence, input schemas and
+budget validation. Three controls against the previous runtime reproduce early
+`min_tokens=64` rejection against 16, lost explicit `max_tokens=16` serialization,
+and Completions' implicit 16-token limit. The installed phase-budget unit now
+checks these resolution and serialization invariants and runs during `check` as
+well as image construction. The integrated generator and `build-vllm.sh check`
+pass with 22 reviewed stages, 96 deployment inputs and all installed CPU units.
+
+Correct initial and implicit reasoning-phase boundaries remain a separate open
+obligation with finding 17; supplying the correct budget alone does not fix its
+token accounting.
+
 ## Finding 10: ship and execute the TurboQuant guards
 
 The runtime Dockerfile now copies both reviewed non-SoA kernels and verifies their
