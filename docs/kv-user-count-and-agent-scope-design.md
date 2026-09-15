@@ -33,6 +33,11 @@ The required ID travels through each generation protocol's sampling
 parameters to the engine request and offload request context. The common
 engine validation also covers direct sampling callers. Rendering and
 pooling do not allocate a generation context and do not require an ID.
+An ongoing input stream belongs to its admitted agent ID. Per-chunk sampling
+parameters may change generation settings but must retain that exact ID.
+An ID change is refused before dispatch and aborts only that stream's request.
+Another agent submits a new generation request, so prefix selection and
+reference acquisition follow the same rules as any other initial lookup.
 
 ## Content and membership
 

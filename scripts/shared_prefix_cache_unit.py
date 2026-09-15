@@ -1,7 +1,16 @@
 #!/usr/bin/env python3
 """Verify installed shared-prefix semantics using CPU metadata only."""
 
+import asyncio
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, MagicMock
+
+from vllm.engine.protocol import StreamingInput
+from vllm.exceptions import VLLMValidationError
+from vllm.sampling_params import RequestOutputKind, SamplingParams
 from vllm.v1.core.prefix_cache import PrefixCacheIndex
+from vllm.v1.engine.async_llm import AsyncLLM, InputStreamError
+from vllm.v1.engine.input_processor import InputProcessor, require_kv_scope
 from vllm.v1.kv_offload.base import LookupResult, ReqContext
 from vllm.v1.kv_offload.cpu.manager import CPUOffloadingManager
 
@@ -23,7 +32,57 @@ def store(manager, context, keys):
     return output
 
 
+async def check_stream_identity():
+    for next_agent in ('agent', 'other'):
+        engine = MagicMock(spec=AsyncLLM)
+        engine.model_config = SimpleNamespace(is_encoder_decoder=False)
+        engine.get_supported_tasks = AsyncMock(return_value=('generate',))
+        engine._validate_streaming_input_sampling_params = AsyncLLM._validate_streaming_input_sampling_params
+        engine._add_request = AsyncMock()
+
+        def process_inputs(request_id, prompt, params, resumable=False, **kwargs):
+            require_kv_scope(params)
+            return SimpleNamespace(
+                request_id=request_id, external_req_id=None,
+                prompt_token_ids=prompt['prompt_token_ids'], prompt_embeds=None,
+                sampling_params=params.clone(), resumable=resumable,
+            )
+
+        engine.input_processor = SimpleNamespace(
+            process_inputs=process_inputs, assign_request_id=InputProcessor.assign_request_id,
+        )
+        initial = SamplingParams(output_kind=RequestOutputKind.DELTA,
+                                 extra_args={'kv_scope': 'agent'})
+        following = SamplingParams(output_kind=RequestOutputKind.DELTA,
+                                   extra_args={'kv_scope': next_agent})
+
+        async def chunks():
+            yield StreamingInput(prompt={'prompt_token_ids': [42]})
+            yield StreamingInput(prompt={'prompt_token_ids': [43]}, sampling_params=following)
+
+        queue = await AsyncLLM._add_streaming_input_request(engine, 'req', chunks(), initial)
+        task = queue._input_stream_task
+        assert task is not None
+        await task
+        requests = [call.args[0] for call in engine._add_request.call_args_list]
+        if next_agent == 'agent':
+            assert len(requests) == 3
+            assert queue.get_nowait() is None
+        else:
+            assert len(requests) == 2
+            try:
+                queue.get_nowait()
+            except InputStreamError as error:
+                assert isinstance(error.cause, VLLMValidationError)
+                assert error.cause.parameter == 'kv_scope'
+            else:
+                raise AssertionError('Input stream accepted a different agent ID')
+        assert all(req.sampling_params.extra_args['kv_scope'] == 'agent' for req in requests)
+        assert not requests[-1].resumable
+
+
 def main():
+    asyncio.run(check_stream_identity())
     index = PrefixCacheIndex()
     gpu = object()
     index.register_tier(gpu, 4)

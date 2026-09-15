@@ -75,7 +75,7 @@ error.
   and relay readiness events, then validates the complete live configuration before
   reporting success. Re-running it validates the existing owned topology rather than
   starting a duplicate.
-- status.sh validates host prerequisites, twenty-seven ordered vLLM transformations, every reviewed
+- status.sh validates host prerequisites, twenty-eight ordered vLLM transformations, every reviewed
   source and test file, the model manifest, image archive, image identity and labels,
   command and environment, mounts, runtime packages, API identity, listener,
   hardening, and live health. HEALTHY means all checks passed.
@@ -95,7 +95,7 @@ Advanced reproducibility operations are deliberately separate from serving mode:
     ./scripts/build-vllm.sh build
     ./scripts/restore-images.sh
 
-The check reconstructs the source tree from the pinned upstream commit through all twenty-seven
+The check reconstructs the source tree from the pinned upstream commit through all twenty-eight
 landmark-aware transformations. The build runs offline from the exact base image and fails unless it produces
 the pinned image ID. Restore verifies the pinned local archive before loading it.
 
@@ -251,7 +251,7 @@ The vLLM submodule is pinned at:
 
     9df9b0b0a1816b6d0d0f6ecd0da563cc37fd72f5
 
-It is intentionally reconstructed by twenty-seven ordered, reviewed semantic transformations:
+It is intentionally reconstructed by twenty-eight ordered, reviewed semantic transformations:
 
 | Patch | SHA-256 |
 |---|---|
@@ -282,9 +282,10 @@ It is intentionally reconstructed by twenty-seven ordered, reviewed semantic tra
 | patches/vllm-raw-image-token-transport.patch | cab095d4b4fce8ee0e34d4b4cd18a066afdeb14da98ff09e1b57072e3cb565fd |
 | patches/vllm-xml-text-fidelity.patch | 999d6f471a4f480f5fd93b087c17c463417a8080206e952f3686510d57c9abd6 |
 | patches/vllm-phase-aware-parser-terminals.patch | cc79995955bc36f6ef383983efe5359b0170895ad8c682593c1435c12dd66ceb |
+| patches/vllm-input-stream-agent-identity.patch | f812362220f83b904d56e55e9c359918990c55e39d7a0750d1011840d377dfb4 |
 
-The reconstructed tree has 87 reviewed runtime-source changes, 1 new runtime source,
-7 runtime-source deletions, 64 existing-test changes, 12 new tests,
+The reconstructed tree has 88 reviewed runtime-source changes, 1 new runtime source,
+7 runtime-source deletions, 65 existing-test changes, 12 new tests,
 and 3 test deletions. The authoritative
 counts are derived and printed by ./scripts/build-vllm.sh check, never restated
 by hand there. The landmark-aware Python patcher calculates every mutation
@@ -307,11 +308,11 @@ Pinned build inputs and products:
 | Offline archive | artifacts/qwen38-vllm-images-runtime-v23.tar |
 | Archive size | Awaiting adoption after the v23 export |
 | Archive SHA-256 | Awaiting adoption after the v23 export |
-| Runtime Dockerfile SHA-256 | 145505973a64968bb9a5045aa4ef50e098a85e6237ab761d4c87ff54970df018 |
-| Docker context allowlist SHA-256 | 8a83f2cf718f9be26b17afa697e513f766380522c10a0c38bab21312cd269338 |
-| Build verifier SHA-256 | af01f428cb083a8e980ad2b4f551e27f5477b421e9175913cc77a73059796a20 |
-| Runtime validator SHA-256 | 7233e41f73a09df9fda8f82337202d0aff266a191e5be006773da2561afee8c0 |
-| Runtime lock SHA-256 | 953c50f581e57c256a01efa6466cba350874a2bbdc891097d23f4864a6e2e621 |
+| Runtime Dockerfile SHA-256 | 346e56547d5b030ac00dca0ff62e0f64b1327c9221db1f38e8afd786c1e0db44 |
+| Docker context allowlist SHA-256 | e9535d6b3248b73d22f35114f6916e99a224ee38e8d18246fb6da47fecd0bd6b |
+| Build verifier SHA-256 | dd055b40560614b3d06f1f07548391d9db6b7d3c9d57ac3202d4a89603479dfa |
+| Runtime validator SHA-256 | b467f9d7a8009407c4cf16c5c62b0f56d2ac0fa127dff7b206133046e9935b27 |
+| Runtime lock SHA-256 | 80d5f8ab23aa908589cd8dd4ac967038695559f6bbd478e276ffc0ddd9e373d4 |
 
 Every reviewed runtime file, including both TurboQuant kernels, is copied and
 hash-checked against its upstream and patched identities. A CPU Triton-interpreter
@@ -428,6 +429,9 @@ shared prefix only while it has no cached blocks of its own; selecting that
 prefix creates an implicit fork. Afterward, it matches only its acquired or
 computed data. GPU and CPU membership jointly determine whether it has a cache.
 If all its cached blocks are evicted, the no-cache rule applies again.
+An input stream keeps one agent ID across all its chunks. Changing that ID is
+refused before the chunk is dispatched; a different agent starts a new generation
+request and goes through the same cache lookup rules.
 
 Shared blocks have references from each agent that uses them. Releasing one
 agent preserves references held by surviving contexts. Request completion

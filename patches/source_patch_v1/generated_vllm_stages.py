@@ -76601,7 +76601,527 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '        # The accepted language is exactly the decoder '
                              "grammar's: a call is\n"
                              '        # ``<tool_call>\\n<function=NAME>`` ... '
-                             '``</function>\\n</tool_call>``\n'})})
+                             '``</function>\\n</tool_call>``\n'})},
+ {'name': 'input-stream-agent-identity',
+  'review_patch': 'patches/vllm-input-stream-agent-identity.patch',
+  'review_sha256': 'f812362220f83b904d56e55e9c359918990c55e39d7a0750d1011840d377dfb4',
+  'files': ({'path': 'tests/v1/streaming_input/test_async_llm_streaming.py',
+             'before_sha256': '04a34ebf708313a315818051434bf0c626cb8a07f23e285e7759a3c0f6c3996b',
+             'after_sha256': '83c121d706fb1f8a06ce94e7e85a5f49d0ce9c6a0282066a6276ff08e5f6400c'},
+            {'path': 'vllm/v1/engine/async_llm.py',
+             'before_sha256': 'bceed0b3f5f0c834fef79525f2462a092f082390f0070526280abc95945837dd',
+             'after_sha256': '1fc980192b7d269128876f1658041140edcb987bbc70427cd69a8ec159b84f46'}),
+  'edits': ({'name': 'tests/v1/streaming_input/test_async_llm_streaming.py:landmark-1',
+             'path': 'tests/v1/streaming_input/test_async_llm_streaming.py',
+             'before': '\n'
+                       'import asyncio\n'
+                       'from collections.abc import AsyncGenerator\n'
+                       'from unittest.mock import AsyncMock, MagicMock\n'
+                       '\n'
+                       'import pytest\n'
+                       '\n'
+                       'from vllm.engine.protocol import StreamingInput\n'
+                       'from vllm.outputs import RequestOutput\n'
+                       'from vllm.sampling_params import RequestOutputKind, '
+                       'SamplingParams\n'
+                       'from vllm.v1.engine.async_llm import AsyncLLM\n'
+                       'from vllm.v1.engine.output_processor import '
+                       'RequestOutputCollector\n'
+                       '\n'
+                       '\n',
+             'after': '\n'
+                      'import asyncio\n'
+                      'from collections.abc import AsyncGenerator\n'
+                      'from types import SimpleNamespace\n'
+                      'from unittest.mock import AsyncMock, MagicMock, patch\n'
+                      '\n'
+                      'import pytest\n'
+                      '\n'
+                      'from vllm.engine.protocol import StreamingInput\n'
+                      'from vllm.exceptions import VLLMValidationError\n'
+                      'from vllm.outputs import STREAM_FINISHED, RequestOutput\n'
+                      'from vllm.sampling_params import RequestOutputKind, '
+                      'SamplingParams\n'
+                      'from vllm.v1.engine.async_llm import AsyncLLM\n'
+                      'from vllm.v1.engine.input_processor import InputProcessor\n'
+                      'from vllm.v1.engine.output_processor import '
+                      'RequestOutputCollector\n'
+                      '\n'
+                      '\n',
+             'review_before': '\n'
+                              'import asyncio\n'
+                              'from collections.abc import AsyncGenerator\n'
+                              'from unittest.mock import AsyncMock, MagicMock\n'
+                              '\n'
+                              'import pytest\n'
+                              '\n'
+                              'from vllm.engine.protocol import StreamingInput\n'
+                              'from vllm.outputs import RequestOutput\n'
+                              'from vllm.sampling_params import RequestOutputKind, '
+                              'SamplingParams\n'
+                              'from vllm.v1.engine.async_llm import AsyncLLM\n'
+                              'from vllm.v1.engine.output_processor import '
+                              'RequestOutputCollector\n'
+                              '\n'
+                              '\n',
+             'review_after': '\n'
+                             'import asyncio\n'
+                             'from collections.abc import AsyncGenerator\n'
+                             'from types import SimpleNamespace\n'
+                             'from unittest.mock import AsyncMock, MagicMock, patch\n'
+                             '\n'
+                             'import pytest\n'
+                             '\n'
+                             'from vllm.engine.protocol import StreamingInput\n'
+                             'from vllm.exceptions import VLLMValidationError\n'
+                             'from vllm.outputs import STREAM_FINISHED, RequestOutput\n'
+                             'from vllm.sampling_params import RequestOutputKind, '
+                             'SamplingParams\n'
+                             'from vllm.v1.engine.async_llm import AsyncLLM\n'
+                             'from vllm.v1.engine.input_processor import '
+                             'InputProcessor\n'
+                             'from vllm.v1.engine.output_processor import '
+                             'RequestOutputCollector\n'
+                             '\n'
+                             '\n'},
+            {'name': 'tests/v1/streaming_input/test_async_llm_streaming.py:landmark-2',
+             'path': 'tests/v1/streaming_input/test_async_llm_streaming.py',
+             'before': '    assert outputs[2].finished is True\n'
+                       '    # Both inputs were processed\n'
+                       '    assert inputs_received == ["Hello", " world"]\n',
+             'after': '    assert outputs[2].finished is True\n'
+                      '    # Both inputs were processed\n'
+                      '    assert inputs_received == ["Hello", " world"]\n'
+                      '\n'
+                      '\n'
+                      '@pytest.fixture\n'
+                      'def streaming_engine():\n'
+                      '    """Run admission and input dispatch with no model, worker '
+                      'or service."""\n'
+                      '    processor = InputProcessor.__new__(InputProcessor)\n'
+                      '    processor.vllm_config = SimpleNamespace(\n'
+                      '        reasoning_config=None,\n'
+                      '        parallel_config=SimpleNamespace(data_parallel_size=1,\n'
+                      '            data_parallel_size_local=1, '
+                      'local_engines_only=True),\n'
+                      '    )\n'
+                      '    processor.model_config = SimpleNamespace(\n'
+                      '        max_model_len=2048, is_encoder_decoder=False, '
+                      'return_sampling_mask=False,\n'
+                      '    )\n'
+                      '    processor.speculative_config = None\n'
+                      '    processor.structured_outputs_config = None\n'
+                      '    processor.lora_config = None\n'
+                      '    processor.renderer = SimpleNamespace(tokenizer=None, '
+                      'get_eos_token_id=lambda: 2)\n'
+                      '    processor.generation_config_fields = {}\n'
+                      '    processor._validate_model_inputs = MagicMock()\n'
+                      '    processor.input_preprocessor = SimpleNamespace(\n'
+                      '        preprocess=lambda prompt, **kwargs: {\n'
+                      "            'type': 'token', 'prompt_token_ids': "
+                      "prompt['prompt_token_ids'],\n"
+                      '        },\n'
+                      '    )\n'
+                      '    engine = MagicMock(spec=AsyncLLM)\n'
+                      '    engine.input_processor = processor\n'
+                      '    engine.model_config = processor.model_config\n'
+                      '    engine.vllm_config = processor.vllm_config\n'
+                      '    engine.vllm_config.cache_config = '
+                      'SimpleNamespace(kv_sharing_fast_prefill=False)\n'
+                      '    engine.errored = False\n'
+                      '    engine.log_requests = False\n'
+                      '    engine.get_supported_tasks = '
+                      "AsyncMock(return_value=('generate',))\n"
+                      '    engine._validate_streaming_input_sampling_params = '
+                      'AsyncLLM._validate_streaming_input_sampling_params\n'
+                      '    engine._add_streaming_input_request = '
+                      'AsyncLLM._add_streaming_input_request.__get__(engine)\n'
+                      '    engine.add_request = AsyncLLM.add_request.__get__(engine)\n'
+                      '    engine.abort = AsyncMock()\n'
+                      '\n'
+                      '    async def dispatch(request, prompt, parent, index, queue):\n'
+                      '        if not request.resumable:\n'
+                      '            queue.put(STREAM_FINISHED)\n'
+                      '\n'
+                      '    engine._add_request = AsyncMock(side_effect=dispatch)\n'
+                      '    # Sampling bounds and model-input validation are '
+                      'independent of cache ID\n'
+                      '    # admission. The actual common ID validation and request '
+                      'cloning run here.\n'
+                      "    with patch.object(SamplingParams, 'verify'), patch(\n"
+                      "        'vllm.v1.engine.input_processor.current_platform',\n"
+                      '    ):\n'
+                      '        yield engine\n'
+                      '\n'
+                      '\n'
+                      '@pytest.mark.asyncio\n'
+                      "@pytest.mark.parametrize('agent', ['agent', '  opaque:/agent  "
+                      "'])\n"
+                      "@pytest.mark.parametrize('kind', [RequestOutputKind.DELTA, "
+                      'RequestOutputKind.CUMULATIVE])\n'
+                      'async def '
+                      'test_input_stream_retains_opaque_id_and_accepts_new_sampling_params(streaming_engine, '
+                      'agent, kind):\n'
+                      '    engine = streaming_engine\n'
+                      '    initial = SamplingParams(max_tokens=7, output_kind=kind,\n'
+                      "                             extra_args={'kv_scope': agent})\n"
+                      '    following = SamplingParams(max_tokens=3, output_kind=kind,\n'
+                      "                               extra_args={'kv_scope': agent})\n"
+                      '\n'
+                      '    async def chunks():\n'
+                      "        yield StreamingInput(prompt={'prompt_token_ids': "
+                      '[42]})\n'
+                      "        yield StreamingInput(prompt={'prompt_token_ids': [43]}, "
+                      'sampling_params=following)\n'
+                      '\n'
+                      '    assert [output async for output in '
+                      "AsyncLLM.generate(engine, chunks(), initial, 'req')] == []\n"
+                      '    requests = [call.args[0] for call in '
+                      'engine._add_request.call_args_list]\n'
+                      '    assert len(requests) == 3\n'
+                      '    assert [request.resumable for request in requests] == '
+                      '[True, True, False]\n'
+                      '    assert [request.sampling_params.max_tokens for request in '
+                      'requests] == [7, 3, 7]\n'
+                      "    assert all(request.sampling_params.extra_args['kv_scope'] "
+                      '== agent for request in requests)\n'
+                      '    assert len({request.request_id for request in requests}) == '
+                      '1\n'
+                      '    engine.abort.assert_not_called()\n'
+                      '\n'
+                      '\n'
+                      '@pytest.mark.asyncio\n'
+                      "@pytest.mark.parametrize('agent', ['other', ' agent ', None, "
+                      "'', '   ', 7])\n"
+                      "@pytest.mark.parametrize('first_chunk', [False, True])\n"
+                      "@pytest.mark.parametrize('kind', [RequestOutputKind.DELTA, "
+                      'RequestOutputKind.CUMULATIVE])\n'
+                      'async def '
+                      'test_input_stream_refuses_id_change_before_dispatch_and_aborts_only_its_request(streaming_engine, '
+                      'agent, first_chunk, kind):\n'
+                      '    engine = streaming_engine\n'
+                      '    initial = SamplingParams(max_tokens=7, output_kind=kind,\n'
+                      "                             extra_args={'kv_scope': 'agent'})\n"
+                      '    following = SamplingParams(max_tokens=3, output_kind=kind,\n'
+                      "                               extra_args={'kv_scope': agent})\n"
+                      '\n'
+                      '    async def chunks():\n'
+                      '        if not first_chunk:\n'
+                      "            yield StreamingInput(prompt={'prompt_token_ids': "
+                      '[42]})\n'
+                      "        yield StreamingInput(prompt={'prompt_token_ids': [43]}, "
+                      'sampling_params=following)\n'
+                      '\n'
+                      '    with pytest.raises(VLLMValidationError) as caught:\n'
+                      '        _ = [output async for output in '
+                      "AsyncLLM.generate(engine, chunks(), initial, 'req')]\n"
+                      "    assert caught.value.parameter == 'kv_scope'\n"
+                      '    requests = [call.args[0] for call in '
+                      'engine._add_request.call_args_list]\n'
+                      '    assert len(requests) == 1 + int(not first_chunk)\n'
+                      '    assert not requests[-1].resumable\n'
+                      "    assert all(request.sampling_params.extra_args['kv_scope'] "
+                      "== 'agent' for request in requests)\n"
+                      '    assert all(request.prompt_token_ids != [43] for request in '
+                      'requests)\n'
+                      '    '
+                      'engine.abort.assert_awaited_once_with(requests[0].request_id, '
+                      'internal=True)\n',
+             'review_before': '    assert outputs[2].finished is True\n'
+                              '    # Both inputs were processed\n'
+                              '    assert inputs_received == ["Hello", " world"]\n',
+             'review_after': '    assert outputs[2].finished is True\n'
+                             '    # Both inputs were processed\n'
+                             '    assert inputs_received == ["Hello", " world"]\n'
+                             '\n'
+                             '\n'
+                             '@pytest.fixture\n'
+                             'def streaming_engine():\n'
+                             '    """Run admission and input dispatch with no model, '
+                             'worker or service."""\n'
+                             '    processor = InputProcessor.__new__(InputProcessor)\n'
+                             '    processor.vllm_config = SimpleNamespace(\n'
+                             '        reasoning_config=None,\n'
+                             '        '
+                             'parallel_config=SimpleNamespace(data_parallel_size=1,\n'
+                             '            data_parallel_size_local=1, '
+                             'local_engines_only=True),\n'
+                             '    )\n'
+                             '    processor.model_config = SimpleNamespace(\n'
+                             '        max_model_len=2048, is_encoder_decoder=False, '
+                             'return_sampling_mask=False,\n'
+                             '    )\n'
+                             '    processor.speculative_config = None\n'
+                             '    processor.structured_outputs_config = None\n'
+                             '    processor.lora_config = None\n'
+                             '    processor.renderer = SimpleNamespace(tokenizer=None, '
+                             'get_eos_token_id=lambda: 2)\n'
+                             '    processor.generation_config_fields = {}\n'
+                             '    processor._validate_model_inputs = MagicMock()\n'
+                             '    processor.input_preprocessor = SimpleNamespace(\n'
+                             '        preprocess=lambda prompt, **kwargs: {\n'
+                             "            'type': 'token', 'prompt_token_ids': "
+                             "prompt['prompt_token_ids'],\n"
+                             '        },\n'
+                             '    )\n'
+                             '    engine = MagicMock(spec=AsyncLLM)\n'
+                             '    engine.input_processor = processor\n'
+                             '    engine.model_config = processor.model_config\n'
+                             '    engine.vllm_config = processor.vllm_config\n'
+                             '    engine.vllm_config.cache_config = '
+                             'SimpleNamespace(kv_sharing_fast_prefill=False)\n'
+                             '    engine.errored = False\n'
+                             '    engine.log_requests = False\n'
+                             '    engine.get_supported_tasks = '
+                             "AsyncMock(return_value=('generate',))\n"
+                             '    engine._validate_streaming_input_sampling_params = '
+                             'AsyncLLM._validate_streaming_input_sampling_params\n'
+                             '    engine._add_streaming_input_request = '
+                             'AsyncLLM._add_streaming_input_request.__get__(engine)\n'
+                             '    engine.add_request = '
+                             'AsyncLLM.add_request.__get__(engine)\n'
+                             '    engine.abort = AsyncMock()\n'
+                             '\n'
+                             '    async def dispatch(request, prompt, parent, index, '
+                             'queue):\n'
+                             '        if not request.resumable:\n'
+                             '            queue.put(STREAM_FINISHED)\n'
+                             '\n'
+                             '    engine._add_request = '
+                             'AsyncMock(side_effect=dispatch)\n'
+                             '    # Sampling bounds and model-input validation are '
+                             'independent of cache ID\n'
+                             '    # admission. The actual common ID validation and '
+                             'request cloning run here.\n'
+                             "    with patch.object(SamplingParams, 'verify'), patch(\n"
+                             '        '
+                             "'vllm.v1.engine.input_processor.current_platform',\n"
+                             '    ):\n'
+                             '        yield engine\n'
+                             '\n'
+                             '\n'
+                             '@pytest.mark.asyncio\n'
+                             "@pytest.mark.parametrize('agent', ['agent', '  "
+                             "opaque:/agent  '])\n"
+                             "@pytest.mark.parametrize('kind', "
+                             '[RequestOutputKind.DELTA, '
+                             'RequestOutputKind.CUMULATIVE])\n'
+                             'async def '
+                             'test_input_stream_retains_opaque_id_and_accepts_new_sampling_params(streaming_engine, '
+                             'agent, kind):\n'
+                             '    engine = streaming_engine\n'
+                             '    initial = SamplingParams(max_tokens=7, '
+                             'output_kind=kind,\n'
+                             "                             extra_args={'kv_scope': "
+                             'agent})\n'
+                             '    following = SamplingParams(max_tokens=3, '
+                             'output_kind=kind,\n'
+                             "                               extra_args={'kv_scope': "
+                             'agent})\n'
+                             '\n'
+                             '    async def chunks():\n'
+                             "        yield StreamingInput(prompt={'prompt_token_ids': "
+                             '[42]})\n'
+                             "        yield StreamingInput(prompt={'prompt_token_ids': "
+                             '[43]}, sampling_params=following)\n'
+                             '\n'
+                             '    assert [output async for output in '
+                             "AsyncLLM.generate(engine, chunks(), initial, 'req')] == "
+                             '[]\n'
+                             '    requests = [call.args[0] for call in '
+                             'engine._add_request.call_args_list]\n'
+                             '    assert len(requests) == 3\n'
+                             '    assert [request.resumable for request in requests] '
+                             '== [True, True, False]\n'
+                             '    assert [request.sampling_params.max_tokens for '
+                             'request in requests] == [7, 3, 7]\n'
+                             '    assert '
+                             "all(request.sampling_params.extra_args['kv_scope'] == "
+                             'agent for request in requests)\n'
+                             '    assert len({request.request_id for request in '
+                             'requests}) == 1\n'
+                             '    engine.abort.assert_not_called()\n'
+                             '\n'
+                             '\n'
+                             '@pytest.mark.asyncio\n'
+                             "@pytest.mark.parametrize('agent', ['other', ' agent ', "
+                             "None, '', '   ', 7])\n"
+                             "@pytest.mark.parametrize('first_chunk', [False, True])\n"
+                             "@pytest.mark.parametrize('kind', "
+                             '[RequestOutputKind.DELTA, '
+                             'RequestOutputKind.CUMULATIVE])\n'
+                             'async def '
+                             'test_input_stream_refuses_id_change_before_dispatch_and_aborts_only_its_request(streaming_engine, '
+                             'agent, first_chunk, kind):\n'
+                             '    engine = streaming_engine\n'
+                             '    initial = SamplingParams(max_tokens=7, '
+                             'output_kind=kind,\n'
+                             "                             extra_args={'kv_scope': "
+                             "'agent'})\n"
+                             '    following = SamplingParams(max_tokens=3, '
+                             'output_kind=kind,\n'
+                             "                               extra_args={'kv_scope': "
+                             'agent})\n'
+                             '\n'
+                             '    async def chunks():\n'
+                             '        if not first_chunk:\n'
+                             '            yield '
+                             "StreamingInput(prompt={'prompt_token_ids': [42]})\n"
+                             "        yield StreamingInput(prompt={'prompt_token_ids': "
+                             '[43]}, sampling_params=following)\n'
+                             '\n'
+                             '    with pytest.raises(VLLMValidationError) as caught:\n'
+                             '        _ = [output async for output in '
+                             "AsyncLLM.generate(engine, chunks(), initial, 'req')]\n"
+                             "    assert caught.value.parameter == 'kv_scope'\n"
+                             '    requests = [call.args[0] for call in '
+                             'engine._add_request.call_args_list]\n'
+                             '    assert len(requests) == 1 + int(not first_chunk)\n'
+                             '    assert not requests[-1].resumable\n'
+                             '    assert '
+                             "all(request.sampling_params.extra_args['kv_scope'] == "
+                             "'agent' for request in requests)\n"
+                             '    assert all(request.prompt_token_ids != [43] for '
+                             'request in requests)\n'
+                             '    '
+                             'engine.abort.assert_awaited_once_with(requests[0].request_id, '
+                             'internal=True)\n'},
+            {'name': 'vllm/v1/engine/async_llm.py:landmark-1',
+             'path': 'vllm/v1/engine/async_llm.py',
+             'before': 'from vllm.v1.engine import EngineCoreRequest, PauseMode\n'
+                       'from vllm.v1.engine.core_client import EngineCoreClient\n'
+                       'from vllm.v1.engine.exceptions import EngineDeadError, '
+                       'EngineGenerateError\n'
+                       'from vllm.v1.engine.input_processor import InputProcessor\n'
+                       'from vllm.v1.engine.output_processor import OutputProcessor, '
+                       'RequestOutputCollector\n'
+                       'from vllm.v1.engine.parallel_sampling import ParentRequest\n'
+                       'from vllm.v1.executor import Executor\n',
+             'after': 'from vllm.v1.engine import EngineCoreRequest, PauseMode\n'
+                      'from vllm.v1.engine.core_client import EngineCoreClient\n'
+                      'from vllm.v1.engine.exceptions import EngineDeadError, '
+                      'EngineGenerateError\n'
+                      'from vllm.v1.engine.input_processor import InputProcessor, '
+                      'require_kv_scope\n'
+                      'from vllm.v1.engine.output_processor import OutputProcessor, '
+                      'RequestOutputCollector\n'
+                      'from vllm.v1.engine.parallel_sampling import ParentRequest\n'
+                      'from vllm.v1.executor import Executor\n',
+             'review_before': 'from vllm.v1.engine import EngineCoreRequest, '
+                              'PauseMode\n'
+                              'from vllm.v1.engine.core_client import '
+                              'EngineCoreClient\n'
+                              'from vllm.v1.engine.exceptions import EngineDeadError, '
+                              'EngineGenerateError\n'
+                              'from vllm.v1.engine.input_processor import '
+                              'InputProcessor\n'
+                              'from vllm.v1.engine.output_processor import '
+                              'OutputProcessor, RequestOutputCollector\n'
+                              'from vllm.v1.engine.parallel_sampling import '
+                              'ParentRequest\n'
+                              'from vllm.v1.executor import Executor\n',
+             'review_after': 'from vllm.v1.engine import EngineCoreRequest, PauseMode\n'
+                             'from vllm.v1.engine.core_client import EngineCoreClient\n'
+                             'from vllm.v1.engine.exceptions import EngineDeadError, '
+                             'EngineGenerateError\n'
+                             'from vllm.v1.engine.input_processor import '
+                             'InputProcessor, require_kv_scope\n'
+                             'from vllm.v1.engine.output_processor import '
+                             'OutputProcessor, RequestOutputCollector\n'
+                             'from vllm.v1.engine.parallel_sampling import '
+                             'ParentRequest\n'
+                             'from vllm.v1.executor import Executor\n'},
+            {'name': 'vllm/v1/engine/async_llm.py:landmark-2',
+             'path': 'vllm/v1/engine/async_llm.py',
+             'before': '        session_id: str | None = None,\n'
+                       '    ) -> RequestOutputCollector:\n'
+                       '        '
+                       'self._validate_streaming_input_sampling_params(sampling_params)\n'
+                       '\n'
+                       '        inputs = dict(\n'
+                       '            supported_tasks=await '
+                       'self.get_supported_tasks(),\n',
+             'after': '        session_id: str | None = None,\n'
+                      '    ) -> RequestOutputCollector:\n'
+                      '        '
+                      'self._validate_streaming_input_sampling_params(sampling_params)\n'
+                      '        agent_id = require_kv_scope(sampling_params)\n'
+                      '\n'
+                      '        inputs = dict(\n'
+                      '            supported_tasks=await self.get_supported_tasks(),\n',
+             'review_before': '        session_id: str | None = None,\n'
+                              '    ) -> RequestOutputCollector:\n'
+                              '        '
+                              'self._validate_streaming_input_sampling_params(sampling_params)\n'
+                              '\n'
+                              '        inputs = dict(\n'
+                              '            supported_tasks=await '
+                              'self.get_supported_tasks(),\n',
+             'review_after': '        session_id: str | None = None,\n'
+                             '    ) -> RequestOutputCollector:\n'
+                             '        '
+                             'self._validate_streaming_input_sampling_params(sampling_params)\n'
+                             '        agent_id = require_kv_scope(sampling_params)\n'
+                             '\n'
+                             '        inputs = dict(\n'
+                             '            supported_tasks=await '
+                             'self.get_supported_tasks(),\n'},
+            {'name': 'vllm/v1/engine/async_llm.py:landmark-3',
+             'path': 'vllm/v1/engine/async_llm.py',
+             'before': '                        '
+                       'self._validate_streaming_input_sampling_params(sp)\n'
+                       '                    else:\n'
+                       '                        sp = sampling_params\n'
+                       '                    # TODO(nick): Avoid re-validating reused '
+                       'sampling parameters\n'
+                       '                    req = '
+                       'self.input_processor.process_inputs(\n'
+                       '                        request_id=internal_req_id,\n',
+             'after': '                        '
+                      'self._validate_streaming_input_sampling_params(sp)\n'
+                      '                    else:\n'
+                      '                        sp = sampling_params\n'
+                      '                    if require_kv_scope(sp) != agent_id:\n'
+                      '                        raise VLLMValidationError(\n'
+                      '                            "kv_scope must remain the same '
+                      'throughout an input "\n'
+                      '                            "stream. Submit a new generation '
+                      'request for a "\n'
+                      '                            "different agent ID.",\n'
+                      '                            parameter="kv_scope",\n'
+                      '                        )\n'
+                      '                    # TODO(nick): Avoid re-validating reused '
+                      'sampling parameters\n'
+                      '                    req = self.input_processor.process_inputs(\n'
+                      '                        request_id=internal_req_id,\n',
+             'review_before': '                        '
+                              'self._validate_streaming_input_sampling_params(sp)\n'
+                              '                    else:\n'
+                              '                        sp = sampling_params\n'
+                              '                    # TODO(nick): Avoid re-validating '
+                              'reused sampling parameters\n'
+                              '                    req = '
+                              'self.input_processor.process_inputs(\n'
+                              '                        request_id=internal_req_id,\n',
+             'review_after': '                        '
+                             'self._validate_streaming_input_sampling_params(sp)\n'
+                             '                    else:\n'
+                             '                        sp = sampling_params\n'
+                             '                    if require_kv_scope(sp) != '
+                             'agent_id:\n'
+                             '                        raise VLLMValidationError(\n'
+                             '                            "kv_scope must remain the '
+                             'same throughout an input "\n'
+                             '                            "stream. Submit a new '
+                             'generation request for a "\n'
+                             '                            "different agent ID.",\n'
+                             '                            parameter="kv_scope",\n'
+                             '                        )\n'
+                             '                    # TODO(nick): Avoid re-validating '
+                             'reused sampling parameters\n'
+                             '                    req = '
+                             'self.input_processor.process_inputs(\n'
+                             '                        request_id=internal_req_id,\n'})})
 
 FINAL_FILES = {'tests/config/test_config_utils.py': '4f5ea0399cc3b4f9603df07e2cc26d32e1eddf6b98a36c0f30d580321879c038',
  'tests/distributed/test_rocm_quick_reduce.py': 'bf6f8a5708568b1f4d96dcc59f42258f8680e5b03bb4abdddcb0c7ead9d414bd',
@@ -76676,6 +77196,7 @@ FINAL_FILES = {'tests/config/test_config_utils.py': '4f5ea0399cc3b4f9603df07e2cc
  'tests/v1/kv_offload/tiering/test_tiering_offloading.py': '4ebf998fb5f29781541761b117e194fce7ef06c14104d8cfa2e7fecbab11b536',
  'tests/v1/simple_kv_offload/test_integration.py': '0dd7471507c88e209fe6a72359dfc655368c836cbe2cd3d95e1c0f72d38a4241',
  'tests/v1/simple_kv_offload/test_scheduler.py': 'd036e691d91dd990228e3dc12c9e40f5a4cd552b49bae64fac29c6d8beed6281',
+ 'tests/v1/streaming_input/test_async_llm_streaming.py': '83c121d706fb1f8a06ce94e7e85a5f49d0ce9c6a0282066a6276ff08e5f6400c',
  'tests/v1/worker/test_gpu_model_runner_mm_gather.py': '7076e2415a3a1246d6f1e22e978a4c32e7b87713d6d7ae5743960c3d31592759',
  'tests/v1/worker/test_gpu_worker.py': '28b1835d1456c988cd2c98154097a1c56dc81018e5bd8d2ee0930e779fc90045',
  'tests/v1/worker/test_workspace.py': '26db5624d8b60db86792762c0f2765fe13ccaa6bfc82ce655c147379fd79b76e',
@@ -76751,6 +77272,7 @@ FINAL_FILES = {'tests/config/test_config_utils.py': '4f5ea0399cc3b4f9603df07e2cc
  'vllm/v1/core/prefix_cache.py': '74cdbe60273641df0df7e0158da777314fe74ca29ccb539f16340ec7a2687ef4',
  'vllm/v1/core/sched/utils.py': 'bf00f90553b05358a2671466eabe3c3f2caee6b64a6ad64ad5544f7ffc997aa2',
  'vllm/v1/core/single_type_kv_cache_manager.py': 'e4d62562736aed93d394ba43f82654b207dd6f926a707e0b015d105129fd2131',
+ 'vllm/v1/engine/async_llm.py': '1fc980192b7d269128876f1658041140edcb987bbc70427cd69a8ec159b84f46',
  'vllm/v1/engine/input_processor.py': '27944f76eb87665136d73ce3b9330abd4af02fb85e62b03bb334c7a219e3bbbe',
  'vllm/v1/kv_offload/base.py': 'e8fff9428338aa2c0d86c2ae1bdbb35e1e2338620e121656ac4f6da0fbd6779a',
  'vllm/v1/kv_offload/config.py': '50daea7891442fa779743796c343fe0a09bdcd0266910bf83b35509e533c3b89',

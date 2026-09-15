@@ -452,6 +452,25 @@ The reviewed source stage compiles with only the two intended source/test change
 The required backend check passes for all twenty-one source stages, the 95-file
 deployment-input manifest and installed CPU units. Image adoption remains pending.
 
+## Shared prefixes: stable identity within an input stream
+
+`vllm-input-stream-agent-identity.patch` binds an input stream's required opaque
+agent ID before reading chunks. Every chunk must keep that exact ID. A different
+ID is rejected before dispatch, and the existing input-error path aborts only
+the affected generation request. This keeps an ID change from continuing another
+agent's live KV under inconsistent sampling metadata. A different agent submits
+a new generation request and follows ordinary prefix selection and acquisition.
+
+Validation: 30 offline source tests pass using actual input admission, stream
+dispatch and generation error handling. Both supported output modes, first and
+later chunk changes, exact opaque IDs, invalid IDs, valid sampling updates and
+request-local abort are covered. Eight controls reproduce the old acceptance of
+changed IDs; 22 unaffected cases pass against that source. The installed shared
+prefix CPU unit also exercises accepted and rejected stream identities. The
+required backend check passes for all 28 reviewed stages and 104 deployment
+inputs, with AsyncLLM included in upstream, final, image and installed hashes.
+The v23 image and archive remain awaiting adoption.
+
 ## Remaining implementation
 
 Parser language, stop handling, schema conversion, protocol translation, image

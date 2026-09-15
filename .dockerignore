@@ -152,3 +152,4 @@
 !vllm/vllm/parser/glm47_moe.py
 !vllm/vllm/parser/minimax_m2.py
 !vllm/vllm/parser/mistral.py
+!vllm/vllm/v1/engine/async_llm.py

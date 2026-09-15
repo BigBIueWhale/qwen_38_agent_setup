@@ -67,6 +67,7 @@ EXPECTED_STATUS=$' M tests/config/test_config_utils.py
  M tests/v1/kv_offload/tiering/test_tiering_offloading.py
  M tests/v1/simple_kv_offload/test_integration.py
  M tests/v1/simple_kv_offload/test_scheduler.py
+ M tests/v1/streaming_input/test_async_llm_streaming.py
  M tests/v1/worker/test_gpu_model_runner_mm_gather.py
  M tests/v1/worker/test_gpu_worker.py
  M vllm/config/cache.py
@@ -142,6 +143,7 @@ EXPECTED_STATUS=$' M tests/config/test_config_utils.py
  M vllm/v1/core/kv_cache_utils.py
  M vllm/v1/core/sched/utils.py
  M vllm/v1/core/single_type_kv_cache_manager.py
+ M vllm/v1/engine/async_llm.py
  M vllm/v1/engine/input_processor.py
  M vllm/v1/kv_offload/base.py
  M vllm/v1/kv_offload/config.py
@@ -232,6 +234,7 @@ SAMPLING_BOUNDARY_PATCH_FILE="${PROJECT_DIR}/patches/vllm-sampling-decoding-boun
 GENERATE_RESULT_PATCH_FILE="${PROJECT_DIR}/patches/vllm-token-generation-result-integrity.patch"
 RAW_IMAGE_TRANSPORT_PATCH_FILE="${PROJECT_DIR}/patches/vllm-raw-image-token-transport.patch"
 XML_TEXT_FIDELITY_PATCH_FILE="${PROJECT_DIR}/patches/vllm-xml-text-fidelity.patch"
+INPUT_STREAM_AGENT_IDENTITY_PATCH_FILE="${PROJECT_DIR}/patches/vllm-input-stream-agent-identity.patch"
 PHASE_AWARE_PARSER_TERMINALS_PATCH_FILE="${PROJECT_DIR}/patches/vllm-phase-aware-parser-terminals.patch"
 SAMPLING_RESOLUTION_PATCH_FILE="${PROJECT_DIR}/patches/vllm-generation-sampling-resolution.patch"
 ANTHROPIC_TERMINAL_PATCH_FILE="${PROJECT_DIR}/patches/vllm-anthropic-terminal-metadata.patch"
@@ -402,6 +405,7 @@ printf '%s  %s\n' \
   "${ANTHROPIC_TERMINAL_PATCH_DIFF_SHA256}" "${ANTHROPIC_TERMINAL_PATCH_FILE}" \
   "${SAMPLING_RESOLUTION_PATCH_DIFF_SHA256}" "${SAMPLING_RESOLUTION_PATCH_FILE}" \
   "${PHASE_AWARE_PARSER_TERMINALS_PATCH_DIFF_SHA256}" "${PHASE_AWARE_PARSER_TERMINALS_PATCH_FILE}" \
+  "${INPUT_STREAM_AGENT_IDENTITY_PATCH_DIFF_SHA256}" "${INPUT_STREAM_AGENT_IDENTITY_PATCH_FILE}" \
   "${XML_TEXT_FIDELITY_PATCH_DIFF_SHA256}" "${XML_TEXT_FIDELITY_PATCH_FILE}" \
   "${RAW_IMAGE_TRANSPORT_PATCH_DIFF_SHA256}" "${RAW_IMAGE_TRANSPORT_PATCH_FILE}" \
   "${GENERATE_RESULT_PATCH_DIFF_SHA256}" "${GENERATE_RESULT_PATCH_FILE}" \
@@ -653,6 +657,10 @@ printf '%s  %s\n' \
   | sha256sum --check --strict
 
 printf '%s  %s\n' \
+  "${ASYNC_LLM_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/v1/engine/async_llm.py" \
+  | sha256sum --check --strict
+
+printf '%s  %s\n' \
   "${RUNTIME_DOCKERFILE_SHA256}" "${DOCKERFILE}" \
   "${DOCKERIGNORE_SHA256}" "${DOCKERIGNORE}" | \
   sha256sum --check --strict
@@ -869,6 +877,9 @@ docker buildx build --progress=plain \
   --build-arg "MISTRAL_PARSER_UPSTREAM_FILE_SHA256=${MISTRAL_PARSER_UPSTREAM_FILE_SHA256}" \
   --build-arg "MISTRAL_PARSER_PATCHED_FILE_SHA256=${MISTRAL_PARSER_PATCHED_FILE_SHA256}" \
   --build-arg "PHASE_AWARE_PARSER_TERMINALS_PATCH_DIFF_SHA256=${PHASE_AWARE_PARSER_TERMINALS_PATCH_DIFF_SHA256}" \
+  --build-arg "INPUT_STREAM_AGENT_IDENTITY_PATCH_DIFF_SHA256=${INPUT_STREAM_AGENT_IDENTITY_PATCH_DIFF_SHA256}" \
+  --build-arg "ASYNC_LLM_UPSTREAM_FILE_SHA256=${ASYNC_LLM_UPSTREAM_FILE_SHA256}" \
+  --build-arg "ASYNC_LLM_PATCHED_FILE_SHA256=${ASYNC_LLM_PATCHED_FILE_SHA256}" \
   --build-arg "DEEPSEEK_V32_PARSER_UPSTREAM_FILE_SHA256=${DEEPSEEK_V32_PARSER_UPSTREAM_FILE_SHA256}" \
   --build-arg "DEEPSEEK_V32_PARSER_PATCHED_FILE_SHA256=${DEEPSEEK_V32_PARSER_PATCHED_FILE_SHA256}" \
   --build-arg "DEEPSEEK_V4_PARSER_UPSTREAM_FILE_SHA256=${DEEPSEEK_V4_PARSER_UPSTREAM_FILE_SHA256}" \
@@ -987,6 +998,7 @@ actual_installed_report="$(
     /usr/local/lib/python3.12/dist-packages/vllm/v1/structured_output/__init__.py \
     /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/anthropic/api_router.py \
     /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/chat_completion/serving.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/async_llm.py \
     /usr/local/lib/python3.12/dist-packages/vllm/parser/gemma4.py \
     /usr/local/lib/python3.12/dist-packages/vllm/parser/glm47_moe.py \
     /usr/local/lib/python3.12/dist-packages/vllm/parser/minimax_m2.py \
@@ -1035,6 +1047,7 @@ expected_installed_report="$(printf '%s  %s\n' \
   "${STRUCTURED_OUTPUT_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/structured_output/__init__.py \
   "${ANTHROPIC_API_ROUTER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/anthropic/api_router.py \
   "${CHAT_SERVING_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/chat_completion/serving.py \
+  "${ASYNC_LLM_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/async_llm.py \
   "${GEMMA4_PARSER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/gemma4.py \
   "${GLM47_PARSER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/glm47_moe.py \
   "${MINIMAX_M2_PARSER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/minimax_m2.py \

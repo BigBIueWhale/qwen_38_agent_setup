@@ -1,0 +1,161 @@
+diff --git a/tests/v1/streaming_input/test_async_llm_streaming.py b/tests/v1/streaming_input/test_async_llm_streaming.py
+--- a/tests/v1/streaming_input/test_async_llm_streaming.py
++++ b/tests/v1/streaming_input/test_async_llm_streaming.py
+@@ -3,14 +3,17 @@
+ 
+ import asyncio
+ from collections.abc import AsyncGenerator
+-from unittest.mock import AsyncMock, MagicMock
++from types import SimpleNamespace
++from unittest.mock import AsyncMock, MagicMock, patch
+ 
+ import pytest
+ 
+ from vllm.engine.protocol import StreamingInput
+-from vllm.outputs import RequestOutput
++from vllm.exceptions import VLLMValidationError
++from vllm.outputs import STREAM_FINISHED, RequestOutput
+ from vllm.sampling_params import RequestOutputKind, SamplingParams
+ from vllm.v1.engine.async_llm import AsyncLLM
++from vllm.v1.engine.input_processor import InputProcessor
+ from vllm.v1.engine.output_processor import RequestOutputCollector
+ 
+ 
+@@ -170,3 +173,103 @@
+     assert outputs[2].finished is True
+     # Both inputs were processed
+     assert inputs_received == ["Hello", " world"]
++
++
++@pytest.fixture
++def streaming_engine():
++    """Run admission and input dispatch with no model, worker or service."""
++    processor = InputProcessor.__new__(InputProcessor)
++    processor.vllm_config = SimpleNamespace(
++        reasoning_config=None,
++        parallel_config=SimpleNamespace(data_parallel_size=1,
++            data_parallel_size_local=1, local_engines_only=True),
++    )
++    processor.model_config = SimpleNamespace(
++        max_model_len=2048, is_encoder_decoder=False, return_sampling_mask=False,
++    )
++    processor.speculative_config = None
++    processor.structured_outputs_config = None
++    processor.lora_config = None
++    processor.renderer = SimpleNamespace(tokenizer=None, get_eos_token_id=lambda: 2)
++    processor.generation_config_fields = {}
++    processor._validate_model_inputs = MagicMock()
++    processor.input_preprocessor = SimpleNamespace(
++        preprocess=lambda prompt, **kwargs: {
++            'type': 'token', 'prompt_token_ids': prompt['prompt_token_ids'],
++        },
++    )
++    engine = MagicMock(spec=AsyncLLM)
++    engine.input_processor = processor
++    engine.model_config = processor.model_config
++    engine.vllm_config = processor.vllm_config
++    engine.vllm_config.cache_config = SimpleNamespace(kv_sharing_fast_prefill=False)
++    engine.errored = False
++    engine.log_requests = False
++    engine.get_supported_tasks = AsyncMock(return_value=('generate',))
++    engine._validate_streaming_input_sampling_params = AsyncLLM._validate_streaming_input_sampling_params
++    engine._add_streaming_input_request = AsyncLLM._add_streaming_input_request.__get__(engine)
++    engine.add_request = AsyncLLM.add_request.__get__(engine)
++    engine.abort = AsyncMock()
++
++    async def dispatch(request, prompt, parent, index, queue):
++        if not request.resumable:
++            queue.put(STREAM_FINISHED)
++
++    engine._add_request = AsyncMock(side_effect=dispatch)
++    # Sampling bounds and model-input validation are independent of cache ID
++    # admission. The actual common ID validation and request cloning run here.
++    with patch.object(SamplingParams, 'verify'), patch(
++        'vllm.v1.engine.input_processor.current_platform',
++    ):
++        yield engine
++
++
++@pytest.mark.asyncio
++@pytest.mark.parametrize('agent', ['agent', '  opaque:/agent  '])
++@pytest.mark.parametrize('kind', [RequestOutputKind.DELTA, RequestOutputKind.CUMULATIVE])
++async def test_input_stream_retains_opaque_id_and_accepts_new_sampling_params(streaming_engine, agent, kind):
++    engine = streaming_engine
++    initial = SamplingParams(max_tokens=7, output_kind=kind,
++                             extra_args={'kv_scope': agent})
++    following = SamplingParams(max_tokens=3, output_kind=kind,
++                               extra_args={'kv_scope': agent})
++
++    async def chunks():
++        yield StreamingInput(prompt={'prompt_token_ids': [42]})
++        yield StreamingInput(prompt={'prompt_token_ids': [43]}, sampling_params=following)
++
++    assert [output async for output in AsyncLLM.generate(engine, chunks(), initial, 'req')] == []
++    requests = [call.args[0] for call in engine._add_request.call_args_list]
++    assert len(requests) == 3
++    assert [request.resumable for request in requests] == [True, True, False]
++    assert [request.sampling_params.max_tokens for request in requests] == [7, 3, 7]
++    assert all(request.sampling_params.extra_args['kv_scope'] == agent for request in requests)
++    assert len({request.request_id for request in requests}) == 1
++    engine.abort.assert_not_called()
++
++
++@pytest.mark.asyncio
++@pytest.mark.parametrize('agent', ['other', ' agent ', None, '', '   ', 7])
++@pytest.mark.parametrize('first_chunk', [False, True])
++@pytest.mark.parametrize('kind', [RequestOutputKind.DELTA, RequestOutputKind.CUMULATIVE])
++async def test_input_stream_refuses_id_change_before_dispatch_and_aborts_only_its_request(streaming_engine, agent, first_chunk, kind):
++    engine = streaming_engine
++    initial = SamplingParams(max_tokens=7, output_kind=kind,
++                             extra_args={'kv_scope': 'agent'})
++    following = SamplingParams(max_tokens=3, output_kind=kind,
++                               extra_args={'kv_scope': agent})
++
++    async def chunks():
++        if not first_chunk:
++            yield StreamingInput(prompt={'prompt_token_ids': [42]})
++        yield StreamingInput(prompt={'prompt_token_ids': [43]}, sampling_params=following)
++
++    with pytest.raises(VLLMValidationError) as caught:
++        _ = [output async for output in AsyncLLM.generate(engine, chunks(), initial, 'req')]
++    assert caught.value.parameter == 'kv_scope'
++    requests = [call.args[0] for call in engine._add_request.call_args_list]
++    assert len(requests) == 1 + int(not first_chunk)
++    assert not requests[-1].resumable
++    assert all(request.sampling_params.extra_args['kv_scope'] == 'agent' for request in requests)
++    assert all(request.prompt_token_ids != [43] for request in requests)
++    engine.abort.assert_awaited_once_with(requests[0].request_id, internal=True)
+diff --git a/vllm/v1/engine/async_llm.py b/vllm/v1/engine/async_llm.py
+--- a/vllm/v1/engine/async_llm.py
++++ b/vllm/v1/engine/async_llm.py
+@@ -41,7 +41,7 @@
+ from vllm.v1.engine import EngineCoreRequest, PauseMode
+ from vllm.v1.engine.core_client import EngineCoreClient
+ from vllm.v1.engine.exceptions import EngineDeadError, EngineGenerateError
+-from vllm.v1.engine.input_processor import InputProcessor
++from vllm.v1.engine.input_processor import InputProcessor, require_kv_scope
+ from vllm.v1.engine.output_processor import OutputProcessor, RequestOutputCollector
+ from vllm.v1.engine.parallel_sampling import ParentRequest
+ from vllm.v1.executor import Executor
+@@ -452,6 +452,7 @@
+         session_id: str | None = None,
+     ) -> RequestOutputCollector:
+         self._validate_streaming_input_sampling_params(sampling_params)
++        agent_id = require_kv_scope(sampling_params)
+ 
+         inputs = dict(
+             supported_tasks=await self.get_supported_tasks(),
+@@ -490,6 +491,13 @@
+                         self._validate_streaming_input_sampling_params(sp)
+                     else:
+                         sp = sampling_params
++                    if require_kv_scope(sp) != agent_id:
++                        raise VLLMValidationError(
++                            "kv_scope must remain the same throughout an input "
++                            "stream. Submit a new generation request for a "
++                            "different agent ID.",
++                            parameter="kv_scope",
++                        )
+                     # TODO(nick): Avoid re-validating reused sampling parameters
+                     req = self.input_processor.process_inputs(
+                         request_id=internal_req_id,

@@ -2158,6 +2158,40 @@ def _validate_phase_terminals_after(state: State) -> None:
         }, label=label)
 
 
+def _validate_stream_identity_before(state: State) -> None:
+    label = "Input-stream agent identity baseline"
+    path = "vllm/v1/engine/async_llm.py"
+    _require_in_symbol(state, path, "AsyncLLM._add_streaming_input_request", (
+        "sp = input_chunk.sampling_params",
+        "sp = sampling_params",
+        "params=sp,",
+    ), label=label)
+    forbid_text(state, path, "require_kv_scope(sp)", label=label)
+
+
+def _validate_stream_identity_after(state: State) -> None:
+    label = "Input-stream agent identity"
+    source = _require_in_symbol(state, "vllm/v1/engine/async_llm.py",
+        "AsyncLLM._add_streaming_input_request", (
+            "agent_id = require_kv_scope(sampling_params)",
+            "if require_kv_scope(sp) != agent_id:",
+            'parameter="kv_scope",',
+            "queue.put(InputStreamError(error))",
+        ), label=label)
+    _require(
+        source.index("agent_id = require_kv_scope(sampling_params)")
+        < source.index("async for input_chunk in input_stream:")
+        < source.index("if require_kv_scope(sp) != agent_id:")
+        < source.index("\n                    req = self.input_processor.process_inputs("),
+        f"{label}: identity must be bound before reading and checked before dispatch",
+    )
+    require_python_symbols(state,
+        "tests/v1/streaming_input/test_async_llm_streaming.py", {
+            "test_input_stream_retains_opaque_id_and_accepts_new_sampling_params": None,
+            "test_input_stream_refuses_id_change_before_dispatch_and_aborts_only_its_request": None,
+        }, label=label)
+
+
 def validate_final(state: State) -> None:
     """Reassert every durable semantic invariant on the complete tree.
 
@@ -2173,6 +2207,20 @@ def validate_final(state: State) -> None:
 
 
 CONTRACTS: Mapping[str, SemanticContract] = {
+    "input-stream-agent-identity": SemanticContract(
+        rationale=(
+            "An input stream resumes one live request and its acquired KV. "
+            "Bind its opaque agent ID before reading chunks and refuse an "
+            "ID change before dispatch. A different agent enters through "
+            "normal generation admission and initial-prefix acquisition."
+        ),
+        removal_condition=(
+            "Remove when upstream enforces the same stable input-stream "
+            "identity and request-local validation/abort behavior."
+        ),
+        validate_before=_validate_stream_identity_before,
+        validate_after=_validate_stream_identity_after,
+    ),
     "phase-aware-parser-terminals": SemanticContract(
         rationale=(
             "Qwen reasoning boundaries require atomic token provenance, while "
