@@ -2,11 +2,11 @@
 # Single source of truth for the only supported serving profile.
 
 readonly PROFILE_VERSION="socket-isolated-nonroot-vision-k8v4-agent-v21"
-readonly IMAGE_PROFILE_VERSION="socket-isolated-nonroot-vision-k8v4-agent-v22"
+readonly IMAGE_PROFILE_VERSION="socket-isolated-nonroot-vision-k8v4-agent-v23"
 readonly CONTAINER_NAME="qwen38-agent-native"
 readonly CONTAINER_LABEL="Qwen_best_model_ever"
-readonly IMAGE_TAG="qwen38-vllm:qwen38-27b-nvfp4-k8v4-runtime-v22"
-# AWAITING ADOPTION for the v22 image. ./scripts/build-vllm.sh builds it and
+readonly IMAGE_TAG="qwen38-vllm:qwen38-27b-nvfp4-k8v4-runtime-v23"
+# AWAITING ADOPTION for the v23 image. ./scripts/build-vllm.sh builds it and
 # refuses at this check, reporting the ID it produced; adopt that ID here.
 # The refusal is what keeps the stale value from being deployable.
 readonly EXPECTED_IMAGE_ID="sha256:695780692e2d9ea863f7081520e02ade0997ee7486a78e05968d2d62efe4b839"
@@ -23,7 +23,7 @@ readonly RELAY_MEMORY="32m"
 readonly RELAY_PIDS_LIMIT="32"
 readonly BASE_IMAGE_TAG="qwen38-vllm:main-9df9b0b"
 readonly EXPECTED_BASE_IMAGE_ID="sha256:fa4a002a88b7043a1a89966dea8a500fe9696f84e75730d9da916f916048d401"
-readonly IMAGE_ARCHIVE_NAME="qwen38-vllm-images-runtime-v22.tar"
+readonly IMAGE_ARCHIVE_NAME="qwen38-vllm-images-runtime-v23.tar"
 # AWAITING ADOPTION, like EXPECTED_IMAGE_ID: the restore path verifies this
 # hash before docker load, so a stale value fails on the bytes.
 readonly IMAGE_ARCHIVE_SHA256="3a0a9e2aa84df4adf3993aa47d922bfc925850e72f7049347722a5406f7cbc31"
@@ -65,11 +65,11 @@ readonly ANTHROPIC_VALIDATION_PATCH_DIFF_SHA256="b4c3327ca4e513b9a58edc3e9aca978
 readonly TOOL_TRUNCATION_PATCH_DIFF_SHA256="1a220f6db9b40967d867b3cfb1a92d95d907ca059718ffe61772b4cb4409f551"
 readonly VISION_RUNTIME_PATCH_DIFF_SHA256="f92603724861da5b5a364f43e57d3f95ef43a9dded8ae645278373850db3140f"
 readonly NUMERICAL_AUDITS_PATCH_DIFF_SHA256="a73aa2f2ae3f82010eb2bafcdf663c2fe14854c30165dbc4d8457725bc3b6632"
-readonly TURBOQUANT_GUARDS_PATCH_DIFF_SHA256="0ecf95ab8ee25a76d5412ce44aafafe13992b2cb373d6010acf5bc119dc8f47b"
+readonly TURBOQUANT_GUARDS_PATCH_DIFF_SHA256="7282d1d4d7a17b40ab8626c82f478bbb938c548451b7793df8233562a9e24c7c"
 readonly KV_OFFLOAD_PINNING_PATCH_DIFF_SHA256="1857071c38d081bb95e3cca12153cebce096649084950b99229104fdae029ca6"
 readonly KV_USERS_SCOPE_PATCH_DIFF_SHA256="d4d18c5afc0af9ecdaff948d7e7f4b5d2e8f85eb15e7853aaddc44de62b17b56"
 readonly EXACT_REASONING_USAGE_PATCH_DIFF_SHA256="7991cca04345cf58a602a6b0630d2ebbf31f3da228e9034da591217956d37b31"
-readonly SOURCE_PATCH_MANIFEST_SHA256="914736b292c8db4001b3b5b04c4e84f2f090971b41b31329da3a7da5b20a7c92"
+readonly SOURCE_PATCH_MANIFEST_SHA256="5da238e2083f405b46c252a6bf1b95cb634ceb35d794d7d1f4c6bfb1d70732a9"
 # Cardinality of config/deployment-inputs.sha256. The hash manifest alone
 # proves the listed bytes but cannot see a quietly grown or shrunk allowlist,
 # so the reviewed file count is pinned as well. It is declared exactly once,
@@ -78,8 +78,10 @@ readonly SOURCE_PATCH_MANIFEST_SHA256="914736b292c8db4001b3b5b04c4e84f2f090971b4
 # was added — the validator then refused a correct manifest. Every consumer
 # (build-vllm.sh, runtime-common.sh, generate-deployment-input-manifest.sh)
 # reads this declaration.
-readonly DEPLOYMENT_INPUT_FILE_COUNT="83"
+readonly DEPLOYMENT_INPUT_FILE_COUNT="85"
 readonly TURBOQUANT_PATCHED_FILE_SHA256="ccda36577e4fb0052f370169dce4b649bad890b8b440a82e584acd3dd92a6d86"
+readonly TURBOQUANT_STORE_PATCHED_FILE_SHA256="298645bff68c6adab58261862602b86e7e714c3552a9fd89102d9ccd2b83e9f7"
+readonly TURBOQUANT_DECODE_PATCHED_FILE_SHA256="dab8b65ab7ddd6582de16e1fc7b1360ab0061b4a2a2b114f5d87ea0532fd726f"
 readonly TOOL_SCHEMA_PATCHED_FILE_SHA256="e88b5cd98ace7c76453552f5f08264e0be23d1a5bc9b9d15cc0f39ba75ec043e"
 readonly MODEL_CONFIG_PATCHED_FILE_SHA256="6a0b5fdcb292fef440ee59321b7db437dae2cd5fd80eb2372fa3647fb163a3cf"
 readonly ANTHROPIC_PROTOCOL_PATCHED_FILE_SHA256="ca33754155c33ab877785a80192a82c4c27db897b5542b942d8157bdbf5241ad"
@@ -203,9 +205,12 @@ readonly POLICY_ARC_UPSTREAM_FILE_SHA256="ff12419f9cb4fb84c4029ff3346319d43d0236
 readonly ABSTRACT_PARSER_UPSTREAM_FILE_SHA256="e567186750002ed7d0f5c5efeaffc9b9cfbec18060bdc080420b24cade713e13"
 readonly PARSER_ADAPTERS_UPSTREAM_FILE_SHA256="dc1c1317dbfb298e54b8d94ca0e66d2b0cb1e481c35cdcc60a815284bd8a6ef7"
 readonly ENGINE_PROTOCOL_UPSTREAM_FILE_SHA256="1c11f63c48fb3a48fdcc60371cb8eff4f03ed28ea7fc226450379b20bf8aa319"
+readonly TURBOQUANT_STORE_UPSTREAM_FILE_SHA256="6e6e2fe74a307d40f0be786ccbaea76d989e3c7b5985f3144a5218c61bf6d902"
+readonly TURBOQUANT_DECODE_UPSTREAM_FILE_SHA256="8e52678136449e4bbca2195fbcbb87426c955a2b1b8422e7ab9511e45ee5f5c6"
+readonly TURBOQUANT_GUARD_UNIT_SHA256="657189807e2966824c556a08eb78a9ed7891331f6de4f3b563cf6cfded15cf47"
 readonly SOURCE_DATE_EPOCH="1786751423"
-readonly RUNTIME_DOCKERFILE_SHA256="31a851427d29dc7a2282a3ce83e5d9084b705369ddb615590dec41f1ebd27fd6"
-readonly DOCKERIGNORE_SHA256="2e3b84466fec6ab55f84c714144f362c2f4e4977d00b0361d068993dd70dcf76"
+readonly RUNTIME_DOCKERFILE_SHA256="e40fce53d48020435ca54abf4262db15ee87553a4448b2aba3cec9e611b23980"
+readonly DOCKERIGNORE_SHA256="1689850e105f36863a99bd97669a878db6dd60acb41649bef3e5e9f50a6dfbc7"
 
 # Functional host contract only. Exact host software versions, binary
 # hashes, and GPU/driver identity are deliberately not pinned: they tie the

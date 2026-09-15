@@ -2,13 +2,13 @@ diff --git a/vllm/v1/attention/ops/triton_turboquant_store.py b/vllm/v1/attentio
 index e680f68..19dd4c9 100644
 --- a/vllm/v1/attention/ops/triton_turboquant_store.py
 +++ b/vllm/vllm/v1/attention/ops/triton_turboquant_store.py
-@@ -120,14 +120,30 @@ def _store_quantized_value(
+@@ -120,14 +120,31 @@ def _store_quantized_value(
          )
  
          sc_offset = val_cache_offset + VAL_DATA_BYTES
 -        sc_f16 = v_scale.to(tl.float16)
-+        # Fail closed on insane inputs instead of laundering them: a NaN or
-+        # ±inf element makes val_min/val_max non-finite, and a range or
++        # Reductions discard isolated NaNs, so check every input lane too.
++        # Fail closed on non-finite values, and a range or
 +        # minimum beyond fp16's finite grid would overflow the stored
 +        # metadata. In every such case poison both metadata fields with NaN
 +        # so reconstruction propagates NaN loudly (matching the FP8 key
@@ -16,7 +16,8 @@ index e680f68..19dd4c9 100644
 +        # all finite in-range inputs the stored bytes are bit-identical to
 +        # the unguarded form.
 +        meta_ok = (
-+            (val_min == val_min)
++            (tl.sum((d_mask & (val_vec != val_vec)).to(tl.int32), axis=0) == 0)
++            & (val_min == val_min)
 +            & (val_max == val_max)
 +            & (val_min > -65504.0)
 +            & (val_min < 65504.0)

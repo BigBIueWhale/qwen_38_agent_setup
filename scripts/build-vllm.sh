@@ -128,9 +128,9 @@ MODEL_MANIFEST_DIR="${PROJECT_DIR}/manifests"
 # IDs purely because their checkouts happened at different moments -- which is
 # exactly what happened, and what made EXPECTED_IMAGE_ID unreachable anywhere
 # except the machine that first wrote the tree.
-BUILD_EXPORT_DIR="$(mktemp -d /tmp/qwen38-vllm-build.XXXXXX)"
+BUILD_EXPORT_DIR="$(mktemp -d "${TMPDIR:-/tmp}/qwen38-vllm-build.XXXXXX")"
 case "${BUILD_EXPORT_DIR}" in
-  /tmp/qwen38-vllm-build.*) ;;
+  "${TMPDIR:-/tmp}"/qwen38-vllm-build.*) ;;
   *) echo "Unexpected temporary build-export directory: ${BUILD_EXPORT_DIR}" >&2; exit 1 ;;
 esac
 readonly BUILD_EXPORT_DIR
@@ -232,7 +232,10 @@ fi
   sha256sum --check --strict \
     "${DEPLOYMENT_INPUT_MANIFEST#"${PROJECT_DIR}"/}"
 )
-bash "${RUNTIME_COMMON_CONTRACT_TEST}"
+docker run --rm --network none --read-only \
+  --user "$(id -u):$(id -g)" \
+  --volume "${PROJECT_DIR}:/project:ro" \
+  --entrypoint bash "${BASE_IMAGE_TAG}" /project/scripts/test-runtime-common-contract.sh
 
 # Every SHA-256 the README states is one this repository derives. A hash in the
 # README is provenance -- a claim that some file, image, or archive has exactly
@@ -325,7 +328,7 @@ docker run --rm \
   --volume "${PROJECT_DIR}:/project:ro" \
   --workdir /project \
   "${BASE_IMAGE_TAG}" \
-  -m unittest -v patches.source_patch_v1.test_framework
+  -m unittest -v patches.source_patch_v1.test_framework scripts.runtime_image_unit
 
 # The served chat template is the fourteenth landmark-aware transformation, and
 # it is proved here on the same terms as the other thirteen: reconstructed from
@@ -352,7 +355,7 @@ docker run --rm \
 # the pinned upstream commit. The reviewed diffs are independently hashed and
 # parsed as review evidence, but they never select mutation locations. The
 # private worktree is discarded on every failure and never becomes a runtime.
-VERIFY_WORKTREE="$(mktemp -d /tmp/qwen38-vllm-verify.XXXXXX)"
+VERIFY_WORKTREE="$(mktemp -d "${TMPDIR:-/tmp}/qwen38-vllm-verify.XXXXXX")"
 remove_verify_worktree() {
   if ! git -C "${VLLM_DIR}" worktree remove --force "${VERIFY_WORKTREE}"; then
     printf 'ERROR: failed to remove the exact disposable verification worktree: %s\n' \
@@ -421,6 +424,8 @@ trap cleanup_build_export EXIT
 
 printf '%s  %s\n' \
   "${TURBOQUANT_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${TURBOQUANT_REL}" \
+  "${TURBOQUANT_DECODE_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/v1/attention/ops/triton_turboquant_decode.py" \
+  "${TURBOQUANT_STORE_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/v1/attention/ops/triton_turboquant_store.py" \
   "${TOOL_SCHEMA_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${TOOL_SCHEMA_REL}" \
   "${MODEL_CONFIG_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${MODEL_CONFIG_REL}" \
   "${ANTHROPIC_PROTOCOL_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${ANTHROPIC_PROTOCOL_REL}" \
@@ -492,12 +497,23 @@ printf '%s  %s\n' \
   sha256sum --check --strict
 
 printf '%s  %s\n' \
+  "${TURBOQUANT_GUARD_UNIT_SHA256}" "${PROJECT_DIR}/scripts/turboquant_guard_unit.py" \
   "${TURBOQUANT_K8V4_UNIT_SHA256}" "${TURBOQUANT_K8V4_UNIT_FILE}" \
   "${QWEN38_CONTEXT_UNIT_SHA256}" "${QWEN38_CONTEXT_UNIT_FILE}" \
   "${CHAT_TEMPLATE_RETENTION_UNIT_SHA256}" "${CHAT_TEMPLATE_RETENTION_UNIT_FILE}" \
   "${NVFP4_KERNEL_UNIT_SHA256}" "${NVFP4_KERNEL_UNIT_FILE}" \
   "${REASONING_USAGE_UNIT_SHA256}" "${REASONING_USAGE_UNIT_FILE}" | \
   sha256sum --check --strict
+
+docker run --rm --network none --read-only \
+  --user "$(id -u):$(id -g)" \
+  --tmpfs /tmp:rw,nodev,nosuid,size=128m \
+  --env PYTHONPYCACHEPREFIX=/tmp/pycache \
+  --env CUDA_VISIBLE_DEVICES= --env TRITON_INTERPRET=1 \
+  --volume "${PROJECT_DIR}:/project:ro" \
+  --volume "${VLLM_DIR}/vllm/v1/attention/ops/triton_turboquant_store.py:/usr/local/lib/python3.12/dist-packages/vllm/v1/attention/ops/triton_turboquant_store.py:ro" \
+  --volume "${VLLM_DIR}/vllm/v1/attention/ops/triton_turboquant_decode.py:/usr/local/lib/python3.12/dist-packages/vllm/v1/attention/ops/triton_turboquant_decode.py:ro" \
+  --entrypoint python3 "${BASE_IMAGE_TAG}" /project/scripts/turboquant_guard_unit.py
 
 git -C "${VLLM_DIR}" diff --check
 
@@ -534,6 +550,8 @@ docker buildx build --progress=plain \
   --target runtime \
   --build-arg "BASE_IMAGE=${BASE_IMAGE_TAG}" \
   --build-arg "TURBOQUANT_UPSTREAM_FILE_SHA256=${TURBOQUANT_UPSTREAM_FILE_SHA256}" \
+  --build-arg "TURBOQUANT_DECODE_UPSTREAM_FILE_SHA256=${TURBOQUANT_DECODE_UPSTREAM_FILE_SHA256}" \
+  --build-arg "TURBOQUANT_STORE_UPSTREAM_FILE_SHA256=${TURBOQUANT_STORE_UPSTREAM_FILE_SHA256}" \
   --build-arg "TOOL_SCHEMA_UPSTREAM_FILE_SHA256=${TOOL_SCHEMA_UPSTREAM_FILE_SHA256}" \
   --build-arg "MODEL_CONFIG_UPSTREAM_FILE_SHA256=${MODEL_CONFIG_UPSTREAM_FILE_SHA256}" \
   --build-arg "ANTHROPIC_PROTOCOL_UPSTREAM_FILE_SHA256=${ANTHROPIC_PROTOCOL_UPSTREAM_FILE_SHA256}" \
@@ -567,6 +585,8 @@ docker buildx build --progress=plain \
   --build-arg "PARSER_ADAPTERS_UPSTREAM_FILE_SHA256=${PARSER_ADAPTERS_UPSTREAM_FILE_SHA256}" \
   --build-arg "ENGINE_PROTOCOL_UPSTREAM_FILE_SHA256=${ENGINE_PROTOCOL_UPSTREAM_FILE_SHA256}" \
   --build-arg "TURBOQUANT_PATCHED_FILE_SHA256=${TURBOQUANT_PATCHED_FILE_SHA256}" \
+  --build-arg "TURBOQUANT_DECODE_PATCHED_FILE_SHA256=${TURBOQUANT_DECODE_PATCHED_FILE_SHA256}" \
+  --build-arg "TURBOQUANT_STORE_PATCHED_FILE_SHA256=${TURBOQUANT_STORE_PATCHED_FILE_SHA256}" \
   --build-arg "TOOL_SCHEMA_PATCHED_FILE_SHA256=${TOOL_SCHEMA_PATCHED_FILE_SHA256}" \
   --build-arg "MODEL_CONFIG_PATCHED_FILE_SHA256=${MODEL_CONFIG_PATCHED_FILE_SHA256}" \
   --build-arg "ANTHROPIC_PROTOCOL_PATCHED_FILE_SHA256=${ANTHROPIC_PROTOCOL_PATCHED_FILE_SHA256}" \
@@ -601,6 +621,7 @@ docker buildx build --progress=plain \
   --build-arg "VISION_WORKSPACE_UNIT_SHA256=${VISION_WORKSPACE_UNIT_SHA256}" \
   --build-arg "VISION_CONTRACT_UNIT_SHA256=${VISION_CONTRACT_UNIT_SHA256}" \
   --build-arg "VISION_MLP_UNIT_SHA256=${VISION_MLP_UNIT_SHA256}" \
+  --build-arg "TURBOQUANT_GUARD_UNIT_SHA256=${TURBOQUANT_GUARD_UNIT_SHA256}" \
   --build-arg "TURBOQUANT_K8V4_UNIT_SHA256=${TURBOQUANT_K8V4_UNIT_SHA256}" \
   --build-arg "QWEN38_CONTEXT_UNIT_SHA256=${QWEN38_CONTEXT_UNIT_SHA256}" \
   --build-arg "CHAT_TEMPLATE_RETENTION_UNIT_SHA256=${CHAT_TEMPLATE_RETENTION_UNIT_SHA256}" \
@@ -678,6 +699,8 @@ actual_image_id="$(docker image inspect --format '{{.Id}}' "${IMAGE_TAG}")"
 actual_installed_report="$(
   docker run --rm --network none --entrypoint sha256sum "${IMAGE_TAG}" \
     /usr/local/lib/python3.12/dist-packages/vllm/v1/attention/backends/turboquant_attn.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/v1/attention/ops/triton_turboquant_store.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/v1/attention/ops/triton_turboquant_decode.py \
     /usr/local/lib/python3.12/dist-packages/vllm/tool_parsers/structural_tag_registry.py \
     /usr/local/lib/python3.12/dist-packages/vllm/config/model.py \
     /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/anthropic/protocol.py \
@@ -703,6 +726,8 @@ actual_installed_report="$(
 )"
 expected_installed_report="$(printf '%s  %s\n' \
   "${TURBOQUANT_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/attention/backends/turboquant_attn.py \
+  "${TURBOQUANT_STORE_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/attention/ops/triton_turboquant_store.py \
+  "${TURBOQUANT_DECODE_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/attention/ops/triton_turboquant_decode.py \
   "${TOOL_SCHEMA_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/tool_parsers/structural_tag_registry.py \
   "${MODEL_CONFIG_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/config/model.py \
   "${ANTHROPIC_PROTOCOL_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/anthropic/protocol.py \
@@ -749,6 +774,7 @@ additional_installed_report="$(
     /opt/qwen38/vision_contract_unit.py \
     /opt/qwen38/vision_mlp_unit.py \
     /opt/qwen38/turboquant_k8v4_unit.py \
+    /opt/qwen38/turboquant_guard_unit.py \
     /opt/qwen38/qwen38_context_unit.py \
     /opt/qwen38/chat_template_retention_unit.py \
     /opt/qwen38/nvfp4_kernel_unit.py
@@ -767,6 +793,7 @@ expected_additional_installed_report="$(printf '%s  %s\n' \
   "${VISION_CONTRACT_UNIT_SHA256}" /opt/qwen38/vision_contract_unit.py \
   "${VISION_MLP_UNIT_SHA256}" /opt/qwen38/vision_mlp_unit.py \
   "${TURBOQUANT_K8V4_UNIT_SHA256}" /opt/qwen38/turboquant_k8v4_unit.py \
+  "${TURBOQUANT_GUARD_UNIT_SHA256}" /opt/qwen38/turboquant_guard_unit.py \
   "${QWEN38_CONTEXT_UNIT_SHA256}" /opt/qwen38/qwen38_context_unit.py \
   "${CHAT_TEMPLATE_RETENTION_UNIT_SHA256}" /opt/qwen38/chat_template_retention_unit.py \
   "${NVFP4_KERNEL_UNIT_SHA256}" /opt/qwen38/nvfp4_kernel_unit.py)"

@@ -15,7 +15,9 @@ workstation.
 
 ### Bottom line
 
-The deployment is complete and healthy. There is one supported mode:
+The v23 source revision awaits its offline image build, adoption and release
+validation. Prior live results below describe the versions that earned them.
+There is one supported mode:
 
 | Property | Locked value |
 |---|---|
@@ -39,8 +41,8 @@ The deployment is complete and healthy. There is one supported mode:
 | Agent client | Qwen Code 0.21.12 at b965d5f8c24f48e65fb0b17c7d45f34ca4ce8f38 |
 | Agent-service release | Pinned by the agent-service release lock, which owns every agent and service image identity |
 | Agent-service listener | 127.0.0.1:8090 only |
-| Runtime profile | socket-isolated-nonroot-vision-k8v4-agent-v22 |
-| Runtime image | sha256:695780692e2d9ea863f7081520e02ade0997ee7486a78e05968d2d62efe4b839 |
+| Runtime profile | socket-isolated-nonroot-vision-k8v4-agent-v23 |
+| Runtime image | Awaiting adoption after the v23 build |
 
 This is not a text-only profile with an optional vision switch. It is not a
 one-million-token profile. It has no MTP, eager-mode, lower-quality image, alternate
@@ -258,7 +260,7 @@ It is intentionally reconstructed by thirteen ordered, reviewed semantic transfo
 | patches/vllm-tool-truncation-finish-reason.patch | 1a220f6db9b40967d867b3cfb1a92d95d907ca059718ffe61772b4cb4409f551 |
 | patches/vllm-qwen38-vision-runtime.patch | f92603724861da5b5a364f43e57d3f95ef43a9dded8ae645278373850db3140f |
 | patches/vllm-qwen38-numerical-audits.patch | a73aa2f2ae3f82010eb2bafcdf663c2fe14854c30165dbc4d8457725bc3b6632 |
-| patches/vllm-turboquant-fail-closed-guards.patch | 0ecf95ab8ee25a76d5412ce44aafafe13992b2cb373d6010acf5bc119dc8f47b |
+| patches/vllm-turboquant-fail-closed-guards.patch | 7282d1d4d7a17b40ab8626c82f478bbb938c548451b7793df8233562a9e24c7c |
 | patches/vllm-kv-offload-pinning-fail-closed.patch | 1857071c38d081bb95e3cca12153cebce096649084950b99229104fdae029ca6 |
 | patches/vllm-kv-user-count-sizing-and-scope-eviction.patch | d4d18c5afc0af9ecdaff948d7e7f4b5d2e8f85eb15e7853aaddc44de62b17b56 |
 | patches/vllm-exact-reasoning-usage.patch | 7991cca04345cf58a602a6b0630d2ebbf31f3da228e9034da591217956d37b31 |
@@ -282,16 +284,23 @@ Pinned build inputs and products:
 |---|---|
 | Immutable base tag | qwen38-vllm:main-9df9b0b |
 | Immutable base ID | sha256:fa4a002a88b7043a1a89966dea8a500fe9696f84e75730d9da916f916048d401 |
-| Runtime tag | qwen38-vllm:qwen38-27b-nvfp4-k8v4-runtime-v22 |
-| Runtime ID | sha256:695780692e2d9ea863f7081520e02ade0997ee7486a78e05968d2d62efe4b839 |
-| Offline archive | artifacts/qwen38-vllm-images-runtime-v22.tar |
-| Archive size | 8,558,573,056 bytes, mode 0600 |
-| Archive SHA-256 | 3a0a9e2aa84df4adf3993aa47d922bfc925850e72f7049347722a5406f7cbc31 |
-| Runtime Dockerfile SHA-256 | 31a851427d29dc7a2282a3ce83e5d9084b705369ddb615590dec41f1ebd27fd6 |
-| Docker context allowlist SHA-256 | 2e3b84466fec6ab55f84c714144f362c2f4e4977d00b0361d068993dd70dcf76 |
-| Build verifier SHA-256 | 23897dde0f0fc9340ebe7f400cb7f1dba876be7ac1b62a0a90f4f9679e62b905 |
-| Runtime validator SHA-256 | 94472f5a2c3d4b141e5d0a3a5717e815690319506ce55aff4ee05b2301552ec4 |
-| Runtime lock SHA-256 | 570910a459c98ba851bb5d74078cc8d81c13c0bfb01fbd550cc7f85ed653ca51 |
+| Runtime tag | qwen38-vllm:qwen38-27b-nvfp4-k8v4-runtime-v23 |
+| Runtime ID | Awaiting adoption after the v23 build |
+| Offline archive | artifacts/qwen38-vllm-images-runtime-v23.tar |
+| Archive size | Awaiting adoption after the v23 export |
+| Archive SHA-256 | Awaiting adoption after the v23 export |
+| Runtime Dockerfile SHA-256 | e40fce53d48020435ca54abf4262db15ee87553a4448b2aba3cec9e611b23980 |
+| Docker context allowlist SHA-256 | 1689850e105f36863a99bd97669a878db6dd60acb41649bef3e5e9f50a6dfbc7 |
+| Build verifier SHA-256 | f03ed8c74c755aaaea64f4699462f16d4840dc5295c6b16cfeee064b9ee21957 |
+| Runtime validator SHA-256 | 086bb442a844598736007e8c8e76b6363410e3affa5e167cc80beaf2e47d7566 |
+| Runtime lock SHA-256 | 554d661fe6ab96b82ff3bf20e9a4f9902701929fc4fc1f4004e8b318cf19e43a |
+
+Every reviewed runtime file, including both TurboQuant kernels, is copied and
+hash-checked against its upstream and patched identities. A CPU Triton-interpreter
+build unit executes the installed K8V4 store with finite, NaN, infinity and
+metadata-overflow inputs and checks the decode hardware guard. A separate recipe
+unit refuses missing copies, context entries or installed-file checks. The GPU
+numerical unit remains a release gate; CPU interpretation is not GPU acceptance.
 
 The final runtime layer does no package resolution or installation. It is built with
 pull=false, network=none, provenance=false, an exact base ID, an allowlisted context,

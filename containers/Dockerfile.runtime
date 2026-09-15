@@ -2,6 +2,12 @@ ARG BASE_IMAGE=qwen38-vllm:main-9df9b0b
 
 FROM ${BASE_IMAGE} AS upstream-verifier
 ARG TURBOQUANT_UPSTREAM_FILE_SHA256
+ARG TURBOQUANT_STORE_UPSTREAM_FILE_SHA256
+ARG TURBOQUANT_DECODE_UPSTREAM_FILE_SHA256
+RUN printf '%s  %s\n' \
+      "${TURBOQUANT_STORE_UPSTREAM_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/attention/ops/triton_turboquant_store.py \
+      "${TURBOQUANT_DECODE_UPSTREAM_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/attention/ops/triton_turboquant_decode.py \
+    | sha256sum --check --strict
 ARG TOOL_SCHEMA_UPSTREAM_FILE_SHA256
 ARG MODEL_CONFIG_UPSTREAM_FILE_SHA256
 ARG ANTHROPIC_PROTOCOL_UPSTREAM_FILE_SHA256
@@ -83,7 +89,7 @@ RUN printf '%s  %s\n%s  %s\n%s  %s\n' \
       "${API_UTILS_UPSTREAM_FILE_SHA256}" \
       /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/serve/utils/api_utils.py \
     | sha256sum --check --strict
-RUN printf '%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n' \
+RUN printf '%s  %s\n' \
       "${ENVS_UPSTREAM_FILE_SHA256}" \
       /usr/local/lib/python3.12/dist-packages/vllm/envs.py \
       "${CHAT_UTILS_UPSTREAM_FILE_SHA256}" \
@@ -190,6 +196,8 @@ RUN printf '%s  %s\n%s  %s\n%s  %s\n' \
 
 FROM upstream-verifier AS runtime
 ARG TURBOQUANT_PATCHED_FILE_SHA256
+ARG TURBOQUANT_STORE_PATCHED_FILE_SHA256
+ARG TURBOQUANT_DECODE_PATCHED_FILE_SHA256
 ARG TOOL_SCHEMA_PATCHED_FILE_SHA256
 ARG MODEL_CONFIG_PATCHED_FILE_SHA256
 ARG ANTHROPIC_PROTOCOL_PATCHED_FILE_SHA256
@@ -224,6 +232,7 @@ ARG PHASE_BUDGET_UNIT_SHA256
 ARG VISION_WORKSPACE_UNIT_SHA256
 ARG VISION_CONTRACT_UNIT_SHA256
 ARG VISION_MLP_UNIT_SHA256
+ARG TURBOQUANT_GUARD_UNIT_SHA256
 ARG TURBOQUANT_K8V4_UNIT_SHA256
 ARG QWEN38_CONTEXT_UNIT_SHA256
 ARG CHAT_TEMPLATE_RETENTION_UNIT_SHA256
@@ -438,17 +447,25 @@ COPY --chmod=0644 \
 COPY --chmod=0644 \
   vllm/vllm/entrypoints/scale_out/token_in_token_out/serving.py \
   /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/scale_out/token_in_token_out/serving.py
+COPY --chmod=0644 vllm/vllm/v1/attention/ops/triton_turboquant_store.py /usr/local/lib/python3.12/dist-packages/vllm/v1/attention/ops/triton_turboquant_store.py
+COPY --chmod=0644 vllm/vllm/v1/attention/ops/triton_turboquant_decode.py /usr/local/lib/python3.12/dist-packages/vllm/v1/attention/ops/triton_turboquant_decode.py
 COPY --chmod=0644 chat_template.jinja /opt/qwen38/chat_template.jinja
 COPY --chmod=0644 scripts/phase_budget_unit.py /opt/qwen38/phase_budget_unit.py
 COPY --chmod=0644 scripts/vision_workspace_unit.py /opt/qwen38/vision_workspace_unit.py
 COPY --chmod=0644 scripts/vision_contract_unit.py /opt/qwen38/vision_contract_unit.py
 COPY --chmod=0644 scripts/vision_mlp_unit.py /opt/qwen38/vision_mlp_unit.py
 COPY --chmod=0644 scripts/turboquant_k8v4_unit.py /opt/qwen38/turboquant_k8v4_unit.py
+COPY --chmod=0644 scripts/turboquant_guard_unit.py /opt/qwen38/turboquant_guard_unit.py
 COPY --chmod=0644 scripts/qwen38_context_unit.py /opt/qwen38/qwen38_context_unit.py
 COPY --chmod=0644 scripts/chat_template_retention_unit.py /opt/qwen38/chat_template_retention_unit.py
 COPY --chmod=0644 scripts/nvfp4_kernel_unit.py /opt/qwen38/nvfp4_kernel_unit.py
 COPY --chmod=0644 scripts/reasoning_usage_unit.py /opt/qwen38/reasoning_usage_unit.py
-RUN printf '%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n' \
+RUN printf '%s  %s\n' \
+      "${TURBOQUANT_STORE_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/attention/ops/triton_turboquant_store.py \
+      "${TURBOQUANT_DECODE_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/attention/ops/triton_turboquant_decode.py \
+    | sha256sum --check --strict
+RUN printf '%s  %s\n' \
+      "${TURBOQUANT_GUARD_UNIT_SHA256}" /opt/qwen38/turboquant_guard_unit.py \
       "${TURBOQUANT_K8V4_UNIT_SHA256}" /opt/qwen38/turboquant_k8v4_unit.py \
       "${QWEN38_CONTEXT_UNIT_SHA256}" /opt/qwen38/qwen38_context_unit.py \
       "${CHAT_TEMPLATE_RETENTION_UNIT_SHA256}" /opt/qwen38/chat_template_retention_unit.py \
@@ -1053,6 +1070,7 @@ PY
 # exact ownership.  The host lifecycle separately initializes a newly-created
 # named volume through this exact image and refuses drift; it deliberately does
 # not depend on Docker volume copy-up semantics.
+RUN CUDA_VISIBLE_DEVICES= TRITON_INTERPRET=1 python3 /opt/qwen38/turboquant_guard_unit.py
 RUN test "$(getent passwd vllm)" = 'vllm:x:2000:0::/home/vllm:/bin/bash' \
  && install --directory --owner=2000 --group=0 --mode=0770 \
       /home/vllm/.cache/vllm \

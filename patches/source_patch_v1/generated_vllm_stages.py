@@ -8696,10 +8696,10 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'import contextlib\n'})},
  {'name': 'turboquant-fail-closed-guards',
   'review_patch': 'patches/vllm-turboquant-fail-closed-guards.patch',
-  'review_sha256': '0ecf95ab8ee25a76d5412ce44aafafe13992b2cb373d6010acf5bc119dc8f47b',
+  'review_sha256': '7282d1d4d7a17b40ab8626c82f478bbb938c548451b7793df8233562a9e24c7c',
   'files': ({'path': 'vllm/v1/attention/ops/triton_turboquant_store.py',
              'before_sha256': '6e6e2fe74a307d40f0be786ccbaea76d989e3c7b5985f3144a5218c61bf6d902',
-             'after_sha256': '3b130ca2a69f868c7b2ad4c72799b330bbacaaf16b8880b1bdc90fb78ff1a1b6'},
+             'after_sha256': '298645bff68c6adab58261862602b86e7e714c3552a9fd89102d9ccd2b83e9f7'},
             {'path': 'vllm/v1/attention/ops/triton_turboquant_decode.py',
              'before_sha256': '8e52678136449e4bbca2195fbcbb87426c955a2b1b8422e7ab9511e45ee5f5c6',
              'after_sha256': 'dab8b65ab7ddd6582de16e1fc7b1360ab0061b4a2a2b114f5d87ea0532fd726f'},
@@ -8730,10 +8730,9 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '        )\n'
                       '\n'
                       '        sc_offset = val_cache_offset + VAL_DATA_BYTES\n'
-                      '        # Fail closed on insane inputs instead of laundering '
-                      'them: a NaN or\n'
-                      '        # ±inf element makes val_min/val_max non-finite, and a '
-                      'range or\n'
+                      '        # Reductions discard isolated NaNs, so check every '
+                      'input lane too.\n'
+                      '        # Fail closed on non-finite values, and a range or\n'
                       "        # minimum beyond fp16's finite grid would overflow the "
                       'stored\n'
                       '        # metadata. In every such case poison both metadata '
@@ -8746,7 +8745,9 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       'bit-identical to\n'
                       '        # the unguarded form.\n'
                       '        meta_ok = (\n'
-                      '            (val_min == val_min)\n'
+                      '            (tl.sum((d_mask & (val_vec != '
+                      'val_vec)).to(tl.int32), axis=0) == 0)\n'
+                      '            & (val_min == val_min)\n'
                       '            & (val_max == val_max)\n'
                       '            & (val_min > -65504.0)\n'
                       '            & (val_min < 65504.0)\n'
@@ -8788,10 +8789,10 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'review_after': '        )\n'
                              '\n'
                              '        sc_offset = val_cache_offset + VAL_DATA_BYTES\n'
-                             '        # Fail closed on insane inputs instead of '
-                             'laundering them: a NaN or\n'
-                             '        # ±inf element makes val_min/val_max non-finite, '
-                             'and a range or\n'
+                             '        # Reductions discard isolated NaNs, so check '
+                             'every input lane too.\n'
+                             '        # Fail closed on non-finite values, and a range '
+                             'or\n'
                              "        # minimum beyond fp16's finite grid would "
                              'overflow the stored\n'
                              '        # metadata. In every such case poison both '
@@ -8804,7 +8805,9 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'are bit-identical to\n'
                              '        # the unguarded form.\n'
                              '        meta_ok = (\n'
-                             '            (val_min == val_min)\n'
+                             '            (tl.sum((d_mask & (val_vec != '
+                             'val_vec)).to(tl.int32), axis=0) == 0)\n'
+                             '            & (val_min == val_min)\n'
                              '            & (val_max == val_max)\n'
                              '            & (val_min > -65504.0)\n'
                              '            & (val_min < 65504.0)\n'
@@ -26657,7 +26660,7 @@ FINAL_FILES = {'tests/config/test_config_utils.py': '4f5ea0399cc3b4f9603df07e2cc
  'vllm/tool_parsers/structural_tag_registry.py': 'e88b5cd98ace7c76453552f5f08264e0be23d1a5bc9b9d15cc0f39ba75ec043e',
  'vllm/v1/attention/backends/turboquant_attn.py': 'ccda36577e4fb0052f370169dce4b649bad890b8b440a82e584acd3dd92a6d86',
  'vllm/v1/attention/ops/triton_turboquant_decode.py': 'dab8b65ab7ddd6582de16e1fc7b1360ab0061b4a2a2b114f5d87ea0532fd726f',
- 'vllm/v1/attention/ops/triton_turboquant_store.py': '3b130ca2a69f868c7b2ad4c72799b330bbacaaf16b8880b1bdc90fb78ff1a1b6',
+ 'vllm/v1/attention/ops/triton_turboquant_store.py': '298645bff68c6adab58261862602b86e7e714c3552a9fd89102d9ccd2b83e9f7',
  'vllm/v1/core/kv_cache_utils.py': '1d80e98548d099bfecc5a789a51a176889d2c77411a014faaf94f0075e90d8c9',
  'vllm/v1/core/sched/utils.py': 'bf00f90553b05358a2671466eabe3c3f2caee6b64a6ad64ad5544f7ffc997aa2',
  'vllm/v1/engine/input_processor.py': '304bb9495796b476a005f69626639b517557864c065bd2a7158d12d4637e6229',

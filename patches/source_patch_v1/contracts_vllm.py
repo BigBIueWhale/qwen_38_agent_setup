@@ -974,6 +974,11 @@ def _validate_tq_guards_after(state: State) -> None:
     require_text(
         state, store, "((val_max - val_min) < 982560.0)", label=label
     )
+    require_text(
+        state, store,
+        "tl.sum((d_mask & (val_vec != val_vec)).to(tl.int32), axis=0) == 0",
+        label=label,
+    )
     # The stored-key byte contract is E4M3: SM < 8.9 refuses instead of a
     # silent fp8e4b15 format switch.
     require_text(state, decode, "Refusing a silent fp8e4b15", label=label)

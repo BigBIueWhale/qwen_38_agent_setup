@@ -485,6 +485,7 @@ assert_running_profile() {
   local cache_model_revision_label cache_model_correction_label cache_model_sha256_label
   local actual_command expected_command
   local actual_environment wrapped_environment required_environment api
+  local kv_users_installed_report expected_kv_users_installed_report
   local installed_report expected_installed_report
   local additional_installed_report expected_additional_installed_report
   local reasoning_usage_installed_report expected_reasoning_usage_installed_report
@@ -691,6 +692,8 @@ assert_running_profile() {
   installed_report="$(
     docker exec "${CONTAINER_NAME}" sha256sum \
       /usr/local/lib/python3.12/dist-packages/vllm/v1/attention/backends/turboquant_attn.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/v1/attention/ops/triton_turboquant_store.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/v1/attention/ops/triton_turboquant_decode.py \
       /usr/local/lib/python3.12/dist-packages/vllm/tool_parsers/structural_tag_registry.py \
       /usr/local/lib/python3.12/dist-packages/vllm/config/model.py \
       /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/anthropic/protocol.py \
@@ -714,8 +717,10 @@ assert_running_profile() {
       /opt/qwen38/chat_template.jinja \
       /opt/qwen38/phase_budget_unit.py
   )"
-  expected_installed_report="$(printf '%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s' \
+  expected_installed_report="$(printf '%s  %s\n' \
     "${TURBOQUANT_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/attention/backends/turboquant_attn.py \
+    "${TURBOQUANT_STORE_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/attention/ops/triton_turboquant_store.py \
+    "${TURBOQUANT_DECODE_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/attention/ops/triton_turboquant_decode.py \
     "${TOOL_SCHEMA_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/tool_parsers/structural_tag_registry.py \
     "${MODEL_CONFIG_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/config/model.py \
     "${ANTHROPIC_PROTOCOL_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/anthropic/protocol.py \
@@ -758,7 +763,7 @@ assert_running_profile() {
       /opt/qwen38/vision_contract_unit.py \
       /opt/qwen38/vision_mlp_unit.py
   )"
-  expected_additional_installed_report="$(printf '%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s' \
+  expected_additional_installed_report="$(printf '%s  %s\n' \
     "${WORKSPACE_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/worker/workspace.py \
     "${GPU_MODEL_RUNNER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/worker/gpu_model_runner.py \
     "${API_UTILS_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/serve/utils/api_utils.py \
@@ -783,7 +788,7 @@ assert_running_profile() {
       /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/engine/protocol.py \
       /opt/qwen38/reasoning_usage_unit.py
   )"
-  expected_reasoning_usage_installed_report="$(printf '%s  %s\n%s  %s\n%s  %s\n%s  %s' \
+  expected_reasoning_usage_installed_report="$(printf '%s  %s\n' \
     "${ABSTRACT_PARSER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/abstract_parser.py \
     "${PARSER_ADAPTERS_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/engine/adapters.py \
     "${ENGINE_PROTOCOL_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/engine/protocol.py \
@@ -792,6 +797,55 @@ assert_running_profile() {
     die "Running reasoning-usage bytes do not match the reviewed profile." \
       "Expected:" "${expected_reasoning_usage_installed_report}" \
       "Found:" "${reasoning_usage_installed_report}"
+
+  kv_users_installed_report="$(
+    docker exec "${CONTAINER_NAME}" sha256sum \
+      /usr/local/lib/python3.12/dist-packages/vllm/config/cache.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/config/vllm.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/engine/arg_utils.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/llm.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/v1/core/kv_cache_utils.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/v1/worker/gpu_worker.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/v1/worker/startup_plan.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/config.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/base.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/cpu/spec.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/cpu/manager.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/tiering/spec.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/tiering/manager.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/distributed/kv_transfer/kv_connector/v1/offloading/config.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/completion/protocol.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/generate/api_router.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/cli_args.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/scale_out/token_in_token_out/protocol.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/scale_out/token_in_token_out/serving.py
+  )"
+  expected_kv_users_installed_report="$(printf '%s  %s\n' \
+    "${CACHE_CONFIG_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/config/cache.py \
+    "${VLLM_CONFIG_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/config/vllm.py \
+    "${ARG_UTILS_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/engine/arg_utils.py \
+    "${LLM_ENTRYPOINT_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/llm.py \
+    "${KV_CACHE_UTILS_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/core/kv_cache_utils.py \
+    "${GPU_WORKER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/worker/gpu_worker.py \
+    "${STARTUP_PLAN_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/worker/startup_plan.py \
+    "${KV_OFFLOAD_CONFIG_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/config.py \
+    "${KV_OFFLOAD_BASE_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/base.py \
+    "${KV_OFFLOAD_CPU_SPEC_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/cpu/spec.py \
+    "${KV_OFFLOAD_CPU_MANAGER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/cpu/manager.py \
+    "${KV_TIERING_SPEC_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/tiering/spec.py \
+    "${KV_TIERING_MANAGER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/tiering/manager.py \
+    "${OFFLOAD_CONNECTOR_CONFIG_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/distributed/kv_transfer/kv_connector/v1/offloading/config.py \
+    "${OFFLOAD_CONNECTOR_SCHEDULER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py \
+    "${COMPLETION_PROTOCOL_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/completion/protocol.py \
+    "${GENERATE_API_ROUTER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/generate/api_router.py \
+    "${CLI_ARGS_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/cli_args.py \
+    "${TITOTO_PROTOCOL_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/scale_out/token_in_token_out/protocol.py \
+    "${TITOTO_SERVING_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/scale_out/token_in_token_out/serving.py)"
+  [[ "${kv_users_installed_report}" == "${expected_kv_users_installed_report}" ]] || \
+    die "Running KV user-count/scope bytes do not match the reviewed profile." \
+      "Expected:" "${expected_kv_users_installed_report}" \
+      "Found:" "${kv_users_installed_report}"
 
   assert_runtime_versions
   assert_kv_offload_pinned
