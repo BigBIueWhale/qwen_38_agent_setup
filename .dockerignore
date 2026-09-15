@@ -122,3 +122,13 @@
 !vllm/vllm/parser/engine/token_id_scanner.py
 !scripts/tool_output_parser_unit.py
 !vllm/vllm/tool_parsers/abstract_tool_parser.py
+!vllm/vllm/distributed/kv_transfer/kv_connector/v1/offloading_connector.py
+!vllm/vllm/v1/core/block_pool.py
+!vllm/vllm/v1/core/kv_cache_coordinator.py
+!vllm/vllm/v1/core/kv_cache_manager.py
+!vllm/vllm/v1/core/prefix_cache.py
+!vllm/vllm/v1/core/single_type_kv_cache_manager.py
+!vllm/vllm/v1/kv_offload/cpu/common.py
+!vllm/vllm/v1/simple_kv_offload/
+!vllm/vllm/v1/simple_kv_offload/manager.py
+!scripts/shared_prefix_cache_unit.py

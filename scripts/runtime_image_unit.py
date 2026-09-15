@@ -33,8 +33,15 @@ class RuntimeImageTest(unittest.TestCase):
                 checked.add((kind, path))
         for path in FINAL_FILES:
             if path.startswith("vllm/"):
-                for kind in ("UPSTREAM", "PATCHED"):
-                    self.assertIn((kind, path), checked)
+                self.assertIn(("PATCHED", path), checked)
+                if upstream[path] is None:
+                    verifier = recipe.split("FROM upstream-verifier AS runtime", 1)[0]
+                    self.assertIn(
+                        "RUN test ! -e /usr/local/lib/python3.12/dist-packages/" + path,
+                        verifier,
+                    )
+                else:
+                    self.assertIn(("UPSTREAM", path), checked)
 
     def test_every_reviewed_runtime_file_is_copied_and_verified(self):
         recipe = (ROOT / "containers/Dockerfile.runtime").read_text()
@@ -86,6 +93,13 @@ class RuntimeImageTest(unittest.TestCase):
         self.assertIn(
             "RUN CUDA_VISIBLE_DEVICES= "
             "python3 /opt/qwen38/tool_output_parser_unit.py", recipe,
+        )
+
+    def test_shared_prefix_unit_is_executed_during_build(self):
+        recipe = (ROOT / "containers/Dockerfile.runtime").read_text()
+        self.assertIn(
+            "RUN CUDA_VISIBLE_DEVICES= python3 /opt/qwen38/shared_prefix_cache_unit.py",
+            recipe,
         )
 
 

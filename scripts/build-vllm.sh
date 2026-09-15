@@ -27,13 +27,17 @@ EXPECTED_STATUS=$' M tests/config/test_config_utils.py
  M tests/parser/engine/trace_builder.py
  M tests/quantization/test_turboquant.py
  M tests/tool_parsers/test_structural_tag_registry.py
+ M tests/v1/core/test_prefix_caching.py
+ M tests/v1/core/test_single_type_kv_cache_manager.py
  M tests/v1/e2e/general/test_context_length.py
  M tests/v1/kv_connector/nixl_integration/run_multi_connector_accuracy_test.sh
  M tests/v1/kv_connector/nixl_integration/run_multi_connector_edge_case_test.sh
  M tests/v1/kv_connector/nixl_integration/spec_decode_acceptance_test.sh
+ M tests/v1/kv_connector/unit/offloading_connector/test_config.py
  M tests/v1/kv_connector/unit/offloading_connector/test_events.py
  M tests/v1/kv_connector/unit/offloading_connector/test_scheduler.py
  M tests/v1/kv_connector/unit/offloading_connector/test_worker.py
+ M tests/v1/kv_connector/unit/offloading_connector/utils.py
  M tests/v1/kv_connector/unit/test_config.py
  M tests/v1/kv_connector/unit/test_hma_auto_config.py
  M tests/v1/kv_connector/unit/test_offloading_connector.py
@@ -45,7 +49,9 @@ EXPECTED_STATUS=$' M tests/config/test_config_utils.py
  M tests/v1/kv_offload/tiering/p2p/run_accuracy_test.sh
  M tests/v1/kv_offload/tiering/test_fs_tier.py
  M tests/v1/kv_offload/tiering/test_obj_tier.py
+ M tests/v1/kv_offload/tiering/test_tiering_offloading.py
  M tests/v1/simple_kv_offload/test_integration.py
+ M tests/v1/simple_kv_offload/test_scheduler.py
  M tests/v1/worker/test_gpu_model_runner_mm_gather.py
  M tests/v1/worker/test_gpu_worker.py
  M vllm/config/cache.py
@@ -53,6 +59,7 @@ EXPECTED_STATUS=$' M tests/config/test_config_utils.py
  M vllm/config/vllm.py
  M vllm/distributed/kv_transfer/kv_connector/v1/offloading/config.py
  M vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py
+ M vllm/distributed/kv_transfer/kv_connector/v1/offloading_connector.py
  M vllm/engine/arg_utils.py
  M vllm/entrypoints/anthropic/api_router.py
  M vllm/entrypoints/anthropic/protocol.py
@@ -98,11 +105,16 @@ EXPECTED_STATUS=$' M tests/config/test_config_utils.py
  M vllm/v1/attention/backends/turboquant_attn.py
  M vllm/v1/attention/ops/triton_turboquant_decode.py
  M vllm/v1/attention/ops/triton_turboquant_store.py
+ M vllm/v1/core/block_pool.py
+ M vllm/v1/core/kv_cache_coordinator.py
+ M vllm/v1/core/kv_cache_manager.py
  M vllm/v1/core/kv_cache_utils.py
  M vllm/v1/core/sched/utils.py
+ M vllm/v1/core/single_type_kv_cache_manager.py
  M vllm/v1/engine/input_processor.py
  M vllm/v1/kv_offload/base.py
  M vllm/v1/kv_offload/config.py
+ M vllm/v1/kv_offload/cpu/common.py
  M vllm/v1/kv_offload/cpu/gpu_worker.py
  M vllm/v1/kv_offload/cpu/manager.py
  D vllm/v1/kv_offload/cpu/policies/__init__.py
@@ -114,6 +126,7 @@ EXPECTED_STATUS=$' M tests/config/test_config_utils.py
  M vllm/v1/kv_offload/tiering/manager.py
  M vllm/v1/kv_offload/tiering/spec.py
  M vllm/v1/request.py
+ M vllm/v1/simple_kv_offload/manager.py
  M vllm/v1/structured_output/__init__.py
  M vllm/v1/worker/gpu_model_runner.py
  M vllm/v1/worker/gpu_worker.py
@@ -123,7 +136,9 @@ EXPECTED_STATUS=$' M tests/config/test_config_utils.py
 ?? tests/entrypoints/test_kv_scope_protocol.py
 ?? tests/parser/engine/test_reasoning_token_count.py
 ?? tests/v1/core/test_kv_cache_users_sizing.py
-?? tests/v1/worker/test_workspace.py'
+?? tests/v1/core/test_prefix_cache.py
+?? tests/v1/worker/test_workspace.py
+?? vllm/v1/core/prefix_cache.py'
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
 # shellcheck source=../config/runtime-v1.sh
@@ -187,7 +202,7 @@ VISION_RUNTIME_PATCH_FILE="${PROJECT_DIR}/patches/vllm-qwen38-vision-runtime.pat
 NUMERICAL_AUDITS_PATCH_FILE="${PROJECT_DIR}/patches/vllm-qwen38-numerical-audits.patch"
 TURBOQUANT_GUARDS_PATCH_FILE="${PROJECT_DIR}/patches/vllm-turboquant-fail-closed-guards.patch"
 KV_OFFLOAD_PINNING_PATCH_FILE="${PROJECT_DIR}/patches/vllm-kv-offload-pinning-fail-closed.patch"
-KV_USERS_SCOPE_PATCH_FILE="${PROJECT_DIR}/patches/vllm-kv-user-count-sizing-and-scope-eviction.patch"
+SHARED_PREFIX_CACHE_PATCH_FILE="${PROJECT_DIR}/patches/vllm-shared-prefix-cache-and-user-capacity.patch"
 EXACT_REASONING_USAGE_PATCH_FILE="${PROJECT_DIR}/patches/vllm-exact-reasoning-usage.patch"
 
 TURBOQUANT_REL="vllm/v1/attention/backends/turboquant_attn.py"
@@ -345,7 +360,7 @@ printf '%s  %s\n' \
   "${NUMERICAL_AUDITS_PATCH_DIFF_SHA256}" "${NUMERICAL_AUDITS_PATCH_FILE}" \
   "${TURBOQUANT_GUARDS_PATCH_DIFF_SHA256}" "${TURBOQUANT_GUARDS_PATCH_FILE}" \
   "${KV_OFFLOAD_PINNING_PATCH_DIFF_SHA256}" "${KV_OFFLOAD_PINNING_PATCH_FILE}" \
-  "${KV_USERS_SCOPE_PATCH_DIFF_SHA256}" "${KV_USERS_SCOPE_PATCH_FILE}" \
+  "${SHARED_PREFIX_CACHE_PATCH_DIFF_SHA256}" "${SHARED_PREFIX_CACHE_PATCH_FILE}" \
   "${EXACT_REASONING_USAGE_PATCH_DIFF_SHA256}" "${EXACT_REASONING_USAGE_PATCH_FILE}" | \
   sha256sum --check --strict
 
@@ -544,6 +559,17 @@ printf '%s  %s\n' \
   sha256sum --check --strict
 
 printf '%s  %s\n' \
+  "${OFFLOADING_CONNECTOR_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/distributed/kv_transfer/kv_connector/v1/offloading_connector.py" \
+  "${BLOCK_POOL_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/v1/core/block_pool.py" \
+  "${KV_CACHE_COORDINATOR_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/v1/core/kv_cache_coordinator.py" \
+  "${KV_CACHE_MANAGER_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/v1/core/kv_cache_manager.py" \
+  "${PREFIX_CACHE_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/v1/core/prefix_cache.py" \
+  "${SINGLE_TYPE_KV_CACHE_MANAGER_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/v1/core/single_type_kv_cache_manager.py" \
+  "${KV_OFFLOAD_CPU_COMMON_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/v1/kv_offload/cpu/common.py" \
+  "${SIMPLE_KV_OFFLOAD_MANAGER_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/v1/simple_kv_offload/manager.py" \
+  "${SHARED_PREFIX_CACHE_UNIT_SHA256}" "${PROJECT_DIR}/scripts/shared_prefix_cache_unit.py" | sha256sum --check --strict
+
+printf '%s  %s\n' \
   "${RUNTIME_DOCKERFILE_SHA256}" "${DOCKERFILE}" \
   "${DOCKERIGNORE_SHA256}" "${DOCKERIGNORE}" | \
   sha256sum --check --strict
@@ -570,10 +596,15 @@ docker run --rm --network none --read-only \
 
 # Execute CPU contract units against the complete reviewed runtime overlay.
 parser_unit_mounts=()
-while IFS= read -r path; do
-  parser_unit_mounts+=(--volume "${VLLM_DIR}/${path}:/usr/local/lib/python3.12/dist-packages/${path}:ro")
-done < <(git -C "${VLLM_DIR}" diff --name-only --diff-filter=M -- vllm)
-for unit in tool_output_parser_unit vision_contract_unit reasoning_usage_unit; do
+while IFS= read -r status_line; do
+  case "${status_line}" in
+    " M vllm/"*|"?? vllm/"*)
+      path="${status_line:3}"
+      parser_unit_mounts+=(--volume "${VLLM_DIR}/${path}:/usr/local/lib/python3.12/dist-packages/${path}:ro")
+      ;;
+  esac
+done <<<"${EXPECTED_STATUS}"
+for unit in tool_output_parser_unit vision_contract_unit reasoning_usage_unit shared_prefix_cache_unit; do
   docker run --rm --network none --read-only --user "$(id -u):$(id -g)" \
     --tmpfs /tmp:rw,nodev,nosuid,size=256m \
     --env PYTHONDONTWRITEBYTECODE=1 --env CUDA_VISIBLE_DEVICES= \
@@ -589,6 +620,7 @@ if [[ "${MODE}" == "check" ]]; then
   # hand: a hand count here is one more copy that can drift from the thing
   # it describes.
   modified_runtime_count="$(grep -c '^ M vllm/' <<<"${EXPECTED_STATUS}" || :)"
+  new_runtime_count="$(grep -c '^?? vllm/' <<<"${EXPECTED_STATUS}" || :)"
   deleted_runtime_count="$(grep -c '^ D vllm/' <<<"${EXPECTED_STATUS}" || :)"
   modified_test_count="$(grep -c '^ M tests/' <<<"${EXPECTED_STATUS}" || :)"
   new_test_count="$(grep -c '^?? tests/' <<<"${EXPECTED_STATUS}" || :)"
@@ -597,6 +629,7 @@ if [[ "${MODE}" == "check" ]]; then
     "${DEPLOYMENT_INPUT_MANIFEST}" || :)"
   echo "Pinned base image, vLLM commit, transactional landmark patcher," \
     "${modified_runtime_count} reviewed modified runtime source files," \
+    "${new_runtime_count} reviewed new runtime source files," \
     "${deleted_runtime_count} reviewed runtime source deletions," \
     "${modified_test_count} reviewed modified test files," \
     "${new_test_count} reviewed new test files," \
@@ -615,6 +648,22 @@ docker buildx build --progress=plain \
   --no-cache \
   --target runtime \
   --build-arg "BASE_IMAGE=${BASE_IMAGE_TAG}" \
+  --build-arg "OFFLOADING_CONNECTOR_UPSTREAM_FILE_SHA256=${OFFLOADING_CONNECTOR_UPSTREAM_FILE_SHA256}" \
+  --build-arg "OFFLOADING_CONNECTOR_PATCHED_FILE_SHA256=${OFFLOADING_CONNECTOR_PATCHED_FILE_SHA256}" \
+  --build-arg "BLOCK_POOL_UPSTREAM_FILE_SHA256=${BLOCK_POOL_UPSTREAM_FILE_SHA256}" \
+  --build-arg "BLOCK_POOL_PATCHED_FILE_SHA256=${BLOCK_POOL_PATCHED_FILE_SHA256}" \
+  --build-arg "KV_CACHE_COORDINATOR_UPSTREAM_FILE_SHA256=${KV_CACHE_COORDINATOR_UPSTREAM_FILE_SHA256}" \
+  --build-arg "KV_CACHE_COORDINATOR_PATCHED_FILE_SHA256=${KV_CACHE_COORDINATOR_PATCHED_FILE_SHA256}" \
+  --build-arg "KV_CACHE_MANAGER_UPSTREAM_FILE_SHA256=${KV_CACHE_MANAGER_UPSTREAM_FILE_SHA256}" \
+  --build-arg "KV_CACHE_MANAGER_PATCHED_FILE_SHA256=${KV_CACHE_MANAGER_PATCHED_FILE_SHA256}" \
+  --build-arg "PREFIX_CACHE_PATCHED_FILE_SHA256=${PREFIX_CACHE_PATCHED_FILE_SHA256}" \
+  --build-arg "SINGLE_TYPE_KV_CACHE_MANAGER_UPSTREAM_FILE_SHA256=${SINGLE_TYPE_KV_CACHE_MANAGER_UPSTREAM_FILE_SHA256}" \
+  --build-arg "SINGLE_TYPE_KV_CACHE_MANAGER_PATCHED_FILE_SHA256=${SINGLE_TYPE_KV_CACHE_MANAGER_PATCHED_FILE_SHA256}" \
+  --build-arg "KV_OFFLOAD_CPU_COMMON_UPSTREAM_FILE_SHA256=${KV_OFFLOAD_CPU_COMMON_UPSTREAM_FILE_SHA256}" \
+  --build-arg "KV_OFFLOAD_CPU_COMMON_PATCHED_FILE_SHA256=${KV_OFFLOAD_CPU_COMMON_PATCHED_FILE_SHA256}" \
+  --build-arg "SIMPLE_KV_OFFLOAD_MANAGER_UPSTREAM_FILE_SHA256=${SIMPLE_KV_OFFLOAD_MANAGER_UPSTREAM_FILE_SHA256}" \
+  --build-arg "SIMPLE_KV_OFFLOAD_MANAGER_PATCHED_FILE_SHA256=${SIMPLE_KV_OFFLOAD_MANAGER_PATCHED_FILE_SHA256}" \
+  --build-arg "SHARED_PREFIX_CACHE_UNIT_SHA256=${SHARED_PREFIX_CACHE_UNIT_SHA256}" \
   --build-arg "TURBOQUANT_UPSTREAM_FILE_SHA256=${TURBOQUANT_UPSTREAM_FILE_SHA256}" \
   --build-arg "TURBOQUANT_DECODE_UPSTREAM_FILE_SHA256=${TURBOQUANT_DECODE_UPSTREAM_FILE_SHA256}" \
   --build-arg "TURBOQUANT_STORE_UPSTREAM_FILE_SHA256=${TURBOQUANT_STORE_UPSTREAM_FILE_SHA256}" \
@@ -729,7 +778,7 @@ docker buildx build --progress=plain \
   --build-arg "NUMERICAL_AUDITS_PATCH_DIFF_SHA256=${NUMERICAL_AUDITS_PATCH_DIFF_SHA256}" \
   --build-arg "TURBOQUANT_GUARDS_PATCH_DIFF_SHA256=${TURBOQUANT_GUARDS_PATCH_DIFF_SHA256}" \
   --build-arg "KV_OFFLOAD_PINNING_PATCH_DIFF_SHA256=${KV_OFFLOAD_PINNING_PATCH_DIFF_SHA256}" \
-  --build-arg "KV_USERS_SCOPE_PATCH_DIFF_SHA256=${KV_USERS_SCOPE_PATCH_DIFF_SHA256}" \
+  --build-arg "SHARED_PREFIX_CACHE_PATCH_DIFF_SHA256=${SHARED_PREFIX_CACHE_PATCH_DIFF_SHA256}" \
   --build-arg "EXACT_REASONING_USAGE_PATCH_DIFF_SHA256=${EXACT_REASONING_USAGE_PATCH_DIFF_SHA256}" \
   --build-arg "IMAGE_PROFILE_VERSION=${IMAGE_PROFILE_VERSION}" \
   --build-arg "CACHE_CONFIG_UPSTREAM_FILE_SHA256=${CACHE_CONFIG_UPSTREAM_FILE_SHA256}" \
@@ -915,6 +964,15 @@ fi
 
 kv_users_installed_report="$(
   docker run --rm --network none --entrypoint sha256sum "${IMAGE_TAG}" \
+    /usr/local/lib/python3.12/dist-packages/vllm/distributed/kv_transfer/kv_connector/v1/offloading_connector.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/v1/core/block_pool.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/v1/core/kv_cache_coordinator.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/v1/core/kv_cache_manager.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/v1/core/prefix_cache.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/v1/core/single_type_kv_cache_manager.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/cpu/common.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/v1/simple_kv_offload/manager.py \
+    /opt/qwen38/shared_prefix_cache_unit.py \
     /usr/local/lib/python3.12/dist-packages/vllm/config/cache.py \
     /usr/local/lib/python3.12/dist-packages/vllm/config/vllm.py \
     /usr/local/lib/python3.12/dist-packages/vllm/engine/arg_utils.py \
@@ -937,6 +995,15 @@ kv_users_installed_report="$(
     /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/scale_out/token_in_token_out/serving.py
 )"
 expected_kv_users_installed_report="$(printf '%s  %s\n' \
+  "${OFFLOADING_CONNECTOR_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/distributed/kv_transfer/kv_connector/v1/offloading_connector.py \
+  "${BLOCK_POOL_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/core/block_pool.py \
+  "${KV_CACHE_COORDINATOR_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/core/kv_cache_coordinator.py \
+  "${KV_CACHE_MANAGER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/core/kv_cache_manager.py \
+  "${PREFIX_CACHE_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/core/prefix_cache.py \
+  "${SINGLE_TYPE_KV_CACHE_MANAGER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/core/single_type_kv_cache_manager.py \
+  "${KV_OFFLOAD_CPU_COMMON_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/cpu/common.py \
+  "${SIMPLE_KV_OFFLOAD_MANAGER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/simple_kv_offload/manager.py \
+  "${SHARED_PREFIX_CACHE_UNIT_SHA256}" /opt/qwen38/shared_prefix_cache_unit.py \
   "${CACHE_CONFIG_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/config/cache.py \
   "${VLLM_CONFIG_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/config/vllm.py \
   "${ARG_UTILS_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/engine/arg_utils.py \
@@ -958,7 +1025,7 @@ expected_kv_users_installed_report="$(printf '%s  %s\n' \
   "${TITOTO_PROTOCOL_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/scale_out/token_in_token_out/protocol.py \
   "${TITOTO_SERVING_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/scale_out/token_in_token_out/serving.py)"
 if [[ "${kv_users_installed_report}" != "${expected_kv_users_installed_report}" ]]; then
-  echo "Built image contains unexpected KV user-count/scope bytes." >&2
+  echo "Built image contains unexpected shared KV cache/capacity bytes." >&2
   echo "Expected:" >&2
   printf '%s\n' "${expected_kv_users_installed_report}" >&2
   echo "Found:" >&2

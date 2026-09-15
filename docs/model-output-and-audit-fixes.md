@@ -221,6 +221,41 @@ the full Qwen marker vocabulary; its expected count includes every generated ID
 before the reasoning boundary. One preexisting strict xfail remains for upstream
 Harmony zero-delta item lifecycle; the deployed Qwen path does not use Harmony.
 
+## Finding 9 and shared prefix caching
+
+`vllm-shared-prefix-cache-and-user-capacity.patch` defines the twelfth source
+stage. Every generation uses an opaque required agent ID. An ID with no cached
+blocks may acquire an initial shared prefix; an existing ID matches its acquired
+or computed data. GPU and CPU share a membership catalog. No parent, lineage
+declaration or ID structure is used.
+
+CPU retention protects complete working sets across cache groups. Releasing an
+agent preserves other retained contexts' shared references. A finished request
+keeps its complete context for its next turn. Transfer pins protect physical
+data separately, allocation plans precede eviction, and failed dependencies
+invalidate only the contexts that need them. User-count sizing uses normalized
+block/window geometry, including grouped specs and EAGLE verification.
+
+Coalesced CPU chunks advertise only written data. Each lookup checks the actual
+candidate window, and filling missing data preserves existing agents' acquired
+subsets. Secondary storage receives canonical-complete entries. Selection inside
+a larger chunk acquires only the selected extent; a 72-token fork cannot acquire
+later attention data from a 96-token physical entry. Native stores preserve every
+source agent's acquired subset when copying shared data from GPU to CPU.
+
+Fresh IDs can observe initial shared hits through latency. IDs provide cache
+accounting and matching semantics, without authentication or confidentiality
+promises, agent-derived cache salts, or artificial timing padding.
+
+Validation: 544 scheduler, cache, geometry, protocol and tiering tests pass in
+offline CPU containers. The production patch framework reconstructs all twenty
+stages and matches the tested sources exactly; its thirteen transaction tests
+pass. The installed-image CPU unit covers initial forks, existing-agent matching,
+GPU/CPU membership, physical-copy preservation, surviving shared references and
+sparse fills. The required backend check passes, including exact reconstruction,
+the 94-file deployment-input manifest and the installed shared-prefix CPU unit.
+The v23 image and archive remain awaiting adoption.
+
 ## Remaining implementation
 
 Parser language, stop handling, schema conversion, protocol translation, image

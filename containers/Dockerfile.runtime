@@ -222,7 +222,33 @@ RUN printf '%s  %s\n%s  %s\n%s  %s\n' \
         /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/engine/protocol.py \
     | sha256sum --check --strict
 
+ARG OFFLOADING_CONNECTOR_UPSTREAM_FILE_SHA256
+ARG BLOCK_POOL_UPSTREAM_FILE_SHA256
+ARG KV_CACHE_COORDINATOR_UPSTREAM_FILE_SHA256
+ARG KV_CACHE_MANAGER_UPSTREAM_FILE_SHA256
+ARG SINGLE_TYPE_KV_CACHE_MANAGER_UPSTREAM_FILE_SHA256
+ARG KV_OFFLOAD_CPU_COMMON_UPSTREAM_FILE_SHA256
+ARG SIMPLE_KV_OFFLOAD_MANAGER_UPSTREAM_FILE_SHA256
+RUN printf '%s  %s\n' \
+      "${OFFLOADING_CONNECTOR_UPSTREAM_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/distributed/kv_transfer/kv_connector/v1/offloading_connector.py \
+      "${BLOCK_POOL_UPSTREAM_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/core/block_pool.py \
+      "${KV_CACHE_COORDINATOR_UPSTREAM_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/core/kv_cache_coordinator.py \
+      "${KV_CACHE_MANAGER_UPSTREAM_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/core/kv_cache_manager.py \
+      "${SINGLE_TYPE_KV_CACHE_MANAGER_UPSTREAM_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/core/single_type_kv_cache_manager.py \
+      "${KV_OFFLOAD_CPU_COMMON_UPSTREAM_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/cpu/common.py \
+      "${SIMPLE_KV_OFFLOAD_MANAGER_UPSTREAM_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/simple_kv_offload/manager.py \
+    | sha256sum --check --strict
+RUN test ! -e /usr/local/lib/python3.12/dist-packages/vllm/v1/core/prefix_cache.py
+
 FROM upstream-verifier AS runtime
+ARG OFFLOADING_CONNECTOR_PATCHED_FILE_SHA256
+ARG BLOCK_POOL_PATCHED_FILE_SHA256
+ARG KV_CACHE_COORDINATOR_PATCHED_FILE_SHA256
+ARG KV_CACHE_MANAGER_PATCHED_FILE_SHA256
+ARG PREFIX_CACHE_PATCHED_FILE_SHA256
+ARG SINGLE_TYPE_KV_CACHE_MANAGER_PATCHED_FILE_SHA256
+ARG KV_OFFLOAD_CPU_COMMON_PATCHED_FILE_SHA256
+ARG SIMPLE_KV_OFFLOAD_MANAGER_PATCHED_FILE_SHA256
 ARG TURBOQUANT_PATCHED_FILE_SHA256
 ARG TURBOQUANT_STORE_PATCHED_FILE_SHA256
 ARG TURBOQUANT_DECODE_PATCHED_FILE_SHA256
@@ -289,7 +315,7 @@ ARG VISION_RUNTIME_PATCH_DIFF_SHA256
 ARG NUMERICAL_AUDITS_PATCH_DIFF_SHA256
 ARG TURBOQUANT_GUARDS_PATCH_DIFF_SHA256
 ARG KV_OFFLOAD_PINNING_PATCH_DIFF_SHA256
-ARG KV_USERS_SCOPE_PATCH_DIFF_SHA256
+ARG SHARED_PREFIX_CACHE_PATCH_DIFF_SHA256
 ARG EXACT_REASONING_USAGE_PATCH_DIFF_SHA256
 ARG IMAGE_PROFILE_VERSION
 ARG CACHE_CONFIG_PATCHED_FILE_SHA256
@@ -321,6 +347,7 @@ ARG TOKEN_ID_SCANNER_PATCHED_FILE_SHA256
 ARG ENGINE_PROTOCOL_PATCHED_FILE_SHA256
 ARG REASONING_USAGE_UNIT_SHA256
 ARG TOOL_OUTPUT_PARSER_UNIT_SHA256
+ARG SHARED_PREFIX_CACHE_UNIT_SHA256
 # The verified pristine policy modules are removed, not replaced: the
 # scope-aware manager is the only eviction mode, and a stranded importable
 # copy of the pluggable LRU/ARC layer would be exactly the leftover this
@@ -524,6 +551,24 @@ RUN printf '%s  %s\n' \
 RUN rm /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/serve/utils/tool_calls_utils.py \
  && rm -f /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/serve/utils/__pycache__/tool_calls_utils.*.pyc \
  && test ! -e /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/serve/utils/tool_calls_utils.py
+COPY --chmod=0644 vllm/vllm/distributed/kv_transfer/kv_connector/v1/offloading_connector.py /usr/local/lib/python3.12/dist-packages/vllm/distributed/kv_transfer/kv_connector/v1/offloading_connector.py
+COPY --chmod=0644 vllm/vllm/v1/core/block_pool.py /usr/local/lib/python3.12/dist-packages/vllm/v1/core/block_pool.py
+COPY --chmod=0644 vllm/vllm/v1/core/kv_cache_coordinator.py /usr/local/lib/python3.12/dist-packages/vllm/v1/core/kv_cache_coordinator.py
+COPY --chmod=0644 vllm/vllm/v1/core/kv_cache_manager.py /usr/local/lib/python3.12/dist-packages/vllm/v1/core/kv_cache_manager.py
+COPY --chmod=0644 vllm/vllm/v1/core/prefix_cache.py /usr/local/lib/python3.12/dist-packages/vllm/v1/core/prefix_cache.py
+COPY --chmod=0644 vllm/vllm/v1/core/single_type_kv_cache_manager.py /usr/local/lib/python3.12/dist-packages/vllm/v1/core/single_type_kv_cache_manager.py
+COPY --chmod=0644 vllm/vllm/v1/kv_offload/cpu/common.py /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/cpu/common.py
+COPY --chmod=0644 vllm/vllm/v1/simple_kv_offload/manager.py /usr/local/lib/python3.12/dist-packages/vllm/v1/simple_kv_offload/manager.py
+RUN printf '%s  %s\n' \
+      "${OFFLOADING_CONNECTOR_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/distributed/kv_transfer/kv_connector/v1/offloading_connector.py \
+      "${BLOCK_POOL_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/core/block_pool.py \
+      "${KV_CACHE_COORDINATOR_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/core/kv_cache_coordinator.py \
+      "${KV_CACHE_MANAGER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/core/kv_cache_manager.py \
+      "${PREFIX_CACHE_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/core/prefix_cache.py \
+      "${SINGLE_TYPE_KV_CACHE_MANAGER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/core/single_type_kv_cache_manager.py \
+      "${KV_OFFLOAD_CPU_COMMON_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/cpu/common.py \
+      "${SIMPLE_KV_OFFLOAD_MANAGER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/simple_kv_offload/manager.py \
+    | sha256sum --check --strict
 COPY --chmod=0644 chat_template.jinja /opt/qwen38/chat_template.jinja
 COPY --chmod=0644 scripts/phase_budget_unit.py /opt/qwen38/phase_budget_unit.py
 COPY --chmod=0644 scripts/vision_workspace_unit.py /opt/qwen38/vision_workspace_unit.py
@@ -536,6 +581,8 @@ COPY --chmod=0644 scripts/chat_template_retention_unit.py /opt/qwen38/chat_templ
 COPY --chmod=0644 scripts/nvfp4_kernel_unit.py /opt/qwen38/nvfp4_kernel_unit.py
 COPY --chmod=0644 scripts/reasoning_usage_unit.py /opt/qwen38/reasoning_usage_unit.py
 COPY --chmod=0644 scripts/tool_output_parser_unit.py /opt/qwen38/tool_output_parser_unit.py
+COPY --chmod=0644 scripts/shared_prefix_cache_unit.py /opt/qwen38/shared_prefix_cache_unit.py
+RUN printf '%s  %s\n' "${SHARED_PREFIX_CACHE_UNIT_SHA256}" /opt/qwen38/shared_prefix_cache_unit.py | sha256sum --check --strict
 RUN printf '%s  %s\n' \
       "${TURBOQUANT_STORE_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/attention/ops/triton_turboquant_store.py \
       "${TURBOQUANT_DECODE_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/attention/ops/triton_turboquant_decode.py \
@@ -991,10 +1038,8 @@ for rejected_context in (
     else:
         raise AssertionError(f"unsafe template configuration was accepted: {rejected_context}")
 
-# Agent-scope identity must ride every generation surface into the one
-# internal channel the engine reads, the superseded byte/policy knobs must
-# be refusals, and the deleted policy package must be gone from the
-# installed tree — not merely unimported.
+# Every generation surface carries an opaque agent ID through the common
+# sampling-parameter channel. Shared-cache behavior has its own installed unit.
 from vllm.entrypoints.openai.completion.protocol import CompletionRequest
 from vllm.entrypoints.openai.responses.protocol import ResponsesRequest
 from vllm.entrypoints.scale_out.token_in_token_out.protocol import GenerateRequest
@@ -1029,7 +1074,7 @@ for scoped_request in (
 ):
     assert scoped_request.kv_scope == "agent_scope"
 
-# Generation requires an owning agent, and the requirement lives on the path
+# Generation requires an agent ID, and the requirement lives on the path
 # into the engine rather than on these models: /v1/chat/completions/render
 # renders through the very same ChatCompletionRequest while allocating
 # nothing, so a model-level requirement would demand an identity from an
@@ -1051,7 +1096,7 @@ except VLLMValidationError as exc:
     assert "required for generation" in str(exc), str(exc)
 else:
     raise AssertionError("generation admitted a request that names no agent")
-for malformed in ("", 0, [], {}):
+for malformed in ("", " ", "\t\n", 0, [], {}):
     try:
         require_kv_scope(SamplingParams(max_tokens=1, extra_args={"kv_scope": malformed}))
     except VLLMValidationError as exc:
@@ -1073,27 +1118,15 @@ derived = [batched.to_chat_completion_request(m) for m in batched.messages]
 assert [d.kv_scope for d in derived] == ["agent_scope", "agent_scope"]
 assert require_kv_scope(derived[0].to_sampling_params(8, defaults)) == "agent_scope"
 
-# The host tier is where an unowned block would actually do damage: a label
-# matching no single context, given up all at once. Storing refuses it.
-_unowned_ctx = ReqContext(req_id="unowned")
-assert _unowned_ctx.kv_scope is None
-
 assert hasattr(EngineArgs, "kv_cache_users")
 assert not hasattr(EngineArgs, "kv_cache_memory_bytes")
 assert not hasattr(EngineArgs, "kv_offloading_size")
-assert not hasattr(CPUOffloadingManager, "release_scope")
-for rejected_config in (
-    {"cpu_bytes_to_use": 1},
-    {"eviction_policy": "arc"},
-    {"cache_policy_module_path": "x"},
-    {"definitely_unknown_knob": 1},
-):
-    try:
-        CPUOffloadingSpec._validate_extra_config(rejected_config)
-    except ValueError:
-        pass
-    else:
-        raise AssertionError(f"superseded offload knob accepted: {rejected_config}")
+try:
+    CPUOffloadingSpec._validate_extra_config({"definitely_unknown_knob": 1})
+except ValueError:
+    pass
+else:
+    raise AssertionError("unknown offload configuration key accepted")
 try:
     import vllm.v1.kv_offload.cpu.policies  # noqa: F401
 except ModuleNotFoundError:
@@ -1147,6 +1180,7 @@ PY
 # exact ownership.  The host lifecycle separately initializes a newly-created
 # named volume through this exact image and refuses drift; it deliberately does
 # not depend on Docker volume copy-up semantics.
+RUN CUDA_VISIBLE_DEVICES= python3 /opt/qwen38/shared_prefix_cache_unit.py
 RUN CUDA_VISIBLE_DEVICES= python3 /opt/qwen38/tool_output_parser_unit.py
 RUN CUDA_VISIBLE_DEVICES= TRITON_INTERPRET=1 python3 /opt/qwen38/turboquant_guard_unit.py
 RUN test "$(getent passwd vllm)" = 'vllm:x:2000:0::/home/vllm:/bin/bash' \
@@ -1187,7 +1221,7 @@ LABEL org.opencontainers.image.revision="9df9b0b0a1816b6d0d0f6ecd0da563cc37fd72f
       qwen38.patch.numerical-audits.diff.sha256="${NUMERICAL_AUDITS_PATCH_DIFF_SHA256}" \
       qwen38.patch.turboquant-guards.diff.sha256="${TURBOQUANT_GUARDS_PATCH_DIFF_SHA256}" \
       qwen38.patch.kv-offload-pinning.diff.sha256="${KV_OFFLOAD_PINNING_PATCH_DIFF_SHA256}" \
-      qwen38.patch.kv-users-scope.diff.sha256="${KV_USERS_SCOPE_PATCH_DIFF_SHA256}" \
+      qwen38.patch.shared-prefix-cache.diff.sha256="${SHARED_PREFIX_CACHE_PATCH_DIFF_SHA256}" \
       qwen38.patch.exact-reasoning-usage.diff.sha256="${EXACT_REASONING_USAGE_PATCH_DIFF_SHA256}" \
       qwen38.patch.exact-reasoning-usage.abstract-parser-file.sha256="${ABSTRACT_PARSER_PATCHED_FILE_SHA256}" \
       qwen38.patch.exact-reasoning-usage.adapters-file.sha256="${PARSER_ADAPTERS_PATCHED_FILE_SHA256}" \

@@ -1,320 +1,198 @@
-# KV sizing by declared users, eviction by agent identity — design note
+# Shared prefix caching and KV capacity
 
-Status: reviewed design for the `kv-user-count-sizing-and-scope-eviction`
-source stage. Authored while runtime-v15 benchmarks were still executing;
-the image pins (`EXPECTED_IMAGE_ID`, archive name/hash, profile label) are
-deliberately untouched and belong to the release step that follows the
-benchmark runs.
+## Identity and matching
 
-## 1. Problem
+Every generation request supplies `kv_scope`, an opaque, nonempty agent ID.
+Use the same ID for successive requests from the same agent. Whitespace-only
+IDs are invalid; other strings are preserved exactly. The server assigns no
+meaning to punctuation, session names, or the relationship between IDs.
 
-Two tiers of KV cache exist and both were sized in raw bytes that are only
-valid on one machine:
+An agent with no cached blocks of its own may match a prefix in the shared
+cache. Selecting that prefix makes it a fork: the agent acquires references
+to the selected data. Once it has cached blocks, matching uses only the data
+it has acquired or computed. Computation extends that cache. The server
+stores no parent pointer, lineage, or declaration of a fork.
 
-- VRAM: `--kv-cache-memory 6925634765` — a hand-measured constant. The
-  number encodes "one 262,144-token context" for exactly this GPU, this
-  quantization, this hybrid layout. On a B200 it is silently wrong.
-- Host RAM: `kv_connector_extra_config.cpu_bytes_to_use: 7747584000` — the
-  same disease. The byte cost of a context only exists post-engine-init
-  (page sizes, hybrid group structure, TP sharding), which is why the
-  operator had to bake measured constants.
+The rule applies across GPU and CPU together. A GPU-resident block makes the
+agent existing even if its CPU cache is empty, and a CPU-resident block does
+the same if its GPU cache is empty. After all of an agent's cached blocks
+have been evicted, its next lookup again has no cache of its own and may
+acquire an initial shared prefix.
 
-Recency alone fails at one provable moment: when a subagent finishes, its
-context is dead AND most-recently-used, so a recency policy protects a
-corpse and evicts the live main agent's blocks. A recency policy can only
-*approximate* that deadness, so the server accepts a protocol by which a
-client that tracks agent lifetimes can *state* it instead.
+For example:
 
-## 2. Decisions
+1. Agent A computes prefix P and continuation A1.
+2. New agent B requests P and continuation B1. B can acquire P from A's
+   cached data, then compute B1.
+3. B's later requests may reuse P and B1. They cannot acquire A1 merely
+   because A1 is also resident.
+4. Releasing A removes A's references. B keeps P and B1 while its context
+   remains resident.
 
-### 2.1 Sizing currency: user contexts, declared, required
+The required ID travels through each generation protocol's sampling
+parameters to the engine request and offload request context. The common
+engine validation also covers direct sampling callers. Rendering and
+pooling do not allocate a generation context and do not require an ID.
 
-Both tiers are declared as counts of resident full-length user contexts.
-Bytes are derived inside vLLM at the point where the KV cache spec exists.
+## Content and membership
 
-- VRAM: `--kv-cache-users N` (new `CacheConfig.kv_cache_users`). Required:
-  engine initialization fails if it is absent while the model has KV cache
-  groups. Derivation, per worker, in `get_kv_cache_configs`
-  (vllm/v1/core/kv_cache_utils.py):
+`PrefixCacheIndex` is the shared membership catalog. Physical cache entries
+identify content by the existing chained prefix hash and KV group. Agent
+IDs do not enter those hashes. Attention entries describe their hash-sized
+data units; recurrent entries describe their final checkpoint.
 
-      blocks_per_user = sum over groups of
-          cdiv(spec.max_memory_usage_bytes(vllm_config), spec.page_size_bytes)
-      needed_blocks  = N * blocks_per_user + 1        # BlockPool block 0 is the null block
-      needed_bytes   = needed_blocks * _pool_bytes_per_block(...)
+A lookup captures a stable membership view before querying groups. Inspecting
+a candidate does not acquire it. Acquisition follows selection of a usable
+prefix, or computation. This keeps one group's tentative hit from changing
+the remaining groups' eligibility during the same lookup.
 
-  `blocks_per_user` is the exact expression `get_max_concurrency_for_kv_cache_config`
-  already uses, and `_pool_bytes_per_block` mirrors the divisor of every
-  layout branch in `get_kv_cache_config_from_groups`, so the round trip
-  bytes -> num_blocks is exact for the uniform, packed, and general
-  layouts. Cross-check against the live server: the measured
-  "Maximum concurrency 1.01x" (264,115 / 262,144 tokens) solves only as a
-  134-block pool over a 133-block request — i.e. today's hand-tuned byte
-  constant is `1 * blocks_per_user + 1` in disguise. The new flag makes
-  that identity the contract instead of an accident.
+A physical entry can have multiple agent references. A complete selection
+uses the entry's shared content description; a shorter selection records
+its acquired subset. This matters when a common resume boundary ends inside
+a larger GPU block or coalesced CPU chunk. Selecting 72 tokens cannot acquire
+later data merely because the physical entry extends to 96 tokens.
 
-  The declaration is authoritative, exactly as the byte flag was.
-  Profiling's conservative availability estimate (the utilization budget
-  minus every observed resident; it preferred ~1.3 GiB less than the
-  proven production pool) is informational only; it can neither shrink
-  nor veto the declared pool. What refuses a declaration is physical
-  capacity: the initially free memory minus every additional measured
-  resident — weights, non-torch allocations, the activation peak that recurs each
-  forward pass, frontend reservations, and the CUDA-graph charge when
-  opted in. This accounts for other processes, device context and allocations
-  made before the first snapshot exactly once. The utilization factor is not charged against
-  the pool: its holdback is a discretionary reserve the superseded byte
-  flag also ignored, and the pinned production footprint (29.6 GiB of a
-  31.8 GiB card) sits beyond the 0.9 budget while fitting the card with
-  slack. `gpu_memory_utilization` keeps its real jobs — the startup
-  free-memory requirement and the estimate's budget. "The estimate would
-  prefer less" proceeds; "the card physically cannot hold N contexts"
-  refuses with the per-user byte cost in the message. Capacity is never
-  silently clamped to "what fits".
+The catalog follows insertion, removal, immutable aliases and physical tier
+copies. Moving a GPU block's hashes registers the destination before removing
+the source, so a move does not erase surviving memberships. Attention growth
+preserves earlier immutable prefix aliases. Replacing recurrent state removes
+the replaced checkpoint's membership.
 
-- Host RAM: `kv_connector_extra_config.cpu_kv_cache_users: N` (required by
-  `CPUOffloadingSpec`, inherited by `TieringOffloadingSpec`). Derivation in
-  the spec, from geometry the offload boundary already normalizes:
+Native CPU stores coalesce source entries while preserving every source agent's
+acquired subset, even when a different agent issues the store. The catalog
+collects the whole transfer batch before changing memberships, since ownership
+record eviction can also change its source records. Copying a shared prefix
+cannot leave its other users dependent on the GPU copy alone.
 
-      tokens_per_chunk_g = tokens_per_block_g * blocks_per_chunk
-      chunks_per_user    = sum over groups of
-          cdiv(max_model_len, tokens_per_chunk_g)              # full attention
-          min(window_chunks_g, cdiv(max_model_len, tpc_g))     # windowed / recurrent
-      num_cpu_chunks     = N * chunks_per_user
+## CPU contexts and eviction
 
-  The windowed term is deliberate, not an approximation: the load path
-  (`_sliding_window_lookup`) reads exactly the trailing
-  `sliding_window_size_in_chunks` chunks of a windowed group, and a Mamba
-  group in `align` mode resumes from a single trailing state chunk. A
-  full-length re-entry therefore touches `chunks_per_user` chunks and no
-  more. Counting every boundary snapshot instead would double this box's
-  footprint past its 8 GiB `/dev/shm` for the same declared "1 user";
-  intermediate-boundary snapshots are opportunistic cache that lives in
-  slack and ages out. For this deployment: 127 attention chunks + 1 GDN
-  state chunk = 128 chunks/user (~6.6 GB at the 51,650,560 B aligned
-  chunk), inside the existing `--shm-size 8g`.
+CPU retention records a request's complete working set across all KV groups:
+the full-attention prefix, each required attention window or recurrent state,
+and any partial tail. Each dependency includes its required data extent.
+Physical transfer pins are separate from these context references.
 
-  The per-group window is computed once, in
-  `build_offloading_config` (offloading/config.py), stored on
-  `OffloadingGroupConfig.sliding_window_size_in_chunks`, and consumed by
-  both the sizing math and the connector scheduler. The scheduler's local
-  recomputation (`get_sliding_window_size_in_chunks`) moves to the config
-  builder so sizing and load planning can never disagree.
-  `OffloadingModelConfig` gains `max_model_len` for the same reason.
+Finishing a request retains its complete context for the next turn. A new
+nonempty turn replaces the previous idle turn from the same agent. Concurrent
+requests retain their separate working sets while active. Missing or failed
+dependencies prevent an incomplete finished context from being retained.
 
-  Chunk *counts* are topology-free; chunk *bytes* already scale through
-  `worker_kv_bytes_per_block * num_copies` with the existing
-  `world_size` / `replicated_layout` handling in cpu/spec.py, which this
-  change does not touch. That is the whole TP=1 vs TP=8 story for the CPU
-  tier; on the GPU tier, derivation runs per worker on projected groups
-  and the min-reduce across workers is upstream's unchanged mechanism.
+Capacity allocation is planned before eviction:
 
-### 2.2 Identity: `kv_scope` on every generation protocol
+1. Reclaim unreferenced, idle entries, including obsolete windows left in spare
+   capacity after a context advanced.
+2. If more space is needed, release whole agents in least-recently-used order,
+   excluding the incoming agent. Release every exclusively held, unpinned
+   entry of the chosen victims. Shared references from surviving contexts
+   continue to protect their entries.
+3. If the required space cannot be made available, decline the store without
+   a partial eviction. Transfer pins protect bytes until the transfer ends.
 
-Two request fields, placed beside `cache_salt` / `kv_transfer_params` on
-every generation surface this image can import — the proven set is six:
-openai chat_completion (single and batch), openai completion, openai
-responses, anthropic, and scale_out token_in_token_out. Every mounted
-generative route is one of them. Cohere is deliberately not in the set:
-its protocol models hard-import the optional `cohere` SDK, which a
-`--network none` build cannot install, so upstream's `/cohere/v2/chat`
-existed only as a try/except-import accident. That guarded registration
-is excised from the server assembly (`generate/api_router.py`) along
-with the endpoint-only `--cohere-is-reasoning-model` knob, and the image
-build asserts that no `/cohere` route is registered — the endpoint's
-absence is an enforced fact, not an installation state.
-`/generative_scoring` is withheld for the mirror-image reason: it reaches
-the engine's generative path, so its blocks land in the host tier, but its
-request model names no agent and a one-shot scoring call has none to name;
-its absence is asserted the same way. The
-`cohere_format` renderer flag survives: it serves `--tokenizer-mode
-cohere` model families over the OpenAI endpoints and is unrelated to
-the excised HTTP surface.
+Releasing one agent never removes another retained context's reference to
+shared data. A failed transfer invalidates each context that depended on the
+failed entry. Other contexts retain their complete working sets. Active
+contexts may have pending dependencies; completion of their transfers makes
+those dependencies readable.
 
-- `kv_scope: str` — the agent owning this request's KV. The harness sends
-  the session id for the main agent and the spawning `tool_use_id` for a
-  subagent — one identity per agent, with no distinction between the two
-  kinds. Generation requires it: there is no anonymous agent, because a
-  label matching no single context is one whose eviction shreds several.
+Cached agent records are bounded by each tier's cache-entry capacity. At that
+metadata bound the tier releases the oldest complete agent record. This is
+separate from physical byte accounting: three agents sharing two chunks
+still consume two physical chunks. Full memberships share one content
+description, and subsets are stored only when selection needs them.
 
-The requirement is enforced on the path into the engine rather than on the
-request models, and the difference matters. `/v1/chat/completions/render`
-renders a prompt through the very same `ChatCompletionRequest` while
-allocating nothing, so a model-level requirement would demand an agent
-identity from an endpoint that owns no context. `require_kv_scope` in
-`InputProcessor` is the one place every generative request passes through,
-which also covers direct `SamplingParams(extra_args=...)` callers that no
-protocol model can reach. Pooling requests take the other branch and carry
-no scope at all: they generate nothing and own no reusable context.
+## Coalesced windows and secondary storage
 
-Transport mirrors `kv_transfer_params` exactly: each protocol's sampling
-conversion writes the fields into `SamplingParams.extra_args`;
-`Request.__init__` materializes them as typed attributes next to
-`kv_transfer_params`; `InputProcessor._validate_params` rejects a
-missing scope, non-string scopes, and empty strings (VLLMValidationError
-naming the `kv_scope` parameter — a 400 on every surface, not a crash:
-the OpenAI-shaped routes map it through the shared exception handler,
-and the Anthropic router maps it to its own `invalid_request_error`
-exactly as it maps typed request validation), and the host tier
-refuses to file a block for a request that named no agent. No new EngineCoreRequest plumbing, no per-endpoint privileged
-path — Anthropic gets the same two lines as everyone else.
+A CPU chunk can contain several GPU blocks. Window recycling can leave its
+leading slots unwritten. The CPU manager tracks the key's canonical contents
+separately from the data actually available in that row. Store descriptions
+name only non-null GPU sources; lookup checks the data needed at the candidate
+resume boundary against both availability and the agent's membership.
 
-Delivery to the manager: `_create_req_context` copies `request.kv_scope`
-onto `ReqContext.kv_scope`; every existing manager call already carries
-the ReqContext, so the label reaches the store that writes each block.
+For example, with 16-token GPU blocks, three per CPU chunk, and an 80-token
+sliding window, the 96-token frontier may need only tokens 16 through 96.
+The first CPU chunk can safely lack tokens 0 through 16. That chunk cannot
+serve a shorter request whose window needs those bytes.
 
-### 2.3 One eviction mode: agent-granular over a live LRU
+Computation or a secondary promotion may fill an incomplete CPU row in place.
+The row must be idle. The fill becomes a pending write, preserves every
+existing agent's acquired subset, and grants the producer only its produced
+data. A failed fill invalidates the row and its dependent contexts.
 
-`CPUOffloadingManager` stops delegating to a pluggable `CachePolicy` and
-owns a single structure:
+Secondary storage keys promise canonical entries. Incomplete window chunks
+are available to valid local window lookups but are not advertised or exported
+as canonical entries. A partial-tail key already defines its shorter valid
+span and can be exported once that span is complete. Physical storage
+transfers do not select a generation prefix or create an agent membership.
+An entry transferred before a generation supplies its hash chain cannot be
+acquired until its content has been described.
 
-- every chunk carries the agent that stored it. The label is fixed where
-  the block is written and never moves, so the grouping is a property of
-  the write path rather than of a later reconciliation.
-- capacity pressure resolves one agent at a time. The evictable set is
-  grouped by owning agent in LRU order; the agent owning the oldest block
-  is drained before another is considered. Taking the globally oldest
-  blocks instead would interleave agents and leave each of them with a
-  partial context, which still has to be prefilled — the whole point of
-  the tier is that a resident context is complete enough to copy.
-- nothing reacts to an agent finishing. A context nobody is contending for
-  costs nothing to keep, so it stays until someone needs the room.
+The native CPU and tiering managers share these rules. The alternate simple
+CPU connector also uses the GPU membership catalog, acquires selected hits,
+and preserves membership when copying physical entries.
 
-The manager keeps its existing ref-count / write-pending accounting,
-events, threshold tracker, and stats surface. `BlockStatus` moves into
-manager.py. The tiering primary tier (`CPUPrimaryTierOffloadingManager`)
-inherits the mode; secondary (fs/obj/p2p) tiers have their own lifecycle
-and are unaffected.
+## Capacity declared in user contexts
 
-### 2.4 Supersede: what stops being accepted, what is deleted
+Operators declare GPU capacity with `--kv-cache-users N` and native CPU
+offload capacity with `cpu_kv_cache_users: N`. Both are positive integer
+counts of full-length contexts. Runtime KV geometry determines the byte
+cost; cache sharing can allow more contexts to coexist within that capacity.
 
-Fails startup (not ignored, not deprecated):
+For each GPU worker:
 
-- `cpu_bytes_to_use`, `eviction_policy`, `cache_policy_module_path` in
-  `kv_connector_extra_config` — `CPUOffloadingSpec` now validates the
-  extra config against an exact key allowlist and names the offender;
-  the error for the three superseded keys states the replacement.
-- `--kv-cache-memory[-bytes]` — the EngineArgs field, CLI flag, and
-  `LLM(kv_cache_memory_bytes=...)` kwarg are deleted; supplying the flag
-  dies in argparse, the kwarg dies as an unexpected argument.
-- `--kv-offloading-size` / `kv_offloading_backend` — deleted with their
-  `VllmConfig` synthesis; the flag existed only to manufacture
-  `cpu_bytes_to_use`.
-- `--num-gpu-blocks-override` alongside `--kv-cache-users` — rejected at
-  derivation. It is block-denominated sizing and cannot coexist with a
-  declared user count; it is *rejected* rather than deleted because it was
-  never part of this profile's configuration and its removal would gut
-  unrelated upstream unit scaffolding — the acceptance surface is closed,
-  which is the invariant that matters.
+```text
+blocks_per_user = sum over KV groups of
+    ceil(spec.max_memory_usage_bytes(vllm_config) / spec.page_size_bytes)
+pool_blocks = N * blocks_per_user + 1
+pool_bytes = pool_blocks * bytes_per_pool_block
+```
 
-Deleted outright (files removed from the tree and `rm`'d from the image):
+The additional block is the pool's null block. Pool byte geometry accounts
+for uniform, packed and general layouts. The declared demand must fit the
+physical memory remaining after measured resident allocations and execution
+peaks. Profiling's utilization estimate cannot silently shrink the declared
+pool. A demand that cannot fit refuses with its capacity cost.
 
-- `vllm/v1/kv_offload/cpu/policies/{__init__,base,factory,lru,arc}.py`
-- `tests/v1/kv_offload/cpu/policies/{__init__,test_factory}.py`
+For native CPU offload, let `T_g` be a group's tokens per GPU block multiplied
+by `blocks_per_chunk`, and let `F_g = ceil(max_model_len / T_g)`:
 
-Retained deliberately, with changed or unchanged roles:
+```text
+chunks_per_user = sum over KV groups of
+    F_g                                      for full attention
+    min(F_g, window_chunks_g + eagle_extra_g) for windowed/recurrent groups
+pool_chunks = N * chunks_per_user
+```
 
-- `CacheConfig.kv_cache_memory_bytes` survives as *internal availability
-  state only*: the CPU backend derives it from `VLLM_CPU_KVCACHE_SPACE`,
-  and the startup-plan cache re-applies a previously *measured*
-  availability. Neither is a user KV-size declaration; the field's
-  docstring and the gpu_worker log that used to advertise the flag are
-  rewritten accordingly. The persisted plan can only shortcut profiling —
-  the N-context demand must still fit inside whatever it reports.
-- `SimpleCPUOffloadConnector` and the NIXL/P2P connectors are different
-  connectors with their own contracts, not alternate modes of this one;
-  they are out of scope exactly as the Anthropic-only-privilege rule is in
-  scope: the boundary is the `OffloadingConnector` spec family
-  (`CPUOffloadingSpec` and its `TieringOffloadingSpec` subclass), which is
-  converted whole.
+A recurrent group needs its trailing checkpoint. EAGLE attention includes
+the additional checkpoint its lookup verifies. Window geometry, recurrent
+mode and EAGLE classification are normalized at the offload configuration
+boundary and used by both sizing and scheduling. Grouped layer specs use
+the same block geometry as engine hash sizing, including context parallelism.
 
-### 2.5 Patch-framework extension: expressible deletion
+CPU row bytes include the worker layout, its number of copies and alignment.
+Shared data is charged once physically. Transfer pins consume space in the
+same pool; concurrent transfers and advancing working sets can cause stores
+to be declined or whole contexts to be evicted. The user count sizes the
+resident working sets and is not a promise to retain every historical
+checkpoint or admit unlimited in-flight copies.
 
-The landmark framework already validates "deleted-file hunks"
-(`review_after == ""` requires `after == ""` describing the whole file)
-but could not commit them: commit wrote zero-byte files and the reader
-refuses files without a terminal newline. The stage above requires true
-deletion, so the transaction learns it end-to-end:
+## Cache-hit timing
 
-- `FileIdentity.after_sha256: str | None` — `None` means absent after.
-- empty pristine files (`policies/__init__.py` is 0 bytes) cannot carry a
-  hunk (`before == after == ""`), so a hunkless deletion is evidenced by
-  the review diff's `deleted file mode` header instead: the parser
-  returns those paths, and `_verify_review_artifact` requires the set of
-  hunkless deletions in the diff to equal the stage's edit-less
-  `after_sha256 is None` identities — the Python data and the reviewed
-  diff still describe byte-identical transformations.
-- `plan()` deletes the key after proving the edit result is empty;
-  `commit()` unlinks with the same backup/rollback discipline as writes;
-  state reading tolerates absence only for planned deletions and reads
-  0-byte files as `""`.
-- `build-vllm.sh`'s worktree comparison learns the ` D ` porcelain code:
-  a deleted path must be absent in both the patched verification worktree
-  and the live tree.
+A fresh agent ID can observe shared-prefix reuse through latency. Existing
+agents query their own acquired cache, but anyone able to submit a fresh ID
+can attempt an initial match. IDs provide cache accounting and matching
+semantics; they provide neither authentication nor a confidentiality boundary.
+No artificial timing padding is added. `cache_salt` remains an independent
+cache-key input and is never derived from an agent ID.
 
-## 3. What pressure does
+## Validation and adoption
 
-1. Two agents are resident: the main line and a subagent. Each block the
-   host tier holds is labelled with whichever of them stored it.
-2. A third context arrives and the tier is full. The oldest evictable
-   block names the agent to give up, and that agent's blocks go first,
-   oldest within the agent, until enough room exists.
-3. Nothing else is touched. The other agent's context stays whole, so its
-   next full-length re-entry is a copy out of host memory rather than a
-   prefill.
-4. When only one agent is resident, that rule falls on its own oldest
-   blocks — the tail it re-reads last, with its prefix kept warm.
+The source tests exercise initial forks, existing-agent matching, shared
+eviction, GPU/CPU membership, aliases and physical copies, shortened selections,
+sparse window fills, transfer failures, complete-context retention, secondary
+promotion/export, geometry and sizing, and required opaque IDs on generation
+surfaces. Scheduler and manager tests use metadata and disposable containers;
+they do not require a GPU or model execution.
 
-## 4. File map
-
-vLLM worktree (runtime):
-
-| File | Change |
-| --- | --- |
-| vllm/config/cache.py | + `kv_cache_users`; − `kv_offloading_size`/`kv_offloading_backend`; `kv_cache_memory_bytes` re-documented as internal |
-| vllm/config/vllm.py | − byte-flag → `cpu_bytes_to_use` synthesis |
-| vllm/engine/arg_utils.py | + `--kv-cache-users`; − `--kv-cache-memory-bytes`, `--kv-offloading-size` |
-| vllm/entrypoints/llm.py | − `kv_cache_memory_bytes` kwarg |
-| vllm/v1/core/kv_cache_utils.py | user-count derivation + fail-closed gates in `get_kv_cache_configs` |
-| vllm/v1/worker/gpu_worker.py | profiling log rewritten (no dead-flag advice; plan still saved) |
-| vllm/v1/kv_offload/config.py | + `max_model_len`, per-group `sliding_window_size_in_chunks` |
-| vllm/v1/kv_offload/base.py | `ReqContext.kv_scope` |
-| vllm/v1/kv_offload/cpu/spec.py | `cpu_kv_cache_users` derivation; exact-key allowlist; policy knobs gone |
-| vllm/v1/kv_offload/cpu/manager.py | agent-labelled blocks, agent-granular eviction; `BlockStatus` moves in |
-| vllm/v1/kv_offload/cpu/policies/* | deleted |
-| vllm/v1/kv_offload/tiering/spec.py, tiering/manager.py | follow the single mode; release forwards to primary |
-| .../kv_connector/v1/offloading/config.py | window classification moves here; new config fields |
-| .../kv_connector/v1/offloading/scheduler.py | consume stored windows; scope into ReqContext; release at on_new_request |
-| five protocol files | `kv_scope` beside `cache_salt`/`kv_transfer_params` |
-| vllm/entrypoints/generate/api_router.py | Cohere registration and serving state excised; absence enforced |
-| vllm/entrypoints/openai/cli_args.py | − `--cohere-is-reasoning-model` (endpoint-only knob) |
-| vllm/v1/request.py | typed `kv_scope` attribute |
-| vllm/v1/engine/input_processor.py | fail-closed field validation |
-
-vLLM worktree (tests): rewrite `tests/v1/kv_offload/cpu/test_manager.py`
-around the single mode + scope release; delete the policies tests; update
-spec/connector construction in `tests/v1/kv_offload/test_factory.py`,
-`tests/v1/kv_connector/unit/test_offloading_connector.py`,
-`offloading_connector/{utils,test_events,test_config}.py`,
-`test_hma_auto_config.py`; new `tests/entrypoints/test_kv_scope_protocol.py`
-proving both fields and their extra_args propagation on all five importable
-surfaces plus the enforced absence of any /cohere route;
-sizing-derivation unit coverage.
-
-Repo: `config/runtime-v1.sh` (VLLM_ARGS + hashes), `scripts/build-vllm.sh`
-(EXPECTED_STATUS incl. ` D ` lines, cmp loop, new hash wiring, manifest
-line count), `containers/Dockerfile.runtime` (new COPY/verify rows, `rm`
-of deleted modules), `patches/vllm-kv-user-count-sizing-and-scope-eviction.patch`,
-`patches/source_patch_v1/{framework,test_framework,compile_review_diff,contracts_vllm,generated_vllm_stages,manifest}`,
-`config/deployment-inputs.sha256` (70 → 71 lines).
-
-## 5. Interim state until the release step
-
-This section described the window between authoring and the
-post-benchmark rebuild, during which `config/runtime-v1.sh` named flags
-only the next image understood and `start.sh` failed closed at vLLM
-argument parsing. That window is closed: the v16 release step re-pinned
-`EXPECTED_IMAGE_ID`, the archive pair, and the profile label together,
-with the image rebuilt twice to prove the pinned ID reproducible. The
-v15 archive and cache volume are retained as a rollback path until the
-new stack is proven healthy. Nothing in this change could be *silently*
-half-adopted at any point.
+The deployment's landmark transformations, reviewed diffs, source hashes and
+Docker unit assertions must reconstruct these sources exactly. The backend
+build and release adopt the image and archive pins together. Source validation
+does not claim that an awaiting-adoption image is already serving these rules.

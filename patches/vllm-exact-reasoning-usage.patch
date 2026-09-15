@@ -1,6 +1,5 @@
 diff --git a/tests/parser/engine/test_reasoning_token_count.py b/tests/parser/engine/test_reasoning_token_count.py
 new file mode 100644
-index 0000000..931e805
 --- /dev/null
 +++ b/tests/parser/engine/test_reasoning_token_count.py
 @@ -0,0 +1,256 @@
@@ -261,10 +260,9 @@ index 0000000..931e805
 +        with pytest.raises(ValueError, match=reason):
 +            engine.count_reasoning_tokens([65, 99, 66])
 diff --git a/vllm/entrypoints/openai/chat_completion/serving.py b/vllm/entrypoints/openai/chat_completion/serving.py
-index 71c53db..8ba7be8 100644
 --- a/vllm/entrypoints/openai/chat_completion/serving.py
 +++ b/vllm/entrypoints/openai/chat_completion/serving.py
-@@ -36,6 +36,7 @@ from vllm.entrypoints.openai.chat_completion.protocol import (
+@@ -36,6 +36,7 @@
      ChatMessage,
  )
  from vllm.entrypoints.openai.engine.protocol import (
@@ -272,10 +270,12 @@ index 71c53db..8ba7be8 100644
      DeltaMessage,
      ErrorResponse,
      FunctionCall,
-@@ -105,6 +106,46 @@ def _make_prompt_tokens_details(
+@@ -103,6 +104,46 @@
+         created_cache_tokens=num_cache_creation_tokens,
+         multimodal_tokens=mm_token_counts or None,
      )
- 
- 
++
++
 +def _reasoning_token_count(
 +    parser: Parser | None, generated_token_count: int
 +) -> int | None:
@@ -314,12 +314,10 @@ index 71c53db..8ba7be8 100644
 +            return None
 +        total += count
 +    return CompletionTokenUsageInfo(reasoning_tokens=total)
-+
-+
+ 
+ 
  class OpenAIServingChat(GenerateBaseServing):
-     def __init__(
-         self,
-@@ -537,6 +578,11 @@ class OpenAIServingChat(GenerateBaseServing):
+@@ -537,6 +578,11 @@
                                  prompt_tokens=num_prompt_tokens,
                                  completion_tokens=0,
                                  total_tokens=num_prompt_tokens,
@@ -331,7 +329,7 @@ index 71c53db..8ba7be8 100644
                              )
  
                          data = chunk.model_dump_json(exclude_unset=True)
-@@ -573,6 +619,11 @@ class OpenAIServingChat(GenerateBaseServing):
+@@ -573,6 +619,11 @@
                                          prompt_tokens=num_prompt_tokens,
                                          completion_tokens=0,
                                          total_tokens=num_prompt_tokens,
@@ -343,7 +341,7 @@ index 71c53db..8ba7be8 100644
                                      )
  
                                  data = chunk.model_dump_json(exclude_unset=True)
-@@ -765,19 +816,36 @@ class OpenAIServingChat(GenerateBaseServing):
+@@ -765,19 +816,36 @@
                              prompt_tokens=num_prompt_tokens,
                              completion_tokens=completion_tokens,
                              total_tokens=num_prompt_tokens + completion_tokens,
@@ -381,7 +379,7 @@ index 71c53db..8ba7be8 100644
                  )
                  final_usage.prompt_tokens_details = _make_prompt_tokens_details(
                      self.enable_prompt_tokens_details,
-@@ -822,6 +890,7 @@ class OpenAIServingChat(GenerateBaseServing):
+@@ -822,6 +890,7 @@
                  prompt_tokens=num_prompt_tokens,
                  completion_tokens=num_completion_tokens,
                  total_tokens=num_prompt_tokens + num_completion_tokens,
@@ -389,7 +387,7 @@ index 71c53db..8ba7be8 100644
              )
  
              # Log complete streaming response if output logging is enabled
-@@ -880,6 +949,9 @@ class OpenAIServingChat(GenerateBaseServing):
+@@ -880,6 +949,9 @@
              )
  
          choices: list[ChatCompletionResponseChoice] = []
@@ -399,7 +397,7 @@ index 71c53db..8ba7be8 100644
  
          role = self.get_chat_request_role(request)
          tool_parser_cls = (
-@@ -914,6 +986,9 @@ class OpenAIServingChat(GenerateBaseServing):
+@@ -914,6 +986,9 @@
                      enable_auto_tools=self.enable_auto_tools,
                      model_output_token_ids=token_ids,
                  )
@@ -409,7 +407,7 @@ index 71c53db..8ba7be8 100644
                  suppress_metadata = not request.include_reasoning and parser is not None
                  if not request.include_reasoning:
                      reasoning = None
-@@ -924,6 +999,7 @@ class OpenAIServingChat(GenerateBaseServing):
+@@ -924,6 +999,7 @@
                  content = output.text
                  tool_calls = []
                  suppress_metadata = False
@@ -417,7 +415,7 @@ index 71c53db..8ba7be8 100644
  
              auto_tools_called = False
              is_named_tool_choice = (
-@@ -1070,6 +1146,9 @@ class OpenAIServingChat(GenerateBaseServing):
+@@ -1070,6 +1146,9 @@
              prompt_tokens=num_prompt_tokens,
              completion_tokens=num_generated_tokens,
              total_tokens=num_prompt_tokens + num_generated_tokens,
@@ -428,10 +426,9 @@ index 71c53db..8ba7be8 100644
          usage.prompt_tokens_details = _make_prompt_tokens_details(
              self.enable_prompt_tokens_details,
 diff --git a/vllm/entrypoints/openai/engine/protocol.py b/vllm/entrypoints/openai/engine/protocol.py
-index 4d07c29..72f1980 100644
 --- a/vllm/entrypoints/openai/engine/protocol.py
 +++ b/vllm/entrypoints/openai/engine/protocol.py
-@@ -117,11 +117,23 @@ class PromptTokenUsageInfo(OpenAIBaseModel):
+@@ -117,11 +117,23 @@
      request has no multimodal input."""
  
  
@@ -456,10 +453,9 @@ index 4d07c29..72f1980 100644
  
  class PerRequestTimingMetrics(OpenAIBaseModel):
 diff --git a/vllm/parser/abstract_parser.py b/vllm/parser/abstract_parser.py
-index f7119d8..dfc2469 100644
 --- a/vllm/parser/abstract_parser.py
 +++ b/vllm/parser/abstract_parser.py
-@@ -57,6 +57,11 @@ class StreamState:
+@@ -57,6 +57,11 @@
      # tracks whether function name has been fully returned in the stream yet
      function_name_returned: bool = False
      engine_based: bool = False
@@ -471,7 +467,7 @@ index f7119d8..dfc2469 100644
  
      def advance(
          self,
-@@ -176,6 +181,25 @@ class Parser:
+@@ -176,6 +181,25 @@
          state.history_tool_call_cnt = count_history_tool_calls(request)
          state.history_tool_call_cnt_initialized = True
  
@@ -497,7 +493,7 @@ index f7119d8..dfc2469 100644
      # ========== Reasoning Parser Methods ==========
  
      @abstractmethod
-@@ -386,11 +410,33 @@ class DelegatingParser(Parser):
+@@ -386,10 +410,32 @@
          self,
          model_output: str,
          request: ChatCompletionRequest | ResponsesRequest,
@@ -516,7 +512,7 @@ index f7119d8..dfc2469 100644
 +                model_output_token_ids=model_output_token_ids,
 +            )
          return self._reasoning_parser.extract_reasoning(model_output, request)
- 
++
 +    @property
 +    def reasoning_token_count(self) -> int | None:
 +        reasoning_parser = self._reasoning_parser
@@ -527,11 +523,10 @@ index f7119d8..dfc2469 100644
 +        if not reasoning_parser.engine_based_streaming:
 +            return None
 +        return reasoning_parser.reasoning_token_count  # type: ignore[attr-defined]
-+
+ 
      def _get_function_name(
          self, request: ChatCompletionRequest | ResponsesRequest
-     ) -> str:
-@@ -790,7 +836,10 @@ class DelegatingParser(Parser):
+@@ -790,7 +836,10 @@
          model_output_token_ids: Sequence[int] = (),
      ) -> tuple[str | None, str | None, list[FunctionCall] | None]:
          self._initialize_history_tool_call_cnt(request)
@@ -543,7 +538,7 @@ index f7119d8..dfc2469 100644
          tool_calls, content = self._extract_tool_calls(
              content=content,
              request=request,
-@@ -809,6 +858,7 @@ class DelegatingParser(Parser):
+@@ -809,6 +858,7 @@
      ) -> DeltaMessage | None:
          self._initialize_history_tool_call_cnt(request)
          state = self._stream_state
@@ -552,10 +547,9 @@ index f7119d8..dfc2469 100644
          if not state.prompt_reasoning_checked and prompt_token_ids is not None:
              state.prompt_reasoning_checked = True
 diff --git a/vllm/parser/engine/adapters.py b/vllm/parser/engine/adapters.py
-index b9c4e42..9420de3 100644
 --- a/vllm/parser/engine/adapters.py
 +++ b/vllm/parser/engine/adapters.py
-@@ -70,8 +70,12 @@ class ParserEngineReasoningAdapter(ReasoningParser):
+@@ -70,8 +70,12 @@
          self,
          model_output: str,
          request: ChatCompletionRequest | ResponsesRequest,
@@ -569,22 +563,21 @@ index b9c4e42..9420de3 100644
              return self._parser_engine.extract_reasoning(model_output, request)
  
      def extract_reasoning_streaming(
-@@ -124,6 +128,10 @@ class ParserEngineReasoningAdapter(ReasoningParser):
+@@ -123,6 +127,10 @@
+ 
      def count_reasoning_tokens(self, token_ids: Sequence[int]) -> int:
          return self._parser_engine.count_reasoning_tokens(token_ids)
- 
++
 +    @property
 +    def reasoning_token_count(self) -> int | None:
 +        return self._parser_engine.reasoning_token_count
-+
+ 
  
  class ParserEngineToolAdapter(ToolParser):
-     """Adapts a :class:`ParserEngine` to the :class:`ToolParser` interface.
 diff --git a/vllm/parser/engine/parser_engine.py b/vllm/parser/engine/parser_engine.py
-index 2964adc..784622c 100644
 --- a/vllm/parser/engine/parser_engine.py
 +++ b/vllm/parser/engine/parser_engine.py
-@@ -7,7 +7,8 @@ extraction with a single :class:`StreamingParserEngine`.
+@@ -7,7 +7,8 @@
  from __future__ import annotations
  
  import json
@@ -594,7 +587,7 @@ index 2964adc..784622c 100644
  from functools import cached_property
  from typing import TYPE_CHECKING
  
-@@ -148,6 +149,22 @@ class ParserEngine(Parser):
+@@ -148,6 +149,22 @@
          if end_text:
              self._reasoning_end_token_id = vocab.get(end_text)
  
@@ -617,7 +610,7 @@ index 2964adc..784622c 100644
      @property
      def reasoning_start_str(self) -> str | None:
          return self.parser_engine_config.terminals.get("THINK_START")
-@@ -200,6 +217,17 @@ class ParserEngine(Parser):
+@@ -200,6 +217,17 @@
          self._deferred_reasoning = ""
          self._content_has_nonws = False
          self._prompt_streaming_prepared = False
@@ -635,7 +628,7 @@ index 2964adc..784622c 100644
  
      def adjust_request(
          self, request: ChatCompletionRequest | ResponsesRequest
-@@ -220,6 +248,7 @@ class ParserEngine(Parser):
+@@ -220,6 +248,7 @@
          delta_token_ids: Sequence[int],
      ) -> list[SemanticEvent]:
          delta_text, delta_token_ids = self._preprocess_feed(delta_text, delta_token_ids)
@@ -643,7 +636,7 @@ index 2964adc..784622c 100644
          return self._engine.feed(delta_text, delta_token_ids)
  
      # ── Schema-aware type correction ─────────────────────────────────
-@@ -437,6 +466,7 @@ class ParserEngine(Parser):
+@@ -437,6 +466,7 @@
          finished: bool,
      ) -> DeltaMessage | None:
          self._initialize_history_tool_call_cnt(request)
@@ -651,7 +644,7 @@ index 2964adc..784622c 100644
          if not self._prompt_streaming_prepared and prompt_token_ids is not None:
              # NOTE: call the hook BEFORE setting the flag, because the hook
              # may invoke ``_reset`` (e.g. via ``initialize_streaming``) which
-@@ -496,7 +526,7 @@ class ParserEngine(Parser):
+@@ -496,7 +526,7 @@
          request: ChatCompletionRequest | ResponsesRequest,
      ) -> tuple[str | None, str | None]:
          self._reset()
@@ -660,20 +653,10 @@ index 2964adc..784622c 100644
          events.extend(self._engine.finish())
  
          reasoning_parts: list[str] = []
-@@ -624,24 +654,148 @@ class ParserEngine(Parser):
+@@ -624,24 +654,148 @@
      ) -> str | None:
          return None
  
--    def count_reasoning_tokens(self, token_ids: Sequence[int]) -> int:
--        start_id = self._reasoning_start_token_id
--        end_id = self._reasoning_end_token_id
--        if start_id is None or end_id is None:
--            return 0
--        count = 0
--        depth = 0
--        for token_id in token_ids:
--            if token_id == start_id:
--                depth += 1
 +    # ── Exact reasoning usage ────────────────────────────────────────
 +
 +    def _resolve_reasoning_boundary(self) -> tuple[frozenset[int], str | None]:
@@ -715,10 +698,7 @@ index 2964adc..784622c 100644
 +        boundary: set[int] = set()
 +        for (state, terminal), transition in config.transitions.items():
 +            if state is not ParserState.REASONING or transition.skip_in_token_id_mode:
-                 continue
--            if token_id == end_id:
--                if depth > 0:
--                    depth -= 1
++                continue
 +            leaves = transition.next_state is not ParserState.REASONING
 +            announces = EventType.REASONING_END in transition.events
 +            if leaves != announces:
@@ -730,10 +710,7 @@ index 2964adc..784622c 100644
 +                    "without leaving reasoning"
 +                )
 +            if not leaves:
-                 continue
--            if depth > 0:
--                count += 1
--        return count
++                continue
 +            token_text = config.token_id_terminals.get(terminal)
 +            token_id = self.vocab.get(token_text) if token_text is not None else None
 +            if token_id is None:
@@ -804,7 +781,10 @@ index 2964adc..784622c 100644
 +            )
 +        return self._reasoning_token_count
 +
-+    def count_reasoning_tokens(self, token_ids: Sequence[int]) -> int:
+     def count_reasoning_tokens(self, token_ids: Sequence[int]) -> int:
+-        start_id = self._reasoning_start_token_id
+-        end_id = self._reasoning_end_token_id
+-        if start_id is None or end_id is None:
 +        """Reasoning ids in a complete generation, by the same boundary.
 +
 +        The count :attr:`reasoning_token_count` accumulates delta by delta,
@@ -817,7 +797,20 @@ index 2964adc..784622c 100644
 +                f"{self._reasoning_boundary_refusal}"
 +            )
 +        if self.parser_engine_config.initial_state is not ParserState.REASONING:
-+            return 0
+             return 0
+-        count = 0
+-        depth = 0
+-        for token_id in token_ids:
+-            if token_id == start_id:
+-                depth += 1
+-                continue
+-            if token_id == end_id:
+-                if depth > 0:
+-                    depth -= 1
+-                continue
+-            if depth > 0:
+-                count += 1
+-        return count
 +        for index, token_id in enumerate(token_ids):
 +            if token_id in self._reasoning_boundary_ids:
 +                return index
@@ -825,7 +818,7 @@ index 2964adc..784622c 100644
  
      # ── Single-pass parse helper ────────────────────────────────────────
  
-@@ -686,6 +840,7 @@ class ParserEngine(Parser):
+@@ -686,6 +840,7 @@
      ) -> tuple[str | None, str | None, list[FunctionCall] | None]:
          self._initialize_history_tool_call_cnt(request)
          self._check_skip_tool_parsing(request)

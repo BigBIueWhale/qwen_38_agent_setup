@@ -1049,8 +1049,8 @@ def _validate_kv_pin_after(state: State) -> None:
     )
 
 
-def _validate_kv_users_before(state: State) -> None:
-    label = "KV user-count sizing precondition"
+def _validate_shared_prefix_cache_before(state: State) -> None:
+    label = "shared prefix cache precondition"
     spec = "vllm/v1/kv_offload/cpu/spec.py"
     manager = "vllm/v1/kv_offload/cpu/manager.py"
     cache = "vllm/config/cache.py"
@@ -1092,16 +1092,13 @@ def _validate_kv_users_before(state: State) -> None:
     )
 
 
-def _validate_kv_users_after(state: State) -> None:
-    label = "KV user-count sizing result"
+def _validate_shared_prefix_cache_after(state: State) -> None:
+    label = "shared prefix cache result"
     spec = "vllm/v1/kv_offload/cpu/spec.py"
     manager = "vllm/v1/kv_offload/cpu/manager.py"
     cache = "vllm/config/cache.py"
     kv_utils = "vllm/v1/core/kv_cache_utils.py"
 
-    # One mode: the pluggable eviction layer is gone, not stranded. The
-    # deleted policies package must be absent from the final tree and
-    # unreferenced anywhere the stage can see.
     for path in (
         "vllm/v1/kv_offload/cpu/policies/__init__.py",
         "vllm/v1/kv_offload/cpu/policies/base.py",
@@ -1111,72 +1108,49 @@ def _validate_kv_users_after(state: State) -> None:
         "tests/v1/kv_offload/cpu/policies/__init__.py",
         "tests/v1/kv_offload/cpu/policies/test_factory.py",
     ):
-        _require(
-            path not in state,
-            f"{label}: superseded policy module survived deletion: {path}",
-        )
-    forbid_text(state, manager, "CachePolicyFactory", label=label)
-    # The superseded knobs survive in the spec only as named entries of its
-    # rejection list — never as read configuration.
-    forbid_text(state, spec, "self.eviction_policy", label=label)
-    forbid_text(state, spec, "self.cache_policy_module_path", label=label)
-    require_text(state, spec, '"eviction_policy",', label=label)
-    require_text(state, spec, '"cache_policy_module_path",', label=label)
-
-    # Fail-closed acceptance surface: superseded keys are named rejections,
-    # the user count is required, and the count drives the chunk math.
-    require_text(state, spec, '"cpu_bytes_to_use",', label=label)
-    require_text(
-        state,
-        spec,
-        "cpu_kv_cache_users must be specified",
-        label=label,
-    )
+        _require(path not in state, f"{label}: deleted policy module is present: {path}")
+    require_text(state, spec, "cpu_kv_cache_users must be specified", label=label)
     require_text(state, spec, "Unknown kv_connector_extra_config keys", label=label)
-    require_text(
-        state, spec, "self.num_blocks = cpu_kv_cache_users * chunks_per_user",
-        label=label,
-    )
-    require_python_symbols(
-        state,
-        manager,
-        {
-            "CPUOffloadingManager.__init__": [
-                "self",
-                "num_blocks",
-                "enable_events",
-                "store_threshold",
-                "max_tracker_size",
-            ],
-        },
-        label=label,
-    )
-    # Pressure resolves one agent at a time: the evictable set is grouped by
-    # owning agent and drained a group at a time, never interleaved.
-    require_text(
-        state, manager, "by_agent: dict[str, list[OffloadKey]] = {}",
-        label=label,
-    )
-    require_text(
-        state, manager, "for agent_keys in by_agent.values():", label=label
-    )
-    # Ownership is fixed where the block is written and nowhere else, and
-    # the write is the one place that refuses a request naming no agent: an
-    # unowned block would sit under a label no single context corresponds to.
-    require_text(
-        state, manager, "self._owner[key] = owner", count=1, label=label
-    )
-    require_text(state, manager, "self._owner: dict[OffloadKey, str] = {}", label=label)
-    _require_ordered(
-        _source(state, manager, label=label),
-        (
-            "owner = req_context.kv_scope",
-            "if not owner:",
-            "raise VLLMServerError(",
-        ),
-        label=label,
-        location=manager,
-    )
+    require_text(state, spec, "self.num_blocks = cpu_kv_cache_users * chunks_per_user", label=label)
+    require_python_symbols(state, manager, {
+        "CPUOffloadingManager.__init__": ["self", "num_blocks", "enable_events"],
+    }, label=label)
+
+    membership = "vllm/v1/core/prefix_cache.py"
+    for text in (
+        "class PrefixCacheView:",
+        "return self.keys is None or self.keys.issuperset(content)",
+        "if agent_id not in self._owned:",
+        "return PrefixCacheView(None)",
+        "return PrefixCacheView(frozenset(owned))",
+        "def extend_content(",
+        "entry.agents[agent_id] = acquired",
+        "def copy_membership(",
+        "def copy_content_memberships(",
+    ):
+        require_text(state, membership, text, label=label)
+    require_text(state, membership, "len(state.agents) + added <= state.capacity", count=2, label=label)
+    for text in (
+        "self.prefix_cache = index",
+        "req_context.set_state(self.prefix_cache.view(self._agent_id(req_context)))",
+        "self._references.setdefault(key, set()).add(req_id)",
+        "not required or not self._has_content(key, required, req_context)",
+        "self._references.get(key, set()) <= released_requests",
+        "if victim == agent_id:",
+        "self.prefix_cache.release_agent(self.cache_tier, victim)",
+        "if self._blocks[key].ref_cnt != 0:",
+        "self.prefix_cache.extend_content(self.cache_tier, key, content[key])",
+        "self.prefix_cache.copy_content_memberships(",
+        "        if key not in self._complete_blocks:",
+    ):
+        require_text(state, manager, text, label=label)
+    require_text(state, "vllm/v1/core/kv_cache_manager.py",
+                 "self.block_pool.prefix_cache.view(request.kv_scope)", count=2, label=label)
+    require_text(state, "vllm/v1/simple_kv_offload/manager.py",
+                 "copy_membership(", label=label)
+    tiering = "vllm/v1/kv_offload/tiering/manager.py"
+    require_text(state, tiering, "if success and complete_keys:", label=label)
+    require_text(state, tiering, "self.primary_tier.begin_lookup(req_context)", label=label)
 
     # GPU tier: the byte flag is gone, the count is required, and the pool
     # is derived rather than filled to whatever memory happened to be free.
@@ -1204,8 +1178,8 @@ def _validate_kv_users_after(state: State) -> None:
     )
     forbid_text(state, "vllm/config/vllm.py", "cpu_bytes_to_use", label=label)
 
-    # Identity on every generation surface, none privileged, one internal
-    # channel. The scheduler applies releases before registration.
+    # Every generation surface carries the same opaque identity through
+    # the common sampling-parameter channel.
     # Six identity surfaces over five modules: the chat module carries both
     # the single-conversation request and the batch, and a batch is one
     # caller, so its conversations are submitted under the one agent.
@@ -1244,7 +1218,7 @@ def _validate_kv_users_after(state: State) -> None:
         'cohere_format: str = "cmd4"',
         label=label,
     )
-    # Generation requires an owning agent, enforced on the path into the
+    # Generation requires an agent ID, enforced on the path into the
     # engine rather than on the request models -- the render endpoints share
     # those models and allocate nothing, so a model-level requirement would
     # demand an identity from a caller that owns no context.
@@ -2136,36 +2110,25 @@ CONTRACTS: Mapping[str, SemanticContract] = {
         validate_before=_validate_kv_pin_before,
         validate_after=_validate_kv_pin_after,
     ),
-    "kv-user-count-sizing-and-scope-eviction": SemanticContract(
+    "shared-prefix-cache-and-user-capacity": SemanticContract(
         rationale=(
-            "Both KV tiers were sized in raw bytes measured on one machine "
-            "(--kv-cache-memory, cpu_bytes_to_use), and eviction was block "
-            "recency, which spreads pressure across every resident agent and "
-            "leaves each of them holding a partial context that still has to "
-            "be prefilled. Capacity is now declared as counts of resident "
-            "full-length user contexts on both tiers and the bytes are "
-            "derived post-engine-init from the KV cache spec; agent identity "
-            "(kv_scope) rides every generation protocol this --network none "
-            "image can import (chat, completion, responses, anthropic, "
-            "token-in-token-out) beside cache_salt; the Cohere surface "
-            "hard-imports the uninstallable cohere SDK, so its guarded "
-            "registration is excised and the endpoint's absence is an "
-            "enforced fact rather than an import accident. The host tier "
-            "labels each block with the agent whose store wrote it and gives "
-            "up whole agents under pressure, oldest agent first, so what "
-            "survives is a whole context. The byte and policy knobs are "
-            "refusals, not fallbacks, and the pluggable policy package is "
-            "deleted."
+            "Both KV tiers are sized from declared full-length user contexts. "
+            "A required opaque agent ID selects shared-prefix membership: an "
+            "ID with no cached blocks can acquire its initial prefix, and an "
+            "existing ID matches its acquired or computed data. GPU and CPU "
+            "share one catalog. Whole-context eviction preserves surviving "
+            "agents' shared references; sparse CPU chunks advertise only "
+            "written data, and secondary storage receives canonical entries. "
+            "Every served generation surface uses the common identity gate."
         ),
         removal_condition=(
-            "Remove only when pinned upstream sizes both KV tiers from "
-            "declared user-context counts, carries a per-request cache scope "
-            "on every generation protocol, and resolves host-tier pressure "
-            "at agent granularity with equivalent fail-closed configuration "
-            "handling."
+            "Remove when pinned upstream provides the same user-count sizing, "
+            "initial-fork matching, shared GPU/CPU membership, complete-context "
+            "retention, and content-accurate offload transfer contracts across "
+            "all generation consumers."
         ),
-        validate_before=_validate_kv_users_before,
-        validate_after=_validate_kv_users_after,
+        validate_before=_validate_shared_prefix_cache_before,
+        validate_after=_validate_shared_prefix_cache_after,
     ),
     "exact-reasoning-usage": SemanticContract(
         rationale=(

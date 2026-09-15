@@ -318,7 +318,7 @@ diff --git a/vllm/entrypoints/openai/chat_completion/protocol.py b/vllm/entrypoi
  )
  from vllm.entrypoints.openai.engine.protocol import (
      AnyResponseFormat,
-@@ -583,88 +584,7 @@
+@@ -582,88 +583,7 @@
  
      @model_validator(mode="after")
      def _validate_tool_result_correlation(self) -> "ChatCompletionRequest":

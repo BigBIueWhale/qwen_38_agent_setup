@@ -1,4 +1,5 @@
 diff --git a/tests/entrypoints/openai/chat_completion/test_parallel_tool_call_integrity.py b/tests/entrypoints/openai/chat_completion/test_parallel_tool_call_integrity.py
+new file mode 100644
 --- /dev/null
 +++ b/tests/entrypoints/openai/chat_completion/test_parallel_tool_call_integrity.py
 @@ -0,0 +1,125 @@
@@ -310,6 +311,48 @@ diff --git a/vllm/entrypoints/openai/chat_completion/serving.py b/vllm/entrypoin
  
              choices.append(choice_data)
  
+diff --git a/vllm/entrypoints/serve/utils/tool_calls_utils.py b/vllm/entrypoints/serve/utils/tool_calls_utils.py
+deleted file mode 100644
+--- a/vllm/entrypoints/serve/utils/tool_calls_utils.py
++++ /dev/null
+@@ -1,37 +0,0 @@
+-# SPDX-License-Identifier: Apache-2.0
+-# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
+-from typing import TypeVar
+-
+-from vllm.entrypoints.openai.chat_completion.protocol import (
+-    ChatCompletionRequest,
+-    ChatCompletionResponseChoice,
+-    ChatCompletionResponseStreamChoice,
+-)
+-
+-# Used internally
+-_ChatCompletionResponseChoiceT = TypeVar(
+-    "_ChatCompletionResponseChoiceT",
+-    ChatCompletionResponseChoice,
+-    ChatCompletionResponseStreamChoice,
+-)
+-
+-
+-def maybe_filter_parallel_tool_calls(
+-    choice: _ChatCompletionResponseChoiceT, request: ChatCompletionRequest
+-) -> _ChatCompletionResponseChoiceT:
+-    """Filter to first tool call only when parallel_tool_calls is explicitly False."""
+-
+-    if request.parallel_tool_calls is not False:
+-        return choice
+-
+-    if isinstance(choice, ChatCompletionResponseChoice) and choice.message.tool_calls:
+-        choice.message.tool_calls = choice.message.tool_calls[:1]
+-    elif (
+-        isinstance(choice, ChatCompletionResponseStreamChoice)
+-        and choice.delta.tool_calls
+-    ):
+-        choice.delta.tool_calls = [
+-            tool_call for tool_call in choice.delta.tool_calls if tool_call.index == 0
+-        ]
+-
+-    return choice
 diff --git a/vllm/tool_parsers/abstract_tool_parser.py b/vllm/tool_parsers/abstract_tool_parser.py
 --- a/vllm/tool_parsers/abstract_tool_parser.py
 +++ b/vllm/tool_parsers/abstract_tool_parser.py
@@ -363,45 +406,3 @@ diff --git a/vllm/tool_parsers/structural_tag_registry.py b/vllm/tool_parsers/st
  
  
  def _dump_tool_for_xgrammar(
-diff --git a/vllm/entrypoints/serve/utils/tool_calls_utils.py b/vllm/entrypoints/serve/utils/tool_calls_utils.py
-deleted file mode 100644
---- a/vllm/entrypoints/serve/utils/tool_calls_utils.py
-+++ /dev/null
-@@ -1,37 +0,0 @@
--# SPDX-License-Identifier: Apache-2.0
--# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
--from typing import TypeVar
--
--from vllm.entrypoints.openai.chat_completion.protocol import (
--    ChatCompletionRequest,
--    ChatCompletionResponseChoice,
--    ChatCompletionResponseStreamChoice,
--)
--
--# Used internally
--_ChatCompletionResponseChoiceT = TypeVar(
--    "_ChatCompletionResponseChoiceT",
--    ChatCompletionResponseChoice,
--    ChatCompletionResponseStreamChoice,
--)
--
--
--def maybe_filter_parallel_tool_calls(
--    choice: _ChatCompletionResponseChoiceT, request: ChatCompletionRequest
--) -> _ChatCompletionResponseChoiceT:
--    """Filter to first tool call only when parallel_tool_calls is explicitly False."""
--
--    if request.parallel_tool_calls is not False:
--        return choice
--
--    if isinstance(choice, ChatCompletionResponseChoice) and choice.message.tool_calls:
--        choice.message.tool_calls = choice.message.tool_calls[:1]
--    elif (
--        isinstance(choice, ChatCompletionResponseStreamChoice)
--        and choice.delta.tool_calls
--    ):
--        choice.delta.tool_calls = [
--            tool_call for tool_call in choice.delta.tool_calls if tool_call.index == 0
--        ]
--
--    return choice

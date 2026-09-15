@@ -822,6 +822,15 @@ assert_running_profile() {
 
   kv_users_installed_report="$(
     docker exec "${CONTAINER_NAME}" sha256sum \
+      /usr/local/lib/python3.12/dist-packages/vllm/distributed/kv_transfer/kv_connector/v1/offloading_connector.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/v1/core/block_pool.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/v1/core/kv_cache_coordinator.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/v1/core/kv_cache_manager.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/v1/core/prefix_cache.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/v1/core/single_type_kv_cache_manager.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/cpu/common.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/v1/simple_kv_offload/manager.py \
+      /opt/qwen38/shared_prefix_cache_unit.py \
       /usr/local/lib/python3.12/dist-packages/vllm/config/cache.py \
       /usr/local/lib/python3.12/dist-packages/vllm/config/vllm.py \
       /usr/local/lib/python3.12/dist-packages/vllm/engine/arg_utils.py \
@@ -844,6 +853,15 @@ assert_running_profile() {
       /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/scale_out/token_in_token_out/serving.py
   )"
   expected_kv_users_installed_report="$(printf '%s  %s\n' \
+    "${OFFLOADING_CONNECTOR_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/distributed/kv_transfer/kv_connector/v1/offloading_connector.py \
+    "${BLOCK_POOL_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/core/block_pool.py \
+    "${KV_CACHE_COORDINATOR_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/core/kv_cache_coordinator.py \
+    "${KV_CACHE_MANAGER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/core/kv_cache_manager.py \
+    "${PREFIX_CACHE_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/core/prefix_cache.py \
+    "${SINGLE_TYPE_KV_CACHE_MANAGER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/core/single_type_kv_cache_manager.py \
+    "${KV_OFFLOAD_CPU_COMMON_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/cpu/common.py \
+    "${SIMPLE_KV_OFFLOAD_MANAGER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/simple_kv_offload/manager.py \
+    "${SHARED_PREFIX_CACHE_UNIT_SHA256}" /opt/qwen38/shared_prefix_cache_unit.py \
     "${CACHE_CONFIG_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/config/cache.py \
     "${VLLM_CONFIG_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/config/vllm.py \
     "${ARG_UTILS_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/engine/arg_utils.py \

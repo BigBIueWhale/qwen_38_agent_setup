@@ -39,7 +39,7 @@ There is one supported mode:
 | Final-answer ceiling | 131,072 generated final tokens, subject to remaining context |
 | MTP/speculation | Disabled |
 | CPU weight offload | Zero |
-| KV offload | One declared resident user context, pinned host tier in /dev/shm; evicted a whole agent at a time |
+| KV offload | One declared resident user context, pinned host tier in /dev/shm; shared prefixes and whole-agent context eviction |
 | Batching | One sequence; 2,048-token chunked prefill |
 | Listener | 127.0.0.1:8000 only |
 | Agent client | Qwen Code 0.21.12 at b965d5f8c24f48e65fb0b17c7d45f34ca4ce8f38 |
@@ -110,9 +110,9 @@ image, stages the suite into that container's bounded scratch tmpfs, and runs
 the named probe by file. That is what lets a probe carry the identity the
 backend requires of every generative caller: `scripts/probe_scope.py` mints one
 `kv_scope` per run from the probe's own file name and a fresh run id — one
-stable id per agent for the life of the run, exactly as the harness names a
-session — and a probe fed to the interpreter any other way refuses to start
-rather than invent one.
+stable ID per agent for the life of the run. This naming convention belongs to
+the probe; the backend treats the ID as opaque. The launcher runs probes by file,
+which supplies the name used by this convention.
 
 The build is reproducible on a given host: layer timestamps are normalised to
 `SOURCE_DATE_EPOCH`, so re-deriving the source tree does not change the image
@@ -266,19 +266,19 @@ It is intentionally reconstructed by twenty ordered, reviewed semantic transform
 | patches/vllm-qwen38-numerical-audits.patch | a73aa2f2ae3f82010eb2bafcdf663c2fe14854c30165dbc4d8457725bc3b6632 |
 | patches/vllm-turboquant-fail-closed-guards.patch | 7282d1d4d7a17b40ab8626c82f478bbb938c548451b7793df8233562a9e24c7c |
 | patches/vllm-kv-offload-pinning-fail-closed.patch | 1857071c38d081bb95e3cca12153cebce096649084950b99229104fdae029ca6 |
-| patches/vllm-kv-user-count-sizing-and-scope-eviction.patch | d4d18c5afc0af9ecdaff948d7e7f4b5d2e8f85eb15e7853aaddc44de62b17b56 |
-| patches/vllm-exact-reasoning-usage.patch | 7991cca04345cf58a602a6b0630d2ebbf31f3da228e9034da591217956d37b31 |
+| patches/vllm-shared-prefix-cache-and-user-capacity.patch | 736183bab22bb200053d38990ef0a51d7721a711542f241bde07f723aa2ce892 |
+| patches/vllm-exact-reasoning-usage.patch | c6a880c0a15056792286f74bf32a4e554f70de05a82615522086ef4ca1cf2db3 |
 | patches/vllm-anthropic-input-fidelity.patch | c2063d509fc90929f7d6018796f753da6445f12a4b4b19181e377f772b923a49 |
 | patches/vllm-qwen-exact-tool-language.patch | fe4e46cb7444c80646537da63ab1ac12c54e7eebb04c0735a4243d8b7e7943d2 |
 | patches/vllm-png-source-admission.patch | b9091c5c227151ec00131a854d927a9405396244a9a59bd4d6e297dd67ea3306 |
 | patches/vllm-kv-physical-free-memory.patch | 21f8993033c78971d4f7a660fe9906e054ec658139e83fc37b7121f1d8d91289 |
-| patches/vllm-qwen-single-call-grammar.patch | cb01f9cafc25301e67cea7b6a81b4708973964b5f772e8193465f1b487838f68 |
-| patches/vllm-responses-history-integrity.patch | b54c7c98b80dd00f824dc7a8dff094f8be8419aa5883d4c35e25483af65b0ab0 |
+| patches/vllm-qwen-single-call-grammar.patch | 2ae587bdde25b974cd88c5c351162fe809ee92b11d22ac0037f38411c8467b8b |
+| patches/vllm-responses-history-integrity.patch | 117c17c114d7e91e57045a8e80b6eeac283c1ab56bdaf135019ad3c372a42186 |
 | patches/vllm-responses-stream-identity.patch | eccec34b8dd211f444065ef60b6b8075161efc790b61db4640104e3747763478 |
 
-The reconstructed tree has exactly sixty-five reviewed runtime-source changes, six
-reviewed runtime-source deletions, forty-four reviewed existing-test changes,
-five reviewed new tests, and two reviewed test deletions — the authoritative
+The reconstructed tree has 72 reviewed runtime-source changes, 1 new runtime source,
+6 runtime-source deletions, 50 existing-test changes, 6 new tests,
+and 2 test deletions. The authoritative
 counts are derived and printed by ./scripts/build-vllm.sh check, never restated
 by hand there. The landmark-aware Python patcher calculates every mutation
 (including file deletions) before writing, validates unique structural landmarks
@@ -300,11 +300,11 @@ Pinned build inputs and products:
 | Offline archive | artifacts/qwen38-vllm-images-runtime-v23.tar |
 | Archive size | Awaiting adoption after the v23 export |
 | Archive SHA-256 | Awaiting adoption after the v23 export |
-| Runtime Dockerfile SHA-256 | 8205f36b8e0f2dcebf17bd03e29de26bffff5bc4ed73f0dd001195ffdb1b1e44 |
-| Docker context allowlist SHA-256 | 515845d3b7c06cbbfbccf1b8d04336d345a66c582a56c5d598a609febd8edcfa |
-| Build verifier SHA-256 | 93a890d6e75a580f6f0946655c42806634297f31702d7927e76ae21a19b2feca |
-| Runtime validator SHA-256 | 605ba10d3907e5ca9976438ec4b9e6f64e6872bc85aed96cd74b40f75a26e983 |
-| Runtime lock SHA-256 | 2298853b73de6e5379654e7d1fc88efceffaa506de3f8964130f7aac0e650dd9 |
+| Runtime Dockerfile SHA-256 | eb0f0baddef109dbe25f6a92f8a2b84ad9c18647892131411bb8f298646c9234 |
+| Docker context allowlist SHA-256 | 00b93440d4684980fc932594c0353e72bdb1d12b69165dd7898b28e03119f00d |
+| Build verifier SHA-256 | 74ae156149873952b4a7639f421e3ee41465716956f8f306ddec3f93458afc84 |
+| Runtime validator SHA-256 | bab63263005f7bde7a6a66f7372d2f043545598fd56563bc5f8766301723d4e2 |
+| Runtime lock SHA-256 | b10427112b861023022109fad29ecbd0613aa6c768185434055098d17eab1808 |
 
 Every reviewed runtime file, including both TurboQuant kernels, is copied and
 hash-checked against its upstream and patched identities. A CPU Triton-interpreter
@@ -400,9 +400,11 @@ Consequences:
 - CPU weight offload is exactly zero. KV offload is not: the OffloadingConnector runs
   in kv_both role with a pinned host tier in /dev/shm sized as one declared resident
   user context (bytes derived in-engine from max_model_len and the KV cache spec).
-  Blocks carry the agent that stored them, and pressure gives up whole agents
-  oldest-first rather than interleaving blocks, so a surviving context is
-  complete. That tier is live and serving hits.
+  An agent ID with no cached blocks may acquire a shared prefix. Once it has
+  cached blocks, it matches its acquired cache and extends it through computation.
+  GPU and CPU use one membership catalog. Pressure releases whole agent contexts;
+  references held by surviving contexts preserve their shared data and complete
+  working sets. The v23 source tests cover these rules; image adoption is pending.
 - Multimodal profiling is mandatory and cannot be skipped to obtain a deceptively
   optimistic allocation.
 - All unquantized model computation, including the entire vision tower, uses BF16.
@@ -410,6 +412,28 @@ Consequences:
   Qwen3_5ForConditionalGeneration.
 - Request-side media limits, processor overrides, and lower image-detail choices are
   rejected by the strict image patch rather than silently replacing the profile.
+
+### Shared prefixes and agent IDs
+
+Every generation request supplies an opaque, nonempty `kv_scope` agent ID.
+Use a stable ID for successive requests from one agent. A new ID can match a
+shared prefix only while it has no cached blocks of its own; selecting that
+prefix creates an implicit fork. Afterward, it matches only its acquired or
+computed data. GPU and CPU membership jointly determine whether it has a cache.
+If all its cached blocks are evicted, the no-cache rule applies again.
+
+Shared blocks have references from each agent that uses them. Releasing one
+agent preserves references held by surviving contexts. Request completion
+retains a complete context for its next turn; it does not declare the agent
+dead. A selected prefix acquires only its selected data, including when it
+ends inside a larger physical cache entry.
+
+The ID has no prescribed format and declares no parent or lineage. A fresh ID
+can observe shared-prefix hits through latency, so IDs carry no authentication
+or confidentiality promise. No timing padding is added, and `cache_salt` is
+independent of agent identity. Rendering and pooling do not require a generation
+ID. See [the KV design](docs/kv-user-count-and-agent-scope-design.md) for complete
+context retention, CPU window availability, secondary storage and capacity math.
 
 ### Agent defaults: xhigh thinking, exact sampling, long output
 
