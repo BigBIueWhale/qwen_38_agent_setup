@@ -121,3 +121,4 @@
 !vllm/vllm/parser/engine/streaming_parser_engine.py
 !vllm/vllm/parser/engine/token_id_scanner.py
 !scripts/tool_output_parser_unit.py
+!vllm/vllm/tool_parsers/abstract_tool_parser.py

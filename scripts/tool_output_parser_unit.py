@@ -102,6 +102,30 @@ def parse(text, chunk_size, *, tools=None, choice="auto", ids=None):
 
 
 class ToolOutputParserTest(unittest.TestCase):
+    def test_call_limit_is_decided_by_the_grammar(self):
+        from xgrammar import Grammar
+        from xgrammar.testing import _is_grammar_accept_string
+
+        from vllm.tool_parsers.structural_tag_registry import get_model_structural_tag
+
+        tools = ChatCompletionRequest(
+            messages=[], tools=[TOOL], tool_choice="auto"
+        ).tools
+        for choice in ("auto", "required"):
+            for parallel in (None, True, False):
+                with self.subTest(choice=choice, parallel=parallel):
+                    tag = get_model_structural_tag(
+                        "qwen_3_coder", tools, choice, False,
+                        parallel_tool_calls=parallel,
+                    )
+                    grammar = Grammar.from_structural_tag(tag)
+                    self.assertTrue(_is_grammar_accept_string(grammar, call("one")))
+                    self.assertEqual(
+                        _is_grammar_accept_string(
+                            grammar, call("one") + "\n" + call("two")
+                        ), parallel is not False,
+                    )
+
     def test_unarmed_text_never_becomes_a_call(self):
         for body in (
             "<function=write><parameter=text>x</parameter></function>",

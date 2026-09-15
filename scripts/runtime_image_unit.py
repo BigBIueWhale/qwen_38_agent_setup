@@ -62,11 +62,16 @@ class RuntimeImageTest(unittest.TestCase):
             for entry in stage["files"]:
                 path = entry["path"]
                 if path.startswith("vllm/") and entry["after_sha256"] is None:
-                    # The removed CPU-policy package is deleted as a whole.
-                    self.assertTrue(path.startswith("vllm/v1/kv_offload/cpu/policies/"))
+                    # The CPU policies are removed as a package; other
+                    # superseded modules must be individually absent.
+                    removed = (
+                        "vllm/v1/kv_offload/cpu/policies"
+                        if path.startswith("vllm/v1/kv_offload/cpu/policies/")
+                        else path
+                    )
                     self.assertIn(
                         "test ! -e /usr/local/lib/python3.12/dist-packages/"
-                        "vllm/v1/kv_offload/cpu/policies", recipe,
+                        + removed, recipe,
                     )
 
     def test_kernel_guard_is_executed_during_build(self):

@@ -1734,6 +1734,39 @@ def _validate_kv_physical_after(state: State) -> None:
     }, label=label)
 
 
+def _validate_single_call_before(state: State) -> None:
+    require_text(state, "vllm/entrypoints/openai/chat_completion/serving.py",
+                 "choice_data = maybe_filter_parallel_tool_calls(choice_data, request)",
+                 count=2, label="Call-count grammar precondition")
+
+
+def _validate_single_call_after(state: State) -> None:
+    label = "Call-count grammar result"
+    _require_in_symbol(state, "vllm/tool_parsers/structural_tag_registry.py",
+                       "get_model_structural_tag", (
+        'model == "qwen_3_coder" and parallel_tool_calls is False',
+        'suffix.stop_after_first = True',
+        'get_xgrammar_model_structural_tag(', 'reasoning=reasoning',
+        'isinstance(suffix, TagFormat)', 'raise RuntimeError(',
+    ), label=label)
+    _require_in_symbol(state, "vllm/tool_parsers/abstract_tool_parser.py",
+                       "ToolParser.get_structural_tag", (
+        'parallel_tool_calls=request.parallel_tool_calls',
+    ), label=label)
+    forbid_text(state, "vllm/entrypoints/openai/chat_completion/serving.py",
+                "maybe_filter_parallel_tool_calls", label=label)
+    _require("vllm/entrypoints/serve/utils/tool_calls_utils.py" not in state,
+             f"{label}: obsolete response filter survived")
+    require_python_symbols(state, "tests/tool_parsers/test_structural_tag_registry.py", {
+        "test_qwen3_auto_with_parallel_off_ends_the_turn_after_one_call": None,
+        "test_single_qwen_call_preserves_the_builtin_reasoning_prefix": None,
+    }, label=label)
+    require_python_symbols(state,
+        "tests/entrypoints/openai/chat_completion/test_parallel_tool_call_integrity.py", {
+            "test_response_does_not_discard_calls_when_parallel_is_false": None,
+        }, label=label)
+
+
 def validate_final(state: State) -> None:
     """Reassert every durable semantic invariant on the complete tree.
 
@@ -1749,6 +1782,19 @@ def validate_final(state: State) -> None:
 
 
 CONTRACTS: Mapping[str, SemanticContract] = {
+    "qwen-single-call-grammar": SemanticContract(
+        rationale=(
+            "A response filter silently removed model-produced calls when parallel "
+            "calls were disabled. The Qwen grammar must own the count, while every "
+            "call actually produced remains on both streaming and batch responses."
+        ),
+        removal_condition=(
+            "Remove when upstream enforces Qwen's call count while decoding and "
+            "preserves the actual tool output on every response path."
+        ),
+        validate_before=_validate_single_call_before,
+        validate_after=_validate_single_call_after,
+    ),
     "kv-physical-free-memory": SemanticContract(
         rationale=(
             "The declared KV capacity cannot spend memory already occupied before "

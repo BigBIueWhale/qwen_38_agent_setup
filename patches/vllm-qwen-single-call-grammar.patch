@@ -1,0 +1,407 @@
+diff --git a/tests/entrypoints/openai/chat_completion/test_parallel_tool_call_integrity.py b/tests/entrypoints/openai/chat_completion/test_parallel_tool_call_integrity.py
+--- /dev/null
++++ b/tests/entrypoints/openai/chat_completion/test_parallel_tool_call_integrity.py
+@@ -0,0 +1,125 @@
++# SPDX-License-Identifier: Apache-2.0
++# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
++"""The response layer preserves every call produced without a call-count grammar."""
++
++import json
++from unittest.mock import MagicMock
++
++import pytest
++
++from vllm.entrypoints.openai.chat_completion.protocol import ChatCompletionRequest
++from vllm.entrypoints.openai.chat_completion.serving import OpenAIServingChat
++from vllm.entrypoints.openai.engine.protocol import RequestResponseMetadata
++from vllm.outputs import CompletionOutput, RequestOutput
++from vllm.parser import ParserManager
++
++
++MARKERS = {"</think>": 20000, "<tool_call>": 20001, "</tool_call>": 20002}
++TEXT = {v: k for k, v in MARKERS.items()}
++TOOLS = [{"type": "function", "function": {
++    "name": "write", "parameters": {
++        "type": "object", "properties": {"text": {"type": "string"}},
++        "required": ["text"],
++    },
++}}]
++
++
++def _encode(text):
++    ids = []
++    while text:
++        marker = next((m for m in MARKERS if text.startswith(m)), None)
++        if marker:
++            ids.append(MARKERS[marker])
++            text = text[len(marker):]
++        else:
++            ids.append(ord(text[0]))
++            text = text[1:]
++    return ids
++
++
++def _decode(ids):
++    return "".join(TEXT.get(i, chr(i)) for i in ids)
++
++
++def _serving():
++    serving = OpenAIServingChat.__new__(OpenAIServingChat)
++    serving.response_role = "assistant"
++    serving.parser_cls = ParserManager.get_parser(
++        tool_parser_name="qwen3_coder", reasoning_parser_name="qwen3",
++        enable_auto_tools=True,
++    )
++    serving.model_config = None
++    serving.enable_auto_tools = True
++    serving.enable_prompt_tokens_details = False
++    serving.enable_log_outputs = False
++    serving.enable_log_deltas = False
++    serving.enable_force_include_usage = False
++    serving.request_logger = None
++    serving.system_fingerprint = None
++    serving.enable_per_request_metrics = False
++    return serving
++
++
++@pytest.mark.asyncio
++@pytest.mark.parametrize("stream,chunk_size", [(False, None), (True, 1), (True, 13)])
++async def test_response_does_not_discard_calls_when_parallel_is_false(
++    monkeypatch, stream, chunk_size
++):
++    monkeypatch.setenv("VLLM_ENFORCE_STRICT_TOOL_CALLING", "0")
++    call = (
++        "<tool_call>\n<function=write>\n<parameter=text>{}</parameter>"
++        "\n</function>\n</tool_call>"
++    )
++    ids = _encode("plan</think>" + call.format("one") + call.format("two"))
++    request = ChatCompletionRequest(
++        model="unit", messages=[{"role": "user", "content": "write"}], tools=TOOLS,
++        tool_choice="auto", parallel_tool_calls=False, stream=stream, kv_scope="unit",
++    )
++    tokenizer = MagicMock()
++    tokenizer.get_vocab.return_value = MARKERS
++    tokenizer.all_special_tokens = list(MARKERS)
++    tokenizer.all_special_ids = list(MARKERS.values())
++    tokenizer.decode.side_effect = _decode
++
++    async def outputs():
++        size = chunk_size or len(ids)
++        for start in range(0, len(ids), size):
++            group = ids[start:start + size]
++            last = start + size >= len(ids)
++            yield RequestOutput(
++                request_id="unit", prompt="prompt", prompt_token_ids=[1, 2, 3],
++                prompt_logprobs=None, outputs=[CompletionOutput(
++                    index=0, text=_decode(group), token_ids=group,
++                    cumulative_logprob=None, logprobs=None,
++                    finish_reason="stop" if last else None, stop_reason=None,
++                )], finished=last,
++            )
++
++    kwargs = dict(
++        request=request, result_generator=outputs(), request_id="chatcmpl-unit",
++        model_name="unit", conversation=[{"role": "user", "content": "write"}],
++        tokenizer=tokenizer, request_metadata=RequestResponseMetadata(request_id="unit"),
++    )
++    serving = _serving()
++    if not stream:
++        kwargs["parser"] = serving.parser_cls(tokenizer, request.tools)
++        response = await serving.chat_completion_full_generator(**kwargs)
++        calls = response.choices[0].message.tool_calls
++        assert [json.loads(c.function.arguments) for c in calls] == [
++            {"text": "one"}, {"text": "two"},
++        ]
++    else:
++        arguments = {}
++        async for event in serving.chat_completion_stream_generator(**kwargs):
++            if not event.startswith("data: ") or event.strip() == "data: [DONE]":
++                continue
++            payload = json.loads(event[6:])
++            for choice in payload.get("choices", []):
++                for call_delta in choice["delta"].get("tool_calls", []):
++                    index = call_delta["index"]
++                    arguments[index] = arguments.get(index, "") + (
++                        call_delta.get("function", {}).get("arguments") or ""
++                    )
++        assert [json.loads(arguments[i]) for i in sorted(arguments)] == [
++            {"text": "one"}, {"text": "two"},
++        ]
+diff --git a/tests/tool_parsers/test_structural_tag_registry.py b/tests/tool_parsers/test_structural_tag_registry.py
+--- a/tests/tool_parsers/test_structural_tag_registry.py
++++ b/tests/tool_parsers/test_structural_tag_registry.py
+@@ -509,7 +509,9 @@
+     assert sample_tools_strict[0].function.parameters is not None
+ 
+ 
+-@pytest.mark.parametrize("model", sorted(XGRAMMAR_BUILTIN_STRUCTURAL_TAG_MODELS))
++@pytest.mark.parametrize(
++    "model", sorted(XGRAMMAR_BUILTIN_STRUCTURAL_TAG_MODELS - {"qwen_3_coder"})
++)
+ def test_auto_tool_choice_skips_structural_tag_without_strict(
+     model: str,
+     sample_tools: list[ChatCompletionToolsParam],
+@@ -522,6 +524,139 @@
+     )
+ 
+     assert tag is None
++
++
++def test_qwen3_auto_tool_choice_is_constrained_without_strict(
++    sample_tools: list[ChatCompletionToolsParam],
++):
++    """A declared Qwen schema binds whether or not the transport said strict."""
++    tag = get_model_structural_tag(
++        model="qwen_3_coder",
++        tools=sample_tools,
++        tool_choice="auto",
++        reasoning=False,
++    )
++
++    assert isinstance(tag, StructuralTag)
++    fmt = tag.model_dump()["format"]
++    assert fmt["type"] == "triggered_tags"
++    assert fmt["triggers"] == ["<tool_call>\n<function="]
++    assert fmt["excludes"] == ["<think>", "</think>"]
++    assert fmt["stop_after_first"] is False
++    assert fmt["tags"][0]["content"]["json_schema"] == (
++        sample_tools[0].function.parameters
++    )
++
++
++# ---------------------------------------------------------------------------
++# Qwen3 XML structural tag: one call per turn when parallel calls are off
++# ---------------------------------------------------------------------------
++_QWEN3_CALL = (
++    "<tool_call>\n<function=get_weather>\n<parameter=city>\nParis\n</parameter>"
++    "\n</function>\n</tool_call>"
++)
++
++
++def _qwen3_grammar(tool_choice, parallel_tool_calls, tools=None):
++    tag = get_model_structural_tag(
++        model="qwen_3_coder",
++        tools=tools if tools is not None else _k3_tools_by_name(),
++        tool_choice=tool_choice,
++        reasoning=False,
++        parallel_tool_calls=parallel_tool_calls,
++    )
++    assert isinstance(tag, StructuralTag)
++    return Grammar.from_structural_tag(tag)
++
++
++@pytest.mark.parametrize("parallel_tool_calls", [None, True, False])
++def test_qwen3_auto_accepts_prose_and_one_call(parallel_tool_calls):
++    grammar = _qwen3_grammar("auto", parallel_tool_calls)
++    assert _is_grammar_accept_string(grammar, "Just an answer.")
++    assert _is_grammar_accept_string(grammar, "Checking.\n\n" + _QWEN3_CALL)
++
++
++@pytest.mark.parametrize("parallel_tool_calls", [None, True])
++def test_qwen3_auto_allows_several_calls_unless_parallel_is_off(
++    parallel_tool_calls,
++):
++    grammar = _qwen3_grammar("auto", parallel_tool_calls)
++    assert _is_grammar_accept_string(grammar, _QWEN3_CALL + "\n" + _QWEN3_CALL)
++    assert _is_grammar_accept_string(grammar, _QWEN3_CALL + " and more text")
++
++
++def test_qwen3_auto_with_parallel_off_ends_the_turn_after_one_call():
++    """``parallel_tool_calls: false`` is enforced at decode time.
++
++    The model cannot produce a second call or trailing text -- which is also
++    what its template asks of it -- so nothing has to be dropped afterwards
++    and the model is never shown a turn with less in it than it produced.
++    """
++    grammar = _qwen3_grammar("auto", False)
++    assert _is_grammar_accept_string(grammar, _QWEN3_CALL)
++    assert not _is_grammar_accept_string(grammar, _QWEN3_CALL + "\n" + _QWEN3_CALL)
++    assert not _is_grammar_accept_string(grammar, _QWEN3_CALL + " and more text")
++
++
++def test_qwen3_required_with_parallel_off_is_exactly_one_call():
++    grammar = _qwen3_grammar("required", False)
++    assert _is_grammar_accept_string(grammar, _QWEN3_CALL)
++    assert not _is_grammar_accept_string(grammar, _QWEN3_CALL + "\n" + _QWEN3_CALL)
++    assert not _is_grammar_accept_string(grammar, "text first " + _QWEN3_CALL)
++    assert not _is_grammar_accept_string(grammar, "no call at all")
++
++
++def test_qwen3_required_allows_several_calls_when_parallel_is_on():
++    grammar = _qwen3_grammar("required", True)
++    assert _is_grammar_accept_string(grammar, _QWEN3_CALL + "\n" + _QWEN3_CALL)
++
++
++@pytest.mark.parametrize("reasoning", [False, True])
++@pytest.mark.parametrize("choice", ["auto", "required", "named"])
++def test_single_qwen_call_preserves_the_builtin_reasoning_prefix(reasoning, choice):
++    selected = (
++        ChatCompletionNamedToolChoiceParam(
++            type="function", function=ChatCompletionNamedFunction(name="get_weather")
++        )
++        if choice == "named" else choice
++    )
++    tag = get_model_structural_tag(
++        "qwen_3_coder", _k3_tools_by_name(), selected, reasoning,
++        parallel_tool_calls=False,
++    )
++    prefix = "thinking</think>\n\n" if reasoning else ""
++    grammar = Grammar.from_structural_tag(tag)
++    assert _is_grammar_accept_string(grammar, prefix + _QWEN3_CALL)
++    assert not _is_grammar_accept_string(grammar, prefix + _QWEN3_CALL * 2)
++    assert not _is_grammar_accept_string(grammar, prefix + _QWEN3_CALL + "tail")
++
++
++def test_qwen_tool_parser_passes_the_request_call_limit(sample_tools, monkeypatch):
++    monkeypatch.setenv("VLLM_ENFORCE_STRICT_TOOL_CALLING", "1")
++    parser = Qwen3EngineToolParser(MagicMock(), sample_tools)
++    request = ChatCompletionRequest(
++        messages=[], tools=sample_tools, tool_choice="auto", parallel_tool_calls=False
++    )
++    grammar = Grammar.from_structural_tag(parser.get_structural_tag(request))
++    assert _is_grammar_accept_string(grammar, _QWEN3_CALL)
++    assert not _is_grammar_accept_string(grammar, _QWEN3_CALL * 2)
++
++
++def test_qwen3_grammar_rejects_what_the_parser_now_treats_as_text():
++    """The parser accepts exactly this grammar: what it takes as content the
++    grammar never produces as a call, and vice versa."""
++    grammar = _qwen3_grammar("auto", None)
++    bare = "<function=get_weather>\n<parameter=city>\nParis\n</parameter>\n</function>"
++    # Grammar-legal free text, parsed as content.
++    assert _is_grammar_accept_string(grammar, "The format is " + bare)
++    assert _is_grammar_accept_string(grammar, "<tool_call> is an opener")
++    # A call the grammar rejects: undeclared name, undeclared parameter.
++    assert not _is_grammar_accept_string(
++        grammar, _QWEN3_CALL.replace("get_weather", "erase_disk")
++    )
++    assert not _is_grammar_accept_string(
++        grammar, _QWEN3_CALL.replace("city", "colour")
++    )
+ 
+ 
+ def test_get_function_parameters_relaxes_function_strict_false():
+diff --git a/vllm/entrypoints/openai/chat_completion/serving.py b/vllm/entrypoints/openai/chat_completion/serving.py
+--- a/vllm/entrypoints/openai/chat_completion/serving.py
++++ b/vllm/entrypoints/openai/chat_completion/serving.py
+@@ -49,9 +49,6 @@
+ from vllm.entrypoints.openai.models.serving import OpenAIServingModels
+ from vllm.entrypoints.serve.utils.api_utils import get_max_tokens, should_include_usage
+ from vllm.entrypoints.serve.utils.request_logger import RequestLogger
+-from vllm.entrypoints.serve.utils.tool_calls_utils import (
+-    maybe_filter_parallel_tool_calls,
+-)
+ from vllm.inputs import EngineInput, MultiModalPlaceholders
+ from vllm.logger import init_logger
+ from vllm.logprobs import Logprob
+@@ -790,7 +787,6 @@
+ 
+                         finish_reason_sent[i] = True
+ 
+-                    choice_data = maybe_filter_parallel_tool_calls(choice_data, request)
+                     chunk = ChatCompletionStreamResponse(
+                         id=request_id,
+                         object=chunk_object_type,
+@@ -1116,7 +1112,6 @@
+                 ),
+                 routed_experts=routed_experts_b64,
+             )
+-            choice_data = maybe_filter_parallel_tool_calls(choice_data, request)
+ 
+             choices.append(choice_data)
+ 
+diff --git a/vllm/tool_parsers/abstract_tool_parser.py b/vllm/tool_parsers/abstract_tool_parser.py
+--- a/vllm/tool_parsers/abstract_tool_parser.py
++++ b/vllm/tool_parsers/abstract_tool_parser.py
+@@ -182,6 +182,7 @@
+             tools=request.tools,
+             tool_choice=request.tool_choice,
+             reasoning=reasoning,
++            parallel_tool_calls=request.parallel_tool_calls,
+         )
+ 
+     def extract_tool_calls(
+diff --git a/vllm/tool_parsers/structural_tag_registry.py b/vllm/tool_parsers/structural_tag_registry.py
+--- a/vllm/tool_parsers/structural_tag_registry.py
++++ b/vllm/tool_parsers/structural_tag_registry.py
+@@ -104,6 +104,7 @@
+     tools: Sequence[ChatCompletionToolsParam | ResponsesTool] | None,
+     tool_choice: ToolChoice,
+     reasoning: bool,
++    parallel_tool_calls: bool | None = None,
+ ) -> StructuralTag | None:
+     """Build a structural tag with xgrammar's builtin model templates."""
+ 
+@@ -151,12 +152,29 @@
+         supported = sorted(SUPPORTED_STRUCTURAL_TAG_MODELS)
+         raise ValueError(f"Unknown format type: {model}, supported types: {supported}")
+ 
+-    return get_xgrammar_model_structural_tag(
++    tag = get_xgrammar_model_structural_tag(
+         model=model,
+         tools=dumped_tools,
+         tool_choice=dumped_tool_choice,
+         reasoning=reasoning,
+     )
++    if model == "qwen_3_coder" and parallel_tool_calls is False:
++        # The grammar owns the call count. Preserve XGrammar's Qwen schema
++        # and reasoning prefix and end the turn after the first complete tag.
++        suffix = tag.format
++        if reasoning:
++            if not isinstance(suffix, SequenceFormat) or len(suffix.elements) != 2:
++                raise RuntimeError(
++                    "XGrammar returned an unexpected Qwen reasoning format"
++                )
++            suffix = suffix.elements[1]
++        if isinstance(suffix, (TriggeredTagsFormat, TagsWithSeparatorFormat)):
++            suffix.stop_after_first = True
++        elif not isinstance(suffix, TagFormat):
++            # A named choice already consists of one tag. Every other shape
++            # contradicts the format contract; never silently ignore the limit.
++            raise RuntimeError("XGrammar returned an unexpected Qwen tool format")
++    return tag
+ 
+ 
+ def _dump_tool_for_xgrammar(
+diff --git a/vllm/entrypoints/serve/utils/tool_calls_utils.py b/vllm/entrypoints/serve/utils/tool_calls_utils.py
+deleted file mode 100644
+--- a/vllm/entrypoints/serve/utils/tool_calls_utils.py
++++ /dev/null
+@@ -1,37 +0,0 @@
+-# SPDX-License-Identifier: Apache-2.0
+-# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
+-from typing import TypeVar
+-
+-from vllm.entrypoints.openai.chat_completion.protocol import (
+-    ChatCompletionRequest,
+-    ChatCompletionResponseChoice,
+-    ChatCompletionResponseStreamChoice,
+-)
+-
+-# Used internally
+-_ChatCompletionResponseChoiceT = TypeVar(
+-    "_ChatCompletionResponseChoiceT",
+-    ChatCompletionResponseChoice,
+-    ChatCompletionResponseStreamChoice,
+-)
+-
+-
+-def maybe_filter_parallel_tool_calls(
+-    choice: _ChatCompletionResponseChoiceT, request: ChatCompletionRequest
+-) -> _ChatCompletionResponseChoiceT:
+-    """Filter to first tool call only when parallel_tool_calls is explicitly False."""
+-
+-    if request.parallel_tool_calls is not False:
+-        return choice
+-
+-    if isinstance(choice, ChatCompletionResponseChoice) and choice.message.tool_calls:
+-        choice.message.tool_calls = choice.message.tool_calls[:1]
+-    elif (
+-        isinstance(choice, ChatCompletionResponseStreamChoice)
+-        and choice.delta.tool_calls
+-    ):
+-        choice.delta.tool_calls = [
+-            tool_call for tool_call in choice.delta.tool_calls if tool_call.index == 0
+-        ]
+-
+-    return choice

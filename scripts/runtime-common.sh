@@ -695,6 +695,7 @@ assert_running_profile() {
       /usr/local/lib/python3.12/dist-packages/vllm/v1/attention/ops/triton_turboquant_store.py \
       /usr/local/lib/python3.12/dist-packages/vllm/v1/attention/ops/triton_turboquant_decode.py \
       /usr/local/lib/python3.12/dist-packages/vllm/tool_parsers/structural_tag_registry.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/tool_parsers/abstract_tool_parser.py \
       /usr/local/lib/python3.12/dist-packages/vllm/config/model.py \
       /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/anthropic/protocol.py \
       /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/anthropic/serving.py \
@@ -727,6 +728,7 @@ assert_running_profile() {
     "${TURBOQUANT_STORE_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/attention/ops/triton_turboquant_store.py \
     "${TURBOQUANT_DECODE_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/attention/ops/triton_turboquant_decode.py \
     "${TOOL_SCHEMA_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/tool_parsers/structural_tag_registry.py \
+    "${TOOL_PARSER_ABSTRACT_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/tool_parsers/abstract_tool_parser.py \
     "${MODEL_CONFIG_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/config/model.py \
     "${ANTHROPIC_PROTOCOL_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/anthropic/protocol.py \
     "${ANTHROPIC_SERVING_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/anthropic/serving.py \

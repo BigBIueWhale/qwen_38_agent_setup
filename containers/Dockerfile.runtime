@@ -9,6 +9,12 @@ RUN printf '%s  %s\n' \
       "${TURBOQUANT_DECODE_UPSTREAM_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/attention/ops/triton_turboquant_decode.py \
     | sha256sum --check --strict
 ARG TOOL_SCHEMA_UPSTREAM_FILE_SHA256
+ARG TOOL_PARSER_ABSTRACT_UPSTREAM_FILE_SHA256
+ARG TOOL_CALL_FILTER_UPSTREAM_FILE_SHA256
+RUN printf '%s  %s\n' \
+      "${TOOL_PARSER_ABSTRACT_UPSTREAM_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/tool_parsers/abstract_tool_parser.py \
+      "${TOOL_CALL_FILTER_UPSTREAM_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/serve/utils/tool_calls_utils.py \
+    | sha256sum --check --strict
 ARG MODEL_CONFIG_UPSTREAM_FILE_SHA256
 ARG ANTHROPIC_PROTOCOL_UPSTREAM_FILE_SHA256
 ARG ANTHROPIC_SERVING_UPSTREAM_FILE_SHA256
@@ -221,6 +227,7 @@ ARG TURBOQUANT_PATCHED_FILE_SHA256
 ARG TURBOQUANT_STORE_PATCHED_FILE_SHA256
 ARG TURBOQUANT_DECODE_PATCHED_FILE_SHA256
 ARG TOOL_SCHEMA_PATCHED_FILE_SHA256
+ARG TOOL_PARSER_ABSTRACT_PATCHED_FILE_SHA256
 ARG MODEL_CONFIG_PATCHED_FILE_SHA256
 ARG ANTHROPIC_PROTOCOL_PATCHED_FILE_SHA256
 ARG ANTHROPIC_SERVING_PATCHED_FILE_SHA256
@@ -274,6 +281,7 @@ ARG ANTHROPIC_INPUTS_PATCH_DIFF_SHA256
 ARG QWEN_LANGUAGE_PATCH_DIFF_SHA256
 ARG PNG_SOURCE_PATCH_DIFF_SHA256
 ARG KV_PHYSICAL_PATCH_DIFF_SHA256
+ARG SINGLE_CALL_PATCH_DIFF_SHA256
 ARG TOOL_TRUNCATION_PATCH_DIFF_SHA256
 ARG VISION_RUNTIME_PATCH_DIFF_SHA256
 ARG NUMERICAL_AUDITS_PATCH_DIFF_SHA256
@@ -507,6 +515,13 @@ RUN printf '%s  %s\n' \
       "${STREAMING_PARSER_ENGINE_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/engine/streaming_parser_engine.py \
       "${TOKEN_ID_SCANNER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/engine/token_id_scanner.py \
     | sha256sum --check --strict
+COPY --chmod=0644 vllm/vllm/tool_parsers/abstract_tool_parser.py /usr/local/lib/python3.12/dist-packages/vllm/tool_parsers/abstract_tool_parser.py
+RUN printf '%s  %s\n' \
+      "${TOOL_PARSER_ABSTRACT_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/tool_parsers/abstract_tool_parser.py \
+    | sha256sum --check --strict
+RUN rm /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/serve/utils/tool_calls_utils.py \
+ && rm -f /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/serve/utils/__pycache__/tool_calls_utils.*.pyc \
+ && test ! -e /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/serve/utils/tool_calls_utils.py
 COPY --chmod=0644 chat_template.jinja /opt/qwen38/chat_template.jinja
 COPY --chmod=0644 scripts/phase_budget_unit.py /opt/qwen38/phase_budget_unit.py
 COPY --chmod=0644 scripts/vision_workspace_unit.py /opt/qwen38/vision_workspace_unit.py
@@ -1188,6 +1203,8 @@ LABEL org.opencontainers.image.revision="9df9b0b0a1816b6d0d0f6ecd0da563cc37fd72f
       qwen38.patch.parser-engine-config.file.sha256="${PARSER_ENGINE_CONFIG_PATCHED_FILE_SHA256}" \
       qwen38.patch.streaming-parser-engine.file.sha256="${STREAMING_PARSER_ENGINE_PATCHED_FILE_SHA256}" \
       qwen38.patch.token-id-scanner.file.sha256="${TOKEN_ID_SCANNER_PATCHED_FILE_SHA256}" \
+      qwen38.patch.qwen-single-call-grammar.diff.sha256="${SINGLE_CALL_PATCH_DIFF_SHA256}" \
+      qwen38.patch.tool-parser-abstract.file.sha256="${TOOL_PARSER_ABSTRACT_PATCHED_FILE_SHA256}" \
       qwen38.template.file.sha256="${AGENT_CHAT_TEMPLATE_SHA256}" \
       qwen38.project="Qwen_best_model_ever" \
       qwen38.runtime.profile="${IMAGE_PROFILE_VERSION}"

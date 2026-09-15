@@ -24,6 +24,7 @@ EXPECTED_STATUS=$' M tests/config/test_config_utils.py
  M tests/parser/engine/test_token_id_scanner.py
  M tests/parser/engine/trace_builder.py
  M tests/quantization/test_turboquant.py
+ M tests/tool_parsers/test_structural_tag_registry.py
  M tests/v1/e2e/general/test_context_length.py
  M tests/v1/kv_connector/nixl_integration/run_multi_connector_accuracy_test.sh
  M tests/v1/kv_connector/nixl_integration/run_multi_connector_edge_case_test.sh
@@ -75,6 +76,7 @@ EXPECTED_STATUS=$' M tests/config/test_config_utils.py
  M vllm/entrypoints/serve/exception_handling/handlers/validation.py
  M vllm/entrypoints/serve/exception_handling/handlers/vllm_error.py
  M vllm/entrypoints/serve/utils/api_utils.py
+ D vllm/entrypoints/serve/utils/tool_calls_utils.py
  M vllm/envs.py
  M vllm/model_executor/models/qwen3_vl.py
  M vllm/multimodal/media/connector.py
@@ -89,6 +91,7 @@ EXPECTED_STATUS=$' M tests/config/test_config_utils.py
  M vllm/parser/qwen3.py
  M vllm/renderers/params.py
  M vllm/sampling_params.py
+ M vllm/tool_parsers/abstract_tool_parser.py
  M vllm/tool_parsers/structural_tag_registry.py
  M vllm/v1/attention/backends/turboquant_attn.py
  M vllm/v1/attention/ops/triton_turboquant_decode.py
@@ -114,6 +117,7 @@ EXPECTED_STATUS=$' M tests/config/test_config_utils.py
  M vllm/v1/worker/gpu_worker.py
  M vllm/v1/worker/startup_plan.py
  M vllm/v1/worker/workspace.py
+?? tests/entrypoints/openai/chat_completion/test_parallel_tool_call_integrity.py
 ?? tests/entrypoints/test_kv_scope_protocol.py
 ?? tests/parser/engine/test_reasoning_token_count.py
 ?? tests/v1/core/test_kv_cache_users_sizing.py
@@ -170,6 +174,7 @@ PHASE_BUDGET_PATCH_FILE="${PROJECT_DIR}/patches/vllm-qwen38-separate-final-respo
 IMPLICIT_TOOL_GRAMMAR_PATCH_FILE="${PROJECT_DIR}/patches/vllm-qwen-implicit-tool-grammar-boundary.patch"
 QWEN_LANGUAGE_PATCH_FILE="${PROJECT_DIR}/patches/vllm-qwen-exact-tool-language.patch"
 PNG_SOURCE_PATCH_FILE="${PROJECT_DIR}/patches/vllm-png-source-admission.patch"
+SINGLE_CALL_PATCH_FILE="${PROJECT_DIR}/patches/vllm-qwen-single-call-grammar.patch"
 KV_PHYSICAL_PATCH_FILE="${PROJECT_DIR}/patches/vllm-kv-physical-free-memory.patch"
 ANTHROPIC_INPUTS_PATCH_FILE="${PROJECT_DIR}/patches/vllm-anthropic-input-fidelity.patch"
 ANTHROPIC_VALIDATION_PATCH_FILE="${PROJECT_DIR}/patches/vllm-anthropic-validation-http400.patch"
@@ -328,6 +333,7 @@ printf '%s  %s\n' \
   "${QWEN_LANGUAGE_PATCH_DIFF_SHA256}" "${QWEN_LANGUAGE_PATCH_FILE}" \
   "${PNG_SOURCE_PATCH_DIFF_SHA256}" "${PNG_SOURCE_PATCH_FILE}" \
   "${KV_PHYSICAL_PATCH_DIFF_SHA256}" "${KV_PHYSICAL_PATCH_FILE}" \
+  "${SINGLE_CALL_PATCH_DIFF_SHA256}" "${SINGLE_CALL_PATCH_FILE}" \
   "${TOOL_TRUNCATION_PATCH_DIFF_SHA256}" "${TOOL_TRUNCATION_PATCH_FILE}" \
   "${VISION_RUNTIME_PATCH_DIFF_SHA256}" "${VISION_RUNTIME_PATCH_FILE}" \
   "${NUMERICAL_AUDITS_PATCH_DIFF_SHA256}" "${NUMERICAL_AUDITS_PATCH_FILE}" \
@@ -457,6 +463,7 @@ printf '%s  %s\n' \
   "${TURBOQUANT_DECODE_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/v1/attention/ops/triton_turboquant_decode.py" \
   "${TURBOQUANT_STORE_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/v1/attention/ops/triton_turboquant_store.py" \
   "${TOOL_SCHEMA_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${TOOL_SCHEMA_REL}" \
+  "${TOOL_PARSER_ABSTRACT_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/tool_parsers/abstract_tool_parser.py" \
   "${MODEL_CONFIG_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${MODEL_CONFIG_REL}" \
   "${ANTHROPIC_PROTOCOL_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${ANTHROPIC_PROTOCOL_REL}" \
   "${ANTHROPIC_SERVING_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${ANTHROPIC_SERVING_REL}" \
@@ -606,6 +613,8 @@ docker buildx build --progress=plain \
   --build-arg "TURBOQUANT_DECODE_UPSTREAM_FILE_SHA256=${TURBOQUANT_DECODE_UPSTREAM_FILE_SHA256}" \
   --build-arg "TURBOQUANT_STORE_UPSTREAM_FILE_SHA256=${TURBOQUANT_STORE_UPSTREAM_FILE_SHA256}" \
   --build-arg "TOOL_SCHEMA_UPSTREAM_FILE_SHA256=${TOOL_SCHEMA_UPSTREAM_FILE_SHA256}" \
+  --build-arg "TOOL_PARSER_ABSTRACT_UPSTREAM_FILE_SHA256=${TOOL_PARSER_ABSTRACT_UPSTREAM_FILE_SHA256}" \
+  --build-arg "TOOL_CALL_FILTER_UPSTREAM_FILE_SHA256=${TOOL_CALL_FILTER_UPSTREAM_FILE_SHA256}" \
   --build-arg "MODEL_CONFIG_UPSTREAM_FILE_SHA256=${MODEL_CONFIG_UPSTREAM_FILE_SHA256}" \
   --build-arg "ANTHROPIC_PROTOCOL_UPSTREAM_FILE_SHA256=${ANTHROPIC_PROTOCOL_UPSTREAM_FILE_SHA256}" \
   --build-arg "ANTHROPIC_SERVING_UPSTREAM_FILE_SHA256=${ANTHROPIC_SERVING_UPSTREAM_FILE_SHA256}" \
@@ -650,6 +659,7 @@ docker buildx build --progress=plain \
   --build-arg "TURBOQUANT_DECODE_PATCHED_FILE_SHA256=${TURBOQUANT_DECODE_PATCHED_FILE_SHA256}" \
   --build-arg "TURBOQUANT_STORE_PATCHED_FILE_SHA256=${TURBOQUANT_STORE_PATCHED_FILE_SHA256}" \
   --build-arg "TOOL_SCHEMA_PATCHED_FILE_SHA256=${TOOL_SCHEMA_PATCHED_FILE_SHA256}" \
+  --build-arg "TOOL_PARSER_ABSTRACT_PATCHED_FILE_SHA256=${TOOL_PARSER_ABSTRACT_PATCHED_FILE_SHA256}" \
   --build-arg "MODEL_CONFIG_PATCHED_FILE_SHA256=${MODEL_CONFIG_PATCHED_FILE_SHA256}" \
   --build-arg "ANTHROPIC_PROTOCOL_PATCHED_FILE_SHA256=${ANTHROPIC_PROTOCOL_PATCHED_FILE_SHA256}" \
   --build-arg "ANTHROPIC_SERVING_PATCHED_FILE_SHA256=${ANTHROPIC_SERVING_PATCHED_FILE_SHA256}" \
@@ -705,6 +715,7 @@ docker buildx build --progress=plain \
   --build-arg "QWEN_LANGUAGE_PATCH_DIFF_SHA256=${QWEN_LANGUAGE_PATCH_DIFF_SHA256}" \
   --build-arg "PNG_SOURCE_PATCH_DIFF_SHA256=${PNG_SOURCE_PATCH_DIFF_SHA256}" \
   --build-arg "KV_PHYSICAL_PATCH_DIFF_SHA256=${KV_PHYSICAL_PATCH_DIFF_SHA256}" \
+  --build-arg "SINGLE_CALL_PATCH_DIFF_SHA256=${SINGLE_CALL_PATCH_DIFF_SHA256}" \
   --build-arg "TOOL_TRUNCATION_PATCH_DIFF_SHA256=${TOOL_TRUNCATION_PATCH_DIFF_SHA256}" \
   --build-arg "VISION_RUNTIME_PATCH_DIFF_SHA256=${VISION_RUNTIME_PATCH_DIFF_SHA256}" \
   --build-arg "NUMERICAL_AUDITS_PATCH_DIFF_SHA256=${NUMERICAL_AUDITS_PATCH_DIFF_SHA256}" \
@@ -778,6 +789,7 @@ actual_installed_report="$(
     /usr/local/lib/python3.12/dist-packages/vllm/v1/attention/ops/triton_turboquant_store.py \
     /usr/local/lib/python3.12/dist-packages/vllm/v1/attention/ops/triton_turboquant_decode.py \
     /usr/local/lib/python3.12/dist-packages/vllm/tool_parsers/structural_tag_registry.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/tool_parsers/abstract_tool_parser.py \
     /usr/local/lib/python3.12/dist-packages/vllm/config/model.py \
     /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/anthropic/protocol.py \
     /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/anthropic/serving.py \
@@ -810,6 +822,7 @@ expected_installed_report="$(printf '%s  %s\n' \
   "${TURBOQUANT_STORE_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/attention/ops/triton_turboquant_store.py \
   "${TURBOQUANT_DECODE_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/attention/ops/triton_turboquant_decode.py \
   "${TOOL_SCHEMA_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/tool_parsers/structural_tag_registry.py \
+  "${TOOL_PARSER_ABSTRACT_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/tool_parsers/abstract_tool_parser.py \
   "${MODEL_CONFIG_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/config/model.py \
   "${ANTHROPIC_PROTOCOL_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/anthropic/protocol.py \
   "${ANTHROPIC_SERVING_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/anthropic/serving.py \
@@ -976,13 +989,15 @@ if [[ "${reasoning_usage_installed_report}" != "${expected_reasoning_usage_insta
   exit 1
 fi
 
-# The deleted eviction-policy package must be absent from the shipped image,
-# not merely unreferenced: a stranded importable copy is a selectable mode.
-if ! docker run --rm --network none --entrypoint test "${IMAGE_TAG}" \
-    '!' -e /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/cpu/policies; then
-  echo "Built image still contains the deleted policies package." >&2
-  exit 1
-fi
+# Superseded runtime code must be absent from the shipped image.
+for obsolete in \
+  /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/cpu/policies \
+  /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/serve/utils/tool_calls_utils.py; do
+  if ! docker run --rm --network none --entrypoint test "${IMAGE_TAG}" '!' -e "${obsolete}"; then
+    printf 'Built image still contains superseded runtime code: %s\n' "${obsolete}" >&2
+    exit 1
+  fi
+done
 
 actual_profile_label="$(
   docker image inspect --format '{{index .Config.Labels "qwen38.runtime.profile"}}' \

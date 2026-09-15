@@ -151,6 +151,26 @@ profiling operations, varying initial occupancy, activation headroom, graph
 memory and utilization. They verify the bound and the separate estimate; the
 two startup-plan tests still pass. No GPU or model profiling was performed.
 
+## S6: the decoder owns the number of calls
+
+`vllm-qwen-single-call-grammar.patch` adds the eighteenth runtime source stage.
+The request's `parallel_tool_calls` value reaches the Qwen structural-tag
+builder. With `false`, XGrammar's existing Qwen format stops after its first
+complete call. Automatic choice still allows an ordinary text answer;
+required choice still requires a call; named choice already contains one tag.
+The existing schema and reasoning prefix retain their behavior.
+
+The Chat response layer returns every call actually produced in both streaming
+and batch responses. Its old filtering module is deleted, including its image
+copy and bytecode. Where a call-count grammar is inactive, output cannot be
+silently changed to make it appear that the model emitted only one call.
+
+Validation: 95 tests pass, including actual XGrammar acceptance/rejection for
+each choice and reasoning setting, request-to-grammar propagation, and real
+streaming/batch response generators supplied with deterministic output. The
+installed-parser build unit also exercises the grammar call limit. No engine,
+model, network listener or GPU was started.
+
 ## Remaining implementation
 
 Parser language, stop handling, schema conversion, protocol translation, image
