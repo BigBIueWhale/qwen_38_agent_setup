@@ -28,7 +28,9 @@ EXPECTED_STATUS=$' M tests/config/test_config_utils.py
  M tests/multimodal/media/test_connector.py
  M tests/multimodal/media/test_image.py
  M tests/parser/engine/replay_harness.py
+ M tests/parser/engine/streaming_helpers.py
  M tests/parser/engine/test_delegating_replay.py
+ M tests/parser/engine/test_engine.py
  M tests/parser/engine/test_nemotron_v3.py
  M tests/parser/engine/test_parser_engine.py
  M tests/parser/engine/test_qwen3.py
@@ -118,8 +120,12 @@ EXPECTED_STATUS=$' M tests/config/test_config_utils.py
  M vllm/parser/engine/parser_engine_config.py
  M vllm/parser/engine/streaming_parser_engine.py
  M vllm/parser/engine/token_id_scanner.py
+ M vllm/parser/gemma4.py
+ M vllm/parser/glm47_moe.py
  M vllm/parser/inkling.py
  M vllm/parser/kimi_k2.py
+ M vllm/parser/minimax_m2.py
+ M vllm/parser/mistral.py
  M vllm/parser/qwen3.py
  M vllm/renderers/base.py
  M vllm/renderers/online_derenderer.py
@@ -163,6 +169,7 @@ EXPECTED_STATUS=$' M tests/config/test_config_utils.py
 ?? tests/entrypoints/scale_out/token_in_token_out/test_raw_images.py
 ?? tests/entrypoints/scale_out/token_in_token_out/test_raw_media_boundary.py
 ?? tests/entrypoints/test_kv_scope_protocol.py
+?? tests/parser/engine/test_qwen_terminal_authority.py
 ?? tests/parser/engine/test_qwen_xml_fidelity.py
 ?? tests/parser/engine/test_reasoning_token_count.py
 ?? tests/v1/core/test_kv_cache_users_sizing.py
@@ -225,6 +232,7 @@ SAMPLING_BOUNDARY_PATCH_FILE="${PROJECT_DIR}/patches/vllm-sampling-decoding-boun
 GENERATE_RESULT_PATCH_FILE="${PROJECT_DIR}/patches/vllm-token-generation-result-integrity.patch"
 RAW_IMAGE_TRANSPORT_PATCH_FILE="${PROJECT_DIR}/patches/vllm-raw-image-token-transport.patch"
 XML_TEXT_FIDELITY_PATCH_FILE="${PROJECT_DIR}/patches/vllm-xml-text-fidelity.patch"
+PHASE_AWARE_PARSER_TERMINALS_PATCH_FILE="${PROJECT_DIR}/patches/vllm-phase-aware-parser-terminals.patch"
 SAMPLING_RESOLUTION_PATCH_FILE="${PROJECT_DIR}/patches/vllm-generation-sampling-resolution.patch"
 ANTHROPIC_TERMINAL_PATCH_FILE="${PROJECT_DIR}/patches/vllm-anthropic-terminal-metadata.patch"
 RESPONSES_IDENTITY_PATCH_FILE="${PROJECT_DIR}/patches/vllm-responses-stream-identity.patch"
@@ -393,6 +401,7 @@ printf '%s  %s\n' \
   "${RESPONSES_IDENTITY_PATCH_DIFF_SHA256}" "${RESPONSES_IDENTITY_PATCH_FILE}" \
   "${ANTHROPIC_TERMINAL_PATCH_DIFF_SHA256}" "${ANTHROPIC_TERMINAL_PATCH_FILE}" \
   "${SAMPLING_RESOLUTION_PATCH_DIFF_SHA256}" "${SAMPLING_RESOLUTION_PATCH_FILE}" \
+  "${PHASE_AWARE_PARSER_TERMINALS_PATCH_DIFF_SHA256}" "${PHASE_AWARE_PARSER_TERMINALS_PATCH_FILE}" \
   "${XML_TEXT_FIDELITY_PATCH_DIFF_SHA256}" "${XML_TEXT_FIDELITY_PATCH_FILE}" \
   "${RAW_IMAGE_TRANSPORT_PATCH_DIFF_SHA256}" "${RAW_IMAGE_TRANSPORT_PATCH_FILE}" \
   "${GENERATE_RESULT_PATCH_DIFF_SHA256}" "${GENERATE_RESULT_PATCH_FILE}" \
@@ -637,6 +646,13 @@ printf '%s  %s\n' \
   | sha256sum --check --strict
 
 printf '%s  %s\n' \
+  "${GEMMA4_PARSER_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/parser/gemma4.py" \
+  "${GLM47_PARSER_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/parser/glm47_moe.py" \
+  "${MINIMAX_M2_PARSER_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/parser/minimax_m2.py" \
+  "${MISTRAL_PARSER_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/parser/mistral.py" \
+  | sha256sum --check --strict
+
+printf '%s  %s\n' \
   "${RUNTIME_DOCKERFILE_SHA256}" "${DOCKERFILE}" \
   "${DOCKERIGNORE_SHA256}" "${DOCKERIGNORE}" | \
   sha256sum --check --strict
@@ -844,6 +860,15 @@ docker buildx build --progress=plain \
   --build-arg "RESPONSES_IDENTITY_PATCH_DIFF_SHA256=${RESPONSES_IDENTITY_PATCH_DIFF_SHA256}" \
   --build-arg "ANTHROPIC_TERMINAL_PATCH_DIFF_SHA256=${ANTHROPIC_TERMINAL_PATCH_DIFF_SHA256}" \
   --build-arg "SAMPLING_RESOLUTION_PATCH_DIFF_SHA256=${SAMPLING_RESOLUTION_PATCH_DIFF_SHA256}" \
+  --build-arg "GEMMA4_PARSER_UPSTREAM_FILE_SHA256=${GEMMA4_PARSER_UPSTREAM_FILE_SHA256}" \
+  --build-arg "GEMMA4_PARSER_PATCHED_FILE_SHA256=${GEMMA4_PARSER_PATCHED_FILE_SHA256}" \
+  --build-arg "GLM47_PARSER_UPSTREAM_FILE_SHA256=${GLM47_PARSER_UPSTREAM_FILE_SHA256}" \
+  --build-arg "GLM47_PARSER_PATCHED_FILE_SHA256=${GLM47_PARSER_PATCHED_FILE_SHA256}" \
+  --build-arg "MINIMAX_M2_PARSER_UPSTREAM_FILE_SHA256=${MINIMAX_M2_PARSER_UPSTREAM_FILE_SHA256}" \
+  --build-arg "MINIMAX_M2_PARSER_PATCHED_FILE_SHA256=${MINIMAX_M2_PARSER_PATCHED_FILE_SHA256}" \
+  --build-arg "MISTRAL_PARSER_UPSTREAM_FILE_SHA256=${MISTRAL_PARSER_UPSTREAM_FILE_SHA256}" \
+  --build-arg "MISTRAL_PARSER_PATCHED_FILE_SHA256=${MISTRAL_PARSER_PATCHED_FILE_SHA256}" \
+  --build-arg "PHASE_AWARE_PARSER_TERMINALS_PATCH_DIFF_SHA256=${PHASE_AWARE_PARSER_TERMINALS_PATCH_DIFF_SHA256}" \
   --build-arg "DEEPSEEK_V32_PARSER_UPSTREAM_FILE_SHA256=${DEEPSEEK_V32_PARSER_UPSTREAM_FILE_SHA256}" \
   --build-arg "DEEPSEEK_V32_PARSER_PATCHED_FILE_SHA256=${DEEPSEEK_V32_PARSER_PATCHED_FILE_SHA256}" \
   --build-arg "DEEPSEEK_V4_PARSER_UPSTREAM_FILE_SHA256=${DEEPSEEK_V4_PARSER_UPSTREAM_FILE_SHA256}" \
@@ -962,6 +987,10 @@ actual_installed_report="$(
     /usr/local/lib/python3.12/dist-packages/vllm/v1/structured_output/__init__.py \
     /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/anthropic/api_router.py \
     /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/chat_completion/serving.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/parser/gemma4.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/parser/glm47_moe.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/parser/minimax_m2.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/parser/mistral.py \
     /usr/local/lib/python3.12/dist-packages/vllm/parser/deepseek_v32.py \
     /usr/local/lib/python3.12/dist-packages/vllm/parser/deepseek_v4.py \
     /usr/local/lib/python3.12/dist-packages/vllm/parser/inkling.py \
@@ -1006,6 +1035,10 @@ expected_installed_report="$(printf '%s  %s\n' \
   "${STRUCTURED_OUTPUT_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/structured_output/__init__.py \
   "${ANTHROPIC_API_ROUTER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/anthropic/api_router.py \
   "${CHAT_SERVING_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/chat_completion/serving.py \
+  "${GEMMA4_PARSER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/gemma4.py \
+  "${GLM47_PARSER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/glm47_moe.py \
+  "${MINIMAX_M2_PARSER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/minimax_m2.py \
+  "${MISTRAL_PARSER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/mistral.py \
   "${DEEPSEEK_V32_PARSER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/deepseek_v32.py \
   "${DEEPSEEK_V4_PARSER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/deepseek_v4.py \
   "${INKLING_PARSER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/inkling.py \

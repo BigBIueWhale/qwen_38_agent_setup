@@ -148,3 +148,7 @@
 !vllm/vllm/parser/deepseek_v4.py
 !vllm/vllm/parser/inkling.py
 !vllm/vllm/parser/kimi_k2.py
+!vllm/vllm/parser/gemma4.py
+!vllm/vllm/parser/glm47_moe.py
+!vllm/vllm/parser/minimax_m2.py
+!vllm/vllm/parser/mistral.py

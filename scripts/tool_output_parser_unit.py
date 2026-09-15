@@ -192,13 +192,39 @@ class ToolOutputParserTest(unittest.TestCase):
                     self.assertEqual(parse("plan</think>" + body, chunk, **settings)[:3],
                                      ("plan", body, []))
 
-    def test_batch_distinguishes_marker_text_from_marker_ids(self):
+    def test_tool_grammar_recognizes_both_tokenizations_after_reasoning(self):
+        import xgrammar as xgr
+        from vllm.tool_parsers.structural_tag_registry import get_model_structural_tag
+
+        vocabulary = [chr(i) for i in range(128)] + list(MARKERS) + ["<eos>"]
+        info = xgr.TokenizerInfo(vocabulary, stop_token_ids=[132])
+        tools = ChatCompletionRequest(messages=[], tools=[TOOL]).tools
+        tag = get_model_structural_tag("qwen_3_coder", tools, "auto", False)
+        grammar = xgr.GrammarCompiler(info, max_threads=1).compile_structural_tag(tag)
+        grammar_ids = {token_id: 128 + index
+                       for index, token_id in enumerate(MARKERS.values())}
         body = call("literal syntax")
         text = "plan</think>" + body
-        ids = encode("plan</think>") + [ord(c) for c in body]
+        for body_ids in (encode(body), [ord(c) for c in body]):
+            matcher = xgr.GrammarMatcher(grammar)
+            for token_id in body_ids:
+                self.assertTrue(matcher.accept_token(grammar_ids.get(token_id, token_id)))
+            self.assertTrue(matcher.accept_token(132))
+            self.assertTrue(matcher.is_terminated())
+            ids = encode("plan</think>") + body_ids
+            for chunk in (1, 13, None):
+                with self.subTest(chunk=chunk, body_ids=body_ids):
+                    result = parse(text, chunk, ids=ids)
+                    self.assertEqual(result[:2], ("plan", ""))
+                    self.assertEqual(result[2], [("write", '{"text": "literal syntax"}')])
+                    self.assertTrue(result[3])
+
+    def test_ordinary_tool_and_think_spellings_leave_reasoning_inactive(self):
+        reasoning = "plan </think> " + call("literal syntax")
         for chunk in (1, 13, None):
             with self.subTest(chunk=chunk):
-                self.assertEqual(parse(text, chunk, ids=ids)[:3], ("plan", body, []))
+                result = parse(reasoning, chunk, ids=[ord(c) for c in reasoning])
+                self.assertEqual(result[:3], (reasoning, "", []))
 
     def test_only_an_observed_wrapper_closes_the_call(self):
         body = call("complete value").removesuffix("</tool_call>")

@@ -2119,6 +2119,45 @@ def _validate_xml_fidelity_after(state: State) -> None:
     }, label=label)
 
 
+def _validate_phase_terminals_before(state: State) -> None:
+    require_text(state, "vllm/parser/engine/streaming_parser_engine.py",
+                 "strict = self._token_id_terminal_names if self._ever_had_token_ids else None",
+                 label="Phase-aware terminal baseline")
+
+
+def _validate_phase_terminals_after(state: State) -> None:
+    label = "Phase-aware parser terminals"
+    config = "vllm/parser/engine/parser_engine_config.py"
+    engine = "vllm/parser/engine/streaming_parser_engine.py"
+    require_python_symbols(state, config, {"TokenTerminal": None}, label=label)
+    require_text(state, config,
+                 "required_states: frozenset[ParserState] = frozenset(ParserState)",
+                 label=label)
+    for path in (config, engine, "vllm/parser/engine/parser_engine.py",
+                 "tests/parser/engine/test_engine.py"):
+        forbid_text(state, path, "skip_in_token_id_mode", label=label)
+    forbid_text(state, engine, "_token_id_terminal_names", label=label)
+    _require_in_symbol(state, engine, "StreamingParserEngine._process_lex_tokens", (
+        "for tok in tokens:",
+        "self.state in self._token_required_states.get(tok.terminal, ())",
+        "events.extend(self._on_content(tok.value))",
+        "events.extend(self._on_terminal(tok.terminal, tok.value))",
+    ), label=label)
+    _require_in_symbol(state, "vllm/parser/qwen3.py", "qwen3_config", (
+        '"THINK_END": TokenTerminal(think_end)',
+        '"TOOL_START": TokenTerminal(tool_start, frozenset({ParserState.REASONING}))',
+        '"TOOL_END": TokenTerminal(tool_end, frozenset())',
+    ), label=label)
+    require_python_symbols(state,
+        "tests/parser/engine/test_qwen_terminal_authority.py", {
+            "test_content_phase_tool_language_is_independent_of_tokenization": None,
+            "test_ordinary_token_trigger_does_not_end_inactive_reasoning": None,
+            "test_implicit_reasoning_end_admits_text_encoded_call_closer": None,
+            "test_literal_thinking_marker_does_not_move_the_real_token_boundary": None,
+            "test_native_grammar_arms_both_tokenizations": None,
+        }, label=label)
+
+
 def validate_final(state: State) -> None:
     """Reassert every durable semantic invariant on the complete tree.
 
@@ -2134,6 +2173,21 @@ def validate_final(state: State) -> None:
 
 
 CONTRACTS: Mapping[str, SemanticContract] = {
+    "phase-aware-parser-terminals": SemanticContract(
+        rationale=(
+            "Qwen reasoning boundaries require atomic token provenance, while "
+            "tool grammar recognizes its exact text trigger after reasoning. "
+            "Declare token authority by state and update every format consumer "
+            "so ordinary-token calls accepted by the grammar survive parsing."
+        ),
+        removal_condition=(
+            "Remove when upstream represents each format's state-dependent "
+            "terminal authority and preserves Qwen grammar acceptance across "
+            "both added-token and ordinary-token spellings."
+        ),
+        validate_before=_validate_phase_terminals_before,
+        validate_after=_validate_phase_terminals_after,
+    ),
     "xml-text-fidelity": SemanticContract(
         rationale=(
             "Whitespace inside an XML string is its value. Preserve those bytes "

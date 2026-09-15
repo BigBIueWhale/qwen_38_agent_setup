@@ -5,6 +5,40 @@ The independent triage and handling policy supplied with the implementation brie
 decide the resolutions. Source validation here does not certify a built image or a
 live release. The v23 image and archive are awaiting adoption.
 
+## Qwen terminal recognition follows the grammar phase
+
+`vllm-phase-aware-parser-terminals.patch` represents token authority in each
+format's terminal declarations. While Qwen is reasoning, an actual boundary
+token ends that phase. Once reasoning has ended, the exact tool-call trigger
+and wrapper closer are recognized through either added tokens or ordinary text
+tokens, as XGrammar recognizes them. A literal thinking-marker spelling in
+ordinary tokens does not end reasoning. Parameter values retain their existing
+exact closer and preserve other markup.
+
+Every parser configuration and consumer uses the same terminal representation.
+The unused transition setting that allowed different fallback transitions in
+text-only input, and its synthetic tests, are deleted. Vocabularies without an
+atomic token for a format terminal retain text recognition: there is no atomic
+token whose identity could distinguish that spelling. This is the existing
+format behavior, and Qwen's deployed vocabulary has its boundary tokens.
+
+Validation: 3,998 offline parser tests and eight installed CPU tests pass. The
+new tests cover both wrapper tokenizations, explicit and implicit reasoning
+boundaries, literal boundary lookalikes and multiple streaming chunk sizes.
+Native XGrammar accepts valid calls and refuses unknown names through both
+tokenizations. Against the previous runtime, 25 focused cases fail and 23
+unaffected cases pass. The earlier installed test requiring ordinary-token
+calls after reasoning to remain prose was incorrect and is replaced. Its old
+passing result is not evidence of grammar equality. Four newly modified parser
+modules join the complete image provenance checks.
+
+The integrated generator and `build-vllm.sh check` pass with 27 reviewed stages,
+103 deployment inputs, 19 framework/recipe tests and every installed CPU unit.
+The standalone reasoning-usage unit also constructs the typed declarations.
+
+This correction leaves terminal promotion, caller-stop control, schema
+conversion, phase accounting and exact detokenizer provenance open.
+
 ## XML string and content fidelity
 
 `vllm-xml-text-fidelity.patch` preserves every byte inside an XML string parameter,
@@ -242,9 +276,11 @@ and stop-control work must use this observation before promotion is complete.
 
 Validation: 3,833 parser-engine tests pass, including the preserved regression
 tests, 24 adversarial value/chunk combinations and two delayed-boundary cases.
-The build now runs five CPU tests against the installed parser, covering exact
-triggers, disabled tools, reserved value markup, token/text lookalikes, batch
-parity and observed closure. `build-vllm.sh check` runs that unit against the
+The original five installed CPU tests covered exact triggers, disabled tools,
+reserved value markup, batch parity and observed closure. The ordinary-token
+tool-call expectation in that set was incorrect; the phase-aware terminal
+correction above replaces it and expands the installed checks to eight tests.
+`build-vllm.sh check` runs that unit against the
 reviewed runtime overlay. The four newly patched engine modules are copied and
 verified in the image, build and runtime checks. The older reasoning-usage build
 unit now declares its test tool and uses marker IDs outside the ASCII range;

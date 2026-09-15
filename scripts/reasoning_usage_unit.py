@@ -21,6 +21,7 @@ from vllm.parser.engine.parser_engine import ParserEngine
 from vllm.parser.engine.parser_engine_config import (
     ParserEngineConfig,
     ParserState,
+    TokenTerminal,
     Transition,
 )
 from vllm.parser.qwen3 import (
@@ -216,7 +217,10 @@ for transitions, reason in (
             name="unit-grammar",
             initial_state=ParserState.REASONING,
             terminals={"THINK_START": THINK_START, "THINK_END": THINK_END},
-            token_id_terminals={"THINK_START": THINK_START, "THINK_END": THINK_END},
+            token_id_terminals={
+                "THINK_START": TokenTerminal(THINK_START),
+                "THINK_END": TokenTerminal(THINK_END),
+            },
             transitions=transitions,
         ),
     )
