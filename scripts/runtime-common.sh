@@ -716,6 +716,10 @@ assert_running_profile() {
       /usr/local/lib/python3.12/dist-packages/vllm/v1/structured_output/__init__.py \
       /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/anthropic/api_router.py \
       /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/chat_completion/serving.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/parser/deepseek_v32.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/parser/deepseek_v4.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/parser/inkling.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/parser/kimi_k2.py \
       /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/scale_out/derender/serving.py \
       /usr/local/lib/python3.12/dist-packages/vllm/multimodal/processing/inputs.py \
       /usr/local/lib/python3.12/dist-packages/vllm/multimodal/processing/processor.py \
@@ -756,6 +760,10 @@ assert_running_profile() {
     "${STRUCTURED_OUTPUT_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/structured_output/__init__.py \
     "${ANTHROPIC_API_ROUTER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/anthropic/api_router.py \
     "${CHAT_SERVING_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/chat_completion/serving.py \
+    "${DEEPSEEK_V32_PARSER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/deepseek_v32.py \
+    "${DEEPSEEK_V4_PARSER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/deepseek_v4.py \
+    "${INKLING_PARSER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/inkling.py \
+    "${KIMI_K2_PARSER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/kimi_k2.py \
     "${DERENDER_SERVING_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/scale_out/derender/serving.py \
     "${MM_PROCESSOR_INPUTS_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/multimodal/processing/inputs.py \
     "${MM_PROCESSOR_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/multimodal/processing/processor.py \

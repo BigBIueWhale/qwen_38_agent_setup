@@ -2093,6 +2093,32 @@ def _validate_raw_image_after(state: State) -> None:
         }, label=label)
 
 
+def _validate_xml_fidelity_before(state: State) -> None:
+    require_text(state, "vllm/parser/qwen3.py", "def _trim_wrapping_newlines(",
+                 label="XML text fidelity baseline")
+
+
+def _validate_xml_fidelity_after(state: State) -> None:
+    label = "XML text fidelity"
+    forbid_text(state, "vllm/parser/qwen3.py", "_trim_wrapping_newlines", label=label)
+    _require_in_symbol(state, "vllm/parser/qwen3.py", "_qwen3_arg_converter",
+                       ("params[name] = value",), label=label)
+    for path in ("vllm/parser/engine/parser_engine.py",
+                 "vllm/parser/engine/parser_engine_config.py",
+                 "vllm/parser/deepseek_v32.py", "vllm/parser/deepseek_v4.py",
+                 "vllm/parser/inkling.py", "vllm/parser/kimi_k2.py"):
+        forbid_text(state, path, "strip_content_whitespace_with_tools", label=label)
+        forbid_text(state, path, "_strip_content_ws_with_tools", label=label)
+    _require_in_symbol(state, "vllm/parser/engine/parser_engine.py",
+        "ParserEngine._strip_content_whitespace", (
+            "and not content.strip()", 'content = ""', "return content or None",
+        ), label=label)
+    require_python_symbols(state, "tests/parser/engine/test_qwen_xml_fidelity.py", {
+        "test_parameter_string_bytes_survive_every_transport_cut": None,
+        "test_partial_string_diagnostic_preserves_raw_value_bytes": None,
+    }, label=label)
+
+
 def validate_final(state: State) -> None:
     """Reassert every durable semantic invariant on the complete tree.
 
@@ -2108,6 +2134,19 @@ def validate_final(state: State) -> None:
 
 
 CONTRACTS: Mapping[str, SemanticContract] = {
+    "xml-text-fidelity": SemanticContract(
+        rationale=(
+            "Whitespace inside an XML string is its value. Preserve those bytes "
+            "and surrounding nonempty content on both transports; remove "
+            "converter padding removal and the batch-only stripping setting."
+        ),
+        removal_condition=(
+            "Remove when upstream preserves exact XML string and nonempty "
+            "content bytes on both transports without a stripping mode."
+        ),
+        validate_before=_validate_xml_fidelity_before,
+        validate_after=_validate_xml_fidelity_after,
+    ),
     "raw-image-token-transport": SemanticContract(
         rationale=(
             "Caller tensor/hash/cache-only features bypass image admission. Carry "

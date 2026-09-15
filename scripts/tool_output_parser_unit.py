@@ -153,6 +153,37 @@ class ToolOutputParserTest(unittest.TestCase):
                     self.assertEqual(json.loads(result[2][0][1]), {"text": value})
                     self.assertTrue(result[3])
 
+    def test_parameter_history_round_trip_preserves_string_bytes(self):
+        from chat_template_retention_unit import load_template
+        from xgrammar import Grammar
+        from xgrammar.testing import _is_grammar_accept_string
+        from vllm.tool_parsers.structural_tag_registry import get_model_structural_tag
+
+        template = load_template()
+        tools = ChatCompletionRequest(messages=[], tools=[TOOL]).tools
+        grammar = Grammar.from_structural_tag(get_model_structural_tag(
+            "qwen_3_coder", tools, "auto", False))
+        for value in ("", "\n", "\n\n", "\nfirst\n", "first\n", "\nfirst",
+                      " \t\r\nfirst\n\t ", "雪\nשלום\n",
+                      "\n</function></tool_call><think>\n", '\n"quoted"\n'):
+            messages = [{"role": "user", "content": "test"}, {
+                "role": "assistant", "reasoning_content": "plan", "content": "",
+                "tool_calls": [{"type": "function", "function": {
+                    "name": "write", "arguments": {"text": value}}}],
+            }]
+            rendered = template.render(messages=messages, tools=[TOOL],
+                                       add_generation_prompt=False)
+            expected = call(value)
+            self.assertIn(expected + "<|im_end|>", rendered)
+            self.assertTrue(_is_grammar_accept_string(grammar, expected))
+            for chunk in (1, 3, 13, None):
+                with self.subTest(value=value, chunk=chunk):
+                    result = parse("plan\n</think>\n before \t\n" + expected
+                                   + "\n after \t\n", chunk)
+                    self.assertEqual(result[:2],
+                                     ("plan\n", "\n before \t\n\n after \t\n"))
+                    self.assertEqual(json.loads(result[2][0][1]), {"text": value})
+
     def test_disabled_tools_keep_the_model_output(self):
         body = call("one</function></tool_call></think>two")
         for settings in ({"tools": []}, {"choice": "none"}):

@@ -144,3 +144,7 @@
 !vllm/vllm/multimodal/processing/processor.py
 !vllm/vllm/renderers/base.py
 !scripts/raw_media_unit.py
+!vllm/vllm/parser/deepseek_v32.py
+!vllm/vllm/parser/deepseek_v4.py
+!vllm/vllm/parser/inkling.py
+!vllm/vllm/parser/kimi_k2.py

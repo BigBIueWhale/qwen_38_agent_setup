@@ -110,12 +110,16 @@ EXPECTED_STATUS=$' M tests/config/test_config_utils.py
  M vllm/multimodal/processing/inputs.py
  M vllm/multimodal/processing/processor.py
  M vllm/parser/abstract_parser.py
+ M vllm/parser/deepseek_v32.py
+ M vllm/parser/deepseek_v4.py
  M vllm/parser/engine/adapters.py
  M vllm/parser/engine/events.py
  M vllm/parser/engine/parser_engine.py
  M vllm/parser/engine/parser_engine_config.py
  M vllm/parser/engine/streaming_parser_engine.py
  M vllm/parser/engine/token_id_scanner.py
+ M vllm/parser/inkling.py
+ M vllm/parser/kimi_k2.py
  M vllm/parser/qwen3.py
  M vllm/renderers/base.py
  M vllm/renderers/online_derenderer.py
@@ -159,6 +163,7 @@ EXPECTED_STATUS=$' M tests/config/test_config_utils.py
 ?? tests/entrypoints/scale_out/token_in_token_out/test_raw_images.py
 ?? tests/entrypoints/scale_out/token_in_token_out/test_raw_media_boundary.py
 ?? tests/entrypoints/test_kv_scope_protocol.py
+?? tests/parser/engine/test_qwen_xml_fidelity.py
 ?? tests/parser/engine/test_reasoning_token_count.py
 ?? tests/v1/core/test_kv_cache_users_sizing.py
 ?? tests/v1/core/test_prefix_cache.py
@@ -219,6 +224,7 @@ PNG_SOURCE_PATCH_FILE="${PROJECT_DIR}/patches/vllm-png-source-admission.patch"
 SAMPLING_BOUNDARY_PATCH_FILE="${PROJECT_DIR}/patches/vllm-sampling-decoding-boundary.patch"
 GENERATE_RESULT_PATCH_FILE="${PROJECT_DIR}/patches/vllm-token-generation-result-integrity.patch"
 RAW_IMAGE_TRANSPORT_PATCH_FILE="${PROJECT_DIR}/patches/vllm-raw-image-token-transport.patch"
+XML_TEXT_FIDELITY_PATCH_FILE="${PROJECT_DIR}/patches/vllm-xml-text-fidelity.patch"
 SAMPLING_RESOLUTION_PATCH_FILE="${PROJECT_DIR}/patches/vllm-generation-sampling-resolution.patch"
 ANTHROPIC_TERMINAL_PATCH_FILE="${PROJECT_DIR}/patches/vllm-anthropic-terminal-metadata.patch"
 RESPONSES_IDENTITY_PATCH_FILE="${PROJECT_DIR}/patches/vllm-responses-stream-identity.patch"
@@ -387,6 +393,7 @@ printf '%s  %s\n' \
   "${RESPONSES_IDENTITY_PATCH_DIFF_SHA256}" "${RESPONSES_IDENTITY_PATCH_FILE}" \
   "${ANTHROPIC_TERMINAL_PATCH_DIFF_SHA256}" "${ANTHROPIC_TERMINAL_PATCH_FILE}" \
   "${SAMPLING_RESOLUTION_PATCH_DIFF_SHA256}" "${SAMPLING_RESOLUTION_PATCH_FILE}" \
+  "${XML_TEXT_FIDELITY_PATCH_DIFF_SHA256}" "${XML_TEXT_FIDELITY_PATCH_FILE}" \
   "${RAW_IMAGE_TRANSPORT_PATCH_DIFF_SHA256}" "${RAW_IMAGE_TRANSPORT_PATCH_FILE}" \
   "${GENERATE_RESULT_PATCH_DIFF_SHA256}" "${GENERATE_RESULT_PATCH_FILE}" \
   "${SAMPLING_BOUNDARY_PATCH_DIFF_SHA256}" "${SAMPLING_BOUNDARY_PATCH_FILE}" \
@@ -623,6 +630,13 @@ printf '%s  %s\n' \
   | sha256sum --check --strict
 
 printf '%s  %s\n' \
+  "${DEEPSEEK_V32_PARSER_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/parser/deepseek_v32.py" \
+  "${DEEPSEEK_V4_PARSER_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/parser/deepseek_v4.py" \
+  "${INKLING_PARSER_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/parser/inkling.py" \
+  "${KIMI_K2_PARSER_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/parser/kimi_k2.py" \
+  | sha256sum --check --strict
+
+printf '%s  %s\n' \
   "${RUNTIME_DOCKERFILE_SHA256}" "${DOCKERFILE}" \
   "${DOCKERIGNORE_SHA256}" "${DOCKERIGNORE}" | \
   sha256sum --check --strict
@@ -657,11 +671,11 @@ while IFS= read -r status_line; do
       ;;
   esac
 done <<<"${EXPECTED_STATUS}"
-for unit in tool_output_parser_unit vision_contract_unit reasoning_usage_unit shared_prefix_cache_unit phase_budget_unit generate_result_unit raw_media_unit; do
+for unit in chat_template_retention_unit tool_output_parser_unit vision_contract_unit reasoning_usage_unit shared_prefix_cache_unit phase_budget_unit generate_result_unit raw_media_unit; do
   docker run --rm --network none --read-only --user "$(id -u):$(id -g)" \
     --tmpfs /tmp:rw,nodev,nosuid,size=256m \
     --env PYTHONDONTWRITEBYTECODE=1 --env CUDA_VISIBLE_DEVICES= \
-    --volume "${PROJECT_DIR}:/project:ro" "${parser_unit_mounts[@]}" \
+    --volume "${TEMPLATE_FILE}:/opt/qwen38/chat_template.jinja:ro" --volume "${PROJECT_DIR}:/project:ro" "${parser_unit_mounts[@]}" \
     --entrypoint python3 "${BASE_IMAGE_TAG}" "/project/scripts/${unit}.py"
 done
 
@@ -830,6 +844,15 @@ docker buildx build --progress=plain \
   --build-arg "RESPONSES_IDENTITY_PATCH_DIFF_SHA256=${RESPONSES_IDENTITY_PATCH_DIFF_SHA256}" \
   --build-arg "ANTHROPIC_TERMINAL_PATCH_DIFF_SHA256=${ANTHROPIC_TERMINAL_PATCH_DIFF_SHA256}" \
   --build-arg "SAMPLING_RESOLUTION_PATCH_DIFF_SHA256=${SAMPLING_RESOLUTION_PATCH_DIFF_SHA256}" \
+  --build-arg "DEEPSEEK_V32_PARSER_UPSTREAM_FILE_SHA256=${DEEPSEEK_V32_PARSER_UPSTREAM_FILE_SHA256}" \
+  --build-arg "DEEPSEEK_V32_PARSER_PATCHED_FILE_SHA256=${DEEPSEEK_V32_PARSER_PATCHED_FILE_SHA256}" \
+  --build-arg "DEEPSEEK_V4_PARSER_UPSTREAM_FILE_SHA256=${DEEPSEEK_V4_PARSER_UPSTREAM_FILE_SHA256}" \
+  --build-arg "DEEPSEEK_V4_PARSER_PATCHED_FILE_SHA256=${DEEPSEEK_V4_PARSER_PATCHED_FILE_SHA256}" \
+  --build-arg "INKLING_PARSER_UPSTREAM_FILE_SHA256=${INKLING_PARSER_UPSTREAM_FILE_SHA256}" \
+  --build-arg "INKLING_PARSER_PATCHED_FILE_SHA256=${INKLING_PARSER_PATCHED_FILE_SHA256}" \
+  --build-arg "KIMI_K2_PARSER_UPSTREAM_FILE_SHA256=${KIMI_K2_PARSER_UPSTREAM_FILE_SHA256}" \
+  --build-arg "KIMI_K2_PARSER_PATCHED_FILE_SHA256=${KIMI_K2_PARSER_PATCHED_FILE_SHA256}" \
+  --build-arg "XML_TEXT_FIDELITY_PATCH_DIFF_SHA256=${XML_TEXT_FIDELITY_PATCH_DIFF_SHA256}" \
   --build-arg "DERENDER_SERVING_UPSTREAM_FILE_SHA256=${DERENDER_SERVING_UPSTREAM_FILE_SHA256}" \
   --build-arg "DERENDER_SERVING_PATCHED_FILE_SHA256=${DERENDER_SERVING_PATCHED_FILE_SHA256}" \
   --build-arg "MM_PROCESSOR_INPUTS_UPSTREAM_FILE_SHA256=${MM_PROCESSOR_INPUTS_UPSTREAM_FILE_SHA256}" \
@@ -939,6 +962,10 @@ actual_installed_report="$(
     /usr/local/lib/python3.12/dist-packages/vllm/v1/structured_output/__init__.py \
     /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/anthropic/api_router.py \
     /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/chat_completion/serving.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/parser/deepseek_v32.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/parser/deepseek_v4.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/parser/inkling.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/parser/kimi_k2.py \
     /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/scale_out/derender/serving.py \
     /usr/local/lib/python3.12/dist-packages/vllm/multimodal/processing/inputs.py \
     /usr/local/lib/python3.12/dist-packages/vllm/multimodal/processing/processor.py \
@@ -979,6 +1006,10 @@ expected_installed_report="$(printf '%s  %s\n' \
   "${STRUCTURED_OUTPUT_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/structured_output/__init__.py \
   "${ANTHROPIC_API_ROUTER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/anthropic/api_router.py \
   "${CHAT_SERVING_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/chat_completion/serving.py \
+  "${DEEPSEEK_V32_PARSER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/deepseek_v32.py \
+  "${DEEPSEEK_V4_PARSER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/deepseek_v4.py \
+  "${INKLING_PARSER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/inkling.py \
+  "${KIMI_K2_PARSER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/kimi_k2.py \
   "${DERENDER_SERVING_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/scale_out/derender/serving.py \
   "${MM_PROCESSOR_INPUTS_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/multimodal/processing/inputs.py \
   "${MM_PROCESSOR_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/multimodal/processing/processor.py \

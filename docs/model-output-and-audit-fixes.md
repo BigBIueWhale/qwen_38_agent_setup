@@ -5,6 +5,32 @@ The independent triage and handling policy supplied with the implementation brie
 decide the resolutions. Source validation here does not certify a built image or a
 live release. The v23 image and archive are awaiting adoption.
 
+## XML string and content fidelity
+
+`vllm-xml-text-fidelity.patch` preserves every byte inside an XML string parameter,
+including leading/trailing newlines and whitespace-only values. The converter's
+newline-trimming helper is deleted. Named derivation stages remove inserted value
+padding from the historical tool-call template and its instruction example. The
+model's source template stays unchanged, and historical reasoning is retained.
+
+The shared parser also removes its batch-only content-stripping setting and all
+consumers of that setting. Nonempty content around calls now retains the same
+bytes on both transports; the existing whitespace-only gap normalization remains.
+Four newly modified parser configurations join the full image provenance cascade.
+
+Validation: 3,954 offline parser tests pass. The previous runtime fails 101 focused
+controls, with 20 unaffected controls passing. The source tests cover multiple
+chunk sizes, empty and whitespace-only strings, Unicode, embedded reserved
+markers, surrounding content and incomplete string diagnostics. Five obsolete
+expectations now require preserved whitespace. Seven installed parser tests pass,
+including actual derived-template rendering, XGrammar acceptance and stream/batch
+round trips. Template retention now also runs in the ordinary CPU source check.
+Schema coercion, incomplete non-string diagnostics, terminal promotion and exact
+token/text provenance remain separate open obligations.
+
+The integrated generator and `build-vllm.sh check` pass with 26 reviewed stages,
+102 deployment inputs, 19 framework/recipe tests and all installed CPU units.
+
 ## Finding 20: raw images through the token generation boundary
 
 `vllm-raw-image-token-transport.patch` gives render and generate one media

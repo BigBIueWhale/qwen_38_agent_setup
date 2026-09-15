@@ -75,7 +75,7 @@ error.
   and relay readiness events, then validates the complete live configuration before
   reporting success. Re-running it validates the existing owned topology rather than
   starting a duplicate.
-- status.sh validates host prerequisites, twenty-five ordered vLLM transformations, every reviewed
+- status.sh validates host prerequisites, twenty-six ordered vLLM transformations, every reviewed
   source and test file, the model manifest, image archive, image identity and labels,
   command and environment, mounts, runtime packages, API identity, listener,
   hardening, and live health. HEALTHY means all checks passed.
@@ -95,7 +95,7 @@ Advanced reproducibility operations are deliberately separate from serving mode:
     ./scripts/build-vllm.sh build
     ./scripts/restore-images.sh
 
-The check reconstructs the source tree from the pinned upstream commit through all twenty-five
+The check reconstructs the source tree from the pinned upstream commit through all twenty-six
 landmark-aware transformations. The build runs offline from the exact base image and fails unless it produces
 the pinned image ID. Restore verifies the pinned local archive before loading it.
 
@@ -251,7 +251,7 @@ The vLLM submodule is pinned at:
 
     9df9b0b0a1816b6d0d0f6ecd0da563cc37fd72f5
 
-It is intentionally reconstructed by twenty-five ordered, reviewed semantic transformations:
+It is intentionally reconstructed by twenty-six ordered, reviewed semantic transformations:
 
 | Patch | SHA-256 |
 |---|---|
@@ -280,9 +280,10 @@ It is intentionally reconstructed by twenty-five ordered, reviewed semantic tran
 | patches/vllm-sampling-decoding-boundary.patch | aaed899245dcfa877d8c1c19f2834317a7326695372c6810267b21dd3337f913 |
 | patches/vllm-token-generation-result-integrity.patch | c9d4e45adbb475c3e9796d1e0907b2f0d98cc384a34829a34e05ccdd33cc65c1 |
 | patches/vllm-raw-image-token-transport.patch | cab095d4b4fce8ee0e34d4b4cd18a066afdeb14da98ff09e1b57072e3cb565fd |
+| patches/vllm-xml-text-fidelity.patch | 999d6f471a4f480f5fd93b087c17c463417a8080206e952f3686510d57c9abd6 |
 
-The reconstructed tree has 79 reviewed runtime-source changes, 1 new runtime source,
-7 runtime-source deletions, 62 existing-test changes, 10 new tests,
+The reconstructed tree has 83 reviewed runtime-source changes, 1 new runtime source,
+7 runtime-source deletions, 62 existing-test changes, 11 new tests,
 and 3 test deletions. The authoritative
 counts are derived and printed by ./scripts/build-vllm.sh check, never restated
 by hand there. The landmark-aware Python patcher calculates every mutation
@@ -305,11 +306,11 @@ Pinned build inputs and products:
 | Offline archive | artifacts/qwen38-vllm-images-runtime-v23.tar |
 | Archive size | Awaiting adoption after the v23 export |
 | Archive SHA-256 | Awaiting adoption after the v23 export |
-| Runtime Dockerfile SHA-256 | b7098fda88c3869af4940388516a8dcee9debb4cac56dc4b68126d0fa102280c |
-| Docker context allowlist SHA-256 | 5e4ac9be61d79bdf3f7f7463d8838b4c745a5f2bff850059d58d978a4abc8adc |
-| Build verifier SHA-256 | 290f41bf51ebb56d17efef93976dc1a709d0821780c5449fb4db57485782e887 |
-| Runtime validator SHA-256 | 68cdb7c8d0a9d0b556a11eeac0bfeef8fc3b85eaec5022f6ed5a0cf8a45d6868 |
-| Runtime lock SHA-256 | 8dd4421c8e272ae55c61b47f5a4df8a424302ac6b7cb678c916de79e7839aa2c |
+| Runtime Dockerfile SHA-256 | ce0723cdd6637e5925c3c39f9e61597a554729e4c11b99d392c804786608f1ce |
+| Docker context allowlist SHA-256 | 7e7cd314d69c50c22168d17f307ec1c8fdd8ecfe01750c1ac41c0d7f12715c78 |
+| Build verifier SHA-256 | 38cf80368e942e224c0f30451bcde951525d73f008e052399483822fb37aa014 |
+| Runtime validator SHA-256 | 5d98dc5051bdbcd6030a1a99fa9fa9c7e6075627daf82c2cfec5a23e1c6c209c |
+| Runtime lock SHA-256 | 6454326ef29612ce38393320e5f35f06d65a914676dc289be9c98dc77fc5205b |
 
 Every reviewed runtime file, including both TurboQuant kernels, is copied and
 hash-checked against its upstream and patched identities. A CPU Triton-interpreter
@@ -852,6 +853,13 @@ whether strict is omitted, false, or true. A normal non-tool answer and
 tool_choice=none remain valid. Unknown names, wrong nested types, extra properties,
 duplicate IDs, orphan results, missing or out-of-order results, and incomplete chains
 fail closed.
+
+XML string parameters retain their exact leading and trailing whitespace,
+including newlines. The derived instruction example and historical tool calls put
+only the actual value between parameter tags. Parsing, history rendering and
+grammar acceptance are checked together. Streaming and batch parsing also preserve
+nonempty content around calls byte for byte; a whitespace-only gap before a call
+may be omitted. Historical reasoning remains intact.
 
 A narrow scheduler patch retains the implicit Qwen tool-start token at the exact
 reasoning-to-tool grammar boundary. Without it, post-generation parsing could

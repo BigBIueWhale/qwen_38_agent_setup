@@ -73174,7 +73174,857 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                               'decode_mm_kwargs_item(features2.kwargs_data["image"][0])\n'
                               '    assert torch.equal(elem.data, '
                               'decoded["pixel_values"].data)\n',
-             'review_after': ''})})
+             'review_after': ''})},
+ {'name': 'xml-text-fidelity',
+  'review_patch': 'patches/vllm-xml-text-fidelity.patch',
+  'review_sha256': '999d6f471a4f480f5fd93b087c17c463417a8080206e952f3686510d57c9abd6',
+  'files': ({'path': 'tests/parser/engine/test_qwen3.py',
+             'before_sha256': 'ff2bab0e9fdafc5a9ac8b2cf3b74b760cc8668a387caf7dd749ca1f8edc730d6',
+             'after_sha256': '0f01de04b2c7290acaf9e3fb509704589d853bb625bbe67d78dfb5b5d28e9452'},
+            {'path': 'tests/parser/engine/test_qwen_xml_fidelity.py',
+             'before_sha256': None,
+             'after_sha256': 'd65437f8236830dba29225e527962f795e40402a6630d418d50bb56a730677bb'},
+            {'path': 'vllm/parser/deepseek_v32.py',
+             'before_sha256': 'e5111aa22cc318028235812e950ed888150270d7d04014395e8f7c4b2d9f9ffb',
+             'after_sha256': 'bab71ef8451d24679b7b2a5b0e4b335ef67a691b674767d5cdc5c03df2aeb637'},
+            {'path': 'vllm/parser/deepseek_v4.py',
+             'before_sha256': 'e03e05595209fe6a665839a3120e9c1153d9f9c54f6352976751926e3f6d8598',
+             'after_sha256': '1f4b3ad07d6fbed70024db07125296121a454f6a0eb68e32118913a31e4c7899'},
+            {'path': 'vllm/parser/engine/parser_engine.py',
+             'before_sha256': '163224e7847cbd29bce9e291adfc4f307aace7109f52fbfd671a1b645cb9542a',
+             'after_sha256': '183bc34df3a83e71931599e8d629ab8d58290557b197942a799489449c49db1f'},
+            {'path': 'vllm/parser/engine/parser_engine_config.py',
+             'before_sha256': 'f746ba34d2b7606037d4229529e97da019bed0abda83b5f62f98559db613a233',
+             'after_sha256': '357bf8876536e1a093d4c6d6de87d00bbc113ae9bc22440fa021c983ee64cf64'},
+            {'path': 'vllm/parser/inkling.py',
+             'before_sha256': 'cb2f269ebd08698105ed895906b6d0d95e6539dea7959cbf138ff51cfd572ee7',
+             'after_sha256': 'd2f1039bc8a7ff164f925c342f448bc5c4d8a1141b19db816d17922ab490e191'},
+            {'path': 'vllm/parser/kimi_k2.py',
+             'before_sha256': 'e85c1598225aba9dbe0c0caedab94ae80cd3db5d4d6ae302e6681b42c593bbcf',
+             'after_sha256': '973593fdca71b7489c86f34353ff65bbc5d30715add86fab40a09c1be63ca12c'},
+            {'path': 'vllm/parser/qwen3.py',
+             'before_sha256': '2c0d5e5bec9e3b504894d278eeaeded0f282e627260f1f35689869dd1fdf9bb0',
+             'after_sha256': '7da16cd0e85b8ff6e6544c260cdde2521b881dc2605b64b666fca6fdf97bbdca'}),
+  'edits': ({'name': 'tests/parser/engine/test_qwen3.py:landmark-1',
+             'path': 'tests/parser/engine/test_qwen3.py',
+             'before': '        assert len(result.tool_calls) == 1\n'
+                       '        assert result.tool_calls[0].function.name == "Bash"\n'
+                       '        args = '
+                       'json.loads(result.tool_calls[0].function.arguments)\n'
+                       '        assert args["command"] == "ls -la /tmp"\n'
+                       '        assert args["description"] == "List files in /tmp '
+                       'directory"\n'
+                       '\n'
+                       '    def test_multiline_two_tool_calls(self, parser, '
+                       'mock_request):\n'
+                       '        """Two tool calls with multi-line parameter values '
+                       '(bug report)."""\n',
+             'after': '        assert len(result.tool_calls) == 1\n'
+                      '        assert result.tool_calls[0].function.name == "Bash"\n'
+                      '        args = '
+                      'json.loads(result.tool_calls[0].function.arguments)\n'
+                      '        assert args["command"] == "\\nls -la /tmp\\n"\n'
+                      '        assert args["description"] == "\\nList files in /tmp '
+                      'directory\\n"\n'
+                      '\n'
+                      '    def test_multiline_two_tool_calls(self, parser, '
+                      'mock_request):\n'
+                      '        """Two tool calls with multi-line parameter values (bug '
+                      'report)."""\n',
+             'review_before': '        assert len(result.tool_calls) == 1\n'
+                              '        assert result.tool_calls[0].function.name == '
+                              '"Bash"\n'
+                              '        args = '
+                              'json.loads(result.tool_calls[0].function.arguments)\n'
+                              '        assert args["command"] == "ls -la /tmp"\n'
+                              '        assert args["description"] == "List files in '
+                              '/tmp directory"\n'
+                              '\n'
+                              '    def test_multiline_two_tool_calls(self, parser, '
+                              'mock_request):\n'
+                              '        """Two tool calls with multi-line parameter '
+                              'values (bug report)."""\n',
+             'review_after': '        assert len(result.tool_calls) == 1\n'
+                             '        assert result.tool_calls[0].function.name == '
+                             '"Bash"\n'
+                             '        args = '
+                             'json.loads(result.tool_calls[0].function.arguments)\n'
+                             '        assert args["command"] == "\\nls -la /tmp\\n"\n'
+                             '        assert args["description"] == "\\nList files in '
+                             '/tmp directory\\n"\n'
+                             '\n'
+                             '    def test_multiline_two_tool_calls(self, parser, '
+                             'mock_request):\n'
+                             '        """Two tool calls with multi-line parameter '
+                             'values (bug report)."""\n'},
+            {'name': 'tests/parser/engine/test_qwen3.py:landmark-2',
+             'path': 'tests/parser/engine/test_qwen3.py',
+             'before': '            "city": "Tokyo"\n'
+                       '        }\n'
+                       '        assert result.content == (\n'
+                       '            "<tool_call>\\n<function=get_weather>\\n"\n'
+                       '            "<parameter=city>Paris</parameter>\\n</function>"\n'
+                       '        )\n'
+                       '        assert parser.tool_calls_complete is True\n',
+             'after': '            "city": "Tokyo"\n'
+                      '        }\n'
+                      '        assert result.content == (\n'
+                      '            "\\n<tool_call>\\n<function=get_weather>\\n"\n'
+                      '            "<parameter=city>Paris</parameter>\\n</function>"\n'
+                      '        )\n'
+                      '        assert parser.tool_calls_complete is True\n',
+             'review_before': '            "city": "Tokyo"\n'
+                              '        }\n'
+                              '        assert result.content == (\n'
+                              '            "<tool_call>\\n<function=get_weather>\\n"\n'
+                              '            '
+                              '"<parameter=city>Paris</parameter>\\n</function>"\n'
+                              '        )\n'
+                              '        assert parser.tool_calls_complete is True\n',
+             'review_after': '            "city": "Tokyo"\n'
+                             '        }\n'
+                             '        assert result.content == (\n'
+                             '            '
+                             '"\\n<tool_call>\\n<function=get_weather>\\n"\n'
+                             '            '
+                             '"<parameter=city>Paris</parameter>\\n</function>"\n'
+                             '        )\n'
+                             '        assert parser.tool_calls_complete is True\n'},
+            {'name': 'tests/parser/engine/test_qwen3.py:landmark-3',
+             'path': 'tests/parser/engine/test_qwen3.py',
+             'before': '            "</parameter>\\n"\n'
+                       '        )\n'
+                       '        result = json.loads(_qwen3_arg_converter(raw, '
+                       'partial=False))\n'
+                       '        assert result["command"] == "ls -la /tmp"\n'
+                       '        assert result["description"] == "List files"\n'
+                       '\n'
+                       '    def test_two_multiline_params(self):\n'
+                       '        from vllm.parser.qwen3 import (\n',
+             'after': '            "</parameter>\\n"\n'
+                      '        )\n'
+                      '        result = json.loads(_qwen3_arg_converter(raw, '
+                      'partial=False))\n'
+                      '        assert result["command"] == "\\nls -la /tmp\\n"\n'
+                      '        assert result["description"] == "\\nList files\\n"\n'
+                      '\n'
+                      '    def test_two_multiline_params(self):\n'
+                      '        from vllm.parser.qwen3 import (\n',
+             'review_before': '            "</parameter>\\n"\n'
+                              '        )\n'
+                              '        result = json.loads(_qwen3_arg_converter(raw, '
+                              'partial=False))\n'
+                              '        assert result["command"] == "ls -la /tmp"\n'
+                              '        assert result["description"] == "List files"\n'
+                              '\n'
+                              '    def test_two_multiline_params(self):\n'
+                              '        from vllm.parser.qwen3 import (\n',
+             'review_after': '            "</parameter>\\n"\n'
+                             '        )\n'
+                             '        result = json.loads(_qwen3_arg_converter(raw, '
+                             'partial=False))\n'
+                             '        assert result["command"] == "\\nls -la /tmp\\n"\n'
+                             '        assert result["description"] == "\\nList '
+                             'files\\n"\n'
+                             '\n'
+                             '    def test_two_multiline_params(self):\n'
+                             '        from vllm.parser.qwen3 import (\n'},
+            {'name': 'tests/parser/engine/test_qwen3.py:landmark-4',
+             'path': 'tests/parser/engine/test_qwen3.py',
+             'before': '            "<parameter=b>\\nbaz\\nqux\\n</parameter>\\n"\n'
+                       '        )\n'
+                       '        result = json.loads(_qwen3_arg_converter(raw, '
+                       'partial=False))\n'
+                       '        assert result["a"] == "foo\\nbar"\n'
+                       '        assert result["b"] == "baz\\nqux"\n'
+                       '\n'
+                       '    def test_partial_multiline(self):\n'
+                       '        from vllm.parser.qwen3 import (\n',
+             'after': '            "<parameter=b>\\nbaz\\nqux\\n</parameter>\\n"\n'
+                      '        )\n'
+                      '        result = json.loads(_qwen3_arg_converter(raw, '
+                      'partial=False))\n'
+                      '        assert result["a"] == "\\nfoo\\nbar\\n"\n'
+                      '        assert result["b"] == "\\nbaz\\nqux\\n"\n'
+                      '\n'
+                      '    def test_partial_multiline(self):\n'
+                      '        from vllm.parser.qwen3 import (\n',
+             'review_before': '            '
+                              '"<parameter=b>\\nbaz\\nqux\\n</parameter>\\n"\n'
+                              '        )\n'
+                              '        result = json.loads(_qwen3_arg_converter(raw, '
+                              'partial=False))\n'
+                              '        assert result["a"] == "foo\\nbar"\n'
+                              '        assert result["b"] == "baz\\nqux"\n'
+                              '\n'
+                              '    def test_partial_multiline(self):\n'
+                              '        from vllm.parser.qwen3 import (\n',
+             'review_after': '            '
+                             '"<parameter=b>\\nbaz\\nqux\\n</parameter>\\n"\n'
+                             '        )\n'
+                             '        result = json.loads(_qwen3_arg_converter(raw, '
+                             'partial=False))\n'
+                             '        assert result["a"] == "\\nfoo\\nbar\\n"\n'
+                             '        assert result["b"] == "\\nbaz\\nqux\\n"\n'
+                             '\n'
+                             '    def test_partial_multiline(self):\n'
+                             '        from vllm.parser.qwen3 import (\n'},
+            {'name': 'tests/parser/engine/test_qwen3.py:landmark-5',
+             'path': 'tests/parser/engine/test_qwen3.py',
+             'before': '\n'
+                       '        raw = "<parameter=command>\\nls '
+                       '-la</parameter>\\n<parameter=desc>\\npartial value"\n'
+                       '        result = json.loads(_qwen3_arg_converter(raw, '
+                       'partial=True))\n'
+                       '        assert result["command"] == "ls -la"\n'
+                       '        assert result["desc"] == "partial value"\n'
+                       '\n'
+                       '    def test_partial_value_with_angle_bracket(self):\n'
+                       '        from vllm.parser.qwen3 import (\n',
+             'after': '\n'
+                      '        raw = "<parameter=command>\\nls '
+                      '-la</parameter>\\n<parameter=desc>\\npartial value"\n'
+                      '        result = json.loads(_qwen3_arg_converter(raw, '
+                      'partial=True))\n'
+                      '        assert result["command"] == "\\nls -la"\n'
+                      '        assert result["desc"] == "\\npartial value"\n'
+                      '\n'
+                      '    def test_partial_value_with_angle_bracket(self):\n'
+                      '        from vllm.parser.qwen3 import (\n',
+             'review_before': '\n'
+                              '        raw = "<parameter=command>\\nls '
+                              '-la</parameter>\\n<parameter=desc>\\npartial value"\n'
+                              '        result = json.loads(_qwen3_arg_converter(raw, '
+                              'partial=True))\n'
+                              '        assert result["command"] == "ls -la"\n'
+                              '        assert result["desc"] == "partial value"\n'
+                              '\n'
+                              '    def test_partial_value_with_angle_bracket(self):\n'
+                              '        from vllm.parser.qwen3 import (\n',
+             'review_after': '\n'
+                             '        raw = "<parameter=command>\\nls '
+                             '-la</parameter>\\n<parameter=desc>\\npartial value"\n'
+                             '        result = json.loads(_qwen3_arg_converter(raw, '
+                             'partial=True))\n'
+                             '        assert result["command"] == "\\nls -la"\n'
+                             '        assert result["desc"] == "\\npartial value"\n'
+                             '\n'
+                             '    def test_partial_value_with_angle_bracket(self):\n'
+                             '        from vllm.parser.qwen3 import (\n'},
+            {'name': 'tests/parser/engine/test_qwen_xml_fidelity.py:landmark-1',
+             'path': 'tests/parser/engine/test_qwen_xml_fidelity.py',
+             'before': '',
+             'after': '# SPDX-License-Identifier: Apache-2.0\n'
+                      '# SPDX-FileCopyrightText: Copyright contributors to the vLLM '
+                      'project\n'
+                      '"""Text fidelity across Qwen XML conversion and arbitrary '
+                      'streaming cuts."""\n'
+                      'import json\n'
+                      'from unittest.mock import MagicMock\n'
+                      '\n'
+                      'import pytest\n'
+                      '\n'
+                      'from vllm.entrypoints.openai.chat_completion.protocol import '
+                      'ChatCompletionRequest\n'
+                      'from vllm.parser import ParserManager\n'
+                      '\n'
+                      "MARKERS = {'<think>': 20000, '</think>': 20001,\n"
+                      "           '<tool_call>': 20002, '</tool_call>': 20003}\n"
+                      'REVERSE = {v: k for k, v in MARKERS.items()}\n'
+                      "TOOL = {'type': 'function', 'function': {'name': 'write', "
+                      "'parameters': {\n"
+                      "    'type': 'object', 'properties': {'text': {'type': "
+                      "'string'}},\n"
+                      "    'required': ['text'], 'additionalProperties': False}}}\n"
+                      'PARSER = '
+                      "ParserManager.get_parser(tool_parser_name='qwen3_coder',\n"
+                      '                                  '
+                      "reasoning_parser_name='qwen3', enable_auto_tools=True)\n"
+                      '\n'
+                      '\n'
+                      'def encode(text):\n'
+                      '    ids = []\n'
+                      '    while text:\n'
+                      '        marker = next((m for m in MARKERS if '
+                      'text.startswith(m)), None)\n'
+                      '        if marker:\n'
+                      '            ids.append(MARKERS[marker]); text = '
+                      'text[len(marker):]\n'
+                      '        else:\n'
+                      '            ids.append(ord(text[0])); text = text[1:]\n'
+                      '    return ids\n'
+                      '\n'
+                      '\n'
+                      'def decode(ids):\n'
+                      "    return ''.join(REVERSE.get(i, chr(i)) for i in ids)\n"
+                      '\n'
+                      '\n'
+                      'def parse(text, chunk_size):\n'
+                      "    request = ChatCompletionRequest(messages=[{'role': 'user', "
+                      "'content': 'test'}],\n"
+                      '                                    tools=[TOOL], '
+                      "tool_choice='auto')\n"
+                      '    tokenizer = MagicMock()\n'
+                      '    tokenizer.get_vocab.return_value = MARKERS\n'
+                      '    tokenizer.decode.side_effect = decode\n'
+                      '    tokenizer.all_special_tokens = list(MARKERS)\n'
+                      '    tokenizer.all_special_ids = list(MARKERS.values())\n'
+                      '    parser = PARSER(tokenizer, request.tools, '
+                      "chat_template_kwargs={'enable_thinking': True})\n"
+                      '    ids = encode(text)\n'
+                      '    if chunk_size is None:\n'
+                      '        reasoning, content, calls = parser.parse(text, '
+                      'request,\n'
+                      '            enable_auto_tools=True, '
+                      'model_output_token_ids=ids)\n'
+                      "        return reasoning or '', content or '', [c.arguments for "
+                      'c in calls or []]\n'
+                      "    reasoning, content, calls = '', '', {}\n"
+                      '    for start in range(0, len(ids), chunk_size):\n'
+                      '        group = ids[start:start+chunk_size]\n'
+                      '        delta = parser.parse_delta(decode(group), group, '
+                      'request,\n'
+                      '            prompt_token_ids=[1, 2, 3], '
+                      'finished=start+chunk_size >= len(ids))\n'
+                      '        if delta is None:\n'
+                      '            continue\n'
+                      "        reasoning += delta.reasoning or ''\n"
+                      "        content += delta.content or ''\n"
+                      '        for call in delta.tool_calls:\n'
+                      '            if call.function and call.function.arguments is not '
+                      'None:\n'
+                      "                calls[call.index] = calls.get(call.index, '') + "
+                      'call.function.arguments\n'
+                      '    return reasoning, content, list(calls.values())\n'
+                      '\n'
+                      '\n'
+                      "VALUES = ['', '\\n', '\\n\\n', '\\nfirst\\n', 'first\\n', "
+                      "'\\nfirst',\n"
+                      "          ' \\t\\r\\nfirst\\n\\t ', 'first\\nsecond\\n', "
+                      "'雪\\nשָׁלוֹם\\n',\n"
+                      "          '\\n</function></tool_call><think>\\n', "
+                      '\'"quoted"\\n\\\\path\\n\']\n'
+                      '\n'
+                      '\n'
+                      "@pytest.mark.parametrize('chunk_size', [None, 1, 2, 3, 7, 13, "
+                      '64])\n'
+                      "@pytest.mark.parametrize('value', VALUES)\n"
+                      'def '
+                      'test_parameter_string_bytes_survive_every_transport_cut(value, '
+                      'chunk_size):\n'
+                      "    text = ('plan\\n</think>\\n before "
+                      "\\t\\n<tool_call>\\n<function=write>\\n'\n"
+                      "            '<parameter=text>' + value + "
+                      "'</parameter>\\n</function>\\n</tool_call>\\n after \\t\\n')\n"
+                      '    reasoning, content, calls = parse(text, chunk_size)\n'
+                      "    assert reasoning == 'plan\\n'\n"
+                      "    assert content == '\\n before \\t\\n\\n after \\t\\n'\n"
+                      '    assert len(calls) == 1\n'
+                      "    assert json.loads(calls[0]) == {'text': value}\n"
+                      '\n'
+                      '\n'
+                      "@pytest.mark.parametrize('chunk_size', [None, 1, 3, 13])\n"
+                      "@pytest.mark.parametrize('value', VALUES)\n"
+                      'def '
+                      'test_partial_string_diagnostic_preserves_raw_value_bytes(value, '
+                      'chunk_size):\n'
+                      '    text = '
+                      "('plan</think><tool_call>\\n<function=write>\\n<parameter=text>' "
+                      '+ value)\n'
+                      '    _, _, calls = parse(text, chunk_size)\n'
+                      '    assert len(calls) == 1\n'
+                      "    assert json.loads(calls[0]) == {'text': value}\n",
+             'review_before': '',
+             'review_after': '# SPDX-License-Identifier: Apache-2.0\n'
+                             '# SPDX-FileCopyrightText: Copyright contributors to the '
+                             'vLLM project\n'
+                             '"""Text fidelity across Qwen XML conversion and '
+                             'arbitrary streaming cuts."""\n'
+                             'import json\n'
+                             'from unittest.mock import MagicMock\n'
+                             '\n'
+                             'import pytest\n'
+                             '\n'
+                             'from vllm.entrypoints.openai.chat_completion.protocol '
+                             'import ChatCompletionRequest\n'
+                             'from vllm.parser import ParserManager\n'
+                             '\n'
+                             "MARKERS = {'<think>': 20000, '</think>': 20001,\n"
+                             "           '<tool_call>': 20002, '</tool_call>': 20003}\n"
+                             'REVERSE = {v: k for k, v in MARKERS.items()}\n'
+                             "TOOL = {'type': 'function', 'function': {'name': "
+                             "'write', 'parameters': {\n"
+                             "    'type': 'object', 'properties': {'text': {'type': "
+                             "'string'}},\n"
+                             "    'required': ['text'], 'additionalProperties': "
+                             'False}}}\n'
+                             'PARSER = '
+                             "ParserManager.get_parser(tool_parser_name='qwen3_coder',\n"
+                             '                                  '
+                             "reasoning_parser_name='qwen3', enable_auto_tools=True)\n"
+                             '\n'
+                             '\n'
+                             'def encode(text):\n'
+                             '    ids = []\n'
+                             '    while text:\n'
+                             '        marker = next((m for m in MARKERS if '
+                             'text.startswith(m)), None)\n'
+                             '        if marker:\n'
+                             '            ids.append(MARKERS[marker]); text = '
+                             'text[len(marker):]\n'
+                             '        else:\n'
+                             '            ids.append(ord(text[0])); text = text[1:]\n'
+                             '    return ids\n'
+                             '\n'
+                             '\n'
+                             'def decode(ids):\n'
+                             "    return ''.join(REVERSE.get(i, chr(i)) for i in ids)\n"
+                             '\n'
+                             '\n'
+                             'def parse(text, chunk_size):\n'
+                             "    request = ChatCompletionRequest(messages=[{'role': "
+                             "'user', 'content': 'test'}],\n"
+                             '                                    tools=[TOOL], '
+                             "tool_choice='auto')\n"
+                             '    tokenizer = MagicMock()\n'
+                             '    tokenizer.get_vocab.return_value = MARKERS\n'
+                             '    tokenizer.decode.side_effect = decode\n'
+                             '    tokenizer.all_special_tokens = list(MARKERS)\n'
+                             '    tokenizer.all_special_ids = list(MARKERS.values())\n'
+                             '    parser = PARSER(tokenizer, request.tools, '
+                             "chat_template_kwargs={'enable_thinking': True})\n"
+                             '    ids = encode(text)\n'
+                             '    if chunk_size is None:\n'
+                             '        reasoning, content, calls = parser.parse(text, '
+                             'request,\n'
+                             '            enable_auto_tools=True, '
+                             'model_output_token_ids=ids)\n'
+                             "        return reasoning or '', content or '', "
+                             '[c.arguments for c in calls or []]\n'
+                             "    reasoning, content, calls = '', '', {}\n"
+                             '    for start in range(0, len(ids), chunk_size):\n'
+                             '        group = ids[start:start+chunk_size]\n'
+                             '        delta = parser.parse_delta(decode(group), group, '
+                             'request,\n'
+                             '            prompt_token_ids=[1, 2, 3], '
+                             'finished=start+chunk_size >= len(ids))\n'
+                             '        if delta is None:\n'
+                             '            continue\n'
+                             "        reasoning += delta.reasoning or ''\n"
+                             "        content += delta.content or ''\n"
+                             '        for call in delta.tool_calls:\n'
+                             '            if call.function and call.function.arguments '
+                             'is not None:\n'
+                             '                calls[call.index] = '
+                             "calls.get(call.index, '') + call.function.arguments\n"
+                             '    return reasoning, content, list(calls.values())\n'
+                             '\n'
+                             '\n'
+                             "VALUES = ['', '\\n', '\\n\\n', '\\nfirst\\n', "
+                             "'first\\n', '\\nfirst',\n"
+                             "          ' \\t\\r\\nfirst\\n\\t ', 'first\\nsecond\\n', "
+                             "'雪\\nשָׁלוֹם\\n',\n"
+                             "          '\\n</function></tool_call><think>\\n', "
+                             '\'"quoted"\\n\\\\path\\n\']\n'
+                             '\n'
+                             '\n'
+                             "@pytest.mark.parametrize('chunk_size', [None, 1, 2, 3, "
+                             '7, 13, 64])\n'
+                             "@pytest.mark.parametrize('value', VALUES)\n"
+                             'def '
+                             'test_parameter_string_bytes_survive_every_transport_cut(value, '
+                             'chunk_size):\n'
+                             "    text = ('plan\\n</think>\\n before "
+                             "\\t\\n<tool_call>\\n<function=write>\\n'\n"
+                             "            '<parameter=text>' + value + "
+                             "'</parameter>\\n</function>\\n</tool_call>\\n after "
+                             "\\t\\n')\n"
+                             '    reasoning, content, calls = parse(text, chunk_size)\n'
+                             "    assert reasoning == 'plan\\n'\n"
+                             "    assert content == '\\n before \\t\\n\\n after "
+                             "\\t\\n'\n"
+                             '    assert len(calls) == 1\n'
+                             "    assert json.loads(calls[0]) == {'text': value}\n"
+                             '\n'
+                             '\n'
+                             "@pytest.mark.parametrize('chunk_size', [None, 1, 3, "
+                             '13])\n'
+                             "@pytest.mark.parametrize('value', VALUES)\n"
+                             'def '
+                             'test_partial_string_diagnostic_preserves_raw_value_bytes(value, '
+                             'chunk_size):\n'
+                             '    text = '
+                             "('plan</think><tool_call>\\n<function=write>\\n<parameter=text>' "
+                             '+ value)\n'
+                             '    _, _, calls = parse(text, chunk_size)\n'
+                             '    assert len(calls) == 1\n'
+                             "    assert json.loads(calls[0]) == {'text': value}\n"},
+            {'name': 'vllm/parser/deepseek_v32.py:landmark-1',
+             'path': 'vllm/parser/deepseek_v32.py',
+             'before': '        },\n'
+                       '        arg_converter=_dsml_arg_converter,\n'
+                       '        arg_structural_chars=frozenset(">"),\n'
+                       '        strip_content_whitespace_with_tools=False,\n'
+                       '        tool_args_json=False,\n'
+                       '    )\n'
+                       '\n',
+             'after': '        },\n'
+                      '        arg_converter=_dsml_arg_converter,\n'
+                      '        arg_structural_chars=frozenset(">"),\n'
+                      '        tool_args_json=False,\n'
+                      '    )\n'
+                      '\n',
+             'review_before': '        },\n'
+                              '        arg_converter=_dsml_arg_converter,\n'
+                              '        arg_structural_chars=frozenset(">"),\n'
+                              '        strip_content_whitespace_with_tools=False,\n'
+                              '        tool_args_json=False,\n'
+                              '    )\n'
+                              '\n',
+             'review_after': '        },\n'
+                             '        arg_converter=_dsml_arg_converter,\n'
+                             '        arg_structural_chars=frozenset(">"),\n'
+                             '        tool_args_json=False,\n'
+                             '    )\n'
+                             '\n'},
+            {'name': 'vllm/parser/deepseek_v4.py:landmark-1',
+             'path': 'vllm/parser/deepseek_v4.py',
+             'before': '        },\n'
+                       '        arg_converter=_dsml_arg_converter,\n'
+                       '        arg_structural_chars=frozenset(">"),\n'
+                       '        strip_content_whitespace_with_tools=False,\n'
+                       '        tool_args_json=False,\n'
+                       '    )\n'
+                       '\n',
+             'after': '        },\n'
+                      '        arg_converter=_dsml_arg_converter,\n'
+                      '        arg_structural_chars=frozenset(">"),\n'
+                      '        tool_args_json=False,\n'
+                      '    )\n'
+                      '\n',
+             'review_before': '        },\n'
+                              '        arg_converter=_dsml_arg_converter,\n'
+                              '        arg_structural_chars=frozenset(">"),\n'
+                              '        strip_content_whitespace_with_tools=False,\n'
+                              '        tool_args_json=False,\n'
+                              '    )\n'
+                              '\n',
+             'review_after': '        },\n'
+                             '        arg_converter=_dsml_arg_converter,\n'
+                             '        arg_structural_chars=frozenset(">"),\n'
+                             '        tool_args_json=False,\n'
+                             '    )\n'
+                             '\n'},
+            {'name': 'vllm/parser/engine/parser_engine.py:landmark-1',
+             'path': 'vllm/parser/engine/parser_engine.py',
+             'before': '        )\n'
+                       '        self._drop_ws_only_content_before_tools = (\n'
+                       '            '
+                       'parser_engine_config.drop_whitespace_only_content_before_tools\n'
+                       '        )\n'
+                       '        self._strip_content_ws_with_tools = (\n'
+                       '            '
+                       'parser_engine_config.strip_content_whitespace_with_tools\n'
+                       '        )\n'
+                       '\n'
+                       '        vocab = self.vocab\n',
+             'after': '        )\n'
+                      '        self._drop_ws_only_content_before_tools = (\n'
+                      '            '
+                      'parser_engine_config.drop_whitespace_only_content_before_tools\n'
+                      '        )\n'
+                      '\n'
+                      '        vocab = self.vocab\n',
+             'review_before': '        )\n'
+                              '        self._drop_ws_only_content_before_tools = (\n'
+                              '            '
+                              'parser_engine_config.drop_whitespace_only_content_before_tools\n'
+                              '        )\n'
+                              '        self._strip_content_ws_with_tools = (\n'
+                              '            '
+                              'parser_engine_config.strip_content_whitespace_with_tools\n'
+                              '        )\n'
+                              '\n'
+                              '        vocab = self.vocab\n',
+             'review_after': '        )\n'
+                             '        self._drop_ws_only_content_before_tools = (\n'
+                             '            '
+                             'parser_engine_config.drop_whitespace_only_content_before_tools\n'
+                             '        )\n'
+                             '\n'
+                             '        vocab = self.vocab\n'},
+            {'name': 'vllm/parser/engine/parser_engine.py:landmark-2',
+             'path': 'vllm/parser/engine/parser_engine.py',
+             'before': '        content: str,\n'
+                       '        tools_called: bool,\n'
+                       '    ) -> str | None:\n'
+                       '        if tools_called:\n'
+                       '            if self._strip_content_ws_with_tools:\n'
+                       '                content = content.strip()\n'
+                       '            elif self._drop_ws_only_content_before_tools and '
+                       'not content.strip():\n'
+                       '                content = ""\n'
+                       '        return content or None\n'
+                       '\n'
+                       '    # ── Streaming: parse_delta '
+                       '────────────────────────────────────────\n',
+             'after': '        content: str,\n'
+                      '        tools_called: bool,\n'
+                      '    ) -> str | None:\n'
+                      '        if (tools_called and '
+                      'self._drop_ws_only_content_before_tools\n'
+                      '                and not content.strip()):\n'
+                      '            content = ""\n'
+                      '        return content or None\n'
+                      '\n'
+                      '    # ── Streaming: parse_delta '
+                      '────────────────────────────────────────\n',
+             'review_before': '        content: str,\n'
+                              '        tools_called: bool,\n'
+                              '    ) -> str | None:\n'
+                              '        if tools_called:\n'
+                              '            if self._strip_content_ws_with_tools:\n'
+                              '                content = content.strip()\n'
+                              '            elif '
+                              'self._drop_ws_only_content_before_tools and not '
+                              'content.strip():\n'
+                              '                content = ""\n'
+                              '        return content or None\n'
+                              '\n'
+                              '    # ── Streaming: parse_delta '
+                              '────────────────────────────────────────\n',
+             'review_after': '        content: str,\n'
+                             '        tools_called: bool,\n'
+                             '    ) -> str | None:\n'
+                             '        if (tools_called and '
+                             'self._drop_ws_only_content_before_tools\n'
+                             '                and not content.strip()):\n'
+                             '            content = ""\n'
+                             '        return content or None\n'
+                             '\n'
+                             '    # ── Streaming: parse_delta '
+                             '────────────────────────────────────────\n'},
+            {'name': 'vllm/parser/engine/parser_engine_config.py:landmark-1',
+             'path': 'vllm/parser/engine/parser_engine_config.py',
+             'before': '    # Drop content that is entirely whitespace when tool calls '
+                       'follow.\n'
+                       '    drop_whitespace_only_content_before_tools: bool = True\n'
+                       '\n'
+                       '    # .strip() content text when tool calls are present.\n'
+                       '    strip_content_whitespace_with_tools: bool = True\n'
+                       '\n'
+                       '    # Reject tool calls whose names are absent from the '
+                       'request tools.\n'
+                       '    validate_tool_names: bool = False\n'
+                       '\n',
+             'after': '    # Drop content that is entirely whitespace when tool calls '
+                      'follow.\n'
+                      '    drop_whitespace_only_content_before_tools: bool = True\n'
+                      '\n'
+                      '    # Reject tool calls whose names are absent from the request '
+                      'tools.\n'
+                      '    validate_tool_names: bool = False\n'
+                      '\n',
+             'review_before': '    # Drop content that is entirely whitespace when '
+                              'tool calls follow.\n'
+                              '    drop_whitespace_only_content_before_tools: bool = '
+                              'True\n'
+                              '\n'
+                              '    # .strip() content text when tool calls are '
+                              'present.\n'
+                              '    strip_content_whitespace_with_tools: bool = True\n'
+                              '\n'
+                              '    # Reject tool calls whose names are absent from the '
+                              'request tools.\n'
+                              '    validate_tool_names: bool = False\n'
+                              '\n',
+             'review_after': '    # Drop content that is entirely whitespace when tool '
+                             'calls follow.\n'
+                             '    drop_whitespace_only_content_before_tools: bool = '
+                             'True\n'
+                             '\n'
+                             '    # Reject tool calls whose names are absent from the '
+                             'request tools.\n'
+                             '    validate_tool_names: bool = False\n'
+                             '\n'},
+            {'name': 'vllm/parser/inkling.py:landmark-1',
+             'path': 'vllm/parser/inkling.py',
+             'before': '        tool_args_json=True,\n'
+                       '        strip_trailing_reasoning_whitespace=True,\n'
+                       '        drop_whitespace_only_content_before_tools=True,\n'
+                       '        strip_content_whitespace_with_tools=False,\n'
+                       '        validate_tool_names=False,\n'
+                       '    )\n'
+                       '\n',
+             'after': '        tool_args_json=True,\n'
+                      '        strip_trailing_reasoning_whitespace=True,\n'
+                      '        drop_whitespace_only_content_before_tools=True,\n'
+                      '        validate_tool_names=False,\n'
+                      '    )\n'
+                      '\n',
+             'review_before': '        tool_args_json=True,\n'
+                              '        strip_trailing_reasoning_whitespace=True,\n'
+                              '        '
+                              'drop_whitespace_only_content_before_tools=True,\n'
+                              '        strip_content_whitespace_with_tools=False,\n'
+                              '        validate_tool_names=False,\n'
+                              '    )\n'
+                              '\n',
+             'review_after': '        tool_args_json=True,\n'
+                             '        strip_trailing_reasoning_whitespace=True,\n'
+                             '        drop_whitespace_only_content_before_tools=True,\n'
+                             '        validate_tool_names=False,\n'
+                             '    )\n'
+                             '\n'},
+            {'name': 'vllm/parser/kimi_k2.py:landmark-1',
+             'path': 'vllm/parser/kimi_k2.py',
+             'before': '        tool_args_json=True,\n'
+                       '        strip_trailing_reasoning_whitespace=True,\n'
+                       '        drop_whitespace_only_content_before_tools=True,\n'
+                       '        strip_content_whitespace_with_tools=False,\n'
+                       '        validate_tool_names=False,\n'
+                       '    )\n'
+                       '\n',
+             'after': '        tool_args_json=True,\n'
+                      '        strip_trailing_reasoning_whitespace=True,\n'
+                      '        drop_whitespace_only_content_before_tools=True,\n'
+                      '        validate_tool_names=False,\n'
+                      '    )\n'
+                      '\n',
+             'review_before': '        tool_args_json=True,\n'
+                              '        strip_trailing_reasoning_whitespace=True,\n'
+                              '        '
+                              'drop_whitespace_only_content_before_tools=True,\n'
+                              '        strip_content_whitespace_with_tools=False,\n'
+                              '        validate_tool_names=False,\n'
+                              '    )\n'
+                              '\n',
+             'review_after': '        tool_args_json=True,\n'
+                             '        strip_trailing_reasoning_whitespace=True,\n'
+                             '        drop_whitespace_only_content_before_tools=True,\n'
+                             '        validate_tool_names=False,\n'
+                             '    )\n'
+                             '\n'},
+            {'name': 'vllm/parser/qwen3.py:landmark-1',
+             'path': 'vllm/parser/qwen3.py',
+             'before': '_PARTIAL_PARAM_RE = re.compile(r"<parameter=([^>]+)>(.*)$", '
+                       're.DOTALL)\n'
+                       '\n'
+                       '\n'
+                       'def _trim_wrapping_newlines(value: str) -> str:\n'
+                       '    """Strip one leading and one trailing newline (the Qwen3 '
+                       'template markup)."""\n'
+                       '    if value.startswith("\\n"):\n'
+                       '        value = value[1:]\n'
+                       '    if value.endswith("\\n"):\n'
+                       '        value = value[:-1]\n'
+                       '    return value\n'
+                       '\n'
+                       '\n'
+                       'def _qwen3_arg_converter(raw_args: str, partial: bool) -> '
+                       'str:\n'
+                       '    params: dict[str, object] = {}\n'
+                       '\n'
+                       '    for match in _PARAM_RE.finditer(raw_args):\n'
+                       '        name = match.group(1)\n'
+                       '        value = match.group(2)\n'
+                       '        params[name] = _trim_wrapping_newlines(value)\n'
+                       '\n'
+                       '    # The streaming path necessarily exposes a safe prefix of '
+                       'the final\n'
+                       '    # parameter before it knows whether generation will close '
+                       'the XML tag.\n',
+             'after': '_PARTIAL_PARAM_RE = re.compile(r"<parameter=([^>]+)>(.*)$", '
+                      're.DOTALL)\n'
+                      '\n'
+                      '\n'
+                      'def _qwen3_arg_converter(raw_args: str, partial: bool) -> str:\n'
+                      '    params: dict[str, object] = {}\n'
+                      '\n'
+                      '    for match in _PARAM_RE.finditer(raw_args):\n'
+                      '        name = match.group(1)\n'
+                      '        value = match.group(2)\n'
+                      '        params[name] = value\n'
+                      '\n'
+                      '    # The streaming path necessarily exposes a safe prefix of '
+                      'the final\n'
+                      '    # parameter before it knows whether generation will close '
+                      'the XML tag.\n',
+             'review_before': '_PARTIAL_PARAM_RE = '
+                              're.compile(r"<parameter=([^>]+)>(.*)$", re.DOTALL)\n'
+                              '\n'
+                              '\n'
+                              'def _trim_wrapping_newlines(value: str) -> str:\n'
+                              '    """Strip one leading and one trailing newline (the '
+                              'Qwen3 template markup)."""\n'
+                              '    if value.startswith("\\n"):\n'
+                              '        value = value[1:]\n'
+                              '    if value.endswith("\\n"):\n'
+                              '        value = value[:-1]\n'
+                              '    return value\n'
+                              '\n'
+                              '\n'
+                              'def _qwen3_arg_converter(raw_args: str, partial: bool) '
+                              '-> str:\n'
+                              '    params: dict[str, object] = {}\n'
+                              '\n'
+                              '    for match in _PARAM_RE.finditer(raw_args):\n'
+                              '        name = match.group(1)\n'
+                              '        value = match.group(2)\n'
+                              '        params[name] = _trim_wrapping_newlines(value)\n'
+                              '\n'
+                              '    # The streaming path necessarily exposes a safe '
+                              'prefix of the final\n'
+                              '    # parameter before it knows whether generation will '
+                              'close the XML tag.\n',
+             'review_after': '_PARTIAL_PARAM_RE = '
+                             're.compile(r"<parameter=([^>]+)>(.*)$", re.DOTALL)\n'
+                             '\n'
+                             '\n'
+                             'def _qwen3_arg_converter(raw_args: str, partial: bool) '
+                             '-> str:\n'
+                             '    params: dict[str, object] = {}\n'
+                             '\n'
+                             '    for match in _PARAM_RE.finditer(raw_args):\n'
+                             '        name = match.group(1)\n'
+                             '        value = match.group(2)\n'
+                             '        params[name] = value\n'
+                             '\n'
+                             '    # The streaming path necessarily exposes a safe '
+                             'prefix of the final\n'
+                             '    # parameter before it knows whether generation will '
+                             'close the XML tag.\n'},
+            {'name': 'vllm/parser/qwen3.py:landmark-2',
+             'path': 'vllm/parser/qwen3.py',
+             'before': '        name = m.group(1)\n'
+                       '        value = m.group(2)\n'
+                       '        if name:\n'
+                       '            params[name] = _trim_wrapping_newlines(value)\n'
+                       '\n'
+                       '    return json.dumps(params, ensure_ascii=False)\n'
+                       '\n',
+             'after': '        name = m.group(1)\n'
+                      '        value = m.group(2)\n'
+                      '        if name:\n'
+                      '            params[name] = value\n'
+                      '\n'
+                      '    return json.dumps(params, ensure_ascii=False)\n'
+                      '\n',
+             'review_before': '        name = m.group(1)\n'
+                              '        value = m.group(2)\n'
+                              '        if name:\n'
+                              '            params[name] = '
+                              '_trim_wrapping_newlines(value)\n'
+                              '\n'
+                              '    return json.dumps(params, ensure_ascii=False)\n'
+                              '\n',
+             'review_after': '        name = m.group(1)\n'
+                             '        value = m.group(2)\n'
+                             '        if name:\n'
+                             '            params[name] = value\n'
+                             '\n'
+                             '    return json.dumps(params, ensure_ascii=False)\n'
+                             '\n'})})
 
 FINAL_FILES = {'tests/config/test_config_utils.py': '4f5ea0399cc3b4f9603df07e2cc26d32e1eddf6b98a36c0f30d580321879c038',
  'tests/distributed/test_rocm_quick_reduce.py': 'bf6f8a5708568b1f4d96dcc59f42258f8680e5b03bb4abdddcb0c7ead9d414bd',
@@ -73210,8 +74060,9 @@ FINAL_FILES = {'tests/config/test_config_utils.py': '4f5ea0399cc3b4f9603df07e2cc
  'tests/parser/engine/test_delegating_replay.py': '80c003e55e34023cd4ffb9c7ea60149fbd9f167bb2a617584ce2c3842d150d66',
  'tests/parser/engine/test_nemotron_v3.py': '65b1be9ad64bd16e08cea6d6886a33169aae31933c918587ea9e4ea8167975c5',
  'tests/parser/engine/test_parser_engine.py': 'e3c906ca611720ddb682f38085f28e3d17ba382abc8fbdbe7938c3c309fbe801',
- 'tests/parser/engine/test_qwen3.py': 'ff2bab0e9fdafc5a9ac8b2cf3b74b760cc8668a387caf7dd749ca1f8edc730d6',
+ 'tests/parser/engine/test_qwen3.py': '0f01de04b2c7290acaf9e3fb509704589d853bb625bbe67d78dfb5b5d28e9452',
  'tests/parser/engine/test_qwen3_reasoning.py': '60a31db16f2b621403b9b2b5259407a44a5ce1e9e79b62e2c27f1cf505a4db21',
+ 'tests/parser/engine/test_qwen_xml_fidelity.py': 'd65437f8236830dba29225e527962f795e40402a6630d418d50bb56a730677bb',
  'tests/parser/engine/test_reasoning_token_count.py': '37bb1cb80e628ceccc0bd042c9d2806183d2366015a64eac7244af6cc81d1e85',
  'tests/parser/engine/test_replay.py': '1299d37b89efcdb9dc4804c79488128117356daeca60a213d13d662628d17a6f',
  'tests/parser/engine/test_seed_oss.py': '9f2af2c75f71c6fb280f2a2a4a2bb8eaecf1c919c083e6c925f6d6f81cc2c236',
@@ -73289,13 +74140,17 @@ FINAL_FILES = {'tests/config/test_config_utils.py': '4f5ea0399cc3b4f9603df07e2cc
  'vllm/multimodal/processing/inputs.py': '389b97d942469c5600c6c321676497a0197eccec231aeabe0836080daaddafce',
  'vllm/multimodal/processing/processor.py': '43aca2c9c8fbd6e8d825c7f6eeed460f19ee65504a8540ee6bc0f0f26b404ef7',
  'vllm/parser/abstract_parser.py': 'c3ab24e70dcabf75cd8cb662e56bd369dfcb6a9e66814e1e35f2840bc3920c4d',
+ 'vllm/parser/deepseek_v32.py': 'bab71ef8451d24679b7b2a5b0e4b335ef67a691b674767d5cdc5c03df2aeb637',
+ 'vllm/parser/deepseek_v4.py': '1f4b3ad07d6fbed70024db07125296121a454f6a0eb68e32118913a31e4c7899',
  'vllm/parser/engine/adapters.py': 'cda9c48f5b64c60224961bd75c8a5667caaa1494da581f5bb7ab10cec07ecd8b',
  'vllm/parser/engine/events.py': 'd0ed492bbe28c19b6ec0446770a21754bfa844a70888ef5706587b0bbea51405',
- 'vllm/parser/engine/parser_engine.py': '163224e7847cbd29bce9e291adfc4f307aace7109f52fbfd671a1b645cb9542a',
- 'vllm/parser/engine/parser_engine_config.py': 'f746ba34d2b7606037d4229529e97da019bed0abda83b5f62f98559db613a233',
+ 'vllm/parser/engine/parser_engine.py': '183bc34df3a83e71931599e8d629ab8d58290557b197942a799489449c49db1f',
+ 'vllm/parser/engine/parser_engine_config.py': '357bf8876536e1a093d4c6d6de87d00bbc113ae9bc22440fa021c983ee64cf64',
  'vllm/parser/engine/streaming_parser_engine.py': '387a342be77da9928001c697e2e46c2895cd3ecd96dca9109ed18c4578a3a027',
  'vllm/parser/engine/token_id_scanner.py': '476d20aa1bc0e340ada1310dfaa909d2dae8236d049bdb5258b1147a0c63e373',
- 'vllm/parser/qwen3.py': '2c0d5e5bec9e3b504894d278eeaeded0f282e627260f1f35689869dd1fdf9bb0',
+ 'vllm/parser/inkling.py': 'd2f1039bc8a7ff164f925c342f448bc5c4d8a1141b19db816d17922ab490e191',
+ 'vllm/parser/kimi_k2.py': '973593fdca71b7489c86f34353ff65bbc5d30715add86fab40a09c1be63ca12c',
+ 'vllm/parser/qwen3.py': '7da16cd0e85b8ff6e6544c260cdde2521b881dc2605b64b666fca6fdf97bbdca',
  'vllm/renderers/base.py': 'efc0e5706c2dbce32a645bb288e920515934566d23f1a54c4fbc4b6466b19a3e',
  'vllm/renderers/online_derenderer.py': '19887b06b24f2d83d69fcc1a1494c15d67dae6cc945a1bcd1ab9f5aa0c9284a5',
  'vllm/renderers/params.py': '2ba9da75d73c77333bb3e66bf5fff7e4afe6af59e681dffb7f74c306320a7381',

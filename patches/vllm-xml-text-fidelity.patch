@@ -1,0 +1,270 @@
+diff --git a/tests/parser/engine/test_qwen3.py b/tests/parser/engine/test_qwen3.py
+--- a/tests/parser/engine/test_qwen3.py
++++ b/tests/parser/engine/test_qwen3.py
+@@ -197,8 +197,8 @@
+         assert len(result.tool_calls) == 1
+         assert result.tool_calls[0].function.name == "Bash"
+         args = json.loads(result.tool_calls[0].function.arguments)
+-        assert args["command"] == "ls -la /tmp"
+-        assert args["description"] == "List files in /tmp directory"
++        assert args["command"] == "\nls -la /tmp\n"
++        assert args["description"] == "\nList files in /tmp directory\n"
+ 
+     def test_multiline_two_tool_calls(self, parser, mock_request):
+         """Two tool calls with multi-line parameter values (bug report)."""
+@@ -259,7 +259,7 @@
+             "city": "Tokyo"
+         }
+         assert result.content == (
+-            "<tool_call>\n<function=get_weather>\n"
++            "\n<tool_call>\n<function=get_weather>\n"
+             "<parameter=city>Paris</parameter>\n</function>"
+         )
+         assert parser.tool_calls_complete is True
+@@ -800,8 +800,8 @@
+             "</parameter>\n"
+         )
+         result = json.loads(_qwen3_arg_converter(raw, partial=False))
+-        assert result["command"] == "ls -la /tmp"
+-        assert result["description"] == "List files"
++        assert result["command"] == "\nls -la /tmp\n"
++        assert result["description"] == "\nList files\n"
+ 
+     def test_two_multiline_params(self):
+         from vllm.parser.qwen3 import (
+@@ -813,8 +813,8 @@
+             "<parameter=b>\nbaz\nqux\n</parameter>\n"
+         )
+         result = json.loads(_qwen3_arg_converter(raw, partial=False))
+-        assert result["a"] == "foo\nbar"
+-        assert result["b"] == "baz\nqux"
++        assert result["a"] == "\nfoo\nbar\n"
++        assert result["b"] == "\nbaz\nqux\n"
+ 
+     def test_partial_multiline(self):
+         from vllm.parser.qwen3 import (
+@@ -823,8 +823,8 @@
+ 
+         raw = "<parameter=command>\nls -la</parameter>\n<parameter=desc>\npartial value"
+         result = json.loads(_qwen3_arg_converter(raw, partial=True))
+-        assert result["command"] == "ls -la"
+-        assert result["desc"] == "partial value"
++        assert result["command"] == "\nls -la"
++        assert result["desc"] == "\npartial value"
+ 
+     def test_partial_value_with_angle_bracket(self):
+         from vllm.parser.qwen3 import (
+diff --git a/tests/parser/engine/test_qwen_xml_fidelity.py b/tests/parser/engine/test_qwen_xml_fidelity.py
+--- /dev/null
++++ b/tests/parser/engine/test_qwen_xml_fidelity.py
+@@ -0,0 +1,89 @@
++# SPDX-License-Identifier: Apache-2.0
++# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
++"""Text fidelity across Qwen XML conversion and arbitrary streaming cuts."""
++import json
++from unittest.mock import MagicMock
++
++import pytest
++
++from vllm.entrypoints.openai.chat_completion.protocol import ChatCompletionRequest
++from vllm.parser import ParserManager
++
++MARKERS = {'<think>': 20000, '</think>': 20001,
++           '<tool_call>': 20002, '</tool_call>': 20003}
++REVERSE = {v: k for k, v in MARKERS.items()}
++TOOL = {'type': 'function', 'function': {'name': 'write', 'parameters': {
++    'type': 'object', 'properties': {'text': {'type': 'string'}},
++    'required': ['text'], 'additionalProperties': False}}}
++PARSER = ParserManager.get_parser(tool_parser_name='qwen3_coder',
++                                  reasoning_parser_name='qwen3', enable_auto_tools=True)
++
++
++def encode(text):
++    ids = []
++    while text:
++        marker = next((m for m in MARKERS if text.startswith(m)), None)
++        if marker:
++            ids.append(MARKERS[marker]); text = text[len(marker):]
++        else:
++            ids.append(ord(text[0])); text = text[1:]
++    return ids
++
++
++def decode(ids):
++    return ''.join(REVERSE.get(i, chr(i)) for i in ids)
++
++
++def parse(text, chunk_size):
++    request = ChatCompletionRequest(messages=[{'role': 'user', 'content': 'test'}],
++                                    tools=[TOOL], tool_choice='auto')
++    tokenizer = MagicMock()
++    tokenizer.get_vocab.return_value = MARKERS
++    tokenizer.decode.side_effect = decode
++    tokenizer.all_special_tokens = list(MARKERS)
++    tokenizer.all_special_ids = list(MARKERS.values())
++    parser = PARSER(tokenizer, request.tools, chat_template_kwargs={'enable_thinking': True})
++    ids = encode(text)
++    if chunk_size is None:
++        reasoning, content, calls = parser.parse(text, request,
++            enable_auto_tools=True, model_output_token_ids=ids)
++        return reasoning or '', content or '', [c.arguments for c in calls or []]
++    reasoning, content, calls = '', '', {}
++    for start in range(0, len(ids), chunk_size):
++        group = ids[start:start+chunk_size]
++        delta = parser.parse_delta(decode(group), group, request,
++            prompt_token_ids=[1, 2, 3], finished=start+chunk_size >= len(ids))
++        if delta is None:
++            continue
++        reasoning += delta.reasoning or ''
++        content += delta.content or ''
++        for call in delta.tool_calls:
++            if call.function and call.function.arguments is not None:
++                calls[call.index] = calls.get(call.index, '') + call.function.arguments
++    return reasoning, content, list(calls.values())
++
++
++VALUES = ['', '\n', '\n\n', '\nfirst\n', 'first\n', '\nfirst',
++          ' \t\r\nfirst\n\t ', 'first\nsecond\n', '雪\nשָׁלוֹם\n',
++          '\n</function></tool_call><think>\n', '"quoted"\n\\path\n']
++
++
++@pytest.mark.parametrize('chunk_size', [None, 1, 2, 3, 7, 13, 64])
++@pytest.mark.parametrize('value', VALUES)
++def test_parameter_string_bytes_survive_every_transport_cut(value, chunk_size):
++    text = ('plan\n</think>\n before \t\n<tool_call>\n<function=write>\n'
++            '<parameter=text>' + value + '</parameter>\n</function>\n</tool_call>\n after \t\n')
++    reasoning, content, calls = parse(text, chunk_size)
++    assert reasoning == 'plan\n'
++    assert content == '\n before \t\n\n after \t\n'
++    assert len(calls) == 1
++    assert json.loads(calls[0]) == {'text': value}
++
++
++@pytest.mark.parametrize('chunk_size', [None, 1, 3, 13])
++@pytest.mark.parametrize('value', VALUES)
++def test_partial_string_diagnostic_preserves_raw_value_bytes(value, chunk_size):
++    text = ('plan</think><tool_call>\n<function=write>\n<parameter=text>' + value)
++    _, _, calls = parse(text, chunk_size)
++    assert len(calls) == 1
++    assert json.loads(calls[0]) == {'text': value}
+diff --git a/vllm/parser/deepseek_v32.py b/vllm/parser/deepseek_v32.py
+--- a/vllm/parser/deepseek_v32.py
++++ b/vllm/parser/deepseek_v32.py
+@@ -102,7 +102,6 @@
+         },
+         arg_converter=_dsml_arg_converter,
+         arg_structural_chars=frozenset(">"),
+-        strip_content_whitespace_with_tools=False,
+         tool_args_json=False,
+     )
+ 
+diff --git a/vllm/parser/deepseek_v4.py b/vllm/parser/deepseek_v4.py
+--- a/vllm/parser/deepseek_v4.py
++++ b/vllm/parser/deepseek_v4.py
+@@ -204,7 +204,6 @@
+         },
+         arg_converter=_dsml_arg_converter,
+         arg_structural_chars=frozenset(">"),
+-        strip_content_whitespace_with_tools=False,
+         tool_args_json=False,
+     )
+ 
+diff --git a/vllm/parser/engine/parser_engine.py b/vllm/parser/engine/parser_engine.py
+--- a/vllm/parser/engine/parser_engine.py
++++ b/vllm/parser/engine/parser_engine.py
+@@ -149,9 +149,6 @@
+         )
+         self._drop_ws_only_content_before_tools = (
+             parser_engine_config.drop_whitespace_only_content_before_tools
+-        )
+-        self._strip_content_ws_with_tools = (
+-            parser_engine_config.strip_content_whitespace_with_tools
+         )
+ 
+         vocab = self.vocab
+@@ -474,11 +471,9 @@
+         content: str,
+         tools_called: bool,
+     ) -> str | None:
+-        if tools_called:
+-            if self._strip_content_ws_with_tools:
+-                content = content.strip()
+-            elif self._drop_ws_only_content_before_tools and not content.strip():
+-                content = ""
++        if (tools_called and self._drop_ws_only_content_before_tools
++                and not content.strip()):
++            content = ""
+         return content or None
+ 
+     # ── Streaming: parse_delta ────────────────────────────────────────
+diff --git a/vllm/parser/engine/parser_engine_config.py b/vllm/parser/engine/parser_engine_config.py
+--- a/vllm/parser/engine/parser_engine_config.py
++++ b/vllm/parser/engine/parser_engine_config.py
+@@ -100,9 +100,6 @@
+     # Drop content that is entirely whitespace when tool calls follow.
+     drop_whitespace_only_content_before_tools: bool = True
+ 
+-    # .strip() content text when tool calls are present.
+-    strip_content_whitespace_with_tools: bool = True
+-
+     # Reject tool calls whose names are absent from the request tools.
+     validate_tool_names: bool = False
+ 
+diff --git a/vllm/parser/inkling.py b/vllm/parser/inkling.py
+--- a/vllm/parser/inkling.py
++++ b/vllm/parser/inkling.py
+@@ -297,7 +297,6 @@
+         tool_args_json=True,
+         strip_trailing_reasoning_whitespace=True,
+         drop_whitespace_only_content_before_tools=True,
+-        strip_content_whitespace_with_tools=False,
+         validate_tool_names=False,
+     )
+ 
+diff --git a/vllm/parser/kimi_k2.py b/vllm/parser/kimi_k2.py
+--- a/vllm/parser/kimi_k2.py
++++ b/vllm/parser/kimi_k2.py
+@@ -142,7 +142,6 @@
+         tool_args_json=True,
+         strip_trailing_reasoning_whitespace=True,
+         drop_whitespace_only_content_before_tools=True,
+-        strip_content_whitespace_with_tools=False,
+         validate_tool_names=False,
+     )
+ 
+diff --git a/vllm/parser/qwen3.py b/vllm/parser/qwen3.py
+--- a/vllm/parser/qwen3.py
++++ b/vllm/parser/qwen3.py
+@@ -59,22 +59,13 @@
+ _PARTIAL_PARAM_RE = re.compile(r"<parameter=([^>]+)>(.*)$", re.DOTALL)
+ 
+ 
+-def _trim_wrapping_newlines(value: str) -> str:
+-    """Strip one leading and one trailing newline (the Qwen3 template markup)."""
+-    if value.startswith("\n"):
+-        value = value[1:]
+-    if value.endswith("\n"):
+-        value = value[:-1]
+-    return value
+-
+-
+ def _qwen3_arg_converter(raw_args: str, partial: bool) -> str:
+     params: dict[str, object] = {}
+ 
+     for match in _PARAM_RE.finditer(raw_args):
+         name = match.group(1)
+         value = match.group(2)
+-        params[name] = _trim_wrapping_newlines(value)
++        params[name] = value
+ 
+     # The streaming path necessarily exposes a safe prefix of the final
+     # parameter before it knows whether generation will close the XML tag.
+@@ -87,7 +78,7 @@
+         name = m.group(1)
+         value = m.group(2)
+         if name:
+-            params[name] = _trim_wrapping_newlines(value)
++            params[name] = value
+ 
+     return json.dumps(params, ensure_ascii=False)
+ 
