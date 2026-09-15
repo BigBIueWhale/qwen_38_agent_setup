@@ -1714,6 +1714,26 @@ def _validate_png_source_after(state: State) -> None:
     }, label=label)
 
 
+def _validate_kv_physical_before(state: State) -> None:
+    require_text(state, "vllm/v1/worker/gpu_worker.py",
+                 "kv_physical_bound = (\n            self.init_snapshot.total_memory",
+                 label="KV physical bound precondition")
+
+
+def _validate_kv_physical_after(state: State) -> None:
+    label = "KV physical bound result"
+    _require_in_symbol(state, "vllm/v1/worker/gpu_worker.py",
+                       "Worker.determine_available_memory", (
+        "kv_physical_bound = (\n            self.init_snapshot.free_memory",
+        "- profile_result.non_kv_cache_memory",
+        "- cudagraph_memory_estimate_applied",
+        "int(kv_physical_bound)",
+    ), label=label)
+    require_python_symbols(state, "tests/v1/worker/test_gpu_worker.py", {
+        "test_physical_bound_charges_preexisting_residents_once": None,
+    }, label=label)
+
+
 def validate_final(state: State) -> None:
     """Reassert every durable semantic invariant on the complete tree.
 
@@ -1729,6 +1749,19 @@ def validate_final(state: State) -> None:
 
 
 CONTRACTS: Mapping[str, SemanticContract] = {
+    "kv-physical-free-memory": SemanticContract(
+        rationale=(
+            "The declared KV capacity cannot spend memory already occupied before "
+            "profiling. Bound it by initially free memory minus the profile delta, "
+            "recurring activation peak, CUDA graph and frontend reservations."
+        ),
+        removal_condition=(
+            "Remove when upstream's authoritative bound includes pre-snapshot "
+            "residents exactly once and keeps utilization as an estimate only."
+        ),
+        validate_before=_validate_kv_physical_before,
+        validate_after=_validate_kv_physical_after,
+    ),
     "png-source-admission": SemanticContract(
         rationale=(
             "Pillow presents 16-bit truecolour and grey+alpha PNGs as RGB/RGBA, "

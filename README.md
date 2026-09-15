@@ -75,7 +75,7 @@ error.
   and relay readiness events, then validates the complete live configuration before
   reporting success. Re-running it validates the existing owned topology rather than
   starting a duplicate.
-- status.sh validates host prerequisites, sixteen ordered vLLM transformations, every reviewed
+- status.sh validates host prerequisites, seventeen ordered vLLM transformations, every reviewed
   source and test file, the model manifest, image archive, image identity and labels,
   command and environment, mounts, runtime packages, API identity, listener,
   hardening, and live health. HEALTHY means all checks passed.
@@ -95,7 +95,7 @@ Advanced reproducibility operations are deliberately separate from serving mode:
     ./scripts/build-vllm.sh build
     ./scripts/restore-images.sh
 
-The check reconstructs the source tree from the pinned upstream commit through all sixteen
+The check reconstructs the source tree from the pinned upstream commit through all seventeen
 landmark-aware transformations. The build runs offline from the exact base image and fails unless it produces
 the pinned image ID. Restore verifies the pinned local archive before loading it.
 
@@ -251,7 +251,7 @@ The vLLM submodule is pinned at:
 
     9df9b0b0a1816b6d0d0f6ecd0da563cc37fd72f5
 
-It is intentionally reconstructed by sixteen ordered, reviewed semantic transformations:
+It is intentionally reconstructed by seventeen ordered, reviewed semantic transformations:
 
 | Patch | SHA-256 |
 |---|---|
@@ -271,9 +271,10 @@ It is intentionally reconstructed by sixteen ordered, reviewed semantic transfor
 | patches/vllm-anthropic-input-fidelity.patch | c2063d509fc90929f7d6018796f753da6445f12a4b4b19181e377f772b923a49 |
 | patches/vllm-qwen-exact-tool-language.patch | fe4e46cb7444c80646537da63ab1ac12c54e7eebb04c0735a4243d8b7e7943d2 |
 | patches/vllm-png-source-admission.patch | b9091c5c227151ec00131a854d927a9405396244a9a59bd4d6e297dd67ea3306 |
+| patches/vllm-kv-physical-free-memory.patch | 21f8993033c78971d4f7a660fe9906e054ec658139e83fc37b7121f1d8d91289 |
 
 The reconstructed tree has exactly sixty-four reviewed runtime-source changes, five
-reviewed runtime-source deletions, forty reviewed existing-test changes,
+reviewed runtime-source deletions, forty-one reviewed existing-test changes,
 four reviewed new tests, and two reviewed test deletions — the authoritative
 counts are derived and printed by ./scripts/build-vllm.sh check, never restated
 by hand there. The landmark-aware Python patcher calculates every mutation
@@ -296,11 +297,11 @@ Pinned build inputs and products:
 | Offline archive | artifacts/qwen38-vllm-images-runtime-v23.tar |
 | Archive size | Awaiting adoption after the v23 export |
 | Archive SHA-256 | Awaiting adoption after the v23 export |
-| Runtime Dockerfile SHA-256 | 4a39668cb049f18f941998f4867689fda5e97963cade7472e45e5aacb3eaf31f |
+| Runtime Dockerfile SHA-256 | ba7773f72aed938a61e7dde7dc79cf6dfa0d6f8f93104f55db461d5d5f4dfa3c |
 | Docker context allowlist SHA-256 | 1bef547518b88ff9c592d411e0fbf1582f82a6f27166b0ba956892e72797ca7a |
-| Build verifier SHA-256 | 8d4ec62792a7fa386ae73a699a53a1e531dbf5168a3181f2b61c55f82307b509 |
+| Build verifier SHA-256 | 1c7a68731b7d35d6687074a230a2483b267ac7c2a3008137a96fc4be81c53c84 |
 | Runtime validator SHA-256 | e8f3fd0f85e903ae461e89dfe63872a4d9037518ac0fd7f8460b065721ea6f4f |
-| Runtime lock SHA-256 | b1a4cf2345f6816d31c9fd11b91ec18fd7fad3b4dbc9ce122554139240a97348 |
+| Runtime lock SHA-256 | c54561d83847a9a03b0e0cfb92f1b6a7f4f1f7d62348029fa2ce4de005bc515d |
 
 Every reviewed runtime file, including both TurboQuant kernels, is copied and
 hash-checked against its upstream and patched identities. A CPU Triton-interpreter
@@ -558,7 +559,7 @@ upstream card, exact tokenizer, vLLM request accounting, and the live boundary a
     262143 prompt + 1 output = 262144 total  -> accepted
     262144 prompt + 1 output = 262145 total -> HTTP 400
 
-The accepted multimodal boundary included all sixteen maximum-size images and
+The accepted multimodal boundary included all seventeen maximum-size images and
 245,745 tokens of multimodal expansion. No YaRN, long-context environment override,
 or nominal one-million setting is enabled.
 

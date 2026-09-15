@@ -133,6 +133,24 @@ includes the `is_error` field required by the real input model. Backend `check`
 now executes the parser, vision and reasoning CPU contract units against the
 complete reviewed runtime overlay as well as its existing kernel guards.
 
+## Finding 16: physical KV capacity includes initial GPU residents
+
+`vllm-kv-physical-free-memory.patch` adds the seventeenth runtime source stage.
+The physical capacity bound starts with the free-memory snapshot taken before
+model loading. The profiler reports subsequent consumption and transient peak
+headroom, so subtracting that amount from the whole card incorrectly made
+earlier residents available a second time. The corrected bound charges initial
+residents, model/profile consumption, recurring activation headroom, CUDA graphs
+and frontend reservations once each. Utilization continues to provide an
+informational estimate and the startup free-memory requirement; it cannot
+silently resize or veto a declaration that fits the physical bound.
+
+Validation: 18 worker tests pass in an offline CPU container. Sixteen combinations
+call the real `Worker.determine_available_memory` with mocked snapshots and
+profiling operations, varying initial occupancy, activation headroom, graph
+memory and utilization. They verify the bound and the separate estimate; the
+two startup-plan tests still pass. No GPU or model profiling was performed.
+
 ## Remaining implementation
 
 Parser language, stop handling, schema conversion, protocol translation, image

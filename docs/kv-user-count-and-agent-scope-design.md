@@ -57,10 +57,11 @@ Bytes are derived inside vLLM at the point where the KV cache spec exists.
   minus every observed resident; it preferred ~1.3 GiB less than the
   proven production pool) is informational only; it can neither shrink
   nor veto the declared pool. What refuses a declaration is physical
-  capacity: the whole card minus every measured resident — weights,
-  non-torch allocations, the transient activation peak that recurs each
+  capacity: the initially free memory minus every additional measured
+  resident — weights, non-torch allocations, the activation peak that recurs each
   forward pass, frontend reservations, and the CUDA-graph charge when
-  opted in. The utilization factor is deliberately not charged against
+  opted in. This accounts for other processes, device context and allocations
+  made before the first snapshot exactly once. The utilization factor is not charged against
   the pool: its holdback is a discretionary reserve the superseded byte
   flag also ignored, and the pinned production footprint (29.6 GiB of a
   31.8 GiB card) sits beyond the 0.9 budget while fitting the card with

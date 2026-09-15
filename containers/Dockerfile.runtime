@@ -273,6 +273,7 @@ ARG ANTHROPIC_VALIDATION_PATCH_DIFF_SHA256
 ARG ANTHROPIC_INPUTS_PATCH_DIFF_SHA256
 ARG QWEN_LANGUAGE_PATCH_DIFF_SHA256
 ARG PNG_SOURCE_PATCH_DIFF_SHA256
+ARG KV_PHYSICAL_PATCH_DIFF_SHA256
 ARG TOOL_TRUNCATION_PATCH_DIFF_SHA256
 ARG VISION_RUNTIME_PATCH_DIFF_SHA256
 ARG NUMERICAL_AUDITS_PATCH_DIFF_SHA256
@@ -1182,6 +1183,7 @@ LABEL org.opencontainers.image.revision="9df9b0b0a1816b6d0d0f6ecd0da563cc37fd72f
       qwen38.patch.vllm-error-exception-handler.file.sha256="${VLLM_ERROR_EXCEPTION_HANDLER_PATCHED_FILE_SHA256}" \
       qwen38.patch.qwen-exact-tool-language.diff.sha256="${QWEN_LANGUAGE_PATCH_DIFF_SHA256}" \
       qwen38.patch.png-source-admission.diff.sha256="${PNG_SOURCE_PATCH_DIFF_SHA256}" \
+      qwen38.patch.kv-physical-free-memory.diff.sha256="${KV_PHYSICAL_PATCH_DIFF_SHA256}" \
       qwen38.patch.parser-events.file.sha256="${PARSER_EVENTS_PATCHED_FILE_SHA256}" \
       qwen38.patch.parser-engine-config.file.sha256="${PARSER_ENGINE_CONFIG_PATCHED_FILE_SHA256}" \
       qwen38.patch.streaming-parser-engine.file.sha256="${STREAMING_PARSER_ENGINE_PATCHED_FILE_SHA256}" \

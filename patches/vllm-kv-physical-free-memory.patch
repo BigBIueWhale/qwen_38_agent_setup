@@ -1,0 +1,131 @@
+diff --git a/tests/v1/worker/test_gpu_worker.py b/tests/v1/worker/test_gpu_worker.py
+--- a/tests/v1/worker/test_gpu_worker.py
++++ b/tests/v1/worker/test_gpu_worker.py
+@@ -1,8 +1,9 @@
+ # SPDX-License-Identifier: Apache-2.0
+ # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
+ 
++from contextlib import nullcontext
+ from types import SimpleNamespace
+-from unittest.mock import patch
++from unittest.mock import Mock, patch
+ 
+ import pytest
+ 
+@@ -77,3 +78,68 @@
+     explicit = _plan_worker(kv_bytes=7 * GiB_bytes)
+     maybe_apply_startup_plan(explicit)
+     assert explicit.cache_config.kv_cache_memory_bytes == 7 * GiB_bytes
++
++
++@pytest.mark.parametrize("initial_residents", [0, 2 * GiB_bytes])
++@pytest.mark.parametrize("activation_peak", [0, GiB_bytes])
++@pytest.mark.parametrize("graph_memory", [0, GiB_bytes // 2])
++@pytest.mark.parametrize("utilization", [0.5, 0.92])
++def test_physical_bound_charges_preexisting_residents_once(
++    monkeypatch, initial_residents, activation_peak, graph_memory, utilization
++):
++    from vllm.v1.worker import gpu_worker
++
++    total = 32 * GiB_bytes
++    initially_free = total - initial_residents
++    weights = 20 * GiB_bytes
++    frontend = GiB_bytes // 4
++    profile = SimpleNamespace(
++        total_consumed=weights,
++        transient_peak_headroom=activation_peak,
++        non_kv_cache_memory=weights + activation_peak,
++        weights_memory=weights,
++        after_profile=SimpleNamespace(free_memory=initially_free - weights),
++    )
++    runner = SimpleNamespace(
++        model_memory_usage=weights,
++        profile_run=Mock(),
++        profile_cudagraph_memory=Mock(return_value=graph_memory),
++    )
++    worker = SimpleNamespace(
++        init_snapshot=SimpleNamespace(free_memory=initially_free, total_memory=total),
++        requested_memory=int(total * utilization),
++        cache_config=SimpleNamespace(
++            kv_cache_memory_bytes=None, gpu_memory_utilization=utilization
++        ),
++        model_config=SimpleNamespace(multimodal_config=object()),
++        parallel_config=SimpleNamespace(_api_process_count=1),
++        model_runner=runner,
++        vllm_config=SimpleNamespace(
++            compilation_config=SimpleNamespace(
++                cudagraph_mode=gpu_worker.CUDAGraphMode.FULL
++            )
++        ),
++    )
++    monkeypatch.setenv("VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS", "1")
++    with (
++        patch.object(gpu_worker, "maybe_apply_startup_plan"),
++        patch.object(gpu_worker, "memory_profiling", return_value=nullcontext(profile)),
++        patch.object(
++            gpu_worker, "current_platform", SimpleNamespace(is_cuda_alike=lambda: True)
++        ),
++        patch.object(
++            gpu_worker, "reserve_mm_ipc_gpu_memory",
++            side_effect=lambda n, *args: n - frontend,
++        ),
++    ):
++        bound = gpu_worker.Worker.determine_available_memory(worker)
++    # Initial occupancy, profile residents, recurring peak, graph and frontend
++    # reservation each consume physical memory exactly once.
++    assert bound == (
++        total - initial_residents - weights - activation_peak - graph_memory - frontend
++    )
++    assert worker.available_kv_cache_memory_bytes == (
++        int(total * utilization) - weights - activation_peak - graph_memory
++    )
++    runner.profile_run.assert_called_once_with()
++    runner.profile_cudagraph_memory.assert_called_once_with()
+diff --git a/vllm/v1/worker/gpu_worker.py b/vllm/v1/worker/gpu_worker.py
+--- a/vllm/v1/worker/gpu_worker.py
++++ b/vllm/v1/worker/gpu_worker.py
+@@ -547,12 +547,13 @@
+         #    allocator reservations, the transient activation peak).
+         #    Informational only. It may prefer a smaller pool than the
+         #    declaration; that preference must not shrink or veto the
+-        #    declared capacity. What separates it from the bound below is
+-        #    exactly the (1 - utilization) holdback — a discretionary paper
+-        #    reserve, not memory anything uses.
++        #    declared capacity. The bound below instead uses the free memory
++        #    measured before this instance loaded its model; memory already
++        #    occupied at that snapshot cannot be spent by either pool.
+         #
+-        # 2) The AUTHORITATIVE physical bound (returned): the whole card
+-        #    minus every measured resident — weights, non-torch consumers,
++        # 2) The AUTHORITATIVE physical bound (returned): initially free
++        #    memory minus the additional measured residents — weights,
++        #    non-torch consumers,
+         #    the transient activation peak that recurs on every forward
+         #    pass, and the opted-in CUDA-graph charge. A declaration beyond
+         #    THIS bound is memory the card genuinely cannot provide and is
+@@ -575,7 +576,7 @@
+             - cudagraph_memory_estimate_applied
+         )
+         kv_physical_bound = (
+-            self.init_snapshot.total_memory
++            self.init_snapshot.free_memory
+             - profile_result.non_kv_cache_memory
+             - cudagraph_memory_estimate_applied
+         )
+@@ -596,14 +597,14 @@
+         logger.info_once(
+             "Available KV cache memory: %s GiB (conservative estimate under "
+             "the %s GiB utilization budget); physical KV bound: %s GiB "
+-            "(the %s GiB card minus %s GiB of measured residents incl. "
++            "(%s GiB initially free minus %s GiB of additional residents incl. "
+             "weights %s GiB and activation peak %s GiB). The pool is sized "
+             "by --kv-cache-users against the physical bound, not the "
+             "estimate.",
+             format_gib(self.available_kv_cache_memory_bytes),
+             format_gib(self.requested_memory),
+             format_gib(kv_physical_bound),
+-            format_gib(self.init_snapshot.total_memory),
++            format_gib(self.init_snapshot.free_memory),
+             format_gib(profile_result.non_kv_cache_memory),
+             format_gib(profile_result.weights_memory),
+             format_gib(profile_result.transient_peak_headroom),
