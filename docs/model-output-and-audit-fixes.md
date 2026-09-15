@@ -195,6 +195,32 @@ malformed call/result sequence on Chat and Responses, mixed content, empty
 content, preserved thinking, nonmutating reconstruction and the real Responses
 request method refusing invalid history before its renderer is called.
 
+## Finding 8: one identity through Responses streaming and completion
+
+`vllm-responses-stream-identity.patch` adds the twentieth runtime source stage.
+The stream's completed output items are the terminal response's output. Batch
+parsing happens once, and both transports call one finalizer for status, usage,
+raw-message metadata, output logging and storage. Streaming no longer re-enters
+batch generation with an empty iterator or reinitializes tool sessions at the
+end. A completed stream cannot acquire fresh item or function-call IDs by being
+parsed a second time.
+
+Text log probabilities retain their token bytes and alternatives in the completed
+item and terminal response. A truncated final text item is incomplete on both
+transports; the existing incomplete-call rule still suppresses arguments.done
+on the interrupted call. This change does not complete the remaining EOS/stop
+promotion work.
+
+Validation: 39 tests pass in an offline CPU container. Eight terminal-identity
+cases cover text, one/two calls, mixed reasoning/text/calls and length/normal ends;
+they verify added/done/terminal IDs, exact item payloads, usage, event sequence,
+absence of reparsing, and successful history replay using the original stream
+call IDs. Four additional cases check log probabilities and text status on both
+transports. The existing reasoning-usage fixture now has a coherent decoder and
+the full Qwen marker vocabulary; its expected count includes every generated ID
+before the reasoning boundary. One preexisting strict xfail remains for upstream
+Harmony zero-delta item lifecycle; the deployed Qwen path does not use Harmony.
+
 ## Remaining implementation
 
 Parser language, stop handling, schema conversion, protocol translation, image

@@ -283,6 +283,7 @@ ARG PNG_SOURCE_PATCH_DIFF_SHA256
 ARG KV_PHYSICAL_PATCH_DIFF_SHA256
 ARG SINGLE_CALL_PATCH_DIFF_SHA256
 ARG RESPONSES_HISTORY_PATCH_DIFF_SHA256
+ARG RESPONSES_IDENTITY_PATCH_DIFF_SHA256
 ARG TOOL_TRUNCATION_PATCH_DIFF_SHA256
 ARG VISION_RUNTIME_PATCH_DIFF_SHA256
 ARG NUMERICAL_AUDITS_PATCH_DIFF_SHA256
@@ -1207,6 +1208,7 @@ LABEL org.opencontainers.image.revision="9df9b0b0a1816b6d0d0f6ecd0da563cc37fd72f
       qwen38.patch.qwen-single-call-grammar.diff.sha256="${SINGLE_CALL_PATCH_DIFF_SHA256}" \
       qwen38.patch.tool-parser-abstract.file.sha256="${TOOL_PARSER_ABSTRACT_PATCHED_FILE_SHA256}" \
       qwen38.patch.responses-history-integrity.diff.sha256="${RESPONSES_HISTORY_PATCH_DIFF_SHA256}" \
+      qwen38.patch.responses-stream-identity.diff.sha256="${RESPONSES_IDENTITY_PATCH_DIFF_SHA256}" \
       qwen38.template.file.sha256="${AGENT_CHAT_TEMPLATE_SHA256}" \
       qwen38.project="Qwen_best_model_ever" \
       qwen38.runtime.profile="${IMAGE_PROFILE_VERSION}"

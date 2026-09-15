@@ -7,6 +7,7 @@ EXPECTED_STATUS=$' M tests/config/test_config_utils.py
  M tests/engine/test_arg_utils.py
  M tests/entrypoints/anthropic/test_anthropic_messages_conversion.py
  M tests/entrypoints/openai/responses/test_responses_utils.py
+ M tests/entrypoints/openai/responses/test_serving_responses.py
  M tests/entrypoints/serve/exception_handling/test_validation_exception_handler.py
  M tests/entrypoints/serve/utils/test_api_utils.py
  M tests/entrypoints/unit_tests/test_chat_utils.py
@@ -175,6 +176,7 @@ PHASE_BUDGET_PATCH_FILE="${PROJECT_DIR}/patches/vllm-qwen38-separate-final-respo
 IMPLICIT_TOOL_GRAMMAR_PATCH_FILE="${PROJECT_DIR}/patches/vllm-qwen-implicit-tool-grammar-boundary.patch"
 QWEN_LANGUAGE_PATCH_FILE="${PROJECT_DIR}/patches/vllm-qwen-exact-tool-language.patch"
 PNG_SOURCE_PATCH_FILE="${PROJECT_DIR}/patches/vllm-png-source-admission.patch"
+RESPONSES_IDENTITY_PATCH_FILE="${PROJECT_DIR}/patches/vllm-responses-stream-identity.patch"
 RESPONSES_HISTORY_PATCH_FILE="${PROJECT_DIR}/patches/vllm-responses-history-integrity.patch"
 SINGLE_CALL_PATCH_FILE="${PROJECT_DIR}/patches/vllm-qwen-single-call-grammar.patch"
 KV_PHYSICAL_PATCH_FILE="${PROJECT_DIR}/patches/vllm-kv-physical-free-memory.patch"
@@ -337,6 +339,7 @@ printf '%s  %s\n' \
   "${KV_PHYSICAL_PATCH_DIFF_SHA256}" "${KV_PHYSICAL_PATCH_FILE}" \
   "${SINGLE_CALL_PATCH_DIFF_SHA256}" "${SINGLE_CALL_PATCH_FILE}" \
   "${RESPONSES_HISTORY_PATCH_DIFF_SHA256}" "${RESPONSES_HISTORY_PATCH_FILE}" \
+  "${RESPONSES_IDENTITY_PATCH_DIFF_SHA256}" "${RESPONSES_IDENTITY_PATCH_FILE}" \
   "${TOOL_TRUNCATION_PATCH_DIFF_SHA256}" "${TOOL_TRUNCATION_PATCH_FILE}" \
   "${VISION_RUNTIME_PATCH_DIFF_SHA256}" "${VISION_RUNTIME_PATCH_FILE}" \
   "${NUMERICAL_AUDITS_PATCH_DIFF_SHA256}" "${NUMERICAL_AUDITS_PATCH_FILE}" \
@@ -720,6 +723,7 @@ docker buildx build --progress=plain \
   --build-arg "KV_PHYSICAL_PATCH_DIFF_SHA256=${KV_PHYSICAL_PATCH_DIFF_SHA256}" \
   --build-arg "SINGLE_CALL_PATCH_DIFF_SHA256=${SINGLE_CALL_PATCH_DIFF_SHA256}" \
   --build-arg "RESPONSES_HISTORY_PATCH_DIFF_SHA256=${RESPONSES_HISTORY_PATCH_DIFF_SHA256}" \
+  --build-arg "RESPONSES_IDENTITY_PATCH_DIFF_SHA256=${RESPONSES_IDENTITY_PATCH_DIFF_SHA256}" \
   --build-arg "TOOL_TRUNCATION_PATCH_DIFF_SHA256=${TOOL_TRUNCATION_PATCH_DIFF_SHA256}" \
   --build-arg "VISION_RUNTIME_PATCH_DIFF_SHA256=${VISION_RUNTIME_PATCH_DIFF_SHA256}" \
   --build-arg "NUMERICAL_AUDITS_PATCH_DIFF_SHA256=${NUMERICAL_AUDITS_PATCH_DIFF_SHA256}" \

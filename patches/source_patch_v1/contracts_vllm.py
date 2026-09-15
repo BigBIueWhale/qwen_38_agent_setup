@@ -1810,6 +1810,43 @@ def _validate_responses_history_after(state: State) -> None:
         }, label=label)
 
 
+def _validate_responses_identity_before(state: State) -> None:
+    require_text(state, "vllm/entrypoints/openai/responses/serving.py",
+                 "async def empty_async_generator():",
+                 label="Responses stream identity precondition")
+
+
+def _validate_responses_identity_after(state: State) -> None:
+    label = "Responses stream identity result"
+    serving = "vllm/entrypoints/openai/responses/serving.py"
+    _require_in_symbol(state, serving, "OpenAIServingResponses.responses_stream_generator", (
+        "output.append(event_data.item)", "isinstance(event_data, ResponseOutputItemDoneEvent)",
+        "self._finalize_response(", "event_data.output_index != len(output)",
+    ), label=label)
+    source = _symbol_source(state, serving,
+        "OpenAIServingResponses.responses_stream_generator", label=label)
+    _require("responses_full_generator(" not in source,
+             f"{label}: streaming must not re-enter batch generation")
+    forbid_text(state, serving, "empty_async_generator", label=label)
+    _require_in_symbol(state, serving, "OpenAIServingResponses.responses_full_generator", (
+        "self._collect_response_output(", "self._finalize_response(",
+    ), label=label)
+    _require_in_symbol(state, serving, "OpenAIServingResponses._finalize_response", (
+        "output=output", "usage=usage", "is_streaming=request.stream",
+        'if finish_reason == "length"',
+    ), label=label)
+    _require_in_symbol(state, "vllm/entrypoints/openai/responses/streaming_events.py",
+        "emit_simple_content_done", (
+            "logprobs=state.accumulated_logprobs or None",
+            'status="incomplete" if incomplete else "completed"',
+        ), label=label)
+    require_python_symbols(state,
+        "tests/entrypoints/openai/responses/test_serving_responses.py", {
+            "test_terminal_response_uses_streamed_items_and_ids": None,
+            "test_text_output_retains_logprobs_and_status_on_both_transports": None,
+        }, label=label)
+
+
 def validate_final(state: State) -> None:
     """Reassert every durable semantic invariant on the complete tree.
 
@@ -1825,6 +1862,19 @@ def validate_final(state: State) -> None:
 
 
 CONTRACTS: Mapping[str, SemanticContract] = {
+    "responses-stream-identity": SemanticContract(
+        rationale=(
+            "Reparsing streamed output minted replacement item and call IDs in "
+            "the terminal response, breaking replay correlation. Finalization "
+            "must use the actual streamed items, preserving status and logprobs."
+        ),
+        removal_condition=(
+            "Remove when upstream uses one item identity from stream creation "
+            "through terminal output, with equivalent metadata on both transports."
+        ),
+        validate_before=_validate_responses_identity_before,
+        validate_after=_validate_responses_identity_after,
+    ),
     "responses-history-integrity": SemanticContract(
         rationale=(
             "Responses replay dropped all but the first text/reasoning block and "

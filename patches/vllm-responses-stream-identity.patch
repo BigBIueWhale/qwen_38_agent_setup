@@ -1,0 +1,588 @@
+diff --git a/tests/entrypoints/openai/responses/test_serving_responses.py b/tests/entrypoints/openai/responses/test_serving_responses.py
+--- a/tests/entrypoints/openai/responses/test_serving_responses.py
++++ b/tests/entrypoints/openai/responses/test_serving_responses.py
+@@ -2,7 +2,7 @@
+ # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
+ 
+ from contextlib import AsyncExitStack
+-from unittest.mock import MagicMock
++from unittest.mock import AsyncMock, MagicMock
+ 
+ import pytest
+ import pytest_asyncio
+@@ -53,6 +53,7 @@
+ from vllm.outputs import CompletionOutput, RequestOutput
+ from vllm.parser.harmony import Segment
+ from vllm.sampling_params import SamplingParams
++from vllm.entrypoints.openai.responses.utils import construct_input_messages
+ 
+ 
+ class MockConversationContext(ConversationContext):
+@@ -355,10 +356,17 @@
+ 
+     class FakeTokenizer:
+         def __init__(self):
+-            self._vocab = {"<think>": 1, "</think>": 2, "reason": 3, "final": 4}
++            self._vocab = {
++                "<think>": 1, "</think>": 2, "reason": 3, "final": 4,
++                "<tool_call>": 5, "</tool_call>": 6,
++            }
+ 
+         def get_vocab(self):
+             return self._vocab
++
++        def decode(self, token_ids, **kwargs):
++            pieces = {token_id: piece for piece, token_id in self._vocab.items()}
++            return "".join(pieces[token_id] for token_id in token_ids)
+ 
+     # Force non-harmony, SimpleContext path
+     monkeypatch.setattr(envs, "VLLM_USE_EXPERIMENTAL_PARSER_CONTEXT", False)
+@@ -396,7 +404,7 @@
+ 
+     # Build a SimpleContext with thinking tokens in the output.
+     context = SimpleContext(response_parser=response_parser)
+-    token_ids = [1, 10, 2, 20]  # <think> 10 </think> 20 -> reasoning token count = 1
++    token_ids = [1, 3, 2, 4]  # <think> reason </think> final
+     completion = CompletionOutput(
+         index=0,
+         text="<think>reason</think>final",
+@@ -433,7 +441,8 @@
+         request_metadata=metadata,
+     )
+ 
+-    assert response.usage.output_tokens_details.reasoning_tokens == 1
++    # Exact generated IDs before the reasoning boundary include the opener.
++    assert response.usage.output_tokens_details.reasoning_tokens == 2
+ 
+ 
+ class TestExtractAllowedToolsFromMcpRequests:
+@@ -1232,3 +1241,115 @@
+         assert len(function_done) == 1
+         assert function_done[0].item.name == "get_weather"
+         assert function_done[0].item.arguments == tool_args
++
++
++@pytest.mark.asyncio
++@pytest.mark.parametrize("finish", ["stop", "length"])
++@pytest.mark.parametrize("shape", ["text", "tool", "two_tools", "mixed"])
++async def test_terminal_response_uses_streamed_items_and_ids(finish, shape):
++    """Item IDs, call IDs, arguments and order must survive terminal replay."""
++    serving = _make_serving_instance_with_reasoning()
++    serving._initialize_tool_sessions = AsyncMock()
++    parser = MagicMock()
++    parser.reasoning_parser = None
++    parser.parse.side_effect = AssertionError("Streaming output must not be reparsed")
++    deltas = []
++    if shape == "mixed":
++        deltas.append(DeltaMessage(reasoning="preserved thinking"))
++    if shape in ("text", "mixed"):
++        deltas.extend([DeltaMessage(content=" first"), DeltaMessage(content="\nlast ")])
++    if shape != "text":
++        for index in range(2 if shape == "two_tools" else 1):
++            deltas.extend([
++                DeltaMessage(tool_calls=[DeltaToolCall(
++                    index=index, function=DeltaFunctionCall(name="lookup", arguments="{"),
++                )]),
++                DeltaMessage(tool_calls=[DeltaToolCall(
++                    index=index, function=DeltaFunctionCall(arguments='"x":1}'),
++                )]),
++            ])
++    parser.parse_delta.side_effect = deltas
++    context = SimpleContext(response_parser=parser)
++
++    async def outputs():
++        for index in range(len(deltas)):
++            terminal = index == len(deltas) - 1
++            context.append_output(RequestOutput(
++                request_id="req", prompt="question", prompt_token_ids=[1, 2],
++                prompt_logprobs=None, outputs=[CompletionOutput(
++                    index=0, text=f"raw{index}", token_ids=[10 + index],
++                    cumulative_logprob=0.0, logprobs=None,
++                    finish_reason=finish if terminal else None, stop_reason=None,
++                )], finished=terminal,
++            ))
++            yield context
++
++    request = ResponsesRequest(input="question", tools=[], stream=True)
++    events = [event async for event in serving.responses_stream_generator(
++        request, SamplingParams(max_tokens=20), outputs(), context, "model",
++        MagicMock(), RequestResponseMetadata(request_id="req"), created_time=123,
++    )]
++    assert events[-1].type == ("response.incomplete" if finish == "length"
++                              else "response.completed")
++    added = [event.item for event in events if event.type == "response.output_item.added"]
++    done = [event.item for event in events if event.type == "response.output_item.done"]
++    final = events[-1].response
++    assert [item.model_dump() for item in final.output] == [item.model_dump() for item in done]
++    assert [item.id for item in added] == [item.id for item in done]
++    assert [item.call_id for item in added if item.type == "function_call"] == [
++        item.call_id for item in final.output if item.type == "function_call"
++    ]
++    assert final.usage.input_tokens == 2
++    assert final.usage.output_tokens == len(deltas)
++    assert [event.sequence_number for event in events] == list(range(len(events)))
++    serving._initialize_tool_sessions.assert_not_awaited()
++    parser.parse.assert_not_called()
++    if finish == "length":
++        assert done[-1].status == "incomplete"
++    else:
++        results = [{"type": "function_call_output", "call_id": item.call_id,
++                    "output": "result"} for item in added if item.type == "function_call"]
++        messages = construct_input_messages(request_input=list(final.output) + results)
++        assert [message["tool_call_id"] for message in messages if message["role"] == "tool"] == [
++            result["call_id"] for result in results
++        ]
++
++
++@pytest.mark.asyncio
++@pytest.mark.parametrize("stream", [False, True])
++@pytest.mark.parametrize("finish", ["stop", "length"])
++async def test_text_output_retains_logprobs_and_status_on_both_transports(stream, finish):
++    from openai.types.responses.response_output_text import Logprob
++
++    serving = _make_serving_instance_with_reasoning()
++    serving.parser = None
++    serving._initialize_tool_sessions = AsyncMock()
++    logprob = Logprob(token="A", bytes=[65], logprob=-0.25, top_logprobs=[])
++    serving._create_response_logprobs = MagicMock(return_value=[logprob])
++    context = SimpleContext()
++
++    async def outputs():
++        context.append_output(RequestOutput(
++            request_id="req", prompt="q", prompt_token_ids=[1, 2],
++            prompt_logprobs=None, outputs=[CompletionOutput(
++                index=0, text="A", token_ids=[65], cumulative_logprob=-0.25,
++                logprobs=[{}], finish_reason=finish, stop_reason=None,
++            )], finished=True,
++        ))
++        yield context
++
++    request = ResponsesRequest(
++        input="q", stream=stream, include=["message.output_text.logprobs"],
++    )
++    args = (request, SamplingParams(max_tokens=20), outputs(), context, "model",
++            MagicMock(), RequestResponseMetadata(request_id="req"))
++    if stream:
++        events = [event async for event in serving.responses_stream_generator(*args)]
++        response = events[-1].response
++        done = next(event for event in events if event.type == "response.output_item.done")
++        assert done.item.model_dump() == response.output[0].model_dump()
++    else:
++        response = await serving.responses_full_generator(*args)
++    assert response.status == ("incomplete" if finish == "length" else "completed")
++    assert response.output[0].status == response.status
++    assert response.output[0].content[0].logprobs == [logprob]
+diff --git a/vllm/entrypoints/openai/responses/serving.py b/vllm/entrypoints/openai/responses/serving.py
+--- a/vllm/entrypoints/openai/responses/serving.py
++++ b/vllm/entrypoints/openai/responses/serving.py
+@@ -14,10 +14,10 @@
+ from openai.types.responses import (
+     ResponseFunctionToolCall,
+     ResponseOutputItem,
++    ResponseOutputItemDoneEvent,
+     ResponseOutputMessage,
+     ResponseOutputText,
+     ResponseStatus,
+-    response_text_delta_event,
+ )
+ from openai.types.responses.response_output_text import Logprob, LogprobTopLogprob
+ from openai.types.responses.tool import Mcp, Tool
+@@ -809,85 +809,93 @@
+             except asyncio.CancelledError:
+                 return self.create_error_response("Client disconnected")
+ 
+-        # NOTE: Implementation of status is still WIP, but for now
+-        # we guarantee that if the status is not "completed", it is accurate.
+-        # "completed" is implemented as the "catch-all" for now.
+-        status: ResponseStatus = "completed"
+-
++        output = self._collect_response_output(request, context, tokenizer)
++        return await self._finalize_response(
++            request, sampling_params, context, model_name, created_time, output,
++        )
++
++    def _collect_response_output(
++        self,
++        request: ResponsesRequest,
++        context: ConversationContext,
++        tokenizer: TokenizerLike,
++    ) -> list[ResponseOutputItem]:
++        """Parse the completed batch output once."""
++        if isinstance(context, HarmonyContext):
++            output: list[ResponseOutputItem] = []
++            messages = context.messages[context.num_init_messages :]
++            for index, message in enumerate(messages):
++                output.extend(
++                    harmony_to_response_output(
++                        message,
++                        context.function_tool_names,
++                        incomplete=(
++                            index == len(messages) - 1
++                            and context.last_append_flush_status
++                        ),
++                    )
++                )
++            return output
++        if isinstance(context, ParsableContext):
++            return context.make_response_output_items()
++        assert isinstance(context, SimpleContext)
++        final_res = context.final_output
++        assert final_res is not None and len(final_res.outputs) == 1
++        self._raise_if_error(final_res.outputs[0].finish_reason, request.request_id)
++        return self._make_response_output_items(
++            request, final_res.outputs[0], tokenizer, parser=context.response_parser,
++        )
++
++    async def _finalize_response(
++        self,
++        request: ResponsesRequest,
++        sampling_params: SamplingParams,
++        context: ConversationContext,
++        model_name: str,
++        created_time: int,
++        output: list[ResponseOutputItem],
++    ) -> ResponsesResponse:
++        """Attach metadata to the output already produced by this response."""
+         input_messages: ResponseInputOutputMessage | None = None
+         output_messages: ResponseInputOutputMessage | None = None
+-        if self.use_harmony:
+-            assert isinstance(context, HarmonyContext)
+-            output = []
+-            harmony_msgs = context.messages[context.num_init_messages :]
+-            if harmony_msgs:
+-                fn_names = context.function_tool_names
+-                for msg in harmony_msgs[:-1]:
+-                    output.extend(harmony_to_response_output(msg, fn_names))
+-                output.extend(
+-                    harmony_to_response_output(
+-                        harmony_msgs[-1],
+-                        fn_names,
+-                        incomplete=context.last_append_flush_status,
+-                    )
+-                )
+-
++        num_tool_output_tokens = 0
++        if isinstance(context, HarmonyContext):
++            finish_reason = context.finish_reason
++            num_tool_output_tokens = context.num_tool_output_tokens
+             if request.enable_response_messages:
+                 input_messages = context.messages[: context.num_init_messages]
+                 output_messages = context.messages[context.num_init_messages :]
+-            num_tool_output_tokens = context.num_tool_output_tokens
+-            if len(output) > 0:
+-                if context.finish_reason == "length":
+-                    status = "incomplete"
+-                elif context.finish_reason == "abort":
+-                    status = "cancelled"
+-                else:
+-                    self._raise_if_error(context.finish_reason, request.request_id)
++        else:
++            assert isinstance(context, (SimpleContext, ParsableContext))
++            if isinstance(context, SimpleContext):
++                final_res = context.final_output
++                assert final_res is not None and len(final_res.outputs) == 1
++                final_output = final_res.outputs[0]
++                finish_reason = final_output.finish_reason
++                assert final_res.prompt_token_ids is not None
++                if self.enable_log_outputs and self.request_logger:
++                    self.request_logger.log_outputs(
++                        request_id=request.request_id,
++                        outputs=final_output.text,
++                        output_token_ids=final_output.token_ids,
++                        finish_reason=finish_reason,
++                        is_streaming=request.stream,
++                        delta=False,
++                    )
+             else:
+-                status = "incomplete"
+-        elif isinstance(context, ParsableContext):
+-            output = context.make_response_output_items()
+-
++                finish_reason = context.finish_reason
+             if request.enable_response_messages:
+                 input_messages = context.input_messages
+                 output_messages = context.output_messages
+ 
+-            # TODO: Calculate usage.
+-            # assert final_res.prompt_token_ids is not None
+-            num_tool_output_tokens = 0
+-
+-            # Check finish reason from the parser
+-            if context.finish_reason == "length":
+-                status = "incomplete"
+-        else:
+-            assert isinstance(context, SimpleContext)
+-            # Use final_output which has accumulated text/token_ids/logprobs
+-            final_res = context.final_output
+-            assert final_res is not None
+-            assert len(final_res.outputs) == 1
+-            final_output = final_res.outputs[0]
+-
+-            # finish_reason='error' indicates retryable internal error
+-            self._raise_if_error(final_output.finish_reason, request.request_id)
+-
+-            # Check if generation was stopped due to max_tokens
+-            if final_output.finish_reason == "length":
+-                status = "incomplete"
+-
+-            output = self._make_response_output_items(
+-                request,
+-                final_output,
+-                tokenizer,
+-                parser=context.response_parser,
+-            )
+-
+-            if request.enable_response_messages:
+-                input_messages = context.input_messages
+-                output_messages = context.output_messages
+-
+-            # Calculate usage.
+-            assert final_res.prompt_token_ids is not None
+-            num_tool_output_tokens = 0
++        self._raise_if_error(finish_reason, request.request_id)
++        status: ResponseStatus = "completed"
++        if finish_reason == "length" or (
++            isinstance(context, HarmonyContext) and not output
++        ):
++            status = "incomplete"
++        elif finish_reason == "abort":
++            status = "cancelled"
+ 
+         assert isinstance(context, (SimpleContext, HarmonyContext, ParsableContext))
+         num_prompt_tokens = context.num_prompt_tokens
+@@ -1020,33 +1028,6 @@
+             )
+         return out
+ 
+-    def _create_stream_response_logprobs(
+-        self,
+-        token_ids: Sequence[int],
+-        logprobs: SampleLogprobs | None,
+-        tokenizer: TokenizerLike,
+-        top_logprobs: int | None = None,
+-    ) -> list[response_text_delta_event.Logprob]:
+-        lgs = self._create_response_logprobs(
+-            token_ids=token_ids,
+-            logprobs=logprobs,
+-            tokenizer=tokenizer,
+-            top_logprobs=top_logprobs,
+-        )
+-        return [
+-            response_text_delta_event.Logprob(
+-                token=lg.token,
+-                logprob=lg.logprob,
+-                top_logprobs=[
+-                    response_text_delta_event.LogprobTopLogprob(
+-                        token=tl.token, logprob=tl.logprob
+-                    )
+-                    for tl in lg.top_logprobs
+-                ],
+-            )
+-            for lg in lgs
+-        ]
+-
+     def _make_response_output_items(
+         self,
+         request: ResponsesRequest,
+@@ -1054,17 +1035,6 @@
+         tokenizer: TokenizerLike,
+         parser: Parser | None = None,
+     ) -> list[ResponseOutputItem]:
+-        # Log complete response if output logging is enabled
+-        if self.enable_log_outputs and self.request_logger:
+-            self.request_logger.log_outputs(
+-                request_id=request.request_id,
+-                outputs=final_output.text,
+-                output_token_ids=final_output.token_ids,
+-                finish_reason=final_output.finish_reason,
+-                is_streaming=False,
+-                delta=False,
+-            )
+-
+         # Compute logprobs if requested
+         logprobs = None
+         if request.is_include_output_logprobs() and final_output.logprobs:
+@@ -1110,7 +1080,9 @@
+                 if final_output.text
+                 else [],
+                 role="assistant",
+-                status="completed",
++                status=(
++                    "incomplete" if final_output.finish_reason == "length" else "completed"
++                ),
+                 type="message",
+             )
+         ]
+@@ -1366,12 +1338,12 @@
+ 
+         def _get_logprobs(
+             output: CompletionOutput,
+-        ) -> list[response_text_delta_event.Logprob]:
++        ) -> list[Logprob]:
+             if not request.is_include_output_logprobs():
+                 return []
+             if hide_stream_metadata:
+                 return []
+-            return self._create_stream_response_logprobs(
++            return self._create_response_logprobs(
+                 token_ids=output.token_ids,
+                 logprobs=output.logprobs,
+                 tokenizer=tokenizer,
+@@ -1527,6 +1499,7 @@
+                 )
+             )
+ 
++            output: list[ResponseOutputItem] = []
+             try:
+                 async for event_data in processor(
+                     request,
+@@ -1539,7 +1512,14 @@
+                     created_time,
+                     _increment_sequence_number_and_return,
+                 ):
++                    if isinstance(event_data, ResponseOutputItemDoneEvent):
++                        if event_data.output_index != len(output):
++                            raise GenerationError("Inconsistent response output index")
++                        output.append(event_data.item)
+                     yield event_data
++                final_response = await self._finalize_response(
++                    request, sampling_params, context, model_name, created_time, output,
++                )
+             except GenerationError as e:
+                 error_json = self._convert_generation_error_to_streaming_response(e)
+                 yield _increment_sequence_number_and_return(
+@@ -1547,22 +1527,6 @@
+                 )
+                 return
+ 
+-            async def empty_async_generator():
+-                # A hack to trick Python to think this is a generator but
+-                # in fact it immediately returns.
+-                if False:
+-                    yield
+-
+-            final_response = await self.responses_full_generator(
+-                request,
+-                sampling_params,
+-                empty_async_generator(),
+-                context,
+-                model_name,
+-                tokenizer,
+-                request_metadata,
+-                created_time=created_time,
+-            )
+             if final_response.status == "incomplete":
+                 yield _increment_sequence_number_and_return(
+                     ResponseIncompleteEvent(
+diff --git a/vllm/entrypoints/openai/responses/streaming_events.py b/vllm/entrypoints/openai/responses/streaming_events.py
+--- a/vllm/entrypoints/openai/responses/streaming_events.py
++++ b/vllm/entrypoints/openai/responses/streaming_events.py
+@@ -55,6 +55,7 @@
+     response_text_delta_event,
+ )
+ from openai.types.responses.response_output_item import McpCall
++from openai.types.responses.response_output_text import Logprob
+ from openai.types.responses.response_reasoning_item import (
+     Content as ResponseReasoningTextContent,
+ )
+@@ -818,6 +819,7 @@
+     current_item_id: str = ""
+     content_index: int = 0
+     accumulated_text: str = ""
++    accumulated_logprobs: list[Logprob] = field(default_factory=list)
+     tool_call_id: str = ""
+     tool_call_name: str = ""
+     tool_call_namespace: str | None = None
+@@ -833,6 +835,7 @@
+     state.current_item_id = random_uuid()
+     state.content_index = 0
+     state.accumulated_text = ""
++    state.accumulated_logprobs = []
+     return [
+         ResponseOutputItemAddedEvent(
+             type="response.output_item.added",
+@@ -865,9 +868,10 @@
+ def emit_simple_content_delta(
+     state: SimpleStreamingState,
+     delta: str,
+-    logprobs: list[response_text_delta_event.Logprob] | None = None,
++    logprobs: list[Logprob] | None = None,
+ ) -> list[StreamingResponsesResponse]:
+     state.accumulated_text += delta
++    state.accumulated_logprobs.extend(logprobs or [])
+     return [
+         ResponseTextDeltaEvent(
+             type="response.output_text.delta",
+@@ -876,18 +880,33 @@
+             output_index=state.output_index,
+             item_id=state.current_item_id,
+             delta=delta,
+-            logprobs=logprobs or [],
++            logprobs=[
++                response_text_delta_event.Logprob(
++                    token=entry.token,
++                    logprob=entry.logprob,
++                    top_logprobs=[
++                        response_text_delta_event.LogprobTopLogprob(
++                            token=top.token, logprob=top.logprob,
++                        )
++                        for top in entry.top_logprobs
++                    ],
++                )
++                for entry in logprobs or []
++            ],
+         )
+     ]
+ 
+ 
+ def emit_simple_content_done(
+     state: SimpleStreamingState,
++    *,
++    incomplete: bool = False,
+ ) -> list[StreamingResponsesResponse]:
+     part = ResponseOutputText(
+         type="output_text",
+         text=state.accumulated_text,
+         annotations=[],
++        logprobs=state.accumulated_logprobs or None,
+     )
+     events: list[StreamingResponsesResponse] = [
+         ResponseTextDoneEvent(
+@@ -896,7 +915,7 @@
+             output_index=state.output_index,
+             content_index=state.content_index,
+             text=state.accumulated_text,
+-            logprobs=[],
++            logprobs=[entry.model_dump() for entry in state.accumulated_logprobs],
+             item_id=state.current_item_id,
+         ),
+         ResponseContentPartDoneEvent(
+@@ -916,7 +935,7 @@
+                 type="message",
+                 role="assistant",
+                 content=[part] if state.accumulated_text else [],
+-                status="completed",
++                status="incomplete" if incomplete else "completed",
+                 summary=[],
+             ),
+         ),
+@@ -1243,6 +1262,8 @@
+                 self.state,
+                 incomplete=incomplete,
+             )
++        if self.state.current_state == _StateType.CONTENT:
++            return emit_simple_content_done(self.state, incomplete=incomplete)
+         return handlers.done_fn(self.state)
+ 
+     def open(
+@@ -1268,9 +1289,7 @@
+         self,
+         delta_message: DeltaMessage,
+         output: CompletionOutput,
+-        get_logprobs: Callable[
+-            [CompletionOutput], list[response_text_delta_event.Logprob]
+-        ]
++        get_logprobs: Callable[[CompletionOutput], list[Logprob]]
+         | None = None,
+     ) -> list[StreamingResponsesResponse]:
+         """Emit incremental events for the current state from the delta."""
