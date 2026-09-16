@@ -28,7 +28,7 @@ from vllm.entrypoints.openai.responses.streaming_events import (
     _StateType,
 )
 from vllm.parser.qwen3 import Qwen3Parser
-from vllm.tokenizers.detokenizer_utils import detokenize_incrementally
+from vllm.tokenizers.detokenizer_utils import NativeDecodeStream
 
 from probe_scope import KV_SCOPE
 
@@ -155,9 +155,11 @@ def parse_nonstream(
     request: ChatCompletionRequest,
 ) -> tuple[str, str, list[tuple[str, str]]]:
     parser = Qwen3Parser(tokenizer, tools=request.tools)
-    reasoning, content, calls = parser.parse(
+    reasoning, content, calls = parser.parse_output(
         raw,
         request,
+        finish_reason="stop",
+        stop_reason=None,
         enable_auto_tools=True,
         model_output_token_ids=token_ids,
     )
@@ -168,12 +170,11 @@ def parse_stream(
     tokenizer: Any,
     token_ids: list[int],
     request: ChatCompletionRequest,
+    *,
+    chunk_size: int = 1,
 ) -> tuple[str, str, list[tuple[str, str]]]:
     parser = Qwen3Parser(tokenizer, tools=request.tools)
-    previous_text = ""
-    previous_tokens = None
-    prefix_offset = 0
-    read_offset = 0
+    decoder = NativeDecodeStream(tokenizer.backend_tokenizer)
     reasoning_parts: list[str] = []
     content_parts: list[str] = []
     slots: dict[int, dict[str, str]] = {}
@@ -191,37 +192,28 @@ def parse_stream(
 
     if not token_ids:
         collect(
-            parser.parse_delta(
+            parser.parse_output_delta(
                 delta_text="",
                 delta_token_ids=[],
                 request=request,
                 prompt_token_ids=[],
-                finished=True,
+                finish_reason="stop",
+                stop_reason=None,
             )
         )
-    for index, token_id in enumerate(token_ids):
-        current_ids = token_ids[: index + 1]
-        new_tokens, delta_text, prefix_offset, read_offset = detokenize_incrementally(
-            tokenizer=tokenizer,
-            all_input_ids=current_ids,
-            prev_tokens=previous_tokens,
-            prefix_offset=prefix_offset,
-            read_offset=read_offset,
-            skip_special_tokens=False,
-            spaces_between_special_tokens=True,
-        )
+    for index in range(0, len(token_ids), chunk_size):
+        delta_ids = token_ids[index : index + chunk_size]
+        current_ids = token_ids[: index + len(delta_ids)]
+        delta_text = "".join(decoder.step(token) or "" for token in delta_ids)
         collect(
-            parser.parse_delta(
+            parser.parse_output_delta(
                 delta_text=delta_text,
-                delta_token_ids=[token_id],
+                delta_token_ids=delta_ids,
                 request=request,
                 prompt_token_ids=[] if index == 0 else None,
-                finished=index == len(token_ids) - 1,
+                finish_reason="stop" if len(current_ids) == len(token_ids) else None,
+                stop_reason=None,
             )
-        )
-        previous_text += delta_text
-        previous_tokens = (
-            previous_tokens + new_tokens if previous_tokens is not None else new_tokens
         )
 
     calls = [
@@ -229,6 +221,85 @@ def parse_stream(
         for index in sorted(slots)
     ]
     return "".join(reasoning_parts), "".join(content_parts), calls
+
+
+def controlled_policy_cases(
+    tokenizer: Any,
+    request: ChatCompletionRequest,
+    valid: str,
+) -> list[str]:
+    """Assert the policy outcome, so equal but corrupted transports cannot pass."""
+    reasoning = "inspect schema"
+    prefix = f"<think>{reasoning}</think>"
+    body = valid.removeprefix(prefix)
+    arguments = {"path": "/workspace/a b.txt", "options": {"safe": True, "retries": 2}}
+    call = [("configure", arguments)]
+    bare = body.removeprefix("<tool_call>\n").removesuffix("\n</tool_call>")
+    cases = [
+        ("S1_bare_function", prefix + bare, (reasoning, bare, [])),
+        (
+            "S1_quoted_function", prefix + "Quoted: " + bare + " END",
+            (reasoning, "Quoted: " + bare + " END", []),
+        ),
+        (
+            "S2_stray_opener", prefix + "<tool_call>literal prose",
+            (reasoning, "<tool_call>literal prose", []),
+        ),
+        (
+            "S2_opener_at_eos", prefix + "<tool_call>",
+            (reasoning, "<tool_call>", []),
+        ),
+        (
+            "S2_empty_wrapper", prefix + "<tool_call></tool_call>",
+            (reasoning, "<tool_call></tool_call>", []),
+        ),
+        (
+            "S7_surrounding_prose", prefix + "BEFORE" + body + "AFTER",
+            (reasoning, "BEFOREAFTER", call),
+        ),
+        ("S8_duplicate_closer", prefix + "</think>answer", (reasoning, "answer", [])),
+        (
+            "S8_literal_opener", prefix + "literal <think> text",
+            (reasoning, "literal <think> text", []),
+        ),
+        ("S8_reasoning_only_eos", "<think>still reasoning", ("still reasoning", "", [])),
+        (
+            "S8_implicit_tool_boundary", f"<think>{reasoning}" + body,
+            (reasoning, "", call),
+        ),
+        (
+            "S4_unclosed_at_eos", prefix + body.removesuffix("</tool_call>"),
+            (reasoning, body.removesuffix("</tool_call>"), []),
+        ),
+    ]
+    for label, value in (
+        ("S8_thinking_closer_in_value", "literal </think> in value"),
+        (
+            "S11_reserved_markup_in_value",
+            "literal </function> </tool_call> <parameter= in value",
+        ),
+    ):
+        cases.append((
+            label, valid.replace(arguments["path"], value),
+            (reasoning, "", [("configure", {**arguments, "path": value})]),
+        ))
+
+    for label, raw, expected in cases:
+        ids = tokenizer.encode(raw, add_special_tokens=False)
+        for chunk in (None, 1, 7, max(1, len(ids))):
+            if chunk is None:
+                actual = parse_nonstream(tokenizer, raw, ids, request)
+            else:
+                actual = parse_stream(tokenizer, ids, request, chunk_size=chunk)
+            observed = (
+                actual[0], actual[1],
+                [(name, json.loads(args)) for name, args in actual[2]],
+            )
+            if observed != expected:
+                raise AssertionError(
+                    f"{label} chunk={chunk}: expected {expected!r}, got {observed!r}"
+                )
+    return [label for label, _, _ in cases]
 
 
 def controlled_parser_replay(tokenizer: Any) -> dict[str, Any]:
@@ -324,8 +395,11 @@ def controlled_parser_replay(tokenizer: Any) -> dict[str, Any]:
     }:
         raise AssertionError(f"Valid replay changed typed arguments: {valid_calls}")
 
+    policy_cases = controlled_policy_cases(tokenizer, request, valid)
+
     return {
         "cases": list(cases),
+        "asserted_policy_cases": policy_cases,
         "real_token_prefixes_compared": checked_prefixes,
         "stream_nonstream_semantics_equal": True,
         "valid_nested_types_preserved": True,

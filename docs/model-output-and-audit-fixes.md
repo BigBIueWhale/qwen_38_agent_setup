@@ -608,6 +608,22 @@ Validation: the installed route assertion fails against the remounted runtime
 and passes after excision. The shared-prefix CPU unit and all 72 protocol cases
 pass in offline containers. No cache ownership or eviction behavior changes.
 
+## Owner verification: asserted degeneracy policy cases
+
+`scripts/tool_output_degeneracy_probe.py` now asserts the actual reasoning,
+content and decoded calls required by S1, S2, S7, S8 and S11, alongside the
+existing stream/batch comparisons. Thirteen cases cover bare/quoted functions,
+stray and empty wrappers, prose surrounding a call, all five S8 thinking shapes,
+an EOS-cut wrapper and reserved markup inside a string value. Each runs in batch
+and streams of one token, seven tokens and the complete response.
+
+Controlled replay uses the deployed native incremental decoder and the
+terminal-aware parser methods, so EOS finalization is exercised. The pinned
+tokenizer replay passes all 13 asserted cases and the existing 30 prefix
+comparisons. A negative control makes both transports delete the same bare
+function text: equality still holds, but the S1 policy assertion fails. This is
+offline CPU evidence; the live model portion of the probe was not run.
+
 ## Retained decisions and release boundary
 
 Finding #15 is workstation archive state, not a source defect. Archive verification
