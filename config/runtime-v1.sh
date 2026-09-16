@@ -6,10 +6,7 @@ readonly IMAGE_PROFILE_VERSION="socket-isolated-nonroot-vision-k8v4-agent-v23"
 readonly CONTAINER_NAME="qwen38-agent-native"
 readonly CONTAINER_LABEL="Qwen_best_model_ever"
 readonly IMAGE_TAG="qwen38-vllm:qwen38-27b-nvfp4-k8v4-runtime-v23"
-# AWAITING ADOPTION for the v23 image. ./scripts/build-vllm.sh builds it and
-# refuses at this check, reporting the ID it produced; adopt that ID here.
-# The refusal is what keeps the stale value from being deployable.
-readonly EXPECTED_IMAGE_ID="sha256:695780692e2d9ea863f7081520e02ade0997ee7486a78e05968d2d62efe4b839"
+readonly EXPECTED_IMAGE_ID="sha256:f6397c5e2ef34eb14fe262f6da7fccb028b74877e64d412268cf781582a002fd"
 readonly RELAY_IMAGE_TAG="qwen38-fixed-relay:1.0.0"
 readonly EXPECTED_RELAY_IMAGE_ID="sha256:0e1c8be9644e7a5e09b1fbdf697be22c11b6c106b9cd167d3f046f78f9aa3657"
 readonly RELAY_SOURCE_SHA256="051dc82af7b9b12e229f9a127183d051ef47a6d44f03d99346762e84bd69c815"
@@ -24,9 +21,7 @@ readonly RELAY_PIDS_LIMIT="32"
 readonly BASE_IMAGE_TAG="qwen38-vllm:main-9df9b0b"
 readonly EXPECTED_BASE_IMAGE_ID="sha256:fa4a002a88b7043a1a89966dea8a500fe9696f84e75730d9da916f916048d401"
 readonly IMAGE_ARCHIVE_NAME="qwen38-vllm-images-runtime-v23.tar"
-# AWAITING ADOPTION, like EXPECTED_IMAGE_ID: the restore path verifies this
-# hash before docker load, so a stale value fails on the bytes.
-readonly IMAGE_ARCHIVE_SHA256="3a0a9e2aa84df4adf3993aa47d922bfc925850e72f7049347722a5406f7cbc31"
+readonly IMAGE_ARCHIVE_SHA256="741730d380f1599fb1475b31a987be7ba72332b2227c18824fd001b8dccb2d22"
 
 readonly MODEL_DIR_NAME="Qwen3.8-27B-NVFP4-Corrected"
 readonly MODEL_REPOSITORY="unsloth/Qwen3.8-27B-NVFP4"

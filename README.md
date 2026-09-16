@@ -47,7 +47,7 @@ There is one supported mode:
 | Agent-service listener | 127.0.0.1:8090 only |
 | Launch profile and cache volume | socket-isolated-nonroot-vision-k8v4-agent-v21 |
 | Image profile | socket-isolated-nonroot-vision-k8v4-agent-v23 |
-| Runtime image | Awaiting adoption after the v23 build |
+| Runtime image | sha256:f6397c5e2ef34eb14fe262f6da7fccb028b74877e64d412268cf781582a002fd |
 
 This is not a text-only profile with an optional vision switch. It is not a
 one-million-token profile. It has no MTP, eager-mode, lower-quality image, alternate
@@ -314,15 +314,15 @@ Pinned build inputs and products:
 | Immutable base tag | qwen38-vllm:main-9df9b0b |
 | Immutable base ID | sha256:fa4a002a88b7043a1a89966dea8a500fe9696f84e75730d9da916f916048d401 |
 | Runtime tag | qwen38-vllm:qwen38-27b-nvfp4-k8v4-runtime-v23 |
-| Runtime ID | Awaiting adoption after the v23 build |
+| Runtime ID | sha256:f6397c5e2ef34eb14fe262f6da7fccb028b74877e64d412268cf781582a002fd |
 | Offline archive | artifacts/qwen38-vllm-images-runtime-v23.tar |
-| Archive size | Awaiting adoption after the v23 export |
-| Archive SHA-256 | Awaiting adoption after the v23 export |
+| Archive size | 8,560,911,872 bytes, mode 0600 |
+| Archive SHA-256 | 741730d380f1599fb1475b31a987be7ba72332b2227c18824fd001b8dccb2d22 |
 | Runtime Dockerfile SHA-256 | 77eb4759fe0671a60e83678d52103920cc458bb98220765217ac4f459bb01c44 |
 | Docker context allowlist SHA-256 | a461af03bbe810de008c026350b4836dc4b44dec0bf79bae9e322b3ff4ef5fd1 |
 | Build verifier SHA-256 | 3052d75ce0451c9d58d2acbe0c23f80234cd282917994202860cc0815cd0faa9 |
 | Runtime validator SHA-256 | 086ee356c2411e6d952f51f5723561951877cfd6f6a0da9d45b36decc30ebd14 |
-| Runtime lock SHA-256 | b71c5ac58d3476d85a35a7943102e65383f2f8474e6b355d23920ecc777f7d2f |
+| Runtime lock SHA-256 | 13c184bef023988e91c87ba14a22985e2f71f6cc58120f69862c95eb55085799 |
 
 Every reviewed runtime file, including both TurboQuant kernels, is copied and
 hash-checked against its upstream and patched identities. A CPU Triton-interpreter
