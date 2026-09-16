@@ -294,7 +294,7 @@ It is intentionally reconstructed by thirty-three ordered, reviewed semantic tra
 | patches/vllm-token-text-provenance.patch | 954b36cb444f7e644e29d13f7a9d3c000512a0d616bbf2b6cd3cb8f4e880dd44 |
 | patches/vllm-precise-request-errors.patch | 055c3348b1a0c801ad6c8202d13659471106d0ff8a9b958efe1df16e25e9e588 |
 | patches/vllm-qwen-canonical-parameter-framing.patch | 6725caf33ac3ab55d1acede045808c5f37585e658900e770c226477b0be5e302 |
-| patches/vllm-qwen-owned-tool-grammar.patch | 060dd836444bc07171b55021d4b946ef71c33b974276407150a77969a9bc7396 |
+| patches/vllm-qwen-owned-tool-grammar.patch | d76bb46515886825558ae3c53dd56667e9d93bac994a1c8668456623f127f8b5 |
 
 The reconstructed tree has 100 reviewed runtime-source changes, 2 new runtime sources,
 7 runtime-source deletions, 71 existing-test changes, 12 new tests,

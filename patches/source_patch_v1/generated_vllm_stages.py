@@ -93631,16 +93631,16 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'SCHEMA_CASES = [\n'})},
  {'name': 'qwen-owned-tool-grammar',
   'review_patch': 'patches/vllm-qwen-owned-tool-grammar.patch',
-  'review_sha256': '060dd836444bc07171b55021d4b946ef71c33b974276407150a77969a9bc7396',
+  'review_sha256': 'd76bb46515886825558ae3c53dd56667e9d93bac994a1c8668456623f127f8b5',
   'files': ({'path': 'vllm/tool_parsers/structural_tag_registry.py',
              'before_sha256': 'b6ddd5a890f31922b2f23cc7b84fd39b42783f65c8db121ba3d402b1e3266288',
-             'after_sha256': '8d5bfc9b6c0b16db35e0e2d0a16fe1cb915a28b31c01f4d86eb30ecf550ffa52'},
+             'after_sha256': '1ac0683cb0500c0c6b04d04ae7821779a193db52b35df50ab24f696fd0f22674'},
             {'path': 'vllm/parser/qwen3.py',
              'before_sha256': 'ecbc647afb1f229ad556fbb055837f7a006b6bc7cc9d4d17e151e79d5fe8cde9',
              'after_sha256': 'e74bb5667bea480948d40598f1b1ea5fc070a67ec2d90921a5047e7d0128df53'},
             {'path': 'tests/tool_parsers/test_structural_tag_registry.py',
              'before_sha256': 'd45f5ba680c75277c0ae46bd6d90e90edefb124416fb1a0f204122a2198fb08a',
-             'after_sha256': '5a42b5807284e35851b6ed97901abf1a1d2ca7c4bec0c09ae89ca3b8a6b9f5d7'},
+             'after_sha256': '921afea86d6392effc7a816f65f39a16554c0a3bedbb35076d484454e2b64554'},
             {'path': 'tests/parser/engine/test_qwen3.py',
              'before_sha256': 'd37dc27c876210e016622c703fc98ca9ef23bb69f1addef5f5931226c8877d00',
              'after_sha256': 'c82a55107f08a0541792cdc99bcf32e019c694fc37f810d5d3b4e2e7199ca784'},
@@ -93702,8 +93702,9 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '        "deepseek_v4",\n'
                       '    }\n'
                       ')\n'
-                      'VLLM_BUILTIN_STRUCTURAL_TAG_MODELS = frozenset({"hermes", '
-                      '"kimi_k3", "qwen_3_coder"})\n'
+                      'VLLM_BUILTIN_STRUCTURAL_TAG_MODELS = frozenset(\n'
+                      '    {"hermes", "kimi_k3", "minimax", "qwen_3_coder"}\n'
+                      ')\n'
                       'SUPPORTED_STRUCTURAL_TAG_MODELS = (\n'
                       '    XGRAMMAR_BUILTIN_STRUCTURAL_TAG_MODELS | '
                       'VLLM_BUILTIN_STRUCTURAL_TAG_MODELS\n'
@@ -93733,8 +93734,9 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '        "deepseek_v4",\n'
                              '    }\n'
                              ')\n'
-                             'VLLM_BUILTIN_STRUCTURAL_TAG_MODELS = '
-                             'frozenset({"hermes", "kimi_k3", "qwen_3_coder"})\n'
+                             'VLLM_BUILTIN_STRUCTURAL_TAG_MODELS = frozenset(\n'
+                             '    {"hermes", "kimi_k3", "minimax", "qwen_3_coder"}\n'
+                             ')\n'
                              'SUPPORTED_STRUCTURAL_TAG_MODELS = (\n'
                              '    XGRAMMAR_BUILTIN_STRUCTURAL_TAG_MODELS | '
                              'VLLM_BUILTIN_STRUCTURAL_TAG_MODELS\n'
@@ -94762,6 +94764,103 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    r"(.*?)"\n'},
             {'name': 'tests/tool_parsers/test_structural_tag_registry.py:landmark-1',
              'path': 'tests/tool_parsers/test_structural_tag_registry.py',
+             'before': 'from vllm.tool_parsers.minimax_m2_tool_parser import '
+                       'MinimaxM2ToolParser\n'
+                       'from vllm.tool_parsers.qwen3_engine_tool_parser import '
+                       'Qwen3EngineToolParser\n'
+                       'from vllm.tool_parsers.structural_tag_registry import (\n'
+                       '    SUPPORTED_STRUCTURAL_TAG_MODELS,\n'
+                       '    VLLM_BUILTIN_STRUCTURAL_TAG_MODELS,\n'
+                       '    XGRAMMAR_BUILTIN_STRUCTURAL_TAG_MODELS,\n',
+             'after': 'from vllm.tool_parsers.minimax_m2_tool_parser import '
+                      'MinimaxM2ToolParser\n'
+                      'from vllm.tool_parsers.qwen3_engine_tool_parser import '
+                      'Qwen3EngineToolParser\n'
+                      'from vllm.tool_parsers.structural_tag_registry import (\n'
+                      '    _VLLM_STRUCTURAL_TAG_REGISTRY,\n'
+                      '    SUPPORTED_STRUCTURAL_TAG_MODELS,\n'
+                      '    VLLM_BUILTIN_STRUCTURAL_TAG_MODELS,\n'
+                      '    XGRAMMAR_BUILTIN_STRUCTURAL_TAG_MODELS,\n',
+             'review_before': 'from vllm.tool_parsers.minimax_m2_tool_parser import '
+                              'MinimaxM2ToolParser\n'
+                              'from vllm.tool_parsers.qwen3_engine_tool_parser import '
+                              'Qwen3EngineToolParser\n'
+                              'from vllm.tool_parsers.structural_tag_registry import '
+                              '(\n'
+                              '    SUPPORTED_STRUCTURAL_TAG_MODELS,\n'
+                              '    VLLM_BUILTIN_STRUCTURAL_TAG_MODELS,\n'
+                              '    XGRAMMAR_BUILTIN_STRUCTURAL_TAG_MODELS,\n',
+             'review_after': 'from vllm.tool_parsers.minimax_m2_tool_parser import '
+                             'MinimaxM2ToolParser\n'
+                             'from vllm.tool_parsers.qwen3_engine_tool_parser import '
+                             'Qwen3EngineToolParser\n'
+                             'from vllm.tool_parsers.structural_tag_registry import (\n'
+                             '    _VLLM_STRUCTURAL_TAG_REGISTRY,\n'
+                             '    SUPPORTED_STRUCTURAL_TAG_MODELS,\n'
+                             '    VLLM_BUILTIN_STRUCTURAL_TAG_MODELS,\n'
+                             '    XGRAMMAR_BUILTIN_STRUCTURAL_TAG_MODELS,\n'},
+            {'name': 'tests/tool_parsers/test_structural_tag_registry.py:landmark-2',
+             'path': 'tests/tool_parsers/test_structural_tag_registry.py',
+             'before': '    assert SUPPORTED_STRUCTURAL_TAG_MODELS == (\n'
+                       '        XGRAMMAR_BUILTIN_STRUCTURAL_TAG_MODELS | '
+                       'VLLM_BUILTIN_STRUCTURAL_TAG_MODELS\n'
+                       '    )\n'
+                       '    assert "hermes" in VLLM_BUILTIN_STRUCTURAL_TAG_MODELS\n'
+                       '\n'
+                       '\n'
+                       '@pytest.mark.parametrize("model", '
+                       'sorted(XGRAMMAR_BUILTIN_STRUCTURAL_TAG_MODELS))\n',
+             'after': '    assert SUPPORTED_STRUCTURAL_TAG_MODELS == (\n'
+                      '        XGRAMMAR_BUILTIN_STRUCTURAL_TAG_MODELS | '
+                      'VLLM_BUILTIN_STRUCTURAL_TAG_MODELS\n'
+                      '    )\n'
+                      '    # The named set is what an unknown model is offered in the '
+                      'refusal, and the\n'
+                      '    # registry is what actually builds. A builder registered '
+                      'but left out of\n'
+                      '    # the set still works, so the omission is invisible until '
+                      'someone reads a\n'
+                      '    # refusal that does not list a model vLLM supports -- bind '
+                      'them instead.\n'
+                      '    assert VLLM_BUILTIN_STRUCTURAL_TAG_MODELS == frozenset(\n'
+                      '        _VLLM_STRUCTURAL_TAG_REGISTRY\n'
+                      '    )\n'
+                      '\n'
+                      '\n'
+                      '@pytest.mark.parametrize("model", '
+                      'sorted(XGRAMMAR_BUILTIN_STRUCTURAL_TAG_MODELS))\n',
+             'review_before': '    assert SUPPORTED_STRUCTURAL_TAG_MODELS == (\n'
+                              '        XGRAMMAR_BUILTIN_STRUCTURAL_TAG_MODELS | '
+                              'VLLM_BUILTIN_STRUCTURAL_TAG_MODELS\n'
+                              '    )\n'
+                              '    assert "hermes" in '
+                              'VLLM_BUILTIN_STRUCTURAL_TAG_MODELS\n'
+                              '\n'
+                              '\n'
+                              '@pytest.mark.parametrize("model", '
+                              'sorted(XGRAMMAR_BUILTIN_STRUCTURAL_TAG_MODELS))\n',
+             'review_after': '    assert SUPPORTED_STRUCTURAL_TAG_MODELS == (\n'
+                             '        XGRAMMAR_BUILTIN_STRUCTURAL_TAG_MODELS | '
+                             'VLLM_BUILTIN_STRUCTURAL_TAG_MODELS\n'
+                             '    )\n'
+                             '    # The named set is what an unknown model is offered '
+                             'in the refusal, and the\n'
+                             '    # registry is what actually builds. A builder '
+                             'registered but left out of\n'
+                             '    # the set still works, so the omission is invisible '
+                             'until someone reads a\n'
+                             '    # refusal that does not list a model vLLM supports '
+                             '-- bind them instead.\n'
+                             '    assert VLLM_BUILTIN_STRUCTURAL_TAG_MODELS == '
+                             'frozenset(\n'
+                             '        _VLLM_STRUCTURAL_TAG_REGISTRY\n'
+                             '    )\n'
+                             '\n'
+                             '\n'
+                             '@pytest.mark.parametrize("model", '
+                             'sorted(XGRAMMAR_BUILTIN_STRUCTURAL_TAG_MODELS))\n'},
+            {'name': 'tests/tool_parsers/test_structural_tag_registry.py:landmark-3',
+             'path': 'tests/tool_parsers/test_structural_tag_registry.py',
              'before': '    assert sample_tools_strict[0].function.parameters is not '
                        'None\n'
                        '\n'
@@ -94806,7 +94905,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'test_auto_tool_choice_skips_structural_tag_without_strict(\n'
                              '    model: str,\n'
                              '    sample_tools: list[ChatCompletionToolsParam],\n'},
-            {'name': 'tests/tool_parsers/test_structural_tag_registry.py:landmark-2',
+            {'name': 'tests/tool_parsers/test_structural_tag_registry.py:landmark-4',
              'path': 'tests/tool_parsers/test_structural_tag_registry.py',
              'before': '    assert fmt["triggers"] == ["<tool_call>\\n<function="]\n'
                        '    assert fmt["excludes"] == ["<think>", "</think>"]\n'
@@ -94970,7 +95069,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    )\n'
                              '\n'
                              '\n'},
-            {'name': 'tests/tool_parsers/test_structural_tag_registry.py:landmark-3',
+            {'name': 'tests/tool_parsers/test_structural_tag_registry.py:landmark-5',
              'path': 'tests/tool_parsers/test_structural_tag_registry.py',
              'before': '    assert not _is_grammar_accept_string(\n'
                        '        grammar, _QWEN3_CALL.replace("city", "colour")\n'
@@ -95780,7 +95879,7 @@ FINAL_FILES = {'tests/config/test_config_utils.py': '4f5ea0399cc3b4f9603df07e2cc
  'tests/renderers/test_hf.py': 'a807a89a298f4542a149acb20471d55ac47a874639c134858996c8196387f8ee',
  'tests/test_request_input_bounds.py': '6ec60c5a6dcc50abd7d8b8e9645825b841fa5cdb510009e6a9f517dba58f1184',
  'tests/test_sampling_params.py': '9ce8ed07080994d48511465e8050a52ee1db8fdf5d0b2188bd6324b9276b3f97',
- 'tests/tool_parsers/test_structural_tag_registry.py': '5a42b5807284e35851b6ed97901abf1a1d2ca7c4bec0c09ae89ca3b8a6b9f5d7',
+ 'tests/tool_parsers/test_structural_tag_registry.py': '921afea86d6392effc7a816f65f39a16554c0a3bedbb35076d484454e2b64554',
  'tests/v1/core/test_kv_cache_users_sizing.py': '2132b5961217378fb7877958e18164a64f4a1705f76342ff60e74f7c47963f9c',
  'tests/v1/core/test_prefix_cache.py': '16db164fabf9de35b9d643a74cb8785baf6e6c9bf56f34977d01886fe0eb9a1a',
  'tests/v1/core/test_prefix_caching.py': '8350df869cf4dfe35fcc7ef253374a9239a7745ecc51a26e9b0b37f08e8a4bc8',
@@ -95879,7 +95978,7 @@ FINAL_FILES = {'tests/config/test_config_utils.py': '4f5ea0399cc3b4f9603df07e2cc
  'vllm/sampling_params.py': '53fafbd08dce3fc1a1017899c46cbac643a2da22746c5a20b5ab4e95830d0325',
  'vllm/tokenizers/detokenizer_utils.py': '7718979d813ed00d41116d92a5abf81524e393693a6b28fa1c2a6d8ff66c880d',
  'vllm/tool_parsers/abstract_tool_parser.py': '91f4f3184e7f0eb6bc9e76d9ce4d3063cff58e0de8afc409038139e48314d0c8',
- 'vllm/tool_parsers/structural_tag_registry.py': '8d5bfc9b6c0b16db35e0e2d0a16fe1cb915a28b31c01f4d86eb30ecf550ffa52',
+ 'vllm/tool_parsers/structural_tag_registry.py': '1ac0683cb0500c0c6b04d04ae7821779a193db52b35df50ab24f696fd0f22674',
  'vllm/tool_parsers/utils.py': '0399a0392644876bbcbdc2e9137b417aa842e7306a09a36d9836ef1d249de05d',
  'vllm/v1/attention/backends/turboquant_attn.py': 'ccda36577e4fb0052f370169dce4b649bad890b8b440a82e584acd3dd92a6d86',
  'vllm/v1/attention/ops/triton_turboquant_decode.py': 'dab8b65ab7ddd6582de16e1fc7b1360ab0061b4a2a2b114f5d87ea0532fd726f',

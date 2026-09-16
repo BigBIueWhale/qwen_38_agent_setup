@@ -2136,8 +2136,6 @@ def _validate_qwen_grammar_after(state: State) -> None:
     ), label=label)
     require_text(state, registry, '@register_vllm_structural_tag("qwen_3_coder")',
                  label=label)
-    require_text(state, registry,
-                 'frozenset({"hermes", "kimi_k3", "qwen_3_coder"})', label=label)
     require_text(state, registry, '_QWEN_PARAM_OPEN = "<parameter="', label=label)
     require_text(state, registry, '_QWEN_PARAM_CLOSE = "</parameter>"', label=label)
     # The whole point of owning the tag: an unconstrained value may carry
@@ -2170,6 +2168,12 @@ def _validate_qwen_grammar_after(state: State) -> None:
         "test_qwen3_root_composition_still_binds_every_property": None,
         "test_qwen3_unresolvable_local_reference_is_refused": None,
         "test_qwen3_external_reference_stays_unconstrained": None,
+        # The named set is what a refusal offers and the registry is what
+        # builds; a builder registered but left out of the set works, so the
+        # omission is invisible until someone reads a refusal missing a model
+        # vLLM supports. The binding is asserted, not a literal membership
+        # list that would have to be rewritten for every new builder.
+        "test_supported_structural_tag_models_include_vllm_builtins": None,
     }, label=label)
 
 
