@@ -81,6 +81,43 @@ def rendered_reasoning(template, messages: list[dict], **kwargs) -> list[int]:
     return sorted(int(match) for match in REASONING_MARKER.findall(prompt))
 
 
+def assert_template_error_classification() -> None:
+    from types import SimpleNamespace
+    from tokenizers import Tokenizer, models
+    from transformers import TokenizersBackend
+    from vllm.exceptions import VLLMValidationError
+    from vllm.entrypoints.serve.exception_handling.error_response import create_error_response
+    from vllm.renderers.hf import safe_apply_chat_template
+
+    tokenizer = TokenizersBackend(tokenizer_object=Tokenizer(models.WordLevel({"hi": 0})))
+    messages = [{"role": "user", "content": "hi"}]
+    with open(TEMPLATE_PATH, encoding="utf-8") as handle:
+        source = handle.read()
+    try:
+        safe_apply_chat_template(SimpleNamespace(), tokenizer, messages,
+            chat_template=source, tokenize=False, preserve_thinking=False,
+            raise_exception="a request cannot replace the guard")
+    except VLLMValidationError as error:
+        assert "cannot be discarded" in str(error)
+        response = create_error_response(error)
+        assert response.error.code == 400
+        assert response.error.param == "messages"
+    else:
+        raise AssertionError("The served template did not return a typed refusal")
+
+    for template in ("{% broken %}", "{{ absent.required() }}"):
+        try:
+            safe_apply_chat_template(SimpleNamespace(), tokenizer, messages,
+                chat_template=template, tokenize=False)
+        except Exception as error:
+            assert create_error_response(error).error.code == 500
+        else:
+            raise AssertionError("An invalid template was rendered")
+    for error in (ValueError("internal value"), TypeError("internal type"),
+                  OverflowError("internal overflow")):
+        assert create_error_response(error).error.code == 500
+
+
 def main() -> None:
     template = load_template()
     messages = agent_history(6, reminder_after=(2, 4))
@@ -114,7 +151,8 @@ def main() -> None:
     opening = [{"role": "user", "content": "Do the task."}]
     assert rendered_reasoning(template, opening) == []
 
-    print("CHAT_TEMPLATE_RETENTION_UNIT_OK turns=6 reminders=2 refusals=5")
+    assert_template_error_classification()
+    print("CHAT_TEMPLATE_RETENTION_UNIT_OK turns=6 reminders=2 refusals=5 classification=PASS")
 
 
 if __name__ == "__main__":

@@ -2425,6 +2425,66 @@ def _validate_token_positions_after(state: State) -> None:
         }, label=label)
 
 
+def _validate_precise_errors_before(state: State) -> None:
+    require_text(state,
+        "vllm/entrypoints/serve/exception_handling/error_response.py",
+        "elif isinstance(exc, (ValueError, TypeError, OverflowError)):",
+        label="Precise request error baseline")
+
+
+def _validate_precise_errors_after(state: State) -> None:
+    label = "Precise request error classification"
+    errors = "vllm/entrypoints/serve/exception_handling/error_response.py"
+    forbid_text(state, errors, "(ValueError, TypeError, OverflowError)", label=label)
+    forbid_text(state, errors, '__name__ == "TemplateError"', label=label)
+    _require_in_symbol(state, errors, "create_error_response", (
+        "isinstance(exc, VLLMValidationError)", "param = exc.parameter",
+        "status_code = HTTPStatus.INTERNAL_SERVER_ERROR",
+    ), label=label)
+    hf = "vllm/renderers/hf.py"
+    source = _require_in_symbol(state, hf, "safe_apply_chat_template", (
+        'resolved_kwargs["raise_exception"] = _raise_template_validation_error',
+        "plain = tokenizer.apply_chat_template(",
+    ), label=label)
+    _require("except Exception" not in source and "raise ValueError(str(e))" not in source,
+             label + ": template bugs must retain their original server cause")
+    _require_in_symbol(state, hf, "_raise_template_validation_error", (
+        'raise VLLMValidationError(message, parameter="messages")',
+    ), label=label)
+    _require_in_symbol(state, "vllm/multimodal/media/image.py", "ImageMediaIO.load_bytes", (
+        "raise VLLMServerError(", "raise VLLMValidationError(",
+        "Image.open(BytesIO(data))", "image.load()",
+    ), label=label)
+    loader = _find_symbol(state, "vllm/multimodal/media/image.py",
+                          "ImageMediaIO.load_bytes", label=label)
+    decoder_calls = []
+    for node in ast.walk(loader):
+        if isinstance(node, ast.With) and any(
+            ast.unparse(item.context_expr) == "_image_decoder_errors()"
+            for item in node.items
+        ):
+            _require(len(node.body) == 1, label + ": decoder boundary contains pipeline work")
+            decoder_calls.append(ast.unparse(node.body[0].value.func))
+    _require(decoder_calls == ["Image.open", "image.load"],
+             label + ": only native byte decoders may translate format failures")
+    _require_in_symbol(state, "vllm/multimodal/media/image.py", "ImageMediaIO.load_base64", (
+        "decoded = pybase64.b64decode(data, validate=True)", "raise VLLMValidationError(",
+    ), label=label)
+    source = _require_in_symbol(state, "vllm/entrypoints/serve/utils/api_utils.py",
+        "get_max_tokens", ("raise VLLMValidationError(",), label=label)
+    _require("raise ValueError" not in source, label + ": context refusals must be typed")
+    require_python_symbols(state,
+        "tests/entrypoints/anthropic/test_anthropic_messages_conversion.py", {
+            "test_internal_template_failure_keeps_its_server_cause": None,
+            "test_template_programming_error_is_not_a_request_refusal": None,
+            "test_unrelated_exception_named_template_error_is_a_server_error": None,
+        }, label=label)
+    require_python_symbols(state, "tests/multimodal/media/test_image.py", {
+        "test_internal_image_pipeline_error_keeps_its_server_cause": None,
+        "test_invalid_base64_image_is_a_typed_request_error": None,
+    }, label=label)
+
+
 def validate_final(state: State) -> None:
     """Reassert every durable semantic invariant on the complete tree.
 
@@ -2440,6 +2500,20 @@ def validate_final(state: State) -> None:
 
 
 CONTRACTS: Mapping[str, SemanticContract] = {
+    "precise-request-errors": SemanticContract(
+        rationale=(
+            "Only a known request cause should become a client error. Type "
+            "template guards, image decoding/admission and context refusals "
+            "at their producers. Preserve internal Python and template errors "
+            "as server errors on every API surface."
+        ),
+        removal_condition=(
+            "Remove when upstream carries request causes through these deployed "
+            "producers and no longer classifies raw Python/template failures as 400."
+        ),
+        validate_before=_validate_precise_errors_before,
+        validate_after=_validate_precise_errors_after,
+    ),
     "token-text-provenance": SemanticContract(
         rationale=(
             "A stop-stripped boundary ID must never bind to a visible prose "

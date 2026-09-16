@@ -29,8 +29,32 @@ exact sampled IDs. The installed parser unit has 12 tests plus 126 subtests.
 The build check reconstructs and verifies every runtime file and runs the
 installed unit. No model, service or GPU was run.
 
-Still open in the owner's order: precise error classification; the written
+Still open in the owner's order: the written
 client commit review; final agent pins, final check and implementation report.
+
+## Precise request errors on the served APIs
+
+`vllm-precise-request-errors.patch` removes the generic ValueError/TypeError/
+OverflowError-to-400 mapping and exception-class-name matching for templates.
+The HF renderer supplies a typed callback for deliberate template guards;
+request kwargs cannot replace it. Template syntax/undefined-variable errors
+and unexpected renderer exceptions keep their original server cause.
+
+Image option and source gates, malformed base64 and native image-decoding
+failures carry typed validation errors at the input boundary. The pinned
+pixel-limit environment invariant is a server error. Unexpected errors in
+the image processing pipeline remain server errors. Prompt lengths that
+exhaust or exceed the window also carry typed validation errors.
+
+The shared classifier still maps explicit unimplemented operations to HTTP
+501, and typed client/server exceptions and generation failures retain their
+declared meanings. Raw exception handlers remain registered inside the metrics
+middleware so the recorded status matches the response. These registrations
+do not turn unknown errors into client refusals.
+
+Fourteen causal controls fail before the fix. The changed request/image/metrics
+suites and focused renderer cases pass offline; installed image and template
+units verify the typed refusals and internal-error distinction. No model ran.
 
 ## Finding #23: exact token positions through text stops
 
@@ -331,12 +355,11 @@ ASGI root path. Other protocols retain their own envelope. OpenAI error chunks
 forwarded through the Anthropic stream keep their classified status semantics;
 the converter emits an `error` and stops without a success terminal.
 
-The existing shared classifier still handles raw `ValueError`, `TypeError` and
-`OverflowError` as client rejections. This is necessary while the pinned renderer
-and input utilities themselves raise those types; duplicating a narrower local
-classifier caused the original 500 defect. Unclassified server failures remain
-500 `api_error`. HTTP statuses without a dedicated Anthropic error name retain
-their HTTP status and use the corresponding client/server error family.
+The shared classifier accepts typed request causes. The precise-error stage
+types the deployed template/image/context producers and removes raw Python
+and template-name inference. Unexpected failures remain 500 `api_error`.
+HTTP statuses without a dedicated Anthropic error name retain their HTTP
+status and use the corresponding client/server error family.
 
 Validation: 122 tests in the extended Anthropic conversion and validation-handler
 suites pass in a disposable, network-disabled base-image container using the

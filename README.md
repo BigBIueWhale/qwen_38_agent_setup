@@ -75,7 +75,7 @@ error.
   and relay readiness events, then validates the complete live configuration before
   reporting success. Re-running it validates the existing owned topology rather than
   starting a duplicate.
-- status.sh validates host prerequisites, thirty-two ordered vLLM transformations, every reviewed
+- status.sh validates host prerequisites, thirty-three ordered vLLM transformations, every reviewed
   source and test file, the model manifest, image archive, image identity and labels,
   command and environment, mounts, runtime packages, API identity, listener,
   hardening, and live health. HEALTHY means all checks passed.
@@ -95,7 +95,7 @@ Advanced reproducibility operations are deliberately separate from serving mode:
     ./scripts/build-vllm.sh build
     ./scripts/restore-images.sh
 
-The check reconstructs the source tree from the pinned upstream commit through all thirty-two
+The check reconstructs the source tree from the pinned upstream commit through all thirty-three
 landmark-aware transformations. The build runs offline from the exact base image and fails unless it produces
 the pinned image ID. Restore verifies the pinned local archive before loading it.
 
@@ -251,7 +251,7 @@ The vLLM submodule is pinned at:
 
     9df9b0b0a1816b6d0d0f6ecd0da563cc37fd72f5
 
-It is intentionally reconstructed by thirty-two ordered, reviewed semantic transformations:
+It is intentionally reconstructed by thirty-three ordered, reviewed semantic transformations:
 
 | Patch | SHA-256 |
 |---|---|
@@ -287,9 +287,10 @@ It is intentionally reconstructed by thirty-two ordered, reviewed semantic trans
 | patches/vllm-one-way-thinking-boundary.patch | 8c6a2ecae7785fffbfec61ec1a7f42428263feb07d1d3a6ff6ea126b366e0144 |
 | patches/vllm-schema-faithful-xml.patch | c78ca3f0b13d85635eafdc4f28f89adca5d3151a3ab5c98276a9202a1814af2d |
 | patches/vllm-token-text-provenance.patch | 954b36cb444f7e644e29d13f7a9d3c000512a0d616bbf2b6cd3cb8f4e880dd44 |
+| patches/vllm-precise-request-errors.patch | 717a7ee8905a9759b2c3db20538034122fa1f1e707d9d32cf9b09bbd8866fecf |
 
-The reconstructed tree has 100 reviewed runtime-source changes, 2 new runtime sources,
-7 runtime-source deletions, 71 existing-test changes, 12 new tests,
+The reconstructed tree has 102 reviewed runtime-source changes, 2 new runtime sources,
+7 runtime-source deletions, 73 existing-test changes, 12 new tests,
 3 test deletions, and 1 serving-documentation change. The authoritative
 counts are derived and printed by ./scripts/build-vllm.sh check, never restated
 by hand there. The landmark-aware Python patcher calculates every mutation
@@ -312,11 +313,11 @@ Pinned build inputs and products:
 | Offline archive | artifacts/qwen38-vllm-images-runtime-v23.tar |
 | Archive size | Awaiting adoption after the v23 export |
 | Archive SHA-256 | Awaiting adoption after the v23 export |
-| Runtime Dockerfile SHA-256 | b3b0e92a062baf23baa432839377de33c927ebac7062582da1b8cdcd54895799 |
-| Docker context allowlist SHA-256 | 4fa102a04821b2078d201d0b2667843e30b071e600225768767ee2341065f718 |
-| Build verifier SHA-256 | 9c28597d58797888574c8d7d02f475581e32f3ccb80dac51e7dc197c9dfd3499 |
-| Runtime validator SHA-256 | b1cf5890694f9b2f714fd0c9ac55e4f9e481ed3829d432eaef34f3f7b543557e |
-| Runtime lock SHA-256 | 9eb1412988e4fd7d2cda50c47b950b264f5aac2f9536ef7bfca07d33979c8488 |
+| Runtime Dockerfile SHA-256 | 9ff52e2f7e2da804a64c20c637e7e12d5f8b5a805a6239a0f7a3459e85b66ef3 |
+| Docker context allowlist SHA-256 | 13f25779da1f8b0a1a7acde26fc96bd9d4c1f3718bea4b784b1b4dc5d1265b65 |
+| Build verifier SHA-256 | 2f4ee3989c42b35044a2f6c225033a50a92c4885f3e33a3f63be081f89c51589 |
+| Runtime validator SHA-256 | 8f11ef441ee916ccb433b4b0551c1ed5a8750ae374a34655e2c947184ad61839 |
+| Runtime lock SHA-256 | eceb1a781bd14538e28f7c69a556b4ffbe8a0358b06cfb1daf3165d8ae22e594 |
 
 Every reviewed runtime file, including both TurboQuant kernels, is copied and
 hash-checked against its upstream and patched identities. A CPU Triton-interpreter
@@ -894,6 +895,11 @@ cannot remove part of the call. Stop tokens remain available as literal
 argument content; only model EOS tokens serve as grammar terminators.
 Unknown emitted names and their whitespace remain exact for client error
 feedback. The parser does not silently delete or rename them.
+
+Request errors are classified at their cause. Deliberate template guards,
+image-data refusals and context-length refusals are typed client errors.
+Unexpected Python exceptions, template bugs and server configuration failures
+remain server errors; a raw ValueError does not imply HTTP 400.
 
 Reasoning and tool boundaries retain their actual token positions through
 Unicode decoding and caller-stop holdback. A stripped marker cannot bind to

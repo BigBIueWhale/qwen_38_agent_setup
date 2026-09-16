@@ -1,0 +1,865 @@
+diff --git a/tests/entrypoints/anthropic/test_anthropic_messages_conversion.py b/tests/entrypoints/anthropic/test_anthropic_messages_conversion.py
+--- a/tests/entrypoints/anthropic/test_anthropic_messages_conversion.py
++++ b/tests/entrypoints/anthropic/test_anthropic_messages_conversion.py
+@@ -1604,10 +1604,10 @@
+ 
+     @pytest.mark.parametrize(
+         ("exc", "status", "error_type"),
+         [
+-            (ValueError("the template refused this history"), 400, "invalid_request_error"),
+-            (TypeError("a content part of the wrong shape"), 400, "invalid_request_error"),
++            (ValueError("unexpected internal value"), 500, "api_error"),
++            (TypeError("unexpected internal type"), 500, "api_error"),
+             (
+                 VLLMValidationError("kv_scope is required", parameter="kv_scope"),
+                 400,
+                 "invalid_request_error",
+@@ -1621,11 +1621,9 @@
+     @pytest.mark.parametrize("stream", [False, True])
+     def test_a_refusal_is_classified_as_the_openai_surface_classifies_it(
+         self, route, stream, exc, status, error_type
+     ):
+-        """A prompt the template refuses, an image the media gate refuses, a
+-        prompt longer than the window: all are ValueErrors, all are the
+-        caller's, and all are HTTP 400 here as they are on the OpenAI paths."""
++        """Only errors with a known request cause receive a client status."""
+         app = self._make_api_app(exc)
+         with TestClient(app, raise_server_exceptions=False) as client:
+             response = client.post(route, json=self._body | {"stream": stream})
+ 
+@@ -1690,35 +1688,80 @@
+ 
+     @pytest.mark.parametrize("route", ["/v1/messages", "/v1/messages/count_tokens"])
+     @pytest.mark.parametrize("stream", [False, True])
+     @pytest.mark.parametrize("gate", ["template", "image", "length"])
+-    def test_real_request_gates_return_400_before_streaming(self, route, stream, gate, monkeypatch):
++    def test_real_request_gates_return_400_before_streaming(
++        self, route, stream, gate, monkeypatch, refusal_tokenizer
++    ):
+         from vllm.entrypoints.serve.utils.api_utils import get_max_tokens
+         from vllm.multimodal.media.image import ImageMediaIO
+         from vllm.renderers.hf import safe_apply_chat_template
+-        import jinja2
++        from io import BytesIO
++        from PIL import Image
+ 
+         monkeypatch.setenv("VLLM_QWEN38_STRICT_IMAGE_CONTRACT", "1")
++        monkeypatch.setenv("VLLM_MAX_IMAGE_PIXELS", "16777216")
+ 
+         async def reject(*args):
+             if gate == "length":
+                 get_max_tokens(32, 1, 33, {})
+             elif gate == "image":
+-                ImageMediaIO(image_mode="RGBA")
++                buffer = BytesIO()
++                Image.new("L", (2, 2)).save(buffer, format="PNG")
++                ImageMediaIO().load_bytes(buffer.getvalue())
+             else:
+-                tokenizer = MagicMock()
+-                tokenizer.apply_chat_template.side_effect = jinja2.TemplateError("history refused")
+                 safe_apply_chat_template(
+-                    MagicMock(), tokenizer, [{"role": "user", "content": "hi"}],
+-                    chat_template="{{ messages }}", tokenize=False,
++                    MagicMock(), refusal_tokenizer,
++                    [{"role": "user", "content": "hi"}],
++                    chat_template="{{ raise_exception('history refused') }}",
++                    tokenize=False,
+                 )
+ 
+         app = self._make_api_app(reject)
+         with TestClient(app, raise_server_exceptions=False) as client:
+             response = client.post(route, json=self._body | {"stream": stream})
+         assert response.status_code == 400
+         assert response.json()["error"]["type"] == "invalid_request_error"
+         assert response.headers["content-type"] == "application/json"
++
++
++@pytest.fixture(scope="module")
++def refusal_tokenizer():
++    from tokenizers import Tokenizer, models
++    from transformers import TokenizersBackend
++    return TokenizersBackend(tokenizer_object=Tokenizer(models.WordLevel({"hi": 0})))
++
++
++@pytest.mark.parametrize("error", [ValueError("decoder bug"), TypeError("internal type"),
++                                  OverflowError("internal overflow")])
++def test_internal_template_failure_keeps_its_server_cause(error):
++    from vllm.renderers.hf import safe_apply_chat_template
++    from vllm.entrypoints.serve.exception_handling.error_response import create_error_response
++    tokenizer = MagicMock()
++    tokenizer.apply_chat_template.side_effect = error
++    with pytest.raises(type(error)) as raised:
++        safe_apply_chat_template(MagicMock(), tokenizer,
++            [{"role": "user", "content": "hi"}],
++            chat_template="{{ messages }}", tokenize=False)
++    assert raised.value is error
++    assert create_error_response(error).error.code == 500
++
++
++@pytest.mark.parametrize("template", ["{% broken %}", "{{ absent.required() }}"])
++def test_template_programming_error_is_not_a_request_refusal(template, refusal_tokenizer):
++    from vllm.renderers.hf import safe_apply_chat_template
++    from vllm.entrypoints.serve.exception_handling.error_response import create_error_response
++    with pytest.raises(Exception) as raised:
++        safe_apply_chat_template(MagicMock(), refusal_tokenizer,
++            [{"role": "user", "content": "hi"}], chat_template=template, tokenize=False)
++    assert create_error_response(raised.value).error.code == 500
++
++
++def test_unrelated_exception_named_template_error_is_a_server_error():
++    from vllm.entrypoints.serve.exception_handling.error_response import create_error_response
++    class TemplateError(Exception):
++        pass
++    assert create_error_response(TemplateError("server bug")).error.code == 500
+ 
+ 
+ class TestAnthropicTerminalMetadata:
+     @pytest.mark.asyncio
+diff --git a/tests/entrypoints/serve/exception_handling/test_http_status_metrics.py b/tests/entrypoints/serve/exception_handling/test_http_status_metrics.py
+--- a/tests/entrypoints/serve/exception_handling/test_http_status_metrics.py
++++ b/tests/entrypoints/serve/exception_handling/test_http_status_metrics.py
+@@ -1,11 +1,10 @@
+ # SPDX-License-Identifier: Apache-2.0
+ # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
+ """Test that http_requests_total metric records correct status codes.
+ 
+-Regression test for: Prometheus http_requests_total records 4xx exceptions
+-(ValueError, TypeError, etc.) as 5xx because they propagate through the
+-PrometheusInstrumentatorMiddleware before being caught by ServerErrorMiddleware.
++Typed request errors and internal errors must retain their actual HTTP status
++in metrics, regardless of which exception middleware handles them.
+ """
+ 
+ from argparse import Namespace
+ 
+@@ -152,11 +151,11 @@
+         ("/raise_request_validation_error", "4xx", 400, {"params": {"n": "x"}}),
+         ("/raise_vllm_validation_error", "4xx", 400, {}),
+         ("/raise_vllm_not_found_error", "4xx", 404, {}),
+         ("/raise_vllm_server_error", "5xx", 500, {}),
+-        ("/raise_value_error", "4xx", 400, {}),
+-        ("/raise_type_error", "4xx", 400, {}),
+-        ("/raise_overflow_error", "4xx", 400, {}),
++        ("/raise_value_error", "5xx", 500, {}),
++        ("/raise_type_error", "5xx", 500, {}),
++        ("/raise_overflow_error", "5xx", 500, {}),
+         ("/raise_not_implemented_error", "5xx", 501, {}),
+         ("/raise_runtime_error", "5xx", 500, {}),
+         ("/success", "2xx", 200, {}),
+     ],
+@@ -166,11 +165,11 @@
+         "RequestValidationError->4xx",
+         "VLLMValidationError->4xx",
+         "VLLMNotFoundError->4xx",
+         "VLLMServerError->5xx",
+-        "ValueError->4xx",
+-        "TypeError->4xx",
+-        "OverflowError->4xx",
++        "ValueError->5xx",
++        "TypeError->5xx",
++        "OverflowError->5xx",
+         "NotImplementedError->5xx",
+         "RuntimeError->5xx",
+         "success->2xx",
+     ],
+diff --git a/tests/entrypoints/serve/utils/test_api_utils.py b/tests/entrypoints/serve/utils/test_api_utils.py
+--- a/tests/entrypoints/serve/utils/test_api_utils.py
++++ b/tests/entrypoints/serve/utils/test_api_utils.py
+@@ -1,8 +1,10 @@
+ # SPDX-License-Identifier: Apache-2.0
+ # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
+ 
+ import pytest
++
++from vllm.exceptions import VLLMValidationError
+ 
+ from vllm.entrypoints.openai.engine.protocol import StreamOptions
+ from vllm.entrypoints.serve.utils.api_utils import (
+     get_max_tokens,
+@@ -100,9 +102,9 @@
+         assert result == 512
+ 
+     def test_input_length_exceeds_max_model_len(self):
+         with pytest.raises(
+-            ValueError,
++            VLLMValidationError,
+             match="Input length .* exceeds model's maximum context length .*",
+         ):
+             get_max_tokens(
+                 max_model_len=100,
+@@ -112,9 +114,9 @@
+             )
+ 
+     def test_input_length_equal_to_max_model_len_is_explicit(self):
+         with pytest.raises(
+-            ValueError,
++            VLLMValidationError,
+             match=(
+                 r"Input length \(100\) equals model's maximum context length "
+                 r"\(100\), leaving no room for the required output token"
+             ),
+diff --git a/tests/multimodal/media/test_image.py b/tests/multimodal/media/test_image.py
+--- a/tests/multimodal/media/test_image.py
++++ b/tests/multimodal/media/test_image.py
+@@ -4,8 +4,10 @@
+ from pathlib import Path
+ 
+ import numpy as np
+ import pytest
++
++from vllm.exceptions import VLLMServerError, VLLMValidationError
+ from PIL import Image
+ 
+ import vllm.envs as envs
+ from vllm.multimodal.media import ImageMediaIO
+@@ -109,47 +111,47 @@
+     """Test that invalid rgba_background_color values are properly rejected."""
+ 
+     # Test invalid types
+     with pytest.raises(
+-        ValueError, match="rgba_background_color must be a list or tuple"
++        VLLMValidationError, match="rgba_background_color must be a list or tuple"
+     ):
+         ImageMediaIO(rgba_background_color="255,255,255")
+ 
+     with pytest.raises(
+-        ValueError, match="rgba_background_color must be a list or tuple"
++        VLLMValidationError, match="rgba_background_color must be a list or tuple"
+     ):
+         ImageMediaIO(rgba_background_color=255)
+ 
+     # Test wrong number of elements
+     with pytest.raises(
+-        ValueError, match="rgba_background_color must be a list or tuple"
++        VLLMValidationError, match="rgba_background_color must be a list or tuple"
+     ):
+         ImageMediaIO(rgba_background_color=(255, 255))
+ 
+     with pytest.raises(
+-        ValueError, match="rgba_background_color must be a list or tuple"
++        VLLMValidationError, match="rgba_background_color must be a list or tuple"
+     ):
+         ImageMediaIO(rgba_background_color=(255, 255, 255, 255))
+ 
+     # Test non-integer values
+     with pytest.raises(
+-        ValueError, match="rgba_background_color must be a list or tuple"
++        VLLMValidationError, match="rgba_background_color must be a list or tuple"
+     ):
+         ImageMediaIO(rgba_background_color=(255.0, 255.0, 255.0))
+ 
+     with pytest.raises(
+-        ValueError, match="rgba_background_color must be a list or tuple"
++        VLLMValidationError, match="rgba_background_color must be a list or tuple"
+     ):
+         ImageMediaIO(rgba_background_color=(255, "255", 255))
+ 
+     # Test out of range values
+     with pytest.raises(
+-        ValueError, match="rgba_background_color must be a list or tuple"
++        VLLMValidationError, match="rgba_background_color must be a list or tuple"
+     ):
+         ImageMediaIO(rgba_background_color=(256, 255, 255))
+ 
+     with pytest.raises(
+-        ValueError, match="rgba_background_color must be a list or tuple"
++        VLLMValidationError, match="rgba_background_color must be a list or tuple"
+     ):
+         ImageMediaIO(rgba_background_color=(255, -1, 255))
+ 
+     # Test that valid values work
+@@ -175,22 +177,22 @@
+     assert isinstance(result.media, Image.Image)
+     assert result.media.size == (8, 8)
+     assert result.media.getpixel((0, 0)) == (100, 150, 200)
+ 
+-    # Test 2: Garbage bytes raise ValueError
+-    with pytest.raises(ValueError, match="Failed to load image"):
++    # Test 2: Garbage bytes raise VLLMValidationError
++    with pytest.raises(VLLMValidationError, match="Failed to load image"):
+         image_io.load_bytes(b"not an image")
+ 
+-    # Test 3: Truncated PNG header raises ValueError
+-    with pytest.raises(ValueError, match="Failed to load image"):
++    # Test 3: Truncated PNG header raises VLLMValidationError
++    with pytest.raises(VLLMValidationError, match="Failed to load image"):
+         image_io.load_bytes(b"\x89PNG\r\n\x1a\n" + b"\x00" * 10)
+ 
+-    # Test 4: Real PNG truncated mid-stream raises ValueError
+-    with pytest.raises(ValueError, match="Failed to load image"):
++    # Test 4: Real PNG truncated mid-stream raises VLLMValidationError
++    with pytest.raises(VLLMValidationError, match="Failed to load image"):
+         image_io.load_bytes(valid_data[: len(valid_data) // 2])
+ 
+-    # Test 5: Empty bytes raise ValueError
+-    with pytest.raises(ValueError, match="Failed to load image"):
++    # Test 5: Empty bytes raise VLLMValidationError
++    with pytest.raises(VLLMValidationError, match="Failed to load image"):
+         image_io.load_bytes(b"")
+ 
+ 
+ def test_image_media_io_load_file(tmp_path):
+@@ -208,28 +210,28 @@
+     assert isinstance(result.media, Image.Image)
+     assert result.media.size == (4, 4)
+     assert result.media.getpixel((0, 0)) == (10, 20, 30)
+ 
+-    # Test 2: File with garbage content raises ValueError
++    # Test 2: File with garbage content raises VLLMValidationError
+     bad_file = tmp_path / "bad.png"
+     bad_file.write_bytes(b"this is not an image")
+ 
+-    with pytest.raises(ValueError, match="Failed to load image"):
++    with pytest.raises(VLLMValidationError, match="Failed to load image"):
+         image_io.load_file(bad_file)
+ 
+-    # Test 3: File with truncated PNG header raises ValueError
++    # Test 3: File with truncated PNG header raises VLLMValidationError
+     truncated_file = tmp_path / "truncated.png"
+     truncated_file.write_bytes(b"\x89PNG\r\n\x1a\n" + b"\x00" * 10)
+ 
+-    with pytest.raises(ValueError, match="Failed to load image"):
++    with pytest.raises(VLLMValidationError, match="Failed to load image"):
+         image_io.load_file(truncated_file)
+ 
+-    # Test 4: Real PNG file truncated mid-stream raises ValueError
++    # Test 4: Real PNG file truncated mid-stream raises VLLMValidationError
+     valid_data = valid_path.read_bytes()
+     truncated_real_file = tmp_path / "truncated_real.png"
+     truncated_real_file.write_bytes(valid_data[: len(valid_data) // 2])
+ 
+-    with pytest.raises(ValueError, match="Failed to load image"):
++    with pytest.raises(VLLMValidationError, match="Failed to load image"):
+         image_io.load_file(truncated_real_file)
+ 
+ 
+ def test_image_pixel_limit_respected():
+@@ -263,9 +265,9 @@
+     image.save(buf, format="PNG")
+     data = buf.getvalue()
+ 
+     image_io = ImageMediaIO()
+-    with pytest.raises(ValueError, match="exceed"):
++    with pytest.raises(VLLMValidationError, match="exceed"):
+         image_io.load_bytes(data)
+ 
+ 
+ def test_image_pixel_limit_disabled(monkeypatch):
+@@ -317,10 +319,10 @@
+     image = Image.open(BytesIO(data))
+     image.load()
+     assert image.mode in ("RGB", "RGBA")  # The old mode-only check accepted it.
+     monkeypatch.setenv("VLLM_QWEN38_STRICT_IMAGE_CONTRACT", "1")
+-    monkeypatch.setenv("VLLM_MAX_IMAGE_PIXELS", "16777216")
+-    with pytest.raises(ValueError, match="IHDR bit depth 16"):
++    monkeypatch.setattr(envs, "VLLM_MAX_IMAGE_PIXELS", 16777216)
++    with pytest.raises(VLLMValidationError, match="IHDR bit depth 16"):
+         ImageMediaIO().load_bytes(data)
+ 
+ 
+ def test_qwen38_strict_image_contract_accepts_rgb_and_rgba(monkeypatch):
+@@ -338,31 +340,31 @@
+ def test_qwen38_strict_image_contract_rejects_ambiguous_inputs(monkeypatch):
+     monkeypatch.setattr(envs, "VLLM_QWEN38_STRICT_IMAGE_CONTRACT", True)
+     monkeypatch.setattr(envs, "VLLM_MAX_IMAGE_PIXELS", 16_777_216)
+ 
+-    with pytest.raises(ValueError, match="requires image_mode='RGB'"):
++    with pytest.raises(VLLMValidationError, match="requires image_mode='RGB'"):
+         ImageMediaIO(image_mode=None)
+-    with pytest.raises(ValueError, match="pinned white"):
++    with pytest.raises(VLLMValidationError, match="pinned white"):
+         ImageMediaIO(rgba_background_color=(0, 0, 0))
+ 
+     image_io = ImageMediaIO()
+-    with pytest.raises(ValueError, match="media type 'image/png'"):
++    with pytest.raises(VLLMValidationError, match="media type 'image/png'"):
+         image_io.load_base64("image/jpeg", "AA==")
+ 
+     jpeg = Image.new("RGB", (8, 8), (1, 2, 3))
+     with BytesIO() as buffer:
+         jpeg.save(buffer, format="JPEG")
+         jpeg_bytes = buffer.getvalue()
+-    with pytest.raises(ValueError, match="accepts only decoded PNG"):
++    with pytest.raises(VLLMValidationError, match="accepts only decoded PNG"):
+         image_io.load_bytes(jpeg_bytes)
+ 
+-    with pytest.raises(ValueError, match="only 8-bit RGB or RGBA"):
++    with pytest.raises(VLLMValidationError, match="only 8-bit RGB or RGBA"):
+         image_io.load_bytes(_png_bytes(mode="L", color=128))
+     assert image_io.load_bytes(_png_bytes(size=(30, 1))).media.size == (30, 1)
+     assert image_io.load_bytes(_png_bytes(size=(1, 30))).media.size == (1, 30)
+-    with pytest.raises(ValueError, match="aspect ratio <= 30:1"):
++    with pytest.raises(VLLMValidationError, match="aspect ratio <= 30:1"):
+         image_io.load_bytes(_png_bytes(size=(31, 1)))
+-    with pytest.raises(ValueError, match="aspect ratio <= 30:1"):
++    with pytest.raises(VLLMValidationError, match="aspect ratio <= 30:1"):
+         image_io.load_bytes(_png_bytes(size=(1, 31)))
+ 
+     second_frame = Image.new("RGB", (8, 8), (30, 20, 10))
+     with BytesIO() as buffer:
+@@ -375,10 +377,35 @@
+             duration=100,
+             loop=0,
+         )
+         animated_png = buffer.getvalue()
+-    with pytest.raises(ValueError, match="single-frame PNG"):
++    with pytest.raises(VLLMValidationError, match="single-frame PNG"):
+         image_io.load_bytes(animated_png)
+ 
+     monkeypatch.setattr(envs, "VLLM_MAX_IMAGE_PIXELS", 16_777_215)
+-    with pytest.raises(ValueError, match="requires VLLM_MAX_IMAGE_PIXELS"):
++    with pytest.raises(VLLMServerError, match="requires VLLM_MAX_IMAGE_PIXELS"):
+         image_io.load_bytes(_png_bytes())
++
++
++@pytest.mark.parametrize("encoded", ["%%%", "雪", "A"])
++def test_invalid_base64_image_is_a_typed_request_error(encoded):
++    from vllm.entrypoints.serve.exception_handling.error_response import create_error_response
++    with pytest.raises(VLLMValidationError) as raised:
++        ImageMediaIO().load_base64("image/png", encoded)
++    assert create_error_response(raised.value).error.code == 400
++
++
++@pytest.mark.parametrize("error", [ValueError("normalizer invariant failed"),
++                                  OSError("internal file failure"),
++                                  SyntaxError("internal syntax failure")])
++def test_internal_image_pipeline_error_keeps_its_server_cause(monkeypatch, error):
++    import vllm.multimodal.media.image as image_module
++    from vllm.entrypoints.serve.exception_handling.error_response import create_error_response
++    buffer = BytesIO()
++    Image.new("RGB", (2, 2)).save(buffer, format="PNG")
++    def broken_normalizer(image):
++        raise error
++    monkeypatch.setattr(image_module, "normalize_image", broken_normalizer)
++    with pytest.raises(type(error)) as raised:
++        ImageMediaIO().load_bytes(buffer.getvalue())
++    assert raised.value is error
++    assert create_error_response(error).error.code == 500
+diff --git a/tests/renderers/test_hf.py b/tests/renderers/test_hf.py
+--- a/tests/renderers/test_hf.py
++++ b/tests/renderers/test_hf.py
+@@ -3,8 +3,9 @@
+ 
+ import pytest
+ 
+ from vllm.config import ModelConfig
++from vllm.exceptions import VLLMValidationError
+ from vllm.entrypoints.chat_utils import load_chat_template
+ from vllm.entrypoints.openai.chat_completion.protocol import ChatCompletionRequest
+ from vllm.renderers.hf import (
+     _consolidate_system_messages,
+@@ -252,9 +253,9 @@
+         tools=tools,
+         model_config=model_config,
+     )
+     with pytest.raises(
+-        ValueError, match="Found unexpected chat template kwargs from request"
++        VLLMValidationError, match="Found unexpected chat template kwargs from request"
+     ):
+         # should raise error if `chat_template_kwargs` contains
+         # `chat_template` or `tokenize`
+         resolve_chat_template_kwargs(
+diff --git a/vllm/entrypoints/serve/exception_handling/error_response.py b/vllm/entrypoints/serve/exception_handling/error_response.py
+--- a/vllm/entrypoints/serve/exception_handling/error_response.py
++++ b/vllm/entrypoints/serve/exception_handling/error_response.py
+@@ -85,22 +85,11 @@
+             # Any other server-caused error defaults to 500.
+             err_type = "InternalServerError"
+             status_code = HTTPStatus.INTERNAL_SERVER_ERROR
+             param = None
+-        # Fallback for raw exceptions not yet migrated to VLLMError.
+-        # TODO(zqzten): remove these fallback handlers after migration to VLLMError
+-        elif isinstance(exc, (ValueError, TypeError, OverflowError)):
+-            err_type = "BadRequestError"
+-            status_code = HTTPStatus.BAD_REQUEST
+-            param = None
+         elif isinstance(exc, NotImplementedError):
+             err_type = "NotImplementedError"
+             status_code = HTTPStatus.NOT_IMPLEMENTED
+-            param = None
+-        elif any(cls.__name__ == "TemplateError" for cls in type(exc).__mro__):
+-            # jinja2.TemplateError and its subclasses (avoid importing jinja2)
+-            err_type = "BadRequestError"
+-            status_code = HTTPStatus.BAD_REQUEST
+             param = None
+         else:
+             err_type = "InternalServerError"
+             status_code = HTTPStatus.INTERNAL_SERVER_ERROR
+diff --git a/vllm/entrypoints/serve/exception_handling/register.py b/vllm/entrypoints/serve/exception_handling/register.py
+--- a/vllm/entrypoints/serve/exception_handling/register.py
++++ b/vllm/entrypoints/serve/exception_handling/register.py
+@@ -4,9 +4,9 @@
+ """
+ vLLM Exception handlers are registered in four layers:
+ 1. framework errors raised by FastAPI/Starlette
+ 2. vLLM-specific errors dispatched via a single ``VLLMError`` handler
+-3. fallback handlers for raw exceptions not yet migrated to ``VLLMError``
++3. common internal exceptions handled inside the metrics middleware
+ 4. the raw ``Exception`` handler as a safety net
+ Registering specific exception types (rather than only ``Exception``)
+ ensures they are handled by ``ExceptionMiddleware`` (inside the Prometheus
+ middleware) rather than ``ServerErrorMiddleware`` (outside it), so their
+@@ -31,10 +31,9 @@
+ 
+     #   2. vLLM-specific errors dispatched via a single ``VLLMError`` handler
+     app.exception_handler(VLLMError)(vllm_error_handler)
+ 
+-    #   3. fallback handlers for raw exceptions not yet migrated to ``VLLMError``
+-    # TODO(zqzten): remove these fallback handlers after migration to VLLMError
++    #   3. Record common internal errors inside the metrics middleware too.
+     app.exception_handler(ValueError)(exception_handler)
+     app.exception_handler(TypeError)(exception_handler)
+     app.exception_handler(OverflowError)(exception_handler)
+     app.exception_handler(NotImplementedError)(exception_handler)
+diff --git a/vllm/entrypoints/serve/utils/api_utils.py b/vllm/entrypoints/serve/utils/api_utils.py
+--- a/vllm/entrypoints/serve/utils/api_utils.py
++++ b/vllm/entrypoints/serve/utils/api_utils.py
+@@ -18,8 +18,9 @@
+ from vllm import envs
+ from vllm.engine.arg_utils import EngineArgs
+ from vllm.entrypoints.openai.engine.protocol import StreamOptions
+ from vllm.entrypoints.openai.models.protocol import LoRAModulePath
++from vllm.exceptions import VLLMValidationError
+ from vllm.logger import current_formatter_type, init_logger
+ from vllm.platforms import current_platform
+ from vllm.utils.argparse_utils import FlexibleArgumentParser
+ 
+@@ -180,15 +181,15 @@
+             input_length,
+             max_model_len if limit == -1 else limit,
+         )
+     if max_model_len < input_length:
+-        raise ValueError(
++        raise VLLMValidationError(
+             f"Input length ({input_length}) exceeds model's maximum "
+             f"context length ({max_model_len})."
+         )
+     model_max_tokens = max_model_len - input_length
+     if model_max_tokens == 0:
+-        raise ValueError(
++        raise VLLMValidationError(
+             f"Input length ({input_length}) equals model's maximum context "
+             f"length ({max_model_len}), leaving no room for the required "
+             "output token. Reduce the input length before requesting a "
+             "completion."
+diff --git a/vllm/multimodal/media/image.py b/vllm/multimodal/media/image.py
+--- a/vllm/multimodal/media/image.py
++++ b/vllm/multimodal/media/image.py
+@@ -1,7 +1,9 @@
+ # SPDX-License-Identifier: Apache-2.0
+ # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
+ 
++from collections.abc import Iterator
++from contextlib import contextmanager
+ from io import BytesIO
+ from pathlib import Path
+ 
+ import numpy as np
+@@ -9,16 +11,26 @@
+ import torch
+ from PIL import Image
+ 
+ import vllm.envs as envs
++from vllm.exceptions import VLLMServerError, VLLMValidationError
+ from vllm.utils.serial_utils import tensor2base64
+ from vllm.utils.sparse_utils import check_sparse_tensor_invariants_threadsafe
+ 
+ from ..image import convert_image_mode, normalize_image, rgba_to_rgb
+ from .base import MediaIO, MediaWithBytes
+ 
+ MAGIC_NUMPY_PREFIX = b"\x93NUMPY"  # https://numpy.org/devdocs/reference/generated/numpy.lib.format.html#format-version-1-0
+ QWEN38_MAX_PROVEN_IMAGE_ASPECT_RATIO = 30
++
++
++@contextmanager
++def _image_decoder_errors() -> Iterator[None]:
++    """Translate documented native decoder failures at the byte boundary."""
++    try:
++        yield
++    except (OSError, SyntaxError, ValueError, Image.DecompressionBombError) as exc:
++        raise VLLMValidationError(f"Failed to load image: {exc}") from exc
+ 
+ 
+ class ImageMediaIO(MediaIO[Image.Image]):
+     """Configuration values can be user-provided either by --media-io-kwargs or
+@@ -29,9 +41,9 @@
+     def __init__(self, image_mode: str | None = "RGB", **kwargs) -> None:
+         super().__init__()
+ 
+         if envs.VLLM_QWEN38_STRICT_IMAGE_CONTRACT and image_mode != "RGB":
+-            raise ValueError(
++            raise VLLMValidationError(
+                 "The Qwen3.8 image contract requires image_mode='RGB'; "
+                 "per-request image-mode changes are forbidden."
+             )
+ 
+@@ -58,9 +70,9 @@
+             isinstance(rgba_bg, tuple)
+             and len(rgba_bg) == 3
+             and all(isinstance(c, int) and 0 <= c <= 255 for c in rgba_bg)
+         ):
+-            raise ValueError(
++            raise VLLMValidationError(
+                 "rgba_background_color must be a list or tuple of 3 integers "
+                 "in the range [0, 255]."
+             )
+         self.rgba_background_color = rgba_bg
+@@ -68,9 +80,9 @@
+         if (
+             envs.VLLM_QWEN38_STRICT_IMAGE_CONTRACT
+             and self.rgba_background_color != (255, 255, 255)
+         ):
+-            raise ValueError(
++            raise VLLMValidationError(
+                 "The Qwen3.8 image contract requires RGBA images to be "
+                 "composited on the pinned white (255, 255, 255) background."
+             )
+ 
+@@ -89,78 +101,77 @@
+                 image, self.image_mode, self.rgba_background_color
+             )
+ 
+     def load_bytes(self, data: bytes) -> MediaWithBytes[Image.Image]:
+-        try:
++        with _image_decoder_errors():
+             image = Image.open(BytesIO(data))
+-            w, h = image.size
+-            max_pixels = envs.VLLM_MAX_IMAGE_PIXELS
+-            if envs.VLLM_QWEN38_STRICT_IMAGE_CONTRACT:
+-                required_max_pixels = 16_777_216
+-                if max_pixels != required_max_pixels:
+-                    raise ValueError(
+-                        "The Qwen3.8 image contract requires "
+-                        f"VLLM_MAX_IMAGE_PIXELS={required_max_pixels}; found "
+-                        f"{max_pixels}."
+-                    )
+-                if image.format != "PNG":
+-                    raise ValueError(
+-                        "The Qwen3.8 image contract accepts only decoded PNG "
+-                        f"files; detected {image.format or 'unknown format'}."
+-                    )
+-                if getattr(image, "is_animated", False) or getattr(
+-                    image, "n_frames", 1
+-                ) != 1:
+-                    raise ValueError(
+-                        "The Qwen3.8 image contract accepts only static, "
+-                        "single-frame PNG files; animated PNG is forbidden."
+-                    )
+-                # Pillow exposes 16-bit truecolour and grey+alpha PNGs as
+-                # RGB/RGBA after reducing them to eight bits. Admission is a
+-                # property of the encoded source, before that conversion.
+-                if data[:16] != b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR":
+-                    raise ValueError("PNG source must begin with a 13-byte IHDR chunk.")
+-                bit_depth, color_type = data[24:26]
+-                if bit_depth != 8 or color_type not in (2, 6):
+-                    raise ValueError(
+-                        "The Qwen3.8 image contract accepts only 8-bit RGB or "
+-                        "RGBA PNG source pixels; detected IHDR "
+-                        f"bit depth {bit_depth}, color type {color_type}."
+-                    )
+-                if image.mode not in ("RGB", "RGBA"):
+-                    raise ValueError(
+-                        "The Qwen3.8 image contract accepts only 8-bit RGB or "
+-                        f"RGBA PNG source pixels; detected mode {image.mode!r}."
+-                    )
+-                if image.mode == "RGB" and "transparency" in image.info:
+-                    raise ValueError(
+-                        "The Qwen3.8 image contract requires transparent PNG "
+-                        "pixels to use explicit 8-bit RGBA, not an RGB tRNS key."
+-                    )
+-                short_edge = min(w, h)
+-                long_edge = max(w, h)
+-                if (
+-                    short_edge <= 0
+-                    or long_edge
+-                    > short_edge * QWEN38_MAX_PROVEN_IMAGE_ASPECT_RATIO
+-                ):
+-                    raise ValueError(
+-                        "The Qwen3.8 deployment's empirically proven full-quality "
+-                        "contract requires image aspect ratio "
+-                        f"<= {QWEN38_MAX_PROVEN_IMAGE_ASPECT_RATIO}:1; received "
+-                        f"{w}x{h}."
+-                    )
+-            if max_pixels > 0 and w * h > max_pixels:
+-                raise ValueError(
+-                    f"Image dimensions {w}x{h} ({w * h} pixels) exceed "
+-                    f"the maximum of {max_pixels} pixels. Set "
+-                    f"VLLM_MAX_IMAGE_PIXELS to increase this limit."
+-                )
+-            image = normalize_image(image)
++        w, h = image.size
++        max_pixels = envs.VLLM_MAX_IMAGE_PIXELS
++        if envs.VLLM_QWEN38_STRICT_IMAGE_CONTRACT:
++            required_max_pixels = 16_777_216
++            if max_pixels != required_max_pixels:
++                raise VLLMServerError(
++                    "The Qwen3.8 image contract requires "
++                    f"VLLM_MAX_IMAGE_PIXELS={required_max_pixels}; found "
++                    f"{max_pixels}."
++                )
++            if image.format != "PNG":
++                raise VLLMValidationError(
++                    "The Qwen3.8 image contract accepts only decoded PNG "
++                    f"files; detected {image.format or 'unknown format'}."
++                )
++            if getattr(image, "is_animated", False) or getattr(
++                image, "n_frames", 1
++            ) != 1:
++                raise VLLMValidationError(
++                    "The Qwen3.8 image contract accepts only static, "
++                    "single-frame PNG files; animated PNG is forbidden."
++                )
++            # Pillow exposes 16-bit truecolour and grey+alpha PNGs as
++            # RGB/RGBA after reducing them to eight bits. Admission is a
++            # property of the encoded source, before that conversion.
++            if data[:16] != b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR":
++                raise VLLMValidationError("PNG source must begin with a 13-byte IHDR chunk.")
++            bit_depth, color_type = data[24:26]
++            if bit_depth != 8 or color_type not in (2, 6):
++                raise VLLMValidationError(
++                    "The Qwen3.8 image contract accepts only 8-bit RGB or "
++                    "RGBA PNG source pixels; detected IHDR "
++                    f"bit depth {bit_depth}, color type {color_type}."
++                )
++            if image.mode not in ("RGB", "RGBA"):
++                raise VLLMValidationError(
++                    "The Qwen3.8 image contract accepts only 8-bit RGB or "
++                    f"RGBA PNG source pixels; detected mode {image.mode!r}."
++                )
++            if image.mode == "RGB" and "transparency" in image.info:
++                raise VLLMValidationError(
++                    "The Qwen3.8 image contract requires transparent PNG "
++                    "pixels to use explicit 8-bit RGBA, not an RGB tRNS key."
++                )
++            short_edge = min(w, h)
++            long_edge = max(w, h)
++            if (
++                short_edge <= 0
++                or long_edge
++                > short_edge * QWEN38_MAX_PROVEN_IMAGE_ASPECT_RATIO
++            ):
++                raise VLLMValidationError(
++                    "The Qwen3.8 deployment's empirically proven full-quality "
++                    "contract requires image aspect ratio "
++                    f"<= {QWEN38_MAX_PROVEN_IMAGE_ASPECT_RATIO}:1; received "
++                    f"{w}x{h}."
++                )
++        if max_pixels > 0 and w * h > max_pixels:
++            raise VLLMValidationError(
++                f"Image dimensions {w}x{h} ({w * h} pixels) exceed "
++                f"the maximum of {max_pixels} pixels. Set "
++                f"VLLM_MAX_IMAGE_PIXELS to increase this limit."
++            )
++        image = normalize_image(image)
++        with _image_decoder_errors():
+             image.load()
+-            converted = self._convert_image_mode(image)
+-        except (OSError, Image.UnidentifiedImageError) as e:
+-            raise ValueError(f"Failed to load image: {e}") from e
++        converted = self._convert_image_mode(image)
+ 
+         io_config = None
+         if converted is not image:
+             io_config = {
+@@ -173,13 +184,17 @@
+         if (
+             envs.VLLM_QWEN38_STRICT_IMAGE_CONTRACT
+             and media_type != "image/png"
+         ):
+-            raise ValueError(
++            raise VLLMValidationError(
+                 "The Qwen3.8 image contract requires the exact data-URL "
+                 f"media type 'image/png'; received {media_type!r}."
+             )
+-        return self.load_bytes(pybase64.b64decode(data, validate=True))
++        try:
++            decoded = pybase64.b64decode(data, validate=True)
++        except ValueError as exc:
++            raise VLLMValidationError(f"Invalid image base64: {exc}") from exc
++        return self.load_bytes(decoded)
+ 
+     def load_file(self, filepath: Path) -> MediaWithBytes[Image.Image]:
+         return self.load_bytes(filepath.read_bytes())
+ 
+diff --git a/vllm/renderers/hf.py b/vllm/renderers/hf.py
+--- a/vllm/renderers/hf.py
++++ b/vllm/renderers/hf.py
+@@ -26,8 +26,9 @@
+     load_chat_template,
+     parse_chat_messages,
+     parse_chat_messages_async,
+ )
++from vllm.exceptions import VLLMValidationError
+ from vllm.inputs import EmbedsPrompt
+ from vllm.inputs.engine import MultiModalInput
+ from vllm.logger import init_logger
+ from vllm.multimodal.hasher import MultiModalHasher
+@@ -652,11 +653,11 @@
+     unexpected_vars = {"chat_template", "tokenize"}
+     if raise_on_unexpected and (
+         unexpected_in_kwargs := unexpected_vars & chat_template_kwargs.keys()
+     ):
+-        raise ValueError(
++        raise VLLMValidationError(
+             "Found unexpected chat template kwargs from request: "
+-            f"{unexpected_in_kwargs}"
++            f"{unexpected_in_kwargs}", parameter="chat_template_kwargs",
+         )
+ 
+     fn_kw = {
+         k
+@@ -669,8 +670,12 @@
+     hf_base_params = _get_hf_base_chat_template_params()
+ 
+     accept_vars = (fn_kw | template_vars | hf_base_params) - unexpected_vars
+     return {k: v for k, v in chat_template_kwargs.items() if k in accept_vars}
++
++
++def _raise_template_validation_error(message: str) -> None:
++    raise VLLMValidationError(message, parameter="messages")
+ 
+ 
+ @overload
+ def safe_apply_chat_template(
+@@ -743,8 +748,12 @@
+         tokenizer=tokenizer,
+         chat_template=chat_template,
+         chat_template_kwargs=kwargs,
+     )
++    # Only the template's deliberate request guard declares a client error.
++    # Syntax, undefined variables and unexpected renderer failures retain
++    # their original server cause. Request kwargs cannot replace this guard.
++    resolved_kwargs["raise_exception"] = _raise_template_validation_error
+ 
+     # assistant_tokens_mask requires tokenized output — force tokenize=True.
+     if return_assistant_tokens_mask:
+         tokenize = True
+@@ -784,21 +793,15 @@
+     # consistently across v4 and v5.
+     if tokenize and "return_dict" not in resolved_kwargs:
+         resolved_kwargs["return_dict"] = False
+ 
+-    try:
+-        plain = tokenizer.apply_chat_template(
+-            conversation=conversation,  # type: ignore[arg-type]
+-            tools=tools,  # type: ignore[arg-type]
+-            chat_template=chat_template,
+-            tokenize=tokenize,
+-            **resolved_kwargs,
+-        )
+-    except Exception as e:
+-        logger.exception(
+-            "An error occurred in `transformers` while applying chat template"
+-        )
+-        raise ValueError(str(e)) from e
++    plain = tokenizer.apply_chat_template(
++        conversation=conversation,  # type: ignore[arg-type]
++        tools=tools,  # type: ignore[arg-type]
++        chat_template=chat_template,
++        tokenize=tokenize,
++        **resolved_kwargs,
++    )
+ 
+     if return_assistant_tokens_mask:
+         assert isinstance(plain, list), f"Expected list[int], got {type(plain)}"
+         return plain, None

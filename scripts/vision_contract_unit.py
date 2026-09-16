@@ -71,16 +71,16 @@ def test_decoder() -> str:
         image = Image.open(BytesIO(encoded))
         image.load()
         assert image.mode in ("RGB", "RGBA")
-        expect(ValueError, "IHDR bit depth 16", lambda: image_io.load_bytes(encoded))
+        expect(VLLMValidationError, "IHDR bit depth 16", lambda: image_io.load_bytes(encoded))
 
-    expect(ValueError, "requires image_mode='RGB'", lambda: ImageMediaIO(None))
+    expect(VLLMValidationError, "requires image_mode='RGB'", lambda: ImageMediaIO(None))
     expect(
-        ValueError,
+        VLLMValidationError,
         "pinned white",
         lambda: ImageMediaIO(rgba_background_color=(0, 0, 0)),
     )
     expect(
-        ValueError,
+        VLLMValidationError,
         "media type 'image/png'",
         lambda: image_io.load_base64("image/jpeg", "AA=="),
     )
@@ -88,21 +88,21 @@ def test_decoder() -> str:
     with BytesIO() as output:
         Image.new("RGB", (8, 8)).save(output, format="JPEG")
         jpeg_bytes = output.getvalue()
-    expect(ValueError, "only decoded PNG", lambda: image_io.load_bytes(jpeg_bytes))
+    expect(VLLMValidationError, "only decoded PNG", lambda: image_io.load_bytes(jpeg_bytes))
     expect(
-        ValueError,
+        VLLMValidationError,
         "only 8-bit RGB or RGBA",
         lambda: image_io.load_bytes(png_bytes("L", color=128)),
     )
     assert image_io.load_bytes(png_bytes(size=(30, 1))).media.size == (30, 1)
     assert image_io.load_bytes(png_bytes(size=(1, 30))).media.size == (1, 30)
     expect(
-        ValueError,
+        VLLMValidationError,
         "aspect ratio <= 30:1",
         lambda: image_io.load_bytes(png_bytes(size=(31, 1))),
     )
     expect(
-        ValueError,
+        VLLMValidationError,
         "aspect ratio <= 30:1",
         lambda: image_io.load_bytes(png_bytes(size=(1, 31))),
     )
@@ -119,7 +119,7 @@ def test_decoder() -> str:
             loop=0,
         )
         animated = output.getvalue()
-    expect(ValueError, "single-frame PNG", lambda: image_io.load_bytes(animated))
+    expect(VLLMValidationError, "single-frame PNG", lambda: image_io.load_bytes(animated))
     return rgb_bytes.hex()
 
 
