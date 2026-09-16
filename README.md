@@ -45,7 +45,8 @@ There is one supported mode:
 | Agent client | Qwen Code 0.21.12 at b965d5f8c24f48e65fb0b17c7d45f34ca4ce8f38 |
 | Agent-service release | Pinned by the agent-service release lock, which owns every agent and service image identity |
 | Agent-service listener | 127.0.0.1:8090 only |
-| Runtime profile | socket-isolated-nonroot-vision-k8v4-agent-v23 |
+| Launch profile and cache volume | socket-isolated-nonroot-vision-k8v4-agent-v21 |
+| Image profile | socket-isolated-nonroot-vision-k8v4-agent-v23 |
 | Runtime image | Awaiting adoption after the v23 build |
 
 This is not a text-only profile with an optional vision switch. It is not a

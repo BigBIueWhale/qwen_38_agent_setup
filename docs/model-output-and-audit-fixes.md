@@ -29,8 +29,7 @@ exact sampled IDs. The installed parser unit has 12 tests plus 126 subtests.
 The build check reconstructs and verifies every runtime file and runs the
 installed unit. No model, service or GPU was run.
 
-Still open in the owner's order: the written
-client commit review; final agent pins, final check and implementation report.
+The client review and release dependencies are recorded at the end of this document.
 
 ## Precise request errors on the served APIs
 
@@ -155,7 +154,7 @@ The standalone reasoning-usage unit also constructs the typed declarations.
 
 Terminal promotion and caller stops are covered by the EOS tool-output stage;
 schema conversion and the V1 thinking boundary have their own stages above.
-Exact token/text provenance is covered by its dedicated stage below.
+Exact token/text provenance is covered by its dedicated stage above.
 
 ## XML string and content fidelity
 
@@ -292,9 +291,8 @@ checks these resolution and serialization invariants and runs during `check` as
 well as image construction. The integrated generator and `build-vllm.sh check`
 pass with 22 reviewed stages, 96 deployment inputs and all installed CPU units.
 
-Correct initial and implicit reasoning-phase boundaries remain a separate open
-obligation with finding 17; supplying the correct budget alone does not fix its
-token accounting.
+The separate finding-17 stage above supplies the initial and implicit reasoning
+boundaries; budget resolution and phase accounting are both required.
 
 ## Finding 10: ship and execute the TurboQuant guards
 
@@ -374,8 +372,9 @@ build verifier and installed runtime verifier.
 ## Finding 13, S11, D2 and batch parity: the Qwen parser's tool language
 
 `vllm-qwen-exact-tool-language.patch` adds the fifteenth runtime source stage.
-Only a real `<tool_call>` token followed by exactly `\n<function=` starts a
-call. Bare function markup, stray openers, empty wrappers and unfinished
+The exact `<tool_call>\n<function=` trigger starts a call after reasoning.
+The phase-aware stage above recognizes both valid tokenizations of that trigger.
+Bare function markup, stray openers, empty wrappers and unfinished
 function headers return as content. With no declared tools or `tool_choice:
 none`, the model's call-shaped text remains visible and produces no call.
 
@@ -389,8 +388,8 @@ The batch tool pass receives the generated IDs after the parser's first exact
 reasoning boundary. Streaming retains those IDs when detokenization delays
 the corresponding text. Later markers inside a value cannot move the boundary.
 Content before and after calls keeps its order, and the parser exposes whether
-each call reached its actual closing wrapper. The remaining serving-layer EOS
-and stop-control work must use this observation before promotion is complete.
+each call reached its actual closing wrapper. The EOS tool-output stage uses
+this observation and the terminal cause to decide promotion.
 
 Validation: 3,833 parser-engine tests pass, including the preserved regression
 tests, 24 adversarial value/chunk combinations and two delayed-boundary cases.
@@ -404,8 +403,8 @@ verified in the image, build and runtime checks. The older reasoning-usage build
 unit now declares its test tool and uses marker IDs outside the ASCII range;
 the old mock assigned several letters the same IDs as reserved markers.
 
-This stage does not finish caller stop suppression, EOS promotion, schema type
-conversion or context-dependent scanner alignment. They remain open.
+The dedicated stages above complete caller stop suppression, EOS promotion,
+schema conversion and exact scanner positions.
 
 ## Finding 11: admit encoded PNG source pixels
 
@@ -499,9 +498,8 @@ parsed a second time.
 
 Text log probabilities retain their token bytes and alternatives in the completed
 item and terminal response. A truncated final text item is incomplete on both
-transports; the existing incomplete-call rule still suppresses arguments.done
-on the interrupted call. This change does not complete the remaining EOS/stop
-promotion work.
+transports. The EOS tool-output stage subsequently completes the call-promotion
+rule, retaining interrupted raw text instead of executable calls.
 
 Validation: 39 tests pass in an offline CPU container. Eight terminal-identity
 cases cover text, one/two calls, mixed reasoning/text/calls and length/normal ends;
@@ -613,9 +611,23 @@ modules join the upstream/final image hashes, copies, context allowlist and
 installed verification. The required generator and backend check pass for all
 28 stages and 104 deployment inputs. Image and archive adoption remain pending.
 
-## Remaining implementation
+## Retained decisions and release boundary
 
-Parser language, stop handling, schema conversion, protocol translation, image
-admission, remaining triage findings, client recovery verification and final
-backend/client pin adoption are still under review. Their completion is not
-implied by the finding-10 validation above.
+Finding #15 is workstation archive state, not a source defect. Archive verification
+remains mandatory. Finding #21's pre-SM-8.9 refusal remains deliberate: this is the
+SM 12.0/K8V4 deployment, with no older-device MSE fallback. The guard unit checks
+that refusal. The Chat half of #12 already follows its protocol and is unchanged.
+
+The owner stopped the expanded phase draft. Its sampling-failure/retry protocol,
+streaming-session redesign and undeployed runner/Rust/speculative changes were
+discarded without a backend commit. The retained #17 stage is the seven-file V1
+thinking-boundary correction described above. The agent retry commit `ddb85d0`
+was reverted by `2566435`; S9 was never implemented or committed.
+
+The client review lives in
+[`agent_service/docs/model-output-handling-review.md`](../../agent_service/docs/model-output-handling-review.md).
+The final implementation report and exact validation logs are under
+`/tmp/codex-fix/`. CPU source checks do not certify GPU execution or deployment.
+The coordinator must build and adopt the v23 image and archive, then synchronize
+the agent backend image ID before cutting the dependent agent-service release.
+The launch profile and cache volume remain v21; the image profile is v23.
