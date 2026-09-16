@@ -624,6 +624,29 @@ comparisons. A negative control makes both transports delete the same bare
 function text: equality still holds, but the S1 policy assertion fails. This is
 offline CPU evidence; the live model portion of the probe was not run.
 
+## Owner verification: retained Qwen name-validation fallback
+
+`qwen3_config` deliberately retains `validate_tool_names=False`, an explicit
+exception to the policy's suggested `True` defense in depth, as permitted by
+follow-up ruling 3. Native strict grammar already rejects undeclared names.
+When a complete, exactly wrapped unknown or whitespace-padded name nevertheless
+reaches the parser, its unchanged name and arguments remain available for the
+client's S5 unknown-tool error result. The brief requires that feedback behavior
+to stay. `True` instead demotes the entire call to raw text in both transports,
+which routes the client through the slipped-markup notice rather than the
+unknown-tool result. It does not delete that raw text.
+
+This preserves diagnostics without trimming names or deriving calls from prose;
+the exact trigger, observed closing wrapper and EOS gates still apply. The
+backend never executes a tool, and clients must validate registered names and
+arguments before execution. The installed parser unit already asserts unknown
+and padded name preservation for batch and both streaming chunk sizes. Six
+offline comparisons verify the behavior of both flag values, and actual
+XGrammar rejects both names while accepting the declared control. Evidence:
+`/tmp/codex-fix/followup-probe/name-validation.log`. Runtime and its contract
+remain unchanged; the retained-fallbacks section of the implementation report
+now records this decision explicitly.
+
 ## Retained decisions and release boundary
 
 Finding #15 is workstation archive state, not a source defect. Archive verification
