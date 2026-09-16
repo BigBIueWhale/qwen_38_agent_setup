@@ -267,7 +267,7 @@ It is intentionally reconstructed by thirty-three ordered, reviewed semantic tra
 | patches/vllm-qwen38-numerical-audits.patch | a73aa2f2ae3f82010eb2bafcdf663c2fe14854c30165dbc4d8457725bc3b6632 |
 | patches/vllm-turboquant-fail-closed-guards.patch | 7282d1d4d7a17b40ab8626c82f478bbb938c548451b7793df8233562a9e24c7c |
 | patches/vllm-kv-offload-pinning-fail-closed.patch | 1857071c38d081bb95e3cca12153cebce096649084950b99229104fdae029ca6 |
-| patches/vllm-shared-prefix-cache-and-user-capacity.patch | 77f85a4b77919819fd2809ec1444fb7c71485bccede2846334540385b2eee227 |
+| patches/vllm-shared-prefix-cache-and-user-capacity.patch | 736183bab22bb200053d38990ef0a51d7721a711542f241bde07f723aa2ce892 |
 | patches/vllm-exact-reasoning-usage.patch | c6a880c0a15056792286f74bf32a4e554f70de05a82615522086ef4ca1cf2db3 |
 | patches/vllm-anthropic-input-fidelity.patch | c2063d509fc90929f7d6018796f753da6445f12a4b4b19181e377f772b923a49 |
 | patches/vllm-qwen-exact-tool-language.patch | fe4e46cb7444c80646537da63ab1ac12c54e7eebb04c0735a4243d8b7e7943d2 |
@@ -290,9 +290,9 @@ It is intentionally reconstructed by thirty-three ordered, reviewed semantic tra
 | patches/vllm-token-text-provenance.patch | 954b36cb444f7e644e29d13f7a9d3c000512a0d616bbf2b6cd3cb8f4e880dd44 |
 | patches/vllm-precise-request-errors.patch | 717a7ee8905a9759b2c3db20538034122fa1f1e707d9d32cf9b09bbd8866fecf |
 
-The reconstructed tree has 102 reviewed runtime-source changes, 2 new runtime sources,
-7 runtime-source deletions, 73 existing-test changes, 12 new tests,
-3 test deletions, and 1 serving-documentation change. The authoritative
+The reconstructed tree has 100 reviewed runtime-source changes, 2 new runtime sources,
+7 runtime-source deletions, 71 existing-test changes, 12 new tests,
+and 3 test deletions. The authoritative
 counts are derived and printed by ./scripts/build-vllm.sh check, never restated
 by hand there. The landmark-aware Python patcher calculates every mutation
 (including file deletions) before writing, validates unique structural landmarks
@@ -314,11 +314,11 @@ Pinned build inputs and products:
 | Offline archive | artifacts/qwen38-vllm-images-runtime-v23.tar |
 | Archive size | Awaiting adoption after the v23 export |
 | Archive SHA-256 | Awaiting adoption after the v23 export |
-| Runtime Dockerfile SHA-256 | 9ff52e2f7e2da804a64c20c637e7e12d5f8b5a805a6239a0f7a3459e85b66ef3 |
-| Docker context allowlist SHA-256 | 13f25779da1f8b0a1a7acde26fc96bd9d4c1f3718bea4b784b1b4dc5d1265b65 |
-| Build verifier SHA-256 | 2f4ee3989c42b35044a2f6c225033a50a92c4885f3e33a3f63be081f89c51589 |
-| Runtime validator SHA-256 | 8f11ef441ee916ccb433b4b0551c1ed5a8750ae374a34655e2c947184ad61839 |
-| Runtime lock SHA-256 | eceb1a781bd14538e28f7c69a556b4ffbe8a0358b06cfb1daf3165d8ae22e594 |
+| Runtime Dockerfile SHA-256 | c1f32dfe23fe4e82cd05612d05ded3ff66e0d4538b994c1da08e0029d47afaf6 |
+| Docker context allowlist SHA-256 | a461af03bbe810de008c026350b4836dc4b44dec0bf79bae9e322b3ff4ef5fd1 |
+| Build verifier SHA-256 | 3052d75ce0451c9d58d2acbe0c23f80234cd282917994202860cc0815cd0faa9 |
+| Runtime validator SHA-256 | 086ee356c2411e6d952f51f5723561951877cfd6f6a0da9d45b36decc30ebd14 |
+| Runtime lock SHA-256 | 86a126a2420ffa79cdda9ac0a55a65959ea1e1f2987e50c97b4ccb8e410149fc |
 
 Every reviewed runtime file, including both TurboQuant kernels, is copied and
 hash-checked against its upstream and patched identities. A CPU Triton-interpreter
@@ -438,9 +438,10 @@ If all its cached blocks are evicted, the no-cache rule applies again.
 An input stream keeps one agent ID across all its chunks. Changing that ID is
 refused before the chunk is dispatched; a different agent starts a new generation
 request and goes through the same cache lookup rules.
-The `/generative_scoring` API requires the same ID and preserves it across
-all item generations in the request. Missing or invalid IDs receive HTTP 400
-before dispatch, with `body.kv_scope` identifying the field.
+The supported generation APIs are Chat Completions (including batch Chat),
+Completions, Responses, Anthropic Messages and token-in-token-out generate.
+These are five protocol families and six routes. Generative scoring and Cohere
+are not mounted; neither is part of this deployment's agent-identity contract.
 
 Shared blocks have references from each agent that uses them. Releasing one
 agent preserves references held by surviving contexts. Request completion
@@ -523,8 +524,9 @@ prompt can use extensive reasoning; a nearly full prompt cannot.
 The final counter starts only after the explicit reasoning-end marker. Tool XML is a
 structured tool phase, not visible final prose. EOS and stop sequences may end
 earlier; min_tokens cannot cross a hard phase ceiling. Chat, Completions, Responses,
-Anthropic Messages, and `/generate` all inherit the configured sampling and phase
-defaults. Clients may lower a phase ceiling for a
+Anthropic Messages, and `/inference/v1/generate` are the five supported generation
+families; batch Chat shares Chat's policy. All inherit the configured sampling and
+phase defaults. Clients may lower a phase ceiling for a
 deliberate request but cannot null or raise the server's final-response ceiling. A
 live five-real-token final-ceiling probe stopped at exactly five final tokens.
 
@@ -957,7 +959,7 @@ misleading server 500, whether they are typed request validation or the engine's
 request validation.
 
 Generation names its agent or does not happen. The protocol probe sends every
-mounted identity surface — Chat Completions and its batch form, Completions,
+one of the six mounted generation routes — Chat Completions and its batch form, Completions,
 Responses, Anthropic Messages, and token-in-token-out generate — a request that is
 complete except for `kv_scope`, and each answers HTTP 400 naming the field: as
 `error.param` on the OpenAI-shaped surfaces, and as an `invalid_request_error`

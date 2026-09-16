@@ -38,10 +38,6 @@ parameters may change generation settings but must retain that exact ID.
 An ID change is refused before dispatch and aborts only that stream's request.
 Another agent submits a new generation request, so prefix selection and
 reference acquisition follow the same rules as any other initial lookup.
-Generative scoring supplies one required ID for all scored items. Each item
-has its own engine request ID and uses the supplied agent ID for prefix
-selection and accounting. Typed HTTP admission rejects a missing, blank,
-or non-string ID with HTTP 400 before starting any item generation.
 
 ## Content and membership
 

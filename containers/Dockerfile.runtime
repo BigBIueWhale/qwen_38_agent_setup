@@ -293,16 +293,6 @@ RUN printf '%s  %s\n' \
   "${ASYNC_LLM_UPSTREAM_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/async_llm.py \
   | sha256sum --check --strict
 
-ARG GENERATIVE_SCORING_SERVING_UPSTREAM_FILE_SHA256
-RUN printf '%s  %s\n' \
-  "${GENERATIVE_SCORING_SERVING_UPSTREAM_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/generate/generative_scoring/serving.py \
-  | sha256sum --check --strict
-
-ARG GENERATIVE_SCORING_ROUTER_UPSTREAM_FILE_SHA256
-RUN printf '%s  %s\n' \
-  "${GENERATIVE_SCORING_ROUTER_UPSTREAM_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/generate/generative_scoring/api_router.py \
-  | sha256sum --check --strict
-
 ARG V1_SCHEDULER_UPSTREAM_FILE_SHA256
 RUN printf '%s  %s\n' \
   "${V1_SCHEDULER_UPSTREAM_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/core/sched/scheduler.py \
@@ -379,8 +369,6 @@ ARG STRUCTURED_OUTPUT_BACKEND_TYPES_PATCHED_FILE_SHA256
 ARG V1_OUTPUT_PROCESSOR_PATCHED_FILE_SHA256
 ARG V1_DETOKENIZER_PATCHED_FILE_SHA256
 ARG V1_SCHEDULER_PATCHED_FILE_SHA256
-ARG GENERATIVE_SCORING_ROUTER_PATCHED_FILE_SHA256
-ARG GENERATIVE_SCORING_SERVING_PATCHED_FILE_SHA256
 ARG ASYNC_LLM_PATCHED_FILE_SHA256
 ARG GEMMA4_PARSER_PATCHED_FILE_SHA256
 ARG GLM47_PARSER_PATCHED_FILE_SHA256
@@ -786,14 +774,6 @@ RUN printf '%s  %s\n' \
 COPY --chmod=0644 vllm/vllm/v1/engine/async_llm.py /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/async_llm.py
 RUN printf '%s  %s\n' \
   "${ASYNC_LLM_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/async_llm.py \
-  | sha256sum --check --strict
-COPY --chmod=0644 vllm/vllm/entrypoints/generate/generative_scoring/serving.py /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/generate/generative_scoring/serving.py
-RUN printf '%s  %s\n' \
-  "${GENERATIVE_SCORING_SERVING_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/generate/generative_scoring/serving.py \
-  | sha256sum --check --strict
-COPY --chmod=0644 vllm/vllm/entrypoints/generate/generative_scoring/api_router.py /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/generate/generative_scoring/api_router.py
-RUN printf '%s  %s\n' \
-  "${GENERATIVE_SCORING_ROUTER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/generate/generative_scoring/api_router.py \
   | sha256sum --check --strict
 COPY --chmod=0644 vllm/vllm/v1/core/sched/scheduler.py /usr/local/lib/python3.12/dist-packages/vllm/v1/core/sched/scheduler.py
 RUN printf '%s  %s\n' \

@@ -277,7 +277,10 @@ JSON transport. Internal engine bookkeeping fields are not request settings.
 Completions uses the remaining window when the total limit is omitted and inherits
 configured presence, thinking and final budgets. Chat also leaves an omitted
 presence penalty available for model defaulting; Responses applies configured
-`min_p`. All five generation surfaces inherit the same configured sampling policy.
+`min_p`. All five supported generation families inherit the same configured
+sampling policy: Chat (including batch Chat), Completions, Responses, Anthropic
+Messages and token-in-token-out generate. They expose six generation routes;
+generative scoring and Cohere are not mounted.
 A shared resolver enforces the server's final-answer ceiling even when a caller
 sends null or the unset sentinel.
 
@@ -587,29 +590,23 @@ required backend check passes for all 28 reviewed stages and 104 deployment
 inputs, with AsyncLLM included in upstream, final, image and installed hashes.
 The v23 image and archive remain awaiting adoption.
 
-## Shared prefixes: generative scoring admission
+## Owner verification: supported generation routes
 
-The shared-prefix transformation includes `/generative_scoring` in the served
-generation APIs. Its typed request requires a nonblank string `kv_scope` and
-passes the exact opaque ID to every scored item's sampling parameters. Each
-item keeps a distinct engine request ID. HTTP admission rejects a missing,
-blank or non-string ID with HTTP 400 and `body.kv_scope` before any item starts.
-The existing birth-only cache matching and shared-reference rules apply.
+Commit `8bb4f92` unnecessarily remounted generative scoring. Section 3 does not
+require that API, so the follow-up removes its registration and serving state
+from the shared-prefix transformation again. The scoring-specific deployment
+changes, source hashes, image copies, tests and serving-document changes are
+removed. Cohere remains unmounted. No shared-prefix ownership rule changes.
 
-Validation: 26 native scoring tests and 72 generation-protocol tests pass in
-offline CPU containers. The real in-memory HTTP route exercises admission,
-request-schema declarations, exact Unicode/whitespace IDs, per-item dispatch,
-scores and usage. Against the previous source, 17 new cases fail and nine
-unaffected cases pass. The installed shared-prefix unit checks the registered
-route, required identity and engine admission of each item's sampling parameters.
-Native live scoring tests use the same request field; they were updated but
-were not run because validation here starts no model, service or listener.
+The supported set is five protocol families and six generation routes, including
+batch Chat. The source protocol test and installed shared-prefix CPU unit check
+this exact supported set and the absence of both excluded API families. This
+also agrees with the image recipe's existing route-absence assertion. Historical
+scoring tests from `8bb4f92` are not evidence for a supported deployment surface.
 
-The reviewed shared-prefix stage, semantic contracts, source tests and comments
-all define the supported scoring API directly. Both newly modified scorer
-modules join the upstream/final image hashes, copies, context allowlist and
-installed verification. The required generator and backend check pass for all
-28 stages and 104 deployment inputs. Image and archive adoption remain pending.
+Validation: the installed route assertion fails against the remounted runtime
+and passes after excision. The shared-prefix CPU unit and all 72 protocol cases
+pass in offline containers. No cache ownership or eviction behavior changes.
 
 ## Retained decisions and release boundary
 
