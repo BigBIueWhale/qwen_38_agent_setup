@@ -167,3 +167,4 @@
 !vllm/vllm/reasoning/abs_reasoning_parsers.py
 !vllm/vllm/v1/sample/
 !vllm/vllm/v1/sample/thinking_budget_state.py
+!vllm/vllm/tool_parsers/utils.py

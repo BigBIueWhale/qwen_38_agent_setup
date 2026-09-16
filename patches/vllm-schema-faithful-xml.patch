@@ -1,0 +1,787 @@
+diff --git a/tests/parser/engine/test_qwen3.py b/tests/parser/engine/test_qwen3.py
+--- a/tests/parser/engine/test_qwen3.py
++++ b/tests/parser/engine/test_qwen3.py
+@@ -372,11 +372,10 @@
+         assert args_text
+         parsed = json.loads(args_text)
+         assert parsed == {"city": "Tokyo", "unit": "celsius"}
+ 
+-    def test_streaming_args_arrive_incrementally(self, parser, mock_request):
+-        """Arguments must stream as intermediate deltas, not batch at
+-        tool-end."""
++    def test_streaming_argument_json_waits_for_all_parameters(self, parser, mock_request):
++        """All parameter constraints are known before argument JSON is emitted."""
+         chunks = [
+             "<tool_call>\n",
+             "<function=get_weather>\n",
+             "<parameter=city>Tokyo</parameter>\n",
+@@ -394,18 +393,16 @@
+                 for tc in delta.tool_calls:
+                     if tc.function and tc.function.arguments:
+                         arg_deltas.append(tc.function.arguments)
+ 
+-        assert len(arg_deltas) > 1, (
+-            f"Expected arguments across multiple deltas, got {len(arg_deltas)}: "
+-            f"{arg_deltas}"
+-        )
++        assert collect_tool_arguments(results[:5]) == ""
++        assert len(arg_deltas) == 1
+         concatenated = "".join(arg_deltas)
+         parsed = json.loads(concatenated)
+         assert parsed == {"city": "Tokyo", "unit": "celsius", "days": "5"}
+ 
+-    def test_streaming_long_string_arg_before_parameter_end(self, parser, mock_request):
+-        """Long string arguments should stream before the closing parameter tag."""
++    def test_long_string_value_is_preserved_when_call_closes(self, parser, mock_request):
++        """Holding the call preserves every byte of a long parameter value."""
+         chunks = [
+             "<tool_call>\n",
+             "<function=write_report>\n",
+             "<parameter=content>",
+@@ -428,16 +425,9 @@
+                         all_arg_deltas.append(tc.function.arguments)
+                         if idx < 5:
+                             pre_close_arg_deltas.append(tc.function.arguments)
+ 
+-        assert len(pre_close_arg_deltas) > 1, (
+-            "Expected long string arguments to stream incrementally before "
+-            f"</parameter>, got {pre_close_arg_deltas}"
+-        )
+-        partial_args = "".join(pre_close_arg_deltas)
+-        assert partial_args.startswith('{"content": "Artificial intelligence')
+-        assert partial_args.endswith("external tools.")
+-        assert not partial_args.endswith('"}')
++        assert pre_close_arg_deltas == []
+ 
+         all_args = "".join(all_arg_deltas)
+         assert json.loads(all_args) == {
+             "content": (
+@@ -592,10 +582,9 @@
+ 
+         results = simulate_tool_streaming(parser, mock_request, chunks)
+ 
+         args_after_partial_tag = collect_tool_arguments(results[:4])
+-        assert "<param" not in args_after_partial_tag
+-        assert args_after_partial_tag == '{"query": "hello '
++        assert args_after_partial_tag == ""
+ 
+         args_text = collect_tool_arguments(results)
+         assert json.loads(args_text) == {"query": "hello ", "limit": "10"}
+ 
+diff --git a/tests/parser/engine/test_qwen_xml_fidelity.py b/tests/parser/engine/test_qwen_xml_fidelity.py
+--- a/tests/parser/engine/test_qwen_xml_fidelity.py
++++ b/tests/parser/engine/test_qwen_xml_fidelity.py
+@@ -33,27 +33,33 @@
+ def decode(ids):
+     return ''.join(REVERSE.get(i, chr(i)) for i in ids)
+ 
+ 
+-def parse(text, chunk_size, ids=None):
++def parse(text, chunk_size, ids=None, schema=None, finish='stop'):
++    tool = TOOL if schema is None else {
++        'type': 'function', 'function': {'name': 'write', 'parameters': schema},
++    }
+     request = ChatCompletionRequest(messages=[{'role': 'user', 'content': 'test'}],
+-                                    tools=[TOOL], tool_choice='auto')
++                                    tools=[tool], tool_choice='auto')
+     tokenizer = MagicMock()
+     tokenizer.get_vocab.return_value = MARKERS
+     tokenizer.decode.side_effect = decode
+     tokenizer.all_special_tokens = list(MARKERS)
+     tokenizer.all_special_ids = list(MARKERS.values())
+     parser = PARSER(tokenizer, request.tools, chat_template_kwargs={'enable_thinking': True})
+     ids = encode(text) if ids is None else ids
+     if chunk_size is None:
+-        reasoning, content, calls = parser.parse(text, request,
+-            enable_auto_tools=True, model_output_token_ids=ids)
++        reasoning, content, calls = parser.parse_output(text, request,
++            enable_auto_tools=True, model_output_token_ids=ids,
++            finish_reason=finish, stop_reason=None)
+         return reasoning or '', content or '', [c.arguments for c in calls or []]
+     reasoning, content, calls = '', '', {}
+     for start in range(0, len(ids), chunk_size):
+         group = ids[start:start+chunk_size]
+-        delta = parser.parse_delta(decode(group), group, request,
+-            prompt_token_ids=[1, 2, 3], finished=start+chunk_size >= len(ids))
++        delta = parser.parse_output_delta(decode(group), group, request,
++            prompt_token_ids=[1, 2, 3],
++            finish_reason=finish if start+chunk_size >= len(ids) else None,
++            stop_reason=None)
+         if delta is None:
+             continue
+         reasoning += delta.reasoning or ''
+         content += delta.content or ''
+@@ -83,7 +89,278 @@
+ @pytest.mark.parametrize('chunk_size', [None, 1, 3, 13])
+ @pytest.mark.parametrize('value', VALUES)
+ def test_partial_string_diagnostic_preserves_raw_value_bytes(value, chunk_size):
+     text = ('plan</think><tool_call>\n<function=write>\n<parameter=text>' + value)
+-    _, _, calls = parse(text, chunk_size)
++    _, _, calls = parse(text, chunk_size, finish='length')
+     assert len(calls) == 1
+     assert json.loads(calls[0]) == {'text': value}
++
++
++SCHEMA_CASES = [
++    pytest.param(
++        {'$defs': {'value': {'type': 'integer'}},
++         'properties': {'value': {'$ref': '#/$defs/value'}}},
++        '42', 42, id='root-reference-integer',
++    ),
++    pytest.param(
++        {'$defs': {'value': {'type': 'object', 'properties': {
++            'count': {'type': 'integer'}}, 'required': ['count']}},
++         'properties': {'value': {'$ref': '#/$defs/value'}}},
++        '{"count":42}', {'count': 42}, id='root-reference-object',
++    ),
++    pytest.param(
++        {'properties': {'value': {'const': 42}}},
++        '42', 42, id='constant-integer',
++    ),
++    pytest.param(
++        {'properties': {'value': {'type': ['string', 'null'], 'enum': ['null']}}},
++        'null', 'null', id='nullable-string-enum',
++    ),
++    pytest.param(
++        {'properties': {'value': {'anyOf': [
++            {'type': 'string', 'const': 'null'}, {'type': 'null'}]}}},
++        'null', 'null', id='ambiguous-null-preserves-text',
++    ),
++    pytest.param(
++        {'properties': {'value': {'allOf': [
++            {'type': ['integer', 'string']}, {'enum': ['42']}]}}},
++        '42', '42', id='intersection-preserves-string-enum',
++    ),
++    pytest.param(
++        {'allOf': [{'properties': {'value': {'type': 'integer'}}}]},
++        '42', 42, id='root-intersection-integer',
++    ),
++    pytest.param(
++        {'$defs': {'inner': {'type': 'integer'},
++                   'outer': {'$ref': '#/$defs/inner'}},
++         'properties': {'value': {'$ref': '#/$defs/outer'}}},
++        '42', 42, id='chained-reference',
++    ),
++    pytest.param(
++        {'$defs': {'a/b~c': {'type': 'integer'}},
++         'properties': {'value': {'$ref': '#/$defs/a~1b~0c'}}},
++        '42', 42, id='escaped-reference',
++    ),
++    pytest.param(
++        {'allOf': [{'type': 'object', 'properties': {'value': {'type': 'integer'}}}],
++         '$ref': '#/allOf/0'},
++        '42', 42, id='root-reference-through-array',
++    ),
++    pytest.param(
++        {'$defs': {'value': {'type': ['null', 'string']}},
++         'properties': {'value': {'$ref': '#/$defs/value', 'enum': ['null']}}},
++        'null', 'null', id='reference-sibling-enum',
++    ),
++    pytest.param(
++        {'properties': {'value': {'type': ['string', 'object']}}},
++        '{"count":42}', '{"count":42}', id='ambiguous-object-preserves-text',
++    ),
++    pytest.param(
++        {'properties': {'value': {'type': 'object', 'properties': {
++            'count': {'type': 'string'}}, 'required': ['count']}}},
++        '{"count":"42"}', {'count': '42'}, id='nested-json-types-are-already-encoded',
++    ),
++    pytest.param(
++        {'patternProperties': {'^val': {'type': 'integer'}}},
++        '42', 42, id='pattern-property',
++    ),
++    pytest.param(
++        {'additionalProperties': {'type': 'integer'}},
++        '42', 42, id='typed-additional-property',
++    ),
++    pytest.param(
++        {'const': {'value': 42}},
++        '42', 42, id='root-object-constant',
++    ),
++    pytest.param(
++        {'properties': {'value': {'type': ['string', 'null'], 'enum': ['null']}}},
++        '\nnull\n', 'null', id='nullable-enum-with-grammar-padding',
++    ),
++]
++
++
++@pytest.mark.parametrize('chunk_size', [None, 1, 3, 13])
++@pytest.mark.parametrize('schema,value,expected', SCHEMA_CASES)
++def test_xml_typing_preserves_the_resolved_schema(schema, value, expected, chunk_size):
++    from jsonschema import Draft202012Validator
++
++    schema = {'type': 'object', 'required': ['value'], **schema}
++    assert Draft202012Validator(schema).is_valid({'value': expected})
++    text = ('plan</think><tool_call>\n<function=write>\n<parameter=value>'
++            + value + '</parameter>\n</function>\n</tool_call>')
++    _, _, calls = parse(text, chunk_size, schema=schema)
++    assert len(calls) == 1
++    actual = json.loads(calls[0])
++    assert actual == {'value': expected}
++    assert type(actual['value']) is type(expected)
++    assert Draft202012Validator(schema).is_valid(actual)
++
++
++@pytest.mark.parametrize('chunk_size', [None, 1, 3, 13])
++@pytest.mark.parametrize('composition', ['oneOf', 'anyOf', 'conditional'])
++def test_whole_object_constraints_choose_only_a_valid_interpretation(
++    chunk_size, composition,
++):
++    from jsonschema import Draft202012Validator
++
++    schema = {
++        'type': 'object', 'required': ['kind', 'value'],
++        'properties': {'kind': {'type': 'string'},
++                       'value': {'type': ['integer', 'string']}},
++    }
++    numeric = {'properties': {'kind': {'const': 'number'},
++                               'value': {'type': 'integer'}}}
++    text = {'properties': {'kind': {'const': 'text'},
++                            'value': {'type': 'string'}}}
++    if composition == 'conditional':
++        schema.update({'if': {'properties': {'kind': {'const': 'number'}}},
++                       'then': numeric, 'else': text})
++    else:
++        schema[composition] = [numeric, text]
++    body = ('plan</think><tool_call>\n<function=write>\n'
++            '<parameter=kind>number</parameter>\n'
++            '<parameter=value>42</parameter>\n</function>\n</tool_call>')
++    _, _, calls = parse(body, chunk_size, schema=schema)
++    assert len(calls) == 1
++    arguments = json.loads(calls[0])
++    assert arguments == {'kind': 'number', 'value': 42}
++    assert Draft202012Validator(schema).is_valid(arguments)
++
++
++@pytest.mark.parametrize('chunk_size', [None, 1, 3, 13])
++@pytest.mark.parametrize('value', ['4', '{"count":4', 'true', 'null', ' 42 '])
++def test_unclosed_typed_parameter_keeps_its_raw_diagnostic(value, chunk_size):
++    schema = {'type': 'object', 'properties': {'value': {'type': 'integer'}}}
++    body = 'plan</think><tool_call>\n<function=write>\n<parameter=value>' + value
++    _, _, calls = parse(body, chunk_size, schema=schema, finish='length')
++    assert [json.loads(call) for call in calls] == [{'value': value}]
++
++
++@pytest.mark.parametrize('chunk_size', [None, 1, 13])
++@pytest.mark.parametrize('schema,value,expected', [
++    ({'$defs': {'count': {'type': 'integer'}},
++      'properties': {'value': {'$ref': '#/$defs/count'}}}, '\n42\n', 42),
++    ({'properties': {'value': {'type': ['string', 'null'], 'enum': ['null']}}},
++     '\nnull\n', 'null'),
++    ({'properties': {'value': {'type': 'object', 'properties': {
++        'count': {'type': 'string'}}, 'required': ['count'],
++        'additionalProperties': False}}}, '{"count":"42"}', {'count': '42'}),
++])
++def test_native_xml_grammar_and_parser_agree_on_value_types(
++    chunk_size, schema, value, expected,
++):
++    import xgrammar as xgr
++    from xgrammar.testing import _is_grammar_accept_string
++    from vllm.tool_parsers.structural_tag_registry import get_model_structural_tag
++
++    schema = {'type': 'object', 'required': ['value'],
++              'additionalProperties': False, **schema}
++    request = ChatCompletionRequest(messages=[], tools=[{
++        'type': 'function', 'function': {'name': 'write', 'parameters': schema},
++    }])
++    grammar = xgr.Grammar.from_structural_tag(get_model_structural_tag(
++        'qwen_3_coder', request.tools, 'auto', False,
++    ))
++    call = ('<tool_call>\n<function=write>\n<parameter=value>' + value
++            + '</parameter>\n</function>\n</tool_call>')
++    assert _is_grammar_accept_string(grammar, call)
++    _, _, calls = parse('plan</think>' + call, chunk_size, schema=schema)
++    assert [json.loads(call) for call in calls] == [{'value': expected}]
++
++
++@pytest.mark.parametrize('chunk_size', [None, 1, 13])
++@pytest.mark.parametrize('value,schema_type', [
++    ('1.000000000000000001', 'number'),
++    ('1e-400', 'number'),
++    ('1e400', 'number'),
++    ('{ "amount": 1.000000000000000001, "label": "42" }', 'object'),
++])
++def test_typed_json_value_keeps_its_original_representation(value, schema_type, chunk_size):
++    schema = {'type': 'object', 'properties': {'value': {'type': schema_type}}}
++    body = ('plan</think><tool_call>\n<function=write>\n<parameter=value>' + value
++            + '</parameter>\n</function>\n</tool_call>')
++    _, _, calls = parse(body, chunk_size, schema=schema)
++    assert calls == ['{"value": ' + value + '}']
++
++
++@pytest.mark.parametrize('chunk_size', [None, 13])
++def test_many_typed_properties_have_independent_interpretations(chunk_size):
++    expected = {f'field_{i}': i for i in range(128)}
++    schema = {'type': 'object', 'required': list(expected), 'properties': {
++        name: {'type': 'integer'} for name in expected
++    }}
++    body = 'plan</think><tool_call>\n<function=write>\n'
++    body += '\n'.join(f'<parameter={name}>{value}</parameter>'
++                      for name, value in expected.items())
++    body += '\n</function>\n</tool_call>'
++    _, _, calls = parse(body, chunk_size, schema=schema)
++    assert [json.loads(call) for call in calls] == [expected]
++
++
++@pytest.mark.parametrize('composition', ['conditional', 'anyOf'])
++def test_stable_discriminator_resolves_many_parameter_types(monkeypatch, composition):
++    import vllm.parser.qwen3 as qwen
++
++    expected = {'kind': 'number', **{f'field_{i}': i for i in range(20)}}
++    properties = {name: {'type': ['string', 'integer']} for name in expected}
++    properties['kind'] = {'type': 'string'}
++    numbers = {'properties': {name: {'type': 'integer'} for name in expected
++                              if name != 'kind'}}
++    numbers['properties']['kind'] = {'const': 'number'}
++    strings = {'properties': {name: {'type': 'string'} for name in expected}}
++    strings['properties']['kind'] = {'const': 'text'}
++    schema = {'type': 'object', 'properties': properties, 'required': list(expected)}
++    if composition == 'conditional':
++        schema.update({'if': {'properties': {'kind': {'const': 'number'}}},
++                       'then': numbers, 'else': strings})
++    else:
++        schema['anyOf'] = [numbers, strings]
++
++    actual_validator = qwen.Draft202012Validator
++    full_checks = 0
++
++    class CountedValidator:
++        def __init__(self, schema, **kwargs):
++            self.inner = actual_validator(schema, **kwargs)
++
++        def evolve(self, **kwargs):
++            return self.inner.evolve(**kwargs)
++
++        def is_valid(self, instance):
++            nonlocal full_checks
++            full_checks += 1
++            assert full_checks < 16, 'enumerated parameter combinations before narrowing'
++            return self.inner.is_valid(instance)
++
++    monkeypatch.setattr(qwen, 'Draft202012Validator', CountedValidator)
++    raw = '\n'.join(f'<parameter={name}>{value}</parameter>'
++                    for name, value in expected.items())
++    result = qwen._qwen3_arg_converter(raw, False, schema)
++    assert json.loads(result) == expected
++
++
++@pytest.mark.parametrize('chunk_size', [None, 1, 13])
++@pytest.mark.parametrize('value,schema_type', [
++    ('NaN', 'number'), ('Infinity', 'number'), ('108.', 'number'),
++    ('1', 'boolean'), ('TRUE', 'boolean'),
++    ('{"count":1,"count":2}', 'object'),
++])
++def test_invalid_value_is_preserved_for_client_validation(value, schema_type, chunk_size):
++    schema = {'type': 'object', 'properties': {'value': {'type': schema_type}}}
++    body = ('plan</think><tool_call>\n<function=write>\n<parameter=value>' + value
++            + '</parameter>\n</function>\n</tool_call>')
++    _, _, calls = parse(body, chunk_size, schema=schema)
++    assert [json.loads(call) for call in calls] == [{'value': value}]
++
++
++@pytest.mark.parametrize('chunk_size', [None, 1])
++def test_internal_decoder_failure_cannot_become_an_empty_call(monkeypatch, chunk_size):
++    import vllm.parser.qwen3 as qwen
++
++    def fail(*_):
++        raise ValueError('internal decoder failure')
++
++    monkeypatch.setattr(qwen, '_decode_xml_parameters', fail)
++    body = ('plan</think><tool_call>\n<function=write>\n<parameter=text>value'
++            '</parameter>\n</function>\n</tool_call>')
++    with pytest.raises(RuntimeError, match='Qwen XML argument decoding failed'):
++        parse(body, chunk_size)
+diff --git a/vllm/parser/engine/parser_engine.py b/vllm/parser/engine/parser_engine.py
+--- a/vllm/parser/engine/parser_engine.py
++++ b/vllm/parser/engine/parser_engine.py
+@@ -1237,18 +1237,15 @@
+             return None
+ 
+         slot = self._tool_slots[idx]
+         try:
+-            current_json = converter(slot.args, True)
++            current_json = self._convert_tool_arguments(slot.args, slot.name, True)
+         except (json.JSONDecodeError, ValueError, TypeError):
+             logger.debug("arg converter failed (streaming): %s", slot.args[:80])
+             return None
+ 
+         if not current_json:
+             return None
+-
+-        if slot.name:
+-            current_json = self._fix_arg_types(current_json, slot.name)
+ 
+         prev = slot.streamed_json
+         safe_json = self._safe_arg_prefix(current_json, slot.string_keys)
+ 
+@@ -1273,15 +1270,12 @@
+             return None
+ 
+         slot = self._tool_slots[idx]
+         try:
+-            final_json = converter(slot.args, False)
++            final_json = self._convert_tool_arguments(slot.args, slot.name, False)
+         except (json.JSONDecodeError, ValueError, TypeError):
+             logger.debug("arg converter failed (flush): %s", slot.args[:80])
+             return None
+-
+-        if final_json:
+-            final_json = self._fix_arg_types(final_json, slot.name)
+ 
+         prev = slot.streamed_json
+         if final_json and len(final_json) > len(prev):
+             if prev and not final_json.startswith(prev):
+@@ -1318,16 +1312,18 @@
+                 continue
+ 
+             name = slot.name
+             raw_body = slot.args
++            converted = False
+ 
+             if not name and raw_body.strip():
+                 name, args_json = self._extract_name_and_args(raw_body)
+             elif raw_body.strip():
+                 converter = self._arg_converter
+                 if converter is not None:
+                     try:
+-                        args_json = converter(raw_body, False)
++                        args_json = self._convert_tool_arguments(raw_body, name, False)
++                        converted = True
+                     except (json.JSONDecodeError, ValueError, TypeError):
+                         logger.debug(
+                             "arg converter failed (extract): %s", raw_body[:80]
+                         )
+@@ -1338,9 +1334,10 @@
+                 args_json = "{}"
+ 
+             if self._accept_tool_name(name):
+                 self._ensure_tool_id(slot, name)
+-                args_json = self._fix_arg_types(args_json, name)
++                if not converted:
++                    args_json = self._fix_arg_types(args_json, name)
+                 tool_calls.append(
+                     ToolCall(
+                         id=slot.id,
+                         function=FunctionCall(name=name, arguments=args_json),
+@@ -1386,8 +1383,16 @@
+ 
+         without_name = {k: v for k, v in parsed.items() if k != "name"}
+         return name, json.dumps(without_name, ensure_ascii=False)
+ 
++    def _convert_tool_arguments(
++        self, raw_args: str, func_name: str, partial: bool
++    ) -> str:
++        """Decode the format's arguments with their tool schema in scope."""
++        assert self._arg_converter is not None
++        result = self._arg_converter(raw_args, partial)
++        return self._fix_arg_types(result, func_name) if result else result
++
+     def _extract_args_json(self, raw_args: str, func_name: str) -> str:
+         if not raw_args.strip():
+             return "{}"
+         _, args = self._extract_name_and_args(raw_args)
+diff --git a/vllm/parser/qwen3.py b/vllm/parser/qwen3.py
+--- a/vllm/parser/qwen3.py
++++ b/vllm/parser/qwen3.py
+@@ -17,11 +17,15 @@
+ from __future__ import annotations
+ 
+ import functools
+ import json
++from itertools import product
+ from typing import TYPE_CHECKING
++from urllib.parse import unquote
+ 
+ import regex as re
++from jsonschema import Draft202012Validator
++from referencing import Registry
+ 
+ from vllm.parser.engine.events import EventType
+ from vllm.parser.engine.parser_engine import ParserEngine
+ from vllm.parser.engine.parser_engine_config import (
+@@ -29,8 +33,9 @@
+     ParserState,
+     TokenTerminal,
+     Transition,
+ )
++from vllm.tool_parsers.utils import find_tool_schema
+ 
+ if TYPE_CHECKING:
+     from vllm.entrypoints.openai.chat_completion.protocol import (
+         ChatCompletionRequest,
+@@ -59,28 +64,193 @@
+ )
+ _PARTIAL_PARAM_RE = re.compile(r"<parameter=([^>]+)>(.*)$", re.DOTALL)
+ 
+ 
+-def _qwen3_arg_converter(raw_args: str, partial: bool) -> str:
+-    params: dict[str, object] = {}
++class _XMLParameterSchema:
++    """Narrow lexical interpretations using the complete tool schema."""
++
++    def __init__(self, schema: dict, params: dict[str, str]):
++        self.schema = schema
++        self.validator = Draft202012Validator(schema, registry=Registry())
++        self.values: dict[str, object] = dict(params)
++        self.known: dict[str, object] = {}
++        self.unknown = set(params)
++
++    def _reference(self, reference: str) -> dict | bool | None:
++        if not reference.startswith("#/"):
++            return None
++        resolved = self.schema
++        for part in unquote(reference[2:]).split("/"):
++            key = part.replace("~1", "/").replace("~0", "~")
++            resolved = (
++                resolved[int(key)] if isinstance(resolved, list) else resolved[key]
++            )
++        return resolved
++
++    def _condition_is_known(self, schema, seen=frozenset()) -> bool:
++        if not isinstance(schema, dict) or not self.unknown:
++            return True
++        reference = schema.get("$ref")
++        if reference:
++            resolved = self._reference(reference)
++            if reference in seen or resolved is None:
++                return False
++            if not self._condition_is_known(resolved, seen | {reference}):
++                return False
++        if self.unknown.intersection(schema.get("properties", {})):
++            return False
++        if any(
++            re.search(pattern, name)
++            for pattern in schema.get("patternProperties", {})
++            for name in self.unknown
++        ):
++            return False
++        if any(key in schema for key in (
++            "const", "enum", "additionalProperties", "unevaluatedProperties",
++            "$dynamicRef", "$recursiveRef",
++        )):
++            return False
++        children = [
++            schema[key] for key in ("not", "if", "then", "else") if key in schema
++        ]
++        for key in ("allOf", "anyOf", "oneOf"):
++            children.extend(schema.get(key, []))
++        children.extend(schema.get("dependentSchemas", {}).values())
++        return all(self._condition_is_known(child, seen) for child in children)
++
++    def field(self, name: str):
++        return self.validator.evolve(schema=self._project(self.schema, name))
++
++    def _project(self, schema, name, seen=frozenset(), narrow=True):
++        if isinstance(schema, bool):
++            return schema
++        constraints = []
++        reference = schema.get("$ref")
++        if reference and reference not in seen:
++            resolved = self._reference(reference)
++            if resolved is not None:
++                constraints.append(
++                    self._project(resolved, name, seen | {reference}, narrow)
++                )
++        properties = schema.get("properties", {})
++        if name in properties:
++            constraints.append(properties[name])
++        patterns = schema.get("patternProperties", {})
++        matches = [pattern for pattern in patterns if re.search(pattern, name)]
++        constraints.extend(patterns[pattern] for pattern in matches)
++        if name not in properties and not matches and "additionalProperties" in schema:
++            constraints.append(schema["additionalProperties"])
++        if isinstance(schema.get("const"), dict) and name in schema["const"]:
++            constraints.append({"const": schema["const"][name]})
++        for keyword in ("allOf", "anyOf", "oneOf"):
++            if keyword not in schema:
++                continue
++            branches = schema[keyword]
++            if narrow and keyword != "allOf":
++                branches = [branch for branch in branches if all(
++                    self.validator.evolve(schema=self._project(
++                        branch, known_name, seen, False
++                    )).is_valid(value)
++                    for known_name, value in self.known.items()
++                )]
++            projected = [
++                self._project(branch, name, seen, narrow) for branch in branches
++            ]
++            constraints.append({"allOf" if keyword == "allOf" else "anyOf": projected})
++        if narrow and "if" in schema and self._condition_is_known(schema["if"]):
++            condition = self.validator.evolve(schema=schema["if"])
++            branch = "then" if condition.is_valid(self.values) else "else"
++            constraints.append(
++                self._project(schema.get(branch, True), name, seen, narrow)
++            )
++        return {"allOf": constraints} if constraints else True
++
++
++def _unique_json_object(pairs: list[tuple[str, object]]) -> dict:
++    result = dict(pairs)
++    if len(result) != len(pairs):
++        raise ValueError("Duplicate JSON member in an XML parameter")
++    return result
++
++
++def _reject_non_json_number(value: str):
++    raise ValueError(f"Non-JSON numeric literal in an XML parameter: {value}")
++
++
++def _decode_xml_parameters(params: dict[str, str], schema: dict) -> str:
++    """Decode only schema-proven JSON values; XML strings keep their bytes."""
++    context = _XMLParameterSchema(schema, params)
++    domains = []
++    for name, text in params.items():
++        field = context.field(name)
++        candidates = (
++            [(text, json.dumps(text, ensure_ascii=False))]
++            if field.is_valid(text) else []
++        )
++        unpadded = text.strip(" \t\r\n")
++        if unpadded != text and field.is_valid(unpadded):
++            candidates.append((unpadded, json.dumps(unpadded, ensure_ascii=False)))
++        try:
++            value = json.loads(
++                text, object_pairs_hook=_unique_json_object,
++                parse_constant=_reject_non_json_number,
++            )
++        except (json.JSONDecodeError, ValueError):
++            pass
++        else:
++            if not isinstance(value, str) and field.is_valid(value):
++                candidates.append((value, text))
++        if not candidates:
++            return json.dumps(params, ensure_ascii=False)
++        domains.append(candidates)
++    while True:
++        context.values = {name: values[0][0] for name, values in zip(params, domains)}
++        context.known = {name: values[0][0] for name, values in zip(params, domains)
++                         if len(values) == 1}
++        context.unknown = set(params) - context.known.keys()
++        narrowed = []
++        for name, values in zip(params, domains):
++            field = context.field(name)
++            narrowed.append([value for value in values if field.is_valid(value[0])])
++        if any(not values for values in narrowed):
++            return json.dumps(params, ensure_ascii=False)
++        if all(len(a) == len(b) for a, b in zip(domains, narrowed)):
++            break
++        domains = narrowed
++    # Independent property constraints narrow the domains first. The complete
++    # schema decides cross-property constraints and exclusive branches. Prefer
++    # the original string whenever it belongs to a valid interpretation.
++    for values in product(*domains):
++        decoded = {name: value[0] for name, value in zip(params, values)}
++        if context.validator.is_valid(decoded):
++            return "{" + ", ".join(
++                json.dumps(name, ensure_ascii=False) + ": " + value[1]
++                for name, value in zip(params, values)
++            ) + "}"
++    return json.dumps(params, ensure_ascii=False)
++
++
++def _qwen3_arg_converter(
++    raw_args: str, partial: bool, schema: dict | None = None
++) -> str:
++    params: dict[str, str] = {}
+ 
+     for match in _PARAM_RE.finditer(raw_args):
+         name = match.group(1)
+         value = match.group(2)
+         params[name] = value
+ 
+-    # The streaming path necessarily exposes a safe prefix of the final
+-    # parameter before it knows whether generation will close the XML tag.
+-    # Recover that same final parameter in batch mode too.  Complete arguments
+-    # are unchanged because _PARAM_RE removes every already-closed parameter;
+-    # this branch only has an effect on malformed or max-token-truncated XML.
++    # An unfinished parameter is a raw diagnostic on both transports.
+     remaining = _PARAM_RE.sub("", raw_args)
+     m = _PARTIAL_PARAM_RE.search(remaining)
+     if m:
+         name = m.group(1)
+         value = m.group(2)
+         if name:
+             params[name] = value
++
++    if schema and m is None:
++        return _decode_xml_parameters(params, schema)
+ 
+     return json.dumps(params, ensure_ascii=False)
+ 
+ 
+@@ -180,9 +350,9 @@
+         },
+         tool_preamble_text="\n",
+         validate_tool_names=False,
+         arg_converter=_qwen3_arg_converter,
+-        stream_arg_deltas=True,
++        stream_arg_deltas=False,
+         strip_trailing_reasoning_whitespace=False,
+         tool_args_json=False,
+     )
+ 
+@@ -210,8 +380,20 @@
+     TOOL_END = TOOL_CALL_END
+     # The reasoning pass forwards a tool span verbatim, so the batch tool
+     # pass splits on the same ids the streaming tool pass sees.
+     batch_tool_pass_uses_ids = True
++
++    def _convert_tool_arguments(
++        self, raw_args: str, func_name: str, partial: bool
++    ) -> str:
++        try:
++            return _qwen3_arg_converter(
++                raw_args, partial, find_tool_schema(self._tools, func_name)
++            )
++        except (TypeError, ValueError) as exc:
++            # Malformed parameter text is handled inside the decoder. An error
++            # here must not enter the engine's provisional-converter fallback.
++            raise RuntimeError("Qwen XML argument decoding failed") from exc
+ 
+     def extract_batch_content_ids(self, token_ids, *, token_offset: int = 0):
+         if not token_ids:
+             return ()
+diff --git a/vllm/tool_parsers/utils.py b/vllm/tool_parsers/utils.py
+--- a/vllm/tool_parsers/utils.py
++++ b/vllm/tool_parsers/utils.py
+@@ -268,27 +268,35 @@
+     else:
+         raise TypeError(f"Unsupported tool type: {type(tool)}")
+ 
+ 
+-def find_tool_properties(
++def find_tool_schema(
+     tools: list[Tool] | None,
+     tool_name: str,
+ ) -> dict[str, Any]:
+-    """Find a tool by name and return its properties dict, or {}."""
++    """Find a tool's complete parameter schema, including its definitions."""
+     if not tools:
+         return {}
+     for tool in tools:
+         if isinstance(tool, (FunctionTool, NamespaceTool)):
+             for name, params in iter_response_function_tool_info(tool):
+                 if name == tool_name:
+-                    return (params or {}).get("properties", {})
++                    return params or {}
+             continue
+         if not _is_function_tool(tool):
+             continue
+         name, params = _extract_tool_info(tool)
+         if name == tool_name:
+-            return (params or {}).get("properties", {})
++            return params or {}
+     return {}
++
++
++def find_tool_properties(
++    tools: list[Tool] | None,
++    tool_name: str,
++) -> dict[str, Any]:
++    """Find a tool by name and return its properties dict, or {}."""
++    return find_tool_schema(tools, tool_name).get("properties", {})
+ 
+ 
+ def find_tool_name(
+     tools: list[Tool] | None,

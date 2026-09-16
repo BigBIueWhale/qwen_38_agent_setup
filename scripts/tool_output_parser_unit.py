@@ -105,6 +105,55 @@ def parse(text, chunk_size, *, tools=None, choice="auto", ids=None,
 
 
 class ToolOutputParserTest(unittest.TestCase):
+    def test_xml_values_follow_the_complete_schema(self):
+        from jsonschema import Draft202012Validator
+        from xgrammar import Grammar
+        from xgrammar.testing import _is_grammar_accept_string
+        from vllm.tool_parsers.structural_tag_registry import get_model_structural_tag
+
+        for schema, value, expected in (
+            ({"$defs": {"count": {"type": "integer"}}, "properties": {
+                "text": {"$ref": "#/$defs/count"}}}, "\n42\n", 42),
+            ({"properties": {"text": {
+                "type": ["string", "null"], "enum": ["null"]}}},
+             "\nnull\n", "null"),
+            ({"properties": {"text": {"type": "object", "properties": {
+                "count": {"type": "string"}}, "required": ["count"],
+                "additionalProperties": False}}}, '{"count":"42"}', {"count": "42"}),
+        ):
+            schema = {"type": "object", "required": ["text"],
+                      "additionalProperties": False, **schema}
+            tool = {"type": "function", "function": {
+                "name": "write", "parameters": schema,
+            }}
+            tools = ChatCompletionRequest(messages=[], tools=[tool]).tools
+            grammar = Grammar.from_structural_tag(get_model_structural_tag(
+                "qwen_3_coder", tools, "auto", False,
+            ))
+            self.assertTrue(_is_grammar_accept_string(grammar, call(value)))
+            for chunk in (None, 1, 13):
+                with self.subTest(value=value, chunk=chunk):
+                    result = parse("plan</think>" + call(value), chunk, tools=[tool])
+                    self.assertEqual(json.loads(result[2][0][1]), {"text": expected})
+                    self.assertTrue(Draft202012Validator(schema).is_valid(
+                        json.loads(result[2][0][1])
+                    ))
+                    self.assertTrue(result[3])
+
+    def test_unfinished_numeric_parameter_stays_a_raw_diagnostic(self):
+        tool = {"type": "function", "function": {
+            "name": "write", "parameters": {
+                "type": "object", "properties": {"text": {"type": "integer"}},
+            },
+        }}
+        for chunk in (None, 1, 13):
+            with self.subTest(chunk=chunk):
+                result = parse("plan</think><tool_call>\n<function=write>\n"
+                               "<parameter=text> 123", chunk, tools=[tool],
+                               finish="length")
+                self.assertEqual(json.loads(result[2][0][1]), {"text": " 123"})
+                self.assertFalse(result[3])
+
     def test_call_limit_is_decided_by_the_grammar(self):
         from xgrammar import Grammar
         from xgrammar.testing import _is_grammar_accept_string

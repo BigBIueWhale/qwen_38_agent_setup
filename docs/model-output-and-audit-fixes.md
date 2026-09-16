@@ -29,9 +29,31 @@ exact sampled IDs. The installed parser unit has 12 tests plus 126 subtests.
 The build check reconstructs and verifies every runtime file and runs the
 installed unit. No model, service or GPU was run.
 
-Still open in the owner's order: schema
-#2/#18; token/text provenance #23; precise error classification; the written
+Still open in the owner's order: token/text provenance #23; precise error
+classification; the written
 client commit review; final agent pins, final check and implementation report.
+
+## Findings #2 and #18: schema-faithful Qwen XML arguments
+
+`vllm-schema-faithful-xml.patch` places decoding at the Qwen XML boundary,
+before raw parameter text loses its lexical meaning. The shared engine passes
+the tool name to the format converter on both transports; Qwen resolves the
+complete parameter schema instead of applying generic type coercion afterward.
+Nested JSON values keep their types and original serialized representation.
+
+The decoder checks string and JSON interpretations against resolved property
+constraints and validates the complete object. Known discriminator values narrow
+conditional and disjunctive branches before joint interpretation checks. Strings
+retain their bytes when valid; schema-required grammar padding is distinguished
+from value whitespace. A string enum containing "null" stays a string, even
+when null is also a declared type. Unclosed parameters and values with no valid
+interpretation remain raw; no partial value is repaired or coerced.
+
+Validation includes references and escaped pointers, enum/const/composition,
+conditional discriminators, native XGrammar acceptance, exact numeric/JSON
+representation, unfinished diagnostics, and batch/stream cuts. The installed
+parser unit has 14 tests. Parser, Chat and Responses regression results are
+recorded with the required source/image reconstruction check. No model ran.
 
 ## Finding #17: one-way thinking boundary on V1
 
@@ -86,13 +108,15 @@ The integrated generator and `build-vllm.sh check` pass with 27 reviewed stages,
 103 deployment inputs, 19 framework/recipe tests and every installed CPU unit.
 The standalone reasoning-usage unit also constructs the typed declarations.
 
-This correction leaves terminal promotion, caller-stop control, schema
-conversion, phase accounting and exact detokenizer provenance open.
+Terminal promotion and caller stops are covered by the EOS tool-output stage;
+schema conversion and the V1 thinking boundary have their own stages above.
+Exact token/text provenance remains the next open item.
 
 ## XML string and content fidelity
 
-`vllm-xml-text-fidelity.patch` preserves every byte inside an XML string parameter,
-including leading/trailing newlines and whitespace-only values. The converter's
+`vllm-xml-text-fidelity.patch` preserves every byte of an unconstrained XML string,
+including leading/trailing newlines and whitespace-only values. The schema
+stage above handles padding only where the complete schema requires it. The converter's
 newline-trimming helper is deleted. Named derivation stages remove inserted value
 padding from the historical tool-call template and its instruction example. The
 model's source template stays unchanged, and historical reasoning is retained.

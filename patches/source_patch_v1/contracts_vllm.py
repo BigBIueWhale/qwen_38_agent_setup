@@ -2332,6 +2332,48 @@ def _validate_thinking_boundary_after(state: State) -> None:
     }, label=label)
 
 
+def _validate_xml_schema_before(state: State) -> None:
+    label = "Qwen XML schema baseline"
+    forbid_text(state, "vllm/parser/qwen3.py", "class _XMLParameterSchema", label=label)
+    _require_in_symbol(state, "vllm/parser/engine/parser_engine.py",
+        "ParserEngine._flush_arg_converter", (
+            "final_json = converter(slot.args, False)",
+            "self._fix_arg_types(final_json, slot.name)",
+        ), label=label)
+
+
+def _validate_xml_schema_after(state: State) -> None:
+    label = "Schema-faithful Qwen XML arguments"
+    qwen = "vllm/parser/qwen3.py"
+    _require_in_symbol(state, qwen, "Qwen3Parser._convert_tool_arguments", (
+        "find_tool_schema(self._tools, func_name)", "_qwen3_arg_converter(",
+    ), label=label)
+    _require_in_symbol(state, qwen, "_qwen3_arg_converter", (
+        "if schema and m is None:", "return _decode_xml_parameters(params, schema)",
+    ), label=label)
+    _require_in_symbol(state, qwen, "_decode_xml_parameters", (
+        "object_pairs_hook=_unique_json_object", "parse_constant=_reject_non_json_number",
+        "context.known", "context.field(name)", "context.validator.is_valid(decoded)",
+        "json.dumps(name, ensure_ascii=False)",
+    ), label=label)
+    _require_in_symbol(state, qwen, "_XMLParameterSchema._project", (
+        'schema.get("$ref")', 'schema.get("properties", {})',
+        '("allOf", "anyOf", "oneOf")', 'self._condition_is_known(schema["if"])',
+    ), label=label)
+    _require_in_symbol(state, qwen, "qwen3_config", (
+        "stream_arg_deltas=False", "arg_converter=_qwen3_arg_converter",
+    ), label=label)
+    for symbol in ("_compute_arg_delta", "_flush_arg_converter", "_build_extracted_result"):
+        _require_in_symbol(state, "vllm/parser/engine/parser_engine.py",
+            "ParserEngine." + symbol, ("self._convert_tool_arguments(",), label=label)
+    require_python_symbols(state, "tests/parser/engine/test_qwen_xml_fidelity.py", {
+        "test_xml_typing_preserves_the_resolved_schema": None,
+        "test_native_xml_grammar_and_parser_agree_on_value_types": None,
+        "test_unclosed_typed_parameter_keeps_its_raw_diagnostic": None,
+        "test_stable_discriminator_resolves_many_parameter_types": None,
+    }, label=label)
+
+
 def validate_final(state: State) -> None:
     """Reassert every durable semantic invariant on the complete tree.
 
@@ -2347,6 +2389,21 @@ def validate_final(state: State) -> None:
 
 
 CONTRACTS: Mapping[str, SemanticContract] = {
+    "schema-faithful-xml": SemanticContract(
+        rationale=(
+            "The Qwen XML converter must resolve the complete tool schema and "
+            "validate its decoded object. Keep strings when valid, distinguish "
+            "grammar padding through constraints, preserve encoded JSON values, "
+            "and leave cut or untypable parameters raw. Narrow stable schema "
+            "branches before checking joint interpretations."
+        ),
+        removal_condition=(
+            "Remove when upstream decodes Qwen XML with the same complete-schema "
+            "and lexical-fidelity guarantees on batch and streaming output."
+        ),
+        validate_before=_validate_xml_schema_before,
+        validate_after=_validate_xml_schema_after,
+    ),
     "one-way-thinking-boundary": SemanticContract(
         rationale=(
             "Qwen ends thinking once, at its natural closer or implicit tool "

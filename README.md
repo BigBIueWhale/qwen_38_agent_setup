@@ -75,7 +75,7 @@ error.
   and relay readiness events, then validates the complete live configuration before
   reporting success. Re-running it validates the existing owned topology rather than
   starting a duplicate.
-- status.sh validates host prerequisites, thirty ordered vLLM transformations, every reviewed
+- status.sh validates host prerequisites, thirty-one ordered vLLM transformations, every reviewed
   source and test file, the model manifest, image archive, image identity and labels,
   command and environment, mounts, runtime packages, API identity, listener,
   hardening, and live health. HEALTHY means all checks passed.
@@ -95,7 +95,7 @@ Advanced reproducibility operations are deliberately separate from serving mode:
     ./scripts/build-vllm.sh build
     ./scripts/restore-images.sh
 
-The check reconstructs the source tree from the pinned upstream commit through all thirty
+The check reconstructs the source tree from the pinned upstream commit through all thirty-one
 landmark-aware transformations. The build runs offline from the exact base image and fails unless it produces
 the pinned image ID. Restore verifies the pinned local archive before loading it.
 
@@ -251,7 +251,7 @@ The vLLM submodule is pinned at:
 
     9df9b0b0a1816b6d0d0f6ecd0da563cc37fd72f5
 
-It is intentionally reconstructed by thirty ordered, reviewed semantic transformations:
+It is intentionally reconstructed by thirty-one ordered, reviewed semantic transformations:
 
 | Patch | SHA-256 |
 |---|---|
@@ -285,8 +285,9 @@ It is intentionally reconstructed by thirty ordered, reviewed semantic transform
 | patches/vllm-input-stream-agent-identity.patch | f812362220f83b904d56e55e9c359918990c55e39d7a0750d1011840d377dfb4 |
 | patches/vllm-tool-output-completion.patch | 9945b84b32a0c33b624e3ed1720aa9cc320f63a0fed5dce35761eb392d0849a5 |
 | patches/vllm-one-way-thinking-boundary.patch | 8c6a2ecae7785fffbfec61ec1a7f42428263feb07d1d3a6ff6ea126b366e0144 |
+| patches/vllm-schema-faithful-xml.patch | c78ca3f0b13d85635eafdc4f28f89adca5d3151a3ab5c98276a9202a1814af2d |
 
-The reconstructed tree has 98 reviewed runtime-source changes, 2 new runtime sources,
+The reconstructed tree has 99 reviewed runtime-source changes, 2 new runtime sources,
 7 runtime-source deletions, 71 existing-test changes, 12 new tests,
 3 test deletions, and 1 serving-documentation change. The authoritative
 counts are derived and printed by ./scripts/build-vllm.sh check, never restated
@@ -310,11 +311,11 @@ Pinned build inputs and products:
 | Offline archive | artifacts/qwen38-vllm-images-runtime-v23.tar |
 | Archive size | Awaiting adoption after the v23 export |
 | Archive SHA-256 | Awaiting adoption after the v23 export |
-| Runtime Dockerfile SHA-256 | 19411bfec6d6e74cd17720700cde55ce737a13735351190fb8554218d0b069af |
-| Docker context allowlist SHA-256 | 63554730631a8a1c34c46354907d7e0d6d92e12260c2c31493cbd4b0d5ec27cb |
-| Build verifier SHA-256 | a5c454f9777b6b6b0453961980eb73d703d4a2b403576b60d4afc9ea66a4dbb5 |
-| Runtime validator SHA-256 | b1494063436314011942408e24f04d2683ccdef2e3794649cc40735c5288e461 |
-| Runtime lock SHA-256 | dfc8ee5bc0239c63f8b3c278791371d377d2dad1dd9f3e0f3e06594f0320c229 |
+| Runtime Dockerfile SHA-256 | e44d82a176b4a84fa42ad608ff2cdff48d789aae79baa158c586555027c898b6 |
+| Docker context allowlist SHA-256 | b2b44053e8f10e4b772046033b194e230b9a7732fc851318682a73174aa81812 |
+| Build verifier SHA-256 | 446b8ffa4b6edb90e7b1c2a8d5dafb0efc15c81721f5efb0a6f08bfb2b22c4ec |
+| Runtime validator SHA-256 | 74d0c6d34b82f24362591775ea219419a7d5217f2690cdeff493bc08c7df422a |
+| Runtime lock SHA-256 | 42c93a72b6f6231a51c334a2d84db48658e68eddf952755116860822c61b0fb3 |
 
 Every reviewed runtime file, including both TurboQuant kernels, is copied and
 hash-checked against its upstream and patched identities. A CPU Triton-interpreter
@@ -781,7 +782,7 @@ The maximum was proved, not estimated:
 
 - fifteen distinct 4,096 x 4,096 images were encoded in one request;
 - every image used the full 16,777,216 source pixels;
-- the model transcribed all thirty independent pixel strings exactly;
+- the model transcribed all thirty-one independent pixel strings exactly;
 - the request used 246,022 prompt tokens and completed normally;
 - a sixteenth image was rejected before inference;
 - the exact native-context boundary with those fifteen images also passed.
@@ -893,8 +894,17 @@ argument content; only model EOS tokens serve as grammar terminators.
 Unknown emitted names and their whitespace remain exact for client error
 feedback. The parser does not silently delete or rename them.
 
-XML string parameters retain their exact leading and trailing whitespace,
-including newlines. The derived instruction example and historical tool calls put
+Qwen XML argument decoding uses the complete tool schema, including local
+references, enum/const constraints and composition. The complete decoded object
+must validate. A schema-valid raw string keeps all its bytes. Grammar padding
+is removed only when the schema requires that interpretation; ambiguous values
+prefer their original string representation. Encoded JSON objects, arrays and
+numbers keep their original representation. Cut or untypable values stay raw
+for diagnostics and client validation. All parameter constraints are available
+before argument JSON is emitted; executable calls still wait for EOS.
+
+Unconstrained XML strings retain leading/trailing whitespace and newlines.
+The derived instruction example and historical tool calls put
 only the actual value between parameter tags. Parsing, history rendering and
 grammar acceptance are checked together. Streaming and batch parsing also preserve
 nonempty content around calls byte for byte; a whitespace-only gap before a call
