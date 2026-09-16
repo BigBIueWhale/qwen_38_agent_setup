@@ -182,6 +182,53 @@ provenance are covered by the dedicated stages above.
 The integrated generator and `build-vllm.sh check` pass with 26 reviewed stages,
 102 deployment inputs, 19 framework/recipe tests and all installed CPU units.
 
+## The decoder owns the Qwen value language
+
+`vllm-qwen-owned-tool-grammar.patch` adds the thirty-fifth runtime source
+stage. vLLM registers its own `qwen_3_coder` structural tag, joining `hermes`,
+`minimax` and `kimi_k3`, and no longer consumes XGrammar's builtin Qwen
+template for this model.
+
+The reason is one rule the structural-tag API cannot express. XGrammar emits
+the Qwen value channel from C++ as `TagDispatch(excludes=("</parameter>"))`,
+excluding a value's own closer and nothing else, so `<parameter=` is ordinary
+value text. A value could therefore absorb the next parameter's opener, and the
+result was not a parse error: it was a different parse. The captured failure is
+exactly that -- one dropped `</` merged a path, an opener and a hundred
+kilobytes of body into a single argument, the required chain was then satisfied
+by an empty second parameter, and the call was published as well formed,
+ordered and schema-satisfying.
+
+The vLLM-owned builder excludes the opener as well. At the token that would
+complete `<parameter=`, the bitmask forbids it and the only legal continuations
+are more value text or the real closer, so the slip self-corrects at decode
+time into the call the model meant rather than being repaired afterwards.
+Everything else reproduces XGrammar's Qwen language exactly: the `[ \n\t]*`
+padding around every value, the ordered required chain, optional properties,
+additional properties, string enums and constants, local `$ref` resolution, and
+JSON productions for every non-string type. A pattern- or length-constrained
+string keeps XGrammar's own emission, whose branch drops the exclusion, so no
+call this deployment accepts today stops being accepted. The call-count limit
+is applied while building instead of by mutating a returned tag, and the
+now-unreachable mutation is deleted.
+
+What this forbids is real and worth stating: a tool argument can no longer
+carry the literal sequence `<parameter=`. That extends a limitation the format
+already had for the exact closer, and it is visible to the model rather than
+silent -- a tool author needing either sequence must use another
+representation, such as encoded input their tool decodes.
+
+Validation: the built tag is compared against XGrammar's own Qwen tag over
+eighteen schema shapes -- required, optional, additional, typed, enum, constant,
+union, nested object, array, local reference, reference to a string, and
+length-, minimum- and pattern-constrained strings -- across automatic and
+required choice, both reasoning settings, and `strict` true, false and absent.
+Every accepted and rejected string agrees except the merge itself, which the
+owned grammar rejects and XGrammar accepts. The call-count behaviour agrees
+with the deleted mutation on single, duplicate and trailing-text calls. Tests
+that placed the opener inside a value move with the grammar and still assert
+that every other marker stays value text.
+
 ## Canonical parameter framing
 
 `vllm-qwen-canonical-parameter-framing.patch` adds the thirty-fourth runtime
@@ -481,10 +528,12 @@ two startup-plan tests still pass. No GPU or model profiling was performed.
 
 `vllm-qwen-single-call-grammar.patch` adds the eighteenth runtime source stage.
 The request's `parallel_tool_calls` value reaches the Qwen structural-tag
-builder. With `false`, XGrammar's existing Qwen format stops after its first
-complete call. Automatic choice still allows an ordinary text answer;
-required choice still requires a call; named choice already contains one tag.
-The existing schema and reasoning prefix retain their behavior.
+builder. With `false`, the grammar stops after its first complete call.
+Automatic choice still allows an ordinary text answer; required choice still
+requires a call; named choice already contains one tag. The schema and
+reasoning prefix retain their behavior. This stage applied the limit by
+mutating the tag XGrammar returned; the Qwen grammar stage below owns the
+builder and applies it while building.
 
 The Chat response layer returns every call actually produced in both streaming
 and batch responses. Its old filtering module is deleted, including its image

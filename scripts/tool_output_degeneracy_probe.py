@@ -276,7 +276,7 @@ def controlled_policy_cases(
         ("S8_thinking_closer_in_value", "literal </think> in value"),
         (
             "S11_reserved_markup_in_value",
-            "literal </function> </tool_call> <parameter= in value",
+            "literal </function> </tool_call> <parameter in value",
         ),
     ):
         cases.append((

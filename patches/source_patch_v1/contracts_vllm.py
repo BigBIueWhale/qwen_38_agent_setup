@@ -1732,12 +1732,14 @@ def _validate_single_call_before(state: State) -> None:
 
 def _validate_single_call_after(state: State) -> None:
     label = "Call-count grammar result"
+    # This stage's durable guarantee is that the response layer no longer drops
+    # calls and that the request's limit reaches the tag builder. Where the
+    # limit is then applied is owned by the Qwen grammar contract: this stage
+    # applied it to XGrammar's returned tag, the Qwen builder now applies it
+    # while building, and this validator also runs against the complete tree.
     _require_in_symbol(state, "vllm/tool_parsers/structural_tag_registry.py",
                        "get_model_structural_tag", (
-        'model == "qwen_3_coder" and parallel_tool_calls is False',
-        'suffix.stop_after_first = True',
-        'get_xgrammar_model_structural_tag(', 'reasoning=reasoning',
-        'isinstance(suffix, TagFormat)', 'raise RuntimeError(',
+        "parallel_tool_calls",
     ), label=label)
     _require_in_symbol(state, "vllm/tool_parsers/abstract_tool_parser.py",
                        "ToolParser.get_structural_tag", (
@@ -2091,6 +2093,84 @@ def _validate_raw_image_after(state: State) -> None:
             "test_render_json_generate_preserves_source_images_tokens_salt_and_identity": None,
             "test_native_image_processing_retains_exact_spans_and_full_cache_data": None,
         }, label=label)
+
+
+def _validate_qwen_grammar_before(state: State) -> None:
+    forbid_text(state, "vllm/tool_parsers/structural_tag_registry.py",
+                "get_qwen_3_coder_structural_tag",
+                label="Qwen-owned tool grammar precondition")
+
+
+def _validate_qwen_grammar_after(state: State) -> None:
+    label = "Qwen-owned tool grammar result"
+    registry = "vllm/tool_parsers/structural_tag_registry.py"
+    require_python_symbols(state, registry, {
+        "get_qwen_3_coder_structural_tag": (
+            "tools", "builtin_tools", "tool_choice", "reasoning",
+            "parallel_tool_calls",
+        ),
+        "_qwen_raw_value": (),
+        "_qwen_value": ("prop", "root"),
+        "_qwen_arguments": ("parameters",),
+        "_qwen_resolve": ("prop", "root", "seen"),
+        "_qwen_definitions": ("root",),
+        "_qwen_embed": ("schema", "root"),
+    }, label=label)
+    # A property is embedded in the tag on its own, so the root definition
+    # tables must travel with it or its references dangle and the tool stops
+    # building at all. The parameters document may itself be a wrapper, whose
+    # unresolved ``properties`` would leave every argument unconstrained.
+    _require_in_symbol(state, registry, "_qwen_value", (
+        "_qwen_embed(resolved, root)",
+    ), label=label)
+    _require_in_symbol(state, registry, "_qwen_arguments", (
+        "resolved = _qwen_resolve(parameters, root)",
+        'properties = resolved.get("properties")',
+        'required = set(resolved.get("required") or [])',
+    ), label=label)
+    # An unresolvable local reference is refused by the JSON channel, never
+    # answered with the raw any-text channel.
+    _require_in_symbol(state, registry, "_qwen_value", (
+        'reference = resolved.get("$ref")',
+        'reference.startswith("#/")',
+    ), label=label)
+    require_text(state, registry, '@register_vllm_structural_tag("qwen_3_coder")',
+                 label=label)
+    require_text(state, registry,
+                 'frozenset({"hermes", "kimi_k3", "qwen_3_coder"})', label=label)
+    require_text(state, registry, '_QWEN_PARAM_OPEN = "<parameter="', label=label)
+    require_text(state, registry, '_QWEN_PARAM_CLOSE = "</parameter>"', label=label)
+    # The whole point of owning the tag: an unconstrained value may carry
+    # neither its own closer nor the next parameter's opener, so a value can
+    # never absorb the opener and publish one call as another.
+    _require_in_symbol(state, registry, "_qwen_raw_value", (
+        "excludes=[_QWEN_PARAM_OPEN, _QWEN_PARAM_CLOSE]",
+    ), label=label)
+    # A length- or pattern-constrained string keeps XGrammar's own emission,
+    # which drops the exclusion on that branch: reproducing it exactly means no
+    # call this deployment accepts today stops being accepted.
+    _require_in_symbol(state, registry, "_qwen_value", (
+        "_QWEN_STRING_CONSTRAINTS",
+        '_qwen_padded(RegexFormat(pattern="[^]" + bound))',
+    ), label=label)
+    # The call count is decided while building, not by mutating a returned tag.
+    _require_in_symbol(state, registry, "get_qwen_3_coder_structural_tag", (
+        "single_call = parallel_tool_calls is False",
+        "stop_after_first=single_call",
+    ), label=label)
+    forbid_text(state, registry, "suffix.stop_after_first = True", label=label)
+    _require_in_symbol(state, "vllm/parser/qwen3.py", "_qwen3_arg_converter", (
+        "_unframe_parameter_value(value, complete=True)",
+    ), label=label)
+    require_python_symbols(state, "tests/tool_parsers/test_structural_tag_registry.py", {
+        "test_qwen3_value_cannot_absorb_the_next_parameter_opener": None,
+        "test_qwen3_auto_with_parallel_off_ends_the_turn_after_one_call": None,
+        "test_qwen3_auto_tool_choice_is_constrained_without_strict": None,
+        "test_qwen3_nested_reference_keeps_the_root_definition_tables": None,
+        "test_qwen3_root_composition_still_binds_every_property": None,
+        "test_qwen3_unresolvable_local_reference_is_refused": None,
+        "test_qwen3_external_reference_stays_unconstrained": None,
+    }, label=label)
 
 
 def _validate_canonical_framing_before(state: State) -> None:
@@ -2513,6 +2593,22 @@ def validate_final(state: State) -> None:
 
 
 CONTRACTS: Mapping[str, SemanticContract] = {
+    "qwen-owned-tool-grammar": SemanticContract(
+        rationale=(
+            "XGrammar's Qwen value channel excludes only the parameter closer, "
+            "so a value could absorb the next parameter's opener and publish a "
+            "different call that was still well formed, ordered and "
+            "schema-satisfying. The exclusion cannot be reached through the "
+            "structural-tag API, so vLLM owns the Qwen tag and excludes the "
+            "opener too, reproducing every other production exactly."
+        ),
+        removal_condition=(
+            "Remove when XGrammar's Qwen template excludes the parameter opener "
+            "from unconstrained values, or lets a caller supply the exclusions."
+        ),
+        validate_before=_validate_qwen_grammar_before,
+        validate_after=_validate_qwen_grammar_after,
+    ),
     "qwen-canonical-parameter-framing": SemanticContract(
         rationale=(
             "The Qwen XML transport pads every parameter value, and the model "

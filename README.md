@@ -294,6 +294,7 @@ It is intentionally reconstructed by thirty-three ordered, reviewed semantic tra
 | patches/vllm-token-text-provenance.patch | 954b36cb444f7e644e29d13f7a9d3c000512a0d616bbf2b6cd3cb8f4e880dd44 |
 | patches/vllm-precise-request-errors.patch | 055c3348b1a0c801ad6c8202d13659471106d0ff8a9b958efe1df16e25e9e588 |
 | patches/vllm-qwen-canonical-parameter-framing.patch | 6725caf33ac3ab55d1acede045808c5f37585e658900e770c226477b0be5e302 |
+| patches/vllm-qwen-owned-tool-grammar.patch | 060dd836444bc07171b55021d4b946ef71c33b974276407150a77969a9bc7396 |
 
 The reconstructed tree has 100 reviewed runtime-source changes, 2 new runtime sources,
 7 runtime-source deletions, 71 existing-test changes, 12 new tests,
@@ -922,6 +923,16 @@ prefer their original string representation. Encoded JSON objects, arrays and
 numbers keep their original representation. Cut or untypable values stay raw
 for diagnostics and client validation. All parameter constraints are available
 before argument JSON is emitted; executable calls still wait for EOS.
+
+An unconstrained parameter value may carry neither its own `</parameter>`
+closer nor the next parameter's `<parameter=` opener. vLLM owns the Qwen
+structural tag so it can exclude both: excluding only the closer let a value
+absorb the following opener, which produced not a parse error but a different,
+well-formed, schema-satisfying call. Every other production reproduces
+XGrammar's Qwen language exactly, and a pattern- or length-constrained string
+keeps XGrammar's own emission. A tool argument therefore cannot carry the
+literal `<parameter=`, the same limitation the format already had for the exact
+closer; tool authors needing either sequence must use another representation.
 
 A parameter value is framed by the transport, not by the value. The served
 template renders `<parameter=NAME>`, a newline, the value, a newline, and

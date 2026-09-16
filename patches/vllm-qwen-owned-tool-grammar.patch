@@ -1,0 +1,740 @@
+diff --git a/vllm/tool_parsers/structural_tag_registry.py b/vllm/tool_parsers/structural_tag_registry.py
+--- a/vllm/tool_parsers/structural_tag_registry.py
++++ b/vllm/tool_parsers/structural_tag_registry.py
+@@ -49,6 +49,7 @@
+         list[BuiltinToolParam],
+         SimplifiedToolChoice,
+         bool,
++        bool | None,
+     ],
+     StructuralTag,
+ ]
+@@ -63,14 +64,13 @@
+         "deepseek_r1",
+         "deepseek_v3_1",
+         "qwen_3_5",
+-        "qwen_3_coder",
+         "qwen_3",
+         "deepseek_v3_2",
+         "glm_4_7",
+         "deepseek_v4",
+     }
+ )
+-VLLM_BUILTIN_STRUCTURAL_TAG_MODELS = frozenset({"hermes", "kimi_k3"})
++VLLM_BUILTIN_STRUCTURAL_TAG_MODELS = frozenset({"hermes", "kimi_k3", "qwen_3_coder"})
+ SUPPORTED_STRUCTURAL_TAG_MODELS = (
+     XGRAMMAR_BUILTIN_STRUCTURAL_TAG_MODELS | VLLM_BUILTIN_STRUCTURAL_TAG_MODELS
+ )
+@@ -146,35 +146,19 @@
+             builtin_tools,
+             simplified_tool_choice,
+             reasoning,
++            parallel_tool_calls,
+         )
+ 
+     if model not in XGRAMMAR_BUILTIN_STRUCTURAL_TAG_MODELS:
+         supported = sorted(SUPPORTED_STRUCTURAL_TAG_MODELS)
+         raise ValueError(f"Unknown format type: {model}, supported types: {supported}")
+ 
+-    tag = get_xgrammar_model_structural_tag(
++    return get_xgrammar_model_structural_tag(
+         model=model,
+         tools=dumped_tools,
+         tool_choice=dumped_tool_choice,
+         reasoning=reasoning,
+     )
+-    if model == "qwen_3_coder" and parallel_tool_calls is False:
+-        # The grammar owns the call count. Preserve XGrammar's Qwen schema
+-        # and reasoning prefix and end the turn after the first complete tag.
+-        suffix = tag.format
+-        if reasoning:
+-            if not isinstance(suffix, SequenceFormat) or len(suffix.elements) != 2:
+-                raise RuntimeError(
+-                    "XGrammar returned an unexpected Qwen reasoning format"
+-                )
+-            suffix = suffix.elements[1]
+-        if isinstance(suffix, (TriggeredTagsFormat, TagsWithSeparatorFormat)):
+-            suffix.stop_after_first = True
+-        elif not isinstance(suffix, TagFormat):
+-            # A named choice already consists of one tag. Every other shape
+-            # contradicts the format contract; never silently ignore the limit.
+-            raise RuntimeError("XGrammar returned an unexpected Qwen tool format")
+-    return tag
+ 
+ 
+ def _dump_tool_for_xgrammar(
+@@ -642,3 +626,316 @@
+     return StructuralTag(
+         format=SequenceFormat(elements=[*_k3_response_prefix(), tools_part, trailer])
+     )
++
++
++# ---------------------------------------------------------------------------
++# Qwen3 XML tool calls
++# ---------------------------------------------------------------------------
++# <tool_call>
++# <function=NAME>
++# <parameter=KEY>
++# VALUE
++# </parameter>
++# </function>
++# </tool_call>
++#
++# vLLM owns this tag instead of consuming XGrammar's builtin because the
++# language needs one rule XGrammar's converter cannot be asked for: an
++# unconstrained string value must not contain ``<parameter=``. That channel is
++# emitted from C++ as ``TagDispatch(excludes=("</parameter>"))`` with no Python
++# lever, so a value could absorb the next parameter's opener and still parse --
++# as a different call that is well formed, ordered and schema-satisfying, which
++# is why the slip was published rather than rejected. Excluding the opener makes
++# the merge ungrammatical at decode time: the bitmask forbids the token that
++# would complete it, and the only legal continuations are more value text or the
++# real closer, so the slip self-corrects into the call the model meant.
++#
++# Every other production reproduces XGrammar's Qwen language exactly, including
++# its ``[ \n\t]*`` padding around every value, its ordered required chain, and
++# its treatment of enums, constants, references and constrained strings.
++_QWEN_PARAM_OPEN = "<parameter="
++_QWEN_PARAM_CLOSE = "</parameter>"
++_QWEN_CALL_BEGIN_PREFIX = "<tool_call>\n<function="
++_QWEN_CALL_BEGIN_SUFFIX = ">\n"
++_QWEN_CALL_END = "\n</function>\n</tool_call>"
++_QWEN_CALL_TRIGGER = "<tool_call>\n<function="
++_QWEN_THINK_END = "</think>"
++_QWEN_THINK_SUFFIX = "\n\n"
++_QWEN_THINK_EXCLUDE_TOKENS = ["<think>", "</think>"]
++_QWEN_WHITESPACE = r"[ \n\t]*"
++_QWEN_VARIABLE_NAME = r"[a-zA-Z_][a-zA-Z0-9_]*"
++# A string carrying any of these is emitted by XGrammar as a regex instead of
++# the raw channel, and that branch drops the closer exclusion. Reproducing it
++# exactly keeps every call this deployment accepts today accepted; the opener
++# exclusion is added only where XGrammar used the unconstrained channel.
++_QWEN_STRING_CONSTRAINTS = ("pattern", "format", "minLength", "maxLength")
++
++
++def _qwen_raw_value() -> AnyTextFormat:
++    """The raw string channel: any text carrying neither parameter marker.
++
++    Both markers are named explicitly because ``TagFormat`` folds its ``end``
++    into the content's excludes only when the text format is its direct
++    content, and this channel is also used nested inside a sequence.
++    """
++    return AnyTextFormat(excludes=[_QWEN_PARAM_OPEN, _QWEN_PARAM_CLOSE])
++
++
++def _qwen_whitespace() -> RegexFormat:
++    return RegexFormat(pattern=_QWEN_WHITESPACE)
++
++
++def _qwen_padded(content: Any) -> SequenceFormat:
++    """Wrap a value in the grammar padding XGrammar writes around every one."""
++    return SequenceFormat(elements=[_qwen_whitespace(), content, _qwen_whitespace()])
++
++
++def _qwen_definitions(root: dict[str, Any]) -> dict[str, Any]:
++    """The root's definition tables, which a sliced sub-schema still needs."""
++    return {
++        key: root[key]
++        for key in ("$defs", "definitions")
++        if isinstance(root.get(key), dict)
++    }
++
++
++def _qwen_embed(schema: dict[str, Any], root: dict[str, Any]) -> dict[str, Any]:
++    """Re-attach the root definition tables to a schema sliced out of it.
++
++    Slicing a property out of the parameters document orphans every
++    ``#/$defs/...`` reference inside it, so the tables travel with it or the
++    embedded schema cannot be compiled at all.
++    """
++    definitions = _qwen_definitions(root) if isinstance(root, dict) else {}
++    if not definitions:
++        return schema
++    embedded = dict(schema)
++    for key, value in definitions.items():
++        embedded.setdefault(key, value)
++    return embedded
++
++
++def _qwen_resolve(prop: Any, root: dict[str, Any], seen: tuple[str, ...] = ()) -> Any:
++    """Follow local ``$ref`` and single-branch ``allOf`` far enough to type it.
++
++    Only the channel decision needs this: a property that resolves to a string
++    rides the raw channel, and every other resolved type is real JSON. An
++    unresolvable reference is left alone and handled as an unknown type.
++    """
++    if not isinstance(prop, dict):
++        return prop
++    reference = prop.get("$ref")
++    if (
++        isinstance(reference, str)
++        and reference.startswith("#/")
++        and reference not in seen
++    ):
++        resolved: Any = root
++        try:
++            for part in reference[2:].split("/"):
++                key = part.replace("~1", "/").replace("~0", "~")
++                resolved = (
++                    resolved[int(key)]
++                    if isinstance(resolved, list)
++                    else resolved[key]
++                )
++        except (KeyError, IndexError, ValueError, TypeError):
++            return prop
++        siblings = {key: value for key, value in prop.items() if key != "$ref"}
++        target = _qwen_resolve(resolved, root, seen + (reference,))
++        return {**(target if isinstance(target, dict) else {}), **siblings}
++    branches = prop.get("allOf")
++    if isinstance(branches, list) and len(branches) == 1:
++        inner = _qwen_resolve(branches[0], root, seen)
++        if isinstance(inner, dict):
++            return {**inner, **{k: v for k, v in prop.items() if k != "allOf"}}
++    return prop
++
++
++def _qwen_value(prop: Any, root: dict[str, Any]) -> Any:
++    """Build the value production for one parameter."""
++    resolved = _qwen_resolve(prop, root)
++    if not isinstance(resolved, dict) or not resolved:
++        return _qwen_raw_value()
++    reference = resolved.get("$ref")
++    if isinstance(reference, str) and reference.startswith("#/"):
++        # A local reference this builder could not follow -- missing, or
++        # circular. Hand the schema and its definition tables to the JSON
++        # channel so XGrammar decides it exactly as it does for every other
++        # model: a dangling reference is refused outright, and a self-referring
++        # one compiles to a production nothing satisfies. Answering an
++        # unresolvable schema with "any text" would fail open.
++        return _qwen_padded(JSONSchemaFormat(json_schema=_qwen_embed(resolved, root)))
++    json_type = resolved.get("type")
++    enum_values = resolved.get("enum")
++    if enum_values is None and isinstance(resolved.get("const"), str):
++        enum_values = [resolved["const"]]
++    if (
++        isinstance(enum_values, list)
++        and enum_values
++        and all(isinstance(value, str) for value in enum_values)
++    ):
++        branches = [ConstStringFormat(value=value) for value in enum_values]
++        return _qwen_padded(
++            branches[0] if len(branches) == 1 else OrFormat(elements=branches)
++        )
++    if json_type == "string":
++        if any(key in resolved for key in _QWEN_STRING_CONSTRAINTS):
++            pattern = resolved.get("pattern")
++            if isinstance(pattern, str):
++                return _qwen_padded(RegexFormat(pattern=pattern))
++            minimum = resolved.get("minLength", 0)
++            maximum = resolved.get("maxLength")
++            minimum = minimum if isinstance(minimum, int) and minimum >= 0 else 0
++            bound = (
++                f"{{{minimum},}}"
++                if not isinstance(maximum, int)
++                else f"{{{minimum},{maximum}}}"
++            )
++            return _qwen_padded(RegexFormat(pattern="[^]" + bound))
++        return _qwen_raw_value()
++    if (
++        json_type is None
++        or isinstance(json_type, list)
++        or {"anyOf", "oneOf"} & resolved.keys()
++    ):
++        # Includes a non-local ``$ref``, which XGrammar also leaves
++        # unconstrained.
++        # XGrammar's ``xml_any`` is the raw channel unioned with JSON arrays and
++        # objects, and both of those are already raw text without a closer, so
++        # the union accepts exactly the raw channel's language.
++        return _qwen_raw_value()
++    return _qwen_padded(JSONSchemaFormat(json_schema=_qwen_embed(resolved, root)))
++
++
++def _qwen_any_parameter(extra: Any, root: dict[str, Any]) -> TagFormat:
++    """One parameter whose name the schema does not declare."""
++    return TagFormat(
++        begin=_QWEN_PARAM_OPEN,
++        content=SequenceFormat(
++            elements=[
++                RegexFormat(pattern=_QWEN_VARIABLE_NAME + ">"),
++                _qwen_value(extra if isinstance(extra, dict) else {}, root),
++            ]
++        ),
++        end=_QWEN_PARAM_CLOSE,
++    )
++
++
++def _qwen_arguments(parameters: dict[str, Any] | bool) -> Any:
++    """Build a tool's argument body: declared order, required chain, extras."""
++    if not isinstance(parameters, dict):
++        return StarFormat(
++            content=SequenceFormat(
++                elements=[_qwen_whitespace(), _qwen_any_parameter(None, {})]
++            )
++        )
++    # The parameters document may itself be a ``$ref`` or a single-branch
++    # ``allOf`` wrapper. Reading ``properties`` straight off the wrapper finds
++    # none and leaves every argument unconstrained, so the body is read off the
++    # resolved document while references still resolve against the original.
++    root = parameters
++    resolved = _qwen_resolve(parameters, root)
++    if not isinstance(resolved, dict):
++        resolved = parameters
++    properties = resolved.get("properties")
++    additional = resolved.get("additionalProperties")
++    if not isinstance(properties, dict) or not properties:
++        if additional is False:
++            return _qwen_whitespace()
++        return StarFormat(
++            content=SequenceFormat(
++                elements=[
++                    _qwen_whitespace(),
++                    _qwen_any_parameter(additional, root),
++                ]
++            )
++        )
++    required = set(resolved.get("required") or [])
++    elements: list[Any] = [_qwen_whitespace()]
++    for key, prop in properties.items():
++        tag = TagFormat(
++            begin=f"{_QWEN_PARAM_OPEN}{key}>",
++            content=_qwen_value(prop, root),
++            end=_QWEN_PARAM_CLOSE,
++        )
++        elements.append(tag if key in required else OptionalFormat(content=tag))
++        elements.append(_qwen_whitespace())
++    if additional is not False:
++        elements.append(
++            StarFormat(
++                content=SequenceFormat(
++                    elements=[
++                        _qwen_any_parameter(additional, root),
++                        _qwen_whitespace(),
++                    ]
++                )
++            )
++        )
++    return SequenceFormat(elements=elements)
++
++
++def _qwen_tool_tags(tools: list[FunctionToolParam]) -> list[TagFormat]:
++    return [
++        TagFormat(
++            begin=(
++                f"{_QWEN_CALL_BEGIN_PREFIX}{tool.function.name}"
++                f"{_QWEN_CALL_BEGIN_SUFFIX}"
++            ),
++            content=_qwen_arguments(get_function_parameters(tool.function)),
++            end=_QWEN_CALL_END,
++        )
++        for tool in tools
++    ]
++
++
++@register_vllm_structural_tag("qwen_3_coder")
++def get_qwen_3_coder_structural_tag(
++    tools: list[FunctionToolParam],
++    builtin_tools: list[BuiltinToolParam],
++    tool_choice: SimplifiedToolChoice,
++    reasoning: bool,
++    parallel_tool_calls: bool | None = None,
++) -> StructuralTag:
++    del builtin_tools
++
++    tags = _qwen_tool_tags(tools)
++    # The grammar owns the call count: with parallel calls off the turn ends
++    # after the first complete tag, so nothing produced has to be dropped
++    # afterwards and the model is never shown a turn with less in it than it
++    # generated. A forced choice is already exactly one tag.
++    single_call = parallel_tool_calls is False
++
++    if tool_choice == "auto":
++        suffix_tag: Any = (
++            TriggeredTagsFormat(
++                triggers=[_QWEN_CALL_TRIGGER],
++                tags=tags,
++                excludes=_QWEN_THINK_EXCLUDE_TOKENS,
++                stop_after_first=single_call,
++            )
++            if tags
++            else AnyTextFormat(excludes=_QWEN_THINK_EXCLUDE_TOKENS)
++        )
++    elif tool_choice == "forced":
++        if not tags:
++            raise ValueError("Forced tool choice must resolve to exactly one tool.")
++        suffix_tag = tags[0]
++    else:
++        suffix_tag = TagsWithSeparatorFormat(
++            tags=tags,
++            separator="\n",
++            at_least_one=True,
++            stop_after_first=single_call,
++        )
++
++    if not reasoning:
++        return StructuralTag(format=suffix_tag)
++
++    prefix_tag = SequenceFormat(
++        elements=[
++            TagFormat(begin="", content=AnyTextFormat(), end=_QWEN_THINK_END),
++            ConstStringFormat(value=_QWEN_THINK_SUFFIX),
++        ]
++    )
++    return StructuralTag(format=SequenceFormat(elements=[prefix_tag, suffix_tag]))
+diff --git a/vllm/parser/qwen3.py b/vllm/parser/qwen3.py
+--- a/vllm/parser/qwen3.py
++++ b/vllm/parser/qwen3.py
+@@ -59,8 +59,10 @@
+ PARAM_END = "</parameter>"
+ 
+ # A value ends only at its own closer.  The grammar excludes ``</parameter>``
+-# from values and nothing else, so any other markup inside a value is the
+-# value's text; a value with no closer is the final, cut-off one.
++# and ``<parameter=`` from an unconstrained value and nothing else, so any
++# other markup inside a value -- ``</function>``, ``</tool_call>``, a bare
++# ``<parameter`` -- is the value's text; a value with no closer is the final,
++# cut-off one.
+ _PARAM_RE = re.compile(
+     r"<parameter=([^>]*)>"
+     r"(.*?)"
+diff --git a/tests/tool_parsers/test_structural_tag_registry.py b/tests/tool_parsers/test_structural_tag_registry.py
+--- a/tests/tool_parsers/test_structural_tag_registry.py
++++ b/tests/tool_parsers/test_structural_tag_registry.py
+@@ -509,9 +509,7 @@
+     assert sample_tools_strict[0].function.parameters is not None
+ 
+ 
+-@pytest.mark.parametrize(
+-    "model", sorted(XGRAMMAR_BUILTIN_STRUCTURAL_TAG_MODELS - {"qwen_3_coder"})
+-)
++@pytest.mark.parametrize("model", sorted(XGRAMMAR_BUILTIN_STRUCTURAL_TAG_MODELS))
+ def test_auto_tool_choice_skips_structural_tag_without_strict(
+     model: str,
+     sample_tools: list[ChatCompletionToolsParam],
+@@ -543,8 +541,53 @@
+     assert fmt["triggers"] == ["<tool_call>\n<function="]
+     assert fmt["excludes"] == ["<think>", "</think>"]
+     assert fmt["stop_after_first"] is False
+-    assert fmt["tags"][0]["content"]["json_schema"] == (
+-        sample_tools[0].function.parameters
++
++    call_tag = fmt["tags"][0]
++    assert call_tag["begin"] == "<tool_call>\n<function=get_weather>\n"
++    assert call_tag["end"] == "\n</function>\n</tool_call>"
++    # The declared property binds by name, in order, and its value rides the
++    # raw channel with both parameter markers excluded.
++    parameter = next(
++        element
++        for element in call_tag["content"]["elements"]
++        if element.get("type") == "tag"
++    )
++    assert parameter["begin"] == "<parameter=city>"
++    assert parameter["end"] == "</parameter>"
++    assert parameter["content"]["type"] == "any_text"
++    assert parameter["content"]["excludes"] == ["<parameter=", "</parameter>"]
++
++
++def test_qwen3_value_cannot_absorb_the_next_parameter_opener(sample_tools):
++    """The merge that published one call as another is ungrammatical.
++
++    A value that runs past its closer used to be more value text, so a dropped
++    ``</`` produced a different call that was still well formed, ordered and
++    schema-satisfying -- and was executed. With the opener excluded the model
++    cannot complete it: the only legal continuations are more value text or the
++    real closer.
++    """
++    grammar = _qwen3_grammar("auto", None, tools=sample_tools)
++    body = "<tool_call>\n<function=get_weather>\n{}\n</function>\n</tool_call>"
++
++    assert _is_grammar_accept_string(
++        grammar, body.format("<parameter=city>Paris</parameter>")
++    )
++    assert _is_grammar_accept_string(
++        grammar, body.format("<parameter=city>\nParis\n</parameter>")
++    )
++    # Every other marker, and a bare ``<parameter`` with no ``=``, stay legal.
++    for value in ("a</function>b", "a</tool_call>b", "a<tool_call>b", "a<parameter b"):
++        assert _is_grammar_accept_string(
++            grammar, body.format(f"<parameter=city>{value}</parameter>")
++        ), value
++    # The captured merge: the value absorbs the next opener, and the required
++    # chain is then satisfied by an empty second parameter.
++    assert not _is_grammar_accept_string(
++        grammar,
++        body.format(
++            "<parameter=city>Paris\nparameter>\n<parameter=unit>C</parameter>"
++        ),
+     )
+ 
+ 
+@@ -657,6 +700,210 @@
+     assert not _is_grammar_accept_string(
+         grammar, _QWEN3_CALL.replace("city", "colour")
+     )
++
++
++def _qwen_schema_tools(parameters: dict) -> list[ChatCompletionToolsParam]:
++    return [
++        ChatCompletionToolsParam(
++            type="function",
++            function={"name": "get_weather", "parameters": parameters},
++        )
++    ]
++
++
++def _qwen_call(key: str, value: str) -> str:
++    return (
++        f"<tool_call>\n<function=get_weather>\n"
++        f"<parameter={key}>{value}</parameter>\n</function>\n</tool_call>"
++    )
++
++
++@pytest.mark.parametrize(
++    ("key", "parameters", "accepted", "rejected"),
++    [
++        # A property that is a reference whose target references again.
++        (
++            "v",
++            {
++                "type": "object",
++                "additionalProperties": False,
++                "$defs": {
++                    "inner": {"type": "integer"},
++                    "outer": {
++                        "type": "object",
++                        "properties": {"k": {"$ref": "#/$defs/inner"}},
++                        "required": ["k"],
++                    },
++                },
++                "properties": {"v": {"$ref": "#/$defs/outer"}},
++                "required": ["v"],
++            },
++            '{"k": 1}',
++            '{"k": "s"}',
++        ),
++        # An inline object property carrying a reference of its own.
++        (
++            "o",
++            {
++                "type": "object",
++                "additionalProperties": False,
++                "$defs": {"c": {"type": "integer"}},
++                "properties": {
++                    "o": {
++                        "type": "object",
++                        "properties": {"k": {"$ref": "#/$defs/c"}},
++                        "required": ["k"],
++                    }
++                },
++                "required": ["o"],
++            },
++            '{"k": 1}',
++            '{"k": "s"}',
++        ),
++        # An array whose items are a reference.
++        (
++            "xs",
++            {
++                "type": "object",
++                "additionalProperties": False,
++                "$defs": {"c": {"type": "integer"}},
++                "properties": {
++                    "xs": {"type": "array", "items": {"$ref": "#/$defs/c"}}
++                },
++                "required": ["xs"],
++            },
++            "[1, 2]",
++            '["a"]',
++        ),
++        # ``definitions`` is the older spelling of the same table.
++        (
++            "v",
++            {
++                "type": "object",
++                "additionalProperties": False,
++                "definitions": {"c": {"type": "integer"}},
++                "properties": {"v": {"$ref": "#/definitions/c"}},
++                "required": ["v"],
++            },
++            "7",
++            "x",
++        ),
++    ],
++)
++def test_qwen3_nested_reference_keeps_the_root_definition_tables(
++    key, parameters, accepted, rejected
++):
++    """Slicing a property out of the document must not orphan its references.
++
++    A property is embedded in the tag on its own, so the root ``$defs`` /
++    ``definitions`` tables have to travel with it. Without them the reference
++    dangles and the grammar cannot be built at all -- the tool stops working
++    rather than becoming permissive, which no test reached before.
++    """
++    grammar = Grammar.from_structural_tag(
++        get_model_structural_tag(
++            model="qwen_3_coder",
++            tools=_qwen_schema_tools(parameters),
++            tool_choice="auto",
++            reasoning=False,
++        )
++    )
++
++    assert _is_grammar_accept_string(grammar, _qwen_call(key, accepted))
++    assert not _is_grammar_accept_string(grammar, _qwen_call(key, rejected))
++
++
++@pytest.mark.parametrize(
++    "parameters",
++    [
++        {
++            "allOf": [
++                {
++                    "type": "object",
++                    "properties": {"v": {"type": "integer"}},
++                    "required": ["v"],
++                }
++            ]
++        },
++        {
++            "$defs": {
++                "body": {
++                    "type": "object",
++                    "properties": {"v": {"type": "integer"}},
++                    "required": ["v"],
++                }
++            },
++            "$ref": "#/$defs/body",
++        },
++    ],
++)
++def test_qwen3_root_composition_still_binds_every_property(parameters):
++    """A wrapper around the parameters document does not relax it.
++
++    Reading ``properties`` off the wrapper finds none, which used to leave
++    every argument unconstrained -- accepting values the declared schema
++    forbids.
++    """
++    grammar = Grammar.from_structural_tag(
++        get_model_structural_tag(
++            model="qwen_3_coder",
++            tools=_qwen_schema_tools(parameters),
++            tool_choice="auto",
++            reasoning=False,
++        )
++    )
++
++    assert _is_grammar_accept_string(grammar, _qwen_call("v", "7"))
++    assert not _is_grammar_accept_string(grammar, _qwen_call("v", "notnum"))
++
++
++def test_qwen3_unresolvable_local_reference_is_refused():
++    """An unresolvable schema is refused, never answered with "any text".
++
++    XGrammar refuses a dangling local reference for every model it builds, and
++    the Qwen builder must not turn that refusal into an unconstrained value.
++    """
++    tag = get_model_structural_tag(
++        model="qwen_3_coder",
++        tools=_qwen_schema_tools(
++            {
++                "type": "object",
++                "additionalProperties": False,
++                "properties": {"v": {"$ref": "#/$defs/missing"}},
++                "required": ["v"],
++            }
++        ),
++        tool_choice="auto",
++        reasoning=False,
++    )
++
++    with pytest.raises(RuntimeError):
++        Grammar.from_structural_tag(tag)
++
++
++def test_qwen3_external_reference_stays_unconstrained():
++    """A reference this builder cannot follow at all is not a local one.
++
++    XGrammar leaves an external ``$ref`` unconstrained, so the raw channel is
++    kept for it rather than routed into the refusal above.
++    """
++    grammar = Grammar.from_structural_tag(
++        get_model_structural_tag(
++            model="qwen_3_coder",
++            tools=_qwen_schema_tools(
++                {
++                    "type": "object",
++                    "additionalProperties": False,
++                    "properties": {"v": {"$ref": "https://example.com/s.json"}},
++                    "required": ["v"],
++                }
++            ),
++            tool_choice="auto",
++            reasoning=False,
++        )
++    )
++
++    assert _is_grammar_accept_string(grammar, _qwen_call("v", "anything"))
+ 
+ 
+ def test_get_function_parameters_relaxes_function_strict_false():
+diff --git a/tests/parser/engine/test_qwen3.py b/tests/parser/engine/test_qwen3.py
+--- a/tests/parser/engine/test_qwen3.py
++++ b/tests/parser/engine/test_qwen3.py
+@@ -293,11 +293,11 @@
+             assert result.content == text
+ 
+     def test_markup_inside_a_value_is_the_value(self, parser, mock_request):
+-        """Only ``</parameter>`` ends a value, as in the grammar."""
++        """Only the two excluded markers end a value, as in the grammar."""
+         text = (
+             "<tool_call>\n<function=write_file>\n"
+             "<parameter=path>t.jinja</parameter>\n"
+-            "<parameter=content>{{ x }}</function>\n<parameter=y>\n"
++            "<parameter=content>{{ x }}</function>\n<parameter y>\n"
+             "</tool_call></parameter>\n"
+             "</function>\n</tool_call>"
+         )
+@@ -306,7 +306,7 @@
+         assert [tc.function.name for tc in result.tool_calls] == ["write_file"]
+         assert json.loads(result.tool_calls[0].function.arguments) == {
+             "path": "t.jinja",
+-            "content": "{{ x }}</function>\n<parameter=y>\n</tool_call>",
++            "content": "{{ x }}</function>\n<parameter y>\n</tool_call>",
+         }
+         assert parser.tool_calls_complete is True
+         assert result.content is None
+@@ -500,7 +500,7 @@
+             "<tool_call>",
+             "\n<function=write_file>\n",
+             "<parameter=content>{{ x }}</function>\n",
+-            "<parameter=y>\n</tool_call></parameter>\n",
++            "<parameter y>\n</tool_call></parameter>\n",
+             "</function>\n",
+             "</tool_call>",
+         ]
+@@ -515,7 +515,7 @@
+         )
+ 
+         assert json.loads(args_text) == {
+-            "content": "{{ x }}</function>\n<parameter=y>\n</tool_call>"
++            "content": "{{ x }}</function>\n<parameter y>\n</tool_call>"
+         }
+         assert parser.tool_calls_complete is True
+ 
+diff --git a/tests/parser/engine/test_delegating_replay.py b/tests/parser/engine/test_delegating_replay.py
+--- a/tests/parser/engine/test_delegating_replay.py
++++ b/tests/parser/engine/test_delegating_replay.py
+@@ -225,11 +225,11 @@
+ @pytest.mark.parametrize("chunk_size", [1, 3, 13, None])
+ @pytest.mark.parametrize("value", [
+     "before</function>after", "before</tool_call></think>after",
+-    "before<parameter=literal>after", "before< /parameter >after",
++    "before<parameter literal>after", "before< /parameter >after",
+     "before</parameter >after", "before</tool_call><tool_call></think>after",
+ ])
+ def test_qwen_value_markup_is_identical_in_batch_and_stream(chunk_size, value):
+-    """Only the exact parameter closer is structural within a value."""
++    """Only the two excluded parameter markers are structural in a value."""
+     parser_cls = next(p.parser_cls for p in _PAIRINGS if p.name == "qwen3")
+     vocab = {text: 20000 + n for n, text in enumerate([
+         "<think>", "</think>", "<tool_call>", "</tool_call>",

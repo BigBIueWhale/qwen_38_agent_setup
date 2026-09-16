@@ -234,10 +234,17 @@ class ToolOutputParserTest(unittest.TestCase):
                     self.assertEqual(parse("plan</think>" + body, chunk)[:3],
                                      ("plan", body, []))
 
-    def test_values_keep_every_marker_except_the_parameter_closer(self):
+    def test_values_keep_every_marker_except_the_two_parameter_markers(self):
+        """Only the two markers the grammar excludes are structural.
+
+        A value cannot carry ``</parameter>`` (its own closer) or
+        ``<parameter=`` (the next parameter's opener, whose absorption is what
+        published one call as another). Everything else -- including a bare
+        ``<parameter`` with no ``=`` -- is the value's own text.
+        """
         for value in (
             "before</function>after", "before</tool_call></think>after",
-            "before<parameter=literal>after", "before< /parameter >after",
+            "before<parameter literal>after", "before< /parameter >after",
             "before</parameter >after", "before</tool_call><tool_call></think>after",
         ):
             for chunk in (1, 3, 13, None):
