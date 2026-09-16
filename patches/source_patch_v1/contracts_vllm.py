@@ -2093,6 +2093,35 @@ def _validate_raw_image_after(state: State) -> None:
         }, label=label)
 
 
+def _validate_canonical_framing_before(state: State) -> None:
+    forbid_text(state, "vllm/parser/qwen3.py", "_unframe_parameter_value",
+                label="Canonical parameter framing precondition")
+
+
+def _validate_canonical_framing_after(state: State) -> None:
+    label = "Canonical parameter framing result"
+    qwen = "vllm/parser/qwen3.py"
+    require_python_symbols(
+        state, qwen, {"_unframe_parameter_value": ("value", "complete")}, label=label
+    )
+    # One newline off each end, and the trailing one only once the closer has
+    # actually been observed: that is the exact inverse of the transport's
+    # framing, which is what makes the round trip a bijection.
+    _require_in_symbol(state, qwen, "_unframe_parameter_value", (
+        'if value.startswith("\\n"):', "value = value[1:]",
+        'if complete and value.endswith("\\n"):', "value = value[:-1]",
+    ), label=label)
+    _require_in_symbol(state, qwen, "_qwen3_arg_converter", (
+        "_unframe_parameter_value(value, complete=True)",
+        "_unframe_parameter_value(value, complete=False)",
+    ), label=label)
+    require_python_symbols(state, "tests/parser/engine/test_qwen_xml_fidelity.py", {
+        "test_framing_habit_cannot_change_a_decoded_value": None,
+        "test_parameter_string_bytes_survive_every_transport_cut": None,
+        "test_partial_string_diagnostic_preserves_raw_value_bytes": None,
+    }, label=label)
+
+
 def _validate_xml_fidelity_before(state: State) -> None:
     require_text(state, "vllm/parser/qwen3.py", "def _trim_wrapping_newlines(",
                  label="XML text fidelity baseline")
@@ -2100,9 +2129,13 @@ def _validate_xml_fidelity_before(state: State) -> None:
 
 def _validate_xml_fidelity_after(state: State) -> None:
     label = "XML text fidelity"
+    # This stage's own guarantee is that the old newline-trimming helper is
+    # gone. How a value then reaches ``params`` is asserted by the
+    # canonical-framing contract, which owns that shape: asserting a bare
+    # ``params[name] = value`` here would forbid the exact transport inverse
+    # that replaced the helper, and this validator also runs against the
+    # complete tree.
     forbid_text(state, "vllm/parser/qwen3.py", "_trim_wrapping_newlines", label=label)
-    _require_in_symbol(state, "vllm/parser/qwen3.py", "_qwen3_arg_converter",
-                       ("params[name] = value",), label=label)
     for path in ("vllm/parser/engine/parser_engine.py",
                  "vllm/parser/engine/parser_engine_config.py",
                  "vllm/parser/deepseek_v32.py", "vllm/parser/deepseek_v4.py",
@@ -2480,6 +2513,22 @@ def validate_final(state: State) -> None:
 
 
 CONTRACTS: Mapping[str, SemanticContract] = {
+    "qwen-canonical-parameter-framing": SemanticContract(
+        rationale=(
+            "The Qwen XML transport pads every parameter value, and the model "
+            "emits the framing it was trained on. Reading that framing as data "
+            "wrote blank first lines and extra trailing newlines to disk. The "
+            "parser must invert the framing exactly once, so every value round "
+            "trips unchanged and a hugged value means what a framed one means."
+        ),
+        removal_condition=(
+            "Remove when upstream decodes the Qwen XML transport's framing as "
+            "framing on both batch and streaming output, or when the served "
+            "model is retrained to emit no framing at all."
+        ),
+        validate_before=_validate_canonical_framing_before,
+        validate_after=_validate_canonical_framing_after,
+    ),
     "precise-request-errors": SemanticContract(
         rationale=(
             "Only a known request cause should become a client error. Type "

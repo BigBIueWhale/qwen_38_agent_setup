@@ -293,6 +293,7 @@ It is intentionally reconstructed by thirty-three ordered, reviewed semantic tra
 | patches/vllm-schema-faithful-xml.patch | c78ca3f0b13d85635eafdc4f28f89adca5d3151a3ab5c98276a9202a1814af2d |
 | patches/vllm-token-text-provenance.patch | 954b36cb444f7e644e29d13f7a9d3c000512a0d616bbf2b6cd3cb8f4e880dd44 |
 | patches/vllm-precise-request-errors.patch | 055c3348b1a0c801ad6c8202d13659471106d0ff8a9b958efe1df16e25e9e588 |
+| patches/vllm-qwen-canonical-parameter-framing.patch | 6725caf33ac3ab55d1acede045808c5f37585e658900e770c226477b0be5e302 |
 
 The reconstructed tree has 100 reviewed runtime-source changes, 2 new runtime sources,
 7 runtime-source deletions, 71 existing-test changes, 12 new tests,
@@ -922,9 +923,15 @@ numbers keep their original representation. Cut or untypable values stay raw
 for diagnostics and client validation. All parameter constraints are available
 before argument JSON is emitted; executable calls still wait for EOS.
 
-Unconstrained XML strings retain leading/trailing whitespace and newlines.
-The derived instruction example and historical tool calls put
-only the actual value between parameter tags. Parsing, history rendering and
+A parameter value is framed by the transport, not by the value. The served
+template renders `<parameter=NAME>`, a newline, the value, a newline, and
+`</parameter>` — the framing the model was trained to emit and the framing the
+grammar pads by construction — and the parser removes exactly one newline from
+each end and nothing else. That inverse is exact, so every value round-trips
+unchanged, including one that begins or ends with a newline of its own, which
+travels as two. A value the model hugs against its tags therefore decodes to
+the same string as one it frames, which makes the model's slot-bound framing
+habit unable to decide what reaches a tool. Parsing, history rendering and
 grammar acceptance are checked together. Streaming and batch parsing also preserve
 nonempty content around calls byte for byte; a whitespace-only gap before a call
 may be omitted. Historical reasoning remains intact.

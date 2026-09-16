@@ -41,7 +41,7 @@ SOURCE_TEMPLATE_SHA256 = (
     "12827f24b742ea4e80cdc12dbcf9622227056b9f797252a3149263d4f9aaadce"
 )
 DERIVED_TEMPLATE_SHA256 = (
-    "6bc4e08a678c117f584f9c0811b2b77197347a2897d8870125b0c052cad34232"
+    "07f545cd8ed9232f2b24d79010fad187f92e5b25b532448eb9017c0f8b8c2088"
 )
 
 # A shedding rule was built here and removed. It worked exactly as designed --
@@ -225,31 +225,17 @@ STAGE_A = (
     STAGE_A_GENERATION_PROMPT,
 )
 
-# --- Stage C: XML parameter boundaries contain only the actual value --------
-# Whitespace within a string parameter belongs to that string. The instruction
-# example and historical calls use the same representation as the parser.
-
-STAGE_C = (
-    (
-        "parameter-history-opener",
-        "{{- '<parameter=' + args_name + '>\\n' }}",
-        "{{- '<parameter=' + args_name + '>' }}",
-    ),
-    (
-        "parameter-history-closer",
-        "{{- '\\n</parameter>\\n' }}",
-        "{{- '</parameter>\\n' }}",
-    ),
-    (
-        "parameter-instruction-example",
-        "<parameter=example_parameter_1>\\nvalue_1\\n</parameter>\\n"
-        "<parameter=example_parameter_2>\\nThis is the value for the second parameter\\n"
-        "that can span\\nmultiple lines\\n</parameter>",
-        "<parameter=example_parameter_1>value_1</parameter>\\n"
-        "<parameter=example_parameter_2>This is the value for the second parameter\\n"
-        "that can span\\nmultiple lines</parameter>",
-    ),
-)
+# The model's own `<parameter=NAME>\n` VALUE `\n</parameter>` framing is the
+# transport, not the value, and it is left exactly as the model was trained to
+# emit it. A stage here once deleted that framing from the served template and
+# from the in-context instruction example, on the reading that whitespace
+# between the tags is part of the string. That reading is right about a decoded
+# value and wrong about the transport: the grammar pads every value with
+# `[ \n\t]*` by construction, so "no padding" is not a neutral choice -- it
+# silently reassigns the model's trained framing to the value, and the model
+# was never retrained. The parser now inverts this encoding exactly once
+# (`_unframe_parameter_value`), which makes the round trip a bijection and the
+# model's slot-bound habit irrelevant rather than load-bearing.
 
 
 TRAILER = (
@@ -262,7 +248,7 @@ TRAILER = (
 
 def derive(source: str) -> str:
     text = source
-    for name, before, after in (*STAGE_A, *STAGE_B, *STAGE_C, TRAILER):
+    for name, before, after in (*STAGE_A, *STAGE_B, TRAILER):
         text = apply_stage(text, name, before, after)
     return text
 

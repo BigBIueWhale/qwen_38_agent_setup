@@ -159,11 +159,10 @@ Exact token/text provenance is covered by its dedicated stage above.
 ## XML string and content fidelity
 
 `vllm-xml-text-fidelity.patch` preserves every byte of an unconstrained XML string,
-including leading/trailing newlines and whitespace-only values. The schema
-stage above handles padding only where the complete schema requires it. The converter's
-newline-trimming helper is deleted. Named derivation stages remove inserted value
-padding from the historical tool-call template and its instruction example. The
-model's source template stays unchanged, and historical reasoning is retained.
+including whitespace-only values. The schema stage above handles padding only
+where the complete schema requires it. The model's source template stays
+unchanged, and historical reasoning is retained. Where a value's newline framing
+ends and the value begins is settled by the canonical-framing stage below.
 
 The shared parser also removes its batch-only content-stripping setting and all
 consumers of that setting. Nonempty content around calls now retains the same
@@ -173,8 +172,8 @@ Four newly modified parser configurations join the full image provenance cascade
 Validation: 3,954 offline parser tests pass. The previous runtime fails 101 focused
 controls, with 20 unaffected controls passing. The source tests cover multiple
 chunk sizes, empty and whitespace-only strings, Unicode, embedded reserved
-markers, surrounding content and incomplete string diagnostics. Five obsolete
-expectations now require preserved whitespace. Seven installed parser tests pass,
+markers, surrounding content and incomplete string diagnostics. Seven installed
+parser tests pass,
 including actual derived-template rendering, XGrammar acceptance and stream/batch
 round trips. Template retention now also runs in the ordinary CPU source check.
 Schema decoding, incomplete diagnostics, terminal promotion and token/text
@@ -182,6 +181,39 @@ provenance are covered by the dedicated stages above.
 
 The integrated generator and `build-vllm.sh check` pass with 26 reviewed stages,
 102 deployment inputs, 19 framework/recipe tests and all installed CPU units.
+
+## Canonical parameter framing
+
+`vllm-qwen-canonical-parameter-framing.patch` adds the thirty-fourth runtime
+source stage, and the served template's derivation drops its Stage C.
+
+The Qwen XML transport pads every parameter: the grammar writes `[ \n\t]*` on
+both sides of a value by construction, and the model's own template renders
+`<parameter=NAME>` newline VALUE newline `</parameter>`. A derivation stage had
+deleted that framing from the served template and from the in-context
+instruction example, on the reading that whitespace between the tags belongs to
+the string. That reading is right about a decoded value and wrong about the
+transport. The model was not retrained, so it kept emitting the framing it was
+trained on and the deployment began reading that framing as data: a written file
+gained a blank first line and an extra trailing newline, silently and on disk.
+
+The framing is now restored and inverted exactly once.
+`_unframe_parameter_value` removes one leading and one trailing newline, so
+`decode(encode(v)) == v` for every `v` — a value that itself begins or ends with
+a newline travels as two and keeps its own — and nothing becomes inexpressible.
+A value the model hugs against its tags decodes to the same string as one it
+frames, which makes the model's slot-bound framing habit irrelevant rather than
+load-bearing. The one parameter whose closer has not been generated yet has no
+observed trailing newline, so only its leading newline is removed and a trailing
+newline there stays value text.
+
+Validation: the served template reproduces from the model's own through the
+remaining named stages and matches its pinned bytes; the round trip from
+rendered history back through the parser returns every value unchanged, over
+empty, newline-only, both-framed, Unicode and embedded-marker values. The
+installed parser unit carries the canonical framing in its shared call helper,
+so the grammar-acceptance, schema-typing and history round-trip checks all
+exercise the transport the model actually emits.
 
 ## Finding 20: raw images through the token generation boundary
 

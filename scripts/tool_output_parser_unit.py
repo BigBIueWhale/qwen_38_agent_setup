@@ -52,9 +52,15 @@ def decode(ids):
 
 
 def call(value):
+    """One call carrying *value* in the transport's canonical framing.
+
+    ``<parameter=NAME>`` ``\n`` VALUE ``\n`` ``</parameter>`` is what the
+    served template renders and what the model is trained to emit; the
+    parser removes exactly that framing, so *value* survives unchanged.
+    """
     return (
-        "<tool_call>\n<function=write>\n<parameter=text>" + value
-        + "</parameter>\n</function>\n</tool_call>"
+        "<tool_call>\n<function=write>\n<parameter=text>\n" + value
+        + "\n</parameter>\n</function>\n</tool_call>"
     )
 
 

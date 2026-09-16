@@ -93022,7 +93022,613 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '        await serving.serve_tokens(req)\n'
                              '    assert not dispatched\n'
                              '    '
-                             'serving.online_renderer.renderer.process_rendered_multimodal_async.assert_not_called()\n'})})
+                             'serving.online_renderer.renderer.process_rendered_multimodal_async.assert_not_called()\n'})},
+ {'name': 'qwen-canonical-parameter-framing',
+  'review_patch': 'patches/vllm-qwen-canonical-parameter-framing.patch',
+  'review_sha256': '6725caf33ac3ab55d1acede045808c5f37585e658900e770c226477b0be5e302',
+  'files': ({'path': 'vllm/parser/qwen3.py',
+             'before_sha256': 'c84856f77e4c2d057bbc5e6bafecc23ef39d4f573b49f28c41b6cc420c381c68',
+             'after_sha256': 'ecbc647afb1f229ad556fbb055837f7a006b6bc7cc9d4d17e151e79d5fe8cde9'},
+            {'path': 'tests/parser/engine/test_qwen3.py',
+             'before_sha256': 'ca773868114ed9eb184bdde02a12763b644e4b14456f847f19e853b39721b569',
+             'after_sha256': 'd37dc27c876210e016622c703fc98ca9ef23bb69f1addef5f5931226c8877d00'},
+            {'path': 'tests/parser/engine/test_qwen_xml_fidelity.py',
+             'before_sha256': '15383f95416d7b52d0c4967e1eb9c9241ce25ae10e8eb3d1bf90eb36d355f775',
+             'after_sha256': '6688d26c1dda44ab874c45d81e45977f5fed46c735a293c18e3c150585223d1f'}),
+  'edits': ({'name': 'vllm/parser/qwen3.py:landmark-1',
+             'path': 'vllm/parser/qwen3.py',
+             'before': '\n'
+                       '    <tool_call>\n'
+                       '    <function=func_name>\n'
+                       '    <parameter=key>value</parameter>\n'
+                       '    </function>\n'
+                       '    </tool_call>\n'
+                       '\n'
+                       'The argument body consists of '
+                       '``<parameter=NAME>VALUE</parameter>`` tags.\n'
+                       'The ``_qwen3_arg_converter`` parses these into a JSON object.\n'
+                       '"""\n'
+                       '\n'
+                       'from __future__ import annotations\n',
+             'after': '\n'
+                      '    <tool_call>\n'
+                      '    <function=func_name>\n'
+                      '    <parameter=key>\n'
+                      '    value\n'
+                      '    </parameter>\n'
+                      '    </function>\n'
+                      '    </tool_call>\n'
+                      '\n'
+                      'The argument body consists of ``<parameter=NAME>`` ``\\n`` '
+                      'VALUE ``\\n``\n'
+                      '``</parameter>`` tags: the newline on each side of a value is '
+                      "the transport's\n"
+                      'framing, which the grammar pads and the model is trained to '
+                      'emit, not part of\n'
+                      'the value. ``_qwen3_arg_converter`` inverts that framing '
+                      'exactly once and\n'
+                      'parses the result into a JSON object.\n'
+                      '"""\n'
+                      '\n'
+                      'from __future__ import annotations\n',
+             'review_before': '\n'
+                              '    <tool_call>\n'
+                              '    <function=func_name>\n'
+                              '    <parameter=key>value</parameter>\n'
+                              '    </function>\n'
+                              '    </tool_call>\n'
+                              '\n'
+                              'The argument body consists of '
+                              '``<parameter=NAME>VALUE</parameter>`` tags.\n'
+                              'The ``_qwen3_arg_converter`` parses these into a JSON '
+                              'object.\n'
+                              '"""\n'
+                              '\n'
+                              'from __future__ import annotations\n',
+             'review_after': '\n'
+                             '    <tool_call>\n'
+                             '    <function=func_name>\n'
+                             '    <parameter=key>\n'
+                             '    value\n'
+                             '    </parameter>\n'
+                             '    </function>\n'
+                             '    </tool_call>\n'
+                             '\n'
+                             'The argument body consists of ``<parameter=NAME>`` '
+                             '``\\n`` VALUE ``\\n``\n'
+                             '``</parameter>`` tags: the newline on each side of a '
+                             "value is the transport's\n"
+                             'framing, which the grammar pads and the model is trained '
+                             'to emit, not part of\n'
+                             'the value. ``_qwen3_arg_converter`` inverts that framing '
+                             'exactly once and\n'
+                             'parses the result into a JSON object.\n'
+                             '"""\n'
+                             '\n'
+                             'from __future__ import annotations\n'},
+            {'name': 'vllm/parser/qwen3.py:landmark-2',
+             'path': 'vllm/parser/qwen3.py',
+             'before': '    return json.dumps(params, ensure_ascii=False)\n'
+                       '\n'
+                       '\n'
+                       'def _qwen3_arg_converter(\n'
+                       '    raw_args: str, partial: bool, schema: dict | None = None\n'
+                       ') -> str:\n',
+             'after': '    return json.dumps(params, ensure_ascii=False)\n'
+                      '\n'
+                      '\n'
+                      'def _unframe_parameter_value(value: str, *, complete: bool) -> '
+                      'str:\n'
+                      '    """Invert the transport\'s framing: one newline off each '
+                      'end, at most once.\n'
+                      '\n'
+                      '    A parameter is carried as ``<parameter=NAME>`` ``\\\\n`` '
+                      'VALUE ``\\\\n``\n'
+                      '    ``</parameter>``.  Removing exactly one newline from each '
+                      'end is the exact\n'
+                      '    inverse of that encoding, so ``decode(encode(v)) == v`` for '
+                      'every ``v`` --\n'
+                      '    including values that themselves begin or end with a '
+                      'newline, which\n'
+                      '    transport as ``\\\\n\\\\n`` and keep their own.  Nothing '
+                      'becomes inexpressible,\n'
+                      '    and a value the model hugged against its tags decodes to '
+                      'the same string as\n'
+                      "    one it framed, which is what makes the model's slot-bound "
+                      'framing habit\n'
+                      '    irrelevant instead of load-bearing.\n'
+                      '\n'
+                      '    ``complete`` is false for the one parameter whose closer '
+                      'has not been\n'
+                      '    generated yet: its trailing framing newline has not been '
+                      'observed, so a\n'
+                      '    trailing newline there is value text and is kept.\n'
+                      '    """\n'
+                      '    if value.startswith("\\n"):\n'
+                      '        value = value[1:]\n'
+                      '    if complete and value.endswith("\\n"):\n'
+                      '        value = value[:-1]\n'
+                      '    return value\n'
+                      '\n'
+                      '\n'
+                      'def _qwen3_arg_converter(\n'
+                      '    raw_args: str, partial: bool, schema: dict | None = None\n'
+                      ') -> str:\n',
+             'review_before': '    return json.dumps(params, ensure_ascii=False)\n'
+                              '\n'
+                              '\n'
+                              'def _qwen3_arg_converter(\n'
+                              '    raw_args: str, partial: bool, schema: dict | None = '
+                              'None\n'
+                              ') -> str:\n',
+             'review_after': '    return json.dumps(params, ensure_ascii=False)\n'
+                             '\n'
+                             '\n'
+                             'def _unframe_parameter_value(value: str, *, complete: '
+                             'bool) -> str:\n'
+                             '    """Invert the transport\'s framing: one newline off '
+                             'each end, at most once.\n'
+                             '\n'
+                             '    A parameter is carried as ``<parameter=NAME>`` '
+                             '``\\\\n`` VALUE ``\\\\n``\n'
+                             '    ``</parameter>``.  Removing exactly one newline from '
+                             'each end is the exact\n'
+                             '    inverse of that encoding, so ``decode(encode(v)) == '
+                             'v`` for every ``v`` --\n'
+                             '    including values that themselves begin or end with a '
+                             'newline, which\n'
+                             '    transport as ``\\\\n\\\\n`` and keep their own.  '
+                             'Nothing becomes inexpressible,\n'
+                             '    and a value the model hugged against its tags '
+                             'decodes to the same string as\n'
+                             "    one it framed, which is what makes the model's "
+                             'slot-bound framing habit\n'
+                             '    irrelevant instead of load-bearing.\n'
+                             '\n'
+                             '    ``complete`` is false for the one parameter whose '
+                             'closer has not been\n'
+                             '    generated yet: its trailing framing newline has not '
+                             'been observed, so a\n'
+                             '    trailing newline there is value text and is kept.\n'
+                             '    """\n'
+                             '    if value.startswith("\\n"):\n'
+                             '        value = value[1:]\n'
+                             '    if complete and value.endswith("\\n"):\n'
+                             '        value = value[:-1]\n'
+                             '    return value\n'
+                             '\n'
+                             '\n'
+                             'def _qwen3_arg_converter(\n'
+                             '    raw_args: str, partial: bool, schema: dict | None = '
+                             'None\n'
+                             ') -> str:\n'},
+            {'name': 'vllm/parser/qwen3.py:landmark-3',
+             'path': 'vllm/parser/qwen3.py',
+             'before': '    for match in _PARAM_RE.finditer(raw_args):\n'
+                       '        name = match.group(1)\n'
+                       '        value = match.group(2)\n'
+                       '        params[name] = value\n'
+                       '\n'
+                       '    # An unfinished parameter is a raw diagnostic on both '
+                       'transports.\n'
+                       '    remaining = _PARAM_RE.sub("", raw_args)\n',
+             'after': '    for match in _PARAM_RE.finditer(raw_args):\n'
+                      '        name = match.group(1)\n'
+                      '        value = match.group(2)\n'
+                      '        params[name] = _unframe_parameter_value(value, '
+                      'complete=True)\n'
+                      '\n'
+                      '    # An unfinished parameter is a raw diagnostic on both '
+                      'transports.\n'
+                      '    remaining = _PARAM_RE.sub("", raw_args)\n',
+             'review_before': '    for match in _PARAM_RE.finditer(raw_args):\n'
+                              '        name = match.group(1)\n'
+                              '        value = match.group(2)\n'
+                              '        params[name] = value\n'
+                              '\n'
+                              '    # An unfinished parameter is a raw diagnostic on '
+                              'both transports.\n'
+                              '    remaining = _PARAM_RE.sub("", raw_args)\n',
+             'review_after': '    for match in _PARAM_RE.finditer(raw_args):\n'
+                             '        name = match.group(1)\n'
+                             '        value = match.group(2)\n'
+                             '        params[name] = _unframe_parameter_value(value, '
+                             'complete=True)\n'
+                             '\n'
+                             '    # An unfinished parameter is a raw diagnostic on '
+                             'both transports.\n'
+                             '    remaining = _PARAM_RE.sub("", raw_args)\n'},
+            {'name': 'vllm/parser/qwen3.py:landmark-4',
+             'path': 'vllm/parser/qwen3.py',
+             'before': '        name = m.group(1)\n'
+                       '        value = m.group(2)\n'
+                       '        if name:\n'
+                       '            params[name] = value\n'
+                       '\n'
+                       '    if schema and m is None:\n'
+                       '        return _decode_xml_parameters(params, schema)\n',
+             'after': '        name = m.group(1)\n'
+                      '        value = m.group(2)\n'
+                      '        if name:\n'
+                      '            params[name] = _unframe_parameter_value(value, '
+                      'complete=False)\n'
+                      '\n'
+                      '    if schema and m is None:\n'
+                      '        return _decode_xml_parameters(params, schema)\n',
+             'review_before': '        name = m.group(1)\n'
+                              '        value = m.group(2)\n'
+                              '        if name:\n'
+                              '            params[name] = value\n'
+                              '\n'
+                              '    if schema and m is None:\n'
+                              '        return _decode_xml_parameters(params, schema)\n',
+             'review_after': '        name = m.group(1)\n'
+                             '        value = m.group(2)\n'
+                             '        if name:\n'
+                             '            params[name] = '
+                             '_unframe_parameter_value(value, complete=False)\n'
+                             '\n'
+                             '    if schema and m is None:\n'
+                             '        return _decode_xml_parameters(params, schema)\n'},
+            {'name': 'tests/parser/engine/test_qwen3.py:landmark-1',
+             'path': 'tests/parser/engine/test_qwen3.py',
+             'before': '        assert len(result.tool_calls) == 1\n'
+                       '        assert result.tool_calls[0].function.name == "Bash"\n'
+                       '        args = '
+                       'json.loads(result.tool_calls[0].function.arguments)\n'
+                       '        assert args["command"] == "\\nls -la /tmp\\n"\n'
+                       '        assert args["description"] == "\\nList files in /tmp '
+                       'directory\\n"\n'
+                       '\n'
+                       '    def test_multiline_two_tool_calls(self, parser, '
+                       'mock_request):\n'
+                       '        """Two tool calls with multi-line parameter values '
+                       '(bug report)."""\n',
+             'after': '        assert len(result.tool_calls) == 1\n'
+                      '        assert result.tool_calls[0].function.name == "Bash"\n'
+                      '        args = '
+                      'json.loads(result.tool_calls[0].function.arguments)\n'
+                      '        assert args["command"] == "ls -la /tmp"\n'
+                      '        assert args["description"] == "List files in /tmp '
+                      'directory"\n'
+                      '\n'
+                      '    def test_multiline_two_tool_calls(self, parser, '
+                      'mock_request):\n'
+                      '        """Two tool calls with multi-line parameter values (bug '
+                      'report)."""\n',
+             'review_before': '        assert len(result.tool_calls) == 1\n'
+                              '        assert result.tool_calls[0].function.name == '
+                              '"Bash"\n'
+                              '        args = '
+                              'json.loads(result.tool_calls[0].function.arguments)\n'
+                              '        assert args["command"] == "\\nls -la /tmp\\n"\n'
+                              '        assert args["description"] == "\\nList files in '
+                              '/tmp directory\\n"\n'
+                              '\n'
+                              '    def test_multiline_two_tool_calls(self, parser, '
+                              'mock_request):\n'
+                              '        """Two tool calls with multi-line parameter '
+                              'values (bug report)."""\n',
+             'review_after': '        assert len(result.tool_calls) == 1\n'
+                             '        assert result.tool_calls[0].function.name == '
+                             '"Bash"\n'
+                             '        args = '
+                             'json.loads(result.tool_calls[0].function.arguments)\n'
+                             '        assert args["command"] == "ls -la /tmp"\n'
+                             '        assert args["description"] == "List files in '
+                             '/tmp directory"\n'
+                             '\n'
+                             '    def test_multiline_two_tool_calls(self, parser, '
+                             'mock_request):\n'
+                             '        """Two tool calls with multi-line parameter '
+                             'values (bug report)."""\n'},
+            {'name': 'tests/parser/engine/test_qwen3.py:landmark-2',
+             'path': 'tests/parser/engine/test_qwen3.py',
+             'before': '            "</parameter>\\n"\n'
+                       '        )\n'
+                       '        result = json.loads(_qwen3_arg_converter(raw, '
+                       'partial=False))\n'
+                       '        assert result["command"] == "\\nls -la /tmp\\n"\n'
+                       '        assert result["description"] == "\\nList files\\n"\n'
+                       '\n'
+                       '    def test_two_multiline_params(self):\n'
+                       '        from vllm.parser.qwen3 import (\n',
+             'after': '            "</parameter>\\n"\n'
+                      '        )\n'
+                      '        result = json.loads(_qwen3_arg_converter(raw, '
+                      'partial=False))\n'
+                      '        assert result["command"] == "ls -la /tmp"\n'
+                      '        assert result["description"] == "List files"\n'
+                      '\n'
+                      '    def test_two_multiline_params(self):\n'
+                      '        from vllm.parser.qwen3 import (\n',
+             'review_before': '            "</parameter>\\n"\n'
+                              '        )\n'
+                              '        result = json.loads(_qwen3_arg_converter(raw, '
+                              'partial=False))\n'
+                              '        assert result["command"] == "\\nls -la '
+                              '/tmp\\n"\n'
+                              '        assert result["description"] == "\\nList '
+                              'files\\n"\n'
+                              '\n'
+                              '    def test_two_multiline_params(self):\n'
+                              '        from vllm.parser.qwen3 import (\n',
+             'review_after': '            "</parameter>\\n"\n'
+                             '        )\n'
+                             '        result = json.loads(_qwen3_arg_converter(raw, '
+                             'partial=False))\n'
+                             '        assert result["command"] == "ls -la /tmp"\n'
+                             '        assert result["description"] == "List files"\n'
+                             '\n'
+                             '    def test_two_multiline_params(self):\n'
+                             '        from vllm.parser.qwen3 import (\n'},
+            {'name': 'tests/parser/engine/test_qwen3.py:landmark-3',
+             'path': 'tests/parser/engine/test_qwen3.py',
+             'before': '            "<parameter=b>\\nbaz\\nqux\\n</parameter>\\n"\n'
+                       '        )\n'
+                       '        result = json.loads(_qwen3_arg_converter(raw, '
+                       'partial=False))\n'
+                       '        assert result["a"] == "\\nfoo\\nbar\\n"\n'
+                       '        assert result["b"] == "\\nbaz\\nqux\\n"\n'
+                       '\n'
+                       '    def test_partial_multiline(self):\n'
+                       '        from vllm.parser.qwen3 import (\n',
+             'after': '            "<parameter=b>\\nbaz\\nqux\\n</parameter>\\n"\n'
+                      '        )\n'
+                      '        result = json.loads(_qwen3_arg_converter(raw, '
+                      'partial=False))\n'
+                      '        assert result["a"] == "foo\\nbar"\n'
+                      '        assert result["b"] == "baz\\nqux"\n'
+                      '\n'
+                      '    def test_partial_multiline(self):\n'
+                      '        from vllm.parser.qwen3 import (\n',
+             'review_before': '            '
+                              '"<parameter=b>\\nbaz\\nqux\\n</parameter>\\n"\n'
+                              '        )\n'
+                              '        result = json.loads(_qwen3_arg_converter(raw, '
+                              'partial=False))\n'
+                              '        assert result["a"] == "\\nfoo\\nbar\\n"\n'
+                              '        assert result["b"] == "\\nbaz\\nqux\\n"\n'
+                              '\n'
+                              '    def test_partial_multiline(self):\n'
+                              '        from vllm.parser.qwen3 import (\n',
+             'review_after': '            '
+                             '"<parameter=b>\\nbaz\\nqux\\n</parameter>\\n"\n'
+                             '        )\n'
+                             '        result = json.loads(_qwen3_arg_converter(raw, '
+                             'partial=False))\n'
+                             '        assert result["a"] == "foo\\nbar"\n'
+                             '        assert result["b"] == "baz\\nqux"\n'
+                             '\n'
+                             '    def test_partial_multiline(self):\n'
+                             '        from vllm.parser.qwen3 import (\n'},
+            {'name': 'tests/parser/engine/test_qwen3.py:landmark-4',
+             'path': 'tests/parser/engine/test_qwen3.py',
+             'before': '\n'
+                       '        raw = "<parameter=command>\\nls '
+                       '-la</parameter>\\n<parameter=desc>\\npartial value"\n'
+                       '        result = json.loads(_qwen3_arg_converter(raw, '
+                       'partial=True))\n'
+                       '        assert result["command"] == "\\nls -la"\n'
+                       '        assert result["desc"] == "\\npartial value"\n'
+                       '\n'
+                       '    def test_partial_value_with_angle_bracket(self):\n'
+                       '        from vllm.parser.qwen3 import (\n',
+             'after': '\n'
+                      '        raw = "<parameter=command>\\nls '
+                      '-la</parameter>\\n<parameter=desc>\\npartial value"\n'
+                      '        result = json.loads(_qwen3_arg_converter(raw, '
+                      'partial=True))\n'
+                      '        assert result["command"] == "ls -la"\n'
+                      '        assert result["desc"] == "partial value"\n'
+                      '\n'
+                      '    def test_partial_value_with_angle_bracket(self):\n'
+                      '        from vllm.parser.qwen3 import (\n',
+             'review_before': '\n'
+                              '        raw = "<parameter=command>\\nls '
+                              '-la</parameter>\\n<parameter=desc>\\npartial value"\n'
+                              '        result = json.loads(_qwen3_arg_converter(raw, '
+                              'partial=True))\n'
+                              '        assert result["command"] == "\\nls -la"\n'
+                              '        assert result["desc"] == "\\npartial value"\n'
+                              '\n'
+                              '    def test_partial_value_with_angle_bracket(self):\n'
+                              '        from vllm.parser.qwen3 import (\n',
+             'review_after': '\n'
+                             '        raw = "<parameter=command>\\nls '
+                             '-la</parameter>\\n<parameter=desc>\\npartial value"\n'
+                             '        result = json.loads(_qwen3_arg_converter(raw, '
+                             'partial=True))\n'
+                             '        assert result["command"] == "ls -la"\n'
+                             '        assert result["desc"] == "partial value"\n'
+                             '\n'
+                             '    def test_partial_value_with_angle_bracket(self):\n'
+                             '        from vllm.parser.qwen3 import (\n'},
+            {'name': 'tests/parser/engine/test_qwen_xml_fidelity.py:landmark-1',
+             'path': 'tests/parser/engine/test_qwen_xml_fidelity.py',
+             'before': "@pytest.mark.parametrize('value', VALUES)\n"
+                       'def '
+                       'test_parameter_string_bytes_survive_every_transport_cut(value, '
+                       'chunk_size):\n'
+                       "    text = ('plan\\n</think>\\n before "
+                       "\\t\\n<tool_call>\\n<function=write>\\n'\n"
+                       "            '<parameter=text>' + value + "
+                       "'</parameter>\\n</function>\\n</tool_call>\\n after \\t\\n')\n"
+                       '    reasoning, content, calls = parse(text, chunk_size)\n'
+                       "    assert reasoning == 'plan\\n'\n"
+                       "    assert content == '\\n before \\t\\n\\n after \\t\\n'\n",
+             'after': "@pytest.mark.parametrize('value', VALUES)\n"
+                      'def '
+                      'test_parameter_string_bytes_survive_every_transport_cut(value, '
+                      'chunk_size):\n'
+                      "    text = ('plan\\n</think>\\n before "
+                      "\\t\\n<tool_call>\\n<function=write>\\n'\n"
+                      "            '<parameter=text>\\n' + value + "
+                      "'\\n</parameter>\\n</function>\\n</tool_call>\\n after "
+                      "\\t\\n')\n"
+                      '    reasoning, content, calls = parse(text, chunk_size)\n'
+                      "    assert reasoning == 'plan\\n'\n"
+                      "    assert content == '\\n before \\t\\n\\n after \\t\\n'\n",
+             'review_before': "@pytest.mark.parametrize('value', VALUES)\n"
+                              'def '
+                              'test_parameter_string_bytes_survive_every_transport_cut(value, '
+                              'chunk_size):\n'
+                              "    text = ('plan\\n</think>\\n before "
+                              "\\t\\n<tool_call>\\n<function=write>\\n'\n"
+                              "            '<parameter=text>' + value + "
+                              "'</parameter>\\n</function>\\n</tool_call>\\n after "
+                              "\\t\\n')\n"
+                              '    reasoning, content, calls = parse(text, '
+                              'chunk_size)\n'
+                              "    assert reasoning == 'plan\\n'\n"
+                              "    assert content == '\\n before \\t\\n\\n after "
+                              "\\t\\n'\n",
+             'review_after': "@pytest.mark.parametrize('value', VALUES)\n"
+                             'def '
+                             'test_parameter_string_bytes_survive_every_transport_cut(value, '
+                             'chunk_size):\n'
+                             "    text = ('plan\\n</think>\\n before "
+                             "\\t\\n<tool_call>\\n<function=write>\\n'\n"
+                             "            '<parameter=text>\\n' + value + "
+                             "'\\n</parameter>\\n</function>\\n</tool_call>\\n after "
+                             "\\t\\n')\n"
+                             '    reasoning, content, calls = parse(text, chunk_size)\n'
+                             "    assert reasoning == 'plan\\n'\n"
+                             "    assert content == '\\n before \\t\\n\\n after "
+                             "\\t\\n'\n"},
+            {'name': 'tests/parser/engine/test_qwen_xml_fidelity.py:landmark-2',
+             'path': 'tests/parser/engine/test_qwen_xml_fidelity.py',
+             'before': "@pytest.mark.parametrize('chunk_size', [None, 1, 3, 13])\n"
+                       "@pytest.mark.parametrize('value', VALUES)\n"
+                       'def '
+                       'test_partial_string_diagnostic_preserves_raw_value_bytes(value, '
+                       'chunk_size):\n'
+                       '    text = '
+                       "('plan</think><tool_call>\\n<function=write>\\n<parameter=text>' "
+                       '+ value)\n'
+                       "    _, _, calls = parse(text, chunk_size, finish='length')\n"
+                       '    assert len(calls) == 1\n'
+                       "    assert json.loads(calls[0]) == {'text': value}\n"
+                       '\n'
+                       '\n'
+                       'SCHEMA_CASES = [\n',
+             'after': "@pytest.mark.parametrize('chunk_size', [None, 1, 3, 13])\n"
+                      "@pytest.mark.parametrize('value', VALUES)\n"
+                      'def '
+                      'test_partial_string_diagnostic_preserves_raw_value_bytes(value, '
+                      'chunk_size):\n'
+                      '    text = '
+                      "('plan</think><tool_call>\\n<function=write>\\n<parameter=text>\\n' "
+                      '+ value)\n'
+                      "    _, _, calls = parse(text, chunk_size, finish='length')\n"
+                      '    assert len(calls) == 1\n'
+                      "    assert json.loads(calls[0]) == {'text': value}\n"
+                      '\n'
+                      '\n'
+                      "@pytest.mark.parametrize('chunk_size', [None, 1, 13])\n"
+                      "@pytest.mark.parametrize('value', VALUES)\n"
+                      'def test_framing_habit_cannot_change_a_decoded_value(value, '
+                      'chunk_size):\n'
+                      '    """A hugged value and a framed value decode to the same '
+                      'string.\n'
+                      '\n'
+                      "    The model's framing habit is slot-bound, not value-bound: "
+                      'it emits the\n'
+                      '    padding it was trained on for some parameters and not '
+                      'others. Because the\n'
+                      "    parser removes exactly the transport's framing, both "
+                      'spellings of a value\n'
+                      '    that neither begins nor ends with a newline mean the same '
+                      'thing, so the\n'
+                      '    habit cannot decide what reaches a tool.\n'
+                      '    """\n'
+                      "    if value.startswith('\\n') or value.endswith('\\n'):\n"
+                      "        pytest.skip('only a value with no framing of its own "
+                      "has two spellings')\n"
+                      "    framed = ('plan</think><tool_call>\\n<function=write>\\n'\n"
+                      "              '<parameter=text>\\n' + value + "
+                      "'\\n</parameter>\\n</function>\\n</tool_call>')\n"
+                      "    hugged = ('plan</think><tool_call>\\n<function=write>\\n'\n"
+                      "              '<parameter=text>' + value + "
+                      "'</parameter>\\n</function>\\n</tool_call>')\n"
+                      '    _, _, framed_calls = parse(framed, chunk_size)\n'
+                      '    _, _, hugged_calls = parse(hugged, chunk_size)\n'
+                      "    assert json.loads(framed_calls[0]) == {'text': value}\n"
+                      '    assert json.loads(hugged_calls[0]) == '
+                      'json.loads(framed_calls[0])\n'
+                      '\n'
+                      '\n'
+                      'SCHEMA_CASES = [\n',
+             'review_before': "@pytest.mark.parametrize('chunk_size', [None, 1, 3, "
+                              '13])\n'
+                              "@pytest.mark.parametrize('value', VALUES)\n"
+                              'def '
+                              'test_partial_string_diagnostic_preserves_raw_value_bytes(value, '
+                              'chunk_size):\n'
+                              '    text = '
+                              "('plan</think><tool_call>\\n<function=write>\\n<parameter=text>' "
+                              '+ value)\n'
+                              '    _, _, calls = parse(text, chunk_size, '
+                              "finish='length')\n"
+                              '    assert len(calls) == 1\n'
+                              "    assert json.loads(calls[0]) == {'text': value}\n"
+                              '\n'
+                              '\n'
+                              'SCHEMA_CASES = [\n',
+             'review_after': "@pytest.mark.parametrize('chunk_size', [None, 1, 3, "
+                             '13])\n'
+                             "@pytest.mark.parametrize('value', VALUES)\n"
+                             'def '
+                             'test_partial_string_diagnostic_preserves_raw_value_bytes(value, '
+                             'chunk_size):\n'
+                             '    text = '
+                             "('plan</think><tool_call>\\n<function=write>\\n<parameter=text>\\n' "
+                             '+ value)\n'
+                             '    _, _, calls = parse(text, chunk_size, '
+                             "finish='length')\n"
+                             '    assert len(calls) == 1\n'
+                             "    assert json.loads(calls[0]) == {'text': value}\n"
+                             '\n'
+                             '\n'
+                             "@pytest.mark.parametrize('chunk_size', [None, 1, 13])\n"
+                             "@pytest.mark.parametrize('value', VALUES)\n"
+                             'def '
+                             'test_framing_habit_cannot_change_a_decoded_value(value, '
+                             'chunk_size):\n'
+                             '    """A hugged value and a framed value decode to the '
+                             'same string.\n'
+                             '\n'
+                             "    The model's framing habit is slot-bound, not "
+                             'value-bound: it emits the\n'
+                             '    padding it was trained on for some parameters and '
+                             'not others. Because the\n'
+                             "    parser removes exactly the transport's framing, both "
+                             'spellings of a value\n'
+                             '    that neither begins nor ends with a newline mean the '
+                             'same thing, so the\n'
+                             '    habit cannot decide what reaches a tool.\n'
+                             '    """\n'
+                             "    if value.startswith('\\n') or "
+                             "value.endswith('\\n'):\n"
+                             "        pytest.skip('only a value with no framing of its "
+                             "own has two spellings')\n"
+                             '    framed = '
+                             "('plan</think><tool_call>\\n<function=write>\\n'\n"
+                             "              '<parameter=text>\\n' + value + "
+                             "'\\n</parameter>\\n</function>\\n</tool_call>')\n"
+                             '    hugged = '
+                             "('plan</think><tool_call>\\n<function=write>\\n'\n"
+                             "              '<parameter=text>' + value + "
+                             "'</parameter>\\n</function>\\n</tool_call>')\n"
+                             '    _, _, framed_calls = parse(framed, chunk_size)\n'
+                             '    _, _, hugged_calls = parse(hugged, chunk_size)\n'
+                             "    assert json.loads(framed_calls[0]) == {'text': "
+                             'value}\n'
+                             '    assert json.loads(hugged_calls[0]) == '
+                             'json.loads(framed_calls[0])\n'
+                             '\n'
+                             '\n'
+                             'SCHEMA_CASES = [\n'})})
 
 FINAL_FILES = {'tests/config/test_config_utils.py': '4f5ea0399cc3b4f9603df07e2cc26d32e1eddf6b98a36c0f30d580321879c038',
  'tests/distributed/test_rocm_quick_reduce.py': 'bf6f8a5708568b1f4d96dcc59f42258f8680e5b03bb4abdddcb0c7ead9d414bd',
@@ -93061,10 +93667,10 @@ FINAL_FILES = {'tests/config/test_config_utils.py': '4f5ea0399cc3b4f9603df07e2cc
  'tests/parser/engine/test_engine.py': 'acf3128470532aa0f07ee5d3749824a48e11cc44df78e4550a9b622a8fb05c0b',
  'tests/parser/engine/test_nemotron_v3.py': '65b1be9ad64bd16e08cea6d6886a33169aae31933c918587ea9e4ea8167975c5',
  'tests/parser/engine/test_parser_engine.py': 'b87bfaa56b7324d3514597dd4cda331b87a94740b4af7ea02d02d4d745863f73',
- 'tests/parser/engine/test_qwen3.py': 'ca773868114ed9eb184bdde02a12763b644e4b14456f847f19e853b39721b569',
+ 'tests/parser/engine/test_qwen3.py': 'd37dc27c876210e016622c703fc98ca9ef23bb69f1addef5f5931226c8877d00',
  'tests/parser/engine/test_qwen3_reasoning.py': '60a31db16f2b621403b9b2b5259407a44a5ce1e9e79b62e2c27f1cf505a4db21',
  'tests/parser/engine/test_qwen_terminal_authority.py': '15b1a503148a15e51bfc85798c7964342cc611e3dfb5451734020513259f8dad',
- 'tests/parser/engine/test_qwen_xml_fidelity.py': '15383f95416d7b52d0c4967e1eb9c9241ce25ae10e8eb3d1bf90eb36d355f775',
+ 'tests/parser/engine/test_qwen_xml_fidelity.py': '6688d26c1dda44ab874c45d81e45977f5fed46c735a293c18e3c150585223d1f',
  'tests/parser/engine/test_reasoning_token_count.py': '4d823e0f71e5041c60d077a258f80250a4c11fbc642f5bbc6ceb7da515c04b94',
  'tests/parser/engine/test_replay.py': '1684c44d016e26a6ed4aec2c99e0b6f355c1fb1562603784d24f2e61496479a6',
  'tests/parser/engine/test_seed_oss.py': '9f2af2c75f71c6fb280f2a2a4a2bb8eaecf1c919c083e6c925f6d6f81cc2c236',
@@ -93164,7 +93770,7 @@ FINAL_FILES = {'tests/config/test_config_utils.py': '4f5ea0399cc3b4f9603df07e2cc
  'vllm/parser/kimi_k2.py': 'b02a260d3dbe8d6e2efaf48d5ec37127e3cd713d4314b439eb05b6b78a2c41cb',
  'vllm/parser/minimax_m2.py': '38577327262d3df29c052240f7bbb1369b82a6d3697d85bd4e5c29d130662fa1',
  'vllm/parser/mistral.py': 'e4d970ebe09b6ab352032de923dd8b446eeca25ec82f9ffa893e6574e86ec480',
- 'vllm/parser/qwen3.py': 'c84856f77e4c2d057bbc5e6bafecc23ef39d4f573b49f28c41b6cc420c381c68',
+ 'vllm/parser/qwen3.py': 'ecbc647afb1f229ad556fbb055837f7a006b6bc7cc9d4d17e151e79d5fe8cde9',
  'vllm/reasoning/abs_reasoning_parsers.py': 'ba4b1145048e5faa217e1ef4d849167ebd1fe7bcb9296fe2e9d2f17ce96607f7',
  'vllm/renderers/base.py': 'efc0e5706c2dbce32a645bb288e920515934566d23f1a54c4fbc4b6466b19a3e',
  'vllm/renderers/hf.py': 'ee40d5f8f0c95b80c372b58b6618790b9ba56da0971fe29f781179fc0199a19d',
