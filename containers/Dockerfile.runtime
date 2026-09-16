@@ -1000,11 +1000,13 @@ from vllm.entrypoints.openai.responses.streaming_events import (
     _StateType,
 )
 from vllm.entrypoints.serve.utils.api_utils import get_max_tokens
+from vllm.exceptions import VLLMValidationError
 from vllm.tool_parsers.structural_tag_registry import get_model_structural_tag
 from vllm.parser.qwen3 import Qwen3Parser, _qwen3_arg_converter
 from vllm.v1.structured_output import StructuredOutputManager
 from pydantic import ValidationError
 from jinja2.sandbox import ImmutableSandboxedEnvironment
+from unittest.mock import MagicMock
 import os
 import json
 import runpy
@@ -1073,7 +1075,7 @@ try:
         input_length=262144,
         default_sampling_params={"max_tokens": 65536},
     )
-except ValueError as exc:
+except VLLMValidationError as exc:
     boundary_error = str(exc)
     assert "equals model's maximum context length (262144)" in boundary_error
     assert "leaving no room for the required output token" in boundary_error
@@ -1098,12 +1100,11 @@ for strict_value in (None, False, True):
 # Decoder-time boundary invariant: an explicit </think> is excluded from the
 # grammar, while an implicit <tool_call> reasoning terminator is retained as
 # the Qwen structural grammar's trigger token.
-parser = object.__new__(Qwen3Parser)
-parser._reasoning_start_token_id = 101
-parser._reasoning_end_token_id = 102
-parser._tool_call_token_id = 103
-parser._tool_call_end_token_id = 104
-parser.parser_engine_config = type("Config", (), {"initial_state": object()})()
+tokenizer = MagicMock()
+tokenizer.get_vocab.return_value = {
+    "<think>": 101, "</think>": 102, "<tool_call>": 103, "</tool_call>": 104,
+}
+parser = Qwen3Parser(tokenizer)
 assert parser.extract_content_ids([101, 11, 102, 21]) == [21]
 assert parser.extract_content_ids([101, 11, 103]) == [103]
 assert parser.is_reasoning_end_streaming([101, 11, 103], [103])
@@ -1186,7 +1187,7 @@ for invalid_history in invalid_histories:
         ChatCompletionRequest(
             model="qwen3.8", messages=invalid_history, max_tokens=1
         )
-    except ValidationError:
+    except VLLMValidationError:
         pass
     else:
         raise AssertionError(f"malformed tool history was accepted: {invalid_history}")
@@ -1311,7 +1312,6 @@ from vllm.v1.kv_offload.cpu.manager import CPUOffloadingManager
 from vllm.v1.kv_offload.cpu.spec import CPUOffloadingSpec
 from vllm.v1.kv_offload.base import ReqContext
 from vllm.v1.engine.input_processor import require_kv_scope
-from vllm.exceptions import VLLMValidationError
 
 scoped = ChatCompletionRequest(
     model="qwen3.8",

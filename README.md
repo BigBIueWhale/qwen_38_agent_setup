@@ -100,6 +100,10 @@ The check reconstructs the source tree from the pinned upstream commit through a
 landmark-aware transformations. The build runs offline from the exact base image and fails unless it produces
 the pinned image ID. Restore verifies the pinned local archive before loading it.
 
+`check` verifies the Dockerfile's hashes and packaging contracts and runs selected
+CPU units; it does not execute the Dockerfile. Its inline build assertions run
+during the actual image build, so a passing check alone does not certify them.
+
 The live probes are launched the same way, through one launcher for the whole
 suite:
 
@@ -288,7 +292,7 @@ It is intentionally reconstructed by thirty-three ordered, reviewed semantic tra
 | patches/vllm-one-way-thinking-boundary.patch | 8c6a2ecae7785fffbfec61ec1a7f42428263feb07d1d3a6ff6ea126b366e0144 |
 | patches/vllm-schema-faithful-xml.patch | c78ca3f0b13d85635eafdc4f28f89adca5d3151a3ab5c98276a9202a1814af2d |
 | patches/vllm-token-text-provenance.patch | 954b36cb444f7e644e29d13f7a9d3c000512a0d616bbf2b6cd3cb8f4e880dd44 |
-| patches/vllm-precise-request-errors.patch | 717a7ee8905a9759b2c3db20538034122fa1f1e707d9d32cf9b09bbd8866fecf |
+| patches/vllm-precise-request-errors.patch | 055c3348b1a0c801ad6c8202d13659471106d0ff8a9b958efe1df16e25e9e588 |
 
 The reconstructed tree has 100 reviewed runtime-source changes, 2 new runtime sources,
 7 runtime-source deletions, 71 existing-test changes, 12 new tests,
@@ -314,11 +318,11 @@ Pinned build inputs and products:
 | Offline archive | artifacts/qwen38-vllm-images-runtime-v23.tar |
 | Archive size | Awaiting adoption after the v23 export |
 | Archive SHA-256 | Awaiting adoption after the v23 export |
-| Runtime Dockerfile SHA-256 | c1f32dfe23fe4e82cd05612d05ded3ff66e0d4538b994c1da08e0029d47afaf6 |
+| Runtime Dockerfile SHA-256 | 77eb4759fe0671a60e83678d52103920cc458bb98220765217ac4f459bb01c44 |
 | Docker context allowlist SHA-256 | a461af03bbe810de008c026350b4836dc4b44dec0bf79bae9e322b3ff4ef5fd1 |
 | Build verifier SHA-256 | 3052d75ce0451c9d58d2acbe0c23f80234cd282917994202860cc0815cd0faa9 |
 | Runtime validator SHA-256 | 086ee356c2411e6d952f51f5723561951877cfd6f6a0da9d45b36decc30ebd14 |
-| Runtime lock SHA-256 | 86a126a2420ffa79cdda9ac0a55a65959ea1e1f2987e50c97b4ccb8e410149fc |
+| Runtime lock SHA-256 | b71c5ac58d3476d85a35a7943102e65383f2f8474e6b355d23920ecc777f7d2f |
 
 Every reviewed runtime file, including both TurboQuant kernels, is copied and
 hash-checked against its upstream and patched identities. A CPU Triton-interpreter

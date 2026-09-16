@@ -863,3 +863,15 @@ diff --git a/vllm/renderers/hf.py b/vllm/renderers/hf.py
      if return_assistant_tokens_mask:
          assert isinstance(plain, list), f"Expected list[int], got {type(plain)}"
          return plain, None
+diff --git a/tests/entrypoints/scale_out/token_in_token_out/test_raw_images.py b/tests/entrypoints/scale_out/token_in_token_out/test_raw_images.py
+--- a/tests/entrypoints/scale_out/token_in_token_out/test_raw_images.py
++++ b/tests/entrypoints/scale_out/token_in_token_out/test_raw_images.py
+@@ -232,7 +232,7 @@
+     serving, dispatched = serving_tokens(image_model, AsyncMock())
+     req = request(stream=stream, content_parts=[
+         {'type': 'image_url', 'image_url': {'url': PNG}}])
+-    with pytest.raises(ValueError, match='Failed to load image'):
++    with pytest.raises(VLLMValidationError, match='Failed to load image'):
+         await serving.serve_tokens(req)
+     assert not dispatched
+     serving.online_renderer.renderer.process_rendered_multimodal_async.assert_not_called()

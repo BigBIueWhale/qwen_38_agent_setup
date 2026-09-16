@@ -89723,7 +89723,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '        super().__init__(request)\n'})},
  {'name': 'precise-request-errors',
   'review_patch': 'patches/vllm-precise-request-errors.patch',
-  'review_sha256': '717a7ee8905a9759b2c3db20538034122fa1f1e707d9d32cf9b09bbd8866fecf',
+  'review_sha256': '055c3348b1a0c801ad6c8202d13659471106d0ff8a9b958efe1df16e25e9e588',
   'files': ({'path': 'tests/entrypoints/anthropic/test_anthropic_messages_conversion.py',
              'before_sha256': 'b95347f4b85b4a63be849c5ac3e10bcd22228cb5d51d903fa4bd6d0aa1f6049e',
              'after_sha256': 'd03cacaa3bc8c1211a82ac044be005f3718d36ebdb66f15c9a971092f978c0b8'},
@@ -89753,7 +89753,10 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'after_sha256': 'ba2f47bc7ce2a0b16b20680943c4da4033b2db43ebf62e1efcaca4818fefe685'},
             {'path': 'vllm/renderers/hf.py',
              'before_sha256': 'b0e83d95fc0aca6e248e28aa727d795bd74da681296634b15a0a0cf68a9feb48',
-             'after_sha256': 'ee40d5f8f0c95b80c372b58b6618790b9ba56da0971fe29f781179fc0199a19d'}),
+             'after_sha256': 'ee40d5f8f0c95b80c372b58b6618790b9ba56da0971fe29f781179fc0199a19d'},
+            {'path': 'tests/entrypoints/scale_out/token_in_token_out/test_raw_images.py',
+             'before_sha256': 'edfd4494fbe0fe7c4e40e3f06cd295155572a6164b77df5c38e7cb230ba0282c',
+             'after_sha256': 'c48d1455ea69faaf28e259f93391c83def0ad6f9f8fa2bc4cd1481f45a3455a8'}),
   'edits': ({'name': 'tests/entrypoints/anthropic/test_anthropic_messages_conversion.py:landmark-1',
              'path': 'tests/entrypoints/anthropic/test_anthropic_messages_conversion.py',
              'before': '\n'
@@ -92975,7 +92978,51 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    if return_assistant_tokens_mask:\n'
                              '        assert isinstance(plain, list), f"Expected '
                              'list[int], got {type(plain)}"\n'
-                             '        return plain, None\n'})})
+                             '        return plain, None\n'},
+            {'name': 'tests/entrypoints/scale_out/token_in_token_out/test_raw_images.py:landmark-1',
+             'path': 'tests/entrypoints/scale_out/token_in_token_out/test_raw_images.py',
+             'before': '    serving, dispatched = serving_tokens(image_model, '
+                       'AsyncMock())\n'
+                       '    req = request(stream=stream, content_parts=[\n'
+                       "        {'type': 'image_url', 'image_url': {'url': PNG}}])\n"
+                       "    with pytest.raises(ValueError, match='Failed to load "
+                       "image'):\n"
+                       '        await serving.serve_tokens(req)\n'
+                       '    assert not dispatched\n'
+                       '    '
+                       'serving.online_renderer.renderer.process_rendered_multimodal_async.assert_not_called()\n',
+             'after': '    serving, dispatched = serving_tokens(image_model, '
+                      'AsyncMock())\n'
+                      '    req = request(stream=stream, content_parts=[\n'
+                      "        {'type': 'image_url', 'image_url': {'url': PNG}}])\n"
+                      "    with pytest.raises(VLLMValidationError, match='Failed to "
+                      "load image'):\n"
+                      '        await serving.serve_tokens(req)\n'
+                      '    assert not dispatched\n'
+                      '    '
+                      'serving.online_renderer.renderer.process_rendered_multimodal_async.assert_not_called()\n',
+             'review_before': '    serving, dispatched = serving_tokens(image_model, '
+                              'AsyncMock())\n'
+                              '    req = request(stream=stream, content_parts=[\n'
+                              "        {'type': 'image_url', 'image_url': {'url': "
+                              'PNG}}])\n'
+                              "    with pytest.raises(ValueError, match='Failed to "
+                              "load image'):\n"
+                              '        await serving.serve_tokens(req)\n'
+                              '    assert not dispatched\n'
+                              '    '
+                              'serving.online_renderer.renderer.process_rendered_multimodal_async.assert_not_called()\n',
+             'review_after': '    serving, dispatched = serving_tokens(image_model, '
+                             'AsyncMock())\n'
+                             '    req = request(stream=stream, content_parts=[\n'
+                             "        {'type': 'image_url', 'image_url': {'url': "
+                             'PNG}}])\n'
+                             '    with pytest.raises(VLLMValidationError, '
+                             "match='Failed to load image'):\n"
+                             '        await serving.serve_tokens(req)\n'
+                             '    assert not dispatched\n'
+                             '    '
+                             'serving.online_renderer.renderer.process_rendered_multimodal_async.assert_not_called()\n'})})
 
 FINAL_FILES = {'tests/config/test_config_utils.py': '4f5ea0399cc3b4f9603df07e2cc26d32e1eddf6b98a36c0f30d580321879c038',
  'tests/distributed/test_rocm_quick_reduce.py': 'bf6f8a5708568b1f4d96dcc59f42258f8680e5b03bb4abdddcb0c7ead9d414bd',
@@ -92995,7 +93042,7 @@ FINAL_FILES = {'tests/config/test_config_utils.py': '4f5ea0399cc3b4f9603df07e2cc
  'tests/entrypoints/scale_out/render/test_render_multimodal.py': '369b8b8c33d901e4864c34bed123af4cbf8e7c69d5ec82730788b30298018fa8',
  'tests/entrypoints/scale_out/token_in_token_out/test_generate_stream.py': '9cb85d537a163dbb3fa61d87c6ce01e104e7135894985c8d98429e9efc865890',
  'tests/entrypoints/scale_out/token_in_token_out/test_protocol.py': 'af8660d1a31485268e62fbb1616608fcaf7468664ba1650b0846a233f547ac56',
- 'tests/entrypoints/scale_out/token_in_token_out/test_raw_images.py': 'edfd4494fbe0fe7c4e40e3f06cd295155572a6164b77df5c38e7cb230ba0282c',
+ 'tests/entrypoints/scale_out/token_in_token_out/test_raw_images.py': 'c48d1455ea69faaf28e259f93391c83def0ad6f9f8fa2bc4cd1481f45a3455a8',
  'tests/entrypoints/scale_out/token_in_token_out/test_raw_media_boundary.py': '56e24dd19b6581813fd03c93419aae7a4c4f795ac198d81ea346dca7166d1fdf',
  'tests/entrypoints/scale_out/token_in_token_out/test_serving_multimodal_tokens.py': 'a3ce14b444a1e86bf3d8abfe707df20878ca08982c563cb89fce37bed26840d1',
  'tests/entrypoints/serve/exception_handling/test_http_status_metrics.py': '3a6f93e9c2ae479d81c8454dd94ab8a4bdf1fe62cf0e134496c7db98d77fcdd1',

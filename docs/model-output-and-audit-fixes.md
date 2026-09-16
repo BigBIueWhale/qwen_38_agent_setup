@@ -647,6 +647,50 @@ XGrammar rejects both names while accepting the declared control. Evidence:
 remain unchanged; the retained-fallbacks section of the implementation report
 now records this decision explicitly.
 
+## Serving-machine build: stale assertion types and parser fixture
+
+The v23 build failed inside the Dockerfile unit block because its full-context
+`get_max_tokens` assertion still caught `ValueError` after `8833ce1` correctly
+retyped that refusal. The assertion now catches `VLLMValidationError`, with its
+import moved before first use. Runtime refusal types and the prohibition on broad
+Python-exception-to-400 classification remain unchanged.
+
+The sibling sweep found two further mismatched assertions: malformed tool history
+in the Dockerfile must catch `VLLMValidationError`, and the raw-image generation
+test must expect that same type for decoder rejection on both stream settings.
+The latter is included in the precise-request-errors reviewed transformation and
+regenerated landmarks. Executing the inline block also exposed a stale parser
+fixture that bypassed initialization; it now constructs `Qwen3Parser` normally
+with a mock tokenizer, preserving the actual reasoning-boundary state.
+
+All 102 original `pytest.raises(ValueError)` occurrences in the generated stages
+were audited against their final source. Repeated before/review landmarks include
+historical image/history assertions already changed by later stages and deleted
+CPU-policy tests. The 13 genuine remaining assertion sites cover exact-count
+invariants, capacity and offload configuration/factory errors; their exception
+types remain unchanged. The Dockerfile's offload-config `ValueError` assertion
+also remains unchanged.
+
+The optional run of these genuine `ValueError` cases was not all green: 12
+parameterized cases passed, five sizing cases could not construct their default
+model metadata offline, and three connector cases stopped at the preexisting
+missing `_build_config` helper. Their production paths still raise `ValueError`;
+these fixture problems are outside the retyped-refusal correction and remain
+unchanged. They are recorded in `build-refusal/genuine-value-errors-final.log`.
+
+The original full-context assertion fails against the typed runtime, and the old
+raw-image test fails on both transports. After correction, all 37 raw-image and
+API-utils cases pass. The entire Dockerfile inline Python unit block, including
+its invoked CPU units, passes when extracted verbatim and executed in a disposable
+offline container. No image build was run here.
+
+`build-vllm.sh check` does **not** execute the Dockerfile: it checks its identity
+and packaging contracts and runs selected CPU units. That gap explains why the
+serving machine's real build first exposed these stale inline assertions. The
+separate inline-block execution above verifies this correction without claiming
+that a new image was built. Logs and the detailed sweep are under
+`/tmp/codex-fix/build-refusal/`.
+
 ## Retained decisions and release boundary
 
 Finding #15 is workstation archive state, not a source defect. Archive verification
