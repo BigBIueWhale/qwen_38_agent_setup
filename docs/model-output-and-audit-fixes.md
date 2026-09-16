@@ -29,9 +29,30 @@ exact sampled IDs. The installed parser unit has 12 tests plus 126 subtests.
 The build check reconstructs and verifies every runtime file and runs the
 installed unit. No model, service or GPU was run.
 
-Still open in the owner's order: token/text provenance #23; precise error
-classification; the written
+Still open in the owner's order: precise error classification; the written
 client commit review; final agent pins, final check and implementation report.
+
+## Finding #23: exact token positions through text stops
+
+`vllm-token-text-provenance.patch` tracks native ByteLevel ASCII terminal
+positions while consuming every generated token ID. V1 output and the scanner
+share the existing incremental decoder and its existing UTF-8 handling.
+Visible text consumes those spans in order. Unicode bytes and text holdback
+cannot move a real marker onto a prose lookalike. A terminal is released only
+when all of its text is visible; a visible fragment remains ordinary text,
+and a permanently stripped suffix is never emitted at finish.
+
+Scope: four runtime files in the scanner, its parser feed, the shared decoder
+helper and V1 detokenizer. No transport fields or engine protocol change.
+Other tokenizer formats retain their existing scanner behavior; the pinned
+Qwen ByteLevel path does not use textual anchor searches.
+
+Validation: 4,333 parser/native-stop tests and 221 Chat/Responses tests pass
+(one existing expected failure). This includes 64 native scanner cases and
+64 Qwen output-processor cases for literal versus real markers, split UTF-8,
+invalid UTF-8 replacement, stop buffering, partial markers, both transports
+and exact reasoning counts. The installed parser unit has 15 tests.
+Twenty-nine corrected controls failed before the fix. No model ran.
 
 ## Findings #2 and #18: schema-faithful Qwen XML arguments
 
@@ -110,7 +131,7 @@ The standalone reasoning-usage unit also constructs the typed declarations.
 
 Terminal promotion and caller stops are covered by the EOS tool-output stage;
 schema conversion and the V1 thinking boundary have their own stages above.
-Exact token/text provenance remains the next open item.
+Exact token/text provenance is covered by its dedicated stage below.
 
 ## XML string and content fidelity
 
@@ -133,8 +154,8 @@ markers, surrounding content and incomplete string diagnostics. Five obsolete
 expectations now require preserved whitespace. Seven installed parser tests pass,
 including actual derived-template rendering, XGrammar acceptance and stream/batch
 round trips. Template retention now also runs in the ordinary CPU source check.
-Schema coercion, incomplete non-string diagnostics, terminal promotion and exact
-token/text provenance remain separate open obligations.
+Schema decoding, incomplete diagnostics, terminal promotion and token/text
+provenance are covered by the dedicated stages above.
 
 The integrated generator and `build-vllm.sh check` pass with 26 reviewed stages,
 102 deployment inputs, 19 framework/recipe tests and all installed CPU units.

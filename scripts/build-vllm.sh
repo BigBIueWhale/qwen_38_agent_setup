@@ -143,6 +143,7 @@ EXPECTED_STATUS=$' M docs/serving/online_serving/generative_scoring.md
  M vllm/renderers/online_derenderer.py
  M vllm/renderers/params.py
  M vllm/sampling_params.py
+ M vllm/tokenizers/detokenizer_utils.py
  M vllm/tool_parsers/abstract_tool_parser.py
  M vllm/tool_parsers/structural_tag_registry.py
  M vllm/tool_parsers/utils.py
@@ -254,6 +255,7 @@ GENERATE_RESULT_PATCH_FILE="${PROJECT_DIR}/patches/vllm-token-generation-result-
 RAW_IMAGE_TRANSPORT_PATCH_FILE="${PROJECT_DIR}/patches/vllm-raw-image-token-transport.patch"
 XML_TEXT_FIDELITY_PATCH_FILE="${PROJECT_DIR}/patches/vllm-xml-text-fidelity.patch"
 INPUT_STREAM_AGENT_IDENTITY_PATCH_FILE="${PROJECT_DIR}/patches/vllm-input-stream-agent-identity.patch"
+TOKEN_TEXT_PROVENANCE_PATCH_FILE="${PROJECT_DIR}/patches/vllm-token-text-provenance.patch"
 SCHEMA_FAITHFUL_XML_PATCH_FILE="${PROJECT_DIR}/patches/vllm-schema-faithful-xml.patch"
 ONE_WAY_THINKING_BOUNDARY_PATCH_FILE="${PROJECT_DIR}/patches/vllm-one-way-thinking-boundary.patch"
 TOOL_OUTPUT_COMPLETION_PATCH_FILE="${PROJECT_DIR}/patches/vllm-tool-output-completion.patch"
@@ -430,6 +432,7 @@ printf '%s  %s\n' \
   "${TOOL_OUTPUT_COMPLETION_PATCH_DIFF_SHA256}" "${TOOL_OUTPUT_COMPLETION_PATCH_FILE}" \
   "${ONE_WAY_THINKING_BOUNDARY_PATCH_DIFF_SHA256}" "${ONE_WAY_THINKING_BOUNDARY_PATCH_FILE}" \
   "${SCHEMA_FAITHFUL_XML_PATCH_DIFF_SHA256}" "${SCHEMA_FAITHFUL_XML_PATCH_FILE}" \
+  "${TOKEN_TEXT_PROVENANCE_PATCH_DIFF_SHA256}" "${TOKEN_TEXT_PROVENANCE_PATCH_FILE}" \
   "${INPUT_STREAM_AGENT_IDENTITY_PATCH_DIFF_SHA256}" "${INPUT_STREAM_AGENT_IDENTITY_PATCH_FILE}" \
   "${XML_TEXT_FIDELITY_PATCH_DIFF_SHA256}" "${XML_TEXT_FIDELITY_PATCH_FILE}" \
   "${RAW_IMAGE_TRANSPORT_PATCH_DIFF_SHA256}" "${RAW_IMAGE_TRANSPORT_PATCH_FILE}" \
@@ -734,6 +737,10 @@ printf '%s  %s\n' \
   | sha256sum --check --strict
 
 printf '%s  %s\n' \
+  "${DETOKENIZER_UTILS_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/tokenizers/detokenizer_utils.py" \
+  | sha256sum --check --strict
+
+printf '%s  %s\n' \
   "${RUNTIME_DOCKERFILE_SHA256}" "${DOCKERFILE}" \
   "${DOCKERIGNORE_SHA256}" "${DOCKERIGNORE}" | \
   sha256sum --check --strict
@@ -898,6 +905,8 @@ docker buildx build --progress=plain \
   --build-arg "REQUEST_PATCHED_FILE_SHA256=${REQUEST_PATCHED_FILE_SHA256}" \
   --build-arg "QWEN3_PARSER_PATCHED_FILE_SHA256=${QWEN3_PARSER_PATCHED_FILE_SHA256}" \
   --build-arg "STRUCTURED_OUTPUT_PATCHED_FILE_SHA256=${STRUCTURED_OUTPUT_PATCHED_FILE_SHA256}" \
+  --build-arg "DETOKENIZER_UTILS_PATCHED_FILE_SHA256=${DETOKENIZER_UTILS_PATCHED_FILE_SHA256}" \
+  --build-arg "DETOKENIZER_UTILS_UPSTREAM_FILE_SHA256=${DETOKENIZER_UTILS_UPSTREAM_FILE_SHA256}" \
   --build-arg "TOOL_PARSER_UTILS_PATCHED_FILE_SHA256=${TOOL_PARSER_UTILS_PATCHED_FILE_SHA256}" \
   --build-arg "TOOL_PARSER_UTILS_UPSTREAM_FILE_SHA256=${TOOL_PARSER_UTILS_UPSTREAM_FILE_SHA256}" \
   --build-arg "V1_THINKING_BUDGET_PATCHED_FILE_SHA256=${V1_THINKING_BUDGET_PATCHED_FILE_SHA256}" \
@@ -974,6 +983,7 @@ docker buildx build --progress=plain \
   --build-arg "TOOL_OUTPUT_COMPLETION_PATCH_DIFF_SHA256=${TOOL_OUTPUT_COMPLETION_PATCH_DIFF_SHA256}" \
   --build-arg "ONE_WAY_THINKING_BOUNDARY_PATCH_DIFF_SHA256=${ONE_WAY_THINKING_BOUNDARY_PATCH_DIFF_SHA256}" \
   --build-arg "SCHEMA_FAITHFUL_XML_PATCH_DIFF_SHA256=${SCHEMA_FAITHFUL_XML_PATCH_DIFF_SHA256}" \
+  --build-arg "TOKEN_TEXT_PROVENANCE_PATCH_DIFF_SHA256=${TOKEN_TEXT_PROVENANCE_PATCH_DIFF_SHA256}" \
   --build-arg "INPUT_STREAM_AGENT_IDENTITY_PATCH_DIFF_SHA256=${INPUT_STREAM_AGENT_IDENTITY_PATCH_DIFF_SHA256}" \
   --build-arg "ASYNC_LLM_UPSTREAM_FILE_SHA256=${ASYNC_LLM_UPSTREAM_FILE_SHA256}" \
   --build-arg "ASYNC_LLM_PATCHED_FILE_SHA256=${ASYNC_LLM_PATCHED_FILE_SHA256}" \
@@ -1099,6 +1109,7 @@ actual_installed_report="$(
     /usr/local/lib/python3.12/dist-packages/vllm/v1/structured_output/__init__.py \
     /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/anthropic/api_router.py \
     /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/chat_completion/serving.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/tokenizers/detokenizer_utils.py \
     /usr/local/lib/python3.12/dist-packages/vllm/tool_parsers/utils.py \
     /usr/local/lib/python3.12/dist-packages/vllm/v1/sample/thinking_budget_state.py \
     /usr/local/lib/python3.12/dist-packages/vllm/reasoning/abs_reasoning_parsers.py \
@@ -1158,6 +1169,7 @@ expected_installed_report="$(printf '%s  %s\n' \
   "${STRUCTURED_OUTPUT_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/structured_output/__init__.py \
   "${ANTHROPIC_API_ROUTER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/anthropic/api_router.py \
   "${CHAT_SERVING_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/chat_completion/serving.py \
+  "${DETOKENIZER_UTILS_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/tokenizers/detokenizer_utils.py \
   "${TOOL_PARSER_UTILS_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/tool_parsers/utils.py \
   "${V1_THINKING_BUDGET_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/sample/thinking_budget_state.py \
   "${BASE_REASONING_PARSER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/reasoning/abs_reasoning_parsers.py \

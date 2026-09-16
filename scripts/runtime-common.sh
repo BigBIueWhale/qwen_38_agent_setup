@@ -716,6 +716,7 @@ assert_running_profile() {
       /usr/local/lib/python3.12/dist-packages/vllm/v1/structured_output/__init__.py \
       /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/anthropic/api_router.py \
       /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/chat_completion/serving.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/tokenizers/detokenizer_utils.py \
       /usr/local/lib/python3.12/dist-packages/vllm/tool_parsers/utils.py \
       /usr/local/lib/python3.12/dist-packages/vllm/v1/sample/thinking_budget_state.py \
       /usr/local/lib/python3.12/dist-packages/vllm/reasoning/abs_reasoning_parsers.py \
@@ -775,6 +776,7 @@ assert_running_profile() {
     "${STRUCTURED_OUTPUT_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/structured_output/__init__.py \
     "${ANTHROPIC_API_ROUTER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/anthropic/api_router.py \
     "${CHAT_SERVING_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/chat_completion/serving.py \
+    "${DETOKENIZER_UTILS_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/tokenizers/detokenizer_utils.py \
     "${TOOL_PARSER_UTILS_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/tool_parsers/utils.py \
     "${V1_THINKING_BUDGET_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/sample/thinking_budget_state.py \
     "${BASE_REASONING_PARSER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/reasoning/abs_reasoning_parsers.py \

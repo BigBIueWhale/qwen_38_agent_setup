@@ -105,6 +105,44 @@ def parse(text, chunk_size, *, tools=None, choice="auto", ids=None,
 
 
 class ToolOutputParserTest(unittest.TestCase):
+    def test_native_byte_positions_survive_stops_and_unicode(self):
+        from types import SimpleNamespace
+        from tokenizers import Tokenizer, decoders, models
+        from vllm.parser.engine.token_id_scanner import (
+            PreLexedTerminal, TokenIDScanner,
+        )
+
+        vocabulary = {chr(i): i for i in range(33, 127)}
+        vocabulary.update({"Ġ": 32, "é": 200, "Ľ": 201, "ª": 202,
+                           "</think>": 300, "<tool_call>": 301})
+        native = Tokenizer(models.BPE(vocabulary, []))
+        native.decoder = decoders.ByteLevel()
+        before = "Example: </think> literal "
+        ids = [200, 201, 202, 32] + [ord(c) for c in before] + [300]
+        decoded = native.decode(ids, skip_special_tokens=False)
+        for chunk_size in (1, 3, 1000):
+            for holdback in (0, 9, 1000):
+                for cut in (0, 3, 8):
+                    with self.subTest(chunk=chunk_size, holdback=holdback, cut=cut):
+                        scanner = TokenIDScanner({300: "THINK_END", 301: "TOOL_START"},
+                            SimpleNamespace(backend_tokenizer=native))
+                        sent, items = 0, []
+                        end = len("雪 " + before) + cut
+                        for start in range(0, len(ids), chunk_size):
+                            group = ids[start:start + chunk_size]
+                            done = start + chunk_size >= len(ids)
+                            available = native.decode(ids[:start + len(group)],
+                                skip_special_tokens=False).rstrip("\ufffd")
+                            visible = min(end, max(0, len(available)
+                                          - (0 if done else holdback)))
+                            items.extend(scanner.scan(available[sent:visible], group))
+                            sent = visible
+                        items.extend(scanner.flush_pending())
+                        self.assertEqual("".join(item.text for item in items), decoded[:end])
+                        self.assertEqual([item.terminal for item in items
+                                          if isinstance(item, PreLexedTerminal)],
+                                         ["THINK_END"] if cut == 8 else [])
+
     def test_xml_values_follow_the_complete_schema(self):
         from jsonschema import Draft202012Validator
         from xgrammar import Grammar

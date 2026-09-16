@@ -2374,6 +2374,57 @@ def _validate_xml_schema_after(state: State) -> None:
     }, label=label)
 
 
+def _validate_token_positions_before(state: State) -> None:
+    _require_in_symbol(state, "vllm/parser/engine/token_id_scanner.py",
+        "TokenIDScanner.scan", ("self._decode_token(tid)",
+                                "self._recover_holdback_text("),
+        label="Token/text position baseline")
+
+
+def _validate_token_positions_after(state: State) -> None:
+    label = "Native ByteLevel token positions"
+    scanner = "vllm/parser/engine/token_id_scanner.py"
+    _require_in_symbol(state, scanner, "TokenIDScanner.__init__", (
+        "isinstance(backend, Tokenizer)", "isinstance(backend.decoder, ByteLevel)",
+        ".isascii()", "_ByteLevelTokenPositions(",
+    ), label=label)
+    _require_in_symbol(state, scanner, "TokenIDScanner.scan", (
+        "return self._token_positions.scan(delta_text, delta_token_ids)",
+    ), label=label)
+    positions = _require_in_symbol(state, scanner, "_ByteLevelTokenPositions", (
+        "NativeDecodeStream(self.tokenizer)", "self.decoder.step(token_id)",
+        "decoded.endswith(spelling)", "self.pending.popleft()", "self.offset",
+    ), label=label)
+    _require(".find(" not in positions and ".rfind(" not in positions,
+             label + ": marker placement must not search for its spelling")
+    _require_in_symbol(state, scanner, "_ByteLevelTokenPositions.finish", (
+        "TextChunk(item.text[: self.offset])", "self.pending.clear()",
+    ), label=label)
+    _require_in_symbol(state, scanner, "TokenIDScanner.reset", (
+        "self._token_positions.reset()",
+    ), label=label)
+    _require_in_symbol(state, "vllm/parser/engine/streaming_parser_engine.py",
+        "StreamingParserEngine.feed", ("not self._scanner.tracks_token_positions",),
+        label=label)
+    _require_in_symbol(state, "vllm/v1/engine/detokenizer.py",
+        "FastIncrementalDetokenizer.__init__", (
+            "self.decoder = NativeDecodeStream(", "ids=request.prompt_token_ids",
+        ), label=label)
+    _require_in_symbol(state, "vllm/v1/engine/detokenizer.py",
+        "FastIncrementalDetokenizer.decode_next", ("self.decoder.step(next_token_id)",),
+        label=label)
+    require_python_symbols(state, "vllm/tokenizers/detokenizer_utils.py", {
+        "NativeDecodeStream.step": None,
+    }, label=label)
+    require_python_symbols(state, "tests/parser/engine/test_token_id_scanner.py", {
+        "TestNativeByteLevelPositions.test_literal_and_real_marker_positions": None,
+    }, label=label)
+    require_python_symbols(state,
+        "tests/v1/structured_output/test_backend_xgrammar_stop_tokens.py", {
+            "test_qwen_stop_stripped_boundary_never_rebinds_to_prose": None,
+        }, label=label)
+
+
 def validate_final(state: State) -> None:
     """Reassert every durable semantic invariant on the complete tree.
 
@@ -2389,6 +2440,20 @@ def validate_final(state: State) -> None:
 
 
 CONTRACTS: Mapping[str, SemanticContract] = {
+    "token-text-provenance": SemanticContract(
+        rationale=(
+            "A stop-stripped boundary ID must never bind to a visible prose "
+            "lookalike. Native ByteLevel ASCII terminals use decoder positions "
+            "across Unicode and text holdback; finishing preserves only visible "
+            "fragments and never recreates stripped marker text."
+        ),
+        removal_condition=(
+            "Remove when upstream preserves these token/text positions in the "
+            "deployed parser on both batch and streaming V1 output."
+        ),
+        validate_before=_validate_token_positions_before,
+        validate_after=_validate_token_positions_after,
+    ),
     "schema-faithful-xml": SemanticContract(
         rationale=(
             "The Qwen XML converter must resolve the complete tool schema and "

@@ -168,3 +168,5 @@
 !vllm/vllm/v1/sample/
 !vllm/vllm/v1/sample/thinking_budget_state.py
 !vllm/vllm/tool_parsers/utils.py
+!vllm/vllm/tokenizers/
+!vllm/vllm/tokenizers/detokenizer_utils.py
