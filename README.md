@@ -46,8 +46,8 @@ There is one supported mode:
 | Agent-service release | Pinned by the agent-service release lock, which owns every agent and service image identity |
 | Agent-service listener | 127.0.0.1:8090 only |
 | Launch profile and cache volume | socket-isolated-nonroot-vision-k8v4-agent-v21 |
-| Image profile | socket-isolated-nonroot-vision-k8v4-agent-v23 |
-| Runtime image | sha256:f6397c5e2ef34eb14fe262f6da7fccb028b74877e64d412268cf781582a002fd |
+| Image profile | socket-isolated-nonroot-vision-k8v4-agent-v24 |
+| Runtime image | sha256:e91fc7b2f92db062fcafa46a6bddfe07cdeb2e589ac600b994520649749fcdc6 |
 
 This is not a text-only profile with an optional vision switch. It is not a
 one-million-token profile. It has no MTP, eager-mode, lower-quality image, alternate
@@ -331,16 +331,16 @@ Pinned build inputs and products:
 |---|---|
 | Immutable base tag | qwen38-vllm:main-9df9b0b |
 | Immutable base ID | sha256:fa4a002a88b7043a1a89966dea8a500fe9696f84e75730d9da916f916048d401 |
-| Runtime tag | qwen38-vllm:qwen38-27b-nvfp4-k8v4-runtime-v23 |
-| Runtime ID | sha256:f6397c5e2ef34eb14fe262f6da7fccb028b74877e64d412268cf781582a002fd |
-| Offline archive | artifacts/qwen38-vllm-images-runtime-v23.tar |
-| Archive size | 8,560,911,872 bytes, mode 0600 |
-| Archive SHA-256 | 741730d380f1599fb1475b31a987be7ba72332b2227c18824fd001b8dccb2d22 |
+| Runtime tag | qwen38-vllm:qwen38-27b-nvfp4-k8v4-runtime-v24 |
+| Runtime ID | sha256:e91fc7b2f92db062fcafa46a6bddfe07cdeb2e589ac600b994520649749fcdc6 |
+| Offline archive | artifacts/qwen38-vllm-images-runtime-v24.tar |
+| Archive size | 8,560,924,160 bytes, mode 0600 |
+| Archive SHA-256 | 218b715bb2f6e67d8f9933f580e94e18b3e5c89534e2e8355ab2fc7212534619 |
 | Runtime Dockerfile SHA-256 | ed925808a7e2d4b8fb0deb1e1f48bd159b18d01449513fe0783a7f0bf0802884 |
 | Docker context allowlist SHA-256 | a461af03bbe810de008c026350b4836dc4b44dec0bf79bae9e322b3ff4ef5fd1 |
 | Build verifier SHA-256 | 7cde1fe75bae92321e9d97cd02ab91ae3a4c8ea7a66c24f5f503bb08a30ae778 |
 | Runtime validator SHA-256 | 086ee356c2411e6d952f51f5723561951877cfd6f6a0da9d45b36decc30ebd14 |
-| Runtime lock SHA-256 | 917f54377a0df32e1f2b3c7f5d474ddb49dfbc0cddf8fe5f702d6525979a9d5d |
+| Runtime lock SHA-256 | 1e76737719a6db03d7586b5f66c1463f13f7373200c5e2d3a4b381f1263569d9 |
 
 Every reviewed runtime file, including both TurboQuant kernels, is copied and
 hash-checked against its upstream and patched identities. A CPU Triton-interpreter
