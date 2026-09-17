@@ -172,17 +172,43 @@ def real_tokenizer_and_grammar_probe() -> dict[str, Any]:
         )
 
     protocol_tool = ChatCompletionToolsParam.model_validate(read_file_tool(False))
+    # The vLLM-owned Qwen builder renders a declared schema as the XML
+    # transport, not as one embedded JSON document: the declared parameter is a
+    # named tag carrying its declared value production, and
+    # "additionalProperties": false is the absence of any element that could
+    # carry an undeclared name. All three spellings of strict must render the
+    # same grammar.
+    rendered_grammars = []
     for strict_value in (None, False, True):
         candidate = protocol_tool.model_copy(deep=True)
         candidate.function.strict = strict_value
         tag = get_model_structural_tag("qwen_3_coder", [candidate], "auto", False)
         if tag is None:
             raise AssertionError(f"Qwen auto schema missing for strict={strict_value!r}")
-        schema = tag.model_dump()["format"]["tags"][0]["content"]["json_schema"]
-        if schema != candidate.function.parameters:
+        call_tag = tag.model_dump()["format"]["tags"][0]
+        body = call_tag["content"]
+        if body["type"] != "sequence":
             raise AssertionError(
-                f"Qwen schema changed for strict={strict_value!r}: {schema}"
+                f"Qwen schema was erased for strict={strict_value!r}: {body}"
             )
+        declared = [e for e in body["elements"] if e["type"] != "regex"]
+        if [e.get("begin") for e in declared] != ["<parameter=path>"]:
+            raise AssertionError(
+                f"Qwen parameters changed for strict={strict_value!r}: {declared}"
+            )
+        path_value = declared[0]["content"]
+        if path_value["type"] != "sequence":
+            raise AssertionError(
+                f"Qwen value channel changed for strict={strict_value!r}: {path_value}"
+            )
+        values = [e for e in path_value["elements"] if e["type"] != "regex"]
+        if values != [{"type": "const_string", "value": PATH}]:
+            raise AssertionError(
+                f"Qwen value schema changed for strict={strict_value!r}: {values}"
+            )
+        rendered_grammars.append(call_tag)
+    if not rendered_grammars[0] == rendered_grammars[1] == rendered_grammars[2]:
+        raise AssertionError("strict changed the served Qwen grammar")
     for other_model in ("llama", "qwen_3_5", "deepseek_v4"):
         if get_model_structural_tag(other_model, [protocol_tool], "auto", False):
             raise AssertionError(f"Non-Qwen strict policy was broadened to {other_model}")

@@ -1039,8 +1039,11 @@ tool = ChatCompletionToolsParam.model_validate(
             "description": "Read a UTF-8 file.",
             "parameters": {
                 "type": "object",
-                "properties": {"path": {"type": "string"}},
-                "required": ["path"],
+                "properties": {
+                    "path": {"type": "string"},
+                    "max_bytes": {"type": "integer"},
+                },
+                "required": ["path", "max_bytes"],
                 "additionalProperties": False,
             },
         },
@@ -1084,18 +1087,52 @@ else:
 
 # A Qwen tool schema is load-bearing even when OpenAI's optional strict flag
 # is omitted or explicitly false. Other structural-tag models retain upstream
-# opt-in semantics. The dumped grammar must therefore contain the real schema.
+# opt-in semantics. The vLLM-owned Qwen builder renders that schema as the XML
+# transport rather than as one embedded JSON document: each declared parameter
+# becomes a named tag in the schema's own order, a string rides the
+# unconstrained channel, every other declared type keeps its JSON sub-schema
+# verbatim, and "additionalProperties": false is the absence of any element
+# that could carry an undeclared name. Assert that rendering, and that all
+# three spellings of strict are one and the same grammar.
+strict_dumps = []
 for strict_value in (None, False, True):
     strict_tool = tool.model_copy(deep=True)
     strict_tool.function.strict = strict_value
     tag = get_model_structural_tag("qwen_3_coder", [strict_tool], "auto", False)
     assert tag is not None
-    tag_dump = tag.model_dump()
-    schema = tag_dump["format"]["tags"][0]["content"]["json_schema"]
-    assert schema["properties"]["path"] == {
-        "type": "string"
-    }
-    assert schema["additionalProperties"] is False
+    call_tag = tag.model_dump()["format"]["tags"][0]
+    assert call_tag["begin"] == "<tool_call>\n<function=read_file>\n"
+    assert call_tag["end"] == "\n</function>\n</tool_call>"
+    # A schema the builder erased is a star of any-named parameters accepting
+    # any value, never the declared-order sequence.
+    body = call_tag["content"]
+    assert body["type"] == "sequence", body
+    declared = [e for e in body["elements"] if e["type"] != "regex"]
+    # Exactly the two declared parameters, in the declared order, each bound
+    # by name and each required -- an optional one arrives wrapped in
+    # "optional", and an undeclared one would need the trailing "star" that
+    # "additionalProperties": false is precisely the absence of.
+    assert [e["type"] for e in declared] == ["tag", "tag"], declared
+    assert [e["begin"] for e in declared] == [
+        "<parameter=path>",
+        "<parameter=max_bytes>",
+    ], declared
+    assert [e["end"] for e in declared] == ["</parameter>", "</parameter>"]
+    # The string parameter rides the unconstrained channel, which excludes its
+    # own closer and the next parameter's opener. That second exclusion is what
+    # makes the argument merge that once published one call as another
+    # ungrammatical rather than merely unlikely.
+    path_value = declared[0]["content"]
+    assert path_value["type"] == "any_text", path_value
+    assert path_value["excludes"] == ["<parameter=", "</parameter>"]
+    # Every other declared type carries its JSON sub-schema verbatim.
+    max_bytes_value = declared[1]["content"]
+    assert max_bytes_value["type"] == "sequence", max_bytes_value
+    embedded = [e for e in max_bytes_value["elements"] if e["type"] != "regex"]
+    assert [e["type"] for e in embedded] == ["json_schema"], embedded
+    assert embedded[0]["json_schema"] == {"type": "integer"}
+    strict_dumps.append(call_tag)
+assert strict_dumps[0] == strict_dumps[1] == strict_dumps[2]
 
 # Decoder-time boundary invariant: an explicit </think> is excluded from the
 # grammar, while an implicit <tool_call> reasoning terminator is retained as

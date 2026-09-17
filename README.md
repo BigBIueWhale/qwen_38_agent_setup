@@ -336,11 +336,11 @@ Pinned build inputs and products:
 | Offline archive | artifacts/qwen38-vllm-images-runtime-v23.tar |
 | Archive size | 8,560,911,872 bytes, mode 0600 |
 | Archive SHA-256 | 741730d380f1599fb1475b31a987be7ba72332b2227c18824fd001b8dccb2d22 |
-| Runtime Dockerfile SHA-256 | 77eb4759fe0671a60e83678d52103920cc458bb98220765217ac4f459bb01c44 |
+| Runtime Dockerfile SHA-256 | ed925808a7e2d4b8fb0deb1e1f48bd159b18d01449513fe0783a7f0bf0802884 |
 | Docker context allowlist SHA-256 | a461af03bbe810de008c026350b4836dc4b44dec0bf79bae9e322b3ff4ef5fd1 |
 | Build verifier SHA-256 | 7cde1fe75bae92321e9d97cd02ab91ae3a4c8ea7a66c24f5f503bb08a30ae778 |
 | Runtime validator SHA-256 | 086ee356c2411e6d952f51f5723561951877cfd6f6a0da9d45b36decc30ebd14 |
-| Runtime lock SHA-256 | 956ea6bfbfe044d90031b5e0e7e823062a2af9825b4c005b515a3b2886d6cac8 |
+| Runtime lock SHA-256 | 917f54377a0df32e1f2b3c7f5d474ddb49dfbc0cddf8fe5f702d6525979a9d5d |
 
 Every reviewed runtime file, including both TurboQuant kernels, is copied and
 hash-checked against its upstream and patched identities. A CPU Triton-interpreter
