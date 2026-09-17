@@ -76,7 +76,7 @@ error.
   and relay readiness events, then validates the complete live configuration before
   reporting success. Re-running it validates the existing owned topology rather than
   starting a duplicate.
-- status.sh validates host prerequisites, thirty-three ordered vLLM transformations, every reviewed
+- status.sh validates host prerequisites, thirty-five ordered vLLM transformations, every reviewed
   source and test file, the model manifest, image archive, image identity and labels,
   command and environment, mounts, runtime packages, API identity, listener,
   hardening, and live health. HEALTHY means all checks passed.
@@ -96,7 +96,7 @@ Advanced reproducibility operations are deliberately separate from serving mode:
     ./scripts/build-vllm.sh build
     ./scripts/restore-images.sh
 
-The check reconstructs the source tree from the pinned upstream commit through all thirty-three
+The check reconstructs the source tree from the pinned upstream commit through all thirty-five
 landmark-aware transformations. The build runs offline from the exact base image and fails unless it produces
 the pinned image ID. Restore verifies the pinned local archive before loading it.
 
@@ -256,7 +256,7 @@ The vLLM submodule is pinned at:
 
     9df9b0b0a1816b6d0d0f6ecd0da563cc37fd72f5
 
-It is intentionally reconstructed by thirty-three ordered, reviewed semantic transformations:
+It is intentionally reconstructed by thirty-five ordered, reviewed semantic transformations:
 
 | Patch | SHA-256 |
 |---|---|
@@ -307,7 +307,23 @@ itself covered by thirteen failure-path tests. The
 unified diffs remain review artifacts, but they do not select mutation locations.
 The build check rejects an extra dirty file, ambiguous landmark, missing hunk, wrong
 stage, changed final hash, whitespace error, partial intermediate state, concurrent
-source drift, or a patch that does not recreate the exact live tree.
+source drift, or a reconstruction that disagrees with the live `vllm/` tree.
+
+That last comparison is a known weakness, stated here rather than left to be
+rediscovered. The reconstruction is authoritative: it is built from the reviewed
+diffs and the committed landmark blocks into a disposable worktree, and every stage
+validates complete pre/post hashes. The live `vllm/` tree it is finally compared
+against is neither authoritative nor managed -- no command in this repository writes
+it. Adding a patch stage therefore updates the reviewed diffs on every machine that
+pulls and leaves that tree behind on all of them; the comparison then fails against
+the reconstruction and names the file whose new stage the tree is missing, which
+reads as a patch defect and is not one. The build consumes that same tree --
+containers/Dockerfile.runtime copies its files out of the build context -- so this
+comparison is currently the only thing tying shipped bytes to the reviewed patches,
+and it must not simply be deleted. The fix is to build from the reconstruction and
+give the live tree an explicit materialising verb, after which the worktree status
+gate, the file-by-file comparison and EXPECTED_STATUS describe nothing and are
+removed with it.
 
 Pinned build inputs and products:
 
