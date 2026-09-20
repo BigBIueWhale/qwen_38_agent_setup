@@ -93631,10 +93631,10 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'SCHEMA_CASES = [\n'})},
  {'name': 'qwen-owned-tool-grammar',
   'review_patch': 'patches/vllm-qwen-owned-tool-grammar.patch',
-  'review_sha256': '7ed11e1bf519ff0b47d61603c2fcdf529a997aac148dc8536468c06193bbd0ec',
+  'review_sha256': '81b3f760a7aa670496deb1252ee3713d452ab62debec88062bbe4cadceb6c849',
   'files': ({'path': 'vllm/tool_parsers/structural_tag_registry.py',
              'before_sha256': 'b6ddd5a890f31922b2f23cc7b84fd39b42783f65c8db121ba3d402b1e3266288',
-             'after_sha256': '04f2ca60e07e388fa2870f6e25d94029455517b0250fe9887e6800e9f92e1169'},
+             'after_sha256': '7bc1462ae76a691b609a8f190787bbbeff977e1442ce39b12ccceffdfcbca190'},
             {'path': 'vllm/parser/qwen3.py',
              'before_sha256': 'ecbc647afb1f229ad556fbb055837f7a006b6bc7cc9d4d17e151e79d5fe8cde9',
              'after_sha256': 'e74bb5667bea480948d40598f1b1ea5fc070a67ec2d90921a5047e7d0128df53'},
@@ -93648,6 +93648,34 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': 'bd67af994d9d155b88a2071f180a6fd56fc67cbe5c423090b215568f632c5bca',
              'after_sha256': 'da1a123dd3df8e22cfdf5b5fa10c13198cc82b295294d0fb5933beff09e2b86f'}),
   'edits': ({'name': 'vllm/tool_parsers/structural_tag_registry.py:landmark-1',
+             'path': 'vllm/tool_parsers/structural_tag_registry.py',
+             'before': '    ChatCompletionNamedToolChoiceParam,\n'
+                       '    ChatCompletionToolsParam,\n'
+                       ')\n'
+                       '\n'
+                       'ToolChoice: TypeAlias = (\n'
+                       '    Literal["none", "auto", "required"]\n',
+             'after': '    ChatCompletionNamedToolChoiceParam,\n'
+                      '    ChatCompletionToolsParam,\n'
+                      ')\n'
+                      'from vllm.exceptions import VLLMValidationError\n'
+                      '\n'
+                      'ToolChoice: TypeAlias = (\n'
+                      '    Literal["none", "auto", "required"]\n',
+             'review_before': '    ChatCompletionNamedToolChoiceParam,\n'
+                              '    ChatCompletionToolsParam,\n'
+                              ')\n'
+                              '\n'
+                              'ToolChoice: TypeAlias = (\n'
+                              '    Literal["none", "auto", "required"]\n',
+             'review_after': '    ChatCompletionNamedToolChoiceParam,\n'
+                             '    ChatCompletionToolsParam,\n'
+                             ')\n'
+                             'from vllm.exceptions import VLLMValidationError\n'
+                             '\n'
+                             'ToolChoice: TypeAlias = (\n'
+                             '    Literal["none", "auto", "required"]\n'},
+            {'name': 'vllm/tool_parsers/structural_tag_registry.py:landmark-2',
              'path': 'vllm/tool_parsers/structural_tag_registry.py',
              'before': '        list[BuiltinToolParam],\n'
                        '        SimplifiedToolChoice,\n'
@@ -93675,7 +93703,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    ],\n'
                              '    StructuralTag,\n'
                              ']\n'},
-            {'name': 'vllm/tool_parsers/structural_tag_registry.py:landmark-2',
+            {'name': 'vllm/tool_parsers/structural_tag_registry.py:landmark-3',
              'path': 'vllm/tool_parsers/structural_tag_registry.py',
              'before': '        "deepseek_r1",\n'
                        '        "deepseek_v3_1",\n'
@@ -93741,7 +93769,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    XGRAMMAR_BUILTIN_STRUCTURAL_TAG_MODELS | '
                              'VLLM_BUILTIN_STRUCTURAL_TAG_MODELS\n'
                              ')\n'},
-            {'name': 'vllm/tool_parsers/structural_tag_registry.py:landmark-3',
+            {'name': 'vllm/tool_parsers/structural_tag_registry.py:landmark-4',
              'path': 'vllm/tool_parsers/structural_tag_registry.py',
              'before': '            builtin_tools,\n'
                        '            simplified_tool_choice,\n'
@@ -93795,6 +93823,16 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '        )\n'
                       '\n'
                       '    if model not in XGRAMMAR_BUILTIN_STRUCTURAL_TAG_MODELS:\n'
+                      '        # Deliberately not a typed request refusal: ``model`` '
+                      'is the tool\n'
+                      "        # parser's own ``structural_tag_model`` class "
+                      'attribute, never a\n'
+                      '        # request field, so an unsupported value means this '
+                      'deployment\n'
+                      '        # registered a parser this module cannot serve. The '
+                      'caller has nothing\n'
+                      '        # to change, and a bare ValueError is the 500 that says '
+                      'so.\n'
                       '        supported = sorted(SUPPORTED_STRUCTURAL_TAG_MODELS)\n'
                       '        raise ValueError(f"Unknown format type: {model}, '
                       'supported types: {supported}")\n'
@@ -93863,6 +93901,16 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '\n'
                              '    if model not in '
                              'XGRAMMAR_BUILTIN_STRUCTURAL_TAG_MODELS:\n'
+                             '        # Deliberately not a typed request refusal: '
+                             '``model`` is the tool\n'
+                             "        # parser's own ``structural_tag_model`` class "
+                             'attribute, never a\n'
+                             '        # request field, so an unsupported value means '
+                             'this deployment\n'
+                             '        # registered a parser this module cannot serve. '
+                             'The caller has nothing\n'
+                             '        # to change, and a bare ValueError is the 500 '
+                             'that says so.\n'
                              '        supported = '
                              'sorted(SUPPORTED_STRUCTURAL_TAG_MODELS)\n'
                              '        raise ValueError(f"Unknown format type: {model}, '
@@ -93877,7 +93925,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '\n'
                              '\n'
                              'def _dump_tool_for_xgrammar(\n'},
-            {'name': 'vllm/tool_parsers/structural_tag_registry.py:landmark-4',
+            {'name': 'vllm/tool_parsers/structural_tag_registry.py:landmark-5',
              'path': 'vllm/tool_parsers/structural_tag_registry.py',
              'before': '    return StructuralTag(\n'
                        '        '
@@ -94114,7 +94162,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '        refused = [key for key in _QWEN_REFUSED_STRING_KEYS if '
                       'key in resolved]\n'
                       '        if refused:\n'
-                      '            raise ValueError(\n'
+                      '            raise VLLMValidationError(\n'
                       '                f"Tool {tool!r} parameter {parameter!r} '
                       'declares "\n'
                       '                f"{\', \'.join(refused)} on a string. The Qwen '
@@ -94128,7 +94176,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '                "length-bounded regex, so this constraint has '
                       'no grammar. "\n'
                       '                "Declare the parameter without it and validate '
-                      'it in the tool."\n'
+                      'it in the tool.",\n'
+                      '                parameter="tools",\n'
                       '            )\n'
                       '        return _qwen_raw_value()\n'
                       '    if (\n'
@@ -94289,8 +94338,13 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '        )\n'
                       '    elif tool_choice == "forced":\n'
                       '        if not tags:\n'
-                      '            raise ValueError("Forced tool choice must resolve '
-                      'to exactly one tool.")\n'
+                      '            raise VLLMValidationError(\n'
+                      '                "Forced tool choice must resolve to exactly one '
+                      'tool. Name a "\n'
+                      '                "function this request also declares in '
+                      '`tools`.",\n'
+                      '                parameter="tool_choice",\n'
+                      '            )\n'
                       '        suffix_tag = tags[0]\n'
                       '    else:\n'
                       '        suffix_tag = TagsWithSeparatorFormat(\n'
@@ -94554,7 +94608,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '        refused = [key for key in '
                              '_QWEN_REFUSED_STRING_KEYS if key in resolved]\n'
                              '        if refused:\n'
-                             '            raise ValueError(\n'
+                             '            raise VLLMValidationError(\n'
                              '                f"Tool {tool!r} parameter {parameter!r} '
                              'declares "\n'
                              '                f"{\', \'.join(refused)} on a string. '
@@ -94568,7 +94622,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '                "length-bounded regex, so this '
                              'constraint has no grammar. "\n'
                              '                "Declare the parameter without it and '
-                             'validate it in the tool."\n'
+                             'validate it in the tool.",\n'
+                             '                parameter="tools",\n'
                              '            )\n'
                              '        return _qwen_raw_value()\n'
                              '    if (\n'
@@ -94732,8 +94787,13 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '        )\n'
                              '    elif tool_choice == "forced":\n'
                              '        if not tags:\n'
-                             '            raise ValueError("Forced tool choice must '
-                             'resolve to exactly one tool.")\n'
+                             '            raise VLLMValidationError(\n'
+                             '                "Forced tool choice must resolve to '
+                             'exactly one tool. Name a "\n'
+                             '                "function this request also declares in '
+                             '`tools`.",\n'
+                             '                parameter="tool_choice",\n'
+                             '            )\n'
                              '        suffix_tag = tags[0]\n'
                              '    else:\n'
                              '        suffix_tag = TagsWithSeparatorFormat(\n'
@@ -96025,7 +96085,7 @@ FINAL_FILES = {'tests/config/test_config_utils.py': '4f5ea0399cc3b4f9603df07e2cc
  'vllm/sampling_params.py': '53fafbd08dce3fc1a1017899c46cbac643a2da22746c5a20b5ab4e95830d0325',
  'vllm/tokenizers/detokenizer_utils.py': '7718979d813ed00d41116d92a5abf81524e393693a6b28fa1c2a6d8ff66c880d',
  'vllm/tool_parsers/abstract_tool_parser.py': '91f4f3184e7f0eb6bc9e76d9ce4d3063cff58e0de8afc409038139e48314d0c8',
- 'vllm/tool_parsers/structural_tag_registry.py': '04f2ca60e07e388fa2870f6e25d94029455517b0250fe9887e6800e9f92e1169',
+ 'vllm/tool_parsers/structural_tag_registry.py': '7bc1462ae76a691b609a8f190787bbbeff977e1442ce39b12ccceffdfcbca190',
  'vllm/tool_parsers/utils.py': '0399a0392644876bbcbdc2e9137b417aa842e7306a09a36d9836ef1d249de05d',
  'vllm/v1/attention/backends/turboquant_attn.py': 'ccda36577e4fb0052f370169dce4b649bad890b8b440a82e584acd3dd92a6d86',
  'vllm/v1/attention/ops/triton_turboquant_decode.py': 'dab8b65ab7ddd6582de16e1fc7b1360ab0061b4a2a2b114f5d87ea0532fd726f',

@@ -297,7 +297,7 @@ It is intentionally reconstructed by thirty-five ordered, reviewed semantic tran
 | patches/vllm-token-text-provenance.patch | 954b36cb444f7e644e29d13f7a9d3c000512a0d616bbf2b6cd3cb8f4e880dd44 |
 | patches/vllm-precise-request-errors.patch | 055c3348b1a0c801ad6c8202d13659471106d0ff8a9b958efe1df16e25e9e588 |
 | patches/vllm-qwen-canonical-parameter-framing.patch | 6725caf33ac3ab55d1acede045808c5f37585e658900e770c226477b0be5e302 |
-| patches/vllm-qwen-owned-tool-grammar.patch | 7ed11e1bf519ff0b47d61603c2fcdf529a997aac148dc8536468c06193bbd0ec |
+| patches/vllm-qwen-owned-tool-grammar.patch | 81b3f760a7aa670496deb1252ee3713d452ab62debec88062bbe4cadceb6c849 |
 
 The reconstructed tree has 100 reviewed runtime-source changes, 2 new runtime sources,
 7 runtime-source deletions, 71 existing-test changes, 12 new tests,
@@ -343,7 +343,7 @@ Pinned build inputs and products:
 | Docker context allowlist SHA-256 | 5b6b3c8e03cd9cdc3e8d48d8f4b30df98de4d1a6d2a0657484c24e295c4d7f50 |
 | Build verifier SHA-256 | bfb4ed21f7c08a39875341fb25c7cab149f47967bb21855ea9533f0e66e92666 |
 | Runtime validator SHA-256 | 086ee356c2411e6d952f51f5723561951877cfd6f6a0da9d45b36decc30ebd14 |
-| Runtime lock SHA-256 | 0ec11f22562f11ab1014f44b6c0caac5210e919e4da7c01ef26f27dab77a84f1 |
+| Runtime lock SHA-256 | cd54349313cd67477ec6b28771ed3382f0e74243d1ba4e34fd09e5497130a862 |
 
 Every reviewed runtime file, including both TurboQuant kernels, is copied and
 hash-checked against its upstream and patched identities. A CPU Triton-interpreter

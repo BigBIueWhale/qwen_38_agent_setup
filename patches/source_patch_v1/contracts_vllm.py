@@ -2154,8 +2154,24 @@ def _validate_qwen_grammar_after(state: State) -> None:
     forbid_text(state, registry, 'RegexFormat(pattern="[^]"', label=label)
     _require_in_symbol(state, registry, "_qwen_value", (
         "refused = [key for key in _QWEN_REFUSED_STRING_KEYS if key in resolved]",
-        "raise ValueError(",
+        "raise VLLMValidationError(",
         "Declare the parameter without it and validate it in the tool.",
+        'parameter="tools",',
+    ), label=label)
+    # A schema this transport cannot express, and a forced choice naming no
+    # declared function, are both the caller's to fix, so both answer as typed
+    # request refusals carrying the field to edit. The module's remaining bare
+    # ValueError is the one fault the caller cannot fix -- a deployment whose
+    # tool parser names a structural-tag model this module does not build --
+    # and it stays a server error on purpose.
+    require_text(state, registry, "from vllm.exceptions import VLLMValidationError",
+                 label=label)
+    _require_in_symbol(state, registry, "get_qwen_3_coder_structural_tag", (
+        "raise VLLMValidationError(",
+        'parameter="tool_choice",',
+    ), label=label)
+    _require_in_symbol(state, registry, "get_model_structural_tag", (
+        "raise ValueError(f\"Unknown format type: {model}",
     ), label=label)
     # The call count is decided while building, not by mutating a returned tag.
     _require_in_symbol(state, registry, "get_qwen_3_coder_structural_tag", (

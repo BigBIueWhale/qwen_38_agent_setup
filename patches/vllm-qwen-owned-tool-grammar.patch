@@ -1,7 +1,15 @@
 diff --git a/vllm/tool_parsers/structural_tag_registry.py b/vllm/tool_parsers/structural_tag_registry.py
 --- a/vllm/tool_parsers/structural_tag_registry.py
 +++ b/vllm/tool_parsers/structural_tag_registry.py
-@@ -49,6 +49,7 @@
+@@ -34,6 +34,7 @@
+     ChatCompletionNamedToolChoiceParam,
+     ChatCompletionToolsParam,
+ )
++from vllm.exceptions import VLLMValidationError
+ 
+ ToolChoice: TypeAlias = (
+     Literal["none", "auto", "required"]
+@@ -49,6 +50,7 @@
          list[BuiltinToolParam],
          SimplifiedToolChoice,
          bool,
@@ -9,7 +17,7 @@ diff --git a/vllm/tool_parsers/structural_tag_registry.py b/vllm/tool_parsers/st
      ],
      StructuralTag,
  ]
-@@ -63,14 +64,15 @@
+@@ -63,14 +65,15 @@
          "deepseek_r1",
          "deepseek_v3_1",
          "qwen_3_5",
@@ -27,7 +35,7 @@ diff --git a/vllm/tool_parsers/structural_tag_registry.py b/vllm/tool_parsers/st
  SUPPORTED_STRUCTURAL_TAG_MODELS = (
      XGRAMMAR_BUILTIN_STRUCTURAL_TAG_MODELS | VLLM_BUILTIN_STRUCTURAL_TAG_MODELS
  )
-@@ -146,35 +148,19 @@
+@@ -146,35 +149,24 @@
              builtin_tools,
              simplified_tool_choice,
              reasoning,
@@ -35,6 +43,11 @@ diff --git a/vllm/tool_parsers/structural_tag_registry.py b/vllm/tool_parsers/st
          )
  
      if model not in XGRAMMAR_BUILTIN_STRUCTURAL_TAG_MODELS:
++        # Deliberately not a typed request refusal: ``model`` is the tool
++        # parser's own ``structural_tag_model`` class attribute, never a
++        # request field, so an unsupported value means this deployment
++        # registered a parser this module cannot serve. The caller has nothing
++        # to change, and a bare ValueError is the 500 that says so.
          supported = sorted(SUPPORTED_STRUCTURAL_TAG_MODELS)
          raise ValueError(f"Unknown format type: {model}, supported types: {supported}")
  
@@ -65,7 +78,7 @@ diff --git a/vllm/tool_parsers/structural_tag_registry.py b/vllm/tool_parsers/st
  
  
  def _dump_tool_for_xgrammar(
-@@ -642,3 +628,327 @@
+@@ -642,3 +634,332 @@
      return StructuralTag(
          format=SequenceFormat(elements=[*_k3_response_prefix(), tools_part, trailer])
      )
@@ -231,14 +244,15 @@ diff --git a/vllm/tool_parsers/structural_tag_registry.py b/vllm/tool_parsers/st
 +    if json_type == "string":
 +        refused = [key for key in _QWEN_REFUSED_STRING_KEYS if key in resolved]
 +        if refused:
-+            raise ValueError(
++            raise VLLMValidationError(
 +                f"Tool {tool!r} parameter {parameter!r} declares "
 +                f"{', '.join(refused)} on a string. The Qwen XML transport "
 +                "emits string values raw, and the raw channel excludes "
 +                f"{_QWEN_PARAM_OPEN!r} so that a value cannot absorb the next "
 +                "parameter's opener; that exclusion cannot be written inside a "
 +                "length-bounded regex, so this constraint has no grammar. "
-+                "Declare the parameter without it and validate it in the tool."
++                "Declare the parameter without it and validate it in the tool.",
++                parameter="tools",
 +            )
 +        return _qwen_raw_value()
 +    if (
@@ -373,7 +387,11 @@ diff --git a/vllm/tool_parsers/structural_tag_registry.py b/vllm/tool_parsers/st
 +        )
 +    elif tool_choice == "forced":
 +        if not tags:
-+            raise ValueError("Forced tool choice must resolve to exactly one tool.")
++            raise VLLMValidationError(
++                "Forced tool choice must resolve to exactly one tool. Name a "
++                "function this request also declares in `tools`.",
++                parameter="tool_choice",
++            )
 +        suffix_tag = tags[0]
 +    else:
 +        suffix_tag = TagsWithSeparatorFormat(

@@ -191,8 +191,11 @@ for refused_key, refused_value in (
     )
     try:
         get_model_structural_tag("qwen_3_coder", [constrained], "auto", False)
-    except ValueError as exc:
+    except VLLMValidationError as exc:
+        # Typed, so the caller is told this is their declaration to fix and
+        # which request field carries it -- not handed a 500 to retry.
         refusal = str(exc)
+        assert exc.parameter == "tools", exc.parameter
         assert "update_todo" in refusal, refusal
         assert "todo_id" in refusal, refusal
         assert refused_key in refusal, refusal
@@ -218,8 +221,9 @@ extra_constrained = ChatCompletionToolsParam.model_validate(
 )
 try:
     get_model_structural_tag("qwen_3_coder", [extra_constrained], "auto", False)
-except ValueError as exc:
+except VLLMValidationError as exc:
     refusal = str(exc)
+    assert exc.parameter == "tools", exc.parameter
     assert "write_note" in refusal, refusal
     assert "additionalProperties" in refusal, refusal
 else:
