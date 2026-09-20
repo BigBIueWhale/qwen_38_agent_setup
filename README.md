@@ -93,11 +93,15 @@ continues after a mismatch, or calls a mutable network fallback.
 Advanced reproducibility operations are deliberately separate from serving mode:
 
     ./scripts/build-vllm.sh check
+    ./scripts/build-vllm.sh materialise
     ./scripts/build-vllm.sh build
     ./scripts/restore-images.sh
 
 The check reconstructs the source tree from the pinned upstream commit through all thirty-five
-landmark-aware transformations. The build runs offline from the exact base image and fails unless it produces
+landmark-aware transformations. Materialise writes that reconstruction into the live `vllm/`
+tree wherever the live bytes are provably stale and refuses the whole run otherwise; it is the
+only command here that writes that tree, and the mode argument is required so it cannot happen
+by default. The build runs offline from the exact base image and fails unless it produces
 the pinned image ID. Restore verifies the pinned local archive before loading it.
 
 `check` verifies the Dockerfile's hashes and packaging contracts and runs build
@@ -312,21 +316,33 @@ The build check rejects an extra dirty file, ambiguous landmark, missing hunk, w
 stage, changed final hash, whitespace error, partial intermediate state, concurrent
 source drift, or a reconstruction that disagrees with the live `vllm/` tree.
 
-That last comparison is a known weakness, stated here rather than left to be
+That last comparison rests on unmanaged state, stated here rather than left to be
 rediscovered. The reconstruction is authoritative: it is built from the reviewed
 diffs and the committed landmark blocks into a disposable worktree, and every stage
 validates complete pre/post hashes. The live `vllm/` tree it is finally compared
-against is neither authoritative nor managed -- no command in this repository writes
-it. Adding a patch stage therefore updates the reviewed diffs on every machine that
-pulls and leaves that tree behind on all of them; the comparison then fails against
-the reconstruction and names the file whose new stage the tree is missing, which
-reads as a patch defect and is not one. The build consumes that same tree --
-containers/Dockerfile.runtime copies its files out of the build context -- so this
-comparison is currently the only thing tying shipped bytes to the reviewed patches,
-and it must not simply be deleted. The fix is to build from the reconstruction and
-give the live tree an explicit materialising verb, after which the worktree status
-gate, the file-by-file comparison and EXPECTED_STATUS describe nothing and are
-removed with it.
+against is neither authoritative nor managed. Changing a patch stage therefore
+updates the reviewed diffs on every machine that pulls and leaves that tree behind on
+all of them; the comparison then fails against the reconstruction and names the file
+whose new stage the tree is missing, which reads as a patch defect and is not one.
+The build consumes that same tree -- containers/Dockerfile.runtime copies its files
+out of the build context -- so this comparison is still the only thing tying shipped
+bytes to the reviewed patches, and it must not simply be deleted.
+
+`./scripts/build-vllm.sh materialise` is the sanctioned way through it, and the only
+command here that writes that tree. It writes from the reconstruction the same run
+has just proved, and only where the live bytes are *provably stale*: either an
+identity this repository itself shipped for that path at some committed revision --
+the FINAL_FILES of every committed revision of the generated stage data -- or the
+pristine upstream identity the patch set starts that path from. Both proofs are read
+from committed data, never from the tree being examined. That tree is also where a
+human edits to author a new stage, so a single difference that cannot be proved stale
+refuses the whole run and writes nothing at all, naming the path and what to do next;
+materialising the explainable subset would leave a tree nobody could reason about
+afterwards, so there is no partial mode. `check` and `build` read that tree and never
+write it, and the mode argument is required rather than defaulted, so the verb is
+reachable only by name. The remaining half of the fix is to build from the
+reconstruction itself, after which the worktree status gate, the file-by-file
+comparison and EXPECTED_STATUS describe nothing and are removed with it.
 
 Pinned build inputs and products:
 
@@ -341,9 +357,9 @@ Pinned build inputs and products:
 | Archive SHA-256 | 218b715bb2f6e67d8f9933f580e94e18b3e5c89534e2e8355ab2fc7212534619 |
 | Runtime Dockerfile SHA-256 | 5c0549ed855ffa7178afa1415680afdec3300e513ae3396eb3e0487db31665ce |
 | Docker context allowlist SHA-256 | 5b6b3c8e03cd9cdc3e8d48d8f4b30df98de4d1a6d2a0657484c24e295c4d7f50 |
-| Build verifier SHA-256 | bfb4ed21f7c08a39875341fb25c7cab149f47967bb21855ea9533f0e66e92666 |
+| Build verifier SHA-256 | ce06d24d28defb9c574ea931d07cc0464042ad45a0ac8ec6de81b4ba4ca91e83 |
 | Runtime validator SHA-256 | 086ee356c2411e6d952f51f5723561951877cfd6f6a0da9d45b36decc30ebd14 |
-| Runtime lock SHA-256 | cd54349313cd67477ec6b28771ed3382f0e74243d1ba4e34fd09e5497130a862 |
+| Runtime lock SHA-256 | d54c66dd5a776cc0e02e1237641db0096279124f3d754c15c2efa9e10a6d950c |
 
 Every reviewed runtime file, including both TurboQuant kernels, is copied and
 hash-checked against its upstream and patched identities. A CPU Triton-interpreter

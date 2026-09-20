@@ -1,7 +1,21 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-MODE="${1:-build}"
+usage() {
+  cat >&2 <<'USAGE'
+Usage: build-vllm.sh {build|check|materialise}
+  build        verify every pinned input, then build and export the runtime image
+  check        verify every pinned input and stop; nothing is written
+  materialise  write the live vllm/ tree from the verified reconstruction
+USAGE
+  exit 2
+}
+
+# The mode is required. It defaulted to `build`, which made the longest and
+# only image-producing action the one you got by typing nothing -- a second
+# mode wearing the first one's clothes.
+(($# == 1)) || usage
+MODE="$1"
 EXPECTED_STATUS=$' M tests/config/test_config_utils.py
  M tests/distributed/test_rocm_quick_reduce.py
  M tests/engine/test_arg_utils.py
@@ -218,6 +232,7 @@ REASONING_USAGE_UNIT_FILE="${PROJECT_DIR}/scripts/reasoning_usage_unit.py"
 QWEN_GRAMMAR_UNIT_FILE="${PROJECT_DIR}/scripts/qwen_grammar_unit.py"
 SOURCE_PATCH_DIR="${PROJECT_DIR}/patches/source_patch_v1"
 SOURCE_PATCH_MANIFEST="${SOURCE_PATCH_DIR}/manifest.sha256"
+GENERATED_STAGES_REL="patches/source_patch_v1/generated_vllm_stages.py"
 DEPLOYMENT_INPUT_MANIFEST="${PROJECT_DIR}/config/deployment-inputs.sha256"
 RUNTIME_COMMON_CONTRACT_TEST="${PROJECT_DIR}/scripts/test-runtime-common-contract.sh"
 README_FILE="${PROJECT_DIR}/README.md"
@@ -334,11 +349,10 @@ PARSER_ADAPTERS_REL="vllm/parser/engine/adapters.py"
 ENGINE_PROTOCOL_REL="vllm/entrypoints/openai/engine/protocol.py"
 
 case "${MODE}" in
-  build|check)
+  build|check|materialise)
     ;;
   *)
-    echo "Usage: $0 [build|check]" >&2
-    exit 2
+    usage
     ;;
 esac
 
@@ -409,9 +423,31 @@ if [[ "${actual_base_image_id}" != "${EXPECTED_BASE_IMAGE_ID}" ]]; then
 fi
 
 actual_status="$(git -C "${VLLM_DIR}" status --short --untracked-files=all)"
-if [[ "${actual_status}" != "${EXPECTED_STATUS}" ]]; then
+# A path the live tree changes that the reviewed patch set does not name is
+# authored work or damage in every mode: no committed identity describes it,
+# and nothing here may write over it.
+unnamed_live_paths="$(
+  sed -n 's/^...//p' <<<"${actual_status}" \
+    | grep -Fxv -f <(sed -n 's/^...//p' <<<"${EXPECTED_STATUS}") || true
+)"
+if [[ -n "${unnamed_live_paths}" ]]; then
+  echo "Refusing a vLLM worktree that changes paths the reviewed patch set" \
+    "does not name:" >&2
+  sed 's/^/  /' <<<"${unnamed_live_paths}" >&2
+  echo "These are hand-authored edits or a damaged tree; nothing was written." >&2
+  echo "Next: compile authored work into a reviewed stage with" \
+    "patches/source_patch_v1/compile_review_diff.py and commit it, or remove" \
+    "the paths deliberately; no mode here will decide that for you." >&2
+  exit 1
+fi
+# A tree merely missing paths a pulled stage added is behind, not damaged, and
+# that is precisely what `materialise` repairs; every other mode still
+# requires the exact reviewed state.
+if [[ "${MODE}" != "materialise" && "${actual_status}" != "${EXPECTED_STATUS}" ]]; then
   echo "Refusing unexpected vLLM worktree state:" >&2
   printf '%s\n' "${actual_status}" >&2
+  echo "The live tree is behind the reviewed patch set." >&2
+  echo "Next: ./scripts/build-vllm.sh materialise" >&2
   exit 1
 fi
 
@@ -474,7 +510,10 @@ docker run --rm \
   --volume "${PROJECT_DIR}:/project:ro" \
   --workdir /project \
   "${BASE_IMAGE_TAG}" \
-  -m unittest -v patches.source_patch_v1.test_framework scripts.runtime_image_unit
+  -m unittest -v \
+  patches.source_patch_v1.test_framework \
+  patches.source_patch_v1.test_materialise_live_tree \
+  scripts.runtime_image_unit
 
 # The served chat template is a landmark-aware transformation, and
 # it is proved here on the same terms as the runtime source stages: reconstructed from
@@ -546,6 +585,52 @@ if [[ "${reproduced_status}" != "${EXPECTED_STATUS}" ]]; then
   printf '%s\n' "${reproduced_status}" >&2
   exit 1
 fi
+
+# The reconstruction is proved at this point: every stage applied from the
+# pinned commit under complete pre/post hashes, and its worktree state is
+# exactly the reviewed one. Only here, and only when the operator asked for it
+# by name, may it be written to the unmanaged live tree. A reconstruction that
+# did not verify has already exited above and is never written anywhere.
+if [[ "${MODE}" == "materialise" ]]; then
+  # Every identity this repository has itself shipped for a path, read out of
+  # its own history: the FINAL_FILES of each committed revision of the
+  # generated stage data. This is what lets "provably stale" be a statement
+  # about committed data rather than about the tree being examined.
+  SHIPPED_IDENTITIES="${BUILD_EXPORT_DIR}/shipped-identities"
+  : >"${SHIPPED_IDENTITIES}"
+  while IFS= read -r revision; do
+    git -C "${PROJECT_DIR}" show "${revision}:${GENERATED_STAGES_REL}" \
+      | sed -n '/^FINAL_FILES = {/,$p' \
+      | sed -n "s/.*'\([^']\{1,\}\)': '\([0-9a-f]\{64\}\)'.*/\2 \1 ${revision}/p" \
+      >>"${SHIPPED_IDENTITIES}"
+  done < <(git -C "${PROJECT_DIR}" log --format=%H -- "${GENERATED_STAGES_REL}")
+  if [[ ! -s "${SHIPPED_IDENTITIES}" ]]; then
+    echo "MATERIALISE REFUSED: no committed final identity was found for" \
+      "${GENERATED_STAGES_REL}; a tree without that history cannot prove" \
+      "staleness, and nothing was written." >&2
+    exit 1
+  fi
+
+  docker run --rm \
+    --network none \
+    --read-only \
+    --user "$(id -u):$(id -g)" \
+    --tmpfs /tmp:rw,nodev,nosuid,size=512m \
+    --env PYTHONPYCACHEPREFIX=/tmp/pycache \
+    --entrypoint python3 \
+    --volume "${PROJECT_DIR}:/project:ro" \
+    --volume "${VERIFY_WORKTREE}:/reconstruction:ro" \
+    --volume "${VLLM_DIR}:/live:rw" \
+    --volume "${SHIPPED_IDENTITIES}:/shipped:ro" \
+    --workdir /project \
+    "${BASE_IMAGE_TAG}" \
+    -m patches.source_patch_v1.materialise_live_tree \
+    --reconstruction /reconstruction --live /live --shipped /shipped
+  remove_verify_worktree
+  trap cleanup_build_export EXIT
+  exit 0
+fi
+
 while IFS= read -r status_line; do
   relative_path="${status_line:3}"
   if [[ "${status_line:0:2}" == " D" ]]; then
@@ -554,6 +639,8 @@ while IFS= read -r status_line; do
     if [[ -e "${VERIFY_WORKTREE}/${relative_path}" \
        || -e "${VLLM_DIR}/${relative_path}" ]]; then
       echo "Reviewed patches do not reproduce deletion of ${relative_path}." >&2
+      echo "The reconstruction is authoritative and the live tree is behind it." >&2
+      echo "Next: ./scripts/build-vllm.sh materialise" >&2
       exit 1
     fi
     continue
@@ -562,6 +649,8 @@ while IFS= read -r status_line; do
     "${VERIFY_WORKTREE}/${relative_path}" \
     "${VLLM_DIR}/${relative_path}"; then
     echo "Reviewed patches do not reproduce ${relative_path}." >&2
+    echo "The reconstruction is authoritative and the live tree is behind it." >&2
+    echo "Next: ./scripts/build-vllm.sh materialise" >&2
     exit 1
   fi
 done <<<"${EXPECTED_STATUS}"

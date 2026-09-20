@@ -66,7 +66,7 @@ readonly SHARED_PREFIX_CACHE_PATCH_DIFF_SHA256="736183bab22bb200053d38990ef0a51d
 readonly EXACT_REASONING_USAGE_PATCH_DIFF_SHA256="c6a880c0a15056792286f74bf32a4e554f70de05a82615522086ef4ca1cf2db3"
 readonly CANONICAL_FRAMING_PATCH_DIFF_SHA256="6725caf33ac3ab55d1acede045808c5f37585e658900e770c226477b0be5e302"
 readonly QWEN_OWNED_GRAMMAR_PATCH_DIFF_SHA256="81b3f760a7aa670496deb1252ee3713d452ab62debec88062bbe4cadceb6c849"
-readonly SOURCE_PATCH_MANIFEST_SHA256="d4cef4c15599e55514bcfef8d295b46ff13131ccf14fa5585ce8179b7d6c9f63"
+readonly SOURCE_PATCH_MANIFEST_SHA256="d968c65a60c87b8e0f6258d5f9300921505c520c8fd6c59a089556772b2f25dc"
 # Cardinality of config/deployment-inputs.sha256. The hash manifest alone
 # proves the listed bytes but cannot see a quietly grown or shrunk allowlist,
 # so the reviewed file count is pinned as well. It is declared exactly once,
@@ -75,7 +75,7 @@ readonly SOURCE_PATCH_MANIFEST_SHA256="d4cef4c15599e55514bcfef8d295b46ff13131ccf
 # was added — the validator then refused a correct manifest. Every consumer
 # (build-vllm.sh, runtime-common.sh, generate-deployment-input-manifest.sh)
 # reads this declaration.
-readonly DEPLOYMENT_INPUT_FILE_COUNT="112"
+readonly DEPLOYMENT_INPUT_FILE_COUNT="114"
 readonly TURBOQUANT_PATCHED_FILE_SHA256="ccda36577e4fb0052f370169dce4b649bad890b8b440a82e584acd3dd92a6d86"
 readonly TURBOQUANT_STORE_PATCHED_FILE_SHA256="298645bff68c6adab58261862602b86e7e714c3552a9fd89102d9ccd2b83e9f7"
 readonly TURBOQUANT_DECODE_PATCHED_FILE_SHA256="dab8b65ab7ddd6582de16e1fc7b1360ab0061b4a2a2b114f5d87ea0532fd726f"
