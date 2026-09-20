@@ -169,3 +169,4 @@
 !vllm/vllm/tokenizers/detokenizer_utils.py
 !vllm/vllm/entrypoints/serve/exception_handling/register.py
 !vllm/vllm/renderers/hf.py
+!scripts/qwen_grammar_unit.py

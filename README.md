@@ -100,9 +100,12 @@ The check reconstructs the source tree from the pinned upstream commit through a
 landmark-aware transformations. The build runs offline from the exact base image and fails unless it produces
 the pinned image ID. Restore verifies the pinned local archive before loading it.
 
-`check` verifies the Dockerfile's hashes and packaging contracts and runs selected
-CPU units; it does not execute the Dockerfile. Its inline build assertions run
-during the actual image build, so a passing check alone does not certify them.
+`check` verifies the Dockerfile's hashes and packaging contracts and runs build
+units offline, the Qwen grammar unit among them; it does not execute the
+Dockerfile. No build assertion is written only inside it any more: what the build
+alone still proves is the image's own assembly -- the copied modes, the removed
+modules and the upstream-verifier hashes -- together with the vision workspace and
+MLP units, which run only against the installed tree.
 
 The live probes are launched the same way, through one launcher for the whole
 suite:
@@ -336,11 +339,11 @@ Pinned build inputs and products:
 | Offline archive | artifacts/qwen38-vllm-images-runtime-v24.tar |
 | Archive size | 8,560,924,160 bytes, mode 0600 |
 | Archive SHA-256 | 218b715bb2f6e67d8f9933f580e94e18b3e5c89534e2e8355ab2fc7212534619 |
-| Runtime Dockerfile SHA-256 | ed925808a7e2d4b8fb0deb1e1f48bd159b18d01449513fe0783a7f0bf0802884 |
-| Docker context allowlist SHA-256 | a461af03bbe810de008c026350b4836dc4b44dec0bf79bae9e322b3ff4ef5fd1 |
-| Build verifier SHA-256 | 7cde1fe75bae92321e9d97cd02ab91ae3a4c8ea7a66c24f5f503bb08a30ae778 |
+| Runtime Dockerfile SHA-256 | 5c0549ed855ffa7178afa1415680afdec3300e513ae3396eb3e0487db31665ce |
+| Docker context allowlist SHA-256 | 5b6b3c8e03cd9cdc3e8d48d8f4b30df98de4d1a6d2a0657484c24e295c4d7f50 |
+| Build verifier SHA-256 | bfb4ed21f7c08a39875341fb25c7cab149f47967bb21855ea9533f0e66e92666 |
 | Runtime validator SHA-256 | 086ee356c2411e6d952f51f5723561951877cfd6f6a0da9d45b36decc30ebd14 |
-| Runtime lock SHA-256 | 1e76737719a6db03d7586b5f66c1463f13f7373200c5e2d3a4b381f1263569d9 |
+| Runtime lock SHA-256 | d61ba1ce80c029d96ce7a5f959b6e283b022cd0676fb269fad12d577e3856808 |
 
 Every reviewed runtime file, including both TurboQuant kernels, is copied and
 hash-checked against its upstream and patched identities. A CPU Triton-interpreter

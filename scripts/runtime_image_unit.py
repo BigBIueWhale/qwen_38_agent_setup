@@ -102,6 +102,16 @@ class RuntimeImageTest(unittest.TestCase):
             recipe,
         )
 
+    def test_grammar_unit_is_executed_during_build(self):
+        # The image must run the shipped file, not a copy of its assertions:
+        # `build-vllm.sh check` runs the same path, so a recipe that stopped
+        # executing it would leave the two able to drift again.
+        recipe = (ROOT / "containers/Dockerfile.runtime").read_text()
+        self.assertIn(
+            "RUN CUDA_VISIBLE_DEVICES= python3 /opt/qwen38/qwen_grammar_unit.py",
+            recipe,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

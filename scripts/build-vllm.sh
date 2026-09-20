@@ -215,6 +215,7 @@ CHAT_TEMPLATE_RETENTION_UNIT_FILE="${PROJECT_DIR}/scripts/chat_template_retentio
 NVFP4_KERNEL_UNIT_FILE="${PROJECT_DIR}/scripts/nvfp4_kernel_unit.py"
 TOOL_OUTPUT_PARSER_UNIT_FILE="${PROJECT_DIR}/scripts/tool_output_parser_unit.py"
 REASONING_USAGE_UNIT_FILE="${PROJECT_DIR}/scripts/reasoning_usage_unit.py"
+QWEN_GRAMMAR_UNIT_FILE="${PROJECT_DIR}/scripts/qwen_grammar_unit.py"
 SOURCE_PATCH_DIR="${PROJECT_DIR}/patches/source_patch_v1"
 SOURCE_PATCH_MANIFEST="${SOURCE_PATCH_DIR}/manifest.sha256"
 DEPLOYMENT_INPUT_MANIFEST="${PROJECT_DIR}/config/deployment-inputs.sha256"
@@ -757,7 +758,8 @@ printf '%s  %s\n' \
   "${CHAT_TEMPLATE_RETENTION_UNIT_SHA256}" "${CHAT_TEMPLATE_RETENTION_UNIT_FILE}" \
   "${NVFP4_KERNEL_UNIT_SHA256}" "${NVFP4_KERNEL_UNIT_FILE}" \
   "${TOOL_OUTPUT_PARSER_UNIT_SHA256}" "${TOOL_OUTPUT_PARSER_UNIT_FILE}" \
-  "${REASONING_USAGE_UNIT_SHA256}" "${REASONING_USAGE_UNIT_FILE}" | \
+  "${REASONING_USAGE_UNIT_SHA256}" "${REASONING_USAGE_UNIT_FILE}" \
+  "${QWEN_GRAMMAR_UNIT_SHA256}" "${QWEN_GRAMMAR_UNIT_FILE}" | \
   sha256sum --check --strict
 
 docker run --rm --network none --read-only \
@@ -780,7 +782,7 @@ while IFS= read -r status_line; do
       ;;
   esac
 done <<<"${EXPECTED_STATUS}"
-for unit in chat_template_retention_unit tool_output_parser_unit vision_contract_unit reasoning_usage_unit shared_prefix_cache_unit phase_budget_unit generate_result_unit raw_media_unit; do
+for unit in chat_template_retention_unit tool_output_parser_unit vision_contract_unit reasoning_usage_unit shared_prefix_cache_unit phase_budget_unit generate_result_unit raw_media_unit qwen_grammar_unit; do
   docker run --rm --network none --read-only --user "$(id -u):$(id -g)" \
     --tmpfs /tmp:rw,nodev,nosuid,size=256m \
     --env PYTHONDONTWRITEBYTECODE=1 --env CUDA_VISIBLE_DEVICES= \
