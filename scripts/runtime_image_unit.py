@@ -81,6 +81,31 @@ class RuntimeImageTest(unittest.TestCase):
                         + removed, recipe,
                     )
 
+    def test_every_declared_build_argument_is_supplied(self):
+        # An ARG the recipe declares but the build never passes expands to the
+        # empty string inside the image. That turns a hash assertion into a
+        # malformed sha256sum line rather than a mismatch, and `check` cannot
+        # catch it because it does not execute the recipe -- which is how
+        # QWEN_GRAMMAR_UNIT_SHA256 reached a build and failed it at step 151.
+        recipe = (ROOT / "containers/Dockerfile.runtime").read_text()
+        build = (ROOT / "scripts/build-vllm.sh").read_text()
+        passed = set(re.findall(r'--build-arg "(\w+)=', build))
+        # SOURCE_DATE_EPOCH is BuildKit's own reproducibility argument; it is
+        # honoured by the builder, not declared by the recipe.
+        builtin = {"SOURCE_DATE_EPOCH"}
+        declared, valueless = set(), set()
+        for line in recipe.splitlines():
+            match = re.match(r"ARG\s+(\w+)(=.*)?$", line.strip())
+            if match:
+                declared.add(match.group(1))
+                if match.group(2) is None:
+                    valueless.add(match.group(1))
+        # An ARG with no default and no value is the empty string downstream.
+        self.assertEqual(sorted(valueless - passed), [])
+        # An argument the recipe never declares is silently discarded, so a
+        # misspelled one would never reach the layer that asserts on it.
+        self.assertEqual(sorted(passed - declared - builtin), [])
+
     def test_kernel_guard_is_executed_during_build(self):
         recipe = (ROOT / "containers/Dockerfile.runtime").read_text()
         self.assertIn(
