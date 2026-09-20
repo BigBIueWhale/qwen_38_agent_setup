@@ -2,10 +2,10 @@
 # Single source of truth for the only supported serving profile.
 
 readonly PROFILE_VERSION="socket-isolated-nonroot-vision-k8v4-agent-v21"
-readonly IMAGE_PROFILE_VERSION="socket-isolated-nonroot-vision-k8v4-agent-v24"
+readonly IMAGE_PROFILE_VERSION="socket-isolated-nonroot-vision-k8v4-agent-v25"
 readonly CONTAINER_NAME="qwen38-agent-native"
 readonly CONTAINER_LABEL="Qwen_best_model_ever"
-readonly IMAGE_TAG="qwen38-vllm:qwen38-27b-nvfp4-k8v4-runtime-v24"
+readonly IMAGE_TAG="qwen38-vllm:qwen38-27b-nvfp4-k8v4-runtime-v25"
 readonly EXPECTED_IMAGE_ID="sha256:e91fc7b2f92db062fcafa46a6bddfe07cdeb2e589ac600b994520649749fcdc6"
 readonly RELAY_IMAGE_TAG="qwen38-fixed-relay:1.0.0"
 readonly EXPECTED_RELAY_IMAGE_ID="sha256:0e1c8be9644e7a5e09b1fbdf697be22c11b6c106b9cd167d3f046f78f9aa3657"
@@ -20,7 +20,7 @@ readonly RELAY_MEMORY="32m"
 readonly RELAY_PIDS_LIMIT="32"
 readonly BASE_IMAGE_TAG="qwen38-vllm:main-9df9b0b"
 readonly EXPECTED_BASE_IMAGE_ID="sha256:fa4a002a88b7043a1a89966dea8a500fe9696f84e75730d9da916f916048d401"
-readonly IMAGE_ARCHIVE_NAME="qwen38-vllm-images-runtime-v24.tar"
+readonly IMAGE_ARCHIVE_NAME="qwen38-vllm-images-runtime-v25.tar"
 readonly IMAGE_ARCHIVE_SHA256="218b715bb2f6e67d8f9933f580e94e18b3e5c89534e2e8355ab2fc7212534619"
 
 readonly MODEL_DIR_NAME="Qwen3.8-27B-NVFP4-Corrected"
