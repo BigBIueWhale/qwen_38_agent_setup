@@ -2110,8 +2110,8 @@ def _validate_qwen_grammar_after(state: State) -> None:
             "parallel_tool_calls",
         ),
         "_qwen_raw_value": (),
-        "_qwen_value": ("prop", "root"),
-        "_qwen_arguments": ("parameters",),
+        "_qwen_value": ("prop", "root", "tool", "parameter"),
+        "_qwen_arguments": ("parameters", "tool"),
         "_qwen_resolve": ("prop", "root", "seen"),
         "_qwen_definitions": ("root",),
         "_qwen_embed": ("schema", "root"),
@@ -2144,12 +2144,18 @@ def _validate_qwen_grammar_after(state: State) -> None:
     _require_in_symbol(state, registry, "_qwen_raw_value", (
         "excludes=[_QWEN_PARAM_OPEN, _QWEN_PARAM_CLOSE]",
     ), label=label)
-    # A length- or pattern-constrained string keeps XGrammar's own emission,
-    # which drops the exclusion on that branch: reproducing it exactly means no
-    # call this deployment accepts today stops being accepted.
+    # There is no second string channel to fall into. XGrammar emits a pattern-
+    # or length-constrained string as a regex, and the opener exclusion cannot
+    # live inside one: its regex engine has no lookahead, so forbidding a fixed
+    # substring is only an unrolled DFA, which cannot then carry a length bound.
+    # The declaration is refused by name, naming the tool, the property and the
+    # fix, rather than served on a channel that silently drops the exclusion.
+    forbid_text(state, registry, "_QWEN_STRING_CONSTRAINTS", label=label)
+    forbid_text(state, registry, 'RegexFormat(pattern="[^]"', label=label)
     _require_in_symbol(state, registry, "_qwen_value", (
-        "_QWEN_STRING_CONSTRAINTS",
-        '_qwen_padded(RegexFormat(pattern="[^]" + bound))',
+        "refused = [key for key in _QWEN_REFUSED_STRING_KEYS if key in resolved]",
+        "raise ValueError(",
+        "Declare the parameter without it and validate it in the tool.",
     ), label=label)
     # The call count is decided while building, not by mutating a returned tag.
     _require_in_symbol(state, registry, "get_qwen_3_coder_structural_tag", (

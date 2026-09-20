@@ -65,7 +65,7 @@ diff --git a/vllm/tool_parsers/structural_tag_registry.py b/vllm/tool_parsers/st
  
  
  def _dump_tool_for_xgrammar(
-@@ -642,3 +628,316 @@
+@@ -642,3 +628,327 @@
      return StructuralTag(
          format=SequenceFormat(elements=[*_k3_response_prefix(), tools_part, trailer])
      )
@@ -93,9 +93,11 @@ diff --git a/vllm/tool_parsers/structural_tag_registry.py b/vllm/tool_parsers/st
 +# would complete it, and the only legal continuations are more value text or the
 +# real closer, so the slip self-corrects into the call the model meant.
 +#
-+# Every other production reproduces XGrammar's Qwen language exactly, including
-+# its ``[ \n\t]*`` padding around every value, its ordered required chain, and
-+# its treatment of enums, constants, references and constrained strings.
++# Every other production this builder has reproduces XGrammar's Qwen language
++# exactly, including its ``[ \n\t]*`` padding around every value, its ordered
++# required chain, and its treatment of enums, constants and references. One
++# production it deliberately does not have is XGrammar's constrained-string
++# regex; ``_QWEN_REFUSED_STRING_KEYS`` refuses that declaration instead.
 +_QWEN_PARAM_OPEN = "<parameter="
 +_QWEN_PARAM_CLOSE = "</parameter>"
 +_QWEN_CALL_BEGIN_PREFIX = "<tool_call>\n<function="
@@ -107,11 +109,15 @@ diff --git a/vllm/tool_parsers/structural_tag_registry.py b/vllm/tool_parsers/st
 +_QWEN_THINK_EXCLUDE_TOKENS = ["<think>", "</think>"]
 +_QWEN_WHITESPACE = r"[ \n\t]*"
 +_QWEN_VARIABLE_NAME = r"[a-zA-Z_][a-zA-Z0-9_]*"
-+# A string carrying any of these is emitted by XGrammar as a regex instead of
-+# the raw channel, and that branch drops the closer exclusion. Reproducing it
-+# exactly keeps every call this deployment accepts today accepted; the opener
-+# exclusion is added only where XGrammar used the unconstrained channel.
-+_QWEN_STRING_CONSTRAINTS = ("pattern", "format", "minLength", "maxLength")
++# XGrammar emits a string carrying any of these as a regex rather than on the
++# raw channel, and a regex here cannot carry the exclusion. xgrammar's regex
++# engine has no lookahead, so forbidding a fixed substring is expressible only
++# as an unrolled DFA over the allowed characters, and an unrolled DFA cannot
++# then carry a ``{m,n}`` bound on the same value. No regex therefore both
++# bounds a string's length and forbids ``<parameter=``, so there is nothing to
++# repair: a second channel that quietly dropped the exclusion is the hole this
++# builder exists to close. Such a declaration is refused by name instead.
++_QWEN_REFUSED_STRING_KEYS = ("pattern", "format", "minLength", "maxLength")
 +
 +
 +def _qwen_raw_value() -> AnyTextFormat:
@@ -195,8 +201,8 @@ diff --git a/vllm/tool_parsers/structural_tag_registry.py b/vllm/tool_parsers/st
 +    return prop
 +
 +
-+def _qwen_value(prop: Any, root: dict[str, Any]) -> Any:
-+    """Build the value production for one parameter."""
++def _qwen_value(prop: Any, root: dict[str, Any], tool: str, parameter: str) -> Any:
++    """Build the value production for one parameter, or refuse to have one."""
 +    resolved = _qwen_resolve(prop, root)
 +    if not isinstance(resolved, dict) or not resolved:
 +        return _qwen_raw_value()
@@ -223,19 +229,17 @@ diff --git a/vllm/tool_parsers/structural_tag_registry.py b/vllm/tool_parsers/st
 +            branches[0] if len(branches) == 1 else OrFormat(elements=branches)
 +        )
 +    if json_type == "string":
-+        if any(key in resolved for key in _QWEN_STRING_CONSTRAINTS):
-+            pattern = resolved.get("pattern")
-+            if isinstance(pattern, str):
-+                return _qwen_padded(RegexFormat(pattern=pattern))
-+            minimum = resolved.get("minLength", 0)
-+            maximum = resolved.get("maxLength")
-+            minimum = minimum if isinstance(minimum, int) and minimum >= 0 else 0
-+            bound = (
-+                f"{{{minimum},}}"
-+                if not isinstance(maximum, int)
-+                else f"{{{minimum},{maximum}}}"
++        refused = [key for key in _QWEN_REFUSED_STRING_KEYS if key in resolved]
++        if refused:
++            raise ValueError(
++                f"Tool {tool!r} parameter {parameter!r} declares "
++                f"{', '.join(refused)} on a string. The Qwen XML transport "
++                "emits string values raw, and the raw channel excludes "
++                f"{_QWEN_PARAM_OPEN!r} so that a value cannot absorb the next "
++                "parameter's opener; that exclusion cannot be written inside a "
++                "length-bounded regex, so this constraint has no grammar. "
++                "Declare the parameter without it and validate it in the tool."
 +            )
-+            return _qwen_padded(RegexFormat(pattern="[^]" + bound))
 +        return _qwen_raw_value()
 +    if (
 +        json_type is None
@@ -251,26 +255,31 @@ diff --git a/vllm/tool_parsers/structural_tag_registry.py b/vllm/tool_parsers/st
 +    return _qwen_padded(JSONSchemaFormat(json_schema=_qwen_embed(resolved, root)))
 +
 +
-+def _qwen_any_parameter(extra: Any, root: dict[str, Any]) -> TagFormat:
++def _qwen_any_parameter(extra: Any, root: dict[str, Any], tool: str) -> TagFormat:
 +    """One parameter whose name the schema does not declare."""
 +    return TagFormat(
 +        begin=_QWEN_PARAM_OPEN,
 +        content=SequenceFormat(
 +            elements=[
 +                RegexFormat(pattern=_QWEN_VARIABLE_NAME + ">"),
-+                _qwen_value(extra if isinstance(extra, dict) else {}, root),
++                _qwen_value(
++                    extra if isinstance(extra, dict) else {},
++                    root,
++                    tool,
++                    "additionalProperties",
++                ),
 +            ]
 +        ),
 +        end=_QWEN_PARAM_CLOSE,
 +    )
 +
 +
-+def _qwen_arguments(parameters: dict[str, Any] | bool) -> Any:
++def _qwen_arguments(parameters: dict[str, Any] | bool, tool: str) -> Any:
 +    """Build a tool's argument body: declared order, required chain, extras."""
 +    if not isinstance(parameters, dict):
 +        return StarFormat(
 +            content=SequenceFormat(
-+                elements=[_qwen_whitespace(), _qwen_any_parameter(None, {})]
++                elements=[_qwen_whitespace(), _qwen_any_parameter(None, {}, tool)]
 +            )
 +        )
 +    # The parameters document may itself be a ``$ref`` or a single-branch
@@ -290,7 +299,7 @@ diff --git a/vllm/tool_parsers/structural_tag_registry.py b/vllm/tool_parsers/st
 +            content=SequenceFormat(
 +                elements=[
 +                    _qwen_whitespace(),
-+                    _qwen_any_parameter(additional, root),
++                    _qwen_any_parameter(additional, root, tool),
 +                ]
 +            )
 +        )
@@ -299,7 +308,7 @@ diff --git a/vllm/tool_parsers/structural_tag_registry.py b/vllm/tool_parsers/st
 +    for key, prop in properties.items():
 +        tag = TagFormat(
 +            begin=f"{_QWEN_PARAM_OPEN}{key}>",
-+            content=_qwen_value(prop, root),
++            content=_qwen_value(prop, root, tool, key),
 +            end=_QWEN_PARAM_CLOSE,
 +        )
 +        elements.append(tag if key in required else OptionalFormat(content=tag))
@@ -309,7 +318,7 @@ diff --git a/vllm/tool_parsers/structural_tag_registry.py b/vllm/tool_parsers/st
 +            StarFormat(
 +                content=SequenceFormat(
 +                    elements=[
-+                        _qwen_any_parameter(additional, root),
++                        _qwen_any_parameter(additional, root, tool),
 +                        _qwen_whitespace(),
 +                    ]
 +                )
@@ -325,7 +334,9 @@ diff --git a/vllm/tool_parsers/structural_tag_registry.py b/vllm/tool_parsers/st
 +                f"{_QWEN_CALL_BEGIN_PREFIX}{tool.function.name}"
 +                f"{_QWEN_CALL_BEGIN_SUFFIX}"
 +            ),
-+            content=_qwen_arguments(get_function_parameters(tool.function)),
++            content=_qwen_arguments(
++                get_function_parameters(tool.function), tool.function.name
++            ),
 +            end=_QWEN_CALL_END,
 +        )
 +        for tool in tools

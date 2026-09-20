@@ -297,7 +297,7 @@ It is intentionally reconstructed by thirty-five ordered, reviewed semantic tran
 | patches/vllm-token-text-provenance.patch | 954b36cb444f7e644e29d13f7a9d3c000512a0d616bbf2b6cd3cb8f4e880dd44 |
 | patches/vllm-precise-request-errors.patch | 055c3348b1a0c801ad6c8202d13659471106d0ff8a9b958efe1df16e25e9e588 |
 | patches/vllm-qwen-canonical-parameter-framing.patch | 6725caf33ac3ab55d1acede045808c5f37585e658900e770c226477b0be5e302 |
-| patches/vllm-qwen-owned-tool-grammar.patch | d76bb46515886825558ae3c53dd56667e9d93bac994a1c8668456623f127f8b5 |
+| patches/vllm-qwen-owned-tool-grammar.patch | 7ed11e1bf519ff0b47d61603c2fcdf529a997aac148dc8536468c06193bbd0ec |
 
 The reconstructed tree has 100 reviewed runtime-source changes, 2 new runtime sources,
 7 runtime-source deletions, 71 existing-test changes, 12 new tests,
@@ -343,7 +343,7 @@ Pinned build inputs and products:
 | Docker context allowlist SHA-256 | 5b6b3c8e03cd9cdc3e8d48d8f4b30df98de4d1a6d2a0657484c24e295c4d7f50 |
 | Build verifier SHA-256 | bfb4ed21f7c08a39875341fb25c7cab149f47967bb21855ea9533f0e66e92666 |
 | Runtime validator SHA-256 | 086ee356c2411e6d952f51f5723561951877cfd6f6a0da9d45b36decc30ebd14 |
-| Runtime lock SHA-256 | d61ba1ce80c029d96ce7a5f959b6e283b022cd0676fb269fad12d577e3856808 |
+| Runtime lock SHA-256 | 0ec11f22562f11ab1014f44b6c0caac5210e919e4da7c01ef26f27dab77a84f1 |
 
 Every reviewed runtime file, including both TurboQuant kernels, is copied and
 hash-checked against its upstream and patched identities. A CPU Triton-interpreter
@@ -943,15 +943,22 @@ numbers keep their original representation. Cut or untypable values stay raw
 for diagnostics and client validation. All parameter constraints are available
 before argument JSON is emitted; executable calls still wait for EOS.
 
-An unconstrained parameter value may carry neither its own `</parameter>`
-closer nor the next parameter's `<parameter=` opener. vLLM owns the Qwen
-structural tag so it can exclude both: excluding only the closer let a value
-absorb the following opener, which produced not a parse error but a different,
-well-formed, schema-satisfying call. Every other production reproduces
-XGrammar's Qwen language exactly, and a pattern- or length-constrained string
-keeps XGrammar's own emission. A tool argument therefore cannot carry the
-literal `<parameter=`, the same limitation the format already had for the exact
-closer; tool authors needing either sequence must use another representation.
+A parameter value may carry neither its own `</parameter>` closer nor the next
+parameter's `<parameter=` opener. vLLM owns the Qwen structural tag so it can
+exclude both: excluding only the closer let a value absorb the following opener,
+which produced not a parse error but a different, well-formed, schema-satisfying
+call. Every other production reproduces XGrammar's Qwen language exactly, with
+one deliberate exception: a string parameter declaring `pattern`, `format`,
+`minLength` or `maxLength` is refused, naming the tool and the property.
+XGrammar emits such a string as a regex, and that regex cannot carry the
+exclusion — xgrammar's regex engine has no lookahead, so forbidding a fixed
+substring is only an unrolled DFA, which cannot then carry a length bound. There
+is no grammar that both bounds the value and keeps the opener ungenerable, so
+there is one string channel rather than a second one that drops the exclusion;
+declare the parameter without the constraint and validate it in the tool. A tool
+argument therefore cannot carry the literal `<parameter=`, the same limitation
+the format already had for the exact closer; tool authors needing either
+sequence must use another representation.
 
 A parameter value is framed by the transport, not by the value. The served
 template renders `<parameter=NAME>`, a newline, the value, a newline, and

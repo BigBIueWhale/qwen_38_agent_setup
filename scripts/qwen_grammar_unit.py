@@ -161,6 +161,101 @@ for strict_value in (None, False, True):
     strict_dumps.append(call_tag)
 assert strict_dumps[0] == strict_dumps[1] == strict_dumps[2]
 
+# There is one string channel and it is the excluded raw one. A string
+# parameter carrying pattern, format, minLength or maxLength has no grammar at
+# all -- the exclusion that makes an argument merge ungrammatical cannot be
+# written inside a length-bounded regex -- so the registry refuses it instead
+# of building a second channel that drops the exclusion. The refusal names the
+# tool and the property because the fix is an edit to that one declaration.
+for refused_key, refused_value in (
+    ("pattern", "^[a-z]+$"),
+    ("format", "uuid"),
+    ("minLength", 1),
+    ("maxLength", 64),
+):
+    constrained = ChatCompletionToolsParam.model_validate(
+        {
+            "type": "function",
+            "function": {
+                "name": "update_todo",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "todo_id": {"type": "string", refused_key: refused_value}
+                    },
+                    "required": ["todo_id"],
+                    "additionalProperties": False,
+                },
+            },
+        }
+    )
+    try:
+        get_model_structural_tag("qwen_3_coder", [constrained], "auto", False)
+    except ValueError as exc:
+        refusal = str(exc)
+        assert "update_todo" in refusal, refusal
+        assert "todo_id" in refusal, refusal
+        assert refused_key in refusal, refusal
+        assert "validate it in the tool" in refusal, refusal
+    else:
+        raise AssertionError(f"a string declaring {refused_key} was given a grammar")
+
+# The undeclared-name channel is a value production too, and is refused on the
+# same terms under the name the schema gives it.
+extra_constrained = ChatCompletionToolsParam.model_validate(
+    {
+        "type": "function",
+        "function": {
+            "name": "write_note",
+            "parameters": {
+                "type": "object",
+                "properties": {"body": {"type": "string"}},
+                "required": ["body"],
+                "additionalProperties": {"type": "string", "maxLength": 8},
+            },
+        },
+    }
+)
+try:
+    get_model_structural_tag("qwen_3_coder", [extra_constrained], "auto", False)
+except ValueError as exc:
+    refusal = str(exc)
+    assert "write_note" in refusal, refusal
+    assert "additionalProperties" in refusal, refusal
+else:
+    raise AssertionError("a constrained additionalProperties string got a grammar")
+
+# Exactly those four keys are refused. An ordinary string, annotations and all,
+# still rides the one channel and still carries both exclusions.
+annotated = ChatCompletionToolsParam.model_validate(
+    {
+        "type": "function",
+        "function": {
+            "name": "write_note",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "body": {
+                        "type": "string",
+                        "title": "Body",
+                        "description": "Note text.",
+                        "default": "",
+                    }
+                },
+                "required": ["body"],
+                "additionalProperties": False,
+            },
+        },
+    }
+)
+annotated_tag = get_model_structural_tag("qwen_3_coder", [annotated], "auto", False)
+annotated_body = annotated_tag.model_dump()["format"]["tags"][0]["content"]
+annotated_declared = [e for e in annotated_body["elements"] if e["type"] != "regex"]
+assert [e["begin"] for e in annotated_declared] == ["<parameter=body>"]
+annotated_value = annotated_declared[0]["content"]
+assert annotated_value["type"] == "any_text", annotated_value
+assert annotated_value["excludes"] == ["<parameter=", "</parameter>"]
+
 # Decoder-time boundary invariant: an explicit </think> is excluded from the
 # grammar, while an implicit <tool_call> reasoning terminator is retained as
 # the Qwen structural grammar's trigger token.

@@ -206,10 +206,14 @@ time into the call the model meant rather than being repaired afterwards.
 Everything else reproduces XGrammar's Qwen language exactly: the `[ \n\t]*`
 padding around every value, the ordered required chain, optional properties,
 additional properties, string enums and constants, local `$ref` resolution, and
-JSON productions for every non-string type. A pattern- or length-constrained
-string keeps XGrammar's own emission, whose branch drops the exclusion, so no
-call this deployment accepts today stops being accepted. The call-count limit
-is applied while building instead of by mutating a returned tag, and the
+JSON productions for every non-string type. The one production it does not have
+is XGrammar's constrained-string regex: a string declaring `pattern`, `format`,
+`minLength` or `maxLength` is refused, naming the tool and the property, because
+the exclusion cannot be written inside a length-bounded regex -- xgrammar's
+regex engine has no lookahead, so forbidding a fixed substring is only an
+unrolled DFA, which cannot then carry a `{m,n}` bound. There is one string
+channel, not a second one that drops the exclusion. The call-count limit is
+applied while building instead of by mutating a returned tag, and the
 now-unreachable mutation is deleted.
 
 What this forbids is real and worth stating: a tool argument can no longer
@@ -224,8 +228,10 @@ union, nested object, array, local reference, reference to a string, and
 length-, minimum- and pattern-constrained strings -- across automatic and
 required choice, both reasoning settings, and `strict` true, false and absent.
 Every accepted and rejected string agrees except the merge itself, which the
-owned grammar rejects and XGrammar accepts. The call-count behaviour agrees
-with the deleted mutation on single, duplicate and trailing-text calls. Tests
+owned grammar rejects and XGrammar accepts, and the three constrained-string
+shapes, which the owned grammar refuses to build at all rather than build
+without the exclusion. The call-count behaviour agrees with the deleted
+mutation on single, duplicate and trailing-text calls. Tests
 that placed the opener inside a value move with the grammar and still assert
 that every other marker stays value text.
 
