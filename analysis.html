@@ -441,7 +441,23 @@ hr{border:0;border-top:1px solid var(--line);margin:30px 0}
 </section>
 <section id="s8">
 <h2>8. Opinions: how Obsidian should and should not be used here</h2>
-<p class="small"><span class="tag warn">PENDING</span> Written last, after all facts are in.</p>
+<p><span class="tag opinion">OPINION</span> Everything in this section is the author's recommendation, reasoned from sections 1 to 7. Where a recommendation depends on a single fact, that fact is named so it can be re-checked.</p>
+
+<h3>8.1 Obsidian itself</h3>
+<p class="small"><span class="tag warn">PENDING</span> Written once the Obsidian audit (section 5) is in.</p>
+
+<h3>8.2 Laguna instead of Ornith</h3>
+<div class="verdict no"><strong>Not as a 1:1 replacement, and not for the LLM Wiki.</strong> Laguna has no vision tower. The deck promises 16-megapixel page conversion of PDFs, image labelling and object grounding on the same served model (slides 2, 3, 9), and the sandbox contract makes "render the page to PNG and look at it" the only way to read a scanned datasheet. A text-only frontier model breaks all three. On the benchmarks Poolside itself publishes, S 2.1 sits at the Ornith 35B-A3B level (Terminal-Bench 2.1 70.2 vs 67.8) and 16 points under Ornith 397B, with nothing published on long context, which is the entire basis of the 397B-for-the-wiki argument.</div>
+<div class="verdict maybe"><strong>Where Laguna S 2.1 is genuinely attractive.</strong> It is the only candidate with zero PRC lineage, so it survives a stricter reading of the rule than "wink wink". Its 8 KV heads fit TP=8 with no replication, so it reaches roughly 226–256 DGX seats on the engine as it is, without the TurboQuant DCP work the deck's 339 depends on. Its checkpoint is small (about 62 GiB NVFP4) and it fits one RTX PRO 6000 with two or three 256K seats. If the policy owner ever demands "no Chinese base at all", Laguna is the answer for the code-agent workload, paired with a separate vision-capable model for pages and images, and the deck's capacity slide must be recomputed. That is a different architecture from the one drawn.</div>
+<p>Two things to do before deciding: run the K8V4-versus-FP8 A/B on S 2.1 in the patched engine on the external card (nobody has published one), and read the current NVFP4 index of <code>poolside/Laguna-S-2.1-NVFP4</code> on a machine that can reach Hugging Face, because the two revisions differ by 30 GB.</p>
+
+<h3>8.3 An embedding model</h3>
+<div class="verdict no"><strong>Do not add one to the platform for the LLM Wiki.</strong> The deck says so on slide 3, the prompt file says so twice, and the wiki mechanism (a long-context agent that reweighs every chunk against everything already written) is the deliberate alternative to retrieval. Bolting a vector index onto the sandbox would also require the one thing the four zeros forbid: persistent storage owned by the platform.</div>
+<div class="verdict maybe"><strong>If the boundary is ever reversed deliberately, the order is:</strong> Harrier-27B when a card can be dedicated to it (clean Gemma lineage, MIT, first on MMTEB, Hebrew listed, but ~26 GiB at FP8 with no official FP8 checkpoint and no public vLLM run of the 27B); Octen-8B only with a written policy decision, because it is the Chinese embedder re-tuned rather than a base model continued; <code>multilingual-e5-large-instruct</code> as the sub-1-GiB default for Hebrew-heavy content. In every case build the 200-query gold set from the real wikis first; Belebele's 900 questions are the only public Hebrew retrieval signal and the top models have saturated it.</div>
+<p>The premise of the question deserves one correction: the "Microsoft 27B" is not a Qwen retrain but a Gemma retrain, and the "retrained by Taiwanese or Singaporeans" model is Octen, whose founder ran AI search at Alibaba Cloud. Neither is what the phrasing assumed, and the second is a weaker provenance story than Ornith's.</p>
+
+<h3>8.4 What the deck should and should not say about any of this</h3>
+<p class="small"><span class="tag warn">PENDING</span> Written with 8.1.</p>
 </section>
 <section id="s9">
 <h2>9. Sources</h2>
