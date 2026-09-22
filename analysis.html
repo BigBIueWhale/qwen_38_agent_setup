@@ -287,7 +287,63 @@ hr{border:0;border-top:1px solid var(--line);margin:30px 0}
 </section>
 <section id="s6">
 <h2>6. Embedding models under the non-PRC rule</h2>
-<p class="small"><span class="tag warn">PENDING</span> This section is filled in by the embedding-model research pass.</p>
+<p><span class="tag fact">FACT</span> The architecture assigns embeddings and retrieval to the organisation-wide service (section 3.2), so this section answers the conditional question the prompt file itself asks: <em>if</em> an embedding model is ever run, which one. The same access limit as section 7 applies: <code>huggingface.co</code> and its mirror are blocked from this session, so model metadata comes from the MTEB model registry and the official MTEB results repository on GitHub (both at their 2026-09-22 commits), the vLLM source, and PyPI. <strong>Every MMTEB and Hebrew score below was recomputed</strong> by running the <code>mteb</code> package against the official results repository; the method reproduces the vendors' published figures exactly (Qwen3-Embedding-8B 70.58, Harrier-27B 74.3, pplx-embed-4B retrieval 69.66). Full report with a URL per claim: <code>research/research-embeddings.md</code>.</p>
+
+<h3>6.1 The Microsoft 27B model: <code>microsoft/harrier-oss-v1-27b</code></h3>
+<table>
+<tr><th>Item</th><th>Value</th></tr>
+<tr><td>Publisher, date, license</td><td>Microsoft (Bing team), weights dated 2026-03-27, press from 2026-03-30; <strong>MIT</strong></td></tr>
+<tr><td>Base model</td><td><strong>Google Gemma 3 27B</strong> (<code>google/gemma-3-27b-pt</code>), not Qwen. MTEB registry <code>adapted_from</code>; a third-party implementation loads it as <code>Gemma3TextModel</code></td></tr>
+<tr><td>Size and shape</td><td>27,008,663,808 parameters (1.41B in the embedding table); embedding dimension 5,376; decoder-only, last-token pooling, L2 normalisation; 32,768-token context per the card (MTEB metadata says 131,072, probably Gemma's position limit)</td></tr>
+<tr><td>Instruction format</td><td>Queries: <code>Instruct: {task}\nQuery: {text}</code>; documents: no prefix. vLLM does not add the prefix; the client must</td></tr>
+<tr><td>Languages</td><td>The card says 94 languages and its explicit list <strong>includes Hebrew</strong> (card text via two independent search snippets); press says "100+"</td></tr>
+<tr><td>MMTEB (Multilingual, v2)</td><td><strong>Mean(Task) 74.27, rank #1</strong> by mean and by Borda among the ~50 strongest full-coverage models on 2026-09-22; retrieval 78.27, STS 79.99, bitext 86.02; zero-shot share 78 % (some MMTEB training splits were in its training data)</td></tr>
+<tr><td>Hebrew subset (Belebele retrieval, nDCG@10)</td><td class="num">heb→heb 94.97 · heb→eng 95.79 · eng→heb 92.54; MASSIVE-intent (he) 82.13; Tatoeba heb-eng 93.58</td></tr>
+<tr><td>Weights in memory</td><td>BF16 54.0 GB = <strong>50.3 GiB</strong> (card and MTEB agree). FP8 ≈ 25–26.5 GiB and NVFP4 ≈ 16 GiB are arithmetic; <strong>no official FP8 or NVFP4 checkpoint exists</strong>, only community GGUF re-uploads, so any quantisation loss is unmeasured</td></tr>
+<tr><td>vLLM</td><td><code>Gemma3TextModel</code> is in vLLM's embedding registry (<code>--runner pooling</code>; the old <code>--task embed</code> no longer appears in the docs). Harrier-0.6B has been served on vLLM 0.24.0; <strong>no public report of the 27B on vLLM</strong> was found. Open bug: PR #48214, a CUDA index crash with nine concurrent ~32k-character inputs during chunked prefill</td></tr>
+<tr><td>Cost of running it (inference)</td><td>About 54 GFLOP per token, roughly 45× a 0.6B embedder; vectors are 21 KB each in FP32, so one million chunks ≈ 20 GiB of vectors against 3.8 GiB at 1,024 dimensions</td></tr>
+</table>
+<p><span class="tag fact">FACT</span> The other Harrier sizes: <code>harrier-oss-v1-270m</code> is Gemma-3-270m based (MMTEB 66.55, Hebrew Belebele 78.3); <code>harrier-oss-v1-0.6b</code> is <strong>Qwen3-0.6B based</strong> (MMTEB 69.01, Hebrew 84.2), which puts it in exactly Ornith's provenance position: a PRC base retrained by a non-PRC publisher. No Microsoft embedding release newer than Harrier-OSS-v1 exists. Microsoft's older E5 family is MIT: <code>multilingual-e5-large-instruct</code> (XLM-R base, 560M, <strong>514-token limit</strong>) scores only 63.22 overall but <strong>91.5 on Hebrew</strong>; <code>e5-mistral-7b-instruct</code> (Mistral base) scores 60.25 and 79.5 on Hebrew.</p>
+
+<h3>6.2 "The Qwen embedding retrained by Taiwanese or Singaporeans"</h3>
+<ul>
+<li><span class="tag fact">FACT</span> Qwen3-Embedding (0.6B / 4B / 8B, Apache-2.0, MMTEB 64.33 / 69.45 / 70.58) is published by Alibaba's Qwen team and is refused by the rule as written.</li>
+<li><span class="tag fact">FACT</span> The model that matches the description is <strong>Octen-Embedding</strong> (0.6B, 4B, 8B, Apache-2.0, 32k context, Qwen3's 1,024 / 2,560 / 4,096 dimensions). Octen is "headquartered in both San Francisco and Singapore"; its founder was head of AI search at Alibaba Cloud; it raised a US$10M seed led by Square Peg in April 2026. The models are fine-tuned <strong>directly from <code>Qwen/Qwen3-Embedding-*</code></strong>. Octen-8B was #1 on the RTEB retrieval leaderboard in early 2026. Recomputed scores: MMTEB 67.84 over 129 of 131 tasks (not an official leaderboard score); Hebrew Belebele <strong>96.78 / 99.14 / 96.30</strong>, the best Hebrew of any open model not published by a PRC organisation, and marginally above Qwen3-Embedding-8B itself (96.86 / 98.78 / 95.98).</li>
+<li><span class="tag fact">FACT</span> No Taiwanese embedding model exists in the MTEB registry; MediaTek Research's Breeze models are Mistral-based LLMs, TAIDE and Academia Sinica publish no embedders. AI Singapore's SEA-LION-ModernBERT-Embedding models are ModernBERT trained from scratch (not Qwen) with no Hebrew. Sea AI Lab's Sailor models are Qwen-based LLMs, not embedders.</li>
+<li><span class="tag infer">INFERENCE</span> Octen passes the rule by its letter (non-PRC publisher) but sits closer to the line than Ornith: it is the Chinese embedding model itself, lightly re-tuned by an ex-Alibaba team, not a continued pre-train of a base LLM. It needs an explicit policy decision rather than a wink.</li>
+</ul>
+
+<h3>6.3 Everything open that is not published from the PRC</h3>
+<table>
+<tr><th>Model</th><th>Org / country</th><th>Base origin</th><th>Params</th><th>Dims</th><th>Ctx</th><th>Hebrew Belebele h→h</th><th>License</th><th>MMTEB</th><th>Weights BF16 / FP8</th><th>vLLM</th></tr>
+<tr><td>harrier-oss-v1-27b</td><td>Microsoft / US</td><td>Gemma-3-27B (Google)</td><td class="num">27.0B</td><td class="num">5,376</td><td class="num">32k</td><td class="num">95.0</td><td>MIT</td><td class="num"><strong>74.27</strong></td><td class="num">50.3 / ~26 GiB</td><td>architecture supported, untested publicly</td></tr>
+<tr><td>Octen-Embedding-8B</td><td>Octen / US + SG</td><td>Qwen3-Embedding-8B (PRC)</td><td class="num">7.6B</td><td class="num">4,096</td><td class="num">32k</td><td class="num"><strong>96.8</strong></td><td>Apache-2.0</td><td class="num">67.84*</td><td class="num">14.1 / 7.0 GiB</td><td>yes (Qwen3)</td></tr>
+<tr><td>llama-embed-nemotron-8b</td><td>NVIDIA / US</td><td>Llama-3.1-8B (Meta)</td><td class="num">7.5B</td><td class="num">4,096</td><td class="num">32k</td><td class="num">94.9</td><td><strong>non-commercial</strong></td><td class="num">69.46</td><td class="num">14.0 / 7.0 GiB</td><td>likely</td></tr>
+<tr><td>Nemotron-3-Embed-8B</td><td>NVIDIA / US</td><td>Ministral-3-8B (FR)</td><td class="num">8.0B</td><td class="num">4,096</td><td class="num">32k</td><td>Hebrew <strong>not supported</strong></td><td>OpenMDW-1.1</td><td>n/a</td><td class="num">14.8 / 7.4 GiB</td><td>not in docs</td></tr>
+<tr><td>pplx-embed-v1-4b</td><td>Perplexity / US</td><td>Qwen3-4B (PRC)</td><td class="num">4.0B</td><td class="num">2,560</td><td class="num">32k</td><td class="num">87.1</td><td>MIT</td><td>retrieval 69.66 only</td><td class="num">7.5 / 3.7 GiB</td><td>not in docs</td></tr>
+<tr><td>harrier-oss-v1-0.6b</td><td>Microsoft / US</td><td>Qwen3-0.6B (PRC)</td><td class="num">0.6B</td><td class="num">1,024</td><td class="num">32k</td><td class="num">84.2</td><td>MIT</td><td class="num">69.01</td><td class="num">1.1 / 0.6 GiB</td><td>yes (served on 0.24.0)</td></tr>
+<tr><td>jina-embeddings-v5-text-small</td><td>Jina (DE) / Elastic (US)</td><td>Qwen3-0.6B (PRC)</td><td class="num">0.6B</td><td class="num">1,024</td><td class="num">32k</td><td class="num">89.4</td><td><strong>CC-BY-NC-4.0</strong></td><td class="num">67.00</td><td class="num">1.1 / 0.6 GiB</td><td>yes</td></tr>
+<tr><td>multilingual-e5-large-instruct</td><td>Microsoft / US</td><td>XLM-R-large (Meta)</td><td class="num">0.56B</td><td class="num">1,024</td><td class="num"><strong>514</strong></td><td class="num">91.5</td><td>MIT</td><td class="num">63.22</td><td class="num">1.0 / 0.5 GiB</td><td>yes</td></tr>
+<tr><td>harrier-oss-v1-270m</td><td>Microsoft / US</td><td>Gemma-3-270m (Google)</td><td class="num">0.27B</td><td class="num">640</td><td class="num">32k</td><td class="num">78.3</td><td>MIT</td><td class="num">66.55</td><td class="num">0.5 / 0.25 GiB</td><td>yes</td></tr>
+<tr><td>embeddinggemma-300m</td><td>Google / US</td><td>Gemma 3</td><td class="num">0.31B</td><td class="num">768</td><td class="num">2,048</td><td class="num">74.0</td><td>Gemma terms</td><td class="num">61.15</td><td class="num">0.6 / 0.3 GiB</td><td>yes</td></tr>
+<tr><td>granite-embedding-311m-multilingual-r2</td><td>IBM / US</td><td>IBM ModernBERT</td><td class="num">0.31B</td><td class="num">768</td><td class="num">32k</td><td class="num">81.1</td><td>Apache-2.0</td><td class="num">55.96</td><td class="num">0.6 / 0.3 GiB</td><td>probably</td></tr>
+</table>
+<p class="small">* 129 of 131 tasks submitted. Refused by publisher and listed only for reference: KaLM-Embedding-Gemma3-12B (Tencent, 72.32, a Gemma base with a PRC publisher), F2LLM-v2 (Ant), bge-m3 (BAAI), Seed1.6-embedding (ByteDance, closed). Snowflake arctic-embed-l-v2.0 (US) is built on BAAI's bge-m3-retromae and so carries PRC lineage. Closed references: gemini-embedding-001 MMTEB 68.37 / Hebrew 95.8; OpenAI text-embedding-3-large Hebrew 79.8. The prompt file's own rule on Nemotron ("I fucking hate nemotron") removes both NVIDIA rows regardless.</p>
+
+<h3>6.4 How much Hebrew evidence actually exists</h3>
+<ul>
+<li><span class="tag fact">FACT</span> MTEB has <strong>no Hebrew benchmark</strong>. Hebrew appears only as a subset of multilingual tasks; inside MMTEB v2 it contributes to Belebele retrieval, MASSIVE intent, SIB200 clustering and bitext mining. Belebele has 900 questions per language and is near saturation for the top models (95–97). A model's MMTEB average therefore says little about Hebrew retrieval.</li>
+<li><span class="tag fact">FACT</span> Outside MTEB: the <strong>Hebrew Semantic Retrieval National Challenge</strong> (MAFAT / Israel National NLP Program, on Codabench, NDCG@20), where Dicta's <code>neodictabert-bilingual-embed</code> (768 dims, 4,096 context, CC-BY-4.0) reports 10th place in the private phase; and Sefaria's leaderboard, which covers Rabbinic rather than modern Hebrew.</li>
+<li><span class="tag infer">INFERENCE</span> The public signal cannot settle which model retrieves best over Hebrew and English engineering wikis. A 200–300-query gold set built from the real wikis is the only decisive test, and it is cheap.</li>
+</ul>
+
+<h3>6.5 Practical notes for the patched stack</h3>
+<ul>
+<li>vLLM serves embedders with <code>--runner pooling</code>; the client must prepend the <code>Instruct: …\nQuery: </code> prefix for Harrier, Octen and Qwen-style models.</li>
+<li>Cap <code>--max-model-len</code> at the chunk size (2,048–8,192) rather than 32k; it saves memory and avoids the long-input chunked-prefill bug in PR #48214.</li>
+<li>The 27B on a shared 96 GiB RTX PRO 6000 at FP8 (~26 GiB plus runtime) takes roughly a third of the card away from LLM weights and cache; its natural home is a dedicated card. The sub-1 GiB models cost nothing that matters.</li>
+<li>Vectors are not portable between models; changing the embedder means re-indexing everything.</li>
+</ul>
 </section>
 <section id="s7">
 <h2>7. Laguna versus Ornith</h2>
