@@ -192,7 +192,89 @@ hr{border:0;border-top:1px solid var(--line);margin:30px 0}
 </section>
 <section id="s7">
 <h2>7. Laguna versus Ornith</h2>
-<p class="small"><span class="tag warn">PENDING</span> This section is filled in by the Laguna research pass.</p>
+<p><span class="tag fact">FACT</span> The prompt file, the research notes and both deck editions never mention Laguna. The statement "we'll probably switch to Laguna (the best one) instead of Ornith" is new. A dedicated research pass identified it. One access limit applies to everything below: the session's egress proxy returns HTTP 403 for <code>huggingface.co</code>, <code>poolside.ai</code>, <code>arxiv.org</code> and several news sites, so configuration values come from verbatim GitHub copies of the Hugging Face <code>config.json</code> files (validated: the parameter count computed from the S 2.1 config, 117,561,977,600, equals the count Hugging Face publishes), and model-card benchmark numbers come from card snapshots and search snippets, not from the cards themselves. The full report with a URL per claim is in the repository next to this file (<code>research/research-laguna.md</code>).</p>
+
+<h3>7.1 What Laguna is</h3>
+<table>
+<tr><th>Model</th><th>Total / active</th><th>Released</th><th>License</th><th>Official exports (all by <code>poolside</code>)</th></tr>
+<tr><td>Laguna XS.2</td><td>33B / 3B</td><td>2026-04-28</td><td>Apache-2.0</td><td>BF16, FP8, NVFP4, INT4, DFlash speculator</td></tr>
+<tr><td>Laguna M.1</td><td>225.8B / 23.5B</td><td>API 2026-04-28; open weights 2026-06-18</td><td>Apache-2.0</td><td>base and post-trained; FP8, NVFP4</td></tr>
+<tr><td>Laguna XS 2.1</td><td>33.4B / 3B</td><td>2026-07-02</td><td>OpenMDW-1.1</td><td>FP8, NVFP4, INT4, GGUF, DFlash</td></tr>
+<tr><td><strong>Laguna S 2.1</strong></td><td>117.6B / ~8B</td><td>2026-07-21</td><td>OpenMDW-1.1</td><td>FP8, NVFP4 (re-uploaded 2026-08), INT4, GGUF, DFlash</td></tr>
+</table>
+<ul>
+<li><span class="tag fact">FACT</span> Laguna is Poolside's open-weights agentic-coding mixture-of-experts family (Hugging Face org <code>poolside</code>; native support in transformers since v5.7.0 and in vLLM as <code>LagunaForCausalLM</code>). Poolside was founded in 2023 by Jason Warner and Eiso Kant; it is described as an American company headquartered in San Francisco, with a reported relocation of headquarters to Paris. It is not a PRC organisation.</li>
+<li><span class="tag fact">FACT</span> Poolside states the models are trained from scratch on its own data and infrastructure (M.1: 30T+ tokens on 6,144 H200s; S 2.1: trained from 2026-05-22 on 4,096 H200s, reusing XS 2.1's pre-training data). Hugging Face metadata shows <code>base_model: None</code>. <span class="tag infer">INFERENCE</span> The architecture (100,352-token vocabulary, sigmoid router, softplus attention gate, 512-token sliding window) does not resemble Qwen, Gemma or Llama, which supports the from-scratch claim.</li>
+<li><span class="tag fact">FACT</span> There is no 397B Laguna. "The best one" is most plausibly <strong>S 2.1</strong>: Poolside's own collection calls it "our most capable model to date" and it beats the larger, older M.1 on every agentic-coding benchmark both publish.</li>
+<li><span class="tag fact">FACT</span> <strong>No Laguna variant has vision.</strong> Every config is text-only; the recipes list <code>tasks: [text]</code>; the only image path is a community hackathon LoRA on XS.2 described as "weakly grounded, 12/80 strict passes".</li>
+</ul>
+
+<h3>7.2 Architecture and KV cache, side by side</h3>
+<table>
+<tr><th></th><th>Laguna S 2.1</th><th>Laguna M.1</th><th>Laguna XS 2.1</th><th>Ornith 1.5 397B</th><th>Ornith 1.5 35B-A3B</th></tr>
+<tr><td>Layers</td><td class="num">48</td><td class="num">70</td><td class="num">40</td><td class="num">60</td><td class="num">40</td></tr>
+<tr><td>Attention pattern</td><td>12 full + 36 sliding-window (512)</td><td>70 full</td><td>10 full + 30 sliding-window (512)</td><td>15 full + 45 Gated DeltaNet (3:1)</td><td>10 full + 30 Gated DeltaNet</td></tr>
+<tr><td>KV heads × head_dim</td><td>8 × 128</td><td>8 × 128</td><td>8 × 128</td><td>2 × 256</td><td>2 × 256</td></tr>
+<tr><td>Experts (total / active)</td><td>256 / 10 + 1 shared</td><td>256 / 16 + 1 shared</td><td>256 / 8 + 1 shared</td><td>512 / 10</td><td>256 / 8</td></tr>
+<tr><td>max_position_embeddings</td><td>1,048,576 (BF16; quantised exports configured for 256K)</td><td class="num">262,144</td><td class="num">262,144</td><td class="num">262,144 (+YaRN ×4)</td><td class="num">262,144 (+YaRN ×4)</td></tr>
+<tr><td>RoPE on full layers</td><td>YaRN ×128 over 8,192</td><td>YaRN ×64 over 4,096</td><td>YaRN ×32 over 8,192</td><td>native 262,144</td><td>native 262,144</td></tr>
+<tr><td>Vision tower</td><td><strong>none</strong></td><td><strong>none</strong></td><td><strong>none</strong></td><td>present (SigLIP-style)</td><td>present</td></tr>
+<tr><td>Thinking</td><td>interleaved; off by default in the template, can be forced on server-side</td><td>same</td><td>same</td><td>on by default</td><td>on by default</td></tr>
+<tr><td>KV bytes/token BF16</td><td class="num">49,152</td><td class="num">286,720</td><td class="num">40,960</td><td class="num">30,720</td><td class="num">20,480</td></tr>
+<tr><td>KV bytes/token K8V4</td><td class="num">18,816</td><td class="num">109,760</td><td class="num">15,680</td><td class="num">11,640</td><td class="num">7,760</td></tr>
+<tr><td>GiB per user at 262,144, K8V4</td><td class="num">4.59</td><td class="num">26.80</td><td class="num">3.83</td><td class="num">2.84</td><td class="num">1.90</td></tr>
+<tr><td>Fixed per-sequence state</td><td>72 MiB (SWA window, BF16)</td><td>none</td><td>60 MiB</td><td>~180 MiB recurrent (FP32)</td><td>~60 MiB recurrent</td></tr>
+</table>
+<p class="small">K8V4 slot arithmetic follows upstream vLLM's <code>TurboQuantConfig.slot_size</code> (K: head_dim bytes; V: head_dim/2 + 4 bytes of FP16 scale and minimum), which reproduces the deck's 11,640 B/token for Ornith 397B. Two caveats from the code: upstream TurboQuant leaves the first two and last two attention layers unquantised for non-hybrid models, which would put S 2.1 at about 21,344 B/token unless the patched engine changes that; and the DFlash draft model, if used, adds six layers of full-context KV (about +50 %), which a third party measured on real vLLM start-ups.</p>
+<p><span class="tag infer">INFERENCE</span> Per token, S 2.1 costs about 1.6× the cache of Ornith 397B and M.1 about 9.3×. The deck's capacity slide (339 answering on a DGX at 3.02 GiB each) is derived for Ornith 397B's 15×2×256 geometry; with S 2.1's 12×8×128 the same arithmetic gives roughly 210 seats before the boundary-skip caveat, and about 185 with it. That is still far above the pinned-engine floor of 87, but it is not the number on slide 7.</p>
+
+<h3>7.3 Benchmarks both sides publish</h3>
+<table>
+<tr><th>Benchmark</th><th>Laguna S 2.1 (thinking)</th><th>Laguna M.1</th><th>Ornith 1.5 397B</th><th>Ornith 1.5 35B-A3B</th></tr>
+<tr><td>Terminal-Bench 2.1</td><td class="num">70.2 (60.4 without thinking)</td><td class="num">— (TB 2.0: 45.8 or 56.9, sources disagree)</td><td class="num">86.1</td><td class="num">67.8</td></tr>
+<tr><td>Toolathlon</td><td class="num">49.7 ("Verified" split)</td><td class="num">—</td><td class="num">71.2</td><td class="num">48.7</td></tr>
+<tr><td>SWE-bench Verified</td><td class="num">not reported</td><td class="num">74.6</td><td class="num">86.0</td><td class="num">79.0</td></tr>
+<tr><td>SWE-bench Pro</td><td class="num">59.4</td><td class="num">49.2</td><td class="num">65.1 (third-party snippet)</td><td class="num">59.6</td></tr>
+<tr><td>SWE-bench Multilingual</td><td class="num">78.5</td><td class="num">63.1 or 73.3 (sources disagree)</td><td class="num">79.6</td><td class="num">—</td></tr>
+<tr><td>GPQA Diamond, MCP-Atlas, BrowseComp, HLE</td><td>not reported</td><td>not reported</td><td class="num">92.8 / 80.0 / 86.6</td><td class="num">89.2 / 70.2 / —</td></tr>
+<tr><td>Long context (MRCR, RULER, needle)</td><td>none published</td><td>none</td><td>none on the card</td><td>none on the card</td></tr>
+</table>
+<ul>
+<li><span class="tag fact">FACT</span> Poolside's evaluation protocol: Laude Institute Harbor framework, its own harness, up to 500 steps, pass@1 averaged over 2–5 attempts, full trajectories published. The S 2.1 card's closed-model comparison row is Claude Fable 5 (Terminal-Bench 2.1 88, SWE-bench Pro 80.3), not Claude Opus 4.8; Poolside's compiled leaderboard lists Opus 4.8 at 84.6 on Terminal-Bench 2.1 where the Ornith card quotes 85.0.</li>
+<li><span class="tag fact">FACT</span> Independent aggregators (BenchLM) rate S 2.1 as tied overall with Ornith <em>1.0</em> 397B, with Ornith ahead on coding (74.6 vs 59.4) and Laguna's advantage being its 1M context; no Ornith 1.5 comparison was found. A Hugging Face discussion on S 2.1 ("BenchMAXXXED") reports it "sensitive to quantization and setup" and worse than Qwen 3.6 27B/35B in one user's application. r/LocalLLaMA on M.1: "below DeepSeek-V4 Flash / Qwen3.5 on several metrics" but "potentially the strongest US-trained open-weight coding model".</li>
+<li><span class="tag infer">INFERENCE</span> On every benchmark the deck tracks that Poolside also reports, S 2.1 sits in the Ornith 35B-A3B tier and 16–22 points below Ornith 397B. Its relative strengths are SWE-bench Pro and Multilingual. Nothing exists to compare on GPQA, MCP-Atlas, BrowseComp or long context, which is exactly the axis the LLM Wiki argument rests on (8-needle MRCR at 1M).</li>
+</ul>
+
+<h3>7.4 Serving on this stack</h3>
+<table>
+<tr><th>Checkpoint</th><th>Size</th><th>1× RTX PRO 6000 (96 GB)</th><th>2× H200 (no NVLink)</th><th>8× B200</th></tr>
+<tr><td>S 2.1 NVFP4 (current revision)</td><td>~67 GB, 14 shards; an earlier revision was 99.7 GB in 49 shards with layers 40–47 experts in BF16</td><td>Yes if the ~67 GB revision: about 2–3 users at 256K with K8V4; no with the 99.7 GB revision</td><td>Recipe says NVFP4 is Blackwell-only; FP8 TP2 or INT4 instead</td><td>Yes</td></tr>
+<tr><td>S 2.1 FP8</td><td>131,264,796,160 B (122 GiB)</td><td>No (TP2 on two RTX PRO 6000 measured working)</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>M.1 NVFP4 / FP8 / BF16</td><td>~135 GB / ≥270 GB / ~451 GB</td><td>No</td><td>Not supported / borderline / no</td><td>Yes</td></tr>
+<tr><td>XS 2.1 (any precision)</td><td>26–62 GiB</td><td>Yes</td><td>Yes</td><td>Yes</td></tr>
+</table>
+<ul>
+<li><span class="tag fact">FACT</span> Minimum versions: vLLM ≥ 0.25.0 for S 2.1 (0.25.1 for DFlash); transformers ≥ 5.7.0; the checkpoints still ship custom config code, so the recipes pass <code>--trust-remote-code</code>. Recommended flags: <code>--tool-call-parser poolside_v1 --reasoning-parser poolside_v1 --enable-auto-tool-choice</code>, plus <code>--default-chat-template-kwargs '{"enable_thinking": true}'</code> to force thinking on.</li>
+<li><span class="tag fact">FACT</span> The pinned engine in <code>qwen_38_agent_setup</code> is vLLM 0.27.2rc1 at commit <code>9df9b0b0</code>, which post-dates 0.25, so the model class exists there; but the 35 patches are landmark-aware transformations of Qwen-specific parsers, grammar and the hybrid GDN cache path, none of which applies to <code>poolside_v1</code> or to a sliding-window model. Open upstream issues on the Poolside parser (#49379: reasoning parser falls back to identity; #49711: reasoning tokens reported as zero) are precisely the class of defect the patch set exists to eliminate for Qwen.</li>
+<li><span class="tag fact">FACT</span> Poolside validates only an FP8 KV cache; no public report of TurboQuant K8V4 on Laguna exists. Upstream vLLM's TurboQuant backend accepts sliding windows, so it is technically applicable, but it is an untested A/B item.</li>
+<li><span class="tag fact">FACT</span> Quirks from the SGLang cookbook: BF16 reasons about twice as long as FP8/INT4 on AIME25; DFlash with the FlashInfer backend "breaks this hybrid-SWA model at tp ≥ 4 on Blackwell".</li>
+</ul>
+
+<h3>7.5 The "not Chinese" rule</h3>
+<table>
+<tr><th></th><th>Laguna</th><th>Ornith 1.5</th></tr>
+<tr><td>Publisher</td><td>Poolside (US / France)</td><td>DeepReinforce (Santa Clara / San Jose, CA)</td></tr>
+<tr><td>Base model</td><td>Trained from scratch; no PRC lineage</td><td>Continued pretraining on Qwen3.5 (Alibaba, PRC) and Gemma 4 (Google)</td></tr>
+<tr><td>Under the policy as written</td><td>Compliant with no exception needed</td><td>Compliant under the "non-PRC retrain of a Chinese base" reading ("wink wink")</td></tr>
+</table>
+<h3>7.6 To verify on a machine that can reach Hugging Face</h3>
+<ol>
+<li><code>curl 'https://huggingface.co/api/models?author=poolside&amp;search=laguna&amp;full=true'</code> to confirm the repository list and last-modified dates.</li>
+<li>For <code>poolside/Laguna-S-2.1-NVFP4</code>: the current <code>model.safetensors.index.json</code> total size (67 GB or 99.7 GB), the quantisation ignore list, <code>max_position_embeddings</code> (256K or 1M) and any <code>kv_cache_scheme</code>.</li>
+<li>The M.1 card's benchmark table, to settle the conflicting SWE-bench Multilingual and Terminal-Bench 2.0 figures.</li>
+<li>The <code>LICENSE.md</code> of each repository actually used (Apache-2.0 for XS.2 and M.1; OpenMDW-1.1 for XS 2.1 and S 2.1).</li>
+<li>An A/B run of <code>--kv-cache-dtype turboquant_k8v4</code> against <code>fp8</code> on S 2.1 in the patched engine, on the external card.</li>
+</ol>
 </section>
 <section id="s8">
 <h2>8. Opinions: how Obsidian should and should not be used here</h2>
