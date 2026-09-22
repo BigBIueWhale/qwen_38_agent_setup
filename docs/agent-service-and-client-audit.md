@@ -85,17 +85,15 @@ Several current behaviors materially supersede the historical `0.15.6` complaint
 - provider entries are arrays of `ModelConfig`; the obsolete wrapped provider shape
   is not accepted;
 - a complete history is retained rather than dropping an arbitrary tail;
-- the project patch holds back two shares of the served window -- 48/256 as the
-  generation reserve, the least room any turn or snapshot is issued with, and
-  2/256 for the message a compaction request adds -- and issues every turn with
-  the window's remainder after its prompt; compaction summarises the prompt the
-  last turn was issued against and carries that turn verbatim behind the
-  snapshot, so no turn is ever cut short at a number the window did not
-  require, with no safety margin, padding, or minimum fabrication;
+- the project patch issues every turn with its turn room `C`, derived from the
+  served window, as its limit whatever the turn's prompt, and admits no
+  configured ceiling of its own; compaction summarises the prompt the last turn
+  was issued against and carries that turn verbatim behind the snapshot, with no
+  safety margin, padding, or minimum fabrication;
 - vLLM `/tokenize` on the exact rendered messages, tool schemas, template kwargs,
-  and image history decides whether a turn may be issued at all, and measures the
-  tool results it appends as the difference between the request with them and the
-  request without them;
+  and image history decides whether a turn may be issued at all, and every tool
+  result's text is bounded once, where the model's copy of it is made, in the
+  UTF-8 bytes of its NFC form, which bound its tokens;
 - compaction is due at one threshold, the history's own share, with state
   validation and a three-consecutive-failure circuit breaker instead of a
   permanent first-failure latch;
@@ -179,13 +177,13 @@ model proxy inside the network-none agent namespace.
 ```
 
 The sampling tuple declares no `max_tokens`, and the client refuses one. Every
-request carries the one limit the send path derives — the window's remainder
-after the rendered prompt — so a value here could only be a second bound on the
-same quantity, and one that names a single window at that: it would have to be
-rewritten by hand the day `max_model_len` moves. The fragment sends no phase
-budget, and the server serves none. On the native 262,144-token profile prompt,
-reasoning, tools, and final output always share the one physical window, which
-is what the shares divide.
+turn carries the one limit the send path derives — the client's turn room `C`,
+derived from the served window — so a value here could only be a second bound
+on the same quantity, and one that names a single window at that: it would have
+to be rewritten by hand the day `max_model_len` moves. The fragment sends no
+phase budget, and the server serves none. On the native 262,144-token profile
+prompt, reasoning, tools, and final output always share the one physical window,
+which is what `C` is derived from.
 
 `maxRetries: 0` is deliberate. A transport error remains observable instead of
 silently replaying an ambiguous long generation; there is no orchestrator retry
@@ -264,7 +262,8 @@ The accepted Qwen Code contract is:
    `length`, `max_tokens`, `response.incomplete`, missing terminals, and malformed
    output fail closed without executing a buffered call;
 5. the real tokenizer counts every rendered request, and the compaction trigger
-   and the tool-result bound are both decided from those counts;
+   is decided from those counts; every tool result's text is bounded once, in
+   the UTF-8 bytes of its NFC form, which bound its tokens;
 6. a timed multi-turn run demonstrates actual prefix-cache hits and lower TTFT,
    instead of merely checking that prefix caching was enabled;
 7. cancellation, timeout, process failure, malformed events, and model/protocol

@@ -1185,7 +1185,8 @@ subagent turn:
   with its turn room `C`, derived from the served window, as its limit and admits
   no configured ceiling of its own;
 - exact /tokenize count on the same rendered request before generation, and
-  again on the request with and without the turn's pending tool results;
+  every tool result's text bounded once, where the model's copy of it is made,
+  in the UTF-8 bytes of its NFC form;
 - no character/image-token heuristic or tokenizer fallback;
 - splitToolMedia false so tool images stay in their originating tool result;
 - typed content parts and PNG-only image tools matching the strict backend;
