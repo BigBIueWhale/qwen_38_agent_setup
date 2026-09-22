@@ -44,7 +44,7 @@ There is one supported mode:
 | Agent-service release | Pinned by the agent-service release lock, which owns every agent and service image identity |
 | Agent-service listener | 127.0.0.1:8090 only |
 | Launch profile and cache volume | socket-isolated-nonroot-vision-k8v4-agent-v21 |
-| Image profile | socket-isolated-nonroot-vision-k8v4-agent-v25 |
+| Image profile | socket-isolated-nonroot-vision-k8v4-agent-v26 |
 | Runtime image | sha256:477c9b55cfafc8e9fcb96fd8aa72e03b3a56d773f6a26bb93fa4c0330dfc9f1b |
 
 This is not a text-only profile with an optional vision switch. It is not a
@@ -348,16 +348,16 @@ Pinned build inputs and products:
 |---|---|
 | Immutable base tag | qwen38-vllm:main-9df9b0b |
 | Immutable base ID | sha256:fa4a002a88b7043a1a89966dea8a500fe9696f84e75730d9da916f916048d401 |
-| Runtime tag | qwen38-vllm:qwen38-27b-nvfp4-k8v4-runtime-v25 |
+| Runtime tag | qwen38-vllm:qwen38-27b-nvfp4-k8v4-runtime-v26 |
 | Runtime ID | sha256:477c9b55cfafc8e9fcb96fd8aa72e03b3a56d773f6a26bb93fa4c0330dfc9f1b |
-| Offline archive | artifacts/qwen38-vllm-images-runtime-v25.tar |
+| Offline archive | artifacts/qwen38-vllm-images-runtime-v26.tar |
 | Archive size | 8,561,235,968 bytes, mode 0600 |
 | Archive SHA-256 | d97ee7078c4ac8faef8868b85dee840bb3a392db37d14977e2c8501f53381867 |
 | Runtime Dockerfile SHA-256 | 5c0549ed855ffa7178afa1415680afdec3300e513ae3396eb3e0487db31665ce |
 | Docker context allowlist SHA-256 | 5b6b3c8e03cd9cdc3e8d48d8f4b30df98de4d1a6d2a0657484c24e295c4d7f50 |
 | Build verifier SHA-256 | 3f532903372f5ba6f61178e990591bbcedf82394a666fe05821481c14ae547d2 |
 | Runtime validator SHA-256 | 83b3498166066b095b5d9e3f5519476006c0986f2aa4e9be93702d464299f8ec |
-| Runtime lock SHA-256 | 126fe984438aca930b78cf2dd5250e9e8758fe4af0462a692a2e1957f012917e |
+| Runtime lock SHA-256 | 43ee794150afa95b4714558fdd7c472298351071e35e98e1f200993ef9da5d0c |
 
 Every reviewed runtime file, including both TurboQuant kernels, is copied and
 hash-checked against its upstream and patched identities. A CPU Triton-interpreter
