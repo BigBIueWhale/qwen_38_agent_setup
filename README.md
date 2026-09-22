@@ -359,7 +359,7 @@ Pinned build inputs and products:
 | Docker context allowlist SHA-256 | 5b6b3c8e03cd9cdc3e8d48d8f4b30df98de4d1a6d2a0657484c24e295c4d7f50 |
 | Build verifier SHA-256 | 3f532903372f5ba6f61178e990591bbcedf82394a666fe05821481c14ae547d2 |
 | Runtime validator SHA-256 | 086ee356c2411e6d952f51f5723561951877cfd6f6a0da9d45b36decc30ebd14 |
-| Runtime lock SHA-256 | e77fed712a7d80804a77bc34d77abdfcdfca857066b20936f5f90b0240e49f22 |
+| Runtime lock SHA-256 | 8920a72f7aed526db2555b15a39b7d645a33674dad77319aeab28395e4c91e0f |
 
 Every reviewed runtime file, including both TurboQuant kernels, is copied and
 hash-checked against its upstream and patched identities. A CPU Triton-interpreter
