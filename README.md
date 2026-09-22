@@ -35,8 +35,6 @@ There is one supported mode:
 | Images | At most 15 static inline PNGs, 16,777,216 pixels each, aspect ratio at most 30:1 |
 | Video/audio | Rejected |
 | Thinking | Always enabled at xhigh; high and max are exact aliases |
-| Reasoning ceiling | 262,144 generated reasoning tokens, subject to remaining context |
-| Final-answer ceiling | 131,072 generated final tokens, subject to remaining context |
 | MTP/speculation | Disabled |
 | CPU weight offload | Zero |
 | KV offload | One declared resident user context, pinned host tier in /dev/shm; shared prefixes and whole-agent context eviction |
@@ -358,8 +356,8 @@ Pinned build inputs and products:
 | Runtime Dockerfile SHA-256 | 5c0549ed855ffa7178afa1415680afdec3300e513ae3396eb3e0487db31665ce |
 | Docker context allowlist SHA-256 | 5b6b3c8e03cd9cdc3e8d48d8f4b30df98de4d1a6d2a0657484c24e295c4d7f50 |
 | Build verifier SHA-256 | 3f532903372f5ba6f61178e990591bbcedf82394a666fe05821481c14ae547d2 |
-| Runtime validator SHA-256 | 086ee356c2411e6d952f51f5723561951877cfd6f6a0da9d45b36decc30ebd14 |
-| Runtime lock SHA-256 | 8920a72f7aed526db2555b15a39b7d645a33674dad77319aeab28395e4c91e0f |
+| Runtime validator SHA-256 | 83b3498166066b095b5d9e3f5519476006c0986f2aa4e9be93702d464299f8ec |
+| Runtime lock SHA-256 | 126fe984438aca930b78cf2dd5250e9e8758fe4af0462a692a2e1957f012917e |
 
 Every reviewed runtime file, including both TurboQuant kernels, is copied and
 hash-checked against its upstream and patched identities. A CPU Triton-interpreter
@@ -395,8 +393,7 @@ restore, and build verification. The exact server argument semantics are:
     --generation-config /model
     --override-generation-config
       {"temperature":1.0,"top_p":0.95,"top_k":20,"min_p":0.0,
-       "presence_penalty":0.0,"repetition_penalty":1.0,
-       "thinking_token_budget":262144,"final_response_token_budget":131072}
+       "presence_penalty":0.0,"repetition_penalty":1.0}
     --quantization compressed-tensors
     --dtype bfloat16
     --kv-cache-dtype turboquant_k8v4
@@ -513,9 +510,6 @@ omits Qwen-specific fields receives all of these server-side defaults:
     presence_penalty      = 0.0
     repetition_penalty    = 1.0
 
-    thinking_token_budget       = 262144
-    final_response_token_budget = 131072
-
 These sampling values are Alibaba's published Qwen3.8 thinking-mode tuple.
 repetition_penalty=1.0 is neutral. The historical Qwen3.6 repetition detector is not
 used; SamplingParams.repetition_detection is None. Adding a heuristic repetition
@@ -555,21 +549,20 @@ upstream card's "Disable Preserved Thinking" section below does not apply to thi
 deployment. The derivation and the rejected alternative are recorded in
 `docs/qwen36-to-qwen38-audit.md`.
 
-Alibaba's 262,144 reasoning and 131,072 final ceilings are recommendations for
-frameworks that distinguish the phases within a much larger window. Locally they are
-hard server defaults but not reservations and not additive capacity. The usable
-generation allowance is the minimum of the phase ceiling, the request's total
-generation ceiling, and physical context remaining after exact rendering. A short
-prompt can use extensive reasoning; a nearly full prompt cannot.
+No phase budget is served. The usable generation allowance is the minimum of the
+request's total generation ceiling and the physical context remaining after exact
+rendering. A short prompt can use extensive reasoning; a nearly full prompt cannot.
 
-The final counter starts only after the explicit reasoning-end marker. Tool XML is a
+A request may still set its own phase budgets: `thinking_token_budget` for reasoning
+and `final_response_token_budget` for the visible answer, or Anthropic's
+`thinking.budget_tokens` for the first, and each is applied exactly as sent. The
+final counter starts only after the explicit reasoning-end marker. Tool XML is a
 structured tool phase, not visible final prose. EOS and stop sequences may end
-earlier; min_tokens cannot cross a hard phase ceiling. Chat, Completions, Responses,
-Anthropic Messages, and `/inference/v1/generate` are the five supported generation
-families; batch Chat shares Chat's policy. All inherit the configured sampling and
-phase defaults. Clients may lower a phase ceiling for a
-deliberate request but cannot null or raise the server's final-response ceiling. A
-live five-real-token final-ceiling probe stopped at exactly five final tokens.
+earlier; min_tokens cannot cross a request's phase budget. Chat, Completions,
+Responses, Anthropic Messages, and `/inference/v1/generate` are the five supported
+generation families; batch Chat shares Chat's policy. All inherit the configured
+sampling defaults. A live five-real-token final-budget probe stopped at exactly five
+final tokens.
 
 Generation settings resolve after the rendered prompt length and server defaults
 are known. Omitting the total token limit uses the remaining window subject to the
@@ -1158,7 +1151,6 @@ The supported status currently reports:
     BF16 vision tower, aspect ratio <= 30:1
     xhigh thinking
     explicit Qwen3.8 sampling
-    reasoning/final ceilings 262144 / 131072
 
 ### Historical audits and client direction
 
@@ -1189,9 +1181,9 @@ subagent turn:
 - exact server/model identity;
 - xhigh mandatory thinking;
 - Alibaba thinking sampling tuple;
-- server reasoning ceiling 262144 and separate final ceiling 131072; the client
-  issues every turn with the window's remainder after its prompt as its limit
-  and admits no configured ceiling of its own;
+- no phase budget, from the server or the client; the client issues every turn
+  with its turn room `C`, derived from the served window, as its limit and admits
+  no configured ceiling of its own;
 - exact /tokenize count on the same rendered request before generation, and
   again on the request with and without the turn's pending tool results;
 - no character/image-token heuristic or tokenizer fallback;

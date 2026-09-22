@@ -66,6 +66,10 @@ append_and_check(no_end, 41, False)
 append_and_check(no_end, 42, True)
 assert no_end.stop_reason is None
 
+# The served generation defaults: exactly the sampling tuple config/runtime-v1.sh
+# passes as --override-generation-config. It carries no phase budget, so a
+# request that names none is resolved with none, and a request that names one
+# keeps the value it sent -- there is no served ceiling to clamp it to.
 defaults = {
     "temperature": 1.0,
     "top_p": 0.95,
@@ -73,8 +77,6 @@ defaults = {
     "min_p": 0.0,
     "presence_penalty": 0.0,
     "repetition_penalty": 1.0,
-    "thinking_token_budget": 262_144,
-    "final_response_token_budget": 131_072,
 }
 
 
@@ -87,15 +89,14 @@ def chat_request(**kwargs) -> ChatCompletionRequest:
     )
 
 
-assert (
-    chat_request().to_sampling_params(200_000, defaults).final_response_token_budget
-    == 131_072
-)
+chat_defaults = chat_request().to_sampling_params(200_000, defaults)
+assert chat_defaults.thinking_token_budget is None
+assert chat_defaults.final_response_token_budget is None
 assert (
     chat_request(final_response_token_budget=200_000)
     .to_sampling_params(200_000, defaults)
     .final_response_token_budget
-    == 131_072
+    == 200_000
 )
 assert (
     chat_request(final_response_token_budget=5)
@@ -107,7 +108,13 @@ assert (
     chat_request(final_response_token_budget=None)
     .to_sampling_params(200_000, defaults)
     .final_response_token_budget
-    == 131_072
+    is None
+)
+assert (
+    chat_request(thinking_token_budget=128)
+    .to_sampling_params(200_000, defaults)
+    .thinking_token_budget
+    == 128
 )
 
 
@@ -121,8 +128,8 @@ def responses_request(**kwargs) -> ResponsesRequest:
 
 
 responses_defaults = responses_request().to_sampling_params(200_000, defaults)
-assert responses_defaults.thinking_token_budget == 262_144
-assert responses_defaults.final_response_token_budget == 131_072
+assert responses_defaults.thinking_token_budget is None
+assert responses_defaults.final_response_token_budget is None
 responses_explicit = responses_request(
     thinking_token_budget=128,
     final_response_token_budget=5,
@@ -133,7 +140,7 @@ assert (
     responses_request(final_response_token_budget=200_000)
     .to_sampling_params(200_000, defaults)
     .final_response_token_budget
-    == 131_072
+    == 200_000
 )
 
 for invalid in (0, -2, True, 1.5):
@@ -152,8 +159,8 @@ from vllm.entrypoints.scale_out.token_in_token_out.protocol import GenerateReque
 completion = CompletionRequest(model="qwen3.8", prompt="test", kv_scope="agent")
 assert completion.max_tokens is None
 completion_params = completion.to_sampling_params(200_000, defaults)
-assert completion_params.thinking_token_budget == 262_144
-assert completion_params.final_response_token_budget == 131_072
+assert completion_params.thinking_token_budget is None
+assert completion_params.final_response_token_budget is None
 assert completion_params.top_p == 0.95 and completion_params.top_k == 20
 
 supplied = GenerateRequest.model_validate({
@@ -162,7 +169,8 @@ supplied = GenerateRequest.model_validate({
 resolved = supplied.to_sampling_params(200_000, defaults)
 assert resolved.max_tokens == 200_000 and resolved.min_tokens == 64
 assert resolved.top_p == 0.95 and resolved.top_k == 20
-assert resolved.final_response_token_budget == 131_072
+assert resolved.thinking_token_budget is None
+assert resolved.final_response_token_budget is None
 assert supplied.sampling_params == {"min_tokens": 64}
 
 rendered = GenerateRequest(
@@ -172,13 +180,30 @@ restored = GenerateRequest.model_validate_json(rendered.model_dump_json())
 assert restored.sampling_params["max_tokens"] == 16
 resolved = restored.to_sampling_params(16, defaults)
 assert resolved.max_tokens == 16 and resolved.top_p == 1.0 and resolved.top_k == 0
-assert resolved.final_response_token_budget == 131_072
+assert resolved.thinking_token_budget is None
+assert resolved.final_response_token_budget is None
 assert resolved.extra_args["kv_scope"] == "agent"
 
 policy = {**defaults, "presence_penalty": 0.3, "min_p": 0.01}
 for request in (chat_request(), responses_request(), completion, supplied):
     params = request.to_sampling_params(200_000, policy)
     for key, value in policy.items():
+        assert getattr(params, key) == value, (type(request).__name__, key)
+
+# The phase budgets remain a per-request capability on every generation
+# protocol: a request that sets both keeps both exactly as sent, and no
+# served ceiling lowers either.
+phase_budgets = {"thinking_token_budget": 128, "final_response_token_budget": 200_000}
+for request in (
+    chat_request(**phase_budgets),
+    responses_request(**phase_budgets),
+    CompletionRequest(model="qwen3.8", prompt="test", kv_scope="agent", **phase_budgets),
+    GenerateRequest.model_validate({
+        "token_ids": [1, 2, 3], "kv_scope": "agent", "sampling_params": phase_budgets,
+    }),
+):
+    params = request.to_sampling_params(200_000, defaults)
+    for key, value in phase_budgets.items():
         assert getattr(params, key) == value, (type(request).__name__, key)
 
 for request_type, prompt in (

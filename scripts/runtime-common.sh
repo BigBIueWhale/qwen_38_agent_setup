@@ -1007,7 +1007,6 @@ print_healthy_summary() {
   printf 'Image quality:  BF16 vision tower; <=30:1 proven aspect ratio; no request overrides\n'
   printf 'Thinking:      xhigh\n'
   printf 'Sampling:      explicit Qwen3.8 defaults; repetition penalty 1.0\n'
-  printf 'Phase ceilings: reasoning 262144; final response 131072 tokens\n'
   printf 'Runtime image: %s\n' "${EXPECTED_IMAGE_ID}"
   printf 'To stop it:    ./stop.sh\n'
 }

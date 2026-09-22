@@ -135,7 +135,7 @@ readonly ENGINE_PROTOCOL_PATCHED_FILE_SHA256="f43e54e057c509899c8718c79bc321ee6e
 # bytes from the model's own template through named stages, and
 # ./scripts/build-vllm.sh check refuses if it cannot reproduce them.
 readonly AGENT_CHAT_TEMPLATE_SHA256="07f545cd8ed9232f2b24d79010fad187f92e5b25b532448eb9017c0f8b8c2088"
-readonly PHASE_BUDGET_UNIT_SHA256="683f03a1bcf25ba06c34301e85caf6dc2f4841de207745ae96d73c822ba3a2d7"
+readonly PHASE_BUDGET_UNIT_SHA256="1de24bb85ef0fd13f888c65da9a9c4c3feba91e48d3f10af052ba4f5c4e0341c"
 readonly VISION_WORKSPACE_UNIT_SHA256="34f6ef1c477794de5e8b349c2da1dd491607a5618498358aa8b86085336a3df8"
 readonly VISION_CONTRACT_UNIT_SHA256="3cb64a1c0305ecedc9e16b7a3dd9c10bf6c5ec085e0a28ca8830feeadd01d140"
 readonly VISION_MLP_UNIT_SHA256="857ba547a099c6ba646210eb33dd7b159bf9a1972d1772ea396071c8d8e4f2e3"
@@ -144,7 +144,7 @@ readonly CHAT_TEMPLATE_RETENTION_UNIT_SHA256="d6d238478401e8c922e379044bbf3d90ca
 readonly QWEN38_CONTEXT_UNIT_SHA256="77696c508ea77ffa8e63eed616783b648656bd81612b7d763ebf4505fdd9f5b2"
 readonly NVFP4_KERNEL_UNIT_SHA256="2fce56060c9589d46e50371c8de456a6b9a65b906d95d9e3e1079cc70f790302"
 readonly REASONING_USAGE_UNIT_SHA256="464c663e52ad4d162c2ebb90b5703cf61bac106addef9d8e96d8db7b2001235f"
-readonly QWEN_GRAMMAR_UNIT_SHA256="0fc9a1ad79ef7140ff82271c521138377239b91ac1179ea1419311c56dc53e1e"
+readonly QWEN_GRAMMAR_UNIT_SHA256="0eb60bfc3f13e731c25cd44715e7bf5a5aeef6544aff0ec2d6a7e1dcef8ab55a"
 readonly TURBOQUANT_UPSTREAM_FILE_SHA256="48994be137f3d25d4ee4f79ba2b89b0a6c3d988085079ffea1d241a34c2c755f"
 readonly TOOL_SCHEMA_UPSTREAM_FILE_SHA256="015b989c567c6794e6dbbba72af88694470421adab13775c95b50efe9eedd2b7"
 readonly MODEL_CONFIG_UPSTREAM_FILE_SHA256="17c687232886184f0390f38fc1c2c8ae078eaf24ebd1960a6b0c6a0669a35a98"
@@ -271,7 +271,7 @@ VLLM_ARGS=(
   --chat-template-content-format openai
   --generation-config /model
   --override-generation-config
-  '{"temperature":1.0,"top_p":0.95,"top_k":20,"min_p":0.0,"presence_penalty":0.0,"repetition_penalty":1.0,"thinking_token_budget":262144,"final_response_token_budget":131072}'
+  '{"temperature":1.0,"top_p":0.95,"top_k":20,"min_p":0.0,"presence_penalty":0.0,"repetition_penalty":1.0}'
   --quantization compressed-tensors
   --dtype bfloat16
   --kv-cache-dtype turboquant_k8v4

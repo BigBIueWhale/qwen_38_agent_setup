@@ -391,30 +391,22 @@ for this Qwen3.8 checkpoint and is not treated as one.
 
 ## Separate budgets and the physical context window
 
-Qwen3.8 recommends a reasoning ceiling of 262,144 and a final-response ceiling of
-131,072 **within a one-million-token context deployment**. Those are phase ceilings,
-not a promise that 393,216 generated tokens fit inside this workstation's native
-262,144-token profile.
-
-This server defaults both ceilings explicitly across Chat Completions, Anthropic
-Messages, and Responses. Responses exposes validated vLLM extension fields for both
-budgets; omitted values inherit the server lock and the final ceiling cannot be raised
-or nulled out. Every request is also constrained
-by:
+This server serves no phase budget. Chat Completions, Completions, Responses and
+`/inference/v1/generate` accept `thinking_token_budget` and
+`final_response_token_budget` as validated per-request fields, and Anthropic Messages
+maps `thinking.budget_tokens` to the first; a request that sets one has it applied
+exactly as sent. Every request is constrained by:
 
 ```text
 prompt tokens + all generated tokens <= 262,144
 all generated tokens <= request max_tokens
-reasoning tokens <= 262,144
-visible final-response tokens <= 131,072
 ```
 
-Consequently, the effective budget is the minimum of the applicable limits and the
-remaining physical window. A client may lower the final-response ceiling but cannot
-raise or null out the server's 131,072 ceiling. A live request with a five-token final
-ceiling produced separated reasoning, exactly five final tokens according to the real
-served tokenizer, `finish_reason="length"`, and
-`stop_reason="final_response_token_budget"`.
+and by any phase budget the request itself sets. Consequently, the effective budget
+is the minimum of the applicable limits and the remaining physical window. A live
+request with a five-token final-response budget produced separated reasoning, exactly
+five final tokens according to the real served tokenizer, `finish_reason="length"`,
+and `stop_reason="final_response_token_budget"`.
 
 ## Bottom-line decisions
 

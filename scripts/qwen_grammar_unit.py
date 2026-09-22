@@ -362,8 +362,6 @@ defaults = {
     "min_p": 0.0,
     "presence_penalty": 0.0,
     "repetition_penalty": 1.0,
-    "thinking_token_budget": 262144,
-    "final_response_token_budget": 131072,
 }
 request = ChatCompletionRequest(
     model="qwen3.8",
@@ -378,8 +376,8 @@ assert sampling.min_p == 0.0
 assert sampling.presence_penalty == 0.0
 assert sampling.repetition_penalty == 1.0
 assert sampling.repetition_detection is None
-assert sampling.thinking_token_budget == 262144
-assert sampling.final_response_token_budget == 131072
+assert sampling.thinking_token_budget is None
+assert sampling.final_response_token_budget is None
 
 anthropic = AnthropicMessagesRequest(
     model="qwen3.8",

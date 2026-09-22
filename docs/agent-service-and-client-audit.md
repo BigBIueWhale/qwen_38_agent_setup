@@ -164,10 +164,7 @@ model proxy inside the network-none agent namespace.
             "repetition_penalty": 1.0
           },
           "extra_body": {
-            "parallel_tool_calls": false,
             "reasoning_effort": "xhigh",
-            "thinking_token_budget": 262144,
-            "final_response_token_budget": 131072,
             "chat_template_kwargs": {
               "enable_thinking": true,
               "reasoning_effort": "xhigh",
@@ -185,10 +182,8 @@ The sampling tuple declares no `max_tokens`, and the client refuses one. Every
 request carries the one limit the send path derives — the window's remainder
 after the rendered prompt — so a value here could only be a second bound on the
 same quantity, and one that names a single window at that: it would have to be
-rewritten by hand the day `max_model_len` moves. `thinking_token_budget` and
-`final_response_token_budget` are the server's own phase ceilings; the
-final-response half is the one bound a turn can meet before the window, and the
-server enforces it regardless. On the native 262,144-token profile prompt,
+rewritten by hand the day `max_model_len` moves. The fragment sends no phase
+budget, and the server serves none. On the native 262,144-token profile prompt,
 reasoning, tools, and final output always share the one physical window, which
 is what the shares divide.
 
@@ -219,19 +214,17 @@ The live project-owned Responses probe passed non-streaming and SSE tool selecti
 strict typed arguments, `function_call_output` continuation, xhigh reasoning,
 completed response events, and semantic transport equivalence. vLLM's request model
 accepts Codex's extra metadata and `reasoning.encrypted_content` include request.
-The v12 request model also applies the pinned `thinking_token_budget=262144` and
-`final_response_token_budget=131072` defaults to Responses requests. It accepts
-explicit smaller vLLM-extension values while retaining the server's final ceiling as
-a hard upper bound.
+The Responses request model accepts both phase budgets as validated vLLM-extension
+fields and applies a value a request sends exactly as sent; the server serves no
+phase budget of its own.
 
 That does **not** establish complete Codex compatibility. Current Codex's normal
-request struct does not send `max_output_tokens` and cannot lower the Qwen-specific
-phase budgets per request. The server now supplies and enforces both defaults, so
-omission no longer bypasses them; however, Codex may still ask for reasoning-summary/
-encrypted-content semantics designed for OpenAI models and has not been run
-end-to-end against this Qwen model's actual system prompt and complete tool palette.
-The server defaults prevent a silent sampling or phase-budget downgrade, but a
-branded client working against protocol probes is not enough for a correctness claim.
+request struct sends neither `max_output_tokens` nor the Qwen-specific phase
+budgets. Codex may still ask for reasoning-summary/encrypted-content semantics
+designed for OpenAI models and has not been run end-to-end against this Qwen
+model's actual system prompt and complete tool palette. The server's sampling
+defaults prevent a silent sampling downgrade, but a branded client working against
+protocol probes is not enough for a correctness claim.
 Codex remains a candidate for a future pinned Docker experiment, not the current
 recommendation.
 
@@ -263,8 +256,8 @@ The accepted Qwen Code contract is:
 2. the client container has no GPU, no Internet/DNS/default route, and reaches only
    the narrow model proxy; every published observer/API socket is loopback-only;
 3. model identity, 262,144 context, full-quality PNG vision, xhigh thinking,
-   all sampling parameters, both phase ceilings, and zero silent
-   retries/fallbacks are sealed into both client and server defaults;
+   all sampling parameters, and zero silent retries/fallbacks are sealed into
+   both client and server defaults;
 4. streamed and non-streamed tool turns have the same typed semantics, and complete
    tool-call/result history round-trips to identical model token IDs; partial deltas
    remain non-executable until the protocol's overall successful terminal, while
