@@ -32,8 +32,8 @@ if [[ "${base_id}" != "${EXPECTED_BASE_IMAGE_ID}" || \
 fi
 
 # The loaded runtime image carries only the version tag it was saved under,
-# which a later build of this version could take from it; it takes its identity
-# tag here, as it does where it was built.
+# which a later re-pin of this version moves to another image; it takes its
+# identity tag here, as it does where it was built, so it keeps a name.
 identity_tag_id="$(docker image inspect --format '{{.Id}}' "${IMAGE_IDENTITY_TAG}" 2>/dev/null || true)"
 if [[ -n "${identity_tag_id}" && "${identity_tag_id}" != "${EXPECTED_IMAGE_ID}" ]]; then
   die "The identity tag ${IMAGE_IDENTITY_TAG} already names ${identity_tag_id}; it was not moved."

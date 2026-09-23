@@ -257,6 +257,16 @@ cleanup_build_export() {
 trap cleanup_build_export EXIT
 RUNTIME_ARCHIVE="${BUILD_EXPORT_DIR}/runtime.tar"
 readonly RUNTIME_ARCHIVE
+# The build is loaded under a name of this run's own, never under IMAGE_TAG.
+# IMAGE_TAG names the pinned image, and a build loaded under it would take it
+# from that image before anything had compared the build with the pin: a build
+# that does not reproduce the pin would leave the pinned image untagged, looking
+# exactly like a failed build, and the tag on an image no lock pinned. The name
+# does not enter the image, so the ID is the same under any name. Once loaded,
+# the build is known by its ID and named by its identity tag, and this name is
+# removed.
+BUILD_LOAD_TAG="${IMAGE_TAG%%:*}:build-${BUILD_EXPORT_DIR##*.}"
+readonly BUILD_LOAD_TAG
 
 TURBOQUANT_PATCH_FILE="${PROJECT_DIR}/patches/vllm-turboquant-k8v4-direct-workspace.patch"
 TOOL_SCHEMA_PATCH_FILE="${PROJECT_DIR}/patches/vllm-enforce-auto-tool-schema.patch"
@@ -1177,14 +1187,27 @@ docker buildx build --progress=plain \
   --build-arg "TOKEN_ID_SCANNER_PATCHED_FILE_SHA256=${TOKEN_ID_SCANNER_PATCHED_FILE_SHA256}" \
   --build-arg "ENGINE_PROTOCOL_PATCHED_FILE_SHA256=${ENGINE_PROTOCOL_PATCHED_FILE_SHA256}" \
   --build-arg "SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH}" \
-  --output "type=docker,dest=${RUNTIME_ARCHIVE},name=${IMAGE_TAG},rewrite-timestamp=true" \
+  --output "type=docker,dest=${RUNTIME_ARCHIVE},name=${BUILD_LOAD_TAG},rewrite-timestamp=true" \
   --file "${DOCKERFILE}" \
   "${PROJECT_DIR}"
 docker load --input "${RUNTIME_ARCHIVE}"
 
-actual_image_id="$(docker image inspect --format '{{.Id}}' "${IMAGE_TAG}")"
+actual_image_id="$(docker image inspect --format '{{.Id}}' "${BUILD_LOAD_TAG}")"
+# The build takes the identity tag of its own ID before anything is checked, so
+# whatever the checks find, it keeps a name that says which image it is -- and
+# IMAGE_TAG, which the checks never touch, still names the pinned image. An
+# identity tag that already names another image is refused, never moved: it
+# carries that image's own ID, so that can only have been done by hand.
+actual_identity_tag="${IMAGE_IDENTITY_TAG_PREFIX}${actual_image_id#sha256:}"
+identity_tag_id="$(docker image inspect --format '{{.Id}}' "${actual_identity_tag}" 2>/dev/null || true)"
+if [[ -n "${identity_tag_id}" && "${identity_tag_id}" != "${actual_image_id}" ]]; then
+  echo "The identity tag ${actual_identity_tag} already names ${identity_tag_id}; it was not moved." >&2
+  exit 1
+fi
+docker tag "${actual_image_id}" "${actual_identity_tag}"
+docker image rm "${BUILD_LOAD_TAG}" >/dev/null
 actual_installed_report="$(
-  docker run --rm --network none --entrypoint sha256sum "${IMAGE_TAG}" \
+  docker run --rm --network none --entrypoint sha256sum "${actual_image_id}" \
     /usr/local/lib/python3.12/dist-packages/vllm/v1/attention/backends/turboquant_attn.py \
     /usr/local/lib/python3.12/dist-packages/vllm/v1/attention/ops/triton_turboquant_store.py \
     /usr/local/lib/python3.12/dist-packages/vllm/v1/attention/ops/triton_turboquant_decode.py \
@@ -1317,7 +1340,7 @@ if [[ "${actual_installed_report}" != "${expected_installed_report}" ]]; then
 fi
 
 additional_installed_report="$(
-  docker run --rm --network none --entrypoint sha256sum "${IMAGE_TAG}" \
+  docker run --rm --network none --entrypoint sha256sum "${actual_image_id}" \
     /usr/local/lib/python3.12/dist-packages/vllm/v1/worker/workspace.py \
     /usr/local/lib/python3.12/dist-packages/vllm/v1/worker/gpu_model_runner.py \
     /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/serve/utils/api_utils.py \
@@ -1364,7 +1387,7 @@ if [[ "${additional_installed_report}" != "${expected_additional_installed_repor
 fi
 
 kv_users_installed_report="$(
-  docker run --rm --network none --entrypoint sha256sum "${IMAGE_TAG}" \
+  docker run --rm --network none --entrypoint sha256sum "${actual_image_id}" \
     /usr/local/lib/python3.12/dist-packages/vllm/distributed/kv_transfer/kv_connector/v1/offloading_connector.py \
     /usr/local/lib/python3.12/dist-packages/vllm/v1/core/block_pool.py \
     /usr/local/lib/python3.12/dist-packages/vllm/v1/core/kv_cache_coordinator.py \
@@ -1439,7 +1462,7 @@ if [[ "${kv_users_installed_report}" != "${expected_kv_users_installed_report}" 
 fi
 
 reasoning_usage_installed_report="$(
-  docker run --rm --network none --entrypoint sha256sum "${IMAGE_TAG}" \
+  docker run --rm --network none --entrypoint sha256sum "${actual_image_id}" \
     /usr/local/lib/python3.12/dist-packages/vllm/parser/abstract_parser.py \
     /usr/local/lib/python3.12/dist-packages/vllm/parser/engine/adapters.py \
     /usr/local/lib/python3.12/dist-packages/vllm/parser/engine/events.py \
@@ -1474,7 +1497,7 @@ for obsolete in \
   /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/cpu/policies \
   /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/serve/utils/tool_calls_utils.py \
   /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/scale_out/token_in_token_out/mm_serde.py; do
-  if ! docker run --rm --network none --entrypoint test "${IMAGE_TAG}" '!' -e "${obsolete}"; then
+  if ! docker run --rm --network none --entrypoint test "${actual_image_id}" '!' -e "${obsolete}"; then
     printf 'Built image still contains superseded runtime code: %s\n' "${obsolete}" >&2
     exit 1
   fi
@@ -1482,7 +1505,7 @@ done
 
 actual_profile_label="$(
   docker image inspect --format '{{index .Config.Labels "qwen38.runtime.profile"}}' \
-    "${IMAGE_TAG}"
+    "${actual_image_id}"
 )"
 if [[ "${actual_profile_label}" != "${IMAGE_PROFILE_VERSION}" ]]; then
   echo "Built image carries the wrong runtime profile label." >&2
@@ -1495,19 +1518,13 @@ if [[ "${actual_image_id}" != "${EXPECTED_IMAGE_ID}" ]]; then
   echo "Reproducible build ID mismatch." >&2
   echo "Expected: ${EXPECTED_IMAGE_ID}" >&2
   echo "Found:    ${actual_image_id}" >&2
+  echo "The build is kept as ${actual_identity_tag}; ${IMAGE_TAG} was not moved." >&2
   exit 1
 fi
 
-# Only a build that reproduced the pin names the pinned image, so this is where
-# it takes its identity tag. One that already names another image is refused
-# rather than moved: the tag carries the image's own ID, so that can only have
-# been done by hand.
-identity_tag_id="$(docker image inspect --format '{{.Id}}' "${IMAGE_IDENTITY_TAG}" 2>/dev/null || true)"
-if [[ -n "${identity_tag_id}" && "${identity_tag_id}" != "${EXPECTED_IMAGE_ID}" ]]; then
-  echo "The identity tag ${IMAGE_IDENTITY_TAG} already names ${identity_tag_id}; it was not moved." >&2
-  exit 1
-fi
-docker tag "${EXPECTED_IMAGE_ID}" "${IMAGE_IDENTITY_TAG}"
+# The build reproduced the pin, so it is the pinned image, and this is the one
+# place IMAGE_TAG is moved.
+docker tag "${EXPECTED_IMAGE_ID}" "${IMAGE_TAG}"
 
 echo "Built ${IMAGE_TAG} with no build-time network access."
 echo "Verified reproducible image ID: ${actual_image_id}"

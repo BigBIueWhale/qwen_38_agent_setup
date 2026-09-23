@@ -356,22 +356,26 @@ Pinned build inputs and products:
 | Archive SHA-256 | c77ba706f884b74e92e3c8ec810cef76ac015e1abc053dac8c4154d1b5e13e92 |
 | Runtime Dockerfile SHA-256 | 5c0549ed855ffa7178afa1415680afdec3300e513ae3396eb3e0487db31665ce |
 | Docker context allowlist SHA-256 | 5b6b3c8e03cd9cdc3e8d48d8f4b30df98de4d1a6d2a0657484c24e295c4d7f50 |
-| Build verifier SHA-256 | 119839da20036c7cfe1d5bac5b47a7b864a9f297679dc7f3f120c95d05378924 |
+| Build verifier SHA-256 | 4eb82b3bb824e213c860c23e8b8e84df47f99f9db6741e86dfabc9be6f485f0e |
 | Runtime validator SHA-256 | 83b3498166066b095b5d9e3f5519476006c0986f2aa4e9be93702d464299f8ec |
-| Runtime lock SHA-256 | 621120457573be832c93c9fe5dd396d27cb25733ea7b118d7d28a46d2c5b5bcd |
+| Runtime lock SHA-256 | 43fec7d94ef35024f4fafcc6a25168f6e188447b03ffc992fdeb80d24057cab6 |
 
-The runtime tag is reused by every build of its version, and a build loads its
-image under that tag before comparing the image ID with the pin -- so a build
-that does not reproduce the pin takes the tag from the pinned image, which is
-then untagged and indistinguishable from a failed build. That has happened: the
-v23 tag on the machine that cut v23 names an image no lock ever pinned, while
-the pinned v23 image is untagged, and the first v19 image lost its tag when v19
-was re-pinned. So the pinned image also carries an identity tag,
-`IMAGE_IDENTITY_TAG` in [`config/runtime-v1.sh`](config/runtime-v1.sh): the release
-the archive is named for and the image itself, derived there from values the lock
-already holds. `./scripts/build-vllm.sh build` applies it once a build reproduces
-the pin and `./scripts/restore-images.sh` once it has proved what it loaded; an
-identity tag that already names another image is refused, never moved. Which of
+The runtime tag names the pinned image and nothing else. A build used to load its
+image under that tag before comparing the image ID with the pin, so a build that
+did not reproduce the pin took the tag from the pinned image, which was left
+untagged and indistinguishable from a failed build. That happened twice: the v23
+tag on the machine that cut v23 names an image no lock ever pinned, while the
+pinned v23 image is untagged, and the first v19 image lost its tag when v19 was
+re-pinned. Now `./scripts/build-vllm.sh build` loads its image under a name of
+the run's own, checks it by its ID, and moves the runtime tag only to a build
+that reproduced the pin; `./scripts/restore-images.sh` moves it only by loading
+the archive the lock pins. Every runtime image also carries an identity tag --
+the release its archive is named for and the image's own ID, derived in
+[`config/runtime-v1.sh`](config/runtime-v1.sh) from values the lock already holds:
+`IMAGE_IDENTITY_TAG` for the pinned image. A build that does not reproduce the pin
+is kept under its own identity tag and named in the refusal, and the pinned image
+keeps its identity tag when a re-pin moves the runtime tag on. An identity tag
+that already names another image is refused, never moved. Which of
 these images and archives a host keeps is decided by `agent_service`'s
 `./collect.sh`, where every session record and benchmark pass that references a
 backend release lives; its README states the policy.
