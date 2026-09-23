@@ -22,6 +22,16 @@ readonly BASE_IMAGE_TAG="qwen38-vllm:main-9df9b0b"
 readonly EXPECTED_BASE_IMAGE_ID="sha256:fa4a002a88b7043a1a89966dea8a500fe9696f84e75730d9da916f916048d401"
 readonly IMAGE_ARCHIVE_NAME="qwen38-vllm-images-runtime-v26.tar"
 readonly IMAGE_ARCHIVE_SHA256="c77ba706f884b74e92e3c8ec810cef76ac015e1abc053dac8c4154d1b5e13e92"
+# The identity tag the pinned runtime image also carries: the release its
+# archive is named for (runtime-vN) and the image itself. IMAGE_TAG is reused by
+# every build of this version, and a build that does not reproduce the pin takes
+# it from the pinned image, which is then untagged and looks exactly like a
+# failed build. This tag names one image, so a released image always keeps a
+# name. build-vllm.sh applies it once a build reproduces the pin, and
+# restore-images.sh once it has proved what it loaded; it is derived here, from
+# what this lock already holds, and nowhere else.
+readonly IMAGE_ARCHIVE_STEM="${IMAGE_ARCHIVE_NAME%.tar}"
+readonly IMAGE_IDENTITY_TAG="${IMAGE_TAG%%:*}:${IMAGE_ARCHIVE_STEM#qwen38-vllm-images-}-${EXPECTED_IMAGE_ID#sha256:}"
 
 readonly MODEL_DIR_NAME="Qwen3.8-27B-NVFP4-Corrected"
 readonly MODEL_REPOSITORY="unsloth/Qwen3.8-27B-NVFP4"

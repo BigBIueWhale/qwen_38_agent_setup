@@ -1498,5 +1498,17 @@ if [[ "${actual_image_id}" != "${EXPECTED_IMAGE_ID}" ]]; then
   exit 1
 fi
 
+# Only a build that reproduced the pin names the pinned image, so this is where
+# it takes its identity tag. One that already names another image is refused
+# rather than moved: the tag carries the image's own ID, so that can only have
+# been done by hand.
+identity_tag_id="$(docker image inspect --format '{{.Id}}' "${IMAGE_IDENTITY_TAG}" 2>/dev/null || true)"
+if [[ -n "${identity_tag_id}" && "${identity_tag_id}" != "${EXPECTED_IMAGE_ID}" ]]; then
+  echo "The identity tag ${IMAGE_IDENTITY_TAG} already names ${identity_tag_id}; it was not moved." >&2
+  exit 1
+fi
+docker tag "${EXPECTED_IMAGE_ID}" "${IMAGE_IDENTITY_TAG}"
+
 echo "Built ${IMAGE_TAG} with no build-time network access."
 echo "Verified reproducible image ID: ${actual_image_id}"
+echo "Identity tag: ${IMAGE_IDENTITY_TAG}"

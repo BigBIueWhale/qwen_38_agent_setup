@@ -31,6 +31,16 @@ if [[ "${base_id}" != "${EXPECTED_BASE_IMAGE_ID}" || \
     "Loaded runtime:   ${runtime_id}"
 fi
 
+# The loaded runtime image carries only the version tag it was saved under,
+# which a later build of this version could take from it; it takes its identity
+# tag here, as it does where it was built.
+identity_tag_id="$(docker image inspect --format '{{.Id}}' "${IMAGE_IDENTITY_TAG}" 2>/dev/null || true)"
+if [[ -n "${identity_tag_id}" && "${identity_tag_id}" != "${EXPECTED_IMAGE_ID}" ]]; then
+  die "The identity tag ${IMAGE_IDENTITY_TAG} already names ${identity_tag_id}; it was not moved."
+fi
+docker tag "${EXPECTED_IMAGE_ID}" "${IMAGE_IDENTITY_TAG}"
+
 printf '\nRESTORED — exact pinned images are available without a network pull.\n'
-printf 'Base:    %s\n' "${base_id}"
-printf 'Runtime: %s\n' "${runtime_id}"
+printf 'Base:     %s\n' "${base_id}"
+printf 'Runtime:  %s\n' "${runtime_id}"
+printf 'Identity: %s\n' "${IMAGE_IDENTITY_TAG}"

@@ -350,14 +350,31 @@ Pinned build inputs and products:
 | Immutable base ID | sha256:fa4a002a88b7043a1a89966dea8a500fe9696f84e75730d9da916f916048d401 |
 | Runtime tag | qwen38-vllm:qwen38-27b-nvfp4-k8v4-runtime-v26 |
 | Runtime ID | sha256:dcc869c00e726abd801d3217ef5acb9350e8e1044085ebc0fbcb6c5d8eac9210 |
+| Runtime identity tag | qwen38-vllm:runtime-v26-dcc869c00e726abd801d3217ef5acb9350e8e1044085ebc0fbcb6c5d8eac9210 |
 | Offline archive | artifacts/qwen38-vllm-images-runtime-v26.tar |
 | Archive size | 8,561,236,480 bytes, mode 0600 |
 | Archive SHA-256 | c77ba706f884b74e92e3c8ec810cef76ac015e1abc053dac8c4154d1b5e13e92 |
 | Runtime Dockerfile SHA-256 | 5c0549ed855ffa7178afa1415680afdec3300e513ae3396eb3e0487db31665ce |
 | Docker context allowlist SHA-256 | 5b6b3c8e03cd9cdc3e8d48d8f4b30df98de4d1a6d2a0657484c24e295c4d7f50 |
-| Build verifier SHA-256 | 3f532903372f5ba6f61178e990591bbcedf82394a666fe05821481c14ae547d2 |
+| Build verifier SHA-256 | 119839da20036c7cfe1d5bac5b47a7b864a9f297679dc7f3f120c95d05378924 |
 | Runtime validator SHA-256 | 83b3498166066b095b5d9e3f5519476006c0986f2aa4e9be93702d464299f8ec |
-| Runtime lock SHA-256 | ce4753e43a7c5d536e566850ed159b2860c6b4db1391dfd72db1780534723d40 |
+| Runtime lock SHA-256 | 621120457573be832c93c9fe5dd396d27cb25733ea7b118d7d28a46d2c5b5bcd |
+
+The runtime tag is reused by every build of its version, and a build loads its
+image under that tag before comparing the image ID with the pin -- so a build
+that does not reproduce the pin takes the tag from the pinned image, which is
+then untagged and indistinguishable from a failed build. That has happened: the
+v23 tag on the machine that cut v23 names an image no lock ever pinned, while
+the pinned v23 image is untagged, and the first v19 image lost its tag when v19
+was re-pinned. So the pinned image also carries an identity tag,
+`IMAGE_IDENTITY_TAG` in [`config/runtime-v1.sh`](config/runtime-v1.sh): the release
+the archive is named for and the image itself, derived there from values the lock
+already holds. `./scripts/build-vllm.sh build` applies it once a build reproduces
+the pin and `./scripts/restore-images.sh` once it has proved what it loaded; an
+identity tag that already names another image is refused, never moved. Which of
+these images and archives a host keeps is decided by `agent_service`'s
+`./collect.sh`, where every session record and benchmark pass that references a
+backend release lives; its README states the policy.
 
 Every reviewed runtime file, including both TurboQuant kernels, is copied and
 hash-checked against its upstream and patched identities. A CPU Triton-interpreter
