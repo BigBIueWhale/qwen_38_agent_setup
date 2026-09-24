@@ -29,17 +29,23 @@
 #   cgroupns  must be reported, with no attributes: every container gets a
 #             private cgroup namespace by default.
 #
-# Those three are the only daemon-wide modes the deployment was verified under,
-# so every other option a daemon can report is refused by name:
+# Every other daemon-wide mode a daemon can report is judged by one principle:
+# a mode that can only add a restriction the deployment's containers already
+# impose is acceptable; a mode that changes the model the stack runs under is
+# not.
 #
-#   userns             remaps every container UID and GID that the deployment's
-#                      socket and file-ownership contracts name;
-#   rootless           replaces the rootful system daemon those contracts name;
-#   selinux            labels containers under a policy that none of the
-#                      deployment's mounts is labelled for;
-#   no-new-privileges  sets the flag daemon-wide. Every container already sets
-#                      it and is verified with it, and no verified host ever
-#                      ran the daemon-wide mode.
+#   no-new-privileges  accepted, with no attributes. It is hardening: it sets
+#                      the flag on every container by default, every container
+#                      already sets it itself and is verified with it, and it
+#                      cannot weaken any property above.
+#   userns             refused: it changes the uid and gid mapping that every
+#                      socket and file-ownership contract is stated in.
+#   rootless           refused: it replaces the rootful system daemon, and with
+#                      it the control socket and the mount and network model
+#                      the stack is built on.
+#   selinux            refused: it changes the LSM in force, from the AppArmor
+#                      the containers are verified under to a policy none of
+#                      the deployment's mounts is labelled for.
 #
 # An option name or attribute the rule does not know, a name reported twice,
 # and a report that is not a JSON array of plain strings cannot be interpreted.
@@ -64,7 +70,7 @@ host_isolation_refusals() {
   local grammar='^[a-z][a-z0-9-]*=[^,=]+(,[a-z][a-z0-9-]*=[^,=]+)*$'
   local unknown_required='every option and attribute Docker reports is one this rule interprets; nothing unknown passes'
   local unknown_next='find out from the Docker Engine documentation which daemon setting produces it, then remove that setting and restart Docker, or extend scripts/host-isolation.sh to interpret it, identically in agent_service and Qwen_best_model_ever'
-  local excluded_required='absent: the deployment is verified only under the daemon-wide modes apparmor, seccomp and cgroupns'
+  local excluded_required='absent: a daemon-wide mode that changes the model the stack runs under is refused; only one that adds a restriction the containers already impose is accepted'
   local apparmor_required='AppArmor enabled with the default profile: name=apparmor, with profile=default wherever a profile is reported'
   local apparmor_next='remove the "apparmor-profile" setting from /etc/docker/daemon.json (or --apparmor-profile from the dockerd command line) and restart Docker'
   local seccomp_required="seccomp in force with the daemon's builtin profile: name=seccomp,profile=builtin"
@@ -148,36 +154,30 @@ host_isolation_refusals() {
           profiles["${name}"]="${attributes[profile]}"
         fi
         ;;
-      cgroupns)
+      cgroupns | no-new-privileges)
         for key in "${!attributes[@]}"; do
           refusals+=("$(host_isolation_refusal \
-            "Docker reports cgroupns with an attribute this rule does not know: ${key}." \
+            "Docker reports ${name} with an attribute this rule does not know: ${key}." \
             "${unknown_required}" "${option}" "${unknown_next}")")
         done
         ;;
       userns)
         refusals+=("$(host_isolation_refusal \
-          "The daemon remaps container users and groups (userns-remap), which moves every UID and GID the deployment's socket and file-ownership contracts name." \
+          "The daemon remaps container users and groups (userns-remap), which changes the uid and gid mapping every socket and file-ownership contract of the deployment is stated in." \
           "${excluded_required}" "${option}" \
           'remove the "userns-remap" setting from /etc/docker/daemon.json (or --userns-remap from the dockerd command line) and restart Docker')")
         ;;
       rootless)
         refusals+=("$(host_isolation_refusal \
-          "The Docker daemon runs rootless, and the deployment's socket and file-ownership contracts name the rootful system daemon." \
+          "The Docker daemon runs rootless, which replaces the rootful system daemon the stack is built on: its control socket, and its mount and network model." \
           "${excluded_required}" "${option}" \
           'point the docker CLI at the system daemon: unset DOCKER_HOST and run docker context use default')")
         ;;
       selinux)
         refusals+=("$(host_isolation_refusal \
-          "The daemon labels containers for SELinux (selinux-enabled), and none of the deployment's mounts is labelled for it." \
+          "The daemon labels containers for SELinux (selinux-enabled), which changes the LSM in force from the AppArmor the containers are verified under to a policy none of the deployment's mounts is labelled for." \
           "${excluded_required}" "${option}" \
           'remove the "selinux-enabled" setting from /etc/docker/daemon.json (or --selinux-enabled from the dockerd command line) and restart Docker')")
-        ;;
-      no-new-privileges)
-        refusals+=("$(host_isolation_refusal \
-          'The daemon sets no-new-privileges on every container by default, a daemon-wide mode no verified host ran; each container already sets and verifies the flag itself.' \
-          "${excluded_required}" "${option}" \
-          'remove the "no-new-privileges" setting from /etc/docker/daemon.json (or --no-new-privileges from the dockerd command line) and restart Docker')")
         ;;
     esac
   done
@@ -257,6 +257,12 @@ host_isolation_cases() {
     accept '["name=apparmor,profile=default","name=seccomp,profile=builtin","name=cgroupns"]' ''
     # Order carries no meaning, neither of options nor of attributes.
     accept '["name=cgroupns","profile=builtin,name=seccomp","name=apparmor,profile=default"]' ''
+    # A daemon-wide no-new-privileges only adds a restriction every container
+    # already imposes. It never stands in for a required property, and it
+    # carries no attributes.
+    accept '["name=apparmor,profile=default","name=seccomp,profile=builtin","name=cgroupns","name=no-new-privileges"]' ''
+    refuse '["name=apparmor","name=seccomp,profile=unconfined","name=cgroupns","name=no-new-privileges"]' 'seccomp is disabled'
+    refuse '["name=apparmor","name=seccomp,profile=builtin","name=cgroupns","name=no-new-privileges,mode=all"]' 'no-new-privileges with an attribute this rule does not know: mode'
     refuse '["name=apparmor","name=seccomp,profile=unconfined","name=cgroupns"]' 'seccomp is disabled'
     refuse '["name=apparmor","name=seccomp,profile=/etc/docker/seccomp.json","name=cgroupns"]' 'seccomp applies a substituted profile'
     refuse '["name=apparmor","name=seccomp","name=cgroupns"]' 'seccomp is reported without a profile'
@@ -272,7 +278,6 @@ host_isolation_cases() {
     refuse '["name=apparmor","name=seccomp,profile=builtin","name=cgroupns","name=userns"]' 'userns-remap'
     refuse '["name=apparmor","name=seccomp,profile=builtin","name=cgroupns","name=rootless"]' 'runs rootless'
     refuse '["name=apparmor","name=seccomp,profile=builtin","name=cgroupns","name=selinux"]' 'SELinux'
-    refuse '["name=apparmor","name=seccomp,profile=builtin","name=cgroupns","name=no-new-privileges"]' 'no-new-privileges on every container'
     refuse '["apparmor","name=seccomp,profile=builtin","name=cgroupns"]' 'not a list of key=value attributes'
     refuse '["name=apparmor","name=seccomp,profile=","name=cgroupns"]' 'not a list of key=value attributes'
     refuse '["name=apparmor","name=seccomp,profile=builtin","name=cgroupns,"]' 'not a list of key=value attributes'

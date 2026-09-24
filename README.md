@@ -1266,9 +1266,11 @@ more correct.
 The isolation rule is one file that agent_service carries byte-identically. It
 parses `docker info` SecurityOptions into names and attributes and requires
 AppArmor with the default profile, seccomp with the builtin profile, and a
-private cgroup namespace. Any other daemon-wide option, and anything it cannot
-interpret, is refused with the failed property, the requirement, the report,
-and the next action. It asserts properties rather than a string, so Docker
+private cgroup namespace. A daemon-wide mode that can only add a restriction
+the containers already impose (`no-new-privileges`) is accepted; one that
+changes the model the stack runs under (`userns`, `rootless`, `selinux`), and
+anything the rule cannot interpret, is refused with the failed property, the
+requirement, the report, and the next action. It asserts properties rather than a string, so Docker
 29.7.2, which reports `name=apparmor`, and Docker 29.8.1, which reports
 `name=apparmor,profile=default`, both pass, and no Docker or containerd version
 is pinned.
