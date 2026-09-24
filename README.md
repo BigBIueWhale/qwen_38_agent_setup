@@ -357,8 +357,8 @@ Pinned build inputs and products:
 | Runtime Dockerfile SHA-256 | 5c0549ed855ffa7178afa1415680afdec3300e513ae3396eb3e0487db31665ce |
 | Docker context allowlist SHA-256 | 5b6b3c8e03cd9cdc3e8d48d8f4b30df98de4d1a6d2a0657484c24e295c4d7f50 |
 | Build verifier SHA-256 | 4eb82b3bb824e213c860c23e8b8e84df47f99f9db6741e86dfabc9be6f485f0e |
-| Runtime validator SHA-256 | 83b3498166066b095b5d9e3f5519476006c0986f2aa4e9be93702d464299f8ec |
-| Runtime lock SHA-256 | 43fec7d94ef35024f4fafcc6a25168f6e188447b03ffc992fdeb80d24057cab6 |
+| Runtime validator SHA-256 | 97aa532add98deeb090264e2b625865571fb07e6795a559b6400b5c59b78a009 |
+| Runtime lock SHA-256 | 2a6eb6f95bae81f46f76f371e6accf0d9d6e4044cadcdd7bd472cd1ad7f3c10e |
 
 The runtime tag names the pinned image and nothing else. A build used to load its
 image under that tag before comparing the image ID with the pin, so a build that
@@ -1255,12 +1255,23 @@ container through the isolated service into this pinned vLLM backend.
 ### Software/hardware record and the host contract
 
 Host requirements are functional, not identity pins: the invoked tools must
-exist, Docker must respond with its NVIDIA runtime and the
-apparmor/seccomp/cgroupns isolation features active, and exactly one GPU with
-at least 32,607 MiB — the calibration floor of the locked VRAM/KV budget —
-must be present. Exact host software versions, binary hashes, and GPU/driver
-identity are deliberately not asserted; pinning them tied the deployment to
-one specific computer without making inference any more correct.
+exist, Docker must respond with its NVIDIA runtime, the daemon must report the
+container isolation [`scripts/host-isolation.sh`](scripts/host-isolation.sh)
+requires, and exactly one GPU with at least 32,607 MiB — the calibration floor
+of the locked VRAM/KV budget — must be present. Exact host software versions,
+binary hashes, and GPU/driver identity are deliberately not asserted; pinning
+them tied the deployment to one specific computer without making inference any
+more correct.
+
+The isolation rule is one file that agent_service carries byte-identically. It
+parses `docker info` SecurityOptions into names and attributes and requires
+AppArmor with the default profile, seccomp with the builtin profile, and a
+private cgroup namespace. Any other daemon-wide option, and anything it cannot
+interpret, is refused with the failed property, the requirement, the report,
+and the next action. It asserts properties rather than a string, so Docker
+29.7.2, which reports `name=apparmor`, and Docker 29.8.1, which reports
+`name=apparmor,profile=default`, both pass, and no Docker or containerd version
+is pinned.
 
 Everything inside the pinned images remains exact. The container runtime
 record is:

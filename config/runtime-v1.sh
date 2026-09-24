@@ -87,7 +87,7 @@ readonly SOURCE_PATCH_MANIFEST_SHA256="d968c65a60c87b8e0f6258d5f9300921505c520c8
 # was added — the validator then refused a correct manifest. Every consumer
 # (build-vllm.sh, runtime-common.sh, generate-deployment-input-manifest.sh)
 # reads this declaration.
-readonly DEPLOYMENT_INPUT_FILE_COUNT="114"
+readonly DEPLOYMENT_INPUT_FILE_COUNT="115"
 readonly TURBOQUANT_PATCHED_FILE_SHA256="ccda36577e4fb0052f370169dce4b649bad890b8b440a82e584acd3dd92a6d86"
 readonly TURBOQUANT_STORE_PATCHED_FILE_SHA256="298645bff68c6adab58261862602b86e7e714c3552a9fd89102d9ccd2b83e9f7"
 readonly TURBOQUANT_DECODE_PATCHED_FILE_SHA256="dab8b65ab7ddd6582de16e1fc7b1360ab0061b4a2a2b114f5d87ea0532fd726f"
@@ -225,10 +225,12 @@ readonly DOCKERIGNORE_SHA256="5b6b3c8e03cd9cdc3e8d48d8f4b30df98de4d1a6d2a0657484
 # Functional host contract only. Exact host software versions, binary
 # hashes, and GPU/driver identity are deliberately not pinned: they tie the
 # deployment to one specific computer without making inference any more
-# correct. The isolation features below and the GPU-memory calibration floor
-# for the locked VRAM budget are the properties the profile actually
-# depends on; everything inside the pinned images remains exact.
-readonly EXPECTED_DOCKER_SECURITY_OPTIONS='["name=apparmor","name=seccomp,profile=builtin","name=cgroupns"]'
+# correct. The AppArmor profile every container is verified to run under and
+# the GPU-memory calibration floor for the locked VRAM budget are the
+# properties the profile actually depends on; what the Docker daemon must
+# report about container isolation is the rule in scripts/host-isolation.sh,
+# asserted against the live daemon. Everything inside the pinned images
+# remains exact.
 readonly EXPECTED_CONTAINER_APPARMOR_PROFILE="docker-default"
 readonly MINIMUM_GPU_MEMORY_MIB="32607"
 

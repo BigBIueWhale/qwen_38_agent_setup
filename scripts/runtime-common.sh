@@ -4,6 +4,8 @@ COMMON_SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(cd -- "${COMMON_SCRIPT_DIR}/.." && pwd)"
 # shellcheck source=../config/runtime-v1.sh
 source "${PROJECT_DIR}/config/runtime-v1.sh"
+# shellcheck source=host-isolation.sh
+source "${COMMON_SCRIPT_DIR}/host-isolation.sh"
 readonly COMMON_SCRIPT_DIR PROJECT_DIR
 readonly MODEL_DIR="${PROJECT_DIR}/${MODEL_DIR_NAME}"
 readonly MODEL_MANIFEST="${PROJECT_DIR}/manifests/${MODEL_MANIFEST_NAME}"
@@ -76,13 +78,15 @@ capture_child_wait_status() {
 check_host_prerequisites() {
   # Functional requirements only. The tools this deployment actually invokes
   # must exist, Docker must respond with its NVIDIA runtime configured, the
-  # container-isolation features the profile depends on must be active, and
-  # exactly one GPU with at least the memory the locked KV/VRAM budget was
-  # calibrated for must be present. Exact host software versions, binary
-  # hashes, and GPU/driver identity are deliberately not asserted: they tie
-  # the deployment to one specific computer without making inference any
-  # more correct. Everything inside the pinned images remains exact.
-  local command_name docker_server runtimes
+  # daemon must report the container isolation the profile depends on, as
+  # scripts/host-isolation.sh states it -- the one rule agent_service carries
+  # byte-identically -- and exactly one GPU with at least the memory the
+  # locked KV/VRAM budget was calibrated for must be present. Exact host
+  # software versions, binary hashes, and GPU/driver identity are
+  # deliberately not asserted: they tie the deployment to one specific
+  # computer without making inference any more correct. Everything inside the
+  # pinned images remains exact.
+  local command_name docker_server security_options isolation_refusals runtimes
   local gpu_report gpu_count gpu_memory
   for command_name in docker git nvidia-smi sha256sum ss; do
     require_command "${command_name}"
@@ -91,9 +95,13 @@ check_host_prerequisites() {
   docker_server="$(docker version --format '{{.Server.Version}}')" ||
     die "Docker server is not responding."
   [[ -n "${docker_server}" ]] || die "Docker server reported an empty version."
-  require_equal "Docker security options" \
-    "$(docker info --format '{{json .SecurityOptions}}')" \
-    "${EXPECTED_DOCKER_SECURITY_OPTIONS}"
+  security_options="$(docker info --format '{{json .SecurityOptions}}')" ||
+    die "Docker did not report its security options." \
+      "Next: run docker info to see the daemon's error, repair the daemon, and rerun."
+  if ! isolation_refusals="$(host_isolation_refusals "${security_options}")"; then
+    die "This host does not provide the container isolation the deployment requires." \
+      "${isolation_refusals}"
+  fi
 
   runtimes="$(docker info --format '{{json .Runtimes}}')"
   if [[ "${runtimes}" != *'"nvidia"'* ]]; then

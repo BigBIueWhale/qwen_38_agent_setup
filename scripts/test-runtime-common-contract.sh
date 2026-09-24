@@ -20,6 +20,9 @@ required_functions=(
   check_host_prerequisites
   check_pinned_build_inputs
   assert_running_profile
+  host_isolation_refusal
+  host_isolation_refusals
+  host_isolation_cases
 )
 for required_function in "${required_functions[@]}"; do
   declare -F "${required_function}" >/dev/null || {
@@ -90,4 +93,103 @@ fi
   exit 1
 }
 
-printf 'RUNTIME_COMMON_CONTRACT_OK functions=%s\n' "${#required_functions[@]}"
+# The host check as run-agent.sh runs it, with Docker's reported security
+# options replaced by the given report. The other host facts it reads are
+# faked to a host that satisfies them, and a command it only requires to exist
+# refuses loudly if it is ever invoked. This runs inside the pinned base image,
+# which carries none of these host tools.
+host_isolation_check_on() (
+  # Named apart from the check's own locals: bash scopes dynamically, so the
+  # fake must not read a variable the check itself declares.
+  local fake_security_options="$1"
+  docker() {
+    case "$*" in
+      "version --format {{.Server.Version}}")
+        printf '%s\n' 29.8.1
+        ;;
+      "info --format {{json .SecurityOptions}}")
+        printf '%s\n' "${fake_security_options}"
+        ;;
+      "info --format {{json .Runtimes}}")
+        printf '%s\n' '{"nvidia":{"path":"nvidia-container-runtime"},"runc":{"path":"runc"}}'
+        ;;
+      *)
+        printf 'unexpected fake Docker invocation: %q' "$1" >&2
+        printf ' %q' "${@:2}" >&2
+        printf '\n' >&2
+        return 97
+        ;;
+    esac
+  }
+  nvidia-smi() {
+    [[ "$*" == '--query-gpu=memory.total --format=csv,noheader,nounits' ]] || {
+      printf 'unexpected fake nvidia-smi invocation: %s\n' "$*" >&2
+      return 97
+    }
+    printf '%s\n' "${MINIMUM_GPU_MEMORY_MIB}"
+  }
+  # git and ss only have to exist; these bodies run only if the check misuses
+  # them.
+  # shellcheck disable=SC2317
+  git() {
+    printf 'the host check must not invoke git: %s\n' "$*" >&2
+    return 97
+  }
+  # shellcheck disable=SC2317
+  ss() {
+    printf 'the host check must not invoke ss: %s\n' "$*" >&2
+    return 97
+  }
+  check_host_prerequisites
+)
+
+# Every case of the host-isolation rule's own corpus -- the file agent_service
+# carries byte-identically -- goes through the real host check: each accepted
+# report passes silently, and each refused one exits with a refusal naming the
+# failed property, what is required, what was reported, and a next action.
+host_isolation_accepted=0
+host_isolation_refused=0
+while IFS=$'\x1f' read -r verdict report fragment; do
+  if isolation_output="$(host_isolation_check_on "${report}" 2>&1)"; then
+    isolation_status=0
+  else
+    isolation_status=$?
+  fi
+  case "${verdict}" in
+    accept)
+      [[ "${isolation_status}" == 0 && -z "${isolation_output}" ]] || {
+        printf 'ERROR: the host check refused an accepted report %s (exit %s):\n%s\n' \
+          "${report}" "${isolation_status}" "${isolation_output}" >&2
+        exit 1
+      }
+      host_isolation_accepted=$((host_isolation_accepted + 1))
+      ;;
+    refuse)
+      [[ "${isolation_status}" == 1 && \
+         "${isolation_output}" == *'ERROR: This host does not provide the container isolation the deployment requires.'* && \
+         "${isolation_output}" == *"Docker reports these security options: ${report:-<nothing>}"* && \
+         "${isolation_output}" == *"${fragment}"* && \
+         "${isolation_output}" == *'  Required: '* && \
+         "${isolation_output}" == *'  Reported: '* && \
+         "${isolation_output}" == *'  Next:     '* && \
+         "${isolation_output}" == *'Nothing was silently substituted.'* ]] || {
+        printf 'ERROR: the host check did not refuse %s with "%s" (exit %s):\n%s\n' \
+          "${report:-<nothing>}" "${fragment}" "${isolation_status}" "${isolation_output}" >&2
+        exit 1
+      }
+      host_isolation_refused=$((host_isolation_refused + 1))
+      ;;
+    *)
+      printf 'ERROR: host-isolation case has no verdict: %q\n' "${verdict}" >&2
+      exit 1
+      ;;
+  esac
+done < <(host_isolation_cases)
+((host_isolation_accepted > 0 && host_isolation_refused > 0)) || {
+  printf 'ERROR: the host-isolation corpus yielded %s accepted and %s refused cases.\n' \
+    "${host_isolation_accepted}" "${host_isolation_refused}" >&2
+  exit 1
+}
+
+printf 'RUNTIME_COMMON_CONTRACT_OK functions=%s host-isolation=%s-accepted-%s-refused\n' \
+  "${#required_functions[@]}" "${host_isolation_accepted}" "${host_isolation_refused}"
