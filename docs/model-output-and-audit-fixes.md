@@ -166,8 +166,29 @@ ends and the value begins is settled by the canonical-framing stage below.
 
 The shared parser also removes its batch-only content-stripping setting and all
 consumers of that setting. Nonempty content around calls now retains the same
-bytes on both transports; the existing whitespace-only gap normalization remains.
+bytes on both transports. Ordinary content also survives when it consists only
+of whitespace, including text before, between and after tool calls and text
+produced without fulfilling a required or named tool choice. The shared engine
+and delegating parser have no content whitespace deletion policy; tool framing
+and tool event ordering remain grammar responsibilities.
 Four newly modified parser configurations join the full image provenance cascade.
+
+Source-only record-completeness verification (2026-09-26): a generation with
+` \t` before two calls, `\n\n` between them and `\r\n` afterward retains all six
+content characters. The baseline loses them in batch and streaming; required
+and named choices also lose a whitespace-only answer when no call is produced.
+The shared engine, its configuration consumers and the delegating boundary now
+preserve those bytes. The replay fixtures assert the literal scenario content
+instead of deleting its whitespace from the expected result. The focused corpus
+has 11 failures against the baseline and passes with the source change; the full
+parser corpus passes 4,255 tests with 27 existing skips. The installed-overlay
+CPU parser unit passes all 16 tests. All 185 final source identities match a fresh
+reconstruction through the existing 35 stages. These are offline CPU source
+checks in the pinned base image, with no image build, model call or release.
+The backend fix reaches agent_service and direct Chat, Responses and Anthropic
+callers through their shared parser, without a request flag or client repair.
+The unmanaged live source tree and runtime image still require the owner's
+separate materialisation and release steps.
 
 Validation: 3,954 offline parser tests pass. The previous runtime fails 101 focused
 controls, with 20 unaffected controls passing. The source tests cover multiple

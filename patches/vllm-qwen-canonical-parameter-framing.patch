@@ -120,7 +120,7 @@ diff --git a/tests/parser/engine/test_qwen3.py b/tests/parser/engine/test_qwen3.
 diff --git a/tests/parser/engine/test_qwen_xml_fidelity.py b/tests/parser/engine/test_qwen_xml_fidelity.py
 --- a/tests/parser/engine/test_qwen_xml_fidelity.py
 +++ b/tests/parser/engine/test_qwen_xml_fidelity.py
-@@ -78,7 +78,7 @@
+@@ -113,7 +113,7 @@
  @pytest.mark.parametrize('value', VALUES)
  def test_parameter_string_bytes_survive_every_transport_cut(value, chunk_size):
      text = ('plan\n</think>\n before \t\n<tool_call>\n<function=write>\n'
@@ -129,7 +129,7 @@ diff --git a/tests/parser/engine/test_qwen_xml_fidelity.py b/tests/parser/engine
      reasoning, content, calls = parse(text, chunk_size)
      assert reasoning == 'plan\n'
      assert content == '\n before \t\n\n after \t\n'
-@@ -89,10 +89,33 @@
+@@ -124,10 +124,33 @@
  @pytest.mark.parametrize('chunk_size', [None, 1, 3, 13])
  @pytest.mark.parametrize('value', VALUES)
  def test_partial_string_diagnostic_preserves_raw_value_bytes(value, chunk_size):

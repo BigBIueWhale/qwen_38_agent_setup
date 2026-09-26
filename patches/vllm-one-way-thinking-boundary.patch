@@ -296,7 +296,7 @@ diff --git a/vllm/parser/engine/adapters.py b/vllm/parser/engine/adapters.py
 diff --git a/vllm/parser/engine/parser_engine.py b/vllm/parser/engine/parser_engine.py
 --- a/vllm/parser/engine/parser_engine.py
 +++ b/vllm/parser/engine/parser_engine.py
-@@ -651,8 +651,13 @@
+@@ -636,8 +636,13 @@
          events = self._feed(delta_text, delta_token_ids)
          return self._strip_trailing_reasoning(self._events_to_delta(events))
  

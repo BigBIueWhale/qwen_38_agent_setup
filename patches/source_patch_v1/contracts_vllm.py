@@ -2245,16 +2245,23 @@ def _validate_xml_fidelity_after(state: State) -> None:
     for path in ("vllm/parser/engine/parser_engine.py",
                  "vllm/parser/engine/parser_engine_config.py",
                  "vllm/parser/deepseek_v32.py", "vllm/parser/deepseek_v4.py",
-                 "vllm/parser/inkling.py", "vllm/parser/kimi_k2.py"):
+                 "vllm/parser/inkling.py", "vllm/parser/kimi_k2.py",
+                 "vllm/parser/mistral.py"):
         forbid_text(state, path, "strip_content_whitespace_with_tools", label=label)
         forbid_text(state, path, "_strip_content_ws_with_tools", label=label)
-    _require_in_symbol(state, "vllm/parser/engine/parser_engine.py",
-        "ParserEngine._strip_content_whitespace", (
-            "and not content.strip()", 'content = ""', "return content or None",
-        ), label=label)
+        forbid_text(state, path, "drop_whitespace_only_content_before_tools", label=label)
+        forbid_text(state, path, "_strip_content_whitespace", label=label)
+        forbid_text(state, path, "_content_has_nonws", label=label)
+    delegating = "vllm/parser/abstract_parser.py"
+    forbid_text(state, delegating, 'if content and content.strip() == "":', label=label)
+    _require_in_symbol(state, delegating, "DelegatingParser._extract_tool_calls", (
+        "content = tool_call_info.content", "return [], content",
+    ), label=label)
     require_python_symbols(state, "tests/parser/engine/test_qwen_xml_fidelity.py", {
         "test_parameter_string_bytes_survive_every_transport_cut": None,
         "test_partial_string_diagnostic_preserves_raw_value_bytes": None,
+        "test_content_around_tool_calls_is_verbatim": None,
+        "test_whitespace_without_a_call_survives_tool_choice": None,
     }, label=label)
 
 
@@ -2756,11 +2763,12 @@ CONTRACTS: Mapping[str, SemanticContract] = {
     "xml-text-fidelity": SemanticContract(
         rationale=(
             "Whitespace inside an XML string is its value. Preserve those bytes "
-            "and surrounding nonempty content on both transports; remove "
-            "converter padding removal and the batch-only stripping setting."
+            "and all surrounding content on both transports, including "
+            "whitespace-only text and unfulfilled tool choices. Shared parsing "
+            "and delegation retain content without a whitespace deletion mode."
         ),
         removal_condition=(
-            "Remove when upstream preserves exact XML string and nonempty "
+            "Remove when upstream preserves exact XML string and all "
             "content bytes on both transports without a stripping mode."
         ),
         validate_before=_validate_xml_fidelity_before,

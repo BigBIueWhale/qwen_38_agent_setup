@@ -73177,13 +73177,13 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'review_after': ''})},
  {'name': 'xml-text-fidelity',
   'review_patch': 'patches/vllm-xml-text-fidelity.patch',
-  'review_sha256': '999d6f471a4f480f5fd93b087c17c463417a8080206e952f3686510d57c9abd6',
+  'review_sha256': '73e973029f05bd88e5faa7bc1f5a38bac75ef5afcd562981be0961c3b830c6ab',
   'files': ({'path': 'tests/parser/engine/test_qwen3.py',
              'before_sha256': 'ff2bab0e9fdafc5a9ac8b2cf3b74b760cc8668a387caf7dd749ca1f8edc730d6',
              'after_sha256': '0f01de04b2c7290acaf9e3fb509704589d853bb625bbe67d78dfb5b5d28e9452'},
             {'path': 'tests/parser/engine/test_qwen_xml_fidelity.py',
              'before_sha256': None,
-             'after_sha256': 'd65437f8236830dba29225e527962f795e40402a6630d418d50bb56a730677bb'},
+             'after_sha256': '2d41c84835a4ae718cf573e8a2f8f5ebe14df1282aab4b1491ed6abd70d5eb37'},
             {'path': 'vllm/parser/deepseek_v32.py',
              'before_sha256': 'e5111aa22cc318028235812e950ed888150270d7d04014395e8f7c4b2d9f9ffb',
              'after_sha256': 'bab71ef8451d24679b7b2a5b0e4b335ef67a691b674767d5cdc5c03df2aeb637'},
@@ -73192,19 +73192,31 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'after_sha256': '1f4b3ad07d6fbed70024db07125296121a454f6a0eb68e32118913a31e4c7899'},
             {'path': 'vllm/parser/engine/parser_engine.py',
              'before_sha256': '163224e7847cbd29bce9e291adfc4f307aace7109f52fbfd671a1b645cb9542a',
-             'after_sha256': '183bc34df3a83e71931599e8d629ab8d58290557b197942a799489449c49db1f'},
+             'after_sha256': 'c53202173f916b09db41122e95055999e11d578401e1809b27f308f86f72bcc5'},
             {'path': 'vllm/parser/engine/parser_engine_config.py',
              'before_sha256': 'f746ba34d2b7606037d4229529e97da019bed0abda83b5f62f98559db613a233',
-             'after_sha256': '357bf8876536e1a093d4c6d6de87d00bbc113ae9bc22440fa021c983ee64cf64'},
+             'after_sha256': 'a5b3aec530efe97e210f3c75fd158f014203d837322ab7f4fceedbb80e07c7d5'},
             {'path': 'vllm/parser/inkling.py',
              'before_sha256': 'cb2f269ebd08698105ed895906b6d0d95e6539dea7959cbf138ff51cfd572ee7',
-             'after_sha256': 'd2f1039bc8a7ff164f925c342f448bc5c4d8a1141b19db816d17922ab490e191'},
+             'after_sha256': '183f1dd726bfe6169f0c72ef506f6a3edb13c8a19ccf1f515ed9f123aeeb3e6e'},
             {'path': 'vllm/parser/kimi_k2.py',
              'before_sha256': 'e85c1598225aba9dbe0c0caedab94ae80cd3db5d4d6ae302e6681b42c593bbcf',
-             'after_sha256': '973593fdca71b7489c86f34353ff65bbc5d30715add86fab40a09c1be63ca12c'},
+             'after_sha256': '6fcb9c15d8168a034fc1f15d8f43467c2b4ad5457c9b8d8f8571ca6caaede85f'},
             {'path': 'vllm/parser/qwen3.py',
              'before_sha256': '2c0d5e5bec9e3b504894d278eeaeded0f282e627260f1f35689869dd1fdf9bb0',
-             'after_sha256': '7da16cd0e85b8ff6e6544c260cdde2521b881dc2605b64b666fca6fdf97bbdca'}),
+             'after_sha256': '7da16cd0e85b8ff6e6544c260cdde2521b881dc2605b64b666fca6fdf97bbdca'},
+            {'path': 'tests/parser/engine/test_parser_engine.py',
+             'before_sha256': 'e3c906ca611720ddb682f38085f28e3d17ba382abc8fbdbe7938c3c309fbe801',
+             'after_sha256': '6e16019a620f197a2bc159ca214fabef9a451b8c3dfe1776eb6572e249582cfb'},
+            {'path': 'tests/parser/engine/trace_builder.py',
+             'before_sha256': '4ec7419f7ffaaef9e3f19ed345aa5ebb31d41b6686470d2768f01240c2efcdbc',
+             'after_sha256': '12311dc9d1686394bc7b4499e32b353dabe02c650942c0c9d3d376da5e55fcb0'},
+            {'path': 'vllm/parser/abstract_parser.py',
+             'before_sha256': 'c3ab24e70dcabf75cd8cb662e56bd369dfcb6a9e66814e1e35f2840bc3920c4d',
+             'after_sha256': '27d0c3fd3694c3aab00bfa59a644f680ff61f2fb76cea2fe4fcc7949ce97a172'},
+            {'path': 'vllm/parser/mistral.py',
+             'before_sha256': 'd361421339cfe4daa0c0e924bf255eabbb3bc34eb9a1be0aeb37f95e6c66295a',
+             'after_sha256': 'af028e500d1eafae7a357a6b2814c7e08d7d4892057a83002081135420005103'}),
   'edits': ({'name': 'tests/parser/engine/test_qwen3.py:landmark-1',
              'path': 'tests/parser/engine/test_qwen3.py',
              'before': '        assert len(result.tool_calls) == 1\n'
@@ -73459,11 +73471,11 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       "    return ''.join(REVERSE.get(i, chr(i)) for i in ids)\n"
                       '\n'
                       '\n'
-                      'def parse(text, chunk_size):\n'
+                      "def parse(text, chunk_size, choice='auto'):\n"
                       "    request = ChatCompletionRequest(messages=[{'role': 'user', "
                       "'content': 'test'}],\n"
                       '                                    tools=[TOOL], '
-                      "tool_choice='auto')\n"
+                      'tool_choice=choice)\n'
                       '    tokenizer = MagicMock()\n'
                       '    tokenizer.get_vocab.return_value = MARKERS\n'
                       '    tokenizer.decode.side_effect = decode\n'
@@ -73496,6 +73508,48 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       "                calls[call.index] = calls.get(call.index, '') + "
                       'call.function.arguments\n'
                       '    return reasoning, content, list(calls.values())\n'
+                      '\n'
+                      '\n'
+                      "@pytest.mark.parametrize('chunk_size', [None, 1, 13])\n"
+                      "@pytest.mark.parametrize('choice', [\n"
+                      "    'auto', 'required', {'type': 'function', 'function': "
+                      "{'name': 'write'}},\n"
+                      '])\n'
+                      "@pytest.mark.parametrize('before,between,after', [\n"
+                      "    (' \\t', '\\n\\n', '\\r\\n'),\n"
+                      "    ('\\n', ' ', 'answer\\n'),\n"
+                      "    ('answer\\n', '\\t', '\\n'),\n"
+                      "    ('', '', ''),\n"
+                      '])\n'
+                      'def test_content_around_tool_calls_is_verbatim(\n'
+                      '    before, between, after, chunk_size, choice,\n'
+                      '):\n'
+                      "    tool = ('<tool_call>\\n<function=write>\\n'\n"
+                      '            '
+                      "'<parameter=text>value</parameter>\\n</function>\\n</tool_call>')\n"
+                      "    text = 'plan\\n</think>' + before + tool + between + tool + "
+                      'after\n'
+                      '    reasoning, content, calls = parse(text, chunk_size, '
+                      'choice=choice)\n'
+                      "    assert reasoning == 'plan\\n'\n"
+                      '    assert content == before + between + after\n'
+                      '    assert [json.loads(arguments) for arguments in calls] == [\n'
+                      "        {'text': 'value'}, {'text': 'value'},\n"
+                      '    ]\n'
+                      '\n'
+                      '\n'
+                      "@pytest.mark.parametrize('chunk_size', [None, 1])\n"
+                      "@pytest.mark.parametrize('choice', [\n"
+                      "    'auto', 'required', {'type': 'function', 'function': "
+                      "{'name': 'write'}},\n"
+                      '])\n'
+                      'def test_whitespace_without_a_call_survives_tool_choice(choice, '
+                      'chunk_size):\n'
+                      "    reasoning, content, calls = parse('plan</think> \\t\\r\\n', "
+                      'chunk_size, choice=choice)\n'
+                      "    assert reasoning == 'plan'\n"
+                      "    assert content == ' \\t\\r\\n'\n"
+                      '    assert calls == []\n'
                       '\n'
                       '\n'
                       "VALUES = ['', '\\n', '\\n\\n', '\\nfirst\\n', 'first\\n', "
@@ -73581,11 +73635,11 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              "    return ''.join(REVERSE.get(i, chr(i)) for i in ids)\n"
                              '\n'
                              '\n'
-                             'def parse(text, chunk_size):\n'
+                             "def parse(text, chunk_size, choice='auto'):\n"
                              "    request = ChatCompletionRequest(messages=[{'role': "
                              "'user', 'content': 'test'}],\n"
                              '                                    tools=[TOOL], '
-                             "tool_choice='auto')\n"
+                             'tool_choice=choice)\n'
                              '    tokenizer = MagicMock()\n'
                              '    tokenizer.get_vocab.return_value = MARKERS\n'
                              '    tokenizer.decode.side_effect = decode\n'
@@ -73618,6 +73672,50 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '                calls[call.index] = '
                              "calls.get(call.index, '') + call.function.arguments\n"
                              '    return reasoning, content, list(calls.values())\n'
+                             '\n'
+                             '\n'
+                             "@pytest.mark.parametrize('chunk_size', [None, 1, 13])\n"
+                             "@pytest.mark.parametrize('choice', [\n"
+                             "    'auto', 'required', {'type': 'function', 'function': "
+                             "{'name': 'write'}},\n"
+                             '])\n'
+                             "@pytest.mark.parametrize('before,between,after', [\n"
+                             "    (' \\t', '\\n\\n', '\\r\\n'),\n"
+                             "    ('\\n', ' ', 'answer\\n'),\n"
+                             "    ('answer\\n', '\\t', '\\n'),\n"
+                             "    ('', '', ''),\n"
+                             '])\n'
+                             'def test_content_around_tool_calls_is_verbatim(\n'
+                             '    before, between, after, chunk_size, choice,\n'
+                             '):\n'
+                             "    tool = ('<tool_call>\\n<function=write>\\n'\n"
+                             '            '
+                             "'<parameter=text>value</parameter>\\n</function>\\n</tool_call>')\n"
+                             "    text = 'plan\\n</think>' + before + tool + between + "
+                             'tool + after\n'
+                             '    reasoning, content, calls = parse(text, chunk_size, '
+                             'choice=choice)\n'
+                             "    assert reasoning == 'plan\\n'\n"
+                             '    assert content == before + between + after\n'
+                             '    assert [json.loads(arguments) for arguments in '
+                             'calls] == [\n'
+                             "        {'text': 'value'}, {'text': 'value'},\n"
+                             '    ]\n'
+                             '\n'
+                             '\n'
+                             "@pytest.mark.parametrize('chunk_size', [None, 1])\n"
+                             "@pytest.mark.parametrize('choice', [\n"
+                             "    'auto', 'required', {'type': 'function', 'function': "
+                             "{'name': 'write'}},\n"
+                             '])\n'
+                             'def '
+                             'test_whitespace_without_a_call_survives_tool_choice(choice, '
+                             'chunk_size):\n'
+                             "    reasoning, content, calls = parse('plan</think> "
+                             "\\t\\r\\n', chunk_size, choice=choice)\n"
+                             "    assert reasoning == 'plan'\n"
+                             "    assert content == ' \\t\\r\\n'\n"
+                             '    assert calls == []\n'
                              '\n'
                              '\n'
                              "VALUES = ['', '\\n', '\\n\\n', '\\nfirst\\n', "
@@ -73717,7 +73815,44 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '\n'},
             {'name': 'vllm/parser/engine/parser_engine.py:landmark-1',
              'path': 'vllm/parser/engine/parser_engine.py',
-             'before': '        )\n'
+             'before': '        self._tool_slots: list[ToolCallSlot] = []\n'
+                       '        self._deferred_content: str = ""\n'
+                       '        self._deferred_reasoning: str = ""\n'
+                       '        self._content_has_nonws: bool = False\n'
+                       '        self._suppress_tool_calls: bool = False\n'
+                       '\n'
+                       '        self._arg_converter = '
+                       'parser_engine_config.arg_converter\n',
+             'after': '        self._tool_slots: list[ToolCallSlot] = []\n'
+                      '        self._deferred_content: str = ""\n'
+                      '        self._deferred_reasoning: str = ""\n'
+                      '        self._suppress_tool_calls: bool = False\n'
+                      '\n'
+                      '        self._arg_converter = '
+                      'parser_engine_config.arg_converter\n',
+             'review_before': '        self._tool_slots: list[ToolCallSlot] = []\n'
+                              '        self._deferred_content: str = ""\n'
+                              '        self._deferred_reasoning: str = ""\n'
+                              '        self._content_has_nonws: bool = False\n'
+                              '        self._suppress_tool_calls: bool = False\n'
+                              '\n'
+                              '        self._arg_converter = '
+                              'parser_engine_config.arg_converter\n',
+             'review_after': '        self._tool_slots: list[ToolCallSlot] = []\n'
+                             '        self._deferred_content: str = ""\n'
+                             '        self._deferred_reasoning: str = ""\n'
+                             '        self._suppress_tool_calls: bool = False\n'
+                             '\n'
+                             '        self._arg_converter = '
+                             'parser_engine_config.arg_converter\n'},
+            {'name': 'vllm/parser/engine/parser_engine.py:landmark-2',
+             'path': 'vllm/parser/engine/parser_engine.py',
+             'before': '        self._stream_arg_deltas = '
+                       'parser_engine_config.stream_arg_deltas\n'
+                       '        self._strip_trailing_reasoning_ws = (\n'
+                       '            '
+                       'parser_engine_config.strip_trailing_reasoning_whitespace\n'
+                       '        )\n'
                        '        self._drop_ws_only_content_before_tools = (\n'
                        '            '
                        'parser_engine_config.drop_whitespace_only_content_before_tools\n'
@@ -73728,14 +73863,20 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                        '        )\n'
                        '\n'
                        '        vocab = self.vocab\n',
-             'after': '        )\n'
-                      '        self._drop_ws_only_content_before_tools = (\n'
+             'after': '        self._stream_arg_deltas = '
+                      'parser_engine_config.stream_arg_deltas\n'
+                      '        self._strip_trailing_reasoning_ws = (\n'
                       '            '
-                      'parser_engine_config.drop_whitespace_only_content_before_tools\n'
+                      'parser_engine_config.strip_trailing_reasoning_whitespace\n'
                       '        )\n'
                       '\n'
                       '        vocab = self.vocab\n',
-             'review_before': '        )\n'
+             'review_before': '        self._stream_arg_deltas = '
+                              'parser_engine_config.stream_arg_deltas\n'
+                              '        self._strip_trailing_reasoning_ws = (\n'
+                              '            '
+                              'parser_engine_config.strip_trailing_reasoning_whitespace\n'
+                              '        )\n'
                               '        self._drop_ws_only_content_before_tools = (\n'
                               '            '
                               'parser_engine_config.drop_whitespace_only_content_before_tools\n'
@@ -73746,16 +73887,50 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                               '        )\n'
                               '\n'
                               '        vocab = self.vocab\n',
-             'review_after': '        )\n'
-                             '        self._drop_ws_only_content_before_tools = (\n'
+             'review_after': '        self._stream_arg_deltas = '
+                             'parser_engine_config.stream_arg_deltas\n'
+                             '        self._strip_trailing_reasoning_ws = (\n'
                              '            '
-                             'parser_engine_config.drop_whitespace_only_content_before_tools\n'
+                             'parser_engine_config.strip_trailing_reasoning_whitespace\n'
                              '        )\n'
                              '\n'
                              '        vocab = self.vocab\n'},
-            {'name': 'vllm/parser/engine/parser_engine.py:landmark-2',
+            {'name': 'vllm/parser/engine/parser_engine.py:landmark-3',
              'path': 'vllm/parser/engine/parser_engine.py',
-             'before': '        content: str,\n'
+             'before': '        self._tool_slots.clear()\n'
+                       '        self._deferred_content = ""\n'
+                       '        self._deferred_reasoning = ""\n'
+                       '        self._content_has_nonws = False\n'
+                       '        self._prompt_streaming_prepared = False\n'
+                       '        effective_initial_state = (\n'
+                       '            initial_state\n',
+             'after': '        self._tool_slots.clear()\n'
+                      '        self._deferred_content = ""\n'
+                      '        self._deferred_reasoning = ""\n'
+                      '        self._prompt_streaming_prepared = False\n'
+                      '        effective_initial_state = (\n'
+                      '            initial_state\n',
+             'review_before': '        self._tool_slots.clear()\n'
+                              '        self._deferred_content = ""\n'
+                              '        self._deferred_reasoning = ""\n'
+                              '        self._content_has_nonws = False\n'
+                              '        self._prompt_streaming_prepared = False\n'
+                              '        effective_initial_state = (\n'
+                              '            initial_state\n',
+             'review_after': '        self._tool_slots.clear()\n'
+                             '        self._deferred_content = ""\n'
+                             '        self._deferred_reasoning = ""\n'
+                             '        self._prompt_streaming_prepared = False\n'
+                             '        effective_initial_state = (\n'
+                             '            initial_state\n'},
+            {'name': 'vllm/parser/engine/parser_engine.py:landmark-4',
+             'path': 'vllm/parser/engine/parser_engine.py',
+             'before': '            if tool_choice == "none" and tools:\n'
+                       '                self._suppress_tool_calls = True\n'
+                       '\n'
+                       '    def _strip_content_whitespace(\n'
+                       '        self,\n'
+                       '        content: str,\n'
                        '        tools_called: bool,\n'
                        '    ) -> str | None:\n'
                        '        if tools_called:\n'
@@ -73767,19 +73942,22 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                        '        return content or None\n'
                        '\n'
                        '    # ── Streaming: parse_delta '
-                       '────────────────────────────────────────\n',
-             'after': '        content: str,\n'
-                      '        tools_called: bool,\n'
-                      '    ) -> str | None:\n'
-                      '        if (tools_called and '
-                      'self._drop_ws_only_content_before_tools\n'
-                      '                and not content.strip()):\n'
-                      '            content = ""\n'
-                      '        return content or None\n'
+                       '────────────────────────────────────────\n'
+                       '\n'
+                       '    def parse_delta(\n',
+             'after': '            if tool_choice == "none" and tools:\n'
+                      '                self._suppress_tool_calls = True\n'
                       '\n'
                       '    # ── Streaming: parse_delta '
-                      '────────────────────────────────────────\n',
-             'review_before': '        content: str,\n'
+                      '────────────────────────────────────────\n'
+                      '\n'
+                      '    def parse_delta(\n',
+             'review_before': '            if tool_choice == "none" and tools:\n'
+                              '                self._suppress_tool_calls = True\n'
+                              '\n'
+                              '    def _strip_content_whitespace(\n'
+                              '        self,\n'
+                              '        content: str,\n'
                               '        tools_called: bool,\n'
                               '    ) -> str | None:\n'
                               '        if tools_called:\n'
@@ -73792,21 +73970,149 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                               '        return content or None\n'
                               '\n'
                               '    # ── Streaming: parse_delta '
-                              '────────────────────────────────────────\n',
-             'review_after': '        content: str,\n'
-                             '        tools_called: bool,\n'
-                             '    ) -> str | None:\n'
-                             '        if (tools_called and '
-                             'self._drop_ws_only_content_before_tools\n'
-                             '                and not content.strip()):\n'
-                             '            content = ""\n'
-                             '        return content or None\n'
+                              '────────────────────────────────────────\n'
+                              '\n'
+                              '    def parse_delta(\n',
+             'review_after': '            if tool_choice == "none" and tools:\n'
+                             '                self._suppress_tool_calls = True\n'
                              '\n'
                              '    # ── Streaming: parse_delta '
-                             '────────────────────────────────────────\n'},
+                             '────────────────────────────────────────\n'
+                             '\n'
+                             '    def parse_delta(\n'},
+            {'name': 'vllm/parser/engine/parser_engine.py:landmark-5',
+             'path': 'vllm/parser/engine/parser_engine.py',
+             'before': '            reasoning = reasoning.rstrip() or None\n'
+                       '\n'
+                       '        content = delta.content if delta else None\n'
+                       '        if content:\n'
+                       '            content = self._strip_content_whitespace(\n'
+                       '                content, tool_call_info.tools_called\n'
+                       '            )\n'
+                       '\n'
+                       '        return reasoning, content, tool_call_info\n'
+                       '\n'
+                       '    # ── Non-streaming: parse '
+                       '───────────────────────────────────────────\n',
+             'after': '            reasoning = reasoning.rstrip() or None\n'
+                      '\n'
+                      '        content = delta.content if delta else None\n'
+                      '        return reasoning, content, tool_call_info\n'
+                      '\n'
+                      '    # ── Non-streaming: parse '
+                      '───────────────────────────────────────────\n',
+             'review_before': '            reasoning = reasoning.rstrip() or None\n'
+                              '\n'
+                              '        content = delta.content if delta else None\n'
+                              '        if content:\n'
+                              '            content = self._strip_content_whitespace(\n'
+                              '                content, tool_call_info.tools_called\n'
+                              '            )\n'
+                              '\n'
+                              '        return reasoning, content, tool_call_info\n'
+                              '\n'
+                              '    # ── Non-streaming: parse '
+                              '───────────────────────────────────────────\n',
+             'review_after': '            reasoning = reasoning.rstrip() or None\n'
+                             '\n'
+                             '        content = delta.content if delta else None\n'
+                             '        return reasoning, content, tool_call_info\n'
+                             '\n'
+                             '    # ── Non-streaming: parse '
+                             '───────────────────────────────────────────\n'},
+            {'name': 'vllm/parser/engine/parser_engine.py:landmark-6',
+             'path': 'vllm/parser/engine/parser_engine.py',
+             'before': '\n'
+                       '        content_str = "".join(content_parts)\n'
+                       '\n'
+                       '        if self._content_has_nonws:\n'
+                       '            pass\n'
+                       '        elif content_str:\n'
+                       '            stripped = content_str.strip()\n'
+                       '            if stripped:\n'
+                       '                self._content_has_nonws = True\n'
+                       '            elif self._tool_slots:\n'
+                       '                if self._drop_ws_only_content_before_tools:\n'
+                       '                    content_str = ""\n'
+                       '            elif not finished:\n'
+                       '                self._deferred_content = content_str\n'
+                       '                content_str = ""\n'
+                       '\n'
+                       '        content = content_str or None\n'
+                       '        reasoning = "".join(reasoning_parts) or None\n'
+                       '\n',
+             'after': '\n'
+                      '        content_str = "".join(content_parts)\n'
+                      '\n'
+                      '        content = content_str or None\n'
+                      '        reasoning = "".join(reasoning_parts) or None\n'
+                      '\n',
+             'review_before': '\n'
+                              '        content_str = "".join(content_parts)\n'
+                              '\n'
+                              '        if self._content_has_nonws:\n'
+                              '            pass\n'
+                              '        elif content_str:\n'
+                              '            stripped = content_str.strip()\n'
+                              '            if stripped:\n'
+                              '                self._content_has_nonws = True\n'
+                              '            elif self._tool_slots:\n'
+                              '                if '
+                              'self._drop_ws_only_content_before_tools:\n'
+                              '                    content_str = ""\n'
+                              '            elif not finished:\n'
+                              '                self._deferred_content = content_str\n'
+                              '                content_str = ""\n'
+                              '\n'
+                              '        content = content_str or None\n'
+                              '        reasoning = "".join(reasoning_parts) or None\n'
+                              '\n',
+             'review_after': '\n'
+                             '        content_str = "".join(content_parts)\n'
+                             '\n'
+                             '        content = content_str or None\n'
+                             '        reasoning = "".join(reasoning_parts) or None\n'
+                             '\n'},
+            {'name': 'vllm/parser/engine/parser_engine.py:landmark-7',
+             'path': 'vllm/parser/engine/parser_engine.py',
+             'before': '                )\n'
+                       '\n'
+                       '        content_str = "".join(content_parts)\n'
+                       '        content = self._strip_content_whitespace(content_str, '
+                       'len(tool_calls) > 0)\n'
+                       '\n'
+                       '        return ExtractedToolCallInformation(\n'
+                       '            tools_called=len(tool_calls) > 0,\n',
+             'after': '                )\n'
+                      '\n'
+                      '        content_str = "".join(content_parts)\n'
+                      '        content = content_str or None\n'
+                      '\n'
+                      '        return ExtractedToolCallInformation(\n'
+                      '            tools_called=len(tool_calls) > 0,\n',
+             'review_before': '                )\n'
+                              '\n'
+                              '        content_str = "".join(content_parts)\n'
+                              '        content = '
+                              'self._strip_content_whitespace(content_str, '
+                              'len(tool_calls) > 0)\n'
+                              '\n'
+                              '        return ExtractedToolCallInformation(\n'
+                              '            tools_called=len(tool_calls) > 0,\n',
+             'review_after': '                )\n'
+                             '\n'
+                             '        content_str = "".join(content_parts)\n'
+                             '        content = content_str or None\n'
+                             '\n'
+                             '        return ExtractedToolCallInformation(\n'
+                             '            tools_called=len(tool_calls) > 0,\n'},
             {'name': 'vllm/parser/engine/parser_engine_config.py:landmark-1',
              'path': 'vllm/parser/engine/parser_engine_config.py',
-             'before': '    # Drop content that is entirely whitespace when tool calls '
+             'before': '    # Prevents trailing-whitespace accumulation across '
+                       'multi-turn conversations.\n'
+                       '    strip_trailing_reasoning_whitespace: bool = True\n'
+                       '\n'
+                       '    # Drop content that is entirely whitespace when tool calls '
                        'follow.\n'
                        '    drop_whitespace_only_content_before_tools: bool = True\n'
                        '\n'
@@ -73817,15 +74123,19 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                        'request tools.\n'
                        '    validate_tool_names: bool = False\n'
                        '\n',
-             'after': '    # Drop content that is entirely whitespace when tool calls '
-                      'follow.\n'
-                      '    drop_whitespace_only_content_before_tools: bool = True\n'
+             'after': '    # Prevents trailing-whitespace accumulation across '
+                      'multi-turn conversations.\n'
+                      '    strip_trailing_reasoning_whitespace: bool = True\n'
                       '\n'
                       '    # Reject tool calls whose names are absent from the request '
                       'tools.\n'
                       '    validate_tool_names: bool = False\n'
                       '\n',
-             'review_before': '    # Drop content that is entirely whitespace when '
+             'review_before': '    # Prevents trailing-whitespace accumulation across '
+                              'multi-turn conversations.\n'
+                              '    strip_trailing_reasoning_whitespace: bool = True\n'
+                              '\n'
+                              '    # Drop content that is entirely whitespace when '
                               'tool calls follow.\n'
                               '    drop_whitespace_only_content_before_tools: bool = '
                               'True\n'
@@ -73838,10 +74148,9 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                               'request tools.\n'
                               '    validate_tool_names: bool = False\n'
                               '\n',
-             'review_after': '    # Drop content that is entirely whitespace when tool '
-                             'calls follow.\n'
-                             '    drop_whitespace_only_content_before_tools: bool = '
-                             'True\n'
+             'review_after': '    # Prevents trailing-whitespace accumulation across '
+                             'multi-turn conversations.\n'
+                             '    strip_trailing_reasoning_whitespace: bool = True\n'
                              '\n'
                              '    # Reject tool calls whose names are absent from the '
                              'request tools.\n'
@@ -73849,20 +74158,22 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '\n'},
             {'name': 'vllm/parser/inkling.py:landmark-1',
              'path': 'vllm/parser/inkling.py',
-             'before': '        tool_args_json=True,\n'
+             'before': '        stream_arg_deltas=True,\n'
+                       '        tool_args_json=True,\n'
                        '        strip_trailing_reasoning_whitespace=True,\n'
                        '        drop_whitespace_only_content_before_tools=True,\n'
                        '        strip_content_whitespace_with_tools=False,\n'
                        '        validate_tool_names=False,\n'
                        '    )\n'
                        '\n',
-             'after': '        tool_args_json=True,\n'
+             'after': '        stream_arg_deltas=True,\n'
+                      '        tool_args_json=True,\n'
                       '        strip_trailing_reasoning_whitespace=True,\n'
-                      '        drop_whitespace_only_content_before_tools=True,\n'
                       '        validate_tool_names=False,\n'
                       '    )\n'
                       '\n',
-             'review_before': '        tool_args_json=True,\n'
+             'review_before': '        stream_arg_deltas=True,\n'
+                              '        tool_args_json=True,\n'
                               '        strip_trailing_reasoning_whitespace=True,\n'
                               '        '
                               'drop_whitespace_only_content_before_tools=True,\n'
@@ -73870,28 +74181,70 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                               '        validate_tool_names=False,\n'
                               '    )\n'
                               '\n',
-             'review_after': '        tool_args_json=True,\n'
+             'review_after': '        stream_arg_deltas=True,\n'
+                             '        tool_args_json=True,\n'
                              '        strip_trailing_reasoning_whitespace=True,\n'
-                             '        drop_whitespace_only_content_before_tools=True,\n'
                              '        validate_tool_names=False,\n'
                              '    )\n'
                              '\n'},
+            {'name': 'vllm/parser/inkling.py:landmark-2',
+             'path': 'vllm/parser/inkling.py',
+             'before': '        if self._deferred_content:\n'
+                       '            trailing = self._deferred_content\n'
+                       '            self._deferred_content = ""\n'
+                       '            content = self._strip_content_whitespace(\n'
+                       '                (content or "") + trailing,\n'
+                       '                tool_call_info.tools_called,\n'
+                       '            )\n'
+                       '            tool_call_info = ExtractedToolCallInformation(\n'
+                       '                tools_called=tool_call_info.tools_called,\n'
+                       '                tool_calls=tool_call_info.tool_calls,\n',
+             'after': '        if self._deferred_content:\n'
+                      '            trailing = self._deferred_content\n'
+                      '            self._deferred_content = ""\n'
+                      '            content = (content or "") + trailing\n'
+                      '            tool_call_info = ExtractedToolCallInformation(\n'
+                      '                tools_called=tool_call_info.tools_called,\n'
+                      '                tool_calls=tool_call_info.tool_calls,\n',
+             'review_before': '        if self._deferred_content:\n'
+                              '            trailing = self._deferred_content\n'
+                              '            self._deferred_content = ""\n'
+                              '            content = self._strip_content_whitespace(\n'
+                              '                (content or "") + trailing,\n'
+                              '                tool_call_info.tools_called,\n'
+                              '            )\n'
+                              '            tool_call_info = '
+                              'ExtractedToolCallInformation(\n'
+                              '                '
+                              'tools_called=tool_call_info.tools_called,\n'
+                              '                tool_calls=tool_call_info.tool_calls,\n',
+             'review_after': '        if self._deferred_content:\n'
+                             '            trailing = self._deferred_content\n'
+                             '            self._deferred_content = ""\n'
+                             '            content = (content or "") + trailing\n'
+                             '            tool_call_info = '
+                             'ExtractedToolCallInformation(\n'
+                             '                '
+                             'tools_called=tool_call_info.tools_called,\n'
+                             '                tool_calls=tool_call_info.tool_calls,\n'},
             {'name': 'vllm/parser/kimi_k2.py:landmark-1',
              'path': 'vllm/parser/kimi_k2.py',
-             'before': '        tool_args_json=True,\n'
+             'before': '        stream_arg_deltas=True,\n'
+                       '        tool_args_json=True,\n'
                        '        strip_trailing_reasoning_whitespace=True,\n'
                        '        drop_whitespace_only_content_before_tools=True,\n'
                        '        strip_content_whitespace_with_tools=False,\n'
                        '        validate_tool_names=False,\n'
                        '    )\n'
                        '\n',
-             'after': '        tool_args_json=True,\n'
+             'after': '        stream_arg_deltas=True,\n'
+                      '        tool_args_json=True,\n'
                       '        strip_trailing_reasoning_whitespace=True,\n'
-                      '        drop_whitespace_only_content_before_tools=True,\n'
                       '        validate_tool_names=False,\n'
                       '    )\n'
                       '\n',
-             'review_before': '        tool_args_json=True,\n'
+             'review_before': '        stream_arg_deltas=True,\n'
+                              '        tool_args_json=True,\n'
                               '        strip_trailing_reasoning_whitespace=True,\n'
                               '        '
                               'drop_whitespace_only_content_before_tools=True,\n'
@@ -73899,9 +74252,9 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                               '        validate_tool_names=False,\n'
                               '    )\n'
                               '\n',
-             'review_after': '        tool_args_json=True,\n'
+             'review_after': '        stream_arg_deltas=True,\n'
+                             '        tool_args_json=True,\n'
                              '        strip_trailing_reasoning_whitespace=True,\n'
-                             '        drop_whitespace_only_content_before_tools=True,\n'
                              '        validate_tool_names=False,\n'
                              '    )\n'
                              '\n'},
@@ -74024,10 +74377,640 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '            params[name] = value\n'
                              '\n'
                              '    return json.dumps(params, ensure_ascii=False)\n'
+                             '\n'},
+            {'name': 'tests/parser/engine/test_parser_engine.py:landmark-1',
+             'path': 'tests/parser/engine/test_parser_engine.py',
+             'before': '\n'
+                       '\n'
+                       'class TestContentWhitespaceHandling:\n'
+                       '    """Unit tests for whitespace deferral / dropping in '
+                       '_events_to_delta."""\n'
+                       '\n'
+                       '    def test_whitespace_only_deferred_until_next_tick(self):\n'
+                       '        engine = _make_engine()\n'
+                       '        d1 = engine._events_to_delta(\n'
+                       '            [SemanticEvent(EventType.TEXT_CHUNK, "  \\n")],\n'
+                       '        )\n'
+                       '        assert d1 is None\n'
+                       '        d2 = engine._events_to_delta(\n'
+                       '            [SemanticEvent(EventType.TEXT_CHUNK, "hello")],\n'
+                       '        )\n'
+                       '        assert d2 is not None\n'
+                       '        assert d2.content == "  \\nhello"\n'
+                       '\n'
+                       '    def test_whitespace_only_emitted_on_finished(self):\n'
+                       '        engine = _make_engine()\n',
+             'after': '\n'
+                      '\n'
+                      'class TestContentWhitespaceHandling:\n'
+                      '    """Content bytes survive regardless of neighboring tool '
+                      'calls."""\n'
+                      '\n'
+                      '    def '
+                      'test_whitespace_only_emitted_without_waiting_for_next_tick(self):\n'
+                      '        engine = _make_engine()\n'
+                      '        d1 = engine._events_to_delta(\n'
+                      '            [SemanticEvent(EventType.TEXT_CHUNK, "  \\n")],\n'
+                      '        )\n'
+                      '        assert d1 is not None\n'
+                      '        assert d1.content == "  \\n"\n'
+                      '        d2 = engine._events_to_delta(\n'
+                      '            [SemanticEvent(EventType.TEXT_CHUNK, "hello")],\n'
+                      '        )\n'
+                      '        assert d2 is not None\n'
+                      '        assert d2.content == "hello"\n'
+                      '\n'
+                      '    def test_whitespace_only_emitted_on_finished(self):\n'
+                      '        engine = _make_engine()\n',
+             'review_before': '\n'
+                              '\n'
+                              'class TestContentWhitespaceHandling:\n'
+                              '    """Unit tests for whitespace deferral / dropping in '
+                              '_events_to_delta."""\n'
+                              '\n'
+                              '    def '
+                              'test_whitespace_only_deferred_until_next_tick(self):\n'
+                              '        engine = _make_engine()\n'
+                              '        d1 = engine._events_to_delta(\n'
+                              '            [SemanticEvent(EventType.TEXT_CHUNK, "  '
+                              '\\n")],\n'
+                              '        )\n'
+                              '        assert d1 is None\n'
+                              '        d2 = engine._events_to_delta(\n'
+                              '            [SemanticEvent(EventType.TEXT_CHUNK, '
+                              '"hello")],\n'
+                              '        )\n'
+                              '        assert d2 is not None\n'
+                              '        assert d2.content == "  \\nhello"\n'
+                              '\n'
+                              '    def '
+                              'test_whitespace_only_emitted_on_finished(self):\n'
+                              '        engine = _make_engine()\n',
+             'review_after': '\n'
+                             '\n'
+                             'class TestContentWhitespaceHandling:\n'
+                             '    """Content bytes survive regardless of neighboring '
+                             'tool calls."""\n'
+                             '\n'
+                             '    def '
+                             'test_whitespace_only_emitted_without_waiting_for_next_tick(self):\n'
+                             '        engine = _make_engine()\n'
+                             '        d1 = engine._events_to_delta(\n'
+                             '            [SemanticEvent(EventType.TEXT_CHUNK, "  '
+                             '\\n")],\n'
+                             '        )\n'
+                             '        assert d1 is not None\n'
+                             '        assert d1.content == "  \\n"\n'
+                             '        d2 = engine._events_to_delta(\n'
+                             '            [SemanticEvent(EventType.TEXT_CHUNK, '
+                             '"hello")],\n'
+                             '        )\n'
+                             '        assert d2 is not None\n'
+                             '        assert d2.content == "hello"\n'
+                             '\n'
+                             '    def test_whitespace_only_emitted_on_finished(self):\n'
+                             '        engine = _make_engine()\n'},
+            {'name': 'tests/parser/engine/test_parser_engine.py:landmark-2',
+             'path': 'tests/parser/engine/test_parser_engine.py',
+             'before': '        assert d is not None\n'
+                       '        assert d.content == "  \\n"\n'
+                       '\n'
+                       '    def test_whitespace_dropped_before_tool_call(self):\n'
+                       '        engine = _make_engine()\n'
+                       '        engine._events_to_delta(\n'
+                       '            [\n'
+                       '                SemanticEvent(EventType.TEXT_CHUNK, "  \\n"),\n'
+                       '                SemanticEvent(EventType.TOOL_CALL_START, '
+                       'tool_index=0),\n'
+                       '            ]\n'
+                       '        )\n'
+                       '        d = engine._events_to_delta(\n'
+                       '            [\n'
+                       '                SemanticEvent(EventType.TOOL_NAME, "f", '
+                       'tool_index=0),\n',
+             'after': '        assert d is not None\n'
+                      '        assert d.content == "  \\n"\n'
+                      '\n'
+                      '    def test_whitespace_preserved_before_tool_call(self):\n'
+                      '        engine = _make_engine()\n'
+                      '        prefix = engine._events_to_delta(\n'
+                      '            [\n'
+                      '                SemanticEvent(EventType.TEXT_CHUNK, "  \\n"),\n'
+                      '                SemanticEvent(EventType.TOOL_CALL_START, '
+                      'tool_index=0),\n'
+                      '            ]\n'
+                      '        )\n'
+                      '        assert prefix is not None\n'
+                      '        assert prefix.content == "  \\n"\n'
+                      '        d = engine._events_to_delta(\n'
+                      '            [\n'
+                      '                SemanticEvent(EventType.TOOL_NAME, "f", '
+                      'tool_index=0),\n',
+             'review_before': '        assert d is not None\n'
+                              '        assert d.content == "  \\n"\n'
+                              '\n'
+                              '    def '
+                              'test_whitespace_dropped_before_tool_call(self):\n'
+                              '        engine = _make_engine()\n'
+                              '        engine._events_to_delta(\n'
+                              '            [\n'
+                              '                SemanticEvent(EventType.TEXT_CHUNK, "  '
+                              '\\n"),\n'
+                              '                '
+                              'SemanticEvent(EventType.TOOL_CALL_START, '
+                              'tool_index=0),\n'
+                              '            ]\n'
+                              '        )\n'
+                              '        d = engine._events_to_delta(\n'
+                              '            [\n'
+                              '                SemanticEvent(EventType.TOOL_NAME, "f", '
+                              'tool_index=0),\n',
+             'review_after': '        assert d is not None\n'
+                             '        assert d.content == "  \\n"\n'
+                             '\n'
+                             '    def '
+                             'test_whitespace_preserved_before_tool_call(self):\n'
+                             '        engine = _make_engine()\n'
+                             '        prefix = engine._events_to_delta(\n'
+                             '            [\n'
+                             '                SemanticEvent(EventType.TEXT_CHUNK, "  '
+                             '\\n"),\n'
+                             '                SemanticEvent(EventType.TOOL_CALL_START, '
+                             'tool_index=0),\n'
+                             '            ]\n'
+                             '        )\n'
+                             '        assert prefix is not None\n'
+                             '        assert prefix.content == "  \\n"\n'
+                             '        d = engine._events_to_delta(\n'
+                             '            [\n'
+                             '                SemanticEvent(EventType.TOOL_NAME, "f", '
+                             'tool_index=0),\n'},
+            {'name': 'tests/parser/engine/trace_builder.py:landmark-1',
+             'path': 'tests/parser/engine/trace_builder.py',
+             'before': '    return segs\n'
+                       '\n'
+                       '\n'
+                       'def _qwen3_expected_content(scenario: Scenario) -> str | '
+                       'None:\n'
+                       '    if (\n'
+                       '        scenario.content is not None\n'
+                       '        and scenario.tool_calls\n'
+                       '        and not scenario.content.strip()\n'
+                       '    ):\n'
+                       '        return ""\n'
+                       '    return scenario.content\n'
+                       '\n'
+                       '\n'
+                       'def _qwen3_grammar_expected_content(\n'
+                       '    scenario: Scenario, tool_start: str, tool_end: str\n'
+                       ') -> str | None:\n',
+             'after': '    return segs\n'
+                      '\n'
+                      '\n'
+                      'def _qwen3_grammar_expected_content(\n'
+                      '    scenario: Scenario, tool_start: str, tool_end: str\n'
+                      ') -> str | None:\n',
+             'review_before': '    return segs\n'
+                              '\n'
+                              '\n'
+                              'def _qwen3_expected_content(scenario: Scenario) -> str '
+                              '| None:\n'
+                              '    if (\n'
+                              '        scenario.content is not None\n'
+                              '        and scenario.tool_calls\n'
+                              '        and not scenario.content.strip()\n'
+                              '    ):\n'
+                              '        return ""\n'
+                              '    return scenario.content\n'
+                              '\n'
+                              '\n'
+                              'def _qwen3_grammar_expected_content(\n'
+                              '    scenario: Scenario, tool_start: str, tool_end: str\n'
+                              ') -> str | None:\n',
+             'review_after': '    return segs\n'
+                             '\n'
+                             '\n'
+                             'def _qwen3_grammar_expected_content(\n'
+                             '    scenario: Scenario, tool_start: str, tool_end: str\n'
+                             ') -> str | None:\n'},
+            {'name': 'tests/parser/engine/trace_builder.py:landmark-2',
+             'path': 'tests/parser/engine/trace_builder.py',
+             'before': '    engine gives the opener, and the closer that follows it, '
+                       'back as content\n'
+                       '    rather than repairing an empty block away.\n'
+                       '    """\n'
+                       '    content = _qwen3_expected_content(scenario)\n'
+                       '    if scenario.tool_calls is not None and not '
+                       'scenario.tool_calls:\n'
+                       '        return tool_start + tool_end + (content or "")\n'
+                       '    return content\n',
+             'after': '    engine gives the opener, and the closer that follows it, '
+                      'back as content\n'
+                      '    rather than repairing an empty block away.\n'
+                      '    """\n'
+                      '    content = scenario.content\n'
+                      '    if scenario.tool_calls is not None and not '
+                      'scenario.tool_calls:\n'
+                      '        return tool_start + tool_end + (content or "")\n'
+                      '    return content\n',
+             'review_before': '    engine gives the opener, and the closer that '
+                              'follows it, back as content\n'
+                              '    rather than repairing an empty block away.\n'
+                              '    """\n'
+                              '    content = _qwen3_expected_content(scenario)\n'
+                              '    if scenario.tool_calls is not None and not '
+                              'scenario.tool_calls:\n'
+                              '        return tool_start + tool_end + (content or "")\n'
+                              '    return content\n',
+             'review_after': '    engine gives the opener, and the closer that follows '
+                             'it, back as content\n'
+                             '    rather than repairing an empty block away.\n'
+                             '    """\n'
+                             '    content = scenario.content\n'
+                             '    if scenario.tool_calls is not None and not '
+                             'scenario.tool_calls:\n'
+                             '        return tool_start + tool_end + (content or "")\n'
+                             '    return content\n'},
+            {'name': 'tests/parser/engine/trace_builder.py:landmark-3',
+             'path': 'tests/parser/engine/trace_builder.py',
+             'before': '        vocab=_MINIMAX_M2_VOCAB,\n'
+                       '        segments=_minimax_m2_segments(scenario),\n'
+                       '        expected_reasoning=expected_reasoning,\n'
+                       '        expected_content=_qwen3_expected_content(scenario),\n'
+                       '        expected_tool_calls=_expected_tc(scenario),\n'
+                       '        tools=_expected_tools(scenario),\n'
+                       '    )\n',
+             'after': '        vocab=_MINIMAX_M2_VOCAB,\n'
+                      '        segments=_minimax_m2_segments(scenario),\n'
+                      '        expected_reasoning=expected_reasoning,\n'
+                      '        expected_content=scenario.content,\n'
+                      '        expected_tool_calls=_expected_tc(scenario),\n'
+                      '        tools=_expected_tools(scenario),\n'
+                      '    )\n',
+             'review_before': '        vocab=_MINIMAX_M2_VOCAB,\n'
+                              '        segments=_minimax_m2_segments(scenario),\n'
+                              '        expected_reasoning=expected_reasoning,\n'
+                              '        '
+                              'expected_content=_qwen3_expected_content(scenario),\n'
+                              '        expected_tool_calls=_expected_tc(scenario),\n'
+                              '        tools=_expected_tools(scenario),\n'
+                              '    )\n',
+             'review_after': '        vocab=_MINIMAX_M2_VOCAB,\n'
+                             '        segments=_minimax_m2_segments(scenario),\n'
+                             '        expected_reasoning=expected_reasoning,\n'
+                             '        expected_content=scenario.content,\n'
+                             '        expected_tool_calls=_expected_tc(scenario),\n'
+                             '        tools=_expected_tools(scenario),\n'
+                             '    )\n'},
+            {'name': 'tests/parser/engine/trace_builder.py:landmark-4',
+             'path': 'tests/parser/engine/trace_builder.py',
+             'before': '        vocab=_GEMMA4_VOCAB,\n'
+                       '        segments=_gemma4_segments(scenario),\n'
+                       '        expected_reasoning=scenario.reasoning,\n'
+                       '        expected_content=_qwen3_expected_content(scenario),\n'
+                       '        expected_tool_calls=_expected_tc(scenario),\n'
+                       '        tools=_expected_tools(scenario),\n'
+                       '        prompt_token_ids=prompt_token_ids,\n',
+             'after': '        vocab=_GEMMA4_VOCAB,\n'
+                      '        segments=_gemma4_segments(scenario),\n'
+                      '        expected_reasoning=scenario.reasoning,\n'
+                      '        expected_content=scenario.content,\n'
+                      '        expected_tool_calls=_expected_tc(scenario),\n'
+                      '        tools=_expected_tools(scenario),\n'
+                      '        prompt_token_ids=prompt_token_ids,\n',
+             'review_before': '        vocab=_GEMMA4_VOCAB,\n'
+                              '        segments=_gemma4_segments(scenario),\n'
+                              '        expected_reasoning=scenario.reasoning,\n'
+                              '        '
+                              'expected_content=_qwen3_expected_content(scenario),\n'
+                              '        expected_tool_calls=_expected_tc(scenario),\n'
+                              '        tools=_expected_tools(scenario),\n'
+                              '        prompt_token_ids=prompt_token_ids,\n',
+             'review_after': '        vocab=_GEMMA4_VOCAB,\n'
+                             '        segments=_gemma4_segments(scenario),\n'
+                             '        expected_reasoning=scenario.reasoning,\n'
+                             '        expected_content=scenario.content,\n'
+                             '        expected_tool_calls=_expected_tc(scenario),\n'
+                             '        tools=_expected_tools(scenario),\n'
+                             '        prompt_token_ids=prompt_token_ids,\n'},
+            {'name': 'tests/parser/engine/trace_builder.py:landmark-5',
+             'path': 'tests/parser/engine/trace_builder.py',
+             'before': '        vocab=_DSV4_VOCAB,\n'
+                       '        segments=_dsv4_segments(scenario, thinking),\n'
+                       '        expected_reasoning=expected_reasoning,\n'
+                       '        expected_content=_qwen3_expected_content(scenario),\n'
+                       '        expected_tool_calls=_expected_tc(scenario),\n'
+                       '        tools=_expected_tools(scenario),\n'
+                       '        chat_template_kwargs=chat_kwargs,\n',
+             'after': '        vocab=_DSV4_VOCAB,\n'
+                      '        segments=_dsv4_segments(scenario, thinking),\n'
+                      '        expected_reasoning=expected_reasoning,\n'
+                      '        expected_content=scenario.content,\n'
+                      '        expected_tool_calls=_expected_tc(scenario),\n'
+                      '        tools=_expected_tools(scenario),\n'
+                      '        chat_template_kwargs=chat_kwargs,\n',
+             'review_before': '        vocab=_DSV4_VOCAB,\n'
+                              '        segments=_dsv4_segments(scenario, thinking),\n'
+                              '        expected_reasoning=expected_reasoning,\n'
+                              '        '
+                              'expected_content=_qwen3_expected_content(scenario),\n'
+                              '        expected_tool_calls=_expected_tc(scenario),\n'
+                              '        tools=_expected_tools(scenario),\n'
+                              '        chat_template_kwargs=chat_kwargs,\n',
+             'review_after': '        vocab=_DSV4_VOCAB,\n'
+                             '        segments=_dsv4_segments(scenario, thinking),\n'
+                             '        expected_reasoning=expected_reasoning,\n'
+                             '        expected_content=scenario.content,\n'
+                             '        expected_tool_calls=_expected_tc(scenario),\n'
+                             '        tools=_expected_tools(scenario),\n'
+                             '        chat_template_kwargs=chat_kwargs,\n'},
+            {'name': 'tests/parser/engine/trace_builder.py:landmark-6',
+             'path': 'tests/parser/engine/trace_builder.py',
+             'before': '        vocab=_DSV32_VOCAB,\n'
+                       '        segments=_dsv32_segments(scenario),\n'
+                       '        expected_reasoning=None,\n'
+                       '        expected_content=_qwen3_expected_content(scenario),\n'
+                       '        expected_tool_calls=_expected_tc(scenario),\n'
+                       '        tools=_expected_tools(scenario),\n'
+                       '    )\n',
+             'after': '        vocab=_DSV32_VOCAB,\n'
+                      '        segments=_dsv32_segments(scenario),\n'
+                      '        expected_reasoning=None,\n'
+                      '        expected_content=scenario.content,\n'
+                      '        expected_tool_calls=_expected_tc(scenario),\n'
+                      '        tools=_expected_tools(scenario),\n'
+                      '    )\n',
+             'review_before': '        vocab=_DSV32_VOCAB,\n'
+                              '        segments=_dsv32_segments(scenario),\n'
+                              '        expected_reasoning=None,\n'
+                              '        '
+                              'expected_content=_qwen3_expected_content(scenario),\n'
+                              '        expected_tool_calls=_expected_tc(scenario),\n'
+                              '        tools=_expected_tools(scenario),\n'
+                              '    )\n',
+             'review_after': '        vocab=_DSV32_VOCAB,\n'
+                             '        segments=_dsv32_segments(scenario),\n'
+                             '        expected_reasoning=None,\n'
+                             '        expected_content=scenario.content,\n'
+                             '        expected_tool_calls=_expected_tc(scenario),\n'
+                             '        tools=_expected_tools(scenario),\n'
+                             '    )\n'},
+            {'name': 'tests/parser/engine/trace_builder.py:landmark-7',
+             'path': 'tests/parser/engine/trace_builder.py',
+             'before': '        vocab=_GLM47_MOE_VOCAB,\n'
+                       '        segments=_glm47_moe_segments(scenario),\n'
+                       '        expected_reasoning=scenario.reasoning if '
+                       'scenario.reasoning is not None else "",\n'
+                       '        expected_content=_qwen3_expected_content(scenario),\n'
+                       '        expected_tool_calls=_expected_tc(scenario),\n'
+                       '        tools=_expected_tools(scenario),\n'
+                       '    )\n',
+             'after': '        vocab=_GLM47_MOE_VOCAB,\n'
+                      '        segments=_glm47_moe_segments(scenario),\n'
+                      '        expected_reasoning=scenario.reasoning if '
+                      'scenario.reasoning is not None else "",\n'
+                      '        expected_content=scenario.content,\n'
+                      '        expected_tool_calls=_expected_tc(scenario),\n'
+                      '        tools=_expected_tools(scenario),\n'
+                      '    )\n',
+             'review_before': '        vocab=_GLM47_MOE_VOCAB,\n'
+                              '        segments=_glm47_moe_segments(scenario),\n'
+                              '        expected_reasoning=scenario.reasoning if '
+                              'scenario.reasoning is not None else "",\n'
+                              '        '
+                              'expected_content=_qwen3_expected_content(scenario),\n'
+                              '        expected_tool_calls=_expected_tc(scenario),\n'
+                              '        tools=_expected_tools(scenario),\n'
+                              '    )\n',
+             'review_after': '        vocab=_GLM47_MOE_VOCAB,\n'
+                             '        segments=_glm47_moe_segments(scenario),\n'
+                             '        expected_reasoning=scenario.reasoning if '
+                             'scenario.reasoning is not None else "",\n'
+                             '        expected_content=scenario.content,\n'
+                             '        expected_tool_calls=_expected_tc(scenario),\n'
+                             '        tools=_expected_tools(scenario),\n'
+                             '    )\n'},
+            {'name': 'tests/parser/engine/trace_builder.py:landmark-8',
+             'path': 'tests/parser/engine/trace_builder.py',
+             'before': '        vocab=_KIMI_K2_VOCAB,\n'
+                       '        segments=_kimi_k2_segments(scenario),\n'
+                       '        expected_reasoning=expected_reasoning,\n'
+                       '        expected_content=_qwen3_expected_content(scenario),\n'
+                       '        expected_tool_calls=_expected_tc(scenario),\n'
+                       '        tools=_expected_tools(scenario),\n'
+                       '        chat_template_kwargs=None if thinking else '
+                       '{"thinking": False},\n',
+             'after': '        vocab=_KIMI_K2_VOCAB,\n'
+                      '        segments=_kimi_k2_segments(scenario),\n'
+                      '        expected_reasoning=expected_reasoning,\n'
+                      '        expected_content=scenario.content,\n'
+                      '        expected_tool_calls=_expected_tc(scenario),\n'
+                      '        tools=_expected_tools(scenario),\n'
+                      '        chat_template_kwargs=None if thinking else {"thinking": '
+                      'False},\n',
+             'review_before': '        vocab=_KIMI_K2_VOCAB,\n'
+                              '        segments=_kimi_k2_segments(scenario),\n'
+                              '        expected_reasoning=expected_reasoning,\n'
+                              '        '
+                              'expected_content=_qwen3_expected_content(scenario),\n'
+                              '        expected_tool_calls=_expected_tc(scenario),\n'
+                              '        tools=_expected_tools(scenario),\n'
+                              '        chat_template_kwargs=None if thinking else '
+                              '{"thinking": False},\n',
+             'review_after': '        vocab=_KIMI_K2_VOCAB,\n'
+                             '        segments=_kimi_k2_segments(scenario),\n'
+                             '        expected_reasoning=expected_reasoning,\n'
+                             '        expected_content=scenario.content,\n'
+                             '        expected_tool_calls=_expected_tc(scenario),\n'
+                             '        tools=_expected_tools(scenario),\n'
+                             '        chat_template_kwargs=None if thinking else '
+                             '{"thinking": False},\n'},
+            {'name': 'tests/parser/engine/trace_builder.py:landmark-9',
+             'path': 'tests/parser/engine/trace_builder.py',
+             'before': '        vocab=_TML_VOCAB,\n'
+                       '        segments=_inkling_segments(scenario),\n'
+                       '        expected_reasoning=scenario.reasoning,\n'
+                       '        expected_content=_qwen3_expected_content(scenario),\n'
+                       '        expected_tool_calls=_expected_tc(scenario),\n'
+                       '        tools=_expected_tools(scenario),\n'
+                       '        prompt_token_ids=prompt_token_ids,\n',
+             'after': '        vocab=_TML_VOCAB,\n'
+                      '        segments=_inkling_segments(scenario),\n'
+                      '        expected_reasoning=scenario.reasoning,\n'
+                      '        expected_content=scenario.content,\n'
+                      '        expected_tool_calls=_expected_tc(scenario),\n'
+                      '        tools=_expected_tools(scenario),\n'
+                      '        prompt_token_ids=prompt_token_ids,\n',
+             'review_before': '        vocab=_TML_VOCAB,\n'
+                              '        segments=_inkling_segments(scenario),\n'
+                              '        expected_reasoning=scenario.reasoning,\n'
+                              '        '
+                              'expected_content=_qwen3_expected_content(scenario),\n'
+                              '        expected_tool_calls=_expected_tc(scenario),\n'
+                              '        tools=_expected_tools(scenario),\n'
+                              '        prompt_token_ids=prompt_token_ids,\n',
+             'review_after': '        vocab=_TML_VOCAB,\n'
+                             '        segments=_inkling_segments(scenario),\n'
+                             '        expected_reasoning=scenario.reasoning,\n'
+                             '        expected_content=scenario.content,\n'
+                             '        expected_tool_calls=_expected_tc(scenario),\n'
+                             '        tools=_expected_tools(scenario),\n'
+                             '        prompt_token_ids=prompt_token_ids,\n'},
+            {'name': 'vllm/parser/abstract_parser.py:landmark-1',
+             'path': 'vllm/parser/abstract_parser.py',
+             'before': '        tool_calls = list[FunctionCall]()\n'
+                       '        if is_named_tool_choice and '
+                       'supports_required_and_named:\n'
+                       '            if content is None or (isinstance(content, str) '
+                       'and not content.strip()):\n'
+                       '                return [], None\n'
+                       '            function_name = self._get_function_name(request)\n'
+                       '            tool_calls.append(\n'
+                       '                FunctionCall(\n',
+             'after': '        tool_calls = list[FunctionCall]()\n'
+                      '        if is_named_tool_choice and '
+                      'supports_required_and_named:\n'
+                      '            if content is None or (isinstance(content, str) and '
+                      'not content.strip()):\n'
+                      '                return [], content\n'
+                      '            function_name = self._get_function_name(request)\n'
+                      '            tool_calls.append(\n'
+                      '                FunctionCall(\n',
+             'review_before': '        tool_calls = list[FunctionCall]()\n'
+                              '        if is_named_tool_choice and '
+                              'supports_required_and_named:\n'
+                              '            if content is None or (isinstance(content, '
+                              'str) and not content.strip()):\n'
+                              '                return [], None\n'
+                              '            function_name = '
+                              'self._get_function_name(request)\n'
+                              '            tool_calls.append(\n'
+                              '                FunctionCall(\n',
+             'review_after': '        tool_calls = list[FunctionCall]()\n'
+                             '        if is_named_tool_choice and '
+                             'supports_required_and_named:\n'
+                             '            if content is None or (isinstance(content, '
+                             'str) and not content.strip()):\n'
+                             '                return [], content\n'
+                             '            function_name = '
+                             'self._get_function_name(request)\n'
+                             '            tool_calls.append(\n'
+                             '                FunctionCall(\n'},
+            {'name': 'vllm/parser/abstract_parser.py:landmark-2',
+             'path': 'vllm/parser/abstract_parser.py',
+             'before': '                    for tc in tool_call_info.tool_calls\n'
+                       '                )\n'
+                       '                content = tool_call_info.content\n'
+                       '                if content and content.strip() == "":\n'
+                       '                    content = None\n'
+                       '            else:\n'
+                       '                # No tool calls.\n'
+                       '                # For required/named tool choice (when falling '
+                       'back to auto\n'
+                       '                # parsing), if content is empty or '
+                       'whitespace-only, return\n'
+                       '                # empty list with None content.\n'
+                       '                if (is_required_tool_choice or '
+                       'is_named_tool_choice) and (\n'
+                       '                    content is None\n'
+                       '                    or (isinstance(content, str) and not '
+                       'content.strip())\n'
+                       '                ):\n'
+                       '                    return [], None\n'
+                       '                return None, content\n'
+                       '\n'
+                       '        return tool_calls, content\n',
+             'after': '                    for tc in tool_call_info.tool_calls\n'
+                      '                )\n'
+                      '                content = tool_call_info.content\n'
+                      '            else:\n'
+                      '                # No tool calls.\n'
+                      '                # An unfulfilled required/named choice still '
+                      'carries the\n'
+                      '                # content the model produced.\n'
+                      '                if (is_required_tool_choice or '
+                      'is_named_tool_choice) and (\n'
+                      '                    content is None\n'
+                      '                    or (isinstance(content, str) and not '
+                      'content.strip())\n'
+                      '                ):\n'
+                      '                    return [], content\n'
+                      '                return None, content\n'
+                      '\n'
+                      '        return tool_calls, content\n',
+             'review_before': '                    for tc in '
+                              'tool_call_info.tool_calls\n'
+                              '                )\n'
+                              '                content = tool_call_info.content\n'
+                              '                if content and content.strip() == "":\n'
+                              '                    content = None\n'
+                              '            else:\n'
+                              '                # No tool calls.\n'
+                              '                # For required/named tool choice (when '
+                              'falling back to auto\n'
+                              '                # parsing), if content is empty or '
+                              'whitespace-only, return\n'
+                              '                # empty list with None content.\n'
+                              '                if (is_required_tool_choice or '
+                              'is_named_tool_choice) and (\n'
+                              '                    content is None\n'
+                              '                    or (isinstance(content, str) and '
+                              'not content.strip())\n'
+                              '                ):\n'
+                              '                    return [], None\n'
+                              '                return None, content\n'
+                              '\n'
+                              '        return tool_calls, content\n',
+             'review_after': '                    for tc in tool_call_info.tool_calls\n'
+                             '                )\n'
+                             '                content = tool_call_info.content\n'
+                             '            else:\n'
+                             '                # No tool calls.\n'
+                             '                # An unfulfilled required/named choice '
+                             'still carries the\n'
+                             '                # content the model produced.\n'
+                             '                if (is_required_tool_choice or '
+                             'is_named_tool_choice) and (\n'
+                             '                    content is None\n'
+                             '                    or (isinstance(content, str) and not '
+                             'content.strip())\n'
+                             '                ):\n'
+                             '                    return [], content\n'
+                             '                return None, content\n'
+                             '\n'
+                             '        return tool_calls, content\n'},
+            {'name': 'vllm/parser/mistral.py:landmark-1',
+             'path': 'vllm/parser/mistral.py',
+             'before': '        stream_arg_deltas=True,\n'
+                       '        tool_args_json=True,\n'
+                       '        strip_trailing_reasoning_whitespace=True,\n'
+                       '        drop_whitespace_only_content_before_tools=True,\n'
+                       '    )\n'
+                       '\n'
+                       '\n',
+             'after': '        stream_arg_deltas=True,\n'
+                      '        tool_args_json=True,\n'
+                      '        strip_trailing_reasoning_whitespace=True,\n'
+                      '    )\n'
+                      '\n'
+                      '\n',
+             'review_before': '        stream_arg_deltas=True,\n'
+                              '        tool_args_json=True,\n'
+                              '        strip_trailing_reasoning_whitespace=True,\n'
+                              '        '
+                              'drop_whitespace_only_content_before_tools=True,\n'
+                              '    )\n'
+                              '\n'
+                              '\n',
+             'review_after': '        stream_arg_deltas=True,\n'
+                             '        tool_args_json=True,\n'
+                             '        strip_trailing_reasoning_whitespace=True,\n'
+                             '    )\n'
+                             '\n'
                              '\n'})},
  {'name': 'phase-aware-parser-terminals',
   'review_patch': 'patches/vllm-phase-aware-parser-terminals.patch',
-  'review_sha256': 'cc79995955bc36f6ef383983efe5359b0170895ad8c682593c1435c12dd66ceb',
+  'review_sha256': '8e9adb65b71b6ba7e3e79ea50ecc37ca9129820ac94a41c71c5286d8d5de68f8',
   'files': ({'path': 'tests/parser/engine/streaming_helpers.py',
              'before_sha256': '969ab05da36e3200c99a1c3d7a2a6a68bfaea5ccc8f3ab158da020a05092177c',
              'after_sha256': '6dba19ea496809f185a2824ac812bbdd93d4f2d8ac36e2827f76d670eddd996a'},
@@ -74038,14 +75021,14 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': '060dee3e8ce5ee791f89b0849d1a1f14ce87e72ce134174054940d8ea78afd6c',
              'after_sha256': 'acf3128470532aa0f07ee5d3749824a48e11cc44df78e4550a9b622a8fb05c0b'},
             {'path': 'tests/parser/engine/test_parser_engine.py',
-             'before_sha256': 'e3c906ca611720ddb682f38085f28e3d17ba382abc8fbdbe7938c3c309fbe801',
-             'after_sha256': 'b87bfaa56b7324d3514597dd4cda331b87a94740b4af7ea02d02d4d745863f73'},
+             'before_sha256': '6e16019a620f197a2bc159ca214fabef9a451b8c3dfe1776eb6572e249582cfb',
+             'after_sha256': 'e78d3a02da16759ee0418fee58ff2c550ca29a9dc0035bd892ebd4fae7369066'},
             {'path': 'tests/parser/engine/test_qwen_terminal_authority.py',
              'before_sha256': None,
              'after_sha256': '15b1a503148a15e51bfc85798c7964342cc611e3dfb5451734020513259f8dad'},
             {'path': 'tests/parser/engine/test_qwen_xml_fidelity.py',
-             'before_sha256': 'd65437f8236830dba29225e527962f795e40402a6630d418d50bb56a730677bb',
-             'after_sha256': '385419884b0d4e7be89043a5d72d07145ad50c259fe494c77256bc31bb92f88c'},
+             'before_sha256': '2d41c84835a4ae718cf573e8a2f8f5ebe14df1282aab4b1491ed6abd70d5eb37',
+             'after_sha256': '969ed3d6968db465472951207d70c3ed70128f4c69f766ea3c41d46b754c8a2e'},
             {'path': 'tests/parser/engine/test_reasoning_token_count.py',
              'before_sha256': '37bb1cb80e628ceccc0bd042c9d2806183d2366015a64eac7244af6cc81d1e85',
              'after_sha256': '4d823e0f71e5041c60d077a258f80250a4c11fbc642f5bbc6ceb7da515c04b94'},
@@ -74059,11 +75042,11 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': '1f4b3ad07d6fbed70024db07125296121a454f6a0eb68e32118913a31e4c7899',
              'after_sha256': 'a95f86eb4146d3096a73f1076260bbc58630a74c377b9da1d7e66d65e898465f'},
             {'path': 'vllm/parser/engine/parser_engine.py',
-             'before_sha256': '183bc34df3a83e71931599e8d629ab8d58290557b197942a799489449c49db1f',
-             'after_sha256': '4a2db5ade2b1b701e460c518d9602c820bec100f25ceba35e58a663784a23ea6'},
+             'before_sha256': 'c53202173f916b09db41122e95055999e11d578401e1809b27f308f86f72bcc5',
+             'after_sha256': '3d75b24ff94895b9f1a5dff49e31c0b3d4d29ce886bcfb04679ad32b27b25904'},
             {'path': 'vllm/parser/engine/parser_engine_config.py',
-             'before_sha256': '357bf8876536e1a093d4c6d6de87d00bbc113ae9bc22440fa021c983ee64cf64',
-             'after_sha256': '4a07e2e283c09334ec527f6fb114ee00e817122a388d567eedae8bf1a282a09b'},
+             'before_sha256': 'a5b3aec530efe97e210f3c75fd158f014203d837322ab7f4fceedbb80e07c7d5',
+             'after_sha256': 'cb14810b125705026ce8e558d0f53e7fb814b86371f8ee36908d30aa9d2e69f1'},
             {'path': 'vllm/parser/engine/streaming_parser_engine.py',
              'before_sha256': '387a342be77da9928001c697e2e46c2895cd3ecd96dca9109ed18c4578a3a027',
              'after_sha256': '4dfe9ac9a6f742237f962fecae6b72f596fe93684b107a2647e79eb52494b392'},
@@ -74074,14 +75057,14 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': 'ce3629319e56e882d25cb75d62e3e7088a4eec1518885fc69fc696eafb4a97b2',
              'after_sha256': 'b0c121dddf46e6c74ee6cae1d47eccddbdd0e1622e2f41b985e4e06bd017ed73'},
             {'path': 'vllm/parser/kimi_k2.py',
-             'before_sha256': '973593fdca71b7489c86f34353ff65bbc5d30715add86fab40a09c1be63ca12c',
-             'after_sha256': 'b02a260d3dbe8d6e2efaf48d5ec37127e3cd713d4314b439eb05b6b78a2c41cb'},
+             'before_sha256': '6fcb9c15d8168a034fc1f15d8f43467c2b4ad5457c9b8d8f8571ca6caaede85f',
+             'after_sha256': '7d1d9a64ae888e08c135e8b3859d6a3a66b53e4b8e685bd2f4090bd30204ab56'},
             {'path': 'vllm/parser/minimax_m2.py',
              'before_sha256': '31c0816e323fd957ff0a2a28222dca411e6811f914e2743a279d05413f839086',
              'after_sha256': '38577327262d3df29c052240f7bbb1369b82a6d3697d85bd4e5c29d130662fa1'},
             {'path': 'vllm/parser/mistral.py',
-             'before_sha256': 'd361421339cfe4daa0c0e924bf255eabbb3bc34eb9a1be0aeb37f95e6c66295a',
-             'after_sha256': 'e4d970ebe09b6ab352032de923dd8b446eeca25ec82f9ffa893e6574e86ec480'},
+             'before_sha256': 'af028e500d1eafae7a357a6b2814c7e08d7d4892057a83002081135420005103',
+             'after_sha256': '1ec656330956a89a6a5446e96282a2b049bb4504baad9f6779351e20958a7c25'},
             {'path': 'vllm/parser/qwen3.py',
              'before_sha256': '7da16cd0e85b8ff6e6544c260cdde2521b881dc2605b64b666fca6fdf97bbdca',
              'after_sha256': 'f86f2c698af67f665cd549b38007e92eba1cdbd1598aa5c4f71e73cf10fe5b09'}),
@@ -75155,39 +76138,39 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before': "    return ''.join(REVERSE.get(i, chr(i)) for i in ids)\n"
                        '\n'
                        '\n'
-                       'def parse(text, chunk_size):\n'
+                       "def parse(text, chunk_size, choice='auto'):\n"
                        "    request = ChatCompletionRequest(messages=[{'role': 'user', "
                        "'content': 'test'}],\n"
                        '                                    tools=[TOOL], '
-                       "tool_choice='auto')\n"
+                       'tool_choice=choice)\n'
                        '    tokenizer = MagicMock()\n',
              'after': "    return ''.join(REVERSE.get(i, chr(i)) for i in ids)\n"
                       '\n'
                       '\n'
-                      'def parse(text, chunk_size, ids=None):\n'
+                      "def parse(text, chunk_size, ids=None, choice='auto'):\n"
                       "    request = ChatCompletionRequest(messages=[{'role': 'user', "
                       "'content': 'test'}],\n"
                       '                                    tools=[TOOL], '
-                      "tool_choice='auto')\n"
+                      'tool_choice=choice)\n'
                       '    tokenizer = MagicMock()\n',
              'review_before': "    return ''.join(REVERSE.get(i, chr(i)) for i in "
                               'ids)\n'
                               '\n'
                               '\n'
-                              'def parse(text, chunk_size):\n'
+                              "def parse(text, chunk_size, choice='auto'):\n"
                               "    request = ChatCompletionRequest(messages=[{'role': "
                               "'user', 'content': 'test'}],\n"
                               '                                    tools=[TOOL], '
-                              "tool_choice='auto')\n"
+                              'tool_choice=choice)\n'
                               '    tokenizer = MagicMock()\n',
              'review_after': "    return ''.join(REVERSE.get(i, chr(i)) for i in ids)\n"
                              '\n'
                              '\n'
-                             'def parse(text, chunk_size, ids=None):\n'
+                             "def parse(text, chunk_size, ids=None, choice='auto'):\n"
                              "    request = ChatCompletionRequest(messages=[{'role': "
                              "'user', 'content': 'test'}],\n"
                              '                                    tools=[TOOL], '
-                             "tool_choice='auto')\n"
+                             'tool_choice=choice)\n'
                              '    tokenizer = MagicMock()\n'},
             {'name': 'tests/parser/engine/test_qwen_xml_fidelity.py:landmark-2',
              'path': 'tests/parser/engine/test_qwen_xml_fidelity.py',
@@ -77124,7 +78107,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '                        request_id=internal_req_id,\n'})},
  {'name': 'tool-output-completion',
   'review_patch': 'patches/vllm-tool-output-completion.patch',
-  'review_sha256': '9945b84b32a0c33b624e3ed1720aa9cc320f63a0fed5dce35761eb392d0849a5',
+  'review_sha256': '1bdbf346fce5376ec87208dd4fffc2afa9abfde997c35b403a8cc7c4dc3b02fa',
   'files': ({'path': 'tests/entrypoints/openai/chat_completion/test_parallel_tool_call_integrity.py',
              'before_sha256': 'a4a6547338dbf625e3041e2578f2a8e314aa14d1520468c69ee17ff22998d9a2',
              'after_sha256': 'e290f2c4df7bd842594db1fb4e66bf713bc6ff653cbadc8877958a955c0fa4c4'},
@@ -77156,14 +78139,14 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': '2eb659b4b126d551ea60516d499e79de420162da90c9cc7dafd220b1f52646cd',
              'after_sha256': 'fd74b42a19e162f1326fbd7e27bf9fe615b572fe6537266ee8bdedb5393a3c30'},
             {'path': 'vllm/parser/abstract_parser.py',
-             'before_sha256': 'c3ab24e70dcabf75cd8cb662e56bd369dfcb6a9e66814e1e35f2840bc3920c4d',
-             'after_sha256': '9bbe4ee311d824ad6fffb3b71f8cee68c17c18c483efada6b2f75a9676accf9a'},
+             'before_sha256': '27d0c3fd3694c3aab00bfa59a644f680ff61f2fb76cea2fe4fcc7949ce97a172',
+             'after_sha256': 'c7c5d58071832c14431c43dc1babde8882b4690ea1c6c506d756f174a9c6c95e'},
             {'path': 'vllm/parser/engine/adapters.py',
              'before_sha256': 'cda9c48f5b64c60224961bd75c8a5667caaa1494da581f5bb7ab10cec07ecd8b',
              'after_sha256': 'f5d248040238b4fdcd89c97164c97e45941fad46d650614b4de5e8cd9e83118a'},
             {'path': 'vllm/parser/engine/parser_engine.py',
-             'before_sha256': '4a2db5ade2b1b701e460c518d9602c820bec100f25ceba35e58a663784a23ea6',
-             'after_sha256': 'b7027030f3b019b018f897e9fc898963bd1b7f1c9893ceaaa4fc4b7af217f240'},
+             'before_sha256': '3d75b24ff94895b9f1a5dff49e31c0b3d4d29ce886bcfb04679ad32b27b25904',
+             'after_sha256': '3e7fa5e4d302ffc6c6fcbff8bb0933f897f1fd5c975254db75cffff9e0f884b2'},
             {'path': 'vllm/parser/engine/streaming_parser_engine.py',
              'before_sha256': '4dfe9ac9a6f742237f962fecae6b72f596fe93684b107a2647e79eb52494b392',
              'after_sha256': '971e1b338169349d03bf04ad4bbd9702b97f6086cf4890d23321a0a37a5b385b'},
@@ -81020,18 +82003,18 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '\n'},
             {'name': 'vllm/parser/engine/parser_engine.py:landmark-5',
              'path': 'vllm/parser/engine/parser_engine.py',
-             'before': '                content, tool_call_info.tools_called\n'
-                       '            )\n'
+             'before': '            reasoning = reasoning.rstrip() or None\n'
                        '\n'
+                       '        content = delta.content if delta else None\n'
                        '        return reasoning, content, tool_call_info\n'
                        '\n'
                        '    # ── Non-streaming: parse '
                        '───────────────────────────────────────────\n'
                        '\n'
                        '    def parse(\n',
-             'after': '                content, tool_call_info.tools_called\n'
-                      '            )\n'
+             'after': '            reasoning = reasoning.rstrip() or None\n'
                       '\n'
+                      '        content = delta.content if delta else None\n'
                       '        return reasoning, content, tool_call_info\n'
                       '\n'
                       '    def _completed_tool_events(\n'
@@ -81110,18 +82093,18 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '───────────────────────────────────────────\n'
                       '\n'
                       '    def parse(\n',
-             'review_before': '                content, tool_call_info.tools_called\n'
-                              '            )\n'
+             'review_before': '            reasoning = reasoning.rstrip() or None\n'
                               '\n'
+                              '        content = delta.content if delta else None\n'
                               '        return reasoning, content, tool_call_info\n'
                               '\n'
                               '    # ── Non-streaming: parse '
                               '───────────────────────────────────────────\n'
                               '\n'
                               '    def parse(\n',
-             'review_after': '                content, tool_call_info.tools_called\n'
-                             '            )\n'
+             'review_after': '            reasoning = reasoning.rstrip() or None\n'
                              '\n'
+                             '        content = delta.content if delta else None\n'
                              '        return reasoning, content, tool_call_info\n'
                              '\n'
                              '    def _completed_tool_events(\n'
@@ -84100,7 +85083,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '        ]\n'})},
  {'name': 'one-way-thinking-boundary',
   'review_patch': 'patches/vllm-one-way-thinking-boundary.patch',
-  'review_sha256': '8c6a2ecae7785fffbfec61ec1a7f42428263feb07d1d3a6ff6ea126b366e0144',
+  'review_sha256': '63a69aea8a184a3875f50673a55058fb9e14dc3178abd8c5510de2770022f346',
   'files': ({'path': 'tests/v1/logits_processors/test_correctness.py',
              'before_sha256': 'e9ae07b22a7d84a676e35dfb2b962504c3b7201f0e6b5d31e97e8c2ef0546e0a',
              'after_sha256': 'ce76f8c40dd6028b195600a2733656a877952b01eacd55b63dd9e619dd2f1290'},
@@ -84111,8 +85094,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': 'f5d248040238b4fdcd89c97164c97e45941fad46d650614b4de5e8cd9e83118a',
              'after_sha256': 'b59c8b5911e0570fbe5778791e079a197c365beda8160ea901e3ff2dcf18fa48'},
             {'path': 'vllm/parser/engine/parser_engine.py',
-             'before_sha256': 'b7027030f3b019b018f897e9fc898963bd1b7f1c9893ceaaa4fc4b7af217f240',
-             'after_sha256': 'd599c6e80ccc7ad054b3ab263177f820b1da840de0b57d964baed3761e59dece'},
+             'before_sha256': '3e7fa5e4d302ffc6c6fcbff8bb0933f897f1fd5c975254db75cffff9e0f884b2',
+             'after_sha256': '6a07e8c8733cefadd7fce345851a1f5e447709a7cf083b96b571fe03e6e1b307'},
             {'path': 'vllm/parser/qwen3.py',
              'before_sha256': '0f2fd79645b9c4ed2f2e87dafa8a67015ec775418b671b387dca4dbfa25f02ac',
              'after_sha256': '1661e17f66a979600a730bfb9369a97be3f1f1719a1c2d7331af3892d388cfbb'},
@@ -85573,16 +86556,16 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '                step_prefix_len = idx - start + 1\n'})},
  {'name': 'schema-faithful-xml',
   'review_patch': 'patches/vllm-schema-faithful-xml.patch',
-  'review_sha256': 'c78ca3f0b13d85635eafdc4f28f89adca5d3151a3ab5c98276a9202a1814af2d',
+  'review_sha256': 'bd5475972df5b62dd4a0b2b67e68640987f018cf9b14870edf6569a6b0cd8dcc',
   'files': ({'path': 'tests/parser/engine/test_qwen3.py',
              'before_sha256': 'e08cb8b5ba3d19e80dca5da22730360c194fcfea7c899dcd84a0d1b7273099de',
              'after_sha256': 'ca773868114ed9eb184bdde02a12763b644e4b14456f847f19e853b39721b569'},
             {'path': 'tests/parser/engine/test_qwen_xml_fidelity.py',
-             'before_sha256': '385419884b0d4e7be89043a5d72d07145ad50c259fe494c77256bc31bb92f88c',
-             'after_sha256': '15383f95416d7b52d0c4967e1eb9c9241ce25ae10e8eb3d1bf90eb36d355f775'},
+             'before_sha256': '969ed3d6968db465472951207d70c3ed70128f4c69f766ea3c41d46b754c8a2e',
+             'after_sha256': 'ecff0586292555a116ada3b7d7e644896c73ff09d076983fc0415d4bbae17ffc'},
             {'path': 'vllm/parser/engine/parser_engine.py',
-             'before_sha256': 'd599c6e80ccc7ad054b3ab263177f820b1da840de0b57d964baed3761e59dece',
-             'after_sha256': 'ad7bb86c0e0737edd9c052f2429296c8949b7f2e3fa30d5b5a7faab9c9e0db1c'},
+             'before_sha256': '6a07e8c8733cefadd7fce345851a1f5e447709a7cf083b96b571fe03e6e1b307',
+             'after_sha256': '3077737309b8064bc6906b24caf06ea94cdc89c205a6b6da8c1c0d05f7544d6e'},
             {'path': 'vllm/parser/qwen3.py',
              'before_sha256': '1661e17f66a979600a730bfb9369a97be3f1f1719a1c2d7331af3892d388cfbb',
              'after_sha256': 'c84856f77e4c2d057bbc5e6bafecc23ef39d4f573b49f28c41b6cc420c381c68'},
@@ -85866,11 +86849,11 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                        "    return ''.join(REVERSE.get(i, chr(i)) for i in ids)\n"
                        '\n'
                        '\n'
-                       'def parse(text, chunk_size, ids=None):\n'
+                       "def parse(text, chunk_size, ids=None, choice='auto'):\n"
                        "    request = ChatCompletionRequest(messages=[{'role': 'user', "
                        "'content': 'test'}],\n"
                        '                                    tools=[TOOL], '
-                       "tool_choice='auto')\n"
+                       'tool_choice=choice)\n'
                        '    tokenizer = MagicMock()\n'
                        '    tokenizer.get_vocab.return_value = MARKERS\n'
                        '    tokenizer.decode.side_effect = decode\n'
@@ -85902,7 +86885,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '\n'
                       '\n'
                       'def parse(text, chunk_size, ids=None, schema=None, '
-                      "finish='stop'):\n"
+                      "finish='stop', choice='auto'):\n"
                       '    tool = TOOL if schema is None else {\n'
                       "        'type': 'function', 'function': {'name': 'write', "
                       "'parameters': schema},\n"
@@ -85910,7 +86893,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       "    request = ChatCompletionRequest(messages=[{'role': 'user', "
                       "'content': 'test'}],\n"
                       '                                    tools=[tool], '
-                      "tool_choice='auto')\n"
+                      'tool_choice=choice)\n'
                       '    tokenizer = MagicMock()\n'
                       '    tokenizer.get_vocab.return_value = MARKERS\n'
                       '    tokenizer.decode.side_effect = decode\n'
@@ -85945,11 +86928,11 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                               'ids)\n'
                               '\n'
                               '\n'
-                              'def parse(text, chunk_size, ids=None):\n'
+                              "def parse(text, chunk_size, ids=None, choice='auto'):\n"
                               "    request = ChatCompletionRequest(messages=[{'role': "
                               "'user', 'content': 'test'}],\n"
                               '                                    tools=[TOOL], '
-                              "tool_choice='auto')\n"
+                              'tool_choice=choice)\n'
                               '    tokenizer = MagicMock()\n'
                               '    tokenizer.get_vocab.return_value = MARKERS\n'
                               '    tokenizer.decode.side_effect = decode\n'
@@ -85981,7 +86964,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '\n'
                              '\n'
                              'def parse(text, chunk_size, ids=None, schema=None, '
-                             "finish='stop'):\n"
+                             "finish='stop', choice='auto'):\n"
                              '    tool = TOOL if schema is None else {\n'
                              "        'type': 'function', 'function': {'name': "
                              "'write', 'parameters': schema},\n"
@@ -85989,7 +86972,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              "    request = ChatCompletionRequest(messages=[{'role': "
                              "'user', 'content': 'test'}],\n"
                              '                                    tools=[tool], '
-                             "tool_choice='auto')\n"
+                             'tool_choice=choice)\n'
                              '    tokenizer = MagicMock()\n'
                              '    tokenizer.get_vocab.return_value = MARKERS\n'
                              '    tokenizer.decode.side_effect = decode\n'
@@ -93025,7 +94008,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'serving.online_renderer.renderer.process_rendered_multimodal_async.assert_not_called()\n'})},
  {'name': 'qwen-canonical-parameter-framing',
   'review_patch': 'patches/vllm-qwen-canonical-parameter-framing.patch',
-  'review_sha256': '6725caf33ac3ab55d1acede045808c5f37585e658900e770c226477b0be5e302',
+  'review_sha256': 'd438f9106c4a989d64837c21f5491d946065e6721570ad47664513347f150064',
   'files': ({'path': 'vllm/parser/qwen3.py',
              'before_sha256': 'c84856f77e4c2d057bbc5e6bafecc23ef39d4f573b49f28c41b6cc420c381c68',
              'after_sha256': 'ecbc647afb1f229ad556fbb055837f7a006b6bc7cc9d4d17e151e79d5fe8cde9'},
@@ -93033,8 +94016,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': 'ca773868114ed9eb184bdde02a12763b644e4b14456f847f19e853b39721b569',
              'after_sha256': 'd37dc27c876210e016622c703fc98ca9ef23bb69f1addef5f5931226c8877d00'},
             {'path': 'tests/parser/engine/test_qwen_xml_fidelity.py',
-             'before_sha256': '15383f95416d7b52d0c4967e1eb9c9241ce25ae10e8eb3d1bf90eb36d355f775',
-             'after_sha256': '6688d26c1dda44ab874c45d81e45977f5fed46c735a293c18e3c150585223d1f'}),
+             'before_sha256': 'ecff0586292555a116ada3b7d7e644896c73ff09d076983fc0415d4bbae17ffc',
+             'after_sha256': '32bc7c5b149b0577ffb47f646cea56d5c1f6bc95be31803e2a05a7959743a421'}),
   'edits': ({'name': 'vllm/parser/qwen3.py:landmark-1',
              'path': 'vllm/parser/qwen3.py',
              'before': '\n'
@@ -95972,16 +96955,16 @@ FINAL_FILES = {'tests/config/test_config_utils.py': '4f5ea0399cc3b4f9603df07e2cc
  'tests/parser/engine/test_delegating_replay.py': 'da1a123dd3df8e22cfdf5b5fa10c13198cc82b295294d0fb5933beff09e2b86f',
  'tests/parser/engine/test_engine.py': 'acf3128470532aa0f07ee5d3749824a48e11cc44df78e4550a9b622a8fb05c0b',
  'tests/parser/engine/test_nemotron_v3.py': '65b1be9ad64bd16e08cea6d6886a33169aae31933c918587ea9e4ea8167975c5',
- 'tests/parser/engine/test_parser_engine.py': 'b87bfaa56b7324d3514597dd4cda331b87a94740b4af7ea02d02d4d745863f73',
+ 'tests/parser/engine/test_parser_engine.py': 'e78d3a02da16759ee0418fee58ff2c550ca29a9dc0035bd892ebd4fae7369066',
  'tests/parser/engine/test_qwen3.py': 'c82a55107f08a0541792cdc99bcf32e019c694fc37f810d5d3b4e2e7199ca784',
  'tests/parser/engine/test_qwen3_reasoning.py': '60a31db16f2b621403b9b2b5259407a44a5ce1e9e79b62e2c27f1cf505a4db21',
  'tests/parser/engine/test_qwen_terminal_authority.py': '15b1a503148a15e51bfc85798c7964342cc611e3dfb5451734020513259f8dad',
- 'tests/parser/engine/test_qwen_xml_fidelity.py': '6688d26c1dda44ab874c45d81e45977f5fed46c735a293c18e3c150585223d1f',
+ 'tests/parser/engine/test_qwen_xml_fidelity.py': '32bc7c5b149b0577ffb47f646cea56d5c1f6bc95be31803e2a05a7959743a421',
  'tests/parser/engine/test_reasoning_token_count.py': '4d823e0f71e5041c60d077a258f80250a4c11fbc642f5bbc6ceb7da515c04b94',
  'tests/parser/engine/test_replay.py': '1684c44d016e26a6ed4aec2c99e0b6f355c1fb1562603784d24f2e61496479a6',
  'tests/parser/engine/test_seed_oss.py': '9f2af2c75f71c6fb280f2a2a4a2bb8eaecf1c919c083e6c925f6d6f81cc2c236',
  'tests/parser/engine/test_token_id_scanner.py': '5e4524f0bc2096c0962246eac497ad014f7da4026d5265a39e3fea52d2a0a0e8',
- 'tests/parser/engine/trace_builder.py': '4ec7419f7ffaaef9e3f19ed345aa5ebb31d41b6686470d2768f01240c2efcdbc',
+ 'tests/parser/engine/trace_builder.py': '12311dc9d1686394bc7b4499e32b353dabe02c650942c0c9d3d376da5e55fcb0',
  'tests/quantization/test_turboquant.py': '6b872b2d50c047bee80a190678305f8962bb837cc48cac745cbda49acb154d7d',
  'tests/renderers/test_hf.py': 'a807a89a298f4542a149acb20471d55ac47a874639c134858996c8196387f8ee',
  'tests/test_request_input_bounds.py': '6ec60c5a6dcc50abd7d8b8e9645825b841fa5cdb510009e6a9f517dba58f1184',
@@ -96061,21 +97044,21 @@ FINAL_FILES = {'tests/config/test_config_utils.py': '4f5ea0399cc3b4f9603df07e2cc
  'vllm/multimodal/media/image.py': 'ba2f47bc7ce2a0b16b20680943c4da4033b2db43ebf62e1efcaca4818fefe685',
  'vllm/multimodal/processing/inputs.py': '389b97d942469c5600c6c321676497a0197eccec231aeabe0836080daaddafce',
  'vllm/multimodal/processing/processor.py': '43aca2c9c8fbd6e8d825c7f6eeed460f19ee65504a8540ee6bc0f0f26b404ef7',
- 'vllm/parser/abstract_parser.py': '9bbe4ee311d824ad6fffb3b71f8cee68c17c18c483efada6b2f75a9676accf9a',
+ 'vllm/parser/abstract_parser.py': 'c7c5d58071832c14431c43dc1babde8882b4690ea1c6c506d756f174a9c6c95e',
  'vllm/parser/deepseek_v32.py': '1fe0aec597caf6c10ff9905a3b1918c2a8608b5b1df32127ff8038c10f5d9b1c',
  'vllm/parser/deepseek_v4.py': 'a95f86eb4146d3096a73f1076260bbc58630a74c377b9da1d7e66d65e898465f',
  'vllm/parser/engine/adapters.py': 'b59c8b5911e0570fbe5778791e079a197c365beda8160ea901e3ff2dcf18fa48',
  'vllm/parser/engine/events.py': 'd0ed492bbe28c19b6ec0446770a21754bfa844a70888ef5706587b0bbea51405',
- 'vllm/parser/engine/parser_engine.py': 'ad7bb86c0e0737edd9c052f2429296c8949b7f2e3fa30d5b5a7faab9c9e0db1c',
- 'vllm/parser/engine/parser_engine_config.py': '4a07e2e283c09334ec527f6fb114ee00e817122a388d567eedae8bf1a282a09b',
+ 'vllm/parser/engine/parser_engine.py': '3077737309b8064bc6906b24caf06ea94cdc89c205a6b6da8c1c0d05f7544d6e',
+ 'vllm/parser/engine/parser_engine_config.py': 'cb14810b125705026ce8e558d0f53e7fb814b86371f8ee36908d30aa9d2e69f1',
  'vllm/parser/engine/streaming_parser_engine.py': 'b0bd3ff96ea79eca7d979d6344b8b0862993db4a293ffce711da8980662106e2',
  'vllm/parser/engine/token_id_scanner.py': 'dc6aec25112eef55f7ace3d5e519a0ded4a0012723318b1d2752df9e917907cd',
  'vllm/parser/gemma4.py': 'eda9202c72a865dc1c32a14891d6104474f3514b90adbf87e1c81a80a11c2719',
  'vllm/parser/glm47_moe.py': 'b0c121dddf46e6c74ee6cae1d47eccddbdd0e1622e2f41b985e4e06bd017ed73',
- 'vllm/parser/inkling.py': 'd2f1039bc8a7ff164f925c342f448bc5c4d8a1141b19db816d17922ab490e191',
- 'vllm/parser/kimi_k2.py': 'b02a260d3dbe8d6e2efaf48d5ec37127e3cd713d4314b439eb05b6b78a2c41cb',
+ 'vllm/parser/inkling.py': '183f1dd726bfe6169f0c72ef506f6a3edb13c8a19ccf1f515ed9f123aeeb3e6e',
+ 'vllm/parser/kimi_k2.py': '7d1d9a64ae888e08c135e8b3859d6a3a66b53e4b8e685bd2f4090bd30204ab56',
  'vllm/parser/minimax_m2.py': '38577327262d3df29c052240f7bbb1369b82a6d3697d85bd4e5c29d130662fa1',
- 'vllm/parser/mistral.py': 'e4d970ebe09b6ab352032de923dd8b446eeca25ec82f9ffa893e6574e86ec480',
+ 'vllm/parser/mistral.py': '1ec656330956a89a6a5446e96282a2b049bb4504baad9f6779351e20958a7c25',
  'vllm/parser/qwen3.py': 'e74bb5667bea480948d40598f1b1ea5fc070a67ec2d90921a5047e7d0128df53',
  'vllm/reasoning/abs_reasoning_parsers.py': 'ba4b1145048e5faa217e1ef4d849167ebd1fe7bcb9296fe2e9d2f17ce96607f7',
  'vllm/renderers/base.py': 'efc0e5706c2dbce32a645bb288e920515934566d23f1a54c4fbc4b6466b19a3e',

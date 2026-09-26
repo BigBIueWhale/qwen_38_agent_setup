@@ -290,15 +290,15 @@ It is intentionally reconstructed by thirty-five ordered, reviewed semantic tran
 | patches/vllm-sampling-decoding-boundary.patch | aaed899245dcfa877d8c1c19f2834317a7326695372c6810267b21dd3337f913 |
 | patches/vllm-token-generation-result-integrity.patch | c9d4e45adbb475c3e9796d1e0907b2f0d98cc384a34829a34e05ccdd33cc65c1 |
 | patches/vllm-raw-image-token-transport.patch | cab095d4b4fce8ee0e34d4b4cd18a066afdeb14da98ff09e1b57072e3cb565fd |
-| patches/vllm-xml-text-fidelity.patch | 999d6f471a4f480f5fd93b087c17c463417a8080206e952f3686510d57c9abd6 |
-| patches/vllm-phase-aware-parser-terminals.patch | cc79995955bc36f6ef383983efe5359b0170895ad8c682593c1435c12dd66ceb |
+| patches/vllm-xml-text-fidelity.patch | 73e973029f05bd88e5faa7bc1f5a38bac75ef5afcd562981be0961c3b830c6ab |
+| patches/vllm-phase-aware-parser-terminals.patch | 8e9adb65b71b6ba7e3e79ea50ecc37ca9129820ac94a41c71c5286d8d5de68f8 |
 | patches/vllm-input-stream-agent-identity.patch | f812362220f83b904d56e55e9c359918990c55e39d7a0750d1011840d377dfb4 |
-| patches/vllm-tool-output-completion.patch | 9945b84b32a0c33b624e3ed1720aa9cc320f63a0fed5dce35761eb392d0849a5 |
-| patches/vllm-one-way-thinking-boundary.patch | 8c6a2ecae7785fffbfec61ec1a7f42428263feb07d1d3a6ff6ea126b366e0144 |
-| patches/vllm-schema-faithful-xml.patch | c78ca3f0b13d85635eafdc4f28f89adca5d3151a3ab5c98276a9202a1814af2d |
+| patches/vllm-tool-output-completion.patch | 1bdbf346fce5376ec87208dd4fffc2afa9abfde997c35b403a8cc7c4dc3b02fa |
+| patches/vllm-one-way-thinking-boundary.patch | 63a69aea8a184a3875f50673a55058fb9e14dc3178abd8c5510de2770022f346 |
+| patches/vllm-schema-faithful-xml.patch | bd5475972df5b62dd4a0b2b67e68640987f018cf9b14870edf6569a6b0cd8dcc |
 | patches/vllm-token-text-provenance.patch | 954b36cb444f7e644e29d13f7a9d3c000512a0d616bbf2b6cd3cb8f4e880dd44 |
 | patches/vllm-precise-request-errors.patch | 055c3348b1a0c801ad6c8202d13659471106d0ff8a9b958efe1df16e25e9e588 |
-| patches/vllm-qwen-canonical-parameter-framing.patch | 6725caf33ac3ab55d1acede045808c5f37585e658900e770c226477b0be5e302 |
+| patches/vllm-qwen-canonical-parameter-framing.patch | d438f9106c4a989d64837c21f5491d946065e6721570ad47664513347f150064 |
 | patches/vllm-qwen-owned-tool-grammar.patch | 81b3f760a7aa670496deb1252ee3713d452ab62debec88062bbe4cadceb6c849 |
 
 The reconstructed tree has 100 reviewed runtime-source changes, 2 new runtime sources,
@@ -358,7 +358,7 @@ Pinned build inputs and products:
 | Docker context allowlist SHA-256 | 5b6b3c8e03cd9cdc3e8d48d8f4b30df98de4d1a6d2a0657484c24e295c4d7f50 |
 | Build verifier SHA-256 | 4eb82b3bb824e213c860c23e8b8e84df47f99f9db6741e86dfabc9be6f485f0e |
 | Runtime validator SHA-256 | 97aa532add98deeb090264e2b625865571fb07e6795a559b6400b5c59b78a009 |
-| Runtime lock SHA-256 | 2a6eb6f95bae81f46f76f371e6accf0d9d6e4044cadcdd7bd472cd1ad7f3c10e |
+| Runtime lock SHA-256 | 66653dc660e155d973f1b57a4e5b59e2b5f5f7759349233267adf70e985508fd |
 
 The runtime tag names the pinned image and nothing else. A build used to load its
 image under that tag before comparing the image ID with the pin, so a build that

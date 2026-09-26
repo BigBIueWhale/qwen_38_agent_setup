@@ -76,14 +76,14 @@ diff --git a/tests/parser/engine/test_qwen_xml_fidelity.py b/tests/parser/engine
      return ''.join(REVERSE.get(i, chr(i)) for i in ids)
  
  
--def parse(text, chunk_size, ids=None):
-+def parse(text, chunk_size, ids=None, schema=None, finish='stop'):
+-def parse(text, chunk_size, ids=None, choice='auto'):
++def parse(text, chunk_size, ids=None, schema=None, finish='stop', choice='auto'):
 +    tool = TOOL if schema is None else {
 +        'type': 'function', 'function': {'name': 'write', 'parameters': schema},
 +    }
      request = ChatCompletionRequest(messages=[{'role': 'user', 'content': 'test'}],
--                                    tools=[TOOL], tool_choice='auto')
-+                                    tools=[tool], tool_choice='auto')
+-                                    tools=[TOOL], tool_choice=choice)
++                                    tools=[tool], tool_choice=choice)
      tokenizer = MagicMock()
      tokenizer.get_vocab.return_value = MARKERS
      tokenizer.decode.side_effect = decode
@@ -111,7 +111,7 @@ diff --git a/tests/parser/engine/test_qwen_xml_fidelity.py b/tests/parser/engine
              continue
          reasoning += delta.reasoning or ''
          content += delta.content or ''
-@@ -83,7 +89,278 @@
+@@ -118,7 +124,278 @@
  @pytest.mark.parametrize('chunk_size', [None, 1, 3, 13])
  @pytest.mark.parametrize('value', VALUES)
  def test_partial_string_diagnostic_preserves_raw_value_bytes(value, chunk_size):
@@ -394,7 +394,7 @@ diff --git a/tests/parser/engine/test_qwen_xml_fidelity.py b/tests/parser/engine
 diff --git a/vllm/parser/engine/parser_engine.py b/vllm/parser/engine/parser_engine.py
 --- a/vllm/parser/engine/parser_engine.py
 +++ b/vllm/parser/engine/parser_engine.py
-@@ -1237,18 +1237,15 @@
+@@ -1204,18 +1204,15 @@
              return None
  
          slot = self._tool_slots[idx]
@@ -414,7 +414,7 @@ diff --git a/vllm/parser/engine/parser_engine.py b/vllm/parser/engine/parser_eng
          prev = slot.streamed_json
          safe_json = self._safe_arg_prefix(current_json, slot.string_keys)
  
-@@ -1273,15 +1270,12 @@
+@@ -1240,15 +1237,12 @@
              return None
  
          slot = self._tool_slots[idx]
@@ -431,7 +431,7 @@ diff --git a/vllm/parser/engine/parser_engine.py b/vllm/parser/engine/parser_eng
          prev = slot.streamed_json
          if final_json and len(final_json) > len(prev):
              if prev and not final_json.startswith(prev):
-@@ -1318,16 +1312,18 @@
+@@ -1285,16 +1279,18 @@
                  continue
  
              name = slot.name
@@ -451,7 +451,7 @@ diff --git a/vllm/parser/engine/parser_engine.py b/vllm/parser/engine/parser_eng
                          logger.debug(
                              "arg converter failed (extract): %s", raw_body[:80]
                          )
-@@ -1338,9 +1334,10 @@
+@@ -1305,9 +1301,10 @@
                  args_json = "{}"
  
              if self._accept_tool_name(name):
@@ -463,7 +463,7 @@ diff --git a/vllm/parser/engine/parser_engine.py b/vllm/parser/engine/parser_eng
                      ToolCall(
                          id=slot.id,
                          function=FunctionCall(name=name, arguments=args_json),
-@@ -1386,8 +1383,16 @@
+@@ -1353,8 +1350,16 @@
  
          without_name = {k: v for k, v in parsed.items() if k != "name"}
          return name, json.dumps(without_name, ensure_ascii=False)

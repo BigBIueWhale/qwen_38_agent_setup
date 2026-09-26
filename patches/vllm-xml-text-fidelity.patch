@@ -57,7 +57,7 @@ diff --git a/tests/parser/engine/test_qwen3.py b/tests/parser/engine/test_qwen3.
 diff --git a/tests/parser/engine/test_qwen_xml_fidelity.py b/tests/parser/engine/test_qwen_xml_fidelity.py
 --- /dev/null
 +++ b/tests/parser/engine/test_qwen_xml_fidelity.py
-@@ -0,0 +1,89 @@
+@@ -0,0 +1,124 @@
 +# SPDX-License-Identifier: Apache-2.0
 +# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
 +"""Text fidelity across Qwen XML conversion and arbitrary streaming cuts."""
@@ -94,9 +94,9 @@ diff --git a/tests/parser/engine/test_qwen_xml_fidelity.py b/tests/parser/engine
 +    return ''.join(REVERSE.get(i, chr(i)) for i in ids)
 +
 +
-+def parse(text, chunk_size):
++def parse(text, chunk_size, choice='auto'):
 +    request = ChatCompletionRequest(messages=[{'role': 'user', 'content': 'test'}],
-+                                    tools=[TOOL], tool_choice='auto')
++                                    tools=[TOOL], tool_choice=choice)
 +    tokenizer = MagicMock()
 +    tokenizer.get_vocab.return_value = MARKERS
 +    tokenizer.decode.side_effect = decode
@@ -121,6 +121,41 @@ diff --git a/tests/parser/engine/test_qwen_xml_fidelity.py b/tests/parser/engine
 +            if call.function and call.function.arguments is not None:
 +                calls[call.index] = calls.get(call.index, '') + call.function.arguments
 +    return reasoning, content, list(calls.values())
++
++
++@pytest.mark.parametrize('chunk_size', [None, 1, 13])
++@pytest.mark.parametrize('choice', [
++    'auto', 'required', {'type': 'function', 'function': {'name': 'write'}},
++])
++@pytest.mark.parametrize('before,between,after', [
++    (' \t', '\n\n', '\r\n'),
++    ('\n', ' ', 'answer\n'),
++    ('answer\n', '\t', '\n'),
++    ('', '', ''),
++])
++def test_content_around_tool_calls_is_verbatim(
++    before, between, after, chunk_size, choice,
++):
++    tool = ('<tool_call>\n<function=write>\n'
++            '<parameter=text>value</parameter>\n</function>\n</tool_call>')
++    text = 'plan\n</think>' + before + tool + between + tool + after
++    reasoning, content, calls = parse(text, chunk_size, choice=choice)
++    assert reasoning == 'plan\n'
++    assert content == before + between + after
++    assert [json.loads(arguments) for arguments in calls] == [
++        {'text': 'value'}, {'text': 'value'},
++    ]
++
++
++@pytest.mark.parametrize('chunk_size', [None, 1])
++@pytest.mark.parametrize('choice', [
++    'auto', 'required', {'type': 'function', 'function': {'name': 'write'}},
++])
++def test_whitespace_without_a_call_survives_tool_choice(choice, chunk_size):
++    reasoning, content, calls = parse('plan</think> \t\r\n', chunk_size, choice=choice)
++    assert reasoning == 'plan'
++    assert content == ' \t\r\n'
++    assert calls == []
 +
 +
 +VALUES = ['', '\n', '\n\n', '\nfirst\n', 'first\n', '\nfirst',
@@ -172,38 +207,105 @@ diff --git a/vllm/parser/deepseek_v4.py b/vllm/parser/deepseek_v4.py
 diff --git a/vllm/parser/engine/parser_engine.py b/vllm/parser/engine/parser_engine.py
 --- a/vllm/parser/engine/parser_engine.py
 +++ b/vllm/parser/engine/parser_engine.py
-@@ -149,9 +149,6 @@
-         )
-         self._drop_ws_only_content_before_tools = (
-             parser_engine_config.drop_whitespace_only_content_before_tools
+@@ -138,7 +138,6 @@
+         self._tool_slots: list[ToolCallSlot] = []
+         self._deferred_content: str = ""
+         self._deferred_reasoning: str = ""
+-        self._content_has_nonws: bool = False
+         self._suppress_tool_calls: bool = False
+ 
+         self._arg_converter = parser_engine_config.arg_converter
+@@ -146,12 +145,6 @@
+         self._stream_arg_deltas = parser_engine_config.stream_arg_deltas
+         self._strip_trailing_reasoning_ws = (
+             parser_engine_config.strip_trailing_reasoning_whitespace
+-        )
+-        self._drop_ws_only_content_before_tools = (
+-            parser_engine_config.drop_whitespace_only_content_before_tools
 -        )
 -        self._strip_content_ws_with_tools = (
 -            parser_engine_config.strip_content_whitespace_with_tools
          )
  
          vocab = self.vocab
-@@ -474,11 +471,9 @@
-         content: str,
-         tools_called: bool,
-     ) -> str | None:
+@@ -242,7 +235,6 @@
+         self._tool_slots.clear()
+         self._deferred_content = ""
+         self._deferred_reasoning = ""
+-        self._content_has_nonws = False
+         self._prompt_streaming_prepared = False
+         effective_initial_state = (
+             initial_state
+@@ -469,18 +461,6 @@
+             if tool_choice == "none" and tools:
+                 self._suppress_tool_calls = True
+ 
+-    def _strip_content_whitespace(
+-        self,
+-        content: str,
+-        tools_called: bool,
+-    ) -> str | None:
 -        if tools_called:
 -            if self._strip_content_ws_with_tools:
 -                content = content.strip()
 -            elif self._drop_ws_only_content_before_tools and not content.strip():
 -                content = ""
-+        if (tools_called and self._drop_ws_only_content_before_tools
-+                and not content.strip()):
-+            content = ""
-         return content or None
- 
+-        return content or None
+-
      # ── Streaming: parse_delta ────────────────────────────────────────
+ 
+     def parse_delta(
+@@ -853,11 +833,6 @@
+             reasoning = reasoning.rstrip() or None
+ 
+         content = delta.content if delta else None
+-        if content:
+-            content = self._strip_content_whitespace(
+-                content, tool_call_info.tools_called
+-            )
+-
+         return reasoning, content, tool_call_info
+ 
+     # ── Non-streaming: parse ───────────────────────────────────────────
+@@ -971,19 +946,6 @@
+ 
+         content_str = "".join(content_parts)
+ 
+-        if self._content_has_nonws:
+-            pass
+-        elif content_str:
+-            stripped = content_str.strip()
+-            if stripped:
+-                self._content_has_nonws = True
+-            elif self._tool_slots:
+-                if self._drop_ws_only_content_before_tools:
+-                    content_str = ""
+-            elif not finished:
+-                self._deferred_content = content_str
+-                content_str = ""
+-
+         content = content_str or None
+         reasoning = "".join(reasoning_parts) or None
+ 
+@@ -1268,7 +1230,7 @@
+                 )
+ 
+         content_str = "".join(content_parts)
+-        content = self._strip_content_whitespace(content_str, len(tool_calls) > 0)
++        content = content_str or None
+ 
+         return ExtractedToolCallInformation(
+             tools_called=len(tool_calls) > 0,
 diff --git a/vllm/parser/engine/parser_engine_config.py b/vllm/parser/engine/parser_engine_config.py
 --- a/vllm/parser/engine/parser_engine_config.py
 +++ b/vllm/parser/engine/parser_engine_config.py
-@@ -100,9 +100,6 @@
-     # Drop content that is entirely whitespace when tool calls follow.
-     drop_whitespace_only_content_before_tools: bool = True
+@@ -97,12 +97,6 @@
+     # Prevents trailing-whitespace accumulation across multi-turn conversations.
+     strip_trailing_reasoning_whitespace: bool = True
  
+-    # Drop content that is entirely whitespace when tool calls follow.
+-    drop_whitespace_only_content_before_tools: bool = True
+-
 -    # .strip() content text when tool calls are present.
 -    strip_content_whitespace_with_tools: bool = True
 -
@@ -213,21 +315,35 @@ diff --git a/vllm/parser/engine/parser_engine_config.py b/vllm/parser/engine/par
 diff --git a/vllm/parser/inkling.py b/vllm/parser/inkling.py
 --- a/vllm/parser/inkling.py
 +++ b/vllm/parser/inkling.py
-@@ -297,7 +297,6 @@
+@@ -296,8 +296,6 @@
+         stream_arg_deltas=True,
          tool_args_json=True,
          strip_trailing_reasoning_whitespace=True,
-         drop_whitespace_only_content_before_tools=True,
+-        drop_whitespace_only_content_before_tools=True,
 -        strip_content_whitespace_with_tools=False,
          validate_tool_names=False,
      )
  
+@@ -395,10 +393,7 @@
+         if self._deferred_content:
+             trailing = self._deferred_content
+             self._deferred_content = ""
+-            content = self._strip_content_whitespace(
+-                (content or "") + trailing,
+-                tool_call_info.tools_called,
+-            )
++            content = (content or "") + trailing
+             tool_call_info = ExtractedToolCallInformation(
+                 tools_called=tool_call_info.tools_called,
+                 tool_calls=tool_call_info.tool_calls,
 diff --git a/vllm/parser/kimi_k2.py b/vllm/parser/kimi_k2.py
 --- a/vllm/parser/kimi_k2.py
 +++ b/vllm/parser/kimi_k2.py
-@@ -142,7 +142,6 @@
+@@ -141,8 +141,6 @@
+         stream_arg_deltas=True,
          tool_args_json=True,
          strip_trailing_reasoning_whitespace=True,
-         drop_whitespace_only_content_before_tools=True,
+-        drop_whitespace_only_content_before_tools=True,
 -        strip_content_whitespace_with_tools=False,
          validate_tool_names=False,
      )
@@ -267,4 +383,190 @@ diff --git a/vllm/parser/qwen3.py b/vllm/parser/qwen3.py
 +            params[name] = value
  
      return json.dumps(params, ensure_ascii=False)
+ 
+diff --git a/tests/parser/engine/test_parser_engine.py b/tests/parser/engine/test_parser_engine.py
+--- a/tests/parser/engine/test_parser_engine.py
++++ b/tests/parser/engine/test_parser_engine.py
+@@ -397,19 +397,20 @@
+ 
+ 
+ class TestContentWhitespaceHandling:
+-    """Unit tests for whitespace deferral / dropping in _events_to_delta."""
+-
+-    def test_whitespace_only_deferred_until_next_tick(self):
++    """Content bytes survive regardless of neighboring tool calls."""
++
++    def test_whitespace_only_emitted_without_waiting_for_next_tick(self):
+         engine = _make_engine()
+         d1 = engine._events_to_delta(
+             [SemanticEvent(EventType.TEXT_CHUNK, "  \n")],
+         )
+-        assert d1 is None
++        assert d1 is not None
++        assert d1.content == "  \n"
+         d2 = engine._events_to_delta(
+             [SemanticEvent(EventType.TEXT_CHUNK, "hello")],
+         )
+         assert d2 is not None
+-        assert d2.content == "  \nhello"
++        assert d2.content == "hello"
+ 
+     def test_whitespace_only_emitted_on_finished(self):
+         engine = _make_engine()
+@@ -420,14 +421,16 @@
+         assert d is not None
+         assert d.content == "  \n"
+ 
+-    def test_whitespace_dropped_before_tool_call(self):
+-        engine = _make_engine()
+-        engine._events_to_delta(
++    def test_whitespace_preserved_before_tool_call(self):
++        engine = _make_engine()
++        prefix = engine._events_to_delta(
+             [
+                 SemanticEvent(EventType.TEXT_CHUNK, "  \n"),
+                 SemanticEvent(EventType.TOOL_CALL_START, tool_index=0),
+             ]
+         )
++        assert prefix is not None
++        assert prefix.content == "  \n"
+         d = engine._events_to_delta(
+             [
+                 SemanticEvent(EventType.TOOL_NAME, "f", tool_index=0),
+diff --git a/tests/parser/engine/trace_builder.py b/tests/parser/engine/trace_builder.py
+--- a/tests/parser/engine/trace_builder.py
++++ b/tests/parser/engine/trace_builder.py
+@@ -368,16 +368,6 @@
+     return segs
+ 
+ 
+-def _qwen3_expected_content(scenario: Scenario) -> str | None:
+-    if (
+-        scenario.content is not None
+-        and scenario.tool_calls
+-        and not scenario.content.strip()
+-    ):
+-        return ""
+-    return scenario.content
+-
+-
+ def _qwen3_grammar_expected_content(
+     scenario: Scenario, tool_start: str, tool_end: str
+ ) -> str | None:
+@@ -387,7 +377,7 @@
+     engine gives the opener, and the closer that follows it, back as content
+     rather than repairing an empty block away.
+     """
+-    content = _qwen3_expected_content(scenario)
++    content = scenario.content
+     if scenario.tool_calls is not None and not scenario.tool_calls:
+         return tool_start + tool_end + (content or "")
+     return content
+@@ -493,7 +483,7 @@
+         vocab=_MINIMAX_M2_VOCAB,
+         segments=_minimax_m2_segments(scenario),
+         expected_reasoning=expected_reasoning,
+-        expected_content=_qwen3_expected_content(scenario),
++        expected_content=scenario.content,
+         expected_tool_calls=_expected_tc(scenario),
+         tools=_expected_tools(scenario),
+     )
+@@ -589,7 +579,7 @@
+         vocab=_GEMMA4_VOCAB,
+         segments=_gemma4_segments(scenario),
+         expected_reasoning=scenario.reasoning,
+-        expected_content=_qwen3_expected_content(scenario),
++        expected_content=scenario.content,
+         expected_tool_calls=_expected_tc(scenario),
+         tools=_expected_tools(scenario),
+         prompt_token_ids=prompt_token_ids,
+@@ -754,7 +744,7 @@
+         vocab=_DSV4_VOCAB,
+         segments=_dsv4_segments(scenario, thinking),
+         expected_reasoning=expected_reasoning,
+-        expected_content=_qwen3_expected_content(scenario),
++        expected_content=scenario.content,
+         expected_tool_calls=_expected_tc(scenario),
+         tools=_expected_tools(scenario),
+         chat_template_kwargs=chat_kwargs,
+@@ -795,7 +785,7 @@
+         vocab=_DSV32_VOCAB,
+         segments=_dsv32_segments(scenario),
+         expected_reasoning=None,
+-        expected_content=_qwen3_expected_content(scenario),
++        expected_content=scenario.content,
+         expected_tool_calls=_expected_tc(scenario),
+         tools=_expected_tools(scenario),
+     )
+@@ -869,7 +859,7 @@
+         vocab=_GLM47_MOE_VOCAB,
+         segments=_glm47_moe_segments(scenario),
+         expected_reasoning=scenario.reasoning if scenario.reasoning is not None else "",
+-        expected_content=_qwen3_expected_content(scenario),
++        expected_content=scenario.content,
+         expected_tool_calls=_expected_tc(scenario),
+         tools=_expected_tools(scenario),
+     )
+@@ -943,7 +933,7 @@
+         vocab=_KIMI_K2_VOCAB,
+         segments=_kimi_k2_segments(scenario),
+         expected_reasoning=expected_reasoning,
+-        expected_content=_qwen3_expected_content(scenario),
++        expected_content=scenario.content,
+         expected_tool_calls=_expected_tc(scenario),
+         tools=_expected_tools(scenario),
+         chat_template_kwargs=None if thinking else {"thinking": False},
+@@ -1029,7 +1019,7 @@
+         vocab=_TML_VOCAB,
+         segments=_inkling_segments(scenario),
+         expected_reasoning=scenario.reasoning,
+-        expected_content=_qwen3_expected_content(scenario),
++        expected_content=scenario.content,
+         expected_tool_calls=_expected_tc(scenario),
+         tools=_expected_tools(scenario),
+         prompt_token_ids=prompt_token_ids,
+diff --git a/vllm/parser/abstract_parser.py b/vllm/parser/abstract_parser.py
+--- a/vllm/parser/abstract_parser.py
++++ b/vllm/parser/abstract_parser.py
+@@ -542,7 +542,7 @@
+         tool_calls = list[FunctionCall]()
+         if is_named_tool_choice and supports_required_and_named:
+             if content is None or (isinstance(content, str) and not content.strip()):
+-                return [], None
++                return [], content
+             function_name = self._get_function_name(request)
+             tool_calls.append(
+                 FunctionCall(
+@@ -587,18 +587,15 @@
+                     for tc in tool_call_info.tool_calls
+                 )
+                 content = tool_call_info.content
+-                if content and content.strip() == "":
+-                    content = None
+             else:
+                 # No tool calls.
+-                # For required/named tool choice (when falling back to auto
+-                # parsing), if content is empty or whitespace-only, return
+-                # empty list with None content.
++                # An unfulfilled required/named choice still carries the
++                # content the model produced.
+                 if (is_required_tool_choice or is_named_tool_choice) and (
+                     content is None
+                     or (isinstance(content, str) and not content.strip())
+                 ):
+-                    return [], None
++                    return [], content
+                 return None, content
+ 
+         return tool_calls, content
+diff --git a/vllm/parser/mistral.py b/vllm/parser/mistral.py
+--- a/vllm/parser/mistral.py
++++ b/vllm/parser/mistral.py
+@@ -233,7 +233,6 @@
+         stream_arg_deltas=True,
+         tool_args_json=True,
+         strip_trailing_reasoning_whitespace=True,
+-        drop_whitespace_only_content_before_tools=True,
+     )
+ 
  

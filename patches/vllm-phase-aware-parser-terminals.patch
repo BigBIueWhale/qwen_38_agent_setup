@@ -257,7 +257,7 @@ diff --git a/tests/parser/engine/test_parser_engine.py b/tests/parser/engine/tes
          },
          transitions={
              (ParserState.CONTENT, "TOOL_START"): Transition(
-@@ -1275,8 +1276,8 @@
+@@ -1278,8 +1279,8 @@
              "TOOL_END": "</tool_call>",
          },
          token_id_terminals={
@@ -379,10 +379,10 @@ diff --git a/tests/parser/engine/test_qwen_xml_fidelity.py b/tests/parser/engine
      return ''.join(REVERSE.get(i, chr(i)) for i in ids)
  
  
--def parse(text, chunk_size):
-+def parse(text, chunk_size, ids=None):
+-def parse(text, chunk_size, choice='auto'):
++def parse(text, chunk_size, ids=None, choice='auto'):
      request = ChatCompletionRequest(messages=[{'role': 'user', 'content': 'test'}],
-                                     tools=[TOOL], tool_choice='auto')
+                                     tools=[TOOL], tool_choice=choice)
      tokenizer = MagicMock()
 @@ -43,7 +43,7 @@
      tokenizer.all_special_tokens = list(MARKERS)
@@ -484,7 +484,7 @@ diff --git a/vllm/parser/deepseek_v4.py b/vllm/parser/deepseek_v4.py
 diff --git a/vllm/parser/engine/parser_engine.py b/vllm/parser/engine/parser_engine.py
 --- a/vllm/parser/engine/parser_engine.py
 +++ b/vllm/parser/engine/parser_engine.py
-@@ -158,9 +158,9 @@
+@@ -154,9 +154,9 @@
          start_text = parser_engine_config.token_id_terminals.get("THINK_START")
          end_text = parser_engine_config.token_id_terminals.get("THINK_END")
          if start_text:
@@ -496,7 +496,7 @@ diff --git a/vllm/parser/engine/parser_engine.py b/vllm/parser/engine/parser_eng
  
          # Exact reasoning usage: the ids this grammar leaves reasoning at,
          # resolved once from the transition table, and the running count of
-@@ -720,7 +720,7 @@
+@@ -705,7 +705,7 @@
                  )
          boundary: set[int] = set()
          for (state, terminal), transition in config.transitions.items():
@@ -505,7 +505,7 @@ diff --git a/vllm/parser/engine/parser_engine.py b/vllm/parser/engine/parser_eng
                  continue
              leaves = transition.next_state is not ParserState.REASONING
              announces = EventType.REASONING_END in transition.events
-@@ -735,7 +735,7 @@
+@@ -720,7 +720,7 @@
              if not leaves:
                  continue
              token_text = config.token_id_terminals.get(terminal)

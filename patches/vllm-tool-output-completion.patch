@@ -1086,7 +1086,7 @@ diff --git a/vllm/parser/abstract_parser.py b/vllm/parser/abstract_parser.py
                  tool_calls.extend(
                      FunctionCall(
                          id=tc.id,
-@@ -901,8 +995,30 @@
+@@ -898,8 +992,30 @@
              content=content,
              request=request,
              enable_auto_tools=enable_auto_tools,
@@ -1147,7 +1147,7 @@ diff --git a/vllm/parser/engine/adapters.py b/vllm/parser/engine/adapters.py
 diff --git a/vllm/parser/engine/parser_engine.py b/vllm/parser/engine/parser_engine.py
 --- a/vllm/parser/engine/parser_engine.py
 +++ b/vllm/parser/engine/parser_engine.py
-@@ -204,16 +204,13 @@
+@@ -200,16 +200,13 @@
      def reasoning_ended(self) -> bool:
          return self._reasoning_ended
  
@@ -1169,7 +1169,7 @@ diff --git a/vllm/parser/engine/parser_engine.py b/vllm/parser/engine/parser_eng
  
      def initialize_streaming(
          self,
-@@ -609,8 +606,9 @@
+@@ -594,8 +591,9 @@
          self,
          content: str,
          request: ChatCompletionRequest,
@@ -1179,7 +1179,7 @@ diff --git a/vllm/parser/engine/parser_engine.py b/vllm/parser/engine/parser_eng
          """Extract tool calls from reasoning-stripped content.
  
          Unlike :meth:`extract_tool_calls` which re-parses the full model
-@@ -620,13 +618,17 @@
+@@ -605,13 +603,17 @@
          from -- the split is made on ids exactly as it is delta by delta, so
          a text lookalike of a marker is content on both paths.
          """
@@ -1202,7 +1202,7 @@ diff --git a/vllm/parser/engine/parser_engine.py b/vllm/parser/engine/parser_eng
              tool_call_info = ExtractedToolCallInformation(
                  tools_called=tool_call_info.tools_called,
                  tool_calls=tool_call_info.tool_calls,
-@@ -830,16 +832,27 @@
+@@ -815,16 +817,27 @@
          text: str,
          token_ids: Sequence[int],
          initial_state: ParserState | None = None,
@@ -1230,10 +1230,10 @@ diff --git a/vllm/parser/engine/parser_engine.py b/vllm/parser/engine/parser_eng
          delta = self._events_to_delta(events, finished=True)
          tool_call_info = self._build_extracted_result()
  
-@@ -853,8 +866,69 @@
-                 content, tool_call_info.tools_called
-             )
+@@ -833,8 +846,69 @@
+             reasoning = reasoning.rstrip() or None
  
+         content = delta.content if delta else None
          return reasoning, content, tool_call_info
 +
 +    def _completed_tool_events(
@@ -1300,7 +1300,7 @@ diff --git a/vllm/parser/engine/parser_engine.py b/vllm/parser/engine/parser_eng
      # ── Non-streaming: parse ───────────────────────────────────────────
  
      def parse(
-@@ -944,9 +1018,15 @@
+@@ -924,9 +998,15 @@
                      if not suppress and event.tool_index == len(self._tool_slots) - 1:
                          # Nothing about this slot was reported; it never was
                          # a call.  The text it held follows as content.
@@ -1316,7 +1316,7 @@ diff --git a/vllm/parser/engine/parser_engine.py b/vllm/parser/engine/parser_eng
                      pass  # no delta-level effect
  
          if len(tool_call_deltas) > 1:
-@@ -1231,9 +1311,9 @@
+@@ -1198,9 +1278,9 @@
          for idx, slot in enumerate(self._tool_slots):
              if not slot.name and not slot.args:
                  continue

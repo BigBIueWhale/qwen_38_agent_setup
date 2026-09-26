@@ -111,6 +111,25 @@ def parse(text, chunk_size, *, tools=None, choice="auto", ids=None,
 
 
 class ToolOutputParserTest(unittest.TestCase):
+    def test_content_survives_tools_without_whitespace_normalization(self):
+        for choice in ('auto', 'required', {
+            'type': 'function', 'function': {'name': 'write'},
+        }):
+            for chunk in (None, 1, 13):
+                with self.subTest(choice=choice, chunk=chunk):
+                    text = ('plan</think> \t' + call('value') + '\n\n'
+                            + call('value') + '\r\n')
+                    reasoning, content, calls, complete = parse(
+                        text, chunk, choice=choice,
+                    )
+                    self.assertEqual(reasoning, 'plan')
+                    self.assertEqual(content, ' \t\n\n\r\n')
+                    self.assertEqual([json.loads(args) for _, args in calls],
+                                     [{'text': 'value'}, {'text': 'value'}])
+                    self.assertTrue(complete)
+                    self.assertEqual(parse('plan</think> \t\r\n', chunk,
+                                           choice=choice)[1], ' \t\r\n')
+
     def test_native_byte_positions_survive_stops_and_unicode(self):
         from types import SimpleNamespace
         from tokenizers import Tokenizer, decoders, models
