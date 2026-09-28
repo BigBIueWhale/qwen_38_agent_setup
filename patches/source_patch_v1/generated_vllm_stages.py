@@ -96917,7 +96917,304 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'p.name == "qwen3")\n'
                              '    vocab = {text: 20000 + n for n, text in enumerate([\n'
                              '        "<think>", "</think>", "<tool_call>", '
-                             '"</tool_call>",\n'})})
+                             '"</tool_call>",\n'})},
+ {'name': 'qwen-unique-tool-parameters',
+  'review_patch': 'patches/vllm-qwen-unique-tool-parameters.patch',
+  'review_sha256': '6a76a61c743807215555cbd6b3bbdd8fcaba4abcaca69ef000d301df6c792d3b',
+  'files': ({'path': 'vllm/parser/qwen3.py',
+             'before_sha256': 'e74bb5667bea480948d40598f1b1ea5fc070a67ec2d90921a5047e7d0128df53',
+             'after_sha256': '0e2e348c350dc27220781d6af791d398d8e0943ac5d14553cbb431ec4914d393'},
+            {'path': 'tests/parser/engine/test_qwen3.py',
+             'before_sha256': 'c82a55107f08a0541792cdc99bcf32e019c694fc37f810d5d3b4e2e7199ca784',
+             'after_sha256': '1fd6129db802f6331f0e79c9db393771379727a9fda3c0901d6b9b9c4e87ebf3'},
+            {'path': 'tests/parser/engine/test_qwen_xml_fidelity.py',
+             'before_sha256': '32bc7c5b149b0577ffb47f646cea56d5c1f6bc95be31803e2a05a7959743a421',
+             'after_sha256': '3222b5f59f5ac7111b95877635364abf9e977716a7ebd8b1f157dff207aa5d12'}),
+  'edits': ({'name': 'vllm/parser/qwen3.py:landmark-1',
+             'path': 'vllm/parser/qwen3.py',
+             'before': '    for match in _PARAM_RE.finditer(raw_args):\n'
+                       '        name = match.group(1)\n'
+                       '        value = match.group(2)\n'
+                       '        params[name] = _unframe_parameter_value(value, '
+                       'complete=True)\n'
+                       '\n'
+                       '    # An unfinished parameter is a raw diagnostic on both '
+                       'transports.\n',
+             'after': '    for match in _PARAM_RE.finditer(raw_args):\n'
+                      '        name = match.group(1)\n'
+                      '        value = match.group(2)\n'
+                      '        if name in params:\n'
+                      '            raise ValueError(f"Qwen XML repeats parameter '
+                      '{name!r}")\n'
+                      '        params[name] = _unframe_parameter_value(value, '
+                      'complete=True)\n'
+                      '\n'
+                      '    # An unfinished parameter is a raw diagnostic on both '
+                      'transports.\n',
+             'review_before': '    for match in _PARAM_RE.finditer(raw_args):\n'
+                              '        name = match.group(1)\n'
+                              '        value = match.group(2)\n'
+                              '        params[name] = _unframe_parameter_value(value, '
+                              'complete=True)\n'
+                              '\n'
+                              '    # An unfinished parameter is a raw diagnostic on '
+                              'both transports.\n',
+             'review_after': '    for match in _PARAM_RE.finditer(raw_args):\n'
+                             '        name = match.group(1)\n'
+                             '        value = match.group(2)\n'
+                             '        if name in params:\n'
+                             '            raise ValueError(f"Qwen XML repeats '
+                             'parameter {name!r}")\n'
+                             '        params[name] = _unframe_parameter_value(value, '
+                             'complete=True)\n'
+                             '\n'
+                             '    # An unfinished parameter is a raw diagnostic on '
+                             'both transports.\n'},
+            {'name': 'vllm/parser/qwen3.py:landmark-2',
+             'path': 'vllm/parser/qwen3.py',
+             'before': '        name = m.group(1)\n'
+                       '        value = m.group(2)\n'
+                       '        if name:\n'
+                       '            params[name] = _unframe_parameter_value(value, '
+                       'complete=False)\n'
+                       '\n'
+                       '    if schema and m is None:\n',
+             'after': '        name = m.group(1)\n'
+                      '        value = m.group(2)\n'
+                      '        if name:\n'
+                      '            if name in params:\n'
+                      '                raise ValueError(f"Qwen XML repeats parameter '
+                      '{name!r}")\n'
+                      '            params[name] = _unframe_parameter_value(value, '
+                      'complete=False)\n'
+                      '\n'
+                      '    if schema and m is None:\n',
+             'review_before': '        name = m.group(1)\n'
+                              '        value = m.group(2)\n'
+                              '        if name:\n'
+                              '            params[name] = '
+                              '_unframe_parameter_value(value, complete=False)\n'
+                              '\n'
+                              '    if schema and m is None:\n',
+             'review_after': '        name = m.group(1)\n'
+                             '        value = m.group(2)\n'
+                             '        if name:\n'
+                             '            if name in params:\n'
+                             '                raise ValueError(f"Qwen XML repeats '
+                             'parameter {name!r}")\n'
+                             '            params[name] = '
+                             '_unframe_parameter_value(value, complete=False)\n'
+                             '\n'
+                             '    if schema and m is None:\n'},
+            {'name': 'vllm/parser/qwen3.py:landmark-3',
+             'path': 'vllm/parser/qwen3.py',
+             'before': '        except (TypeError, ValueError) as exc:\n'
+                       '            # Malformed parameter text is handled inside the '
+                       'decoder. An error\n'
+                       "            # here must not enter the engine's "
+                       'provisional-converter fallback.\n'
+                       '            raise RuntimeError("Qwen XML argument decoding '
+                       'failed") from exc\n'
+                       '\n'
+                       '    def extract_batch_content_ids(self, token_ids, *, '
+                       'token_offset: int = 0):\n'
+                       '        if not token_ids:\n',
+             'after': '        except (TypeError, ValueError) as exc:\n'
+                      '            # Malformed parameter text is handled inside the '
+                      'decoder. An error\n'
+                      "            # here must not enter the engine's "
+                      'provisional-converter fallback.\n'
+                      '            raise RuntimeError(\n'
+                      '                f"Qwen XML argument decoding failed: {exc}; "\n'
+                      '                "inspect the generated call and retry"\n'
+                      '            ) from exc\n'
+                      '\n'
+                      '    def extract_batch_content_ids(self, token_ids, *, '
+                      'token_offset: int = 0):\n'
+                      '        if not token_ids:\n',
+             'review_before': '        except (TypeError, ValueError) as exc:\n'
+                              '            # Malformed parameter text is handled '
+                              'inside the decoder. An error\n'
+                              "            # here must not enter the engine's "
+                              'provisional-converter fallback.\n'
+                              '            raise RuntimeError("Qwen XML argument '
+                              'decoding failed") from exc\n'
+                              '\n'
+                              '    def extract_batch_content_ids(self, token_ids, *, '
+                              'token_offset: int = 0):\n'
+                              '        if not token_ids:\n',
+             'review_after': '        except (TypeError, ValueError) as exc:\n'
+                             '            # Malformed parameter text is handled inside '
+                             'the decoder. An error\n'
+                             "            # here must not enter the engine's "
+                             'provisional-converter fallback.\n'
+                             '            raise RuntimeError(\n'
+                             '                f"Qwen XML argument decoding failed: '
+                             '{exc}; "\n'
+                             '                "inspect the generated call and retry"\n'
+                             '            ) from exc\n'
+                             '\n'
+                             '    def extract_batch_content_ids(self, token_ids, *, '
+                             'token_offset: int = 0):\n'
+                             '        if not token_ids:\n'},
+            {'name': 'tests/parser/engine/test_qwen3.py:landmark-1',
+             'path': 'tests/parser/engine/test_qwen3.py',
+             'before': '\n'
+                       'class TestArgConverter:\n'
+                       '    """Direct tests for the Qwen3 arg_converter with '
+                       'multi-line values."""\n'
+                       '\n'
+                       '    def test_multiline_param_values(self):\n'
+                       '        from vllm.parser.qwen3 import (\n',
+             'after': '\n'
+                      'class TestArgConverter:\n'
+                      '    """Direct tests for the Qwen3 arg_converter with multi-line '
+                      'values."""\n'
+                      '\n'
+                      '    @pytest.mark.parametrize(\n'
+                      '        ("raw", "partial"),\n'
+                      '        [\n'
+                      '            (\n'
+                      '                "<parameter=city>Tokyo</parameter>\\n"\n'
+                      '                "<parameter=city>Paris</parameter>\\n",\n'
+                      '                False,\n'
+                      '            ),\n'
+                      '            (\n'
+                      '                '
+                      '"<parameter=city>Tokyo</parameter>\\n<parameter=city>Par",\n'
+                      '                True,\n'
+                      '            ),\n'
+                      '        ],\n'
+                      '    )\n'
+                      '    def '
+                      'test_repeated_parameter_cannot_overwrite_model_output(self, '
+                      'raw, partial):\n'
+                      '        from vllm.parser.qwen3 import _qwen3_arg_converter\n'
+                      '\n'
+                      '        with pytest.raises(ValueError, match="repeats parameter '
+                      '\'city\'"):\n'
+                      '            _qwen3_arg_converter(raw, partial)\n'
+                      '\n'
+                      '    def test_multiline_param_values(self):\n'
+                      '        from vllm.parser.qwen3 import (\n',
+             'review_before': '\n'
+                              'class TestArgConverter:\n'
+                              '    """Direct tests for the Qwen3 arg_converter with '
+                              'multi-line values."""\n'
+                              '\n'
+                              '    def test_multiline_param_values(self):\n'
+                              '        from vllm.parser.qwen3 import (\n',
+             'review_after': '\n'
+                             'class TestArgConverter:\n'
+                             '    """Direct tests for the Qwen3 arg_converter with '
+                             'multi-line values."""\n'
+                             '\n'
+                             '    @pytest.mark.parametrize(\n'
+                             '        ("raw", "partial"),\n'
+                             '        [\n'
+                             '            (\n'
+                             '                "<parameter=city>Tokyo</parameter>\\n"\n'
+                             '                "<parameter=city>Paris</parameter>\\n",\n'
+                             '                False,\n'
+                             '            ),\n'
+                             '            (\n'
+                             '                '
+                             '"<parameter=city>Tokyo</parameter>\\n<parameter=city>Par",\n'
+                             '                True,\n'
+                             '            ),\n'
+                             '        ],\n'
+                             '    )\n'
+                             '    def '
+                             'test_repeated_parameter_cannot_overwrite_model_output(self, '
+                             'raw, partial):\n'
+                             '        from vllm.parser.qwen3 import '
+                             '_qwen3_arg_converter\n'
+                             '\n'
+                             '        with pytest.raises(ValueError, match="repeats '
+                             'parameter \'city\'"):\n'
+                             '            _qwen3_arg_converter(raw, partial)\n'
+                             '\n'
+                             '    def test_multiline_param_values(self):\n'
+                             '        from vllm.parser.qwen3 import (\n'},
+            {'name': 'tests/parser/engine/test_qwen_xml_fidelity.py:landmark-1',
+             'path': 'tests/parser/engine/test_qwen_xml_fidelity.py',
+             'before': "          '\\n</function></tool_call><think>\\n', "
+                       '\'"quoted"\\n\\\\path\\n\']\n'
+                       '\n'
+                       '\n'
+                       "@pytest.mark.parametrize('chunk_size', [None, 1, 2, 3, 7, 13, "
+                       '64])\n'
+                       "@pytest.mark.parametrize('value', VALUES)\n"
+                       'def '
+                       'test_parameter_string_bytes_survive_every_transport_cut(value, '
+                       'chunk_size):\n',
+             'after': "          '\\n</function></tool_call><think>\\n', "
+                      '\'"quoted"\\n\\\\path\\n\']\n'
+                      '\n'
+                      '\n'
+                      "@pytest.mark.parametrize('chunk_size', [None, 7])\n"
+                      'def '
+                      'test_repeated_parameter_refuses_the_call_instead_of_replacing_text(chunk_size):\n'
+                      "    text = ('plan</think><tool_call>\\n<function=write>\\n'\n"
+                      "            '<parameter=text>\\nfirst\\n</parameter>\\n'\n"
+                      "            '<parameter=text>\\nsecond\\n</parameter>\\n'\n"
+                      "            '</function>\\n</tool_call>')\n"
+                      '    with pytest.raises(RuntimeError, match="repeats parameter '
+                      '\'text\'; .*retry"):\n'
+                      '        parse(text, chunk_size, schema={\n'
+                      "            'type': 'object', 'properties': {'text': {'type': "
+                      "'string'}},\n"
+                      "            'required': ['text'], 'additionalProperties': "
+                      'True,\n'
+                      '        })\n'
+                      '\n'
+                      '\n'
+                      "@pytest.mark.parametrize('chunk_size', [None, 1, 2, 3, 7, 13, "
+                      '64])\n'
+                      "@pytest.mark.parametrize('value', VALUES)\n"
+                      'def '
+                      'test_parameter_string_bytes_survive_every_transport_cut(value, '
+                      'chunk_size):\n',
+             'review_before': "          '\\n</function></tool_call><think>\\n', "
+                              '\'"quoted"\\n\\\\path\\n\']\n'
+                              '\n'
+                              '\n'
+                              "@pytest.mark.parametrize('chunk_size', [None, 1, 2, 3, "
+                              '7, 13, 64])\n'
+                              "@pytest.mark.parametrize('value', VALUES)\n"
+                              'def '
+                              'test_parameter_string_bytes_survive_every_transport_cut(value, '
+                              'chunk_size):\n',
+             'review_after': "          '\\n</function></tool_call><think>\\n', "
+                             '\'"quoted"\\n\\\\path\\n\']\n'
+                             '\n'
+                             '\n'
+                             "@pytest.mark.parametrize('chunk_size', [None, 7])\n"
+                             'def '
+                             'test_repeated_parameter_refuses_the_call_instead_of_replacing_text(chunk_size):\n'
+                             '    text = '
+                             "('plan</think><tool_call>\\n<function=write>\\n'\n"
+                             '            '
+                             "'<parameter=text>\\nfirst\\n</parameter>\\n'\n"
+                             '            '
+                             "'<parameter=text>\\nsecond\\n</parameter>\\n'\n"
+                             "            '</function>\\n</tool_call>')\n"
+                             '    with pytest.raises(RuntimeError, match="repeats '
+                             'parameter \'text\'; .*retry"):\n'
+                             '        parse(text, chunk_size, schema={\n'
+                             "            'type': 'object', 'properties': {'text': "
+                             "{'type': 'string'}},\n"
+                             "            'required': ['text'], "
+                             "'additionalProperties': True,\n"
+                             '        })\n'
+                             '\n'
+                             '\n'
+                             "@pytest.mark.parametrize('chunk_size', [None, 1, 2, 3, "
+                             '7, 13, 64])\n'
+                             "@pytest.mark.parametrize('value', VALUES)\n"
+                             'def '
+                             'test_parameter_string_bytes_survive_every_transport_cut(value, '
+                             'chunk_size):\n'})})
 
 FINAL_FILES = {'tests/config/test_config_utils.py': '4f5ea0399cc3b4f9603df07e2cc26d32e1eddf6b98a36c0f30d580321879c038',
  'tests/distributed/test_rocm_quick_reduce.py': 'bf6f8a5708568b1f4d96dcc59f42258f8680e5b03bb4abdddcb0c7ead9d414bd',
@@ -96956,10 +97253,10 @@ FINAL_FILES = {'tests/config/test_config_utils.py': '4f5ea0399cc3b4f9603df07e2cc
  'tests/parser/engine/test_engine.py': 'acf3128470532aa0f07ee5d3749824a48e11cc44df78e4550a9b622a8fb05c0b',
  'tests/parser/engine/test_nemotron_v3.py': '65b1be9ad64bd16e08cea6d6886a33169aae31933c918587ea9e4ea8167975c5',
  'tests/parser/engine/test_parser_engine.py': 'e78d3a02da16759ee0418fee58ff2c550ca29a9dc0035bd892ebd4fae7369066',
- 'tests/parser/engine/test_qwen3.py': 'c82a55107f08a0541792cdc99bcf32e019c694fc37f810d5d3b4e2e7199ca784',
+ 'tests/parser/engine/test_qwen3.py': '1fd6129db802f6331f0e79c9db393771379727a9fda3c0901d6b9b9c4e87ebf3',
  'tests/parser/engine/test_qwen3_reasoning.py': '60a31db16f2b621403b9b2b5259407a44a5ce1e9e79b62e2c27f1cf505a4db21',
  'tests/parser/engine/test_qwen_terminal_authority.py': '15b1a503148a15e51bfc85798c7964342cc611e3dfb5451734020513259f8dad',
- 'tests/parser/engine/test_qwen_xml_fidelity.py': '32bc7c5b149b0577ffb47f646cea56d5c1f6bc95be31803e2a05a7959743a421',
+ 'tests/parser/engine/test_qwen_xml_fidelity.py': '3222b5f59f5ac7111b95877635364abf9e977716a7ebd8b1f157dff207aa5d12',
  'tests/parser/engine/test_reasoning_token_count.py': '4d823e0f71e5041c60d077a258f80250a4c11fbc642f5bbc6ceb7da515c04b94',
  'tests/parser/engine/test_replay.py': '1684c44d016e26a6ed4aec2c99e0b6f355c1fb1562603784d24f2e61496479a6',
  'tests/parser/engine/test_seed_oss.py': '9f2af2c75f71c6fb280f2a2a4a2bb8eaecf1c919c083e6c925f6d6f81cc2c236',
@@ -97059,7 +97356,7 @@ FINAL_FILES = {'tests/config/test_config_utils.py': '4f5ea0399cc3b4f9603df07e2cc
  'vllm/parser/kimi_k2.py': '7d1d9a64ae888e08c135e8b3859d6a3a66b53e4b8e685bd2f4090bd30204ab56',
  'vllm/parser/minimax_m2.py': '38577327262d3df29c052240f7bbb1369b82a6d3697d85bd4e5c29d130662fa1',
  'vllm/parser/mistral.py': '1ec656330956a89a6a5446e96282a2b049bb4504baad9f6779351e20958a7c25',
- 'vllm/parser/qwen3.py': 'e74bb5667bea480948d40598f1b1ea5fc070a67ec2d90921a5047e7d0128df53',
+ 'vllm/parser/qwen3.py': '0e2e348c350dc27220781d6af791d398d8e0943ac5d14553cbb431ec4914d393',
  'vllm/reasoning/abs_reasoning_parsers.py': 'ba4b1145048e5faa217e1ef4d849167ebd1fe7bcb9296fe2e9d2f17ce96607f7',
  'vllm/renderers/base.py': 'efc0e5706c2dbce32a645bb288e920515934566d23f1a54c4fbc4b6466b19a3e',
  'vllm/renderers/hf.py': 'ee40d5f8f0c95b80c372b58b6618790b9ba56da0971fe29f781179fc0199a19d',

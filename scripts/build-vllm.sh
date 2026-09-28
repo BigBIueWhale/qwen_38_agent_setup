@@ -303,6 +303,7 @@ SHARED_PREFIX_CACHE_PATCH_FILE="${PROJECT_DIR}/patches/vllm-shared-prefix-cache-
 EXACT_REASONING_USAGE_PATCH_FILE="${PROJECT_DIR}/patches/vllm-exact-reasoning-usage.patch"
 CANONICAL_FRAMING_PATCH_FILE="${PROJECT_DIR}/patches/vllm-qwen-canonical-parameter-framing.patch"
 QWEN_OWNED_GRAMMAR_PATCH_FILE="${PROJECT_DIR}/patches/vllm-qwen-owned-tool-grammar.patch"
+QWEN_UNIQUE_PARAMETERS_PATCH_FILE="${PROJECT_DIR}/patches/vllm-qwen-unique-tool-parameters.patch"
 
 TURBOQUANT_REL="vllm/v1/attention/backends/turboquant_attn.py"
 TOOL_SCHEMA_REL="vllm/tool_parsers/structural_tag_registry.py"
@@ -496,7 +497,8 @@ printf '%s  %s\n' \
   "${SHARED_PREFIX_CACHE_PATCH_DIFF_SHA256}" "${SHARED_PREFIX_CACHE_PATCH_FILE}" \
   "${EXACT_REASONING_USAGE_PATCH_DIFF_SHA256}" "${EXACT_REASONING_USAGE_PATCH_FILE}" \
   "${CANONICAL_FRAMING_PATCH_DIFF_SHA256}" "${CANONICAL_FRAMING_PATCH_FILE}" \
-  "${QWEN_OWNED_GRAMMAR_PATCH_DIFF_SHA256}" "${QWEN_OWNED_GRAMMAR_PATCH_FILE}" | \
+  "${QWEN_OWNED_GRAMMAR_PATCH_DIFF_SHA256}" "${QWEN_OWNED_GRAMMAR_PATCH_FILE}" \
+  "${QWEN_UNIQUE_PARAMETERS_PATCH_DIFF_SHA256}" "${QWEN_UNIQUE_PARAMETERS_PATCH_FILE}" | \
   sha256sum --check --strict
 
 printf '%s  %s\n' \

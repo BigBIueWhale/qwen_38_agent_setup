@@ -2204,6 +2204,35 @@ def _validate_canonical_framing_before(state: State) -> None:
                 label="Canonical parameter framing precondition")
 
 
+def _validate_unique_parameters_before(state: State) -> None:
+    forbid_text(
+        state, "vllm/parser/qwen3.py", "Qwen XML repeats parameter",
+        label="Qwen unique parameter precondition",
+    )
+
+
+def _validate_unique_parameters_after(state: State) -> None:
+    label = "Qwen unique tool parameters"
+    qwen = "vllm/parser/qwen3.py"
+    _require_in_symbol(state, qwen, "_qwen3_arg_converter", (
+        "if name in params:",
+        'raise ValueError(f"Qwen XML repeats parameter {name!r}")',
+        "_unframe_parameter_value(value, complete=True)",
+        "_unframe_parameter_value(value, complete=False)",
+    ), label=label)
+    _require_in_symbol(state, qwen, "Qwen3Parser._convert_tool_arguments", (
+        'f"Qwen XML argument decoding failed: {exc}; "',
+        "inspect the generated call and retry",
+        "raise RuntimeError(",
+    ), label=label)
+    require_python_symbols(state, "tests/parser/engine/test_qwen3.py", {
+        "TestArgConverter.test_repeated_parameter_cannot_overwrite_model_output": None,
+    }, label=label)
+    require_python_symbols(state, "tests/parser/engine/test_qwen_xml_fidelity.py", {
+        "test_repeated_parameter_refuses_the_call_instead_of_replacing_text": None,
+    }, label=label)
+
+
 def _validate_canonical_framing_after(state: State) -> None:
     label = "Canonical parameter framing result"
     qwen = "vllm/parser/qwen3.py"
@@ -2626,6 +2655,20 @@ def validate_final(state: State) -> None:
 
 
 CONTRACTS: Mapping[str, SemanticContract] = {
+    "qwen-unique-tool-parameters": SemanticContract(
+        rationale=(
+            "Qwen's additional-properties grammar can emit a parameter name "
+            "already emitted in the same call. A dictionary assignment then "
+            "silently replaced the first model value. Refuse repeated names "
+            "before schema conversion on both complete and partial output."
+        ),
+        removal_condition=(
+            "Remove when upstream's Qwen XML converter refuses repeated "
+            "parameter names before any decoded tool call is published."
+        ),
+        validate_before=_validate_unique_parameters_before,
+        validate_after=_validate_unique_parameters_after,
+    ),
     "qwen-owned-tool-grammar": SemanticContract(
         rationale=(
             "XGrammar's Qwen value channel excludes only the parameter closer, "

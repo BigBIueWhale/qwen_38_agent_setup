@@ -261,7 +261,7 @@ The vLLM submodule is pinned at:
 
     9df9b0b0a1816b6d0d0f6ecd0da563cc37fd72f5
 
-It is intentionally reconstructed by thirty-five ordered, reviewed semantic transformations:
+It is intentionally reconstructed by the ordered, reviewed semantic transformations below:
 
 | Patch | SHA-256 |
 |---|---|
@@ -300,6 +300,7 @@ It is intentionally reconstructed by thirty-five ordered, reviewed semantic tran
 | patches/vllm-precise-request-errors.patch | 055c3348b1a0c801ad6c8202d13659471106d0ff8a9b958efe1df16e25e9e588 |
 | patches/vllm-qwen-canonical-parameter-framing.patch | d438f9106c4a989d64837c21f5491d946065e6721570ad47664513347f150064 |
 | patches/vllm-qwen-owned-tool-grammar.patch | 81b3f760a7aa670496deb1252ee3713d452ab62debec88062bbe4cadceb6c849 |
+| patches/vllm-qwen-unique-tool-parameters.patch | 6a76a61c743807215555cbd6b3bbdd8fcaba4abcaca69ef000d301df6c792d3b |
 
 The reconstructed tree has 100 reviewed runtime-source changes, 2 new runtime sources,
 7 runtime-source deletions, 71 existing-test changes, 12 new tests,
@@ -972,6 +973,11 @@ prefer their original string representation. Encoded JSON objects, arrays and
 numbers keep their original representation. Cut or untypable values stay raw
 for diagnostics and client validation. All parameter constraints are available
 before argument JSON is emitted; executable calls still wait for EOS.
+If one call repeats a parameter name, decoding refuses the call before its
+earlier value can be replaced. This covers complete output and an unfinished
+trailing parameter on either transport, including schemas that allow additional
+properties. The error names the repeated parameter and directs the caller to
+inspect the generated call and retry.
 
 A parameter value may carry neither its own `</parameter>` closer nor the next
 parameter's `<parameter=` opener. vLLM owns the Qwen structural tag so it can

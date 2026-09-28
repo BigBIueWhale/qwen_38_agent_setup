@@ -1,0 +1,86 @@
+diff --git a/vllm/parser/qwen3.py b/vllm/parser/qwen3.py
+--- a/vllm/parser/qwen3.py
++++ b/vllm/parser/qwen3.py
+@@ -267,6 +267,8 @@
+     for match in _PARAM_RE.finditer(raw_args):
+         name = match.group(1)
+         value = match.group(2)
++        if name in params:
++            raise ValueError(f"Qwen XML repeats parameter {name!r}")
+         params[name] = _unframe_parameter_value(value, complete=True)
+ 
+     # An unfinished parameter is a raw diagnostic on both transports.
+@@ -276,6 +278,8 @@
+         name = m.group(1)
+         value = m.group(2)
+         if name:
++            if name in params:
++                raise ValueError(f"Qwen XML repeats parameter {name!r}")
+             params[name] = _unframe_parameter_value(value, complete=False)
+ 
+     if schema and m is None:
+@@ -422,7 +426,10 @@
+         except (TypeError, ValueError) as exc:
+             # Malformed parameter text is handled inside the decoder. An error
+             # here must not enter the engine's provisional-converter fallback.
+-            raise RuntimeError("Qwen XML argument decoding failed") from exc
++            raise RuntimeError(
++                f"Qwen XML argument decoding failed: {exc}; "
++                "inspect the generated call and retry"
++            ) from exc
+ 
+     def extract_batch_content_ids(self, token_ids, *, token_offset: int = 0):
+         if not token_ids:
+diff --git a/tests/parser/engine/test_qwen3.py b/tests/parser/engine/test_qwen3.py
+--- a/tests/parser/engine/test_qwen3.py
++++ b/tests/parser/engine/test_qwen3.py
+@@ -767,6 +767,26 @@
+ 
+ class TestArgConverter:
+     """Direct tests for the Qwen3 arg_converter with multi-line values."""
++
++    @pytest.mark.parametrize(
++        ("raw", "partial"),
++        [
++            (
++                "<parameter=city>Tokyo</parameter>\n"
++                "<parameter=city>Paris</parameter>\n",
++                False,
++            ),
++            (
++                "<parameter=city>Tokyo</parameter>\n<parameter=city>Par",
++                True,
++            ),
++        ],
++    )
++    def test_repeated_parameter_cannot_overwrite_model_output(self, raw, partial):
++        from vllm.parser.qwen3 import _qwen3_arg_converter
++
++        with pytest.raises(ValueError, match="repeats parameter 'city'"):
++            _qwen3_arg_converter(raw, partial)
+ 
+     def test_multiline_param_values(self):
+         from vllm.parser.qwen3 import (
+diff --git a/tests/parser/engine/test_qwen_xml_fidelity.py b/tests/parser/engine/test_qwen_xml_fidelity.py
+--- a/tests/parser/engine/test_qwen_xml_fidelity.py
++++ b/tests/parser/engine/test_qwen_xml_fidelity.py
+@@ -109,6 +109,19 @@
+           '\n</function></tool_call><think>\n', '"quoted"\n\\path\n']
+ 
+ 
++@pytest.mark.parametrize('chunk_size', [None, 7])
++def test_repeated_parameter_refuses_the_call_instead_of_replacing_text(chunk_size):
++    text = ('plan</think><tool_call>\n<function=write>\n'
++            '<parameter=text>\nfirst\n</parameter>\n'
++            '<parameter=text>\nsecond\n</parameter>\n'
++            '</function>\n</tool_call>')
++    with pytest.raises(RuntimeError, match="repeats parameter 'text'; .*retry"):
++        parse(text, chunk_size, schema={
++            'type': 'object', 'properties': {'text': {'type': 'string'}},
++            'required': ['text'], 'additionalProperties': True,
++        })
++
++
+ @pytest.mark.parametrize('chunk_size', [None, 1, 2, 3, 7, 13, 64])
+ @pytest.mark.parametrize('value', VALUES)
+ def test_parameter_string_bytes_survive_every_transport_cut(value, chunk_size):
