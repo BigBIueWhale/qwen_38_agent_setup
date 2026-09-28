@@ -474,11 +474,8 @@ Consequences:
 - CPU weight offload is exactly zero. KV offload is not: the OffloadingConnector runs
   in kv_both role with a pinned host tier in /dev/shm sized as one declared resident
   user context (bytes derived in-engine from max_model_len and the KV cache spec).
-  An agent ID with no cached blocks may acquire a shared prefix. Once it has
-  cached blocks, it matches its acquired cache and extends it through computation.
-  GPU and CPU use one membership catalog. Pressure releases whole agent contexts;
-  references held by surviving contexts preserve their shared data and complete
-  working sets. The v23 source tests cover these rules; image adoption is pending.
+  Agent IDs decide what each lookup may match and what this tier retains; see
+  [Shared prefixes and agent IDs](#shared-prefixes-and-agent-ids).
 - Multimodal profiling is mandatory and cannot be skipped to obtain a deceptively
   optimistic allocation.
 - All unquantized model computation, including the entire vision tower, uses BF16.
@@ -489,32 +486,92 @@ Consequences:
 
 ### Shared prefixes and agent IDs
 
-Every generation request supplies an opaque, nonempty `kv_scope` agent ID.
-Use a stable ID for successive requests from one agent. A new ID can match a
-shared prefix only while it has no cached blocks of its own; selecting that
-prefix creates an implicit fork. Afterward, it matches only its acquired or
-computed data. GPU and CPU membership jointly determine whether it has a cache.
-If all its cached blocks are evicted, the no-cache rule applies again.
-An input stream keeps one agent ID across all its chunks. Changing that ID is
-refused before the chunk is dispatched; a different agent starts a new generation
-request and goes through the same cache lookup rules.
-The supported generation APIs are Chat Completions (including batch Chat),
-Completions, Responses, Anthropic Messages and token-in-token-out generate.
-These are five protocol families and six routes. Generative scoring and Cohere
+Every generation request supplies an opaque `kv_scope` agent ID containing a
+non-whitespace character. The protocol models reject an empty or whitespace-only
+value. Absence is refused at the one boundary every generative request passes,
+`require_kv_scope` in `vllm/vllm/v1/engine/input_processor.py`, reached through
+`AsyncLLM.add_request`; a non-streaming request without it receives HTTP 400
+naming the field. The supported generation APIs are Chat Completions (including
+batch Chat), Completions, Responses, Anthropic Messages and token-in-token-out
+generate: five protocol families and six routes. Generative scoring and Cohere
 are not mounted; neither is part of this deployment's agent-identity contract.
+Rendering and pooling allocate no KV and do not require an ID.
 
-Shared blocks have references from each agent that uses them. Releasing one
-agent preserves references held by surviving contexts. Request completion
-retains a complete context for its next turn; it does not declare the agent
-dead. A selected prefix acquires only its selected data, including when it
-ends inside a larger physical cache entry.
+The ID never enters a block hash, so a request reuses KV only for its own exact
+token prefix. No ID choice can serve one agent another agent's state, and none
+isolates agents, since any fresh ID may match any resident prefix. Isolation is
+`cache_salt`, a hash input the server never derives from the ID. The ID has no
+prescribed format and declares no parent or lineage. A fresh ID can observe
+shared-prefix hits through latency, so IDs carry no authentication or
+confidentiality promise; no timing padding is added.
 
-The ID has no prescribed format and declares no parent or lineage. A fresh ID
-can observe shared-prefix hits through latency, so IDs carry no authentication
-or confidentiality promise. No timing padding is added, and `cache_salt` is
-independent of agent identity. Rendering and pooling do not require a generation
-ID. See [the KV design](docs/kv-user-count-and-agent-scope-design.md) for complete
-context retention, CPU window availability, secondary storage and capacity math.
+The ID controls two things:
+
+- **What a lookup may match.** `PrefixCacheIndex.view` in
+  `vllm/vllm/v1/core/prefix_cache.py` lets an ID with no cached blocks in any tier
+  match every resident prefix, and any other ID only data it acquired or
+  computed. The GPU block pool and the CPU tier share this one index. A selected
+  prefix acquires only its selected data, including when it ends inside a larger
+  physical entry. Once all of an ID's blocks are evicted, the no-cache rule
+  applies again.
+- **What the CPU tier retains.** `CPUOffloadingManager` in
+  `vllm/vllm/v1/kv_offload/cpu/manager.py` keeps at most one finished context per
+  ID. The ID's next request drops it as soon as that request retains any data
+  (`retain_context`), and completion makes the finished request the ID's retained
+  context (`on_request_finished`). Concurrent requests of one ID keep separate
+  working sets only while active. Under pressure, `_prepare_store` reclaims
+  unreferenced chunks first, then releases whole IDs in least-recently-used order,
+  never the storing ID; references held by surviving contexts keep their shared
+  data. GPU block eviction is per-block LRU and ignores the ID.
+
+A harness decides at run time whether new work forks the current agent (its
+history continues the agent's) or spawns a subagent (its own conversation). That
+decision is where the ID matters. A request whose ID has no cached blocks,
+normally a new ID's first request, is the only lookup that may acquire data the
+ID has not itself acquired or computed. Reusing an ID makes two lines of work
+compete for one retained context. The server records no lineage, so the ID the
+harness sends is the entire decision.
+
+| Caller case | Send | What the code does |
+| --- | --- | --- |
+| Next turn of the same conversation | The same ID | Earlier turns are in the ID's own cache while resident. The new turn replaces the retained context; chunks only the old context used become the first reclaimed. |
+| Retry or redraw of the same turn | The ID the conversation continues under | The prompt is in that ID's cache. The redraw replaces the discarded attempt's retained context. |
+| Fork sharing history up to a point | A new ID, first used by the fork's first request | With no cache, that request matches the longest resident prefix, the parent's history if still resident, and acquires it. Parent and fork then keep separate retained contexts over the shared chunks. |
+| Subagent with its own conversation | A new ID | Its first request may acquire any identical resident prefix. The parent's retained context stays under the parent's ID, released only by whole-ID pressure. |
+
+Each of several forks or subagents needs its own ID. The batch route submits
+every conversation under the batch's one ID, so after completion the ID retains
+only one of their contexts.
+
+Scoping mistakes never change output. They cost prefill and retention:
+
+- **One ID for two lines of work**, such as a subagent or fork on the parent's
+  ID: each line's next request drops the other's retained context, so while the
+  parent waits, its chunks the child does not use become the first reclaimed
+  under CPU pressure. That wait is what the CPU tier is configured for
+  (`config/runtime-v1.sh`). A subagent on the parent's ID also cannot acquire a
+  prefix held only by other IDs.
+- **A fork or subagent ID that already has cached blocks**, for example from an
+  earlier side request: it cannot acquire the parent's resident history, so it
+  prefills that history again and holds a second GPU copy; the block pool does
+  not deduplicate.
+- **A new ID per turn or retry of one conversation:** the prefix still matches,
+  because each fresh ID may match every resident prefix. Each abandoned ID keeps
+  its last context retained as a whole agent, however, so least-recently-used
+  release can take older agents' contexts first. A request under an older ID that
+  still has cached blocks cannot match data computed under the newer one.
+
+Nothing verifies correct use. The server checks that the ID is present and
+contains a non-whitespace character, and that an input stream keeps one ID
+across its chunks: a change is refused before dispatch and aborts only that
+stream's request. It cannot tell a continuation, retry, fork or subagent apart.
+Correct scoping rests entirely on the caller. Its effects are visible only as
+prefill latency, the served cached-token count
+(`prompt_tokens_details.cached_tokens` on Chat Completions; see
+[Exact served usage](#exact-served-usage)) and the server's prefix-cache metrics.
+
+See [the KV design](docs/kv-user-count-and-agent-scope-design.md) for the
+membership catalog, CPU window availability, secondary storage and capacity math.
 
 ### Agent defaults: xhigh thinking, exact sampling, long output
 
@@ -1044,8 +1101,8 @@ request validation.
 
 Generation names its agent or does not happen. The protocol probe sends every
 one of the six mounted generation routes — Chat Completions and its batch form, Completions,
-Responses, Anthropic Messages, and token-in-token-out generate — a request that is
-complete except for `kv_scope`, and each answers HTTP 400 naming the field: as
+Responses, Anthropic Messages, and token-in-token-out generate — a non-streaming
+request that is complete except for `kv_scope`, and each answers HTTP 400 naming the field: as
 `error.param` on the OpenAI-shaped surfaces, and as an `invalid_request_error`
 whose message names it on the Anthropic surface, because the Anthropic router maps
 the engine's request-validation error exactly as it maps typed request validation.
