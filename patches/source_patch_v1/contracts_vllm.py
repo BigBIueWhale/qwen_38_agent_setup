@@ -2808,7 +2808,11 @@ CONTRACTS: Mapping[str, SemanticContract] = {
             "Whitespace inside an XML string is its value. Preserve those bytes "
             "and all surrounding content on both transports, including "
             "whitespace-only text and unfulfilled tool choices. Shared parsing "
-            "and delegation retain content without a whitespace deletion mode."
+            "and delegation retain content without a whitespace deletion mode. "
+            "Upstream's deletion shaped only the response: the model's own "
+            "template, and the served one derived from it, trims every "
+            "message's content before rendering, so the next prompt is "
+            "byte-identical with or without it and the trained shape is kept."
         ),
         removal_condition=(
             "Remove when upstream preserves exact XML string and all "

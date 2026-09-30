@@ -173,6 +173,22 @@ and delegating parser have no content whitespace deletion policy; tool framing
 and tool event ordering remain grammar responsibilities.
 Four newly modified parser configurations join the full image provenance cascade.
 
+This is a divergence from upstream vLLM's response, not from the shape the model
+was trained on. Upstream's parser engine (at the pinned commit, the Qwen3 parser
+takes the defaults `drop_whitespace_only_content_before_tools=True` and
+`strip_content_whitespace_with_tools=True`) deletes or strips that content before
+returning it. What the model reads on its next turn is the history rendered by its
+template, and the model's own template renders every message as
+`render_content(message.content, true)|trim`; the served template keeps that line.
+So the deletion was never what kept a turn in its trained shape. Rendering an
+assistant turn whose content is `None`, `''`, `'\n'`, `'\n\n'` or `' \t\r\n'`,
+with and without a tool call, through both the model's template and the served one
+gives byte-identical prompts, and so do `'answer'` and `'\nanswer\n\n'` (run
+2026-09-30 in the pinned base image with the model's tokenizer; template rendering
+only, no model). The Responses and Anthropic surfaces convert history into the same
+chat messages and render it through the same template. Keeping the bytes therefore
+changes only what a caller receives, which is then what the model produced.
+
 Source-only record-completeness verification (2026-09-26): a generation with
 ` \t` before two calls, `\n\n` between them and `\r\n` afterward retains all six
 content characters. The baseline loses them in batch and streaming; required

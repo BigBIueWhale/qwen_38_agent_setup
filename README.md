@@ -359,7 +359,7 @@ Pinned build inputs and products:
 | Docker context allowlist SHA-256 | 5b6b3c8e03cd9cdc3e8d48d8f4b30df98de4d1a6d2a0657484c24e295c4d7f50 |
 | Build verifier SHA-256 | 94d15391118a6beb8d307c1aff28e32fc237ef1aaf8fddb450b4586916a8ff82 |
 | Runtime validator SHA-256 | 97aa532add98deeb090264e2b625865571fb07e6795a559b6400b5c59b78a009 |
-| Runtime lock SHA-256 | 7f0e44210b08406b70d29f5ea12c89f9c430222bae7140cdbd0d2390fd4d6896 |
+| Runtime lock SHA-256 | 4c9c67187e5ee32242a7f909d43f96377a71cca12d814f257eefe042b99ca7fb |
 
 The runtime tag names the pinned image and nothing else. A build used to load its
 image under that tag before comparing the image ID with the pin, so a build that
@@ -1062,9 +1062,16 @@ unchanged, including one that begins or ends with a newline of its own, which
 travels as two. A value the model hugs against its tags therefore decodes to
 the same string as one it frames, which makes the model's slot-bound framing
 habit unable to decide what reaches a tool. Parsing, history rendering and
-grammar acceptance are checked together. Streaming and batch parsing also preserve
-nonempty content around calls byte for byte; a whitespace-only gap before a call
-may be omitted. Historical reasoning remains intact.
+grammar acceptance are checked together. Streaming and batch parsing also return
+all content before, between and after calls byte for byte, whitespace-only content
+included, so a caller records exactly what the model produced. Upstream vLLM's
+shared parser deletes whitespace-only content before a call and strips content
+beside calls; this deployment does not. That changes the response, not the next
+prompt: the model's own template trims every message's content before rendering
+it (`render_content(...)|trim`), and so does the served template derived from it,
+so a turn whose content is whitespace or carries surrounding whitespace renders
+byte for byte as the trimmed or empty turn upstream would have returned.
+Historical reasoning remains intact.
 
 A narrow scheduler patch retains the implicit Qwen tool-start token at the exact
 reasoning-to-tool grammar boundary. Without it, post-generation parsing could
