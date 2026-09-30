@@ -2,13 +2,13 @@
 """Verify installed shared-prefix semantics using CPU metadata only."""
 
 import asyncio
+import importlib.util
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
 from vllm.engine.protocol import StreamingInput
 from vllm.exceptions import VLLMValidationError
 from vllm.sampling_params import RequestOutputKind, SamplingParams
-from vllm.v1.core.prefix_cache import PrefixCacheIndex
 from vllm.v1.engine.async_llm import AsyncLLM, InputStreamError
 from vllm.v1.engine.input_processor import InputProcessor, require_kv_scope
 from vllm.v1.kv_offload.base import LookupResult, ReqContext
@@ -99,59 +99,57 @@ def main():
         "/v1/responses", "/v1/messages", "/inference/v1/generate",
     } <= paths, paths
     asyncio.run(check_stream_identity())
-    index = PrefixCacheIndex()
-    gpu = object()
-    index.register_tier(gpu, 4)
-    manager = CPUOffloadingManager(4)
-    manager.bind_prefix_cache(index)
-    index.insert(gpu, b'prefix', (b'prefix',))
-    index.acquire(gpu, 'source-agent', [b'prefix'])
-    content = {key: (key,) for key in (b'prefix', b'producer-tail', b'fork-tail')}
+
+    # Lookup matches content alone. The membership catalog that once let only
+    # an ID without cached blocks match another ID's data is gone.
+    assert importlib.util.find_spec('vllm.v1.core.prefix_cache') is None
+    manager = CPUOffloadingManager(7)
+    content = {key: (key,) for key in
+               (b'prefix', b'producer-tail', b'fork-tail', b'own', b'other')}
     producer = request('producer', content)
     store(manager, producer, [b'prefix', b'producer-tail'])
-    index.remove(gpu, b'prefix')
-    assert index.view('source-agent').keys == frozenset((b'prefix',))
+    manager.on_request_finished(producer)
 
     fork = request('fork', content)
-    manager.begin_lookup(fork)
     assert manager.lookup(b'prefix', fork) is LookupResult.HIT
     manager.prepare_load([b'prefix'], fork)
     manager.complete_load([b'prefix'], fork)
     store(manager, fork, [b'fork-tail'])
-    manager.begin_lookup(fork)
-    assert manager.lookup(b'prefix', fork) is LookupResult.HIT
-    assert manager.lookup(b'fork-tail', fork) is LookupResult.HIT
-    assert manager.lookup(b'producer-tail', fork) is LookupResult.MISS
+    # The fork now has cached data of its own and still matches every
+    # resident prefix it names, including data only the producer computed.
+    for key in (b'prefix', b'fork-tail', b'producer-tail'):
+        assert manager.lookup(key, fork) is LookupResult.HIT
+    manager.on_request_finished(fork)
 
-    # GPU membership makes the agent existing even with no CPU membership.
-    index.insert(gpu, b'gpu-only', (b'gpu-only',))
-    index.acquire(gpu, 'gpu-agent', [b'gpu-only'])
-    gpu_agent = request('gpu-agent', content)
-    manager.begin_lookup(gpu_agent)
-    assert manager.lookup(b'prefix', gpu_agent) is LookupResult.MISS
-    index.release_agent(manager.cache_tier, 'producer')
-    manager.begin_lookup(fork)
+    # Whole-agent retention: pressure releases the least recently used ID,
+    # never the storing one, and references a survivor holds keep shared data.
+    incoming = request('incoming', content)
+    output = store(manager, incoming, [b'own', b'other'])
+    assert output.evicted_keys == []
+    pressure = request('pressure', {key: (key,) for key in (b'p1', b'p2', b'p3')})
+    output = store(manager, pressure, [b'p1', b'p2', b'p3'])
+    assert output.evicted_keys == [b'producer-tail']
+    assert 'producer' not in manager._agents and 'fork' in manager._agents
     assert manager.lookup(b'prefix', fork) is LookupResult.HIT
 
-    # An incomplete window chunk serves its written suffix. Filling it
-    # preserves each previous user's acquired extent and uses the same row.
+    # An incomplete window chunk serves its written suffix. Filling it uses
+    # the same row; the complete row then serves every reader, including the
+    # agent that wrote only the suffix.
     manager = CPUOffloadingManager(3, enable_events=True)
     canonical, suffix = (b'early', b'middle', b'end'), (b'middle', b'end')
     window = request('window', {b'end': canonical}, {b'end': suffix}, {b'end': suffix})
     store(manager, window, [b'end'])
     slot = manager._blocks[b'end'].block_id
-    manager.begin_lookup(window)
     assert manager.lookup(b'end', window) is LookupResult.HIT
     assert manager._lookup(b'end', ReqContext('storage')) is LookupResult.MISS
     assert not list(manager.take_events())
     earlier = request('earlier', {b'end': canonical})
-    manager.begin_lookup(earlier)
     assert manager.lookup(b'end', earlier) is LookupResult.MISS
     output = store(manager, earlier, [b'end'])
     assert list(output.store_spec.block_ids) == [slot]
     assert manager._num_allocated_blocks == 1
-    assert manager.prefix_cache.view('window').keys == frozenset(suffix)
-    assert manager.prefix_cache.view('earlier').keys == frozenset(canonical)
+    assert manager._available_content[b'end'] == canonical
+    assert manager.lookup(b'end', request('window', {b'end': canonical})) is LookupResult.HIT
     assert manager._lookup(b'end', ReqContext('storage')) is LookupResult.HIT
     assert len(list(manager.take_events())) == 1
     print('Shared prefix cache CPU unit PASS')

@@ -1127,41 +1127,41 @@ def _validate_shared_prefix_cache_after(state: State) -> None:
         "CPUOffloadingManager.__init__": ["self", "num_blocks", "enable_events"],
     }, label=label)
 
-    membership = "vllm/v1/core/prefix_cache.py"
-    for text in (
-        "class PrefixCacheView:",
-        "return self.keys is None or self.keys.issuperset(content)",
-        "if agent_id not in self._owned:",
-        "return PrefixCacheView(None)",
-        "return PrefixCacheView(frozenset(owned))",
-        "def extend_content(",
-        "entry.agents[agent_id] = acquired",
-        "def copy_membership(",
-        "def copy_content_memberships(",
+    # Lookup matches content and cache_salt alone, in every tier, as upstream
+    # does: no membership view, acquisition or per-agent catalog exists to
+    # make an ID with cached blocks miss data another ID computed.
+    for path in (
+        "vllm/v1/core/block_pool.py",
+        "vllm/v1/core/single_type_kv_cache_manager.py",
+        manager,
+        "vllm/v1/kv_offload/base.py",
+        "vllm/v1/kv_offload/tiering/manager.py",
+        "vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py",
     ):
-        require_text(state, membership, text, label=label)
-    require_text(state, membership, "len(state.agents) + added <= state.capacity", count=2, label=label)
+        for text in ("prefix_cache.", "PrefixCache", "cache_view", "begin_lookup"):
+            forbid_text(state, path, text, label=label)
+    # The agent ID groups retention. Whole agents are released in
+    # least-recently-used order, never the storing one; references held by
+    # surviving contexts protect shared chunks; retained contexts are bounded
+    # by the chunk count; sparse rows record the data actually written.
     for text in (
-        "self.prefix_cache = index",
-        "req_context.set_state(self.prefix_cache.view(self._agent_id(req_context)))",
         "self._references.setdefault(key, set()).add(req_id)",
         "not required or not self._has_content(key, required, req_context)",
         "self._references.get(key, set()) <= released_requests",
         "if victim == agent_id:",
-        "self.prefix_cache.release_agent(self.cache_tier, victim)",
+        "self._forget_agent(victim)",
         "if self._blocks[key].ref_cnt != 0:",
-        "self.prefix_cache.extend_content(self.cache_tier, key, content[key])",
-        "self.prefix_cache.copy_content_memberships(",
+        "while len(self._idle_context) > self._num_blocks:",
         "        if key not in self._complete_blocks:",
     ):
         require_text(state, manager, text, label=label)
-    require_text(state, "vllm/v1/core/kv_cache_manager.py",
-                 "self.block_pool.prefix_cache.view(request.kv_scope)", count=2, label=label)
-    require_text(state, "vllm/v1/simple_kv_offload/manager.py",
-                 "copy_membership(", label=label)
+    require_text(state, manager, "self._available_content[key] = content[key]",
+                 count=2, label=label)
+    # Attention growth keeps the block's earlier immutable prefix reachable.
+    require_text(state, "vllm/v1/core/block_pool.py", "*, is_recurrent: bool,",
+                 count=2, label=label)
     tiering = "vllm/v1/kv_offload/tiering/manager.py"
     require_text(state, tiering, "if success and complete_keys:", label=label)
-    require_text(state, tiering, "self.primary_tier.begin_lookup(req_context)", label=label)
 
     # GPU tier: the byte flag is gone, the count is required, and the pool
     # is derived rather than filled to whatever memory happened to be free.
@@ -3173,19 +3173,19 @@ CONTRACTS: Mapping[str, SemanticContract] = {
     "shared-prefix-cache-and-user-capacity": SemanticContract(
         rationale=(
             "Both KV tiers are sized from declared full-length user contexts. "
-            "A required opaque agent ID selects shared-prefix membership: an "
-            "ID with no cached blocks can acquire its initial prefix, and an "
-            "existing ID matches its acquired or computed data. GPU and CPU "
-            "share one catalog. Whole-context eviction preserves surviving "
-            "agents' shared references; sparse CPU chunks advertise only "
-            "written data, and secondary storage receives canonical entries. "
-            "Every served generation surface uses the common identity gate."
+            "Prefix lookup matches content and cache_salt alone in every tier, "
+            "as upstream does. A required opaque agent ID groups retention: "
+            "the CPU tier keeps each ID's finished context for its next turn, "
+            "and pressure releases whole IDs in least-recently-used order while "
+            "references held by surviving contexts protect shared chunks. "
+            "Sparse CPU chunks advertise only written data, and secondary "
+            "storage receives canonical entries. Every served generation "
+            "surface uses the common identity gate."
         ),
         removal_condition=(
             "Remove when pinned upstream provides the same user-count sizing, "
-            "initial-fork matching, shared GPU/CPU membership, complete-context "
-            "retention, and content-accurate offload transfer contracts across "
-            "all generation consumers."
+            "agent-grouped complete-context retention, and content-accurate "
+            "offload transfer contracts across all generation consumers."
         ),
         validate_before=_validate_shared_prefix_cache_before,
         validate_after=_validate_shared_prefix_cache_after,

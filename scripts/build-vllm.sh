@@ -60,7 +60,6 @@ EXPECTED_STATUS=$' M tests/config/test_config_utils.py
  M tests/test_sampling_params.py
  M tests/tool_parsers/test_structural_tag_registry.py
  M tests/v1/core/test_prefix_caching.py
- M tests/v1/core/test_single_type_kv_cache_manager.py
  M tests/v1/e2e/general/test_context_length.py
  M tests/v1/engine/test_output_processor.py
  M tests/v1/kv_connector/nixl_integration/run_multi_connector_accuracy_test.sh
@@ -70,7 +69,6 @@ EXPECTED_STATUS=$' M tests/config/test_config_utils.py
  M tests/v1/kv_connector/unit/offloading_connector/test_events.py
  M tests/v1/kv_connector/unit/offloading_connector/test_scheduler.py
  M tests/v1/kv_connector/unit/offloading_connector/test_worker.py
- M tests/v1/kv_connector/unit/offloading_connector/utils.py
  M tests/v1/kv_connector/unit/test_config.py
  M tests/v1/kv_connector/unit/test_hma_auto_config.py
  M tests/v1/kv_connector/unit/test_offloading_connector.py
@@ -96,7 +94,6 @@ EXPECTED_STATUS=$' M tests/config/test_config_utils.py
  M vllm/config/vllm.py
  M vllm/distributed/kv_transfer/kv_connector/v1/offloading/config.py
  M vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py
- M vllm/distributed/kv_transfer/kv_connector/v1/offloading_connector.py
  M vllm/engine/arg_utils.py
  M vllm/entrypoints/anthropic/api_router.py
  M vllm/entrypoints/anthropic/protocol.py
@@ -164,8 +161,6 @@ EXPECTED_STATUS=$' M tests/config/test_config_utils.py
  M vllm/v1/attention/ops/triton_turboquant_decode.py
  M vllm/v1/attention/ops/triton_turboquant_store.py
  M vllm/v1/core/block_pool.py
- M vllm/v1/core/kv_cache_coordinator.py
- M vllm/v1/core/kv_cache_manager.py
  M vllm/v1/core/kv_cache_utils.py
  M vllm/v1/core/sched/scheduler.py
  M vllm/v1/core/sched/utils.py
@@ -189,7 +184,6 @@ EXPECTED_STATUS=$' M tests/config/test_config_utils.py
  M vllm/v1/kv_offload/tiering/spec.py
  M vllm/v1/request.py
  M vllm/v1/sample/thinking_budget_state.py
- M vllm/v1/simple_kv_offload/manager.py
  M vllm/v1/structured_output/__init__.py
  M vllm/v1/structured_output/backend_types.py
  M vllm/v1/structured_output/backend_xgrammar.py
@@ -207,9 +201,7 @@ EXPECTED_STATUS=$' M tests/config/test_config_utils.py
 ?? tests/parser/engine/test_qwen_xml_fidelity.py
 ?? tests/parser/engine/test_reasoning_token_count.py
 ?? tests/v1/core/test_kv_cache_users_sizing.py
-?? tests/v1/core/test_prefix_cache.py
 ?? tests/v1/worker/test_workspace.py
-?? vllm/v1/core/prefix_cache.py
 ?? vllm/v1/structured_output/stop_checker.py'
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
@@ -433,14 +425,42 @@ if [[ "${actual_base_image_id}" != "${EXPECTED_BASE_IMAGE_ID}" ]]; then
   exit 1
 fi
 
+# Every identity this repository has itself shipped for a path, read out of
+# its own history: the FINAL_FILES of each committed revision of the generated
+# stage data. This is what lets "provably stale" be a statement about
+# committed data rather than about the tree being examined.
+SHIPPED_IDENTITIES="${BUILD_EXPORT_DIR}/shipped-identities"
+write_shipped_identities() {
+  : >"${SHIPPED_IDENTITIES}"
+  local revision
+  while IFS= read -r revision; do
+    git -C "${PROJECT_DIR}" show "${revision}:${GENERATED_STAGES_REL}" \
+      | sed -n '/^FINAL_FILES = {/,$p' \
+      | sed -n "s/.*'\([^']\{1,\}\)': '\([0-9a-f]\{64\}\)'.*/\2 \1 ${revision}/p" \
+      >>"${SHIPPED_IDENTITIES}"
+  done < <(git -C "${PROJECT_DIR}" log --format=%H -- "${GENERATED_STAGES_REL}")
+}
+
 actual_status="$(git -C "${VLLM_DIR}" status --short --untracked-files=all)"
 # A path the live tree changes that the reviewed patch set does not name is
 # authored work or damage in every mode: no committed identity describes it,
-# and nothing here may write over it.
-unnamed_live_paths="$(
+# and nothing here may write over it. A path an earlier committed revision
+# patched is named by that history instead: the patch set retired it, so the
+# live tree is behind on it rather than damaged, and the verb that writes the
+# live tree proves its bytes against the shipped identities before restoring
+# the reconstruction's.
+live_paths_outside_set="$(
   sed -n 's/^...//p' <<<"${actual_status}" \
     | grep -Fxv -f <(sed -n 's/^...//p' <<<"${EXPECTED_STATUS}") || true
 )"
+unnamed_live_paths="${live_paths_outside_set}"
+if [[ -n "${live_paths_outside_set}" ]]; then
+  write_shipped_identities
+  unnamed_live_paths="$(
+    grep -Fxv -f <(cut -d' ' -f2 "${SHIPPED_IDENTITIES}" | sort -u) \
+      <<<"${live_paths_outside_set}" || true
+  )"
+fi
 if [[ -n "${unnamed_live_paths}" ]]; then
   echo "Refusing a vLLM worktree that changes paths the reviewed patch set" \
     "does not name:" >&2
@@ -451,9 +471,10 @@ if [[ -n "${unnamed_live_paths}" ]]; then
     "the paths deliberately; no mode here will decide that for you." >&2
   exit 1
 fi
-# A tree merely missing paths a pulled stage added is behind, not damaged, and
-# that is precisely what `materialise` repairs; every other mode still
-# requires the exact reviewed state.
+# A tree merely missing paths a pulled stage added, or still holding a path a
+# pulled stage retired, is behind, not damaged, and that is precisely what
+# `materialise` repairs; every other mode still requires the exact reviewed
+# state.
 if [[ "${MODE}" != "materialise" && "${actual_status}" != "${EXPECTED_STATUS}" ]]; then
   echo "Refusing unexpected vLLM worktree state:" >&2
   printf '%s\n' "${actual_status}" >&2
@@ -604,18 +625,7 @@ fi
 # by name, may it be written to the unmanaged live tree. A reconstruction that
 # did not verify has already exited above and is never written anywhere.
 if [[ "${MODE}" == "materialise" ]]; then
-  # Every identity this repository has itself shipped for a path, read out of
-  # its own history: the FINAL_FILES of each committed revision of the
-  # generated stage data. This is what lets "provably stale" be a statement
-  # about committed data rather than about the tree being examined.
-  SHIPPED_IDENTITIES="${BUILD_EXPORT_DIR}/shipped-identities"
-  : >"${SHIPPED_IDENTITIES}"
-  while IFS= read -r revision; do
-    git -C "${PROJECT_DIR}" show "${revision}:${GENERATED_STAGES_REL}" \
-      | sed -n '/^FINAL_FILES = {/,$p' \
-      | sed -n "s/.*'\([^']\{1,\}\)': '\([0-9a-f]\{64\}\)'.*/\2 \1 ${revision}/p" \
-      >>"${SHIPPED_IDENTITIES}"
-  done < <(git -C "${PROJECT_DIR}" log --format=%H -- "${GENERATED_STAGES_REL}")
+  write_shipped_identities
   if [[ ! -s "${SHIPPED_IDENTITIES}" ]]; then
     echo "MATERIALISE REFUSED: no committed final identity was found for" \
       "${GENERATED_STAGES_REL}; a tree without that history cannot prove" \
@@ -749,14 +759,9 @@ printf '%s  %s\n' \
   sha256sum --check --strict
 
 printf '%s  %s\n' \
-  "${OFFLOADING_CONNECTOR_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/distributed/kv_transfer/kv_connector/v1/offloading_connector.py" \
   "${BLOCK_POOL_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/v1/core/block_pool.py" \
-  "${KV_CACHE_COORDINATOR_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/v1/core/kv_cache_coordinator.py" \
-  "${KV_CACHE_MANAGER_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/v1/core/kv_cache_manager.py" \
-  "${PREFIX_CACHE_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/v1/core/prefix_cache.py" \
   "${SINGLE_TYPE_KV_CACHE_MANAGER_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/v1/core/single_type_kv_cache_manager.py" \
   "${KV_OFFLOAD_CPU_COMMON_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/v1/kv_offload/cpu/common.py" \
-  "${SIMPLE_KV_OFFLOAD_MANAGER_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/v1/simple_kv_offload/manager.py" \
   "${SHARED_PREFIX_CACHE_UNIT_SHA256}" "${PROJECT_DIR}/scripts/shared_prefix_cache_unit.py" \
   "${RAW_MEDIA_UNIT_SHA256}" "${PROJECT_DIR}/scripts/raw_media_unit.py" \
   "${GENERATE_RESULT_UNIT_SHA256}" "${PROJECT_DIR}/scripts/generate_result_unit.py" | sha256sum --check --strict
@@ -929,21 +934,12 @@ docker buildx build --progress=plain \
   --no-cache \
   --target runtime \
   --build-arg "BASE_IMAGE=${BASE_IMAGE_TAG}" \
-  --build-arg "OFFLOADING_CONNECTOR_UPSTREAM_FILE_SHA256=${OFFLOADING_CONNECTOR_UPSTREAM_FILE_SHA256}" \
-  --build-arg "OFFLOADING_CONNECTOR_PATCHED_FILE_SHA256=${OFFLOADING_CONNECTOR_PATCHED_FILE_SHA256}" \
   --build-arg "BLOCK_POOL_UPSTREAM_FILE_SHA256=${BLOCK_POOL_UPSTREAM_FILE_SHA256}" \
   --build-arg "BLOCK_POOL_PATCHED_FILE_SHA256=${BLOCK_POOL_PATCHED_FILE_SHA256}" \
-  --build-arg "KV_CACHE_COORDINATOR_UPSTREAM_FILE_SHA256=${KV_CACHE_COORDINATOR_UPSTREAM_FILE_SHA256}" \
-  --build-arg "KV_CACHE_COORDINATOR_PATCHED_FILE_SHA256=${KV_CACHE_COORDINATOR_PATCHED_FILE_SHA256}" \
-  --build-arg "KV_CACHE_MANAGER_UPSTREAM_FILE_SHA256=${KV_CACHE_MANAGER_UPSTREAM_FILE_SHA256}" \
-  --build-arg "KV_CACHE_MANAGER_PATCHED_FILE_SHA256=${KV_CACHE_MANAGER_PATCHED_FILE_SHA256}" \
-  --build-arg "PREFIX_CACHE_PATCHED_FILE_SHA256=${PREFIX_CACHE_PATCHED_FILE_SHA256}" \
   --build-arg "SINGLE_TYPE_KV_CACHE_MANAGER_UPSTREAM_FILE_SHA256=${SINGLE_TYPE_KV_CACHE_MANAGER_UPSTREAM_FILE_SHA256}" \
   --build-arg "SINGLE_TYPE_KV_CACHE_MANAGER_PATCHED_FILE_SHA256=${SINGLE_TYPE_KV_CACHE_MANAGER_PATCHED_FILE_SHA256}" \
   --build-arg "KV_OFFLOAD_CPU_COMMON_UPSTREAM_FILE_SHA256=${KV_OFFLOAD_CPU_COMMON_UPSTREAM_FILE_SHA256}" \
   --build-arg "KV_OFFLOAD_CPU_COMMON_PATCHED_FILE_SHA256=${KV_OFFLOAD_CPU_COMMON_PATCHED_FILE_SHA256}" \
-  --build-arg "SIMPLE_KV_OFFLOAD_MANAGER_UPSTREAM_FILE_SHA256=${SIMPLE_KV_OFFLOAD_MANAGER_UPSTREAM_FILE_SHA256}" \
-  --build-arg "SIMPLE_KV_OFFLOAD_MANAGER_PATCHED_FILE_SHA256=${SIMPLE_KV_OFFLOAD_MANAGER_PATCHED_FILE_SHA256}" \
   --build-arg "SHARED_PREFIX_CACHE_UNIT_SHA256=${SHARED_PREFIX_CACHE_UNIT_SHA256}" \
   --build-arg "RAW_MEDIA_UNIT_SHA256=${RAW_MEDIA_UNIT_SHA256}" \
   --build-arg "GENERATE_RESULT_UNIT_SHA256=${GENERATE_RESULT_UNIT_SHA256}" \
@@ -1390,14 +1386,9 @@ fi
 
 kv_users_installed_report="$(
   docker run --rm --network none --entrypoint sha256sum "${actual_image_id}" \
-    /usr/local/lib/python3.12/dist-packages/vllm/distributed/kv_transfer/kv_connector/v1/offloading_connector.py \
     /usr/local/lib/python3.12/dist-packages/vllm/v1/core/block_pool.py \
-    /usr/local/lib/python3.12/dist-packages/vllm/v1/core/kv_cache_coordinator.py \
-    /usr/local/lib/python3.12/dist-packages/vllm/v1/core/kv_cache_manager.py \
-    /usr/local/lib/python3.12/dist-packages/vllm/v1/core/prefix_cache.py \
     /usr/local/lib/python3.12/dist-packages/vllm/v1/core/single_type_kv_cache_manager.py \
     /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/cpu/common.py \
-    /usr/local/lib/python3.12/dist-packages/vllm/v1/simple_kv_offload/manager.py \
     /opt/qwen38/shared_prefix_cache_unit.py \
     /opt/qwen38/raw_media_unit.py \
     /opt/qwen38/generate_result_unit.py \
@@ -1423,14 +1414,9 @@ kv_users_installed_report="$(
     /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/scale_out/token_in_token_out/serving.py
 )"
 expected_kv_users_installed_report="$(printf '%s  %s\n' \
-  "${OFFLOADING_CONNECTOR_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/distributed/kv_transfer/kv_connector/v1/offloading_connector.py \
   "${BLOCK_POOL_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/core/block_pool.py \
-  "${KV_CACHE_COORDINATOR_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/core/kv_cache_coordinator.py \
-  "${KV_CACHE_MANAGER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/core/kv_cache_manager.py \
-  "${PREFIX_CACHE_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/core/prefix_cache.py \
   "${SINGLE_TYPE_KV_CACHE_MANAGER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/core/single_type_kv_cache_manager.py \
   "${KV_OFFLOAD_CPU_COMMON_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/cpu/common.py \
-  "${SIMPLE_KV_OFFLOAD_MANAGER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/simple_kv_offload/manager.py \
   "${SHARED_PREFIX_CACHE_UNIT_SHA256}" /opt/qwen38/shared_prefix_cache_unit.py \
   "${RAW_MEDIA_UNIT_SHA256}" /opt/qwen38/raw_media_unit.py \
   "${GENERATE_RESULT_UNIT_SHA256}" /opt/qwen38/generate_result_unit.py \

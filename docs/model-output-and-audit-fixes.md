@@ -641,10 +641,11 @@ Harmony zero-delta item lifecycle; the deployed Qwen path does not use Harmony.
 ## Finding 9 and shared prefix caching
 
 `vllm-shared-prefix-cache-and-user-capacity.patch` defines the twelfth source
-stage. Every generation uses an opaque required agent ID. An ID with no cached
-blocks may acquire an initial shared prefix; an existing ID matches its acquired
-or computed data. GPU and CPU share a membership catalog. No parent, lineage
-declaration or ID structure is used.
+stage. Every generation uses an opaque required agent ID. Prefix lookup matches
+content and `cache_salt` alone in both tiers, as upstream does: the ID never
+restricts what a request may reuse, and `cache_salt` is what isolates callers.
+The ID groups what the CPU tier retains. No parent, lineage declaration or ID
+structure is used.
 
 CPU retention protects complete working sets across cache groups. Releasing an
 agent preserves other retained contexts' shared references. A finished request
@@ -654,24 +655,26 @@ invalidate only the contexts that need them. User-count sizing uses normalized
 block/window geometry, including grouped specs and EAGLE verification.
 
 Coalesced CPU chunks advertise only written data. Each lookup checks the actual
-candidate window, and filling missing data preserves existing agents' acquired
-subsets. Secondary storage receives canonical-complete entries. Selection inside
-a larger chunk acquires only the selected extent; a 72-token fork cannot acquire
-later attention data from a 96-token physical entry. Native stores preserve every
-source agent's acquired subset when copying shared data from GPU to CPU.
+candidate window against the data a row holds, and a fill extends that row in
+place for every reader. Secondary storage receives canonical-complete entries.
+An attention block that grows keeps its earlier immutable prefix reachable, so a
+fork resuming inside the block still reuses it.
 
-Fresh IDs can observe initial shared hits through latency. IDs provide cache
-accounting and matching semantics, without authentication or confidentiality
+Any request can observe shared hits through latency. IDs provide retention
+grouping, without matching restrictions, authentication or confidentiality
 promises, agent-derived cache salts, or artificial timing padding.
 
-Validation: 544 scheduler, cache, geometry, protocol and tiering tests pass in
-offline CPU containers. The production patch framework reconstructs all twenty
-stages and matches the tested sources exactly; its thirteen transaction tests
-pass. The installed-image CPU unit covers initial forks, existing-agent matching,
-GPU/CPU membership, physical-copy preservation, surviving shared references and
-sparse fills. The required backend check passes, including exact reconstruction,
-the 94-file deployment-input manifest and the installed shared-prefix CPU unit.
-The v23 image and archive remain awaiting adoption.
+Validation (2026-09-30, offline CPU containers from the pinned base image): the
+offload-connector, simple-offload, CPU/tiering manager and GPU prefix-caching
+suites give 833 passed against 815 on the tree before content-only matching;
+seven partial-prefix-hit tests that the matching filter's changed lookup
+signature had broken pass again, and the 148 remaining failures and errors are
+identical on both trees and environmental (a Hugging Face model download under
+`--network none`, or no CUDA device). The installed-image CPU unit covers
+matching under a new and an existing ID, whole-agent release, surviving shared
+references and sparse fills. The required backend check passes, including exact
+reconstruction and the installed shared-prefix CPU unit. This changes installed
+runtime files, so it reaches a server only through a new image release.
 
 ## Findings 4 and 12: Anthropic terminal metadata
 

@@ -276,7 +276,7 @@ It is intentionally reconstructed by the ordered, reviewed semantic transformati
 | patches/vllm-qwen38-numerical-audits.patch | a73aa2f2ae3f82010eb2bafcdf663c2fe14854c30165dbc4d8457725bc3b6632 |
 | patches/vllm-turboquant-fail-closed-guards.patch | 7282d1d4d7a17b40ab8626c82f478bbb938c548451b7793df8233562a9e24c7c |
 | patches/vllm-kv-offload-pinning-fail-closed.patch | 1857071c38d081bb95e3cca12153cebce096649084950b99229104fdae029ca6 |
-| patches/vllm-shared-prefix-cache-and-user-capacity.patch | 736183bab22bb200053d38990ef0a51d7721a711542f241bde07f723aa2ce892 |
+| patches/vllm-shared-prefix-cache-and-user-capacity.patch | 96d9a7805f76eda6c8b20451aabd8cbb49482158c6d71c6f0db571a6711f3776 |
 | patches/vllm-exact-reasoning-usage.patch | c6a880c0a15056792286f74bf32a4e554f70de05a82615522086ef4ca1cf2db3 |
 | patches/vllm-anthropic-input-fidelity.patch | c2063d509fc90929f7d6018796f753da6445f12a4b4b19181e377f772b923a49 |
 | patches/vllm-qwen-exact-tool-language.patch | fe4e46cb7444c80646537da63ab1ac12c54e7eebb04c0735a4243d8b7e7943d2 |
@@ -302,8 +302,8 @@ It is intentionally reconstructed by the ordered, reviewed semantic transformati
 | patches/vllm-qwen-owned-tool-grammar.patch | 81b3f760a7aa670496deb1252ee3713d452ab62debec88062bbe4cadceb6c849 |
 | patches/vllm-qwen-unique-tool-parameters.patch | 6a76a61c743807215555cbd6b3bbdd8fcaba4abcaca69ef000d301df6c792d3b |
 
-The reconstructed tree has 100 reviewed runtime-source changes, 2 new runtime sources,
-7 runtime-source deletions, 71 existing-test changes, 12 new tests,
+The reconstructed tree has 96 reviewed runtime-source changes, 1 new runtime source,
+7 runtime-source deletions, 69 existing-test changes, 11 new tests,
 and 3 test deletions. The authoritative
 counts are derived and printed by ./scripts/build-vllm.sh check, never restated
 by hand there. The landmark-aware Python patcher calculates every mutation
@@ -355,11 +355,11 @@ Pinned build inputs and products:
 | Offline archive | artifacts/qwen38-vllm-images-runtime-v26.tar |
 | Archive size | 8,561,236,480 bytes, mode 0600 |
 | Archive SHA-256 | c77ba706f884b74e92e3c8ec810cef76ac015e1abc053dac8c4154d1b5e13e92 |
-| Runtime Dockerfile SHA-256 | 5c0549ed855ffa7178afa1415680afdec3300e513ae3396eb3e0487db31665ce |
-| Docker context allowlist SHA-256 | 5b6b3c8e03cd9cdc3e8d48d8f4b30df98de4d1a6d2a0657484c24e295c4d7f50 |
-| Build verifier SHA-256 | 94d15391118a6beb8d307c1aff28e32fc237ef1aaf8fddb450b4586916a8ff82 |
-| Runtime validator SHA-256 | 97aa532add98deeb090264e2b625865571fb07e6795a559b6400b5c59b78a009 |
-| Runtime lock SHA-256 | 4c9c67187e5ee32242a7f909d43f96377a71cca12d814f257eefe042b99ca7fb |
+| Runtime Dockerfile SHA-256 | 8228f07e2fb7f6bce892a69f7e1bceb1a9f3f794a830cdd572905a92ff2429bd |
+| Docker context allowlist SHA-256 | a5de9a3cef2f73a812c7e2a923bab3ed3e0f1ab6947868b492d181cfb020feff |
+| Build verifier SHA-256 | 94e92727af1a6230016e4ce411aed798d043b13067439399b550f870d8cf1523 |
+| Runtime validator SHA-256 | c44b3430de4d61cd779dc2b1fa67b99e43835483bfbc5e354d45f16e5e26c1e8 |
+| Runtime lock SHA-256 | 9852a25a752d062a51deb79071977fa3066d93bb003570578b9670830ec8295d |
 
 The runtime tag names the pinned image and nothing else. A build used to load its
 image under that tag before comparing the image ID with the pin, so a build that
@@ -474,7 +474,7 @@ Consequences:
 - CPU weight offload is exactly zero. KV offload is not: the OffloadingConnector runs
   in kv_both role with a pinned host tier in /dev/shm sized as one declared resident
   user context (bytes derived in-engine from max_model_len and the KV cache spec).
-  Agent IDs decide what each lookup may match and what this tier retains; see
+  Agent IDs decide what this tier retains, not what a lookup matches; see
   [Shared prefixes and agent IDs](#shared-prefixes-and-agent-ids).
 - Multimodal profiling is mandatory and cannot be skipped to obtain a deceptively
   optimistic allocation.
@@ -497,69 +497,72 @@ generate: five protocol families and six routes. Generative scoring and Cohere
 are not mounted; neither is part of this deployment's agent-identity contract.
 Rendering and pooling allocate no KV and do not require an ID.
 
-The ID never enters a block hash, so a request reuses KV only for its own exact
-token prefix. No ID choice can serve one agent another agent's state, and none
-isolates agents, since any fresh ID may match any resident prefix. Isolation is
-`cache_salt`, a hash input the server never derives from the ID. The ID has no
-prescribed format and declares no parent or lineage. A fresh ID can observe
-shared-prefix hits through latency, so IDs carry no authentication or
-confidentiality promise; no timing padding is added.
+The ID never enters a block hash and never restricts a lookup. Prefix lookup
+matches content and `cache_salt` alone, in the GPU block pool and the CPU tier,
+as upstream vLLM does: any request may reuse any resident prefix whose tokens
+and salt it shares, whether its ID is new or already has cached blocks. No ID
+choice can serve one agent another agent's state, since reuse needs the same
+tokens, and none isolates agents. Isolation is `cache_salt`, a hash input the
+server never derives from the ID. The ID has no prescribed format and declares
+no parent or lineage. Any request can observe shared-prefix hits through
+latency, so IDs carry no authentication or confidentiality promise; no timing
+padding is added.
 
-The ID controls two things:
+The ID controls one thing: **what the CPU tier retains.** `CPUOffloadingManager`
+in `vllm/vllm/v1/kv_offload/cpu/manager.py` keeps at most one finished context
+per ID. The ID's next request drops it as soon as that request retains any data
+(`retain_context`), and completion makes the finished request the ID's retained
+context (`on_request_finished`). Concurrent requests of one ID keep separate
+working sets only while active. Under pressure, `_prepare_store` reclaims
+unreferenced chunks first, then releases whole IDs in least-recently-used order,
+never the storing ID; references held by surviving contexts keep their shared
+data. Retained contexts are bounded by the tier's chunk count: past it, the
+least recently used retained context is dropped. GPU block eviction is
+per-block LRU and ignores the ID.
 
-- **What a lookup may match.** `PrefixCacheIndex.view` in
-  `vllm/vllm/v1/core/prefix_cache.py` lets an ID with no cached blocks in any tier
-  match every resident prefix, and any other ID only data it acquired or
-  computed. The GPU block pool and the CPU tier share this one index. A selected
-  prefix acquires only its selected data, including when it ends inside a larger
-  physical entry. Once all of an ID's blocks are evicted, the no-cache rule
-  applies again.
-- **What the CPU tier retains.** `CPUOffloadingManager` in
-  `vllm/vllm/v1/kv_offload/cpu/manager.py` keeps at most one finished context per
-  ID. The ID's next request drops it as soon as that request retains any data
-  (`retain_context`), and completion makes the finished request the ID's retained
-  context (`on_request_finished`). Concurrent requests of one ID keep separate
-  working sets only while active. Under pressure, `_prepare_store` reclaims
-  unreferenced chunks first, then releases whole IDs in least-recently-used order,
-  never the storing ID; references held by surviving contexts keep their shared
-  data. GPU block eviction is per-block LRU and ignores the ID.
-
-A harness decides at run time whether new work forks the current agent (its
-history continues the agent's) or spawns a subagent (its own conversation). That
-decision is where the ID matters. A request whose ID has no cached blocks,
-normally a new ID's first request, is the only lookup that may acquire data the
-ID has not itself acquired or computed. Reusing an ID makes two lines of work
-compete for one retained context. The server records no lineage, so the ID the
-harness sends is the entire decision.
+So the ID the harness sends decides which retained context a request replaces
+and which line pressure releases as a unit. It does not decide what a request
+matches, and it does not decide what stays resident: whether an earlier context
+is still there to match depends on both tiers' capacity, least-recently-used
+order and the retained-context bound.
 
 | Caller case | Send | What the code does |
 | --- | --- | --- |
-| Next turn of the same conversation | The same ID | Earlier turns are in the ID's own cache while resident. The new turn replaces the retained context; chunks only the old context used become the first reclaimed. |
-| Retry or redraw of the same turn | The ID the conversation continues under | The prompt is in that ID's cache. The redraw replaces the discarded attempt's retained context. |
-| Fork sharing history up to a point | A new ID, first used by the fork's first request | With no cache, that request matches the longest resident prefix, the parent's history if still resident, and acquires it. Parent and fork then keep separate retained contexts over the shared chunks. |
-| Subagent with its own conversation | A new ID | Its first request may acquire any identical resident prefix. The parent's retained context stays under the parent's ID, released only by whole-ID pressure. |
+| Next turn of the same conversation | The same ID | The new turn replaces the ID's retained context; chunks only the old context used become the first reclaimed. |
+| Retry or redraw of the same turn | The ID the conversation continues under | The redraw replaces the discarded attempt's retained context. |
+| Fork sharing history up to a point | A new ID, first used by the fork's first request | The fork matches the parent's history while it is resident. Parent and fork then keep separate retained contexts over the shared chunks. |
+| Subagent with its own conversation | A new ID | It matches any identical resident prefix, such as the system prompt and tools. The parent's retained context stays under the parent's ID, released only by whole-ID pressure or the retained-context bound. |
+
+A waiting parent survives a subagent only while both fit. This deployment runs
+one sequence at a time (`--max-num-seqs 1`), so a foreground subagent runs after
+the parent's request finished. In the CPU tier the parent is then the least
+recently used ID besides the subagent: when a subagent store needs more rows
+than free and unreferenced ones, `_prepare_store` releases the parent first
+(after any older ID) and reclaims every chunk the subagent does not share with
+it. The tier holds one full-length context (`cpu_kv_cache_users:1`), so the
+parent's retained context survives exactly while the parent's chunks and the
+subagent's unshared chunks, each context with its own trailing recurrent-state
+chunk per recurrent group, fit in that one context's rows. The GPU pool is one
+context too (`--kv-cache-users 1`) and evicts the parent's freed blocks first as
+the subagent allocates beyond the free pool; losing the parent's recurrent-state
+blocks there forfeits its GPU hit and leaves the CPU copy, if it survived, as
+the parent's only cached context.
 
 Each of several forks or subagents needs its own ID. The batch route submits
 every conversation under the batch's one ID, so after completion the ID retains
 only one of their contexts.
 
-Scoping mistakes never change output. They cost prefill and retention:
+Scoping mistakes never change output. They cost retention:
 
 - **One ID for two lines of work**, such as a subagent or fork on the parent's
   ID: each line's next request drops the other's retained context, so while the
   parent waits, its chunks the child does not use become the first reclaimed
   under CPU pressure. That wait is what the CPU tier is configured for
-  (`config/runtime-v1.sh`). A subagent on the parent's ID also cannot acquire a
-  prefix held only by other IDs.
-- **A fork or subagent ID that already has cached blocks**, for example from an
-  earlier side request: it cannot acquire the parent's resident history, so it
-  prefills that history again and holds a second GPU copy; the block pool does
-  not deduplicate.
-- **A new ID per turn or retry of one conversation:** the prefix still matches,
-  because each fresh ID may match every resident prefix. Each abandoned ID keeps
-  its last context retained as a whole agent, however, so least-recently-used
-  release can take older agents' contexts first. A request under an older ID that
-  still has cached blocks cannot match data computed under the newer one.
+  (`config/runtime-v1.sh`).
+- **A new ID per turn or retry of one conversation:** the prefix still matches.
+  Each abandoned ID keeps its last context retained as a whole agent, however,
+  so least-recently-used release and the retained-context bound can take other
+  agents' contexts first.
 
 Nothing verifies correct use. The server checks that the ID is present and
 contains a non-whitespace character, and that an input stream keeps one ID
@@ -570,8 +573,8 @@ prefill latency, the served cached-token count
 (`prompt_tokens_details.cached_tokens` on Chat Completions; see
 [Exact served usage](#exact-served-usage)) and the server's prefix-cache metrics.
 
-See [the KV design](docs/kv-user-count-and-agent-scope-design.md) for the
-membership catalog, CPU window availability, secondary storage and capacity math.
+See [the KV design](docs/kv-user-count-and-agent-scope-design.md) for CPU
+window availability, retention, secondary storage and capacity math.
 
 ### Agent defaults: xhigh thinking, exact sampling, long output
 

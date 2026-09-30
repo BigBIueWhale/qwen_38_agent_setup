@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 """One opaque agent identity for a complete probe run.
 
-Generation requires a stable agent ID for shared-prefix matching and cache
-accounting. An ID with no cached blocks may acquire an initial shared prefix;
-an existing ID matches its own acquired cache and extends it.
+Generation requires a stable agent ID, which groups what the CPU KV tier
+retains. Prefix lookup matches content and cache_salt, whatever the ID.
 
 Each probe run is one agent. The probe's file name and a fresh run ID identify
 it for the life of the process. This convention is local to the probe suite;

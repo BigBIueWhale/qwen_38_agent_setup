@@ -222,23 +222,14 @@ RUN printf '%s  %s\n%s  %s\n%s  %s\n' \
         /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/engine/protocol.py \
     | sha256sum --check --strict
 
-ARG OFFLOADING_CONNECTOR_UPSTREAM_FILE_SHA256
 ARG BLOCK_POOL_UPSTREAM_FILE_SHA256
-ARG KV_CACHE_COORDINATOR_UPSTREAM_FILE_SHA256
-ARG KV_CACHE_MANAGER_UPSTREAM_FILE_SHA256
 ARG SINGLE_TYPE_KV_CACHE_MANAGER_UPSTREAM_FILE_SHA256
 ARG KV_OFFLOAD_CPU_COMMON_UPSTREAM_FILE_SHA256
-ARG SIMPLE_KV_OFFLOAD_MANAGER_UPSTREAM_FILE_SHA256
 RUN printf '%s  %s\n' \
-      "${OFFLOADING_CONNECTOR_UPSTREAM_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/distributed/kv_transfer/kv_connector/v1/offloading_connector.py \
       "${BLOCK_POOL_UPSTREAM_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/core/block_pool.py \
-      "${KV_CACHE_COORDINATOR_UPSTREAM_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/core/kv_cache_coordinator.py \
-      "${KV_CACHE_MANAGER_UPSTREAM_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/core/kv_cache_manager.py \
       "${SINGLE_TYPE_KV_CACHE_MANAGER_UPSTREAM_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/core/single_type_kv_cache_manager.py \
       "${KV_OFFLOAD_CPU_COMMON_UPSTREAM_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/cpu/common.py \
-      "${SIMPLE_KV_OFFLOAD_MANAGER_UPSTREAM_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/simple_kv_offload/manager.py \
     | sha256sum --check --strict
-RUN test ! -e /usr/local/lib/python3.12/dist-packages/vllm/v1/core/prefix_cache.py
 
 ARG COMPLETION_SERVING_UPSTREAM_FILE_SHA256
 ARG RENDER_SERVING_UPSTREAM_FILE_SHA256
@@ -385,14 +376,9 @@ ARG BASE_RENDERER_PATCHED_FILE_SHA256
 ARG ONLINE_DERENDERER_PATCHED_FILE_SHA256
 ARG COMPLETION_SERVING_PATCHED_FILE_SHA256
 ARG RENDER_SERVING_PATCHED_FILE_SHA256
-ARG OFFLOADING_CONNECTOR_PATCHED_FILE_SHA256
 ARG BLOCK_POOL_PATCHED_FILE_SHA256
-ARG KV_CACHE_COORDINATOR_PATCHED_FILE_SHA256
-ARG KV_CACHE_MANAGER_PATCHED_FILE_SHA256
-ARG PREFIX_CACHE_PATCHED_FILE_SHA256
 ARG SINGLE_TYPE_KV_CACHE_MANAGER_PATCHED_FILE_SHA256
 ARG KV_OFFLOAD_CPU_COMMON_PATCHED_FILE_SHA256
-ARG SIMPLE_KV_OFFLOAD_MANAGER_PATCHED_FILE_SHA256
 ARG TURBOQUANT_PATCHED_FILE_SHA256
 ARG TURBOQUANT_STORE_PATCHED_FILE_SHA256
 ARG TURBOQUANT_DECODE_PATCHED_FILE_SHA256
@@ -711,23 +697,13 @@ RUN printf '%s  %s\n' \
 RUN rm /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/serve/utils/tool_calls_utils.py \
  && rm -f /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/serve/utils/__pycache__/tool_calls_utils.*.pyc \
  && test ! -e /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/serve/utils/tool_calls_utils.py
-COPY --chmod=0644 vllm/vllm/distributed/kv_transfer/kv_connector/v1/offloading_connector.py /usr/local/lib/python3.12/dist-packages/vllm/distributed/kv_transfer/kv_connector/v1/offloading_connector.py
 COPY --chmod=0644 vllm/vllm/v1/core/block_pool.py /usr/local/lib/python3.12/dist-packages/vllm/v1/core/block_pool.py
-COPY --chmod=0644 vllm/vllm/v1/core/kv_cache_coordinator.py /usr/local/lib/python3.12/dist-packages/vllm/v1/core/kv_cache_coordinator.py
-COPY --chmod=0644 vllm/vllm/v1/core/kv_cache_manager.py /usr/local/lib/python3.12/dist-packages/vllm/v1/core/kv_cache_manager.py
-COPY --chmod=0644 vllm/vllm/v1/core/prefix_cache.py /usr/local/lib/python3.12/dist-packages/vllm/v1/core/prefix_cache.py
 COPY --chmod=0644 vllm/vllm/v1/core/single_type_kv_cache_manager.py /usr/local/lib/python3.12/dist-packages/vllm/v1/core/single_type_kv_cache_manager.py
 COPY --chmod=0644 vllm/vllm/v1/kv_offload/cpu/common.py /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/cpu/common.py
-COPY --chmod=0644 vllm/vllm/v1/simple_kv_offload/manager.py /usr/local/lib/python3.12/dist-packages/vllm/v1/simple_kv_offload/manager.py
 RUN printf '%s  %s\n' \
-      "${OFFLOADING_CONNECTOR_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/distributed/kv_transfer/kv_connector/v1/offloading_connector.py \
       "${BLOCK_POOL_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/core/block_pool.py \
-      "${KV_CACHE_COORDINATOR_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/core/kv_cache_coordinator.py \
-      "${KV_CACHE_MANAGER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/core/kv_cache_manager.py \
-      "${PREFIX_CACHE_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/core/prefix_cache.py \
       "${SINGLE_TYPE_KV_CACHE_MANAGER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/core/single_type_kv_cache_manager.py \
       "${KV_OFFLOAD_CPU_COMMON_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/cpu/common.py \
-      "${SIMPLE_KV_OFFLOAD_MANAGER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/simple_kv_offload/manager.py \
     | sha256sum --check --strict
 COPY --chmod=0644 vllm/vllm/entrypoints/openai/completion/serving.py /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/completion/serving.py
 COPY --chmod=0644 vllm/vllm/entrypoints/scale_out/render/serving.py /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/scale_out/render/serving.py

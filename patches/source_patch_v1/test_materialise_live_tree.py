@@ -225,6 +225,68 @@ class MaterialiseTests(unittest.TestCase):
             )
         self.assertFalse(self.live.joinpath(*STALE.split("/")).exists())
 
+    def test_retired_path_returns_to_the_reconstruction(self):
+        # The patch set no longer names STALE; the reconstruction holds its
+        # pristine upstream bytes, and the live tree still holds the identity
+        # an earlier revision shipped.
+        _put(self.live, STALE, OLD)
+        _put(self.reconstruction, STALE, UPSTREAM)
+        actions, refusals, reviewed = self.run_verb(
+            final_files={},
+            deleted=set(),
+            pristine={},
+            shipped={STALE: {OLD_ID: "6af1414"}},
+        )
+        self.assertEqual(refusals, ())
+        self.assertEqual(reviewed, 1)
+        self.assertEqual([(a.path, a.verb) for a in actions], [(STALE, "write")])
+        self.assertIn("6af1414", actions[0].proof)
+        self.assertEqual(_digest_of(self.live, STALE), UPSTREAM_ID)
+
+    def test_retired_new_file_is_deleted(self):
+        # An earlier patch set created GONE; the reconstruction has no such file.
+        _put(self.live, GONE, OLD)
+        actions, refusals, reviewed = self.run_verb(
+            final_files={},
+            deleted=set(),
+            pristine={},
+            shipped={GONE: {OLD_ID: "6af1414"}},
+        )
+        self.assertEqual(refusals, ())
+        self.assertEqual([(a.path, a.verb) for a in actions], [(GONE, "delete")])
+        self.assertEqual(_digest_of(self.live, GONE), ABSENT)
+        self.assertEqual(reviewed, 1)
+
+    def test_retired_path_already_upstream_is_a_no_op(self):
+        _put(self.live, STALE, UPSTREAM)
+        _put(self.reconstruction, STALE, UPSTREAM)
+        actions, refusals, reviewed = self.run_verb(
+            final_files={},
+            deleted=set(),
+            pristine={},
+            shipped={STALE: {OLD_ID: "6af1414"}},
+        )
+        self.assertEqual((actions, refusals, reviewed), ((), (), 1))
+
+    def test_retired_path_with_unshipped_bytes_is_refused(self):
+        # Work on a path the patch set no longer names is still work: it
+        # refuses, and the explainable path in the same run is left alone.
+        _put(self.live, STALE, OLD)
+        _put(self.reconstruction, STALE, UPSTREAM)
+        _put(self.live, OTHER, MINE)
+        _put(self.reconstruction, OTHER, UPSTREAM)
+        actions, refusals, reviewed = self.run_verb(
+            final_files={},
+            deleted=set(),
+            pristine={},
+            shipped={STALE: {OLD_ID: "6af1414"}, OTHER: {OLD_ID: "6af1414"}},
+        )
+        self.assertEqual((actions, reviewed), ((), 0))
+        self.assertEqual([r.path for r in refusals], [OTHER])
+        self.assertIn("no longer names", refusals[0].reason)
+        self.assertEqual(_digest_of(self.live, STALE), OLD_ID)
+        self.assertEqual(_digest_of(self.live, OTHER), MINE_ID)
+
     def test_written_file_keeps_the_reconstruction_mode(self):
         _put(self.live, STALE, OLD)
         _put(self.reconstruction, STALE, NEW)
@@ -328,6 +390,14 @@ class BuildScriptContractTests(unittest.TestCase):
         self.assertIn(guard, self.script)
         before = self.script.split(guard, 1)[0]
         self.assertNotIn("materialise", before.rsplit("actual_status=", 1)[1])
+
+    def test_retired_paths_are_named_by_the_shipped_history(self):
+        # A path an earlier revision patched is not unnamed work: the filter
+        # consults the committed identities before the refusal, in every mode.
+        guard = 'if [[ -n "${unnamed_live_paths}" ]]; then'
+        before = self.script.split(guard, 1)[0].rsplit("actual_status=", 1)[1]
+        self.assertIn("write_shipped_identities", before)
+        self.assertIn('cut -d\' \' -f2 "${SHIPPED_IDENTITIES}"', before)
 
     def test_only_materialise_tolerates_a_tree_that_is_behind(self):
         # Exact equality stays the rule everywhere else; relaxing it is what

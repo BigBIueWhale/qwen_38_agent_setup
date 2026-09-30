@@ -79,8 +79,8 @@ new file mode 100644
 +# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
 +"""Every generation surface carries the same opaque cache-accounting ID.
 +
-+An agent without cached blocks may acquire a shared prefix; existing agents
-+match their acquired cache and extend it. ID syntax does not encode ancestry.
++Prefix reuse matches content and cache_salt whatever the ID; the ID groups
++what the KV tiers retain. ID syntax does not encode ancestry.
 +Rendering needs no ID because it allocates no KV. The shared engine boundary
 +requires an ID for generation, including direct SamplingParams callers.
 +"""
@@ -484,402 +484,10 @@ new file mode 100644
 +    )
 +    assert config_a.num_blocks == expected_blocks
 +    assert config_b.num_blocks == expected_blocks
-diff --git a/tests/v1/core/test_prefix_cache.py b/tests/v1/core/test_prefix_cache.py
-new file mode 100644
---- /dev/null
-+++ b/tests/v1/core/test_prefix_cache.py
-@@ -0,0 +1,370 @@
-+# SPDX-License-Identifier: Apache-2.0
-+# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
-+import pytest
-+
-+from vllm.v1.core.prefix_cache import PrefixCacheIndex
-+
-+
-+def test_first_acquisition_then_own_cache_and_extensions():
-+    index = PrefixCacheIndex()
-+    index.register_tier('CPU', 16)
-+    index.register_tier('GPU', 16)
-+    for key in [b'prefix', b'writer-tail']:
-+        index.insert('CPU', key, (key,))
-+        index.acquire('CPU', 'writer', [key])
-+    first_lookup = index.view('new-agent')
-+    assert first_lookup.permits(b'prefix')
-+    assert first_lookup.permits(b'writer-tail')
-+    index.acquire('CPU', 'new-agent', [b'prefix'])
-+    own_lookup = index.view('new-agent')
-+    assert own_lookup.permits(b'prefix')
-+    assert not own_lookup.permits(b'writer-tail')
-+    index.insert('GPU', b'own-extension', (b'own-extension',))
-+    index.acquire('GPU', 'new-agent', [b'own-extension'])
-+    assert index.view('new-agent').permits(b'own-extension')
-+    assert not index.view('new-agent').permits(b'writer-tail')
-+
-+
-+@pytest.mark.parametrize('first,second', [('GPU', 'CPU'), ('CPU', 'GPU')])
-+def test_own_cache_in_either_tier_prevents_another_initial_acquisition(first, second):
-+    index = PrefixCacheIndex()
-+    index.register_tier('CPU', 16)
-+    index.register_tier('GPU', 16)
-+    index.insert(first, b'own', (b'own',))
-+    index.acquire(first, 'agent', [b'own'])
-+    index.insert(second, b'another', (b'another',))
-+    index.acquire(second, 'another-agent', [b'another'])
-+    assert index.view('agent').permits(b'own')
-+    assert not index.view('agent').permits(b'another')
-+
-+
-+def test_releasing_one_agent_keeps_another_agents_shared_cache():
-+    index = PrefixCacheIndex()
-+    index.register_tier('CPU', 16)
-+    index.register_tier('GPU', 16)
-+    index.insert('CPU', b'shared', (b'shared',))
-+    for agent in ['first', 'second']:
-+        index.acquire('CPU', agent, [b'shared'])
-+    index.release_agent('CPU', 'first')
-+    assert index.view('first').keys is None
-+    assert index.view('second').keys == frozenset({b'shared'})
-+
-+
-+def test_tier_eviction_preserves_membership_in_another_tier():
-+    index = PrefixCacheIndex()
-+    index.register_tier('CPU', 16)
-+    index.register_tier('GPU', 16)
-+    for tier in ['CPU', 'GPU']:
-+        index.insert(tier, b'shared', (b'shared',))
-+        index.acquire(tier, 'agent', [b'shared'])
-+    index.release_agent('CPU', 'agent')
-+    assert index.view('agent').keys == frozenset({b'shared'})
-+    index.remove('GPU', b'shared')
-+    assert index.view('agent').keys is None
-+
-+
-+def test_removing_last_physical_copy_removes_membership():
-+    index = PrefixCacheIndex()
-+    index.register_tier('CPU', 16)
-+    index.register_tier('GPU', 16)
-+    index.insert('GPU', b'key', (b'key',))
-+    index.insert('GPU', b'key', (b'key',))
-+    index.acquire('GPU', 'agent', [b'key'])
-+    index.remove('GPU', b'key')
-+    assert index.view('agent').keys == frozenset({b'key'})
-+    index.remove('GPU', b'key')
-+    assert index.view('agent').keys is None
-+
-+
-+def test_candidate_lookup_is_read_only_and_its_view_is_stable():
-+    index = PrefixCacheIndex()
-+    index.register_tier('CPU', 16)
-+    index.register_tier('GPU', 16)
-+    index.insert('CPU', b'first', (b'first',))
-+    index.insert('CPU', b'second', (b'second',))
-+    view = index.view('agent')
-+    assert view.permits(b'first')
-+    assert index.view('agent').keys is None
-+    index.acquire('CPU', 'agent', [b'first'])
-+    assert view.permits(b'second')
-+    assert not index.view('agent').permits(b'second')
-+
-+
-+def test_reset_and_duplicate_acquisition_count_membership_exactly():
-+    index = PrefixCacheIndex()
-+    index.register_tier('CPU', 16)
-+    index.register_tier('GPU', 16)
-+    for tier in ['CPU', 'GPU']:
-+        index.insert(tier, b'key', (b'key',))
-+        index.acquire(tier, 'agent', [b'key', b'key'])
-+    index.reset('CPU')
-+    assert index.view('agent').keys == frozenset({b'key'})
-+    index.reset('GPU')
-+    assert index.view('agent').keys is None
-+    assert index._owned == {} and all(not t.entries and not t.references for t in index._tiers.values())
-+
-+
-+def make_gpu_cache():
-+    from types import SimpleNamespace
-+    from vllm.v1.core.block_pool import BlockPool
-+
-+    pool = BlockPool(8, enable_caching=True, hash_block_size=16)
-+    blocks = pool.get_new_blocks(2)
-+    request = SimpleNamespace(kv_scope='writer', block_hashes=[b'prefix', b'writer-tail'])
-+    pool.cache_full_blocks(request, blocks, 0, 2, 16, 0, is_recurrent=False)
-+    return pool, request, blocks
-+
-+
-+def test_gpu_initial_prefix_acquisition_then_only_own_cache():
-+    from types import SimpleNamespace
-+    from vllm.v1.core.kv_cache_utils import make_block_hash_with_group_id
-+
-+    pool, request, blocks = make_gpu_cache()
-+    view = pool.prefix_cache.view('new-agent')
-+    assert pool.get_cached_block(b'prefix', [0], view) == [blocks[0]]
-+    assert pool.get_cached_block(b'writer-tail', [0], view) == [blocks[1]]
-+    selected = SimpleNamespace(kv_scope='new-agent', block_hashes=request.block_hashes)
-+    pool.acquire_cached_blocks(selected, ([blocks[0]],), 16)
-+    view = pool.prefix_cache.view('new-agent')
-+    assert pool.get_cached_block(b'prefix', [0], view) == [blocks[0]]
-+    assert pool.get_cached_block(b'writer-tail', [0], view) is None
-+
-+    own_tail = pool.get_new_blocks(1)
-+    selected.block_hashes = [b'prefix', b'own-tail']
-+    pool.cache_full_blocks(selected, [blocks[0], own_tail[0]], 1, 2, 16, 0, is_recurrent=False)
-+    owned = pool.prefix_cache.view('new-agent')
-+    assert owned.keys == frozenset({
-+        make_block_hash_with_group_id(b'prefix', 0),
-+        make_block_hash_with_group_id(b'own-tail', 0),
-+    })
-+
-+
-+def test_gpu_and_cpu_use_the_same_existing_agent_membership():
-+    from vllm.v1.kv_offload.base import LookupResult, ReqContext, make_offload_key
-+    from vllm.v1.kv_offload.cpu.manager import CPUOffloadingManager
-+
-+    pool, request, blocks = make_gpu_cache()
-+    manager = CPUOffloadingManager(4)
-+    manager.bind_prefix_cache(pool.prefix_cache)
-+    cpu_agent = ReqContext('cpu-request', kv_scope='cpu-agent')
-+    cpu_key = make_offload_key(b'cpu-only', 0)
-+    cpu_agent.prefix_content[cpu_key] = (cpu_key,)
-+    result = manager.prepare_store([cpu_key], cpu_agent)
-+    manager.complete_store(result.keys_to_store, cpu_agent)
-+    assert pool.get_cached_block(b'prefix', [0], pool.prefix_cache.view('cpu-agent')) is None
-+
-+    gpu_agent = ReqContext('gpu-request', kv_scope='writer')
-+    manager.begin_lookup(gpu_agent)
-+    assert manager.lookup(cpu_key, gpu_agent) is LookupResult.MISS
-+    fresh = ReqContext('fresh-request', kv_scope='fresh-agent')
-+    manager.begin_lookup(fresh)
-+    assert manager.lookup(cpu_key, fresh) is LookupResult.HIT
-+
-+
-+def test_gpu_copy_on_write_moves_preserve_every_acquired_membership():
-+    from types import SimpleNamespace
-+
-+    pool, request, blocks = make_gpu_cache()
-+    selected = SimpleNamespace(kv_scope='reader', block_hashes=request.block_hashes)
-+    pool.acquire_cached_blocks(selected, ([blocks[0]],), 16)
-+    before = pool.prefix_cache.view('reader')
-+    destination = pool.get_new_blocks(1)[0]
-+    pool.move_block_hashes(blocks[0], destination)
-+    assert pool.prefix_cache.view('reader') == before
-+    assert pool.get_cached_block(b'prefix', [0], before) == [destination]
-+    pool._maybe_evict_cached_block(destination)
-+    assert pool.prefix_cache.view('reader').keys is None
-+    assert pool.prefix_cache.view('writer').keys is not None
-+
-+
-+def test_speculative_cpu_promotion_does_not_acquire_a_prefix():
-+    from vllm.v1.kv_offload.base import LookupResult, ReqContext
-+    from vllm.v1.kv_offload.cpu.manager import CPUOffloadingManager
-+
-+    manager = CPUOffloadingManager(3)
-+    ctx = ReqContext('request', kv_scope='new-agent')
-+    manager.begin_lookup(ctx)
-+    ctx.prefix_content[b'candidate'] = (b'candidate',)
-+    result = manager._prepare_store([b'candidate'], ctx)
-+    manager.complete_store(result.keys_to_store, ctx)
-+    assert manager.prefix_cache.view(ctx.kv_scope).keys is None
-+    manager.begin_lookup(ctx)
-+    assert manager.lookup(b'candidate', ctx) is LookupResult.HIT
-+    manager.retain_context([b'candidate'], ctx)
-+    assert manager.prefix_cache.view(ctx.kv_scope).keys == frozenset({b'candidate'})
-+
-+
-+@pytest.mark.parametrize('is_recurrent', [False, True])
-+def test_coalesced_cpu_chunk_describes_exactly_its_contained_gpu_data(is_recurrent):
-+    """An attention span contains sub-blocks; a checkpoint contains one state."""
-+    from types import SimpleNamespace
-+    from vllm.v1.core.block_pool import BlockPool
-+    from vllm.v1.core.prefix_cache import cache_content_keys
-+    from vllm.v1.kv_offload.base import LookupResult, ReqContext
-+    from vllm.v1.kv_offload.cpu.manager import CPUOffloadingManager
-+
-+    pool = BlockPool(16, enable_caching=True, hash_block_size=4)
-+    hashes = [bytes([i]) for i in range(1, 13)]
-+    request = SimpleNamespace(kv_scope='producer', block_hashes=hashes)
-+    blocks = pool.get_new_blocks(6)
-+    pool.cache_full_blocks(request, blocks, 0, 6, 8, 0, is_recurrent=is_recurrent)
-+    manager = CPUOffloadingManager(4)
-+    manager.bind_prefix_cache(pool.prefix_cache)
-+    # This chunk spans tokens 16..32: it does not include tokens 0..16.
-+    content = cache_content_keys(hashes[5:8:2] if is_recurrent else hashes[4:8], 0)
-+    key = content[-1]
-+    ctx = ReqContext('store', kv_scope='cpu-agent', prefix_content={key: content})
-+    output = manager.prepare_store([key], ctx)
-+    manager.complete_store(output.keys_to_store, ctx)
-+    view = pool.prefix_cache.view('cpu-agent')
-+    assert pool.get_cached_block(hashes[3], [0], view) is None
-+    assert pool.get_cached_block(hashes[5], [0], view) == [blocks[2]]
-+    assert pool.get_cached_block(hashes[7], [0], view) == [blocks[3]]
-+    assert pool.get_cached_block(hashes[9], [0], view) is None
-+    assert view.permits(cache_content_keys([hashes[4]], 0)[0]) is (not is_recurrent)
-+
-+    # Owning just the final GPU block cannot acquire the earlier part of a
-+    # larger CPU chunk that happens to have the same end hash.
-+    selected = SimpleNamespace(kv_scope='gpu-agent', block_hashes=hashes)
-+    pool.acquire_cached_blocks(selected, ([blocks[3]],), 32)
-+    gpu_ctx = ReqContext('load', kv_scope='gpu-agent')
-+    manager.begin_lookup(gpu_ctx)
-+    assert manager.lookup(key, gpu_ctx) is LookupResult.MISS
-+
-+
-+def test_partial_recurrent_checkpoint_does_not_acquire_earlier_states():
-+    from types import SimpleNamespace
-+    from vllm.v1.core.block_pool import BlockPool
-+    from vllm.v1.core.prefix_cache import cache_content_keys
-+
-+    pool = BlockPool(8, enable_caching=True, hash_block_size=4)
-+    hashes = [bytes([i]) for i in range(1, 9)]
-+    block = pool.get_new_blocks(1)[0]
-+    request = SimpleNamespace(kv_scope='agent', block_hashes=hashes)
-+    pool.cache_partial_block(request, block, 28, 0, 16, is_recurrent=True)
-+    view = pool.prefix_cache.view('agent')
-+    assert view.keys == frozenset(cache_content_keys([hashes[6]], 0))
-+
-+
-+def test_prefix_shortened_inside_attention_block_acquires_only_selected_data():
-+    """EAGLE may replay a tail after lookup selected a larger physical block."""
-+    from types import SimpleNamespace
-+    from vllm.v1.core.block_pool import BlockPool
-+    from vllm.v1.core.prefix_cache import cache_content_keys
-+
-+    pool = BlockPool(8, enable_caching=True, hash_block_size=4)
-+    hashes = [bytes([i]) for i in range(1, 5)]
-+    block = pool.get_new_blocks(1)[0]
-+    writer = SimpleNamespace(kv_scope='writer', block_hashes=hashes)
-+    pool.cache_full_blocks(writer, [block], 0, 1, 16, 0, is_recurrent=False)
-+    fork = SimpleNamespace(kv_scope='fork', block_hashes=hashes)
-+    pool.acquire_cached_blocks(fork, ([block],), 8)
-+    assert pool.prefix_cache.view('fork').keys == frozenset(cache_content_keys(hashes[:2], 0))
-+    assert pool.get_cached_block(hashes[-1], [0], pool.prefix_cache.view('fork')) is None
-+
-+
-+def test_physical_copy_to_cpu_keeps_every_users_selected_content():
-+    from vllm.v1.core.block_pool import BlockPool
-+    from types import SimpleNamespace
-+
-+    gpu, writer, blocks = make_gpu_cache()
-+    reader = SimpleNamespace(kv_scope='reader', block_hashes=writer.block_hashes)
-+    gpu.acquire_cached_blocks(reader, ([blocks[0]],), 16)
-+    cpu = BlockPool(8, enable_caching=True, hash_block_size=16)
-+    cpu.bind_prefix_cache(gpu.prefix_cache)
-+    copy = cpu.get_new_blocks(1)[0]
-+    key = blocks[0].block_hash
-+    # A transfer stamps metadata before completion makes it discoverable.
-+    copy.set_block_hash(key, num_tokens=16)
-+    cpu._insert_block_hash(key, copy, 16, gpu.prefix_cache.content(gpu.cache_tier, key))
-+    gpu.prefix_cache.copy_membership(gpu.cache_tier, cpu.cache_tier, key)
-+    gpu._maybe_evict_cached_block(blocks[0])
-+    for agent in ['writer', 'reader']:
-+        view = gpu.prefix_cache.view(agent)
-+        assert view.keys is not None
-+        assert cpu.get_cached_block(b'prefix', [0], view) == [copy]
-+
-+
-+def test_attention_extension_preserves_a_forks_immutable_partial_prefix():
-+    from types import SimpleNamespace
-+    from vllm.v1.core.block_pool import BlockPool
-+    from vllm.v1.core.prefix_cache import cache_content_keys
-+
-+    pool = BlockPool(8, enable_caching=True, hash_block_size=4)
-+    hashes = [bytes([i]) for i in range(1, 5)]
-+    block = pool.get_new_blocks(1)[0]
-+    writer = SimpleNamespace(kv_scope='writer', block_hashes=hashes)
-+    pool.cache_partial_block(writer, block, 8, 0, 16, is_recurrent=False)
-+    fork = SimpleNamespace(kv_scope='fork', block_hashes=hashes)
-+    pool.acquire_cached_blocks(fork, ([block],), 8)
-+    pool.cache_full_blocks(writer, [block], 0, 1, 16, 0, is_recurrent=False)
-+    view = pool.prefix_cache.view('fork')
-+    assert view.keys == frozenset(cache_content_keys(hashes[:2], 0))
-+    assert pool.get_cached_block(hashes[1], [0], view) == [block]
-+    assert pool.get_cached_block(hashes[3], [0], view) is None
-+    assert block.block_hash == cache_content_keys(hashes[3:], 0)[0]
-+
-+
-+def test_storage_transfer_can_precede_generation_without_inventing_an_agent():
-+    from vllm.v1.kv_offload.base import ReqContext, LookupResult
-+    from vllm.v1.kv_offload.cpu.manager import CPUOffloadingManager
-+
-+    m = CPUOffloadingManager(4)
-+    physical = ReqContext('physical-transfer')
-+    result = m._prepare_store([b'end'], physical)
-+    m.complete_store(result.keys_to_store, physical)
-+    assert m._lookup(b'end', physical) is LookupResult.HIT
-+    assert m.prefix_cache._owned == {}
-+    # The first generation supplies the content hash chain, then acquires it
-+    # only when the scheduler selects the prefix.
-+    generation = ReqContext('generation', kv_scope='agent',
-+                            prefix_content={b'end': (b'first', b'end')})
-+    m.begin_lookup(generation)
-+    assert m.lookup(b'end', generation) is LookupResult.HIT
-+    assert m.prefix_cache.view('agent').keys is None
-+    m.retain_context([b'end'], generation)
-+    assert m.prefix_cache.view('agent').keys == frozenset({b'first', b'end'})
-+
-+
-+def test_secondary_facing_lookup_borrows_data_without_acquiring_a_prefix():
-+    from unittest.mock import MagicMock
-+    from vllm.v1.kv_offload.base import ReqContext, LookupResult
-+    from vllm.v1.kv_offload.tiering.manager import (
-+        CPUPrimaryTierOffloadingManager, TieringOffloadingManager,
-+        _SecondaryTierFacingParent,
-+    )
-+
-+    region = MagicMock()
-+    region.create_kv_memoryview.return_value = memoryview(bytearray(64)).cast('B', shape=(4, 16))
-+    primary = CPUPrimaryTierOffloadingManager(4, region)
-+    manager = TieringOffloadingManager(primary)
-+    generation = ReqContext('store', kv_scope='writer', prefix_content={b'key': (b'key',)})
-+    manager.on_new_request(generation)
-+    result = manager.prepare_store([b'key'], generation)
-+    manager.complete_store(result.keys_to_store, generation)
-+    manager.on_request_finished(generation)
-+    before = primary.prefix_cache.view('writer')
-+
-+    parent = _SecondaryTierFacingParent(manager, 0)
-+    storage = ReqContext('storage-request')
-+    parent.on_new_request(storage)
-+    assert parent.lookup(b'key', storage) is LookupResult.HIT
-+    parent.on_request_finished(storage)
-+    assert primary.prefix_cache.view('writer') == before
-+    assert set(primary.prefix_cache._owned) == {'writer'}
-+    assert storage.req_id not in manager._req_state
-+    assert storage.req_id not in primary._contexts
-+
-+
-+def test_filling_unwritten_data_preserves_each_agents_acquired_subset():
-+    index = PrefixCacheIndex()
-+    index.register_tier('CPU', 8)
-+    index.insert('CPU', b'end', (b'middle', b'end'))
-+    index.acquire('CPU', 'first', [b'end'])
-+    index.acquire('CPU', 'second', [b'end'])
-+    index.extend_content('CPU', b'end', (b'begin', b'middle', b'end'))
-+    for agent in ['first', 'second']:
-+        assert index.view(agent).keys == frozenset({b'middle', b'end'})
-+    index.acquire('CPU', 'producer', [b'end'])
-+    assert index.view('producer').keys == frozenset({b'begin', b'middle', b'end'})
-+    assert not index.view('first').permits(b'begin')
 diff --git a/tests/v1/core/test_prefix_caching.py b/tests/v1/core/test_prefix_caching.py
 --- a/tests/v1/core/test_prefix_caching.py
 +++ b/tests/v1/core/test_prefix_caching.py
-@@ -26,6 +26,7 @@
- )
- from vllm.sampling_params import SamplingParams
- from vllm.utils.hashing import sha256, sha256_cbor
-+from vllm.v1.core.prefix_cache import PrefixCacheView
- from vllm.v1.core.block_pool import BlockHashToBlockMap, BlockPool
- from vllm.v1.core.kv_cache_manager import KVCacheBlocks, KVCacheManager, Request
- from vllm.v1.core.kv_cache_utils import (
-@@ -89,7 +90,7 @@
-     sampling_params = SamplingParams(max_tokens=17, prompt_logprobs=prompt_logprobs)
-     sampling_params.update_from_generation_config({}, eos_token_id=100)
- 
--    return Request(
-+    return _request_with_identity(
-         request_id=request_id,
-         prompt_token_ids=prompt_token_ids,
-         mm_features=mm_features if mm_features else None,
-@@ -1565,6 +1566,7 @@
+@@ -1565,6 +1565,7 @@
          num_full_blocks=2,
          block_size=block_size,
          kv_cache_group_id=0,
@@ -887,7 +495,7 @@ diff --git a/tests/v1/core/test_prefix_caching.py b/tests/v1/core/test_prefix_ca
      )
  
      assert len(block_pool.cached_block_hash_to_block) == 2
-@@ -1580,6 +1582,7 @@
+@@ -1580,6 +1581,7 @@
          num_full_blocks=3,
          block_size=block_size,
          kv_cache_group_id=0,
@@ -895,7 +503,7 @@ diff --git a/tests/v1/core/test_prefix_caching.py b/tests/v1/core/test_prefix_ca
      )
      assert len(block_pool.cached_block_hash_to_block) == 3
      assert blocks[0].block_hash is not None
-@@ -1610,6 +1613,7 @@
+@@ -1610,6 +1612,7 @@
          num_full_blocks=2,
          block_size=block_size,
          kv_cache_group_id=0,
@@ -903,7 +511,7 @@ diff --git a/tests/v1/core/test_prefix_caching.py b/tests/v1/core/test_prefix_ca
      )
      assert len(block_pool.cached_block_hash_to_block) == 2
      assert len(req.block_hashes) == 3
-@@ -1624,6 +1628,7 @@
+@@ -1624,6 +1627,7 @@
          num_full_blocks=3,
          block_size=block_size,
          kv_cache_group_id=1,
@@ -911,64 +519,7 @@ diff --git a/tests/v1/core/test_prefix_caching.py b/tests/v1/core/test_prefix_ca
      )
      assert len(block_pool.cached_block_hash_to_block) == 5
      assert len(req.block_hashes) == 3
-@@ -1634,38 +1639,38 @@
-     # Block hash 2: hit for group 1
- 
-     assert (
--        block_pool.get_cached_block(req.block_hashes[0], kv_cache_group_ids=[0])
-+        block_pool.get_cached_block(req.block_hashes[0], kv_cache_group_ids=[0], cache_view=PrefixCacheView(None))
-         is not None
-     )
-     assert (
--        block_pool.get_cached_block(req.block_hashes[1], kv_cache_group_ids=[0])
-+        block_pool.get_cached_block(req.block_hashes[1], kv_cache_group_ids=[0], cache_view=PrefixCacheView(None))
-         is not None
-     )
-     assert (
--        block_pool.get_cached_block(req.block_hashes[2], kv_cache_group_ids=[0]) is None
-+        block_pool.get_cached_block(req.block_hashes[2], kv_cache_group_ids=[0], cache_view=PrefixCacheView(None)) is None
-     )
-     assert (
--        block_pool.get_cached_block(req.block_hashes[0], kv_cache_group_ids=[1])
-+        block_pool.get_cached_block(req.block_hashes[0], kv_cache_group_ids=[1], cache_view=PrefixCacheView(None))
-         is not None
-     )
-     assert (
--        block_pool.get_cached_block(req.block_hashes[1], kv_cache_group_ids=[1])
-+        block_pool.get_cached_block(req.block_hashes[1], kv_cache_group_ids=[1], cache_view=PrefixCacheView(None))
-         is not None
-     )
-     assert (
--        block_pool.get_cached_block(req.block_hashes[2], kv_cache_group_ids=[1])
-+        block_pool.get_cached_block(req.block_hashes[2], kv_cache_group_ids=[1], cache_view=PrefixCacheView(None))
-         is not None
-     )
-     assert (
--        block_pool.get_cached_block(req.block_hashes[0], kv_cache_group_ids=[0, 1])
-+        block_pool.get_cached_block(req.block_hashes[0], kv_cache_group_ids=[0, 1], cache_view=PrefixCacheView(None))
-         is not None
-     )
-     assert (
--        block_pool.get_cached_block(req.block_hashes[1], kv_cache_group_ids=[0, 1])
-+        block_pool.get_cached_block(req.block_hashes[1], kv_cache_group_ids=[0, 1], cache_view=PrefixCacheView(None))
-         is not None
-     )
-     assert (
--        block_pool.get_cached_block(req.block_hashes[2], kv_cache_group_ids=[0, 1])
-+        block_pool.get_cached_block(req.block_hashes[2], kv_cache_group_ids=[0, 1], cache_view=PrefixCacheView(None))
-         is None
-     )
- 
-@@ -2019,7 +2024,7 @@
-     # Manually add all blocks to cached_blocks
-     for block, block_hash in zip(pool.blocks, block_hashes):
-         block.set_block_hash(block_hash)
--        pool.cached_block_hash_to_block.insert(block_hash, block)
-+        pool._insert_block_hash(block_hash, block, num_tokens=None, content=(block_hash,))
- 
-     block0, block1, block2, block3 = pool.blocks
-     assert pool.cached_block_hash_to_block._cache == {
-@@ -2152,6 +2157,7 @@
+@@ -2152,6 +2156,7 @@
          num_full_blocks=num_full_blocks,
          block_size=block_size,
          kv_cache_group_id=kv_cache_group_id,
@@ -976,7 +527,7 @@ diff --git a/tests/v1/core/test_prefix_caching.py b/tests/v1/core/test_prefix_ca
      )
  
      events = pool.take_events()
-@@ -2270,6 +2276,7 @@
+@@ -2270,6 +2275,7 @@
          num_full_blocks=2,
          block_size=block_size,
          kv_cache_group_id=group_id,
@@ -984,7 +535,7 @@ diff --git a/tests/v1/core/test_prefix_caching.py b/tests/v1/core/test_prefix_ca
      )
  
      events = manager.take_events()
-@@ -2355,6 +2362,7 @@
+@@ -2355,6 +2361,7 @@
          num_full_blocks=2,
          block_size=block_size,
          kv_cache_group_id=0,
@@ -992,7 +543,7 @@ diff --git a/tests/v1/core/test_prefix_caching.py b/tests/v1/core/test_prefix_ca
      )
  
      # Cache blocks for group 1 (sliding-window)
-@@ -2366,6 +2374,7 @@
+@@ -2366,6 +2373,7 @@
          num_full_blocks=2,
          block_size=block_size,
          kv_cache_group_id=1,
@@ -1000,7 +551,7 @@ diff --git a/tests/v1/core/test_prefix_caching.py b/tests/v1/core/test_prefix_ca
      )
  
      events = manager.take_events()
-@@ -2450,6 +2459,7 @@
+@@ -2450,6 +2458,7 @@
          num_full_blocks=2,
          block_size=block_size,
          kv_cache_group_id=group_id,
@@ -1008,219 +559,84 @@ diff --git a/tests/v1/core/test_prefix_caching.py b/tests/v1/core/test_prefix_ca
      )
  
      # Drain the BlockStored events so only eviction events remain later.
-@@ -2690,7 +2700,8 @@
-     # Evict the first block in the request
-     assert (
-         manager.block_pool.get_cached_block(
--            block_hash_first_block, kv_cache_group_ids=[0]
-+            block_hash_first_block, kv_cache_group_ids=[0],
-+            cache_view=PrefixCacheView(None),
-         )
-         is not None
-     )
-@@ -2840,8 +2851,8 @@
-     assert blocks is not None
- 
-     pool = manager.block_pool
--    assert pool.get_cached_block(req0.block_hashes[3], kv_cache_group_ids=[1])
--    assert pool.get_cached_block(req0.block_hashes[4], kv_cache_group_ids=[1])
-+    assert pool.get_cached_block(req0.block_hashes[3], kv_cache_group_ids=[1], cache_view=PrefixCacheView(None))
-+    assert pool.get_cached_block(req0.block_hashes[4], kv_cache_group_ids=[1], cache_view=PrefixCacheView(None))
-     manager.free(req0)
- 
-     req1 = make_request("1", token_ids + [999], block_size, sha256)
-@@ -2896,8 +2907,8 @@
-     assert blocks is not None
- 
-     pool = manager.block_pool
--    assert pool.get_cached_block(req0.block_hashes[4], kv_cache_group_ids=[1, 2])
--    assert pool.get_cached_block(req0.block_hashes[8], kv_cache_group_ids=[1, 2])
-+    assert pool.get_cached_block(req0.block_hashes[4], kv_cache_group_ids=[1, 2], cache_view=PrefixCacheView(None))
-+    assert pool.get_cached_block(req0.block_hashes[8], kv_cache_group_ids=[1, 2], cache_view=PrefixCacheView(None))
-     manager.free(req0)
- 
-     req1 = make_request("1", token_ids + [999], block_size, sha256)
-@@ -3043,7 +3054,7 @@
-     # a hit at any lcm-aligned length, so they must NOT be cached.
-     expected_cached = {3, 7}
-     for i in range(8):
--        cached = pool.get_cached_block(req.block_hashes[i], kv_cache_group_ids=[1])
-+        cached = pool.get_cached_block(req.block_hashes[i], kv_cache_group_ids=[1], cache_view=PrefixCacheView(None))
-         if i in expected_cached:
-             assert cached is not None, f"SWA hash {i} should be cached"
-         else:
-@@ -3111,10 +3122,10 @@
-     # spans tokens [96, 112) past the lcm boundary and must NOT be cached.
-     for i in range(6):
-         assert (
--            pool.get_cached_block(req.block_hashes[i], kv_cache_group_ids=[1])
-+            pool.get_cached_block(req.block_hashes[i], kv_cache_group_ids=[1], cache_view=PrefixCacheView(None))
-             is not None
-         ), f"SWA hash {i} should be cached"
--    assert pool.get_cached_block(req.block_hashes[6], kv_cache_group_ids=[1]) is None, (
-+    assert pool.get_cached_block(req.block_hashes[6], kv_cache_group_ids=[1], cache_view=PrefixCacheView(None)) is None, (
-         "SWA hash 6 spans tokens past the lcm boundary; should not be cached"
-     )
- 
-@@ -3173,7 +3184,7 @@
-     pool = manager.block_pool
-     expected_swa_cached = {7, 11, 15}
-     for i in range(16):
--        cached = pool.get_cached_block(req.block_hashes[i], kv_cache_group_ids=[1])
-+        cached = pool.get_cached_block(req.block_hashes[i], kv_cache_group_ids=[1], cache_view=PrefixCacheView(None))
-         if i in expected_swa_cached:
-             assert cached is not None, f"SWA hash {i} should be cached"
-         else:
-@@ -3364,14 +3375,14 @@
-     pool = manager.block_pool
-     expected_swa_cached = {11}
-     for i in range(16):
--        cached = pool.get_cached_block(req0.block_hashes[i], kv_cache_group_ids=[1])
-+        cached = pool.get_cached_block(req0.block_hashes[i], kv_cache_group_ids=[1], cache_view=PrefixCacheView(None))
-         if i in expected_swa_cached:
-             assert cached is not None, f"SWA hash {i} should be cached"
-         else:
-             assert cached is None, f"SWA hash {i} should not be cached"
- 
-     manager.free(req0)
--    retained_swa_block = pool.get_cached_block(req0.block_hashes[11], [1])
-+    retained_swa_block = pool.get_cached_block(req0.block_hashes[11], [1], cache_view=PrefixCacheView(None))
-     assert retained_swa_block is not None
-     assert retained_swa_block[0].ref_cnt == 0
- 
-@@ -3449,7 +3460,7 @@
-     pool = manager.block_pool
-     expected_swa_cached = {11, 12}
-     for i in range(15):
--        cached = pool.get_cached_block(req0.block_hashes[i], kv_cache_group_ids=[1])
-+        cached = pool.get_cached_block(req0.block_hashes[i], kv_cache_group_ids=[1], cache_view=PrefixCacheView(None))
-         if i in expected_swa_cached:
-             assert cached is not None, f"SWA hash {i} should be cached"
-         else:
-@@ -3904,7 +3915,8 @@
-     for i in cached_hash_indices:
-         assert (
-             manager.block_pool.get_cached_block(
--                req.block_hashes[i], kv_cache_group_ids=[1]
-+                req.block_hashes[i], kv_cache_group_ids=[1],
-+                cache_view=PrefixCacheView(None),
-             )
-             is not None
-         )
-@@ -3961,7 +3973,7 @@
-     cached = {
-         i
-         for i in range(16)
--        if pool.get_cached_block(req.block_hashes[i], kv_cache_group_ids=[0])
-+        if pool.get_cached_block(req.block_hashes[i], kv_cache_group_ids=[0], cache_view=PrefixCacheView(None))
-         is not None
-     }
-     # per_segment = 64 / 16 = 4, need = cdiv(16-1, 16) = 1 -> segment tails at
-@@ -3997,7 +4009,7 @@
-     cached = {
-         i
-         for i in range(16)
--        if pool.get_cached_block(req.block_hashes[i], kv_cache_group_ids=[0])
-+        if pool.get_cached_block(req.block_hashes[i], kv_cache_group_ids=[0], cache_view=PrefixCacheView(None))
-         is not None
-     }
-     # No segment tails (interval 0); only the latest replay tail (block 14).
-@@ -4030,7 +4042,7 @@
-     cached = {
-         i
-         for i in range(16)
--        if pool.get_cached_block(req.block_hashes[i], kv_cache_group_ids=[0])
-+        if pool.get_cached_block(req.block_hashes[i], kv_cache_group_ids=[0], cache_view=PrefixCacheView(None))
-         is not None
-     }
-     assert cached == set(range(16))
-@@ -4152,7 +4164,7 @@
-         return {
-             i
-             for i in range(16)
--            if pool.get_cached_block(req.block_hashes[i], kv_cache_group_ids=[1])
-+            if pool.get_cached_block(req.block_hashes[i], kv_cache_group_ids=[1], cache_view=PrefixCacheView(None))
-             is not None
-         }
- 
-@@ -4311,3 +4323,10 @@
+@@ -4311,3 +4320,77 @@
      assert last_req_hit(retention=0, pin=False) == 0
      # retention=0 with the pin keeps the junction window -> reuse restored.
      assert last_req_hit(retention=0, pin=True) == 4 * block_size
 +
 +
-+def _request_with_identity(*, request_id, sampling_params, **kwargs):
-+    sampling_params = sampling_params.clone()
-+    sampling_params.extra_args = dict(sampling_params.extra_args or {})
-+    sampling_params.extra_args["kv_scope"] = request_id
-+    return Request(request_id=request_id, sampling_params=sampling_params, **kwargs)
-diff --git a/tests/v1/core/test_single_type_kv_cache_manager.py b/tests/v1/core/test_single_type_kv_cache_manager.py
---- a/tests/v1/core/test_single_type_kv_cache_manager.py
-+++ b/tests/v1/core/test_single_type_kv_cache_manager.py
-@@ -6,6 +6,7 @@
- import pytest
- import torch
- 
-+from vllm.v1.core.prefix_cache import PrefixCacheView
- from vllm.v1.core.block_pool import BlockPool
- from vllm.v1.core.kv_cache_utils import (
-     BlockHash,
-@@ -139,17 +140,14 @@
-             BlockHash(str(i).encode()) for i in range(len(block_is_cached))
-         ]
- 
--        block_pool.cached_block_hash_to_block._cache.clear()
-+        assert block_pool.reset_prefix_cache()
- 
-         # Mock the block pool with the cached blocks
-         for i, (block_hash, is_cached) in enumerate(
-             zip(block_hash_list, block_is_cached)
-         ):
-             if is_cached:
--                block_pool.cached_block_hash_to_block.insert(
--                    make_block_hash_with_group_id(block_hash, 0),
--                    block_pool.blocks[i + 10],
--                )
-+                block_pool._insert_block_hash(make_block_hash_with_group_id(block_hash, 0), block_pool.blocks[i + 10], num_tokens=None, content=(make_block_hash_with_group_id(block_hash, 0),))
- 
-         computed_blocks = manager.find_longest_cache_hit(
-             block_hashes=block_hash_list,
-@@ -159,6 +157,7 @@
-             kv_cache_spec=chunked_local_attention_spec,
-             drop_eagle_block=False,
-             alignment_tokens=block_size,
-+            cache_view=PrefixCacheView(None),
-         )[0][0]
-         assert len(computed_blocks) == expect_length
- 
-@@ -210,17 +209,14 @@
-             BlockHash(str(i).encode()) for i in range(len(block_is_cached))
-         ]
- 
--        block_pool.cached_block_hash_to_block._cache.clear()
-+        assert block_pool.reset_prefix_cache()
- 
-         # Mock the block pool with the cached blocks
-         for i, (block_hash, is_cached) in enumerate(
-             zip(block_hash_list, block_is_cached)
-         ):
-             if is_cached:
--                block_pool.cached_block_hash_to_block.insert(
--                    make_block_hash_with_group_id(block_hash, 0),
--                    block_pool.blocks[i + 10],
--                )
-+                block_pool._insert_block_hash(make_block_hash_with_group_id(block_hash, 0), block_pool.blocks[i + 10], num_tokens=None, content=(make_block_hash_with_group_id(block_hash, 0),))
- 
-         computed_blocks = manager.find_longest_cache_hit(
-             block_hashes=block_hash_list,
-@@ -230,6 +226,7 @@
-             kv_cache_spec=sliding_window_spec,
-             drop_eagle_block=False,
-             alignment_tokens=block_size,
-+            cache_view=PrefixCacheView(None),
-         )[0][0]
-         assert len(computed_blocks) == expect_length
- 
++def _scoped_request(request_id, prompt_token_ids, block_size, agent, cache_salt=None):
++    sampling_params = SamplingParams(max_tokens=17, extra_args={"kv_scope": agent})
++    sampling_params.update_from_generation_config({}, eos_token_id=100)
++    return Request(
++        request_id=request_id,
++        prompt_token_ids=prompt_token_ids,
++        sampling_params=sampling_params,
++        pooling_params=None,
++        cache_salt=cache_salt,
++        block_hasher=get_request_block_hasher(block_size, sha256),
++    )
++
++
++@pytest.mark.parametrize("reader_agent", ["new-agent", "own-agent", "writer-agent"])
++def test_prefix_match_is_content_and_salt_whatever_the_agent_id(reader_agent):
++    """An ID with cached blocks of its own matches another ID's resident
++    prefix exactly as a new ID does; only content and cache_salt decide."""
++    block_size = 16
++    manager = make_kv_cache_manager(
++        make_kv_cache_config(block_size, 16),
++        max_model_len=8192,
++        enable_caching=True,
++        hash_block_size=block_size,
++    )
++
++    def run(request):
++        computed, num_computed, _ = manager.get_computed_blocks(request)
++        blocks = manager.allocate_slots(
++            request, request.num_tokens - num_computed, num_computed, computed
++        )
++        assert blocks is not None
++        request.num_computed_tokens = request.num_tokens
++        manager.free(request)
++        return num_computed
++
++    # The reader's own line already has cached blocks of different content.
++    assert run(_scoped_request("own", [9] * (2 * block_size + 1), block_size,
++                               "own-agent")) == 0
++    common = [i for i in range(3) for _ in range(block_size)]
++    assert run(_scoped_request("writer", common + [7] * 5, block_size,
++                               "writer-agent")) == 0
++
++    reader = _scoped_request("reader", common + [8] * 5, block_size, reader_agent)
++    _, num_computed, _ = manager.get_computed_blocks(reader)
++    assert num_computed == 3 * block_size
++
++    salted = _scoped_request("salted", common + [8] * 5, block_size, reader_agent,
++                             cache_salt="other-salt")
++    _, num_computed, _ = manager.get_computed_blocks(salted)
++    assert num_computed == 0
++
++
++@pytest.mark.parametrize("is_recurrent", [False, True])
++def test_attention_extension_keeps_the_immutable_partial_prefix(is_recurrent):
++    """Extending an attention block leaves its shorter prefix valid, so the
++    partial entry stays reachable; a recurrent state replaces its checkpoint."""
++    pool = BlockPool(8, enable_caching=True, hash_block_size=4)
++    hashes = [BlockHash(bytes([i])) for i in range(1, 5)]
++    block = pool.get_new_blocks(1)[0]
++    writer = SimpleNamespace(block_hashes=hashes)
++    pool.cache_partial_block(writer, block, 8, 0, 16, is_recurrent=is_recurrent)
++    assert pool.get_cached_block(hashes[1], [0]) == [block]
++    pool.cache_full_blocks(writer, [block], 0, 1, 16, 0, is_recurrent=is_recurrent)
++    assert block.block_hash == make_block_hash_with_group_id(hashes[3], 0)
++    assert pool.get_cached_block(hashes[3], [0]) == [block]
++    if is_recurrent:
++        assert pool.get_cached_block(hashes[1], [0]) is None
++    else:
++        assert pool.get_cached_block(hashes[1], [0]) == [block]
++    pool._maybe_evict_cached_block(block)
++    assert pool.get_cached_block(hashes[1], [0]) is None
++    assert pool.get_cached_block(hashes[3], [0]) is None
 diff --git a/tests/v1/e2e/general/test_context_length.py b/tests/v1/e2e/general/test_context_length.py
 --- a/tests/v1/e2e/general/test_context_length.py
 +++ b/tests/v1/e2e/general/test_context_length.py
@@ -1464,16 +880,15 @@ diff --git a/tests/v1/kv_connector/unit/offloading_connector/test_scheduler.py b
  def _make_partial_tail_scheduler() -> OffloadingConnectorScheduler:
      vllm_config = _make_vllm_config(extra_config={"self_describing_kv_events": True})
      vllm_config.cache_config.prefix_match_unit = 4
-@@ -85,6 +94,8 @@
+@@ -85,6 +94,7 @@
      request.lora_request = None
      request.is_finished.return_value = False
      scheduler.on_new_request(request)
 +    scheduler._req_status[request.request_id].update_offload_keys()
-+    scheduler.manager.begin_lookup(scheduler._req_status[request.request_id].req_context)
      return request
  
  
-@@ -559,7 +570,7 @@
+@@ -559,7 +569,7 @@
          decoded_tokens=[0] * (tokens_per_chunk - 1),
          expected_stored=(3, 4, 5),
      )
@@ -1482,7 +897,7 @@ diff --git a/tests/v1/kv_connector/unit/offloading_connector/test_scheduler.py b
  
      # +1 token -> single block, fail prepare_store
      runner.manager.prepare_store.side_effect = lambda keys, req_context: None
-@@ -574,7 +585,7 @@
+@@ -574,7 +584,7 @@
      runner.run(decoded_tokens=[0] * (tokens_per_chunk + 1))
  
      # 1 more block (+ token for kicking off offloading)
@@ -1491,7 +906,7 @@ diff --git a/tests/v1/kv_connector/unit/offloading_connector/test_scheduler.py b
      runner.manager.prepare_store.side_effect = lambda keys, req_context: (
          generate_store_output(keys)
      )
-@@ -582,8 +593,8 @@
+@@ -582,8 +592,8 @@
          decoded_tokens=[0] * (tokens_per_chunk + 1),
          expected_stored=(15, 16, 17),
      )
@@ -1502,7 +917,7 @@ diff --git a/tests/v1/kv_connector/unit/offloading_connector/test_scheduler.py b
      assert len(block_hashes1) == 6
  
      # terminate request
-@@ -592,8 +603,8 @@
+@@ -592,8 +602,8 @@
      # create a new request differing only on the last token
      runner.new_request(token_ids=[0] * (tokens_per_chunk * 6 - 1) + [1])
      runner.run(decoded_tokens=[0])
@@ -1513,7 +928,7 @@ diff --git a/tests/v1/kv_connector/unit/offloading_connector/test_scheduler.py b
      assert len(block_hashes2) == 6
  
      # verify hashes are the same, except for the last block
-@@ -994,14 +1005,8 @@
+@@ -994,14 +1004,8 @@
          generate_store_output(keys)
      )
      runner.run(decoded_tokens=[0])
@@ -1530,25 +945,23 @@ diff --git a/tests/v1/kv_connector/unit/offloading_connector/test_scheduler.py b
  
      # store 3 more block
      runner.manager.prepare_store.side_effect = lambda keys, req_context: (
-@@ -1009,12 +1014,11 @@
+@@ -1009,12 +1013,11 @@
      )
      runner.run(
          decoded_tokens=[0] * (block_size * 3 + 2),
 -        expected_stored=(0, 1, 2, 3, 4, 5),
--    )
--
++        expected_stored=tuple((0, i) for i in range(6)) + tuple((1, i) for i in range(1, 6)),
+     )
+ 
 -    # touch called from _get_reqs_to_store * 3 blocks, once for each group
 -    touch_calls = runner.manager.touch.call_args_list
 -    assert len(touch_calls) == 6
-+        expected_stored=tuple((0, i) for i in range(6)) + tuple((1, i) for i in range(1, 6)),
-+    )
-+
 +    # Each update publishes one complete working set across groups.
 +    _assert_retained_group_sizes(runner, (6, 2))
  
      # EOS fills the 7th block (offset 6). The extra schedule step processes
      # finished_req_ids and stores block 6 for both groups before the request's
-@@ -1034,13 +1038,8 @@
+@@ -1034,13 +1037,8 @@
          expected_loaded=((0, 0), (0, 1), (0, 2), (1, 1), (1, 2)),
      )
  
@@ -1564,7 +977,7 @@ diff --git a/tests/v1/kv_connector/unit/offloading_connector/test_scheduler.py b
  
      # 3 blocks are hit on GPU [0, 1, 2]
      # 1 block loaded [3,]
-@@ -1106,15 +1105,8 @@
+@@ -1106,15 +1104,8 @@
          generate_store_output(keys)
      )
      runner.run(decoded_tokens=[0])
@@ -1582,7 +995,7 @@ diff --git a/tests/v1/kv_connector/unit/offloading_connector/test_scheduler.py b
  
      # Get to 31 tokens
      # No further blocks offloaded
-@@ -1124,11 +1116,8 @@
+@@ -1124,11 +1115,8 @@
      # Group 0 blocks: [0, 1], ending_token_offset = 24
      # Group 1 blocks: [0, 1], ending_token_offset = 32
      runner.run(decoded_tokens=[0])
@@ -1596,7 +1009,7 @@ diff --git a/tests/v1/kv_connector/unit/offloading_connector/test_scheduler.py b
  
      # Get to 35 tokens
      # No further blocks offloaded
-@@ -1138,11 +1127,8 @@
+@@ -1138,11 +1126,8 @@
      # Group 0 blocks: [0, 1, 2], ending_token_offset = 36
      # Group 1 blocks: [0, 1], ending_token_offset = 32
      runner.run(decoded_tokens=[0])
@@ -1610,7 +1023,7 @@ diff --git a/tests/v1/kv_connector/unit/offloading_connector/test_scheduler.py b
  
      # Get to 47 tokens
      # No further blocks offloaded
-@@ -1152,11 +1138,8 @@
+@@ -1152,11 +1137,8 @@
      # Group 0 blocks: [0, 1, 2, 3], ending_token_offset = 4
      # Group 1 blocks: [0, 1, 2], ending_token_offset = 48
      runner.run(decoded_tokens=[0])
@@ -1624,7 +1037,7 @@ diff --git a/tests/v1/kv_connector/unit/offloading_connector/test_scheduler.py b
  
      runner.run(decoded_tokens=[0], expected_stored=((0, 3), (1, 2)))
  
-@@ -1356,32 +1339,38 @@
+@@ -1356,32 +1338,38 @@
          sched._events_tracker.record_lookup.assert_not_called()
  
  
@@ -1669,7 +1082,7 @@ diff --git a/tests/v1/kv_connector/unit/offloading_connector/test_scheduler.py b
  
      def test_gap_resets_consecutive(self):
          sched = _make_scheduler_with_lookup(
-@@ -1389,7 +1378,7 @@
+@@ -1389,7 +1377,7 @@
          )
          # [1, 2, 3, 0, 4] — gap at 0 resets, window of 2 found at [2,3]
          assert (
@@ -1678,7 +1091,7 @@ diff --git a/tests/v1/kv_connector/unit/offloading_connector/test_scheduler.py b
              == 3
          )
  
-@@ -1405,7 +1394,7 @@
+@@ -1405,7 +1393,7 @@
          # two valid windows: [1,2] at positions 0-1 and [4,5] at positions 3-4
          # scans right-to-left, finds [4,5] first
          assert (
@@ -1687,7 +1100,7 @@ diff --git a/tests/v1/kv_connector/unit/offloading_connector/test_scheduler.py b
              == 5
          )
  
-@@ -1420,19 +1409,19 @@
+@@ -1420,19 +1408,19 @@
          )
          # window of 4 not found contiguously (gap at 1)
          assert (
@@ -1710,7 +1123,7 @@ diff --git a/tests/v1/kv_connector/unit/offloading_connector/test_scheduler.py b
  
      def test_retry_with_full_window_still_defers(self):
          """Even if a real window is found after a RETRY, result is deferred."""
-@@ -1447,7 +1436,7 @@
+@@ -1447,7 +1435,7 @@
              }
          )
          assert (
@@ -1719,7 +1132,7 @@ diff --git a/tests/v1/kv_connector/unit/offloading_connector/test_scheduler.py b
              is None
          )
  
-@@ -1457,7 +1446,7 @@
+@@ -1457,7 +1445,7 @@
              {1: LookupResult.HIT, 2: LookupResult.HIT_PENDING}
          )
          # window=2: both count as hits, but defer_lookup is set
@@ -1728,7 +1141,7 @@ diff --git a/tests/v1/kv_connector/unit/offloading_connector/test_scheduler.py b
  
      def test_hit_pending_does_not_break_streak(self):
          """HIT_PENDING in the middle of a window doesn't reset the streak."""
-@@ -1466,7 +1455,7 @@
+@@ -1466,7 +1454,7 @@
          )
          # window=3: right-to-left finds 3(HIT),2(HIT_PENDING),1(HIT) = 3 consecutive
          assert (
@@ -1737,7 +1150,7 @@ diff --git a/tests/v1/kv_connector/unit/offloading_connector/test_scheduler.py b
          )
  
  
-@@ -2103,26 +2092,7 @@
+@@ -2103,26 +2091,7 @@
  
  @pytest.mark.parametrize("async_scheduling", [True, False])
  def test_swa_alignment_skip(request_runner, async_scheduling: bool):
@@ -1765,7 +1178,7 @@ diff --git a/tests/v1/kv_connector/unit/offloading_connector/test_scheduler.py b
      full_attn_block_size = 16
      swa_block_size = 4
      sliding_window = 8
-@@ -2187,15 +2157,10 @@
+@@ -2187,15 +2156,10 @@
          decoded_tokens=[EOS_TOKEN_ID],
          # Group 0 (full attn, block_size=16): 2 offloaded chunks
          #   -> GPU blocks (0, 0) and (0, 1)
@@ -1782,17 +1195,16 @@ diff --git a/tests/v1/kv_connector/unit/offloading_connector/test_scheduler.py b
              (1, 6),
              (1, 7),
          ),
-@@ -2399,6 +2364,9 @@
+@@ -2399,6 +2363,8 @@
              gs.offload_keys = TestEagle._group_keys(
                  scheduler.config.kv_group_configs[idx].group_idx, hashes
              )
 +            for key in gs.offload_keys:
 +                state.req_context.prefix_content[key] = (key,)
-+        scheduler.manager.begin_lookup(state.req_context)
          return state
  
      # -------------------------------------------------------------------
-@@ -2542,12 +2510,12 @@
+@@ -2542,12 +2508,12 @@
          captured_keys: list = []
          orig_sw_lookup = type(sched)._sliding_window_lookup
  
@@ -1800,17 +1212,16 @@ diff --git a/tests/v1/kv_connector/unit/offloading_connector/test_scheduler.py b
 +        def capturing_sw_lookup(self_arg, keys, window, req_context, required):
              captured_keys.append(list(keys))
 -            return orig_sw_lookup(self_arg, keys, window, req_context)
--
++            return orig_sw_lookup(self_arg, keys, window, req_context, required)
+ 
 -        sched._sliding_window_lookup = lambda keys, window, req_ctx: (
 -            capturing_sw_lookup(sched, keys, window, req_ctx)
-+            return orig_sw_lookup(self_arg, keys, window, req_context, required)
-+
 +        sched._sliding_window_lookup = lambda keys, window, req_ctx, required: (
 +            capturing_sw_lookup(sched, keys, window, req_ctx, required)
          )
  
          req_status = self._make_req_status(
-@@ -3363,3 +3331,254 @@
+@@ -3363,3 +3329,254 @@
      assert get_sliding_window_size_in_chunks(spec, tokens_per_chunk=1024) == 8
      # Partial chunks round up, so the reachable tail is never understated.
      assert get_sliding_window_size_in_chunks(spec, tokens_per_chunk=3000) == 3
@@ -1908,10 +1319,9 @@ diff --git a/tests/v1/kv_connector/unit/offloading_connector/test_scheduler.py b
 +    assert request.kv_scope not in scheduler.manager._agents
 +    assert fork.kv_scope in scheduler.manager._agents
 +    fork_context = scheduler._req_status[fork.request_id].req_context
-+    scheduler.manager.begin_lookup(fork_context)
 +    assert all(scheduler.manager.lookup(k, fork_context) is LookupResult.HIT for k in partial_keys)
-+    scheduler.manager.begin_lookup(incoming)
-+    assert all(scheduler.manager.lookup(k, incoming) is LookupResult.MISS for k in partial_keys)
++    # An agent with cached data of its own matches the same resident content.
++    assert all(scheduler.manager.lookup(k, incoming) is LookupResult.HIT for k in partial_keys)
 +
 +
 +def test_retention_uses_one_boundary_across_different_group_chunk_sizes():
@@ -1994,13 +1404,14 @@ diff --git a/tests/v1/kv_connector/unit/offloading_connector/test_scheduler.py b
 +    return scheduler, writer, request
 +
 +
-+def test_coalesced_window_owns_only_gpu_data_that_was_written():
-+    from vllm.v1.core.prefix_cache import cache_content_keys
-+
++def test_coalesced_window_holds_only_gpu_data_that_was_written():
 +    scheduler, writer, _ = _coalesced_window_cache()
-+    view = scheduler.manager.prefix_cache.view(writer.kv_scope)
-+    assert not view.permits(cache_content_keys([writer.block_hashes[0]], 1)[0])
-+    assert view.allows(cache_content_keys(writer.block_hashes[1:], 1))
++    first_chunk = make_offload_key(writer.block_hashes[2], 1)
++    available = scheduler.manager._available_content[first_chunk]
++    assert available == tuple(
++        make_offload_key(block_hash, 1) for block_hash in writer.block_hashes[1:3]
++    )
++    assert first_chunk not in scheduler.manager._complete_blocks
 +
 +
 +def test_coalesced_window_reuses_its_frontier_without_claiming_an_earlier_window():
@@ -2013,8 +1424,7 @@ diff --git a/tests/v1/kv_connector/unit/offloading_connector/test_scheduler.py b
 +    assert scheduler.get_num_new_matched_tokens(earlier_frontier, 0) == (0, False)
 +
 +
-+def test_fork_acquires_only_the_common_boundary_inside_a_larger_cpu_chunk():
-+    from vllm.v1.core.prefix_cache import cache_content_keys
++def test_fork_resumes_at_the_common_boundary_inside_a_larger_cpu_chunk():
 +    from vllm.v1.kv_cache_interface import KVCacheConfig, MambaSpec
 +    from vllm.v1.kv_offload.cpu.manager import CPUOffloadingManager
 +
@@ -2059,12 +1469,13 @@ diff --git a/tests/v1/kv_connector/unit/offloading_connector/test_scheduler.py b
 +        scheduler.manager.complete_store(job.keys, state.req_context)
 +    fork = request('fork', 'fork-first')
 +    assert scheduler.get_num_new_matched_tokens(fork, 0) == (72, True)
-+    acquired = scheduler.manager.prefix_cache.view('fork')
-+    assert acquired.allows(cache_content_keys(producer.block_hashes[:9], 0))
-+    assert not acquired.permits(cache_content_keys([producer.block_hashes[9]], 0)[0])
++    assert scheduler.manager._contexts['fork-first'].keys
 +    assert len(scheduler.manager._blocks) == 3
 +    next_turn = request('fork', 'fork-next')
 +    assert scheduler.get_num_new_matched_tokens(next_turn, 0) == (72, True)
++    # The resume boundary is a property of the resident content alone.
++    other = request('another-agent', 'another-first')
++    assert scheduler.get_num_new_matched_tokens(other, 0) == (72, True)
 diff --git a/tests/v1/kv_connector/unit/offloading_connector/test_worker.py b/tests/v1/kv_connector/unit/offloading_connector/test_worker.py
 --- a/tests/v1/kv_connector/unit/offloading_connector/test_worker.py
 +++ b/tests/v1/kv_connector/unit/offloading_connector/test_worker.py
@@ -2079,18 +1490,6 @@ diff --git a/tests/v1/kv_connector/unit/offloading_connector/test_worker.py b/te
          cache=OffloadingCacheConfig(tokens_per_hash=16, blocks_per_chunk=1),
          parallel=OffloadingParallelConfig(
              rank=rank,
-diff --git a/tests/v1/kv_connector/unit/offloading_connector/utils.py b/tests/v1/kv_connector/unit/offloading_connector/utils.py
---- a/tests/v1/kv_connector/unit/offloading_connector/utils.py
-+++ b/tests/v1/kv_connector/unit/offloading_connector/utils.py
-@@ -127,6 +127,8 @@
-         super().__init__(config)
- 
-         self.manager = MagicMock(spec=OffloadingManager)
-+        from vllm.v1.core.prefix_cache import PrefixCacheView
-+        self.manager.begin_lookup.side_effect = lambda ctx: ctx.set_state(PrefixCacheView(None))
-         self.manager.prepare_load = lambda keys, req_context: MockLoadStoreSpec(keys)
-         self.manager.lookup.return_value = LookupResult.MISS
-         self.manager.get_stats.return_value = None
 diff --git a/tests/v1/kv_connector/unit/test_config.py b/tests/v1/kv_connector/unit/test_config.py
 --- a/tests/v1/kv_connector/unit/test_config.py
 +++ b/tests/v1/kv_connector/unit/test_config.py
@@ -2506,18 +1905,19 @@ deleted file mode 100644
 diff --git a/tests/v1/kv_offload/cpu/test_manager.py b/tests/v1/kv_offload/cpu/test_manager.py
 --- a/tests/v1/kv_offload/cpu/test_manager.py
 +++ b/tests/v1/kv_offload/cpu/test_manager.py
-@@ -1,1085 +1,467 @@
+@@ -1,1085 +1,523 @@
  # SPDX-License-Identifier: Apache-2.0
  # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
 -from collections import OrderedDict
 -from collections.abc import Iterable
 -from dataclasses import dataclass
--
--import numpy as np
-+"""Shared prefix retention and physical transfer lifetime, without an engine."""
++"""Content-matched lookup, shared prefix retention and physical transfer
++lifetime, without an engine. The agent ID groups retention; it never
++restricts what a lookup may match."""
 +
 +import random
-+
+ 
+-import numpy as np
  import pytest
  
 -from vllm.v1.kv_offload.base import (
@@ -2538,8 +1938,15 @@ diff --git a/tests/v1/kv_offload/cpu/test_manager.py b/tests/v1/kv_offload/cpu/t
 +from vllm.v1.kv_offload.base import LookupResult, OffloadPolicy, ReqContext
  from vllm.v1.kv_offload.cpu.manager import CPUOffloadingManager
 -from vllm.v1.kv_offload.cpu.policies.arc import ARCCachePolicy
--
--
++from vllm.v1.kv_offload.cpu.common import CPUOffloadingMetrics
++
++
++class AtomicTestContent(dict):
++    """These manager fixtures use one opaque data unit per offload key."""
+ 
++    def __missing__(self, key):
++        return (key,)
+ 
 -def make_req_context(
 -    req_id: str = "", kv_transfer_params: dict | None = None
 -) -> ReqContext:
@@ -3598,15 +3005,6 @@ diff --git a/tests/v1/kv_offload/cpu/test_manager.py b/tests/v1/kv_offload/cpu/t
 -    assert len(received) == 1
 -    assert received[0][0] == keys
 -    assert received[0][1] is ctx
-+from vllm.v1.kv_offload.cpu.common import CPUOffloadingMetrics
-+
-+
-+class AtomicTestContent(dict):
-+    """These manager fixtures use one opaque data unit per offload key."""
-+
-+    def __missing__(self, key):
-+        return (key,)
-+
 +    def get(self, key, default=None):
 +        return self[key]
 +
@@ -3616,12 +3014,10 @@ diff --git a/tests/v1/kv_offload/cpu/test_manager.py b/tests/v1/kv_offload/cpu/t
 +
 +
 +def lookup(manager, key, ctx):
-+    manager.begin_lookup(ctx)
 +    return manager.lookup(key, ctx)
 +
 +
 +def load(manager, keys, ctx):
-+    manager.begin_lookup(ctx)
 +    return manager.prepare_load(keys, ctx)
 +
 +
@@ -3644,6 +3040,11 @@ diff --git a/tests/v1/kv_offload/cpu/test_manager.py b/tests/v1/kv_offload/cpu/t
 +    assert references == manager._references
 +    assert {r for rs in manager._agents.values() for r in rs} == set(manager._contexts)
 +    blocks = manager._blocks
++    assert manager._canonical_content.keys() == blocks.keys()
++    assert manager._available_content.keys() == blocks.keys()
++    assert manager._complete_blocks <= blocks.keys()
++    assert set(manager._idle_context.values()) <= set(manager._contexts)
++    assert len(manager._idle_context) <= manager._num_blocks
 +    allocated = {b.block_id for b in blocks.values()}
 +    assert len(allocated) == len(blocks)
 +    assert allocated.isdisjoint(manager._free_list)
@@ -3653,22 +3054,21 @@ diff --git a/tests/v1/kv_offload/cpu/test_manager.py b/tests/v1/kv_offload/cpu/t
 +    assert manager._num_write_pending_blocks == sum(b.ref_cnt == -1 for b in blocks.values())
 +
 +
-+def test_shared_memberships_fit_declared_context_capacity():
-+    """Unlimited fresh IDs cannot accumulate unlimited ownership metadata."""
++def test_retained_contexts_fit_declared_chunk_count():
++    """Unlimited IDs cannot accumulate unlimited retained-context metadata."""
 +    m = CPUOffloadingManager(4)
 +    keys = [b'prefix', b'tail']
 +    for i in range(100):
 +        ctx = context(str(i))
-+        m.begin_lookup(ctx)
 +        store(m, ctx, keys)
 +        m.on_request_finished(ctx)
 +        assert len(m._contexts) <= 4
-+        assert m.prefix_cache._tiers[m.cache_tier].references <= 8
 +        assert set(m._blocks) == set(keys)
 +        for survivor in m._contexts.values():
 +            assert survivor.keys == set(keys)
-+            assert m.prefix_cache.view(survivor.agent_id).keys == frozenset(keys)
 +        check(m)
++    # The most recently finished contexts are the ones retained.
++    assert set(m._idle_context) == {'96', '97', '98', '99'}
 +
 +
 +def test_shared_prefix_capacity_counts_physical_data_once():
@@ -3676,37 +3076,66 @@ diff --git a/tests/v1/kv_offload/cpu/test_manager.py b/tests/v1/kv_offload/cpu/t
 +    keys = [b'prefix', b'tail']
 +    for agent in ['one', 'two', 'three']:
 +        ctx = context(agent)
-+        m.begin_lookup(ctx)
 +        store(m, ctx, keys)
 +        m.on_request_finished(ctx)
 +    assert set(m._agents) == {'one', 'two', 'three'}
 +    assert len(m._blocks) == 2
-+    for agent in m._agents:
-+        assert m.prefix_cache.view(agent).keys == frozenset(keys)
++    for req_id in m._idle_context.values():
++        assert m._contexts[req_id].keys == set(keys)
++    check(m)
 +
 +
-+def test_native_offload_preserves_all_gpu_users_of_the_copied_content():
-+    from vllm.v1.core.prefix_cache import PrefixCacheIndex
++@pytest.mark.parametrize('reader', ['new', 'existing', 'writer'])
++def test_lookup_matches_content_whatever_the_agent_id(reader):
++    """Any ID matches any resident prefix it names by content: an ID with
++    cached data of its own is no more restricted than a new one."""
++    m = CPUOffloadingManager(6)
++    writer = context('writer')
++    store(m, writer, [b'prefix', b'writer-tail'])
++    m.on_request_finished(writer)
++    if reader == 'existing':
++        own = context('existing', 'own-turn')
++        store(m, own, [b'own-prefix', b'own-tail'])
++        m.on_request_finished(own)
++    ctx = context(reader, 'next-turn')
++    for key in [b'prefix', b'writer-tail']:
++        assert lookup(m, key, ctx) is LookupResult.HIT
++    load(m, [b'prefix', b'writer-tail'], ctx)
++    m.complete_load([b'prefix', b'writer-tail'], ctx)
++    # Loading shared data references it under the reader's own line.
++    assert m._references[b'prefix'] >= {'next-turn'}
++    check(m)
 +
-+    index = PrefixCacheIndex()
-+    gpu = object()
-+    index.register_tier(gpu, 4)
-+    first, second, tail = b'first', b'second', b'tail'
-+    index.insert(gpu, second, (first, second))
-+    index.acquire(gpu, 'original', [second])
-+    index.acquire(gpu, 'fork', [second], selection={second: (first,)})
-+    index.insert(gpu, tail, (tail,))
-+    index.acquire(gpu, 'original', [tail])
-+    manager = CPUOffloadingManager(4)
-+    manager.bind_prefix_cache(index)
-+    writer = ReqContext('offloading-request', kv_scope='writer',
-+                        prefix_content={second: (first, second)})
-+    store(manager, writer, [second])
-+    index.remove(gpu, second)
-+    assert index.view('original').keys == frozenset((first, second, tail))
-+    assert index.view('fork').keys == frozenset((first,))
-+    original = ReqContext('next', kv_scope='original', prefix_content={second: (first, second)})
-+    assert lookup(manager, second, original) is LookupResult.HIT
++
++def test_storage_transfer_can_precede_generation_without_inventing_an_agent():
++    m = CPUOffloadingManager(4)
++    physical = ReqContext('physical-transfer')
++    result = m._prepare_store([b'end'], physical)
++    m.complete_store(result.keys_to_store, physical)
++    assert m._lookup(b'end', physical) is LookupResult.HIT
++    assert not m._contexts and not m._agents
++    assert m._available_content[b'end'] is None
++    # The first generation supplies the hash chain that describes the entry.
++    generation = ReqContext('generation', kv_scope='agent',
++                            prefix_content={b'end': (b'first', b'end')})
++    assert m.lookup(b'end', generation) is LookupResult.HIT
++    assert m._available_content[b'end'] == (b'first', b'end')
++    assert not m._contexts
++    m.retain_context([b'end'], generation)
++    assert m._contexts['generation'].keys == {b'end'}
++    check(m)
++
++
++def test_speculative_promotion_retains_no_context():
++    m = CPUOffloadingManager(3)
++    ctx = context('new-agent', 'promotion')
++    result = m._prepare_store([b'candidate'], ctx)
++    m.complete_store(result.keys_to_store, ctx)
++    assert not m._contexts
++    assert lookup(m, b'candidate', ctx) is LookupResult.HIT
++    m.retain_context([b'candidate'], ctx)
++    assert m._contexts['promotion'].keys == {b'candidate'}
++    check(m)
 +
 +
 +def test_transfer_metrics_count_shared_reads_once_and_clear_histograms():
@@ -3752,7 +3181,6 @@ diff --git a/tests/v1/kv_offload/cpu/test_manager.py b/tests/v1/kv_offload/cpu/t
 +    m = CPUOffloadingManager(5)
 +    a, b, c = map(context, ['writer', 'fork', 'incoming'])
 +    store(m, a, [b'prefix', b'a'])
-+    m.begin_lookup(b)
 +    if reuse == 'retain':
 +        m.retain_context([b'prefix'], b)  # includes GPU prefix-cache hits
 +    elif reuse == 'load':
@@ -3916,16 +3344,18 @@ diff --git a/tests/v1/kv_offload/cpu/test_manager.py b/tests/v1/kv_offload/cpu/t
 +    assert list(output.store_spec.block_ids) == [slot]
 +    assert m._num_allocated_blocks == 1
 +    assert lookup(m, key, earlier) is LookupResult.HIT_PENDING
++    assert m._available_content[key] == (b'early', *suffix)
 +    for agent in ['writer', 'fork']:
-+        assert m.prefix_cache.view(agent).keys == frozenset(suffix)
-+    assert m.prefix_cache.view('earlier').keys == frozenset((b'early', *suffix))
++        assert m._contexts[agent].keys == {key}
 +    m.complete_store(output.keys_to_store, earlier)
 +    assert lookup(m, key, earlier) is LookupResult.HIT
 +    assert m._lookup(key, ReqContext('storage')) is LookupResult.HIT
 +    events = list(m.take_events())
 +    assert [(e.keys, e.removed) for e in events] == [([key], False)]
++    # The filled row serves every reader whose required data it holds,
++    # including the agents that wrote or read only its suffix before.
 +    for agent in ['writer', 'fork']:
-+        assert lookup(m, key, window_context(agent)) is LookupResult.MISS
++        assert lookup(m, key, window_context(agent)) is LookupResult.HIT
 +    check(m)
 +
 +
@@ -3942,7 +3372,7 @@ diff --git a/tests/v1/kv_offload/cpu/test_manager.py b/tests/v1/kv_offload/cpu/t
 +    incoming.prefix_content[b'new'] = (b'new',)
 +    assert m.prepare_store([b'new', key], incoming) is None
 +    assert set(m._blocks) == {key}
-+    assert m.prefix_cache.content(m.cache_tier, key) == suffix
++    assert m._available_content[key] == suffix
 +    if pin == 'reader':
 +        m.complete_load([key], writer)
 +    else:
@@ -3968,8 +3398,7 @@ diff --git a/tests/v1/kv_offload/cpu/test_manager.py b/tests/v1/kv_offload/cpu/t
 +    m.complete_store(output.keys_to_store, incoming, success=False)
 +    assert not m._contexts and not m._blocks
 +    assert not m._complete_blocks and not m._canonical_content
-+    for agent in ['writer', 'fork', 'incoming']:
-+        assert m.prefix_cache.view(agent).keys is None
++    assert not m._available_content
 +    check(m)
 +
 +
@@ -3979,7 +3408,8 @@ diff --git a/tests/v1/kv_offload/cpu/test_manager.py b/tests/v1/kv_offload/cpu/t
 +    store(m, writer, [b'end'])
 +    m.on_request_finished(writer)
 +    assert writer.req_id not in m._contexts
-+    assert m.prefix_cache.view('writer').keys == frozenset((b'middle', b'end'))
++    assert m._available_content[b'end'] == (b'middle', b'end')
++    check(m)
 +
 +
 +@pytest.mark.parametrize('bad', [None, '', ' ', 4, False])
@@ -4054,6 +3484,28 @@ diff --git a/tests/v1/kv_offload/cpu/test_manager.py b/tests/v1/kv_offload/cpu/t
 +        if rng.random() < 0.3:
 +            m.on_request_finished(ctx)
 +        check(m)
++
++
++@pytest.mark.parametrize('subagent_tail', [3, 4])
++def test_waiting_parent_survives_a_subagent_only_while_both_fit(subagent_tail):
++    """With one sequence at a time the parent has finished and is the least
++    recently used other ID: it survives exactly while its chunks and the
++    subagent's unshared chunks fit in the tier together."""
++    m = CPUOffloadingManager(6)
++    parent = context('parent')
++    store(m, parent, [b'system', b'parent-1', b'parent-2'])
++    m.on_request_finished(parent)
++    subagent = context('subagent')
++    tail = [f'sub-{i}'.encode() for i in range(subagent_tail)]
++    # The subagent matches the shared system prompt by content and extends it.
++    assert lookup(m, b'system', subagent) is LookupResult.HIT
++    output = store(m, subagent, tail, retain=[b'system', *tail])
++    survives = 3 + subagent_tail <= 6
++    assert ('parent' in m._agents) is survives
++    assert set(output.evicted_keys) == (set() if survives else {b'parent-1', b'parent-2'})
++    # The shared chunk stays: the subagent's own context references it.
++    assert lookup(m, b'system', subagent) is LookupResult.HIT
++    check(m)
 diff --git a/tests/v1/kv_offload/test_factory.py b/tests/v1/kv_offload/test_factory.py
 --- a/tests/v1/kv_offload/test_factory.py
 +++ b/tests/v1/kv_offload/test_factory.py
@@ -4810,7 +4262,7 @@ diff --git a/tests/v1/kv_offload/tiering/test_obj_tier.py b/tests/v1/kv_offload/
 diff --git a/tests/v1/kv_offload/tiering/test_tiering_offloading.py b/tests/v1/kv_offload/tiering/test_tiering_offloading.py
 --- a/tests/v1/kv_offload/tiering/test_tiering_offloading.py
 +++ b/tests/v1/kv_offload/tiering/test_tiering_offloading.py
-@@ -53,8 +53,76 @@
+@@ -53,10 +53,83 @@
  )
  from vllm.v1.kv_offload.tiering.spec import TieringOffloadingSpec
  
@@ -4829,14 +4281,13 @@ diff --git a/tests/v1/kv_offload/tiering/test_tiering_offloading.py b/tests/v1/k
 +
 +
 +def _lookup(manager, key, ctx):
-+    manager.begin_lookup(ctx)
 +    return manager.lookup(key, ctx)
 +
 +
 +_CTX = _context(req_id="test")
  _MOCK_OFFLOADING_SPEC = MagicMock()
-+
-+
+ 
+ 
 +@pytest.mark.parametrize('fill_source', ['generation', 'secondary'])
 +def test_sparse_primary_serves_its_window_and_exports_only_complete_content(fill_source):
 +    region = _mock_mmap_region(4)
@@ -4875,28 +4326,28 @@ diff --git a/tests/v1/kv_offload/tiering/test_tiering_offloading.py b/tests/v1/k
 +        manager.on_schedule_end(ScheduleEndContext(new_req_ids=[], preempted_req_ids=[]))
 +        [promotion] = secondary.submitted_loads
 +        assert promotion.keys == [key]
-+        assert primary.prefix_cache.view('reader').keys is None
++        # A promotion is a physical transfer; it retains nothing for the reader.
++        assert primary._contexts['reader'].keys == set()
 +        secondary.finished_jobs.append(JobResult(job_id=promotion.job_id, success=True))
 +        assert _lookup(manager, key, reader) is LookupResult.HIT
 +        manager.prepare_load([key], reader)
 +        manager.complete_load([key], reader)
 +    assert primary._blocks[key].block_id == slot
 +    assert primary._num_allocated_blocks == 1
-+    assert primary.prefix_cache.view('writer').keys == frozenset(suffix)
-+    assert primary.prefix_cache.view('reader').keys == frozenset(canonical)
++    assert primary._available_content[key] == canonical
++    assert primary._contexts['writer'].keys == {key}
++    assert primary._contexts['reader'].keys == {key}
++    # The complete row serves the writer's full window too: lookup matches
++    # content, not which agent wrote or read it.
++    full = ReqContext('writer-next', kv_scope='writer', prefix_content={key: canonical})
++    assert _lookup(manager, key, full) is LookupResult.HIT
 +    assert manager._lookup(key, ReqContext('storage')) is LookupResult.HIT
- 
- 
++
++
  def _mock_mmap_region(num_blocks: int, row_bytes: int = 16):
-@@ -75,6 +143,7 @@
-     Returns the count of leading HIT results, or None if any lookup
-     returns HIT_PENDING or RETRY.
-     """
-+    manager.begin_lookup(_CTX)
-     count = 0
-     for key in keys:
-         result = manager.lookup(key, _CTX)
-@@ -425,7 +494,7 @@
+     """Create a mock SharedOffloadRegion for testing."""
+     mock = MagicMock()
+@@ -425,7 +498,7 @@
          # After complete_store, blocks should have ref_cnt > 0
          # (one for each secondary tier)
          for block_hash in blocks:
@@ -4905,7 +4356,7 @@ diff --git a/tests/v1/kv_offload/tiering/test_tiering_offloading.py b/tests/v1/k
              # ref_cnt should be 2 (one for each secondary tier)
              assert block.ref_cnt == 2
  
-@@ -438,7 +507,7 @@
+@@ -438,7 +511,7 @@
          # ref_cnt still held: cascade jobs finished (sync tier) but haven't
          # been polled yet because the per-step guard skipped the second call.
          for block_hash in blocks:
@@ -4914,7 +4365,7 @@ diff --git a/tests/v1/kv_offload/tiering/test_tiering_offloading.py b/tests/v1/k
              assert block.ref_cnt == 2
  
          # Secondary tiers have completed jobs waiting to be drained
-@@ -451,7 +520,7 @@
+@@ -451,7 +524,7 @@
  
          # After cascade completes, ref_cnt should be 0
          for block_hash in blocks:
@@ -4923,7 +4374,7 @@ diff --git a/tests/v1/kv_offload/tiering/test_tiering_offloading.py b/tests/v1/k
              assert block.ref_cnt == 0
  
          # All completed jobs have been drained
-@@ -480,7 +549,7 @@
+@@ -480,7 +553,7 @@
  
          # Lookup each block to initiate promotion for all of them
          for block in blocks:
@@ -4932,7 +4383,7 @@ diff --git a/tests/v1/kv_offload/tiering/test_tiering_offloading.py b/tests/v1/k
              assert result is LookupResult.HIT_PENDING  # promotion initiated
  
          # End of step 1: flushes deferred submit_load() calls
-@@ -533,13 +602,13 @@
+@@ -533,13 +606,13 @@
          self.secondary_tier1.submit_load = submit_partial
  
          for block in blocks:
@@ -4948,7 +4399,7 @@ diff --git a/tests/v1/kv_offload/tiering/test_tiering_offloading.py b/tests/v1/k
          ] == expected_results
  
      def test_lookup_reports_sync_delay_for_resolved_lookups(self, manager_setup):
-@@ -549,7 +618,7 @@
+@@ -549,7 +622,7 @@
  
          # No tier has these blocks: they resolve immediately as misses.
          for block in blocks:
@@ -4957,7 +4408,7 @@ diff --git a/tests/v1/kv_offload/tiering/test_tiering_offloading.py b/tests/v1/k
  
          stats = self.manager.get_stats()
          assert stats is not None
-@@ -589,7 +658,7 @@
+@@ -589,7 +662,7 @@
          self.secondary_tier1.blocks[block] = True
  
          # First lookup finds the block in a secondary tier and defers.
@@ -4966,7 +4417,7 @@ diff --git a/tests/v1/kv_offload/tiering/test_tiering_offloading.py b/tests/v1/k
  
          # Promotion is not treated as unresolved secondary lookup time.
          self._simulate_on_schedule_end(new_req_ids=[_CTX.req_id])
-@@ -620,7 +689,7 @@
+@@ -620,7 +693,7 @@
          self._simulate_on_schedule_end()
  
          # Next lookup resolves via the now-promoted primary-tier block.
@@ -4975,7 +4426,7 @@ diff --git a/tests/v1/kv_offload/tiering/test_tiering_offloading.py b/tests/v1/k
  
          stats = self.manager.get_stats()
          if stats is not None:
-@@ -632,7 +701,7 @@
+@@ -632,7 +705,7 @@
          self, manager_setup
      ):
          """Async delay is observed when a RETRY lookup later resolves."""
@@ -4984,7 +4435,7 @@ diff --git a/tests/v1/kv_offload/tiering/test_tiering_offloading.py b/tests/v1/k
          self._start_request(ctx)
          block = to_keys(range(1))[0]
          self.secondary_tier1.lookup = MagicMock(
-@@ -640,7 +709,7 @@
+@@ -640,7 +713,7 @@
          )
  
          # First lookup is deferred by the secondary tier.
@@ -4993,7 +4444,7 @@ diff --git a/tests/v1/kv_offload/tiering/test_tiering_offloading.py b/tests/v1/k
  
          stats = self.manager.get_stats()
          if stats is not None:
-@@ -648,7 +717,7 @@
+@@ -648,7 +721,7 @@
                  stats.reduce(), TieringOffloadingMetrics.LOOKUP_ASYNC_DELAY
              )
  
@@ -5002,7 +4453,7 @@ diff --git a/tests/v1/kv_offload/tiering/test_tiering_offloading.py b/tests/v1/k
  
          stats = self.manager.get_stats()
          assert stats is not None
-@@ -696,17 +765,21 @@
+@@ -696,17 +769,21 @@
          # End of step: release ref_cnt from cascade
          self._simulate_on_schedule_end()
  
@@ -5013,11 +4464,10 @@ diff --git a/tests/v1/kv_offload/tiering/test_tiering_offloading.py b/tests/v1/k
 +        self._start_request(incoming)
          more_blocks = to_keys(range(5, 7))
 -        result = self.manager.prepare_store(more_blocks, _CTX)
--
--        # Should evict 2 blocks from primary tier
 +        result = self.manager.prepare_store(more_blocks, incoming)
 +        assert _CTX.req_id not in self.primary_tier._contexts
-+
+ 
+-        # Should evict 2 blocks from primary tier
 +        # All five chunks belonged only to the released context.
          assert result is not None
 -        assert len(result.evicted_keys) == 2
@@ -5031,23 +4481,21 @@ diff --git a/tests/v1/kv_offload/tiering/test_tiering_offloading.py b/tests/v1/k
          blocks = to_keys(range(3))
  
          # Store blocks
-@@ -721,11 +794,10 @@
+@@ -721,11 +798,9 @@
          self.secondary_tier2.touch = MagicMock(wraps=self.secondary_tier2.touch)
  
          # Touch blocks
 -        self.manager.touch(blocks, _CTX)
--
++        self.manager.retain_context(blocks, _CTX)
+ 
 -        # Verify touch was called on primary tier (check LRU order)
 -        primary_keys = list(self.primary_tier._policy.evictable_blocks.keys())
 -        assert primary_keys[-3:] == list(reversed(blocks))
-+        self.manager.begin_lookup(_CTX)
-+        self.manager.retain_context(blocks, _CTX)
-+
 +        assert self.primary_tier._contexts[_CTX.req_id].keys == set(blocks)
  
          # Verify touch was propagated to all secondary tiers
          self.secondary_tier1.touch.assert_called_once_with(blocks, _CTX)
-@@ -768,14 +840,14 @@
+@@ -768,14 +843,14 @@
              wraps=self.secondary_tier1.submit_load
          )
  
@@ -5068,24 +4516,23 @@ diff --git a/tests/v1/kv_offload/tiering/test_tiering_offloading.py b/tests/v1/k
  
          # submit_load must not fire during lookup - only at end of step
          self.secondary_tier1.submit_load.assert_not_called()
-@@ -806,11 +878,11 @@
+@@ -806,11 +881,11 @@
              wraps=self.secondary_tier1.submit_load
          )
  
 -        ctx_a = ReqContext(req_id="req_a")
 -        ctx_b = ReqContext(req_id="req_b")
--
--        result_a = self.manager.lookup(shared_block, ctx_a)
--        result_b = self.manager.lookup(shared_block, ctx_b)
 +        ctx_a = _context(req_id="req_a")
 +        ctx_b = _context(req_id="req_b")
-+
+ 
+-        result_a = self.manager.lookup(shared_block, ctx_a)
+-        result_b = self.manager.lookup(shared_block, ctx_b)
 +        result_a = _lookup(self.manager, shared_block, ctx_a)
 +        result_b = _lookup(self.manager, shared_block, ctx_b)
  
          # Both lookups find the shared_block and trigger promotion
          # returning HIT_PENDING.
-@@ -833,7 +905,7 @@
+@@ -833,7 +908,7 @@
              wraps=self.secondary_tier1.submit_store
          )
  
@@ -5094,7 +4541,7 @@ diff --git a/tests/v1/kv_offload/tiering/test_tiering_offloading.py b/tests/v1/k
  
          self._start_request(ctx)
          self.manager.prepare_store(blocks, ctx)
-@@ -848,7 +920,7 @@
+@@ -848,7 +923,7 @@
      ):
          """Manager hook is eager; secondary hooks wait for cascade submission."""
          blocks = to_keys(range(2))
@@ -5103,7 +4550,7 @@ diff --git a/tests/v1/kv_offload/tiering/test_tiering_offloading.py b/tests/v1/k
          calls: list[tuple[str, str]] = []
  
          self.primary_tier.on_request_finished = MagicMock(
-@@ -902,7 +974,7 @@
+@@ -902,7 +977,7 @@
      def test_failed_store_finalizes_finished_request(self, manager_setup):
          """Failed primary stores still unblock secondary finalization."""
          blocks = to_keys(range(2))
@@ -5112,7 +4559,7 @@ diff --git a/tests/v1/kv_offload/tiering/test_tiering_offloading.py b/tests/v1/k
  
          self.secondary_tier1.submit_store = MagicMock(
              wraps=self.secondary_tier1.submit_store
-@@ -934,7 +1006,7 @@
+@@ -934,7 +1009,7 @@
  
      def test_zero_store_request_finalizes_immediately(self, manager_setup):
          """Requests with no pending stores finalize secondary tiers immediately."""
@@ -5121,7 +4568,7 @@ diff --git a/tests/v1/kv_offload/tiering/test_tiering_offloading.py b/tests/v1/k
  
          self.secondary_tier1.on_request_finished = MagicMock(
              wraps=self.secondary_tier1.on_request_finished
-@@ -953,7 +1025,7 @@
+@@ -953,7 +1028,7 @@
      def test_reset_cache_finalizes_delayed_secondary_request(self, manager_setup):
          """reset_cache abandons pending primary stores and finalizes secondaries."""
          blocks = to_keys(range(2))
@@ -5130,7 +4577,7 @@ diff --git a/tests/v1/kv_offload/tiering/test_tiering_offloading.py b/tests/v1/k
  
          self.secondary_tier1.on_request_finished = MagicMock(
              wraps=self.secondary_tier1.on_request_finished
-@@ -981,7 +1053,7 @@
+@@ -981,7 +1056,7 @@
          """reset_cache drops active pending stores so resumed requests finalize."""
          initial_blocks = to_keys(range(2))
          resumed_blocks = to_keys(range(2, 4))
@@ -5139,7 +4586,7 @@ diff --git a/tests/v1/kv_offload/tiering/test_tiering_offloading.py b/tests/v1/k
  
          self.secondary_tier1.on_request_finished = MagicMock(
              wraps=self.secondary_tier1.on_request_finished
-@@ -1013,9 +1085,9 @@
+@@ -1013,9 +1088,9 @@
          """Policy defaults to BLOCK_LEVEL, escalates when a tier requests it,
          and is cleaned up on on_request_finished."""
          # Default: all tiers return BLOCK_LEVEL
@@ -5151,7 +4598,7 @@ diff --git a/tests/v1/kv_offload/tiering/test_tiering_offloading.py b/tests/v1/k
          assert self.manager._req_state[ctx.req_id].request_level_tiers is None
          self.manager.on_request_finished(ctx)
          assert ctx.req_id not in self.manager._req_state
-@@ -1025,7 +1097,7 @@
+@@ -1025,7 +1100,7 @@
              RequestOffloadingContext(policy=OffloadPolicy.REQUEST_LEVEL)
          )
  
@@ -5160,7 +4607,7 @@ diff --git a/tests/v1/kv_offload/tiering/test_tiering_offloading.py b/tests/v1/k
          result = self.manager.on_new_request(ctx)
          assert result.policy == OffloadPolicy.REQUEST_LEVEL
          assert self.manager._req_state[ctx.req_id].request_level_tiers == {0}
-@@ -1052,7 +1124,7 @@
+@@ -1052,7 +1127,7 @@
              RequestOffloadingContext(policy=OffloadPolicy.REQUEST_LEVEL)
          )
  
@@ -5169,7 +4616,7 @@ diff --git a/tests/v1/kv_offload/tiering/test_tiering_offloading.py b/tests/v1/k
          self.manager.on_new_request(ctx)
  
          # Spy on submit_store
-@@ -1097,7 +1169,7 @@
+@@ -1097,7 +1172,7 @@
          promo_block = to_keys([99])[0]
          self.secondary_tier1.blocks[promo_block] = True
          assert (
@@ -5178,7 +4625,7 @@ diff --git a/tests/v1/kv_offload/tiering/test_tiering_offloading.py b/tests/v1/k
              is LookupResult.HIT_PENDING
          )
          assert self.manager._pending_load_submissions
-@@ -1106,7 +1178,7 @@
+@@ -1106,7 +1181,7 @@
          self.secondary_tier1.on_new_request = lambda req_context: (
              RequestOffloadingContext(policy=OffloadPolicy.REQUEST_LEVEL)
          )
@@ -5187,7 +4634,7 @@ diff --git a/tests/v1/kv_offload/tiering/test_tiering_offloading.py b/tests/v1/k
          self.manager.on_new_request(rl_ctx)
          assert self.manager._req_state[rl_ctx.req_id].request_level_tiers == {0}
  
-@@ -1130,7 +1202,7 @@
+@@ -1130,7 +1205,7 @@
          assert self.primary_tier._num_allocated_blocks == 0
          assert self.primary_tier._free_list == []
          for block in blocks:
@@ -5196,7 +4643,7 @@ diff --git a/tests/v1/kv_offload/tiering/test_tiering_offloading.py b/tests/v1/k
  
          # Pending submission was dropped, not submitted.
          self.secondary_tier1.submit_load.assert_not_called()
-@@ -1185,9 +1257,9 @@
+@@ -1185,9 +1260,9 @@
          # Secondaries have medium=CPU, so load_tier_filter skips them.
          self.secondary_tier1.lookup = MagicMock(wraps=self.secondary_tier1.lookup)
  
@@ -5209,7 +4656,7 @@ diff --git a/tests/v1/kv_offload/tiering/test_tiering_offloading.py b/tests/v1/k
          self.secondary_tier1.lookup.assert_not_called()
  
      @pytest.mark.parametrize(
-@@ -1208,8 +1280,8 @@
+@@ -1208,8 +1283,8 @@
  
          self.secondary_tier1.lookup = MagicMock(wraps=self.secondary_tier1.lookup)
  
@@ -5235,24 +4682,7 @@ diff --git a/tests/v1/simple_kv_offload/test_integration.py b/tests/v1/simple_kv
 diff --git a/tests/v1/simple_kv_offload/test_scheduler.py b/tests/v1/simple_kv_offload/test_scheduler.py
 --- a/tests/v1/simple_kv_offload/test_scheduler.py
 +++ b/tests/v1/simple_kv_offload/test_scheduler.py
-@@ -19,6 +19,7 @@
-     VllmConfig,
- )
- from vllm.utils.hashing import sha256
-+from vllm.v1.core.prefix_cache import PrefixCacheView
- from vllm.v1.core.block_pool import BlockPool
- from vllm.v1.core.kv_cache_manager import KVCacheBlocks
- from vllm.v1.core.kv_cache_utils import (
-@@ -201,7 +202,7 @@
-     prompt_token_ids = list(range(start, start + num_tokens))
-     sampling_params = SamplingParams(max_tokens=1)
- 
--    req = Request(
-+    req = _request_with_identity(
-         request_id=request_id,
-         prompt_token_ids=prompt_token_ids,
-         sampling_params=sampling_params,
-@@ -325,6 +326,7 @@
+@@ -325,6 +325,7 @@
              num_full_blocks=num_full,
              block_size=BLOCK_SIZE,
              kv_cache_group_id=group_id,
@@ -5260,133 +4690,7 @@ diff --git a/tests/v1/simple_kv_offload/test_scheduler.py b/tests/v1/simple_kv_o
          )
      return blocks
  
-@@ -381,7 +383,7 @@
-     simulate_store_completion(sched, meta.store_event)
- 
-     # New request with same tokens should get CPU cache hit
--    req2 = Request(
-+    req2 = _request_with_identity(
-         request_id="req-eager-load",
-         prompt_token_ids=req.prompt_token_ids,
-         sampling_params=req.sampling_params,
-@@ -435,7 +437,7 @@
-     meta = sched.build_connector_meta(sched_out)
-     simulate_store_completion(sched, meta.store_event)
- 
--    req2 = Request(
-+    req2 = _request_with_identity(
-         request_id="req-cap-boundary",
-         prompt_token_ids=req.prompt_token_ids,
-         sampling_params=req.sampling_params,
-@@ -501,7 +503,7 @@
-     gpu_pool.free_blocks(fillers)
- 
-     # --- Step 3: Re-schedule req_old — should get CPU cache hit ---
--    req_old2 = Request(
-+    req_old2 = _request_with_identity(
-         request_id="req-old-reload",
-         prompt_token_ids=req_old.prompt_token_ids,
-         sampling_params=req_old.sampling_params,
-@@ -558,7 +560,7 @@
-     cpu_free_after_first = get_cpu_free_blocks(sched)
- 
-     # Second request with identical hashes — should skip store
--    req2 = Request(
-+    req2 = _request_with_identity(
-         request_id="req-dup-eager",
-         prompt_token_ids=req.prompt_token_ids,
-         sampling_params=req.sampling_params,
-@@ -617,7 +619,7 @@
-     # Second request shares the prefix and reuses the same GPU block IDs
-     # (the real scheduler path: GPU prefix cache returns the same blocks).
-     # Do NOT simulate completion — the first store is still in-flight.
--    req2 = Request(
-+    req2 = _request_with_identity(
-         request_id="req-dup-eager-inflight",
-         prompt_token_ids=req.prompt_token_ids,
-         sampling_params=req.sampling_params,
-@@ -677,7 +679,7 @@
- 
-     # Allocate blocks with the same hashes and free them again.
-     # The scanner should see they are already in CPU cache and skip them.
--    req2 = Request(
-+    req2 = _request_with_identity(
-         request_id="req-dup-lazy",
-         prompt_token_ids=req.prompt_token_ids,
-         sampling_params=req.sampling_params,
-@@ -887,7 +889,7 @@
-     simulate_store_completion(sched, meta.store_event)
- 
-     # Create new request with same tokens, check hit
--    req2 = Request(
-+    req2 = _request_with_identity(
-         request_id="req-preempt-load",
-         prompt_token_ids=req.prompt_token_ids,
-         sampling_params=req.sampling_params,
-@@ -982,7 +984,7 @@
-     simulate_store_completion(sched, meta.store_event)
- 
-     # Load
--    req2 = Request(
-+    req2 = _request_with_identity(
-         request_id="req-inflight-load",
-         prompt_token_ids=req.prompt_token_ids,
-         sampling_params=req.sampling_params,
-@@ -1064,7 +1066,7 @@
-     simulate_store_completion(sched, meta.store_event)
- 
-     # Create matching request and get load hit
--    req2 = Request(
-+    req2 = _request_with_identity(
-         request_id="req-null-load",
-         prompt_token_ids=req.prompt_token_ids,
-         sampling_params=req.sampling_params,
-@@ -1189,7 +1191,7 @@
-     simulate_store_completion(sched, meta.store_event)
- 
-     # New request with same tokens — but only partial GPU prefix hit.
--    req2 = Request(
-+    req2 = _request_with_identity(
-         request_id="req-partial-gpu",
-         prompt_token_ids=req.prompt_token_ids,
-         sampling_params=req.sampling_params,
-@@ -1296,7 +1298,7 @@
-     simulate_store_completion(sched, meta_a.store_event)
- 
-     # --- Step 2: Phase A — req_b (same prompt as req_a) reports a CPU hit ---
--    req_b = Request(
-+    req_b = _request_with_identity(
-         request_id="req-b-toctou",
-         prompt_token_ids=req_a.prompt_token_ids,
-         sampling_params=req_a.sampling_params,
-@@ -1448,7 +1450,7 @@
-     assert sched.reset() is True
- 
-     # No CPU cache hits after reset
--    req2 = Request(
-+    req2 = _request_with_identity(
-         request_id="req-after-lazy-reset",
-         prompt_token_ids=req.prompt_token_ids,
-         sampling_params=req.sampling_params,
-@@ -1484,7 +1486,7 @@
-     simulate_store_completion(sched, meta.store_event)
- 
-     # Start a load — CPU cache hit
--    req2 = Request(
-+    req2 = _request_with_identity(
-         request_id="req-load-reset",
-         prompt_token_ids=req.prompt_token_ids,
-         sampling_params=req.sampling_params,
-@@ -1600,7 +1602,7 @@
-     prompt_token_ids = list(range(start, start + num_tokens))
-     sampling_params = SamplingParams(max_tokens=1)
- 
--    return Request(
-+    return _request_with_identity(
-         request_id=request_id,
-         prompt_token_ids=prompt_token_ids,
-         sampling_params=sampling_params,
-@@ -1628,6 +1630,7 @@
+@@ -1628,6 +1629,7 @@
              num_full_blocks=num_full,
              block_size=virtual_block_size,
              kv_cache_group_id=group_id,
@@ -5394,35 +4698,6 @@ diff --git a/tests/v1/simple_kv_offload/test_scheduler.py b/tests/v1/simple_kv_o
          )
      return blocks
  
-@@ -1702,7 +1705,7 @@
-     simulate_store_completion(sched, meta.store_event)
- 
-     # New request with same tokens — should get a full CPU cache hit.
--    req2 = Request(
-+    req2 = _request_with_identity(
-         request_id="req-cp-load",
-         prompt_token_ids=req.prompt_token_ids,
-         sampling_params=req.sampling_params,
-@@ -1782,7 +1785,7 @@
-     )
-     simulate_store_completion(sched, m2.store_event)
- 
--    req3 = Request(
-+    req3 = _request_with_identity(
-         request_id="req-cp-partial-load",
-         prompt_token_ids=req2.prompt_token_ids,
-         sampling_params=req2.sampling_params,
-@@ -1831,3 +1834,10 @@
-             f"cp_world_size={cp_world_size}: target_cp={target_cp} should be "
-             f"less than target_base={target_base}"
-         )
-+
-+
-+def _request_with_identity(*, request_id, sampling_params, **kwargs):
-+    sampling_params = sampling_params.clone()
-+    sampling_params.extra_args = dict(sampling_params.extra_args or {})
-+    sampling_params.extra_args["kv_scope"] = request_id
-+    return Request(request_id=request_id, sampling_params=sampling_params, **kwargs)
 diff --git a/vllm/config/cache.py b/vllm/config/cache.py
 --- a/vllm/config/cache.py
 +++ b/vllm/config/cache.py
@@ -5704,11 +4979,8 @@ diff --git a/vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.p
  from dataclasses import dataclass, field
  from itertools import chain, islice
  from typing import Any, NamedTuple
-@@ -29,14 +29,10 @@
- from vllm.logger import init_logger
- from vllm.utils.math_utils import cdiv, round_down
+@@ -31,12 +31,7 @@
  from vllm.v1.core.kv_cache_manager import KVCacheBlocks
-+from vllm.v1.core.prefix_cache import PrefixCacheView, cache_content_keys
  from vllm.v1.core.sched.output import SchedulerOutput
  from vllm.v1.kv_cache_interface import (
 -    ChunkedLocalAttentionSpec,
@@ -5720,7 +4992,7 @@ diff --git a/vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.p
  )
  from vllm.v1.kv_offload.base import (
      GPULoadStoreSpec,
-@@ -94,6 +90,9 @@
+@@ -94,6 +89,9 @@
      # Partial-tail data for this group comes from the scheduler's CoW hand-off
      # rather than the request block table.
      requires_cow_source: bool = False
@@ -5730,12 +5002,10 @@ diff --git a/vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.p
      # Number of this group's offloaded chunks per full-attention alignment
      # segment. Used to skip storing SWA chunks that can never serve a load
      # hit (e.g. DeepSeek V4 where SWA groups have much smaller block sizes
-@@ -104,26 +103,6 @@
-     # of these groups is volatile and lacks a stable hash, so it must
-     # be excluded from store and load scheduling.
+@@ -106,26 +104,6 @@
      is_eagle_group: bool = False
--
--
+ 
+ 
 -def get_sliding_window_size_in_chunks(
 -    kv_cache_spec: KVCacheSpec, tokens_per_chunk: int
 -) -> int | None:
@@ -5754,10 +5024,12 @@ diff --git a/vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.p
 -
 -    assert isinstance(kv_cache_spec, FullAttentionSpec)
 -    return None
- 
- 
+-
+-
  def is_store_reachable_swa_chunk(
-@@ -158,8 +137,7 @@
+     absolute_chunk_index: int,
+     storable_chunk_count: int,
+@@ -158,8 +136,7 @@
      """
      mamba_align_size: int | None = None
      for idx, tokens_per_block in enumerate(spec.tokens_per_block):
@@ -5767,7 +5039,7 @@ diff --git a/vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.p
              "align",
              "all",
          ):
-@@ -191,10 +169,11 @@
+@@ -191,10 +168,11 @@
          # architectures like DeepSeek V4 (MLA + SWA groups).
          full_attn_tokens_per_chunk: set[int] = set()
          for idx, tokens_per_block in enumerate(spec.tokens_per_block):
@@ -5783,7 +5055,7 @@ diff --git a/vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.p
              if sw is None:
                  full_attn_tokens_per_chunk.add(tokens_per_block * spec.blocks_per_chunk)
  
-@@ -218,17 +197,9 @@
+@@ -218,18 +196,10 @@
              return per_segment
  
          eagle_groups = {
@@ -5793,17 +5065,18 @@ diff --git a/vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.p
 +            idx for idx, group in enumerate(spec.config.groups)
 +            if group.is_eagle_group
          }
--
+ 
 -        use_eagle = (
 -            vllm_config.speculative_config is not None
 -            and vllm_config.speculative_config.use_eagle()
 -        )
 -        if use_eagle and not eagle_groups:
 -            eagle_groups = set(range(len(kv_cache_config.kv_cache_groups)))
- 
+-
          if eagle_groups:
              logger.info(
-@@ -241,10 +212,7 @@
+                 "KV offloading: EAGLE/MTP draft attention groups %s "
+@@ -241,10 +211,7 @@
          kv_group_configs_list: list[GroupOffloadConfig] = []
          for idx, tokens_per_block in enumerate(spec.tokens_per_block):
              kv_cache_group = kv_cache_config.kv_cache_groups[idx]
@@ -5815,7 +5088,7 @@ diff --git a/vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.p
              kv_group_configs_list.append(
                  GroupOffloadConfig(
                      group_idx=idx,
-@@ -260,10 +228,10 @@
+@@ -260,10 +227,10 @@
                      ),
                      kv_event_group_spec=get_offloading_event_group_spec(kv_cache_group),
                      is_eagle_group=idx in eagle_groups,
@@ -5830,7 +5103,7 @@ diff --git a/vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.p
                  )
              )
          kv_group_configs = tuple(kv_group_configs_list)
-@@ -305,9 +273,6 @@
+@@ -305,9 +272,6 @@
      block_ids: list[int] = field(default_factory=list)
      # Index of the next chunk to offload.
      next_stored_chunk_idx: int = 0
@@ -5840,7 +5113,7 @@ diff --git a/vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.p
  
  
  @dataclass(slots=True)
-@@ -321,6 +286,8 @@
+@@ -321,6 +285,8 @@
      max_offload_tokens: int | None = None
      # number of hits in the GPU cache
      num_locally_computed_tokens: int = 0
@@ -5849,7 +5122,7 @@ diff --git a/vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.p
      # In-flight job IDs. Per the connector's invariant, at any given time
      # this contains either a single load job, or one or more store jobs.
      transfer_jobs: set[int] = field(default_factory=set)
-@@ -330,6 +297,9 @@
+@@ -330,6 +296,9 @@
      # Fine-grained token boundary selected beyond the last complete offload
      # chunk. It is consumed when the corresponding load is scheduled.
      partial_tail_boundary: int | None = None
@@ -5859,7 +5132,7 @@ diff --git a/vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.p
      # True once on_request_finished has been signaled to the manager.
      finished_signaled: bool = False
  
-@@ -353,21 +323,65 @@
+@@ -353,21 +322,65 @@
                  "max_offload_tokens must be a non-negative int, got %r; ignoring", raw
              )
  
@@ -5871,7 +5144,7 @@ diff --git a/vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.p
 +            selected = [hashes[stop - 1]]
 +        else:
 +            selected = hashes[start:stop]
-+        content = cache_content_keys(selected, group.group_idx)
++        content = tuple(make_offload_key(h, group.group_idx) for h in selected)
 +        key = make_offload_key(hashes[stop - 1], group.group_idx)
 +        self.req_context.prefix_content[key] = content
 +        return key
@@ -5938,7 +5211,7 @@ diff --git a/vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.p
  
      def update_block_id_groups(
          self, new_block_id_groups: tuple[list[int], ...] | None
-@@ -419,13 +433,6 @@
+@@ -419,13 +432,6 @@
                  self.storable_chunks(group_config, group_state, num_offloadable_tokens),
              )
  
@@ -5952,7 +5225,7 @@ diff --git a/vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.p
  
  
  def _parse_tier_filter(raw: Any) -> TierFilter:
-@@ -483,6 +490,7 @@
+@@ -483,6 +489,7 @@
          req_id=req.request_id,
          kv_transfer_params=params,
          load_tier_filter=load_filter,
@@ -5960,7 +5233,7 @@ diff --git a/vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.p
      )
  
  
-@@ -635,64 +643,107 @@
+@@ -635,64 +642,107 @@
          keys: Sequence[OffloadKey],
          sliding_window_size: int,
          req_context: ReqContext,
@@ -5992,15 +5265,14 @@ diff --git a/vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.p
 -            if consecutive_hits == sliding_window_size:
 -                return idx + sliding_window_size if not defer_lookup else None
 -        return consecutive_hits if not defer_lookup else None
--
++        """Find the latest available window using its actual data requirements.
+ 
 -    def _touch(self, req_status: RequestOffloadState):
 -        for group_config, group_state in zip(
 -            self.config.kv_group_configs, req_status.group_states
 -        ):
 -            if group_config.sliding_window_size_in_chunks is None:
 -                self.manager.touch(group_state.offload_keys, req_status.req_context)
-+        """Find the latest available window using its actual data requirements.
-+
 +        Moving the frontier backwards changes the earliest required data inside
 +        a coalesced chunk. A hit for one frontier does not certify another.
 +        """
@@ -6124,35 +5396,7 @@ diff --git a/vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.p
  
      def _lookup_complete_chunks(self, req_status: RequestOffloadState) -> int | None:
          """
-@@ -705,11 +756,26 @@
-         """
-         num_computed_tokens = req_status.num_locally_computed_tokens
-         max_hit_size_tokens: int = req_status.req.num_tokens
-+        view = req_status.req_context.get_state(PrefixCacheView)
-+        assert view is not None
-+        if view.keys is not None:
-+            # A physical CPU chunk can extend beyond the acquired prefix.
-+            # Bound the search by owned full-attention data before choosing
-+            # chunk keys, so an existing agent can reuse a shorter extent.
-+            for group in self.config.kv_group_configs:
-+                if group.sliding_window_size_in_chunks is not None:
-+                    continue
-+                owned_tokens = 0
-+                for key in cache_content_keys(req_status.req.block_hashes, group.group_idx):
-+                    if not view.permits(key):
-+                        break
-+                    owned_tokens += self.config.tokens_per_hash
-+                max_hit_size_tokens = min(max_hit_size_tokens, owned_tokens)
-         if self._sliding_window_groups:
-             # the last prompt token has to be recomputed to get the logprobs
-             # for sliding window attention, we must reduce by 1 to make sure
-             # we still have a hit after reduction
--            max_hit_size_tokens -= 1
-+            max_hit_size_tokens = min(max_hit_size_tokens, req_status.req.num_tokens - 1)
-             if self._mamba_align_size is not None:
-                 # Constrain hit-window to the mamba block size.
-                 max_hit_size_tokens = round_down(
-@@ -773,6 +839,12 @@
+@@ -773,6 +823,12 @@
                  # have backend-confirmed hits
                  num_hit_chunks: int | None
                  if sliding_window_size_in_chunks is None:
@@ -6165,7 +5409,7 @@ diff --git a/vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.p
                      num_hit_chunks = self._maximal_prefix_lookup(
                          offload_keys,
                          req_status.req_context,
-@@ -788,6 +860,11 @@
+@@ -788,6 +844,11 @@
                          offload_keys,
                          required_window,
                          req_status.req_context,
@@ -6177,7 +5421,7 @@ diff --git a/vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.p
                      )
                  if num_hit_chunks == 0:
                      return 0
-@@ -870,8 +947,8 @@
+@@ -870,8 +931,8 @@
      def _make_boundary_key(
          self, request: Request, group_idx: int, boundary_tokens: int
      ) -> OffloadKey:
@@ -6188,7 +5432,7 @@ diff --git a/vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.p
  
      def _lookup(self, req_status: RequestOffloadState) -> int | None:
          complete_hit = self._lookup_complete_chunks(req_status)
-@@ -882,7 +959,25 @@
+@@ -882,7 +943,25 @@
          local_tokens = req_status.num_locally_computed_tokens
          complete_boundary = local_tokens + complete_hit
          tokens_per_hash = self.config.tokens_per_hash
@@ -6215,7 +5459,7 @@ diff --git a/vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.p
          max_boundary = round_down(
              min(req_status.req.num_prompt_tokens - 1, block_end - 1), tokens_per_hash
          )
-@@ -891,6 +986,8 @@
+@@ -891,6 +970,8 @@
  
          pending = False
          for boundary in range(max_boundary, complete_boundary, -tokens_per_hash):
@@ -6224,30 +5468,21 @@ diff --git a/vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.p
              boundary_pending = False
              boundary_missed = False
              boundary_keys = []
-@@ -969,6 +1066,7 @@
-         req_status.update_offload_keys()
-         req_status.num_locally_computed_tokens = num_computed_tokens
- 
-+        self.manager.begin_lookup(req_status.req_context)
-         num_hit_tokens: int | None
-         if request.skip_reading_prefix_cache:
-             num_hit_tokens = 0
-@@ -984,9 +1082,11 @@
+@@ -984,9 +1065,11 @@
                      req_status.deferred_lookup_start_time = lookup_start
              else:
                  self._maybe_observe_lookup_async_delay(req_status)
 -        req_status.update_num_hit_chunks(num_computed_tokens + (num_hit_tokens or 0))
--
--        self._touch(req_status)
 +        req_status.num_cached_tokens = num_computed_tokens + (num_hit_tokens or 0)
-+
+ 
+-        self._touch(req_status)
 +        if num_hit_tokens is not None:
 +            req_status.retained_partial_tail_boundary = req_status.partial_tail_boundary
 +            self._retain_context(req_status)
  
          return num_hit_tokens, bool(num_hit_tokens)
  
-@@ -1198,6 +1298,10 @@
+@@ -1198,6 +1281,10 @@
              ]
              assert all(block_id != 0 for block_id in block_ids)
  
@@ -6258,16 +5493,16 @@ diff --git a/vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.p
              store_output = self.manager.prepare_store(keys, req_status.req_context)
              if store_output is None:
                  self._connector_stats.increase_counter(
-@@ -1271,6 +1375,8 @@
-             num_offloadable_tokens = self._calc_num_offloadable_tokens(
+@@ -1272,6 +1359,8 @@
                  req_status, num_tokens_after_batch
              )
-+
-+            retained_keys = self._retain_context(req_status, num_offloadable_tokens)
  
++            retained_keys = self._retain_context(req_status, num_offloadable_tokens)
++
              # Filter out chunks skipped due to sliding window attention / SSM
              # or unreachable by the load path's alignment constraints.
-@@ -1301,7 +1407,7 @@
+             new_offload_keys: list[OffloadKey] = []
+@@ -1301,7 +1390,7 @@
                  for key_idx, (offload_key, block_id) in enumerate(
                      zip(offload_keys, offload_block_ids)
                  ):
@@ -6276,7 +5511,7 @@ diff --git a/vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.p
                          continue
                      # Skip SWA chunks that can never serve a load hit:
                      # within each full-attention alignment segment, only the
-@@ -1318,6 +1424,9 @@
+@@ -1318,6 +1407,9 @@
                      ):
                          continue
                      new_offload_keys.append(offload_key)
@@ -6286,16 +5521,16 @@ diff --git a/vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.p
  
              if not new_offload_keys:
                  req_status.advance_stored_idx(num_offloadable_tokens)
-@@ -1336,8 +1445,6 @@
-             if not store_output.keys_to_store:
+@@ -1337,8 +1429,6 @@
                  req_status.advance_stored_idx(num_offloadable_tokens)
                  continue
--
--            self._touch(req_status)
  
+-            self._touch(req_status)
+-
              keys_to_store = set(store_output.keys_to_store)
  
-@@ -1374,7 +1481,7 @@
+             group_sizes: list[int] = []
+@@ -1374,7 +1464,7 @@
                      gpu_block_idx = chunk_idx * blocks_per_chunk
                      for i in range(blocks_per_chunk):
                          block_id = block_ids[gpu_block_idx + i]
@@ -6304,7 +5539,7 @@ diff --git a/vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.p
                              continue
                          if start_gpu_block_idx is None:
                              start_gpu_block_idx = gpu_block_idx + i
-@@ -1679,6 +1786,7 @@
+@@ -1679,6 +1769,7 @@
                  group_state.next_stored_chunk_idx = 0
              status.transfer_jobs.clear()
              status.partial_tail_boundary = None
@@ -6312,84 +5547,6 @@ diff --git a/vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.p
  
          # Discard jobs and save job_counter to be able to discard worker responses
          self._stale_job_threshold = self._job_counter
-diff --git a/vllm/distributed/kv_transfer/kv_connector/v1/offloading_connector.py b/vllm/distributed/kv_transfer/kv_connector/v1/offloading_connector.py
---- a/vllm/distributed/kv_transfer/kv_connector/v1/offloading_connector.py
-+++ b/vllm/distributed/kv_transfer/kv_connector/v1/offloading_connector.py
-@@ -81,6 +81,74 @@
-                 spec, vllm_config, kv_cache_config
-             )
- 
-+    def bind_gpu_block_pool(self, gpu_block_pool) -> None:
-+        assert self.connector_scheduler is not None
-+        self.connector_scheduler.manager.bind_prefix_cache(gpu_block_pool.prefix_cache)
-+
-+    def bind_gpu_block_pool(self, gpu_block_pool) -> None:
-+        assert self.connector_scheduler is not None
-+        self.connector_scheduler.manager.bind_prefix_cache(gpu_block_pool.prefix_cache)
-+
-+    def bind_gpu_block_pool(self, gpu_block_pool) -> None:
-+        assert self.connector_scheduler is not None
-+        self.connector_scheduler.manager.bind_prefix_cache(gpu_block_pool.prefix_cache)
-+
-+    def bind_gpu_block_pool(self, gpu_block_pool) -> None:
-+        assert self.connector_scheduler is not None
-+        self.connector_scheduler.manager.bind_prefix_cache(gpu_block_pool.prefix_cache)
-+
-+    def bind_gpu_block_pool(self, gpu_block_pool) -> None:
-+        assert self.connector_scheduler is not None
-+        self.connector_scheduler.manager.bind_prefix_cache(gpu_block_pool.prefix_cache)
-+
-+    def bind_gpu_block_pool(self, gpu_block_pool) -> None:
-+        assert self.connector_scheduler is not None
-+        self.connector_scheduler.manager.bind_prefix_cache(gpu_block_pool.prefix_cache)
-+
-+    def bind_gpu_block_pool(self, gpu_block_pool) -> None:
-+        assert self.connector_scheduler is not None
-+        self.connector_scheduler.manager.bind_prefix_cache(gpu_block_pool.prefix_cache)
-+
-+    def bind_gpu_block_pool(self, gpu_block_pool) -> None:
-+        assert self.connector_scheduler is not None
-+        self.connector_scheduler.manager.bind_prefix_cache(gpu_block_pool.prefix_cache)
-+
-+    def bind_gpu_block_pool(self, gpu_block_pool) -> None:
-+        assert self.connector_scheduler is not None
-+        self.connector_scheduler.manager.bind_prefix_cache(gpu_block_pool.prefix_cache)
-+
-+    def bind_gpu_block_pool(self, gpu_block_pool) -> None:
-+        assert self.connector_scheduler is not None
-+        self.connector_scheduler.manager.bind_prefix_cache(gpu_block_pool.prefix_cache)
-+
-+    def bind_gpu_block_pool(self, gpu_block_pool) -> None:
-+        assert self.connector_scheduler is not None
-+        self.connector_scheduler.manager.bind_prefix_cache(gpu_block_pool.prefix_cache)
-+
-+    def bind_gpu_block_pool(self, gpu_block_pool) -> None:
-+        assert self.connector_scheduler is not None
-+        self.connector_scheduler.manager.bind_prefix_cache(gpu_block_pool.prefix_cache)
-+
-+    def bind_gpu_block_pool(self, gpu_block_pool) -> None:
-+        assert self.connector_scheduler is not None
-+        self.connector_scheduler.manager.bind_prefix_cache(gpu_block_pool.prefix_cache)
-+
-+    def bind_gpu_block_pool(self, gpu_block_pool) -> None:
-+        assert self.connector_scheduler is not None
-+        self.connector_scheduler.manager.bind_prefix_cache(gpu_block_pool.prefix_cache)
-+
-+    def bind_gpu_block_pool(self, gpu_block_pool) -> None:
-+        assert self.connector_scheduler is not None
-+        self.connector_scheduler.manager.bind_prefix_cache(gpu_block_pool.prefix_cache)
-+
-+    def bind_gpu_block_pool(self, gpu_block_pool) -> None:
-+        assert self.connector_scheduler is not None
-+        self.connector_scheduler.manager.bind_prefix_cache(gpu_block_pool.prefix_cache)
-+
-+    def bind_gpu_block_pool(self, gpu_block_pool) -> None:
-+        assert self.connector_scheduler is not None
-+        self.connector_scheduler.manager.bind_prefix_cache(gpu_block_pool.prefix_cache)
-+
-     def shutdown(self) -> None:
-         if self.connector_worker is not None:
-             self.connector_worker.shutdown()
 diff --git a/vllm/engine/arg_utils.py b/vllm/engine/arg_utils.py
 --- a/vllm/engine/arg_utils.py
 +++ b/vllm/engine/arg_utils.py
@@ -6479,7 +5636,7 @@ diff --git a/vllm/engine/arg_utils.py b/vllm/engine/arg_utils.py
 diff --git a/vllm/entrypoints/anthropic/protocol.py b/vllm/entrypoints/anthropic/protocol.py
 --- a/vllm/entrypoints/anthropic/protocol.py
 +++ b/vllm/entrypoints/anthropic/protocol.py
-@@ -187,6 +187,20 @@
+@@ -187,6 +187,21 @@
          default=None,
          description="KVTransfer parameters used for disaggregated serving.",
      )
@@ -6488,12 +5645,13 @@ diff --git a/vllm/entrypoints/anthropic/protocol.py b/vllm/entrypoints/anthropic
 +        min_length=1,
 +        pattern=r"\S",
 +        description=(
-+            "Opaque, stable agent ID required for generation and shared KV "
-+            "cache accounting. An agent with no cached blocks may acquire a "
-+            "matching prefix from any agent. Once it has cached blocks, it "
-+            "matches only its own acquired cache and extends that cache. "
-+            "No lineage declaration or ID format is required. Render-only "
-+            "requests need no agent ID."
++            "Opaque agent ID naming one line of work, required for "
++            "generation: the same ID for every request that continues a "
++            "conversation, a new, never-used ID for a fork or a subagent. "
++            "It groups what the KV tiers retain; prefix reuse matches "
++            "content and cache_salt, whatever the ID. No lineage "
++            "declaration or ID format is required. Render-only requests "
++            "need no agent ID."
 +        ),
 +    )
 +
@@ -6662,7 +5820,7 @@ diff --git a/vllm/entrypoints/llm.py b/vllm/entrypoints/llm.py
 diff --git a/vllm/entrypoints/openai/chat_completion/protocol.py b/vllm/entrypoints/openai/chat_completion/protocol.py
 --- a/vllm/entrypoints/openai/chat_completion/protocol.py
 +++ b/vllm/entrypoints/openai/chat_completion/protocol.py
-@@ -484,6 +484,20 @@
+@@ -484,6 +484,21 @@
          description="KVTransfer parameters used for disaggregated serving.",
      )
  
@@ -6671,19 +5829,20 @@ diff --git a/vllm/entrypoints/openai/chat_completion/protocol.py b/vllm/entrypoi
 +        min_length=1,
 +        pattern=r"\S",
 +        description=(
-+            "Opaque, stable agent ID required for generation and shared KV "
-+            "cache accounting. An agent with no cached blocks may acquire a "
-+            "matching prefix from any agent. Once it has cached blocks, it "
-+            "matches only its own acquired cache and extends that cache. "
-+            "No lineage declaration or ID format is required. Render-only "
-+            "requests need no agent ID."
++            "Opaque agent ID naming one line of work, required for "
++            "generation: the same ID for every request that continues a "
++            "conversation, a new, never-used ID for a fork or a subagent. "
++            "It groups what the KV tiers retain; prefix reuse matches "
++            "content and cache_salt, whatever the ID. No lineage "
++            "declaration or ID format is required. Render-only requests "
++            "need no agent ID."
 +        ),
 +    )
 +
      ec_transfer_params: dict[str, Any] | None = Field(
          default=None,
          description=(
-@@ -818,6 +832,8 @@
+@@ -818,6 +833,8 @@
          if self.ec_transfer_params:
              # Pass in ec_transfer_params via extra_args
              extra_args["ec_transfer_params"] = self.ec_transfer_params
@@ -6692,7 +5851,7 @@ diff --git a/vllm/entrypoints/openai/chat_completion/protocol.py b/vllm/entrypoi
          return SamplingParams.from_optional(
              n=self.n,
              presence_penalty=presence_penalty,
-@@ -1219,6 +1235,19 @@
+@@ -1219,6 +1236,20 @@
      mm_processor_kwargs: dict[str, Any] | None = None
      priority: int = Field(default=0, ge=_INT64_MIN, le=_INT64_MAX)
      cache_salt: str | None = None
@@ -6701,12 +5860,13 @@ diff --git a/vllm/entrypoints/openai/chat_completion/protocol.py b/vllm/entrypoi
 +        min_length=1,
 +        pattern=r"\S",
 +        description=(
-+            "Opaque, stable agent ID required for generation and shared KV "
-+            "cache accounting. An agent with no cached blocks may acquire a "
-+            "matching prefix from any agent. Once it has cached blocks, it "
-+            "matches only its own acquired cache and extends that cache. "
-+            "No lineage declaration or ID format is required. Render-only "
-+            "requests need no agent ID."
++            "Opaque agent ID naming one line of work, required for "
++            "generation: the same ID for every request that continues a "
++            "conversation, a new, never-used ID for a fork or a subagent. "
++            "It groups what the KV tiers retain; prefix reuse matches "
++            "content and cache_salt, whatever the ID. No lineage "
++            "declaration or ID format is required. Render-only requests "
++            "need no agent ID."
 +        ),
 +    )
      include_stop_str_in_output: bool = False
@@ -6734,7 +5894,7 @@ diff --git a/vllm/entrypoints/openai/cli_args.py b/vllm/entrypoints/openai/cli_a
 diff --git a/vllm/entrypoints/openai/completion/protocol.py b/vllm/entrypoints/openai/completion/protocol.py
 --- a/vllm/entrypoints/openai/completion/protocol.py
 +++ b/vllm/entrypoints/openai/completion/protocol.py
-@@ -214,6 +214,20 @@
+@@ -214,6 +214,21 @@
          description="KVTransfer parameters used for disaggregated serving.",
      )
  
@@ -6743,19 +5903,20 @@ diff --git a/vllm/entrypoints/openai/completion/protocol.py b/vllm/entrypoints/o
 +        min_length=1,
 +        pattern=r"\S",
 +        description=(
-+            "Opaque, stable agent ID required for generation and shared KV "
-+            "cache accounting. An agent with no cached blocks may acquire a "
-+            "matching prefix from any agent. Once it has cached blocks, it "
-+            "matches only its own acquired cache and extends that cache. "
-+            "No lineage declaration or ID format is required. Render-only "
-+            "requests need no agent ID."
++            "Opaque agent ID naming one line of work, required for "
++            "generation: the same ID for every request that continues a "
++            "conversation, a new, never-used ID for a fork or a subagent. "
++            "It groups what the KV tiers retain; prefix reuse matches "
++            "content and cache_salt, whatever the ID. No lineage "
++            "declaration or ID format is required. Render-only requests "
++            "need no agent ID."
 +        ),
 +    )
 +
      ec_transfer_params: dict[str, Any] | None = Field(
          default=None,
          description=(
-@@ -366,6 +380,8 @@
+@@ -366,6 +381,8 @@
          if self.ec_transfer_params:
              # Pass in ec_transfer_params via extra_args
              extra_args["ec_transfer_params"] = self.ec_transfer_params
@@ -6767,7 +5928,7 @@ diff --git a/vllm/entrypoints/openai/completion/protocol.py b/vllm/entrypoints/o
 diff --git a/vllm/entrypoints/openai/responses/protocol.py b/vllm/entrypoints/openai/responses/protocol.py
 --- a/vllm/entrypoints/openai/responses/protocol.py
 +++ b/vllm/entrypoints/openai/responses/protocol.py
-@@ -314,6 +314,20 @@
+@@ -314,6 +314,21 @@
          default=None,
          description="KVTransfer parameters used for disaggregated serving.",
      )
@@ -6776,19 +5937,20 @@ diff --git a/vllm/entrypoints/openai/responses/protocol.py b/vllm/entrypoints/op
 +        min_length=1,
 +        pattern=r"\S",
 +        description=(
-+            "Opaque, stable agent ID required for generation and shared KV "
-+            "cache accounting. An agent with no cached blocks may acquire a "
-+            "matching prefix from any agent. Once it has cached blocks, it "
-+            "matches only its own acquired cache and extends that cache. "
-+            "No lineage declaration or ID format is required. Render-only "
-+            "requests need no agent ID."
++            "Opaque agent ID naming one line of work, required for "
++            "generation: the same ID for every request that continues a "
++            "conversation, a new, never-used ID for a fork or a subagent. "
++            "It groups what the KV tiers retain; prefix reuse matches "
++            "content and cache_salt, whatever the ID. No lineage "
++            "declaration or ID format is required. Render-only requests "
++            "need no agent ID."
 +        ),
 +    )
 +
      ec_transfer_params: dict[str, Any] | None = Field(
          default=None,
          description=(
-@@ -471,6 +485,8 @@
+@@ -471,6 +486,8 @@
              extra_args["kv_transfer_params"] = self.kv_transfer_params
          if self.ec_transfer_params:
              extra_args["ec_transfer_params"] = self.ec_transfer_params
@@ -6800,26 +5962,27 @@ diff --git a/vllm/entrypoints/openai/responses/protocol.py b/vllm/entrypoints/op
 diff --git a/vllm/entrypoints/scale_out/token_in_token_out/protocol.py b/vllm/entrypoints/scale_out/token_in_token_out/protocol.py
 --- a/vllm/entrypoints/scale_out/token_in_token_out/protocol.py
 +++ b/vllm/entrypoints/scale_out/token_in_token_out/protocol.py
-@@ -151,6 +151,19 @@
-         default=None,
-         description=(
+@@ -153,6 +153,20 @@
              "ECTransfer parameters used for encoder-cache disaggregated serving."
-+        ),
-+    )
+         ),
+     )
 +    kv_scope: str | None = Field(
 +        default=None,
 +        min_length=1,
 +        pattern=r"\S",
 +        description=(
-+            "Opaque, stable agent ID required for generation and shared KV "
-+            "cache accounting. An agent with no cached blocks may acquire a "
-+            "matching prefix from any agent. Once it has cached blocks, it "
-+            "matches only its own acquired cache and extends that cache. "
-+            "No lineage declaration or ID format is required. Render-only "
-+            "requests need no agent ID."
-         ),
-     )
++            "Opaque agent ID naming one line of work, required for "
++            "generation: the same ID for every request that continues a "
++            "conversation, a new, never-used ID for a fork or a subagent. "
++            "It groups what the KV tiers retain; prefix reuse matches "
++            "content and cache_salt, whatever the ID. No lineage "
++            "declaration or ID format is required. Render-only requests "
++            "need no agent ID."
++        ),
++    )
  
+     # Tracks which keys the caller explicitly set inside ``sampling_params``
+     # when the request was parsed from a JSON body. Lets the server tell
 diff --git a/vllm/entrypoints/scale_out/token_in_token_out/serving.py b/vllm/entrypoints/scale_out/token_in_token_out/serving.py
 --- a/vllm/entrypoints/scale_out/token_in_token_out/serving.py
 +++ b/vllm/entrypoints/scale_out/token_in_token_out/serving.py
@@ -6856,83 +6019,7 @@ diff --git a/vllm/envs.py b/vllm/envs.py
 diff --git a/vllm/v1/core/block_pool.py b/vllm/v1/core/block_pool.py
 --- a/vllm/v1/core/block_pool.py
 +++ b/vllm/v1/core/block_pool.py
-@@ -12,6 +12,7 @@
- )
- from vllm.logger import init_logger
- from vllm.v1.core.kv_cache_metrics import KVCacheMetricsCollector
-+from vllm.v1.core.prefix_cache import PrefixCacheIndex, PrefixCacheView, cache_content_keys
- from vllm.v1.core.kv_cache_utils import (
-     BlockHash,
-     BlockHashWithGroupId,
-@@ -170,6 +171,9 @@
-         assert isinstance(num_gpu_blocks, int) and num_gpu_blocks > 0
-         self.num_gpu_blocks = num_gpu_blocks
-         self.enable_caching = enable_caching
-+        self.prefix_cache = PrefixCacheIndex()
-+        self.cache_tier = object()
-+        self.prefix_cache.register_tier(self.cache_tier, num_gpu_blocks - 1)
-         self.hash_block_size = hash_block_size
-         # All kv-cache blocks.
-         self.blocks: list[KVCacheBlock] = [
-@@ -195,8 +199,15 @@
- 
-         self.metrics_collector = metrics_collector
- 
-+    def bind_prefix_cache(self, index: PrefixCacheIndex) -> None:
-+        assert self.get_usage() == 0
-+        assert not self.cached_block_hash_to_block._cache
-+        self.prefix_cache = index
-+        self.prefix_cache.register_tier(self.cache_tier, self.num_gpu_blocks - 1)
-+
-     def get_cached_block(
--        self, block_hash: BlockHash, kv_cache_group_ids: list[int]
-+        self, block_hash: BlockHash, kv_cache_group_ids: list[int],
-+        cache_view: PrefixCacheView,
-     ) -> list[KVCacheBlock] | None:
-         """Get the cached block by the block hash for each group in
-         `kv_cache_group_ids`, or None if cache miss for any group.
-@@ -217,10 +228,39 @@
-             block = self.cached_block_hash_to_block.get_one_block(
-                 block_hash_with_group_id
-             )
--            if not block:
-+            if not block or not cache_view.allows(
-+                self.prefix_cache.content(self.cache_tier, block_hash_with_group_id)
-+            ):
-                 return None
-             cached_blocks.append(block)
-         return cached_blocks
-+
-+    def acquire_cached_blocks(
-+        self,
-+        request: Request,
-+        blocks: tuple[Sequence[KVCacheBlock], ...],
-+        num_tokens: int,
-+    ) -> None:
-+        """Acquire only the selected request prefix, including partial aliases."""
-+        prefix_hashes = set(request.block_hashes[:num_tokens // self.hash_block_size])
-+        selected: dict[bytes, set[bytes]] = {}
-+        for group in blocks:
-+            for block in group:
-+                if block.is_null:
-+                    continue
-+                hashes = self.cached_block_hashes_by_block.get(block.block_id, set())
-+                if block.block_hash is not None:
-+                    hashes = hashes | {block.block_hash}
-+                for key in hashes:
-+                    content = {
-+                        unit for unit in self.prefix_cache.content(self.cache_tier, key)
-+                        if get_block_hash(unit) in prefix_hashes
-+                    }
-+                    if content:
-+                        selected[key] = content
-+        self.prefix_cache.acquire(
-+            self.cache_tier, request.kv_scope, selected.keys(), selection=selected,
-+        )
- 
-     def cache_full_blocks(
-         self,
-@@ -231,6 +271,7 @@
+@@ -231,6 +231,7 @@
          block_size: int,
          kv_cache_group_id: int,
          block_mask: list[bool] | None = None,
@@ -6940,7 +6027,7 @@ diff --git a/vllm/v1/core/block_pool.py b/vllm/v1/core/block_pool.py
      ) -> None:
          """Cache a list of full blocks for prefix caching.
          This function takes a list of blocks that will have their block hash
-@@ -288,12 +329,27 @@
+@@ -288,8 +289,16 @@
                      blk.block_hash_num_tokens is not None
                      and blk.block_hash_num_tokens < num_hash_tokens
                  )
@@ -6951,7 +6038,7 @@ diff --git a/vllm/v1/core/block_pool.py b/vllm/v1/core/block_pool.py
 +                    self._emit_block_removed_events(removed_hashes)
 +                else:
 +                    # Attention appends data. Its earlier immutable prefix
-+                    # remains a valid cache entry for every acquired user.
++                    # remains a valid entry for a prefix that ends there.
 +                    self.cached_block_hashes_by_block.setdefault(blk.block_id, set()).add(
 +                        blk.block_hash
 +                    )
@@ -6959,18 +6046,7 @@ diff --git a/vllm/v1/core/block_pool.py b/vllm/v1/core/block_pool.py
              self._insert_block_hash(
                  block_hash_with_group_id,
                  blk,
-                 num_tokens=num_hash_tokens,
-+                content=self._cache_content(
-+                    request, kv_cache_group_id, num_hash_tokens,
-+                    block_size, is_recurrent,
-+                ),
-+            )
-+            self.prefix_cache.acquire(
-+                self.cache_tier, request.kv_scope, [block_hash_with_group_id]
-             )
-             if new_hashes is not None:
-                 new_hashes.append(maybe_convert_block_hash(block_hash))
-@@ -449,6 +505,7 @@
+@@ -449,6 +458,7 @@
          num_tokens: int,
          kv_cache_group_id: int,
          block_size: int,
@@ -6978,7 +6054,7 @@ diff --git a/vllm/v1/core/block_pool.py b/vllm/v1/core/block_pool.py
      ) -> BlockHashWithGroupId | None:
          """Register a partial prefix-cache entry for an existing block.
  
-@@ -503,12 +560,24 @@
+@@ -503,8 +513,14 @@
              and block.block_hash_num_tokens is not None
              and block.block_hash_num_tokens < num_hash_blocks * self.hash_block_size
          ):
@@ -6995,214 +6071,6 @@ diff --git a/vllm/v1/core/block_pool.py b/vllm/v1/core/block_pool.py
          self._insert_block_hash(
              block_hash_with_group_id,
              block,
-             num_tokens=num_hash_blocks * self.hash_block_size,
-+            content=self._cache_content(
-+                request, kv_cache_group_id, num_tokens, block_size, is_recurrent,
-+            ),
-+        )
-+        self.prefix_cache.acquire(
-+            self.cache_tier, request.kv_scope, [block_hash_with_group_id]
-         )
-         if self.enable_kv_cache_events and not already_cached:
-             parent_hash, block_start = self._get_partial_block_parent_hash_and_start(
-@@ -543,6 +612,16 @@
-             )
-         return block_hash_with_group_id
- 
-+    def _cache_content(
-+        self, request: Request, group_id: int, end: int,
-+        block_size: int, is_recurrent: bool,
-+    ) -> tuple[bytes, ...]:
-+        stop = end // self.hash_block_size
-+        start = stop - 1 if is_recurrent else (
-+            (end - 1) // block_size * block_size // self.hash_block_size
-+        )
-+        return cache_content_keys(request.block_hashes[start:stop], group_id)
-+
-     def _get_partial_block_hash(
-         self,
-         request: Request,
-@@ -586,7 +665,12 @@
-                 is not None
-             ):
-                 removed_hashes.append(block_hash)
-+                self.prefix_cache.remove(self.cache_tier, block_hash)
-         block.reset_hash()
-+        self.prefix_cache.set_capacity(
-+            self.cache_tier, self.num_gpu_blocks - 1
-+            + sum(len(hashes) for hashes in self.cached_block_hashes_by_block.values()),
-+        )
-         return removed_hashes
- 
-     def _emit_block_removed_events(
-@@ -609,10 +693,8 @@
-         block_hash_with_group_id: BlockHashWithGroupId,
-         block: KVCacheBlock,
-         num_tokens: int | None,
-+        content: tuple[bytes, ...],
-     ) -> None:
--        if block.block_hash == block_hash_with_group_id:
--            return
--
-         if self.cached_block_hash_to_block.contain(
-             block_hash_with_group_id, block.block_id
-         ):
-@@ -620,11 +702,16 @@
- 
-         if block.block_hash is None:
-             block.set_block_hash(block_hash_with_group_id, num_tokens=num_tokens)
--        else:
-+        elif block.block_hash != block_hash_with_group_id:
-             self.cached_block_hashes_by_block.setdefault(block.block_id, set()).add(
-                 block_hash_with_group_id
-             )
-         self.cached_block_hash_to_block.insert(block_hash_with_group_id, block)
-+        self.prefix_cache.insert(self.cache_tier, block_hash_with_group_id, content)
-+        self.prefix_cache.set_capacity(
-+            self.cache_tier, self.num_gpu_blocks - 1
-+            + sum(len(hashes) for hashes in self.cached_block_hashes_by_block.values()),
-+        )
- 
-     def move_block_hashes(
-         self,
-@@ -640,9 +727,16 @@
-         assert dst_block.block_hash is None
-         assert dst_block.block_id not in self.cached_block_hashes_by_block
-         num_tokens = src_block.block_hash_num_tokens
--        for block_hash in self._remove_cached_block_hashes(src_block):
--            # `num_tokens` only applies to the first (primary) insertion.
--            self._insert_block_hash(block_hash, dst_block, num_tokens=num_tokens)
-+        hashes = ([src_block.block_hash] if src_block.block_hash is not None else [])
-+        hashes.extend(self.cached_block_hashes_by_block.get(src_block.block_id, ()))
-+        # Register the destination before removing the source. The content
-+        # remains resident throughout this move, including all acquired users.
-+        for block_hash in hashes:
-+            self._insert_block_hash(
-+                block_hash, dst_block, num_tokens=num_tokens,
-+                content=self.prefix_cache.content(self.cache_tier, block_hash),
-+            )
-+        self._remove_cached_block_hashes(src_block)
- 
-     def get_new_blocks(self, num_blocks: int) -> list[KVCacheBlock]:
-         """Get new blocks from the free block pool.
-@@ -779,6 +873,8 @@
-             )
-             return False
- 
-+        self.prefix_cache.reset(self.cache_tier)
-+
-         # Remove all hashes so that no new blocks will hit.
-         self.cached_block_hash_to_block = BlockHashToBlockMap()
-         self.cached_block_hashes_by_block.clear()
-diff --git a/vllm/v1/core/kv_cache_coordinator.py b/vllm/v1/core/kv_cache_coordinator.py
---- a/vllm/v1/core/kv_cache_coordinator.py
-+++ b/vllm/v1/core/kv_cache_coordinator.py
-@@ -8,6 +8,7 @@
- from vllm.logger import init_logger
- from vllm.utils.math_utils import cdiv
- from vllm.v1.core.block_pool import BlockPool
-+from vllm.v1.core.prefix_cache import PrefixCacheView
- from vllm.v1.core.kv_cache_metrics import KVCacheMetricsCollector
- from vllm.v1.core.kv_cache_utils import (
-     BlockHash,
-@@ -404,6 +405,7 @@
-         self,
-         block_hashes: list[BlockHash],
-         max_cache_hit_length: int,
-+        cache_view: PrefixCacheView,
-     ) -> tuple[tuple[list[KVCacheBlock], ...], int, int]:
-         """Returns the per-group hit blocks, the hit length, and the number of
-         ``num_uncached_common_prefix_tokens`` (a shared prefix that a
-@@ -461,6 +463,7 @@
-         self,
-         block_hashes: list[BlockHash],
-         max_cache_hit_length: int,
-+        cache_view: PrefixCacheView,
-     ) -> tuple[tuple[list[KVCacheBlock], ...], int, int]:
-         blocks: tuple[list[KVCacheBlock], ...] = tuple(
-             [] for _ in range(self.num_single_type_manager)
-@@ -525,6 +528,7 @@
-         self,
-         block_hashes: list[BlockHash],
-         max_cache_hit_length: int,
-+        cache_view: PrefixCacheView,
-     ) -> tuple[tuple[list[KVCacheBlock], ...], int, int]:
-         hit_blocks, hit_length = self.single_type_managers[0].find_longest_cache_hit(
-             block_hashes=block_hashes,
-@@ -536,6 +540,7 @@
-             alignment_tokens=self.block_size,
-             dcp_world_size=self.dcp_world_size,
-             pcp_world_size=self.pcp_world_size,
-+            cache_view=cache_view,
-         )
-         # Single group: nothing "uncached common" -- no other group to lag it.
-         return hit_blocks, hit_length, 0
-@@ -752,6 +757,7 @@
-         self,
-         block_hashes: list[BlockHash],
-         max_cache_hit_length: int,
-+        cache_view: PrefixCacheView,
-     ) -> tuple[tuple[list[KVCacheBlock], ...], int, int]:
-         """
-         Find the longest cache hit using an iterative fixed-point algorithm.
-@@ -842,6 +848,7 @@
-                         if isinstance(spec, FullAttentionSpec)
-                         else 1
-                     ),
-+                    cache_view=cache_view,
-                 )
-                 if drop_eagle_block:
-                     eagle_verified.add(idx)
-@@ -886,6 +893,7 @@
-         self,
-         block_hashes: list[BlockHash],
-         max_cache_hit_length: int,
-+        cache_view: PrefixCacheView,
-     ) -> tuple[tuple[list[KVCacheBlock], ...], tuple[int, ...]]:
-         """Like find_longest_cache_hit but evaluates each group independently.
- 
-@@ -906,6 +914,7 @@
-                 kv_cache_spec=spec,
-                 drop_eagle_block=use_eagle,
-                 alignment_tokens=self._cache_hit_alignment_tokens,
-+                cache_view=cache_view,
-             )
-             for gid, blks in zip(group_ids, blocks):
-                 hit_blocks[gid] = blks
-diff --git a/vllm/v1/core/kv_cache_manager.py b/vllm/v1/core/kv_cache_manager.py
---- a/vllm/v1/core/kv_cache_manager.py
-+++ b/vllm/v1/core/kv_cache_manager.py
-@@ -262,7 +262,8 @@
-         max_cache_hit_length = request.num_tokens - 1
-         computed_blocks, num_new_computed_tokens, num_uncached = (
-             self.coordinator.find_longest_cache_hit(
--                request.block_hashes, max_cache_hit_length
-+                request.block_hashes, max_cache_hit_length,
-+                cache_view=self.block_pool.prefix_cache.view(request.kv_scope),
-             )
-         )
- 
-@@ -331,7 +332,8 @@
- 
-         fa_group_id = coordinator.full_attention_group_id
-         computed, per_group_hits = coordinator.find_longest_cache_hit_per_group(
--            request.block_hashes, request.num_tokens - 1
-+            request.block_hashes, request.num_tokens - 1,
-+            cache_view=self.block_pool.prefix_cache.view(request.kv_scope),
-         )
-         if any(hit > per_group_hits[fa_group_id] for hit in per_group_hits):
-             # A lagging group hit deeper than full attention means its
-@@ -542,6 +544,10 @@
-                 num_external_computed_tokens=num_external_computed_tokens,
-             )
- 
-+        self.block_pool.acquire_cached_blocks(
-+            request, new_computed_block_list, num_local_computed_tokens
-+        )
-+
-         new_blocks = self.coordinator.allocate_new_blocks(
-             request.request_id,
-             num_tokens_need_slot,
 diff --git a/vllm/v1/core/kv_cache_utils.py b/vllm/v1/core/kv_cache_utils.py
 --- a/vllm/v1/core/kv_cache_utils.py
 +++ b/vllm/v1/core/kv_cache_utils.py
@@ -7448,279 +6316,10 @@ diff --git a/vllm/v1/core/kv_cache_utils.py b/vllm/v1/core/kv_cache_utils.py
              )
          )
  
-diff --git a/vllm/v1/core/prefix_cache.py b/vllm/v1/core/prefix_cache.py
-new file mode 100644
---- /dev/null
-+++ b/vllm/v1/core/prefix_cache.py
-@@ -0,0 +1,256 @@
-+# SPDX-License-Identifier: Apache-2.0
-+# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
-+"""Cache membership shared by the scheduler's physical KV tiers.
-+
-+Keys describe KV content, including its cache group. Agent IDs are opaque.
-+An agent with no resident membership can acquire an initial shared prefix;
-+subsequent matching uses the content it acquired or computed itself.
-+"""
-+
-+from collections import OrderedDict
-+from collections.abc import Callable, Collection, Hashable, Mapping
-+from dataclasses import dataclass, field
-+
-+
-+def cache_content_keys(
-+    block_hashes: Collection[bytes],
-+    group_id: int,
-+) -> tuple[bytes, ...]:
-+    """Name the hash-sized data units (or recurrent states) in a cache entry."""
-+    suffix = group_id.to_bytes(4, "big")
-+    return tuple(block_hash + suffix for block_hash in block_hashes)
-+
-+
-+@dataclass(frozen=True, slots=True)
-+class PrefixCacheView:
-+    """A stable membership view for one complete prefix lookup."""
-+
-+    keys: frozenset[bytes] | None
-+
-+    def permits(self, key: bytes) -> bool:
-+        return self.keys is None or key in self.keys
-+
-+    def allows(self, content: Collection[bytes]) -> bool:
-+        return self.keys is None or self.keys.issuperset(content)
-+
-+
-+@dataclass(slots=True)
-+class ResidentPrefix:
-+    # Storage-to-storage transfers may arrive before a generation request
-+    # supplies the hash chain describing their contained data.
-+    content: tuple[bytes, ...] | None
-+    copies: int = 1
-+    # None means the complete entry. Only a shortened selection needs a set.
-+    agents: dict[str, frozenset[bytes] | None] = field(default_factory=dict)
-+
-+
-+@dataclass(slots=True)
-+class PrefixCacheTier:
-+    capacity: int
-+    on_release: Callable[[str], None]
-+    entries: dict[bytes, ResidentPrefix] = field(default_factory=dict)
-+    agents: OrderedDict[str, set[bytes]] = field(default_factory=OrderedDict)
-+    references: int = 0
-+
-+
-+class PrefixCacheIndex:
-+    """Track acquired content while any of its physical tier copies exists.
-+
-+    A view is read-only. Looking up candidate blocks never acquires them;
-+    acquisition follows selection of a usable prefix, or computation of new
-+    KV. This prevents an early group hit from changing the remaining lookup.
-+    """
-+
-+    def __init__(self) -> None:
-+        self._tiers: dict[Hashable, PrefixCacheTier] = {}
-+        self._owned: dict[str, int] = {}
-+
-+    def register_tier(
-+        self, tier: Hashable, capacity: int,
-+        on_release: Callable[[str], None] = lambda _agent: None,
-+    ) -> None:
-+        """Bound cached agent records by the tier's cache-entry capacity."""
-+        assert tier not in self._tiers and capacity >= 0
-+        self._tiers[tier] = PrefixCacheTier(capacity, on_release)
-+
-+    def set_capacity(self, tier: Hashable, capacity: int) -> None:
-+        state = self._tiers[tier]
-+        state.capacity = capacity
-+        self._make_room(tier, None)
-+
-+    def _make_room(
-+        self, tier: Hashable, acquiring: str | None,
-+    ) -> None:
-+        state = self._tiers[tier]
-+        added = int(acquiring is not None and acquiring not in state.agents)
-+        for agent_id in tuple(state.agents):
-+            if len(state.agents) + added <= state.capacity:
-+                return
-+            if agent_id != acquiring:
-+                self.release_agent(tier, agent_id)
-+        assert len(state.agents) + added <= state.capacity
-+
-+    def view(self, agent_id: str) -> PrefixCacheView:
-+        if agent_id not in self._owned:
-+            return PrefixCacheView(None)
-+        owned: set[bytes] = set()
-+        for state in self._tiers.values():
-+            for key in state.agents.get(agent_id, ()):
-+                entry = state.entries[key]
-+                assert entry.content is not None
-+                selected = entry.agents[agent_id]
-+                owned.update(entry.content if selected is None else selected)
-+        assert owned
-+        return PrefixCacheView(frozenset(owned))
-+
-+    def content(self, tier: Hashable, key: bytes) -> tuple[bytes, ...]:
-+        content = self._tiers[tier].entries[key].content
-+        assert content is not None
-+        return content
-+
-+    def describe(self, tier: Hashable, key: bytes, content: tuple[bytes, ...]) -> None:
-+        entry = self._tiers[tier].entries[key]
-+        assert content and key in content and len(content) == len(set(content))
-+        assert entry.content is None or entry.content == content
-+        entry.content = content
-+
-+    def extend_content(
-+        self, tier: Hashable, key: bytes, content: tuple[bytes, ...],
-+    ) -> None:
-+        """Publish a filled CPU chunk without expanding its existing users."""
-+        entry = self._tiers[tier].entries[key]
-+        previous = entry.content
-+        assert previous is not None and entry.copies == 1
-+        assert set(previous).issubset(content)
-+        if previous == content:
-+            return
-+        acquired = frozenset(previous)
-+        for agent_id, selected in entry.agents.items():
-+            if selected is None:
-+                entry.agents[agent_id] = acquired
-+        entry.content = content
-+
-+    def insert(
-+        self, tier: Hashable, key: bytes, content: tuple[bytes, ...] | None
-+    ) -> None:
-+        entries = self._tiers[tier].entries
-+        entry = entries.get(key)
-+        if entry is None:
-+            entries[key] = ResidentPrefix(None)
-+        else:
-+            entry.copies += 1
-+        if content is not None:
-+            self.describe(tier, key, content)
-+
-+    def acquire(
-+        self, tier: Hashable, agent_id: str, keys: Collection[bytes],
-+        selection: Mapping[bytes, Collection[bytes]] | None = None,
-+    ) -> None:
-+        state = self._tiers[tier]
-+        entries = state.entries
-+        if not keys:
-+            return
-+        added = set(keys) - state.agents.get(agent_id, set())
-+        assert added <= entries.keys()
-+        self._make_room(tier, agent_id)
-+        for key in set(keys):
-+            entry = entries[key]
-+            assert entry.content is not None
-+            if selection is None:
-+                entry.agents[agent_id] = None
-+            else:
-+                selected = frozenset(selection[key])
-+                assert selected and selected.issubset(entry.content)
-+                if agent_id in entry.agents:
-+                    previous = entry.agents[agent_id]
-+                    if previous is None:
-+                        continue
-+                    selected |= previous
-+                entry.agents[agent_id] = (
-+                    None if len(selected) == len(entry.content) else selected
-+                )
-+        if keys:
-+            state.agents.setdefault(agent_id, set()).update(added)
-+            state.agents.move_to_end(agent_id)
-+        state.references += len(added)
-+        self._owned[agent_id] = self._owned.get(agent_id, 0) + len(added)
-+
-+    def _release(self, agent_id: str) -> None:
-+        self._owned[agent_id] -= 1
-+        if not self._owned[agent_id]:
-+            del self._owned[agent_id]
-+
-+    def remove(self, tier: Hashable, key: bytes) -> None:
-+        state = self._tiers[tier]
-+        entries = state.entries
-+        entry = entries[key]
-+        entry.copies -= 1
-+        if entry.copies:
-+            return
-+        for agent_id in entry.agents:
-+            self._release(agent_id)
-+            state.agents[agent_id].remove(key)
-+            if not state.agents[agent_id]:
-+                del state.agents[agent_id]
-+        state.references -= len(entry.agents)
-+        del entries[key]
-+
-+    def release_agent(self, tier: Hashable, agent_id: str) -> None:
-+        """Release this agent's tier membership without changing another's."""
-+        state = self._tiers[tier]
-+        keys = state.agents.pop(agent_id, set())
-+        for key in keys:
-+            del state.entries[key].agents[agent_id]
-+            self._release(agent_id)
-+        state.references -= len(keys)
-+        state.on_release(agent_id)
-+
-+    def copy_membership(
-+        self, source: Hashable, destination: Hashable, key: bytes,
-+    ) -> None:
-+        """A physical tier copy preserves the source content's acquired users."""
-+        for agent_id, content in tuple(self._tiers[source].entries[key].agents.items()):
-+            self.acquire(
-+                destination, agent_id, [key],
-+                selection=None if content is None else {key: content},
-+            )
-+
-+    def copy_content_memberships(
-+        self, destination: Hashable, keys: Collection[bytes],
-+    ) -> None:
-+        """Preserve acquired data while coalescing physical cache entries.
-+
-+        CPU chunks can contain several GPU entries, including shortened
-+        selections. Collect the complete transfer batch before acquiring any
-+        membership: metadata eviction may change the source memberships too.
-+        """
-+        if not keys:
-+            return
-+        by_unit: dict[bytes, set[bytes]] = {}
-+        for key in keys:
-+            for unit in self.content(destination, key):
-+                by_unit.setdefault(unit, set()).add(key)
-+        inherited: dict[str, dict[bytes, set[bytes]]] = {}
-+        for state in self._tiers.values():
-+            for entry in state.entries.values():
-+                if entry.content is None or not entry.agents:
-+                    continue
-+                copied = by_unit.keys() & entry.content
-+                if not copied:
-+                    continue
-+                for agent, selected in entry.agents.items():
-+                    units = copied if selected is None else copied & selected
-+                    if not units:
-+                        continue
-+                    entries = inherited.setdefault(agent, {})
-+                    for unit in units:
-+                        for key in by_unit[unit]:
-+                            entries.setdefault(key, set()).add(unit)
-+        for agent, entries in inherited.items():
-+            self.acquire(destination, agent, entries, selection=entries)
-+
-+    def reset(self, tier: Hashable) -> None:
-+        state = self._tiers[tier]
-+        for agent_id in tuple(state.agents):
-+            self.release_agent(tier, agent_id)
-+        state.entries.clear()
 diff --git a/vllm/v1/core/single_type_kv_cache_manager.py b/vllm/v1/core/single_type_kv_cache_manager.py
 --- a/vllm/v1/core/single_type_kv_cache_manager.py
 +++ b/vllm/v1/core/single_type_kv_cache_manager.py
-@@ -8,6 +8,7 @@
- 
- from vllm.utils.math_utils import cdiv
- from vllm.v1.core.block_pool import BlockPool
-+from vllm.v1.core.prefix_cache import PrefixCacheView
- from vllm.v1.core.kv_cache_utils import (
-     BlockHashList,
-     BlockHashListWithBlockSize,
-@@ -469,6 +470,7 @@
+@@ -469,6 +469,7 @@
              block_size=self.block_size,
              kv_cache_group_id=self.kv_cache_group_id,
              block_mask=block_mask,
@@ -7728,42 +6327,7 @@ diff --git a/vllm/v1/core/single_type_kv_cache_manager.py b/vllm/v1/core/single_
          )
  
          self.num_cached_block[request.request_id] = num_full_blocks
-@@ -547,6 +549,7 @@
-         max_length: int,
-         kv_cache_group_ids: list[int],
-         block_pool: BlockPool,
-+        cache_view: PrefixCacheView,
-         kv_cache_spec: KVCacheSpec,
-         drop_eagle_block: bool,
-         alignment_tokens: int,
-@@ -687,6 +690,7 @@
-         max_length: int,
-         kv_cache_group_ids: list[int],
-         block_pool: BlockPool,
-+        cache_view: PrefixCacheView,
-         kv_cache_spec: KVCacheSpec,
-         drop_eagle_block: bool,
-         alignment_tokens: int,
-@@ -733,7 +737,7 @@
-         # Phase 1: longest run of cached full blocks from the start. A missing
-         # block implies every later block misses too (chained hashes).
-         for block_hash in itertools.islice(full_block_hashes, max_length // block_size):
--            cached_block = block_pool.get_cached_block(block_hash, kv_cache_group_ids)
-+            cached_block = block_pool.get_cached_block(block_hash, kv_cache_group_ids, cache_view=cache_view)
-             if not cached_block:
-                 break
-             for computed, cached in zip(computed_blocks, cached_block):
-@@ -754,7 +758,8 @@
-             )
-             for fine_idx in range(max_partial_idx - 1, first_partial_idx - 1, -1):
-                 cached_tail = block_pool.get_cached_block(
--                    block_hashes[fine_idx], kv_cache_group_ids
-+                    block_hashes[fine_idx], kv_cache_group_ids,
-+                    cache_view=cache_view,
-                 )
-                 if not cached_tail:
-                     continue
-@@ -818,6 +823,7 @@
+@@ -818,6 +819,7 @@
              num_tokens=boundary_tokens,
              kv_cache_group_id=self.kv_cache_group_id,
              block_size=self.block_size,
@@ -7771,71 +6335,7 @@ diff --git a/vllm/v1/core/single_type_kv_cache_manager.py b/vllm/v1/core/single_
          )
  
      def get_num_common_prefix_blocks(self, running_request_id: str) -> int:
-@@ -906,6 +912,7 @@
-         max_length: int,
-         kv_cache_group_ids: list[int],
-         block_pool: BlockPool,
-+        cache_view: PrefixCacheView,
-         kv_cache_spec: KVCacheSpec,
-         drop_eagle_block: bool,
-         alignment_tokens: int,
-@@ -950,7 +957,8 @@
-         # Search from right to left and early stop when a match is found.
-         for i in range(max_num_blocks - 1, -1, -1):
-             if cached_block := block_pool.get_cached_block(
--                block_hashes[i], kv_cache_group_ids
-+                block_hashes[i], kv_cache_group_ids,
-+                cache_view=cache_view,
-             ):
-                 # Skip prefix matching check if the block is not aligned with
-                 # `alignment_tokens`.
-@@ -1119,6 +1127,7 @@
-         max_length: int,
-         kv_cache_group_ids: list[int],
-         block_pool: BlockPool,
-+        cache_view: PrefixCacheView,
-         kv_cache_spec: KVCacheSpec,
-         drop_eagle_block: bool,
-         alignment_tokens: int,
-@@ -1203,7 +1212,8 @@
-         for i in range(local_attention_start_block_idx, max_num_blocks):
-             block_hash = block_hashes[i]
-             if cached_block := block_pool.get_cached_block(
--                block_hash, kv_cache_group_ids
-+                block_hash, kv_cache_group_ids,
-+                cache_view=cache_view,
-             ):
-                 for computed, cached in zip(computed_blocks, cached_block):
-                     computed.append(cached)
-@@ -1298,6 +1308,7 @@
-         max_length: int,
-         kv_cache_group_ids: list[int],
-         block_pool: BlockPool,
-+        cache_view: PrefixCacheView,
-         kv_cache_spec: KVCacheSpec,
-         drop_eagle_block: bool,
-         alignment_tokens: int,
-@@ -1334,7 +1345,8 @@
-                 num_tokens = (fine_idx + 1) * hash_block_size
-                 block_hash = block_hashes[fine_idx]
-                 if cached_block := block_pool.get_cached_block(
--                    block_hash, kv_cache_group_ids
-+                    block_hash, kv_cache_group_ids,
-+                    cache_view=cache_view,
-                 ):
-                     block_idx = fine_idx // scale_factor
-                     for computed, cached in zip(computed_blocks, cached_block):
-@@ -1348,7 +1360,8 @@
-         # Search from right to left and early stop when a match is found.
-         for i in range(max_num_blocks - 1, -1, -1):
-             if cached_block := block_pool.get_cached_block(
--                block_hashes[i], kv_cache_group_ids
-+                block_hashes[i], kv_cache_group_ids,
-+                cache_view=cache_view,
-             ):
-                 # When enable Mamba prefix caching, `block_size` will be aligned
-                 # across full attention layers and Mamba layers to ensure the
-@@ -1748,6 +1761,7 @@
+@@ -1748,6 +1750,7 @@
              num_tokens=num_tokens,
              kv_cache_group_id=self.kv_cache_group_id,
              block_size=self.block_size,
@@ -7843,14 +6343,6 @@ diff --git a/vllm/v1/core/single_type_kv_cache_manager.py b/vllm/v1/core/single_
          )
          if partial_hash is not None:
              self._partial_hit_reqs[request.request_id] = (block_idx, source_block)
-@@ -1805,6 +1819,7 @@
-         max_length: int,
-         kv_cache_group_ids: list[int],
-         block_pool: BlockPool,
-+        cache_view: PrefixCacheView,
-         kv_cache_spec: KVCacheSpec,
-         drop_eagle_block: bool,
-         alignment_tokens: int,
 diff --git a/vllm/v1/engine/input_processor.py b/vllm/v1/engine/input_processor.py
 --- a/vllm/v1/engine/input_processor.py
 +++ b/vllm/v1/engine/input_processor.py
@@ -7895,15 +6387,7 @@ diff --git a/vllm/v1/engine/input_processor.py b/vllm/v1/engine/input_processor.
 diff --git a/vllm/v1/kv_offload/base.py b/vllm/v1/kv_offload/base.py
 --- a/vllm/v1/kv_offload/base.py
 +++ b/vllm/v1/kv_offload/base.py
-@@ -18,6 +18,7 @@
-         OffloadingConnectorStats,
-     )
- 
-+from vllm.v1.core.prefix_cache import PrefixCacheIndex
- from vllm.v1.kv_offload.config import OffloadingConfig
- 
- # `OffloadKey` identifies an offloaded block. It combines a block hash with
-@@ -92,6 +93,14 @@
+@@ -92,6 +92,14 @@
      req_id: str
      kv_transfer_params: dict[str, Any] | None = None
      load_tier_filter: TierFilter = TierFilter.ALL
@@ -7918,7 +6402,7 @@ diff --git a/vllm/v1/kv_offload/base.py b/vllm/v1/kv_offload/base.py
      # Per-request scratch space keyed by value type, so a tier can parse
      # kv_transfer_params once (in on_new_request) and read the result back
      # on later calls for the same request.
-@@ -171,11 +180,9 @@
+@@ -171,11 +179,9 @@
          The given blocks will be protected from eviction.
          This function returns a LoadSpec which encapsulates
          information required for performing the load.
@@ -7933,24 +6417,7 @@ diff --git a/vllm/v1/kv_offload/base.py b/vllm/v1/kv_offload/base.py
      complete_load() - mark blocks which were previously prepared to be
          loaded as done loading. This is to re-allow their eviction.
      prepare_store() - prepare the given blocks to be written.
-@@ -219,6 +226,16 @@
- 
- class OffloadingManager(ABC):
-     @abstractmethod
-+    def bind_prefix_cache(self, index: PrefixCacheIndex) -> None:
-+        """Share the engine's cache membership across GPU and offload tiers."""
-+        pass
-+
-+    @abstractmethod
-+    def begin_lookup(self, req_context: ReqContext) -> None:
-+        """Capture a stable membership view before querying any cache group."""
-+        pass
-+
-+    @abstractmethod
-     def lookup(self, key: OffloadKey, req_context: ReqContext) -> LookupResult:
-         """
-         Checks whether a single block is offloaded and ready to be read.
-@@ -256,14 +273,12 @@
+@@ -256,14 +262,12 @@
          """
          pass
  
@@ -7958,27 +6425,18 @@ diff --git a/vllm/v1/kv_offload/base.py b/vllm/v1/kv_offload/base.py
 -        """
 -        Mark the given blocks as recently used.
 -        This could in practice mean moving them to the end of an LRU list.
--
++    def retain_context(self, keys: Collection[OffloadKey], req_context: ReqContext):
++        """Replace the complete reusable prefix working set for this request.
+ 
 -        Args:
 -            keys: the keys identifying the blocks.
 -            req_context: per-request context (e.g. kv_transfer_params).
-+    def retain_context(self, keys: Collection[OffloadKey], req_context: ReqContext):
-+        """Replace the complete reusable prefix working set for this request.
-+
 +        Includes full-attention prefix chunks, the required trailing window or
 +        recurrent state, and any partial tail. Keys can be awaiting storage.
 +        Called after selecting a prefix hit and before preparing new stores.
          """
          return
  
-@@ -331,6 +346,7 @@
-             req_context: per-request context.
-         """
-         pass
-+
- 
-     def on_request_finished(self, req_context: ReqContext) -> None:
-         """
 diff --git a/vllm/v1/kv_offload/config.py b/vllm/v1/kv_offload/config.py
 --- a/vllm/v1/kv_offload/config.py
 +++ b/vllm/v1/kv_offload/config.py
@@ -8046,7 +6504,7 @@ diff --git a/vllm/v1/kv_offload/cpu/gpu_worker.py b/vllm/v1/kv_offload/cpu/gpu_w
 diff --git a/vllm/v1/kv_offload/cpu/manager.py b/vllm/v1/kv_offload/cpu/manager.py
 --- a/vllm/v1/kv_offload/cpu/manager.py
 +++ b/vllm/v1/kv_offload/cpu/manager.py
-@@ -1,10 +1,14 @@
+@@ -1,10 +1,13 @@
  # SPDX-License-Identifier: Apache-2.0
  # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
 +import ctypes
@@ -8058,11 +6516,10 @@ diff --git a/vllm/v1/kv_offload/cpu/manager.py b/vllm/v1/kv_offload/cpu/manager.
  from typing_extensions import override
  
 +from vllm.exceptions import VLLMServerError
-+from vllm.v1.core.prefix_cache import PrefixCacheIndex, PrefixCacheView
  from vllm.distributed.kv_transfer.kv_connector.v1.offloading.metrics import (
      OffloadingConnectorStats,
  )
-@@ -15,6 +19,7 @@
+@@ -15,6 +18,7 @@
      OffloadingEvent,
      OffloadingManager,
      OffloadKey,
@@ -8070,14 +6527,15 @@ diff --git a/vllm/v1/kv_offload/cpu/manager.py b/vllm/v1/kv_offload/cpu/manager.
      PrepareStoreOutput,
      ReqContext,
      RequestOffloadingContext,
-@@ -23,54 +28,111 @@
+@@ -23,54 +27,91 @@
      CPULoadStoreSpec,
      CPUOffloadingMetrics,
  )
 -from vllm.v1.kv_offload.cpu.policies.base import BlockStatus, CachePolicy
 -from vllm.v1.kv_offload.cpu.policies.factory import CachePolicyFactory
-+
-+
+ 
+ 
+-class CPUOffloadingManager(OffloadingManager):
 +class BlockStatus(ctypes.Structure):
 +    """
 +    Offloading status for a single block of KV data.
@@ -8086,7 +6544,15 @@ diff --git a/vllm/v1/kv_offload/cpu/manager.py b/vllm/v1/kv_offload/cpu/manager.
 +    ref_cnt - the current number of transfers using this block as a source.
 +        A value of -1 indicates the block is not yet ready to be read.
 +    block_id - index of the physical CPU buffer slot.
-+    """
+     """
+-    An OffloadingManager with a pluggable CachePolicy, resolved by name via
+-    CachePolicyFactory (built in: "lru", "arc"; external policies can either
+-    register their own or be loaded out-of-tree via cache_policy_module_path).
+-
+-    The manager owns all shared logic: ref-counting, event emission,
+-    block pool management, and the prepare_store/complete_store skeletons.
+-    Policy-specific block organization and eviction decisions are delegated
+-    to the CachePolicy implementation.
 +
 +    _fields_ = [("ref_cnt", ctypes.c_int32), ("block_id", ctypes.c_int64)]
 +
@@ -8112,24 +6578,17 @@ diff --git a/vllm/v1/kv_offload/cpu/manager.py b/vllm/v1/kv_offload/cpu/manager.
 +    keys: set[OffloadKey] = field(default_factory=set)
 +    required: dict[OffloadKey, tuple[bytes, ...]] = field(default_factory=dict)
 +    active: bool = True
- 
- 
- class CPUOffloadingManager(OffloadingManager):
--    """
--    An OffloadingManager with a pluggable CachePolicy, resolved by name via
--    CachePolicyFactory (built in: "lru", "arc"; external policies can either
--    register their own or be loaded out-of-tree via cache_policy_module_path).
--
--    The manager owns all shared logic: ref-counting, event emission,
--    block pool management, and the prepare_store/complete_store skeletons.
--    Policy-specific block organization and eviction decisions are delegated
--    to the CachePolicy implementation.
++
++
++class CPUOffloadingManager(OffloadingManager):
 +    """Content-addressed KV with shared context references.
 +
-+    Capacity pressure releases complete agents in least-recently-used order.
-+    Releasing an agent removes only its references: blocks used by another
-+    retained context or an in-flight transfer remain resident. Request completion
-+    retains the context for its next turn; it does not declare an agent dead.
++    Lookup matches content alone; the agent ID never restricts it. The ID
++    groups retention: capacity pressure releases complete agents in
++    least-recently-used order. Releasing an agent removes only its references:
++    blocks used by another retained context or an in-flight transfer remain
++    resident. Request completion retains the context for its next turn; it
++    does not declare an agent dead.
      """
  
      def __init__(
@@ -8142,8 +6601,6 @@ diff --git a/vllm/v1/kv_offload/cpu/manager.py b/vllm/v1/kv_offload/cpu/manager.
 -        max_tracker_size: int = 64_000,
      ):
          self.medium: Medium = Medium.CPU
-+        self.prefix_cache = PrefixCacheIndex()
-+        self.cache_tier = object()
          self._num_blocks: int = num_blocks
          self._num_allocated_blocks: int = 0
          self._free_list: list[int] = []
@@ -8157,12 +6614,16 @@ diff --git a/vllm/v1/kv_offload/cpu/manager.py b/vllm/v1/kv_offload/cpu/manager.
 +
 +        # All resident blocks, and the idle (ref_cnt 0) subset in LRU order.
 +        self._blocks: dict[OffloadKey, BlockStatus] = {}
++        # What each key names, and what its row actually holds. A coalesced
++        # window chunk can hold only a suffix of its canonical content. Both
++        # stay None until a generation supplies the hash chain describing them.
 +        self._canonical_content: dict[OffloadKey, tuple[bytes, ...] | None] = {}
++        self._available_content: dict[OffloadKey, tuple[bytes, ...] | None] = {}
 +        self._complete_blocks: set[OffloadKey] = set()
 +        self._evictable_blocks: OrderedDict[OffloadKey, None] = OrderedDict()
 +
-+        # Context membership includes not-yet-resident keys so a GPU hit or
-+        # a concurrent store acquires the same references as a CPU hit.
++        # Context references include not-yet-resident keys so a GPU hit or
++        # a concurrent store takes the same references as a CPU hit.
 +        self._contexts: dict[str, RetainedContext] = {}
 +        self._references: dict[OffloadKey, set[str]] = {}
 +        self._agents: OrderedDict[str, set[str]] = OrderedDict()
@@ -8175,42 +6636,18 @@ diff --git a/vllm/v1/kv_offload/cpu/manager.py b/vllm/v1/kv_offload/cpu/manager.
 -        self.max_tracker_size: int = max_tracker_size
 -        self.stores_skipped_in_current_batch: int = 0
          self.allocation_sizes_in_current_batch: list[int] = []
--
+ 
 -        # Number of block references. It is ordered so can evict the LRU entry in O(1).
 -        self.counts: OrderedDict[OffloadKey, int] | None = (
 -            OrderedDict() if store_threshold >= 2 else None
-+        self._register_cache_tier()
-+
-+    @override
-+    def bind_prefix_cache(self, index: PrefixCacheIndex) -> None:
-+        assert not self._blocks and not self._contexts
-+        self.prefix_cache = index
-+        self._register_cache_tier()
-+
-+    def _register_cache_tier(self) -> None:
-+        self.prefix_cache.register_tier(
-+            self.cache_tier, self._num_blocks,
-+            self._forget_agent,
-         )
-+
+-        )
 +    def _forget_agent(self, agent_id: str) -> None:
 +        for req_id in tuple(self._agents.get(agent_id, ())):
 +            self._forget_context(req_id)
-+
-+    @override
-+    def begin_lookup(self, req_context: ReqContext) -> None:
-+        req_context.set_state(self.prefix_cache.view(self._agent_id(req_context)))
-+
-+    @staticmethod
-+    def _lookup_view(req_context: ReqContext) -> PrefixCacheView:
-+        view = req_context.get_state(PrefixCacheView)
-+        if view is None:
-+            raise VLLMServerError("KV prefix lookup began without a cache membership view.")
-+        return view
  
      # --- block pool ---
  
-@@ -103,64 +165,213 @@
+@@ -103,28 +144,168 @@
      ) -> CPULoadStoreSpec:
          return CPULoadStoreSpec([block.block_id for block in blocks])
  
@@ -8257,10 +6694,10 @@ diff --git a/vllm/v1/kv_offload/cpu/manager.py b/vllm/v1/kv_offload/cpu/manager.
 +        """Recycle physical storage; logical references belong to contexts."""
 +        del self._blocks[key]
 +        del self._canonical_content[key]
++        del self._available_content[key]
 +        self._complete_blocks.discard(key)
 +        self._evictable_blocks.pop(key, None)
 +        self._free_block(block)
-+        self.prefix_cache.remove(self.cache_tier, key)
  
      @override
      def on_new_request(self, req_context: ReqContext) -> RequestOffloadingContext:
@@ -8289,16 +6726,6 @@ diff --git a/vllm/v1/kv_offload/cpu/manager.py b/vllm/v1/kv_offload/cpu/manager.
 +            key: req_context.prefix_required.get(key, req_context.prefix_content.get(key))
 +            for key in keys
 +        }
-+        view = req_context.get_state(PrefixCacheView)
-+        if view is not None:
-+            selected = {}
-+            for key in keys:
-+                required = context.required[key]
-+                if required and self._has_content(key, required, req_context) and view.allows(required):
-+                    selected[key] = required
-+            self.prefix_cache.acquire(
-+                self.cache_tier, context.agent_id, selected, selection=selected,
-+            )
 +
 +        # A new turn replaces the previous idle turn of the same agent.
 +        # Other concurrent requests retain their own complete working sets.
@@ -8322,6 +6749,16 @@ diff --git a/vllm/v1/kv_offload/cpu/manager.py b/vllm/v1/kv_offload/cpu/manager.
 +        if idle is not None and idle != req_context.req_id:
 +            self._forget_context(idle)
 +        self._idle_context[context.agent_id] = req_context.req_id
++        # Retained contexts are bounded by the chunk count. Without sharing,
++        # each one holds at least one chunk of its own, so no more could stay
++        # resident; sharing must not let identical content under ever more
++        # IDs grow this metadata without bound. The least recently used
++        # retained context goes first; active requests keep theirs.
++        while len(self._idle_context) > self._num_blocks:
++            oldest = next(
++                agent for agent in self._agents if agent in self._idle_context
++            )
++            self._forget_context(self._idle_context[oldest])
 +
 +    def _describe_content(self, key: OffloadKey, req_context: ReqContext) -> None:
 +        canonical = req_context.prefix_content.get(key)
@@ -8331,7 +6768,9 @@ diff --git a/vllm/v1/kv_offload/cpu/manager.py b/vllm/v1/kv_offload/cpu/manager.
 +        assert previous is None or previous == canonical
 +        self._canonical_content[key] = canonical
 +        if key in self._complete_blocks:
-+            self.prefix_cache.describe(self.cache_tier, key, canonical)
++            available = self._available_content[key]
++            assert available is None or available == canonical
++            self._available_content[key] = canonical
 +
 +    def _has_content(
 +        self, key: OffloadKey, required: Collection[bytes], req_context: ReqContext,
@@ -8339,14 +6778,15 @@ diff --git a/vllm/v1/kv_offload/cpu/manager.py b/vllm/v1/kv_offload/cpu/manager.
 +        if key not in self._blocks:
 +            return False
 +        self._describe_content(key, req_context)
-+        return set(required).issubset(self.prefix_cache.content(self.cache_tier, key))
++        available = self._available_content[key]
++        return available is not None and set(required).issubset(available)
 +
 +    def _required_content(self, key: OffloadKey, req_context: ReqContext) -> tuple[bytes, ...]:
 +        required = req_context.prefix_required.get(key)
 +        if required is None:
 +            required = req_context.prefix_content.get(key)
 +        if required is None and key in self._blocks:
-+            required = self.prefix_cache.content(self.cache_tier, key)
++            required = self._available_content[key]
 +        assert required
 +        return required
  
@@ -8362,8 +6802,6 @@ diff --git a/vllm/v1/kv_offload/cpu/manager.py b/vllm/v1/kv_offload/cpu/manager.
 -                self.counts[key] = 1
 -        block = self._policy.get(key)
 +        required = self._required_content(key, req_context)
-+        if not self._lookup_view(req_context).allows(required):
-+            return LookupResult.MISS
 +        if not self._has_content(key, required, req_context):
 +            return LookupResult.MISS
 +        return self._readiness(key)
@@ -8392,27 +6830,24 @@ diff --git a/vllm/v1/kv_offload/cpu/manager.py b/vllm/v1/kv_offload/cpu/manager.
  
      @override
      def prepare_load(
+@@ -132,35 +313,42 @@
+         keys: Collection[OffloadKey],
+         req_context: ReqContext,
+     ) -> LoadStoreSpec:
++        if any(
++            not self._has_content(key, self._required_content(key, req_context), req_context)
++            for key in keys
++        ):
++            raise VLLMServerError("A KV load contains data its chunk does not hold.")
++        context = self._context(req_context)
++        self.retain_context(context.keys | set(keys), req_context)
++        return self._prepare_load(keys, req_context)
++
++    def _prepare_load(
 +        self,
 +        keys: Collection[OffloadKey],
 +        req_context: ReqContext,
 +    ) -> LoadStoreSpec:
-+        view = self._lookup_view(req_context)
-+        selected = {key: self._required_content(key, req_context) for key in keys}
-+        if any(
-+            not view.allows(required) or not self._has_content(key, required, req_context)
-+            for key, required in selected.items()
-+        ):
-+            raise VLLMServerError("A KV load contains data outside its available selected prefix.")
-+        context = self._context(req_context)
-+        self.retain_context(context.keys | set(keys), req_context)
-+        self.prefix_cache.acquire(self.cache_tier, context.agent_id, keys, selection=selected)
-+        return self._prepare_load(keys, req_context)
-+
-+    def _prepare_load(
-         self,
-         keys: Collection[OffloadKey],
-         req_context: ReqContext,
-     ) -> LoadStoreSpec:
          blocks = []
          for key in keys:
 -            block = self._policy.get(key)
@@ -8427,12 +6862,12 @@ diff --git a/vllm/v1/kv_offload/cpu/manager.py b/vllm/v1/kv_offload/cpu/manager.
              block.ref_cnt += 1
              blocks.append(block)
          return self._get_load_store_spec(keys, blocks)
--
--    @override
--    def touch(self, keys: Collection[OffloadKey], req_context: ReqContext) -> None:
--        self._policy.touch(keys, req_context)
  
      @override
+-    def touch(self, keys: Collection[OffloadKey], req_context: ReqContext) -> None:
+-        self._policy.touch(keys, req_context)
+-
+-    @override
      def complete_load(
          self, keys: Collection[OffloadKey], req_context: ReqContext
      ) -> None:
@@ -8449,7 +6884,7 @@ diff --git a/vllm/v1/kv_offload/cpu/manager.py b/vllm/v1/kv_offload/cpu/manager.
  
      @override
      def prepare_store(
-@@ -168,45 +379,95 @@
+@@ -168,45 +356,86 @@
          keys: Collection[OffloadKey],
          req_context: ReqContext,
      ) -> PrepareStoreOutput | None:
@@ -8459,25 +6894,14 @@ diff --git a/vllm/v1/kv_offload/cpu/manager.py b/vllm/v1/kv_offload/cpu/manager.
 -            self.stores_skipped_in_current_batch += num_keys - len(keys)
 -        # filter out blocks that are already stored
 -        keys_to_store = [k for k in keys if self._policy.get(k) is None]
--
 +        context = self._context(req_context)
 +        self.retain_context(context.keys | set(keys), req_context)
 +        produced = {
 +            key: req_context.prefix_store.get(key, req_context.prefix_content[key])
 +            for key in keys
 +        }
-+        retained_keys = set(context.keys)
-+        output = self._prepare_store(keys, req_context, produced=produced)
-+        if output is not None:
-+            # Physical-copy membership can evict an agent record at the
-+            # metadata bound. Re-establish this producing request's working
-+            # set before acquiring its computed data.
-+            self.retain_context(retained_keys, req_context)
-+            self.prefix_cache.acquire(
-+                self.cache_tier, context.agent_id, keys, selection=produced,
-+            )
-+        return output
-+
++        return self._prepare_store(keys, req_context, produced=produced)
+ 
 +    def _prepare_store(
 +        self,
 +        keys: Collection[OffloadKey],
@@ -8504,7 +6928,8 @@ diff --git a/vllm/v1/kv_offload/cpu/manager.py b/vllm/v1/kv_offload/cpu/manager.
 +                new_keys.append(key)
 +                content[key] = incoming
 +            elif key not in self._complete_blocks:
-+                available = self.prefix_cache.content(self.cache_tier, key)
++                available = self._available_content[key]
++                assert available is not None
 +                assert incoming is not None and canonical is not None
 +                combined = set(available) | set(incoming)
 +                if len(combined) != len(available):
@@ -8520,7 +6945,8 @@ diff --git a/vllm/v1/kv_offload/cpu/manager.py b/vllm/v1/kv_offload/cpu/manager.
 -                store_spec=self._get_load_store_spec([], []),
 -                evicted_keys=[],
 -            )
--
++            return PrepareStoreOutput([], self._get_load_store_spec([], []), [])
+ 
 -        self.allocation_sizes_in_current_batch.append(len(keys_to_store))
 -        num_blocks_to_evict = len(keys_to_store) - self._get_num_free_blocks()
 -
@@ -8528,8 +6954,6 @@ diff --git a/vllm/v1/kv_offload/cpu/manager.py b/vllm/v1/kv_offload/cpu/manager.
 -        if num_blocks_to_evict > 0:
 -            if num_blocks_to_evict > self._num_evictable_cache_blocks:
 -                # Eviction will fail.
-+            return PrepareStoreOutput([], self._get_load_store_spec([], []), [])
-+
 +        self.allocation_sizes_in_current_batch.append(len(new_keys))
 +        deficit = len(new_keys) - self._get_num_free_blocks()
 +        protected = set(keys)
@@ -8559,7 +6983,7 @@ diff --git a/vllm/v1/kv_offload/cpu/manager.py b/vllm/v1/kv_offload/cpu/manager.
                  return None
 -            # There is a still a chance for eviction failure as some of the
 -            # idle blocks might be in the protected list.
--
+ 
 -            # Blocks from the original input are excluded from eviction candidates:
 -            # a block that was already stored must remain in the cache after this call.
 -            protected = set(keys)
@@ -8574,42 +6998,40 @@ diff --git a/vllm/v1/kv_offload/cpu/manager.py b/vllm/v1/kv_offload/cpu/manager.
 -            for key, block in evicted:
 -                self._free_block(block)
 -                to_evict.append(key)
-+
 +        for victim in victims:
-+            self.prefix_cache.release_agent(self.cache_tier, victim)
++            self._forget_agent(victim)
 +        for key in to_evict:
 +            self._remove_block(key, self._blocks[key])
  
          if to_evict and self.events is not None:
              self.events.append(
-@@ -217,17 +478,26 @@
+@@ -217,17 +446,25 @@
                  )
              )
  
 -        blocks = self._allocate_blocks(keys_to_store)
 -        assert len(blocks) == len(keys_to_store), (
 -            "Block pool did not allocate the expected number of blocks"
+-        )
+-
+-        for key, block in zip(keys_to_store, blocks):
+-            self._policy.insert(key, block)
 +        blocks = self._allocate_blocks(new_keys)
 +        assert len(blocks) == len(new_keys)
 +        for key, block in zip(new_keys, blocks):
 +            self._blocks[key] = block
 +            self._canonical_content[key] = req_context.prefix_content.get(key)
-+            self.prefix_cache.insert(self.cache_tier, key, content[key])
++            self._available_content[key] = content[key]
 +        for key in upgrades:
 +            self._blocks[key].ref_cnt = -1
 +            del self._evictable_blocks[key]
-+            self.prefix_cache.extend_content(self.cache_tier, key, content[key])
++            available = self._available_content[key]
++            assert available is not None and set(available).issubset(content[key])
++            self._available_content[key] = content[key]
 +        for key in keys_to_store:
 +            if produced is None or content[key] == self._canonical_content[key]:
 +                self._complete_blocks.add(key)
-+        self._num_write_pending_blocks += len(keys_to_store)
-+        self.prefix_cache.copy_content_memberships(
-+            self.cache_tier, [key for key in keys_to_store if content[key] is not None],
-         )
--
--        for key, block in zip(keys_to_store, blocks):
--            self._policy.insert(key, block)
--        self._num_write_pending_blocks += len(keys_to_store)
+         self._num_write_pending_blocks += len(keys_to_store)
 -
 -        # build store specs for allocated blocks
 -        store_spec = self._get_load_store_spec(keys_to_store, blocks)
@@ -8619,19 +7041,19 @@ diff --git a/vllm/v1/kv_offload/cpu/manager.py b/vllm/v1/kv_offload/cpu/manager.
  
          return PrepareStoreOutput(
              keys_to_store=keys_to_store,
-@@ -246,20 +516,23 @@
+@@ -246,20 +483,23 @@
  
          if success:
              for key in keys:
 -                block = self._policy.get(key)
 +                block = self._blocks.get(key)
                  if block is not None and not block.is_ready:
-+                    self._num_write_pending_blocks -= 1
-                     block.ref_cnt = 0
--                    self._num_write_pending_blocks -= 1
+-                    block.ref_cnt = 0
+                     self._num_write_pending_blocks -= 1
 -                    self._num_evictable_cache_blocks += 1
 -                    self._policy.mark_evictable(key)
 -                    stored_keys.append(key)
++                    block.ref_cnt = 0
 +                    self._evictable_blocks[key] = None
 +                    if key in self._complete_blocks:
 +                        stored_keys.append(key)
@@ -8651,15 +7073,15 @@ diff --git a/vllm/v1/kv_offload/cpu/manager.py b/vllm/v1/kv_offload/cpu/manager.
  
          if stored_keys and self.events is not None:
              self.events.append(
-@@ -277,8 +550,15 @@
+@@ -277,8 +517,15 @@
          # pre-reset jobs, so no lazy cleanup is needed. The scheduler also
          # flushes in-flight load job IDs to the workers before any new stores
          # can begin, preventing a cross-direction data race on reused offload block IDs.
 -        self._policy.clear()
 -        self._num_evictable_cache_blocks = 0
-+        self.prefix_cache.reset(self.cache_tier)
 +        self._blocks.clear()
 +        self._canonical_content.clear()
++        self._available_content.clear()
 +        self._complete_blocks.clear()
 +        self._evictable_blocks.clear()
 +        self._contexts.clear()
@@ -8669,7 +7091,7 @@ diff --git a/vllm/v1/kv_offload/cpu/manager.py b/vllm/v1/kv_offload/cpu/manager.
          self._num_write_pending_blocks = 0
  
          self._free_list.clear()
-@@ -297,7 +577,7 @@
+@@ -297,7 +544,7 @@
          num_used = (
              self._num_allocated_blocks
              - len(self._free_list)
@@ -8678,7 +7100,7 @@ diff --git a/vllm/v1/kv_offload/cpu/manager.py b/vllm/v1/kv_offload/cpu/manager.
          )
          usage = num_used / self._num_blocks if self._num_blocks > 0 else 0.0
          stats.set_gauge(CPUOffloadingMetrics.CPU_CACHE_USAGE_PERC, usage)
-@@ -317,11 +597,4 @@
+@@ -317,11 +564,4 @@
          stats.set_gauge(CPUOffloadingMetrics.CPU_CACHE_WRITE_USAGE_PERC, write_usage)
          stats.set_gauge(CPUOffloadingMetrics.CPU_CACHE_READ_USAGE_PERC, read_usage)
  
@@ -9366,16 +7788,12 @@ diff --git a/vllm/v1/kv_offload/tiering/manager.py b/vllm/v1/kv_offload/tiering/
  
      def create_store_job(
          self, keys: Collection[OffloadKey], req_context: ReqContext
-@@ -333,12 +328,20 @@
+@@ -333,12 +328,16 @@
                      )
  
      @override
 -    def lookup(
 +    def lookup(self, key: OffloadKey, req_context: ReqContext) -> LookupResult:
-+        view = self.primary_tier._lookup_view(req_context)
-+        required = self.primary_tier._required_content(key, req_context)
-+        if not view.allows(required):
-+            return LookupResult.MISS
 +        return self._lookup(key, req_context, generation=True)
 +
 +    def _lookup(
@@ -9388,7 +7806,7 @@ diff --git a/vllm/v1/kv_offload/tiering/manager.py b/vllm/v1/kv_offload/tiering/
      ) -> LookupResult:
          """
          Check whether a single block is offloaded and ready.
-@@ -361,14 +364,10 @@
+@@ -361,14 +360,10 @@
              MISS      — block not found in any tier, or primary is full
                          and cannot accept a promotion.
          """
@@ -9404,7 +7822,7 @@ diff --git a/vllm/v1/kv_offload/tiering/manager.py b/vllm/v1/kv_offload/tiering/
          lookup_duration = time.monotonic() - start_time
          self._metrics.on_lookup(
              req_context,
-@@ -514,15 +513,16 @@
+@@ -514,15 +509,8 @@
          return self.primary_tier.prepare_load(keys, req_context)
  
      @override
@@ -9417,20 +7835,12 @@ diff --git a/vllm/v1/kv_offload/tiering/manager.py b/vllm/v1/kv_offload/tiering/
 -            req_context: Per-request context.
 -        """
 -        self.primary_tier.touch(keys, req_context)
-+    def bind_prefix_cache(self, index) -> None:
-+        self.primary_tier.bind_prefix_cache(index)
-+
-+    @override
-+    def begin_lookup(self, req_context: ReqContext) -> None:
-+        self.primary_tier.begin_lookup(req_context)
-+
-+    @override
 +    def retain_context(self, keys: Collection[OffloadKey], req_context: ReqContext):
 +        self.primary_tier.retain_context(keys, req_context)
          for tier in self.secondary_tiers:
              tier.touch(keys, req_context)
  
-@@ -615,7 +615,7 @@
+@@ -615,7 +603,7 @@
          ready_keys = tuple(
              k
              for k in keys
@@ -9439,7 +7849,7 @@ diff --git a/vllm/v1/kv_offload/tiering/manager.py b/vllm/v1/kv_offload/tiering/
          )
          if not ready_keys:
              return
-@@ -653,14 +653,18 @@
+@@ -653,14 +641,18 @@
          # Step 1: Complete store in primary tier (makes blocks loadable)
          self.primary_tier.complete_store(keys, req_context, success)
  
@@ -9461,7 +7871,7 @@ diff --git a/vllm/v1/kv_offload/tiering/manager.py b/vllm/v1/kv_offload/tiering/
                  tier.submit_store(job_metadata)
  
          # Note: The async transfers are now in flight. Their completion is
-@@ -712,6 +716,10 @@
+@@ -712,6 +704,10 @@
          Returns REQUEST_LEVEL if ANY secondary tier wants request-level.
          Only stores REQUEST_LEVEL tier decisions for use in prepare_store.
          """
@@ -9472,7 +7882,7 @@ diff --git a/vllm/v1/kv_offload/tiering/manager.py b/vllm/v1/kv_offload/tiering/
          state = RequestState(req_context=req_context)
          self._metrics.on_new_request(req_context)
          for tier_idx, tier in enumerate(self.secondary_tiers):
-@@ -727,6 +735,7 @@
+@@ -727,6 +723,7 @@
          policy = (
              OffloadPolicy.REQUEST_LEVEL
              if state.request_level_tiers
@@ -9480,7 +7890,7 @@ diff --git a/vllm/v1/kv_offload/tiering/manager.py b/vllm/v1/kv_offload/tiering/
              else OffloadPolicy.BLOCK_LEVEL
          )
          return RequestOffloadingContext(policy=policy)
-@@ -738,7 +747,8 @@
+@@ -738,7 +735,8 @@
          *,
          exclude_tier_idx: int | None = None,
      ) -> None:
@@ -9618,58 +8028,6 @@ diff --git a/vllm/v1/request.py b/vllm/v1/request.py
                  self.kv_cache_report_mode = sampling_params.extra_args.get(
                      "kv_cache_report_mode", "incremental"
                  )
-diff --git a/vllm/v1/simple_kv_offload/manager.py b/vllm/v1/simple_kv_offload/manager.py
---- a/vllm/v1/simple_kv_offload/manager.py
-+++ b/vllm/v1/simple_kv_offload/manager.py
-@@ -245,6 +245,7 @@
-         """Bind GPU block pool so that we can touch blocks during stores.
-         Called by Scheduler after kv_cache_manager is ready."""
-         self._gpu_block_pool = gpu_block_pool
-+        self.cpu_block_pool.bind_prefix_cache(gpu_block_pool.prefix_cache)
- 
-     def get_num_new_matched_tokens(
-         self, request: "Request", num_computed_tokens: int
-@@ -269,7 +270,8 @@
-         if max_hit_len <= 0:
-             return 0, False
-         cpu_hit_blocks, hit_length, _ = self.cpu_coordinator.find_longest_cache_hit(
--            remaining_hashes, max_hit_len
-+            remaining_hashes, max_hit_len,
-+            cache_view=self.cpu_block_pool.prefix_cache.view(request.kv_scope),
-         )
- 
-         if hit_length > 0:
-@@ -392,6 +394,10 @@
-                 gpu_block_ids.append(group_gpu_ids[gpu_ext_start + i])
-                 cpu_block_ids.append(cpu_blk.block_id)
-                 cpu_blocks_to_touch.append(cpu_blk)
-+
-+        self.cpu_block_pool.acquire_cached_blocks(
-+            request, tuple(cpu_hit_blocks), total_computed_tokens,
-+        )
- 
-         # Touch CPU blocks to prevent eviction during async load.
-         self.cpu_block_pool.touch(cpu_blocks_to_touch)
-@@ -738,10 +744,18 @@
- 
-         cpu_blocks = [self.cpu_block_pool.blocks[bid] for bid in cpu_block_ids]
- 
-+        assert self._gpu_block_pool is not None
-+        index = self.cpu_block_pool.prefix_cache
-+        source_tier = self._gpu_block_pool.cache_tier
-+        destination_tier = self.cpu_block_pool.cache_tier
-         for cpu_block in cpu_blocks:
-             bhash = cpu_block.block_hash
-             assert bhash is not None
--            self.cpu_block_pool.cached_block_hash_to_block.insert(bhash, cpu_block)
-+            self.cpu_block_pool._insert_block_hash(
-+                bhash, cpu_block, num_tokens=cpu_block.block_hash_num_tokens,
-+                content=index.content(source_tier, bhash),
-+            )
-+            index.copy_membership(source_tier, destination_tier, bhash)
- 
-         # Free CPU and GPU blocks' ref counts to turn them into prefix cache
-         self.cpu_block_pool.free_blocks(cpu_blocks)
 diff --git a/vllm/v1/worker/gpu_worker.py b/vllm/v1/worker/gpu_worker.py
 --- a/vllm/v1/worker/gpu_worker.py
 +++ b/vllm/v1/worker/gpu_worker.py

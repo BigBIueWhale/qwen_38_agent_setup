@@ -7,27 +7,21 @@ Use the same ID for successive requests from the same agent. Whitespace-only
 IDs are invalid; other strings are preserved exactly. The server assigns no
 meaning to punctuation, session names, or the relationship between IDs.
 
-An agent with no cached blocks of its own may match a prefix in the shared
-cache. Selecting that prefix makes it a fork: the agent acquires references
-to the selected data. Once it has cached blocks, matching uses only the data
-it has acquired or computed. Computation extends that cache. The server
-stores no parent pointer, lineage, or declaration of a fork.
-
-The rule applies across GPU and CPU together. A GPU-resident block makes the
-agent existing even if its CPU cache is empty, and a CPU-resident block does
-the same if its GPU cache is empty. After all of an agent's cached blocks
-have been evicted, its next lookup again has no cache of its own and may
-acquire an initial shared prefix.
+Prefix lookup matches content and `cache_salt` alone, as upstream vLLM does.
+The ID never enters a block hash and never restricts a lookup: every request
+may reuse any resident prefix whose tokens and salt it shares, whether its ID
+is new or already has cached blocks. `cache_salt` is what isolates callers.
+The server stores no parent pointer, lineage, or declaration of a fork.
 
 For example:
 
 1. Agent A computes prefix P and continuation A1.
-2. New agent B requests P and continuation B1. B can acquire P from A's
-   cached data, then compute B1.
-3. B's later requests may reuse P and B1. They cannot acquire A1 merely
-   because A1 is also resident.
-4. Releasing A removes A's references. B keeps P and B1 while its context
-   remains resident.
+2. Agent B requests P and continuation B1. B reuses P from A's cached data,
+   then computes B1.
+3. A later request of either agent reuses P, A1 and B1 wherever its own
+   tokens continue them, while they remain resident.
+4. Releasing A removes A's retention references. B's retained context keeps
+   P and B1 resident while B is retained.
 
 The required ID travels through each generation protocol's sampling
 parameters to the engine request and offload request context. The common
@@ -36,45 +30,30 @@ pooling do not allocate a generation context and do not require an ID.
 An ongoing input stream belongs to its admitted agent ID. Per-chunk sampling
 parameters may change generation settings but must retain that exact ID.
 An ID change is refused before dispatch and aborts only that stream's request.
-Another agent submits a new generation request, so prefix selection and
-reference acquisition follow the same rules as any other initial lookup.
 
-## Content and membership
+## Content availability
 
-`PrefixCacheIndex` is the shared membership catalog. Physical cache entries
-identify content by the existing chained prefix hash and KV group. Agent
-IDs do not enter those hashes. Attention entries describe their hash-sized
-data units; recurrent entries describe their final checkpoint.
+Physical cache entries identify content by the existing chained prefix hash
+and KV group. The GPU block pool keeps upstream's per-block LRU eviction. When
+an attention block grows, its earlier immutable prefix stays reachable under
+its shorter hash, so a request whose prefix ends inside the block still hits
+it; a recurrent block replaces its checkpoint.
 
-A lookup captures a stable membership view before querying groups. Inspecting
-a candidate does not acquire it. Acquisition follows selection of a usable
-prefix, or computation. This keeps one group's tentative hit from changing
-the remaining groups' eligibility during the same lookup.
-
-A physical entry can have multiple agent references. A complete selection
-uses the entry's shared content description; a shorter selection records
-its acquired subset. This matters when a common resume boundary ends inside
-a larger GPU block or coalesced CPU chunk. Selecting 72 tokens cannot acquire
-later data merely because the physical entry extends to 96 tokens.
-
-The catalog follows insertion, removal, immutable aliases and physical tier
-copies. Moving a GPU block's hashes registers the destination before removing
-the source, so a move does not erase surviving memberships. Attention growth
-preserves earlier immutable prefix aliases. Replacing recurrent state removes
-the replaced checkpoint's membership.
-
-Native CPU stores coalesce source entries while preserving every source agent's
-acquired subset, even when a different agent issues the store. The catalog
-collects the whole transfer batch before changing memberships, since ownership
-record eviction can also change its source records. Copying a shared prefix
-cannot leave its other users dependent on the GPU copy alone.
+A CPU chunk can coalesce several GPU blocks. The CPU manager records, for each
+resident row, the canonical content its key names and the content actually
+written there. Attention entries describe their hash-sized data units;
+recurrent entries describe their final checkpoint. A lookup checks the data
+needed at its candidate resume boundary against the row's written content, so
+a chunk that holds only part of a window serves exactly the frontiers that part
+covers.
 
 ## CPU contexts and eviction
 
-CPU retention records a request's complete working set across all KV groups:
-the full-attention prefix, each required attention window or recurrent state,
-and any partial tail. Each dependency includes its required data extent.
-Physical transfer pins are separate from these context references.
+The agent ID groups retention. CPU retention records a request's complete
+working set across all KV groups: the full-attention prefix, each required
+attention window or recurrent state, and any partial tail. Each dependency
+includes its required data extent. Physical transfer pins are separate from
+these context references.
 
 Finishing a request retains its complete context for the next turn. A new
 nonempty turn replaces the previous idle turn from the same agent. Concurrent
@@ -98,11 +77,12 @@ failed entry. Other contexts retain their complete working sets. Active
 contexts may have pending dependencies; completion of their transfers makes
 those dependencies readable.
 
-Cached agent records are bounded by each tier's cache-entry capacity. At that
-metadata bound the tier releases the oldest complete agent record. This is
-separate from physical byte accounting: three agents sharing two chunks
-still consume two physical chunks. Full memberships share one content
-description, and subsets are stored only when selection needs them.
+Retained contexts are bounded by the tier's chunk count. Without sharing, each
+one holds at least one chunk of its own, so no more could stay resident;
+sharing must not let identical content under ever more IDs grow this metadata
+without bound. Past the bound, the least recently used retained context is
+dropped; active requests keep theirs. This is separate from physical byte
+accounting: three agents sharing two chunks still consume two physical chunks.
 
 ## Coalesced windows and secondary storage
 
@@ -110,7 +90,7 @@ A CPU chunk can contain several GPU blocks. Window recycling can leave its
 leading slots unwritten. The CPU manager tracks the key's canonical contents
 separately from the data actually available in that row. Store descriptions
 name only non-null GPU sources; lookup checks the data needed at the candidate
-resume boundary against both availability and the agent's membership.
+resume boundary against that availability.
 
 For example, with 16-token GPU blocks, three per CPU chunk, and an 80-token
 sliding window, the 96-token frontier may need only tokens 16 through 96.
@@ -118,21 +98,21 @@ The first CPU chunk can safely lack tokens 0 through 16. That chunk cannot
 serve a shorter request whose window needs those bytes.
 
 Computation or a secondary promotion may fill an incomplete CPU row in place.
-The row must be idle. The fill becomes a pending write, preserves every
-existing agent's acquired subset, and grants the producer only its produced
-data. A failed fill invalidates the row and its dependent contexts.
+The row must be idle. The fill becomes a pending write; once complete, the row
+serves every frontier its content now covers, for every agent. A failed fill
+invalidates the row and its dependent contexts.
 
 Secondary storage keys promise canonical entries. Incomplete window chunks
 are available to valid local window lookups but are not advertised or exported
 as canonical entries. A partial-tail key already defines its shorter valid
 span and can be exported once that span is complete. Physical storage
-transfers do not select a generation prefix or create an agent membership.
-An entry transferred before a generation supplies its hash chain cannot be
-acquired until its content has been described.
+transfers do not select a generation prefix or retain an agent context.
+An entry transferred before a generation supplies its hash chain serves a
+generation lookup once that lookup describes its content.
 
 The native CPU and tiering managers share these rules. The alternate simple
-CPU connector also uses the GPU membership catalog, acquires selected hits,
-and preserves membership when copying physical entries.
+CPU connector is upstream's: it matches content and salt and keeps no agent
+retention.
 
 ## Capacity declared in user contexts
 
@@ -181,20 +161,19 @@ checkpoint or admit unlimited in-flight copies.
 
 ## Cache-hit timing
 
-A fresh agent ID can observe shared-prefix reuse through latency. Existing
-agents query their own acquired cache, but anyone able to submit a fresh ID
-can attempt an initial match. IDs provide cache accounting and matching
-semantics; they provide neither authentication nor a confidentiality boundary.
-No artificial timing padding is added. `cache_salt` remains an independent
-cache-key input and is never derived from an agent ID.
+Any request can observe shared-prefix reuse through latency, whatever its ID.
+IDs group retention; they provide neither matching restrictions,
+authentication nor a confidentiality boundary. No artificial timing padding is
+added. `cache_salt` remains an independent cache-key input, is what isolates
+callers, and is never derived from an agent ID.
 
 ## Validation and adoption
 
-The source tests exercise initial forks, existing-agent matching, shared
-eviction, GPU/CPU membership, aliases and physical copies, shortened selections,
-sparse window fills, transfer failures, complete-context retention, secondary
-promotion/export, geometry and sizing, and required opaque IDs on generation
-surfaces. Scheduler and manager tests use metadata and disposable containers;
+The source tests exercise content matching under new and existing IDs, shared
+eviction, whole-agent retention and its bound, attention prefix aliases, sparse
+window availability and fills, transfer failures, complete-context retention,
+secondary promotion/export, geometry and sizing, and required opaque IDs on
+generation surfaces. Scheduler and manager tests use metadata and disposable containers;
 they do not require a GPU or model execution.
 
 The deployment's landmark transformations, reviewed diffs, source hashes and

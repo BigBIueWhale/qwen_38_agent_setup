@@ -9122,7 +9122,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'def _new_descriptor_buffers(\n'},)},
  {'name': 'shared-prefix-cache-and-user-capacity',
   'review_patch': 'patches/vllm-shared-prefix-cache-and-user-capacity.patch',
-  'review_sha256': '736183bab22bb200053d38990ef0a51d7721a711542f241bde07f723aa2ce892',
+  'review_sha256': '96d9a7805f76eda6c8b20451aabd8cbb49482158c6d71c6f0db571a6711f3776',
   'files': ({'path': 'tests/config/test_config_utils.py',
              'before_sha256': 'ca93f4a4de7c00f353e1de0f73a81ff632c5731c15904aec4bcb165b751ddd87',
              'after_sha256': '4f5ea0399cc3b4f9603df07e2cc26d32e1eddf6b98a36c0f30d580321879c038'},
@@ -9134,7 +9134,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'after_sha256': '858f15c077a1fa031228bcf8e2d92a7a479a07f2d7da32b106f8eab419b7901b'},
             {'path': 'tests/entrypoints/test_kv_scope_protocol.py',
              'before_sha256': None,
-             'after_sha256': '17eb84050768d5a85708464c4105d45552b1f85717f4eb6b8c71e34e51cf6dc4'},
+             'after_sha256': '1dcfd97db5993633b575e848a562ea7b8f615404ff8ee1f2dd930bf4143c0932'},
             {'path': 'tests/evals/gsm8k/test_gsm8k_offloading.py',
              'before_sha256': '3e61db44e67ef27bb0c8351900a9f65db42ba86b543e0b569df9dc2f181d7612',
              'after_sha256': 'a7ced3b714c418120c2e4d5cfb55690d3b11baa96083256c2bb640dc80eec3f6'},
@@ -9144,15 +9144,9 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
             {'path': 'tests/v1/core/test_kv_cache_users_sizing.py',
              'before_sha256': None,
              'after_sha256': '2132b5961217378fb7877958e18164a64f4a1705f76342ff60e74f7c47963f9c'},
-            {'path': 'tests/v1/core/test_prefix_cache.py',
-             'before_sha256': None,
-             'after_sha256': '16db164fabf9de35b9d643a74cb8785baf6e6c9bf56f34977d01886fe0eb9a1a'},
             {'path': 'tests/v1/core/test_prefix_caching.py',
              'before_sha256': '94d3de218e2580d3ef214e7d186d5b0d231247a5b20c8c718790162eb307ff2a',
-             'after_sha256': '8350df869cf4dfe35fcc7ef253374a9239a7745ecc51a26e9b0b37f08e8a4bc8'},
-            {'path': 'tests/v1/core/test_single_type_kv_cache_manager.py',
-             'before_sha256': '42572635062adb9fdd39c8d7aafb5b7ee255f42fa0c358b1c9526bfa7c6a1c14',
-             'after_sha256': 'bf03a46ee50027170619bb2a4474830126ff5f6f02d58e4f8992c55f2226c6ff'},
+             'after_sha256': '7ceb00826d43dc4186bb746e64c6e650784d536a04127ccd7d02162f1fea4c4f'},
             {'path': 'tests/v1/e2e/general/test_context_length.py',
              'before_sha256': '1940b8fddc5a63db62a7133309bd87dabb98a75de3848b9c106383f7abf30aab',
              'after_sha256': '11f1dc8484d92d6414607a3cb1670d2832919166450f4ed684e1cdc59b4ead81'},
@@ -9173,13 +9167,10 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'after_sha256': 'b773dc65b320dfa3952cc04f4732d6772ed3aa06eca49d2fa3a911c38fb74fc6'},
             {'path': 'tests/v1/kv_connector/unit/offloading_connector/test_scheduler.py',
              'before_sha256': '7dfed75c7bc4b2b9bbc5cfdb146e0ccc6dc7a7093d7a544146fa1dd386c0322d',
-             'after_sha256': '62e95e1b34d87c3fc73cb45866204e29a8fc033c4c6e65796acdcbe1f81e6d8e'},
+             'after_sha256': '016959d9e34301478f18401f66312ebbc9ac7801f71bae62a6ae9995729783f2'},
             {'path': 'tests/v1/kv_connector/unit/offloading_connector/test_worker.py',
              'before_sha256': '766adc81edb9a36dad1cdb954bb963041cffe413dae0d5b8b4f1dffaa3dd4db2',
              'after_sha256': 'b8e5d70410134842f12a6a5274e3a60cf423549bd45ae923311fcbc618da6805'},
-            {'path': 'tests/v1/kv_connector/unit/offloading_connector/utils.py',
-             'before_sha256': '9b58f8b1f5ded3551959a7c485e187979fdefcd97321d40c23dee5adf255ba30',
-             'after_sha256': 'd483ede99960d85bcf1c77e1f57580750030e8b67fc80eaafdd2cfe6c36b1f0f'},
             {'path': 'tests/v1/kv_connector/unit/test_config.py',
              'before_sha256': '27e2eb147d74d99f820bb957935492b8c53e658d2d4034e2da8b75639c217333',
              'after_sha256': 'd3159c374919b21ae96b9a9eab49c1b33340b249513f4354984bfc7ae21e1e2c'},
@@ -9194,7 +9185,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'after_sha256': None},
             {'path': 'tests/v1/kv_offload/cpu/test_manager.py',
              'before_sha256': 'ea1fb0ad56dbecf4bccb4d157297809bc340b4f3e04800bec3e495c070f485cc',
-             'after_sha256': '0abe9a5480e0d268b6d8f98e8930498c67b4844dbf6cf2e4d042f7d75c802e0c'},
+             'after_sha256': '1dea9c01dc15292db00ad856b0c4eade9ed4bd65bbf01620e72234b80ba991ab'},
             {'path': 'tests/v1/kv_offload/test_factory.py',
              'before_sha256': '16fd72f0fb374015240734225a7bd62e9830cdd3c278e590b0a8749e1e151205',
              'after_sha256': '30697b1ef07da44f609a29c6638d634fd43f4cac81c753d16a4aca413e1416e2'},
@@ -9212,13 +9203,13 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'after_sha256': '9995d78ebe1d8037253362521119d4b4e2f2ee79f85629c668403ffd77962ba8'},
             {'path': 'tests/v1/kv_offload/tiering/test_tiering_offloading.py',
              'before_sha256': '07e61fbaae93f2ae82ecab8d7e3f90c7d44b6e0d207f58fc975f5bf284f8a11c',
-             'after_sha256': '4ebf998fb5f29781541761b117e194fce7ef06c14104d8cfa2e7fecbab11b536'},
+             'after_sha256': '2106bb9a5cf1dbbd9a869bc97b11e88aa55831a45bff13d27ab52c4dc96d8564'},
             {'path': 'tests/v1/simple_kv_offload/test_integration.py',
              'before_sha256': '5b8c46633e031c6dfb3f8764871ec5070d86a09c3a246e8dfa1bc16453ebe866',
              'after_sha256': '0dd7471507c88e209fe6a72359dfc655368c836cbe2cd3d95e1c0f72d38a4241'},
             {'path': 'tests/v1/simple_kv_offload/test_scheduler.py',
              'before_sha256': '1219e0e2160569262c4b80b6037be33526830ee923c3818a1b0c3916f8470c37',
-             'after_sha256': 'd036e691d91dd990228e3dc12c9e40f5a4cd552b49bae64fac29c6d8beed6281'},
+             'after_sha256': '430db8cc9d99844e7fd6099a6c7eac9ecadc4c0cff820db6ea62582de2443316'},
             {'path': 'vllm/config/cache.py',
              'before_sha256': '8790351601be188ed1cc7ad9de2af1978b238269da4724873af1185c91165ef6',
              'after_sha256': '82ab839cacb2e30f62f485c9e3ea32440fbf27beef00d1c60220f9776eb1ef43'},
@@ -9230,16 +9221,13 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'after_sha256': '328033f5240090ed684eeb4a96e67658b6839be9ccb6886483569c7bc2702c21'},
             {'path': 'vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py',
              'before_sha256': '616e7fd4cb0d09064cbc4d5735f607b37964c6be3b81e26de00d5913e0a9a3e3',
-             'after_sha256': '3afc05d7389a2590ef012279492c9526d5f0afe54b7909c9e5f8e8fd1857cc53'},
-            {'path': 'vllm/distributed/kv_transfer/kv_connector/v1/offloading_connector.py',
-             'before_sha256': 'b5ddf7c1c8c50f6183dcdc4247759865b88e2b1b415e605c7993f615534912e0',
-             'after_sha256': '0c46f6fb9c8b25c626c3d95b1463176e95f8a700afb2219e3ce4d267547ff5bb'},
+             'after_sha256': 'd1ba74da27133f83979baf3c11d79e7fe1d1c783c191f0696f25636cecab3889'},
             {'path': 'vllm/engine/arg_utils.py',
              'before_sha256': '75636c2a7903738f0e8954394fcedfced318d30a41598a8aca533be2ea2c38c4',
              'after_sha256': '88582e97c98ffcd16416e48eeea3db415cab1f33673c7ff8c1613fa83aad1eac'},
             {'path': 'vllm/entrypoints/anthropic/protocol.py',
              'before_sha256': 'b4841be67939294cfabbc5370452c3235f8c484fc9bcd2dea4821756db4df298',
-             'after_sha256': '511b25d3f4507d1908ff2ef6bfab6d0ff3ad0e656c869fda4fc0aa038a987e7c'},
+             'after_sha256': 'd5fdbbf102ace46a24c69e42e040ce72324d28b50244e8b3b132b7b1e3d66221'},
             {'path': 'vllm/entrypoints/anthropic/serving.py',
              'before_sha256': '0e67a46639b5369fad8de21a31799b4fe2bfbbd93c5d1df02911f0f98a08a43c',
              'after_sha256': 'b5a15aaae06b874814558fe5cdffc4fc212a5c926c279a1ad654f1ccb3778c2e'},
@@ -9251,19 +9239,19 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'after_sha256': '79f9bb1212884746964a347f7e4b39087b5ac084b1d72821a12efd2fb85bcb03'},
             {'path': 'vllm/entrypoints/openai/chat_completion/protocol.py',
              'before_sha256': '0dae9a86a71ec3bbe1d55e55e7c8c7e2c14a6a8f5b1fa3f98a5223a63165e77b',
-             'after_sha256': 'fe675435bc590e57f170075fa2d813591b04373e9b1fb23dd93e896f3c07d284'},
+             'after_sha256': '3daf3057960f7c77868a430baef559f2f345df159417fe506df09b4dceb3ecd4'},
             {'path': 'vllm/entrypoints/openai/cli_args.py',
              'before_sha256': '5b6c1c61bc9d25c703086b92a3e0040d21cc054305d9a0fbe69767dfd26af646',
              'after_sha256': '2c74b481652e1b7154df7836a98eb3ef1377092dc8ac4ae02095160907b5e36e'},
             {'path': 'vllm/entrypoints/openai/completion/protocol.py',
              'before_sha256': 'fce5b234ae7f7d4cddea55357d18a3cb79e979f4d249a96968146bf9ef3e25c0',
-             'after_sha256': '5b70feb0a6a59b6c763d64f5c8ab5fbc99750ff98cc055f4db70958b7bfc98ac'},
+             'after_sha256': 'f15939680ff6796c5b2b502f5a019209a53b7e966e8b621af0e9c432af07cf8a'},
             {'path': 'vllm/entrypoints/openai/responses/protocol.py',
              'before_sha256': 'ae15671c1863efa07573a6f2282fb7c7e364c0af7a778e50151241b501a5468e',
-             'after_sha256': 'bc0f16f37ee45ec9a5329c3b9bf51991c55ef89454f13b890128dd9f8e134983'},
+             'after_sha256': '33e914fc6a34a37a755fb04ee7c2d4c56513980d6622a0b00adef9939a3b194b'},
             {'path': 'vllm/entrypoints/scale_out/token_in_token_out/protocol.py',
              'before_sha256': '89cc87f17da8223c0467361d89daa0eb74d2647a896af88682a061c4e0c39e0d',
-             'after_sha256': '2f668f2796cfc767777771508f2ad439bf96ba9d560f288212e3d675d99e2a7d'},
+             'after_sha256': 'a392d732e3fc061fa477e1ad702eb11a505029d179bf6d98e75d9a641124eda7'},
             {'path': 'vllm/entrypoints/scale_out/token_in_token_out/serving.py',
              'before_sha256': '9e840e76e30863769ca653eabfa89c1e0e17c998751cd29da5313192404419ce',
              'after_sha256': 'c055a75cd9148521bdf921110dcd54d7fa6fad17d2cfd552c23e775946beff7a'},
@@ -9272,28 +9260,19 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'after_sha256': '44dcae7ec3cf943de5c2e11125adf7e75676b12e627ed02c213e8dd38049f371'},
             {'path': 'vllm/v1/core/block_pool.py',
              'before_sha256': 'ddee56dccb2208411b3a035918e917ce8f56a9858471e9ca12b420d5d79bc69c',
-             'after_sha256': 'fb1a35481812980aed5370ee54a684261673547a359fff763f13422ed3802140'},
-            {'path': 'vllm/v1/core/kv_cache_coordinator.py',
-             'before_sha256': 'e88a023b2364907140520bc333f25e3477eb8c6a3fff2cb8eeabca8e6e1d25ef',
-             'after_sha256': 'fd0373ae5fb314eb1a2a8c064560835224459a0147c10ea238094915f22f52a5'},
-            {'path': 'vllm/v1/core/kv_cache_manager.py',
-             'before_sha256': '2d20c3d98845cfd8d88a2f66b8fc6402ea1fcfbee16879d2364a4a9e45b8fa47',
-             'after_sha256': 'af5f1204087629e4467b294eadd982a3255e01581b42a58a0ec3758c404286c5'},
+             'after_sha256': '7370727256c2743a952053572503e6bd8f51c61edf8cddf030e34898c8d2903f'},
             {'path': 'vllm/v1/core/kv_cache_utils.py',
              'before_sha256': '088f2201bee86fade694e78141b6e99a5cd0cdd23c5c7ab3526dd119f76e4aec',
              'after_sha256': '83cfaccc6607e8b850484aab0373bbfb326c072d606952dd42f21e41192dc8e7'},
-            {'path': 'vllm/v1/core/prefix_cache.py',
-             'before_sha256': None,
-             'after_sha256': '74cdbe60273641df0df7e0158da777314fe74ca29ccb539f16340ec7a2687ef4'},
             {'path': 'vllm/v1/core/single_type_kv_cache_manager.py',
              'before_sha256': 'dc6d2e64cc4cd8cbb3f4bd77d2d035038658d75b6e52f9ace0cf637a4897f71f',
-             'after_sha256': 'e4d62562736aed93d394ba43f82654b207dd6f926a707e0b015d105129fd2131'},
+             'after_sha256': 'c96644fbb3404fe67151abdb46dcbfbde6788f7d65eb29c1ab8060caa0c628df'},
             {'path': 'vllm/v1/engine/input_processor.py',
              'before_sha256': '2b9e64486ce316fb4bc2293f18b1f005ae2e4b9adc60e39331a5add342b4b018',
              'after_sha256': '27944f76eb87665136d73ce3b9330abd4af02fb85e62b03bb334c7a219e3bbbe'},
             {'path': 'vllm/v1/kv_offload/base.py',
              'before_sha256': '8c999cc328d61e8cbaa0bc27b9f2488eb5323218807717ded69e9f6ecdfe7ef4',
-             'after_sha256': 'e8fff9428338aa2c0d86c2ae1bdbb35e1e2338620e121656ac4f6da0fbd6779a'},
+             'after_sha256': 'd3f86b26330e057a7b030c7b4e32417acf18822e443ebf224d9393e67b86acc1'},
             {'path': 'vllm/v1/kv_offload/config.py',
              'before_sha256': '92fbcc19d9e863c80676f03540c4a4b68b3943979b80123cc219ff114a92f955',
              'after_sha256': '50daea7891442fa779743796c343fe0a09bdcd0266910bf83b35509e533c3b89'},
@@ -9305,7 +9284,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'after_sha256': '0cd50f3deea7c8e91de072dde5d55f96edb6c0b35525c2d144ade7ae4e1b8a91'},
             {'path': 'vllm/v1/kv_offload/cpu/manager.py',
              'before_sha256': '64b7ade9508fc4d1af5d7e67f030c05b3fe4b5dca0bcb6e91469ca0a127906c2',
-             'after_sha256': 'c6761a1151887f4fb4c3223de0e57f29e523a9568a4652c646c2fbb5f8ccecbf'},
+             'after_sha256': '020810a735801dcd4f6740a43a76d8c654a1dc25de92e5e3e27df1aecb973455'},
             {'path': 'vllm/v1/kv_offload/cpu/policies/arc.py',
              'before_sha256': 'ff12419f9cb4fb84c4029ff3346319d43d02365a8c74748c35fbbdb3066e91d6',
              'after_sha256': None},
@@ -9323,16 +9302,13 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'after_sha256': '02bb64e4052092229e372002acdedb5206d3709698e88ff4c5e33b26da836e93'},
             {'path': 'vllm/v1/kv_offload/tiering/manager.py',
              'before_sha256': 'ebf34d67e83071b88be0e955c399f524c026965d8d41a0e3ffce68fd8ebee90c',
-             'after_sha256': 'c1119810cd34feb028e739f35ccce8fbf1793997e13766fa1d595fd8c9efaae4'},
+             'after_sha256': 'b63a0d85d3cff32a27f82ebc9df6749cf2e64e6fe439dcae7adad00000817a13'},
             {'path': 'vllm/v1/kv_offload/tiering/spec.py',
              'before_sha256': 'ff882d9e406e084d845cdc476771ace68a55843efe7735d74525cdf45b13cb77',
              'after_sha256': 'a78615eeb2befe97739461b1db84b4fa79ebd3690fc63a807e2bed1ef2dc12f8'},
             {'path': 'vllm/v1/request.py',
              'before_sha256': '9894e1e7d12850796c04f2f17116f7cea58daaa78ec9e24294df136c37b41e60',
              'after_sha256': '6281dcb0f3562cf6cc365e8fa43b1fd8d4fe06e136900fd49d2cbe718cbd0839'},
-            {'path': 'vllm/v1/simple_kv_offload/manager.py',
-             'before_sha256': 'd17d29556e61b82f6a8b3da998b995622bc0aed8ae395249bf315d21998fef9a',
-             'after_sha256': 'bb8358c21057634fae53c34346588b7dd854b66fe6b6085947aac25f9ebbaef5'},
             {'path': 'vllm/v1/worker/gpu_worker.py',
              'before_sha256': '7ed4d59ee05cfefcdf16ffc901767e3c8a51d0fb0da4309cbd7b389bca96b7d2',
              'after_sha256': '083561f27ca5f0ce4d5c3e133565e13631572947524757035051eb938a067a6e'},
@@ -9610,10 +9586,9 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '"""Every generation surface carries the same opaque '
                       'cache-accounting ID.\n'
                       '\n'
-                      'An agent without cached blocks may acquire a shared prefix; '
-                      'existing agents\n'
-                      'match their acquired cache and extend it. ID syntax does not '
-                      'encode ancestry.\n'
+                      'Prefix reuse matches content and cache_salt whatever the ID; '
+                      'the ID groups\n'
+                      'what the KV tiers retain. ID syntax does not encode ancestry.\n'
                       'Rendering needs no ID because it allocates no KV. The shared '
                       'engine boundary\n'
                       'requires an ID for generation, including direct SamplingParams '
@@ -9890,10 +9865,10 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '"""Every generation surface carries the same opaque '
                              'cache-accounting ID.\n'
                              '\n'
-                             'An agent without cached blocks may acquire a shared '
-                             'prefix; existing agents\n'
-                             'match their acquired cache and extend it. ID syntax does '
-                             'not encode ancestry.\n'
+                             'Prefix reuse matches content and cache_salt whatever the '
+                             'ID; the ID groups\n'
+                             'what the KV tiers retain. ID syntax does not encode '
+                             'ancestry.\n'
                              'Rendering needs no ID because it allocates no KV. The '
                              'shared engine boundary\n'
                              'requires an ID for generation, including direct '
@@ -10709,1054 +10684,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    )\n'
                              '    assert config_a.num_blocks == expected_blocks\n'
                              '    assert config_b.num_blocks == expected_blocks\n'},
-            {'name': 'tests/v1/core/test_prefix_cache.py:landmark-1',
-             'path': 'tests/v1/core/test_prefix_cache.py',
-             'before': '',
-             'after': '# SPDX-License-Identifier: Apache-2.0\n'
-                      '# SPDX-FileCopyrightText: Copyright contributors to the vLLM '
-                      'project\n'
-                      'import pytest\n'
-                      '\n'
-                      'from vllm.v1.core.prefix_cache import PrefixCacheIndex\n'
-                      '\n'
-                      '\n'
-                      'def test_first_acquisition_then_own_cache_and_extensions():\n'
-                      '    index = PrefixCacheIndex()\n'
-                      "    index.register_tier('CPU', 16)\n"
-                      "    index.register_tier('GPU', 16)\n"
-                      "    for key in [b'prefix', b'writer-tail']:\n"
-                      "        index.insert('CPU', key, (key,))\n"
-                      "        index.acquire('CPU', 'writer', [key])\n"
-                      "    first_lookup = index.view('new-agent')\n"
-                      "    assert first_lookup.permits(b'prefix')\n"
-                      "    assert first_lookup.permits(b'writer-tail')\n"
-                      "    index.acquire('CPU', 'new-agent', [b'prefix'])\n"
-                      "    own_lookup = index.view('new-agent')\n"
-                      "    assert own_lookup.permits(b'prefix')\n"
-                      "    assert not own_lookup.permits(b'writer-tail')\n"
-                      "    index.insert('GPU', b'own-extension', (b'own-extension',))\n"
-                      "    index.acquire('GPU', 'new-agent', [b'own-extension'])\n"
-                      "    assert index.view('new-agent').permits(b'own-extension')\n"
-                      "    assert not index.view('new-agent').permits(b'writer-tail')\n"
-                      '\n'
-                      '\n'
-                      "@pytest.mark.parametrize('first,second', [('GPU', 'CPU'), "
-                      "('CPU', 'GPU')])\n"
-                      'def '
-                      'test_own_cache_in_either_tier_prevents_another_initial_acquisition(first, '
-                      'second):\n'
-                      '    index = PrefixCacheIndex()\n'
-                      "    index.register_tier('CPU', 16)\n"
-                      "    index.register_tier('GPU', 16)\n"
-                      "    index.insert(first, b'own', (b'own',))\n"
-                      "    index.acquire(first, 'agent', [b'own'])\n"
-                      "    index.insert(second, b'another', (b'another',))\n"
-                      "    index.acquire(second, 'another-agent', [b'another'])\n"
-                      "    assert index.view('agent').permits(b'own')\n"
-                      "    assert not index.view('agent').permits(b'another')\n"
-                      '\n'
-                      '\n'
-                      'def '
-                      'test_releasing_one_agent_keeps_another_agents_shared_cache():\n'
-                      '    index = PrefixCacheIndex()\n'
-                      "    index.register_tier('CPU', 16)\n"
-                      "    index.register_tier('GPU', 16)\n"
-                      "    index.insert('CPU', b'shared', (b'shared',))\n"
-                      "    for agent in ['first', 'second']:\n"
-                      "        index.acquire('CPU', agent, [b'shared'])\n"
-                      "    index.release_agent('CPU', 'first')\n"
-                      "    assert index.view('first').keys is None\n"
-                      "    assert index.view('second').keys == frozenset({b'shared'})\n"
-                      '\n'
-                      '\n'
-                      'def test_tier_eviction_preserves_membership_in_another_tier():\n'
-                      '    index = PrefixCacheIndex()\n'
-                      "    index.register_tier('CPU', 16)\n"
-                      "    index.register_tier('GPU', 16)\n"
-                      "    for tier in ['CPU', 'GPU']:\n"
-                      "        index.insert(tier, b'shared', (b'shared',))\n"
-                      "        index.acquire(tier, 'agent', [b'shared'])\n"
-                      "    index.release_agent('CPU', 'agent')\n"
-                      "    assert index.view('agent').keys == frozenset({b'shared'})\n"
-                      "    index.remove('GPU', b'shared')\n"
-                      "    assert index.view('agent').keys is None\n"
-                      '\n'
-                      '\n'
-                      'def test_removing_last_physical_copy_removes_membership():\n'
-                      '    index = PrefixCacheIndex()\n'
-                      "    index.register_tier('CPU', 16)\n"
-                      "    index.register_tier('GPU', 16)\n"
-                      "    index.insert('GPU', b'key', (b'key',))\n"
-                      "    index.insert('GPU', b'key', (b'key',))\n"
-                      "    index.acquire('GPU', 'agent', [b'key'])\n"
-                      "    index.remove('GPU', b'key')\n"
-                      "    assert index.view('agent').keys == frozenset({b'key'})\n"
-                      "    index.remove('GPU', b'key')\n"
-                      "    assert index.view('agent').keys is None\n"
-                      '\n'
-                      '\n'
-                      'def '
-                      'test_candidate_lookup_is_read_only_and_its_view_is_stable():\n'
-                      '    index = PrefixCacheIndex()\n'
-                      "    index.register_tier('CPU', 16)\n"
-                      "    index.register_tier('GPU', 16)\n"
-                      "    index.insert('CPU', b'first', (b'first',))\n"
-                      "    index.insert('CPU', b'second', (b'second',))\n"
-                      "    view = index.view('agent')\n"
-                      "    assert view.permits(b'first')\n"
-                      "    assert index.view('agent').keys is None\n"
-                      "    index.acquire('CPU', 'agent', [b'first'])\n"
-                      "    assert view.permits(b'second')\n"
-                      "    assert not index.view('agent').permits(b'second')\n"
-                      '\n'
-                      '\n'
-                      'def '
-                      'test_reset_and_duplicate_acquisition_count_membership_exactly():\n'
-                      '    index = PrefixCacheIndex()\n'
-                      "    index.register_tier('CPU', 16)\n"
-                      "    index.register_tier('GPU', 16)\n"
-                      "    for tier in ['CPU', 'GPU']:\n"
-                      "        index.insert(tier, b'key', (b'key',))\n"
-                      "        index.acquire(tier, 'agent', [b'key', b'key'])\n"
-                      "    index.reset('CPU')\n"
-                      "    assert index.view('agent').keys == frozenset({b'key'})\n"
-                      "    index.reset('GPU')\n"
-                      "    assert index.view('agent').keys is None\n"
-                      '    assert index._owned == {} and all(not t.entries and not '
-                      't.references for t in index._tiers.values())\n'
-                      '\n'
-                      '\n'
-                      'def make_gpu_cache():\n'
-                      '    from types import SimpleNamespace\n'
-                      '    from vllm.v1.core.block_pool import BlockPool\n'
-                      '\n'
-                      '    pool = BlockPool(8, enable_caching=True, '
-                      'hash_block_size=16)\n'
-                      '    blocks = pool.get_new_blocks(2)\n'
-                      "    request = SimpleNamespace(kv_scope='writer', "
-                      "block_hashes=[b'prefix', b'writer-tail'])\n"
-                      '    pool.cache_full_blocks(request, blocks, 0, 2, 16, 0, '
-                      'is_recurrent=False)\n'
-                      '    return pool, request, blocks\n'
-                      '\n'
-                      '\n'
-                      'def test_gpu_initial_prefix_acquisition_then_only_own_cache():\n'
-                      '    from types import SimpleNamespace\n'
-                      '    from vllm.v1.core.kv_cache_utils import '
-                      'make_block_hash_with_group_id\n'
-                      '\n'
-                      '    pool, request, blocks = make_gpu_cache()\n'
-                      "    view = pool.prefix_cache.view('new-agent')\n"
-                      "    assert pool.get_cached_block(b'prefix', [0], view) == "
-                      '[blocks[0]]\n'
-                      "    assert pool.get_cached_block(b'writer-tail', [0], view) == "
-                      '[blocks[1]]\n'
-                      "    selected = SimpleNamespace(kv_scope='new-agent', "
-                      'block_hashes=request.block_hashes)\n'
-                      '    pool.acquire_cached_blocks(selected, ([blocks[0]],), 16)\n'
-                      "    view = pool.prefix_cache.view('new-agent')\n"
-                      "    assert pool.get_cached_block(b'prefix', [0], view) == "
-                      '[blocks[0]]\n'
-                      "    assert pool.get_cached_block(b'writer-tail', [0], view) is "
-                      'None\n'
-                      '\n'
-                      '    own_tail = pool.get_new_blocks(1)\n'
-                      "    selected.block_hashes = [b'prefix', b'own-tail']\n"
-                      '    pool.cache_full_blocks(selected, [blocks[0], own_tail[0]], '
-                      '1, 2, 16, 0, is_recurrent=False)\n'
-                      "    owned = pool.prefix_cache.view('new-agent')\n"
-                      '    assert owned.keys == frozenset({\n'
-                      "        make_block_hash_with_group_id(b'prefix', 0),\n"
-                      "        make_block_hash_with_group_id(b'own-tail', 0),\n"
-                      '    })\n'
-                      '\n'
-                      '\n'
-                      'def test_gpu_and_cpu_use_the_same_existing_agent_membership():\n'
-                      '    from vllm.v1.kv_offload.base import LookupResult, '
-                      'ReqContext, make_offload_key\n'
-                      '    from vllm.v1.kv_offload.cpu.manager import '
-                      'CPUOffloadingManager\n'
-                      '\n'
-                      '    pool, request, blocks = make_gpu_cache()\n'
-                      '    manager = CPUOffloadingManager(4)\n'
-                      '    manager.bind_prefix_cache(pool.prefix_cache)\n'
-                      "    cpu_agent = ReqContext('cpu-request', "
-                      "kv_scope='cpu-agent')\n"
-                      "    cpu_key = make_offload_key(b'cpu-only', 0)\n"
-                      '    cpu_agent.prefix_content[cpu_key] = (cpu_key,)\n'
-                      '    result = manager.prepare_store([cpu_key], cpu_agent)\n'
-                      '    manager.complete_store(result.keys_to_store, cpu_agent)\n'
-                      "    assert pool.get_cached_block(b'prefix', [0], "
-                      "pool.prefix_cache.view('cpu-agent')) is None\n"
-                      '\n'
-                      "    gpu_agent = ReqContext('gpu-request', kv_scope='writer')\n"
-                      '    manager.begin_lookup(gpu_agent)\n'
-                      '    assert manager.lookup(cpu_key, gpu_agent) is '
-                      'LookupResult.MISS\n'
-                      "    fresh = ReqContext('fresh-request', "
-                      "kv_scope='fresh-agent')\n"
-                      '    manager.begin_lookup(fresh)\n'
-                      '    assert manager.lookup(cpu_key, fresh) is LookupResult.HIT\n'
-                      '\n'
-                      '\n'
-                      'def '
-                      'test_gpu_copy_on_write_moves_preserve_every_acquired_membership():\n'
-                      '    from types import SimpleNamespace\n'
-                      '\n'
-                      '    pool, request, blocks = make_gpu_cache()\n'
-                      "    selected = SimpleNamespace(kv_scope='reader', "
-                      'block_hashes=request.block_hashes)\n'
-                      '    pool.acquire_cached_blocks(selected, ([blocks[0]],), 16)\n'
-                      "    before = pool.prefix_cache.view('reader')\n"
-                      '    destination = pool.get_new_blocks(1)[0]\n'
-                      '    pool.move_block_hashes(blocks[0], destination)\n'
-                      "    assert pool.prefix_cache.view('reader') == before\n"
-                      "    assert pool.get_cached_block(b'prefix', [0], before) == "
-                      '[destination]\n'
-                      '    pool._maybe_evict_cached_block(destination)\n'
-                      "    assert pool.prefix_cache.view('reader').keys is None\n"
-                      "    assert pool.prefix_cache.view('writer').keys is not None\n"
-                      '\n'
-                      '\n'
-                      'def '
-                      'test_speculative_cpu_promotion_does_not_acquire_a_prefix():\n'
-                      '    from vllm.v1.kv_offload.base import LookupResult, '
-                      'ReqContext\n'
-                      '    from vllm.v1.kv_offload.cpu.manager import '
-                      'CPUOffloadingManager\n'
-                      '\n'
-                      '    manager = CPUOffloadingManager(3)\n'
-                      "    ctx = ReqContext('request', kv_scope='new-agent')\n"
-                      '    manager.begin_lookup(ctx)\n'
-                      "    ctx.prefix_content[b'candidate'] = (b'candidate',)\n"
-                      "    result = manager._prepare_store([b'candidate'], ctx)\n"
-                      '    manager.complete_store(result.keys_to_store, ctx)\n'
-                      '    assert manager.prefix_cache.view(ctx.kv_scope).keys is '
-                      'None\n'
-                      '    manager.begin_lookup(ctx)\n'
-                      "    assert manager.lookup(b'candidate', ctx) is "
-                      'LookupResult.HIT\n'
-                      "    manager.retain_context([b'candidate'], ctx)\n"
-                      '    assert manager.prefix_cache.view(ctx.kv_scope).keys == '
-                      "frozenset({b'candidate'})\n"
-                      '\n'
-                      '\n'
-                      "@pytest.mark.parametrize('is_recurrent', [False, True])\n"
-                      'def '
-                      'test_coalesced_cpu_chunk_describes_exactly_its_contained_gpu_data(is_recurrent):\n'
-                      '    """An attention span contains sub-blocks; a checkpoint '
-                      'contains one state."""\n'
-                      '    from types import SimpleNamespace\n'
-                      '    from vllm.v1.core.block_pool import BlockPool\n'
-                      '    from vllm.v1.core.prefix_cache import cache_content_keys\n'
-                      '    from vllm.v1.kv_offload.base import LookupResult, '
-                      'ReqContext\n'
-                      '    from vllm.v1.kv_offload.cpu.manager import '
-                      'CPUOffloadingManager\n'
-                      '\n'
-                      '    pool = BlockPool(16, enable_caching=True, '
-                      'hash_block_size=4)\n'
-                      '    hashes = [bytes([i]) for i in range(1, 13)]\n'
-                      "    request = SimpleNamespace(kv_scope='producer', "
-                      'block_hashes=hashes)\n'
-                      '    blocks = pool.get_new_blocks(6)\n'
-                      '    pool.cache_full_blocks(request, blocks, 0, 6, 8, 0, '
-                      'is_recurrent=is_recurrent)\n'
-                      '    manager = CPUOffloadingManager(4)\n'
-                      '    manager.bind_prefix_cache(pool.prefix_cache)\n'
-                      '    # This chunk spans tokens 16..32: it does not include '
-                      'tokens 0..16.\n'
-                      '    content = cache_content_keys(hashes[5:8:2] if is_recurrent '
-                      'else hashes[4:8], 0)\n'
-                      '    key = content[-1]\n'
-                      "    ctx = ReqContext('store', kv_scope='cpu-agent', "
-                      'prefix_content={key: content})\n'
-                      '    output = manager.prepare_store([key], ctx)\n'
-                      '    manager.complete_store(output.keys_to_store, ctx)\n'
-                      "    view = pool.prefix_cache.view('cpu-agent')\n"
-                      '    assert pool.get_cached_block(hashes[3], [0], view) is None\n'
-                      '    assert pool.get_cached_block(hashes[5], [0], view) == '
-                      '[blocks[2]]\n'
-                      '    assert pool.get_cached_block(hashes[7], [0], view) == '
-                      '[blocks[3]]\n'
-                      '    assert pool.get_cached_block(hashes[9], [0], view) is None\n'
-                      '    assert view.permits(cache_content_keys([hashes[4]], 0)[0]) '
-                      'is (not is_recurrent)\n'
-                      '\n'
-                      '    # Owning just the final GPU block cannot acquire the '
-                      'earlier part of a\n'
-                      '    # larger CPU chunk that happens to have the same end hash.\n'
-                      "    selected = SimpleNamespace(kv_scope='gpu-agent', "
-                      'block_hashes=hashes)\n'
-                      '    pool.acquire_cached_blocks(selected, ([blocks[3]],), 32)\n'
-                      "    gpu_ctx = ReqContext('load', kv_scope='gpu-agent')\n"
-                      '    manager.begin_lookup(gpu_ctx)\n'
-                      '    assert manager.lookup(key, gpu_ctx) is LookupResult.MISS\n'
-                      '\n'
-                      '\n'
-                      'def '
-                      'test_partial_recurrent_checkpoint_does_not_acquire_earlier_states():\n'
-                      '    from types import SimpleNamespace\n'
-                      '    from vllm.v1.core.block_pool import BlockPool\n'
-                      '    from vllm.v1.core.prefix_cache import cache_content_keys\n'
-                      '\n'
-                      '    pool = BlockPool(8, enable_caching=True, '
-                      'hash_block_size=4)\n'
-                      '    hashes = [bytes([i]) for i in range(1, 9)]\n'
-                      '    block = pool.get_new_blocks(1)[0]\n'
-                      "    request = SimpleNamespace(kv_scope='agent', "
-                      'block_hashes=hashes)\n'
-                      '    pool.cache_partial_block(request, block, 28, 0, 16, '
-                      'is_recurrent=True)\n'
-                      "    view = pool.prefix_cache.view('agent')\n"
-                      '    assert view.keys == '
-                      'frozenset(cache_content_keys([hashes[6]], 0))\n'
-                      '\n'
-                      '\n'
-                      'def '
-                      'test_prefix_shortened_inside_attention_block_acquires_only_selected_data():\n'
-                      '    """EAGLE may replay a tail after lookup selected a larger '
-                      'physical block."""\n'
-                      '    from types import SimpleNamespace\n'
-                      '    from vllm.v1.core.block_pool import BlockPool\n'
-                      '    from vllm.v1.core.prefix_cache import cache_content_keys\n'
-                      '\n'
-                      '    pool = BlockPool(8, enable_caching=True, '
-                      'hash_block_size=4)\n'
-                      '    hashes = [bytes([i]) for i in range(1, 5)]\n'
-                      '    block = pool.get_new_blocks(1)[0]\n'
-                      "    writer = SimpleNamespace(kv_scope='writer', "
-                      'block_hashes=hashes)\n'
-                      '    pool.cache_full_blocks(writer, [block], 0, 1, 16, 0, '
-                      'is_recurrent=False)\n'
-                      "    fork = SimpleNamespace(kv_scope='fork', "
-                      'block_hashes=hashes)\n'
-                      '    pool.acquire_cached_blocks(fork, ([block],), 8)\n'
-                      "    assert pool.prefix_cache.view('fork').keys == "
-                      'frozenset(cache_content_keys(hashes[:2], 0))\n'
-                      '    assert pool.get_cached_block(hashes[-1], [0], '
-                      "pool.prefix_cache.view('fork')) is None\n"
-                      '\n'
-                      '\n'
-                      'def '
-                      'test_physical_copy_to_cpu_keeps_every_users_selected_content():\n'
-                      '    from vllm.v1.core.block_pool import BlockPool\n'
-                      '    from types import SimpleNamespace\n'
-                      '\n'
-                      '    gpu, writer, blocks = make_gpu_cache()\n'
-                      "    reader = SimpleNamespace(kv_scope='reader', "
-                      'block_hashes=writer.block_hashes)\n'
-                      '    gpu.acquire_cached_blocks(reader, ([blocks[0]],), 16)\n'
-                      '    cpu = BlockPool(8, enable_caching=True, '
-                      'hash_block_size=16)\n'
-                      '    cpu.bind_prefix_cache(gpu.prefix_cache)\n'
-                      '    copy = cpu.get_new_blocks(1)[0]\n'
-                      '    key = blocks[0].block_hash\n'
-                      '    # A transfer stamps metadata before completion makes it '
-                      'discoverable.\n'
-                      '    copy.set_block_hash(key, num_tokens=16)\n'
-                      '    cpu._insert_block_hash(key, copy, 16, '
-                      'gpu.prefix_cache.content(gpu.cache_tier, key))\n'
-                      '    gpu.prefix_cache.copy_membership(gpu.cache_tier, '
-                      'cpu.cache_tier, key)\n'
-                      '    gpu._maybe_evict_cached_block(blocks[0])\n'
-                      "    for agent in ['writer', 'reader']:\n"
-                      '        view = gpu.prefix_cache.view(agent)\n'
-                      '        assert view.keys is not None\n'
-                      "        assert cpu.get_cached_block(b'prefix', [0], view) == "
-                      '[copy]\n'
-                      '\n'
-                      '\n'
-                      'def '
-                      'test_attention_extension_preserves_a_forks_immutable_partial_prefix():\n'
-                      '    from types import SimpleNamespace\n'
-                      '    from vllm.v1.core.block_pool import BlockPool\n'
-                      '    from vllm.v1.core.prefix_cache import cache_content_keys\n'
-                      '\n'
-                      '    pool = BlockPool(8, enable_caching=True, '
-                      'hash_block_size=4)\n'
-                      '    hashes = [bytes([i]) for i in range(1, 5)]\n'
-                      '    block = pool.get_new_blocks(1)[0]\n'
-                      "    writer = SimpleNamespace(kv_scope='writer', "
-                      'block_hashes=hashes)\n'
-                      '    pool.cache_partial_block(writer, block, 8, 0, 16, '
-                      'is_recurrent=False)\n'
-                      "    fork = SimpleNamespace(kv_scope='fork', "
-                      'block_hashes=hashes)\n'
-                      '    pool.acquire_cached_blocks(fork, ([block],), 8)\n'
-                      '    pool.cache_full_blocks(writer, [block], 0, 1, 16, 0, '
-                      'is_recurrent=False)\n'
-                      "    view = pool.prefix_cache.view('fork')\n"
-                      '    assert view.keys == '
-                      'frozenset(cache_content_keys(hashes[:2], 0))\n'
-                      '    assert pool.get_cached_block(hashes[1], [0], view) == '
-                      '[block]\n'
-                      '    assert pool.get_cached_block(hashes[3], [0], view) is None\n'
-                      '    assert block.block_hash == cache_content_keys(hashes[3:], '
-                      '0)[0]\n'
-                      '\n'
-                      '\n'
-                      'def '
-                      'test_storage_transfer_can_precede_generation_without_inventing_an_agent():\n'
-                      '    from vllm.v1.kv_offload.base import ReqContext, '
-                      'LookupResult\n'
-                      '    from vllm.v1.kv_offload.cpu.manager import '
-                      'CPUOffloadingManager\n'
-                      '\n'
-                      '    m = CPUOffloadingManager(4)\n'
-                      "    physical = ReqContext('physical-transfer')\n"
-                      "    result = m._prepare_store([b'end'], physical)\n"
-                      '    m.complete_store(result.keys_to_store, physical)\n'
-                      "    assert m._lookup(b'end', physical) is LookupResult.HIT\n"
-                      '    assert m.prefix_cache._owned == {}\n'
-                      '    # The first generation supplies the content hash chain, '
-                      'then acquires it\n'
-                      '    # only when the scheduler selects the prefix.\n'
-                      "    generation = ReqContext('generation', kv_scope='agent',\n"
-                      "                            prefix_content={b'end': (b'first', "
-                      "b'end')})\n"
-                      '    m.begin_lookup(generation)\n'
-                      "    assert m.lookup(b'end', generation) is LookupResult.HIT\n"
-                      "    assert m.prefix_cache.view('agent').keys is None\n"
-                      "    m.retain_context([b'end'], generation)\n"
-                      "    assert m.prefix_cache.view('agent').keys == "
-                      "frozenset({b'first', b'end'})\n"
-                      '\n'
-                      '\n'
-                      'def '
-                      'test_secondary_facing_lookup_borrows_data_without_acquiring_a_prefix():\n'
-                      '    from unittest.mock import MagicMock\n'
-                      '    from vllm.v1.kv_offload.base import ReqContext, '
-                      'LookupResult\n'
-                      '    from vllm.v1.kv_offload.tiering.manager import (\n'
-                      '        CPUPrimaryTierOffloadingManager, '
-                      'TieringOffloadingManager,\n'
-                      '        _SecondaryTierFacingParent,\n'
-                      '    )\n'
-                      '\n'
-                      '    region = MagicMock()\n'
-                      '    region.create_kv_memoryview.return_value = '
-                      "memoryview(bytearray(64)).cast('B', shape=(4, 16))\n"
-                      '    primary = CPUPrimaryTierOffloadingManager(4, region)\n'
-                      '    manager = TieringOffloadingManager(primary)\n'
-                      "    generation = ReqContext('store', kv_scope='writer', "
-                      "prefix_content={b'key': (b'key',)})\n"
-                      '    manager.on_new_request(generation)\n'
-                      "    result = manager.prepare_store([b'key'], generation)\n"
-                      '    manager.complete_store(result.keys_to_store, generation)\n'
-                      '    manager.on_request_finished(generation)\n'
-                      "    before = primary.prefix_cache.view('writer')\n"
-                      '\n'
-                      '    parent = _SecondaryTierFacingParent(manager, 0)\n'
-                      "    storage = ReqContext('storage-request')\n"
-                      '    parent.on_new_request(storage)\n'
-                      "    assert parent.lookup(b'key', storage) is LookupResult.HIT\n"
-                      '    parent.on_request_finished(storage)\n'
-                      "    assert primary.prefix_cache.view('writer') == before\n"
-                      "    assert set(primary.prefix_cache._owned) == {'writer'}\n"
-                      '    assert storage.req_id not in manager._req_state\n'
-                      '    assert storage.req_id not in primary._contexts\n'
-                      '\n'
-                      '\n'
-                      'def '
-                      'test_filling_unwritten_data_preserves_each_agents_acquired_subset():\n'
-                      '    index = PrefixCacheIndex()\n'
-                      "    index.register_tier('CPU', 8)\n"
-                      "    index.insert('CPU', b'end', (b'middle', b'end'))\n"
-                      "    index.acquire('CPU', 'first', [b'end'])\n"
-                      "    index.acquire('CPU', 'second', [b'end'])\n"
-                      "    index.extend_content('CPU', b'end', (b'begin', b'middle', "
-                      "b'end'))\n"
-                      "    for agent in ['first', 'second']:\n"
-                      "        assert index.view(agent).keys == frozenset({b'middle', "
-                      "b'end'})\n"
-                      "    index.acquire('CPU', 'producer', [b'end'])\n"
-                      "    assert index.view('producer').keys == frozenset({b'begin', "
-                      "b'middle', b'end'})\n"
-                      "    assert not index.view('first').permits(b'begin')\n",
-             'review_before': '',
-             'review_after': '# SPDX-License-Identifier: Apache-2.0\n'
-                             '# SPDX-FileCopyrightText: Copyright contributors to the '
-                             'vLLM project\n'
-                             'import pytest\n'
-                             '\n'
-                             'from vllm.v1.core.prefix_cache import PrefixCacheIndex\n'
-                             '\n'
-                             '\n'
-                             'def '
-                             'test_first_acquisition_then_own_cache_and_extensions():\n'
-                             '    index = PrefixCacheIndex()\n'
-                             "    index.register_tier('CPU', 16)\n"
-                             "    index.register_tier('GPU', 16)\n"
-                             "    for key in [b'prefix', b'writer-tail']:\n"
-                             "        index.insert('CPU', key, (key,))\n"
-                             "        index.acquire('CPU', 'writer', [key])\n"
-                             "    first_lookup = index.view('new-agent')\n"
-                             "    assert first_lookup.permits(b'prefix')\n"
-                             "    assert first_lookup.permits(b'writer-tail')\n"
-                             "    index.acquire('CPU', 'new-agent', [b'prefix'])\n"
-                             "    own_lookup = index.view('new-agent')\n"
-                             "    assert own_lookup.permits(b'prefix')\n"
-                             "    assert not own_lookup.permits(b'writer-tail')\n"
-                             "    index.insert('GPU', b'own-extension', "
-                             "(b'own-extension',))\n"
-                             "    index.acquire('GPU', 'new-agent', "
-                             "[b'own-extension'])\n"
-                             '    assert '
-                             "index.view('new-agent').permits(b'own-extension')\n"
-                             '    assert not '
-                             "index.view('new-agent').permits(b'writer-tail')\n"
-                             '\n'
-                             '\n'
-                             "@pytest.mark.parametrize('first,second', [('GPU', "
-                             "'CPU'), ('CPU', 'GPU')])\n"
-                             'def '
-                             'test_own_cache_in_either_tier_prevents_another_initial_acquisition(first, '
-                             'second):\n'
-                             '    index = PrefixCacheIndex()\n'
-                             "    index.register_tier('CPU', 16)\n"
-                             "    index.register_tier('GPU', 16)\n"
-                             "    index.insert(first, b'own', (b'own',))\n"
-                             "    index.acquire(first, 'agent', [b'own'])\n"
-                             "    index.insert(second, b'another', (b'another',))\n"
-                             "    index.acquire(second, 'another-agent', "
-                             "[b'another'])\n"
-                             "    assert index.view('agent').permits(b'own')\n"
-                             "    assert not index.view('agent').permits(b'another')\n"
-                             '\n'
-                             '\n'
-                             'def '
-                             'test_releasing_one_agent_keeps_another_agents_shared_cache():\n'
-                             '    index = PrefixCacheIndex()\n'
-                             "    index.register_tier('CPU', 16)\n"
-                             "    index.register_tier('GPU', 16)\n"
-                             "    index.insert('CPU', b'shared', (b'shared',))\n"
-                             "    for agent in ['first', 'second']:\n"
-                             "        index.acquire('CPU', agent, [b'shared'])\n"
-                             "    index.release_agent('CPU', 'first')\n"
-                             "    assert index.view('first').keys is None\n"
-                             "    assert index.view('second').keys == "
-                             "frozenset({b'shared'})\n"
-                             '\n'
-                             '\n'
-                             'def '
-                             'test_tier_eviction_preserves_membership_in_another_tier():\n'
-                             '    index = PrefixCacheIndex()\n'
-                             "    index.register_tier('CPU', 16)\n"
-                             "    index.register_tier('GPU', 16)\n"
-                             "    for tier in ['CPU', 'GPU']:\n"
-                             "        index.insert(tier, b'shared', (b'shared',))\n"
-                             "        index.acquire(tier, 'agent', [b'shared'])\n"
-                             "    index.release_agent('CPU', 'agent')\n"
-                             "    assert index.view('agent').keys == "
-                             "frozenset({b'shared'})\n"
-                             "    index.remove('GPU', b'shared')\n"
-                             "    assert index.view('agent').keys is None\n"
-                             '\n'
-                             '\n'
-                             'def '
-                             'test_removing_last_physical_copy_removes_membership():\n'
-                             '    index = PrefixCacheIndex()\n'
-                             "    index.register_tier('CPU', 16)\n"
-                             "    index.register_tier('GPU', 16)\n"
-                             "    index.insert('GPU', b'key', (b'key',))\n"
-                             "    index.insert('GPU', b'key', (b'key',))\n"
-                             "    index.acquire('GPU', 'agent', [b'key'])\n"
-                             "    index.remove('GPU', b'key')\n"
-                             "    assert index.view('agent').keys == "
-                             "frozenset({b'key'})\n"
-                             "    index.remove('GPU', b'key')\n"
-                             "    assert index.view('agent').keys is None\n"
-                             '\n'
-                             '\n'
-                             'def '
-                             'test_candidate_lookup_is_read_only_and_its_view_is_stable():\n'
-                             '    index = PrefixCacheIndex()\n'
-                             "    index.register_tier('CPU', 16)\n"
-                             "    index.register_tier('GPU', 16)\n"
-                             "    index.insert('CPU', b'first', (b'first',))\n"
-                             "    index.insert('CPU', b'second', (b'second',))\n"
-                             "    view = index.view('agent')\n"
-                             "    assert view.permits(b'first')\n"
-                             "    assert index.view('agent').keys is None\n"
-                             "    index.acquire('CPU', 'agent', [b'first'])\n"
-                             "    assert view.permits(b'second')\n"
-                             "    assert not index.view('agent').permits(b'second')\n"
-                             '\n'
-                             '\n'
-                             'def '
-                             'test_reset_and_duplicate_acquisition_count_membership_exactly():\n'
-                             '    index = PrefixCacheIndex()\n'
-                             "    index.register_tier('CPU', 16)\n"
-                             "    index.register_tier('GPU', 16)\n"
-                             "    for tier in ['CPU', 'GPU']:\n"
-                             "        index.insert(tier, b'key', (b'key',))\n"
-                             "        index.acquire(tier, 'agent', [b'key', b'key'])\n"
-                             "    index.reset('CPU')\n"
-                             "    assert index.view('agent').keys == "
-                             "frozenset({b'key'})\n"
-                             "    index.reset('GPU')\n"
-                             "    assert index.view('agent').keys is None\n"
-                             '    assert index._owned == {} and all(not t.entries and '
-                             'not t.references for t in index._tiers.values())\n'
-                             '\n'
-                             '\n'
-                             'def make_gpu_cache():\n'
-                             '    from types import SimpleNamespace\n'
-                             '    from vllm.v1.core.block_pool import BlockPool\n'
-                             '\n'
-                             '    pool = BlockPool(8, enable_caching=True, '
-                             'hash_block_size=16)\n'
-                             '    blocks = pool.get_new_blocks(2)\n'
-                             "    request = SimpleNamespace(kv_scope='writer', "
-                             "block_hashes=[b'prefix', b'writer-tail'])\n"
-                             '    pool.cache_full_blocks(request, blocks, 0, 2, 16, 0, '
-                             'is_recurrent=False)\n'
-                             '    return pool, request, blocks\n'
-                             '\n'
-                             '\n'
-                             'def '
-                             'test_gpu_initial_prefix_acquisition_then_only_own_cache():\n'
-                             '    from types import SimpleNamespace\n'
-                             '    from vllm.v1.core.kv_cache_utils import '
-                             'make_block_hash_with_group_id\n'
-                             '\n'
-                             '    pool, request, blocks = make_gpu_cache()\n'
-                             "    view = pool.prefix_cache.view('new-agent')\n"
-                             "    assert pool.get_cached_block(b'prefix', [0], view) "
-                             '== [blocks[0]]\n'
-                             "    assert pool.get_cached_block(b'writer-tail', [0], "
-                             'view) == [blocks[1]]\n'
-                             "    selected = SimpleNamespace(kv_scope='new-agent', "
-                             'block_hashes=request.block_hashes)\n'
-                             '    pool.acquire_cached_blocks(selected, ([blocks[0]],), '
-                             '16)\n'
-                             "    view = pool.prefix_cache.view('new-agent')\n"
-                             "    assert pool.get_cached_block(b'prefix', [0], view) "
-                             '== [blocks[0]]\n'
-                             "    assert pool.get_cached_block(b'writer-tail', [0], "
-                             'view) is None\n'
-                             '\n'
-                             '    own_tail = pool.get_new_blocks(1)\n'
-                             "    selected.block_hashes = [b'prefix', b'own-tail']\n"
-                             '    pool.cache_full_blocks(selected, [blocks[0], '
-                             'own_tail[0]], 1, 2, 16, 0, is_recurrent=False)\n'
-                             "    owned = pool.prefix_cache.view('new-agent')\n"
-                             '    assert owned.keys == frozenset({\n'
-                             "        make_block_hash_with_group_id(b'prefix', 0),\n"
-                             "        make_block_hash_with_group_id(b'own-tail', 0),\n"
-                             '    })\n'
-                             '\n'
-                             '\n'
-                             'def '
-                             'test_gpu_and_cpu_use_the_same_existing_agent_membership():\n'
-                             '    from vllm.v1.kv_offload.base import LookupResult, '
-                             'ReqContext, make_offload_key\n'
-                             '    from vllm.v1.kv_offload.cpu.manager import '
-                             'CPUOffloadingManager\n'
-                             '\n'
-                             '    pool, request, blocks = make_gpu_cache()\n'
-                             '    manager = CPUOffloadingManager(4)\n'
-                             '    manager.bind_prefix_cache(pool.prefix_cache)\n'
-                             "    cpu_agent = ReqContext('cpu-request', "
-                             "kv_scope='cpu-agent')\n"
-                             "    cpu_key = make_offload_key(b'cpu-only', 0)\n"
-                             '    cpu_agent.prefix_content[cpu_key] = (cpu_key,)\n'
-                             '    result = manager.prepare_store([cpu_key], '
-                             'cpu_agent)\n'
-                             '    manager.complete_store(result.keys_to_store, '
-                             'cpu_agent)\n'
-                             "    assert pool.get_cached_block(b'prefix', [0], "
-                             "pool.prefix_cache.view('cpu-agent')) is None\n"
-                             '\n'
-                             "    gpu_agent = ReqContext('gpu-request', "
-                             "kv_scope='writer')\n"
-                             '    manager.begin_lookup(gpu_agent)\n'
-                             '    assert manager.lookup(cpu_key, gpu_agent) is '
-                             'LookupResult.MISS\n'
-                             "    fresh = ReqContext('fresh-request', "
-                             "kv_scope='fresh-agent')\n"
-                             '    manager.begin_lookup(fresh)\n'
-                             '    assert manager.lookup(cpu_key, fresh) is '
-                             'LookupResult.HIT\n'
-                             '\n'
-                             '\n'
-                             'def '
-                             'test_gpu_copy_on_write_moves_preserve_every_acquired_membership():\n'
-                             '    from types import SimpleNamespace\n'
-                             '\n'
-                             '    pool, request, blocks = make_gpu_cache()\n'
-                             "    selected = SimpleNamespace(kv_scope='reader', "
-                             'block_hashes=request.block_hashes)\n'
-                             '    pool.acquire_cached_blocks(selected, ([blocks[0]],), '
-                             '16)\n'
-                             "    before = pool.prefix_cache.view('reader')\n"
-                             '    destination = pool.get_new_blocks(1)[0]\n'
-                             '    pool.move_block_hashes(blocks[0], destination)\n'
-                             "    assert pool.prefix_cache.view('reader') == before\n"
-                             "    assert pool.get_cached_block(b'prefix', [0], before) "
-                             '== [destination]\n'
-                             '    pool._maybe_evict_cached_block(destination)\n'
-                             "    assert pool.prefix_cache.view('reader').keys is "
-                             'None\n'
-                             "    assert pool.prefix_cache.view('writer').keys is not "
-                             'None\n'
-                             '\n'
-                             '\n'
-                             'def '
-                             'test_speculative_cpu_promotion_does_not_acquire_a_prefix():\n'
-                             '    from vllm.v1.kv_offload.base import LookupResult, '
-                             'ReqContext\n'
-                             '    from vllm.v1.kv_offload.cpu.manager import '
-                             'CPUOffloadingManager\n'
-                             '\n'
-                             '    manager = CPUOffloadingManager(3)\n'
-                             "    ctx = ReqContext('request', kv_scope='new-agent')\n"
-                             '    manager.begin_lookup(ctx)\n'
-                             "    ctx.prefix_content[b'candidate'] = (b'candidate',)\n"
-                             "    result = manager._prepare_store([b'candidate'], "
-                             'ctx)\n'
-                             '    manager.complete_store(result.keys_to_store, ctx)\n'
-                             '    assert manager.prefix_cache.view(ctx.kv_scope).keys '
-                             'is None\n'
-                             '    manager.begin_lookup(ctx)\n'
-                             "    assert manager.lookup(b'candidate', ctx) is "
-                             'LookupResult.HIT\n'
-                             "    manager.retain_context([b'candidate'], ctx)\n"
-                             '    assert manager.prefix_cache.view(ctx.kv_scope).keys '
-                             "== frozenset({b'candidate'})\n"
-                             '\n'
-                             '\n'
-                             "@pytest.mark.parametrize('is_recurrent', [False, True])\n"
-                             'def '
-                             'test_coalesced_cpu_chunk_describes_exactly_its_contained_gpu_data(is_recurrent):\n'
-                             '    """An attention span contains sub-blocks; a '
-                             'checkpoint contains one state."""\n'
-                             '    from types import SimpleNamespace\n'
-                             '    from vllm.v1.core.block_pool import BlockPool\n'
-                             '    from vllm.v1.core.prefix_cache import '
-                             'cache_content_keys\n'
-                             '    from vllm.v1.kv_offload.base import LookupResult, '
-                             'ReqContext\n'
-                             '    from vllm.v1.kv_offload.cpu.manager import '
-                             'CPUOffloadingManager\n'
-                             '\n'
-                             '    pool = BlockPool(16, enable_caching=True, '
-                             'hash_block_size=4)\n'
-                             '    hashes = [bytes([i]) for i in range(1, 13)]\n'
-                             "    request = SimpleNamespace(kv_scope='producer', "
-                             'block_hashes=hashes)\n'
-                             '    blocks = pool.get_new_blocks(6)\n'
-                             '    pool.cache_full_blocks(request, blocks, 0, 6, 8, 0, '
-                             'is_recurrent=is_recurrent)\n'
-                             '    manager = CPUOffloadingManager(4)\n'
-                             '    manager.bind_prefix_cache(pool.prefix_cache)\n'
-                             '    # This chunk spans tokens 16..32: it does not '
-                             'include tokens 0..16.\n'
-                             '    content = cache_content_keys(hashes[5:8:2] if '
-                             'is_recurrent else hashes[4:8], 0)\n'
-                             '    key = content[-1]\n'
-                             "    ctx = ReqContext('store', kv_scope='cpu-agent', "
-                             'prefix_content={key: content})\n'
-                             '    output = manager.prepare_store([key], ctx)\n'
-                             '    manager.complete_store(output.keys_to_store, ctx)\n'
-                             "    view = pool.prefix_cache.view('cpu-agent')\n"
-                             '    assert pool.get_cached_block(hashes[3], [0], view) '
-                             'is None\n'
-                             '    assert pool.get_cached_block(hashes[5], [0], view) '
-                             '== [blocks[2]]\n'
-                             '    assert pool.get_cached_block(hashes[7], [0], view) '
-                             '== [blocks[3]]\n'
-                             '    assert pool.get_cached_block(hashes[9], [0], view) '
-                             'is None\n'
-                             '    assert view.permits(cache_content_keys([hashes[4]], '
-                             '0)[0]) is (not is_recurrent)\n'
-                             '\n'
-                             '    # Owning just the final GPU block cannot acquire the '
-                             'earlier part of a\n'
-                             '    # larger CPU chunk that happens to have the same end '
-                             'hash.\n'
-                             "    selected = SimpleNamespace(kv_scope='gpu-agent', "
-                             'block_hashes=hashes)\n'
-                             '    pool.acquire_cached_blocks(selected, ([blocks[3]],), '
-                             '32)\n'
-                             "    gpu_ctx = ReqContext('load', kv_scope='gpu-agent')\n"
-                             '    manager.begin_lookup(gpu_ctx)\n'
-                             '    assert manager.lookup(key, gpu_ctx) is '
-                             'LookupResult.MISS\n'
-                             '\n'
-                             '\n'
-                             'def '
-                             'test_partial_recurrent_checkpoint_does_not_acquire_earlier_states():\n'
-                             '    from types import SimpleNamespace\n'
-                             '    from vllm.v1.core.block_pool import BlockPool\n'
-                             '    from vllm.v1.core.prefix_cache import '
-                             'cache_content_keys\n'
-                             '\n'
-                             '    pool = BlockPool(8, enable_caching=True, '
-                             'hash_block_size=4)\n'
-                             '    hashes = [bytes([i]) for i in range(1, 9)]\n'
-                             '    block = pool.get_new_blocks(1)[0]\n'
-                             "    request = SimpleNamespace(kv_scope='agent', "
-                             'block_hashes=hashes)\n'
-                             '    pool.cache_partial_block(request, block, 28, 0, 16, '
-                             'is_recurrent=True)\n'
-                             "    view = pool.prefix_cache.view('agent')\n"
-                             '    assert view.keys == '
-                             'frozenset(cache_content_keys([hashes[6]], 0))\n'
-                             '\n'
-                             '\n'
-                             'def '
-                             'test_prefix_shortened_inside_attention_block_acquires_only_selected_data():\n'
-                             '    """EAGLE may replay a tail after lookup selected a '
-                             'larger physical block."""\n'
-                             '    from types import SimpleNamespace\n'
-                             '    from vllm.v1.core.block_pool import BlockPool\n'
-                             '    from vllm.v1.core.prefix_cache import '
-                             'cache_content_keys\n'
-                             '\n'
-                             '    pool = BlockPool(8, enable_caching=True, '
-                             'hash_block_size=4)\n'
-                             '    hashes = [bytes([i]) for i in range(1, 5)]\n'
-                             '    block = pool.get_new_blocks(1)[0]\n'
-                             "    writer = SimpleNamespace(kv_scope='writer', "
-                             'block_hashes=hashes)\n'
-                             '    pool.cache_full_blocks(writer, [block], 0, 1, 16, 0, '
-                             'is_recurrent=False)\n'
-                             "    fork = SimpleNamespace(kv_scope='fork', "
-                             'block_hashes=hashes)\n'
-                             '    pool.acquire_cached_blocks(fork, ([block],), 8)\n'
-                             "    assert pool.prefix_cache.view('fork').keys == "
-                             'frozenset(cache_content_keys(hashes[:2], 0))\n'
-                             '    assert pool.get_cached_block(hashes[-1], [0], '
-                             "pool.prefix_cache.view('fork')) is None\n"
-                             '\n'
-                             '\n'
-                             'def '
-                             'test_physical_copy_to_cpu_keeps_every_users_selected_content():\n'
-                             '    from vllm.v1.core.block_pool import BlockPool\n'
-                             '    from types import SimpleNamespace\n'
-                             '\n'
-                             '    gpu, writer, blocks = make_gpu_cache()\n'
-                             "    reader = SimpleNamespace(kv_scope='reader', "
-                             'block_hashes=writer.block_hashes)\n'
-                             '    gpu.acquire_cached_blocks(reader, ([blocks[0]],), '
-                             '16)\n'
-                             '    cpu = BlockPool(8, enable_caching=True, '
-                             'hash_block_size=16)\n'
-                             '    cpu.bind_prefix_cache(gpu.prefix_cache)\n'
-                             '    copy = cpu.get_new_blocks(1)[0]\n'
-                             '    key = blocks[0].block_hash\n'
-                             '    # A transfer stamps metadata before completion makes '
-                             'it discoverable.\n'
-                             '    copy.set_block_hash(key, num_tokens=16)\n'
-                             '    cpu._insert_block_hash(key, copy, 16, '
-                             'gpu.prefix_cache.content(gpu.cache_tier, key))\n'
-                             '    gpu.prefix_cache.copy_membership(gpu.cache_tier, '
-                             'cpu.cache_tier, key)\n'
-                             '    gpu._maybe_evict_cached_block(blocks[0])\n'
-                             "    for agent in ['writer', 'reader']:\n"
-                             '        view = gpu.prefix_cache.view(agent)\n'
-                             '        assert view.keys is not None\n'
-                             "        assert cpu.get_cached_block(b'prefix', [0], "
-                             'view) == [copy]\n'
-                             '\n'
-                             '\n'
-                             'def '
-                             'test_attention_extension_preserves_a_forks_immutable_partial_prefix():\n'
-                             '    from types import SimpleNamespace\n'
-                             '    from vllm.v1.core.block_pool import BlockPool\n'
-                             '    from vllm.v1.core.prefix_cache import '
-                             'cache_content_keys\n'
-                             '\n'
-                             '    pool = BlockPool(8, enable_caching=True, '
-                             'hash_block_size=4)\n'
-                             '    hashes = [bytes([i]) for i in range(1, 5)]\n'
-                             '    block = pool.get_new_blocks(1)[0]\n'
-                             "    writer = SimpleNamespace(kv_scope='writer', "
-                             'block_hashes=hashes)\n'
-                             '    pool.cache_partial_block(writer, block, 8, 0, 16, '
-                             'is_recurrent=False)\n'
-                             "    fork = SimpleNamespace(kv_scope='fork', "
-                             'block_hashes=hashes)\n'
-                             '    pool.acquire_cached_blocks(fork, ([block],), 8)\n'
-                             '    pool.cache_full_blocks(writer, [block], 0, 1, 16, 0, '
-                             'is_recurrent=False)\n'
-                             "    view = pool.prefix_cache.view('fork')\n"
-                             '    assert view.keys == '
-                             'frozenset(cache_content_keys(hashes[:2], 0))\n'
-                             '    assert pool.get_cached_block(hashes[1], [0], view) '
-                             '== [block]\n'
-                             '    assert pool.get_cached_block(hashes[3], [0], view) '
-                             'is None\n'
-                             '    assert block.block_hash == '
-                             'cache_content_keys(hashes[3:], 0)[0]\n'
-                             '\n'
-                             '\n'
-                             'def '
-                             'test_storage_transfer_can_precede_generation_without_inventing_an_agent():\n'
-                             '    from vllm.v1.kv_offload.base import ReqContext, '
-                             'LookupResult\n'
-                             '    from vllm.v1.kv_offload.cpu.manager import '
-                             'CPUOffloadingManager\n'
-                             '\n'
-                             '    m = CPUOffloadingManager(4)\n'
-                             "    physical = ReqContext('physical-transfer')\n"
-                             "    result = m._prepare_store([b'end'], physical)\n"
-                             '    m.complete_store(result.keys_to_store, physical)\n'
-                             "    assert m._lookup(b'end', physical) is "
-                             'LookupResult.HIT\n'
-                             '    assert m.prefix_cache._owned == {}\n'
-                             '    # The first generation supplies the content hash '
-                             'chain, then acquires it\n'
-                             '    # only when the scheduler selects the prefix.\n'
-                             "    generation = ReqContext('generation', "
-                             "kv_scope='agent',\n"
-                             "                            prefix_content={b'end': "
-                             "(b'first', b'end')})\n"
-                             '    m.begin_lookup(generation)\n'
-                             "    assert m.lookup(b'end', generation) is "
-                             'LookupResult.HIT\n'
-                             "    assert m.prefix_cache.view('agent').keys is None\n"
-                             "    m.retain_context([b'end'], generation)\n"
-                             "    assert m.prefix_cache.view('agent').keys == "
-                             "frozenset({b'first', b'end'})\n"
-                             '\n'
-                             '\n'
-                             'def '
-                             'test_secondary_facing_lookup_borrows_data_without_acquiring_a_prefix():\n'
-                             '    from unittest.mock import MagicMock\n'
-                             '    from vllm.v1.kv_offload.base import ReqContext, '
-                             'LookupResult\n'
-                             '    from vllm.v1.kv_offload.tiering.manager import (\n'
-                             '        CPUPrimaryTierOffloadingManager, '
-                             'TieringOffloadingManager,\n'
-                             '        _SecondaryTierFacingParent,\n'
-                             '    )\n'
-                             '\n'
-                             '    region = MagicMock()\n'
-                             '    region.create_kv_memoryview.return_value = '
-                             "memoryview(bytearray(64)).cast('B', shape=(4, 16))\n"
-                             '    primary = CPUPrimaryTierOffloadingManager(4, '
-                             'region)\n'
-                             '    manager = TieringOffloadingManager(primary)\n'
-                             "    generation = ReqContext('store', kv_scope='writer', "
-                             "prefix_content={b'key': (b'key',)})\n"
-                             '    manager.on_new_request(generation)\n'
-                             "    result = manager.prepare_store([b'key'], "
-                             'generation)\n'
-                             '    manager.complete_store(result.keys_to_store, '
-                             'generation)\n'
-                             '    manager.on_request_finished(generation)\n'
-                             "    before = primary.prefix_cache.view('writer')\n"
-                             '\n'
-                             '    parent = _SecondaryTierFacingParent(manager, 0)\n'
-                             "    storage = ReqContext('storage-request')\n"
-                             '    parent.on_new_request(storage)\n'
-                             "    assert parent.lookup(b'key', storage) is "
-                             'LookupResult.HIT\n'
-                             '    parent.on_request_finished(storage)\n'
-                             "    assert primary.prefix_cache.view('writer') == "
-                             'before\n'
-                             '    assert set(primary.prefix_cache._owned) == '
-                             "{'writer'}\n"
-                             '    assert storage.req_id not in manager._req_state\n'
-                             '    assert storage.req_id not in primary._contexts\n'
-                             '\n'
-                             '\n'
-                             'def '
-                             'test_filling_unwritten_data_preserves_each_agents_acquired_subset():\n'
-                             '    index = PrefixCacheIndex()\n'
-                             "    index.register_tier('CPU', 8)\n"
-                             "    index.insert('CPU', b'end', (b'middle', b'end'))\n"
-                             "    index.acquire('CPU', 'first', [b'end'])\n"
-                             "    index.acquire('CPU', 'second', [b'end'])\n"
-                             "    index.extend_content('CPU', b'end', (b'begin', "
-                             "b'middle', b'end'))\n"
-                             "    for agent in ['first', 'second']:\n"
-                             '        assert index.view(agent).keys == '
-                             "frozenset({b'middle', b'end'})\n"
-                             "    index.acquire('CPU', 'producer', [b'end'])\n"
-                             "    assert index.view('producer').keys == "
-                             "frozenset({b'begin', b'middle', b'end'})\n"
-                             "    assert not index.view('first').permits(b'begin')\n"},
             {'name': 'tests/v1/core/test_prefix_caching.py:landmark-1',
-             'path': 'tests/v1/core/test_prefix_caching.py',
-             'before': ')\n'
-                       'from vllm.sampling_params import SamplingParams\n'
-                       'from vllm.utils.hashing import sha256, sha256_cbor\n'
-                       'from vllm.v1.core.block_pool import BlockHashToBlockMap, '
-                       'BlockPool\n'
-                       'from vllm.v1.core.kv_cache_manager import KVCacheBlocks, '
-                       'KVCacheManager, Request\n'
-                       'from vllm.v1.core.kv_cache_utils import (\n',
-             'after': ')\n'
-                      'from vllm.sampling_params import SamplingParams\n'
-                      'from vllm.utils.hashing import sha256, sha256_cbor\n'
-                      'from vllm.v1.core.prefix_cache import PrefixCacheView\n'
-                      'from vllm.v1.core.block_pool import BlockHashToBlockMap, '
-                      'BlockPool\n'
-                      'from vllm.v1.core.kv_cache_manager import KVCacheBlocks, '
-                      'KVCacheManager, Request\n'
-                      'from vllm.v1.core.kv_cache_utils import (\n',
-             'review_before': ')\n'
-                              'from vllm.sampling_params import SamplingParams\n'
-                              'from vllm.utils.hashing import sha256, sha256_cbor\n'
-                              'from vllm.v1.core.block_pool import '
-                              'BlockHashToBlockMap, BlockPool\n'
-                              'from vllm.v1.core.kv_cache_manager import '
-                              'KVCacheBlocks, KVCacheManager, Request\n'
-                              'from vllm.v1.core.kv_cache_utils import (\n',
-             'review_after': ')\n'
-                             'from vllm.sampling_params import SamplingParams\n'
-                             'from vllm.utils.hashing import sha256, sha256_cbor\n'
-                             'from vllm.v1.core.prefix_cache import PrefixCacheView\n'
-                             'from vllm.v1.core.block_pool import BlockHashToBlockMap, '
-                             'BlockPool\n'
-                             'from vllm.v1.core.kv_cache_manager import KVCacheBlocks, '
-                             'KVCacheManager, Request\n'
-                             'from vllm.v1.core.kv_cache_utils import (\n'},
-            {'name': 'tests/v1/core/test_prefix_caching.py:landmark-2',
-             'path': 'tests/v1/core/test_prefix_caching.py',
-             'before': '    sampling_params = SamplingParams(max_tokens=17, '
-                       'prompt_logprobs=prompt_logprobs)\n'
-                       '    sampling_params.update_from_generation_config({}, '
-                       'eos_token_id=100)\n'
-                       '\n'
-                       '    return Request(\n'
-                       '        request_id=request_id,\n'
-                       '        prompt_token_ids=prompt_token_ids,\n'
-                       '        mm_features=mm_features if mm_features else None,\n',
-             'after': '    sampling_params = SamplingParams(max_tokens=17, '
-                      'prompt_logprobs=prompt_logprobs)\n'
-                      '    sampling_params.update_from_generation_config({}, '
-                      'eos_token_id=100)\n'
-                      '\n'
-                      '    return _request_with_identity(\n'
-                      '        request_id=request_id,\n'
-                      '        prompt_token_ids=prompt_token_ids,\n'
-                      '        mm_features=mm_features if mm_features else None,\n',
-             'review_before': '    sampling_params = SamplingParams(max_tokens=17, '
-                              'prompt_logprobs=prompt_logprobs)\n'
-                              '    sampling_params.update_from_generation_config({}, '
-                              'eos_token_id=100)\n'
-                              '\n'
-                              '    return Request(\n'
-                              '        request_id=request_id,\n'
-                              '        prompt_token_ids=prompt_token_ids,\n'
-                              '        mm_features=mm_features if mm_features else '
-                              'None,\n',
-             'review_after': '    sampling_params = SamplingParams(max_tokens=17, '
-                             'prompt_logprobs=prompt_logprobs)\n'
-                             '    sampling_params.update_from_generation_config({}, '
-                             'eos_token_id=100)\n'
-                             '\n'
-                             '    return _request_with_identity(\n'
-                             '        request_id=request_id,\n'
-                             '        prompt_token_ids=prompt_token_ids,\n'
-                             '        mm_features=mm_features if mm_features else '
-                             'None,\n'},
-            {'name': 'tests/v1/core/test_prefix_caching.py:landmark-3',
              'path': 'tests/v1/core/test_prefix_caching.py',
              'before': '        num_full_blocks=2,\n'
                        '        block_size=block_size,\n'
@@ -11786,7 +10714,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '\n'
                              '    assert len(block_pool.cached_block_hash_to_block) == '
                              '2\n'},
-            {'name': 'tests/v1/core/test_prefix_caching.py:landmark-4',
+            {'name': 'tests/v1/core/test_prefix_caching.py:landmark-2',
              'path': 'tests/v1/core/test_prefix_caching.py',
              'before': '        num_full_blocks=3,\n'
                        '        block_size=block_size,\n'
@@ -11816,7 +10744,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    assert len(block_pool.cached_block_hash_to_block) == '
                              '3\n'
                              '    assert blocks[0].block_hash is not None\n'},
-            {'name': 'tests/v1/core/test_prefix_caching.py:landmark-5',
+            {'name': 'tests/v1/core/test_prefix_caching.py:landmark-3',
              'path': 'tests/v1/core/test_prefix_caching.py',
              'before': '        num_full_blocks=2,\n'
                        '        block_size=block_size,\n'
@@ -11846,7 +10774,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    assert len(block_pool.cached_block_hash_to_block) == '
                              '2\n'
                              '    assert len(req.block_hashes) == 3\n'},
-            {'name': 'tests/v1/core/test_prefix_caching.py:landmark-6',
+            {'name': 'tests/v1/core/test_prefix_caching.py:landmark-4',
              'path': 'tests/v1/core/test_prefix_caching.py',
              'before': '        num_full_blocks=3,\n'
                        '        block_size=block_size,\n'
@@ -11876,255 +10804,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    assert len(block_pool.cached_block_hash_to_block) == '
                              '5\n'
                              '    assert len(req.block_hashes) == 3\n'},
-            {'name': 'tests/v1/core/test_prefix_caching.py:landmark-7',
-             'path': 'tests/v1/core/test_prefix_caching.py',
-             'before': '    # Block hash 2: hit for group 1\n'
-                       '\n'
-                       '    assert (\n'
-                       '        block_pool.get_cached_block(req.block_hashes[0], '
-                       'kv_cache_group_ids=[0])\n'
-                       '        is not None\n'
-                       '    )\n'
-                       '    assert (\n'
-                       '        block_pool.get_cached_block(req.block_hashes[1], '
-                       'kv_cache_group_ids=[0])\n'
-                       '        is not None\n'
-                       '    )\n'
-                       '    assert (\n'
-                       '        block_pool.get_cached_block(req.block_hashes[2], '
-                       'kv_cache_group_ids=[0]) is None\n'
-                       '    )\n'
-                       '    assert (\n'
-                       '        block_pool.get_cached_block(req.block_hashes[0], '
-                       'kv_cache_group_ids=[1])\n'
-                       '        is not None\n'
-                       '    )\n'
-                       '    assert (\n'
-                       '        block_pool.get_cached_block(req.block_hashes[1], '
-                       'kv_cache_group_ids=[1])\n'
-                       '        is not None\n'
-                       '    )\n'
-                       '    assert (\n'
-                       '        block_pool.get_cached_block(req.block_hashes[2], '
-                       'kv_cache_group_ids=[1])\n'
-                       '        is not None\n'
-                       '    )\n'
-                       '    assert (\n'
-                       '        block_pool.get_cached_block(req.block_hashes[0], '
-                       'kv_cache_group_ids=[0, 1])\n'
-                       '        is not None\n'
-                       '    )\n'
-                       '    assert (\n'
-                       '        block_pool.get_cached_block(req.block_hashes[1], '
-                       'kv_cache_group_ids=[0, 1])\n'
-                       '        is not None\n'
-                       '    )\n'
-                       '    assert (\n'
-                       '        block_pool.get_cached_block(req.block_hashes[2], '
-                       'kv_cache_group_ids=[0, 1])\n'
-                       '        is None\n'
-                       '    )\n'
-                       '\n',
-             'after': '    # Block hash 2: hit for group 1\n'
-                      '\n'
-                      '    assert (\n'
-                      '        block_pool.get_cached_block(req.block_hashes[0], '
-                      'kv_cache_group_ids=[0], cache_view=PrefixCacheView(None))\n'
-                      '        is not None\n'
-                      '    )\n'
-                      '    assert (\n'
-                      '        block_pool.get_cached_block(req.block_hashes[1], '
-                      'kv_cache_group_ids=[0], cache_view=PrefixCacheView(None))\n'
-                      '        is not None\n'
-                      '    )\n'
-                      '    assert (\n'
-                      '        block_pool.get_cached_block(req.block_hashes[2], '
-                      'kv_cache_group_ids=[0], cache_view=PrefixCacheView(None)) is '
-                      'None\n'
-                      '    )\n'
-                      '    assert (\n'
-                      '        block_pool.get_cached_block(req.block_hashes[0], '
-                      'kv_cache_group_ids=[1], cache_view=PrefixCacheView(None))\n'
-                      '        is not None\n'
-                      '    )\n'
-                      '    assert (\n'
-                      '        block_pool.get_cached_block(req.block_hashes[1], '
-                      'kv_cache_group_ids=[1], cache_view=PrefixCacheView(None))\n'
-                      '        is not None\n'
-                      '    )\n'
-                      '    assert (\n'
-                      '        block_pool.get_cached_block(req.block_hashes[2], '
-                      'kv_cache_group_ids=[1], cache_view=PrefixCacheView(None))\n'
-                      '        is not None\n'
-                      '    )\n'
-                      '    assert (\n'
-                      '        block_pool.get_cached_block(req.block_hashes[0], '
-                      'kv_cache_group_ids=[0, 1], cache_view=PrefixCacheView(None))\n'
-                      '        is not None\n'
-                      '    )\n'
-                      '    assert (\n'
-                      '        block_pool.get_cached_block(req.block_hashes[1], '
-                      'kv_cache_group_ids=[0, 1], cache_view=PrefixCacheView(None))\n'
-                      '        is not None\n'
-                      '    )\n'
-                      '    assert (\n'
-                      '        block_pool.get_cached_block(req.block_hashes[2], '
-                      'kv_cache_group_ids=[0, 1], cache_view=PrefixCacheView(None))\n'
-                      '        is None\n'
-                      '    )\n'
-                      '\n',
-             'review_before': '    # Block hash 2: hit for group 1\n'
-                              '\n'
-                              '    assert (\n'
-                              '        '
-                              'block_pool.get_cached_block(req.block_hashes[0], '
-                              'kv_cache_group_ids=[0])\n'
-                              '        is not None\n'
-                              '    )\n'
-                              '    assert (\n'
-                              '        '
-                              'block_pool.get_cached_block(req.block_hashes[1], '
-                              'kv_cache_group_ids=[0])\n'
-                              '        is not None\n'
-                              '    )\n'
-                              '    assert (\n'
-                              '        '
-                              'block_pool.get_cached_block(req.block_hashes[2], '
-                              'kv_cache_group_ids=[0]) is None\n'
-                              '    )\n'
-                              '    assert (\n'
-                              '        '
-                              'block_pool.get_cached_block(req.block_hashes[0], '
-                              'kv_cache_group_ids=[1])\n'
-                              '        is not None\n'
-                              '    )\n'
-                              '    assert (\n'
-                              '        '
-                              'block_pool.get_cached_block(req.block_hashes[1], '
-                              'kv_cache_group_ids=[1])\n'
-                              '        is not None\n'
-                              '    )\n'
-                              '    assert (\n'
-                              '        '
-                              'block_pool.get_cached_block(req.block_hashes[2], '
-                              'kv_cache_group_ids=[1])\n'
-                              '        is not None\n'
-                              '    )\n'
-                              '    assert (\n'
-                              '        '
-                              'block_pool.get_cached_block(req.block_hashes[0], '
-                              'kv_cache_group_ids=[0, 1])\n'
-                              '        is not None\n'
-                              '    )\n'
-                              '    assert (\n'
-                              '        '
-                              'block_pool.get_cached_block(req.block_hashes[1], '
-                              'kv_cache_group_ids=[0, 1])\n'
-                              '        is not None\n'
-                              '    )\n'
-                              '    assert (\n'
-                              '        '
-                              'block_pool.get_cached_block(req.block_hashes[2], '
-                              'kv_cache_group_ids=[0, 1])\n'
-                              '        is None\n'
-                              '    )\n'
-                              '\n',
-             'review_after': '    # Block hash 2: hit for group 1\n'
-                             '\n'
-                             '    assert (\n'
-                             '        block_pool.get_cached_block(req.block_hashes[0], '
-                             'kv_cache_group_ids=[0], '
-                             'cache_view=PrefixCacheView(None))\n'
-                             '        is not None\n'
-                             '    )\n'
-                             '    assert (\n'
-                             '        block_pool.get_cached_block(req.block_hashes[1], '
-                             'kv_cache_group_ids=[0], '
-                             'cache_view=PrefixCacheView(None))\n'
-                             '        is not None\n'
-                             '    )\n'
-                             '    assert (\n'
-                             '        block_pool.get_cached_block(req.block_hashes[2], '
-                             'kv_cache_group_ids=[0], '
-                             'cache_view=PrefixCacheView(None)) is None\n'
-                             '    )\n'
-                             '    assert (\n'
-                             '        block_pool.get_cached_block(req.block_hashes[0], '
-                             'kv_cache_group_ids=[1], '
-                             'cache_view=PrefixCacheView(None))\n'
-                             '        is not None\n'
-                             '    )\n'
-                             '    assert (\n'
-                             '        block_pool.get_cached_block(req.block_hashes[1], '
-                             'kv_cache_group_ids=[1], '
-                             'cache_view=PrefixCacheView(None))\n'
-                             '        is not None\n'
-                             '    )\n'
-                             '    assert (\n'
-                             '        block_pool.get_cached_block(req.block_hashes[2], '
-                             'kv_cache_group_ids=[1], '
-                             'cache_view=PrefixCacheView(None))\n'
-                             '        is not None\n'
-                             '    )\n'
-                             '    assert (\n'
-                             '        block_pool.get_cached_block(req.block_hashes[0], '
-                             'kv_cache_group_ids=[0, 1], '
-                             'cache_view=PrefixCacheView(None))\n'
-                             '        is not None\n'
-                             '    )\n'
-                             '    assert (\n'
-                             '        block_pool.get_cached_block(req.block_hashes[1], '
-                             'kv_cache_group_ids=[0, 1], '
-                             'cache_view=PrefixCacheView(None))\n'
-                             '        is not None\n'
-                             '    )\n'
-                             '    assert (\n'
-                             '        block_pool.get_cached_block(req.block_hashes[2], '
-                             'kv_cache_group_ids=[0, 1], '
-                             'cache_view=PrefixCacheView(None))\n'
-                             '        is None\n'
-                             '    )\n'
-                             '\n'},
-            {'name': 'tests/v1/core/test_prefix_caching.py:landmark-8',
-             'path': 'tests/v1/core/test_prefix_caching.py',
-             'before': '    # Manually add all blocks to cached_blocks\n'
-                       '    for block, block_hash in zip(pool.blocks, block_hashes):\n'
-                       '        block.set_block_hash(block_hash)\n'
-                       '        pool.cached_block_hash_to_block.insert(block_hash, '
-                       'block)\n'
-                       '\n'
-                       '    block0, block1, block2, block3 = pool.blocks\n'
-                       '    assert pool.cached_block_hash_to_block._cache == {\n',
-             'after': '    # Manually add all blocks to cached_blocks\n'
-                      '    for block, block_hash in zip(pool.blocks, block_hashes):\n'
-                      '        block.set_block_hash(block_hash)\n'
-                      '        pool._insert_block_hash(block_hash, block, '
-                      'num_tokens=None, content=(block_hash,))\n'
-                      '\n'
-                      '    block0, block1, block2, block3 = pool.blocks\n'
-                      '    assert pool.cached_block_hash_to_block._cache == {\n',
-             'review_before': '    # Manually add all blocks to cached_blocks\n'
-                              '    for block, block_hash in zip(pool.blocks, '
-                              'block_hashes):\n'
-                              '        block.set_block_hash(block_hash)\n'
-                              '        '
-                              'pool.cached_block_hash_to_block.insert(block_hash, '
-                              'block)\n'
-                              '\n'
-                              '    block0, block1, block2, block3 = pool.blocks\n'
-                              '    assert pool.cached_block_hash_to_block._cache == '
-                              '{\n',
-             'review_after': '    # Manually add all blocks to cached_blocks\n'
-                             '    for block, block_hash in zip(pool.blocks, '
-                             'block_hashes):\n'
-                             '        block.set_block_hash(block_hash)\n'
-                             '        pool._insert_block_hash(block_hash, block, '
-                             'num_tokens=None, content=(block_hash,))\n'
-                             '\n'
-                             '    block0, block1, block2, block3 = pool.blocks\n'
-                             '    assert pool.cached_block_hash_to_block._cache == '
-                             '{\n'},
-            {'name': 'tests/v1/core/test_prefix_caching.py:landmark-9',
+            {'name': 'tests/v1/core/test_prefix_caching.py:landmark-5',
              'path': 'tests/v1/core/test_prefix_caching.py',
              'before': '        num_full_blocks=num_full_blocks,\n'
                        '        block_size=block_size,\n'
@@ -12152,7 +10832,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    )\n'
                              '\n'
                              '    events = pool.take_events()\n'},
-            {'name': 'tests/v1/core/test_prefix_caching.py:landmark-10',
+            {'name': 'tests/v1/core/test_prefix_caching.py:landmark-6',
              'path': 'tests/v1/core/test_prefix_caching.py',
              'before': '        num_full_blocks=2,\n'
                        '        block_size=block_size,\n'
@@ -12180,7 +10860,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    )\n'
                              '\n'
                              '    events = manager.take_events()\n'},
-            {'name': 'tests/v1/core/test_prefix_caching.py:landmark-11',
+            {'name': 'tests/v1/core/test_prefix_caching.py:landmark-7',
              'path': 'tests/v1/core/test_prefix_caching.py',
              'before': '        num_full_blocks=2,\n'
                        '        block_size=block_size,\n'
@@ -12208,7 +10888,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    )\n'
                              '\n'
                              '    # Cache blocks for group 1 (sliding-window)\n'},
-            {'name': 'tests/v1/core/test_prefix_caching.py:landmark-12',
+            {'name': 'tests/v1/core/test_prefix_caching.py:landmark-8',
              'path': 'tests/v1/core/test_prefix_caching.py',
              'before': '        num_full_blocks=2,\n'
                        '        block_size=block_size,\n'
@@ -12236,7 +10916,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    )\n'
                              '\n'
                              '    events = manager.take_events()\n'},
-            {'name': 'tests/v1/core/test_prefix_caching.py:landmark-13',
+            {'name': 'tests/v1/core/test_prefix_caching.py:landmark-9',
              'path': 'tests/v1/core/test_prefix_caching.py',
              'before': '        num_full_blocks=2,\n'
                        '        block_size=block_size,\n'
@@ -12268,588 +10948,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '\n'
                              '    # Drain the BlockStored events so only eviction '
                              'events remain later.\n'},
-            {'name': 'tests/v1/core/test_prefix_caching.py:landmark-14',
-             'path': 'tests/v1/core/test_prefix_caching.py',
-             'before': '    # Evict the first block in the request\n'
-                       '    assert (\n'
-                       '        manager.block_pool.get_cached_block(\n'
-                       '            block_hash_first_block, kv_cache_group_ids=[0]\n'
-                       '        )\n'
-                       '        is not None\n'
-                       '    )\n',
-             'after': '    # Evict the first block in the request\n'
-                      '    assert (\n'
-                      '        manager.block_pool.get_cached_block(\n'
-                      '            block_hash_first_block, kv_cache_group_ids=[0],\n'
-                      '            cache_view=PrefixCacheView(None),\n'
-                      '        )\n'
-                      '        is not None\n'
-                      '    )\n',
-             'review_before': '    # Evict the first block in the request\n'
-                              '    assert (\n'
-                              '        manager.block_pool.get_cached_block(\n'
-                              '            block_hash_first_block, '
-                              'kv_cache_group_ids=[0]\n'
-                              '        )\n'
-                              '        is not None\n'
-                              '    )\n',
-             'review_after': '    # Evict the first block in the request\n'
-                             '    assert (\n'
-                             '        manager.block_pool.get_cached_block(\n'
-                             '            block_hash_first_block, '
-                             'kv_cache_group_ids=[0],\n'
-                             '            cache_view=PrefixCacheView(None),\n'
-                             '        )\n'
-                             '        is not None\n'
-                             '    )\n'},
-            {'name': 'tests/v1/core/test_prefix_caching.py:landmark-15',
-             'path': 'tests/v1/core/test_prefix_caching.py',
-             'before': '    assert blocks is not None\n'
-                       '\n'
-                       '    pool = manager.block_pool\n'
-                       '    assert pool.get_cached_block(req0.block_hashes[3], '
-                       'kv_cache_group_ids=[1])\n'
-                       '    assert pool.get_cached_block(req0.block_hashes[4], '
-                       'kv_cache_group_ids=[1])\n'
-                       '    manager.free(req0)\n'
-                       '\n'
-                       '    req1 = make_request("1", token_ids + [999], block_size, '
-                       'sha256)\n',
-             'after': '    assert blocks is not None\n'
-                      '\n'
-                      '    pool = manager.block_pool\n'
-                      '    assert pool.get_cached_block(req0.block_hashes[3], '
-                      'kv_cache_group_ids=[1], cache_view=PrefixCacheView(None))\n'
-                      '    assert pool.get_cached_block(req0.block_hashes[4], '
-                      'kv_cache_group_ids=[1], cache_view=PrefixCacheView(None))\n'
-                      '    manager.free(req0)\n'
-                      '\n'
-                      '    req1 = make_request("1", token_ids + [999], block_size, '
-                      'sha256)\n',
-             'review_before': '    assert blocks is not None\n'
-                              '\n'
-                              '    pool = manager.block_pool\n'
-                              '    assert pool.get_cached_block(req0.block_hashes[3], '
-                              'kv_cache_group_ids=[1])\n'
-                              '    assert pool.get_cached_block(req0.block_hashes[4], '
-                              'kv_cache_group_ids=[1])\n'
-                              '    manager.free(req0)\n'
-                              '\n'
-                              '    req1 = make_request("1", token_ids + [999], '
-                              'block_size, sha256)\n',
-             'review_after': '    assert blocks is not None\n'
-                             '\n'
-                             '    pool = manager.block_pool\n'
-                             '    assert pool.get_cached_block(req0.block_hashes[3], '
-                             'kv_cache_group_ids=[1], '
-                             'cache_view=PrefixCacheView(None))\n'
-                             '    assert pool.get_cached_block(req0.block_hashes[4], '
-                             'kv_cache_group_ids=[1], '
-                             'cache_view=PrefixCacheView(None))\n'
-                             '    manager.free(req0)\n'
-                             '\n'
-                             '    req1 = make_request("1", token_ids + [999], '
-                             'block_size, sha256)\n'},
-            {'name': 'tests/v1/core/test_prefix_caching.py:landmark-16',
-             'path': 'tests/v1/core/test_prefix_caching.py',
-             'before': '    assert blocks is not None\n'
-                       '\n'
-                       '    pool = manager.block_pool\n'
-                       '    assert pool.get_cached_block(req0.block_hashes[4], '
-                       'kv_cache_group_ids=[1, 2])\n'
-                       '    assert pool.get_cached_block(req0.block_hashes[8], '
-                       'kv_cache_group_ids=[1, 2])\n'
-                       '    manager.free(req0)\n'
-                       '\n'
-                       '    req1 = make_request("1", token_ids + [999], block_size, '
-                       'sha256)\n',
-             'after': '    assert blocks is not None\n'
-                      '\n'
-                      '    pool = manager.block_pool\n'
-                      '    assert pool.get_cached_block(req0.block_hashes[4], '
-                      'kv_cache_group_ids=[1, 2], cache_view=PrefixCacheView(None))\n'
-                      '    assert pool.get_cached_block(req0.block_hashes[8], '
-                      'kv_cache_group_ids=[1, 2], cache_view=PrefixCacheView(None))\n'
-                      '    manager.free(req0)\n'
-                      '\n'
-                      '    req1 = make_request("1", token_ids + [999], block_size, '
-                      'sha256)\n',
-             'review_before': '    assert blocks is not None\n'
-                              '\n'
-                              '    pool = manager.block_pool\n'
-                              '    assert pool.get_cached_block(req0.block_hashes[4], '
-                              'kv_cache_group_ids=[1, 2])\n'
-                              '    assert pool.get_cached_block(req0.block_hashes[8], '
-                              'kv_cache_group_ids=[1, 2])\n'
-                              '    manager.free(req0)\n'
-                              '\n'
-                              '    req1 = make_request("1", token_ids + [999], '
-                              'block_size, sha256)\n',
-             'review_after': '    assert blocks is not None\n'
-                             '\n'
-                             '    pool = manager.block_pool\n'
-                             '    assert pool.get_cached_block(req0.block_hashes[4], '
-                             'kv_cache_group_ids=[1, 2], '
-                             'cache_view=PrefixCacheView(None))\n'
-                             '    assert pool.get_cached_block(req0.block_hashes[8], '
-                             'kv_cache_group_ids=[1, 2], '
-                             'cache_view=PrefixCacheView(None))\n'
-                             '    manager.free(req0)\n'
-                             '\n'
-                             '    req1 = make_request("1", token_ids + [999], '
-                             'block_size, sha256)\n'},
-            {'name': 'tests/v1/core/test_prefix_caching.py:landmark-17',
-             'path': 'tests/v1/core/test_prefix_caching.py',
-             'before': '    # a hit at any lcm-aligned length, so they must NOT be '
-                       'cached.\n'
-                       '    expected_cached = {3, 7}\n'
-                       '    for i in range(8):\n'
-                       '        cached = pool.get_cached_block(req.block_hashes[i], '
-                       'kv_cache_group_ids=[1])\n'
-                       '        if i in expected_cached:\n'
-                       '            assert cached is not None, f"SWA hash {i} should '
-                       'be cached"\n'
-                       '        else:\n',
-             'after': '    # a hit at any lcm-aligned length, so they must NOT be '
-                      'cached.\n'
-                      '    expected_cached = {3, 7}\n'
-                      '    for i in range(8):\n'
-                      '        cached = pool.get_cached_block(req.block_hashes[i], '
-                      'kv_cache_group_ids=[1], cache_view=PrefixCacheView(None))\n'
-                      '        if i in expected_cached:\n'
-                      '            assert cached is not None, f"SWA hash {i} should be '
-                      'cached"\n'
-                      '        else:\n',
-             'review_before': '    # a hit at any lcm-aligned length, so they must NOT '
-                              'be cached.\n'
-                              '    expected_cached = {3, 7}\n'
-                              '    for i in range(8):\n'
-                              '        cached = '
-                              'pool.get_cached_block(req.block_hashes[i], '
-                              'kv_cache_group_ids=[1])\n'
-                              '        if i in expected_cached:\n'
-                              '            assert cached is not None, f"SWA hash {i} '
-                              'should be cached"\n'
-                              '        else:\n',
-             'review_after': '    # a hit at any lcm-aligned length, so they must NOT '
-                             'be cached.\n'
-                             '    expected_cached = {3, 7}\n'
-                             '    for i in range(8):\n'
-                             '        cached = '
-                             'pool.get_cached_block(req.block_hashes[i], '
-                             'kv_cache_group_ids=[1], '
-                             'cache_view=PrefixCacheView(None))\n'
-                             '        if i in expected_cached:\n'
-                             '            assert cached is not None, f"SWA hash {i} '
-                             'should be cached"\n'
-                             '        else:\n'},
-            {'name': 'tests/v1/core/test_prefix_caching.py:landmark-18',
-             'path': 'tests/v1/core/test_prefix_caching.py',
-             'before': '    # spans tokens [96, 112) past the lcm boundary and must '
-                       'NOT be cached.\n'
-                       '    for i in range(6):\n'
-                       '        assert (\n'
-                       '            pool.get_cached_block(req.block_hashes[i], '
-                       'kv_cache_group_ids=[1])\n'
-                       '            is not None\n'
-                       '        ), f"SWA hash {i} should be cached"\n'
-                       '    assert pool.get_cached_block(req.block_hashes[6], '
-                       'kv_cache_group_ids=[1]) is None, (\n'
-                       '        "SWA hash 6 spans tokens past the lcm boundary; should '
-                       'not be cached"\n'
-                       '    )\n'
-                       '\n',
-             'after': '    # spans tokens [96, 112) past the lcm boundary and must NOT '
-                      'be cached.\n'
-                      '    for i in range(6):\n'
-                      '        assert (\n'
-                      '            pool.get_cached_block(req.block_hashes[i], '
-                      'kv_cache_group_ids=[1], cache_view=PrefixCacheView(None))\n'
-                      '            is not None\n'
-                      '        ), f"SWA hash {i} should be cached"\n'
-                      '    assert pool.get_cached_block(req.block_hashes[6], '
-                      'kv_cache_group_ids=[1], cache_view=PrefixCacheView(None)) is '
-                      'None, (\n'
-                      '        "SWA hash 6 spans tokens past the lcm boundary; should '
-                      'not be cached"\n'
-                      '    )\n'
-                      '\n',
-             'review_before': '    # spans tokens [96, 112) past the lcm boundary and '
-                              'must NOT be cached.\n'
-                              '    for i in range(6):\n'
-                              '        assert (\n'
-                              '            pool.get_cached_block(req.block_hashes[i], '
-                              'kv_cache_group_ids=[1])\n'
-                              '            is not None\n'
-                              '        ), f"SWA hash {i} should be cached"\n'
-                              '    assert pool.get_cached_block(req.block_hashes[6], '
-                              'kv_cache_group_ids=[1]) is None, (\n'
-                              '        "SWA hash 6 spans tokens past the lcm boundary; '
-                              'should not be cached"\n'
-                              '    )\n'
-                              '\n',
-             'review_after': '    # spans tokens [96, 112) past the lcm boundary and '
-                             'must NOT be cached.\n'
-                             '    for i in range(6):\n'
-                             '        assert (\n'
-                             '            pool.get_cached_block(req.block_hashes[i], '
-                             'kv_cache_group_ids=[1], '
-                             'cache_view=PrefixCacheView(None))\n'
-                             '            is not None\n'
-                             '        ), f"SWA hash {i} should be cached"\n'
-                             '    assert pool.get_cached_block(req.block_hashes[6], '
-                             'kv_cache_group_ids=[1], '
-                             'cache_view=PrefixCacheView(None)) is None, (\n'
-                             '        "SWA hash 6 spans tokens past the lcm boundary; '
-                             'should not be cached"\n'
-                             '    )\n'
-                             '\n'},
-            {'name': 'tests/v1/core/test_prefix_caching.py:landmark-19',
-             'path': 'tests/v1/core/test_prefix_caching.py',
-             'before': '    pool = manager.block_pool\n'
-                       '    expected_swa_cached = {7, 11, 15}\n'
-                       '    for i in range(16):\n'
-                       '        cached = pool.get_cached_block(req.block_hashes[i], '
-                       'kv_cache_group_ids=[1])\n'
-                       '        if i in expected_swa_cached:\n'
-                       '            assert cached is not None, f"SWA hash {i} should '
-                       'be cached"\n'
-                       '        else:\n',
-             'after': '    pool = manager.block_pool\n'
-                      '    expected_swa_cached = {7, 11, 15}\n'
-                      '    for i in range(16):\n'
-                      '        cached = pool.get_cached_block(req.block_hashes[i], '
-                      'kv_cache_group_ids=[1], cache_view=PrefixCacheView(None))\n'
-                      '        if i in expected_swa_cached:\n'
-                      '            assert cached is not None, f"SWA hash {i} should be '
-                      'cached"\n'
-                      '        else:\n',
-             'review_before': '    pool = manager.block_pool\n'
-                              '    expected_swa_cached = {7, 11, 15}\n'
-                              '    for i in range(16):\n'
-                              '        cached = '
-                              'pool.get_cached_block(req.block_hashes[i], '
-                              'kv_cache_group_ids=[1])\n'
-                              '        if i in expected_swa_cached:\n'
-                              '            assert cached is not None, f"SWA hash {i} '
-                              'should be cached"\n'
-                              '        else:\n',
-             'review_after': '    pool = manager.block_pool\n'
-                             '    expected_swa_cached = {7, 11, 15}\n'
-                             '    for i in range(16):\n'
-                             '        cached = '
-                             'pool.get_cached_block(req.block_hashes[i], '
-                             'kv_cache_group_ids=[1], '
-                             'cache_view=PrefixCacheView(None))\n'
-                             '        if i in expected_swa_cached:\n'
-                             '            assert cached is not None, f"SWA hash {i} '
-                             'should be cached"\n'
-                             '        else:\n'},
-            {'name': 'tests/v1/core/test_prefix_caching.py:landmark-20',
-             'path': 'tests/v1/core/test_prefix_caching.py',
-             'before': '    pool = manager.block_pool\n'
-                       '    expected_swa_cached = {11}\n'
-                       '    for i in range(16):\n'
-                       '        cached = pool.get_cached_block(req0.block_hashes[i], '
-                       'kv_cache_group_ids=[1])\n'
-                       '        if i in expected_swa_cached:\n'
-                       '            assert cached is not None, f"SWA hash {i} should '
-                       'be cached"\n'
-                       '        else:\n'
-                       '            assert cached is None, f"SWA hash {i} should not '
-                       'be cached"\n'
-                       '\n'
-                       '    manager.free(req0)\n'
-                       '    retained_swa_block = '
-                       'pool.get_cached_block(req0.block_hashes[11], [1])\n'
-                       '    assert retained_swa_block is not None\n'
-                       '    assert retained_swa_block[0].ref_cnt == 0\n'
-                       '\n',
-             'after': '    pool = manager.block_pool\n'
-                      '    expected_swa_cached = {11}\n'
-                      '    for i in range(16):\n'
-                      '        cached = pool.get_cached_block(req0.block_hashes[i], '
-                      'kv_cache_group_ids=[1], cache_view=PrefixCacheView(None))\n'
-                      '        if i in expected_swa_cached:\n'
-                      '            assert cached is not None, f"SWA hash {i} should be '
-                      'cached"\n'
-                      '        else:\n'
-                      '            assert cached is None, f"SWA hash {i} should not be '
-                      'cached"\n'
-                      '\n'
-                      '    manager.free(req0)\n'
-                      '    retained_swa_block = '
-                      'pool.get_cached_block(req0.block_hashes[11], [1], '
-                      'cache_view=PrefixCacheView(None))\n'
-                      '    assert retained_swa_block is not None\n'
-                      '    assert retained_swa_block[0].ref_cnt == 0\n'
-                      '\n',
-             'review_before': '    pool = manager.block_pool\n'
-                              '    expected_swa_cached = {11}\n'
-                              '    for i in range(16):\n'
-                              '        cached = '
-                              'pool.get_cached_block(req0.block_hashes[i], '
-                              'kv_cache_group_ids=[1])\n'
-                              '        if i in expected_swa_cached:\n'
-                              '            assert cached is not None, f"SWA hash {i} '
-                              'should be cached"\n'
-                              '        else:\n'
-                              '            assert cached is None, f"SWA hash {i} '
-                              'should not be cached"\n'
-                              '\n'
-                              '    manager.free(req0)\n'
-                              '    retained_swa_block = '
-                              'pool.get_cached_block(req0.block_hashes[11], [1])\n'
-                              '    assert retained_swa_block is not None\n'
-                              '    assert retained_swa_block[0].ref_cnt == 0\n'
-                              '\n',
-             'review_after': '    pool = manager.block_pool\n'
-                             '    expected_swa_cached = {11}\n'
-                             '    for i in range(16):\n'
-                             '        cached = '
-                             'pool.get_cached_block(req0.block_hashes[i], '
-                             'kv_cache_group_ids=[1], '
-                             'cache_view=PrefixCacheView(None))\n'
-                             '        if i in expected_swa_cached:\n'
-                             '            assert cached is not None, f"SWA hash {i} '
-                             'should be cached"\n'
-                             '        else:\n'
-                             '            assert cached is None, f"SWA hash {i} should '
-                             'not be cached"\n'
-                             '\n'
-                             '    manager.free(req0)\n'
-                             '    retained_swa_block = '
-                             'pool.get_cached_block(req0.block_hashes[11], [1], '
-                             'cache_view=PrefixCacheView(None))\n'
-                             '    assert retained_swa_block is not None\n'
-                             '    assert retained_swa_block[0].ref_cnt == 0\n'
-                             '\n'},
-            {'name': 'tests/v1/core/test_prefix_caching.py:landmark-21',
-             'path': 'tests/v1/core/test_prefix_caching.py',
-             'before': '    pool = manager.block_pool\n'
-                       '    expected_swa_cached = {11, 12}\n'
-                       '    for i in range(15):\n'
-                       '        cached = pool.get_cached_block(req0.block_hashes[i], '
-                       'kv_cache_group_ids=[1])\n'
-                       '        if i in expected_swa_cached:\n'
-                       '            assert cached is not None, f"SWA hash {i} should '
-                       'be cached"\n'
-                       '        else:\n',
-             'after': '    pool = manager.block_pool\n'
-                      '    expected_swa_cached = {11, 12}\n'
-                      '    for i in range(15):\n'
-                      '        cached = pool.get_cached_block(req0.block_hashes[i], '
-                      'kv_cache_group_ids=[1], cache_view=PrefixCacheView(None))\n'
-                      '        if i in expected_swa_cached:\n'
-                      '            assert cached is not None, f"SWA hash {i} should be '
-                      'cached"\n'
-                      '        else:\n',
-             'review_before': '    pool = manager.block_pool\n'
-                              '    expected_swa_cached = {11, 12}\n'
-                              '    for i in range(15):\n'
-                              '        cached = '
-                              'pool.get_cached_block(req0.block_hashes[i], '
-                              'kv_cache_group_ids=[1])\n'
-                              '        if i in expected_swa_cached:\n'
-                              '            assert cached is not None, f"SWA hash {i} '
-                              'should be cached"\n'
-                              '        else:\n',
-             'review_after': '    pool = manager.block_pool\n'
-                             '    expected_swa_cached = {11, 12}\n'
-                             '    for i in range(15):\n'
-                             '        cached = '
-                             'pool.get_cached_block(req0.block_hashes[i], '
-                             'kv_cache_group_ids=[1], '
-                             'cache_view=PrefixCacheView(None))\n'
-                             '        if i in expected_swa_cached:\n'
-                             '            assert cached is not None, f"SWA hash {i} '
-                             'should be cached"\n'
-                             '        else:\n'},
-            {'name': 'tests/v1/core/test_prefix_caching.py:landmark-22',
-             'path': 'tests/v1/core/test_prefix_caching.py',
-             'before': '    for i in cached_hash_indices:\n'
-                       '        assert (\n'
-                       '            manager.block_pool.get_cached_block(\n'
-                       '                req.block_hashes[i], kv_cache_group_ids=[1]\n'
-                       '            )\n'
-                       '            is not None\n'
-                       '        )\n',
-             'after': '    for i in cached_hash_indices:\n'
-                      '        assert (\n'
-                      '            manager.block_pool.get_cached_block(\n'
-                      '                req.block_hashes[i], kv_cache_group_ids=[1],\n'
-                      '                cache_view=PrefixCacheView(None),\n'
-                      '            )\n'
-                      '            is not None\n'
-                      '        )\n',
-             'review_before': '    for i in cached_hash_indices:\n'
-                              '        assert (\n'
-                              '            manager.block_pool.get_cached_block(\n'
-                              '                req.block_hashes[i], '
-                              'kv_cache_group_ids=[1]\n'
-                              '            )\n'
-                              '            is not None\n'
-                              '        )\n',
-             'review_after': '    for i in cached_hash_indices:\n'
-                             '        assert (\n'
-                             '            manager.block_pool.get_cached_block(\n'
-                             '                req.block_hashes[i], '
-                             'kv_cache_group_ids=[1],\n'
-                             '                cache_view=PrefixCacheView(None),\n'
-                             '            )\n'
-                             '            is not None\n'
-                             '        )\n'},
-            {'name': 'tests/v1/core/test_prefix_caching.py:landmark-23',
-             'path': 'tests/v1/core/test_prefix_caching.py',
-             'before': '    cached = {\n'
-                       '        i\n'
-                       '        for i in range(16)\n'
-                       '        if pool.get_cached_block(req.block_hashes[i], '
-                       'kv_cache_group_ids=[0])\n'
-                       '        is not None\n'
-                       '    }\n'
-                       '    # per_segment = 64 / 16 = 4, need = cdiv(16-1, 16) = 1 -> '
-                       'segment tails at\n',
-             'after': '    cached = {\n'
-                      '        i\n'
-                      '        for i in range(16)\n'
-                      '        if pool.get_cached_block(req.block_hashes[i], '
-                      'kv_cache_group_ids=[0], cache_view=PrefixCacheView(None))\n'
-                      '        is not None\n'
-                      '    }\n'
-                      '    # per_segment = 64 / 16 = 4, need = cdiv(16-1, 16) = 1 -> '
-                      'segment tails at\n',
-             'review_before': '    cached = {\n'
-                              '        i\n'
-                              '        for i in range(16)\n'
-                              '        if pool.get_cached_block(req.block_hashes[i], '
-                              'kv_cache_group_ids=[0])\n'
-                              '        is not None\n'
-                              '    }\n'
-                              '    # per_segment = 64 / 16 = 4, need = cdiv(16-1, 16) '
-                              '= 1 -> segment tails at\n',
-             'review_after': '    cached = {\n'
-                             '        i\n'
-                             '        for i in range(16)\n'
-                             '        if pool.get_cached_block(req.block_hashes[i], '
-                             'kv_cache_group_ids=[0], '
-                             'cache_view=PrefixCacheView(None))\n'
-                             '        is not None\n'
-                             '    }\n'
-                             '    # per_segment = 64 / 16 = 4, need = cdiv(16-1, 16) = '
-                             '1 -> segment tails at\n'},
-            {'name': 'tests/v1/core/test_prefix_caching.py:landmark-24',
-             'path': 'tests/v1/core/test_prefix_caching.py',
-             'before': '    cached = {\n'
-                       '        i\n'
-                       '        for i in range(16)\n'
-                       '        if pool.get_cached_block(req.block_hashes[i], '
-                       'kv_cache_group_ids=[0])\n'
-                       '        is not None\n'
-                       '    }\n'
-                       '    # No segment tails (interval 0); only the latest replay '
-                       'tail (block 14).\n',
-             'after': '    cached = {\n'
-                      '        i\n'
-                      '        for i in range(16)\n'
-                      '        if pool.get_cached_block(req.block_hashes[i], '
-                      'kv_cache_group_ids=[0], cache_view=PrefixCacheView(None))\n'
-                      '        is not None\n'
-                      '    }\n'
-                      '    # No segment tails (interval 0); only the latest replay '
-                      'tail (block 14).\n',
-             'review_before': '    cached = {\n'
-                              '        i\n'
-                              '        for i in range(16)\n'
-                              '        if pool.get_cached_block(req.block_hashes[i], '
-                              'kv_cache_group_ids=[0])\n'
-                              '        is not None\n'
-                              '    }\n'
-                              '    # No segment tails (interval 0); only the latest '
-                              'replay tail (block 14).\n',
-             'review_after': '    cached = {\n'
-                             '        i\n'
-                             '        for i in range(16)\n'
-                             '        if pool.get_cached_block(req.block_hashes[i], '
-                             'kv_cache_group_ids=[0], '
-                             'cache_view=PrefixCacheView(None))\n'
-                             '        is not None\n'
-                             '    }\n'
-                             '    # No segment tails (interval 0); only the latest '
-                             'replay tail (block 14).\n'},
-            {'name': 'tests/v1/core/test_prefix_caching.py:landmark-25',
-             'path': 'tests/v1/core/test_prefix_caching.py',
-             'before': '    cached = {\n'
-                       '        i\n'
-                       '        for i in range(16)\n'
-                       '        if pool.get_cached_block(req.block_hashes[i], '
-                       'kv_cache_group_ids=[0])\n'
-                       '        is not None\n'
-                       '    }\n'
-                       '    assert cached == set(range(16))\n',
-             'after': '    cached = {\n'
-                      '        i\n'
-                      '        for i in range(16)\n'
-                      '        if pool.get_cached_block(req.block_hashes[i], '
-                      'kv_cache_group_ids=[0], cache_view=PrefixCacheView(None))\n'
-                      '        is not None\n'
-                      '    }\n'
-                      '    assert cached == set(range(16))\n',
-             'review_before': '    cached = {\n'
-                              '        i\n'
-                              '        for i in range(16)\n'
-                              '        if pool.get_cached_block(req.block_hashes[i], '
-                              'kv_cache_group_ids=[0])\n'
-                              '        is not None\n'
-                              '    }\n'
-                              '    assert cached == set(range(16))\n',
-             'review_after': '    cached = {\n'
-                             '        i\n'
-                             '        for i in range(16)\n'
-                             '        if pool.get_cached_block(req.block_hashes[i], '
-                             'kv_cache_group_ids=[0], '
-                             'cache_view=PrefixCacheView(None))\n'
-                             '        is not None\n'
-                             '    }\n'
-                             '    assert cached == set(range(16))\n'},
-            {'name': 'tests/v1/core/test_prefix_caching.py:landmark-26',
-             'path': 'tests/v1/core/test_prefix_caching.py',
-             'before': '        return {\n'
-                       '            i\n'
-                       '            for i in range(16)\n'
-                       '            if pool.get_cached_block(req.block_hashes[i], '
-                       'kv_cache_group_ids=[1])\n'
-                       '            is not None\n'
-                       '        }\n'
-                       '\n',
-             'after': '        return {\n'
-                      '            i\n'
-                      '            for i in range(16)\n'
-                      '            if pool.get_cached_block(req.block_hashes[i], '
-                      'kv_cache_group_ids=[1], cache_view=PrefixCacheView(None))\n'
-                      '            is not None\n'
-                      '        }\n'
-                      '\n',
-             'review_before': '        return {\n'
-                              '            i\n'
-                              '            for i in range(16)\n'
-                              '            if '
-                              'pool.get_cached_block(req.block_hashes[i], '
-                              'kv_cache_group_ids=[1])\n'
-                              '            is not None\n'
-                              '        }\n'
-                              '\n',
-             'review_after': '        return {\n'
-                             '            i\n'
-                             '            for i in range(16)\n'
-                             '            if '
-                             'pool.get_cached_block(req.block_hashes[i], '
-                             'kv_cache_group_ids=[1], '
-                             'cache_view=PrefixCacheView(None))\n'
-                             '            is not None\n'
-                             '        }\n'
-                             '\n'},
-            {'name': 'tests/v1/core/test_prefix_caching.py:landmark-27',
+            {'name': 'tests/v1/core/test_prefix_caching.py:landmark-10',
              'path': 'tests/v1/core/test_prefix_caching.py',
              'before': '    assert last_req_hit(retention=0, pin=False) == 0\n'
                        '    # retention=0 with the pin keeps the junction window -> '
@@ -12863,14 +10962,101 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       'block_size\n'
                       '\n'
                       '\n'
-                      'def _request_with_identity(*, request_id, sampling_params, '
-                      '**kwargs):\n'
-                      '    sampling_params = sampling_params.clone()\n'
-                      '    sampling_params.extra_args = '
-                      'dict(sampling_params.extra_args or {})\n'
-                      '    sampling_params.extra_args["kv_scope"] = request_id\n'
-                      '    return Request(request_id=request_id, '
-                      'sampling_params=sampling_params, **kwargs)\n',
+                      'def _scoped_request(request_id, prompt_token_ids, block_size, '
+                      'agent, cache_salt=None):\n'
+                      '    sampling_params = SamplingParams(max_tokens=17, '
+                      'extra_args={"kv_scope": agent})\n'
+                      '    sampling_params.update_from_generation_config({}, '
+                      'eos_token_id=100)\n'
+                      '    return Request(\n'
+                      '        request_id=request_id,\n'
+                      '        prompt_token_ids=prompt_token_ids,\n'
+                      '        sampling_params=sampling_params,\n'
+                      '        pooling_params=None,\n'
+                      '        cache_salt=cache_salt,\n'
+                      '        block_hasher=get_request_block_hasher(block_size, '
+                      'sha256),\n'
+                      '    )\n'
+                      '\n'
+                      '\n'
+                      '@pytest.mark.parametrize("reader_agent", ["new-agent", '
+                      '"own-agent", "writer-agent"])\n'
+                      'def '
+                      'test_prefix_match_is_content_and_salt_whatever_the_agent_id(reader_agent):\n'
+                      '    """An ID with cached blocks of its own matches another '
+                      "ID's resident\n"
+                      '    prefix exactly as a new ID does; only content and '
+                      'cache_salt decide."""\n'
+                      '    block_size = 16\n'
+                      '    manager = make_kv_cache_manager(\n'
+                      '        make_kv_cache_config(block_size, 16),\n'
+                      '        max_model_len=8192,\n'
+                      '        enable_caching=True,\n'
+                      '        hash_block_size=block_size,\n'
+                      '    )\n'
+                      '\n'
+                      '    def run(request):\n'
+                      '        computed, num_computed, _ = '
+                      'manager.get_computed_blocks(request)\n'
+                      '        blocks = manager.allocate_slots(\n'
+                      '            request, request.num_tokens - num_computed, '
+                      'num_computed, computed\n'
+                      '        )\n'
+                      '        assert blocks is not None\n'
+                      '        request.num_computed_tokens = request.num_tokens\n'
+                      '        manager.free(request)\n'
+                      '        return num_computed\n'
+                      '\n'
+                      "    # The reader's own line already has cached blocks of "
+                      'different content.\n'
+                      '    assert run(_scoped_request("own", [9] * (2 * block_size + '
+                      '1), block_size,\n'
+                      '                               "own-agent")) == 0\n'
+                      '    common = [i for i in range(3) for _ in range(block_size)]\n'
+                      '    assert run(_scoped_request("writer", common + [7] * 5, '
+                      'block_size,\n'
+                      '                               "writer-agent")) == 0\n'
+                      '\n'
+                      '    reader = _scoped_request("reader", common + [8] * 5, '
+                      'block_size, reader_agent)\n'
+                      '    _, num_computed, _ = manager.get_computed_blocks(reader)\n'
+                      '    assert num_computed == 3 * block_size\n'
+                      '\n'
+                      '    salted = _scoped_request("salted", common + [8] * 5, '
+                      'block_size, reader_agent,\n'
+                      '                             cache_salt="other-salt")\n'
+                      '    _, num_computed, _ = manager.get_computed_blocks(salted)\n'
+                      '    assert num_computed == 0\n'
+                      '\n'
+                      '\n'
+                      '@pytest.mark.parametrize("is_recurrent", [False, True])\n'
+                      'def '
+                      'test_attention_extension_keeps_the_immutable_partial_prefix(is_recurrent):\n'
+                      '    """Extending an attention block leaves its shorter prefix '
+                      'valid, so the\n'
+                      '    partial entry stays reachable; a recurrent state replaces '
+                      'its checkpoint."""\n'
+                      '    pool = BlockPool(8, enable_caching=True, '
+                      'hash_block_size=4)\n'
+                      '    hashes = [BlockHash(bytes([i])) for i in range(1, 5)]\n'
+                      '    block = pool.get_new_blocks(1)[0]\n'
+                      '    writer = SimpleNamespace(block_hashes=hashes)\n'
+                      '    pool.cache_partial_block(writer, block, 8, 0, 16, '
+                      'is_recurrent=is_recurrent)\n'
+                      '    assert pool.get_cached_block(hashes[1], [0]) == [block]\n'
+                      '    pool.cache_full_blocks(writer, [block], 0, 1, 16, 0, '
+                      'is_recurrent=is_recurrent)\n'
+                      '    assert block.block_hash == '
+                      'make_block_hash_with_group_id(hashes[3], 0)\n'
+                      '    assert pool.get_cached_block(hashes[3], [0]) == [block]\n'
+                      '    if is_recurrent:\n'
+                      '        assert pool.get_cached_block(hashes[1], [0]) is None\n'
+                      '    else:\n'
+                      '        assert pool.get_cached_block(hashes[1], [0]) == '
+                      '[block]\n'
+                      '    pool._maybe_evict_cached_block(block)\n'
+                      '    assert pool.get_cached_block(hashes[1], [0]) is None\n'
+                      '    assert pool.get_cached_block(hashes[3], [0]) is None\n',
              'review_before': '    assert last_req_hit(retention=0, pin=False) == 0\n'
                               '    # retention=0 with the pin keeps the junction '
                               'window -> reuse restored.\n'
@@ -12883,271 +11069,112 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'block_size\n'
                              '\n'
                              '\n'
-                             'def _request_with_identity(*, request_id, '
-                             'sampling_params, **kwargs):\n'
-                             '    sampling_params = sampling_params.clone()\n'
-                             '    sampling_params.extra_args = '
-                             'dict(sampling_params.extra_args or {})\n'
-                             '    sampling_params.extra_args["kv_scope"] = request_id\n'
-                             '    return Request(request_id=request_id, '
-                             'sampling_params=sampling_params, **kwargs)\n'},
-            {'name': 'tests/v1/core/test_single_type_kv_cache_manager.py:landmark-1',
-             'path': 'tests/v1/core/test_single_type_kv_cache_manager.py',
-             'before': 'import pytest\n'
-                       'import torch\n'
-                       '\n'
-                       'from vllm.v1.core.block_pool import BlockPool\n'
-                       'from vllm.v1.core.kv_cache_utils import (\n'
-                       '    BlockHash,\n',
-             'after': 'import pytest\n'
-                      'import torch\n'
-                      '\n'
-                      'from vllm.v1.core.prefix_cache import PrefixCacheView\n'
-                      'from vllm.v1.core.block_pool import BlockPool\n'
-                      'from vllm.v1.core.kv_cache_utils import (\n'
-                      '    BlockHash,\n',
-             'review_before': 'import pytest\n'
-                              'import torch\n'
-                              '\n'
-                              'from vllm.v1.core.block_pool import BlockPool\n'
-                              'from vllm.v1.core.kv_cache_utils import (\n'
-                              '    BlockHash,\n',
-             'review_after': 'import pytest\n'
-                             'import torch\n'
+                             'def _scoped_request(request_id, prompt_token_ids, '
+                             'block_size, agent, cache_salt=None):\n'
+                             '    sampling_params = SamplingParams(max_tokens=17, '
+                             'extra_args={"kv_scope": agent})\n'
+                             '    sampling_params.update_from_generation_config({}, '
+                             'eos_token_id=100)\n'
+                             '    return Request(\n'
+                             '        request_id=request_id,\n'
+                             '        prompt_token_ids=prompt_token_ids,\n'
+                             '        sampling_params=sampling_params,\n'
+                             '        pooling_params=None,\n'
+                             '        cache_salt=cache_salt,\n'
+                             '        '
+                             'block_hasher=get_request_block_hasher(block_size, '
+                             'sha256),\n'
+                             '    )\n'
                              '\n'
-                             'from vllm.v1.core.prefix_cache import PrefixCacheView\n'
-                             'from vllm.v1.core.block_pool import BlockPool\n'
-                             'from vllm.v1.core.kv_cache_utils import (\n'
-                             '    BlockHash,\n'},
-            {'name': 'tests/v1/core/test_single_type_kv_cache_manager.py:landmark-2',
-             'path': 'tests/v1/core/test_single_type_kv_cache_manager.py',
-             'before': '        block_hash_list = [\n'
-                       '            BlockHash(str(i).encode()) for i in '
-                       'range(len(block_is_cached))\n'
-                       '        ]\n'
-                       '\n'
-                       '        block_pool.cached_block_hash_to_block._cache.clear()\n'
-                       '\n'
-                       '        # Mock the block pool with the cached blocks\n'
-                       '        for i, (block_hash, is_cached) in enumerate(\n'
-                       '            zip(block_hash_list, block_is_cached)\n'
-                       '        ):\n'
-                       '            if is_cached:\n'
-                       '                block_pool.cached_block_hash_to_block.insert(\n'
-                       '                    make_block_hash_with_group_id(block_hash, '
-                       '0),\n'
-                       '                    block_pool.blocks[i + 10],\n'
-                       '                )\n'
-                       '\n'
-                       '        computed_blocks = manager.find_longest_cache_hit(\n'
-                       '            block_hashes=block_hash_list,\n'
-                       '            max_length=len(block_hash_list) * block_size + '
-                       'tail_token,\n',
-             'after': '        block_hash_list = [\n'
-                      '            BlockHash(str(i).encode()) for i in '
-                      'range(len(block_is_cached))\n'
-                      '        ]\n'
-                      '\n'
-                      '        assert block_pool.reset_prefix_cache()\n'
-                      '\n'
-                      '        # Mock the block pool with the cached blocks\n'
-                      '        for i, (block_hash, is_cached) in enumerate(\n'
-                      '            zip(block_hash_list, block_is_cached)\n'
-                      '        ):\n'
-                      '            if is_cached:\n'
-                      '                '
-                      'block_pool._insert_block_hash(make_block_hash_with_group_id(block_hash, '
-                      '0), block_pool.blocks[i + 10], num_tokens=None, '
-                      'content=(make_block_hash_with_group_id(block_hash, 0),))\n'
-                      '\n'
-                      '        computed_blocks = manager.find_longest_cache_hit(\n'
-                      '            block_hashes=block_hash_list,\n'
-                      '            max_length=len(block_hash_list) * block_size + '
-                      'tail_token,\n',
-             'review_before': '            BlockHash(str(i).encode()) for i in '
-                              'range(len(block_is_cached))\n'
-                              '        ]\n'
-                              '\n'
-                              '        '
-                              'block_pool.cached_block_hash_to_block._cache.clear()\n'
-                              '\n'
-                              '        # Mock the block pool with the cached blocks\n'
-                              '        for i, (block_hash, is_cached) in enumerate(\n'
-                              '            zip(block_hash_list, block_is_cached)\n'
-                              '        ):\n'
-                              '            if is_cached:\n'
-                              '                '
-                              'block_pool.cached_block_hash_to_block.insert(\n'
-                              '                    '
-                              'make_block_hash_with_group_id(block_hash, 0),\n'
-                              '                    block_pool.blocks[i + 10],\n'
-                              '                )\n'
-                              '\n'
-                              '        computed_blocks = '
-                              'manager.find_longest_cache_hit(\n'
-                              '            block_hashes=block_hash_list,\n',
-             'review_after': '            BlockHash(str(i).encode()) for i in '
-                             'range(len(block_is_cached))\n'
-                             '        ]\n'
                              '\n'
-                             '        assert block_pool.reset_prefix_cache()\n'
+                             '@pytest.mark.parametrize("reader_agent", ["new-agent", '
+                             '"own-agent", "writer-agent"])\n'
+                             'def '
+                             'test_prefix_match_is_content_and_salt_whatever_the_agent_id(reader_agent):\n'
+                             '    """An ID with cached blocks of its own matches '
+                             "another ID's resident\n"
+                             '    prefix exactly as a new ID does; only content and '
+                             'cache_salt decide."""\n'
+                             '    block_size = 16\n'
+                             '    manager = make_kv_cache_manager(\n'
+                             '        make_kv_cache_config(block_size, 16),\n'
+                             '        max_model_len=8192,\n'
+                             '        enable_caching=True,\n'
+                             '        hash_block_size=block_size,\n'
+                             '    )\n'
                              '\n'
-                             '        # Mock the block pool with the cached blocks\n'
-                             '        for i, (block_hash, is_cached) in enumerate(\n'
-                             '            zip(block_hash_list, block_is_cached)\n'
-                             '        ):\n'
-                             '            if is_cached:\n'
-                             '                '
-                             'block_pool._insert_block_hash(make_block_hash_with_group_id(block_hash, '
-                             '0), block_pool.blocks[i + 10], num_tokens=None, '
-                             'content=(make_block_hash_with_group_id(block_hash, '
-                             '0),))\n'
+                             '    def run(request):\n'
+                             '        computed, num_computed, _ = '
+                             'manager.get_computed_blocks(request)\n'
+                             '        blocks = manager.allocate_slots(\n'
+                             '            request, request.num_tokens - num_computed, '
+                             'num_computed, computed\n'
+                             '        )\n'
+                             '        assert blocks is not None\n'
+                             '        request.num_computed_tokens = '
+                             'request.num_tokens\n'
+                             '        manager.free(request)\n'
+                             '        return num_computed\n'
                              '\n'
-                             '        computed_blocks = '
-                             'manager.find_longest_cache_hit(\n'
-                             '            block_hashes=block_hash_list,\n'},
-            {'name': 'tests/v1/core/test_single_type_kv_cache_manager.py:landmark-3',
-             'path': 'tests/v1/core/test_single_type_kv_cache_manager.py',
-             'before': '            kv_cache_spec=chunked_local_attention_spec,\n'
-                       '            drop_eagle_block=False,\n'
-                       '            alignment_tokens=block_size,\n'
-                       '        )[0][0]\n'
-                       '        assert len(computed_blocks) == expect_length\n'
-                       '\n',
-             'after': '            kv_cache_spec=chunked_local_attention_spec,\n'
-                      '            drop_eagle_block=False,\n'
-                      '            alignment_tokens=block_size,\n'
-                      '            cache_view=PrefixCacheView(None),\n'
-                      '        )[0][0]\n'
-                      '        assert len(computed_blocks) == expect_length\n'
-                      '\n',
-             'review_before': '            '
-                              'kv_cache_spec=chunked_local_attention_spec,\n'
-                              '            drop_eagle_block=False,\n'
-                              '            alignment_tokens=block_size,\n'
-                              '        )[0][0]\n'
-                              '        assert len(computed_blocks) == expect_length\n'
-                              '\n',
-             'review_after': '            kv_cache_spec=chunked_local_attention_spec,\n'
-                             '            drop_eagle_block=False,\n'
-                             '            alignment_tokens=block_size,\n'
-                             '            cache_view=PrefixCacheView(None),\n'
-                             '        )[0][0]\n'
-                             '        assert len(computed_blocks) == expect_length\n'
-                             '\n'},
-            {'name': 'tests/v1/core/test_single_type_kv_cache_manager.py:landmark-4',
-             'path': 'tests/v1/core/test_single_type_kv_cache_manager.py',
-             'before': '        block_hash_list = [\n'
-                       '            BlockHash(str(i).encode()) for i in '
-                       'range(len(block_is_cached))\n'
-                       '        ]\n'
-                       '\n'
-                       '        block_pool.cached_block_hash_to_block._cache.clear()\n'
-                       '\n'
-                       '        # Mock the block pool with the cached blocks\n'
-                       '        for i, (block_hash, is_cached) in enumerate(\n'
-                       '            zip(block_hash_list, block_is_cached)\n'
-                       '        ):\n'
-                       '            if is_cached:\n'
-                       '                block_pool.cached_block_hash_to_block.insert(\n'
-                       '                    make_block_hash_with_group_id(block_hash, '
-                       '0),\n'
-                       '                    block_pool.blocks[i + 10],\n'
-                       '                )\n'
-                       '\n'
-                       '        computed_blocks = manager.find_longest_cache_hit(\n'
-                       '            block_hashes=block_hash_list,\n'
-                       '            max_length=len(block_hash_list) * block_size,\n',
-             'after': '        block_hash_list = [\n'
-                      '            BlockHash(str(i).encode()) for i in '
-                      'range(len(block_is_cached))\n'
-                      '        ]\n'
-                      '\n'
-                      '        assert block_pool.reset_prefix_cache()\n'
-                      '\n'
-                      '        # Mock the block pool with the cached blocks\n'
-                      '        for i, (block_hash, is_cached) in enumerate(\n'
-                      '            zip(block_hash_list, block_is_cached)\n'
-                      '        ):\n'
-                      '            if is_cached:\n'
-                      '                '
-                      'block_pool._insert_block_hash(make_block_hash_with_group_id(block_hash, '
-                      '0), block_pool.blocks[i + 10], num_tokens=None, '
-                      'content=(make_block_hash_with_group_id(block_hash, 0),))\n'
-                      '\n'
-                      '        computed_blocks = manager.find_longest_cache_hit(\n'
-                      '            block_hashes=block_hash_list,\n'
-                      '            max_length=len(block_hash_list) * block_size,\n',
-             'review_before': '            BlockHash(str(i).encode()) for i in '
-                              'range(len(block_is_cached))\n'
-                              '        ]\n'
-                              '\n'
-                              '        '
-                              'block_pool.cached_block_hash_to_block._cache.clear()\n'
-                              '\n'
-                              '        # Mock the block pool with the cached blocks\n'
-                              '        for i, (block_hash, is_cached) in enumerate(\n'
-                              '            zip(block_hash_list, block_is_cached)\n'
-                              '        ):\n'
-                              '            if is_cached:\n'
-                              '                '
-                              'block_pool.cached_block_hash_to_block.insert(\n'
-                              '                    '
-                              'make_block_hash_with_group_id(block_hash, 0),\n'
-                              '                    block_pool.blocks[i + 10],\n'
-                              '                )\n'
-                              '\n'
-                              '        computed_blocks = '
-                              'manager.find_longest_cache_hit(\n'
-                              '            block_hashes=block_hash_list,\n',
-             'review_after': '            BlockHash(str(i).encode()) for i in '
-                             'range(len(block_is_cached))\n'
-                             '        ]\n'
+                             "    # The reader's own line already has cached blocks of "
+                             'different content.\n'
+                             '    assert run(_scoped_request("own", [9] * (2 * '
+                             'block_size + 1), block_size,\n'
+                             '                               "own-agent")) == 0\n'
+                             '    common = [i for i in range(3) for _ in '
+                             'range(block_size)]\n'
+                             '    assert run(_scoped_request("writer", common + [7] * '
+                             '5, block_size,\n'
+                             '                               "writer-agent")) == 0\n'
                              '\n'
-                             '        assert block_pool.reset_prefix_cache()\n'
+                             '    reader = _scoped_request("reader", common + [8] * 5, '
+                             'block_size, reader_agent)\n'
+                             '    _, num_computed, _ = '
+                             'manager.get_computed_blocks(reader)\n'
+                             '    assert num_computed == 3 * block_size\n'
                              '\n'
-                             '        # Mock the block pool with the cached blocks\n'
-                             '        for i, (block_hash, is_cached) in enumerate(\n'
-                             '            zip(block_hash_list, block_is_cached)\n'
-                             '        ):\n'
-                             '            if is_cached:\n'
-                             '                '
-                             'block_pool._insert_block_hash(make_block_hash_with_group_id(block_hash, '
-                             '0), block_pool.blocks[i + 10], num_tokens=None, '
-                             'content=(make_block_hash_with_group_id(block_hash, '
-                             '0),))\n'
+                             '    salted = _scoped_request("salted", common + [8] * 5, '
+                             'block_size, reader_agent,\n'
+                             '                             cache_salt="other-salt")\n'
+                             '    _, num_computed, _ = '
+                             'manager.get_computed_blocks(salted)\n'
+                             '    assert num_computed == 0\n'
                              '\n'
-                             '        computed_blocks = '
-                             'manager.find_longest_cache_hit(\n'
-                             '            block_hashes=block_hash_list,\n'},
-            {'name': 'tests/v1/core/test_single_type_kv_cache_manager.py:landmark-5',
-             'path': 'tests/v1/core/test_single_type_kv_cache_manager.py',
-             'before': '            kv_cache_spec=sliding_window_spec,\n'
-                       '            drop_eagle_block=False,\n'
-                       '            alignment_tokens=block_size,\n'
-                       '        )[0][0]\n'
-                       '        assert len(computed_blocks) == expect_length\n'
-                       '\n',
-             'after': '            kv_cache_spec=sliding_window_spec,\n'
-                      '            drop_eagle_block=False,\n'
-                      '            alignment_tokens=block_size,\n'
-                      '            cache_view=PrefixCacheView(None),\n'
-                      '        )[0][0]\n'
-                      '        assert len(computed_blocks) == expect_length\n'
-                      '\n',
-             'review_before': '            kv_cache_spec=sliding_window_spec,\n'
-                              '            drop_eagle_block=False,\n'
-                              '            alignment_tokens=block_size,\n'
-                              '        )[0][0]\n'
-                              '        assert len(computed_blocks) == expect_length\n'
-                              '\n',
-             'review_after': '            kv_cache_spec=sliding_window_spec,\n'
-                             '            drop_eagle_block=False,\n'
-                             '            alignment_tokens=block_size,\n'
-                             '            cache_view=PrefixCacheView(None),\n'
-                             '        )[0][0]\n'
-                             '        assert len(computed_blocks) == expect_length\n'
-                             '\n'},
+                             '\n'
+                             '@pytest.mark.parametrize("is_recurrent", [False, True])\n'
+                             'def '
+                             'test_attention_extension_keeps_the_immutable_partial_prefix(is_recurrent):\n'
+                             '    """Extending an attention block leaves its shorter '
+                             'prefix valid, so the\n'
+                             '    partial entry stays reachable; a recurrent state '
+                             'replaces its checkpoint."""\n'
+                             '    pool = BlockPool(8, enable_caching=True, '
+                             'hash_block_size=4)\n'
+                             '    hashes = [BlockHash(bytes([i])) for i in range(1, '
+                             '5)]\n'
+                             '    block = pool.get_new_blocks(1)[0]\n'
+                             '    writer = SimpleNamespace(block_hashes=hashes)\n'
+                             '    pool.cache_partial_block(writer, block, 8, 0, 16, '
+                             'is_recurrent=is_recurrent)\n'
+                             '    assert pool.get_cached_block(hashes[1], [0]) == '
+                             '[block]\n'
+                             '    pool.cache_full_blocks(writer, [block], 0, 1, 16, 0, '
+                             'is_recurrent=is_recurrent)\n'
+                             '    assert block.block_hash == '
+                             'make_block_hash_with_group_id(hashes[3], 0)\n'
+                             '    assert pool.get_cached_block(hashes[3], [0]) == '
+                             '[block]\n'
+                             '    if is_recurrent:\n'
+                             '        assert pool.get_cached_block(hashes[1], [0]) is '
+                             'None\n'
+                             '    else:\n'
+                             '        assert pool.get_cached_block(hashes[1], [0]) == '
+                             '[block]\n'
+                             '    pool._maybe_evict_cached_block(block)\n'
+                             '    assert pool.get_cached_block(hashes[1], [0]) is '
+                             'None\n'
+                             '    assert pool.get_cached_block(hashes[3], [0]) is '
+                             'None\n'},
             {'name': 'tests/v1/e2e/general/test_context_length.py:landmark-1',
              'path': 'tests/v1/e2e/general/test_context_length.py',
              'before': '    must see this reduced value and reject prompts that exceed '
@@ -14018,8 +12045,6 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '    scheduler.on_new_request(request)\n'
                       '    '
                       'scheduler._req_status[request.request_id].update_offload_keys()\n'
-                      '    '
-                      'scheduler.manager.begin_lookup(scheduler._req_status[request.request_id].req_context)\n'
                       '    return request\n'
                       '\n'
                       '\n',
@@ -14034,8 +12059,6 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    scheduler.on_new_request(request)\n'
                              '    '
                              'scheduler._req_status[request.request_id].update_offload_keys()\n'
-                             '    '
-                             'scheduler.manager.begin_lookup(scheduler._req_status[request.request_id].req_context)\n'
                              '    return request\n'
                              '\n'
                              '\n'},
@@ -15216,7 +13239,6 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '            )\n'
                       '            for key in gs.offload_keys:\n'
                       '                state.req_context.prefix_content[key] = (key,)\n'
-                      '        scheduler.manager.begin_lookup(state.req_context)\n'
                       '        return state\n'
                       '\n'
                       '    # '
@@ -15238,8 +13260,6 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '            for key in gs.offload_keys:\n'
                              '                state.req_context.prefix_content[key] = '
                              '(key,)\n'
-                             '        '
-                             'scheduler.manager.begin_lookup(state.req_context)\n'
                              '        return state\n'
                              '\n'
                              '    # '
@@ -15441,12 +13461,12 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '    assert fork.kv_scope in scheduler.manager._agents\n'
                       '    fork_context = '
                       'scheduler._req_status[fork.request_id].req_context\n'
-                      '    scheduler.manager.begin_lookup(fork_context)\n'
                       '    assert all(scheduler.manager.lookup(k, fork_context) is '
                       'LookupResult.HIT for k in partial_keys)\n'
-                      '    scheduler.manager.begin_lookup(incoming)\n'
+                      '    # An agent with cached data of its own matches the same '
+                      'resident content.\n'
                       '    assert all(scheduler.manager.lookup(k, incoming) is '
-                      'LookupResult.MISS for k in partial_keys)\n'
+                      'LookupResult.HIT for k in partial_keys)\n'
                       '\n'
                       '\n'
                       'def '
@@ -15552,17 +13572,17 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '\n'
                       '\n'
                       'def '
-                      'test_coalesced_window_owns_only_gpu_data_that_was_written():\n'
-                      '    from vllm.v1.core.prefix_cache import cache_content_keys\n'
-                      '\n'
+                      'test_coalesced_window_holds_only_gpu_data_that_was_written():\n'
                       '    scheduler, writer, _ = _coalesced_window_cache()\n'
-                      '    view = '
-                      'scheduler.manager.prefix_cache.view(writer.kv_scope)\n'
-                      '    assert not '
-                      'view.permits(cache_content_keys([writer.block_hashes[0]], '
-                      '1)[0])\n'
-                      '    assert '
-                      'view.allows(cache_content_keys(writer.block_hashes[1:], 1))\n'
+                      '    first_chunk = make_offload_key(writer.block_hashes[2], 1)\n'
+                      '    available = '
+                      'scheduler.manager._available_content[first_chunk]\n'
+                      '    assert available == tuple(\n'
+                      '        make_offload_key(block_hash, 1) for block_hash in '
+                      'writer.block_hashes[1:3]\n'
+                      '    )\n'
+                      '    assert first_chunk not in '
+                      'scheduler.manager._complete_blocks\n'
                       '\n'
                       '\n'
                       'def '
@@ -15582,8 +13602,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '\n'
                       '\n'
                       'def '
-                      'test_fork_acquires_only_the_common_boundary_inside_a_larger_cpu_chunk():\n'
-                      '    from vllm.v1.core.prefix_cache import cache_content_keys\n'
+                      'test_fork_resumes_at_the_common_boundary_inside_a_larger_cpu_chunk():\n'
                       '    from vllm.v1.kv_cache_interface import KVCacheConfig, '
                       'MambaSpec\n'
                       '    from vllm.v1.kv_offload.cpu.manager import '
@@ -15640,17 +13659,16 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       "    fork = request('fork', 'fork-first')\n"
                       '    assert scheduler.get_num_new_matched_tokens(fork, 0) == '
                       '(72, True)\n'
-                      "    acquired = scheduler.manager.prefix_cache.view('fork')\n"
-                      '    assert '
-                      'acquired.allows(cache_content_keys(producer.block_hashes[:9], '
-                      '0))\n'
-                      '    assert not '
-                      'acquired.permits(cache_content_keys([producer.block_hashes[9]], '
-                      '0)[0])\n'
+                      "    assert scheduler.manager._contexts['fork-first'].keys\n"
                       '    assert len(scheduler.manager._blocks) == 3\n'
                       "    next_turn = request('fork', 'fork-next')\n"
                       '    assert scheduler.get_num_new_matched_tokens(next_turn, 0) '
-                      '== (72, True)\n',
+                      '== (72, True)\n'
+                      '    # The resume boundary is a property of the resident content '
+                      'alone.\n'
+                      "    other = request('another-agent', 'another-first')\n"
+                      '    assert scheduler.get_num_new_matched_tokens(other, 0) == '
+                      '(72, True)\n',
              'review_before': '    assert get_sliding_window_size_in_chunks(spec, '
                               'tokens_per_chunk=1024) == 8\n'
                               '    # Partial chunks round up, so the reachable tail is '
@@ -15790,12 +13808,12 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    assert fork.kv_scope in scheduler.manager._agents\n'
                              '    fork_context = '
                              'scheduler._req_status[fork.request_id].req_context\n'
-                             '    scheduler.manager.begin_lookup(fork_context)\n'
                              '    assert all(scheduler.manager.lookup(k, fork_context) '
                              'is LookupResult.HIT for k in partial_keys)\n'
-                             '    scheduler.manager.begin_lookup(incoming)\n'
+                             '    # An agent with cached data of its own matches the '
+                             'same resident content.\n'
                              '    assert all(scheduler.manager.lookup(k, incoming) is '
-                             'LookupResult.MISS for k in partial_keys)\n'
+                             'LookupResult.HIT for k in partial_keys)\n'
                              '\n'
                              '\n'
                              'def '
@@ -15911,19 +13929,18 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '\n'
                              '\n'
                              'def '
-                             'test_coalesced_window_owns_only_gpu_data_that_was_written():\n'
-                             '    from vllm.v1.core.prefix_cache import '
-                             'cache_content_keys\n'
-                             '\n'
+                             'test_coalesced_window_holds_only_gpu_data_that_was_written():\n'
                              '    scheduler, writer, _ = _coalesced_window_cache()\n'
-                             '    view = '
-                             'scheduler.manager.prefix_cache.view(writer.kv_scope)\n'
-                             '    assert not '
-                             'view.permits(cache_content_keys([writer.block_hashes[0]], '
-                             '1)[0])\n'
-                             '    assert '
-                             'view.allows(cache_content_keys(writer.block_hashes[1:], '
-                             '1))\n'
+                             '    first_chunk = '
+                             'make_offload_key(writer.block_hashes[2], 1)\n'
+                             '    available = '
+                             'scheduler.manager._available_content[first_chunk]\n'
+                             '    assert available == tuple(\n'
+                             '        make_offload_key(block_hash, 1) for block_hash '
+                             'in writer.block_hashes[1:3]\n'
+                             '    )\n'
+                             '    assert first_chunk not in '
+                             'scheduler.manager._complete_blocks\n'
                              '\n'
                              '\n'
                              'def '
@@ -15944,9 +13961,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '\n'
                              '\n'
                              'def '
-                             'test_fork_acquires_only_the_common_boundary_inside_a_larger_cpu_chunk():\n'
-                             '    from vllm.v1.core.prefix_cache import '
-                             'cache_content_keys\n'
+                             'test_fork_resumes_at_the_common_boundary_inside_a_larger_cpu_chunk():\n'
                              '    from vllm.v1.kv_cache_interface import '
                              'KVCacheConfig, MambaSpec\n'
                              '    from vllm.v1.kv_offload.cpu.manager import '
@@ -16005,19 +14020,18 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              "    fork = request('fork', 'fork-first')\n"
                              '    assert scheduler.get_num_new_matched_tokens(fork, 0) '
                              '== (72, True)\n'
-                             '    acquired = '
-                             "scheduler.manager.prefix_cache.view('fork')\n"
                              '    assert '
-                             'acquired.allows(cache_content_keys(producer.block_hashes[:9], '
-                             '0))\n'
-                             '    assert not '
-                             'acquired.permits(cache_content_keys([producer.block_hashes[9]], '
-                             '0)[0])\n'
+                             "scheduler.manager._contexts['fork-first'].keys\n"
                              '    assert len(scheduler.manager._blocks) == 3\n'
                              "    next_turn = request('fork', 'fork-next')\n"
                              '    assert '
                              'scheduler.get_num_new_matched_tokens(next_turn, 0) == '
-                             '(72, True)\n'},
+                             '(72, True)\n'
+                             '    # The resume boundary is a property of the resident '
+                             'content alone.\n'
+                             "    other = request('another-agent', 'another-first')\n"
+                             '    assert scheduler.get_num_new_matched_tokens(other, '
+                             '0) == (72, True)\n'},
             {'name': 'tests/v1/kv_connector/unit/offloading_connector/test_worker.py:landmark-1',
              'path': 'tests/v1/kv_connector/unit/offloading_connector/test_worker.py',
              'before': '        enable_kv_cache_events=False,\n'
@@ -16060,47 +14074,6 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'blocks_per_chunk=1),\n'
                              '        parallel=OffloadingParallelConfig(\n'
                              '            rank=rank,\n'},
-            {'name': 'tests/v1/kv_connector/unit/offloading_connector/utils.py:landmark-1',
-             'path': 'tests/v1/kv_connector/unit/offloading_connector/utils.py',
-             'before': '        super().__init__(config)\n'
-                       '\n'
-                       '        self.manager = MagicMock(spec=OffloadingManager)\n'
-                       '        self.manager.prepare_load = lambda keys, req_context: '
-                       'MockLoadStoreSpec(keys)\n'
-                       '        self.manager.lookup.return_value = LookupResult.MISS\n'
-                       '        self.manager.get_stats.return_value = None\n',
-             'after': '        super().__init__(config)\n'
-                      '\n'
-                      '        self.manager = MagicMock(spec=OffloadingManager)\n'
-                      '        from vllm.v1.core.prefix_cache import PrefixCacheView\n'
-                      '        self.manager.begin_lookup.side_effect = lambda ctx: '
-                      'ctx.set_state(PrefixCacheView(None))\n'
-                      '        self.manager.prepare_load = lambda keys, req_context: '
-                      'MockLoadStoreSpec(keys)\n'
-                      '        self.manager.lookup.return_value = LookupResult.MISS\n'
-                      '        self.manager.get_stats.return_value = None\n',
-             'review_before': '        super().__init__(config)\n'
-                              '\n'
-                              '        self.manager = '
-                              'MagicMock(spec=OffloadingManager)\n'
-                              '        self.manager.prepare_load = lambda keys, '
-                              'req_context: MockLoadStoreSpec(keys)\n'
-                              '        self.manager.lookup.return_value = '
-                              'LookupResult.MISS\n'
-                              '        self.manager.get_stats.return_value = None\n',
-             'review_after': '        super().__init__(config)\n'
-                             '\n'
-                             '        self.manager = '
-                             'MagicMock(spec=OffloadingManager)\n'
-                             '        from vllm.v1.core.prefix_cache import '
-                             'PrefixCacheView\n'
-                             '        self.manager.begin_lookup.side_effect = lambda '
-                             'ctx: ctx.set_state(PrefixCacheView(None))\n'
-                             '        self.manager.prepare_load = lambda keys, '
-                             'req_context: MockLoadStoreSpec(keys)\n'
-                             '        self.manager.lookup.return_value = '
-                             'LookupResult.MISS\n'
-                             '        self.manager.get_stats.return_value = None\n'},
             {'name': 'tests/v1/kv_connector/unit/test_config.py:landmark-1',
              'path': 'tests/v1/kv_connector/unit/test_config.py',
              'before': '# SPDX-License-Identifier: Apache-2.0\n'
@@ -18888,8 +16861,11 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'after': '# SPDX-License-Identifier: Apache-2.0\n'
                       '# SPDX-FileCopyrightText: Copyright contributors to the vLLM '
                       'project\n'
-                      '"""Shared prefix retention and physical transfer lifetime, '
-                      'without an engine."""\n'
+                      '"""Content-matched lookup, shared prefix retention and physical '
+                      'transfer\n'
+                      'lifetime, without an engine. The agent ID groups retention; it '
+                      'never\n'
+                      'restricts what a lookup may match."""\n'
                       '\n'
                       'import random\n'
                       '\n'
@@ -18920,12 +16896,10 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '\n'
                       '\n'
                       'def lookup(manager, key, ctx):\n'
-                      '    manager.begin_lookup(ctx)\n'
                       '    return manager.lookup(key, ctx)\n'
                       '\n'
                       '\n'
                       'def load(manager, keys, ctx):\n'
-                      '    manager.begin_lookup(ctx)\n'
                       '    return manager.prepare_load(keys, ctx)\n'
                       '\n'
                       '\n'
@@ -18951,6 +16925,12 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '    assert {r for rs in manager._agents.values() for r in rs} '
                       '== set(manager._contexts)\n'
                       '    blocks = manager._blocks\n'
+                      '    assert manager._canonical_content.keys() == blocks.keys()\n'
+                      '    assert manager._available_content.keys() == blocks.keys()\n'
+                      '    assert manager._complete_blocks <= blocks.keys()\n'
+                      '    assert set(manager._idle_context.values()) <= '
+                      'set(manager._contexts)\n'
+                      '    assert len(manager._idle_context) <= manager._num_blocks\n'
                       '    allocated = {b.block_id for b in blocks.values()}\n'
                       '    assert len(allocated) == len(blocks)\n'
                       '    assert allocated.isdisjoint(manager._free_list)\n'
@@ -18964,25 +16944,23 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '== -1 for b in blocks.values())\n'
                       '\n'
                       '\n'
-                      'def test_shared_memberships_fit_declared_context_capacity():\n'
-                      '    """Unlimited fresh IDs cannot accumulate unlimited '
-                      'ownership metadata."""\n'
+                      'def test_retained_contexts_fit_declared_chunk_count():\n'
+                      '    """Unlimited IDs cannot accumulate unlimited '
+                      'retained-context metadata."""\n'
                       '    m = CPUOffloadingManager(4)\n'
                       "    keys = [b'prefix', b'tail']\n"
                       '    for i in range(100):\n'
                       '        ctx = context(str(i))\n'
-                      '        m.begin_lookup(ctx)\n'
                       '        store(m, ctx, keys)\n'
                       '        m.on_request_finished(ctx)\n'
                       '        assert len(m._contexts) <= 4\n'
-                      '        assert m.prefix_cache._tiers[m.cache_tier].references '
-                      '<= 8\n'
                       '        assert set(m._blocks) == set(keys)\n'
                       '        for survivor in m._contexts.values():\n'
                       '            assert survivor.keys == set(keys)\n'
-                      '            assert m.prefix_cache.view(survivor.agent_id).keys '
-                      '== frozenset(keys)\n'
                       '        check(m)\n'
+                      '    # The most recently finished contexts are the ones '
+                      'retained.\n'
+                      "    assert set(m._idle_context) == {'96', '97', '98', '99'}\n"
                       '\n'
                       '\n'
                       'def test_shared_prefix_capacity_counts_physical_data_once():\n'
@@ -18990,45 +16968,73 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       "    keys = [b'prefix', b'tail']\n"
                       "    for agent in ['one', 'two', 'three']:\n"
                       '        ctx = context(agent)\n'
-                      '        m.begin_lookup(ctx)\n'
                       '        store(m, ctx, keys)\n'
                       '        m.on_request_finished(ctx)\n'
                       "    assert set(m._agents) == {'one', 'two', 'three'}\n"
                       '    assert len(m._blocks) == 2\n'
-                      '    for agent in m._agents:\n'
-                      '        assert m.prefix_cache.view(agent).keys == '
-                      'frozenset(keys)\n'
+                      '    for req_id in m._idle_context.values():\n'
+                      '        assert m._contexts[req_id].keys == set(keys)\n'
+                      '    check(m)\n'
+                      '\n'
+                      '\n'
+                      "@pytest.mark.parametrize('reader', ['new', 'existing', "
+                      "'writer'])\n"
+                      'def test_lookup_matches_content_whatever_the_agent_id(reader):\n'
+                      '    """Any ID matches any resident prefix it names by content: '
+                      'an ID with\n'
+                      '    cached data of its own is no more restricted than a new '
+                      'one."""\n'
+                      '    m = CPUOffloadingManager(6)\n'
+                      "    writer = context('writer')\n"
+                      "    store(m, writer, [b'prefix', b'writer-tail'])\n"
+                      '    m.on_request_finished(writer)\n'
+                      "    if reader == 'existing':\n"
+                      "        own = context('existing', 'own-turn')\n"
+                      "        store(m, own, [b'own-prefix', b'own-tail'])\n"
+                      '        m.on_request_finished(own)\n'
+                      "    ctx = context(reader, 'next-turn')\n"
+                      "    for key in [b'prefix', b'writer-tail']:\n"
+                      '        assert lookup(m, key, ctx) is LookupResult.HIT\n'
+                      "    load(m, [b'prefix', b'writer-tail'], ctx)\n"
+                      "    m.complete_load([b'prefix', b'writer-tail'], ctx)\n"
+                      "    # Loading shared data references it under the reader's own "
+                      'line.\n'
+                      "    assert m._references[b'prefix'] >= {'next-turn'}\n"
+                      '    check(m)\n'
                       '\n'
                       '\n'
                       'def '
-                      'test_native_offload_preserves_all_gpu_users_of_the_copied_content():\n'
-                      '    from vllm.v1.core.prefix_cache import PrefixCacheIndex\n'
+                      'test_storage_transfer_can_precede_generation_without_inventing_an_agent():\n'
+                      '    m = CPUOffloadingManager(4)\n'
+                      "    physical = ReqContext('physical-transfer')\n"
+                      "    result = m._prepare_store([b'end'], physical)\n"
+                      '    m.complete_store(result.keys_to_store, physical)\n'
+                      "    assert m._lookup(b'end', physical) is LookupResult.HIT\n"
+                      '    assert not m._contexts and not m._agents\n'
+                      "    assert m._available_content[b'end'] is None\n"
+                      '    # The first generation supplies the hash chain that '
+                      'describes the entry.\n'
+                      "    generation = ReqContext('generation', kv_scope='agent',\n"
+                      "                            prefix_content={b'end': (b'first', "
+                      "b'end')})\n"
+                      "    assert m.lookup(b'end', generation) is LookupResult.HIT\n"
+                      "    assert m._available_content[b'end'] == (b'first', b'end')\n"
+                      '    assert not m._contexts\n'
+                      "    m.retain_context([b'end'], generation)\n"
+                      "    assert m._contexts['generation'].keys == {b'end'}\n"
+                      '    check(m)\n'
                       '\n'
-                      '    index = PrefixCacheIndex()\n'
-                      '    gpu = object()\n'
-                      '    index.register_tier(gpu, 4)\n'
-                      "    first, second, tail = b'first', b'second', b'tail'\n"
-                      '    index.insert(gpu, second, (first, second))\n'
-                      "    index.acquire(gpu, 'original', [second])\n"
-                      "    index.acquire(gpu, 'fork', [second], selection={second: "
-                      '(first,)})\n'
-                      '    index.insert(gpu, tail, (tail,))\n'
-                      "    index.acquire(gpu, 'original', [tail])\n"
-                      '    manager = CPUOffloadingManager(4)\n'
-                      '    manager.bind_prefix_cache(index)\n'
-                      "    writer = ReqContext('offloading-request', "
-                      "kv_scope='writer',\n"
-                      '                        prefix_content={second: (first, '
-                      'second)})\n'
-                      '    store(manager, writer, [second])\n'
-                      '    index.remove(gpu, second)\n'
-                      "    assert index.view('original').keys == frozenset((first, "
-                      'second, tail))\n'
-                      "    assert index.view('fork').keys == frozenset((first,))\n"
-                      "    original = ReqContext('next', kv_scope='original', "
-                      'prefix_content={second: (first, second)})\n'
-                      '    assert lookup(manager, second, original) is '
-                      'LookupResult.HIT\n'
+                      '\n'
+                      'def test_speculative_promotion_retains_no_context():\n'
+                      '    m = CPUOffloadingManager(3)\n'
+                      "    ctx = context('new-agent', 'promotion')\n"
+                      "    result = m._prepare_store([b'candidate'], ctx)\n"
+                      '    m.complete_store(result.keys_to_store, ctx)\n'
+                      '    assert not m._contexts\n'
+                      "    assert lookup(m, b'candidate', ctx) is LookupResult.HIT\n"
+                      "    m.retain_context([b'candidate'], ctx)\n"
+                      "    assert m._contexts['promotion'].keys == {b'candidate'}\n"
+                      '    check(m)\n'
                       '\n'
                       '\n'
                       'def '
@@ -19096,7 +17102,6 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '    m = CPUOffloadingManager(5)\n'
                       "    a, b, c = map(context, ['writer', 'fork', 'incoming'])\n"
                       "    store(m, a, [b'prefix', b'a'])\n"
-                      '    m.begin_lookup(b)\n'
                       "    if reuse == 'retain':\n"
                       "        m.retain_context([b'prefix'], b)  # includes GPU "
                       'prefix-cache hits\n'
@@ -19280,11 +17285,9 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '    assert list(output.store_spec.block_ids) == [slot]\n'
                       '    assert m._num_allocated_blocks == 1\n'
                       '    assert lookup(m, key, earlier) is LookupResult.HIT_PENDING\n'
+                      "    assert m._available_content[key] == (b'early', *suffix)\n"
                       "    for agent in ['writer', 'fork']:\n"
-                      '        assert m.prefix_cache.view(agent).keys == '
-                      'frozenset(suffix)\n'
-                      "    assert m.prefix_cache.view('earlier').keys == "
-                      "frozenset((b'early', *suffix))\n"
+                      '        assert m._contexts[agent].keys == {key}\n'
                       '    m.complete_store(output.keys_to_store, earlier)\n'
                       '    assert lookup(m, key, earlier) is LookupResult.HIT\n'
                       "    assert m._lookup(key, ReqContext('storage')) is "
@@ -19292,9 +17295,13 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '    events = list(m.take_events())\n'
                       '    assert [(e.keys, e.removed) for e in events] == [([key], '
                       'False)]\n'
+                      '    # The filled row serves every reader whose required data it '
+                      'holds,\n'
+                      '    # including the agents that wrote or read only its suffix '
+                      'before.\n'
                       "    for agent in ['writer', 'fork']:\n"
                       '        assert lookup(m, key, window_context(agent)) is '
-                      'LookupResult.MISS\n'
+                      'LookupResult.HIT\n'
                       '    check(m)\n'
                       '\n'
                       '\n'
@@ -19314,7 +17321,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       "    incoming.prefix_content[b'new'] = (b'new',)\n"
                       "    assert m.prepare_store([b'new', key], incoming) is None\n"
                       '    assert set(m._blocks) == {key}\n'
-                      '    assert m.prefix_cache.content(m.cache_tier, key) == suffix\n'
+                      '    assert m._available_content[key] == suffix\n'
                       "    if pin == 'reader':\n"
                       '        m.complete_load([key], writer)\n'
                       '    else:\n'
@@ -19343,8 +17350,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       'success=False)\n'
                       '    assert not m._contexts and not m._blocks\n'
                       '    assert not m._complete_blocks and not m._canonical_content\n'
-                      "    for agent in ['writer', 'fork', 'incoming']:\n"
-                      '        assert m.prefix_cache.view(agent).keys is None\n'
+                      '    assert not m._available_content\n'
                       '    check(m)\n'
                       '\n'
                       '\n'
@@ -19356,8 +17362,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       "    store(m, writer, [b'end'])\n"
                       '    m.on_request_finished(writer)\n'
                       '    assert writer.req_id not in m._contexts\n'
-                      "    assert m.prefix_cache.view('writer').keys == "
-                      "frozenset((b'middle', b'end'))\n"
+                      "    assert m._available_content[b'end'] == (b'middle', b'end')\n"
+                      '    check(m)\n'
                       '\n'
                       '\n'
                       "@pytest.mark.parametrize('bad', [None, '', ' ', 4, False])\n"
@@ -19439,7 +17445,36 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '                assert required <= m._blocks.keys()\n'
                       '        if rng.random() < 0.3:\n'
                       '            m.on_request_finished(ctx)\n'
-                      '        check(m)\n',
+                      '        check(m)\n'
+                      '\n'
+                      '\n'
+                      "@pytest.mark.parametrize('subagent_tail', [3, 4])\n"
+                      'def '
+                      'test_waiting_parent_survives_a_subagent_only_while_both_fit(subagent_tail):\n'
+                      '    """With one sequence at a time the parent has finished and '
+                      'is the least\n'
+                      '    recently used other ID: it survives exactly while its '
+                      'chunks and the\n'
+                      '    subagent\'s unshared chunks fit in the tier together."""\n'
+                      '    m = CPUOffloadingManager(6)\n'
+                      "    parent = context('parent')\n"
+                      "    store(m, parent, [b'system', b'parent-1', b'parent-2'])\n"
+                      '    m.on_request_finished(parent)\n'
+                      "    subagent = context('subagent')\n"
+                      "    tail = [f'sub-{i}'.encode() for i in range(subagent_tail)]\n"
+                      '    # The subagent matches the shared system prompt by content '
+                      'and extends it.\n'
+                      "    assert lookup(m, b'system', subagent) is LookupResult.HIT\n"
+                      "    output = store(m, subagent, tail, retain=[b'system', "
+                      '*tail])\n'
+                      '    survives = 3 + subagent_tail <= 6\n'
+                      "    assert ('parent' in m._agents) is survives\n"
+                      '    assert set(output.evicted_keys) == (set() if survives else '
+                      "{b'parent-1', b'parent-2'})\n"
+                      "    # The shared chunk stays: the subagent's own context "
+                      'references it.\n'
+                      "    assert lookup(m, b'system', subagent) is LookupResult.HIT\n"
+                      '    check(m)\n',
              'review_before': '# SPDX-License-Identifier: Apache-2.0\n'
                               '# SPDX-FileCopyrightText: Copyright contributors to the '
                               'vLLM project\n'
@@ -20893,8 +18928,11 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'review_after': '# SPDX-License-Identifier: Apache-2.0\n'
                              '# SPDX-FileCopyrightText: Copyright contributors to the '
                              'vLLM project\n'
-                             '"""Shared prefix retention and physical transfer '
-                             'lifetime, without an engine."""\n'
+                             '"""Content-matched lookup, shared prefix retention and '
+                             'physical transfer\n'
+                             'lifetime, without an engine. The agent ID groups '
+                             'retention; it never\n'
+                             'restricts what a lookup may match."""\n'
                              '\n'
                              'import random\n'
                              '\n'
@@ -20926,12 +18964,10 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '\n'
                              '\n'
                              'def lookup(manager, key, ctx):\n'
-                             '    manager.begin_lookup(ctx)\n'
                              '    return manager.lookup(key, ctx)\n'
                              '\n'
                              '\n'
                              'def load(manager, keys, ctx):\n'
-                             '    manager.begin_lookup(ctx)\n'
                              '    return manager.prepare_load(keys, ctx)\n'
                              '\n'
                              '\n'
@@ -20960,6 +18996,15 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    assert {r for rs in manager._agents.values() for r '
                              'in rs} == set(manager._contexts)\n'
                              '    blocks = manager._blocks\n'
+                             '    assert manager._canonical_content.keys() == '
+                             'blocks.keys()\n'
+                             '    assert manager._available_content.keys() == '
+                             'blocks.keys()\n'
+                             '    assert manager._complete_blocks <= blocks.keys()\n'
+                             '    assert set(manager._idle_context.values()) <= '
+                             'set(manager._contexts)\n'
+                             '    assert len(manager._idle_context) <= '
+                             'manager._num_blocks\n'
                              '    allocated = {b.block_id for b in blocks.values()}\n'
                              '    assert len(allocated) == len(blocks)\n'
                              '    assert allocated.isdisjoint(manager._free_list)\n'
@@ -20973,27 +19018,24 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'sum(b.ref_cnt == -1 for b in blocks.values())\n'
                              '\n'
                              '\n'
-                             'def '
-                             'test_shared_memberships_fit_declared_context_capacity():\n'
-                             '    """Unlimited fresh IDs cannot accumulate unlimited '
-                             'ownership metadata."""\n'
+                             'def test_retained_contexts_fit_declared_chunk_count():\n'
+                             '    """Unlimited IDs cannot accumulate unlimited '
+                             'retained-context metadata."""\n'
                              '    m = CPUOffloadingManager(4)\n'
                              "    keys = [b'prefix', b'tail']\n"
                              '    for i in range(100):\n'
                              '        ctx = context(str(i))\n'
-                             '        m.begin_lookup(ctx)\n'
                              '        store(m, ctx, keys)\n'
                              '        m.on_request_finished(ctx)\n'
                              '        assert len(m._contexts) <= 4\n'
-                             '        assert '
-                             'm.prefix_cache._tiers[m.cache_tier].references <= 8\n'
                              '        assert set(m._blocks) == set(keys)\n'
                              '        for survivor in m._contexts.values():\n'
                              '            assert survivor.keys == set(keys)\n'
-                             '            assert '
-                             'm.prefix_cache.view(survivor.agent_id).keys == '
-                             'frozenset(keys)\n'
                              '        check(m)\n'
+                             '    # The most recently finished contexts are the ones '
+                             'retained.\n'
+                             "    assert set(m._idle_context) == {'96', '97', '98', "
+                             "'99'}\n"
                              '\n'
                              '\n'
                              'def '
@@ -21002,47 +19044,80 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              "    keys = [b'prefix', b'tail']\n"
                              "    for agent in ['one', 'two', 'three']:\n"
                              '        ctx = context(agent)\n'
-                             '        m.begin_lookup(ctx)\n'
                              '        store(m, ctx, keys)\n'
                              '        m.on_request_finished(ctx)\n'
                              "    assert set(m._agents) == {'one', 'two', 'three'}\n"
                              '    assert len(m._blocks) == 2\n'
-                             '    for agent in m._agents:\n'
-                             '        assert m.prefix_cache.view(agent).keys == '
-                             'frozenset(keys)\n'
+                             '    for req_id in m._idle_context.values():\n'
+                             '        assert m._contexts[req_id].keys == set(keys)\n'
+                             '    check(m)\n'
+                             '\n'
+                             '\n'
+                             "@pytest.mark.parametrize('reader', ['new', 'existing', "
+                             "'writer'])\n"
+                             'def '
+                             'test_lookup_matches_content_whatever_the_agent_id(reader):\n'
+                             '    """Any ID matches any resident prefix it names by '
+                             'content: an ID with\n'
+                             '    cached data of its own is no more restricted than a '
+                             'new one."""\n'
+                             '    m = CPUOffloadingManager(6)\n'
+                             "    writer = context('writer')\n"
+                             "    store(m, writer, [b'prefix', b'writer-tail'])\n"
+                             '    m.on_request_finished(writer)\n'
+                             "    if reader == 'existing':\n"
+                             "        own = context('existing', 'own-turn')\n"
+                             "        store(m, own, [b'own-prefix', b'own-tail'])\n"
+                             '        m.on_request_finished(own)\n'
+                             "    ctx = context(reader, 'next-turn')\n"
+                             "    for key in [b'prefix', b'writer-tail']:\n"
+                             '        assert lookup(m, key, ctx) is LookupResult.HIT\n'
+                             "    load(m, [b'prefix', b'writer-tail'], ctx)\n"
+                             "    m.complete_load([b'prefix', b'writer-tail'], ctx)\n"
+                             '    # Loading shared data references it under the '
+                             "reader's own line.\n"
+                             "    assert m._references[b'prefix'] >= {'next-turn'}\n"
+                             '    check(m)\n'
                              '\n'
                              '\n'
                              'def '
-                             'test_native_offload_preserves_all_gpu_users_of_the_copied_content():\n'
-                             '    from vllm.v1.core.prefix_cache import '
-                             'PrefixCacheIndex\n'
-                             '\n'
-                             '    index = PrefixCacheIndex()\n'
-                             '    gpu = object()\n'
-                             '    index.register_tier(gpu, 4)\n'
-                             "    first, second, tail = b'first', b'second', b'tail'\n"
-                             '    index.insert(gpu, second, (first, second))\n'
-                             "    index.acquire(gpu, 'original', [second])\n"
-                             "    index.acquire(gpu, 'fork', [second], "
-                             'selection={second: (first,)})\n'
-                             '    index.insert(gpu, tail, (tail,))\n'
-                             "    index.acquire(gpu, 'original', [tail])\n"
-                             '    manager = CPUOffloadingManager(4)\n'
-                             '    manager.bind_prefix_cache(index)\n'
-                             "    writer = ReqContext('offloading-request', "
-                             "kv_scope='writer',\n"
-                             '                        prefix_content={second: (first, '
-                             'second)})\n'
-                             '    store(manager, writer, [second])\n'
-                             '    index.remove(gpu, second)\n'
-                             "    assert index.view('original').keys == "
-                             'frozenset((first, second, tail))\n'
-                             "    assert index.view('fork').keys == "
-                             'frozenset((first,))\n'
-                             "    original = ReqContext('next', kv_scope='original', "
-                             'prefix_content={second: (first, second)})\n'
-                             '    assert lookup(manager, second, original) is '
+                             'test_storage_transfer_can_precede_generation_without_inventing_an_agent():\n'
+                             '    m = CPUOffloadingManager(4)\n'
+                             "    physical = ReqContext('physical-transfer')\n"
+                             "    result = m._prepare_store([b'end'], physical)\n"
+                             '    m.complete_store(result.keys_to_store, physical)\n'
+                             "    assert m._lookup(b'end', physical) is "
                              'LookupResult.HIT\n'
+                             '    assert not m._contexts and not m._agents\n'
+                             "    assert m._available_content[b'end'] is None\n"
+                             '    # The first generation supplies the hash chain that '
+                             'describes the entry.\n'
+                             "    generation = ReqContext('generation', "
+                             "kv_scope='agent',\n"
+                             "                            prefix_content={b'end': "
+                             "(b'first', b'end')})\n"
+                             "    assert m.lookup(b'end', generation) is "
+                             'LookupResult.HIT\n'
+                             "    assert m._available_content[b'end'] == (b'first', "
+                             "b'end')\n"
+                             '    assert not m._contexts\n'
+                             "    m.retain_context([b'end'], generation)\n"
+                             "    assert m._contexts['generation'].keys == {b'end'}\n"
+                             '    check(m)\n'
+                             '\n'
+                             '\n'
+                             'def test_speculative_promotion_retains_no_context():\n'
+                             '    m = CPUOffloadingManager(3)\n'
+                             "    ctx = context('new-agent', 'promotion')\n"
+                             "    result = m._prepare_store([b'candidate'], ctx)\n"
+                             '    m.complete_store(result.keys_to_store, ctx)\n'
+                             '    assert not m._contexts\n'
+                             "    assert lookup(m, b'candidate', ctx) is "
+                             'LookupResult.HIT\n'
+                             "    m.retain_context([b'candidate'], ctx)\n"
+                             "    assert m._contexts['promotion'].keys == "
+                             "{b'candidate'}\n"
+                             '    check(m)\n'
                              '\n'
                              '\n'
                              'def '
@@ -21126,7 +19201,6 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              "    a, b, c = map(context, ['writer', 'fork', "
                              "'incoming'])\n"
                              "    store(m, a, [b'prefix', b'a'])\n"
-                             '    m.begin_lookup(b)\n'
                              "    if reuse == 'retain':\n"
                              "        m.retain_context([b'prefix'], b)  # includes GPU "
                              'prefix-cache hits\n'
@@ -21318,11 +19392,10 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    assert m._num_allocated_blocks == 1\n'
                              '    assert lookup(m, key, earlier) is '
                              'LookupResult.HIT_PENDING\n'
+                             "    assert m._available_content[key] == (b'early', "
+                             '*suffix)\n'
                              "    for agent in ['writer', 'fork']:\n"
-                             '        assert m.prefix_cache.view(agent).keys == '
-                             'frozenset(suffix)\n'
-                             "    assert m.prefix_cache.view('earlier').keys == "
-                             "frozenset((b'early', *suffix))\n"
+                             '        assert m._contexts[agent].keys == {key}\n'
                              '    m.complete_store(output.keys_to_store, earlier)\n'
                              '    assert lookup(m, key, earlier) is LookupResult.HIT\n'
                              "    assert m._lookup(key, ReqContext('storage')) is "
@@ -21330,9 +19403,13 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    events = list(m.take_events())\n'
                              '    assert [(e.keys, e.removed) for e in events] == '
                              '[([key], False)]\n'
+                             '    # The filled row serves every reader whose required '
+                             'data it holds,\n'
+                             '    # including the agents that wrote or read only its '
+                             'suffix before.\n'
                              "    for agent in ['writer', 'fork']:\n"
                              '        assert lookup(m, key, window_context(agent)) is '
-                             'LookupResult.MISS\n'
+                             'LookupResult.HIT\n'
                              '    check(m)\n'
                              '\n'
                              '\n'
@@ -21353,8 +19430,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              "    assert m.prepare_store([b'new', key], incoming) is "
                              'None\n'
                              '    assert set(m._blocks) == {key}\n'
-                             '    assert m.prefix_cache.content(m.cache_tier, key) == '
-                             'suffix\n'
+                             '    assert m._available_content[key] == suffix\n'
                              "    if pin == 'reader':\n"
                              '        m.complete_load([key], writer)\n'
                              '    else:\n'
@@ -21385,8 +19461,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    assert not m._contexts and not m._blocks\n'
                              '    assert not m._complete_blocks and not '
                              'm._canonical_content\n'
-                             "    for agent in ['writer', 'fork', 'incoming']:\n"
-                             '        assert m.prefix_cache.view(agent).keys is None\n'
+                             '    assert not m._available_content\n'
                              '    check(m)\n'
                              '\n'
                              '\n'
@@ -21398,8 +19473,9 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              "    store(m, writer, [b'end'])\n"
                              '    m.on_request_finished(writer)\n'
                              '    assert writer.req_id not in m._contexts\n'
-                             "    assert m.prefix_cache.view('writer').keys == "
-                             "frozenset((b'middle', b'end'))\n"
+                             "    assert m._available_content[b'end'] == (b'middle', "
+                             "b'end')\n"
+                             '    check(m)\n'
                              '\n'
                              '\n'
                              "@pytest.mark.parametrize('bad', [None, '', ' ', 4, "
@@ -21485,7 +19561,41 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '                assert required <= m._blocks.keys()\n'
                              '        if rng.random() < 0.3:\n'
                              '            m.on_request_finished(ctx)\n'
-                             '        check(m)\n'},
+                             '        check(m)\n'
+                             '\n'
+                             '\n'
+                             "@pytest.mark.parametrize('subagent_tail', [3, 4])\n"
+                             'def '
+                             'test_waiting_parent_survives_a_subagent_only_while_both_fit(subagent_tail):\n'
+                             '    """With one sequence at a time the parent has '
+                             'finished and is the least\n'
+                             '    recently used other ID: it survives exactly while '
+                             'its chunks and the\n'
+                             "    subagent's unshared chunks fit in the tier "
+                             'together."""\n'
+                             '    m = CPUOffloadingManager(6)\n'
+                             "    parent = context('parent')\n"
+                             "    store(m, parent, [b'system', b'parent-1', "
+                             "b'parent-2'])\n"
+                             '    m.on_request_finished(parent)\n'
+                             "    subagent = context('subagent')\n"
+                             "    tail = [f'sub-{i}'.encode() for i in "
+                             'range(subagent_tail)]\n'
+                             '    # The subagent matches the shared system prompt by '
+                             'content and extends it.\n'
+                             "    assert lookup(m, b'system', subagent) is "
+                             'LookupResult.HIT\n'
+                             "    output = store(m, subagent, tail, retain=[b'system', "
+                             '*tail])\n'
+                             '    survives = 3 + subagent_tail <= 6\n'
+                             "    assert ('parent' in m._agents) is survives\n"
+                             '    assert set(output.evicted_keys) == (set() if '
+                             "survives else {b'parent-1', b'parent-2'})\n"
+                             "    # The shared chunk stays: the subagent's own context "
+                             'references it.\n'
+                             "    assert lookup(m, b'system', subagent) is "
+                             'LookupResult.HIT\n'
+                             '    check(m)\n'},
             {'name': 'tests/v1/kv_offload/test_factory.py:landmark-1',
              'path': 'tests/v1/kv_offload/test_factory.py',
              'before': '# SPDX-License-Identifier: Apache-2.0\n'
@@ -24756,7 +22866,9 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                        '_MOCK_OFFLOADING_SPEC = MagicMock()\n'
                        '\n'
                        '\n'
-                       'def _mock_mmap_region(num_blocks: int, row_bytes: int = 16):\n',
+                       'def _mock_mmap_region(num_blocks: int, row_bytes: int = 16):\n'
+                       '    """Create a mock SharedOffloadRegion for testing."""\n'
+                       '    mock = MagicMock()\n',
              'after': ')\n'
                       'from vllm.v1.kv_offload.tiering.spec import '
                       'TieringOffloadingSpec\n'
@@ -24776,7 +22888,6 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '\n'
                       '\n'
                       'def _lookup(manager, key, ctx):\n'
-                      '    manager.begin_lookup(ctx)\n'
                       '    return manager.lookup(key, ctx)\n'
                       '\n'
                       '\n'
@@ -24834,8 +22945,9 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       'preempted_req_ids=[]))\n'
                       '        [promotion] = secondary.submitted_loads\n'
                       '        assert promotion.keys == [key]\n'
-                      "        assert primary.prefix_cache.view('reader').keys is "
-                      'None\n'
+                      '        # A promotion is a physical transfer; it retains '
+                      'nothing for the reader.\n'
+                      "        assert primary._contexts['reader'].keys == set()\n"
                       '        '
                       'secondary.finished_jobs.append(JobResult(job_id=promotion.job_id, '
                       'success=True))\n'
@@ -24845,15 +22957,22 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '        manager.complete_load([key], reader)\n'
                       '    assert primary._blocks[key].block_id == slot\n'
                       '    assert primary._num_allocated_blocks == 1\n'
-                      "    assert primary.prefix_cache.view('writer').keys == "
-                      'frozenset(suffix)\n'
-                      "    assert primary.prefix_cache.view('reader').keys == "
-                      'frozenset(canonical)\n'
+                      '    assert primary._available_content[key] == canonical\n'
+                      "    assert primary._contexts['writer'].keys == {key}\n"
+                      "    assert primary._contexts['reader'].keys == {key}\n"
+                      "    # The complete row serves the writer's full window too: "
+                      'lookup matches\n'
+                      '    # content, not which agent wrote or read it.\n'
+                      "    full = ReqContext('writer-next', kv_scope='writer', "
+                      'prefix_content={key: canonical})\n'
+                      '    assert _lookup(manager, key, full) is LookupResult.HIT\n'
                       "    assert manager._lookup(key, ReqContext('storage')) is "
                       'LookupResult.HIT\n'
                       '\n'
                       '\n'
-                      'def _mock_mmap_region(num_blocks: int, row_bytes: int = 16):\n',
+                      'def _mock_mmap_region(num_blocks: int, row_bytes: int = 16):\n'
+                      '    """Create a mock SharedOffloadRegion for testing."""\n'
+                      '    mock = MagicMock()\n',
              'review_before': ')\n'
                               'from vllm.v1.kv_offload.tiering.spec import '
                               'TieringOffloadingSpec\n'
@@ -24863,7 +22982,10 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                               '\n'
                               '\n'
                               'def _mock_mmap_region(num_blocks: int, row_bytes: int = '
-                              '16):\n',
+                              '16):\n'
+                              '    """Create a mock SharedOffloadRegion for '
+                              'testing."""\n'
+                              '    mock = MagicMock()\n',
              'review_after': ')\n'
                              'from vllm.v1.kv_offload.tiering.spec import '
                              'TieringOffloadingSpec\n'
@@ -24883,7 +23005,6 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '\n'
                              '\n'
                              'def _lookup(manager, key, ctx):\n'
-                             '    manager.begin_lookup(ctx)\n'
                              '    return manager.lookup(key, ctx)\n'
                              '\n'
                              '\n'
@@ -24949,8 +23070,10 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'preempted_req_ids=[]))\n'
                              '        [promotion] = secondary.submitted_loads\n'
                              '        assert promotion.keys == [key]\n'
-                             "        assert primary.prefix_cache.view('reader').keys "
-                             'is None\n'
+                             '        # A promotion is a physical transfer; it retains '
+                             'nothing for the reader.\n'
+                             "        assert primary._contexts['reader'].keys == "
+                             'set()\n'
                              '        '
                              'secondary.finished_jobs.append(JobResult(job_id=promotion.job_id, '
                              'success=True))\n'
@@ -24960,49 +23083,26 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '        manager.complete_load([key], reader)\n'
                              '    assert primary._blocks[key].block_id == slot\n'
                              '    assert primary._num_allocated_blocks == 1\n'
-                             "    assert primary.prefix_cache.view('writer').keys == "
-                             'frozenset(suffix)\n'
-                             "    assert primary.prefix_cache.view('reader').keys == "
-                             'frozenset(canonical)\n'
+                             '    assert primary._available_content[key] == canonical\n'
+                             "    assert primary._contexts['writer'].keys == {key}\n"
+                             "    assert primary._contexts['reader'].keys == {key}\n"
+                             "    # The complete row serves the writer's full window "
+                             'too: lookup matches\n'
+                             '    # content, not which agent wrote or read it.\n'
+                             "    full = ReqContext('writer-next', kv_scope='writer', "
+                             'prefix_content={key: canonical})\n'
+                             '    assert _lookup(manager, key, full) is '
+                             'LookupResult.HIT\n'
                              "    assert manager._lookup(key, ReqContext('storage')) "
                              'is LookupResult.HIT\n'
                              '\n'
                              '\n'
                              'def _mock_mmap_region(num_blocks: int, row_bytes: int = '
-                             '16):\n'},
+                             '16):\n'
+                             '    """Create a mock SharedOffloadRegion for '
+                             'testing."""\n'
+                             '    mock = MagicMock()\n'},
             {'name': 'tests/v1/kv_offload/tiering/test_tiering_offloading.py:landmark-2',
-             'path': 'tests/v1/kv_offload/tiering/test_tiering_offloading.py',
-             'before': '    Returns the count of leading HIT results, or None if any '
-                       'lookup\n'
-                       '    returns HIT_PENDING or RETRY.\n'
-                       '    """\n'
-                       '    count = 0\n'
-                       '    for key in keys:\n'
-                       '        result = manager.lookup(key, _CTX)\n',
-             'after': '    Returns the count of leading HIT results, or None if any '
-                      'lookup\n'
-                      '    returns HIT_PENDING or RETRY.\n'
-                      '    """\n'
-                      '    manager.begin_lookup(_CTX)\n'
-                      '    count = 0\n'
-                      '    for key in keys:\n'
-                      '        result = manager.lookup(key, _CTX)\n',
-             'review_before': '    Returns the count of leading HIT results, or None '
-                              'if any lookup\n'
-                              '    returns HIT_PENDING or RETRY.\n'
-                              '    """\n'
-                              '    count = 0\n'
-                              '    for key in keys:\n'
-                              '        result = manager.lookup(key, _CTX)\n',
-             'review_after': '    Returns the count of leading HIT results, or None if '
-                             'any lookup\n'
-                             '    returns HIT_PENDING or RETRY.\n'
-                             '    """\n'
-                             '    manager.begin_lookup(_CTX)\n'
-                             '    count = 0\n'
-                             '    for key in keys:\n'
-                             '        result = manager.lookup(key, _CTX)\n'},
-            {'name': 'tests/v1/kv_offload/tiering/test_tiering_offloading.py:landmark-3',
              'path': 'tests/v1/kv_offload/tiering/test_tiering_offloading.py',
              'before': '        # After complete_store, blocks should have ref_cnt > '
                        '0\n'
@@ -25041,7 +23141,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'secondary tier)\n'
                              '            assert block.ref_cnt == 2\n'
                              '\n'},
-            {'name': 'tests/v1/kv_offload/tiering/test_tiering_offloading.py:landmark-4',
+            {'name': 'tests/v1/kv_offload/tiering/test_tiering_offloading.py:landmark-3',
              'path': 'tests/v1/kv_offload/tiering/test_tiering_offloading.py',
              'before': '        # ref_cnt still held: cascade jobs finished (sync '
                        "tier) but haven't\n"
@@ -25085,7 +23185,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '\n'
                              '        # Secondary tiers have completed jobs waiting to '
                              'be drained\n'},
-            {'name': 'tests/v1/kv_offload/tiering/test_tiering_offloading.py:landmark-5',
+            {'name': 'tests/v1/kv_offload/tiering/test_tiering_offloading.py:landmark-4',
              'path': 'tests/v1/kv_offload/tiering/test_tiering_offloading.py',
              'before': '\n'
                        '        # After cascade completes, ref_cnt should be 0\n'
@@ -25117,7 +23217,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '            assert block.ref_cnt == 0\n'
                              '\n'
                              '        # All completed jobs have been drained\n'},
-            {'name': 'tests/v1/kv_offload/tiering/test_tiering_offloading.py:landmark-6',
+            {'name': 'tests/v1/kv_offload/tiering/test_tiering_offloading.py:landmark-5',
              'path': 'tests/v1/kv_offload/tiering/test_tiering_offloading.py',
              'before': '\n'
                        '        # Lookup each block to initiate promotion for all of '
@@ -25158,7 +23258,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '\n'
                              '        # End of step 1: flushes deferred submit_load() '
                              'calls\n'},
-            {'name': 'tests/v1/kv_offload/tiering/test_tiering_offloading.py:landmark-7',
+            {'name': 'tests/v1/kv_offload/tiering/test_tiering_offloading.py:landmark-6',
              'path': 'tests/v1/kv_offload/tiering/test_tiering_offloading.py',
              'before': '        self.secondary_tier1.submit_load = submit_partial\n'
                        '\n'
@@ -25230,7 +23330,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    def '
                              'test_lookup_reports_sync_delay_for_resolved_lookups(self, '
                              'manager_setup):\n'},
-            {'name': 'tests/v1/kv_offload/tiering/test_tiering_offloading.py:landmark-8',
+            {'name': 'tests/v1/kv_offload/tiering/test_tiering_offloading.py:landmark-7',
              'path': 'tests/v1/kv_offload/tiering/test_tiering_offloading.py',
              'before': '\n'
                        '        # No tier has these blocks: they resolve immediately '
@@ -25268,7 +23368,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '\n'
                              '        stats = self.manager.get_stats()\n'
                              '        assert stats is not None\n'},
-            {'name': 'tests/v1/kv_offload/tiering/test_tiering_offloading.py:landmark-9',
+            {'name': 'tests/v1/kv_offload/tiering/test_tiering_offloading.py:landmark-8',
              'path': 'tests/v1/kv_offload/tiering/test_tiering_offloading.py',
              'before': '        self.secondary_tier1.blocks[block] = True\n'
                        '\n'
@@ -25314,7 +23414,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'secondary lookup time.\n'
                              '        '
                              'self._simulate_on_schedule_end(new_req_ids=[_CTX.req_id])\n'},
-            {'name': 'tests/v1/kv_offload/tiering/test_tiering_offloading.py:landmark-10',
+            {'name': 'tests/v1/kv_offload/tiering/test_tiering_offloading.py:landmark-9',
              'path': 'tests/v1/kv_offload/tiering/test_tiering_offloading.py',
              'before': '        self._simulate_on_schedule_end()\n'
                        '\n'
@@ -25352,7 +23452,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '\n'
                              '        stats = self.manager.get_stats()\n'
                              '        if stats is not None:\n'},
-            {'name': 'tests/v1/kv_offload/tiering/test_tiering_offloading.py:landmark-11',
+            {'name': 'tests/v1/kv_offload/tiering/test_tiering_offloading.py:landmark-10',
              'path': 'tests/v1/kv_offload/tiering/test_tiering_offloading.py',
              'before': '        self, manager_setup\n'
                        '    ):\n'
@@ -25386,7 +23486,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '        self._start_request(ctx)\n'
                              '        block = to_keys(range(1))[0]\n'
                              '        self.secondary_tier1.lookup = MagicMock(\n'},
-            {'name': 'tests/v1/kv_offload/tiering/test_tiering_offloading.py:landmark-12',
+            {'name': 'tests/v1/kv_offload/tiering/test_tiering_offloading.py:landmark-11',
              'path': 'tests/v1/kv_offload/tiering/test_tiering_offloading.py',
              'before': '        )\n'
                        '\n'
@@ -25422,7 +23522,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '\n'
                              '        stats = self.manager.get_stats()\n'
                              '        if stats is not None:\n'},
-            {'name': 'tests/v1/kv_offload/tiering/test_tiering_offloading.py:landmark-13',
+            {'name': 'tests/v1/kv_offload/tiering/test_tiering_offloading.py:landmark-12',
              'path': 'tests/v1/kv_offload/tiering/test_tiering_offloading.py',
              'before': '                stats.reduce(), '
                        'TieringOffloadingMetrics.LOOKUP_ASYNC_DELAY\n'
@@ -25460,7 +23560,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '\n'
                              '        stats = self.manager.get_stats()\n'
                              '        assert stats is not None\n'},
-            {'name': 'tests/v1/kv_offload/tiering/test_tiering_offloading.py:landmark-14',
+            {'name': 'tests/v1/kv_offload/tiering/test_tiering_offloading.py:landmark-13',
              'path': 'tests/v1/kv_offload/tiering/test_tiering_offloading.py',
              'before': '        # End of step: release ref_cnt from cascade\n'
                        '        self._simulate_on_schedule_end()\n'
@@ -25556,7 +23656,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '        blocks = to_keys(range(3))\n'
                              '\n'
                              '        # Store blocks\n'},
-            {'name': 'tests/v1/kv_offload/tiering/test_tiering_offloading.py:landmark-15',
+            {'name': 'tests/v1/kv_offload/tiering/test_tiering_offloading.py:landmark-14',
              'path': 'tests/v1/kv_offload/tiering/test_tiering_offloading.py',
              'before': '        self.secondary_tier2.touch = '
                        'MagicMock(wraps=self.secondary_tier2.touch)\n'
@@ -25578,7 +23678,6 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       'MagicMock(wraps=self.secondary_tier2.touch)\n'
                       '\n'
                       '        # Touch blocks\n'
-                      '        self.manager.begin_lookup(_CTX)\n'
                       '        self.manager.retain_context(blocks, _CTX)\n'
                       '\n'
                       '        assert self.primary_tier._contexts[_CTX.req_id].keys == '
@@ -25610,7 +23709,6 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'MagicMock(wraps=self.secondary_tier2.touch)\n'
                              '\n'
                              '        # Touch blocks\n'
-                             '        self.manager.begin_lookup(_CTX)\n'
                              '        self.manager.retain_context(blocks, _CTX)\n'
                              '\n'
                              '        assert '
@@ -25622,7 +23720,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '        '
                              'self.secondary_tier1.touch.assert_called_once_with(blocks, '
                              '_CTX)\n'},
-            {'name': 'tests/v1/kv_offload/tiering/test_tiering_offloading.py:landmark-16',
+            {'name': 'tests/v1/kv_offload/tiering/test_tiering_offloading.py:landmark-15',
              'path': 'tests/v1/kv_offload/tiering/test_tiering_offloading.py',
              'before': '            wraps=self.secondary_tier1.submit_load\n'
                        '        )\n'
@@ -25706,7 +23804,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'at end of step\n'
                              '        '
                              'self.secondary_tier1.submit_load.assert_not_called()\n'},
-            {'name': 'tests/v1/kv_offload/tiering/test_tiering_offloading.py:landmark-17',
+            {'name': 'tests/v1/kv_offload/tiering/test_tiering_offloading.py:landmark-16',
              'path': 'tests/v1/kv_offload/tiering/test_tiering_offloading.py',
              'before': '            wraps=self.secondary_tier1.submit_load\n'
                        '        )\n'
@@ -25760,7 +23858,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '        # Both lookups find the shared_block and trigger '
                              'promotion\n'
                              '        # returning HIT_PENDING.\n'},
-            {'name': 'tests/v1/kv_offload/tiering/test_tiering_offloading.py:landmark-18',
+            {'name': 'tests/v1/kv_offload/tiering/test_tiering_offloading.py:landmark-17',
              'path': 'tests/v1/kv_offload/tiering/test_tiering_offloading.py',
              'before': '            wraps=self.secondary_tier1.submit_store\n'
                        '        )\n'
@@ -25794,7 +23892,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '\n'
                              '        self._start_request(ctx)\n'
                              '        self.manager.prepare_store(blocks, ctx)\n'},
-            {'name': 'tests/v1/kv_offload/tiering/test_tiering_offloading.py:landmark-19',
+            {'name': 'tests/v1/kv_offload/tiering/test_tiering_offloading.py:landmark-18',
              'path': 'tests/v1/kv_offload/tiering/test_tiering_offloading.py',
              'before': '    ):\n'
                        '        """Manager hook is eager; secondary hooks wait for '
@@ -25831,7 +23929,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '\n'
                              '        self.primary_tier.on_request_finished = '
                              'MagicMock(\n'},
-            {'name': 'tests/v1/kv_offload/tiering/test_tiering_offloading.py:landmark-20',
+            {'name': 'tests/v1/kv_offload/tiering/test_tiering_offloading.py:landmark-19',
              'path': 'tests/v1/kv_offload/tiering/test_tiering_offloading.py',
              'before': '    def test_failed_store_finalizes_finished_request(self, '
                        'manager_setup):\n'
@@ -25873,7 +23971,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '\n'
                              '        self.secondary_tier1.submit_store = MagicMock(\n'
                              '            wraps=self.secondary_tier1.submit_store\n'},
-            {'name': 'tests/v1/kv_offload/tiering/test_tiering_offloading.py:landmark-21',
+            {'name': 'tests/v1/kv_offload/tiering/test_tiering_offloading.py:landmark-20',
              'path': 'tests/v1/kv_offload/tiering/test_tiering_offloading.py',
              'before': '\n'
                        '    def test_zero_store_request_finalizes_immediately(self, '
@@ -25919,7 +24017,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'MagicMock(\n'
                              '            '
                              'wraps=self.secondary_tier1.on_request_finished\n'},
-            {'name': 'tests/v1/kv_offload/tiering/test_tiering_offloading.py:landmark-22',
+            {'name': 'tests/v1/kv_offload/tiering/test_tiering_offloading.py:landmark-21',
              'path': 'tests/v1/kv_offload/tiering/test_tiering_offloading.py',
              'before': '    def '
                        'test_reset_cache_finalizes_delayed_secondary_request(self, '
@@ -25968,7 +24066,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'MagicMock(\n'
                              '            '
                              'wraps=self.secondary_tier1.on_request_finished\n'},
-            {'name': 'tests/v1/kv_offload/tiering/test_tiering_offloading.py:landmark-23',
+            {'name': 'tests/v1/kv_offload/tiering/test_tiering_offloading.py:landmark-22',
              'path': 'tests/v1/kv_offload/tiering/test_tiering_offloading.py',
              'before': '        """reset_cache drops active pending stores so resumed '
                        'requests finalize."""\n'
@@ -26006,7 +24104,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'MagicMock(\n'
                              '            '
                              'wraps=self.secondary_tier1.on_request_finished\n'},
-            {'name': 'tests/v1/kv_offload/tiering/test_tiering_offloading.py:landmark-24',
+            {'name': 'tests/v1/kv_offload/tiering/test_tiering_offloading.py:landmark-23',
              'path': 'tests/v1/kv_offload/tiering/test_tiering_offloading.py',
              'before': '        """Policy defaults to BLOCK_LEVEL, escalates when a '
                        'tier requests it,\n'
@@ -26061,7 +24159,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '        self.manager.on_request_finished(ctx)\n'
                              '        assert ctx.req_id not in '
                              'self.manager._req_state\n'},
-            {'name': 'tests/v1/kv_offload/tiering/test_tiering_offloading.py:landmark-25',
+            {'name': 'tests/v1/kv_offload/tiering/test_tiering_offloading.py:landmark-24',
              'path': 'tests/v1/kv_offload/tiering/test_tiering_offloading.py',
              'before': '            '
                        'RequestOffloadingContext(policy=OffloadPolicy.REQUEST_LEVEL)\n'
@@ -26106,7 +24204,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '        assert '
                              'self.manager._req_state[ctx.req_id].request_level_tiers '
                              '== {0}\n'},
-            {'name': 'tests/v1/kv_offload/tiering/test_tiering_offloading.py:landmark-26',
+            {'name': 'tests/v1/kv_offload/tiering/test_tiering_offloading.py:landmark-25',
              'path': 'tests/v1/kv_offload/tiering/test_tiering_offloading.py',
              'before': '            '
                        'RequestOffloadingContext(policy=OffloadPolicy.REQUEST_LEVEL)\n'
@@ -26140,7 +24238,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '        self.manager.on_new_request(ctx)\n'
                              '\n'
                              '        # Spy on submit_store\n'},
-            {'name': 'tests/v1/kv_offload/tiering/test_tiering_offloading.py:landmark-27',
+            {'name': 'tests/v1/kv_offload/tiering/test_tiering_offloading.py:landmark-26',
              'path': 'tests/v1/kv_offload/tiering/test_tiering_offloading.py',
              'before': '        promo_block = to_keys([99])[0]\n'
                        '        self.secondary_tier1.blocks[promo_block] = True\n'
@@ -26175,7 +24273,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '            is LookupResult.HIT_PENDING\n'
                              '        )\n'
                              '        assert self.manager._pending_load_submissions\n'},
-            {'name': 'tests/v1/kv_offload/tiering/test_tiering_offloading.py:landmark-28',
+            {'name': 'tests/v1/kv_offload/tiering/test_tiering_offloading.py:landmark-27',
              'path': 'tests/v1/kv_offload/tiering/test_tiering_offloading.py',
              'before': '        self.secondary_tier1.on_new_request = lambda '
                        'req_context: (\n'
@@ -26221,7 +24319,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'self.manager._req_state[rl_ctx.req_id].request_level_tiers '
                              '== {0}\n'
                              '\n'},
-            {'name': 'tests/v1/kv_offload/tiering/test_tiering_offloading.py:landmark-29',
+            {'name': 'tests/v1/kv_offload/tiering/test_tiering_offloading.py:landmark-28',
              'path': 'tests/v1/kv_offload/tiering/test_tiering_offloading.py',
              'before': '        assert self.primary_tier._num_allocated_blocks == 0\n'
                        '        assert self.primary_tier._free_list == []\n'
@@ -26261,7 +24359,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'submitted.\n'
                              '        '
                              'self.secondary_tier1.submit_load.assert_not_called()\n'},
-            {'name': 'tests/v1/kv_offload/tiering/test_tiering_offloading.py:landmark-30',
+            {'name': 'tests/v1/kv_offload/tiering/test_tiering_offloading.py:landmark-29',
              'path': 'tests/v1/kv_offload/tiering/test_tiering_offloading.py',
              'before': '        # Secondaries have medium=CPU, so load_tier_filter '
                        'skips them.\n'
@@ -26320,7 +24418,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '        self.secondary_tier1.lookup.assert_not_called()\n'
                              '\n'
                              '    @pytest.mark.parametrize(\n'},
-            {'name': 'tests/v1/kv_offload/tiering/test_tiering_offloading.py:landmark-31',
+            {'name': 'tests/v1/kv_offload/tiering/test_tiering_offloading.py:landmark-30',
              'path': 'tests/v1/kv_offload/tiering/test_tiering_offloading.py',
              'before': '\n'
                        '        self.secondary_tier1.lookup = '
@@ -26398,67 +24496,6 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '        kv_transfer_config=kv_transfer_config,\n'},
             {'name': 'tests/v1/simple_kv_offload/test_scheduler.py:landmark-1',
              'path': 'tests/v1/simple_kv_offload/test_scheduler.py',
-             'before': '    VllmConfig,\n'
-                       ')\n'
-                       'from vllm.utils.hashing import sha256\n'
-                       'from vllm.v1.core.block_pool import BlockPool\n'
-                       'from vllm.v1.core.kv_cache_manager import KVCacheBlocks\n'
-                       'from vllm.v1.core.kv_cache_utils import (\n',
-             'after': '    VllmConfig,\n'
-                      ')\n'
-                      'from vllm.utils.hashing import sha256\n'
-                      'from vllm.v1.core.prefix_cache import PrefixCacheView\n'
-                      'from vllm.v1.core.block_pool import BlockPool\n'
-                      'from vllm.v1.core.kv_cache_manager import KVCacheBlocks\n'
-                      'from vllm.v1.core.kv_cache_utils import (\n',
-             'review_before': '    VllmConfig,\n'
-                              ')\n'
-                              'from vllm.utils.hashing import sha256\n'
-                              'from vllm.v1.core.block_pool import BlockPool\n'
-                              'from vllm.v1.core.kv_cache_manager import '
-                              'KVCacheBlocks\n'
-                              'from vllm.v1.core.kv_cache_utils import (\n',
-             'review_after': '    VllmConfig,\n'
-                             ')\n'
-                             'from vllm.utils.hashing import sha256\n'
-                             'from vllm.v1.core.prefix_cache import PrefixCacheView\n'
-                             'from vllm.v1.core.block_pool import BlockPool\n'
-                             'from vllm.v1.core.kv_cache_manager import KVCacheBlocks\n'
-                             'from vllm.v1.core.kv_cache_utils import (\n'},
-            {'name': 'tests/v1/simple_kv_offload/test_scheduler.py:landmark-2',
-             'path': 'tests/v1/simple_kv_offload/test_scheduler.py',
-             'before': '    prompt_token_ids = list(range(start, start + num_tokens))\n'
-                       '    sampling_params = SamplingParams(max_tokens=1)\n'
-                       '\n'
-                       '    req = Request(\n'
-                       '        request_id=request_id,\n'
-                       '        prompt_token_ids=prompt_token_ids,\n'
-                       '        sampling_params=sampling_params,\n',
-             'after': '    prompt_token_ids = list(range(start, start + num_tokens))\n'
-                      '    sampling_params = SamplingParams(max_tokens=1)\n'
-                      '\n'
-                      '    req = _request_with_identity(\n'
-                      '        request_id=request_id,\n'
-                      '        prompt_token_ids=prompt_token_ids,\n'
-                      '        sampling_params=sampling_params,\n',
-             'review_before': '    prompt_token_ids = list(range(start, start + '
-                              'num_tokens))\n'
-                              '    sampling_params = SamplingParams(max_tokens=1)\n'
-                              '\n'
-                              '    req = Request(\n'
-                              '        request_id=request_id,\n'
-                              '        prompt_token_ids=prompt_token_ids,\n'
-                              '        sampling_params=sampling_params,\n',
-             'review_after': '    prompt_token_ids = list(range(start, start + '
-                             'num_tokens))\n'
-                             '    sampling_params = SamplingParams(max_tokens=1)\n'
-                             '\n'
-                             '    req = _request_with_identity(\n'
-                             '        request_id=request_id,\n'
-                             '        prompt_token_ids=prompt_token_ids,\n'
-                             '        sampling_params=sampling_params,\n'},
-            {'name': 'tests/v1/simple_kv_offload/test_scheduler.py:landmark-3',
-             'path': 'tests/v1/simple_kv_offload/test_scheduler.py',
              'before': '            num_full_blocks=num_full,\n'
                        '            block_size=BLOCK_SIZE,\n'
                        '            kv_cache_group_id=group_id,\n'
@@ -26485,468 +24522,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '        )\n'
                              '    return blocks\n'
                              '\n'},
-            {'name': 'tests/v1/simple_kv_offload/test_scheduler.py:landmark-4',
-             'path': 'tests/v1/simple_kv_offload/test_scheduler.py',
-             'before': '    simulate_store_completion(sched, meta.store_event)\n'
-                       '\n'
-                       '    # New request with same tokens should get CPU cache hit\n'
-                       '    req2 = Request(\n'
-                       '        request_id="req-eager-load",\n'
-                       '        prompt_token_ids=req.prompt_token_ids,\n'
-                       '        sampling_params=req.sampling_params,\n',
-             'after': '    simulate_store_completion(sched, meta.store_event)\n'
-                      '\n'
-                      '    # New request with same tokens should get CPU cache hit\n'
-                      '    req2 = _request_with_identity(\n'
-                      '        request_id="req-eager-load",\n'
-                      '        prompt_token_ids=req.prompt_token_ids,\n'
-                      '        sampling_params=req.sampling_params,\n',
-             'review_before': '    simulate_store_completion(sched, meta.store_event)\n'
-                              '\n'
-                              '    # New request with same tokens should get CPU cache '
-                              'hit\n'
-                              '    req2 = Request(\n'
-                              '        request_id="req-eager-load",\n'
-                              '        prompt_token_ids=req.prompt_token_ids,\n'
-                              '        sampling_params=req.sampling_params,\n',
-             'review_after': '    simulate_store_completion(sched, meta.store_event)\n'
-                             '\n'
-                             '    # New request with same tokens should get CPU cache '
-                             'hit\n'
-                             '    req2 = _request_with_identity(\n'
-                             '        request_id="req-eager-load",\n'
-                             '        prompt_token_ids=req.prompt_token_ids,\n'
-                             '        sampling_params=req.sampling_params,\n'},
-            {'name': 'tests/v1/simple_kv_offload/test_scheduler.py:landmark-5',
-             'path': 'tests/v1/simple_kv_offload/test_scheduler.py',
-             'before': '    meta = sched.build_connector_meta(sched_out)\n'
-                       '    simulate_store_completion(sched, meta.store_event)\n'
-                       '\n'
-                       '    req2 = Request(\n'
-                       '        request_id="req-cap-boundary",\n'
-                       '        prompt_token_ids=req.prompt_token_ids,\n'
-                       '        sampling_params=req.sampling_params,\n',
-             'after': '    meta = sched.build_connector_meta(sched_out)\n'
-                      '    simulate_store_completion(sched, meta.store_event)\n'
-                      '\n'
-                      '    req2 = _request_with_identity(\n'
-                      '        request_id="req-cap-boundary",\n'
-                      '        prompt_token_ids=req.prompt_token_ids,\n'
-                      '        sampling_params=req.sampling_params,\n',
-             'review_before': '    meta = sched.build_connector_meta(sched_out)\n'
-                              '    simulate_store_completion(sched, meta.store_event)\n'
-                              '\n'
-                              '    req2 = Request(\n'
-                              '        request_id="req-cap-boundary",\n'
-                              '        prompt_token_ids=req.prompt_token_ids,\n'
-                              '        sampling_params=req.sampling_params,\n',
-             'review_after': '    meta = sched.build_connector_meta(sched_out)\n'
-                             '    simulate_store_completion(sched, meta.store_event)\n'
-                             '\n'
-                             '    req2 = _request_with_identity(\n'
-                             '        request_id="req-cap-boundary",\n'
-                             '        prompt_token_ids=req.prompt_token_ids,\n'
-                             '        sampling_params=req.sampling_params,\n'},
-            {'name': 'tests/v1/simple_kv_offload/test_scheduler.py:landmark-6',
-             'path': 'tests/v1/simple_kv_offload/test_scheduler.py',
-             'before': '    gpu_pool.free_blocks(fillers)\n'
-                       '\n'
-                       '    # --- Step 3: Re-schedule req_old — should get CPU cache '
-                       'hit ---\n'
-                       '    req_old2 = Request(\n'
-                       '        request_id="req-old-reload",\n'
-                       '        prompt_token_ids=req_old.prompt_token_ids,\n'
-                       '        sampling_params=req_old.sampling_params,\n',
-             'after': '    gpu_pool.free_blocks(fillers)\n'
-                      '\n'
-                      '    # --- Step 3: Re-schedule req_old — should get CPU cache '
-                      'hit ---\n'
-                      '    req_old2 = _request_with_identity(\n'
-                      '        request_id="req-old-reload",\n'
-                      '        prompt_token_ids=req_old.prompt_token_ids,\n'
-                      '        sampling_params=req_old.sampling_params,\n',
-             'review_before': '    gpu_pool.free_blocks(fillers)\n'
-                              '\n'
-                              '    # --- Step 3: Re-schedule req_old — should get CPU '
-                              'cache hit ---\n'
-                              '    req_old2 = Request(\n'
-                              '        request_id="req-old-reload",\n'
-                              '        prompt_token_ids=req_old.prompt_token_ids,\n'
-                              '        sampling_params=req_old.sampling_params,\n',
-             'review_after': '    gpu_pool.free_blocks(fillers)\n'
-                             '\n'
-                             '    # --- Step 3: Re-schedule req_old — should get CPU '
-                             'cache hit ---\n'
-                             '    req_old2 = _request_with_identity(\n'
-                             '        request_id="req-old-reload",\n'
-                             '        prompt_token_ids=req_old.prompt_token_ids,\n'
-                             '        sampling_params=req_old.sampling_params,\n'},
-            {'name': 'tests/v1/simple_kv_offload/test_scheduler.py:landmark-7',
-             'path': 'tests/v1/simple_kv_offload/test_scheduler.py',
-             'before': '    cpu_free_after_first = get_cpu_free_blocks(sched)\n'
-                       '\n'
-                       '    # Second request with identical hashes — should skip '
-                       'store\n'
-                       '    req2 = Request(\n'
-                       '        request_id="req-dup-eager",\n'
-                       '        prompt_token_ids=req.prompt_token_ids,\n'
-                       '        sampling_params=req.sampling_params,\n',
-             'after': '    cpu_free_after_first = get_cpu_free_blocks(sched)\n'
-                      '\n'
-                      '    # Second request with identical hashes — should skip store\n'
-                      '    req2 = _request_with_identity(\n'
-                      '        request_id="req-dup-eager",\n'
-                      '        prompt_token_ids=req.prompt_token_ids,\n'
-                      '        sampling_params=req.sampling_params,\n',
-             'review_before': '    cpu_free_after_first = get_cpu_free_blocks(sched)\n'
-                              '\n'
-                              '    # Second request with identical hashes — should '
-                              'skip store\n'
-                              '    req2 = Request(\n'
-                              '        request_id="req-dup-eager",\n'
-                              '        prompt_token_ids=req.prompt_token_ids,\n'
-                              '        sampling_params=req.sampling_params,\n',
-             'review_after': '    cpu_free_after_first = get_cpu_free_blocks(sched)\n'
-                             '\n'
-                             '    # Second request with identical hashes — should skip '
-                             'store\n'
-                             '    req2 = _request_with_identity(\n'
-                             '        request_id="req-dup-eager",\n'
-                             '        prompt_token_ids=req.prompt_token_ids,\n'
-                             '        sampling_params=req.sampling_params,\n'},
-            {'name': 'tests/v1/simple_kv_offload/test_scheduler.py:landmark-8',
-             'path': 'tests/v1/simple_kv_offload/test_scheduler.py',
-             'before': '    # Second request shares the prefix and reuses the same GPU '
-                       'block IDs\n'
-                       '    # (the real scheduler path: GPU prefix cache returns the '
-                       'same blocks).\n'
-                       '    # Do NOT simulate completion — the first store is still '
-                       'in-flight.\n'
-                       '    req2 = Request(\n'
-                       '        request_id="req-dup-eager-inflight",\n'
-                       '        prompt_token_ids=req.prompt_token_ids,\n'
-                       '        sampling_params=req.sampling_params,\n',
-             'after': '    # Second request shares the prefix and reuses the same GPU '
-                      'block IDs\n'
-                      '    # (the real scheduler path: GPU prefix cache returns the '
-                      'same blocks).\n'
-                      '    # Do NOT simulate completion — the first store is still '
-                      'in-flight.\n'
-                      '    req2 = _request_with_identity(\n'
-                      '        request_id="req-dup-eager-inflight",\n'
-                      '        prompt_token_ids=req.prompt_token_ids,\n'
-                      '        sampling_params=req.sampling_params,\n',
-             'review_before': '    # Second request shares the prefix and reuses the '
-                              'same GPU block IDs\n'
-                              '    # (the real scheduler path: GPU prefix cache '
-                              'returns the same blocks).\n'
-                              '    # Do NOT simulate completion — the first store is '
-                              'still in-flight.\n'
-                              '    req2 = Request(\n'
-                              '        request_id="req-dup-eager-inflight",\n'
-                              '        prompt_token_ids=req.prompt_token_ids,\n'
-                              '        sampling_params=req.sampling_params,\n',
-             'review_after': '    # Second request shares the prefix and reuses the '
-                             'same GPU block IDs\n'
-                             '    # (the real scheduler path: GPU prefix cache returns '
-                             'the same blocks).\n'
-                             '    # Do NOT simulate completion — the first store is '
-                             'still in-flight.\n'
-                             '    req2 = _request_with_identity(\n'
-                             '        request_id="req-dup-eager-inflight",\n'
-                             '        prompt_token_ids=req.prompt_token_ids,\n'
-                             '        sampling_params=req.sampling_params,\n'},
-            {'name': 'tests/v1/simple_kv_offload/test_scheduler.py:landmark-9',
-             'path': 'tests/v1/simple_kv_offload/test_scheduler.py',
-             'before': '\n'
-                       '    # Allocate blocks with the same hashes and free them '
-                       'again.\n'
-                       '    # The scanner should see they are already in CPU cache and '
-                       'skip them.\n'
-                       '    req2 = Request(\n'
-                       '        request_id="req-dup-lazy",\n'
-                       '        prompt_token_ids=req.prompt_token_ids,\n'
-                       '        sampling_params=req.sampling_params,\n',
-             'after': '\n'
-                      '    # Allocate blocks with the same hashes and free them '
-                      'again.\n'
-                      '    # The scanner should see they are already in CPU cache and '
-                      'skip them.\n'
-                      '    req2 = _request_with_identity(\n'
-                      '        request_id="req-dup-lazy",\n'
-                      '        prompt_token_ids=req.prompt_token_ids,\n'
-                      '        sampling_params=req.sampling_params,\n',
-             'review_before': '\n'
-                              '    # Allocate blocks with the same hashes and free '
-                              'them again.\n'
-                              '    # The scanner should see they are already in CPU '
-                              'cache and skip them.\n'
-                              '    req2 = Request(\n'
-                              '        request_id="req-dup-lazy",\n'
-                              '        prompt_token_ids=req.prompt_token_ids,\n'
-                              '        sampling_params=req.sampling_params,\n',
-             'review_after': '\n'
-                             '    # Allocate blocks with the same hashes and free them '
-                             'again.\n'
-                             '    # The scanner should see they are already in CPU '
-                             'cache and skip them.\n'
-                             '    req2 = _request_with_identity(\n'
-                             '        request_id="req-dup-lazy",\n'
-                             '        prompt_token_ids=req.prompt_token_ids,\n'
-                             '        sampling_params=req.sampling_params,\n'},
-            {'name': 'tests/v1/simple_kv_offload/test_scheduler.py:landmark-10',
-             'path': 'tests/v1/simple_kv_offload/test_scheduler.py',
-             'before': '    simulate_store_completion(sched, meta.store_event)\n'
-                       '\n'
-                       '    # Create new request with same tokens, check hit\n'
-                       '    req2 = Request(\n'
-                       '        request_id="req-preempt-load",\n'
-                       '        prompt_token_ids=req.prompt_token_ids,\n'
-                       '        sampling_params=req.sampling_params,\n',
-             'after': '    simulate_store_completion(sched, meta.store_event)\n'
-                      '\n'
-                      '    # Create new request with same tokens, check hit\n'
-                      '    req2 = _request_with_identity(\n'
-                      '        request_id="req-preempt-load",\n'
-                      '        prompt_token_ids=req.prompt_token_ids,\n'
-                      '        sampling_params=req.sampling_params,\n',
-             'review_before': '    simulate_store_completion(sched, meta.store_event)\n'
-                              '\n'
-                              '    # Create new request with same tokens, check hit\n'
-                              '    req2 = Request(\n'
-                              '        request_id="req-preempt-load",\n'
-                              '        prompt_token_ids=req.prompt_token_ids,\n'
-                              '        sampling_params=req.sampling_params,\n',
-             'review_after': '    simulate_store_completion(sched, meta.store_event)\n'
-                             '\n'
-                             '    # Create new request with same tokens, check hit\n'
-                             '    req2 = _request_with_identity(\n'
-                             '        request_id="req-preempt-load",\n'
-                             '        prompt_token_ids=req.prompt_token_ids,\n'
-                             '        sampling_params=req.sampling_params,\n'},
-            {'name': 'tests/v1/simple_kv_offload/test_scheduler.py:landmark-11',
-             'path': 'tests/v1/simple_kv_offload/test_scheduler.py',
-             'before': '    simulate_store_completion(sched, meta.store_event)\n'
-                       '\n'
-                       '    # Load\n'
-                       '    req2 = Request(\n'
-                       '        request_id="req-inflight-load",\n'
-                       '        prompt_token_ids=req.prompt_token_ids,\n'
-                       '        sampling_params=req.sampling_params,\n',
-             'after': '    simulate_store_completion(sched, meta.store_event)\n'
-                      '\n'
-                      '    # Load\n'
-                      '    req2 = _request_with_identity(\n'
-                      '        request_id="req-inflight-load",\n'
-                      '        prompt_token_ids=req.prompt_token_ids,\n'
-                      '        sampling_params=req.sampling_params,\n',
-             'review_before': '    simulate_store_completion(sched, meta.store_event)\n'
-                              '\n'
-                              '    # Load\n'
-                              '    req2 = Request(\n'
-                              '        request_id="req-inflight-load",\n'
-                              '        prompt_token_ids=req.prompt_token_ids,\n'
-                              '        sampling_params=req.sampling_params,\n',
-             'review_after': '    simulate_store_completion(sched, meta.store_event)\n'
-                             '\n'
-                             '    # Load\n'
-                             '    req2 = _request_with_identity(\n'
-                             '        request_id="req-inflight-load",\n'
-                             '        prompt_token_ids=req.prompt_token_ids,\n'
-                             '        sampling_params=req.sampling_params,\n'},
-            {'name': 'tests/v1/simple_kv_offload/test_scheduler.py:landmark-12',
-             'path': 'tests/v1/simple_kv_offload/test_scheduler.py',
-             'before': '    simulate_store_completion(sched, meta.store_event)\n'
-                       '\n'
-                       '    # Create matching request and get load hit\n'
-                       '    req2 = Request(\n'
-                       '        request_id="req-null-load",\n'
-                       '        prompt_token_ids=req.prompt_token_ids,\n'
-                       '        sampling_params=req.sampling_params,\n',
-             'after': '    simulate_store_completion(sched, meta.store_event)\n'
-                      '\n'
-                      '    # Create matching request and get load hit\n'
-                      '    req2 = _request_with_identity(\n'
-                      '        request_id="req-null-load",\n'
-                      '        prompt_token_ids=req.prompt_token_ids,\n'
-                      '        sampling_params=req.sampling_params,\n',
-             'review_before': '    simulate_store_completion(sched, meta.store_event)\n'
-                              '\n'
-                              '    # Create matching request and get load hit\n'
-                              '    req2 = Request(\n'
-                              '        request_id="req-null-load",\n'
-                              '        prompt_token_ids=req.prompt_token_ids,\n'
-                              '        sampling_params=req.sampling_params,\n',
-             'review_after': '    simulate_store_completion(sched, meta.store_event)\n'
-                             '\n'
-                             '    # Create matching request and get load hit\n'
-                             '    req2 = _request_with_identity(\n'
-                             '        request_id="req-null-load",\n'
-                             '        prompt_token_ids=req.prompt_token_ids,\n'
-                             '        sampling_params=req.sampling_params,\n'},
-            {'name': 'tests/v1/simple_kv_offload/test_scheduler.py:landmark-13',
-             'path': 'tests/v1/simple_kv_offload/test_scheduler.py',
-             'before': '    simulate_store_completion(sched, meta.store_event)\n'
-                       '\n'
-                       '    # New request with same tokens — but only partial GPU '
-                       'prefix hit.\n'
-                       '    req2 = Request(\n'
-                       '        request_id="req-partial-gpu",\n'
-                       '        prompt_token_ids=req.prompt_token_ids,\n'
-                       '        sampling_params=req.sampling_params,\n',
-             'after': '    simulate_store_completion(sched, meta.store_event)\n'
-                      '\n'
-                      '    # New request with same tokens — but only partial GPU '
-                      'prefix hit.\n'
-                      '    req2 = _request_with_identity(\n'
-                      '        request_id="req-partial-gpu",\n'
-                      '        prompt_token_ids=req.prompt_token_ids,\n'
-                      '        sampling_params=req.sampling_params,\n',
-             'review_before': '    simulate_store_completion(sched, meta.store_event)\n'
-                              '\n'
-                              '    # New request with same tokens — but only partial '
-                              'GPU prefix hit.\n'
-                              '    req2 = Request(\n'
-                              '        request_id="req-partial-gpu",\n'
-                              '        prompt_token_ids=req.prompt_token_ids,\n'
-                              '        sampling_params=req.sampling_params,\n',
-             'review_after': '    simulate_store_completion(sched, meta.store_event)\n'
-                             '\n'
-                             '    # New request with same tokens — but only partial '
-                             'GPU prefix hit.\n'
-                             '    req2 = _request_with_identity(\n'
-                             '        request_id="req-partial-gpu",\n'
-                             '        prompt_token_ids=req.prompt_token_ids,\n'
-                             '        sampling_params=req.sampling_params,\n'},
-            {'name': 'tests/v1/simple_kv_offload/test_scheduler.py:landmark-14',
-             'path': 'tests/v1/simple_kv_offload/test_scheduler.py',
-             'before': '    simulate_store_completion(sched, meta_a.store_event)\n'
-                       '\n'
-                       '    # --- Step 2: Phase A — req_b (same prompt as req_a) '
-                       'reports a CPU hit ---\n'
-                       '    req_b = Request(\n'
-                       '        request_id="req-b-toctou",\n'
-                       '        prompt_token_ids=req_a.prompt_token_ids,\n'
-                       '        sampling_params=req_a.sampling_params,\n',
-             'after': '    simulate_store_completion(sched, meta_a.store_event)\n'
-                      '\n'
-                      '    # --- Step 2: Phase A — req_b (same prompt as req_a) '
-                      'reports a CPU hit ---\n'
-                      '    req_b = _request_with_identity(\n'
-                      '        request_id="req-b-toctou",\n'
-                      '        prompt_token_ids=req_a.prompt_token_ids,\n'
-                      '        sampling_params=req_a.sampling_params,\n',
-             'review_before': '    simulate_store_completion(sched, '
-                              'meta_a.store_event)\n'
-                              '\n'
-                              '    # --- Step 2: Phase A — req_b (same prompt as '
-                              'req_a) reports a CPU hit ---\n'
-                              '    req_b = Request(\n'
-                              '        request_id="req-b-toctou",\n'
-                              '        prompt_token_ids=req_a.prompt_token_ids,\n'
-                              '        sampling_params=req_a.sampling_params,\n',
-             'review_after': '    simulate_store_completion(sched, '
-                             'meta_a.store_event)\n'
-                             '\n'
-                             '    # --- Step 2: Phase A — req_b (same prompt as req_a) '
-                             'reports a CPU hit ---\n'
-                             '    req_b = _request_with_identity(\n'
-                             '        request_id="req-b-toctou",\n'
-                             '        prompt_token_ids=req_a.prompt_token_ids,\n'
-                             '        sampling_params=req_a.sampling_params,\n'},
-            {'name': 'tests/v1/simple_kv_offload/test_scheduler.py:landmark-15',
-             'path': 'tests/v1/simple_kv_offload/test_scheduler.py',
-             'before': '    assert sched.reset() is True\n'
-                       '\n'
-                       '    # No CPU cache hits after reset\n'
-                       '    req2 = Request(\n'
-                       '        request_id="req-after-lazy-reset",\n'
-                       '        prompt_token_ids=req.prompt_token_ids,\n'
-                       '        sampling_params=req.sampling_params,\n',
-             'after': '    assert sched.reset() is True\n'
-                      '\n'
-                      '    # No CPU cache hits after reset\n'
-                      '    req2 = _request_with_identity(\n'
-                      '        request_id="req-after-lazy-reset",\n'
-                      '        prompt_token_ids=req.prompt_token_ids,\n'
-                      '        sampling_params=req.sampling_params,\n',
-             'review_before': '    assert sched.reset() is True\n'
-                              '\n'
-                              '    # No CPU cache hits after reset\n'
-                              '    req2 = Request(\n'
-                              '        request_id="req-after-lazy-reset",\n'
-                              '        prompt_token_ids=req.prompt_token_ids,\n'
-                              '        sampling_params=req.sampling_params,\n',
-             'review_after': '    assert sched.reset() is True\n'
-                             '\n'
-                             '    # No CPU cache hits after reset\n'
-                             '    req2 = _request_with_identity(\n'
-                             '        request_id="req-after-lazy-reset",\n'
-                             '        prompt_token_ids=req.prompt_token_ids,\n'
-                             '        sampling_params=req.sampling_params,\n'},
-            {'name': 'tests/v1/simple_kv_offload/test_scheduler.py:landmark-16',
-             'path': 'tests/v1/simple_kv_offload/test_scheduler.py',
-             'before': '    simulate_store_completion(sched, meta.store_event)\n'
-                       '\n'
-                       '    # Start a load — CPU cache hit\n'
-                       '    req2 = Request(\n'
-                       '        request_id="req-load-reset",\n'
-                       '        prompt_token_ids=req.prompt_token_ids,\n'
-                       '        sampling_params=req.sampling_params,\n',
-             'after': '    simulate_store_completion(sched, meta.store_event)\n'
-                      '\n'
-                      '    # Start a load — CPU cache hit\n'
-                      '    req2 = _request_with_identity(\n'
-                      '        request_id="req-load-reset",\n'
-                      '        prompt_token_ids=req.prompt_token_ids,\n'
-                      '        sampling_params=req.sampling_params,\n',
-             'review_before': '    simulate_store_completion(sched, meta.store_event)\n'
-                              '\n'
-                              '    # Start a load — CPU cache hit\n'
-                              '    req2 = Request(\n'
-                              '        request_id="req-load-reset",\n'
-                              '        prompt_token_ids=req.prompt_token_ids,\n'
-                              '        sampling_params=req.sampling_params,\n',
-             'review_after': '    simulate_store_completion(sched, meta.store_event)\n'
-                             '\n'
-                             '    # Start a load — CPU cache hit\n'
-                             '    req2 = _request_with_identity(\n'
-                             '        request_id="req-load-reset",\n'
-                             '        prompt_token_ids=req.prompt_token_ids,\n'
-                             '        sampling_params=req.sampling_params,\n'},
-            {'name': 'tests/v1/simple_kv_offload/test_scheduler.py:landmark-17',
-             'path': 'tests/v1/simple_kv_offload/test_scheduler.py',
-             'before': '    prompt_token_ids = list(range(start, start + num_tokens))\n'
-                       '    sampling_params = SamplingParams(max_tokens=1)\n'
-                       '\n'
-                       '    return Request(\n'
-                       '        request_id=request_id,\n'
-                       '        prompt_token_ids=prompt_token_ids,\n'
-                       '        sampling_params=sampling_params,\n',
-             'after': '    prompt_token_ids = list(range(start, start + num_tokens))\n'
-                      '    sampling_params = SamplingParams(max_tokens=1)\n'
-                      '\n'
-                      '    return _request_with_identity(\n'
-                      '        request_id=request_id,\n'
-                      '        prompt_token_ids=prompt_token_ids,\n'
-                      '        sampling_params=sampling_params,\n',
-             'review_before': '    prompt_token_ids = list(range(start, start + '
-                              'num_tokens))\n'
-                              '    sampling_params = SamplingParams(max_tokens=1)\n'
-                              '\n'
-                              '    return Request(\n'
-                              '        request_id=request_id,\n'
-                              '        prompt_token_ids=prompt_token_ids,\n'
-                              '        sampling_params=sampling_params,\n',
-             'review_after': '    prompt_token_ids = list(range(start, start + '
-                             'num_tokens))\n'
-                             '    sampling_params = SamplingParams(max_tokens=1)\n'
-                             '\n'
-                             '    return _request_with_identity(\n'
-                             '        request_id=request_id,\n'
-                             '        prompt_token_ids=prompt_token_ids,\n'
-                             '        sampling_params=sampling_params,\n'},
-            {'name': 'tests/v1/simple_kv_offload/test_scheduler.py:landmark-18',
+            {'name': 'tests/v1/simple_kv_offload/test_scheduler.py:landmark-2',
              'path': 'tests/v1/simple_kv_offload/test_scheduler.py',
              'before': '            num_full_blocks=num_full,\n'
                        '            block_size=virtual_block_size,\n'
@@ -26974,108 +24550,6 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '        )\n'
                              '    return blocks\n'
                              '\n'},
-            {'name': 'tests/v1/simple_kv_offload/test_scheduler.py:landmark-19',
-             'path': 'tests/v1/simple_kv_offload/test_scheduler.py',
-             'before': '    simulate_store_completion(sched, meta.store_event)\n'
-                       '\n'
-                       '    # New request with same tokens — should get a full CPU '
-                       'cache hit.\n'
-                       '    req2 = Request(\n'
-                       '        request_id="req-cp-load",\n'
-                       '        prompt_token_ids=req.prompt_token_ids,\n'
-                       '        sampling_params=req.sampling_params,\n',
-             'after': '    simulate_store_completion(sched, meta.store_event)\n'
-                      '\n'
-                      '    # New request with same tokens — should get a full CPU '
-                      'cache hit.\n'
-                      '    req2 = _request_with_identity(\n'
-                      '        request_id="req-cp-load",\n'
-                      '        prompt_token_ids=req.prompt_token_ids,\n'
-                      '        sampling_params=req.sampling_params,\n',
-             'review_before': '    simulate_store_completion(sched, meta.store_event)\n'
-                              '\n'
-                              '    # New request with same tokens — should get a full '
-                              'CPU cache hit.\n'
-                              '    req2 = Request(\n'
-                              '        request_id="req-cp-load",\n'
-                              '        prompt_token_ids=req.prompt_token_ids,\n'
-                              '        sampling_params=req.sampling_params,\n',
-             'review_after': '    simulate_store_completion(sched, meta.store_event)\n'
-                             '\n'
-                             '    # New request with same tokens — should get a full '
-                             'CPU cache hit.\n'
-                             '    req2 = _request_with_identity(\n'
-                             '        request_id="req-cp-load",\n'
-                             '        prompt_token_ids=req.prompt_token_ids,\n'
-                             '        sampling_params=req.sampling_params,\n'},
-            {'name': 'tests/v1/simple_kv_offload/test_scheduler.py:landmark-20',
-             'path': 'tests/v1/simple_kv_offload/test_scheduler.py',
-             'before': '    )\n'
-                       '    simulate_store_completion(sched, m2.store_event)\n'
-                       '\n'
-                       '    req3 = Request(\n'
-                       '        request_id="req-cp-partial-load",\n'
-                       '        prompt_token_ids=req2.prompt_token_ids,\n'
-                       '        sampling_params=req2.sampling_params,\n',
-             'after': '    )\n'
-                      '    simulate_store_completion(sched, m2.store_event)\n'
-                      '\n'
-                      '    req3 = _request_with_identity(\n'
-                      '        request_id="req-cp-partial-load",\n'
-                      '        prompt_token_ids=req2.prompt_token_ids,\n'
-                      '        sampling_params=req2.sampling_params,\n',
-             'review_before': '    )\n'
-                              '    simulate_store_completion(sched, m2.store_event)\n'
-                              '\n'
-                              '    req3 = Request(\n'
-                              '        request_id="req-cp-partial-load",\n'
-                              '        prompt_token_ids=req2.prompt_token_ids,\n'
-                              '        sampling_params=req2.sampling_params,\n',
-             'review_after': '    )\n'
-                             '    simulate_store_completion(sched, m2.store_event)\n'
-                             '\n'
-                             '    req3 = _request_with_identity(\n'
-                             '        request_id="req-cp-partial-load",\n'
-                             '        prompt_token_ids=req2.prompt_token_ids,\n'
-                             '        sampling_params=req2.sampling_params,\n'},
-            {'name': 'tests/v1/simple_kv_offload/test_scheduler.py:landmark-21',
-             'path': 'tests/v1/simple_kv_offload/test_scheduler.py',
-             'before': '            f"cp_world_size={cp_world_size}: '
-                       'target_cp={target_cp} should be "\n'
-                       '            f"less than target_base={target_base}"\n'
-                       '        )\n',
-             'after': '            f"cp_world_size={cp_world_size}: '
-                      'target_cp={target_cp} should be "\n'
-                      '            f"less than target_base={target_base}"\n'
-                      '        )\n'
-                      '\n'
-                      '\n'
-                      'def _request_with_identity(*, request_id, sampling_params, '
-                      '**kwargs):\n'
-                      '    sampling_params = sampling_params.clone()\n'
-                      '    sampling_params.extra_args = '
-                      'dict(sampling_params.extra_args or {})\n'
-                      '    sampling_params.extra_args["kv_scope"] = request_id\n'
-                      '    return Request(request_id=request_id, '
-                      'sampling_params=sampling_params, **kwargs)\n',
-             'review_before': '            f"cp_world_size={cp_world_size}: '
-                              'target_cp={target_cp} should be "\n'
-                              '            f"less than target_base={target_base}"\n'
-                              '        )\n',
-             'review_after': '            f"cp_world_size={cp_world_size}: '
-                             'target_cp={target_cp} should be "\n'
-                             '            f"less than target_base={target_base}"\n'
-                             '        )\n'
-                             '\n'
-                             '\n'
-                             'def _request_with_identity(*, request_id, '
-                             'sampling_params, **kwargs):\n'
-                             '    sampling_params = sampling_params.clone()\n'
-                             '    sampling_params.extra_args = '
-                             'dict(sampling_params.extra_args or {})\n'
-                             '    sampling_params.extra_args["kv_scope"] = request_id\n'
-                             '    return Request(request_id=request_id, '
-                             'sampling_params=sampling_params, **kwargs)\n'},
             {'name': 'vllm/config/cache.py:landmark-1',
              'path': 'vllm/config/cache.py',
              'before': 'MambaDType = Literal["auto", "float32", "float16", '
@@ -28022,9 +25496,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'from typing import Any, NamedTuple\n'},
             {'name': 'vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py:landmark-2',
              'path': 'vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py',
-             'before': 'from vllm.logger import init_logger\n'
-                       'from vllm.utils.math_utils import cdiv, round_down\n'
-                       'from vllm.v1.core.kv_cache_manager import KVCacheBlocks\n'
+             'before': 'from vllm.v1.core.kv_cache_manager import KVCacheBlocks\n'
                        'from vllm.v1.core.sched.output import SchedulerOutput\n'
                        'from vllm.v1.kv_cache_interface import (\n'
                        '    ChunkedLocalAttentionSpec,\n'
@@ -28036,20 +25508,14 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                        ')\n'
                        'from vllm.v1.kv_offload.base import (\n'
                        '    GPULoadStoreSpec,\n',
-             'after': 'from vllm.logger import init_logger\n'
-                      'from vllm.utils.math_utils import cdiv, round_down\n'
-                      'from vllm.v1.core.kv_cache_manager import KVCacheBlocks\n'
-                      'from vllm.v1.core.prefix_cache import PrefixCacheView, '
-                      'cache_content_keys\n'
+             'after': 'from vllm.v1.core.kv_cache_manager import KVCacheBlocks\n'
                       'from vllm.v1.core.sched.output import SchedulerOutput\n'
                       'from vllm.v1.kv_cache_interface import (\n'
                       '    KVCacheConfig,\n'
                       ')\n'
                       'from vllm.v1.kv_offload.base import (\n'
                       '    GPULoadStoreSpec,\n',
-             'review_before': 'from vllm.logger import init_logger\n'
-                              'from vllm.utils.math_utils import cdiv, round_down\n'
-                              'from vllm.v1.core.kv_cache_manager import '
+             'review_before': 'from vllm.v1.core.kv_cache_manager import '
                               'KVCacheBlocks\n'
                               'from vllm.v1.core.sched.output import SchedulerOutput\n'
                               'from vllm.v1.kv_cache_interface import (\n'
@@ -28062,11 +25528,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                               ')\n'
                               'from vllm.v1.kv_offload.base import (\n'
                               '    GPULoadStoreSpec,\n',
-             'review_after': 'from vllm.logger import init_logger\n'
-                             'from vllm.utils.math_utils import cdiv, round_down\n'
-                             'from vllm.v1.core.kv_cache_manager import KVCacheBlocks\n'
-                             'from vllm.v1.core.prefix_cache import PrefixCacheView, '
-                             'cache_content_keys\n'
+             'review_after': 'from vllm.v1.core.kv_cache_manager import KVCacheBlocks\n'
                              'from vllm.v1.core.sched.output import SchedulerOutput\n'
                              'from vllm.v1.kv_cache_interface import (\n'
                              '    KVCacheConfig,\n'
@@ -28123,10 +25585,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'smaller block sizes\n'},
             {'name': 'vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py:landmark-4',
              'path': 'vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py',
-             'before': '    # of these groups is volatile and lacks a stable hash, so '
-                       'it must\n'
-                       '    # be excluded from store and load scheduling.\n'
-                       '    is_eagle_group: bool = False\n'
+             'before': '    is_eagle_group: bool = False\n'
                        '\n'
                        '\n'
                        'def get_sliding_window_size_in_chunks(\n'
@@ -28151,18 +25610,16 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                        '    return None\n'
                        '\n'
                        '\n'
-                       'def is_store_reachable_swa_chunk(\n',
-             'after': '    # of these groups is volatile and lacks a stable hash, so '
-                      'it must\n'
-                      '    # be excluded from store and load scheduling.\n'
-                      '    is_eagle_group: bool = False\n'
+                       'def is_store_reachable_swa_chunk(\n'
+                       '    absolute_chunk_index: int,\n'
+                       '    storable_chunk_count: int,\n',
+             'after': '    is_eagle_group: bool = False\n'
                       '\n'
                       '\n'
-                      'def is_store_reachable_swa_chunk(\n',
-             'review_before': '    # of these groups is volatile and lacks a stable '
-                              'hash, so it must\n'
-                              '    # be excluded from store and load scheduling.\n'
-                              '    is_eagle_group: bool = False\n'
+                      'def is_store_reachable_swa_chunk(\n'
+                      '    absolute_chunk_index: int,\n'
+                      '    storable_chunk_count: int,\n',
+             'review_before': '    is_eagle_group: bool = False\n'
                               '\n'
                               '\n'
                               'def get_sliding_window_size_in_chunks(\n'
@@ -28189,14 +25646,15 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                               '    return None\n'
                               '\n'
                               '\n'
-                              'def is_store_reachable_swa_chunk(\n',
-             'review_after': '    # of these groups is volatile and lacks a stable '
-                             'hash, so it must\n'
-                             '    # be excluded from store and load scheduling.\n'
-                             '    is_eagle_group: bool = False\n'
+                              'def is_store_reachable_swa_chunk(\n'
+                              '    absolute_chunk_index: int,\n'
+                              '    storable_chunk_count: int,\n',
+             'review_after': '    is_eagle_group: bool = False\n'
                              '\n'
                              '\n'
-                             'def is_store_reachable_swa_chunk(\n'},
+                             'def is_store_reachable_swa_chunk(\n'
+                             '    absolute_chunk_index: int,\n'
+                             '    storable_chunk_count: int,\n'},
             {'name': 'vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py:landmark-5',
              'path': 'vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py',
              'before': '    """\n'
@@ -28329,7 +25787,9 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                        'set(range(len(kv_cache_config.kv_cache_groups)))\n'
                        '\n'
                        '        if eagle_groups:\n'
-                       '            logger.info(\n',
+                       '            logger.info(\n'
+                       '                "KV offloading: EAGLE/MTP draft attention '
+                       'groups %s "\n',
              'after': '            return per_segment\n'
                       '\n'
                       '        eagle_groups = {\n'
@@ -28339,7 +25799,9 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '        }\n'
                       '\n'
                       '        if eagle_groups:\n'
-                      '            logger.info(\n',
+                      '            logger.info(\n'
+                      '                "KV offloading: EAGLE/MTP draft attention '
+                      'groups %s "\n',
              'review_before': '            return per_segment\n'
                               '\n'
                               '        eagle_groups = {\n'
@@ -28359,7 +25821,9 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                               'set(range(len(kv_cache_config.kv_cache_groups)))\n'
                               '\n'
                               '        if eagle_groups:\n'
-                              '            logger.info(\n',
+                              '            logger.info(\n'
+                              '                "KV offloading: EAGLE/MTP draft '
+                              'attention groups %s "\n',
              'review_after': '            return per_segment\n'
                              '\n'
                              '        eagle_groups = {\n'
@@ -28369,7 +25833,9 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '        }\n'
                              '\n'
                              '        if eagle_groups:\n'
-                             '            logger.info(\n'},
+                             '            logger.info(\n'
+                             '                "KV offloading: EAGLE/MTP draft '
+                             'attention groups %s "\n'},
             {'name': 'vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py:landmark-8',
              'path': 'vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py',
              'before': '        kv_group_configs_list: list[GroupOffloadConfig] = []\n'
@@ -28648,8 +26114,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '            selected = [hashes[stop - 1]]\n'
                       '        else:\n'
                       '            selected = hashes[start:stop]\n'
-                      '        content = cache_content_keys(selected, '
-                      'group.group_idx)\n'
+                      '        content = tuple(make_offload_key(h, group.group_idx) '
+                      'for h in selected)\n'
                       '        key = make_offload_key(hashes[stop - 1], '
                       'group.group_idx)\n'
                       '        self.req_context.prefix_content[key] = content\n'
@@ -28759,8 +26225,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '            selected = [hashes[stop - 1]]\n'
                              '        else:\n'
                              '            selected = hashes[start:stop]\n'
-                             '        content = cache_content_keys(selected, '
-                             'group.group_idx)\n'
+                             '        content = tuple(make_offload_key(h, '
+                             'group.group_idx) for h in selected)\n'
                              '        key = make_offload_key(hashes[stop - 1], '
                              'group.group_idx)\n'
                              '        self.req_context.prefix_content[key] = content\n'
@@ -29373,120 +26839,6 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '        """\n'},
             {'name': 'vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py:landmark-17',
              'path': 'vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py',
-             'before': '        """\n'
-                       '        num_computed_tokens = '
-                       'req_status.num_locally_computed_tokens\n'
-                       '        max_hit_size_tokens: int = req_status.req.num_tokens\n'
-                       '        if self._sliding_window_groups:\n'
-                       '            # the last prompt token has to be recomputed to '
-                       'get the logprobs\n'
-                       '            # for sliding window attention, we must reduce by '
-                       '1 to make sure\n'
-                       '            # we still have a hit after reduction\n'
-                       '            max_hit_size_tokens -= 1\n'
-                       '            if self._mamba_align_size is not None:\n'
-                       '                # Constrain hit-window to the mamba block '
-                       'size.\n'
-                       '                max_hit_size_tokens = round_down(\n',
-             'after': '        """\n'
-                      '        num_computed_tokens = '
-                      'req_status.num_locally_computed_tokens\n'
-                      '        max_hit_size_tokens: int = req_status.req.num_tokens\n'
-                      '        view = '
-                      'req_status.req_context.get_state(PrefixCacheView)\n'
-                      '        assert view is not None\n'
-                      '        if view.keys is not None:\n'
-                      '            # A physical CPU chunk can extend beyond the '
-                      'acquired prefix.\n'
-                      '            # Bound the search by owned full-attention data '
-                      'before choosing\n'
-                      '            # chunk keys, so an existing agent can reuse a '
-                      'shorter extent.\n'
-                      '            for group in self.config.kv_group_configs:\n'
-                      '                if group.sliding_window_size_in_chunks is not '
-                      'None:\n'
-                      '                    continue\n'
-                      '                owned_tokens = 0\n'
-                      '                for key in '
-                      'cache_content_keys(req_status.req.block_hashes, '
-                      'group.group_idx):\n'
-                      '                    if not view.permits(key):\n'
-                      '                        break\n'
-                      '                    owned_tokens += '
-                      'self.config.tokens_per_hash\n'
-                      '                max_hit_size_tokens = min(max_hit_size_tokens, '
-                      'owned_tokens)\n'
-                      '        if self._sliding_window_groups:\n'
-                      '            # the last prompt token has to be recomputed to get '
-                      'the logprobs\n'
-                      '            # for sliding window attention, we must reduce by 1 '
-                      'to make sure\n'
-                      '            # we still have a hit after reduction\n'
-                      '            max_hit_size_tokens = min(max_hit_size_tokens, '
-                      'req_status.req.num_tokens - 1)\n'
-                      '            if self._mamba_align_size is not None:\n'
-                      '                # Constrain hit-window to the mamba block '
-                      'size.\n'
-                      '                max_hit_size_tokens = round_down(\n',
-             'review_before': '        """\n'
-                              '        num_computed_tokens = '
-                              'req_status.num_locally_computed_tokens\n'
-                              '        max_hit_size_tokens: int = '
-                              'req_status.req.num_tokens\n'
-                              '        if self._sliding_window_groups:\n'
-                              '            # the last prompt token has to be '
-                              'recomputed to get the logprobs\n'
-                              '            # for sliding window attention, we must '
-                              'reduce by 1 to make sure\n'
-                              '            # we still have a hit after reduction\n'
-                              '            max_hit_size_tokens -= 1\n'
-                              '            if self._mamba_align_size is not None:\n'
-                              '                # Constrain hit-window to the mamba '
-                              'block size.\n'
-                              '                max_hit_size_tokens = round_down(\n',
-             'review_after': '        """\n'
-                             '        num_computed_tokens = '
-                             'req_status.num_locally_computed_tokens\n'
-                             '        max_hit_size_tokens: int = '
-                             'req_status.req.num_tokens\n'
-                             '        view = '
-                             'req_status.req_context.get_state(PrefixCacheView)\n'
-                             '        assert view is not None\n'
-                             '        if view.keys is not None:\n'
-                             '            # A physical CPU chunk can extend beyond the '
-                             'acquired prefix.\n'
-                             '            # Bound the search by owned full-attention '
-                             'data before choosing\n'
-                             '            # chunk keys, so an existing agent can reuse '
-                             'a shorter extent.\n'
-                             '            for group in self.config.kv_group_configs:\n'
-                             '                if group.sliding_window_size_in_chunks '
-                             'is not None:\n'
-                             '                    continue\n'
-                             '                owned_tokens = 0\n'
-                             '                for key in '
-                             'cache_content_keys(req_status.req.block_hashes, '
-                             'group.group_idx):\n'
-                             '                    if not view.permits(key):\n'
-                             '                        break\n'
-                             '                    owned_tokens += '
-                             'self.config.tokens_per_hash\n'
-                             '                max_hit_size_tokens = '
-                             'min(max_hit_size_tokens, owned_tokens)\n'
-                             '        if self._sliding_window_groups:\n'
-                             '            # the last prompt token has to be recomputed '
-                             'to get the logprobs\n'
-                             '            # for sliding window attention, we must '
-                             'reduce by 1 to make sure\n'
-                             '            # we still have a hit after reduction\n'
-                             '            max_hit_size_tokens = '
-                             'min(max_hit_size_tokens, req_status.req.num_tokens - 1)\n'
-                             '            if self._mamba_align_size is not None:\n'
-                             '                # Constrain hit-window to the mamba '
-                             'block size.\n'
-                             '                max_hit_size_tokens = round_down(\n'},
-            {'name': 'vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py:landmark-18',
-             'path': 'vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py',
              'before': '                # have backend-confirmed hits\n'
                        '                num_hit_chunks: int | None\n'
                        '                if sliding_window_size_in_chunks is None:\n'
@@ -29536,7 +26888,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'self._maximal_prefix_lookup(\n'
                              '                        offload_keys,\n'
                              '                        req_status.req_context,\n'},
-            {'name': 'vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py:landmark-19',
+            {'name': 'vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py:landmark-18',
              'path': 'vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py',
              'before': '                        offload_keys,\n'
                        '                        required_window,\n'
@@ -29581,7 +26933,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '                    )\n'
                              '                if num_hit_chunks == 0:\n'
                              '                    return 0\n'},
-            {'name': 'vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py:landmark-20',
+            {'name': 'vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py:landmark-19',
              'path': 'vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py',
              'before': '    def _make_boundary_key(\n'
                        '        self, request: Request, group_idx: int, '
@@ -29636,7 +26988,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '-> int | None:\n'
                              '        complete_hit = '
                              'self._lookup_complete_chunks(req_status)\n'},
-            {'name': 'vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py:landmark-21',
+            {'name': 'vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py:landmark-20',
              'path': 'vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py',
              'before': '        local_tokens = req_status.num_locally_computed_tokens\n'
                        '        complete_boundary = local_tokens + complete_hit\n'
@@ -29734,7 +27086,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '            min(req_status.req.num_prompt_tokens - 1, '
                              'block_end - 1), tokens_per_hash\n'
                              '        )\n'},
-            {'name': 'vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py:landmark-22',
+            {'name': 'vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py:landmark-21',
              'path': 'vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py',
              'before': '\n'
                        '        pending = False\n'
@@ -29769,40 +27121,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '            boundary_pending = False\n'
                              '            boundary_missed = False\n'
                              '            boundary_keys = []\n'},
-            {'name': 'vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py:landmark-23',
-             'path': 'vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py',
-             'before': '        req_status.update_offload_keys()\n'
-                       '        req_status.num_locally_computed_tokens = '
-                       'num_computed_tokens\n'
-                       '\n'
-                       '        num_hit_tokens: int | None\n'
-                       '        if request.skip_reading_prefix_cache:\n'
-                       '            num_hit_tokens = 0\n',
-             'after': '        req_status.update_offload_keys()\n'
-                      '        req_status.num_locally_computed_tokens = '
-                      'num_computed_tokens\n'
-                      '\n'
-                      '        self.manager.begin_lookup(req_status.req_context)\n'
-                      '        num_hit_tokens: int | None\n'
-                      '        if request.skip_reading_prefix_cache:\n'
-                      '            num_hit_tokens = 0\n',
-             'review_before': '        req_status.update_offload_keys()\n'
-                              '        req_status.num_locally_computed_tokens = '
-                              'num_computed_tokens\n'
-                              '\n'
-                              '        num_hit_tokens: int | None\n'
-                              '        if request.skip_reading_prefix_cache:\n'
-                              '            num_hit_tokens = 0\n',
-             'review_after': '        req_status.update_offload_keys()\n'
-                             '        req_status.num_locally_computed_tokens = '
-                             'num_computed_tokens\n'
-                             '\n'
-                             '        '
-                             'self.manager.begin_lookup(req_status.req_context)\n'
-                             '        num_hit_tokens: int | None\n'
-                             '        if request.skip_reading_prefix_cache:\n'
-                             '            num_hit_tokens = 0\n'},
-            {'name': 'vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py:landmark-24',
+            {'name': 'vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py:landmark-22',
              'path': 'vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py',
              'before': '                    req_status.deferred_lookup_start_time = '
                        'lookup_start\n'
@@ -29859,7 +27178,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '\n'
                              '        return num_hit_tokens, bool(num_hit_tokens)\n'
                              '\n'},
-            {'name': 'vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py:landmark-25',
+            {'name': 'vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py:landmark-23',
              'path': 'vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py',
              'before': '            ]\n'
                        '            assert all(block_id != 0 for block_id in '
@@ -29909,20 +27228,17 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '            if store_output is None:\n'
                              '                '
                              'self._connector_stats.increase_counter(\n'},
-            {'name': 'vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py:landmark-26',
+            {'name': 'vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py:landmark-24',
              'path': 'vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py',
-             'before': '            num_offloadable_tokens = '
-                       'self._calc_num_offloadable_tokens(\n'
-                       '                req_status, num_tokens_after_batch\n'
+             'before': '                req_status, num_tokens_after_batch\n'
                        '            )\n'
                        '\n'
                        '            # Filter out chunks skipped due to sliding window '
                        'attention / SSM\n'
                        "            # or unreachable by the load path's alignment "
-                       'constraints.\n',
-             'after': '            num_offloadable_tokens = '
-                      'self._calc_num_offloadable_tokens(\n'
-                      '                req_status, num_tokens_after_batch\n'
+                       'constraints.\n'
+                       '            new_offload_keys: list[OffloadKey] = []\n',
+             'after': '                req_status, num_tokens_after_batch\n'
                       '            )\n'
                       '\n'
                       '            retained_keys = self._retain_context(req_status, '
@@ -29931,19 +27247,17 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '            # Filter out chunks skipped due to sliding window '
                       'attention / SSM\n'
                       "            # or unreachable by the load path's alignment "
-                      'constraints.\n',
-             'review_before': '            num_offloadable_tokens = '
-                              'self._calc_num_offloadable_tokens(\n'
-                              '                req_status, num_tokens_after_batch\n'
+                      'constraints.\n'
+                      '            new_offload_keys: list[OffloadKey] = []\n',
+             'review_before': '                req_status, num_tokens_after_batch\n'
                               '            )\n'
                               '\n'
                               '            # Filter out chunks skipped due to sliding '
                               'window attention / SSM\n'
                               "            # or unreachable by the load path's "
-                              'alignment constraints.\n',
-             'review_after': '            num_offloadable_tokens = '
-                             'self._calc_num_offloadable_tokens(\n'
-                             '                req_status, num_tokens_after_batch\n'
+                              'alignment constraints.\n'
+                              '            new_offload_keys: list[OffloadKey] = []\n',
+             'review_after': '                req_status, num_tokens_after_batch\n'
                              '            )\n'
                              '\n'
                              '            retained_keys = '
@@ -29953,8 +27267,9 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '            # Filter out chunks skipped due to sliding '
                              'window attention / SSM\n'
                              "            # or unreachable by the load path's "
-                             'alignment constraints.\n'},
-            {'name': 'vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py:landmark-27',
+                             'alignment constraints.\n'
+                             '            new_offload_keys: list[OffloadKey] = []\n'},
+            {'name': 'vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py:landmark-25',
              'path': 'vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py',
              'before': '                for key_idx, (offload_key, block_id) in '
                        'enumerate(\n'
@@ -30000,7 +27315,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'serve a load hit:\n'
                              '                    # within each full-attention '
                              'alignment segment, only the\n'},
-            {'name': 'vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py:landmark-28',
+            {'name': 'vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py:landmark-26',
              'path': 'vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py',
              'before': '                    ):\n'
                        '                        continue\n'
@@ -30044,26 +27359,25 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '            if not new_offload_keys:\n'
                              '                '
                              'req_status.advance_stored_idx(num_offloadable_tokens)\n'},
-            {'name': 'vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py:landmark-29',
+            {'name': 'vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py:landmark-27',
              'path': 'vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py',
-             'before': '            if not store_output.keys_to_store:\n'
-                       '                '
+             'before': '                '
                        'req_status.advance_stored_idx(num_offloadable_tokens)\n'
                        '                continue\n'
                        '\n'
                        '            self._touch(req_status)\n'
                        '\n'
                        '            keys_to_store = set(store_output.keys_to_store)\n'
-                       '\n',
-             'after': '            if not store_output.keys_to_store:\n'
-                      '                '
+                       '\n'
+                       '            group_sizes: list[int] = []\n',
+             'after': '                '
                       'req_status.advance_stored_idx(num_offloadable_tokens)\n'
                       '                continue\n'
                       '\n'
                       '            keys_to_store = set(store_output.keys_to_store)\n'
-                      '\n',
-             'review_before': '            if not store_output.keys_to_store:\n'
-                              '                '
+                      '\n'
+                      '            group_sizes: list[int] = []\n',
+             'review_before': '                '
                               'req_status.advance_stored_idx(num_offloadable_tokens)\n'
                               '                continue\n'
                               '\n'
@@ -30071,16 +27385,17 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                               '\n'
                               '            keys_to_store = '
                               'set(store_output.keys_to_store)\n'
-                              '\n',
-             'review_after': '            if not store_output.keys_to_store:\n'
-                             '                '
+                              '\n'
+                              '            group_sizes: list[int] = []\n',
+             'review_after': '                '
                              'req_status.advance_stored_idx(num_offloadable_tokens)\n'
                              '                continue\n'
                              '\n'
                              '            keys_to_store = '
                              'set(store_output.keys_to_store)\n'
-                             '\n'},
-            {'name': 'vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py:landmark-30',
+                             '\n'
+                             '            group_sizes: list[int] = []\n'},
+            {'name': 'vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py:landmark-28',
              'path': 'vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py',
              'before': '                    gpu_block_idx = chunk_idx * '
                        'blocks_per_chunk\n'
@@ -30125,7 +27440,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '                        if start_gpu_block_idx is None:\n'
                              '                            start_gpu_block_idx = '
                              'gpu_block_idx + i\n'},
-            {'name': 'vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py:landmark-31',
+            {'name': 'vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py:landmark-29',
              'path': 'vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py',
              'before': '                group_state.next_stored_chunk_idx = 0\n'
                        '            status.transfer_jobs.clear()\n'
@@ -30158,219 +27473,6 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '        # Discard jobs and save job_counter to be able '
                              'to discard worker responses\n'
                              '        self._stale_job_threshold = self._job_counter\n'},
-            {'name': 'vllm/distributed/kv_transfer/kv_connector/v1/offloading_connector.py:landmark-1',
-             'path': 'vllm/distributed/kv_transfer/kv_connector/v1/offloading_connector.py',
-             'before': '                spec, vllm_config, kv_cache_config\n'
-                       '            )\n'
-                       '\n'
-                       '    def shutdown(self) -> None:\n'
-                       '        if self.connector_worker is not None:\n'
-                       '            self.connector_worker.shutdown()\n',
-             'after': '                spec, vllm_config, kv_cache_config\n'
-                      '            )\n'
-                      '\n'
-                      '    def bind_gpu_block_pool(self, gpu_block_pool) -> None:\n'
-                      '        assert self.connector_scheduler is not None\n'
-                      '        '
-                      'self.connector_scheduler.manager.bind_prefix_cache(gpu_block_pool.prefix_cache)\n'
-                      '\n'
-                      '    def bind_gpu_block_pool(self, gpu_block_pool) -> None:\n'
-                      '        assert self.connector_scheduler is not None\n'
-                      '        '
-                      'self.connector_scheduler.manager.bind_prefix_cache(gpu_block_pool.prefix_cache)\n'
-                      '\n'
-                      '    def bind_gpu_block_pool(self, gpu_block_pool) -> None:\n'
-                      '        assert self.connector_scheduler is not None\n'
-                      '        '
-                      'self.connector_scheduler.manager.bind_prefix_cache(gpu_block_pool.prefix_cache)\n'
-                      '\n'
-                      '    def bind_gpu_block_pool(self, gpu_block_pool) -> None:\n'
-                      '        assert self.connector_scheduler is not None\n'
-                      '        '
-                      'self.connector_scheduler.manager.bind_prefix_cache(gpu_block_pool.prefix_cache)\n'
-                      '\n'
-                      '    def bind_gpu_block_pool(self, gpu_block_pool) -> None:\n'
-                      '        assert self.connector_scheduler is not None\n'
-                      '        '
-                      'self.connector_scheduler.manager.bind_prefix_cache(gpu_block_pool.prefix_cache)\n'
-                      '\n'
-                      '    def bind_gpu_block_pool(self, gpu_block_pool) -> None:\n'
-                      '        assert self.connector_scheduler is not None\n'
-                      '        '
-                      'self.connector_scheduler.manager.bind_prefix_cache(gpu_block_pool.prefix_cache)\n'
-                      '\n'
-                      '    def bind_gpu_block_pool(self, gpu_block_pool) -> None:\n'
-                      '        assert self.connector_scheduler is not None\n'
-                      '        '
-                      'self.connector_scheduler.manager.bind_prefix_cache(gpu_block_pool.prefix_cache)\n'
-                      '\n'
-                      '    def bind_gpu_block_pool(self, gpu_block_pool) -> None:\n'
-                      '        assert self.connector_scheduler is not None\n'
-                      '        '
-                      'self.connector_scheduler.manager.bind_prefix_cache(gpu_block_pool.prefix_cache)\n'
-                      '\n'
-                      '    def bind_gpu_block_pool(self, gpu_block_pool) -> None:\n'
-                      '        assert self.connector_scheduler is not None\n'
-                      '        '
-                      'self.connector_scheduler.manager.bind_prefix_cache(gpu_block_pool.prefix_cache)\n'
-                      '\n'
-                      '    def bind_gpu_block_pool(self, gpu_block_pool) -> None:\n'
-                      '        assert self.connector_scheduler is not None\n'
-                      '        '
-                      'self.connector_scheduler.manager.bind_prefix_cache(gpu_block_pool.prefix_cache)\n'
-                      '\n'
-                      '    def bind_gpu_block_pool(self, gpu_block_pool) -> None:\n'
-                      '        assert self.connector_scheduler is not None\n'
-                      '        '
-                      'self.connector_scheduler.manager.bind_prefix_cache(gpu_block_pool.prefix_cache)\n'
-                      '\n'
-                      '    def bind_gpu_block_pool(self, gpu_block_pool) -> None:\n'
-                      '        assert self.connector_scheduler is not None\n'
-                      '        '
-                      'self.connector_scheduler.manager.bind_prefix_cache(gpu_block_pool.prefix_cache)\n'
-                      '\n'
-                      '    def bind_gpu_block_pool(self, gpu_block_pool) -> None:\n'
-                      '        assert self.connector_scheduler is not None\n'
-                      '        '
-                      'self.connector_scheduler.manager.bind_prefix_cache(gpu_block_pool.prefix_cache)\n'
-                      '\n'
-                      '    def bind_gpu_block_pool(self, gpu_block_pool) -> None:\n'
-                      '        assert self.connector_scheduler is not None\n'
-                      '        '
-                      'self.connector_scheduler.manager.bind_prefix_cache(gpu_block_pool.prefix_cache)\n'
-                      '\n'
-                      '    def bind_gpu_block_pool(self, gpu_block_pool) -> None:\n'
-                      '        assert self.connector_scheduler is not None\n'
-                      '        '
-                      'self.connector_scheduler.manager.bind_prefix_cache(gpu_block_pool.prefix_cache)\n'
-                      '\n'
-                      '    def bind_gpu_block_pool(self, gpu_block_pool) -> None:\n'
-                      '        assert self.connector_scheduler is not None\n'
-                      '        '
-                      'self.connector_scheduler.manager.bind_prefix_cache(gpu_block_pool.prefix_cache)\n'
-                      '\n'
-                      '    def bind_gpu_block_pool(self, gpu_block_pool) -> None:\n'
-                      '        assert self.connector_scheduler is not None\n'
-                      '        '
-                      'self.connector_scheduler.manager.bind_prefix_cache(gpu_block_pool.prefix_cache)\n'
-                      '\n'
-                      '    def shutdown(self) -> None:\n'
-                      '        if self.connector_worker is not None:\n'
-                      '            self.connector_worker.shutdown()\n',
-             'review_before': '                spec, vllm_config, kv_cache_config\n'
-                              '            )\n'
-                              '\n'
-                              '    def shutdown(self) -> None:\n'
-                              '        if self.connector_worker is not None:\n'
-                              '            self.connector_worker.shutdown()\n',
-             'review_after': '                spec, vllm_config, kv_cache_config\n'
-                             '            )\n'
-                             '\n'
-                             '    def bind_gpu_block_pool(self, gpu_block_pool) -> '
-                             'None:\n'
-                             '        assert self.connector_scheduler is not None\n'
-                             '        '
-                             'self.connector_scheduler.manager.bind_prefix_cache(gpu_block_pool.prefix_cache)\n'
-                             '\n'
-                             '    def bind_gpu_block_pool(self, gpu_block_pool) -> '
-                             'None:\n'
-                             '        assert self.connector_scheduler is not None\n'
-                             '        '
-                             'self.connector_scheduler.manager.bind_prefix_cache(gpu_block_pool.prefix_cache)\n'
-                             '\n'
-                             '    def bind_gpu_block_pool(self, gpu_block_pool) -> '
-                             'None:\n'
-                             '        assert self.connector_scheduler is not None\n'
-                             '        '
-                             'self.connector_scheduler.manager.bind_prefix_cache(gpu_block_pool.prefix_cache)\n'
-                             '\n'
-                             '    def bind_gpu_block_pool(self, gpu_block_pool) -> '
-                             'None:\n'
-                             '        assert self.connector_scheduler is not None\n'
-                             '        '
-                             'self.connector_scheduler.manager.bind_prefix_cache(gpu_block_pool.prefix_cache)\n'
-                             '\n'
-                             '    def bind_gpu_block_pool(self, gpu_block_pool) -> '
-                             'None:\n'
-                             '        assert self.connector_scheduler is not None\n'
-                             '        '
-                             'self.connector_scheduler.manager.bind_prefix_cache(gpu_block_pool.prefix_cache)\n'
-                             '\n'
-                             '    def bind_gpu_block_pool(self, gpu_block_pool) -> '
-                             'None:\n'
-                             '        assert self.connector_scheduler is not None\n'
-                             '        '
-                             'self.connector_scheduler.manager.bind_prefix_cache(gpu_block_pool.prefix_cache)\n'
-                             '\n'
-                             '    def bind_gpu_block_pool(self, gpu_block_pool) -> '
-                             'None:\n'
-                             '        assert self.connector_scheduler is not None\n'
-                             '        '
-                             'self.connector_scheduler.manager.bind_prefix_cache(gpu_block_pool.prefix_cache)\n'
-                             '\n'
-                             '    def bind_gpu_block_pool(self, gpu_block_pool) -> '
-                             'None:\n'
-                             '        assert self.connector_scheduler is not None\n'
-                             '        '
-                             'self.connector_scheduler.manager.bind_prefix_cache(gpu_block_pool.prefix_cache)\n'
-                             '\n'
-                             '    def bind_gpu_block_pool(self, gpu_block_pool) -> '
-                             'None:\n'
-                             '        assert self.connector_scheduler is not None\n'
-                             '        '
-                             'self.connector_scheduler.manager.bind_prefix_cache(gpu_block_pool.prefix_cache)\n'
-                             '\n'
-                             '    def bind_gpu_block_pool(self, gpu_block_pool) -> '
-                             'None:\n'
-                             '        assert self.connector_scheduler is not None\n'
-                             '        '
-                             'self.connector_scheduler.manager.bind_prefix_cache(gpu_block_pool.prefix_cache)\n'
-                             '\n'
-                             '    def bind_gpu_block_pool(self, gpu_block_pool) -> '
-                             'None:\n'
-                             '        assert self.connector_scheduler is not None\n'
-                             '        '
-                             'self.connector_scheduler.manager.bind_prefix_cache(gpu_block_pool.prefix_cache)\n'
-                             '\n'
-                             '    def bind_gpu_block_pool(self, gpu_block_pool) -> '
-                             'None:\n'
-                             '        assert self.connector_scheduler is not None\n'
-                             '        '
-                             'self.connector_scheduler.manager.bind_prefix_cache(gpu_block_pool.prefix_cache)\n'
-                             '\n'
-                             '    def bind_gpu_block_pool(self, gpu_block_pool) -> '
-                             'None:\n'
-                             '        assert self.connector_scheduler is not None\n'
-                             '        '
-                             'self.connector_scheduler.manager.bind_prefix_cache(gpu_block_pool.prefix_cache)\n'
-                             '\n'
-                             '    def bind_gpu_block_pool(self, gpu_block_pool) -> '
-                             'None:\n'
-                             '        assert self.connector_scheduler is not None\n'
-                             '        '
-                             'self.connector_scheduler.manager.bind_prefix_cache(gpu_block_pool.prefix_cache)\n'
-                             '\n'
-                             '    def bind_gpu_block_pool(self, gpu_block_pool) -> '
-                             'None:\n'
-                             '        assert self.connector_scheduler is not None\n'
-                             '        '
-                             'self.connector_scheduler.manager.bind_prefix_cache(gpu_block_pool.prefix_cache)\n'
-                             '\n'
-                             '    def bind_gpu_block_pool(self, gpu_block_pool) -> '
-                             'None:\n'
-                             '        assert self.connector_scheduler is not None\n'
-                             '        '
-                             'self.connector_scheduler.manager.bind_prefix_cache(gpu_block_pool.prefix_cache)\n'
-                             '\n'
-                             '    def bind_gpu_block_pool(self, gpu_block_pool) -> '
-                             'None:\n'
-                             '        assert self.connector_scheduler is not None\n'
-                             '        '
-                             'self.connector_scheduler.manager.bind_prefix_cache(gpu_block_pool.prefix_cache)\n'
-                             '\n'
-                             '    def shutdown(self) -> None:\n'
-                             '        if self.connector_worker is not None:\n'
-                             '            self.connector_worker.shutdown()\n'},
             {'name': 'vllm/engine/arg_utils.py:landmark-1',
              'path': 'vllm/engine/arg_utils.py',
              'before': ')\n'
@@ -30751,17 +27853,19 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '        min_length=1,\n'
                       '        pattern=r"\\S",\n'
                       '        description=(\n'
-                      '            "Opaque, stable agent ID required for generation '
-                      'and shared KV "\n'
-                      '            "cache accounting. An agent with no cached blocks '
-                      'may acquire a "\n'
-                      '            "matching prefix from any agent. Once it has cached '
-                      'blocks, it "\n'
-                      '            "matches only its own acquired cache and extends '
-                      'that cache. "\n'
-                      '            "No lineage declaration or ID format is required. '
-                      'Render-only "\n'
-                      '            "requests need no agent ID."\n'
+                      '            "Opaque agent ID naming one line of work, required '
+                      'for "\n'
+                      '            "generation: the same ID for every request that '
+                      'continues a "\n'
+                      '            "conversation, a new, never-used ID for a fork or a '
+                      'subagent. "\n'
+                      '            "It groups what the KV tiers retain; prefix reuse '
+                      'matches "\n'
+                      '            "content and cache_salt, whatever the ID. No '
+                      'lineage "\n'
+                      '            "declaration or ID format is required. Render-only '
+                      'requests "\n'
+                      '            "need no agent ID."\n'
                       '        ),\n'
                       '    )\n'
                       '\n'
@@ -30784,17 +27888,19 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '        min_length=1,\n'
                              '        pattern=r"\\S",\n'
                              '        description=(\n'
-                             '            "Opaque, stable agent ID required for '
-                             'generation and shared KV "\n'
-                             '            "cache accounting. An agent with no cached '
-                             'blocks may acquire a "\n'
-                             '            "matching prefix from any agent. Once it has '
-                             'cached blocks, it "\n'
-                             '            "matches only its own acquired cache and '
-                             'extends that cache. "\n'
-                             '            "No lineage declaration or ID format is '
-                             'required. Render-only "\n'
-                             '            "requests need no agent ID."\n'
+                             '            "Opaque agent ID naming one line of work, '
+                             'required for "\n'
+                             '            "generation: the same ID for every request '
+                             'that continues a "\n'
+                             '            "conversation, a new, never-used ID for a '
+                             'fork or a subagent. "\n'
+                             '            "It groups what the KV tiers retain; prefix '
+                             'reuse matches "\n'
+                             '            "content and cache_salt, whatever the ID. No '
+                             'lineage "\n'
+                             '            "declaration or ID format is required. '
+                             'Render-only requests "\n'
+                             '            "need no agent ID."\n'
                              '        ),\n'
                              '    )\n'
                              '\n'
@@ -31374,17 +28480,19 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '        min_length=1,\n'
                       '        pattern=r"\\S",\n'
                       '        description=(\n'
-                      '            "Opaque, stable agent ID required for generation '
-                      'and shared KV "\n'
-                      '            "cache accounting. An agent with no cached blocks '
-                      'may acquire a "\n'
-                      '            "matching prefix from any agent. Once it has cached '
-                      'blocks, it "\n'
-                      '            "matches only its own acquired cache and extends '
-                      'that cache. "\n'
-                      '            "No lineage declaration or ID format is required. '
-                      'Render-only "\n'
-                      '            "requests need no agent ID."\n'
+                      '            "Opaque agent ID naming one line of work, required '
+                      'for "\n'
+                      '            "generation: the same ID for every request that '
+                      'continues a "\n'
+                      '            "conversation, a new, never-used ID for a fork or a '
+                      'subagent. "\n'
+                      '            "It groups what the KV tiers retain; prefix reuse '
+                      'matches "\n'
+                      '            "content and cache_salt, whatever the ID. No '
+                      'lineage "\n'
+                      '            "declaration or ID format is required. Render-only '
+                      'requests "\n'
+                      '            "need no agent ID."\n'
                       '        ),\n'
                       '    )\n'
                       '\n'
@@ -31407,17 +28515,19 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '        min_length=1,\n'
                              '        pattern=r"\\S",\n'
                              '        description=(\n'
-                             '            "Opaque, stable agent ID required for '
-                             'generation and shared KV "\n'
-                             '            "cache accounting. An agent with no cached '
-                             'blocks may acquire a "\n'
-                             '            "matching prefix from any agent. Once it has '
-                             'cached blocks, it "\n'
-                             '            "matches only its own acquired cache and '
-                             'extends that cache. "\n'
-                             '            "No lineage declaration or ID format is '
-                             'required. Render-only "\n'
-                             '            "requests need no agent ID."\n'
+                             '            "Opaque agent ID naming one line of work, '
+                             'required for "\n'
+                             '            "generation: the same ID for every request '
+                             'that continues a "\n'
+                             '            "conversation, a new, never-used ID for a '
+                             'fork or a subagent. "\n'
+                             '            "It groups what the KV tiers retain; prefix '
+                             'reuse matches "\n'
+                             '            "content and cache_salt, whatever the ID. No '
+                             'lineage "\n'
+                             '            "declaration or ID format is required. '
+                             'Render-only requests "\n'
+                             '            "need no agent ID."\n'
                              '        ),\n'
                              '    )\n'
                              '\n'
@@ -31477,17 +28587,19 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '        min_length=1,\n'
                       '        pattern=r"\\S",\n'
                       '        description=(\n'
-                      '            "Opaque, stable agent ID required for generation '
-                      'and shared KV "\n'
-                      '            "cache accounting. An agent with no cached blocks '
-                      'may acquire a "\n'
-                      '            "matching prefix from any agent. Once it has cached '
-                      'blocks, it "\n'
-                      '            "matches only its own acquired cache and extends '
-                      'that cache. "\n'
-                      '            "No lineage declaration or ID format is required. '
-                      'Render-only "\n'
-                      '            "requests need no agent ID."\n'
+                      '            "Opaque agent ID naming one line of work, required '
+                      'for "\n'
+                      '            "generation: the same ID for every request that '
+                      'continues a "\n'
+                      '            "conversation, a new, never-used ID for a fork or a '
+                      'subagent. "\n'
+                      '            "It groups what the KV tiers retain; prefix reuse '
+                      'matches "\n'
+                      '            "content and cache_salt, whatever the ID. No '
+                      'lineage "\n'
+                      '            "declaration or ID format is required. Render-only '
+                      'requests "\n'
+                      '            "need no agent ID."\n'
                       '        ),\n'
                       '    )\n'
                       '    include_stop_str_in_output: bool = False\n'
@@ -31509,17 +28621,19 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '        min_length=1,\n'
                              '        pattern=r"\\S",\n'
                              '        description=(\n'
-                             '            "Opaque, stable agent ID required for '
-                             'generation and shared KV "\n'
-                             '            "cache accounting. An agent with no cached '
-                             'blocks may acquire a "\n'
-                             '            "matching prefix from any agent. Once it has '
-                             'cached blocks, it "\n'
-                             '            "matches only its own acquired cache and '
-                             'extends that cache. "\n'
-                             '            "No lineage declaration or ID format is '
-                             'required. Render-only "\n'
-                             '            "requests need no agent ID."\n'
+                             '            "Opaque agent ID naming one line of work, '
+                             'required for "\n'
+                             '            "generation: the same ID for every request '
+                             'that continues a "\n'
+                             '            "conversation, a new, never-used ID for a '
+                             'fork or a subagent. "\n'
+                             '            "It groups what the KV tiers retain; prefix '
+                             'reuse matches "\n'
+                             '            "content and cache_salt, whatever the ID. No '
+                             'lineage "\n'
+                             '            "declaration or ID format is required. '
+                             'Render-only requests "\n'
+                             '            "need no agent ID."\n'
                              '        ),\n'
                              '    )\n'
                              '    include_stop_str_in_output: bool = False\n'
@@ -31612,17 +28726,19 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '        min_length=1,\n'
                       '        pattern=r"\\S",\n'
                       '        description=(\n'
-                      '            "Opaque, stable agent ID required for generation '
-                      'and shared KV "\n'
-                      '            "cache accounting. An agent with no cached blocks '
-                      'may acquire a "\n'
-                      '            "matching prefix from any agent. Once it has cached '
-                      'blocks, it "\n'
-                      '            "matches only its own acquired cache and extends '
-                      'that cache. "\n'
-                      '            "No lineage declaration or ID format is required. '
-                      'Render-only "\n'
-                      '            "requests need no agent ID."\n'
+                      '            "Opaque agent ID naming one line of work, required '
+                      'for "\n'
+                      '            "generation: the same ID for every request that '
+                      'continues a "\n'
+                      '            "conversation, a new, never-used ID for a fork or a '
+                      'subagent. "\n'
+                      '            "It groups what the KV tiers retain; prefix reuse '
+                      'matches "\n'
+                      '            "content and cache_salt, whatever the ID. No '
+                      'lineage "\n'
+                      '            "declaration or ID format is required. Render-only '
+                      'requests "\n'
+                      '            "need no agent ID."\n'
                       '        ),\n'
                       '    )\n'
                       '\n'
@@ -31645,17 +28761,19 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '        min_length=1,\n'
                              '        pattern=r"\\S",\n'
                              '        description=(\n'
-                             '            "Opaque, stable agent ID required for '
-                             'generation and shared KV "\n'
-                             '            "cache accounting. An agent with no cached '
-                             'blocks may acquire a "\n'
-                             '            "matching prefix from any agent. Once it has '
-                             'cached blocks, it "\n'
-                             '            "matches only its own acquired cache and '
-                             'extends that cache. "\n'
-                             '            "No lineage declaration or ID format is '
-                             'required. Render-only "\n'
-                             '            "requests need no agent ID."\n'
+                             '            "Opaque agent ID naming one line of work, '
+                             'required for "\n'
+                             '            "generation: the same ID for every request '
+                             'that continues a "\n'
+                             '            "conversation, a new, never-used ID for a '
+                             'fork or a subagent. "\n'
+                             '            "It groups what the KV tiers retain; prefix '
+                             'reuse matches "\n'
+                             '            "content and cache_salt, whatever the ID. No '
+                             'lineage "\n'
+                             '            "declaration or ID format is required. '
+                             'Render-only requests "\n'
+                             '            "need no agent ID."\n'
                              '        ),\n'
                              '    )\n'
                              '\n'
@@ -31715,17 +28833,19 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '        min_length=1,\n'
                       '        pattern=r"\\S",\n'
                       '        description=(\n'
-                      '            "Opaque, stable agent ID required for generation '
-                      'and shared KV "\n'
-                      '            "cache accounting. An agent with no cached blocks '
-                      'may acquire a "\n'
-                      '            "matching prefix from any agent. Once it has cached '
-                      'blocks, it "\n'
-                      '            "matches only its own acquired cache and extends '
-                      'that cache. "\n'
-                      '            "No lineage declaration or ID format is required. '
-                      'Render-only "\n'
-                      '            "requests need no agent ID."\n'
+                      '            "Opaque agent ID naming one line of work, required '
+                      'for "\n'
+                      '            "generation: the same ID for every request that '
+                      'continues a "\n'
+                      '            "conversation, a new, never-used ID for a fork or a '
+                      'subagent. "\n'
+                      '            "It groups what the KV tiers retain; prefix reuse '
+                      'matches "\n'
+                      '            "content and cache_salt, whatever the ID. No '
+                      'lineage "\n'
+                      '            "declaration or ID format is required. Render-only '
+                      'requests "\n'
+                      '            "need no agent ID."\n'
                       '        ),\n'
                       '    )\n'
                       '\n'
@@ -31748,17 +28868,19 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '        min_length=1,\n'
                              '        pattern=r"\\S",\n'
                              '        description=(\n'
-                             '            "Opaque, stable agent ID required for '
-                             'generation and shared KV "\n'
-                             '            "cache accounting. An agent with no cached '
-                             'blocks may acquire a "\n'
-                             '            "matching prefix from any agent. Once it has '
-                             'cached blocks, it "\n'
-                             '            "matches only its own acquired cache and '
-                             'extends that cache. "\n'
-                             '            "No lineage declaration or ID format is '
-                             'required. Render-only "\n'
-                             '            "requests need no agent ID."\n'
+                             '            "Opaque agent ID naming one line of work, '
+                             'required for "\n'
+                             '            "generation: the same ID for every request '
+                             'that continues a "\n'
+                             '            "conversation, a new, never-used ID for a '
+                             'fork or a subagent. "\n'
+                             '            "It groups what the KV tiers retain; prefix '
+                             'reuse matches "\n'
+                             '            "content and cache_salt, whatever the ID. No '
+                             'lineage "\n'
+                             '            "declaration or ID format is required. '
+                             'Render-only requests "\n'
+                             '            "need no agent ID."\n'
                              '        ),\n'
                              '    )\n'
                              '\n'
@@ -31805,20 +28927,16 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '            temperature=temperature,\n'},
             {'name': 'vllm/entrypoints/scale_out/token_in_token_out/protocol.py:landmark-1',
              'path': 'vllm/entrypoints/scale_out/token_in_token_out/protocol.py',
-             'before': '    ec_transfer_params: dict[str, Any] | None = Field(\n'
-                       '        default=None,\n'
-                       '        description=(\n'
-                       '            "ECTransfer parameters used for encoder-cache '
+             'before': '            "ECTransfer parameters used for encoder-cache '
                        'disaggregated serving."\n'
                        '        ),\n'
                        '    )\n'
                        '\n'
                        '    # Tracks which keys the caller explicitly set inside '
-                       '``sampling_params``\n',
-             'after': '    ec_transfer_params: dict[str, Any] | None = Field(\n'
-                      '        default=None,\n'
-                      '        description=(\n'
-                      '            "ECTransfer parameters used for encoder-cache '
+                       '``sampling_params``\n'
+                       '    # when the request was parsed from a JSON body. Lets the '
+                       'server tell\n',
+             'after': '            "ECTransfer parameters used for encoder-cache '
                       'disaggregated serving."\n'
                       '        ),\n'
                       '    )\n'
@@ -31827,32 +28945,36 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '        min_length=1,\n'
                       '        pattern=r"\\S",\n'
                       '        description=(\n'
-                      '            "Opaque, stable agent ID required for generation '
-                      'and shared KV "\n'
-                      '            "cache accounting. An agent with no cached blocks '
-                      'may acquire a "\n'
-                      '            "matching prefix from any agent. Once it has cached '
-                      'blocks, it "\n'
-                      '            "matches only its own acquired cache and extends '
-                      'that cache. "\n'
-                      '            "No lineage declaration or ID format is required. '
-                      'Render-only "\n'
-                      '            "requests need no agent ID."\n'
+                      '            "Opaque agent ID naming one line of work, required '
+                      'for "\n'
+                      '            "generation: the same ID for every request that '
+                      'continues a "\n'
+                      '            "conversation, a new, never-used ID for a fork or a '
+                      'subagent. "\n'
+                      '            "It groups what the KV tiers retain; prefix reuse '
+                      'matches "\n'
+                      '            "content and cache_salt, whatever the ID. No '
+                      'lineage "\n'
+                      '            "declaration or ID format is required. Render-only '
+                      'requests "\n'
+                      '            "need no agent ID."\n'
                       '        ),\n'
                       '    )\n'
                       '\n'
                       '    # Tracks which keys the caller explicitly set inside '
-                      '``sampling_params``\n',
-             'review_before': '        default=None,\n'
-                              '        description=(\n'
-                              '            "ECTransfer parameters used for '
+                      '``sampling_params``\n'
+                      '    # when the request was parsed from a JSON body. Lets the '
+                      'server tell\n',
+             'review_before': '            "ECTransfer parameters used for '
                               'encoder-cache disaggregated serving."\n'
                               '        ),\n'
                               '    )\n'
-                              '\n',
-             'review_after': '        default=None,\n'
-                             '        description=(\n'
-                             '            "ECTransfer parameters used for '
+                              '\n'
+                              '    # Tracks which keys the caller explicitly set '
+                              'inside ``sampling_params``\n'
+                              '    # when the request was parsed from a JSON body. '
+                              'Lets the server tell\n',
+             'review_after': '            "ECTransfer parameters used for '
                              'encoder-cache disaggregated serving."\n'
                              '        ),\n'
                              '    )\n'
@@ -31861,20 +28983,26 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '        min_length=1,\n'
                              '        pattern=r"\\S",\n'
                              '        description=(\n'
-                             '            "Opaque, stable agent ID required for '
-                             'generation and shared KV "\n'
-                             '            "cache accounting. An agent with no cached '
-                             'blocks may acquire a "\n'
-                             '            "matching prefix from any agent. Once it has '
-                             'cached blocks, it "\n'
-                             '            "matches only its own acquired cache and '
-                             'extends that cache. "\n'
-                             '            "No lineage declaration or ID format is '
-                             'required. Render-only "\n'
-                             '            "requests need no agent ID."\n'
+                             '            "Opaque agent ID naming one line of work, '
+                             'required for "\n'
+                             '            "generation: the same ID for every request '
+                             'that continues a "\n'
+                             '            "conversation, a new, never-used ID for a '
+                             'fork or a subagent. "\n'
+                             '            "It groups what the KV tiers retain; prefix '
+                             'reuse matches "\n'
+                             '            "content and cache_salt, whatever the ID. No '
+                             'lineage "\n'
+                             '            "declaration or ID format is required. '
+                             'Render-only requests "\n'
+                             '            "need no agent ID."\n'
                              '        ),\n'
                              '    )\n'
-                             '\n'},
+                             '\n'
+                             '    # Tracks which keys the caller explicitly set inside '
+                             '``sampling_params``\n'
+                             '    # when the request was parsed from a JSON body. Lets '
+                             'the server tell\n'},
             {'name': 'vllm/entrypoints/scale_out/token_in_token_out/serving.py:landmark-1',
              'path': 'vllm/entrypoints/scale_out/token_in_token_out/serving.py',
              'before': '        if request.stream:\n'
@@ -31977,265 +29105,6 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '        os.getenv("VLLM_USE_DIRECT_DCP_A2A")\n'},
             {'name': 'vllm/v1/core/block_pool.py:landmark-1',
              'path': 'vllm/v1/core/block_pool.py',
-             'before': ')\n'
-                       'from vllm.logger import init_logger\n'
-                       'from vllm.v1.core.kv_cache_metrics import '
-                       'KVCacheMetricsCollector\n'
-                       'from vllm.v1.core.kv_cache_utils import (\n'
-                       '    BlockHash,\n'
-                       '    BlockHashWithGroupId,\n',
-             'after': ')\n'
-                      'from vllm.logger import init_logger\n'
-                      'from vllm.v1.core.kv_cache_metrics import '
-                      'KVCacheMetricsCollector\n'
-                      'from vllm.v1.core.prefix_cache import PrefixCacheIndex, '
-                      'PrefixCacheView, cache_content_keys\n'
-                      'from vllm.v1.core.kv_cache_utils import (\n'
-                      '    BlockHash,\n'
-                      '    BlockHashWithGroupId,\n',
-             'review_before': ')\n'
-                              'from vllm.logger import init_logger\n'
-                              'from vllm.v1.core.kv_cache_metrics import '
-                              'KVCacheMetricsCollector\n'
-                              'from vllm.v1.core.kv_cache_utils import (\n'
-                              '    BlockHash,\n'
-                              '    BlockHashWithGroupId,\n',
-             'review_after': ')\n'
-                             'from vllm.logger import init_logger\n'
-                             'from vllm.v1.core.kv_cache_metrics import '
-                             'KVCacheMetricsCollector\n'
-                             'from vllm.v1.core.prefix_cache import PrefixCacheIndex, '
-                             'PrefixCacheView, cache_content_keys\n'
-                             'from vllm.v1.core.kv_cache_utils import (\n'
-                             '    BlockHash,\n'
-                             '    BlockHashWithGroupId,\n'},
-            {'name': 'vllm/v1/core/block_pool.py:landmark-2',
-             'path': 'vllm/v1/core/block_pool.py',
-             'before': '        assert isinstance(num_gpu_blocks, int) and '
-                       'num_gpu_blocks > 0\n'
-                       '        self.num_gpu_blocks = num_gpu_blocks\n'
-                       '        self.enable_caching = enable_caching\n'
-                       '        self.hash_block_size = hash_block_size\n'
-                       '        # All kv-cache blocks.\n'
-                       '        self.blocks: list[KVCacheBlock] = [\n',
-             'after': '        assert isinstance(num_gpu_blocks, int) and '
-                      'num_gpu_blocks > 0\n'
-                      '        self.num_gpu_blocks = num_gpu_blocks\n'
-                      '        self.enable_caching = enable_caching\n'
-                      '        self.prefix_cache = PrefixCacheIndex()\n'
-                      '        self.cache_tier = object()\n'
-                      '        self.prefix_cache.register_tier(self.cache_tier, '
-                      'num_gpu_blocks - 1)\n'
-                      '        self.hash_block_size = hash_block_size\n'
-                      '        # All kv-cache blocks.\n'
-                      '        self.blocks: list[KVCacheBlock] = [\n',
-             'review_before': '        assert isinstance(num_gpu_blocks, int) and '
-                              'num_gpu_blocks > 0\n'
-                              '        self.num_gpu_blocks = num_gpu_blocks\n'
-                              '        self.enable_caching = enable_caching\n'
-                              '        self.hash_block_size = hash_block_size\n'
-                              '        # All kv-cache blocks.\n'
-                              '        self.blocks: list[KVCacheBlock] = [\n',
-             'review_after': '        assert isinstance(num_gpu_blocks, int) and '
-                             'num_gpu_blocks > 0\n'
-                             '        self.num_gpu_blocks = num_gpu_blocks\n'
-                             '        self.enable_caching = enable_caching\n'
-                             '        self.prefix_cache = PrefixCacheIndex()\n'
-                             '        self.cache_tier = object()\n'
-                             '        self.prefix_cache.register_tier(self.cache_tier, '
-                             'num_gpu_blocks - 1)\n'
-                             '        self.hash_block_size = hash_block_size\n'
-                             '        # All kv-cache blocks.\n'
-                             '        self.blocks: list[KVCacheBlock] = [\n'},
-            {'name': 'vllm/v1/core/block_pool.py:landmark-3',
-             'path': 'vllm/v1/core/block_pool.py',
-             'before': '\n'
-                       '        self.metrics_collector = metrics_collector\n'
-                       '\n'
-                       '    def get_cached_block(\n'
-                       '        self, block_hash: BlockHash, kv_cache_group_ids: '
-                       'list[int]\n'
-                       '    ) -> list[KVCacheBlock] | None:\n'
-                       '        """Get the cached block by the block hash for each '
-                       'group in\n'
-                       '        `kv_cache_group_ids`, or None if cache miss for any '
-                       'group.\n',
-             'after': '\n'
-                      '        self.metrics_collector = metrics_collector\n'
-                      '\n'
-                      '    def bind_prefix_cache(self, index: PrefixCacheIndex) -> '
-                      'None:\n'
-                      '        assert self.get_usage() == 0\n'
-                      '        assert not self.cached_block_hash_to_block._cache\n'
-                      '        self.prefix_cache = index\n'
-                      '        self.prefix_cache.register_tier(self.cache_tier, '
-                      'self.num_gpu_blocks - 1)\n'
-                      '\n'
-                      '    def get_cached_block(\n'
-                      '        self, block_hash: BlockHash, kv_cache_group_ids: '
-                      'list[int],\n'
-                      '        cache_view: PrefixCacheView,\n'
-                      '    ) -> list[KVCacheBlock] | None:\n'
-                      '        """Get the cached block by the block hash for each '
-                      'group in\n'
-                      '        `kv_cache_group_ids`, or None if cache miss for any '
-                      'group.\n',
-             'review_before': '\n'
-                              '        self.metrics_collector = metrics_collector\n'
-                              '\n'
-                              '    def get_cached_block(\n'
-                              '        self, block_hash: BlockHash, '
-                              'kv_cache_group_ids: list[int]\n'
-                              '    ) -> list[KVCacheBlock] | None:\n'
-                              '        """Get the cached block by the block hash for '
-                              'each group in\n'
-                              '        `kv_cache_group_ids`, or None if cache miss for '
-                              'any group.\n',
-             'review_after': '\n'
-                             '        self.metrics_collector = metrics_collector\n'
-                             '\n'
-                             '    def bind_prefix_cache(self, index: PrefixCacheIndex) '
-                             '-> None:\n'
-                             '        assert self.get_usage() == 0\n'
-                             '        assert not '
-                             'self.cached_block_hash_to_block._cache\n'
-                             '        self.prefix_cache = index\n'
-                             '        self.prefix_cache.register_tier(self.cache_tier, '
-                             'self.num_gpu_blocks - 1)\n'
-                             '\n'
-                             '    def get_cached_block(\n'
-                             '        self, block_hash: BlockHash, kv_cache_group_ids: '
-                             'list[int],\n'
-                             '        cache_view: PrefixCacheView,\n'
-                             '    ) -> list[KVCacheBlock] | None:\n'
-                             '        """Get the cached block by the block hash for '
-                             'each group in\n'
-                             '        `kv_cache_group_ids`, or None if cache miss for '
-                             'any group.\n'},
-            {'name': 'vllm/v1/core/block_pool.py:landmark-4',
-             'path': 'vllm/v1/core/block_pool.py',
-             'before': '            block = '
-                       'self.cached_block_hash_to_block.get_one_block(\n'
-                       '                block_hash_with_group_id\n'
-                       '            )\n'
-                       '            if not block:\n'
-                       '                return None\n'
-                       '            cached_blocks.append(block)\n'
-                       '        return cached_blocks\n'
-                       '\n'
-                       '    def cache_full_blocks(\n'
-                       '        self,\n',
-             'after': '            block = '
-                      'self.cached_block_hash_to_block.get_one_block(\n'
-                      '                block_hash_with_group_id\n'
-                      '            )\n'
-                      '            if not block or not cache_view.allows(\n'
-                      '                self.prefix_cache.content(self.cache_tier, '
-                      'block_hash_with_group_id)\n'
-                      '            ):\n'
-                      '                return None\n'
-                      '            cached_blocks.append(block)\n'
-                      '        return cached_blocks\n'
-                      '\n'
-                      '    def acquire_cached_blocks(\n'
-                      '        self,\n'
-                      '        request: Request,\n'
-                      '        blocks: tuple[Sequence[KVCacheBlock], ...],\n'
-                      '        num_tokens: int,\n'
-                      '    ) -> None:\n'
-                      '        """Acquire only the selected request prefix, including '
-                      'partial aliases."""\n'
-                      '        prefix_hashes = set(request.block_hashes[:num_tokens // '
-                      'self.hash_block_size])\n'
-                      '        selected: dict[bytes, set[bytes]] = {}\n'
-                      '        for group in blocks:\n'
-                      '            for block in group:\n'
-                      '                if block.is_null:\n'
-                      '                    continue\n'
-                      '                hashes = '
-                      'self.cached_block_hashes_by_block.get(block.block_id, set())\n'
-                      '                if block.block_hash is not None:\n'
-                      '                    hashes = hashes | {block.block_hash}\n'
-                      '                for key in hashes:\n'
-                      '                    content = {\n'
-                      '                        unit for unit in '
-                      'self.prefix_cache.content(self.cache_tier, key)\n'
-                      '                        if get_block_hash(unit) in '
-                      'prefix_hashes\n'
-                      '                    }\n'
-                      '                    if content:\n'
-                      '                        selected[key] = content\n'
-                      '        self.prefix_cache.acquire(\n'
-                      '            self.cache_tier, request.kv_scope, selected.keys(), '
-                      'selection=selected,\n'
-                      '        )\n'
-                      '\n'
-                      '    def cache_full_blocks(\n'
-                      '        self,\n',
-             'review_before': '            block = '
-                              'self.cached_block_hash_to_block.get_one_block(\n'
-                              '                block_hash_with_group_id\n'
-                              '            )\n'
-                              '            if not block:\n'
-                              '                return None\n'
-                              '            cached_blocks.append(block)\n'
-                              '        return cached_blocks\n'
-                              '\n'
-                              '    def cache_full_blocks(\n'
-                              '        self,\n',
-             'review_after': '            block = '
-                             'self.cached_block_hash_to_block.get_one_block(\n'
-                             '                block_hash_with_group_id\n'
-                             '            )\n'
-                             '            if not block or not cache_view.allows(\n'
-                             '                '
-                             'self.prefix_cache.content(self.cache_tier, '
-                             'block_hash_with_group_id)\n'
-                             '            ):\n'
-                             '                return None\n'
-                             '            cached_blocks.append(block)\n'
-                             '        return cached_blocks\n'
-                             '\n'
-                             '    def acquire_cached_blocks(\n'
-                             '        self,\n'
-                             '        request: Request,\n'
-                             '        blocks: tuple[Sequence[KVCacheBlock], ...],\n'
-                             '        num_tokens: int,\n'
-                             '    ) -> None:\n'
-                             '        """Acquire only the selected request prefix, '
-                             'including partial aliases."""\n'
-                             '        prefix_hashes = '
-                             'set(request.block_hashes[:num_tokens // '
-                             'self.hash_block_size])\n'
-                             '        selected: dict[bytes, set[bytes]] = {}\n'
-                             '        for group in blocks:\n'
-                             '            for block in group:\n'
-                             '                if block.is_null:\n'
-                             '                    continue\n'
-                             '                hashes = '
-                             'self.cached_block_hashes_by_block.get(block.block_id, '
-                             'set())\n'
-                             '                if block.block_hash is not None:\n'
-                             '                    hashes = hashes | '
-                             '{block.block_hash}\n'
-                             '                for key in hashes:\n'
-                             '                    content = {\n'
-                             '                        unit for unit in '
-                             'self.prefix_cache.content(self.cache_tier, key)\n'
-                             '                        if get_block_hash(unit) in '
-                             'prefix_hashes\n'
-                             '                    }\n'
-                             '                    if content:\n'
-                             '                        selected[key] = content\n'
-                             '        self.prefix_cache.acquire(\n'
-                             '            self.cache_tier, request.kv_scope, '
-                             'selected.keys(), selection=selected,\n'
-                             '        )\n'
-                             '\n'
-                             '    def cache_full_blocks(\n'
-                             '        self,\n'},
-            {'name': 'vllm/v1/core/block_pool.py:landmark-5',
-             'path': 'vllm/v1/core/block_pool.py',
              'before': '        block_size: int,\n'
                        '        kv_cache_group_id: int,\n'
                        '        block_mask: list[bool] | None = None,\n'
@@ -32268,7 +29137,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'caching.\n'
                              '        This function takes a list of blocks that will '
                              'have their block hash\n'},
-            {'name': 'vllm/v1/core/block_pool.py:landmark-6',
+            {'name': 'vllm/v1/core/block_pool.py:landmark-2',
              'path': 'vllm/v1/core/block_pool.py',
              'before': '                    blk.block_hash_num_tokens is not None\n'
                        '                    and blk.block_hash_num_tokens < '
@@ -32280,12 +29149,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                        'self._emit_block_removed_events(removed_hashes)\n'
                        '            self._insert_block_hash(\n'
                        '                block_hash_with_group_id,\n'
-                       '                blk,\n'
-                       '                num_tokens=num_hash_tokens,\n'
-                       '            )\n'
-                       '            if new_hashes is not None:\n'
-                       '                '
-                       'new_hashes.append(maybe_convert_block_hash(block_hash))\n',
+                       '                blk,\n',
              'after': '                    blk.block_hash_num_tokens is not None\n'
                       '                    and blk.block_hash_num_tokens < '
                       'num_hash_tokens\n'
@@ -32298,8 +29162,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '                else:\n'
                       '                    # Attention appends data. Its earlier '
                       'immutable prefix\n'
-                      '                    # remains a valid cache entry for every '
-                      'acquired user.\n'
+                      '                    # remains a valid entry for a prefix that '
+                      'ends there.\n'
                       '                    '
                       'self.cached_block_hashes_by_block.setdefault(blk.block_id, '
                       'set()).add(\n'
@@ -32308,21 +29172,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '                    blk.reset_hash()\n'
                       '            self._insert_block_hash(\n'
                       '                block_hash_with_group_id,\n'
-                      '                blk,\n'
-                      '                num_tokens=num_hash_tokens,\n'
-                      '                content=self._cache_content(\n'
-                      '                    request, kv_cache_group_id, '
-                      'num_hash_tokens,\n'
-                      '                    block_size, is_recurrent,\n'
-                      '                ),\n'
-                      '            )\n'
-                      '            self.prefix_cache.acquire(\n'
-                      '                self.cache_tier, request.kv_scope, '
-                      '[block_hash_with_group_id]\n'
-                      '            )\n'
-                      '            if new_hashes is not None:\n'
-                      '                '
-                      'new_hashes.append(maybe_convert_block_hash(block_hash))\n',
+                      '                blk,\n',
              'review_before': '                    blk.block_hash_num_tokens is not '
                               'None\n'
                               '                    and blk.block_hash_num_tokens < '
@@ -32334,12 +29184,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                               'self._emit_block_removed_events(removed_hashes)\n'
                               '            self._insert_block_hash(\n'
                               '                block_hash_with_group_id,\n'
-                              '                blk,\n'
-                              '                num_tokens=num_hash_tokens,\n'
-                              '            )\n'
-                              '            if new_hashes is not None:\n'
-                              '                '
-                              'new_hashes.append(maybe_convert_block_hash(block_hash))\n',
+                              '                blk,\n',
              'review_after': '                    blk.block_hash_num_tokens is not '
                              'None\n'
                              '                    and blk.block_hash_num_tokens < '
@@ -32353,8 +29198,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '                else:\n'
                              '                    # Attention appends data. Its '
                              'earlier immutable prefix\n'
-                             '                    # remains a valid cache entry for '
-                             'every acquired user.\n'
+                             '                    # remains a valid entry for a prefix '
+                             'that ends there.\n'
                              '                    '
                              'self.cached_block_hashes_by_block.setdefault(blk.block_id, '
                              'set()).add(\n'
@@ -32363,22 +29208,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '                    blk.reset_hash()\n'
                              '            self._insert_block_hash(\n'
                              '                block_hash_with_group_id,\n'
-                             '                blk,\n'
-                             '                num_tokens=num_hash_tokens,\n'
-                             '                content=self._cache_content(\n'
-                             '                    request, kv_cache_group_id, '
-                             'num_hash_tokens,\n'
-                             '                    block_size, is_recurrent,\n'
-                             '                ),\n'
-                             '            )\n'
-                             '            self.prefix_cache.acquire(\n'
-                             '                self.cache_tier, request.kv_scope, '
-                             '[block_hash_with_group_id]\n'
-                             '            )\n'
-                             '            if new_hashes is not None:\n'
-                             '                '
-                             'new_hashes.append(maybe_convert_block_hash(block_hash))\n'},
-            {'name': 'vllm/v1/core/block_pool.py:landmark-7',
+                             '                blk,\n'},
+            {'name': 'vllm/v1/core/block_pool.py:landmark-3',
              'path': 'vllm/v1/core/block_pool.py',
              'before': '        num_tokens: int,\n'
                        '        kv_cache_group_id: int,\n'
@@ -32410,7 +29241,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '        """Register a partial prefix-cache entry for an '
                              'existing block.\n'
                              '\n'},
-            {'name': 'vllm/v1/core/block_pool.py:landmark-8',
+            {'name': 'vllm/v1/core/block_pool.py:landmark-4',
              'path': 'vllm/v1/core/block_pool.py',
              'before': '            and block.block_hash_num_tokens is not None\n'
                        '            and block.block_hash_num_tokens < num_hash_blocks '
@@ -32421,14 +29252,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                        '            self._emit_block_removed_events(removed_hashes)\n'
                        '        self._insert_block_hash(\n'
                        '            block_hash_with_group_id,\n'
-                       '            block,\n'
-                       '            num_tokens=num_hash_blocks * '
-                       'self.hash_block_size,\n'
-                       '        )\n'
-                       '        if self.enable_kv_cache_events and not '
-                       'already_cached:\n'
-                       '            parent_hash, block_start = '
-                       'self._get_partial_block_parent_hash_and_start(\n',
+                       '            block,\n',
              'after': '            and block.block_hash_num_tokens is not None\n'
                       '            and block.block_hash_num_tokens < num_hash_blocks * '
                       'self.hash_block_size\n'
@@ -32447,20 +29271,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '                block.reset_hash()\n'
                       '        self._insert_block_hash(\n'
                       '            block_hash_with_group_id,\n'
-                      '            block,\n'
-                      '            num_tokens=num_hash_blocks * self.hash_block_size,\n'
-                      '            content=self._cache_content(\n'
-                      '                request, kv_cache_group_id, num_tokens, '
-                      'block_size, is_recurrent,\n'
-                      '            ),\n'
-                      '        )\n'
-                      '        self.prefix_cache.acquire(\n'
-                      '            self.cache_tier, request.kv_scope, '
-                      '[block_hash_with_group_id]\n'
-                      '        )\n'
-                      '        if self.enable_kv_cache_events and not already_cached:\n'
-                      '            parent_hash, block_start = '
-                      'self._get_partial_block_parent_hash_and_start(\n',
+                      '            block,\n',
              'review_before': '            and block.block_hash_num_tokens is not '
                               'None\n'
                               '            and block.block_hash_num_tokens < '
@@ -32472,14 +29283,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                               'self._emit_block_removed_events(removed_hashes)\n'
                               '        self._insert_block_hash(\n'
                               '            block_hash_with_group_id,\n'
-                              '            block,\n'
-                              '            num_tokens=num_hash_blocks * '
-                              'self.hash_block_size,\n'
-                              '        )\n'
-                              '        if self.enable_kv_cache_events and not '
-                              'already_cached:\n'
-                              '            parent_hash, block_start = '
-                              'self._get_partial_block_parent_hash_and_start(\n',
+                              '            block,\n',
              'review_after': '            and block.block_hash_num_tokens is not None\n'
                              '            and block.block_hash_num_tokens < '
                              'num_hash_blocks * self.hash_block_size\n'
@@ -32498,792 +29302,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '                block.reset_hash()\n'
                              '        self._insert_block_hash(\n'
                              '            block_hash_with_group_id,\n'
-                             '            block,\n'
-                             '            num_tokens=num_hash_blocks * '
-                             'self.hash_block_size,\n'
-                             '            content=self._cache_content(\n'
-                             '                request, kv_cache_group_id, num_tokens, '
-                             'block_size, is_recurrent,\n'
-                             '            ),\n'
-                             '        )\n'
-                             '        self.prefix_cache.acquire(\n'
-                             '            self.cache_tier, request.kv_scope, '
-                             '[block_hash_with_group_id]\n'
-                             '        )\n'
-                             '        if self.enable_kv_cache_events and not '
-                             'already_cached:\n'
-                             '            parent_hash, block_start = '
-                             'self._get_partial_block_parent_hash_and_start(\n'},
-            {'name': 'vllm/v1/core/block_pool.py:landmark-9',
-             'path': 'vllm/v1/core/block_pool.py',
-             'before': '            )\n'
-                       '        return block_hash_with_group_id\n'
-                       '\n'
-                       '    def _get_partial_block_hash(\n'
-                       '        self,\n'
-                       '        request: Request,\n',
-             'after': '            )\n'
-                      '        return block_hash_with_group_id\n'
-                      '\n'
-                      '    def _cache_content(\n'
-                      '        self, request: Request, group_id: int, end: int,\n'
-                      '        block_size: int, is_recurrent: bool,\n'
-                      '    ) -> tuple[bytes, ...]:\n'
-                      '        stop = end // self.hash_block_size\n'
-                      '        start = stop - 1 if is_recurrent else (\n'
-                      '            (end - 1) // block_size * block_size // '
-                      'self.hash_block_size\n'
-                      '        )\n'
-                      '        return '
-                      'cache_content_keys(request.block_hashes[start:stop], group_id)\n'
-                      '\n'
-                      '    def _get_partial_block_hash(\n'
-                      '        self,\n'
-                      '        request: Request,\n',
-             'review_before': '            )\n'
-                              '        return block_hash_with_group_id\n'
-                              '\n'
-                              '    def _get_partial_block_hash(\n'
-                              '        self,\n'
-                              '        request: Request,\n',
-             'review_after': '            )\n'
-                             '        return block_hash_with_group_id\n'
-                             '\n'
-                             '    def _cache_content(\n'
-                             '        self, request: Request, group_id: int, end: '
-                             'int,\n'
-                             '        block_size: int, is_recurrent: bool,\n'
-                             '    ) -> tuple[bytes, ...]:\n'
-                             '        stop = end // self.hash_block_size\n'
-                             '        start = stop - 1 if is_recurrent else (\n'
-                             '            (end - 1) // block_size * block_size // '
-                             'self.hash_block_size\n'
-                             '        )\n'
-                             '        return '
-                             'cache_content_keys(request.block_hashes[start:stop], '
-                             'group_id)\n'
-                             '\n'
-                             '    def _get_partial_block_hash(\n'
-                             '        self,\n'
-                             '        request: Request,\n'},
-            {'name': 'vllm/v1/core/block_pool.py:landmark-10',
-             'path': 'vllm/v1/core/block_pool.py',
-             'before': '                is not None\n'
-                       '            ):\n'
-                       '                removed_hashes.append(block_hash)\n'
-                       '        block.reset_hash()\n'
-                       '        return removed_hashes\n'
-                       '\n'
-                       '    def _emit_block_removed_events(\n',
-             'after': '                is not None\n'
-                      '            ):\n'
-                      '                removed_hashes.append(block_hash)\n'
-                      '                self.prefix_cache.remove(self.cache_tier, '
-                      'block_hash)\n'
-                      '        block.reset_hash()\n'
-                      '        self.prefix_cache.set_capacity(\n'
-                      '            self.cache_tier, self.num_gpu_blocks - 1\n'
-                      '            + sum(len(hashes) for hashes in '
-                      'self.cached_block_hashes_by_block.values()),\n'
-                      '        )\n'
-                      '        return removed_hashes\n'
-                      '\n'
-                      '    def _emit_block_removed_events(\n',
-             'review_before': '                is not None\n'
-                              '            ):\n'
-                              '                removed_hashes.append(block_hash)\n'
-                              '        block.reset_hash()\n'
-                              '        return removed_hashes\n'
-                              '\n'
-                              '    def _emit_block_removed_events(\n',
-             'review_after': '                is not None\n'
-                             '            ):\n'
-                             '                removed_hashes.append(block_hash)\n'
-                             '                '
-                             'self.prefix_cache.remove(self.cache_tier, block_hash)\n'
-                             '        block.reset_hash()\n'
-                             '        self.prefix_cache.set_capacity(\n'
-                             '            self.cache_tier, self.num_gpu_blocks - 1\n'
-                             '            + sum(len(hashes) for hashes in '
-                             'self.cached_block_hashes_by_block.values()),\n'
-                             '        )\n'
-                             '        return removed_hashes\n'
-                             '\n'
-                             '    def _emit_block_removed_events(\n'},
-            {'name': 'vllm/v1/core/block_pool.py:landmark-11',
-             'path': 'vllm/v1/core/block_pool.py',
-             'before': '        block_hash_with_group_id: BlockHashWithGroupId,\n'
-                       '        block: KVCacheBlock,\n'
-                       '        num_tokens: int | None,\n'
-                       '    ) -> None:\n'
-                       '        if block.block_hash == block_hash_with_group_id:\n'
-                       '            return\n'
-                       '\n'
-                       '        if self.cached_block_hash_to_block.contain(\n'
-                       '            block_hash_with_group_id, block.block_id\n'
-                       '        ):\n',
-             'after': '        block_hash_with_group_id: BlockHashWithGroupId,\n'
-                      '        block: KVCacheBlock,\n'
-                      '        num_tokens: int | None,\n'
-                      '        content: tuple[bytes, ...],\n'
-                      '    ) -> None:\n'
-                      '        if self.cached_block_hash_to_block.contain(\n'
-                      '            block_hash_with_group_id, block.block_id\n'
-                      '        ):\n',
-             'review_before': '        block_hash_with_group_id: '
-                              'BlockHashWithGroupId,\n'
-                              '        block: KVCacheBlock,\n'
-                              '        num_tokens: int | None,\n'
-                              '    ) -> None:\n'
-                              '        if block.block_hash == '
-                              'block_hash_with_group_id:\n'
-                              '            return\n'
-                              '\n'
-                              '        if self.cached_block_hash_to_block.contain(\n'
-                              '            block_hash_with_group_id, block.block_id\n'
-                              '        ):\n',
-             'review_after': '        block_hash_with_group_id: BlockHashWithGroupId,\n'
-                             '        block: KVCacheBlock,\n'
-                             '        num_tokens: int | None,\n'
-                             '        content: tuple[bytes, ...],\n'
-                             '    ) -> None:\n'
-                             '        if self.cached_block_hash_to_block.contain(\n'
-                             '            block_hash_with_group_id, block.block_id\n'
-                             '        ):\n'},
-            {'name': 'vllm/v1/core/block_pool.py:landmark-12',
-             'path': 'vllm/v1/core/block_pool.py',
-             'before': '\n'
-                       '        if block.block_hash is None:\n'
-                       '            block.set_block_hash(block_hash_with_group_id, '
-                       'num_tokens=num_tokens)\n'
-                       '        else:\n'
-                       '            '
-                       'self.cached_block_hashes_by_block.setdefault(block.block_id, '
-                       'set()).add(\n'
-                       '                block_hash_with_group_id\n'
-                       '            )\n'
-                       '        '
-                       'self.cached_block_hash_to_block.insert(block_hash_with_group_id, '
-                       'block)\n'
-                       '\n'
-                       '    def move_block_hashes(\n'
-                       '        self,\n',
-             'after': '\n'
-                      '        if block.block_hash is None:\n'
-                      '            block.set_block_hash(block_hash_with_group_id, '
-                      'num_tokens=num_tokens)\n'
-                      '        elif block.block_hash != block_hash_with_group_id:\n'
-                      '            '
-                      'self.cached_block_hashes_by_block.setdefault(block.block_id, '
-                      'set()).add(\n'
-                      '                block_hash_with_group_id\n'
-                      '            )\n'
-                      '        '
-                      'self.cached_block_hash_to_block.insert(block_hash_with_group_id, '
-                      'block)\n'
-                      '        self.prefix_cache.insert(self.cache_tier, '
-                      'block_hash_with_group_id, content)\n'
-                      '        self.prefix_cache.set_capacity(\n'
-                      '            self.cache_tier, self.num_gpu_blocks - 1\n'
-                      '            + sum(len(hashes) for hashes in '
-                      'self.cached_block_hashes_by_block.values()),\n'
-                      '        )\n'
-                      '\n'
-                      '    def move_block_hashes(\n'
-                      '        self,\n',
-             'review_before': '\n'
-                              '        if block.block_hash is None:\n'
-                              '            '
-                              'block.set_block_hash(block_hash_with_group_id, '
-                              'num_tokens=num_tokens)\n'
-                              '        else:\n'
-                              '            '
-                              'self.cached_block_hashes_by_block.setdefault(block.block_id, '
-                              'set()).add(\n'
-                              '                block_hash_with_group_id\n'
-                              '            )\n'
-                              '        '
-                              'self.cached_block_hash_to_block.insert(block_hash_with_group_id, '
-                              'block)\n'
-                              '\n'
-                              '    def move_block_hashes(\n'
-                              '        self,\n',
-             'review_after': '\n'
-                             '        if block.block_hash is None:\n'
-                             '            '
-                             'block.set_block_hash(block_hash_with_group_id, '
-                             'num_tokens=num_tokens)\n'
-                             '        elif block.block_hash != '
-                             'block_hash_with_group_id:\n'
-                             '            '
-                             'self.cached_block_hashes_by_block.setdefault(block.block_id, '
-                             'set()).add(\n'
-                             '                block_hash_with_group_id\n'
-                             '            )\n'
-                             '        '
-                             'self.cached_block_hash_to_block.insert(block_hash_with_group_id, '
-                             'block)\n'
-                             '        self.prefix_cache.insert(self.cache_tier, '
-                             'block_hash_with_group_id, content)\n'
-                             '        self.prefix_cache.set_capacity(\n'
-                             '            self.cache_tier, self.num_gpu_blocks - 1\n'
-                             '            + sum(len(hashes) for hashes in '
-                             'self.cached_block_hashes_by_block.values()),\n'
-                             '        )\n'
-                             '\n'
-                             '    def move_block_hashes(\n'
-                             '        self,\n'},
-            {'name': 'vllm/v1/core/block_pool.py:landmark-13',
-             'path': 'vllm/v1/core/block_pool.py',
-             'before': '        assert dst_block.block_hash is None\n'
-                       '        assert dst_block.block_id not in '
-                       'self.cached_block_hashes_by_block\n'
-                       '        num_tokens = src_block.block_hash_num_tokens\n'
-                       '        for block_hash in '
-                       'self._remove_cached_block_hashes(src_block):\n'
-                       '            # `num_tokens` only applies to the first (primary) '
-                       'insertion.\n'
-                       '            self._insert_block_hash(block_hash, dst_block, '
-                       'num_tokens=num_tokens)\n'
-                       '\n'
-                       '    def get_new_blocks(self, num_blocks: int) -> '
-                       'list[KVCacheBlock]:\n'
-                       '        """Get new blocks from the free block pool.\n',
-             'after': '        assert dst_block.block_hash is None\n'
-                      '        assert dst_block.block_id not in '
-                      'self.cached_block_hashes_by_block\n'
-                      '        num_tokens = src_block.block_hash_num_tokens\n'
-                      '        hashes = ([src_block.block_hash] if '
-                      'src_block.block_hash is not None else [])\n'
-                      '        '
-                      'hashes.extend(self.cached_block_hashes_by_block.get(src_block.block_id, '
-                      '()))\n'
-                      '        # Register the destination before removing the source. '
-                      'The content\n'
-                      '        # remains resident throughout this move, including all '
-                      'acquired users.\n'
-                      '        for block_hash in hashes:\n'
-                      '            self._insert_block_hash(\n'
-                      '                block_hash, dst_block, num_tokens=num_tokens,\n'
-                      '                '
-                      'content=self.prefix_cache.content(self.cache_tier, '
-                      'block_hash),\n'
-                      '            )\n'
-                      '        self._remove_cached_block_hashes(src_block)\n'
-                      '\n'
-                      '    def get_new_blocks(self, num_blocks: int) -> '
-                      'list[KVCacheBlock]:\n'
-                      '        """Get new blocks from the free block pool.\n',
-             'review_before': '        assert dst_block.block_hash is None\n'
-                              '        assert dst_block.block_id not in '
-                              'self.cached_block_hashes_by_block\n'
-                              '        num_tokens = src_block.block_hash_num_tokens\n'
-                              '        for block_hash in '
-                              'self._remove_cached_block_hashes(src_block):\n'
-                              '            # `num_tokens` only applies to the first '
-                              '(primary) insertion.\n'
-                              '            self._insert_block_hash(block_hash, '
-                              'dst_block, num_tokens=num_tokens)\n'
-                              '\n'
-                              '    def get_new_blocks(self, num_blocks: int) -> '
-                              'list[KVCacheBlock]:\n'
-                              '        """Get new blocks from the free block pool.\n',
-             'review_after': '        assert dst_block.block_hash is None\n'
-                             '        assert dst_block.block_id not in '
-                             'self.cached_block_hashes_by_block\n'
-                             '        num_tokens = src_block.block_hash_num_tokens\n'
-                             '        hashes = ([src_block.block_hash] if '
-                             'src_block.block_hash is not None else [])\n'
-                             '        '
-                             'hashes.extend(self.cached_block_hashes_by_block.get(src_block.block_id, '
-                             '()))\n'
-                             '        # Register the destination before removing the '
-                             'source. The content\n'
-                             '        # remains resident throughout this move, '
-                             'including all acquired users.\n'
-                             '        for block_hash in hashes:\n'
-                             '            self._insert_block_hash(\n'
-                             '                block_hash, dst_block, '
-                             'num_tokens=num_tokens,\n'
-                             '                '
-                             'content=self.prefix_cache.content(self.cache_tier, '
-                             'block_hash),\n'
-                             '            )\n'
-                             '        self._remove_cached_block_hashes(src_block)\n'
-                             '\n'
-                             '    def get_new_blocks(self, num_blocks: int) -> '
-                             'list[KVCacheBlock]:\n'
-                             '        """Get new blocks from the free block pool.\n'},
-            {'name': 'vllm/v1/core/block_pool.py:landmark-14',
-             'path': 'vllm/v1/core/block_pool.py',
-             'before': '            )\n'
-                       '            return False\n'
-                       '\n'
-                       '        # Remove all hashes so that no new blocks will hit.\n'
-                       '        self.cached_block_hash_to_block = '
-                       'BlockHashToBlockMap()\n'
-                       '        self.cached_block_hashes_by_block.clear()\n',
-             'after': '            )\n'
-                      '            return False\n'
-                      '\n'
-                      '        self.prefix_cache.reset(self.cache_tier)\n'
-                      '\n'
-                      '        # Remove all hashes so that no new blocks will hit.\n'
-                      '        self.cached_block_hash_to_block = '
-                      'BlockHashToBlockMap()\n'
-                      '        self.cached_block_hashes_by_block.clear()\n',
-             'review_before': '            )\n'
-                              '            return False\n'
-                              '\n'
-                              '        # Remove all hashes so that no new blocks will '
-                              'hit.\n'
-                              '        self.cached_block_hash_to_block = '
-                              'BlockHashToBlockMap()\n'
-                              '        self.cached_block_hashes_by_block.clear()\n',
-             'review_after': '            )\n'
-                             '            return False\n'
-                             '\n'
-                             '        self.prefix_cache.reset(self.cache_tier)\n'
-                             '\n'
-                             '        # Remove all hashes so that no new blocks will '
-                             'hit.\n'
-                             '        self.cached_block_hash_to_block = '
-                             'BlockHashToBlockMap()\n'
-                             '        self.cached_block_hashes_by_block.clear()\n'},
-            {'name': 'vllm/v1/core/kv_cache_coordinator.py:landmark-1',
-             'path': 'vllm/v1/core/kv_cache_coordinator.py',
-             'before': 'from vllm.logger import init_logger\n'
-                       'from vllm.utils.math_utils import cdiv\n'
-                       'from vllm.v1.core.block_pool import BlockPool\n'
-                       'from vllm.v1.core.kv_cache_metrics import '
-                       'KVCacheMetricsCollector\n'
-                       'from vllm.v1.core.kv_cache_utils import (\n'
-                       '    BlockHash,\n',
-             'after': 'from vllm.logger import init_logger\n'
-                      'from vllm.utils.math_utils import cdiv\n'
-                      'from vllm.v1.core.block_pool import BlockPool\n'
-                      'from vllm.v1.core.prefix_cache import PrefixCacheView\n'
-                      'from vllm.v1.core.kv_cache_metrics import '
-                      'KVCacheMetricsCollector\n'
-                      'from vllm.v1.core.kv_cache_utils import (\n'
-                      '    BlockHash,\n',
-             'review_before': 'from vllm.logger import init_logger\n'
-                              'from vllm.utils.math_utils import cdiv\n'
-                              'from vllm.v1.core.block_pool import BlockPool\n'
-                              'from vllm.v1.core.kv_cache_metrics import '
-                              'KVCacheMetricsCollector\n'
-                              'from vllm.v1.core.kv_cache_utils import (\n'
-                              '    BlockHash,\n',
-             'review_after': 'from vllm.logger import init_logger\n'
-                             'from vllm.utils.math_utils import cdiv\n'
-                             'from vllm.v1.core.block_pool import BlockPool\n'
-                             'from vllm.v1.core.prefix_cache import PrefixCacheView\n'
-                             'from vllm.v1.core.kv_cache_metrics import '
-                             'KVCacheMetricsCollector\n'
-                             'from vllm.v1.core.kv_cache_utils import (\n'
-                             '    BlockHash,\n'},
-            {'name': 'vllm/v1/core/kv_cache_coordinator.py:landmark-2',
-             'path': 'vllm/v1/core/kv_cache_coordinator.py',
-             'before': '        self,\n'
-                       '        block_hashes: list[BlockHash],\n'
-                       '        max_cache_hit_length: int,\n'
-                       '    ) -> tuple[tuple[list[KVCacheBlock], ...], int, int]:\n'
-                       '        """Returns the per-group hit blocks, the hit length, '
-                       'and the number of\n'
-                       '        ``num_uncached_common_prefix_tokens`` (a shared prefix '
-                       'that a\n',
-             'after': '        self,\n'
-                      '        block_hashes: list[BlockHash],\n'
-                      '        max_cache_hit_length: int,\n'
-                      '        cache_view: PrefixCacheView,\n'
-                      '    ) -> tuple[tuple[list[KVCacheBlock], ...], int, int]:\n'
-                      '        """Returns the per-group hit blocks, the hit length, '
-                      'and the number of\n'
-                      '        ``num_uncached_common_prefix_tokens`` (a shared prefix '
-                      'that a\n',
-             'review_before': '        self,\n'
-                              '        block_hashes: list[BlockHash],\n'
-                              '        max_cache_hit_length: int,\n'
-                              '    ) -> tuple[tuple[list[KVCacheBlock], ...], int, '
-                              'int]:\n'
-                              '        """Returns the per-group hit blocks, the hit '
-                              'length, and the number of\n'
-                              '        ``num_uncached_common_prefix_tokens`` (a shared '
-                              'prefix that a\n',
-             'review_after': '        self,\n'
-                             '        block_hashes: list[BlockHash],\n'
-                             '        max_cache_hit_length: int,\n'
-                             '        cache_view: PrefixCacheView,\n'
-                             '    ) -> tuple[tuple[list[KVCacheBlock], ...], int, '
-                             'int]:\n'
-                             '        """Returns the per-group hit blocks, the hit '
-                             'length, and the number of\n'
-                             '        ``num_uncached_common_prefix_tokens`` (a shared '
-                             'prefix that a\n'},
-            {'name': 'vllm/v1/core/kv_cache_coordinator.py:landmark-3',
-             'path': 'vllm/v1/core/kv_cache_coordinator.py',
-             'before': '        self,\n'
-                       '        block_hashes: list[BlockHash],\n'
-                       '        max_cache_hit_length: int,\n'
-                       '    ) -> tuple[tuple[list[KVCacheBlock], ...], int, int]:\n'
-                       '        blocks: tuple[list[KVCacheBlock], ...] = tuple(\n'
-                       '            [] for _ in range(self.num_single_type_manager)\n',
-             'after': '        self,\n'
-                      '        block_hashes: list[BlockHash],\n'
-                      '        max_cache_hit_length: int,\n'
-                      '        cache_view: PrefixCacheView,\n'
-                      '    ) -> tuple[tuple[list[KVCacheBlock], ...], int, int]:\n'
-                      '        blocks: tuple[list[KVCacheBlock], ...] = tuple(\n'
-                      '            [] for _ in range(self.num_single_type_manager)\n',
-             'review_before': '        self,\n'
-                              '        block_hashes: list[BlockHash],\n'
-                              '        max_cache_hit_length: int,\n'
-                              '    ) -> tuple[tuple[list[KVCacheBlock], ...], int, '
-                              'int]:\n'
-                              '        blocks: tuple[list[KVCacheBlock], ...] = '
-                              'tuple(\n'
-                              '            [] for _ in '
-                              'range(self.num_single_type_manager)\n',
-             'review_after': '        self,\n'
-                             '        block_hashes: list[BlockHash],\n'
-                             '        max_cache_hit_length: int,\n'
-                             '        cache_view: PrefixCacheView,\n'
-                             '    ) -> tuple[tuple[list[KVCacheBlock], ...], int, '
-                             'int]:\n'
-                             '        blocks: tuple[list[KVCacheBlock], ...] = tuple(\n'
-                             '            [] for _ in '
-                             'range(self.num_single_type_manager)\n'},
-            {'name': 'vllm/v1/core/kv_cache_coordinator.py:landmark-4',
-             'path': 'vllm/v1/core/kv_cache_coordinator.py',
-             'before': '        self,\n'
-                       '        block_hashes: list[BlockHash],\n'
-                       '        max_cache_hit_length: int,\n'
-                       '    ) -> tuple[tuple[list[KVCacheBlock], ...], int, int]:\n'
-                       '        hit_blocks, hit_length = '
-                       'self.single_type_managers[0].find_longest_cache_hit(\n'
-                       '            block_hashes=block_hashes,\n',
-             'after': '        self,\n'
-                      '        block_hashes: list[BlockHash],\n'
-                      '        max_cache_hit_length: int,\n'
-                      '        cache_view: PrefixCacheView,\n'
-                      '    ) -> tuple[tuple[list[KVCacheBlock], ...], int, int]:\n'
-                      '        hit_blocks, hit_length = '
-                      'self.single_type_managers[0].find_longest_cache_hit(\n'
-                      '            block_hashes=block_hashes,\n',
-             'review_before': '        self,\n'
-                              '        block_hashes: list[BlockHash],\n'
-                              '        max_cache_hit_length: int,\n'
-                              '    ) -> tuple[tuple[list[KVCacheBlock], ...], int, '
-                              'int]:\n'
-                              '        hit_blocks, hit_length = '
-                              'self.single_type_managers[0].find_longest_cache_hit(\n'
-                              '            block_hashes=block_hashes,\n',
-             'review_after': '        self,\n'
-                             '        block_hashes: list[BlockHash],\n'
-                             '        max_cache_hit_length: int,\n'
-                             '        cache_view: PrefixCacheView,\n'
-                             '    ) -> tuple[tuple[list[KVCacheBlock], ...], int, '
-                             'int]:\n'
-                             '        hit_blocks, hit_length = '
-                             'self.single_type_managers[0].find_longest_cache_hit(\n'
-                             '            block_hashes=block_hashes,\n'},
-            {'name': 'vllm/v1/core/kv_cache_coordinator.py:landmark-5',
-             'path': 'vllm/v1/core/kv_cache_coordinator.py',
-             'before': '            alignment_tokens=self.block_size,\n'
-                       '            dcp_world_size=self.dcp_world_size,\n'
-                       '            pcp_world_size=self.pcp_world_size,\n'
-                       '        )\n'
-                       '        # Single group: nothing "uncached common" -- no other '
-                       'group to lag it.\n'
-                       '        return hit_blocks, hit_length, 0\n',
-             'after': '            alignment_tokens=self.block_size,\n'
-                      '            dcp_world_size=self.dcp_world_size,\n'
-                      '            pcp_world_size=self.pcp_world_size,\n'
-                      '            cache_view=cache_view,\n'
-                      '        )\n'
-                      '        # Single group: nothing "uncached common" -- no other '
-                      'group to lag it.\n'
-                      '        return hit_blocks, hit_length, 0\n',
-             'review_before': '            alignment_tokens=self.block_size,\n'
-                              '            dcp_world_size=self.dcp_world_size,\n'
-                              '            pcp_world_size=self.pcp_world_size,\n'
-                              '        )\n'
-                              '        # Single group: nothing "uncached common" -- no '
-                              'other group to lag it.\n'
-                              '        return hit_blocks, hit_length, 0\n',
-             'review_after': '            alignment_tokens=self.block_size,\n'
-                             '            dcp_world_size=self.dcp_world_size,\n'
-                             '            pcp_world_size=self.pcp_world_size,\n'
-                             '            cache_view=cache_view,\n'
-                             '        )\n'
-                             '        # Single group: nothing "uncached common" -- no '
-                             'other group to lag it.\n'
-                             '        return hit_blocks, hit_length, 0\n'},
-            {'name': 'vllm/v1/core/kv_cache_coordinator.py:landmark-6',
-             'path': 'vllm/v1/core/kv_cache_coordinator.py',
-             'before': '        self,\n'
-                       '        block_hashes: list[BlockHash],\n'
-                       '        max_cache_hit_length: int,\n'
-                       '    ) -> tuple[tuple[list[KVCacheBlock], ...], int, int]:\n'
-                       '        """\n'
-                       '        Find the longest cache hit using an iterative '
-                       'fixed-point algorithm.\n',
-             'after': '        self,\n'
-                      '        block_hashes: list[BlockHash],\n'
-                      '        max_cache_hit_length: int,\n'
-                      '        cache_view: PrefixCacheView,\n'
-                      '    ) -> tuple[tuple[list[KVCacheBlock], ...], int, int]:\n'
-                      '        """\n'
-                      '        Find the longest cache hit using an iterative '
-                      'fixed-point algorithm.\n',
-             'review_before': '        self,\n'
-                              '        block_hashes: list[BlockHash],\n'
-                              '        max_cache_hit_length: int,\n'
-                              '    ) -> tuple[tuple[list[KVCacheBlock], ...], int, '
-                              'int]:\n'
-                              '        """\n'
-                              '        Find the longest cache hit using an iterative '
-                              'fixed-point algorithm.\n',
-             'review_after': '        self,\n'
-                             '        block_hashes: list[BlockHash],\n'
-                             '        max_cache_hit_length: int,\n'
-                             '        cache_view: PrefixCacheView,\n'
-                             '    ) -> tuple[tuple[list[KVCacheBlock], ...], int, '
-                             'int]:\n'
-                             '        """\n'
-                             '        Find the longest cache hit using an iterative '
-                             'fixed-point algorithm.\n'},
-            {'name': 'vllm/v1/core/kv_cache_coordinator.py:landmark-7',
-             'path': 'vllm/v1/core/kv_cache_coordinator.py',
-             'before': '                        if isinstance(spec, '
-                       'FullAttentionSpec)\n'
-                       '                        else 1\n'
-                       '                    ),\n'
-                       '                )\n'
-                       '                if drop_eagle_block:\n'
-                       '                    eagle_verified.add(idx)\n',
-             'after': '                        if isinstance(spec, FullAttentionSpec)\n'
-                      '                        else 1\n'
-                      '                    ),\n'
-                      '                    cache_view=cache_view,\n'
-                      '                )\n'
-                      '                if drop_eagle_block:\n'
-                      '                    eagle_verified.add(idx)\n',
-             'review_before': '                        if isinstance(spec, '
-                              'FullAttentionSpec)\n'
-                              '                        else 1\n'
-                              '                    ),\n'
-                              '                )\n'
-                              '                if drop_eagle_block:\n'
-                              '                    eagle_verified.add(idx)\n',
-             'review_after': '                        if isinstance(spec, '
-                             'FullAttentionSpec)\n'
-                             '                        else 1\n'
-                             '                    ),\n'
-                             '                    cache_view=cache_view,\n'
-                             '                )\n'
-                             '                if drop_eagle_block:\n'
-                             '                    eagle_verified.add(idx)\n'},
-            {'name': 'vllm/v1/core/kv_cache_coordinator.py:landmark-8',
-             'path': 'vllm/v1/core/kv_cache_coordinator.py',
-             'before': '        self,\n'
-                       '        block_hashes: list[BlockHash],\n'
-                       '        max_cache_hit_length: int,\n'
-                       '    ) -> tuple[tuple[list[KVCacheBlock], ...], tuple[int, '
-                       '...]]:\n'
-                       '        """Like find_longest_cache_hit but evaluates each '
-                       'group independently.\n'
-                       '\n',
-             'after': '        self,\n'
-                      '        block_hashes: list[BlockHash],\n'
-                      '        max_cache_hit_length: int,\n'
-                      '        cache_view: PrefixCacheView,\n'
-                      '    ) -> tuple[tuple[list[KVCacheBlock], ...], tuple[int, '
-                      '...]]:\n'
-                      '        """Like find_longest_cache_hit but evaluates each group '
-                      'independently.\n'
-                      '\n',
-             'review_before': '        self,\n'
-                              '        block_hashes: list[BlockHash],\n'
-                              '        max_cache_hit_length: int,\n'
-                              '    ) -> tuple[tuple[list[KVCacheBlock], ...], '
-                              'tuple[int, ...]]:\n'
-                              '        """Like find_longest_cache_hit but evaluates '
-                              'each group independently.\n'
-                              '\n',
-             'review_after': '        self,\n'
-                             '        block_hashes: list[BlockHash],\n'
-                             '        max_cache_hit_length: int,\n'
-                             '        cache_view: PrefixCacheView,\n'
-                             '    ) -> tuple[tuple[list[KVCacheBlock], ...], '
-                             'tuple[int, ...]]:\n'
-                             '        """Like find_longest_cache_hit but evaluates '
-                             'each group independently.\n'
-                             '\n'},
-            {'name': 'vllm/v1/core/kv_cache_coordinator.py:landmark-9',
-             'path': 'vllm/v1/core/kv_cache_coordinator.py',
-             'before': '                kv_cache_spec=spec,\n'
-                       '                drop_eagle_block=use_eagle,\n'
-                       '                '
-                       'alignment_tokens=self._cache_hit_alignment_tokens,\n'
-                       '            )\n'
-                       '            for gid, blks in zip(group_ids, blocks):\n'
-                       '                hit_blocks[gid] = blks\n',
-             'after': '                kv_cache_spec=spec,\n'
-                      '                drop_eagle_block=use_eagle,\n'
-                      '                '
-                      'alignment_tokens=self._cache_hit_alignment_tokens,\n'
-                      '                cache_view=cache_view,\n'
-                      '            )\n'
-                      '            for gid, blks in zip(group_ids, blocks):\n'
-                      '                hit_blocks[gid] = blks\n',
-             'review_before': '                kv_cache_spec=spec,\n'
-                              '                drop_eagle_block=use_eagle,\n'
-                              '                '
-                              'alignment_tokens=self._cache_hit_alignment_tokens,\n'
-                              '            )\n'
-                              '            for gid, blks in zip(group_ids, blocks):\n'
-                              '                hit_blocks[gid] = blks\n',
-             'review_after': '                kv_cache_spec=spec,\n'
-                             '                drop_eagle_block=use_eagle,\n'
-                             '                '
-                             'alignment_tokens=self._cache_hit_alignment_tokens,\n'
-                             '                cache_view=cache_view,\n'
-                             '            )\n'
-                             '            for gid, blks in zip(group_ids, blocks):\n'
-                             '                hit_blocks[gid] = blks\n'},
-            {'name': 'vllm/v1/core/kv_cache_manager.py:landmark-1',
-             'path': 'vllm/v1/core/kv_cache_manager.py',
-             'before': '        max_cache_hit_length = request.num_tokens - 1\n'
-                       '        computed_blocks, num_new_computed_tokens, num_uncached '
-                       '= (\n'
-                       '            self.coordinator.find_longest_cache_hit(\n'
-                       '                request.block_hashes, max_cache_hit_length\n'
-                       '            )\n'
-                       '        )\n'
-                       '\n',
-             'after': '        max_cache_hit_length = request.num_tokens - 1\n'
-                      '        computed_blocks, num_new_computed_tokens, num_uncached '
-                      '= (\n'
-                      '            self.coordinator.find_longest_cache_hit(\n'
-                      '                request.block_hashes, max_cache_hit_length,\n'
-                      '                '
-                      'cache_view=self.block_pool.prefix_cache.view(request.kv_scope),\n'
-                      '            )\n'
-                      '        )\n'
-                      '\n',
-             'review_before': '        max_cache_hit_length = request.num_tokens - 1\n'
-                              '        computed_blocks, num_new_computed_tokens, '
-                              'num_uncached = (\n'
-                              '            self.coordinator.find_longest_cache_hit(\n'
-                              '                request.block_hashes, '
-                              'max_cache_hit_length\n'
-                              '            )\n'
-                              '        )\n'
-                              '\n',
-             'review_after': '        max_cache_hit_length = request.num_tokens - 1\n'
-                             '        computed_blocks, num_new_computed_tokens, '
-                             'num_uncached = (\n'
-                             '            self.coordinator.find_longest_cache_hit(\n'
-                             '                request.block_hashes, '
-                             'max_cache_hit_length,\n'
-                             '                '
-                             'cache_view=self.block_pool.prefix_cache.view(request.kv_scope),\n'
-                             '            )\n'
-                             '        )\n'
-                             '\n'},
-            {'name': 'vllm/v1/core/kv_cache_manager.py:landmark-2',
-             'path': 'vllm/v1/core/kv_cache_manager.py',
-             'before': '\n'
-                       '        fa_group_id = coordinator.full_attention_group_id\n'
-                       '        computed, per_group_hits = '
-                       'coordinator.find_longest_cache_hit_per_group(\n'
-                       '            request.block_hashes, request.num_tokens - 1\n'
-                       '        )\n'
-                       '        if any(hit > per_group_hits[fa_group_id] for hit in '
-                       'per_group_hits):\n'
-                       '            # A lagging group hit deeper than full attention '
-                       'means its\n',
-             'after': '\n'
-                      '        fa_group_id = coordinator.full_attention_group_id\n'
-                      '        computed, per_group_hits = '
-                      'coordinator.find_longest_cache_hit_per_group(\n'
-                      '            request.block_hashes, request.num_tokens - 1,\n'
-                      '            '
-                      'cache_view=self.block_pool.prefix_cache.view(request.kv_scope),\n'
-                      '        )\n'
-                      '        if any(hit > per_group_hits[fa_group_id] for hit in '
-                      'per_group_hits):\n'
-                      '            # A lagging group hit deeper than full attention '
-                      'means its\n',
-             'review_before': '\n'
-                              '        fa_group_id = '
-                              'coordinator.full_attention_group_id\n'
-                              '        computed, per_group_hits = '
-                              'coordinator.find_longest_cache_hit_per_group(\n'
-                              '            request.block_hashes, request.num_tokens - '
-                              '1\n'
-                              '        )\n'
-                              '        if any(hit > per_group_hits[fa_group_id] for '
-                              'hit in per_group_hits):\n'
-                              '            # A lagging group hit deeper than full '
-                              'attention means its\n',
-             'review_after': '\n'
-                             '        fa_group_id = '
-                             'coordinator.full_attention_group_id\n'
-                             '        computed, per_group_hits = '
-                             'coordinator.find_longest_cache_hit_per_group(\n'
-                             '            request.block_hashes, request.num_tokens - '
-                             '1,\n'
-                             '            '
-                             'cache_view=self.block_pool.prefix_cache.view(request.kv_scope),\n'
-                             '        )\n'
-                             '        if any(hit > per_group_hits[fa_group_id] for hit '
-                             'in per_group_hits):\n'
-                             '            # A lagging group hit deeper than full '
-                             'attention means its\n'},
-            {'name': 'vllm/v1/core/kv_cache_manager.py:landmark-3',
-             'path': 'vllm/v1/core/kv_cache_manager.py',
-             'before': '                '
-                       'num_external_computed_tokens=num_external_computed_tokens,\n'
-                       '            )\n'
-                       '\n'
-                       '        new_blocks = self.coordinator.allocate_new_blocks(\n'
-                       '            request.request_id,\n'
-                       '            num_tokens_need_slot,\n',
-             'after': '                '
-                      'num_external_computed_tokens=num_external_computed_tokens,\n'
-                      '            )\n'
-                      '\n'
-                      '        self.block_pool.acquire_cached_blocks(\n'
-                      '            request, new_computed_block_list, '
-                      'num_local_computed_tokens\n'
-                      '        )\n'
-                      '\n'
-                      '        new_blocks = self.coordinator.allocate_new_blocks(\n'
-                      '            request.request_id,\n'
-                      '            num_tokens_need_slot,\n',
-             'review_before': '                '
-                              'num_external_computed_tokens=num_external_computed_tokens,\n'
-                              '            )\n'
-                              '\n'
-                              '        new_blocks = '
-                              'self.coordinator.allocate_new_blocks(\n'
-                              '            request.request_id,\n'
-                              '            num_tokens_need_slot,\n',
-             'review_after': '                '
-                             'num_external_computed_tokens=num_external_computed_tokens,\n'
-                             '            )\n'
-                             '\n'
-                             '        self.block_pool.acquire_cached_blocks(\n'
-                             '            request, new_computed_block_list, '
-                             'num_local_computed_tokens\n'
-                             '        )\n'
-                             '\n'
-                             '        new_blocks = '
-                             'self.coordinator.allocate_new_blocks(\n'
-                             '            request.request_id,\n'
-                             '            num_tokens_need_slot,\n'},
+                             '            block,\n'},
             {'name': 'vllm/v1/core/kv_cache_utils.py:landmark-1',
              'path': 'vllm/v1/core/kv_cache_utils.py',
              'before': '    )\n'
@@ -34151,669 +30170,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '            )\n'
                              '        )\n'
                              '\n'},
-            {'name': 'vllm/v1/core/prefix_cache.py:landmark-1',
-             'path': 'vllm/v1/core/prefix_cache.py',
-             'before': '',
-             'after': '# SPDX-License-Identifier: Apache-2.0\n'
-                      '# SPDX-FileCopyrightText: Copyright contributors to the vLLM '
-                      'project\n'
-                      '"""Cache membership shared by the scheduler\'s physical KV '
-                      'tiers.\n'
-                      '\n'
-                      'Keys describe KV content, including its cache group. Agent IDs '
-                      'are opaque.\n'
-                      'An agent with no resident membership can acquire an initial '
-                      'shared prefix;\n'
-                      'subsequent matching uses the content it acquired or computed '
-                      'itself.\n'
-                      '"""\n'
-                      '\n'
-                      'from collections import OrderedDict\n'
-                      'from collections.abc import Callable, Collection, Hashable, '
-                      'Mapping\n'
-                      'from dataclasses import dataclass, field\n'
-                      '\n'
-                      '\n'
-                      'def cache_content_keys(\n'
-                      '    block_hashes: Collection[bytes],\n'
-                      '    group_id: int,\n'
-                      ') -> tuple[bytes, ...]:\n'
-                      '    """Name the hash-sized data units (or recurrent states) in '
-                      'a cache entry."""\n'
-                      '    suffix = group_id.to_bytes(4, "big")\n'
-                      '    return tuple(block_hash + suffix for block_hash in '
-                      'block_hashes)\n'
-                      '\n'
-                      '\n'
-                      '@dataclass(frozen=True, slots=True)\n'
-                      'class PrefixCacheView:\n'
-                      '    """A stable membership view for one complete prefix '
-                      'lookup."""\n'
-                      '\n'
-                      '    keys: frozenset[bytes] | None\n'
-                      '\n'
-                      '    def permits(self, key: bytes) -> bool:\n'
-                      '        return self.keys is None or key in self.keys\n'
-                      '\n'
-                      '    def allows(self, content: Collection[bytes]) -> bool:\n'
-                      '        return self.keys is None or '
-                      'self.keys.issuperset(content)\n'
-                      '\n'
-                      '\n'
-                      '@dataclass(slots=True)\n'
-                      'class ResidentPrefix:\n'
-                      '    # Storage-to-storage transfers may arrive before a '
-                      'generation request\n'
-                      '    # supplies the hash chain describing their contained data.\n'
-                      '    content: tuple[bytes, ...] | None\n'
-                      '    copies: int = 1\n'
-                      '    # None means the complete entry. Only a shortened selection '
-                      'needs a set.\n'
-                      '    agents: dict[str, frozenset[bytes] | None] = '
-                      'field(default_factory=dict)\n'
-                      '\n'
-                      '\n'
-                      '@dataclass(slots=True)\n'
-                      'class PrefixCacheTier:\n'
-                      '    capacity: int\n'
-                      '    on_release: Callable[[str], None]\n'
-                      '    entries: dict[bytes, ResidentPrefix] = '
-                      'field(default_factory=dict)\n'
-                      '    agents: OrderedDict[str, set[bytes]] = '
-                      'field(default_factory=OrderedDict)\n'
-                      '    references: int = 0\n'
-                      '\n'
-                      '\n'
-                      'class PrefixCacheIndex:\n'
-                      '    """Track acquired content while any of its physical tier '
-                      'copies exists.\n'
-                      '\n'
-                      '    A view is read-only. Looking up candidate blocks never '
-                      'acquires them;\n'
-                      '    acquisition follows selection of a usable prefix, or '
-                      'computation of new\n'
-                      '    KV. This prevents an early group hit from changing the '
-                      'remaining lookup.\n'
-                      '    """\n'
-                      '\n'
-                      '    def __init__(self) -> None:\n'
-                      '        self._tiers: dict[Hashable, PrefixCacheTier] = {}\n'
-                      '        self._owned: dict[str, int] = {}\n'
-                      '\n'
-                      '    def register_tier(\n'
-                      '        self, tier: Hashable, capacity: int,\n'
-                      '        on_release: Callable[[str], None] = lambda _agent: '
-                      'None,\n'
-                      '    ) -> None:\n'
-                      '        """Bound cached agent records by the tier\'s '
-                      'cache-entry capacity."""\n'
-                      '        assert tier not in self._tiers and capacity >= 0\n'
-                      '        self._tiers[tier] = PrefixCacheTier(capacity, '
-                      'on_release)\n'
-                      '\n'
-                      '    def set_capacity(self, tier: Hashable, capacity: int) -> '
-                      'None:\n'
-                      '        state = self._tiers[tier]\n'
-                      '        state.capacity = capacity\n'
-                      '        self._make_room(tier, None)\n'
-                      '\n'
-                      '    def _make_room(\n'
-                      '        self, tier: Hashable, acquiring: str | None,\n'
-                      '    ) -> None:\n'
-                      '        state = self._tiers[tier]\n'
-                      '        added = int(acquiring is not None and acquiring not in '
-                      'state.agents)\n'
-                      '        for agent_id in tuple(state.agents):\n'
-                      '            if len(state.agents) + added <= state.capacity:\n'
-                      '                return\n'
-                      '            if agent_id != acquiring:\n'
-                      '                self.release_agent(tier, agent_id)\n'
-                      '        assert len(state.agents) + added <= state.capacity\n'
-                      '\n'
-                      '    def view(self, agent_id: str) -> PrefixCacheView:\n'
-                      '        if agent_id not in self._owned:\n'
-                      '            return PrefixCacheView(None)\n'
-                      '        owned: set[bytes] = set()\n'
-                      '        for state in self._tiers.values():\n'
-                      '            for key in state.agents.get(agent_id, ()):\n'
-                      '                entry = state.entries[key]\n'
-                      '                assert entry.content is not None\n'
-                      '                selected = entry.agents[agent_id]\n'
-                      '                owned.update(entry.content if selected is None '
-                      'else selected)\n'
-                      '        assert owned\n'
-                      '        return PrefixCacheView(frozenset(owned))\n'
-                      '\n'
-                      '    def content(self, tier: Hashable, key: bytes) -> '
-                      'tuple[bytes, ...]:\n'
-                      '        content = self._tiers[tier].entries[key].content\n'
-                      '        assert content is not None\n'
-                      '        return content\n'
-                      '\n'
-                      '    def describe(self, tier: Hashable, key: bytes, content: '
-                      'tuple[bytes, ...]) -> None:\n'
-                      '        entry = self._tiers[tier].entries[key]\n'
-                      '        assert content and key in content and len(content) == '
-                      'len(set(content))\n'
-                      '        assert entry.content is None or entry.content == '
-                      'content\n'
-                      '        entry.content = content\n'
-                      '\n'
-                      '    def extend_content(\n'
-                      '        self, tier: Hashable, key: bytes, content: tuple[bytes, '
-                      '...],\n'
-                      '    ) -> None:\n'
-                      '        """Publish a filled CPU chunk without expanding its '
-                      'existing users."""\n'
-                      '        entry = self._tiers[tier].entries[key]\n'
-                      '        previous = entry.content\n'
-                      '        assert previous is not None and entry.copies == 1\n'
-                      '        assert set(previous).issubset(content)\n'
-                      '        if previous == content:\n'
-                      '            return\n'
-                      '        acquired = frozenset(previous)\n'
-                      '        for agent_id, selected in entry.agents.items():\n'
-                      '            if selected is None:\n'
-                      '                entry.agents[agent_id] = acquired\n'
-                      '        entry.content = content\n'
-                      '\n'
-                      '    def insert(\n'
-                      '        self, tier: Hashable, key: bytes, content: tuple[bytes, '
-                      '...] | None\n'
-                      '    ) -> None:\n'
-                      '        entries = self._tiers[tier].entries\n'
-                      '        entry = entries.get(key)\n'
-                      '        if entry is None:\n'
-                      '            entries[key] = ResidentPrefix(None)\n'
-                      '        else:\n'
-                      '            entry.copies += 1\n'
-                      '        if content is not None:\n'
-                      '            self.describe(tier, key, content)\n'
-                      '\n'
-                      '    def acquire(\n'
-                      '        self, tier: Hashable, agent_id: str, keys: '
-                      'Collection[bytes],\n'
-                      '        selection: Mapping[bytes, Collection[bytes]] | None = '
-                      'None,\n'
-                      '    ) -> None:\n'
-                      '        state = self._tiers[tier]\n'
-                      '        entries = state.entries\n'
-                      '        if not keys:\n'
-                      '            return\n'
-                      '        added = set(keys) - state.agents.get(agent_id, set())\n'
-                      '        assert added <= entries.keys()\n'
-                      '        self._make_room(tier, agent_id)\n'
-                      '        for key in set(keys):\n'
-                      '            entry = entries[key]\n'
-                      '            assert entry.content is not None\n'
-                      '            if selection is None:\n'
-                      '                entry.agents[agent_id] = None\n'
-                      '            else:\n'
-                      '                selected = frozenset(selection[key])\n'
-                      '                assert selected and '
-                      'selected.issubset(entry.content)\n'
-                      '                if agent_id in entry.agents:\n'
-                      '                    previous = entry.agents[agent_id]\n'
-                      '                    if previous is None:\n'
-                      '                        continue\n'
-                      '                    selected |= previous\n'
-                      '                entry.agents[agent_id] = (\n'
-                      '                    None if len(selected) == len(entry.content) '
-                      'else selected\n'
-                      '                )\n'
-                      '        if keys:\n'
-                      '            state.agents.setdefault(agent_id, '
-                      'set()).update(added)\n'
-                      '            state.agents.move_to_end(agent_id)\n'
-                      '        state.references += len(added)\n'
-                      '        self._owned[agent_id] = self._owned.get(agent_id, 0) + '
-                      'len(added)\n'
-                      '\n'
-                      '    def _release(self, agent_id: str) -> None:\n'
-                      '        self._owned[agent_id] -= 1\n'
-                      '        if not self._owned[agent_id]:\n'
-                      '            del self._owned[agent_id]\n'
-                      '\n'
-                      '    def remove(self, tier: Hashable, key: bytes) -> None:\n'
-                      '        state = self._tiers[tier]\n'
-                      '        entries = state.entries\n'
-                      '        entry = entries[key]\n'
-                      '        entry.copies -= 1\n'
-                      '        if entry.copies:\n'
-                      '            return\n'
-                      '        for agent_id in entry.agents:\n'
-                      '            self._release(agent_id)\n'
-                      '            state.agents[agent_id].remove(key)\n'
-                      '            if not state.agents[agent_id]:\n'
-                      '                del state.agents[agent_id]\n'
-                      '        state.references -= len(entry.agents)\n'
-                      '        del entries[key]\n'
-                      '\n'
-                      '    def release_agent(self, tier: Hashable, agent_id: str) -> '
-                      'None:\n'
-                      '        """Release this agent\'s tier membership without '
-                      'changing another\'s."""\n'
-                      '        state = self._tiers[tier]\n'
-                      '        keys = state.agents.pop(agent_id, set())\n'
-                      '        for key in keys:\n'
-                      '            del state.entries[key].agents[agent_id]\n'
-                      '            self._release(agent_id)\n'
-                      '        state.references -= len(keys)\n'
-                      '        state.on_release(agent_id)\n'
-                      '\n'
-                      '    def copy_membership(\n'
-                      '        self, source: Hashable, destination: Hashable, key: '
-                      'bytes,\n'
-                      '    ) -> None:\n'
-                      '        """A physical tier copy preserves the source content\'s '
-                      'acquired users."""\n'
-                      '        for agent_id, content in '
-                      'tuple(self._tiers[source].entries[key].agents.items()):\n'
-                      '            self.acquire(\n'
-                      '                destination, agent_id, [key],\n'
-                      '                selection=None if content is None else {key: '
-                      'content},\n'
-                      '            )\n'
-                      '\n'
-                      '    def copy_content_memberships(\n'
-                      '        self, destination: Hashable, keys: Collection[bytes],\n'
-                      '    ) -> None:\n'
-                      '        """Preserve acquired data while coalescing physical '
-                      'cache entries.\n'
-                      '\n'
-                      '        CPU chunks can contain several GPU entries, including '
-                      'shortened\n'
-                      '        selections. Collect the complete transfer batch before '
-                      'acquiring any\n'
-                      '        membership: metadata eviction may change the source '
-                      'memberships too.\n'
-                      '        """\n'
-                      '        if not keys:\n'
-                      '            return\n'
-                      '        by_unit: dict[bytes, set[bytes]] = {}\n'
-                      '        for key in keys:\n'
-                      '            for unit in self.content(destination, key):\n'
-                      '                by_unit.setdefault(unit, set()).add(key)\n'
-                      '        inherited: dict[str, dict[bytes, set[bytes]]] = {}\n'
-                      '        for state in self._tiers.values():\n'
-                      '            for entry in state.entries.values():\n'
-                      '                if entry.content is None or not entry.agents:\n'
-                      '                    continue\n'
-                      '                copied = by_unit.keys() & entry.content\n'
-                      '                if not copied:\n'
-                      '                    continue\n'
-                      '                for agent, selected in entry.agents.items():\n'
-                      '                    units = copied if selected is None else '
-                      'copied & selected\n'
-                      '                    if not units:\n'
-                      '                        continue\n'
-                      '                    entries = inherited.setdefault(agent, {})\n'
-                      '                    for unit in units:\n'
-                      '                        for key in by_unit[unit]:\n'
-                      '                            entries.setdefault(key, '
-                      'set()).add(unit)\n'
-                      '        for agent, entries in inherited.items():\n'
-                      '            self.acquire(destination, agent, entries, '
-                      'selection=entries)\n'
-                      '\n'
-                      '    def reset(self, tier: Hashable) -> None:\n'
-                      '        state = self._tiers[tier]\n'
-                      '        for agent_id in tuple(state.agents):\n'
-                      '            self.release_agent(tier, agent_id)\n'
-                      '        state.entries.clear()\n',
-             'review_before': '',
-             'review_after': '# SPDX-License-Identifier: Apache-2.0\n'
-                             '# SPDX-FileCopyrightText: Copyright contributors to the '
-                             'vLLM project\n'
-                             '"""Cache membership shared by the scheduler\'s physical '
-                             'KV tiers.\n'
-                             '\n'
-                             'Keys describe KV content, including its cache group. '
-                             'Agent IDs are opaque.\n'
-                             'An agent with no resident membership can acquire an '
-                             'initial shared prefix;\n'
-                             'subsequent matching uses the content it acquired or '
-                             'computed itself.\n'
-                             '"""\n'
-                             '\n'
-                             'from collections import OrderedDict\n'
-                             'from collections.abc import Callable, Collection, '
-                             'Hashable, Mapping\n'
-                             'from dataclasses import dataclass, field\n'
-                             '\n'
-                             '\n'
-                             'def cache_content_keys(\n'
-                             '    block_hashes: Collection[bytes],\n'
-                             '    group_id: int,\n'
-                             ') -> tuple[bytes, ...]:\n'
-                             '    """Name the hash-sized data units (or recurrent '
-                             'states) in a cache entry."""\n'
-                             '    suffix = group_id.to_bytes(4, "big")\n'
-                             '    return tuple(block_hash + suffix for block_hash in '
-                             'block_hashes)\n'
-                             '\n'
-                             '\n'
-                             '@dataclass(frozen=True, slots=True)\n'
-                             'class PrefixCacheView:\n'
-                             '    """A stable membership view for one complete prefix '
-                             'lookup."""\n'
-                             '\n'
-                             '    keys: frozenset[bytes] | None\n'
-                             '\n'
-                             '    def permits(self, key: bytes) -> bool:\n'
-                             '        return self.keys is None or key in self.keys\n'
-                             '\n'
-                             '    def allows(self, content: Collection[bytes]) -> '
-                             'bool:\n'
-                             '        return self.keys is None or '
-                             'self.keys.issuperset(content)\n'
-                             '\n'
-                             '\n'
-                             '@dataclass(slots=True)\n'
-                             'class ResidentPrefix:\n'
-                             '    # Storage-to-storage transfers may arrive before a '
-                             'generation request\n'
-                             '    # supplies the hash chain describing their contained '
-                             'data.\n'
-                             '    content: tuple[bytes, ...] | None\n'
-                             '    copies: int = 1\n'
-                             '    # None means the complete entry. Only a shortened '
-                             'selection needs a set.\n'
-                             '    agents: dict[str, frozenset[bytes] | None] = '
-                             'field(default_factory=dict)\n'
-                             '\n'
-                             '\n'
-                             '@dataclass(slots=True)\n'
-                             'class PrefixCacheTier:\n'
-                             '    capacity: int\n'
-                             '    on_release: Callable[[str], None]\n'
-                             '    entries: dict[bytes, ResidentPrefix] = '
-                             'field(default_factory=dict)\n'
-                             '    agents: OrderedDict[str, set[bytes]] = '
-                             'field(default_factory=OrderedDict)\n'
-                             '    references: int = 0\n'
-                             '\n'
-                             '\n'
-                             'class PrefixCacheIndex:\n'
-                             '    """Track acquired content while any of its physical '
-                             'tier copies exists.\n'
-                             '\n'
-                             '    A view is read-only. Looking up candidate blocks '
-                             'never acquires them;\n'
-                             '    acquisition follows selection of a usable prefix, or '
-                             'computation of new\n'
-                             '    KV. This prevents an early group hit from changing '
-                             'the remaining lookup.\n'
-                             '    """\n'
-                             '\n'
-                             '    def __init__(self) -> None:\n'
-                             '        self._tiers: dict[Hashable, PrefixCacheTier] = '
-                             '{}\n'
-                             '        self._owned: dict[str, int] = {}\n'
-                             '\n'
-                             '    def register_tier(\n'
-                             '        self, tier: Hashable, capacity: int,\n'
-                             '        on_release: Callable[[str], None] = lambda '
-                             '_agent: None,\n'
-                             '    ) -> None:\n'
-                             '        """Bound cached agent records by the tier\'s '
-                             'cache-entry capacity."""\n'
-                             '        assert tier not in self._tiers and capacity >= '
-                             '0\n'
-                             '        self._tiers[tier] = PrefixCacheTier(capacity, '
-                             'on_release)\n'
-                             '\n'
-                             '    def set_capacity(self, tier: Hashable, capacity: '
-                             'int) -> None:\n'
-                             '        state = self._tiers[tier]\n'
-                             '        state.capacity = capacity\n'
-                             '        self._make_room(tier, None)\n'
-                             '\n'
-                             '    def _make_room(\n'
-                             '        self, tier: Hashable, acquiring: str | None,\n'
-                             '    ) -> None:\n'
-                             '        state = self._tiers[tier]\n'
-                             '        added = int(acquiring is not None and acquiring '
-                             'not in state.agents)\n'
-                             '        for agent_id in tuple(state.agents):\n'
-                             '            if len(state.agents) + added <= '
-                             'state.capacity:\n'
-                             '                return\n'
-                             '            if agent_id != acquiring:\n'
-                             '                self.release_agent(tier, agent_id)\n'
-                             '        assert len(state.agents) + added <= '
-                             'state.capacity\n'
-                             '\n'
-                             '    def view(self, agent_id: str) -> PrefixCacheView:\n'
-                             '        if agent_id not in self._owned:\n'
-                             '            return PrefixCacheView(None)\n'
-                             '        owned: set[bytes] = set()\n'
-                             '        for state in self._tiers.values():\n'
-                             '            for key in state.agents.get(agent_id, ()):\n'
-                             '                entry = state.entries[key]\n'
-                             '                assert entry.content is not None\n'
-                             '                selected = entry.agents[agent_id]\n'
-                             '                owned.update(entry.content if selected '
-                             'is None else selected)\n'
-                             '        assert owned\n'
-                             '        return PrefixCacheView(frozenset(owned))\n'
-                             '\n'
-                             '    def content(self, tier: Hashable, key: bytes) -> '
-                             'tuple[bytes, ...]:\n'
-                             '        content = '
-                             'self._tiers[tier].entries[key].content\n'
-                             '        assert content is not None\n'
-                             '        return content\n'
-                             '\n'
-                             '    def describe(self, tier: Hashable, key: bytes, '
-                             'content: tuple[bytes, ...]) -> None:\n'
-                             '        entry = self._tiers[tier].entries[key]\n'
-                             '        assert content and key in content and '
-                             'len(content) == len(set(content))\n'
-                             '        assert entry.content is None or entry.content == '
-                             'content\n'
-                             '        entry.content = content\n'
-                             '\n'
-                             '    def extend_content(\n'
-                             '        self, tier: Hashable, key: bytes, content: '
-                             'tuple[bytes, ...],\n'
-                             '    ) -> None:\n'
-                             '        """Publish a filled CPU chunk without expanding '
-                             'its existing users."""\n'
-                             '        entry = self._tiers[tier].entries[key]\n'
-                             '        previous = entry.content\n'
-                             '        assert previous is not None and entry.copies == '
-                             '1\n'
-                             '        assert set(previous).issubset(content)\n'
-                             '        if previous == content:\n'
-                             '            return\n'
-                             '        acquired = frozenset(previous)\n'
-                             '        for agent_id, selected in entry.agents.items():\n'
-                             '            if selected is None:\n'
-                             '                entry.agents[agent_id] = acquired\n'
-                             '        entry.content = content\n'
-                             '\n'
-                             '    def insert(\n'
-                             '        self, tier: Hashable, key: bytes, content: '
-                             'tuple[bytes, ...] | None\n'
-                             '    ) -> None:\n'
-                             '        entries = self._tiers[tier].entries\n'
-                             '        entry = entries.get(key)\n'
-                             '        if entry is None:\n'
-                             '            entries[key] = ResidentPrefix(None)\n'
-                             '        else:\n'
-                             '            entry.copies += 1\n'
-                             '        if content is not None:\n'
-                             '            self.describe(tier, key, content)\n'
-                             '\n'
-                             '    def acquire(\n'
-                             '        self, tier: Hashable, agent_id: str, keys: '
-                             'Collection[bytes],\n'
-                             '        selection: Mapping[bytes, Collection[bytes]] | '
-                             'None = None,\n'
-                             '    ) -> None:\n'
-                             '        state = self._tiers[tier]\n'
-                             '        entries = state.entries\n'
-                             '        if not keys:\n'
-                             '            return\n'
-                             '        added = set(keys) - state.agents.get(agent_id, '
-                             'set())\n'
-                             '        assert added <= entries.keys()\n'
-                             '        self._make_room(tier, agent_id)\n'
-                             '        for key in set(keys):\n'
-                             '            entry = entries[key]\n'
-                             '            assert entry.content is not None\n'
-                             '            if selection is None:\n'
-                             '                entry.agents[agent_id] = None\n'
-                             '            else:\n'
-                             '                selected = frozenset(selection[key])\n'
-                             '                assert selected and '
-                             'selected.issubset(entry.content)\n'
-                             '                if agent_id in entry.agents:\n'
-                             '                    previous = entry.agents[agent_id]\n'
-                             '                    if previous is None:\n'
-                             '                        continue\n'
-                             '                    selected |= previous\n'
-                             '                entry.agents[agent_id] = (\n'
-                             '                    None if len(selected) == '
-                             'len(entry.content) else selected\n'
-                             '                )\n'
-                             '        if keys:\n'
-                             '            state.agents.setdefault(agent_id, '
-                             'set()).update(added)\n'
-                             '            state.agents.move_to_end(agent_id)\n'
-                             '        state.references += len(added)\n'
-                             '        self._owned[agent_id] = '
-                             'self._owned.get(agent_id, 0) + len(added)\n'
-                             '\n'
-                             '    def _release(self, agent_id: str) -> None:\n'
-                             '        self._owned[agent_id] -= 1\n'
-                             '        if not self._owned[agent_id]:\n'
-                             '            del self._owned[agent_id]\n'
-                             '\n'
-                             '    def remove(self, tier: Hashable, key: bytes) -> '
-                             'None:\n'
-                             '        state = self._tiers[tier]\n'
-                             '        entries = state.entries\n'
-                             '        entry = entries[key]\n'
-                             '        entry.copies -= 1\n'
-                             '        if entry.copies:\n'
-                             '            return\n'
-                             '        for agent_id in entry.agents:\n'
-                             '            self._release(agent_id)\n'
-                             '            state.agents[agent_id].remove(key)\n'
-                             '            if not state.agents[agent_id]:\n'
-                             '                del state.agents[agent_id]\n'
-                             '        state.references -= len(entry.agents)\n'
-                             '        del entries[key]\n'
-                             '\n'
-                             '    def release_agent(self, tier: Hashable, agent_id: '
-                             'str) -> None:\n'
-                             '        """Release this agent\'s tier membership without '
-                             'changing another\'s."""\n'
-                             '        state = self._tiers[tier]\n'
-                             '        keys = state.agents.pop(agent_id, set())\n'
-                             '        for key in keys:\n'
-                             '            del state.entries[key].agents[agent_id]\n'
-                             '            self._release(agent_id)\n'
-                             '        state.references -= len(keys)\n'
-                             '        state.on_release(agent_id)\n'
-                             '\n'
-                             '    def copy_membership(\n'
-                             '        self, source: Hashable, destination: Hashable, '
-                             'key: bytes,\n'
-                             '    ) -> None:\n'
-                             '        """A physical tier copy preserves the source '
-                             'content\'s acquired users."""\n'
-                             '        for agent_id, content in '
-                             'tuple(self._tiers[source].entries[key].agents.items()):\n'
-                             '            self.acquire(\n'
-                             '                destination, agent_id, [key],\n'
-                             '                selection=None if content is None else '
-                             '{key: content},\n'
-                             '            )\n'
-                             '\n'
-                             '    def copy_content_memberships(\n'
-                             '        self, destination: Hashable, keys: '
-                             'Collection[bytes],\n'
-                             '    ) -> None:\n'
-                             '        """Preserve acquired data while coalescing '
-                             'physical cache entries.\n'
-                             '\n'
-                             '        CPU chunks can contain several GPU entries, '
-                             'including shortened\n'
-                             '        selections. Collect the complete transfer batch '
-                             'before acquiring any\n'
-                             '        membership: metadata eviction may change the '
-                             'source memberships too.\n'
-                             '        """\n'
-                             '        if not keys:\n'
-                             '            return\n'
-                             '        by_unit: dict[bytes, set[bytes]] = {}\n'
-                             '        for key in keys:\n'
-                             '            for unit in self.content(destination, key):\n'
-                             '                by_unit.setdefault(unit, '
-                             'set()).add(key)\n'
-                             '        inherited: dict[str, dict[bytes, set[bytes]]] = '
-                             '{}\n'
-                             '        for state in self._tiers.values():\n'
-                             '            for entry in state.entries.values():\n'
-                             '                if entry.content is None or not '
-                             'entry.agents:\n'
-                             '                    continue\n'
-                             '                copied = by_unit.keys() & entry.content\n'
-                             '                if not copied:\n'
-                             '                    continue\n'
-                             '                for agent, selected in '
-                             'entry.agents.items():\n'
-                             '                    units = copied if selected is None '
-                             'else copied & selected\n'
-                             '                    if not units:\n'
-                             '                        continue\n'
-                             '                    entries = '
-                             'inherited.setdefault(agent, {})\n'
-                             '                    for unit in units:\n'
-                             '                        for key in by_unit[unit]:\n'
-                             '                            entries.setdefault(key, '
-                             'set()).add(unit)\n'
-                             '        for agent, entries in inherited.items():\n'
-                             '            self.acquire(destination, agent, entries, '
-                             'selection=entries)\n'
-                             '\n'
-                             '    def reset(self, tier: Hashable) -> None:\n'
-                             '        state = self._tiers[tier]\n'
-                             '        for agent_id in tuple(state.agents):\n'
-                             '            self.release_agent(tier, agent_id)\n'
-                             '        state.entries.clear()\n'},
             {'name': 'vllm/v1/core/single_type_kv_cache_manager.py:landmark-1',
-             'path': 'vllm/v1/core/single_type_kv_cache_manager.py',
-             'before': '\n'
-                       'from vllm.utils.math_utils import cdiv\n'
-                       'from vllm.v1.core.block_pool import BlockPool\n'
-                       'from vllm.v1.core.kv_cache_utils import (\n'
-                       '    BlockHashList,\n'
-                       '    BlockHashListWithBlockSize,\n',
-             'after': '\n'
-                      'from vllm.utils.math_utils import cdiv\n'
-                      'from vllm.v1.core.block_pool import BlockPool\n'
-                      'from vllm.v1.core.prefix_cache import PrefixCacheView\n'
-                      'from vllm.v1.core.kv_cache_utils import (\n'
-                      '    BlockHashList,\n'
-                      '    BlockHashListWithBlockSize,\n',
-             'review_before': '\n'
-                              'from vllm.utils.math_utils import cdiv\n'
-                              'from vllm.v1.core.block_pool import BlockPool\n'
-                              'from vllm.v1.core.kv_cache_utils import (\n'
-                              '    BlockHashList,\n'
-                              '    BlockHashListWithBlockSize,\n',
-             'review_after': '\n'
-                             'from vllm.utils.math_utils import cdiv\n'
-                             'from vllm.v1.core.block_pool import BlockPool\n'
-                             'from vllm.v1.core.prefix_cache import PrefixCacheView\n'
-                             'from vllm.v1.core.kv_cache_utils import (\n'
-                             '    BlockHashList,\n'
-                             '    BlockHashListWithBlockSize,\n'},
-            {'name': 'vllm/v1/core/single_type_kv_cache_manager.py:landmark-2',
              'path': 'vllm/v1/core/single_type_kv_cache_manager.py',
              'before': '            block_size=self.block_size,\n'
                        '            kv_cache_group_id=self.kv_cache_group_id,\n'
@@ -34847,192 +30204,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '\n'
                              '        self.num_cached_block[request.request_id] = '
                              'num_full_blocks\n'},
-            {'name': 'vllm/v1/core/single_type_kv_cache_manager.py:landmark-3',
-             'path': 'vllm/v1/core/single_type_kv_cache_manager.py',
-             'before': '    @abstractmethod\n'
-                       '    def find_longest_cache_hit(\n'
-                       '        cls,\n'
-                       '        block_hashes: BlockHashList,\n'
-                       '        max_length: int,\n'
-                       '        kv_cache_group_ids: list[int],\n'
-                       '        block_pool: BlockPool,\n'
-                       '        kv_cache_spec: KVCacheSpec,\n'
-                       '        drop_eagle_block: bool,\n'
-                       '        alignment_tokens: int,\n'
-                       '        dcp_world_size: int = 1,\n'
-                       '        pcp_world_size: int = 1,\n'
-                       '    ) -> tuple[tuple[list[KVCacheBlock], ...], int]:\n'
-                       '        """\n',
-             'after': '    @abstractmethod\n'
-                      '    def find_longest_cache_hit(\n'
-                      '        cls,\n'
-                      '        block_hashes: BlockHashList,\n'
-                      '        max_length: int,\n'
-                      '        kv_cache_group_ids: list[int],\n'
-                      '        block_pool: BlockPool,\n'
-                      '        cache_view: PrefixCacheView,\n'
-                      '        kv_cache_spec: KVCacheSpec,\n'
-                      '        drop_eagle_block: bool,\n'
-                      '        alignment_tokens: int,\n'
-                      '        dcp_world_size: int = 1,\n'
-                      '        pcp_world_size: int = 1,\n'
-                      '    ) -> tuple[tuple[list[KVCacheBlock], ...], int]:\n'
-                      '        """\n',
-             'review_before': '        max_length: int,\n'
-                              '        kv_cache_group_ids: list[int],\n'
-                              '        block_pool: BlockPool,\n'
-                              '        kv_cache_spec: KVCacheSpec,\n'
-                              '        drop_eagle_block: bool,\n'
-                              '        alignment_tokens: int,\n',
-             'review_after': '        max_length: int,\n'
-                             '        kv_cache_group_ids: list[int],\n'
-                             '        block_pool: BlockPool,\n'
-                             '        cache_view: PrefixCacheView,\n'
-                             '        kv_cache_spec: KVCacheSpec,\n'
-                             '        drop_eagle_block: bool,\n'
-                             '        alignment_tokens: int,\n'},
-            {'name': 'vllm/v1/core/single_type_kv_cache_manager.py:landmark-4',
-             'path': 'vllm/v1/core/single_type_kv_cache_manager.py',
-             'before': '    @classmethod\n'
-                       '    def find_longest_cache_hit(\n'
-                       '        cls,\n'
-                       '        block_hashes: BlockHashList,\n'
-                       '        max_length: int,\n'
-                       '        kv_cache_group_ids: list[int],\n'
-                       '        block_pool: BlockPool,\n'
-                       '        kv_cache_spec: KVCacheSpec,\n'
-                       '        drop_eagle_block: bool,\n'
-                       '        alignment_tokens: int,\n'
-                       '        dcp_world_size: int = 1,\n'
-                       '        pcp_world_size: int = 1,\n'
-                       '    ) -> tuple[tuple[list[KVCacheBlock], ...], int]:\n'
-                       '        assert isinstance(\n',
-             'after': '    @classmethod\n'
-                      '    def find_longest_cache_hit(\n'
-                      '        cls,\n'
-                      '        block_hashes: BlockHashList,\n'
-                      '        max_length: int,\n'
-                      '        kv_cache_group_ids: list[int],\n'
-                      '        block_pool: BlockPool,\n'
-                      '        cache_view: PrefixCacheView,\n'
-                      '        kv_cache_spec: KVCacheSpec,\n'
-                      '        drop_eagle_block: bool,\n'
-                      '        alignment_tokens: int,\n'
-                      '        dcp_world_size: int = 1,\n'
-                      '        pcp_world_size: int = 1,\n'
-                      '    ) -> tuple[tuple[list[KVCacheBlock], ...], int]:\n'
-                      '        assert isinstance(\n',
-             'review_before': '        max_length: int,\n'
-                              '        kv_cache_group_ids: list[int],\n'
-                              '        block_pool: BlockPool,\n'
-                              '        kv_cache_spec: KVCacheSpec,\n'
-                              '        drop_eagle_block: bool,\n'
-                              '        alignment_tokens: int,\n',
-             'review_after': '        max_length: int,\n'
-                             '        kv_cache_group_ids: list[int],\n'
-                             '        block_pool: BlockPool,\n'
-                             '        cache_view: PrefixCacheView,\n'
-                             '        kv_cache_spec: KVCacheSpec,\n'
-                             '        drop_eagle_block: bool,\n'
-                             '        alignment_tokens: int,\n'},
-            {'name': 'vllm/v1/core/single_type_kv_cache_manager.py:landmark-5',
-             'path': 'vllm/v1/core/single_type_kv_cache_manager.py',
-             'before': '        # Phase 1: longest run of cached full blocks from the '
-                       'start. A missing\n'
-                       '        # block implies every later block misses too (chained '
-                       'hashes).\n'
-                       '        for block_hash in itertools.islice(full_block_hashes, '
-                       'max_length // block_size):\n'
-                       '            cached_block = '
-                       'block_pool.get_cached_block(block_hash, kv_cache_group_ids)\n'
-                       '            if not cached_block:\n'
-                       '                break\n'
-                       '            for computed, cached in zip(computed_blocks, '
-                       'cached_block):\n',
-             'after': '        # Phase 1: longest run of cached full blocks from the '
-                      'start. A missing\n'
-                      '        # block implies every later block misses too (chained '
-                      'hashes).\n'
-                      '        for block_hash in itertools.islice(full_block_hashes, '
-                      'max_length // block_size):\n'
-                      '            cached_block = '
-                      'block_pool.get_cached_block(block_hash, kv_cache_group_ids, '
-                      'cache_view=cache_view)\n'
-                      '            if not cached_block:\n'
-                      '                break\n'
-                      '            for computed, cached in zip(computed_blocks, '
-                      'cached_block):\n',
-             'review_before': '        # Phase 1: longest run of cached full blocks '
-                              'from the start. A missing\n'
-                              '        # block implies every later block misses too '
-                              '(chained hashes).\n'
-                              '        for block_hash in '
-                              'itertools.islice(full_block_hashes, max_length // '
-                              'block_size):\n'
-                              '            cached_block = '
-                              'block_pool.get_cached_block(block_hash, '
-                              'kv_cache_group_ids)\n'
-                              '            if not cached_block:\n'
-                              '                break\n'
-                              '            for computed, cached in '
-                              'zip(computed_blocks, cached_block):\n',
-             'review_after': '        # Phase 1: longest run of cached full blocks '
-                             'from the start. A missing\n'
-                             '        # block implies every later block misses too '
-                             '(chained hashes).\n'
-                             '        for block_hash in '
-                             'itertools.islice(full_block_hashes, max_length // '
-                             'block_size):\n'
-                             '            cached_block = '
-                             'block_pool.get_cached_block(block_hash, '
-                             'kv_cache_group_ids, cache_view=cache_view)\n'
-                             '            if not cached_block:\n'
-                             '                break\n'
-                             '            for computed, cached in zip(computed_blocks, '
-                             'cached_block):\n'},
-            {'name': 'vllm/v1/core/single_type_kv_cache_manager.py:landmark-6',
-             'path': 'vllm/v1/core/single_type_kv_cache_manager.py',
-             'before': '            )\n'
-                       '            for fine_idx in range(max_partial_idx - 1, '
-                       'first_partial_idx - 1, -1):\n'
-                       '                cached_tail = block_pool.get_cached_block(\n'
-                       '                    block_hashes[fine_idx], '
-                       'kv_cache_group_ids\n'
-                       '                )\n'
-                       '                if not cached_tail:\n'
-                       '                    continue\n',
-             'after': '            )\n'
-                      '            for fine_idx in range(max_partial_idx - 1, '
-                      'first_partial_idx - 1, -1):\n'
-                      '                cached_tail = block_pool.get_cached_block(\n'
-                      '                    block_hashes[fine_idx], '
-                      'kv_cache_group_ids,\n'
-                      '                    cache_view=cache_view,\n'
-                      '                )\n'
-                      '                if not cached_tail:\n'
-                      '                    continue\n',
-             'review_before': '            )\n'
-                              '            for fine_idx in range(max_partial_idx - 1, '
-                              'first_partial_idx - 1, -1):\n'
-                              '                cached_tail = '
-                              'block_pool.get_cached_block(\n'
-                              '                    block_hashes[fine_idx], '
-                              'kv_cache_group_ids\n'
-                              '                )\n'
-                              '                if not cached_tail:\n'
-                              '                    continue\n',
-             'review_after': '            )\n'
-                             '            for fine_idx in range(max_partial_idx - 1, '
-                             'first_partial_idx - 1, -1):\n'
-                             '                cached_tail = '
-                             'block_pool.get_cached_block(\n'
-                             '                    block_hashes[fine_idx], '
-                             'kv_cache_group_ids,\n'
-                             '                    cache_view=cache_view,\n'
-                             '                )\n'
-                             '                if not cached_tail:\n'
-                             '                    continue\n'},
-            {'name': 'vllm/v1/core/single_type_kv_cache_manager.py:landmark-7',
+            {'name': 'vllm/v1/core/single_type_kv_cache_manager.py:landmark-2',
              'path': 'vllm/v1/core/single_type_kv_cache_manager.py',
              'before': '            num_tokens=boundary_tokens,\n'
                        '            kv_cache_group_id=self.kv_cache_group_id,\n'
@@ -35066,315 +30238,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '\n'
                              '    def get_num_common_prefix_blocks(self, '
                              'running_request_id: str) -> int:\n'},
-            {'name': 'vllm/v1/core/single_type_kv_cache_manager.py:landmark-8',
-             'path': 'vllm/v1/core/single_type_kv_cache_manager.py',
-             'before': '    @classmethod\n'
-                       '    def find_longest_cache_hit(\n'
-                       '        cls,\n'
-                       '        block_hashes: BlockHashList,\n'
-                       '        max_length: int,\n'
-                       '        kv_cache_group_ids: list[int],\n'
-                       '        block_pool: BlockPool,\n'
-                       '        kv_cache_spec: KVCacheSpec,\n'
-                       '        drop_eagle_block: bool,\n'
-                       '        alignment_tokens: int,\n'
-                       '        dcp_world_size: int = 1,\n'
-                       '        pcp_world_size: int = 1,\n'
-                       '    ) -> tuple[tuple[list[KVCacheBlock], ...], int]:\n'
-                       '        assert isinstance(kv_cache_spec, SlidingWindowSpec), '
-                       '(\n',
-             'after': '    @classmethod\n'
-                      '    def find_longest_cache_hit(\n'
-                      '        cls,\n'
-                      '        block_hashes: BlockHashList,\n'
-                      '        max_length: int,\n'
-                      '        kv_cache_group_ids: list[int],\n'
-                      '        block_pool: BlockPool,\n'
-                      '        cache_view: PrefixCacheView,\n'
-                      '        kv_cache_spec: KVCacheSpec,\n'
-                      '        drop_eagle_block: bool,\n'
-                      '        alignment_tokens: int,\n'
-                      '        dcp_world_size: int = 1,\n'
-                      '        pcp_world_size: int = 1,\n'
-                      '    ) -> tuple[tuple[list[KVCacheBlock], ...], int]:\n'
-                      '        assert isinstance(kv_cache_spec, SlidingWindowSpec), '
-                      '(\n',
-             'review_before': '        max_length: int,\n'
-                              '        kv_cache_group_ids: list[int],\n'
-                              '        block_pool: BlockPool,\n'
-                              '        kv_cache_spec: KVCacheSpec,\n'
-                              '        drop_eagle_block: bool,\n'
-                              '        alignment_tokens: int,\n',
-             'review_after': '        max_length: int,\n'
-                             '        kv_cache_group_ids: list[int],\n'
-                             '        block_pool: BlockPool,\n'
-                             '        cache_view: PrefixCacheView,\n'
-                             '        kv_cache_spec: KVCacheSpec,\n'
-                             '        drop_eagle_block: bool,\n'
-                             '        alignment_tokens: int,\n'},
-            {'name': 'vllm/v1/core/single_type_kv_cache_manager.py:landmark-9',
-             'path': 'vllm/v1/core/single_type_kv_cache_manager.py',
-             'before': '        # Search from right to left and early stop when a '
-                       'match is found.\n'
-                       '        for i in range(max_num_blocks - 1, -1, -1):\n'
-                       '            if cached_block := block_pool.get_cached_block(\n'
-                       '                block_hashes[i], kv_cache_group_ids\n'
-                       '            ):\n'
-                       '                # Skip prefix matching check if the block is '
-                       'not aligned with\n'
-                       '                # `alignment_tokens`.\n',
-             'after': '        # Search from right to left and early stop when a match '
-                      'is found.\n'
-                      '        for i in range(max_num_blocks - 1, -1, -1):\n'
-                      '            if cached_block := block_pool.get_cached_block(\n'
-                      '                block_hashes[i], kv_cache_group_ids,\n'
-                      '                cache_view=cache_view,\n'
-                      '            ):\n'
-                      '                # Skip prefix matching check if the block is '
-                      'not aligned with\n'
-                      '                # `alignment_tokens`.\n',
-             'review_before': '        # Search from right to left and early stop when '
-                              'a match is found.\n'
-                              '        for i in range(max_num_blocks - 1, -1, -1):\n'
-                              '            if cached_block := '
-                              'block_pool.get_cached_block(\n'
-                              '                block_hashes[i], kv_cache_group_ids\n'
-                              '            ):\n'
-                              '                # Skip prefix matching check if the '
-                              'block is not aligned with\n'
-                              '                # `alignment_tokens`.\n',
-             'review_after': '        # Search from right to left and early stop when '
-                             'a match is found.\n'
-                             '        for i in range(max_num_blocks - 1, -1, -1):\n'
-                             '            if cached_block := '
-                             'block_pool.get_cached_block(\n'
-                             '                block_hashes[i], kv_cache_group_ids,\n'
-                             '                cache_view=cache_view,\n'
-                             '            ):\n'
-                             '                # Skip prefix matching check if the '
-                             'block is not aligned with\n'
-                             '                # `alignment_tokens`.\n'},
-            {'name': 'vllm/v1/core/single_type_kv_cache_manager.py:landmark-10',
-             'path': 'vllm/v1/core/single_type_kv_cache_manager.py',
-             'before': '    @classmethod\n'
-                       '    def find_longest_cache_hit(\n'
-                       '        cls,\n'
-                       '        block_hashes: BlockHashList,\n'
-                       '        max_length: int,\n'
-                       '        kv_cache_group_ids: list[int],\n'
-                       '        block_pool: BlockPool,\n'
-                       '        kv_cache_spec: KVCacheSpec,\n'
-                       '        drop_eagle_block: bool,\n'
-                       '        alignment_tokens: int,\n'
-                       '        dcp_world_size: int = 1,\n'
-                       '        pcp_world_size: int = 1,\n'
-                       '    ) -> tuple[tuple[list[KVCacheBlock], ...], int]:\n'
-                       '        """\n',
-             'after': '    @classmethod\n'
-                      '    def find_longest_cache_hit(\n'
-                      '        cls,\n'
-                      '        block_hashes: BlockHashList,\n'
-                      '        max_length: int,\n'
-                      '        kv_cache_group_ids: list[int],\n'
-                      '        block_pool: BlockPool,\n'
-                      '        cache_view: PrefixCacheView,\n'
-                      '        kv_cache_spec: KVCacheSpec,\n'
-                      '        drop_eagle_block: bool,\n'
-                      '        alignment_tokens: int,\n'
-                      '        dcp_world_size: int = 1,\n'
-                      '        pcp_world_size: int = 1,\n'
-                      '    ) -> tuple[tuple[list[KVCacheBlock], ...], int]:\n'
-                      '        """\n',
-             'review_before': '        max_length: int,\n'
-                              '        kv_cache_group_ids: list[int],\n'
-                              '        block_pool: BlockPool,\n'
-                              '        kv_cache_spec: KVCacheSpec,\n'
-                              '        drop_eagle_block: bool,\n'
-                              '        alignment_tokens: int,\n',
-             'review_after': '        max_length: int,\n'
-                             '        kv_cache_group_ids: list[int],\n'
-                             '        block_pool: BlockPool,\n'
-                             '        cache_view: PrefixCacheView,\n'
-                             '        kv_cache_spec: KVCacheSpec,\n'
-                             '        drop_eagle_block: bool,\n'
-                             '        alignment_tokens: int,\n'},
-            {'name': 'vllm/v1/core/single_type_kv_cache_manager.py:landmark-11',
-             'path': 'vllm/v1/core/single_type_kv_cache_manager.py',
-             'before': '        for i in range(local_attention_start_block_idx, '
-                       'max_num_blocks):\n'
-                       '            block_hash = block_hashes[i]\n'
-                       '            if cached_block := block_pool.get_cached_block(\n'
-                       '                block_hash, kv_cache_group_ids\n'
-                       '            ):\n'
-                       '                for computed, cached in zip(computed_blocks, '
-                       'cached_block):\n'
-                       '                    computed.append(cached)\n',
-             'after': '        for i in range(local_attention_start_block_idx, '
-                      'max_num_blocks):\n'
-                      '            block_hash = block_hashes[i]\n'
-                      '            if cached_block := block_pool.get_cached_block(\n'
-                      '                block_hash, kv_cache_group_ids,\n'
-                      '                cache_view=cache_view,\n'
-                      '            ):\n'
-                      '                for computed, cached in zip(computed_blocks, '
-                      'cached_block):\n'
-                      '                    computed.append(cached)\n',
-             'review_before': '        for i in range(local_attention_start_block_idx, '
-                              'max_num_blocks):\n'
-                              '            block_hash = block_hashes[i]\n'
-                              '            if cached_block := '
-                              'block_pool.get_cached_block(\n'
-                              '                block_hash, kv_cache_group_ids\n'
-                              '            ):\n'
-                              '                for computed, cached in '
-                              'zip(computed_blocks, cached_block):\n'
-                              '                    computed.append(cached)\n',
-             'review_after': '        for i in range(local_attention_start_block_idx, '
-                             'max_num_blocks):\n'
-                             '            block_hash = block_hashes[i]\n'
-                             '            if cached_block := '
-                             'block_pool.get_cached_block(\n'
-                             '                block_hash, kv_cache_group_ids,\n'
-                             '                cache_view=cache_view,\n'
-                             '            ):\n'
-                             '                for computed, cached in '
-                             'zip(computed_blocks, cached_block):\n'
-                             '                    computed.append(cached)\n'},
-            {'name': 'vllm/v1/core/single_type_kv_cache_manager.py:landmark-12',
-             'path': 'vllm/v1/core/single_type_kv_cache_manager.py',
-             'before': '    @classmethod\n'
-                       '    def find_longest_cache_hit(\n'
-                       '        cls,\n'
-                       '        block_hashes: BlockHashList,\n'
-                       '        max_length: int,\n'
-                       '        kv_cache_group_ids: list[int],\n'
-                       '        block_pool: BlockPool,\n'
-                       '        kv_cache_spec: KVCacheSpec,\n'
-                       '        drop_eagle_block: bool,\n'
-                       '        alignment_tokens: int,\n'
-                       '        dcp_world_size: int = 1,\n'
-                       '        pcp_world_size: int = 1,\n'
-                       '    ) -> tuple[tuple[list[KVCacheBlock], ...], int]:\n'
-                       '        assert isinstance(kv_cache_spec, MambaSpec), (\n',
-             'after': '    @classmethod\n'
-                      '    def find_longest_cache_hit(\n'
-                      '        cls,\n'
-                      '        block_hashes: BlockHashList,\n'
-                      '        max_length: int,\n'
-                      '        kv_cache_group_ids: list[int],\n'
-                      '        block_pool: BlockPool,\n'
-                      '        cache_view: PrefixCacheView,\n'
-                      '        kv_cache_spec: KVCacheSpec,\n'
-                      '        drop_eagle_block: bool,\n'
-                      '        alignment_tokens: int,\n'
-                      '        dcp_world_size: int = 1,\n'
-                      '        pcp_world_size: int = 1,\n'
-                      '    ) -> tuple[tuple[list[KVCacheBlock], ...], int]:\n'
-                      '        assert isinstance(kv_cache_spec, MambaSpec), (\n',
-             'review_before': '        max_length: int,\n'
-                              '        kv_cache_group_ids: list[int],\n'
-                              '        block_pool: BlockPool,\n'
-                              '        kv_cache_spec: KVCacheSpec,\n'
-                              '        drop_eagle_block: bool,\n'
-                              '        alignment_tokens: int,\n',
-             'review_after': '        max_length: int,\n'
-                             '        kv_cache_group_ids: list[int],\n'
-                             '        block_pool: BlockPool,\n'
-                             '        cache_view: PrefixCacheView,\n'
-                             '        kv_cache_spec: KVCacheSpec,\n'
-                             '        drop_eagle_block: bool,\n'
-                             '        alignment_tokens: int,\n'},
-            {'name': 'vllm/v1/core/single_type_kv_cache_manager.py:landmark-13',
-             'path': 'vllm/v1/core/single_type_kv_cache_manager.py',
-             'before': '                num_tokens = (fine_idx + 1) * hash_block_size\n'
-                       '                block_hash = block_hashes[fine_idx]\n'
-                       '                if cached_block := '
-                       'block_pool.get_cached_block(\n'
-                       '                    block_hash, kv_cache_group_ids\n'
-                       '                ):\n'
-                       '                    block_idx = fine_idx // scale_factor\n'
-                       '                    for computed, cached in '
-                       'zip(computed_blocks, cached_block):\n',
-             'after': '                num_tokens = (fine_idx + 1) * hash_block_size\n'
-                      '                block_hash = block_hashes[fine_idx]\n'
-                      '                if cached_block := '
-                      'block_pool.get_cached_block(\n'
-                      '                    block_hash, kv_cache_group_ids,\n'
-                      '                    cache_view=cache_view,\n'
-                      '                ):\n'
-                      '                    block_idx = fine_idx // scale_factor\n'
-                      '                    for computed, cached in '
-                      'zip(computed_blocks, cached_block):\n',
-             'review_before': '                num_tokens = (fine_idx + 1) * '
-                              'hash_block_size\n'
-                              '                block_hash = block_hashes[fine_idx]\n'
-                              '                if cached_block := '
-                              'block_pool.get_cached_block(\n'
-                              '                    block_hash, kv_cache_group_ids\n'
-                              '                ):\n'
-                              '                    block_idx = fine_idx // '
-                              'scale_factor\n'
-                              '                    for computed, cached in '
-                              'zip(computed_blocks, cached_block):\n',
-             'review_after': '                num_tokens = (fine_idx + 1) * '
-                             'hash_block_size\n'
-                             '                block_hash = block_hashes[fine_idx]\n'
-                             '                if cached_block := '
-                             'block_pool.get_cached_block(\n'
-                             '                    block_hash, kv_cache_group_ids,\n'
-                             '                    cache_view=cache_view,\n'
-                             '                ):\n'
-                             '                    block_idx = fine_idx // '
-                             'scale_factor\n'
-                             '                    for computed, cached in '
-                             'zip(computed_blocks, cached_block):\n'},
-            {'name': 'vllm/v1/core/single_type_kv_cache_manager.py:landmark-14',
-             'path': 'vllm/v1/core/single_type_kv_cache_manager.py',
-             'before': '        # Search from right to left and early stop when a '
-                       'match is found.\n'
-                       '        for i in range(max_num_blocks - 1, -1, -1):\n'
-                       '            if cached_block := block_pool.get_cached_block(\n'
-                       '                block_hashes[i], kv_cache_group_ids\n'
-                       '            ):\n'
-                       '                # When enable Mamba prefix caching, '
-                       '`block_size` will be aligned\n'
-                       '                # across full attention layers and Mamba '
-                       'layers to ensure the\n',
-             'after': '        # Search from right to left and early stop when a match '
-                      'is found.\n'
-                      '        for i in range(max_num_blocks - 1, -1, -1):\n'
-                      '            if cached_block := block_pool.get_cached_block(\n'
-                      '                block_hashes[i], kv_cache_group_ids,\n'
-                      '                cache_view=cache_view,\n'
-                      '            ):\n'
-                      '                # When enable Mamba prefix caching, '
-                      '`block_size` will be aligned\n'
-                      '                # across full attention layers and Mamba layers '
-                      'to ensure the\n',
-             'review_before': '        # Search from right to left and early stop when '
-                              'a match is found.\n'
-                              '        for i in range(max_num_blocks - 1, -1, -1):\n'
-                              '            if cached_block := '
-                              'block_pool.get_cached_block(\n'
-                              '                block_hashes[i], kv_cache_group_ids\n'
-                              '            ):\n'
-                              '                # When enable Mamba prefix caching, '
-                              '`block_size` will be aligned\n'
-                              '                # across full attention layers and '
-                              'Mamba layers to ensure the\n',
-             'review_after': '        # Search from right to left and early stop when '
-                             'a match is found.\n'
-                             '        for i in range(max_num_blocks - 1, -1, -1):\n'
-                             '            if cached_block := '
-                             'block_pool.get_cached_block(\n'
-                             '                block_hashes[i], kv_cache_group_ids,\n'
-                             '                cache_view=cache_view,\n'
-                             '            ):\n'
-                             '                # When enable Mamba prefix caching, '
-                             '`block_size` will be aligned\n'
-                             '                # across full attention layers and Mamba '
-                             'layers to ensure the\n'},
-            {'name': 'vllm/v1/core/single_type_kv_cache_manager.py:landmark-15',
+            {'name': 'vllm/v1/core/single_type_kv_cache_manager.py:landmark-3',
              'path': 'vllm/v1/core/single_type_kv_cache_manager.py',
              'before': '            num_tokens=num_tokens,\n'
                        '            kv_cache_group_id=self.kv_cache_group_id,\n'
@@ -35408,52 +30272,6 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '        if partial_hash is not None:\n'
                              '            self._partial_hit_reqs[request.request_id] = '
                              '(block_idx, source_block)\n'},
-            {'name': 'vllm/v1/core/single_type_kv_cache_manager.py:landmark-16',
-             'path': 'vllm/v1/core/single_type_kv_cache_manager.py',
-             'before': '    @classmethod\n'
-                       '    def find_longest_cache_hit(\n'
-                       '        cls,\n'
-                       '        block_hashes: BlockHashList,\n'
-                       '        max_length: int,\n'
-                       '        kv_cache_group_ids: list[int],\n'
-                       '        block_pool: BlockPool,\n'
-                       '        kv_cache_spec: KVCacheSpec,\n'
-                       '        drop_eagle_block: bool,\n'
-                       '        alignment_tokens: int,\n'
-                       '        dcp_world_size: int = 1,\n'
-                       '        pcp_world_size: int = 1,\n'
-                       '    ) -> tuple[tuple[list[KVCacheBlock], ...], int]:\n'
-                       '        assert isinstance(kv_cache_spec, CrossAttentionSpec), '
-                       '(\n',
-             'after': '    @classmethod\n'
-                      '    def find_longest_cache_hit(\n'
-                      '        cls,\n'
-                      '        block_hashes: BlockHashList,\n'
-                      '        max_length: int,\n'
-                      '        kv_cache_group_ids: list[int],\n'
-                      '        block_pool: BlockPool,\n'
-                      '        cache_view: PrefixCacheView,\n'
-                      '        kv_cache_spec: KVCacheSpec,\n'
-                      '        drop_eagle_block: bool,\n'
-                      '        alignment_tokens: int,\n'
-                      '        dcp_world_size: int = 1,\n'
-                      '        pcp_world_size: int = 1,\n'
-                      '    ) -> tuple[tuple[list[KVCacheBlock], ...], int]:\n'
-                      '        assert isinstance(kv_cache_spec, CrossAttentionSpec), '
-                      '(\n',
-             'review_before': '        max_length: int,\n'
-                              '        kv_cache_group_ids: list[int],\n'
-                              '        block_pool: BlockPool,\n'
-                              '        kv_cache_spec: KVCacheSpec,\n'
-                              '        drop_eagle_block: bool,\n'
-                              '        alignment_tokens: int,\n',
-             'review_after': '        max_length: int,\n'
-                             '        kv_cache_group_ids: list[int],\n'
-                             '        block_pool: BlockPool,\n'
-                             '        cache_view: PrefixCacheView,\n'
-                             '        kv_cache_spec: KVCacheSpec,\n'
-                             '        drop_eagle_block: bool,\n'
-                             '        alignment_tokens: int,\n'},
             {'name': 'vllm/v1/engine/input_processor.py:landmark-1',
              'path': 'vllm/v1/engine/input_processor.py',
              'before': 'logger = init_logger(__name__)\n'
@@ -35580,38 +30398,6 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'in POOLING_TASKS\n'},
             {'name': 'vllm/v1/kv_offload/base.py:landmark-1',
              'path': 'vllm/v1/kv_offload/base.py',
-             'before': '        OffloadingConnectorStats,\n'
-                       '    )\n'
-                       '\n'
-                       'from vllm.v1.kv_offload.config import OffloadingConfig\n'
-                       '\n'
-                       '# `OffloadKey` identifies an offloaded block. It combines a '
-                       'block hash with\n',
-             'after': '        OffloadingConnectorStats,\n'
-                      '    )\n'
-                      '\n'
-                      'from vllm.v1.core.prefix_cache import PrefixCacheIndex\n'
-                      'from vllm.v1.kv_offload.config import OffloadingConfig\n'
-                      '\n'
-                      '# `OffloadKey` identifies an offloaded block. It combines a '
-                      'block hash with\n',
-             'review_before': '        OffloadingConnectorStats,\n'
-                              '    )\n'
-                              '\n'
-                              'from vllm.v1.kv_offload.config import OffloadingConfig\n'
-                              '\n'
-                              '# `OffloadKey` identifies an offloaded block. It '
-                              'combines a block hash with\n',
-             'review_after': '        OffloadingConnectorStats,\n'
-                             '    )\n'
-                             '\n'
-                             'from vllm.v1.core.prefix_cache import PrefixCacheIndex\n'
-                             'from vllm.v1.kv_offload.config import OffloadingConfig\n'
-                             '\n'
-                             '# `OffloadKey` identifies an offloaded block. It '
-                             'combines a block hash with\n'},
-            {'name': 'vllm/v1/kv_offload/base.py:landmark-2',
-             'path': 'vllm/v1/kv_offload/base.py',
              'before': '    req_id: str\n'
                        '    kv_transfer_params: dict[str, Any] | None = None\n'
                        '    load_tier_filter: TierFilter = TierFilter.ALL\n'
@@ -35674,7 +30460,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    # kv_transfer_params once (in on_new_request) and '
                              'read the result back\n'
                              '    # on later calls for the same request.\n'},
-            {'name': 'vllm/v1/kv_offload/base.py:landmark-3',
+            {'name': 'vllm/v1/kv_offload/base.py:landmark-2',
              'path': 'vllm/v1/kv_offload/base.py',
              'before': '        The given blocks will be protected from eviction.\n'
                        '        This function returns a LoadSpec which encapsulates\n'
@@ -35746,68 +30532,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'their eviction.\n'
                              '    prepare_store() - prepare the given blocks to be '
                              'written.\n'},
-            {'name': 'vllm/v1/kv_offload/base.py:landmark-4',
-             'path': 'vllm/v1/kv_offload/base.py',
-             'before': '\n'
-                       'class OffloadingManager(ABC):\n'
-                       '    @abstractmethod\n'
-                       '    def lookup(self, key: OffloadKey, req_context: ReqContext) '
-                       '-> LookupResult:\n'
-                       '        """\n'
-                       '        Checks whether a single block is offloaded and ready '
-                       'to be read.\n',
-             'after': '\n'
-                      'class OffloadingManager(ABC):\n'
-                      '    @abstractmethod\n'
-                      '    def bind_prefix_cache(self, index: PrefixCacheIndex) -> '
-                      'None:\n'
-                      '        """Share the engine\'s cache membership across GPU and '
-                      'offload tiers."""\n'
-                      '        pass\n'
-                      '\n'
-                      '    @abstractmethod\n'
-                      '    def begin_lookup(self, req_context: ReqContext) -> None:\n'
-                      '        """Capture a stable membership view before querying any '
-                      'cache group."""\n'
-                      '        pass\n'
-                      '\n'
-                      '    @abstractmethod\n'
-                      '    def lookup(self, key: OffloadKey, req_context: ReqContext) '
-                      '-> LookupResult:\n'
-                      '        """\n'
-                      '        Checks whether a single block is offloaded and ready to '
-                      'be read.\n',
-             'review_before': '\n'
-                              'class OffloadingManager(ABC):\n'
-                              '    @abstractmethod\n'
-                              '    def lookup(self, key: OffloadKey, req_context: '
-                              'ReqContext) -> LookupResult:\n'
-                              '        """\n'
-                              '        Checks whether a single block is offloaded and '
-                              'ready to be read.\n',
-             'review_after': '\n'
-                             'class OffloadingManager(ABC):\n'
-                             '    @abstractmethod\n'
-                             '    def bind_prefix_cache(self, index: PrefixCacheIndex) '
-                             '-> None:\n'
-                             '        """Share the engine\'s cache membership across '
-                             'GPU and offload tiers."""\n'
-                             '        pass\n'
-                             '\n'
-                             '    @abstractmethod\n'
-                             '    def begin_lookup(self, req_context: ReqContext) -> '
-                             'None:\n'
-                             '        """Capture a stable membership view before '
-                             'querying any cache group."""\n'
-                             '        pass\n'
-                             '\n'
-                             '    @abstractmethod\n'
-                             '    def lookup(self, key: OffloadKey, req_context: '
-                             'ReqContext) -> LookupResult:\n'
-                             '        """\n'
-                             '        Checks whether a single block is offloaded and '
-                             'ready to be read.\n'},
-            {'name': 'vllm/v1/kv_offload/base.py:landmark-5',
+            {'name': 'vllm/v1/kv_offload/base.py:landmark-3',
              'path': 'vllm/v1/kv_offload/base.py',
              'before': '        """\n'
                        '        pass\n'
@@ -35877,38 +30602,6 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '        """\n'
                              '        return\n'
                              '\n'},
-            {'name': 'vllm/v1/kv_offload/base.py:landmark-6',
-             'path': 'vllm/v1/kv_offload/base.py',
-             'before': '            req_context: per-request context.\n'
-                       '        """\n'
-                       '        pass\n'
-                       '\n'
-                       '    def on_request_finished(self, req_context: ReqContext) -> '
-                       'None:\n'
-                       '        """\n',
-             'after': '            req_context: per-request context.\n'
-                      '        """\n'
-                      '        pass\n'
-                      '\n'
-                      '\n'
-                      '    def on_request_finished(self, req_context: ReqContext) -> '
-                      'None:\n'
-                      '        """\n',
-             'review_before': '            req_context: per-request context.\n'
-                              '        """\n'
-                              '        pass\n'
-                              '\n'
-                              '    def on_request_finished(self, req_context: '
-                              'ReqContext) -> None:\n'
-                              '        """\n',
-             'review_after': '            req_context: per-request context.\n'
-                             '        """\n'
-                             '        pass\n'
-                             '\n'
-                             '\n'
-                             '    def on_request_finished(self, req_context: '
-                             'ReqContext) -> None:\n'
-                             '        """\n'},
             {'name': 'vllm/v1/kv_offload/config.py:landmark-1',
              'path': 'vllm/v1/kv_offload/config.py',
              'before': '    tokens_per_block: int\n'
@@ -36153,8 +30846,6 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       'from typing_extensions import override\n'
                       '\n'
                       'from vllm.exceptions import VLLMServerError\n'
-                      'from vllm.v1.core.prefix_cache import PrefixCacheIndex, '
-                      'PrefixCacheView\n'
                       'from '
                       'vllm.distributed.kv_transfer.kv_connector.v1.offloading.metrics '
                       'import (\n'
@@ -36185,8 +30876,6 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'from typing_extensions import override\n'
                              '\n'
                              'from vllm.exceptions import VLLMServerError\n'
-                             'from vllm.v1.core.prefix_cache import PrefixCacheIndex, '
-                             'PrefixCacheView\n'
                              'from '
                              'vllm.distributed.kv_transfer.kv_connector.v1.offloading.metrics '
                              'import (\n'
@@ -36339,14 +31028,17 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       'class CPUOffloadingManager(OffloadingManager):\n'
                       '    """Content-addressed KV with shared context references.\n'
                       '\n'
-                      '    Capacity pressure releases complete agents in '
-                      'least-recently-used order.\n'
-                      '    Releasing an agent removes only its references: blocks used '
-                      'by another\n'
-                      '    retained context or an in-flight transfer remain resident. '
-                      'Request completion\n'
-                      '    retains the context for its next turn; it does not declare '
-                      'an agent dead.\n'
+                      '    Lookup matches content alone; the agent ID never restricts '
+                      'it. The ID\n'
+                      '    groups retention: capacity pressure releases complete '
+                      'agents in\n'
+                      '    least-recently-used order. Releasing an agent removes only '
+                      'its references:\n'
+                      '    blocks used by another retained context or an in-flight '
+                      'transfer remain\n'
+                      '    resident. Request completion retains the context for its '
+                      'next turn; it\n'
+                      '    does not declare an agent dead.\n'
                       '    """\n'
                       '\n'
                       '    def __init__(\n'
@@ -36355,8 +31047,6 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '        enable_events: bool = False,\n'
                       '    ):\n'
                       '        self.medium: Medium = Medium.CPU\n'
-                      '        self.prefix_cache = PrefixCacheIndex()\n'
-                      '        self.cache_tier = object()\n'
                       '        self._num_blocks: int = num_blocks\n'
                       '        self._num_allocated_blocks: int = 0\n'
                       '        self._free_list: list[int] = []\n'
@@ -36366,16 +31056,24 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '        # All resident blocks, and the idle (ref_cnt 0) subset '
                       'in LRU order.\n'
                       '        self._blocks: dict[OffloadKey, BlockStatus] = {}\n'
+                      '        # What each key names, and what its row actually holds. '
+                      'A coalesced\n'
+                      '        # window chunk can hold only a suffix of its canonical '
+                      'content. Both\n'
+                      '        # stay None until a generation supplies the hash chain '
+                      'describing them.\n'
                       '        self._canonical_content: dict[OffloadKey, tuple[bytes, '
+                      '...] | None] = {}\n'
+                      '        self._available_content: dict[OffloadKey, tuple[bytes, '
                       '...] | None] = {}\n'
                       '        self._complete_blocks: set[OffloadKey] = set()\n'
                       '        self._evictable_blocks: OrderedDict[OffloadKey, None] = '
                       'OrderedDict()\n'
                       '\n'
-                      '        # Context membership includes not-yet-resident keys so '
-                      'a GPU hit or\n'
-                      '        # a concurrent store acquires the same references as a '
-                      'CPU hit.\n'
+                      '        # Context references include not-yet-resident keys so a '
+                      'GPU hit or\n'
+                      '        # a concurrent store takes the same references as a CPU '
+                      'hit.\n'
                       '        self._contexts: dict[str, RetainedContext] = {}\n'
                       '        self._references: dict[OffloadKey, set[str]] = {}\n'
                       '        self._agents: OrderedDict[str, set[str]] = '
@@ -36387,38 +31085,10 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '        self._num_write_pending_blocks: int = 0\n'
                       '\n'
                       '        self.allocation_sizes_in_current_batch: list[int] = []\n'
-                      '        self._register_cache_tier()\n'
-                      '\n'
-                      '    @override\n'
-                      '    def bind_prefix_cache(self, index: PrefixCacheIndex) -> '
-                      'None:\n'
-                      '        assert not self._blocks and not self._contexts\n'
-                      '        self.prefix_cache = index\n'
-                      '        self._register_cache_tier()\n'
-                      '\n'
-                      '    def _register_cache_tier(self) -> None:\n'
-                      '        self.prefix_cache.register_tier(\n'
-                      '            self.cache_tier, self._num_blocks,\n'
-                      '            self._forget_agent,\n'
-                      '        )\n'
                       '\n'
                       '    def _forget_agent(self, agent_id: str) -> None:\n'
                       '        for req_id in tuple(self._agents.get(agent_id, ())):\n'
                       '            self._forget_context(req_id)\n'
-                      '\n'
-                      '    @override\n'
-                      '    def begin_lookup(self, req_context: ReqContext) -> None:\n'
-                      '        '
-                      'req_context.set_state(self.prefix_cache.view(self._agent_id(req_context)))\n'
-                      '\n'
-                      '    @staticmethod\n'
-                      '    def _lookup_view(req_context: ReqContext) -> '
-                      'PrefixCacheView:\n'
-                      '        view = req_context.get_state(PrefixCacheView)\n'
-                      '        if view is None:\n'
-                      '            raise VLLMServerError("KV prefix lookup began '
-                      'without a cache membership view.")\n'
-                      '        return view\n'
                       '\n'
                       '    # --- block pool ---\n'
                       '\n',
@@ -36544,14 +31214,17 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    """Content-addressed KV with shared context '
                              'references.\n'
                              '\n'
-                             '    Capacity pressure releases complete agents in '
-                             'least-recently-used order.\n'
-                             '    Releasing an agent removes only its references: '
-                             'blocks used by another\n'
-                             '    retained context or an in-flight transfer remain '
-                             'resident. Request completion\n'
-                             '    retains the context for its next turn; it does not '
-                             'declare an agent dead.\n'
+                             '    Lookup matches content alone; the agent ID never '
+                             'restricts it. The ID\n'
+                             '    groups retention: capacity pressure releases '
+                             'complete agents in\n'
+                             '    least-recently-used order. Releasing an agent '
+                             'removes only its references:\n'
+                             '    blocks used by another retained context or an '
+                             'in-flight transfer remain\n'
+                             '    resident. Request completion retains the context for '
+                             'its next turn; it\n'
+                             '    does not declare an agent dead.\n'
                              '    """\n'
                              '\n'
                              '    def __init__(\n'
@@ -36560,8 +31233,6 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '        enable_events: bool = False,\n'
                              '    ):\n'
                              '        self.medium: Medium = Medium.CPU\n'
-                             '        self.prefix_cache = PrefixCacheIndex()\n'
-                             '        self.cache_tier = object()\n'
                              '        self._num_blocks: int = num_blocks\n'
                              '        self._num_allocated_blocks: int = 0\n'
                              '        self._free_list: list[int] = []\n'
@@ -36572,16 +31243,24 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'subset in LRU order.\n'
                              '        self._blocks: dict[OffloadKey, BlockStatus] = '
                              '{}\n'
+                             '        # What each key names, and what its row actually '
+                             'holds. A coalesced\n'
+                             '        # window chunk can hold only a suffix of its '
+                             'canonical content. Both\n'
+                             '        # stay None until a generation supplies the hash '
+                             'chain describing them.\n'
                              '        self._canonical_content: dict[OffloadKey, '
+                             'tuple[bytes, ...] | None] = {}\n'
+                             '        self._available_content: dict[OffloadKey, '
                              'tuple[bytes, ...] | None] = {}\n'
                              '        self._complete_blocks: set[OffloadKey] = set()\n'
                              '        self._evictable_blocks: OrderedDict[OffloadKey, '
                              'None] = OrderedDict()\n'
                              '\n'
-                             '        # Context membership includes not-yet-resident '
+                             '        # Context references include not-yet-resident '
                              'keys so a GPU hit or\n'
-                             '        # a concurrent store acquires the same '
-                             'references as a CPU hit.\n'
+                             '        # a concurrent store takes the same references '
+                             'as a CPU hit.\n'
                              '        self._contexts: dict[str, RetainedContext] = {}\n'
                              '        self._references: dict[OffloadKey, set[str]] = '
                              '{}\n'
@@ -36595,40 +31274,11 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '\n'
                              '        self.allocation_sizes_in_current_batch: '
                              'list[int] = []\n'
-                             '        self._register_cache_tier()\n'
-                             '\n'
-                             '    @override\n'
-                             '    def bind_prefix_cache(self, index: PrefixCacheIndex) '
-                             '-> None:\n'
-                             '        assert not self._blocks and not self._contexts\n'
-                             '        self.prefix_cache = index\n'
-                             '        self._register_cache_tier()\n'
-                             '\n'
-                             '    def _register_cache_tier(self) -> None:\n'
-                             '        self.prefix_cache.register_tier(\n'
-                             '            self.cache_tier, self._num_blocks,\n'
-                             '            self._forget_agent,\n'
-                             '        )\n'
                              '\n'
                              '    def _forget_agent(self, agent_id: str) -> None:\n'
                              '        for req_id in tuple(self._agents.get(agent_id, '
                              '())):\n'
                              '            self._forget_context(req_id)\n'
-                             '\n'
-                             '    @override\n'
-                             '    def begin_lookup(self, req_context: ReqContext) -> '
-                             'None:\n'
-                             '        '
-                             'req_context.set_state(self.prefix_cache.view(self._agent_id(req_context)))\n'
-                             '\n'
-                             '    @staticmethod\n'
-                             '    def _lookup_view(req_context: ReqContext) -> '
-                             'PrefixCacheView:\n'
-                             '        view = req_context.get_state(PrefixCacheView)\n'
-                             '        if view is None:\n'
-                             '            raise VLLMServerError("KV prefix lookup '
-                             'began without a cache membership view.")\n'
-                             '        return view\n'
                              '\n'
                              '    # --- block pool ---\n'
                              '\n'},
@@ -36664,51 +31314,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                        '        return LookupResult.HIT\n'
                        '\n'
                        '    @override\n'
-                       '    def prepare_load(\n'
-                       '        self,\n'
-                       '        keys: Collection[OffloadKey],\n'
-                       '        req_context: ReqContext,\n'
-                       '    ) -> LoadStoreSpec:\n'
-                       '        blocks = []\n'
-                       '        for key in keys:\n'
-                       '            block = self._policy.get(key)\n'
-                       '            assert block is not None, f"Block {key!r} not '
-                       'found in cache"\n'
-                       '            assert block.is_ready, f"Block {key!r} is not '
-                       'ready for reading"\n'
-                       '            if block.ref_cnt == 0:\n'
-                       '                self._policy.mark_non_evictable(key)\n'
-                       '                self._num_evictable_cache_blocks -= 1  # '
-                       'ref_cnt 0 -> 1\n'
-                       '                assert self._num_evictable_cache_blocks >= 0\n'
-                       '            block.ref_cnt += 1\n'
-                       '            blocks.append(block)\n'
-                       '        return self._get_load_store_spec(keys, blocks)\n'
-                       '\n'
-                       '    @override\n'
-                       '    def touch(self, keys: Collection[OffloadKey], req_context: '
-                       'ReqContext) -> None:\n'
-                       '        self._policy.touch(keys, req_context)\n'
-                       '\n'
-                       '    @override\n'
-                       '    def complete_load(\n'
-                       '        self, keys: Collection[OffloadKey], req_context: '
-                       'ReqContext\n'
-                       '    ) -> None:\n'
-                       '        for key in keys:\n'
-                       '            block = self._policy.get(key)\n'
-                       '            assert block is not None, f"Block {key!r} not '
-                       'found"\n'
-                       '            assert block.ref_cnt > 0, f"Block {key!r} ref_cnt '
-                       'is already 0"\n'
-                       '            block.ref_cnt -= 1\n'
-                       '            if block.ref_cnt == 0:\n'
-                       '                self._num_evictable_cache_blocks += 1  # '
-                       'ref_cnt 1 -> 0\n'
-                       '                self._policy.mark_evictable(key)\n'
-                       '\n'
-                       '    @override\n'
-                       '    def prepare_store(\n',
+                       '    def prepare_load(\n',
              'after': '    ) -> CPULoadStoreSpec:\n'
                       '        return CPULoadStoreSpec([block.block_id for block in '
                       'blocks])\n'
@@ -36762,10 +31368,10 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       'to contexts."""\n'
                       '        del self._blocks[key]\n'
                       '        del self._canonical_content[key]\n'
+                      '        del self._available_content[key]\n'
                       '        self._complete_blocks.discard(key)\n'
                       '        self._evictable_blocks.pop(key, None)\n'
                       '        self._free_block(block)\n'
-                      '        self.prefix_cache.remove(self.cache_tier, key)\n'
                       '\n'
                       '    @override\n'
                       '    def on_new_request(self, req_context: ReqContext) -> '
@@ -36800,18 +31406,6 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       'req_context.prefix_content.get(key))\n'
                       '            for key in keys\n'
                       '        }\n'
-                      '        view = req_context.get_state(PrefixCacheView)\n'
-                      '        if view is not None:\n'
-                      '            selected = {}\n'
-                      '            for key in keys:\n'
-                      '                required = context.required[key]\n'
-                      '                if required and self._has_content(key, '
-                      'required, req_context) and view.allows(required):\n'
-                      '                    selected[key] = required\n'
-                      '            self.prefix_cache.acquire(\n'
-                      '                self.cache_tier, context.agent_id, selected, '
-                      'selection=selected,\n'
-                      '            )\n'
                       '\n'
                       '        # A new turn replaces the previous idle turn of the '
                       'same agent.\n'
@@ -36841,6 +31435,22 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '            self._forget_context(idle)\n'
                       '        self._idle_context[context.agent_id] = '
                       'req_context.req_id\n'
+                      '        # Retained contexts are bounded by the chunk count. '
+                      'Without sharing,\n'
+                      '        # each one holds at least one chunk of its own, so no '
+                      'more could stay\n'
+                      '        # resident; sharing must not let identical content '
+                      'under ever more\n'
+                      '        # IDs grow this metadata without bound. The least '
+                      'recently used\n'
+                      '        # retained context goes first; active requests keep '
+                      'theirs.\n'
+                      '        while len(self._idle_context) > self._num_blocks:\n'
+                      '            oldest = next(\n'
+                      '                agent for agent in self._agents if agent in '
+                      'self._idle_context\n'
+                      '            )\n'
+                      '            self._forget_context(self._idle_context[oldest])\n'
                       '\n'
                       '    def _describe_content(self, key: OffloadKey, req_context: '
                       'ReqContext) -> None:\n'
@@ -36851,8 +31461,9 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '        assert previous is None or previous == canonical\n'
                       '        self._canonical_content[key] = canonical\n'
                       '        if key in self._complete_blocks:\n'
-                      '            self.prefix_cache.describe(self.cache_tier, key, '
-                      'canonical)\n'
+                      '            available = self._available_content[key]\n'
+                      '            assert available is None or available == canonical\n'
+                      '            self._available_content[key] = canonical\n'
                       '\n'
                       '    def _has_content(\n'
                       '        self, key: OffloadKey, required: Collection[bytes], '
@@ -36861,9 +31472,9 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '        if key not in self._blocks:\n'
                       '            return False\n'
                       '        self._describe_content(key, req_context)\n'
-                      '        return '
-                      'set(required).issubset(self.prefix_cache.content(self.cache_tier, '
-                      'key))\n'
+                      '        available = self._available_content[key]\n'
+                      '        return available is not None and '
+                      'set(required).issubset(available)\n'
                       '\n'
                       '    def _required_content(self, key: OffloadKey, req_context: '
                       'ReqContext) -> tuple[bytes, ...]:\n'
@@ -36871,8 +31482,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '        if required is None:\n'
                       '            required = req_context.prefix_content.get(key)\n'
                       '        if required is None and key in self._blocks:\n'
-                      '            required = '
-                      'self.prefix_cache.content(self.cache_tier, key)\n'
+                      '            required = self._available_content[key]\n'
                       '        assert required\n'
                       '        return required\n'
                       '\n'
@@ -36880,9 +31490,6 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '    def lookup(self, key: OffloadKey, req_context: ReqContext) '
                       '-> LookupResult:\n'
                       '        required = self._required_content(key, req_context)\n'
-                      '        if not '
-                      'self._lookup_view(req_context).allows(required):\n'
-                      '            return LookupResult.MISS\n'
                       '        if not self._has_content(key, required, req_context):\n'
                       '            return LookupResult.MISS\n'
                       '        return self._readiness(key)\n'
@@ -36912,63 +31519,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '        return self._prepare_load(keys, req_context)\n'
                       '\n'
                       '    @override\n'
-                      '    def prepare_load(\n'
-                      '        self,\n'
-                      '        keys: Collection[OffloadKey],\n'
-                      '        req_context: ReqContext,\n'
-                      '    ) -> LoadStoreSpec:\n'
-                      '        view = self._lookup_view(req_context)\n'
-                      '        selected = {key: self._required_content(key, '
-                      'req_context) for key in keys}\n'
-                      '        if any(\n'
-                      '            not view.allows(required) or not '
-                      'self._has_content(key, required, req_context)\n'
-                      '            for key, required in selected.items()\n'
-                      '        ):\n'
-                      '            raise VLLMServerError("A KV load contains data '
-                      'outside its available selected prefix.")\n'
-                      '        context = self._context(req_context)\n'
-                      '        self.retain_context(context.keys | set(keys), '
-                      'req_context)\n'
-                      '        self.prefix_cache.acquire(self.cache_tier, '
-                      'context.agent_id, keys, selection=selected)\n'
-                      '        return self._prepare_load(keys, req_context)\n'
-                      '\n'
-                      '    def _prepare_load(\n'
-                      '        self,\n'
-                      '        keys: Collection[OffloadKey],\n'
-                      '        req_context: ReqContext,\n'
-                      '    ) -> LoadStoreSpec:\n'
-                      '        blocks = []\n'
-                      '        for key in keys:\n'
-                      '            block = self._blocks.get(key)\n'
-                      '            assert block is not None, f"Block {key!r} not found '
-                      'in cache"\n'
-                      '            assert block.is_ready, f"Block {key!r} is not ready '
-                      'for reading"\n'
-                      '            if block.ref_cnt == 0:\n'
-                      '                del self._evictable_blocks[key]\n'
-                      '            block.ref_cnt += 1\n'
-                      '            blocks.append(block)\n'
-                      '        return self._get_load_store_spec(keys, blocks)\n'
-                      '\n'
-                      '    @override\n'
-                      '    def complete_load(\n'
-                      '        self, keys: Collection[OffloadKey], req_context: '
-                      'ReqContext\n'
-                      '    ) -> None:\n'
-                      '        for key in keys:\n'
-                      '            block = self._blocks.get(key)\n'
-                      '            assert block is not None, f"Block {key!r} not '
-                      'found"\n'
-                      '            assert block.ref_cnt > 0, f"Block {key!r} ref_cnt '
-                      'is already 0"\n'
-                      '            block.ref_cnt -= 1\n'
-                      '            if block.ref_cnt == 0:\n'
-                      '                self._evictable_blocks[key] = None\n'
-                      '\n'
-                      '    @override\n'
-                      '    def prepare_store(\n',
+                      '    def prepare_load(\n',
              'review_before': '    ) -> CPULoadStoreSpec:\n'
                               '        return CPULoadStoreSpec([block.block_id for '
                               'block in blocks])\n'
@@ -37000,52 +31551,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                               '        return LookupResult.HIT\n'
                               '\n'
                               '    @override\n'
-                              '    def prepare_load(\n'
-                              '        self,\n'
-                              '        keys: Collection[OffloadKey],\n'
-                              '        req_context: ReqContext,\n'
-                              '    ) -> LoadStoreSpec:\n'
-                              '        blocks = []\n'
-                              '        for key in keys:\n'
-                              '            block = self._policy.get(key)\n'
-                              '            assert block is not None, f"Block {key!r} '
-                              'not found in cache"\n'
-                              '            assert block.is_ready, f"Block {key!r} is '
-                              'not ready for reading"\n'
-                              '            if block.ref_cnt == 0:\n'
-                              '                self._policy.mark_non_evictable(key)\n'
-                              '                self._num_evictable_cache_blocks -= 1  '
-                              '# ref_cnt 0 -> 1\n'
-                              '                assert self._num_evictable_cache_blocks '
-                              '>= 0\n'
-                              '            block.ref_cnt += 1\n'
-                              '            blocks.append(block)\n'
-                              '        return self._get_load_store_spec(keys, blocks)\n'
-                              '\n'
-                              '    @override\n'
-                              '    def touch(self, keys: Collection[OffloadKey], '
-                              'req_context: ReqContext) -> None:\n'
-                              '        self._policy.touch(keys, req_context)\n'
-                              '\n'
-                              '    @override\n'
-                              '    def complete_load(\n'
-                              '        self, keys: Collection[OffloadKey], '
-                              'req_context: ReqContext\n'
-                              '    ) -> None:\n'
-                              '        for key in keys:\n'
-                              '            block = self._policy.get(key)\n'
-                              '            assert block is not None, f"Block {key!r} '
-                              'not found"\n'
-                              '            assert block.ref_cnt > 0, f"Block {key!r} '
-                              'ref_cnt is already 0"\n'
-                              '            block.ref_cnt -= 1\n'
-                              '            if block.ref_cnt == 0:\n'
-                              '                self._num_evictable_cache_blocks += 1  '
-                              '# ref_cnt 1 -> 0\n'
-                              '                self._policy.mark_evictable(key)\n'
-                              '\n'
-                              '    @override\n'
-                              '    def prepare_store(\n',
+                              '    def prepare_load(\n',
              'review_after': '    ) -> CPULoadStoreSpec:\n'
                              '        return CPULoadStoreSpec([block.block_id for '
                              'block in blocks])\n'
@@ -37102,10 +31608,10 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'belong to contexts."""\n'
                              '        del self._blocks[key]\n'
                              '        del self._canonical_content[key]\n'
+                             '        del self._available_content[key]\n'
                              '        self._complete_blocks.discard(key)\n'
                              '        self._evictable_blocks.pop(key, None)\n'
                              '        self._free_block(block)\n'
-                             '        self.prefix_cache.remove(self.cache_tier, key)\n'
                              '\n'
                              '    @override\n'
                              '    def on_new_request(self, req_context: ReqContext) -> '
@@ -37140,18 +31646,6 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'req_context.prefix_content.get(key))\n'
                              '            for key in keys\n'
                              '        }\n'
-                             '        view = req_context.get_state(PrefixCacheView)\n'
-                             '        if view is not None:\n'
-                             '            selected = {}\n'
-                             '            for key in keys:\n'
-                             '                required = context.required[key]\n'
-                             '                if required and self._has_content(key, '
-                             'required, req_context) and view.allows(required):\n'
-                             '                    selected[key] = required\n'
-                             '            self.prefix_cache.acquire(\n'
-                             '                self.cache_tier, context.agent_id, '
-                             'selected, selection=selected,\n'
-                             '            )\n'
                              '\n'
                              '        # A new turn replaces the previous idle turn of '
                              'the same agent.\n'
@@ -37185,6 +31679,24 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '            self._forget_context(idle)\n'
                              '        self._idle_context[context.agent_id] = '
                              'req_context.req_id\n'
+                             '        # Retained contexts are bounded by the chunk '
+                             'count. Without sharing,\n'
+                             '        # each one holds at least one chunk of its own, '
+                             'so no more could stay\n'
+                             '        # resident; sharing must not let identical '
+                             'content under ever more\n'
+                             '        # IDs grow this metadata without bound. The '
+                             'least recently used\n'
+                             '        # retained context goes first; active requests '
+                             'keep theirs.\n'
+                             '        while len(self._idle_context) > '
+                             'self._num_blocks:\n'
+                             '            oldest = next(\n'
+                             '                agent for agent in self._agents if agent '
+                             'in self._idle_context\n'
+                             '            )\n'
+                             '            '
+                             'self._forget_context(self._idle_context[oldest])\n'
                              '\n'
                              '    def _describe_content(self, key: OffloadKey, '
                              'req_context: ReqContext) -> None:\n'
@@ -37196,8 +31708,10 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'canonical\n'
                              '        self._canonical_content[key] = canonical\n'
                              '        if key in self._complete_blocks:\n'
-                             '            self.prefix_cache.describe(self.cache_tier, '
-                             'key, canonical)\n'
+                             '            available = self._available_content[key]\n'
+                             '            assert available is None or available == '
+                             'canonical\n'
+                             '            self._available_content[key] = canonical\n'
                              '\n'
                              '    def _has_content(\n'
                              '        self, key: OffloadKey, required: '
@@ -37206,9 +31720,9 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '        if key not in self._blocks:\n'
                              '            return False\n'
                              '        self._describe_content(key, req_context)\n'
-                             '        return '
-                             'set(required).issubset(self.prefix_cache.content(self.cache_tier, '
-                             'key))\n'
+                             '        available = self._available_content[key]\n'
+                             '        return available is not None and '
+                             'set(required).issubset(available)\n'
                              '\n'
                              '    def _required_content(self, key: OffloadKey, '
                              'req_context: ReqContext) -> tuple[bytes, ...]:\n'
@@ -37217,8 +31731,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '            required = '
                              'req_context.prefix_content.get(key)\n'
                              '        if required is None and key in self._blocks:\n'
-                             '            required = '
-                             'self.prefix_cache.content(self.cache_tier, key)\n'
+                             '            required = self._available_content[key]\n'
                              '        assert required\n'
                              '        return required\n'
                              '\n'
@@ -37227,9 +31740,6 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'ReqContext) -> LookupResult:\n'
                              '        required = self._required_content(key, '
                              'req_context)\n'
-                             '        if not '
-                             'self._lookup_view(req_context).allows(required):\n'
-                             '            return LookupResult.MISS\n'
                              '        if not self._has_content(key, required, '
                              'req_context):\n'
                              '            return LookupResult.MISS\n'
@@ -37262,26 +31772,159 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '        return self._prepare_load(keys, req_context)\n'
                              '\n'
                              '    @override\n'
-                             '    def prepare_load(\n'
-                             '        self,\n'
-                             '        keys: Collection[OffloadKey],\n'
+                             '    def prepare_load(\n'},
+            {'name': 'vllm/v1/kv_offload/cpu/manager.py:landmark-5',
+             'path': 'vllm/v1/kv_offload/cpu/manager.py',
+             'before': '        keys: Collection[OffloadKey],\n'
+                       '        req_context: ReqContext,\n'
+                       '    ) -> LoadStoreSpec:\n'
+                       '        blocks = []\n'
+                       '        for key in keys:\n'
+                       '            block = self._policy.get(key)\n'
+                       '            assert block is not None, f"Block {key!r} not '
+                       'found in cache"\n'
+                       '            assert block.is_ready, f"Block {key!r} is not '
+                       'ready for reading"\n'
+                       '            if block.ref_cnt == 0:\n'
+                       '                self._policy.mark_non_evictable(key)\n'
+                       '                self._num_evictable_cache_blocks -= 1  # '
+                       'ref_cnt 0 -> 1\n'
+                       '                assert self._num_evictable_cache_blocks >= 0\n'
+                       '            block.ref_cnt += 1\n'
+                       '            blocks.append(block)\n'
+                       '        return self._get_load_store_spec(keys, blocks)\n'
+                       '\n'
+                       '    @override\n'
+                       '    def touch(self, keys: Collection[OffloadKey], req_context: '
+                       'ReqContext) -> None:\n'
+                       '        self._policy.touch(keys, req_context)\n'
+                       '\n'
+                       '    @override\n'
+                       '    def complete_load(\n'
+                       '        self, keys: Collection[OffloadKey], req_context: '
+                       'ReqContext\n'
+                       '    ) -> None:\n'
+                       '        for key in keys:\n'
+                       '            block = self._policy.get(key)\n'
+                       '            assert block is not None, f"Block {key!r} not '
+                       'found"\n'
+                       '            assert block.ref_cnt > 0, f"Block {key!r} ref_cnt '
+                       'is already 0"\n'
+                       '            block.ref_cnt -= 1\n'
+                       '            if block.ref_cnt == 0:\n'
+                       '                self._num_evictable_cache_blocks += 1  # '
+                       'ref_cnt 1 -> 0\n'
+                       '                self._policy.mark_evictable(key)\n'
+                       '\n'
+                       '    @override\n'
+                       '    def prepare_store(\n',
+             'after': '        keys: Collection[OffloadKey],\n'
+                      '        req_context: ReqContext,\n'
+                      '    ) -> LoadStoreSpec:\n'
+                      '        if any(\n'
+                      '            not self._has_content(key, '
+                      'self._required_content(key, req_context), req_context)\n'
+                      '            for key in keys\n'
+                      '        ):\n'
+                      '            raise VLLMServerError("A KV load contains data its '
+                      'chunk does not hold.")\n'
+                      '        context = self._context(req_context)\n'
+                      '        self.retain_context(context.keys | set(keys), '
+                      'req_context)\n'
+                      '        return self._prepare_load(keys, req_context)\n'
+                      '\n'
+                      '    def _prepare_load(\n'
+                      '        self,\n'
+                      '        keys: Collection[OffloadKey],\n'
+                      '        req_context: ReqContext,\n'
+                      '    ) -> LoadStoreSpec:\n'
+                      '        blocks = []\n'
+                      '        for key in keys:\n'
+                      '            block = self._blocks.get(key)\n'
+                      '            assert block is not None, f"Block {key!r} not found '
+                      'in cache"\n'
+                      '            assert block.is_ready, f"Block {key!r} is not ready '
+                      'for reading"\n'
+                      '            if block.ref_cnt == 0:\n'
+                      '                del self._evictable_blocks[key]\n'
+                      '            block.ref_cnt += 1\n'
+                      '            blocks.append(block)\n'
+                      '        return self._get_load_store_spec(keys, blocks)\n'
+                      '\n'
+                      '    @override\n'
+                      '    def complete_load(\n'
+                      '        self, keys: Collection[OffloadKey], req_context: '
+                      'ReqContext\n'
+                      '    ) -> None:\n'
+                      '        for key in keys:\n'
+                      '            block = self._blocks.get(key)\n'
+                      '            assert block is not None, f"Block {key!r} not '
+                      'found"\n'
+                      '            assert block.ref_cnt > 0, f"Block {key!r} ref_cnt '
+                      'is already 0"\n'
+                      '            block.ref_cnt -= 1\n'
+                      '            if block.ref_cnt == 0:\n'
+                      '                self._evictable_blocks[key] = None\n'
+                      '\n'
+                      '    @override\n'
+                      '    def prepare_store(\n',
+             'review_before': '        keys: Collection[OffloadKey],\n'
+                              '        req_context: ReqContext,\n'
+                              '    ) -> LoadStoreSpec:\n'
+                              '        blocks = []\n'
+                              '        for key in keys:\n'
+                              '            block = self._policy.get(key)\n'
+                              '            assert block is not None, f"Block {key!r} '
+                              'not found in cache"\n'
+                              '            assert block.is_ready, f"Block {key!r} is '
+                              'not ready for reading"\n'
+                              '            if block.ref_cnt == 0:\n'
+                              '                self._policy.mark_non_evictable(key)\n'
+                              '                self._num_evictable_cache_blocks -= 1  '
+                              '# ref_cnt 0 -> 1\n'
+                              '                assert self._num_evictable_cache_blocks '
+                              '>= 0\n'
+                              '            block.ref_cnt += 1\n'
+                              '            blocks.append(block)\n'
+                              '        return self._get_load_store_spec(keys, blocks)\n'
+                              '\n'
+                              '    @override\n'
+                              '    def touch(self, keys: Collection[OffloadKey], '
+                              'req_context: ReqContext) -> None:\n'
+                              '        self._policy.touch(keys, req_context)\n'
+                              '\n'
+                              '    @override\n'
+                              '    def complete_load(\n'
+                              '        self, keys: Collection[OffloadKey], '
+                              'req_context: ReqContext\n'
+                              '    ) -> None:\n'
+                              '        for key in keys:\n'
+                              '            block = self._policy.get(key)\n'
+                              '            assert block is not None, f"Block {key!r} '
+                              'not found"\n'
+                              '            assert block.ref_cnt > 0, f"Block {key!r} '
+                              'ref_cnt is already 0"\n'
+                              '            block.ref_cnt -= 1\n'
+                              '            if block.ref_cnt == 0:\n'
+                              '                self._num_evictable_cache_blocks += 1  '
+                              '# ref_cnt 1 -> 0\n'
+                              '                self._policy.mark_evictable(key)\n'
+                              '\n'
+                              '    @override\n'
+                              '    def prepare_store(\n',
+             'review_after': '        keys: Collection[OffloadKey],\n'
                              '        req_context: ReqContext,\n'
                              '    ) -> LoadStoreSpec:\n'
-                             '        view = self._lookup_view(req_context)\n'
-                             '        selected = {key: self._required_content(key, '
-                             'req_context) for key in keys}\n'
                              '        if any(\n'
-                             '            not view.allows(required) or not '
-                             'self._has_content(key, required, req_context)\n'
-                             '            for key, required in selected.items()\n'
+                             '            not self._has_content(key, '
+                             'self._required_content(key, req_context), req_context)\n'
+                             '            for key in keys\n'
                              '        ):\n'
                              '            raise VLLMServerError("A KV load contains '
-                             'data outside its available selected prefix.")\n'
+                             'data its chunk does not hold.")\n'
                              '        context = self._context(req_context)\n'
                              '        self.retain_context(context.keys | set(keys), '
                              'req_context)\n'
-                             '        self.prefix_cache.acquire(self.cache_tier, '
-                             'context.agent_id, keys, selection=selected)\n'
                              '        return self._prepare_load(keys, req_context)\n'
                              '\n'
                              '    def _prepare_load(\n'
@@ -37319,7 +31962,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '\n'
                              '    @override\n'
                              '    def prepare_store(\n'},
-            {'name': 'vllm/v1/kv_offload/cpu/manager.py:landmark-5',
+            {'name': 'vllm/v1/kv_offload/cpu/manager.py:landmark-6',
              'path': 'vllm/v1/kv_offload/cpu/manager.py',
              'before': '        keys: Collection[OffloadKey],\n'
                        '        req_context: ReqContext,\n'
@@ -37387,21 +32030,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       'req_context.prefix_content[key])\n'
                       '            for key in keys\n'
                       '        }\n'
-                      '        retained_keys = set(context.keys)\n'
-                      '        output = self._prepare_store(keys, req_context, '
+                      '        return self._prepare_store(keys, req_context, '
                       'produced=produced)\n'
-                      '        if output is not None:\n'
-                      '            # Physical-copy membership can evict an agent '
-                      'record at the\n'
-                      '            # metadata bound. Re-establish this producing '
-                      "request's working\n"
-                      '            # set before acquiring its computed data.\n'
-                      '            self.retain_context(retained_keys, req_context)\n'
-                      '            self.prefix_cache.acquire(\n'
-                      '                self.cache_tier, context.agent_id, keys, '
-                      'selection=produced,\n'
-                      '            )\n'
-                      '        return output\n'
                       '\n'
                       '    def _prepare_store(\n'
                       '        self,\n'
@@ -37433,8 +32063,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '                new_keys.append(key)\n'
                       '                content[key] = incoming\n'
                       '            elif key not in self._complete_blocks:\n'
-                      '                available = '
-                      'self.prefix_cache.content(self.cache_tier, key)\n'
+                      '                available = self._available_content[key]\n'
+                      '                assert available is not None\n'
                       '                assert incoming is not None and canonical is '
                       'not None\n'
                       '                combined = set(available) | set(incoming)\n'
@@ -37485,8 +32115,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '                return None\n'
                       '\n'
                       '        for victim in victims:\n'
-                      '            self.prefix_cache.release_agent(self.cache_tier, '
-                      'victim)\n'
+                      '            self._forget_agent(victim)\n'
                       '        for key in to_evict:\n'
                       '            self._remove_block(key, self._blocks[key])\n'
                       '\n'
@@ -37562,22 +32191,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'req_context.prefix_content[key])\n'
                              '            for key in keys\n'
                              '        }\n'
-                             '        retained_keys = set(context.keys)\n'
-                             '        output = self._prepare_store(keys, req_context, '
+                             '        return self._prepare_store(keys, req_context, '
                              'produced=produced)\n'
-                             '        if output is not None:\n'
-                             '            # Physical-copy membership can evict an '
-                             'agent record at the\n'
-                             '            # metadata bound. Re-establish this '
-                             "producing request's working\n"
-                             '            # set before acquiring its computed data.\n'
-                             '            self.retain_context(retained_keys, '
-                             'req_context)\n'
-                             '            self.prefix_cache.acquire(\n'
-                             '                self.cache_tier, context.agent_id, keys, '
-                             'selection=produced,\n'
-                             '            )\n'
-                             '        return output\n'
                              '\n'
                              '    def _prepare_store(\n'
                              '        self,\n'
@@ -37613,7 +32228,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '                content[key] = incoming\n'
                              '            elif key not in self._complete_blocks:\n'
                              '                available = '
-                             'self.prefix_cache.content(self.cache_tier, key)\n'
+                             'self._available_content[key]\n'
+                             '                assert available is not None\n'
                              '                assert incoming is not None and '
                              'canonical is not None\n'
                              '                combined = set(available) | '
@@ -37667,15 +32283,13 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '                return None\n'
                              '\n'
                              '        for victim in victims:\n'
-                             '            '
-                             'self.prefix_cache.release_agent(self.cache_tier, '
-                             'victim)\n'
+                             '            self._forget_agent(victim)\n'
                              '        for key in to_evict:\n'
                              '            self._remove_block(key, self._blocks[key])\n'
                              '\n'
                              '        if to_evict and self.events is not None:\n'
                              '            self.events.append(\n'},
-            {'name': 'vllm/v1/kv_offload/cpu/manager.py:landmark-6',
+            {'name': 'vllm/v1/kv_offload/cpu/manager.py:landmark-7',
              'path': 'vllm/v1/kv_offload/cpu/manager.py',
              'before': '                )\n'
                        '            )\n'
@@ -37705,22 +32319,19 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '            self._blocks[key] = block\n'
                       '            self._canonical_content[key] = '
                       'req_context.prefix_content.get(key)\n'
-                      '            self.prefix_cache.insert(self.cache_tier, key, '
-                      'content[key])\n'
+                      '            self._available_content[key] = content[key]\n'
                       '        for key in upgrades:\n'
                       '            self._blocks[key].ref_cnt = -1\n'
                       '            del self._evictable_blocks[key]\n'
-                      '            self.prefix_cache.extend_content(self.cache_tier, '
-                      'key, content[key])\n'
+                      '            available = self._available_content[key]\n'
+                      '            assert available is not None and '
+                      'set(available).issubset(content[key])\n'
+                      '            self._available_content[key] = content[key]\n'
                       '        for key in keys_to_store:\n'
                       '            if produced is None or content[key] == '
                       'self._canonical_content[key]:\n'
                       '                self._complete_blocks.add(key)\n'
                       '        self._num_write_pending_blocks += len(keys_to_store)\n'
-                      '        self.prefix_cache.copy_content_memberships(\n'
-                      '            self.cache_tier, [key for key in keys_to_store if '
-                      'content[key] is not None],\n'
-                      '        )\n'
                       '        store_spec = self._get_load_store_spec(\n'
                       '            keys_to_store, (self._blocks[key] for key in '
                       'keys_to_store),\n'
@@ -37757,24 +32368,20 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '            self._blocks[key] = block\n'
                              '            self._canonical_content[key] = '
                              'req_context.prefix_content.get(key)\n'
-                             '            self.prefix_cache.insert(self.cache_tier, '
-                             'key, content[key])\n'
+                             '            self._available_content[key] = content[key]\n'
                              '        for key in upgrades:\n'
                              '            self._blocks[key].ref_cnt = -1\n'
                              '            del self._evictable_blocks[key]\n'
-                             '            '
-                             'self.prefix_cache.extend_content(self.cache_tier, key, '
-                             'content[key])\n'
+                             '            available = self._available_content[key]\n'
+                             '            assert available is not None and '
+                             'set(available).issubset(content[key])\n'
+                             '            self._available_content[key] = content[key]\n'
                              '        for key in keys_to_store:\n'
                              '            if produced is None or content[key] == '
                              'self._canonical_content[key]:\n'
                              '                self._complete_blocks.add(key)\n'
                              '        self._num_write_pending_blocks += '
                              'len(keys_to_store)\n'
-                             '        self.prefix_cache.copy_content_memberships(\n'
-                             '            self.cache_tier, [key for key in '
-                             'keys_to_store if content[key] is not None],\n'
-                             '        )\n'
                              '        store_spec = self._get_load_store_spec(\n'
                              '            keys_to_store, (self._blocks[key] for key in '
                              'keys_to_store),\n'
@@ -37782,7 +32389,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '\n'
                              '        return PrepareStoreOutput(\n'
                              '            keys_to_store=keys_to_store,\n'},
-            {'name': 'vllm/v1/kv_offload/cpu/manager.py:landmark-7',
+            {'name': 'vllm/v1/kv_offload/cpu/manager.py:landmark-8',
              'path': 'vllm/v1/kv_offload/cpu/manager.py',
              'before': '\n'
                        '        if success:\n'
@@ -37883,7 +32490,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '\n'
                              '        if stored_keys and self.events is not None:\n'
                              '            self.events.append(\n'},
-            {'name': 'vllm/v1/kv_offload/cpu/manager.py:landmark-8',
+            {'name': 'vllm/v1/kv_offload/cpu/manager.py:landmark-9',
              'path': 'vllm/v1/kv_offload/cpu/manager.py',
              'before': '        # pre-reset jobs, so no lazy cleanup is needed. The '
                        'scheduler also\n'
@@ -37902,9 +32509,9 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       'any new stores\n'
                       '        # can begin, preventing a cross-direction data race on '
                       'reused offload block IDs.\n'
-                      '        self.prefix_cache.reset(self.cache_tier)\n'
                       '        self._blocks.clear()\n'
                       '        self._canonical_content.clear()\n'
+                      '        self._available_content.clear()\n'
                       '        self._complete_blocks.clear()\n'
                       '        self._evictable_blocks.clear()\n'
                       '        self._contexts.clear()\n'
@@ -37931,9 +32538,9 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'before any new stores\n'
                              '        # can begin, preventing a cross-direction data '
                              'race on reused offload block IDs.\n'
-                             '        self.prefix_cache.reset(self.cache_tier)\n'
                              '        self._blocks.clear()\n'
                              '        self._canonical_content.clear()\n'
+                             '        self._available_content.clear()\n'
                              '        self._complete_blocks.clear()\n'
                              '        self._evictable_blocks.clear()\n'
                              '        self._contexts.clear()\n'
@@ -37943,7 +32550,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '        self._num_write_pending_blocks = 0\n'
                              '\n'
                              '        self._free_list.clear()\n'},
-            {'name': 'vllm/v1/kv_offload/cpu/manager.py:landmark-9',
+            {'name': 'vllm/v1/kv_offload/cpu/manager.py:landmark-10',
              'path': 'vllm/v1/kv_offload/cpu/manager.py',
              'before': '        num_used = (\n'
                        '            self._num_allocated_blocks\n'
@@ -37985,7 +32592,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '        '
                              'stats.set_gauge(CPUOffloadingMetrics.CPU_CACHE_USAGE_PERC, '
                              'usage)\n'},
-            {'name': 'vllm/v1/kv_offload/cpu/manager.py:landmark-10',
+            {'name': 'vllm/v1/kv_offload/cpu/manager.py:landmark-11',
              'path': 'vllm/v1/kv_offload/cpu/manager.py',
              'before': '        '
                        'stats.set_gauge(CPUOffloadingMetrics.CPU_CACHE_WRITE_USAGE_PERC, '
@@ -39856,11 +34463,6 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '    @override\n'
                       '    def lookup(self, key: OffloadKey, req_context: ReqContext) '
                       '-> LookupResult:\n'
-                      '        view = self.primary_tier._lookup_view(req_context)\n'
-                      '        required = self.primary_tier._required_content(key, '
-                      'req_context)\n'
-                      '        if not view.allows(required):\n'
-                      '            return LookupResult.MISS\n'
                       '        return self._lookup(key, req_context, generation=True)\n'
                       '\n'
                       '    def _lookup(\n'
@@ -39891,12 +34493,6 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    @override\n'
                              '    def lookup(self, key: OffloadKey, req_context: '
                              'ReqContext) -> LookupResult:\n'
-                             '        view = '
-                             'self.primary_tier._lookup_view(req_context)\n'
-                             '        required = '
-                             'self.primary_tier._required_content(key, req_context)\n'
-                             '        if not view.allows(required):\n'
-                             '            return LookupResult.MISS\n'
                              '        return self._lookup(key, req_context, '
                              'generation=True)\n'
                              '\n'
@@ -40001,14 +34597,6 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       'req_context)\n'
                       '\n'
                       '    @override\n'
-                      '    def bind_prefix_cache(self, index) -> None:\n'
-                      '        self.primary_tier.bind_prefix_cache(index)\n'
-                      '\n'
-                      '    @override\n'
-                      '    def begin_lookup(self, req_context: ReqContext) -> None:\n'
-                      '        self.primary_tier.begin_lookup(req_context)\n'
-                      '\n'
-                      '    @override\n'
                       '    def retain_context(self, keys: Collection[OffloadKey], '
                       'req_context: ReqContext):\n'
                       '        self.primary_tier.retain_context(keys, req_context)\n'
@@ -40034,15 +34622,6 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                               '\n',
              'review_after': '        return self.primary_tier.prepare_load(keys, '
                              'req_context)\n'
-                             '\n'
-                             '    @override\n'
-                             '    def bind_prefix_cache(self, index) -> None:\n'
-                             '        self.primary_tier.bind_prefix_cache(index)\n'
-                             '\n'
-                             '    @override\n'
-                             '    def begin_lookup(self, req_context: ReqContext) -> '
-                             'None:\n'
-                             '        self.primary_tier.begin_lookup(req_context)\n'
                              '\n'
                              '    @override\n'
                              '    def retain_context(self, keys: '
@@ -40798,206 +35377,6 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '                    "kv_cache_report_mode", '
                              '"incremental"\n'
                              '                )\n'},
-            {'name': 'vllm/v1/simple_kv_offload/manager.py:landmark-1',
-             'path': 'vllm/v1/simple_kv_offload/manager.py',
-             'before': '        """Bind GPU block pool so that we can touch blocks '
-                       'during stores.\n'
-                       '        Called by Scheduler after kv_cache_manager is '
-                       'ready."""\n'
-                       '        self._gpu_block_pool = gpu_block_pool\n'
-                       '\n'
-                       '    def get_num_new_matched_tokens(\n'
-                       '        self, request: "Request", num_computed_tokens: int\n',
-             'after': '        """Bind GPU block pool so that we can touch blocks '
-                      'during stores.\n'
-                      '        Called by Scheduler after kv_cache_manager is '
-                      'ready."""\n'
-                      '        self._gpu_block_pool = gpu_block_pool\n'
-                      '        '
-                      'self.cpu_block_pool.bind_prefix_cache(gpu_block_pool.prefix_cache)\n'
-                      '\n'
-                      '    def get_num_new_matched_tokens(\n'
-                      '        self, request: "Request", num_computed_tokens: int\n',
-             'review_before': '        """Bind GPU block pool so that we can touch '
-                              'blocks during stores.\n'
-                              '        Called by Scheduler after kv_cache_manager is '
-                              'ready."""\n'
-                              '        self._gpu_block_pool = gpu_block_pool\n'
-                              '\n'
-                              '    def get_num_new_matched_tokens(\n'
-                              '        self, request: "Request", num_computed_tokens: '
-                              'int\n',
-             'review_after': '        """Bind GPU block pool so that we can touch '
-                             'blocks during stores.\n'
-                             '        Called by Scheduler after kv_cache_manager is '
-                             'ready."""\n'
-                             '        self._gpu_block_pool = gpu_block_pool\n'
-                             '        '
-                             'self.cpu_block_pool.bind_prefix_cache(gpu_block_pool.prefix_cache)\n'
-                             '\n'
-                             '    def get_num_new_matched_tokens(\n'
-                             '        self, request: "Request", num_computed_tokens: '
-                             'int\n'},
-            {'name': 'vllm/v1/simple_kv_offload/manager.py:landmark-2',
-             'path': 'vllm/v1/simple_kv_offload/manager.py',
-             'before': '        if max_hit_len <= 0:\n'
-                       '            return 0, False\n'
-                       '        cpu_hit_blocks, hit_length, _ = '
-                       'self.cpu_coordinator.find_longest_cache_hit(\n'
-                       '            remaining_hashes, max_hit_len\n'
-                       '        )\n'
-                       '\n'
-                       '        if hit_length > 0:\n',
-             'after': '        if max_hit_len <= 0:\n'
-                      '            return 0, False\n'
-                      '        cpu_hit_blocks, hit_length, _ = '
-                      'self.cpu_coordinator.find_longest_cache_hit(\n'
-                      '            remaining_hashes, max_hit_len,\n'
-                      '            '
-                      'cache_view=self.cpu_block_pool.prefix_cache.view(request.kv_scope),\n'
-                      '        )\n'
-                      '\n'
-                      '        if hit_length > 0:\n',
-             'review_before': '        if max_hit_len <= 0:\n'
-                              '            return 0, False\n'
-                              '        cpu_hit_blocks, hit_length, _ = '
-                              'self.cpu_coordinator.find_longest_cache_hit(\n'
-                              '            remaining_hashes, max_hit_len\n'
-                              '        )\n'
-                              '\n'
-                              '        if hit_length > 0:\n',
-             'review_after': '        if max_hit_len <= 0:\n'
-                             '            return 0, False\n'
-                             '        cpu_hit_blocks, hit_length, _ = '
-                             'self.cpu_coordinator.find_longest_cache_hit(\n'
-                             '            remaining_hashes, max_hit_len,\n'
-                             '            '
-                             'cache_view=self.cpu_block_pool.prefix_cache.view(request.kv_scope),\n'
-                             '        )\n'
-                             '\n'
-                             '        if hit_length > 0:\n'},
-            {'name': 'vllm/v1/simple_kv_offload/manager.py:landmark-3',
-             'path': 'vllm/v1/simple_kv_offload/manager.py',
-             'before': '                '
-                       'gpu_block_ids.append(group_gpu_ids[gpu_ext_start + i])\n'
-                       '                cpu_block_ids.append(cpu_blk.block_id)\n'
-                       '                cpu_blocks_to_touch.append(cpu_blk)\n'
-                       '\n'
-                       '        # Touch CPU blocks to prevent eviction during async '
-                       'load.\n'
-                       '        self.cpu_block_pool.touch(cpu_blocks_to_touch)\n',
-             'after': '                '
-                      'gpu_block_ids.append(group_gpu_ids[gpu_ext_start + i])\n'
-                      '                cpu_block_ids.append(cpu_blk.block_id)\n'
-                      '                cpu_blocks_to_touch.append(cpu_blk)\n'
-                      '\n'
-                      '        self.cpu_block_pool.acquire_cached_blocks(\n'
-                      '            request, tuple(cpu_hit_blocks), '
-                      'total_computed_tokens,\n'
-                      '        )\n'
-                      '\n'
-                      '        # Touch CPU blocks to prevent eviction during async '
-                      'load.\n'
-                      '        self.cpu_block_pool.touch(cpu_blocks_to_touch)\n',
-             'review_before': '                '
-                              'gpu_block_ids.append(group_gpu_ids[gpu_ext_start + i])\n'
-                              '                cpu_block_ids.append(cpu_blk.block_id)\n'
-                              '                cpu_blocks_to_touch.append(cpu_blk)\n'
-                              '\n'
-                              '        # Touch CPU blocks to prevent eviction during '
-                              'async load.\n'
-                              '        '
-                              'self.cpu_block_pool.touch(cpu_blocks_to_touch)\n',
-             'review_after': '                '
-                             'gpu_block_ids.append(group_gpu_ids[gpu_ext_start + i])\n'
-                             '                cpu_block_ids.append(cpu_blk.block_id)\n'
-                             '                cpu_blocks_to_touch.append(cpu_blk)\n'
-                             '\n'
-                             '        self.cpu_block_pool.acquire_cached_blocks(\n'
-                             '            request, tuple(cpu_hit_blocks), '
-                             'total_computed_tokens,\n'
-                             '        )\n'
-                             '\n'
-                             '        # Touch CPU blocks to prevent eviction during '
-                             'async load.\n'
-                             '        '
-                             'self.cpu_block_pool.touch(cpu_blocks_to_touch)\n'},
-            {'name': 'vllm/v1/simple_kv_offload/manager.py:landmark-4',
-             'path': 'vllm/v1/simple_kv_offload/manager.py',
-             'before': '\n'
-                       '        cpu_blocks = [self.cpu_block_pool.blocks[bid] for bid '
-                       'in cpu_block_ids]\n'
-                       '\n'
-                       '        for cpu_block in cpu_blocks:\n'
-                       '            bhash = cpu_block.block_hash\n'
-                       '            assert bhash is not None\n'
-                       '            '
-                       'self.cpu_block_pool.cached_block_hash_to_block.insert(bhash, '
-                       'cpu_block)\n'
-                       '\n'
-                       "        # Free CPU and GPU blocks' ref counts to turn them "
-                       'into prefix cache\n'
-                       '        self.cpu_block_pool.free_blocks(cpu_blocks)\n',
-             'after': '\n'
-                      '        cpu_blocks = [self.cpu_block_pool.blocks[bid] for bid '
-                      'in cpu_block_ids]\n'
-                      '\n'
-                      '        assert self._gpu_block_pool is not None\n'
-                      '        index = self.cpu_block_pool.prefix_cache\n'
-                      '        source_tier = self._gpu_block_pool.cache_tier\n'
-                      '        destination_tier = self.cpu_block_pool.cache_tier\n'
-                      '        for cpu_block in cpu_blocks:\n'
-                      '            bhash = cpu_block.block_hash\n'
-                      '            assert bhash is not None\n'
-                      '            self.cpu_block_pool._insert_block_hash(\n'
-                      '                bhash, cpu_block, '
-                      'num_tokens=cpu_block.block_hash_num_tokens,\n'
-                      '                content=index.content(source_tier, bhash),\n'
-                      '            )\n'
-                      '            index.copy_membership(source_tier, '
-                      'destination_tier, bhash)\n'
-                      '\n'
-                      "        # Free CPU and GPU blocks' ref counts to turn them into "
-                      'prefix cache\n'
-                      '        self.cpu_block_pool.free_blocks(cpu_blocks)\n',
-             'review_before': '\n'
-                              '        cpu_blocks = [self.cpu_block_pool.blocks[bid] '
-                              'for bid in cpu_block_ids]\n'
-                              '\n'
-                              '        for cpu_block in cpu_blocks:\n'
-                              '            bhash = cpu_block.block_hash\n'
-                              '            assert bhash is not None\n'
-                              '            '
-                              'self.cpu_block_pool.cached_block_hash_to_block.insert(bhash, '
-                              'cpu_block)\n'
-                              '\n'
-                              "        # Free CPU and GPU blocks' ref counts to turn "
-                              'them into prefix cache\n'
-                              '        self.cpu_block_pool.free_blocks(cpu_blocks)\n',
-             'review_after': '\n'
-                             '        cpu_blocks = [self.cpu_block_pool.blocks[bid] '
-                             'for bid in cpu_block_ids]\n'
-                             '\n'
-                             '        assert self._gpu_block_pool is not None\n'
-                             '        index = self.cpu_block_pool.prefix_cache\n'
-                             '        source_tier = self._gpu_block_pool.cache_tier\n'
-                             '        destination_tier = '
-                             'self.cpu_block_pool.cache_tier\n'
-                             '        for cpu_block in cpu_blocks:\n'
-                             '            bhash = cpu_block.block_hash\n'
-                             '            assert bhash is not None\n'
-                             '            self.cpu_block_pool._insert_block_hash(\n'
-                             '                bhash, cpu_block, '
-                             'num_tokens=cpu_block.block_hash_num_tokens,\n'
-                             '                content=index.content(source_tier, '
-                             'bhash),\n'
-                             '            )\n'
-                             '            index.copy_membership(source_tier, '
-                             'destination_tier, bhash)\n'
-                             '\n'
-                             "        # Free CPU and GPU blocks' ref counts to turn "
-                             'them into prefix cache\n'
-                             '        self.cpu_block_pool.free_blocks(cpu_blocks)\n'},
             {'name': 'vllm/v1/worker/gpu_worker.py:landmark-1',
              'path': 'vllm/v1/worker/gpu_worker.py',
              'before': '\n'
@@ -44156,8 +38535,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': 'b8dbd78c226490fc13209f7220b95b3f445711dcbee76c0b37a3f8860a015b78',
              'after_sha256': '8d7d742f6e7d9f2fa9bbe1e57d6adbd4f2753075a083c7a7f93d39fc5ab474b6'},
             {'path': 'vllm/entrypoints/anthropic/protocol.py',
-             'before_sha256': '511b25d3f4507d1908ff2ef6bfab6d0ff3ad0e656c869fda4fc0aa038a987e7c',
-             'after_sha256': '4f648cfd2ddfb8fab0f611de597b2943e0041de679887ed9bb0292234bdf96cd'},
+             'before_sha256': 'd5fdbbf102ace46a24c69e42e040ce72324d28b50244e8b3b132b7b1e3d66221',
+             'after_sha256': 'e8ea13f888e8ea75f28d4de1b1ded74f2751c72b6c729df90a0a345ade21893a'},
             {'path': 'vllm/entrypoints/anthropic/serving.py',
              'before_sha256': 'b5a15aaae06b874814558fe5cdffc4fc212a5c926c279a1ad654f1ccb3778c2e',
              'after_sha256': '01b02c09a64be7e0de8921694c1537a4972d37c4e6c861716df461c2b0debc5c'},
@@ -54698,8 +49077,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': 'ca23415158a124c1c53b21bee6e22ab0ee7b433f8c9389e208d32a52162fb947',
              'after_sha256': '9d939e56e812a583becfa18b5421488adc2087fba9922bd4e69dbccb012ca89a'},
             {'path': 'vllm/entrypoints/openai/chat_completion/protocol.py',
-             'before_sha256': 'fe675435bc590e57f170075fa2d813591b04373e9b1fb23dd93e896f3c07d284',
-             'after_sha256': 'be4c43d9d8fdce12021e771ddef1992962cd3c913096ac1e789688b5b4265cfa'},
+             'before_sha256': '3daf3057960f7c77868a430baef559f2f345df159417fe506df09b4dceb3ecd4',
+             'after_sha256': 'dd6212acf217fad740b8078c9c3d21be7decc44b4de1c9a3a3613406e89ccbff'},
             {'path': 'vllm/entrypoints/openai/responses/utils.py',
              'before_sha256': '6c70148e6de4a9806f2e4e8fe3e02659780e86b6886601bb8a60b377235dc29d',
              'after_sha256': '8d266a6a9a0f2d3c2d748e2bb4e8e69b2cdfb4a0488224e2a28d356cdf046b79'}),
@@ -59430,20 +53809,20 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': 'fb2ff88c15028af53b5693036b2ad077306010d6220a7c60140fa6cd8d4c3ef1',
              'after_sha256': '9f48652c9a1bb74e059293b287139865c9fc6d8140122d4a75f1ef1d617bded3'},
             {'path': 'tests/entrypoints/test_kv_scope_protocol.py',
-             'before_sha256': '17eb84050768d5a85708464c4105d45552b1f85717f4eb6b8c71e34e51cf6dc4',
-             'after_sha256': '3d5a58a7d8125e160de002a9175ee6784695fe5622eec0223f08637ac05ea5f6'},
+             'before_sha256': '1dcfd97db5993633b575e848a562ea7b8f615404ff8ee1f2dd930bf4143c0932',
+             'after_sha256': '5c3e802e34d3b49b40a50e53ff3b29b0c79f157c7aa406e65fec9820f128461d'},
             {'path': 'vllm/entrypoints/openai/chat_completion/protocol.py',
-             'before_sha256': 'be4c43d9d8fdce12021e771ddef1992962cd3c913096ac1e789688b5b4265cfa',
-             'after_sha256': '623a0acaf1a88bbf18992694587ce1426f9bbb9a305e73c74e1b9769b3169d57'},
+             'before_sha256': 'dd6212acf217fad740b8078c9c3d21be7decc44b4de1c9a3a3613406e89ccbff',
+             'after_sha256': 'e73d68e0bcb8d96424b862bdf13bede371fa3ff98359c3a91ecb9d60f72924ca'},
             {'path': 'vllm/entrypoints/openai/completion/protocol.py',
-             'before_sha256': '5b70feb0a6a59b6c763d64f5c8ab5fbc99750ff98cc055f4db70958b7bfc98ac',
-             'after_sha256': 'fdcbeb79bf27fdd34fbf797439b25b74a8a18d80ae6d2410d08667ee212537fa'},
+             'before_sha256': 'f15939680ff6796c5b2b502f5a019209a53b7e966e8b621af0e9c432af07cf8a',
+             'after_sha256': 'c969f5d56c418a3b5536815df9876a33dadc06800fad01ddf62387be20187c37'},
             {'path': 'vllm/entrypoints/openai/responses/protocol.py',
-             'before_sha256': 'bc0f16f37ee45ec9a5329c3b9bf51991c55ef89454f13b890128dd9f8e134983',
-             'after_sha256': '31e156a3d61c349525feef28d86fbad32749e4e73ea7e72d5ee4cc450c2c1341'},
+             'before_sha256': '33e914fc6a34a37a755fb04ee7c2d4c56513980d6622a0b00adef9939a3b194b',
+             'after_sha256': '0b5dbf895115591287be6ce6361fb9df6de7b69d7976de70e7fcb9066f6d84f1'},
             {'path': 'vllm/entrypoints/scale_out/token_in_token_out/protocol.py',
-             'before_sha256': '2f668f2796cfc767777771508f2ad439bf96ba9d560f288212e3d675d99e2a7d',
-             'after_sha256': 'ea933988b12b9cde960106f9070741fe8a4062316867185dea431a5e8d11fc2f'},
+             'before_sha256': 'a392d732e3fc061fa477e1ad702eb11a505029d179bf6d98e75d9a641124eda7',
+             'after_sha256': '3e2db17828cd4e093d8a45a82f0b78c4b1dfb4fcdeb84939866bdeddaec835da'},
             {'path': 'vllm/entrypoints/scale_out/token_in_token_out/serving.py',
              'before_sha256': 'c055a75cd9148521bdf921110dcd54d7fa6fad17d2cfd552c23e775946beff7a',
              'after_sha256': '6811a18564dc7d096fa9c4d809db1cac75b546d094cdd826babe39b2f2b0f9d8'},
@@ -62345,14 +56724,14 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': '0090315ba1e59d9460155b5b94a25c74be8823e735b2c748cd4315b1546af2a9',
              'after_sha256': '6ec60c5a6dcc50abd7d8b8e9645825b841fa5cdb510009e6a9f517dba58f1184'},
             {'path': 'vllm/entrypoints/openai/chat_completion/protocol.py',
-             'before_sha256': '623a0acaf1a88bbf18992694587ce1426f9bbb9a305e73c74e1b9769b3169d57',
-             'after_sha256': '129d1c2b304a332c27f15102f745a8022a4a48e6a9c6022015bbaa7f60c9ad8b'},
+             'before_sha256': 'e73d68e0bcb8d96424b862bdf13bede371fa3ff98359c3a91ecb9d60f72924ca',
+             'after_sha256': '5aa76ce3f38f6b55630e89671b69564d5220fa38601a28839385e5d2dc031a3c'},
             {'path': 'vllm/entrypoints/openai/chat_completion/serving.py',
              'before_sha256': '6d7e623168292c83e8a2eebd97ee124dc2ea03a4de5a7c36dc21d461ec623337',
              'after_sha256': 'fd06cc1eec25bc41efb4ac7bff1c33a17a65a6463715a731d24c8bed8cc887d1'},
             {'path': 'vllm/entrypoints/openai/completion/protocol.py',
-             'before_sha256': 'fdcbeb79bf27fdd34fbf797439b25b74a8a18d80ae6d2410d08667ee212537fa',
-             'after_sha256': '91fbf3bd89b60cb19c7a1d4e2be58ec665bcb8542e2d23a3c1623bad5bea54f5'},
+             'before_sha256': 'c969f5d56c418a3b5536815df9876a33dadc06800fad01ddf62387be20187c37',
+             'after_sha256': 'bc0e377519a528458ac10cbe6996881505db7f816ae75a0abd656ec49fac33be'},
             {'path': 'vllm/entrypoints/openai/completion/serving.py',
              'before_sha256': 'c4348ccaf254e4a6b729f9c452aa02f899df64a1fb6d3ab7b7dde199f53dff40',
              'after_sha256': '6b4747502ecb32467626e54041e7e0cd276e064dd714554c58b8ebe4cdc3736b'},
@@ -64801,8 +59180,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': '9f48652c9a1bb74e059293b287139865c9fc6d8140122d4a75f1ef1d617bded3',
              'after_sha256': 'af8660d1a31485268e62fbb1616608fcaf7468664ba1650b0846a233f547ac56'},
             {'path': 'vllm/entrypoints/scale_out/token_in_token_out/protocol.py',
-             'before_sha256': 'ea933988b12b9cde960106f9070741fe8a4062316867185dea431a5e8d11fc2f',
-             'after_sha256': '2ebec163e9492d9d2b64134cdffe305aec4d9c6a62ed4540f267ca8760555522'},
+             'before_sha256': '3e2db17828cd4e093d8a45a82f0b78c4b1dfb4fcdeb84939866bdeddaec835da',
+             'after_sha256': '3206ac3fbd004fc7b894d301ab172bfec6da16d01bcb9e30ff41d6687f8dd72c'},
             {'path': 'vllm/entrypoints/scale_out/token_in_token_out/serving.py',
              'before_sha256': '6811a18564dc7d096fa9c4d809db1cac75b546d094cdd826babe39b2f2b0f9d8',
              'after_sha256': 'c61790ed2a9cf20e4e568f7671e153f69c10f103fcbfd2267c04d3c33b3fd3eb'},
@@ -67244,8 +61623,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': '7f460ca14ac85d5817cd8923938269df24fd49c84647d83308392ff6ee3c86c5',
              'after_sha256': '170d9ee1f5023075e128f9158b09ef33e4d653f3fb07ca73fd474cc5168b4f68'},
             {'path': 'vllm/entrypoints/scale_out/token_in_token_out/protocol.py',
-             'before_sha256': '2ebec163e9492d9d2b64134cdffe305aec4d9c6a62ed4540f267ca8760555522',
-             'after_sha256': '1c341e415d7af2ea78bff14d205b9464b63ae8f57d8e0aaf422ea1060d0fecb0'},
+             'before_sha256': '3206ac3fbd004fc7b894d301ab172bfec6da16d01bcb9e30ff41d6687f8dd72c',
+             'after_sha256': '4402f3e7e27437e888389e2f99cdd6f6f7693bc03fca8f979316f47a8ad4daed'},
             {'path': 'vllm/entrypoints/scale_out/token_in_token_out/serving.py',
              'before_sha256': 'c61790ed2a9cf20e4e568f7671e153f69c10f103fcbfd2267c04d3c33b3fd3eb',
              'after_sha256': 'd15c24953a944ae422b399d8bc2251d06a946b1f78cca6add38e26c47bcc21fe'},
@@ -97241,7 +91620,7 @@ FINAL_FILES = {'tests/config/test_config_utils.py': '4f5ea0399cc3b4f9603df07e2cc
  'tests/entrypoints/serve/exception_handling/test_validation_exception_handler.py': '1a4574a22f9dd00afccbb99dd0b113bb613fa99945e66a9effd3c5014aa886af',
  'tests/entrypoints/serve/lora/test_lora_adapters.py': '57dd9087c0c6f5d27ce93b217ca3e9edb74801c7249d298ce1e8cd03425b3b7e',
  'tests/entrypoints/serve/utils/test_api_utils.py': 'ef96041b54c496109f8eaa0dbb62d3465dbaf595a5a446bd588dd44ab304085d',
- 'tests/entrypoints/test_kv_scope_protocol.py': '3d5a58a7d8125e160de002a9175ee6784695fe5622eec0223f08637ac05ea5f6',
+ 'tests/entrypoints/test_kv_scope_protocol.py': '5c3e802e34d3b49b40a50e53ff3b29b0c79f157c7aa406e65fec9820f128461d',
  'tests/entrypoints/unit_tests/test_chat_utils.py': 'c9f568717268c744bd2b9e104a58f51b8b33e55f17f65e3cf5b9497dbc173dea',
  'tests/evals/gsm8k/test_gsm8k_offloading.py': 'a7ced3b714c418120c2e4d5cfb55690d3b11baa96083256c2bb640dc80eec3f6',
  'tests/models/language/pooling/test_reward.py': '768653da76744a46273b18aad25342b48a7accd8be31b4cfaad71bd0e7f7f6e0',
@@ -97268,9 +91647,7 @@ FINAL_FILES = {'tests/config/test_config_utils.py': '4f5ea0399cc3b4f9603df07e2cc
  'tests/test_sampling_params.py': '9ce8ed07080994d48511465e8050a52ee1db8fdf5d0b2188bd6324b9276b3f97',
  'tests/tool_parsers/test_structural_tag_registry.py': '921afea86d6392effc7a816f65f39a16554c0a3bedbb35076d484454e2b64554',
  'tests/v1/core/test_kv_cache_users_sizing.py': '2132b5961217378fb7877958e18164a64f4a1705f76342ff60e74f7c47963f9c',
- 'tests/v1/core/test_prefix_cache.py': '16db164fabf9de35b9d643a74cb8785baf6e6c9bf56f34977d01886fe0eb9a1a',
- 'tests/v1/core/test_prefix_caching.py': '8350df869cf4dfe35fcc7ef253374a9239a7745ecc51a26e9b0b37f08e8a4bc8',
- 'tests/v1/core/test_single_type_kv_cache_manager.py': 'bf03a46ee50027170619bb2a4474830126ff5f6f02d58e4f8992c55f2226c6ff',
+ 'tests/v1/core/test_prefix_caching.py': '7ceb00826d43dc4186bb746e64c6e650784d536a04127ccd7d02162f1fea4c4f',
  'tests/v1/e2e/general/test_context_length.py': '11f1dc8484d92d6414607a3cb1670d2832919166450f4ed684e1cdc59b4ead81',
  'tests/v1/engine/test_output_processor.py': 'c3db074be5010ac0f4a353864b89a77b0a697c358dacd92faf291a794ad741f9',
  'tests/v1/kv_connector/nixl_integration/run_multi_connector_accuracy_test.sh': '0307e35d5215f2b3baf35a2e637bd2ef048f054a7f0f9b3d05e861f0d2cbfc52',
@@ -97278,22 +91655,21 @@ FINAL_FILES = {'tests/config/test_config_utils.py': '4f5ea0399cc3b4f9603df07e2cc
  'tests/v1/kv_connector/nixl_integration/spec_decode_acceptance_test.sh': '2071951cbc6bb2e718c53521c831a073219426b024b2a090675beaaf42e64231',
  'tests/v1/kv_connector/unit/offloading_connector/test_config.py': 'fa0b10f1c08339bec56cc7973a9df9fcf38ddd9b8c381fd3782db3b8570c9841',
  'tests/v1/kv_connector/unit/offloading_connector/test_events.py': 'b773dc65b320dfa3952cc04f4732d6772ed3aa06eca49d2fa3a911c38fb74fc6',
- 'tests/v1/kv_connector/unit/offloading_connector/test_scheduler.py': '62e95e1b34d87c3fc73cb45866204e29a8fc033c4c6e65796acdcbe1f81e6d8e',
+ 'tests/v1/kv_connector/unit/offloading_connector/test_scheduler.py': '016959d9e34301478f18401f66312ebbc9ac7801f71bae62a6ae9995729783f2',
  'tests/v1/kv_connector/unit/offloading_connector/test_worker.py': 'b8e5d70410134842f12a6a5274e3a60cf423549bd45ae923311fcbc618da6805',
- 'tests/v1/kv_connector/unit/offloading_connector/utils.py': 'd483ede99960d85bcf1c77e1f57580750030e8b67fc80eaafdd2cfe6c36b1f0f',
  'tests/v1/kv_connector/unit/test_config.py': 'd3159c374919b21ae96b9a9eab49c1b33340b249513f4354984bfc7ae21e1e2c',
  'tests/v1/kv_connector/unit/test_hma_auto_config.py': '3b9bec3a98b2ee5dca12a315a58307389f517c850c7ce30eb26ce9f8ec305588',
  'tests/v1/kv_connector/unit/test_offloading_connector.py': '3192b3d8dff17cfcc57cc3920fe6061afd9bc6dde5aef70cfadbe7a258e2c63c',
- 'tests/v1/kv_offload/cpu/test_manager.py': '0abe9a5480e0d268b6d8f98e8930498c67b4844dbf6cf2e4d042f7d75c802e0c',
+ 'tests/v1/kv_offload/cpu/test_manager.py': '1dea9c01dc15292db00ad856b0c4eade9ed4bd65bbf01620e72234b80ba991ab',
  'tests/v1/kv_offload/test_factory.py': '30697b1ef07da44f609a29c6638d634fd43f4cac81c753d16a4aca413e1416e2',
  'tests/v1/kv_offload/test_file_mapper.py': 'be0514f0a37a1c9932863bfc8638f57dd9de9d710c5ff63e71d69289d532a125',
  'tests/v1/kv_offload/tiering/p2p/run_accuracy_test.sh': 'a8189fb7a0f618fe0a4ffe2d24acca45cfc8fe785c0aae2c22a1105fe05e96f9',
  'tests/v1/kv_offload/tiering/test_fs_tier.py': 'ef7b3d28e0efe36157f10dae7b0a1b98ab0a1e54ed683cbd1647247c371eb861',
  'tests/v1/kv_offload/tiering/test_obj_tier.py': '9995d78ebe1d8037253362521119d4b4e2f2ee79f85629c668403ffd77962ba8',
- 'tests/v1/kv_offload/tiering/test_tiering_offloading.py': '4ebf998fb5f29781541761b117e194fce7ef06c14104d8cfa2e7fecbab11b536',
+ 'tests/v1/kv_offload/tiering/test_tiering_offloading.py': '2106bb9a5cf1dbbd9a869bc97b11e88aa55831a45bff13d27ab52c4dc96d8564',
  'tests/v1/logits_processors/test_correctness.py': 'ce76f8c40dd6028b195600a2733656a877952b01eacd55b63dd9e619dd2f1290',
  'tests/v1/simple_kv_offload/test_integration.py': '0dd7471507c88e209fe6a72359dfc655368c836cbe2cd3d95e1c0f72d38a4241',
- 'tests/v1/simple_kv_offload/test_scheduler.py': 'd036e691d91dd990228e3dc12c9e40f5a4cd552b49bae64fac29c6d8beed6281',
+ 'tests/v1/simple_kv_offload/test_scheduler.py': '430db8cc9d99844e7fd6099a6c7eac9ecadc4c0cff820db6ea62582de2443316',
  'tests/v1/streaming_input/test_async_llm_streaming.py': '83c121d706fb1f8a06ce94e7e85a5f49d0ce9c6a0282066a6276ff08e5f6400c',
  'tests/v1/structured_output/test_backend_xgrammar_stop_tokens.py': '5bccea5e5739b479439ef4be796dce56af686581064f6eb1ba0feab87238050a',
  'tests/v1/worker/test_gpu_model_runner_mm_gather.py': '7076e2415a3a1246d6f1e22e978a4c32e7b87713d6d7ae5743960c3d31592759',
@@ -97304,29 +91680,28 @@ FINAL_FILES = {'tests/config/test_config_utils.py': '4f5ea0399cc3b4f9603df07e2cc
  'vllm/config/reasoning.py': '29a3bb76af99f67a7706f365fbcd3362205ef8af9db46b7f167374e68f8146ae',
  'vllm/config/vllm.py': '30f612691ee2a5a1511484fbcece4bd89ade72c4309e786771826cf12fad38df',
  'vllm/distributed/kv_transfer/kv_connector/v1/offloading/config.py': '328033f5240090ed684eeb4a96e67658b6839be9ccb6886483569c7bc2702c21',
- 'vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py': '3afc05d7389a2590ef012279492c9526d5f0afe54b7909c9e5f8e8fd1857cc53',
- 'vllm/distributed/kv_transfer/kv_connector/v1/offloading_connector.py': '0c46f6fb9c8b25c626c3d95b1463176e95f8a700afb2219e3ce4d267547ff5bb',
+ 'vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py': 'd1ba74da27133f83979baf3c11d79e7fe1d1c783c191f0696f25636cecab3889',
  'vllm/engine/arg_utils.py': '88582e97c98ffcd16416e48eeea3db415cab1f33673c7ff8c1613fa83aad1eac',
  'vllm/entrypoints/anthropic/api_router.py': '8d7d742f6e7d9f2fa9bbe1e57d6adbd4f2753075a083c7a7f93d39fc5ab474b6',
- 'vllm/entrypoints/anthropic/protocol.py': '4f648cfd2ddfb8fab0f611de597b2943e0041de679887ed9bb0292234bdf96cd',
+ 'vllm/entrypoints/anthropic/protocol.py': 'e8ea13f888e8ea75f28d4de1b1ded74f2751c72b6c729df90a0a345ade21893a',
  'vllm/entrypoints/anthropic/serving.py': '09a97d1ac1a258e75b497906b998625beec1d9974dae6577b1da971dbb0211a3',
  'vllm/entrypoints/chat_utils.py': '9d939e56e812a583becfa18b5421488adc2087fba9922bd4e69dbccb012ca89a',
  'vllm/entrypoints/generate/api_router.py': 'dffeda2c3ccc6cfe3d4945720a7378bab34e7c7c9959d020a9643675895a3ffd',
  'vllm/entrypoints/llm.py': '79f9bb1212884746964a347f7e4b39087b5ac084b1d72821a12efd2fb85bcb03',
- 'vllm/entrypoints/openai/chat_completion/protocol.py': '129d1c2b304a332c27f15102f745a8022a4a48e6a9c6022015bbaa7f60c9ad8b',
+ 'vllm/entrypoints/openai/chat_completion/protocol.py': '5aa76ce3f38f6b55630e89671b69564d5220fa38601a28839385e5d2dc031a3c',
  'vllm/entrypoints/openai/chat_completion/serving.py': 'b698eb4843d0a06fffb7f7331c4250e09f2709ec7e119ee35f12e6c1c785c6f8',
  'vllm/entrypoints/openai/cli_args.py': '2c74b481652e1b7154df7836a98eb3ef1377092dc8ac4ae02095160907b5e36e',
- 'vllm/entrypoints/openai/completion/protocol.py': '91fbf3bd89b60cb19c7a1d4e2be58ec665bcb8542e2d23a3c1623bad5bea54f5',
+ 'vllm/entrypoints/openai/completion/protocol.py': 'bc0e377519a528458ac10cbe6996881505db7f816ae75a0abd656ec49fac33be',
  'vllm/entrypoints/openai/completion/serving.py': '6b4747502ecb32467626e54041e7e0cd276e064dd714554c58b8ebe4cdc3736b',
  'vllm/entrypoints/openai/engine/protocol.py': 'f43e54e057c509899c8718c79bc321ee6e76d48782c35a44ad0055a9bfb68148',
  'vllm/entrypoints/openai/responses/context.py': 'a92273bc16cbdda51dafc4ba0f32615f4a4586f07acaef4256ce459f7b327b78',
- 'vllm/entrypoints/openai/responses/protocol.py': '31e156a3d61c349525feef28d86fbad32749e4e73ea7e72d5ee4cc450c2c1341',
+ 'vllm/entrypoints/openai/responses/protocol.py': '0b5dbf895115591287be6ce6361fb9df6de7b69d7976de70e7fcb9066f6d84f1',
  'vllm/entrypoints/openai/responses/serving.py': 'fd74b42a19e162f1326fbd7e27bf9fe615b572fe6537266ee8bdedb5393a3c30',
  'vllm/entrypoints/openai/responses/streaming_events.py': '1d39608c0ddfb5466661fbe42d44f8c8b3584e9eeab36f3093c41734183efeba',
  'vllm/entrypoints/openai/responses/utils.py': '8d266a6a9a0f2d3c2d748e2bb4e8e69b2cdfb4a0488224e2a28d356cdf046b79',
  'vllm/entrypoints/scale_out/derender/serving.py': '3beb23995dddcfac4b98bf38f5948bd992ff06bf99290157317ba7018f57a6d7',
  'vllm/entrypoints/scale_out/render/serving.py': '170d9ee1f5023075e128f9158b09ef33e4d653f3fb07ca73fd474cc5168b4f68',
- 'vllm/entrypoints/scale_out/token_in_token_out/protocol.py': '1c341e415d7af2ea78bff14d205b9464b63ae8f57d8e0aaf422ea1060d0fecb0',
+ 'vllm/entrypoints/scale_out/token_in_token_out/protocol.py': '4402f3e7e27437e888389e2f99cdd6f6f7693bc03fca8f979316f47a8ad4daed',
  'vllm/entrypoints/scale_out/token_in_token_out/serving.py': 'd15c24953a944ae422b399d8bc2251d06a946b1f78cca6add38e26c47bcc21fe',
  'vllm/entrypoints/serve/exception_handling/error_response.py': 'fbd9ba671dccceef0eabf62b5fe19218ed38dda991b3519a3b92e02ad4b24b39',
  'vllm/entrypoints/serve/exception_handling/handlers/exception.py': '644dbe4bca975923d66f5a929b10f61efb182667e33cd04f09ab496891af2764',
@@ -97370,29 +91745,25 @@ FINAL_FILES = {'tests/config/test_config_utils.py': '4f5ea0399cc3b4f9603df07e2cc
  'vllm/v1/attention/backends/turboquant_attn.py': 'ccda36577e4fb0052f370169dce4b649bad890b8b440a82e584acd3dd92a6d86',
  'vllm/v1/attention/ops/triton_turboquant_decode.py': 'dab8b65ab7ddd6582de16e1fc7b1360ab0061b4a2a2b114f5d87ea0532fd726f',
  'vllm/v1/attention/ops/triton_turboquant_store.py': '298645bff68c6adab58261862602b86e7e714c3552a9fd89102d9ccd2b83e9f7',
- 'vllm/v1/core/block_pool.py': 'fb1a35481812980aed5370ee54a684261673547a359fff763f13422ed3802140',
- 'vllm/v1/core/kv_cache_coordinator.py': 'fd0373ae5fb314eb1a2a8c064560835224459a0147c10ea238094915f22f52a5',
- 'vllm/v1/core/kv_cache_manager.py': 'af5f1204087629e4467b294eadd982a3255e01581b42a58a0ec3758c404286c5',
+ 'vllm/v1/core/block_pool.py': '7370727256c2743a952053572503e6bd8f51c61edf8cddf030e34898c8d2903f',
  'vllm/v1/core/kv_cache_utils.py': '83cfaccc6607e8b850484aab0373bbfb326c072d606952dd42f21e41192dc8e7',
- 'vllm/v1/core/prefix_cache.py': '74cdbe60273641df0df7e0158da777314fe74ca29ccb539f16340ec7a2687ef4',
  'vllm/v1/core/sched/scheduler.py': '92a95c3223987c7eacafecb30d4cceb32bfc8a754718a69f97bc094f6253abf9',
  'vllm/v1/core/sched/utils.py': 'bd79fd9adb8cff3a89559afa415ac7beca093ed523a0e86b73e72cd0628c4368',
- 'vllm/v1/core/single_type_kv_cache_manager.py': 'e4d62562736aed93d394ba43f82654b207dd6f926a707e0b015d105129fd2131',
+ 'vllm/v1/core/single_type_kv_cache_manager.py': 'c96644fbb3404fe67151abdb46dcbfbde6788f7d65eb29c1ab8060caa0c628df',
  'vllm/v1/engine/async_llm.py': 'ba58e5c36b1dd77da5f78f2611815e6d9fe0afbb395bf1de5d7869d1b91108af',
  'vllm/v1/engine/detokenizer.py': '3af97dd30fa95fb8e294b2de407012d365b124006ee324c576cba3d3a9d58c21',
  'vllm/v1/engine/input_processor.py': '27944f76eb87665136d73ce3b9330abd4af02fb85e62b03bb334c7a219e3bbbe',
  'vllm/v1/engine/output_processor.py': '08361a6521cd1bc5e32e5c8cdaa6c1f8c6ca2e43c616729871c6d933a6f9d0f6',
- 'vllm/v1/kv_offload/base.py': 'e8fff9428338aa2c0d86c2ae1bdbb35e1e2338620e121656ac4f6da0fbd6779a',
+ 'vllm/v1/kv_offload/base.py': 'd3f86b26330e057a7b030c7b4e32417acf18822e443ebf224d9393e67b86acc1',
  'vllm/v1/kv_offload/config.py': '50daea7891442fa779743796c343fe0a09bdcd0266910bf83b35509e533c3b89',
  'vllm/v1/kv_offload/cpu/common.py': '9144fd869fa0c6df122081be01f2d81fa70f2e407f187564aad874e679b832c4',
  'vllm/v1/kv_offload/cpu/gpu_worker.py': '0cd50f3deea7c8e91de072dde5d55f96edb6c0b35525c2d144ade7ae4e1b8a91',
- 'vllm/v1/kv_offload/cpu/manager.py': 'c6761a1151887f4fb4c3223de0e57f29e523a9568a4652c646c2fbb5f8ccecbf',
+ 'vllm/v1/kv_offload/cpu/manager.py': '020810a735801dcd4f6740a43a76d8c654a1dc25de92e5e3e27df1aecb973455',
  'vllm/v1/kv_offload/cpu/spec.py': '02bb64e4052092229e372002acdedb5206d3709698e88ff4c5e33b26da836e93',
- 'vllm/v1/kv_offload/tiering/manager.py': 'c1119810cd34feb028e739f35ccce8fbf1793997e13766fa1d595fd8c9efaae4',
+ 'vllm/v1/kv_offload/tiering/manager.py': 'b63a0d85d3cff32a27f82ebc9df6749cf2e64e6fe439dcae7adad00000817a13',
  'vllm/v1/kv_offload/tiering/spec.py': 'a78615eeb2befe97739461b1db84b4fa79ebd3690fc63a807e2bed1ef2dc12f8',
  'vllm/v1/request.py': '6281dcb0f3562cf6cc365e8fa43b1fd8d4fe06e136900fd49d2cbe718cbd0839',
  'vllm/v1/sample/thinking_budget_state.py': '2de2bd4623f27a3f610c9f84b37cab0a9fb17d4da7574748994d4e209d89cb07',
- 'vllm/v1/simple_kv_offload/manager.py': 'bb8358c21057634fae53c34346588b7dd854b66fe6b6085947aac25f9ebbaef5',
  'vllm/v1/structured_output/__init__.py': '3ac80fb92f5ff57a44fcb800d96b46ad37987df55830568ea49ac303c4b472c8',
  'vllm/v1/structured_output/backend_types.py': '5b8b80b82ba998b8e860866c2d499d1412eb480d82f5bcf4e99fe742ed1c52e4',
  'vllm/v1/structured_output/backend_xgrammar.py': '5f3263aefa001c4efb968cfb7accfb4d5dfaa584e3874d24af1e637f674019ff',

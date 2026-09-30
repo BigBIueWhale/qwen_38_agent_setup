@@ -21,6 +21,11 @@ is written only when the live bytes are *provably stale*, meaning one of:
   * they are the pristine upstream identity the patch set starts that path
     from, recorded in the committed stage data.
 
+A path a committed revision patched and the current patch set no longer names
+is retired: its reconstruction is the pristine upstream file, or its absence
+when the patch set had created it. Its live bytes are stale only by the first
+proof, a shipped identity.
+
 Both proofs are read from committed data alone; neither is inferred from the
 tree being examined.  A single difference that cannot be proved stale refuses
 the whole run and writes nothing at all.  Materialising only the explainable
@@ -154,6 +159,25 @@ def _live_digest(live_root: Path, path: str) -> str:
     return sha256_bytes(candidate.read_bytes())
 
 
+def retired_targets(
+    *,
+    reconstruction_root: Path,
+    final_files: Mapping[str, str],
+    deleted: frozenset[str] | set[str],
+    shipped: Mapping[str, Mapping[str, str]],
+) -> dict[str, str]:
+    """The reconstruction's identity for every retired path.
+
+    A retired path is one a committed revision shipped and the current patch
+    set no longer names. The reconstruction holds its pristine upstream bytes,
+    or nothing when an earlier patch set had created it.
+    """
+    retired = set(shipped) - set(final_files) - set(deleted)
+    return {
+        path: _live_digest(reconstruction_root, path) for path in sorted(retired)
+    }
+
+
 def plan_materialisation(
     *,
     live_root: Path,
@@ -161,26 +185,44 @@ def plan_materialisation(
     deleted: frozenset[str] | set[str],
     pristine: Mapping[str, str | None],
     shipped: Mapping[str, Mapping[str, str]],
+    retired: Mapping[str, str],
 ) -> tuple[tuple[Action, ...], tuple[Refusal, ...]]:
     """Classify every difference between the live tree and the reconstruction.
 
-    The reconstruction is described by ``final_files`` and ``deleted``, which
-    the caller has already proved the reconstruction satisfies.  Nothing here
-    writes; the caller decides, and only a wholly explained plan may proceed.
+    The reconstruction is described by ``final_files``, ``deleted`` and the
+    ``retired`` targets, which the caller has already proved the
+    reconstruction satisfies.  Nothing here writes; the caller decides, and
+    only a wholly explained plan may proceed.
     """
     actions: list[Action] = []
     refusals: list[Refusal] = []
-    for path in sorted(set(final_files) | set(deleted)):
+    for path in sorted(set(final_files) | set(deleted) | set(retired)):
         _safe_relative_path(path)
-        target = ABSENT if path in deleted else final_files[path]
+        if path in retired:
+            target = retired[path]
+        else:
+            target = ABSENT if path in deleted else final_files[path]
         live = _live_digest(live_root, path)
         if live == target:
             continue
 
         known = shipped.get(path, {})
-        upstream = pristine.get(path)
+        upstream = None if path in retired else pristine.get(path)
         if live in known:
             proof = f"final identity shipped at {known[live]}"
+        elif path in retired:
+            refusals.append(
+                Refusal(
+                    path=path,
+                    live=live,
+                    target=target,
+                    reason=(
+                        "the patch set no longer names this path, and no "
+                        "committed revision has shipped these bytes for it"
+                    ),
+                )
+            )
+            continue
         elif live != ABSENT and live == upstream:
             proof = "pristine upstream identity"
         elif live == ABSENT and upstream is None:
@@ -266,17 +308,22 @@ def verify_live_tree(
     live_root: Path,
     final_files: Mapping[str, str],
     deleted: frozenset[str] | set[str],
+    retired: Mapping[str, str],
 ) -> int:
     """Re-read every reviewed path and prove the live tree is now the result."""
-    for path in sorted(set(final_files) | set(deleted)):
-        expected = ABSENT if path in deleted else final_files[path]
+    paths = set(final_files) | set(deleted) | set(retired)
+    for path in sorted(paths):
+        if path in retired:
+            expected = retired[path]
+        else:
+            expected = ABSENT if path in deleted else final_files[path]
         found = _live_digest(live_root, path)
         if found != expected:
             raise MaterialiseWriteError(
                 f"{path}: the live tree does not hold the reconstruction's "
                 f"identity after materialising; expected {expected}, found {found}"
             )
-    return len(set(final_files) | set(deleted))
+    return len(paths)
 
 
 def materialise(
@@ -294,12 +341,19 @@ def materialise(
     reachable, so "one unexplained path writes nothing at all" is a property of
     the control flow rather than of the caller remembering to check.
     """
+    retired = retired_targets(
+        reconstruction_root=reconstruction_root,
+        final_files=final_files,
+        deleted=deleted,
+        shipped=shipped,
+    )
     actions, refusals = plan_materialisation(
         live_root=live_root,
         final_files=final_files,
         deleted=deleted,
         pristine=pristine,
         shipped=shipped,
+        retired=retired,
     )
     if refusals:
         return (), refusals, 0
@@ -308,7 +362,10 @@ def materialise(
             actions, live_root=live_root, reconstruction_root=reconstruction_root
         )
     reviewed = verify_live_tree(
-        live_root=live_root, final_files=final_files, deleted=deleted
+        live_root=live_root,
+        final_files=final_files,
+        deleted=deleted,
+        retired=retired,
     )
     return actions, (), reviewed
 
