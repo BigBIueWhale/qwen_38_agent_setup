@@ -6,7 +6,7 @@ readonly IMAGE_PROFILE_VERSION="socket-isolated-nonroot-vision-k8v4-agent-v27"
 readonly CONTAINER_NAME="qwen38-agent-native"
 readonly CONTAINER_LABEL="Qwen_best_model_ever"
 readonly IMAGE_TAG="qwen38-vllm:qwen38-27b-nvfp4-k8v4-runtime-v27"
-readonly EXPECTED_IMAGE_ID="sha256:dcc869c00e726abd801d3217ef5acb9350e8e1044085ebc0fbcb6c5d8eac9210"
+readonly EXPECTED_IMAGE_ID="sha256:b850afc5b01b74399706ce33f1316b589e22a31b042834ba58661dc4b58b96e6"
 readonly RELAY_IMAGE_TAG="qwen38-fixed-relay:1.0.0"
 readonly EXPECTED_RELAY_IMAGE_ID="sha256:568e6bc1ae204600c030b98b472f20ebc35706bdfb7e5218547378579912c8f2"
 readonly RELAY_SOURCE_SHA256="051dc82af7b9b12e229f9a127183d051ef47a6d44f03d99346762e84bd69c815"
@@ -21,7 +21,7 @@ readonly RELAY_PIDS_LIMIT="32"
 readonly BASE_IMAGE_TAG="qwen38-vllm:main-9df9b0b"
 readonly EXPECTED_BASE_IMAGE_ID="sha256:fa4a002a88b7043a1a89966dea8a500fe9696f84e75730d9da916f916048d401"
 readonly IMAGE_ARCHIVE_NAME="qwen38-vllm-images-runtime-v27.tar"
-readonly IMAGE_ARCHIVE_SHA256="c77ba706f884b74e92e3c8ec810cef76ac015e1abc053dac8c4154d1b5e13e92"
+readonly IMAGE_ARCHIVE_SHA256="48cc3978e66e4d18f0a10752dbdfa08917f00d5dc9d75f7653b35b4a207d31a4"
 # IMAGE_TAG names the pinned image and nothing else: build-vllm.sh moves it only
 # to a build that reproduced EXPECTED_IMAGE_ID, and restore-images.sh only by
 # loading the archive IMAGE_ARCHIVE_SHA256 pins. Every runtime image also
