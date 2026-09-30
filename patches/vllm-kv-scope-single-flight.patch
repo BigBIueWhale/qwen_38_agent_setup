@@ -1,0 +1,366 @@
+diff --git a/tests/entrypoints/test_generation_admission.py b/tests/entrypoints/test_generation_admission.py
+--- a/tests/entrypoints/test_generation_admission.py
++++ b/tests/entrypoints/test_generation_admission.py
+@@ -319,3 +319,93 @@
+         response = client.post(path, json=body)
+     assert response.status_code == 200
+     assert '"error"' in response.text, response.text
++
++
++# --- One request in flight per kv_scope, refused at admission ------------
++
++
++def _frontend_admission():
++    """The real AsyncLLM admission and output processor. Input processing and
++    the engine core process are the only stand-ins; the engine answers every
++    request at once with one token and a stop."""
++    from vllm.v1.engine import EngineCoreOutput, EngineCoreRequest, FinishReason
++    from vllm.v1.engine.async_llm import AsyncLLM
++    from vllm.v1.engine.output_processor import (
++        OutputProcessor,
++        RequestOutputCollector,
++    )
++
++    llm = object.__new__(AsyncLLM)
++    llm.log_requests = False
++    llm.output_processor = OutputProcessor(None, log_stats=False)
++    llm.engine_core = MagicMock()
++    llm.engine_core.abort_requests_async = AsyncMock()
++
++    async def engine_core_add(request):
++        llm.output_processor.process_outputs([EngineCoreOutput(
++            request_id=request.request_id, new_token_ids=[4],
++            finish_reason=FinishReason.STOP,
++        )])
++
++    llm.engine_core.add_request_async = AsyncMock(side_effect=engine_core_add)
++
++    def core_request(request_id, params):
++        return EngineCoreRequest(
++            request_id=f"{request_id}-internal", external_req_id=request_id,
++            prompt_token_ids=[1, 2, 3], mm_features=None, arrival_time=0,
++            lora_request=None, cache_salt=None, data_parallel_rank=None,
++            sampling_params=params, pooling_params=None,
++        )
++
++    async def add_request(request_id, prompt, params, **kwargs):
++        request = core_request(request_id, params)
++        queue = RequestOutputCollector(params.output_kind, request.request_id)
++        await llm._add_request(request, None, None, 0, queue)
++        return queue
++
++    llm.add_request = add_request
++
++    def hold_in_flight(request_id, scope):
++        from vllm.sampling_params import SamplingParams
++
++        params = SamplingParams(max_tokens=1, extra_args={"kv_scope": scope})
++        request = core_request(request_id, params)
++        llm.output_processor.add_request(
++            request, None, None, 0,
++            RequestOutputCollector(params.output_kind, request.request_id),
++        )
++
++    return llm, hold_in_flight
++
++
++@pytest.mark.parametrize("surface", sorted(SURFACES))
++def test_an_overlapping_request_under_one_scope_is_a_400_naming_it(surface):
++    path, body = SURFACES[surface]
++    scopes = body["kv_scope"]
++    # A batch is refused on its last conversation, after admitting the others.
++    scope = scopes[-1] if isinstance(scopes, list) else scopes
++    llm, hold_in_flight = _frontend_admission()
++    app, _ = _app(llm.admit)
++    hold_in_flight("earlier", scope)
++
++    with TestClient(app) as client:
++        response = client.post(path, json=body)
++    assert response.status_code == 400, (surface, response.text)
++    assert not response.headers["content-type"].startswith("text/event-stream")
++    assert f"kv_scope {scope!r} already has a request in flight (earlier)" in (
++        response.text
++    )
++    assert "Wait for it to finish or abort it" in response.text
++    # Only the earlier request is still in flight under any ID.
++    assert list(llm.output_processor.kv_scope_requests) == [scope]
++    assert llm.output_processor.kv_scope_requests[scope].external_req_id == (
++        "earlier"
++    )
++
++    # Once the earlier request ends, the same body is admitted and answered.
++    llm.output_processor.abort_requests(["earlier"], internal=False)
++    with TestClient(app) as client:
++        response = client.post(path, json=body)
++    assert response.status_code == 200, (surface, response.text)
++    assert llm.output_processor.kv_scope_requests == {}
++
+diff --git a/tests/v1/engine/test_kv_scope_single_flight.py b/tests/v1/engine/test_kv_scope_single_flight.py
+new file mode 100644
+--- /dev/null
++++ b/tests/v1/engine/test_kv_scope_single_flight.py
+@@ -0,0 +1,141 @@
++# SPDX-License-Identifier: Apache-2.0
++# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
++"""A kv_scope names one line of work, which has at most one request in flight.
++
++The frontend process knows every request in flight, so it refuses an
++overlapping request under one ID at admission: before the engine sees it,
++and before an HTTP surface answers. Finishing or aborting the earlier request
++frees the ID; a different ID is never affected.
++"""
++
++from unittest.mock import AsyncMock, MagicMock
++
++import pytest
++
++from vllm.exceptions import VLLMValidationError
++from vllm.sampling_params import RequestOutputKind, SamplingParams
++from vllm.v1.engine import EngineCoreOutput, EngineCoreRequest, FinishReason
++from vllm.v1.engine.async_llm import AsyncLLM
++from vllm.v1.engine.output_processor import OutputProcessor, RequestOutputCollector
++
++pytestmark = pytest.mark.cpu_test
++
++
++def _request(name: str, scope: str | None, *, resumable: bool = False):
++    extra_args = None if scope is None else {"kv_scope": scope}
++    return EngineCoreRequest(
++        request_id=f"{name}-internal",
++        external_req_id=name,
++        prompt_token_ids=[1, 2, 3],
++        mm_features=None,
++        arrival_time=0,
++        lora_request=None,
++        cache_salt=None,
++        data_parallel_rank=None,
++        sampling_params=SamplingParams(
++            max_tokens=4, detokenize=False, extra_args=extra_args,
++            output_kind=RequestOutputKind.DELTA,
++        ),
++        pooling_params=None,
++        resumable=resumable,
++    )
++
++
++def _processor() -> OutputProcessor:
++    return OutputProcessor(None, log_stats=False)
++
++
++def _add(processor, request):
++    queue = RequestOutputCollector(RequestOutputKind.DELTA, request.request_id)
++    processor.add_request(request, None, None, 0, queue)
++
++
++def test_an_overlapping_request_under_one_id_is_refused_by_name():
++    processor = _processor()
++    _add(processor, _request("first", "line"))
++    with pytest.raises(VLLMValidationError) as excinfo:
++        _add(processor, _request("second", "line"))
++    message = str(excinfo.value)
++    assert excinfo.value.parameter == "kv_scope"
++    assert "'line' already has a request in flight (first)" in message
++    assert "Wait for it to finish or abort it" in message
++    assert "a concurrent line of work needs its own new kv_scope" in message
++    assert set(processor.request_states) == {"first-internal"}
++
++
++def test_finishing_the_earlier_request_frees_the_id():
++    processor = _processor()
++    _add(processor, _request("first", "line"))
++    processor.process_outputs([EngineCoreOutput(
++        request_id="first-internal", new_token_ids=[4],
++        finish_reason=FinishReason.STOP,
++    )])
++    assert "first-internal" not in processor.request_states
++    _add(processor, _request("second", "line"))
++    assert processor.kv_scope_requests["line"].request_id == "second-internal"
++
++
++@pytest.mark.parametrize("internal", [True, False])
++def test_aborting_the_earlier_request_frees_the_id(internal):
++    processor = _processor()
++    _add(processor, _request("first", "line"))
++    processor.abort_requests(
++        ["first-internal" if internal else "first"], internal=internal
++    )
++    _add(processor, _request("second", "line"))
++    assert set(processor.request_states) == {"second-internal"}
++
++
++def test_different_ids_and_unscoped_requests_run_side_by_side():
++    processor = _processor()
++    _add(processor, _request("a", "line-a"))
++    _add(processor, _request("b", "line-b"))
++    _add(processor, _request("pool-1", None))
++    _add(processor, _request("pool-2", None))
++    assert set(processor.kv_scope_requests) == {"line-a", "line-b"}
++    assert len(processor.request_states) == 4
++
++
++def test_an_input_stream_chunk_continues_its_own_request():
++    processor = _processor()
++    _add(processor, _request("stream", "line", resumable=True))
++    # Later chunks of the same input stream carry the same request ID.
++    _add(processor, _request("stream", "line", resumable=True))
++    assert set(processor.request_states) == {"stream-internal"}
++
++
++@pytest.mark.asyncio
++async def test_admission_refuses_the_overlap_before_the_engine_sees_it():
++    engine = object.__new__(AsyncLLM)
++    engine.log_requests = False
++    engine.output_processor = _processor()
++    engine.engine_core = MagicMock()
++    engine.engine_core.add_request_async = AsyncMock()
++    engine.engine_core.abort_requests_async = AsyncMock()
++
++    async def add(name):
++        request = _request(name, "line")
++        queue = RequestOutputCollector(RequestOutputKind.DELTA, request.request_id)
++        await engine._add_request(request, None, None, 0, queue)
++
++    await add("first")
++    with pytest.raises(VLLMValidationError):
++        await add("second")
++    assert engine.engine_core.add_request_async.await_count == 1
++
++    # Aborting the first (a closed stream or a client that went away) frees
++    # the ID for the next request.
++    await engine.abort("first-internal", internal=True)
++    await add("third")
++    assert engine.engine_core.add_request_async.await_count == 2
++
++
++@pytest.mark.parametrize("client_count", [0, 2, 4])
++def test_only_one_api_server_process_may_admit_generation(client_count):
++    # Each API server process has its own output processor; with several, two
++    # requests under one ID could be admitted side by side. Refused at start.
++    with pytest.raises(ValueError, match="--api-server-count 1"):
++        AsyncLLM(
++            vllm_config=MagicMock(), executor_class=MagicMock(),
++            log_stats=False, client_count=client_count,
++        )
+diff --git a/vllm/v1/engine/async_llm.py b/vllm/v1/engine/async_llm.py
+--- a/vllm/v1/engine/async_llm.py
++++ b/vllm/v1/engine/async_llm.py
+@@ -109,6 +109,16 @@
+         Returns:
+             None
+         """
++        # A kv_scope has at most one request in flight, and the output
++        # processor of the one API server process answers that at admission.
++        # Several API server processes would each see only their own share.
++        if client_count != 1:
++            raise ValueError(
++                "One API server process admits every generation request, so "
++                "that it can refuse a second request in flight under one "
++                f"kv_scope; got {client_count}. Serve with --api-server-count 1."
++            )
++
+         # Ensure we can serialize custom transformer configs
+         maybe_register_config_serialize_by_value()
+ 
+diff --git a/vllm/v1/engine/output_processor.py b/vllm/v1/engine/output_processor.py
+--- a/vllm/v1/engine/output_processor.py
++++ b/vllm/v1/engine/output_processor.py
+@@ -11,6 +11,7 @@
+ import torch
+ 
+ from vllm.config import StructuredOutputsConfig
++from vllm.exceptions import VLLMValidationError
+ from vllm.lora.request import LoRARequest
+ from vllm.outputs import (
+     STREAM_FINISHED,
+@@ -152,9 +153,11 @@
+         n: int | None = None,
+         temperature: float | None = None,
+         stream_input: bool = False,
++        kv_scope: str | None = None,
+     ):
+         self.request_id = request_id
+         self.external_req_id = external_req_id
++        self.kv_scope = kv_scope
+         self.parent_req = parent_req
+         self.request_index = request_index
+         self.lora_request = lora_request
+@@ -245,6 +248,7 @@
+             top_p = sampling_params.top_p
+             n = sampling_params.n
+             temperature = sampling_params.temperature
++            kv_scope = (sampling_params.extra_args or {}).get("kv_scope")
+         else:
+             logprobs_processor = None
+             detokenizer = None
+@@ -252,6 +256,7 @@
+             top_p = None
+             n = None
+             temperature = None
++            kv_scope = None
+             assert request.pooling_params is not None
+             output_kind = request.pooling_params.output_kind
+ 
+@@ -277,6 +282,7 @@
+             log_stats=log_stats,
+             stream_interval=stream_interval,
+             stream_input=request.resumable,
++            kv_scope=kv_scope,
+         )
+ 
+     def make_request_output(
+@@ -454,6 +460,9 @@
+         self.tokenizer = tokenizer
+         self.stream_interval = stream_interval
+         self.request_states: dict[str, RequestState] = {}
++        # The request in flight for each kv_scope. A kv_scope names one line
++        # of work, and a line of work has at most one request in flight.
++        self.kv_scope_requests: dict[str, RequestState] = {}
+         self.parent_requests: dict[str, ParentRequest] = {}
+         self.external_req_ids: defaultdict[str, list[str]] = defaultdict(list)
+         self.lora_states = LoRARequestStates(log_stats)
+@@ -509,6 +518,7 @@
+         for request_id in internal_req_ids:
+             req_state = self.request_states.pop(request_id, None)
+             if req_state is not None:
++                self._release_kv_scope(req_state)
+                 self.lora_states.request_finished(request_id, req_state.lora_name)
+                 request_ids_to_abort.append(request_id)
+                 # Produce final abort output.
+@@ -561,6 +571,17 @@
+             stream_interval=self.stream_interval,
+             structured_outputs_config=self.structured_outputs_config,
+         )
++        if (scope := req_state.kv_scope) is not None:
++            if (in_flight := self.kv_scope_requests.get(scope)) is not None:
++                raise VLLMValidationError(
++                    f"kv_scope {scope!r} already has a request in flight "
++                    f"({in_flight.external_req_id}). Wait for it to finish or "
++                    "abort it before sending the next request under this ID: "
++                    "a continuation must not overlap its predecessor, and a "
++                    "concurrent line of work needs its own new kv_scope.",
++                    parameter="kv_scope",
++                )
++            self.kv_scope_requests[scope] = req_state
+         self.request_states[request_id] = req_state
+         if parent_req:
+             self.parent_requests[parent_req.request_id] = parent_req
+@@ -732,6 +753,7 @@
+     def _finish_request(self, req_state: RequestState) -> None:
+         req_id = req_state.request_id
+         self.request_states.pop(req_id)
++        self._release_kv_scope(req_state)
+ 
+         internal_ids = self.external_req_ids[req_state.external_req_id]
+         internal_ids.remove(req_id)
+@@ -743,6 +765,11 @@
+         if parent_req and not parent_req.child_requests:
+             self.parent_requests.pop(parent_req.request_id, None)
+ 
++    def _release_kv_scope(self, req_state: RequestState) -> None:
++        scope = req_state.kv_scope
++        if scope is not None and self.kv_scope_requests.get(scope) is req_state:
++            del self.kv_scope_requests[scope]
++
+     def update_scheduler_stats(self, scheduler_stats: SchedulerStats | None):
+         self.lora_states.update_scheduler_stats(scheduler_stats)
+ 

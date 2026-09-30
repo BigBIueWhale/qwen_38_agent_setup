@@ -383,6 +383,7 @@ anthropic = AnthropicMessagesRequest(
     model="qwen3.8",
     messages=[{"role": "user", "content": "test"}],
     max_tokens=1024,
+    kv_scope="agent_scope",
     thinking={"type": "enabled", "budget_tokens": 512},
 )
 converted = AnthropicServingMessages._build_base_request(
@@ -395,6 +396,7 @@ adaptive = AnthropicMessagesRequest(
     model="qwen3.8",
     messages=[{"role": "user", "content": "test"}],
     max_tokens=1024,
+    kv_scope="agent_scope",
     thinking={"type": "adaptive"},
     output_config={"effort": "max"},
 )
@@ -414,6 +416,7 @@ for rejected in (
             model="qwen3.8",
             messages=[{"role": "user", "content": "test"}],
             max_tokens=1024,
+            kv_scope="agent_scope",
             **rejected,
         )
     except ValidationError:
@@ -462,11 +465,23 @@ for rejected_context in (
     else:
         raise AssertionError(f"unsafe template configuration was accepted: {rejected_context}")
 
-# Every generation surface carries an opaque agent ID through the common
-# sampling-parameter channel. Shared-cache behavior has its own installed unit.
-from vllm.entrypoints.openai.completion.protocol import CompletionRequest
+# Generation names its line of work: every generation request model requires
+# an opaque agent ID and carries it through the common sampling-parameter
+# channel into the engine. Rendering shares the chat, completion and token
+# shapes but allocates nothing, so the render models have no ID at all.
+# Shared-cache behavior has its own installed unit.
+from vllm.entrypoints.openai.chat_completion.protocol import (
+    ChatCompletionGenerationRequest,
+)
+from vllm.entrypoints.openai.completion.protocol import (
+    CompletionGenerationRequest,
+    CompletionRequest,
+)
 from vllm.entrypoints.openai.responses.protocol import ResponsesRequest
-from vllm.entrypoints.scale_out.token_in_token_out.protocol import GenerateRequest
+from vllm.entrypoints.scale_out.token_in_token_out.protocol import (
+    GenerateRequest,
+    TokenGenerationRequest,
+)
 from vllm.sampling_params import SamplingParams
 from vllm.engine.arg_utils import EngineArgs
 from vllm.v1.kv_offload.cpu.manager import CPUOffloadingManager
@@ -474,43 +489,37 @@ from vllm.v1.kv_offload.cpu.spec import CPUOffloadingSpec
 from vllm.v1.kv_offload.base import ReqContext
 from vllm.v1.engine.input_processor import require_kv_scope
 
-scoped = ChatCompletionRequest(
-    model="qwen3.8",
-    messages=[{"role": "user", "content": "test"}],
-    max_tokens=8,
-    kv_scope="agent_scope",
+chat_fields = dict(
+    model="qwen3.8", messages=[{"role": "user", "content": "test"}], max_tokens=8,
 )
+generation_fields = {
+    ChatCompletionGenerationRequest: chat_fields,
+    CompletionGenerationRequest: dict(model="m", prompt="hi"),
+    ResponsesRequest: dict(model="m", input="hi"),
+    AnthropicMessagesRequest: dict(
+        model="m", max_tokens=8, messages=[{"role": "user", "content": "hi"}],
+    ),
+    TokenGenerationRequest: dict(token_ids=[1], sampling_params=SamplingParams()),
+}
+for model, fields in generation_fields.items():
+    assert model(**fields, kv_scope="agent_scope").kv_scope == "agent_scope"
+    try:
+        model(**fields)
+    except VLLMValidationError as exc:
+        assert exc.parameter == "kv_scope", exc.parameter
+        assert "required for generation" in str(exc), str(exc)
+    else:
+        raise AssertionError(f"{model.__name__} accepted a request naming no agent")
+scoped = ChatCompletionGenerationRequest(**chat_fields, kv_scope="agent_scope")
 scoped_sampling = scoped.to_sampling_params(8, defaults)
 assert scoped_sampling.extra_args["kv_scope"] == "agent_scope"
-for scoped_request in (
-    CompletionRequest(model="m", prompt="hi", kv_scope="agent_scope"),
-    ResponsesRequest(model="m", input="hi", kv_scope="agent_scope"),
-    AnthropicMessagesRequest(
-        model="m",
-        max_tokens=8,
-        messages=[{"role": "user", "content": "hi"}],
-        kv_scope="agent_scope",
-    ),
-    GenerateRequest(
-        token_ids=[1], sampling_params=SamplingParams(), kv_scope="agent_scope"
-    ),
-):
-    assert scoped_request.kv_scope == "agent_scope"
-
-# Generation requires an agent ID, and the requirement lives on the path
-# into the engine rather than on these models: /v1/chat/completions/render
-# renders through the very same ChatCompletionRequest while allocating
-# nothing, so a model-level requirement would demand an identity from an
-# endpoint that owns no context. Prove both directions here, plus the fact
-# that keeps them separable -- the shared model still builds unscoped.
 assert require_kv_scope(scoped_sampling) == "agent_scope"
-unscoped = ChatCompletionRequest(
-    model="qwen3.8",
-    messages=[{"role": "user", "content": "test"}],
-    max_tokens=8,
-)
-assert unscoped.kv_scope is None
-unscoped_sampling = unscoped.to_sampling_params(8, defaults)
+
+# What the render models describe names no agent, and the engine refuses to
+# generate for it: the common gate holds for every caller, not only HTTP.
+for model in (ChatCompletionRequest, CompletionRequest, GenerateRequest):
+    assert "kv_scope" not in model.model_fields, model.__name__
+unscoped_sampling = ChatCompletionRequest(**chat_fields).to_sampling_params(8, defaults)
 assert "kv_scope" not in (unscoped_sampling.extra_args or {})
 try:
     require_kv_scope(unscoped_sampling)
@@ -527,19 +536,35 @@ for malformed in ("", " ", "\t\n", 0, [], {}):
     else:
         raise AssertionError(f"malformed kv_scope accepted: {malformed!r}")
 
-# One batch is one caller: every conversation is submitted under its agent.
+# One kv_scope names one line of work, which generates one sequence.
+try:
+    ChatCompletionGenerationRequest(**chat_fields, kv_scope="agent_scope", n=2)
+except VLLMValidationError as exc:
+    assert exc.parameter == "n", exc.parameter
+else:
+    raise AssertionError("n > 1 under one kv_scope was accepted")
+
+# Each batch conversation is its own line of work under its own agent.
+conversations = [
+    [{"role": "user", "content": "a"}],
+    [{"role": "user", "content": "b"}],
+]
 batched = BatchChatCompletionRequest(
-    model="qwen3.8",
-    messages=[
-        [{"role": "user", "content": "a"}],
-        [{"role": "user", "content": "b"}],
-    ],
-    max_tokens=8,
-    kv_scope="agent_scope",
+    model="qwen3.8", messages=conversations, max_tokens=8,
+    kv_scope=["agent_a", "agent_b"],
 )
-derived = [batched.to_chat_completion_request(m) for m in batched.messages]
-assert [d.kv_scope for d in derived] == ["agent_scope", "agent_scope"]
-assert require_kv_scope(derived[0].to_sampling_params(8, defaults)) == "agent_scope"
+derived = batched.to_chat_completion_requests()
+assert [d.kv_scope for d in derived] == ["agent_a", "agent_b"]
+assert require_kv_scope(derived[1].to_sampling_params(8, defaults)) == "agent_b"
+for scopes in (["agent_a", "agent_a"], ["agent_a"], "agent_a"):
+    try:
+        BatchChatCompletionRequest(
+            model="qwen3.8", messages=conversations, max_tokens=8, kv_scope=scopes,
+        )
+    except (VLLMValidationError, ValidationError):
+        pass
+    else:
+        raise AssertionError(f"batch kv_scope {scopes!r} was accepted")
 
 assert hasattr(EngineArgs, "kv_cache_users")
 assert not hasattr(EngineArgs, "kv_cache_memory_bytes")

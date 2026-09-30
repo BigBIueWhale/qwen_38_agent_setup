@@ -1086,8 +1086,26 @@ def _validate_shared_prefix_cache_before(state: State) -> None:
         "vllm/entrypoints/openai/responses/protocol.py",
         "vllm/entrypoints/anthropic/protocol.py",
         "vllm/entrypoints/scale_out/token_in_token_out/protocol.py",
+        "vllm/entrypoints/openai/chat_completion/batch_serving.py",
+        "vllm/entrypoints/openai/run_batch.py",
+        "vllm/sampling_params.py",
     ):
         forbid_text(state, path, "kv_scope", label=label)
+    require_text(
+        state, "vllm/entrypoints/openai/chat_completion/api_router.py",
+        "async def create_chat_completion(request: ChatCompletionRequest, raw_request: Request):",
+        label=label,
+    )
+    require_text(
+        state, "vllm/entrypoints/openai/completion/api_router.py",
+        "async def create_completion(request: CompletionRequest, raw_request: Request):",
+        label=label,
+    )
+    require_text(
+        state, "vllm/entrypoints/scale_out/token_in_token_out/api_router.py",
+        "async def generate(request: GenerateRequest, raw_request: Request):",
+        label=label,
+    )
     generate_router = "vllm/entrypoints/generate/api_router.py"
     require_text(
         state, generate_router, "register_cohere_api_router(app)", label=label
@@ -1189,27 +1207,62 @@ def _validate_shared_prefix_cache_after(state: State) -> None:
     )
     forbid_text(state, "vllm/config/vllm.py", "cpu_bytes_to_use", label=label)
 
-    # Every generation surface carries the same opaque identity through
-    # the common sampling-parameter channel.
-    # Six identity surfaces over five modules: the chat module carries both
-    # the single-conversation request and the batch, and a batch is one
-    # caller, so its conversations are submitted under the one agent.
-    for path, surfaces in (
-        ("vllm/entrypoints/openai/chat_completion/protocol.py", 2),
-        ("vllm/entrypoints/openai/completion/protocol.py", 1),
-        ("vllm/entrypoints/openai/responses/protocol.py", 1),
-        ("vllm/entrypoints/anthropic/protocol.py", 1),
-        ("vllm/entrypoints/scale_out/token_in_token_out/protocol.py", 1),
-    ):
-        require_text(
-            state, path, "kv_scope: str | None = Field(", count=surfaces, label=label
-        )
+    # Every generation request model requires the agent ID, and the served
+    # schema says so; the render models it shares its shape with allocate no
+    # KV and have no ID. The chat module carries the single conversation and
+    # the batch, which names one line of work per conversation.
+    chat = "vllm/entrypoints/openai/chat_completion/protocol.py"
+    completion = "vllm/entrypoints/openai/completion/protocol.py"
+    tokens = "vllm/entrypoints/scale_out/token_in_token_out/protocol.py"
     require_text(
-        state,
-        "vllm/entrypoints/openai/chat_completion/protocol.py",
-        "return ChatCompletionRequest.model_validate(data)",
-        label=label,
+        state, "vllm/entrypoints/openai/engine/protocol.py",
+        "KvScope: TypeAlias = Annotated[", label=label,
     )
+    for path in (
+        chat, completion, tokens,
+        "vllm/entrypoints/openai/responses/protocol.py",
+        "vllm/entrypoints/anthropic/protocol.py",
+    ):
+        require_text(state, path, "    kv_scope: KvScope\n", label=label)
+        forbid_text(state, path, "kv_scope: str | None", label=label)
+    require_text(state, chat, "class ChatCompletionGenerationRequest(ChatCompletionRequest):",
+                 label=label)
+    require_text(state, chat, "kv_scope: list[KvScope] = Field(", label=label)
+    require_text(state, chat, "ChatCompletionGenerationRequest.model_validate(", label=label)
+    require_text(state, chat, 'require_one_sequence(data.get("n"), "n")', count=2, label=label)
+    require_text(state, completion,
+                 "class CompletionGenerationRequest(CompletionRequest):", label=label)
+    require_text(state, completion,
+                 'require_one_sequence(count, "prompt", "the number of prompts")',
+                 label=label)
+    require_text(state, tokens, "class TokenGenerationRequest(GenerateRequest):", label=label)
+    # Each generation route takes the generation model; rendering keeps the
+    # shared shape.
+    for path, text in (
+        ("vllm/entrypoints/openai/chat_completion/api_router.py",
+         "    request: ChatCompletionGenerationRequest, raw_request: Request\n"),
+        ("vllm/entrypoints/openai/completion/api_router.py",
+         "    request: CompletionGenerationRequest, raw_request: Request\n"),
+        ("vllm/entrypoints/scale_out/token_in_token_out/api_router.py",
+         "async def generate(request: TokenGenerationRequest, raw_request: Request):"),
+        ("vllm/entrypoints/openai/chat_completion/batch_serving.py",
+         "single_requests = request.to_chat_completion_requests()"),
+        ("vllm/entrypoints/anthropic/serving.py",
+         "return ChatCompletionGenerationRequest("),
+        ("vllm/entrypoints/openai/run_batch.py",
+         "return ChatCompletionGenerationRequest.model_validate(value)"),
+    ):
+        require_text(state, path, text, label=label)
+    # The same rule holds for every caller at the one boundary every
+    # generation passes, stated once and reused by the request models.
+    sampling = "vllm/sampling_params.py"
+    for text in (
+        "def require_kv_scope_value(value: object) -> str:",
+        "def require_one_sequence(",
+        "send the same kv_scope for every request that continues a conversation, ",
+        "and a new, never-used kv_scope for a fork or a subagent",
+    ):
+        require_text(state, sampling, text, label=label)
     generate_router = "vllm/entrypoints/generate/api_router.py"
     forbid_text(state, generate_router, "register_cohere_api_router", label=label)
     forbid_text(state, generate_router, "CohereServingChatV2", label=label)
@@ -1229,10 +1282,6 @@ def _validate_shared_prefix_cache_after(state: State) -> None:
         'cohere_format: str = "cmd4"',
         label=label,
     )
-    # Generation requires an agent ID, enforced on the path into the
-    # engine rather than on the request models -- the render endpoints share
-    # those models and allocate nothing, so a model-level requirement would
-    # demand an identity from a caller that owns no context.
     input_processor = "vllm/v1/engine/input_processor.py"
     require_text(
         state, input_processor, "def require_kv_scope(params: SamplingParams) -> str:",
@@ -1242,10 +1291,9 @@ def _validate_shared_prefix_cache_after(state: State) -> None:
     _require_ordered(
         _source(state, input_processor, label=label),
         (
-            'scope = params.extra_args.get("kv_scope") if params.extra_args else None',
-            "if scope is None:",
-            "kv_scope is required for generation",
-            'parameter="kv_scope",',
+            "scope = require_kv_scope_value(",
+            'params.extra_args.get("kv_scope") if params.extra_args else None',
+            'require_one_sequence(params.n, "n")',
         ),
         label=label,
         location=input_processor,
@@ -1899,8 +1947,13 @@ def _validate_sampling_resolution_after(state: State) -> None:
     _require_in_symbol(state, protocol, "GenerateRequest.to_sampling_params", (
         "deepcopy({**default_sampling_params, **self.sampling_params})",
         "resolve_final_response_token_budget(",
-        'extra_args["kv_scope"] = self.kv_scope',
         "return SamplingParams(**values)",
+    ), label=label)
+    # A rendered request names no line of work; the generation request adds
+    # its own to the one resolved engine request.
+    _require_in_symbol(state, protocol, "TokenGenerationRequest.to_sampling_params", (
+        "super().to_sampling_params(max_tokens, default_sampling_params)",
+        '"kv_scope": self.kv_scope',
     ), label=label)
     source = _symbol_source(state, serving, "ServingTokens.serve_tokens", label=label)
     _require_ordered(source, (
@@ -1908,7 +1961,7 @@ def _validate_sampling_resolution_after(state: State) -> None:
         "sampling_params = request.to_sampling_params(",
         "sampling_params.n > max_num_seqs",
         "msgspec.msgpack.encode(sampling_params)",
-        "self.engine_client.generate(",
+        "result_generator = ",
     ), label=label, location="ServingTokens.serve_tokens")
     for path in (protocol, serving):
         for obsolete in ("is_sampling_param_provided", "_sampling_params_provided_keys"):
@@ -1971,7 +2024,8 @@ def _validate_sampling_boundary_after(state: State) -> None:
         serving = f"vllm/entrypoints/openai/{surface}/serving.py"
         for obsolete in ("use_beam_search", "BeamSearchParams", "self.beam_search("):
             forbid_text(state, serving, obsolete, label=label)
-        require_text(state, serving, "self.engine_client.generate(", label=label)
+        require_text(state, serving, "sampling_params = request.to_sampling_params(",
+                     label=label)
     forbid_text(state, "vllm/entrypoints/scale_out/render/serving.py",
         "use_beam_search", label=label)
     require_python_symbols(state,
@@ -2028,7 +2082,7 @@ def _validate_generate_result_after(state: State) -> None:
     require_python_symbols(state,
         "tests/entrypoints/scale_out/token_in_token_out/test_generate_stream.py", {
             "test_terminal_cause_survives_empty_completion": None,
-            "test_parallel_sampling_keeps_staggered_choices_and_total_usage": None,
+            "test_parallel_sampling_is_refused_before_dispatch": None,
             "test_generation_integrity_failures_are_errors_on_both_transports": None,
         }, label=label)
 
@@ -2640,6 +2694,101 @@ def _validate_precise_errors_after(state: State) -> None:
     }, label=label)
 
 
+def _validate_admission_before(state: State) -> None:
+    label = "generation admission precondition"
+    engine = "vllm/v1/engine/async_llm.py"
+    forbid_text(state, engine, "async def admit(", label=label)
+    require_text(state, "vllm/entrypoints/openai/chat_completion/serving.py",
+                 "generator = self.engine_client.generate(", label=label)
+    require_text(state, "vllm/entrypoints/openai/responses/serving.py",
+                 "TypeAdapter(StreamingResponsesResponse).validate_json(error_json)",
+                 label=label)
+
+
+def _validate_admission_after(state: State) -> None:
+    label = "generation admission result"
+    require_text(state, "vllm/engine/protocol.py", "    async def admit(\n", label=label)
+    engine = "vllm/v1/engine/async_llm.py"
+    _require_in_symbol(state, engine, "AsyncLLM.admit", (
+        "stream = self._admitted_stream(",
+        "admitted = await anext(stream)",
+        "assert admitted is _ADMITTED",
+    ), label=label)
+    _require_in_symbol(state, engine, "AsyncLLM.generate", (
+        "stream = await self.admit(", "await stream.aclose()",
+    ), label=label)
+    _require_ordered(
+        _symbol_source(state, engine, "AsyncLLM._admitted_stream", label=label),
+        ("q = await self.add_request(", "yield _ADMITTED", "out = q.get_nowait()"),
+        label=label, location=engine,
+    )
+    # Admission is all or nothing: a failed engine submission is aborted.
+    _require_in_symbol(state, engine, "AsyncLLM._add_request", (
+        "except BaseException:", "await self.abort(request.request_id, internal=True)",
+    ), label=label)
+    # Every served generation surface admits before it answers.
+    for path, text in (
+        ("vllm/entrypoints/openai/chat_completion/serving.py",
+         "generator = await self.engine_client.admit("),
+        ("vllm/entrypoints/openai/completion/serving.py",
+         "generator = await self.engine_client.admit("),
+        ("vllm/entrypoints/openai/chat_completion/batch_serving.py",
+         "stream = await self.engine_client.admit("),
+        ("vllm/entrypoints/openai/responses/serving.py",
+         "return await self.engine_client.admit("),
+        ("vllm/entrypoints/scale_out/token_in_token_out/serving.py",
+         "result_generator = await self.engine_client.admit("),
+    ):
+        require_text(state, path, text, label=label)
+        forbid_text(state, path, "self.engine_client.generate(", label=label)
+    require_text(state, "vllm/entrypoints/openai/chat_completion/batch_serving.py",
+                 "admitted.push_async_callback(stream.aclose)", label=label)
+    responses = "vllm/entrypoints/openai/responses/serving.py"
+    forbid_text(state, responses, "TypeAdapter(StreamingResponsesResponse)", label=label)
+    _require_in_symbol(state, responses, "OpenAIServingResponses.responses_stream_generator", (
+        "except GenerationError as e:", "except Exception as e:",
+        "self._stream_error_event(e)",
+    ), label=label)
+    require_text(state, "vllm/entrypoints/openai/responses/protocol.py",
+                 "    | ResponseErrorEvent\n", label=label)
+    require_python_symbols(state, "tests/entrypoints/test_generation_admission.py", {
+        "test_an_admission_refusal_is_a_400_before_any_status_line": None,
+        "test_a_responses_failure_after_the_status_line_ends_with_its_error_event": None,
+    }, label=label)
+
+
+def _validate_single_flight_before(state: State) -> None:
+    forbid_text(state, "vllm/v1/engine/output_processor.py", "kv_scope",
+                label="kv_scope single-flight precondition")
+
+
+def _validate_single_flight_after(state: State) -> None:
+    label = "kv_scope single-flight result"
+    processor = "vllm/v1/engine/output_processor.py"
+    for text in (
+        "self.kv_scope_requests: dict[str, RequestState] = {}",
+        "already has a request in flight",
+        "a continuation must not overlap its predecessor",
+        "self.kv_scope_requests[scope] = req_state",
+    ):
+        require_text(state, processor, text, label=label)
+    require_text(state, processor, "self._release_kv_scope(req_state)", count=2,
+                 label=label)
+    # One API server process admits every generation request; several would
+    # each see only their own share of the requests in flight.
+    _require_in_symbol(state, "vllm/v1/engine/async_llm.py", "AsyncLLM.__init__", (
+        "if client_count != 1:", "Serve with --api-server-count 1.",
+    ), label=label)
+    require_python_symbols(state, "tests/v1/engine/test_kv_scope_single_flight.py", {
+        "test_an_overlapping_request_under_one_id_is_refused_by_name": None,
+        "test_admission_refuses_the_overlap_before_the_engine_sees_it": None,
+        "test_only_one_api_server_process_may_admit_generation": None,
+    }, label=label)
+    require_python_symbols(state, "tests/entrypoints/test_generation_admission.py", {
+        "test_an_overlapping_request_under_one_scope_is_a_400_naming_it": None,
+    }, label=label)
+
+
 def validate_final(state: State) -> None:
     """Reassert every durable semantic invariant on the complete tree.
 
@@ -2655,6 +2804,45 @@ def validate_final(state: State) -> None:
 
 
 CONTRACTS: Mapping[str, SemanticContract] = {
+    "kv-scope-single-flight": SemanticContract(
+        rationale=(
+            "One kv_scope names one line of work, yet upstream runs two "
+            "requests under one ID at once: each replaces the other's retained "
+            "context and neither continues the other. The one API server "
+            "process knows every request in flight, so admission refuses an "
+            "overlapping request under the same ID by name, before the engine "
+            "or any response sees it; finishing or aborting the earlier "
+            "request frees the ID. Several API server processes would each see "
+            "only their own share, so the engine refuses to start with more "
+            "than one."
+        ),
+        removal_condition=(
+            "Remove when pinned upstream refuses a second in-flight request "
+            "under one agent identity at admission."
+        ),
+        validate_before=_validate_single_flight_before,
+        validate_after=_validate_single_flight_after,
+    ),
+    "generation-admission-before-response": SemanticContract(
+        rationale=(
+            "Upstream streaming surfaces return their response before the "
+            "engine admits the request, so every admission refusal (a missing "
+            "or malformed kv_scope, an overlapping request, input validation) "
+            "arrives after HTTP 200 as an in-stream error, and Responses cuts "
+            "its stream after response.in_progress with no error event at all. "
+            "Admission is a step of its own that every generation surface "
+            "completes before it answers; the admitted stream owns its request "
+            "and aborts it when closed, cancelled or dropped; Responses ends "
+            "every later failure with its error event."
+        ),
+        removal_condition=(
+            "Remove when pinned upstream admits a generation request before "
+            "answering on every surface and ends every Responses stream "
+            "failure with an error event."
+        ),
+        validate_before=_validate_admission_before,
+        validate_after=_validate_admission_after,
+    ),
     "qwen-unique-tool-parameters": SemanticContract(
         rationale=(
             "Qwen's additional-properties grammar can emit a parameter name "
@@ -3179,8 +3367,12 @@ CONTRACTS: Mapping[str, SemanticContract] = {
             "and pressure releases whole IDs in least-recently-used order while "
             "references held by surviving contexts protect shared chunks. "
             "Sparse CPU chunks advertise only written data, and secondary "
-            "storage receives canonical entries. Every served generation "
-            "surface uses the common identity gate."
+            "storage receives canonical entries. An ID names one line of work, "
+            "which generates one sequence per request: generation request "
+            "models require it and state its rule, render models have none, a "
+            "batch names one ID per conversation, and n > 1 or several prompts "
+            "under one ID are refused, here and at the engine boundary for "
+            "every other caller."
         ),
         removal_condition=(
             "Remove when pinned upstream provides the same user-count sizing, "

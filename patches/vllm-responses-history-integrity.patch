@@ -99,7 +99,7 @@ diff --git a/tests/entrypoints/openai/responses/test_responses_utils.py b/tests/
 +            {"type": "input_text", "text": " one\n"},
 +            {"type": "input_text", "text": "two "},
 +        ]}
-+    request = ResponsesRequest(input=items, stream=stream)
++    request = ResponsesRequest(input=items, stream=stream, kv_scope="agent")
 +    messages = construct_input_messages(request_input=request.input)
 +    assert messages == [{
 +        "role": "assistant", "reasoning": " first\nsecond ",
@@ -160,7 +160,7 @@ diff --git a/tests/entrypoints/openai/responses/test_responses_utils.py b/tests/
 +                messages=construct_chat_messages_with_tool_call(items), stream=stream,
 +            )
 +        else:
-+            request = ResponsesRequest(input=items, stream=stream)
++            request = ResponsesRequest(input=items, stream=stream, kv_scope="agent")
 +            construct_input_messages(request_input=request.input)
 +
 +
@@ -205,7 +205,7 @@ diff --git a/tests/entrypoints/openai/responses/test_responses_utils.py b/tests/
 +    serving.parser = None
 +    serving._effective_chat_template_kwargs = lambda request: {}
 +    items = _history(["a", "b"], ["a", "b"] if valid else ["b", "a"])
-+    request = ResponsesRequest(input=items, stream=stream)
++    request = ResponsesRequest(input=items, stream=stream, kv_scope="agent")
 +    if valid:
 +        messages, _ = await serving._make_request(request, None)
 +        assert [message["tool_call_id"] for message in messages[1:]] == ["a", "b"]
@@ -318,7 +318,7 @@ diff --git a/vllm/entrypoints/openai/chat_completion/protocol.py b/vllm/entrypoi
  )
  from vllm.entrypoints.openai.engine.protocol import (
      AnyResponseFormat,
-@@ -582,88 +583,7 @@
+@@ -571,88 +572,7 @@
  
      @model_validator(mode="after")
      def _validate_tool_result_correlation(self) -> "ChatCompletionRequest":

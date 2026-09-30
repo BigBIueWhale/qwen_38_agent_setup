@@ -1,0 +1,1852 @@
+diff --git a/tests/entrypoints/openai/chat_completion/test_chat_error.py b/tests/entrypoints/openai/chat_completion/test_chat_error.py
+--- a/tests/entrypoints/openai/chat_completion/test_chat_error.py
++++ b/tests/entrypoints/openai/chat_completion/test_chat_error.py
+@@ -156,7 +156,10 @@
+     async def mock_generate(*args, **kwargs):
+         yield request_output
+ 
+-    mock_engine.generate = MagicMock(side_effect=mock_generate)
++    async def mock_admit(*args, **kwargs):
++        return mock_generate(*args, **kwargs)
++
++    mock_engine.admit = MagicMock(side_effect=mock_admit)
+ 
+     request = ChatCompletionRequest(
+         model=MODEL_NAME,
+@@ -304,7 +307,10 @@
+         yield request_output_1
+         yield request_output_2
+ 
+-    mock_engine.generate = MagicMock(side_effect=mock_generate)
++    async def mock_admit(*args, **kwargs):
++        return mock_generate(*args, **kwargs)
++
++    mock_engine.admit = MagicMock(side_effect=mock_admit)
+ 
+     request = ChatCompletionRequest(
+         model=MODEL_NAME,
+diff --git a/tests/entrypoints/openai/chat_completion/test_serving_chat.py b/tests/entrypoints/openai/chat_completion/test_serving_chat.py
+--- a/tests/entrypoints/openai/chat_completion/test_serving_chat.py
++++ b/tests/entrypoints/openai/chat_completion/test_serving_chat.py
+@@ -897,13 +897,13 @@
+     with suppress(Exception):
+         await serving_chat.create_chat_completion(req)
+ 
+-    assert mock_engine.generate.call_args.args[1].max_tokens == 93
++    assert mock_engine.admit.call_args.args[1].max_tokens == 93
+ 
+     req.max_tokens = 10
+     with suppress(Exception):
+         await serving_chat.create_chat_completion(req)
+ 
+-    assert mock_engine.generate.call_args.args[1].max_tokens == 10
++    assert mock_engine.admit.call_args.args[1].max_tokens == 10
+ 
+     # Model author's generation_config.json sets max_tokens (auto, no override)
+     # — should act as fallback only, not ceiling
+@@ -929,7 +929,7 @@
+     with suppress(Exception):
+         await serving_chat.create_chat_completion(req)
+ 
+-    assert mock_engine.generate.call_args.args[1].max_tokens == 10
++    assert mock_engine.admit.call_args.args[1].max_tokens == 10
+ 
+     # Test Case 2: Request's max_tokens set higher than generation_config
+     # default so request-provided max_tokens takes precedence
+@@ -938,7 +938,7 @@
+     with suppress(Exception):
+         await serving_chat.create_chat_completion(req)
+ 
+-    assert mock_engine.generate.call_args.args[1].max_tokens == 15
++    assert mock_engine.admit.call_args.args[1].max_tokens == 15
+ 
+     # Test Case 3: Request's max_tokens set lower than server accepts
+     req.max_tokens = 5
+@@ -946,7 +946,7 @@
+     with suppress(Exception):
+         await serving_chat.create_chat_completion(req)
+ 
+-    assert mock_engine.generate.call_args.args[1].max_tokens == 5
++    assert mock_engine.admit.call_args.args[1].max_tokens == 5
+ 
+     # User explicitly sets max_tokens via --override-generation-config
+     # — should act as a ceiling
+@@ -971,7 +971,7 @@
+     with suppress(Exception):
+         await serving_chat.create_chat_completion(req)
+ 
+-    assert mock_engine.generate.call_args.args[1].max_tokens == 10
++    assert mock_engine.admit.call_args.args[1].max_tokens == 10
+ 
+     # Test Case 3.2: Request max_tokens higher — capped by user ceiling from override
+     req.max_tokens = 15
+@@ -979,7 +979,7 @@
+     with suppress(Exception):
+         await serving_chat.create_chat_completion(req)
+ 
+-    assert mock_engine.generate.call_args.args[1].max_tokens == 10
++    assert mock_engine.admit.call_args.args[1].max_tokens == 10
+ 
+     # Test Case 3.3: Request max_tokens lower — respected
+     req.max_tokens = 5
+@@ -987,7 +987,7 @@
+     with suppress(Exception):
+         await serving_chat.create_chat_completion(req)
+ 
+-    assert mock_engine.generate.call_args.args[1].max_tokens == 5
++    assert mock_engine.admit.call_args.args[1].max_tokens == 5
+ 
+     # Setting server's max_tokens in the generation_config.json
+     # higher than context_window - prompt_tokens
+@@ -1013,7 +1013,7 @@
+     with suppress(Exception):
+         await serving_chat.create_chat_completion(req)
+ 
+-    assert mock_engine.generate.call_args.args[1].max_tokens == 93
++    assert mock_engine.admit.call_args.args[1].max_tokens == 93
+ 
+     # Test Case 2: Request's max_tokens set higher than server accepts
+     req.max_tokens = 100
+@@ -1021,7 +1021,7 @@
+     with suppress(Exception):
+         await serving_chat.create_chat_completion(req)
+ 
+-    assert mock_engine.generate.call_args.args[1].max_tokens == 93
++    assert mock_engine.admit.call_args.args[1].max_tokens == 93
+ 
+     # Test Case 3: Request's max_tokens set lower than server accepts
+     req.max_tokens = 5
+@@ -1029,7 +1029,7 @@
+     with suppress(Exception):
+         await serving_chat.create_chat_completion(req)
+ 
+-    assert mock_engine.generate.call_args.args[1].max_tokens == 5
++    assert mock_engine.admit.call_args.args[1].max_tokens == 5
+ 
+ 
+ @pytest.mark.asyncio
+@@ -1057,7 +1057,7 @@
+     req = ChatCompletionRequest(model=MODEL_NAME, messages=messages)
+     with suppress(Exception):
+         await serving_chat.create_chat_completion(req)
+-    assert mock_engine.generate.call_args.args[1].max_tokens == 93
++    assert mock_engine.admit.call_args.args[1].max_tokens == 93
+ 
+     # With truncate_prompt_tokens=5 (less than 7): the effective prompt length
+     # is 5, so max_tokens should be 100 - 5 = 95, not 93.
+@@ -1068,7 +1068,7 @@
+     )
+     with suppress(Exception):
+         await serving_chat.create_chat_completion(req)
+-    assert mock_engine.generate.call_args.args[1].max_tokens == 95
++    assert mock_engine.admit.call_args.args[1].max_tokens == 95
+ 
+     # With truncate_prompt_tokens=-1 (meaning use full max_model_len as the
+     # truncation limit, i.e., no practical truncation vs the window): effective
+@@ -1080,7 +1080,7 @@
+     )
+     with suppress(Exception):
+         await serving_chat.create_chat_completion(req)
+-    assert mock_engine.generate.call_args.args[1].max_tokens == 93
++    assert mock_engine.admit.call_args.args[1].max_tokens == 93
+ 
+ 
+ @pytest.mark.asyncio
+@@ -1231,8 +1231,8 @@
+     with suppress(Exception):
+         await serving_chat.create_chat_completion(req)
+ 
+-    assert mock_engine.generate.call_args.args[1].temperature == 0.5
+-    assert mock_engine.generate.call_args.args[1].repetition_penalty == 1.05
++    assert mock_engine.admit.call_args.args[1].temperature == 0.5
++    assert mock_engine.admit.call_args.args[1].repetition_penalty == 1.05
+ 
+     # Test the param when user set it
+     req.temperature = 0.1
+@@ -1240,8 +1240,8 @@
+     with suppress(Exception):
+         await serving_chat.create_chat_completion(req)
+ 
+-    assert mock_engine.generate.call_args.args[1].temperature == 0.1
+-    assert mock_engine.generate.call_args.args[1].repetition_penalty == 1.05
++    assert mock_engine.admit.call_args.args[1].temperature == 0.1
++    assert mock_engine.admit.call_args.args[1].repetition_penalty == 1.05
+ 
+     # Test When temperature==0.0
+     req.temperature = 0.0
+@@ -1249,8 +1249,8 @@
+     with suppress(Exception):
+         await serving_chat.create_chat_completion(req)
+ 
+-    assert mock_engine.generate.call_args.args[1].temperature == 0.0
+-    assert mock_engine.generate.call_args.args[1].repetition_penalty == 1.05
++    assert mock_engine.admit.call_args.args[1].temperature == 0.0
++    assert mock_engine.admit.call_args.args[1].repetition_penalty == 1.05
+ 
+ 
+ @pytest.mark.parametrize("model_type", ["gpt_oss", "any"])
+@@ -1339,7 +1339,10 @@
+             finished=True,
+         )
+ 
+-    mock_engine.generate = AsyncMock(side_effect=mock_generate)
++    async def mock_admit(*args, **kwargs):
++        return mock_generate(*args, **kwargs)
++
++    mock_engine.admit = AsyncMock(side_effect=mock_admit)
+ 
+     serving_chat = _build_serving_chat(mock_engine)
+ 
+@@ -1357,9 +1360,9 @@
+     with suppress(Exception):
+         await serving_chat.create_chat_completion(req, mock_raw_request)
+ 
+-    # Verify that data_parallel_rank was passed to engine.generate
+-    assert "data_parallel_rank" in mock_engine.generate.call_args.kwargs
+-    assert mock_engine.generate.call_args.kwargs["data_parallel_rank"] == 2
++    # Verify that data_parallel_rank was passed to engine admission
++    assert "data_parallel_rank" in mock_engine.admit.call_args.kwargs
++    assert mock_engine.admit.call_args.kwargs["data_parallel_rank"] == 2
+ 
+     # Test when data_parallel_rank is not present (defaults to None)
+     req_no_dp = ChatCompletionRequest(
+@@ -1376,8 +1379,8 @@
+         await serving_chat.create_chat_completion(req_no_dp, mock_raw_request_no_dp)
+ 
+     # Verify that data_parallel_rank defaults to None
+-    assert "data_parallel_rank" in mock_engine.generate.call_args.kwargs
+-    assert mock_engine.generate.call_args.kwargs["data_parallel_rank"] is None
++    assert "data_parallel_rank" in mock_engine.admit.call_args.kwargs
++    assert mock_engine.admit.call_args.kwargs["data_parallel_rank"] is None
+ 
+ 
+ async def _render_chat_prompt_token_ids(
+diff --git a/tests/entrypoints/openai/completion/test_completion_error.py b/tests/entrypoints/openai/completion/test_completion_error.py
+--- a/tests/entrypoints/openai/completion/test_completion_error.py
++++ b/tests/entrypoints/openai/completion/test_completion_error.py
+@@ -232,7 +232,10 @@
+     async def mock_generate(*args, **kwargs):
+         yield request_output
+ 
+-    mock_engine.generate = MagicMock(side_effect=mock_generate)
++    async def mock_admit(*args, **kwargs):
++        return mock_generate(*args, **kwargs)
++
++    mock_engine.admit = MagicMock(side_effect=mock_admit)
+ 
+     request = CompletionRequest(
+         model=MODEL_NAME,
+@@ -391,7 +394,10 @@
+         yield request_output_1
+         yield request_output_2
+ 
+-    mock_engine.generate = MagicMock(side_effect=mock_generate)
++    async def mock_admit(*args, **kwargs):
++        return mock_generate(*args, **kwargs)
++
++    mock_engine.admit = MagicMock(side_effect=mock_admit)
+ 
+     request = CompletionRequest(
+         model=MODEL_NAME,
+diff --git a/tests/entrypoints/openai/completion/test_lora_resolvers.py b/tests/entrypoints/openai/completion/test_lora_resolvers.py
+--- a/tests/entrypoints/openai/completion/test_lora_resolvers.py
++++ b/tests/entrypoints/openai/completion/test_lora_resolvers.py
+@@ -130,9 +130,12 @@
+         for _ in []:
+             yield _
+ 
+-    mock_engine.generate = MagicMock(spec=AsyncLLM.generate, side_effect=mock_generate)
++    async def mock_admit(*args, **kwargs):
++        return mock_generate(*args, **kwargs)
+ 
+-    mock_engine.generate.reset_mock()
++    mock_engine.admit = MagicMock(spec=AsyncLLM.admit, side_effect=mock_admit)
++
++    mock_engine.admit.reset_mock()
+     mock_engine.add_lora.reset_mock()
+ 
+     mock_engine.model_config = MockModelConfig()
+@@ -170,8 +173,8 @@
+         prompt="Generate with LoRA",
+     )
+ 
+-    # Suppress potential errors during the mocked generate call,
+-    # as we are primarily checking for add_lora and generate calls
++    # Suppress potential errors during the mocked admission,
++    # as we are primarily checking for add_lora and admission calls
+     with suppress(Exception):
+         await serving_completion.create_completion(req_found)
+ 
+@@ -180,8 +183,8 @@
+     assert isinstance(called_lora_request, LoRARequest)
+     assert called_lora_request.lora_name == lora_model_name
+ 
+-    mock_engine.generate.assert_called_once()
+-    called_lora_request = mock_engine.generate.call_args[1]["lora_request"]
++    mock_engine.admit.assert_called_once()
++    called_lora_request = mock_engine.admit.call_args[1]["lora_request"]
+     assert isinstance(called_lora_request, LoRARequest)
+     assert called_lora_request.lora_name == lora_model_name
+ 
+@@ -201,7 +204,7 @@
+     response = await serving_completion.create_completion(req)
+ 
+     mock_engine.add_lora.assert_not_awaited()
+-    mock_engine.generate.assert_not_called()
++    mock_engine.admit.assert_not_called()
+ 
+     assert isinstance(response, ErrorResponse)
+     assert response.error.code == HTTPStatus.NOT_FOUND.value
+@@ -230,8 +233,8 @@
+     assert isinstance(called_lora_request, LoRARequest)
+     assert called_lora_request.lora_name == invalid_model
+ 
+-    # Assert generate was *not* called due to the failure
+-    mock_engine.generate.assert_not_called()
++    # Assert admission was *not* reached due to the failure
++    mock_engine.admit.assert_not_called()
+ 
+     # Assert the correct error response
+     assert isinstance(response, ErrorResponse)
+@@ -252,4 +255,4 @@
+     await serving_completion.create_completion(req_found)
+ 
+     mock_engine.add_lora.assert_not_called()
+-    mock_engine.generate.assert_not_called()
++    mock_engine.admit.assert_not_called()
+diff --git a/tests/entrypoints/scale_out/token_in_token_out/test_generate_stream.py b/tests/entrypoints/scale_out/token_in_token_out/test_generate_stream.py
+--- a/tests/entrypoints/scale_out/token_in_token_out/test_generate_stream.py
++++ b/tests/entrypoints/scale_out/token_in_token_out/test_generate_stream.py
+@@ -158,6 +158,16 @@
+     return engine
+ 
+ 
++def _admitting(outputs):
++    """The engine client's admission: admit the request, then return its
++    output stream, which the fake outputs generator stands in for."""
++
++    async def admit(*args, **kwargs):
++        return outputs(*args, **kwargs)
++
++    return MagicMock(side_effect=admit)
++
++
+ def _parse_sse_chunks(chunks: list[str]) -> list[Any]:
+     """Parse SSE chunks into dicts (JSON) or raw strings ([DONE])."""
+     parsed: list[Any] = []
+@@ -180,7 +190,7 @@
+             "req-1", token_ids=[10], finish_reason="stop", finished=True
+         )
+ 
+-    engine.generate = MagicMock(side_effect=mock_generate)
++    engine.admit = _admitting(mock_generate)
+     serving = _build_serving_tokens(engine)
+ 
+     request = TokenGenerationRequest(
+@@ -209,7 +219,7 @@
+             "req-1", token_ids=[10], finish_reason="stop", finished=True
+         )
+ 
+-    engine.generate = MagicMock(side_effect=mock_generate)
++    engine.admit = _admitting(mock_generate)
+     serving = _build_serving_tokens(engine)
+ 
+     request = TokenGenerationRequest(
+@@ -224,7 +234,7 @@
+ 
+     await serving.serve_tokens(request, raw_request)
+ 
+-    assert engine.generate.call_args.kwargs["session_id"] == "header-session"
++    assert engine.admit.call_args.kwargs["session_id"] == "header-session"
+ 
+ 
+ @pytest.mark.asyncio
+@@ -239,7 +249,7 @@
+             "req-1", token_ids=[40], finish_reason="stop", finished=True
+         )
+ 
+-    engine.generate = MagicMock(side_effect=mock_generate)
++    engine.admit = _admitting(mock_generate)
+     serving = _build_serving_tokens(engine)
+ 
+     request = TokenGenerationRequest(
+@@ -279,7 +289,7 @@
+             "req-1", token_ids=[20], finish_reason="error", finished=True
+         )
+ 
+-    engine.generate = MagicMock(side_effect=mock_generate)
++    engine.admit = _admitting(mock_generate)
+     serving = _build_serving_tokens(engine)
+ 
+     request = TokenGenerationRequest(
+@@ -313,7 +323,7 @@
+             "req-1", token_ids=[], finish_reason="error", finished=True
+         )
+ 
+-    engine.generate = MagicMock(side_effect=mock_generate)
++    engine.admit = _admitting(mock_generate)
+     serving = _build_serving_tokens(engine)
+ 
+     request = TokenGenerationRequest(
+@@ -347,7 +357,7 @@
+             "req-1", token_ids=[20], finish_reason="stop", finished=True
+         )
+ 
+-    engine.generate = MagicMock(side_effect=mock_generate)
++    engine.admit = _admitting(mock_generate)
+     serving = _build_serving_tokens(engine)
+ 
+     request = TokenGenerationRequest(
+@@ -384,7 +394,7 @@
+             "req-1", token_ids=[20], finish_reason="stop", finished=True
+         )
+ 
+-    engine.generate = MagicMock(side_effect=mock_generate)
++    engine.admit = _admitting(mock_generate)
+     serving = _build_serving_tokens(engine)
+ 
+     request = TokenGenerationRequest(
+@@ -423,7 +433,7 @@
+             "req-1", token_ids=[20], finish_reason="stop", finished=True
+         )
+ 
+-    engine.generate = MagicMock(side_effect=mock_generate)
++    engine.admit = _admitting(mock_generate)
+     serving = _build_serving_tokens(engine)
+ 
+     request = TokenGenerationRequest(
+@@ -479,7 +489,7 @@
+             finished=True,
+         )
+ 
+-    engine.generate = MagicMock(side_effect=mock_generate)
++    engine.admit = _admitting(mock_generate)
+     serving = _build_serving_tokens(engine)
+ 
+     request = TokenGenerationRequest(
+@@ -519,7 +529,7 @@
+             num_cached_tokens=2,
+         )
+ 
+-    engine.generate = MagicMock(side_effect=mock_generate)
++    engine.admit = _admitting(mock_generate)
+     serving = _build_serving_tokens(engine, enable_prompt_tokens_details=True)
+ 
+     request = TokenGenerationRequest(
+@@ -561,7 +571,7 @@
+             num_cached_tokens=0,
+         )
+ 
+-    engine.generate = MagicMock(side_effect=mock_generate)
++    engine.admit = _admitting(mock_generate)
+     serving = _build_serving_tokens(engine, enable_prompt_tokens_details=True)
+ 
+     request = TokenGenerationRequest(
+@@ -601,7 +611,7 @@
+         res.outputs[0].stop_reason = stop_reason
+         yield res
+ 
+-    engine.generate = MagicMock(side_effect=generate)
++    engine.admit = _admitting(generate)
+     serving = _build_serving_tokens(engine)
+     request = TokenGenerationRequest(token_ids=[1], sampling_params={'logprobs': 0},
+         stream=stream, kv_scope='agent')
+@@ -676,7 +686,7 @@
+         for output in outputs:
+             yield output
+ 
+-    engine.generate = MagicMock(side_effect=generate)
++    engine.admit = _admitting(generate)
+     serving = _build_serving_tokens(engine)
+     request = TokenGenerationRequest(token_ids=[1], sampling_params={}, stream=stream,
+         stream_options=StreamOptions(include_usage=True), kv_scope='agent')
+diff --git a/tests/entrypoints/scale_out/token_in_token_out/test_protocol.py b/tests/entrypoints/scale_out/token_in_token_out/test_protocol.py
+--- a/tests/entrypoints/scale_out/token_in_token_out/test_protocol.py
++++ b/tests/entrypoints/scale_out/token_in_token_out/test_protocol.py
+@@ -237,8 +237,11 @@
+             )],
+         )
+ 
++    async def engine_admit(prompt, params, request_id, **kwargs):
++        return engine_generate(prompt, params, request_id, **kwargs)
++
+     serving.engine_client = SimpleNamespace(
+-        errored=False, generate=engine_generate,
++        errored=False, admit=engine_admit,
+         vllm_config=SimpleNamespace(scheduler_config=SimpleNamespace(max_num_seqs=1)),
+     )
+     request = generate(settings)
+diff --git a/tests/entrypoints/scale_out/token_in_token_out/test_raw_images.py b/tests/entrypoints/scale_out/token_in_token_out/test_raw_images.py
+--- a/tests/entrypoints/scale_out/token_in_token_out/test_raw_images.py
++++ b/tests/entrypoints/scale_out/token_in_token_out/test_raw_images.py
+@@ -173,7 +173,10 @@
+                 index=0, text='', token_ids=[9], cumulative_logprob=None,
+                 logprobs=None, finish_reason='stop')])
+ 
+-    serving.engine_client = SimpleNamespace(errored=False, generate=generate,
++    async def admit(*args, **kwargs):
++        return generate(*args, **kwargs)
++
++    serving.engine_client = SimpleNamespace(errored=False, admit=admit,
+         vllm_config=SimpleNamespace(scheduler_config=SimpleNamespace(max_num_seqs=10)))
+     return serving, dispatched
+ 
+diff --git a/tests/entrypoints/test_generation_admission.py b/tests/entrypoints/test_generation_admission.py
+new file mode 100644
+--- /dev/null
++++ b/tests/entrypoints/test_generation_admission.py
+@@ -0,0 +1,321 @@
++# SPDX-License-Identifier: Apache-2.0
++# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
++"""Every generation surface finishes admission before its status line.
++
++A refusal that admission raises -- input validation, the agent-ID rules --
++is answered with an error status of its own, never inside a stream that has
++already been answered 200. The routes, serving classes and exception handlers
++here are the served ones; only the engine client and the renderer are fakes.
++"""
++
++import json
++from types import SimpleNamespace
++from unittest.mock import AsyncMock, MagicMock
++
++import pytest
++from fastapi import FastAPI
++from fastapi.testclient import TestClient
++
++from vllm.entrypoints.anthropic.serving import AnthropicServingMessages
++from vllm.entrypoints.generate.api_router import register_generate_api_routers
++from vllm.entrypoints.openai.chat_completion.batch_serving import (
++    OpenAIServingChatBatch,
++)
++from vllm.entrypoints.openai.chat_completion.serving import OpenAIServingChat
++from vllm.entrypoints.openai.completion.serving import OpenAIServingCompletion
++from vllm.entrypoints.openai.responses.serving import OpenAIServingResponses
++from vllm.entrypoints.scale_out.factories import register_scale_out_api_routers
++from vllm.entrypoints.scale_out.token_in_token_out.serving import ServingTokens
++from vllm.entrypoints.serve.exception_handling.register import (
++    init_exception_handler,
++)
++from vllm.exceptions import VLLMValidationError
++from vllm.outputs import CompletionOutput, RequestOutput
++from vllm.v1.engine.exceptions import EngineGenerateError
++
++pytestmark = pytest.mark.cpu_test
++
++_REFUSAL = "admission refused this request (unit)"
++_TOKEN_INPUT = {"type": "token", "prompt_token_ids": [1, 2, 3]}
++_MESSAGES = [{"role": "user", "content": "hi"}]
++
++# Every generative route, with a streaming body that names its line of work.
++SURFACES = {
++    "chat": ("/v1/chat/completions",
++             {"model": "m", "messages": _MESSAGES, "stream": True,
++              "kv_scope": "line"}),
++    "completion": ("/v1/completions",
++                   {"model": "m", "prompt": "hi", "stream": True,
++                    "kv_scope": "line"}),
++    "responses": ("/v1/responses",
++                  {"model": "m", "input": "hi", "stream": True,
++                   "kv_scope": "line"}),
++    "anthropic": ("/v1/messages",
++                  {"model": "m", "max_tokens": 16, "messages": _MESSAGES,
++                   "stream": True, "kv_scope": "line"}),
++    "tokens": ("/inference/v1/generate",
++               {"token_ids": [1, 2, 3], "sampling_params": {}, "stream": True,
++                "kv_scope": "line"}),
++    "batch": ("/v1/chat/completions/batch",
++              {"model": "m", "messages": [_MESSAGES, _MESSAGES],
++               "kv_scope": ["line-a", "line-b"]}),
++}
++
++
++class FakeStream:
++    """An admitted request's output stream, as the engine client returns it:
++    already started, so closing it runs its cleanup like the real one."""
++
++    def __init__(self, outputs, fail_after=None):
++        self.outputs = outputs
++        self.fail_after = fail_after
++        self.closed = False
++        self._gen = self._run()
++
++    async def _run(self):
++        try:
++            yield None  # admission marker, consumed by prime()
++            for index, output in enumerate(self.outputs):
++                if self.fail_after is not None and index == self.fail_after:
++                    raise EngineGenerateError()
++                yield output
++            if self.fail_after is not None and self.fail_after >= len(self.outputs):
++                raise EngineGenerateError()
++        finally:
++            self.closed = True
++
++    async def prime(self):
++        await anext(self._gen)
++        return self._gen
++
++
++def _output(text="ok", finished=True):
++    return RequestOutput(
++        request_id="unit", prompt=None, prompt_token_ids=[1, 2, 3],
++        prompt_logprobs=None, finished=finished,
++        outputs=[CompletionOutput(
++            index=0, text=text, token_ids=[4], cumulative_logprob=None,
++            logprobs=None, finish_reason="stop" if finished else None,
++            stop_reason=None,
++        )],
++    )
++
++
++def _engine(admit):
++    model_config = MagicMock()
++    model_config.hf_config.model_type = "test"
++    model_config.max_model_len = 4096
++    model_config.is_encoder_decoder = False
++    model_config.generation_config = "auto"
++    model_config.override_generation_config = {}
++    model_config.get_diff_sampling_param.return_value = {}
++    engine = MagicMock()
++    engine.model_config = model_config
++    engine.vllm_config = MagicMock(kv_transfer_config=None)
++    engine.vllm_config.scheduler_config.max_num_seqs = 1
++    engine.errored = False
++    engine.is_tracing_enabled = AsyncMock(return_value=False)
++    engine.admit = admit
++    engine.generate = MagicMock(
++        side_effect=AssertionError("a served surface must admit, not generate")
++    )
++    return engine
++
++
++def _app(admit) -> tuple[FastAPI, MagicMock]:
++    engine = _engine(admit)
++    models = MagicMock()
++    models.model_name.return_value = "m"
++    models.lora_requests = {}
++    renderer = MagicMock()
++    renderer.render_chat = AsyncMock(return_value=(_MESSAGES, [_TOKEN_INPUT]))
++    renderer.render_completion = AsyncMock(return_value=[_TOKEN_INPUT])
++    renderer.preprocess_chat = AsyncMock(return_value=(_MESSAGES, [_TOKEN_INPUT]))
++    renderer.preprocess_completion = AsyncMock(return_value=[_TOKEN_INPUT])
++    renderer.use_harmony = False
++    renderer.validate_chat_template.return_value = None
++    renderer.parser = None
++    chat_args = dict(
++        online_renderer=renderer, request_logger=None, chat_template=None,
++        chat_template_content_format="auto",
++    )
++    app = FastAPI()
++    app.state.args = SimpleNamespace(tokens_only=False, log_error_stack=False)
++    register_generate_api_routers(app)
++    register_scale_out_api_routers(app, ("generate",))
++    init_exception_handler(app)
++    state = app.state
++    state.openai_serving_chat = OpenAIServingChat(engine, models, "assistant", **chat_args)
++    state.openai_serving_chat_batch = OpenAIServingChatBatch(
++        engine, models, "assistant", **chat_args
++    )
++    state.anthropic_serving_messages = AnthropicServingMessages(
++        engine, models, "assistant", **chat_args
++    )
++    state.openai_serving_completion = OpenAIServingCompletion(
++        engine, models, online_renderer=renderer, request_logger=None
++    )
++    state.openai_serving_responses = OpenAIServingResponses(
++        engine, models, renderer, request_logger=None, chat_template=None,
++        chat_template_content_format="auto",
++    )
++    state.serving_tokens = ServingTokens(
++        engine, models, renderer, request_logger=None,
++    )
++    return app, engine
++
++
++def _refuse(*args, **kwargs):
++    raise VLLMValidationError(_REFUSAL, parameter="kv_scope")
++
++
++@pytest.mark.parametrize("surface", sorted(SURFACES))
++def test_an_admission_refusal_is_a_400_before_any_status_line(surface):
++    path, body = SURFACES[surface]
++    admit = AsyncMock(side_effect=_refuse)
++    app, engine = _app(admit)
++    with TestClient(app) as client:
++        response = client.post(path, json=body)
++    assert response.status_code == 400, (surface, response.text)
++    assert not response.headers["content-type"].startswith("text/event-stream")
++    assert _REFUSAL in response.text
++    assert admit.await_count == 1
++    engine.generate.assert_not_called()
++
++
++@pytest.mark.parametrize("surface", sorted(SURFACES))
++def test_a_missing_scope_is_refused_by_its_rule_before_admission(surface):
++    path, body = SURFACES[surface]
++    body = {key: value for key, value in body.items() if key != "kv_scope"}
++    admit = AsyncMock(side_effect=AssertionError("must not be reached"))
++    app, _ = _app(admit)
++    with TestClient(app) as client:
++        response = client.post(path, json=body)
++    assert response.status_code == 400, (surface, response.text)
++    assert "same kv_scope for every request that continues a conversation" in (
++        response.text
++    )
++    assert admit.await_count == 0
++
++
++@pytest.mark.parametrize(("surface", "fan_out"), [
++    ("chat", {"n": 2}),
++    ("batch", {"n": 2}),
++    ("completion", {"n": 2}),
++    ("completion", {"prompt": ["a", "b"]}),
++    ("tokens", {"sampling_params": {"n": 2}}),
++])
++def test_one_scope_fanning_out_into_several_sequences_is_refused(surface, fan_out):
++    path, body = SURFACES[surface]
++    admit = AsyncMock(side_effect=AssertionError("must not be reached"))
++    app, _ = _app(admit)
++    with TestClient(app) as client:
++        response = client.post(path, json=body | fan_out)
++    assert response.status_code == 400, (surface, response.text)
++    assert "each with its own new kv_scope" in response.text
++    assert admit.await_count == 0
++
++
++@pytest.mark.parametrize("surface", sorted(set(SURFACES) - {"batch"}))
++def test_an_admitted_stream_is_answered_200_and_streamed(surface):
++    # The control for the refusals above: the same bodies, admitted, stream.
++    path, body = SURFACES[surface]
++    streams = []
++
++    async def admit(*args, **kwargs):
++        stream = FakeStream([_output()])
++        streams.append(stream)
++        return await stream.prime()
++
++    app, _ = _app(admit)
++    with TestClient(app) as client:
++        response = client.post(path, json=body)
++    assert response.status_code == 200, (surface, response.text)
++    assert response.headers["content-type"].startswith("text/event-stream")
++    assert len(streams) == 1 and streams[0].closed
++
++
++def test_a_batch_refused_on_one_conversation_aborts_the_ones_admitted():
++    path, body = SURFACES["batch"]
++    streams = []
++
++    async def admit(prompt, params, request_id, **kwargs):
++        if params.extra_args["kv_scope"] == "line-b":
++            _refuse()
++        stream = FakeStream([_output()])
++        streams.append(stream)
++        return await stream.prime()
++
++    app, _ = _app(admit)
++    with TestClient(app) as client:
++        response = client.post(path, json=body)
++    assert response.status_code == 400, response.text
++    assert _REFUSAL in response.text
++    assert len(streams) == 1 and streams[0].closed
++
++
++def test_a_batch_admits_each_conversation_under_its_own_scope():
++    path, body = SURFACES["batch"]
++    scopes = []
++
++    async def admit(prompt, params, request_id, **kwargs):
++        scopes.append(params.extra_args["kv_scope"])
++        return await FakeStream([_output()]).prime()
++
++    app, _ = _app(admit)
++    with TestClient(app) as client:
++        response = client.post(path, json=body)
++    assert response.status_code == 200, response.text
++    assert scopes == ["line-a", "line-b"]
++    assert len(response.json()["choices"]) == 2
++
++
++def _events(text: str) -> list[tuple[str, dict]]:
++    events = []
++    for block in text.strip().split("\n\n"):
++        lines = dict(line.split(": ", 1) for line in block.splitlines())
++        events.append((lines["event"], json.loads(lines["data"])))
++    return events
++
++
++@pytest.mark.parametrize("fail_after", [0, 1])
++def test_a_responses_failure_after_the_status_line_ends_with_its_error_event(
++    fail_after,
++):
++    path, body = SURFACES["responses"]
++
++    async def admit(*args, **kwargs):
++        return await FakeStream(
++            [_output("partial", finished=False), _output()], fail_after=fail_after
++        ).prime()
++
++    app, _ = _app(admit)
++    with TestClient(app) as client:
++        response = client.post(path, json=body)
++    assert response.status_code == 200
++    events = _events(response.text)
++    assert [kind for kind, _ in events[:2]] == [
++        "response.created", "response.in_progress",
++    ]
++    kind, data = events[-1]
++    assert kind == "error", events
++    assert data["type"] == "error"
++    assert data["code"] == "InternalServerError"
++    assert data["sequence_number"] == len(events) - 1
++    assert not any(k in ("response.completed", "response.incomplete")
++                   for k, _ in events)
++
++
++@pytest.mark.parametrize("surface", ["chat", "completion", "tokens"])
++def test_other_surfaces_end_a_failure_after_the_status_line_with_an_error(surface):
++    path, body = SURFACES[surface]
++
++    async def admit(*args, **kwargs):
++        return await FakeStream([_output("partial", finished=False)],
++                                fail_after=1).prime()
++
++    app, _ = _app(admit)
++    with TestClient(app) as client:
++        response = client.post(path, json=body)
++    assert response.status_code == 200
++    assert '"error"' in response.text, response.text
+diff --git a/tests/v1/engine/test_async_llm_admission.py b/tests/v1/engine/test_async_llm_admission.py
+new file mode 100644
+--- /dev/null
++++ b/tests/v1/engine/test_async_llm_admission.py
+@@ -0,0 +1,143 @@
++# SPDX-License-Identifier: Apache-2.0
++# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
++"""Admission is a step of its own, and the admitted stream owns its request.
++
++admit() raises every refusal before its caller has committed to a response.
++Whatever then happens to the returned stream -- exhausted, closed, cancelled
++or dropped -- the request finishes or is aborted; nothing stays in flight.
++"""
++
++import asyncio
++import gc
++from unittest.mock import AsyncMock, MagicMock
++
++import pytest
++
++from vllm.exceptions import VLLMValidationError
++from vllm.outputs import CompletionOutput, RequestOutput
++from vllm.sampling_params import RequestOutputKind, SamplingParams
++from vllm.v1.engine.async_llm import AsyncLLM
++from vllm.v1.engine.output_processor import RequestOutputCollector
++
++pytestmark = pytest.mark.cpu_test
++
++_PROMPT = {"type": "token", "prompt_token_ids": [1, 2, 3]}
++
++
++def _output(finished: bool) -> RequestOutput:
++    return RequestOutput(
++        request_id="internal", prompt=None, prompt_token_ids=[1, 2, 3],
++        prompt_logprobs=None, finished=finished,
++        outputs=[CompletionOutput(
++            index=0, text="x", token_ids=[4], cumulative_logprob=None,
++            logprobs=None, finish_reason="stop" if finished else None,
++        )],
++    )
++
++
++def _engine(*outputs: RequestOutput, refusal: Exception | None = None):
++    engine = object.__new__(AsyncLLM)
++    engine.log_requests = False
++    queue = RequestOutputCollector(RequestOutputKind.DELTA, "internal")
++    for output in outputs:
++        queue.put(output)
++
++    async def add_request(*args, **kwargs):
++        if refusal is not None:
++            raise refusal
++        return queue
++
++    engine.add_request = AsyncMock(side_effect=add_request)
++    engine.abort = AsyncMock()
++    return engine
++
++
++def _params() -> SamplingParams:
++    return SamplingParams(max_tokens=4, extra_args={"kv_scope": "line"})
++
++
++@pytest.mark.asyncio
++async def test_admit_raises_the_refusal_before_any_stream_exists():
++    refusal = VLLMValidationError("refused", parameter="kv_scope")
++    engine = _engine(refusal=refusal)
++    with pytest.raises(VLLMValidationError) as excinfo:
++        await engine.admit(_PROMPT, _params(), "req")
++    assert excinfo.value is refusal
++    engine.abort.assert_not_awaited()
++
++
++@pytest.mark.asyncio
++async def test_admit_returns_the_admitted_request_outputs():
++    engine = _engine(_output(False))
++    stream = await engine.admit(_PROMPT, _params(), "req")
++    engine.add_request.assert_awaited_once()
++    assert (await anext(stream)).finished is False
++    queue = await engine.add_request.side_effect()
++    queue.put(_output(True))
++    assert [output.finished async for output in stream] == [True]
++    engine.abort.assert_not_awaited()
++
++
++@pytest.mark.asyncio
++async def test_closing_an_admitted_stream_aborts_its_request():
++    engine = _engine(_output(False))
++    stream = await engine.admit(_PROMPT, _params(), "req")
++    await stream.aclose()
++    engine.abort.assert_awaited_once_with("internal", internal=True)
++
++
++@pytest.mark.asyncio
++async def test_dropping_an_admitted_stream_unread_aborts_its_request():
++    # A response that is never iterated, e.g. a client gone before the body
++    # starts, still frees its request.
++    engine = _engine(_output(False))
++    stream = await engine.admit(_PROMPT, _params(), "req")
++    del stream
++    gc.collect()
++    for _ in range(3):
++        await asyncio.sleep(0)
++    engine.abort.assert_awaited_once_with("internal", internal=True)
++
++
++@pytest.mark.asyncio
++async def test_cancelling_the_consumer_aborts_its_request():
++    engine = _engine()  # no output ever arrives
++    stream = await engine.admit(_PROMPT, _params(), "req")
++    consumer = asyncio.create_task(anext(stream))
++    await asyncio.sleep(0)
++    consumer.cancel()
++    with pytest.raises(asyncio.CancelledError):
++        await consumer
++    engine.abort.assert_awaited_once_with("internal", internal=True)
++
++
++@pytest.mark.asyncio
++async def test_generate_admits_on_first_iteration_and_yields_the_same_outputs():
++    engine = _engine(_output(True))
++    generator = engine.generate(_PROMPT, _params(), "req")
++    engine.add_request.assert_not_awaited()
++    assert [output.finished async for output in generator] == [True]
++    engine.add_request.assert_awaited_once()
++
++    refusal = VLLMValidationError("refused", parameter="kv_scope")
++    refused = _engine(refusal=refusal)
++    with pytest.raises(VLLMValidationError):
++        await anext(refused.generate(_PROMPT, _params(), "req"))
++
++
++@pytest.mark.asyncio
++@pytest.mark.parametrize("failure", [asyncio.CancelledError, ConnectionError])
++async def test_a_failed_engine_submission_leaves_nothing_in_flight(failure):
++    # Admission is all or nothing: once the output processor holds the
++    # request, a submission that fails or is cancelled aborts it again.
++    engine = object.__new__(AsyncLLM)
++    engine.log_requests = False
++    engine.output_processor = MagicMock()
++    engine.engine_core = MagicMock()
++    engine.engine_core.add_request_async = AsyncMock(side_effect=failure())
++    engine.abort = AsyncMock()
++    request = MagicMock(request_id="internal")
++    with pytest.raises(failure):
++        await engine._add_request(request, None, None, 0, MagicMock())
++    engine.output_processor.add_request.assert_called_once()
++    engine.abort.assert_awaited_once_with("internal", internal=True)
+diff --git a/tests/v1/streaming_input/test_async_llm_streaming.py b/tests/v1/streaming_input/test_async_llm_streaming.py
+--- a/tests/v1/streaming_input/test_async_llm_streaming.py
++++ b/tests/v1/streaming_input/test_async_llm_streaming.py
+@@ -37,8 +37,10 @@
+     llm._run_output_handler = MagicMock()
+     llm.abort = AsyncMock()
+ 
+-    # Use the real generate method from AsyncLLM
++    # Use the real generate method from AsyncLLM, and the admission it runs
+     llm.generate = AsyncLLM.generate.__get__(llm, AsyncLLM)
++    llm.admit = AsyncLLM.admit.__get__(llm, AsyncLLM)
++    llm._admitted_stream = AsyncLLM._admitted_stream.__get__(llm, AsyncLLM)
+ 
+     return llm
+ 
+@@ -132,8 +134,10 @@
+     llm._run_output_handler = MagicMock()
+     llm.abort = AsyncMock()
+ 
+-    # Bind the real generate method
++    # Bind the real generate method and the admission it runs
+     llm.generate = AsyncLLM.generate.__get__(llm, AsyncLLM)
++    llm.admit = AsyncLLM.admit.__get__(llm, AsyncLLM)
++    llm._admitted_stream = AsyncLLM._admitted_stream.__get__(llm, AsyncLLM)
+ 
+     # Track inputs processed
+     inputs_received = []
+@@ -209,6 +213,8 @@
+     engine._validate_streaming_input_sampling_params = AsyncLLM._validate_streaming_input_sampling_params
+     engine._add_streaming_input_request = AsyncLLM._add_streaming_input_request.__get__(engine)
+     engine.add_request = AsyncLLM.add_request.__get__(engine)
++    engine.admit = AsyncLLM.admit.__get__(engine)
++    engine._admitted_stream = AsyncLLM._admitted_stream.__get__(engine)
+     engine.abort = AsyncMock()
+ 
+     async def dispatch(request, prompt, parent, index, queue):
+diff --git a/vllm/engine/protocol.py b/vllm/engine/protocol.py
+--- a/vllm/engine/protocol.py
++++ b/vllm/engine/protocol.py
+@@ -63,6 +63,32 @@
+     def dead_error(self) -> BaseException: ...
+ 
+     @abstractmethod
++    async def admit(
++        self,
++        prompt: EngineCoreRequest
++        | PromptType
++        | EngineInput
++        | AsyncGenerator[StreamingInput, None],
++        sampling_params: SamplingParams,
++        request_id: str,
++        *,
++        prompt_text: str | None = None,
++        lora_request: LoRARequest | None = None,
++        tokenization_kwargs: dict[str, Any] | None = None,
++        trace_headers: Mapping[str, str] | None = None,
++        priority: int = 0,
++        data_parallel_rank: int | None = None,
++        session_id: str | None = None,
++        reasoning_ended: bool | None = None,
++        reasoning_parser_kwargs: dict[str, Any] | None = None,
++    ) -> AsyncGenerator[RequestOutput, None]:
++        """Admit a request, raising any refusal, then return its output stream.
++
++        Closing, cancelling or dropping the returned stream aborts the request.
++        """
++        ...
++
++    @abstractmethod
+     def generate(
+         self,
+         prompt: EngineCoreRequest
+diff --git a/vllm/entrypoints/openai/chat_completion/batch_serving.py b/vllm/entrypoints/openai/chat_completion/batch_serving.py
+--- a/vllm/entrypoints/openai/chat_completion/batch_serving.py
++++ b/vllm/entrypoints/openai/chat_completion/batch_serving.py
+@@ -3,6 +3,7 @@
+ 
+ import asyncio
+ import time
++from contextlib import AsyncExitStack
+ from collections.abc import AsyncGenerator
+ from http import HTTPStatus
+ 
+@@ -145,36 +146,38 @@
+         data_parallel_rank = self._get_data_parallel_rank(raw_request)
+         max_model_len = self.model_config.max_model_len
+ 
++        # Every conversation is admitted before any response exists. A refusal
++        # of one closes the streams already admitted, aborting their requests.
+         generators: list[AsyncGenerator[RequestOutput, None]] = []
+-        for i, engine_prompt in enumerate(engine_prompts):
+-            sub_request_id = f"{request_id}_{i}"
+-            max_tokens = get_max_tokens(
+-                max_model_len,
+-                request.max_completion_tokens
+-                if request.max_completion_tokens is not None
+-                else request.max_tokens,
+-                self._extract_prompt_len(engine_prompt),
+-                self.default_sampling_params,
+-                self.override_max_tokens,
+-            )
+-            single_request = single_requests[i]
+-            sampling_params = single_request.to_sampling_params(
+-                max_tokens, self.default_sampling_params
+-            )
+-            self._log_inputs(
+-                sub_request_id,
+-                engine_prompt,
+-                params=sampling_params,
+-                lora_request=lora_request,
+-            )
+-            trace_headers = (
+-                None
+-                if raw_request is None
+-                else await self._get_trace_headers(raw_request.headers)
+-            )
+-            session_id = self._get_session_id(single_request, raw_request)
+-            generators.append(
+-                self.engine_client.generate(
++        async with AsyncExitStack() as admitted:
++            for i, engine_prompt in enumerate(engine_prompts):
++                sub_request_id = f"{request_id}_{i}"
++                max_tokens = get_max_tokens(
++                    max_model_len,
++                    request.max_completion_tokens
++                    if request.max_completion_tokens is not None
++                    else request.max_tokens,
++                    self._extract_prompt_len(engine_prompt),
++                    self.default_sampling_params,
++                    self.override_max_tokens,
++                )
++                single_request = single_requests[i]
++                sampling_params = single_request.to_sampling_params(
++                    max_tokens, self.default_sampling_params
++                )
++                self._log_inputs(
++                    sub_request_id,
++                    engine_prompt,
++                    params=sampling_params,
++                    lora_request=lora_request,
++                )
++                trace_headers = (
++                    None
++                    if raw_request is None
++                    else await self._get_trace_headers(raw_request.headers)
++                )
++                session_id = self._get_session_id(single_request, raw_request)
++                stream = await self.engine_client.admit(
+                     engine_prompt,
+                     sampling_params,
+                     sub_request_id,
+@@ -185,7 +188,9 @@
+                     session_id=session_id,
+                     reasoning_ended=None,
+                 )
+-            )
++                admitted.push_async_callback(stream.aclose)
++                generators.append(stream)
++            admitted.pop_all()
+ 
+         return await self.chat_completion_full_generator_batch(
+             request,  # type: ignore[arg-type]
+diff --git a/vllm/entrypoints/openai/chat_completion/serving.py b/vllm/entrypoints/openai/chat_completion/serving.py
+--- a/vllm/entrypoints/openai/chat_completion/serving.py
++++ b/vllm/entrypoints/openai/chat_completion/serving.py
+@@ -24,6 +24,7 @@
+     format_token_id_placeholder,
+ )
+ from vllm.entrypoints.openai.chat_completion.protocol import (
++    ChatCompletionGenerationRequest,
+     ChatCompletionLogProb,
+     ChatCompletionLogProbs,
+     ChatCompletionLogProbsContent,
+@@ -254,7 +255,7 @@
+ 
+     async def create_chat_completion(
+         self,
+-        request: ChatCompletionRequest,
++        request: ChatCompletionGenerationRequest,
+         raw_request: Request | None = None,
+     ) -> AsyncGenerator[str, None] | ChatCompletionResponse | ErrorResponse:
+         """
+@@ -270,7 +271,7 @@
+ 
+     async def _create_chat_completion(
+         self,
+-        request: ChatCompletionRequest,
++        request: ChatCompletionGenerationRequest,
+         raw_request: Request | None = None,
+     ) -> AsyncGenerator[str, None] | ChatCompletionResponse | ErrorResponse:
+         # Streaming response
+@@ -306,7 +307,10 @@
+         # Extract data_parallel_rank from header (router can inject it)
+         data_parallel_rank = self._get_data_parallel_rank(raw_request)
+ 
+-        # Schedule the request and get the result generator.
++        # Admit the request and get the result generator. A chat request
++        # renders one prompt, so admission is one request: its refusal is
++        # this call's, raised before any response exists.
++        assert len(engine_inputs) == 1
+         max_model_len = self.model_config.max_model_len
+         generators: list[AsyncGenerator[RequestOutput, None]] = []
+         mm_token_counts: dict[str, int] | None = None
+@@ -362,7 +366,7 @@
+             else:
+                 reasoning_ended = None
+ 
+-            generator = self.engine_client.generate(
++            generator = await self.engine_client.admit(
+                 engine_input,
+                 sampling_params,
+                 sub_request_id,
+@@ -381,7 +385,6 @@
+ 
+             generators.append(generator)
+ 
+-        assert len(generators) == 1
+         (result_generator,) = generators
+ 
+         if request.stream:
+diff --git a/vllm/entrypoints/openai/completion/serving.py b/vllm/entrypoints/openai/completion/serving.py
+--- a/vllm/entrypoints/openai/completion/serving.py
++++ b/vllm/entrypoints/openai/completion/serving.py
+@@ -18,6 +18,7 @@
+     format_token_id_placeholder,
+ )
+ from vllm.entrypoints.openai.completion.protocol import (
++    CompletionGenerationRequest,
+     CompletionLogProbs,
+     CompletionRequest,
+     CompletionResponse,
+@@ -110,7 +111,7 @@
+ 
+     async def create_completion(
+         self,
+-        request: CompletionRequest,
++        request: CompletionGenerationRequest,
+         raw_request: Request | None = None,
+     ) -> AsyncGenerator[str, None] | CompletionResponse | ErrorResponse:
+         """Completion API similar to OpenAI's API.
+@@ -128,7 +129,7 @@
+ 
+     async def _create_completion(
+         self,
+-        request: CompletionRequest,
++        request: CompletionGenerationRequest,
+         raw_request: Request | None = None,
+     ) -> AsyncGenerator[str, None] | CompletionResponse | ErrorResponse:
+         result = await self.render_completion_request(request)
+@@ -149,7 +150,10 @@
+         # Extract data_parallel_rank from header (router can inject it)
+         data_parallel_rank = self._get_data_parallel_rank(raw_request)
+ 
+-        # Schedule the request and get the result generator.
++        # Admit the request and get the result generator. A generation names
++        # one line of work and so carries one prompt: admission is one
++        # request, whose refusal is this call's, raised before any response.
++        assert len(engine_inputs) == 1
+         max_model_len = self.model_config.max_model_len
+         generators: list[AsyncGenerator[RequestOutput, None]] = []
+         for i, engine_input in enumerate(engine_inputs):
+@@ -183,7 +187,7 @@
+             )
+             session_id = self._get_session_id(request, raw_request)
+ 
+-            generator = self.engine_client.generate(
++            generator = await self.engine_client.admit(
+                 engine_input,
+                 sampling_params,
+                 request_id_item,
+diff --git a/vllm/entrypoints/openai/responses/protocol.py b/vllm/entrypoints/openai/responses/protocol.py
+--- a/vllm/entrypoints/openai/responses/protocol.py
++++ b/vllm/entrypoints/openai/responses/protocol.py
+@@ -14,6 +14,7 @@
+     ResponseCodeInterpreterCallInterpretingEvent,
+     ResponseContentPartAddedEvent,
+     ResponseContentPartDoneEvent,
++    ResponseErrorEvent,
+     ResponseFunctionToolCall,
+     ResponseInputItemParam,
+     ResponseMcpCallArgumentsDeltaEvent,
+@@ -917,4 +918,5 @@
+     | ResponseMcpCallArgumentsDoneEvent
+     | ResponseMcpCallInProgressEvent
+     | ResponseMcpCallCompletedEvent
++    | ResponseErrorEvent
+ )
+diff --git a/vllm/entrypoints/openai/responses/serving.py b/vllm/entrypoints/openai/responses/serving.py
+--- a/vllm/entrypoints/openai/responses/serving.py
++++ b/vllm/entrypoints/openai/responses/serving.py
+@@ -22,7 +22,6 @@
+ from openai.types.responses.response_output_text import Logprob, LogprobTopLogprob
+ from openai.types.responses.tool import Mcp, Tool
+ from openai_harmony import Message as OpenAIHarmonyMessage
+-from pydantic import TypeAdapter
+ 
+ from vllm import envs
+ from vllm.config.utils import replace
+@@ -65,6 +64,7 @@
+     OutputTokensDetails,
+     ResponseCompletedEvent,
+     ResponseCreatedEvent,
++    ResponseErrorEvent,
+     ResponseInProgressEvent,
+     ResponseInputOutputItem,
+     ResponseInputOutputMessage,
+@@ -98,7 +98,7 @@
+ from vllm.logprobs import Logprob as SampleLogprob
+ from vllm.logprobs import SampleLogprobs
+ from vllm.lora.request import LoRARequest
+-from vllm.outputs import CompletionOutput
++from vllm.outputs import CompletionOutput, RequestOutput
+ from vllm.parser import Parser, ParserManager
+ from vllm.renderers.online_renderer import OnlineRenderer
+ from vllm.sampling_params import SamplingParams, StructuredOutputsParams
+@@ -108,6 +108,12 @@
+ 
+ logger = init_logger(__name__)
+ 
++# A stream ends with exactly one of these. A replay of a stored stream stops
++# at whichever arrives.
++_TERMINAL_EVENT_TYPES = frozenset(
++    {"response.completed", "response.incomplete", "error"}
++)
++
+ 
+ def _extract_allowed_tools_from_mcp_requests(
+     tools: list[Tool],
+@@ -510,7 +516,7 @@
+                             )
+                         ),
+                     )
+-            generator = self._generate_with_builtin_tools(
++            generator = await self._generate_with_builtin_tools(
+                 request_id=request.request_id,
+                 engine_input=engine_input,
+                 sampling_params=sampling_params,
+@@ -674,80 +680,144 @@
+         trace_headers: Mapping[str, str] | None = None,
+         session_id: str | None = None,
+         reasoning_parser_kwargs: dict[str, Any] | None = None,
+-    ):
+-        max_model_len = self.model_config.max_model_len
++    ) -> AsyncGenerator[ConversationContext, None]:
++        """Admit the first turn, then return the stream of every turn.
+ 
+-        orig_priority = priority
+-        sub_request = 0
+-        while True:
+-            # Ensure that each sub-request has a unique request id.
+-            sub_request_id = f"{request_id}_{sub_request}"
+-
+-            self._log_inputs(
+-                sub_request_id,
+-                engine_input,
+-                params=sampling_params,
+-                lora_request=lora_request,
+-            )
++        The first turn's refusal raises here, before any response exists. A
++        turn after a built-in tool call is admitted while the response is
++        already under way, so its refusal ends that response as a failure.
++        """
++        turn = await self._admit_turn(
++            f"{request_id}_0",
++            engine_input,
++            sampling_params,
++            lora_request=lora_request,
++            priority=priority,
++            trace_headers=trace_headers,
++            session_id=session_id,
++            reasoning_parser_kwargs=reasoning_parser_kwargs,
++        )
++        return self._run_turns(
++            turn,
++            request_id,
++            sampling_params,
++            context,
++            lora_request=lora_request,
++            priority=priority,
++            trace_headers=trace_headers,
++            session_id=session_id,
++            reasoning_parser_kwargs=reasoning_parser_kwargs,
++        )
+ 
+-            generator = self.engine_client.generate(
+-                engine_input,
+-                sampling_params,
+-                sub_request_id,
+-                lora_request=lora_request,
+-                trace_headers=trace_headers,
+-                priority=priority,
+-                session_id=session_id,
+-                reasoning_parser_kwargs=reasoning_parser_kwargs,
+-            )
++    async def _admit_turn(
++        self,
++        sub_request_id: str,
++        engine_input: EngineInput,
++        sampling_params: SamplingParams,
++        *,
++        lora_request: LoRARequest | None,
++        priority: int,
++        trace_headers: Mapping[str, str] | None,
++        session_id: str | None,
++        reasoning_parser_kwargs: dict[str, Any] | None,
++    ) -> AsyncGenerator[RequestOutput, None]:
++        self._log_inputs(
++            sub_request_id,
++            engine_input,
++            params=sampling_params,
++            lora_request=lora_request,
++        )
++        return await self.engine_client.admit(
++            engine_input,
++            sampling_params,
++            sub_request_id,
++            lora_request=lora_request,
++            trace_headers=trace_headers,
++            priority=priority,
++            session_id=session_id,
++            reasoning_parser_kwargs=reasoning_parser_kwargs,
++        )
+ 
+-            async for res in generator:
+-                context.append_output(res)
+-                # NOTE(woosuk): The stop condition is handled by the engine.
+-                yield context
++    async def _run_turns(
++        self,
++        turn: AsyncGenerator[RequestOutput, None],
++        request_id: str,
++        sampling_params: SamplingParams,
++        context: ConversationContext,
++        *,
++        lora_request: LoRARequest | None,
++        priority: int,
++        trace_headers: Mapping[str, str] | None,
++        session_id: str | None,
++        reasoning_parser_kwargs: dict[str, Any] | None,
++    ) -> AsyncGenerator[ConversationContext, None]:
++        max_model_len = self.model_config.max_model_len
+ 
+-            if not context.need_builtin_tool_call():
+-                # The model did not ask for a tool call, so we're done.
+-                break
++        orig_priority = priority
++        sub_request = 0
++        try:
++            while True:
++                async for res in turn:
++                    context.append_output(res)
++                    # NOTE(woosuk): The stop condition is handled by the engine.
++                    yield context
++
++                if not context.need_builtin_tool_call():
++                    # The model did not ask for a tool call, so we're done.
++                    break
++
++                # Call the tool and update the context with the result.
++                tool_output = await context.call_tool()
++                context.append_tool_output(tool_output)
++
++                # TODO: uncomment this and enable tool output streaming
++                # yield context
++
++                # Create inputs for the next turn.
++                # Render the next prompt token ids and update sampling_params.
++                if isinstance(context, HarmonyContext):
++                    token_ids = context.render_for_completion()
++                    engine_input = tokens_input(token_ids)
++
++                    sampling_params.max_tokens = max_model_len - len(token_ids)
++                elif isinstance(context, ParsableContext):
++                    (engine_input,) = await self._render_next_turn(
++                        context.request,
++                        context.response_messages,
++                        context.tool_dicts,
++                        context.parser_cls,
++                        context.chat_template,
++                        context.chat_template_content_format,
++                    )
+ 
+-            # Call the tool and update the context with the result.
+-            tool_output = await context.call_tool()
+-            context.append_tool_output(tool_output)
+-
+-            # TODO: uncomment this and enable tool output streaming
+-            # yield context
+-
+-            # Create inputs for the next turn.
+-            # Render the next prompt token ids and update sampling_params.
+-            if isinstance(context, HarmonyContext):
+-                token_ids = context.render_for_completion()
+-                engine_input = tokens_input(token_ids)
+-
+-                sampling_params.max_tokens = max_model_len - len(token_ids)
+-            elif isinstance(context, ParsableContext):
+-                (engine_input,) = await self._render_next_turn(
+-                    context.request,
+-                    context.response_messages,
+-                    context.tool_dicts,
+-                    context.parser_cls,
+-                    context.chat_template,
+-                    context.chat_template_content_format,
+-                )
++                    sampling_params.max_tokens = get_max_tokens(
++                        max_model_len,
++                        context.request.max_output_tokens,
++                        self._extract_prompt_len(engine_input),
++                        self.default_sampling_params,  # type: ignore
++                        self.override_max_tokens,  # type: ignore
++                        truncate_prompt_tokens=(
++                            -1 if context.request.truncation != "disabled" else None
++                        ),
++                    )
+ 
+-                sampling_params.max_tokens = get_max_tokens(
+-                    max_model_len,
+-                    context.request.max_output_tokens,
+-                    self._extract_prompt_len(engine_input),
+-                    self.default_sampling_params,  # type: ignore
+-                    self.override_max_tokens,  # type: ignore
+-                    truncate_prompt_tokens=(
+-                        -1 if context.request.truncation != "disabled" else None
+-                    ),
++                # OPTIMIZATION
++                priority = orig_priority - 1
++                sub_request += 1
++                # Ensure that each sub-request has a unique request id.
++                turn = await self._admit_turn(
++                    f"{request_id}_{sub_request}",
++                    engine_input,
++                    sampling_params,
++                    lora_request=lora_request,
++                    priority=priority,
++                    trace_headers=trace_headers,
++                    session_id=session_id,
++                    reasoning_parser_kwargs=reasoning_parser_kwargs,
+                 )
+-
+-            # OPTIMIZATION
+-            priority = orig_priority - 1
+-            sub_request += 1
++        finally:
++            # A turn still streaming when the response ends is aborted.
++            await turn.aclose()
+ 
+     def _make_request_with_harmony(
+         self,
+@@ -1253,7 +1323,7 @@
+             while current_index < len(event_deque):
+                 event = event_deque[current_index]
+                 yield event
+-                if getattr(event, "type", "unknown") == "response.completed":
++                if getattr(event, "type", "unknown") in _TERMINAL_EVENT_TYPES:
+                     return
+                 current_index += 1
+ 
+@@ -1468,42 +1538,46 @@
+             sequence_number += 1
+             return event
+ 
+-        async with AsyncExitStack() as exit_stack:
+-            if self.use_harmony:
+-                # TODO: in streaming, we noticed this bug:
+-                # https://github.com/vllm-project/vllm/issues/25697
+-                await self._initialize_tool_sessions(request, context, exit_stack)
+-                processor = self._process_harmony_streaming_events
+-            else:
+-                processor = self._process_simple_streaming_events
+-            # TODO Hanchen make sampling params to include the structural tag
++        # The status line is sent before this stream runs, so every failure
++        # from here on ends the response with its error event rather than
++        # cutting the stream. Admission refusals never reach this point: the
++        # request was admitted before the response began.
++        try:
++            async with AsyncExitStack() as exit_stack:
++                if self.use_harmony:
++                    # TODO: in streaming, we noticed this bug:
++                    # https://github.com/vllm-project/vllm/issues/25697
++                    await self._initialize_tool_sessions(request, context, exit_stack)
++                    processor = self._process_harmony_streaming_events
++                else:
++                    processor = self._process_simple_streaming_events
++                # TODO Hanchen make sampling params to include the structural tag
+ 
+-            initial_response = ResponsesResponse.from_request(
+-                request,
+-                sampling_params,
+-                model_name=model_name,
+-                created_time=created_time,
+-                output=[],
+-                status="in_progress",
+-                usage=None,
+-            ).model_dump(mode="json", by_alias=True)
+-            yield _increment_sequence_number_and_return(
+-                ResponseCreatedEvent(
+-                    type="response.created",
+-                    sequence_number=-1,
+-                    response=initial_response,
++                initial_response = ResponsesResponse.from_request(
++                    request,
++                    sampling_params,
++                    model_name=model_name,
++                    created_time=created_time,
++                    output=[],
++                    status="in_progress",
++                    usage=None,
++                ).model_dump(mode="json", by_alias=True)
++                yield _increment_sequence_number_and_return(
++                    ResponseCreatedEvent(
++                        type="response.created",
++                        sequence_number=-1,
++                        response=initial_response,
++                    )
+                 )
+-            )
+-            yield _increment_sequence_number_and_return(
+-                ResponseInProgressEvent(
+-                    type="response.in_progress",
+-                    sequence_number=-1,
+-                    response=initial_response,
++                yield _increment_sequence_number_and_return(
++                    ResponseInProgressEvent(
++                        type="response.in_progress",
++                        sequence_number=-1,
++                        response=initial_response,
++                    )
+                 )
+-            )
+ 
+-            output: list[ResponseOutputItem] = []
+-            try:
++                output: list[ResponseOutputItem] = []
+                 async for event_data in processor(
+                     request,
+                     sampling_params,
+@@ -1523,26 +1597,36 @@
+                 final_response = await self._finalize_response(
+                     request, sampling_params, context, model_name, created_time, output,
+                 )
+-            except GenerationError as e:
+-                error_json = self._convert_generation_error_to_streaming_response(e)
+-                yield _increment_sequence_number_and_return(
+-                    TypeAdapter(StreamingResponsesResponse).validate_json(error_json)
+-                )
+-                return
+ 
+-            if final_response.status == "incomplete":
+-                yield _increment_sequence_number_and_return(
+-                    ResponseIncompleteEvent(
+-                        type="response.incomplete",
+-                        sequence_number=-1,
+-                        response=final_response,
++                if final_response.status == "incomplete":
++                    yield _increment_sequence_number_and_return(
++                        ResponseIncompleteEvent(
++                            type="response.incomplete",
++                            sequence_number=-1,
++                            response=final_response,
++                        )
+                     )
+-                )
+-            else:
+-                yield _increment_sequence_number_and_return(
+-                    ResponseCompletedEvent(
+-                        type="response.completed",
+-                        sequence_number=-1,
+-                        response=final_response,
++                else:
++                    yield _increment_sequence_number_and_return(
++                        ResponseCompletedEvent(
++                            type="response.completed",
++                            sequence_number=-1,
++                            response=final_response,
++                        )
+                     )
+-                )
++        except GenerationError as e:
++            yield _increment_sequence_number_and_return(self._stream_error_event(e))
++        except Exception as e:
++            logger.exception("Error in Responses stream generator.")
++            yield _increment_sequence_number_and_return(self._stream_error_event(e))
++
++    def _stream_error_event(self, error: Exception) -> ResponseErrorEvent:
++        """The Responses error event for a failure after the stream began."""
++        info = self.create_error_response(error).error
++        return ResponseErrorEvent(
++            type="error",
++            code=info.type,
++            message=info.message,
++            param=info.param,
++            sequence_number=-1,
++        )
+diff --git a/vllm/entrypoints/scale_out/token_in_token_out/serving.py b/vllm/entrypoints/scale_out/token_in_token_out/serving.py
+--- a/vllm/entrypoints/scale_out/token_in_token_out/serving.py
++++ b/vllm/entrypoints/scale_out/token_in_token_out/serving.py
+@@ -237,7 +237,8 @@
+         data_parallel_rank = self._get_data_parallel_rank(raw_request)
+         session_id = self._get_session_id_from_headers(raw_request)
+ 
+-        result_generator = self.engine_client.generate(
++        # Admission raises its refusal here, before any response exists.
++        result_generator = await self.engine_client.admit(
+             engine_input,
+             sampling_params,
+             request_id,
+diff --git a/vllm/v1/engine/async_llm.py b/vllm/v1/engine/async_llm.py
+--- a/vllm/v1/engine/async_llm.py
++++ b/vllm/v1/engine/async_llm.py
+@@ -56,6 +56,9 @@
+ 
+ logger = init_logger(__name__)
+ 
++# Marks the point in an admitted stream where admission has completed.
++_ADMITTED = object()
++
+ 
+ class InputStreamError(Exception):
+     """Wrapper for errors from the input stream generator.
+@@ -433,8 +436,14 @@
+         # Add the request to OutputProcessor (this process).
+         self.output_processor.add_request(request, prompt, parent_req, index, queue)
+ 
+-        # Add the EngineCoreRequest to EngineCore (separate process).
+-        await self.engine_core.add_request_async(request)
++        # Add the EngineCoreRequest to EngineCore (separate process). Admission
++        # is all or nothing: a request the engine may not have received must
++        # not stay in flight here.
++        try:
++            await self.engine_core.add_request_async(request)
++        except BaseException:
++            await self.abort(request.request_id, internal=True)
++            raise
+ 
+         if self.log_requests:
+             logger.info("Added request %s.", request.request_id)
+@@ -556,6 +565,57 @@
+     # requests we don't need to send multiple messages to core proc,
+     # and so we don't need multiple streams which then get
+     # re-multiplexed in the API server anyhow.
++    async def admit(
++        self,
++        prompt: EngineCoreRequest
++        | PromptType
++        | EngineInput
++        | AsyncGenerator[StreamingInput, None],
++        sampling_params: SamplingParams,
++        request_id: str,
++        *,
++        prompt_text: str | None = None,
++        lora_request: LoRARequest | None = None,
++        tokenization_kwargs: dict[str, Any] | None = None,
++        trace_headers: Mapping[str, str] | None = None,
++        priority: int = 0,
++        data_parallel_rank: int | None = None,
++        session_id: str | None = None,
++        reasoning_ended: bool | None = None,
++        reasoning_parser_kwargs: dict[str, Any] | None = None,
++    ) -> AsyncGenerator[RequestOutput, None]:
++        """Admit one request, then return the stream of its outputs.
++
++        Admission processes the input, applies every validation and the
++        agent-ID rules, and hands the request to the engine. Any refusal is
++        raised here, before the caller has committed to a response, so an
++        HTTP surface answers it with a status of its own instead of inside a
++        stream it has already started.
++
++        The returned stream owns the admitted request: exhausting it finishes
++        the request; closing it, cancelling its consumer or dropping it aborts
++        the request.
++        """
++        stream = self._admitted_stream(
++            prompt,
++            sampling_params,
++            request_id,
++            prompt_text=prompt_text,
++            lora_request=lora_request,
++            tokenization_kwargs=tokenization_kwargs,
++            trace_headers=trace_headers,
++            priority=priority,
++            data_parallel_rank=data_parallel_rank,
++            session_id=session_id,
++            reasoning_ended=reasoning_ended,
++            reasoning_parser_kwargs=reasoning_parser_kwargs,
++        )
++        # The stream starts by admitting the request and stops at the marker,
++        # suspended inside the scope that aborts it on close or collection.
++        admitted = await anext(stream)
++        assert admitted is _ADMITTED
++        return stream  # type: ignore[return-value]
++
+     async def generate(
+         self,
+         prompt: EngineCoreRequest
+@@ -575,19 +635,59 @@
+         reasoning_ended: bool | None = None,
+         reasoning_parser_kwargs: dict[str, Any] | None = None,
+     ) -> AsyncGenerator[RequestOutput, None]:
++        """Admit a request when first iterated, then yield its outputs.
++
++        A caller that must answer a refusal before it responds -- every HTTP
++        generation surface -- calls admit() first instead.
+         """
+-        Main function called by the API server to kick off a request
+-            * 1) Making an AsyncStream corresponding to the Request.
+-            * 2) Processing the Input.
+-            * 3) Adding the Request to the Detokenizer.
+-            * 4) Adding the Request to the EngineCore (separate process).
++        stream = await self.admit(
++            prompt,
++            sampling_params,
++            request_id,
++            prompt_text=prompt_text,
++            lora_request=lora_request,
++            tokenization_kwargs=tokenization_kwargs,
++            trace_headers=trace_headers,
++            priority=priority,
++            data_parallel_rank=data_parallel_rank,
++            session_id=session_id,
++            reasoning_ended=reasoning_ended,
++            reasoning_parser_kwargs=reasoning_parser_kwargs,
++        )
++        try:
++            async for output in stream:
++                yield output
++        finally:
++            await stream.aclose()
++
++    async def _admitted_stream(
++        self,
++        prompt: EngineCoreRequest
++        | PromptType
++        | EngineInput
++        | AsyncGenerator[StreamingInput, None],
++        sampling_params: SamplingParams,
++        request_id: str,
++        *,
++        prompt_text: str | None,
++        lora_request: LoRARequest | None,
++        tokenization_kwargs: dict[str, Any] | None,
++        trace_headers: Mapping[str, str] | None,
++        priority: int,
++        data_parallel_rank: int | None,
++        session_id: str | None,
++        reasoning_ended: bool | None,
++        reasoning_parser_kwargs: dict[str, Any] | None,
++    ) -> AsyncGenerator[RequestOutput | object, None]:
++        """Admit the request, yield ``_ADMITTED``, then yield its outputs.
++
++        * 1) Processing the Input.
++        * 2) Adding the Request to the Detokenizer.
++        * 3) Adding the Request to the EngineCore (separate process).
+ 
+         A separate output_handler loop runs in a background AsyncIO task,
+         pulling outputs from EngineCore and putting them into the
+-        per-request AsyncStream.
+-
+-        The caller of generate() iterates the returned AsyncGenerator,
+-        returning the RequestOutput back to the caller.
++        per-request queue this stream drains.
+         """
+ 
+         q: RequestOutputCollector | None = None
+@@ -606,6 +706,7 @@
+                 reasoning_ended=reasoning_ended,
+                 reasoning_parser_kwargs=reasoning_parser_kwargs,
+             )
++            yield _ADMITTED
+ 
+             # The output_handler task pushes items into the queue.
+             # This task pulls from the queue and yields to caller.
+@@ -622,9 +723,9 @@
+                 if out is not STREAM_FINISHED:
+                     yield out
+ 
+-        # If the request is disconnected by the client, generate()
+-        # is cancelled or the generator is garbage collected. So,
+-        # we abort the request if we end up here.
++        # If the request is disconnected by the client, the stream is
++        # cancelled, closed or garbage collected. So, we abort the request
++        # if we end up here.
+         except (asyncio.CancelledError, GeneratorExit):
+             if q is not None:
+                 await self.abort(q.request_id, internal=True)

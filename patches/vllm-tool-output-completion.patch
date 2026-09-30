@@ -201,8 +201,7 @@ diff --git a/tests/entrypoints/openai/chat_completion/test_parallel_tool_call_in
 diff --git a/tests/entrypoints/openai/responses/test_serving_responses.py b/tests/entrypoints/openai/responses/test_serving_responses.py
 --- a/tests/entrypoints/openai/responses/test_serving_responses.py
 +++ b/tests/entrypoints/openai/responses/test_serving_responses.py
-@@ -753,9 +753,9 @@
-     """Set up serving.parser so that it returns a mock parser instance
+@@ -756,7 +756,7 @@
      with a reasoning parser that returns the given delta_sequence.
  
      The mock has reasoning_parser set (truthy) but tool_parser as None,
@@ -211,9 +210,7 @@ diff --git a/tests/entrypoints/openai/responses/test_serving_responses.py b/test
      """
      call_count = 0
  
-     def mock_parse_delta(**kwargs):
-@@ -768,9 +768,9 @@
- 
+@@ -771,7 +771,7 @@
      mock_parser_instance = MagicMock()
      mock_parser_instance.reasoning_parser = MagicMock()  # truthy
      mock_parser_instance.tool_parser = None
@@ -222,9 +219,7 @@ diff --git a/tests/entrypoints/openai/responses/test_serving_responses.py b/test
      mock_parser_instance.is_reasoning_end = MagicMock(return_value=False)
      serving.parser = MagicMock(return_value=mock_parser_instance)
      return mock_parser_instance
- 
-@@ -1251,9 +1251,9 @@
-     serving = _make_serving_instance_with_reasoning()
+@@ -1255,7 +1255,7 @@
      serving._initialize_tool_sessions = AsyncMock()
      parser = MagicMock()
      parser.reasoning_parser = None
@@ -233,9 +228,7 @@ diff --git a/tests/entrypoints/openai/responses/test_serving_responses.py b/test
      deltas = []
      if shape == "mixed":
          deltas.append(DeltaMessage(reasoning="preserved thinking"))
-     if shape in ("text", "mixed"):
-@@ -1267,9 +1267,9 @@
-                 DeltaMessage(tool_calls=[DeltaToolCall(
+@@ -1271,7 +1271,7 @@
                      index=index, function=DeltaFunctionCall(arguments='"x":1}'),
                  )]),
              ])
@@ -244,9 +237,7 @@ diff --git a/tests/entrypoints/openai/responses/test_serving_responses.py b/test
      context = SimpleContext(response_parser=parser)
  
      async def outputs():
-         for index in range(len(deltas)):
-@@ -1302,9 +1302,9 @@
-     assert final.usage.input_tokens == 2
+@@ -1306,7 +1306,7 @@
      assert final.usage.output_tokens == len(deltas)
      assert [event.sequence_number for event in events] == list(range(len(events)))
      serving._initialize_tool_sessions.assert_not_awaited()
@@ -255,9 +246,7 @@ diff --git a/tests/entrypoints/openai/responses/test_serving_responses.py b/test
      if finish == "length":
          assert done[-1].status == "incomplete"
      else:
-         results = [{"type": "function_call_output", "call_id": item.call_id,
-@@ -1352,4 +1352,88 @@
-         response = await serving.responses_full_generator(*args)
+@@ -1357,3 +1357,87 @@
      assert response.status == ("incomplete" if finish == "length" else "completed")
      assert response.output[0].status == response.status
      assert response.output[0].content[0].logprobs == [logprob]
@@ -1533,8 +1522,7 @@ diff --git a/vllm/renderers/online_derenderer.py b/vllm/renderers/online_derende
 diff --git a/vllm/sampling_params.py b/vllm/sampling_params.py
 --- a/vllm/sampling_params.py
 +++ b/vllm/sampling_params.py
-@@ -371,9 +371,9 @@
- 
+@@ -418,7 +418,7 @@
      # The below fields are not supposed to be used as an input.
      # They are set in post_init.
      output_text_buffer_length: int = 0
@@ -1543,9 +1531,7 @@ diff --git a/vllm/sampling_params.py b/vllm/sampling_params.py
      _all_stop_token_ids: set[int] = msgspec.field(default_factory=set)
  
      # Fields used to construct logits processors
-     structured_outputs: StructuredOutputsParams | None = None
-@@ -710,32 +710,19 @@
-         self,
+@@ -757,30 +757,17 @@
          generation_config: dict[str, Any],
          eos_token_id: int | None = None,
      ) -> None:
@@ -1586,9 +1572,7 @@ diff --git a/vllm/sampling_params.py b/vllm/sampling_params.py
  
      def update_from_tokenizer(self, tokenizer: TokenizerLike) -> None:
          if not self.bad_words:
-             return
-@@ -794,10 +781,10 @@
-             return SamplingType.RANDOM_SEED
+@@ -841,8 +828,8 @@
          return SamplingType.RANDOM
  
      @property
@@ -1599,7 +1583,6 @@ diff --git a/vllm/sampling_params.py b/vllm/sampling_params.py
  
      @property
      def all_stop_token_ids(self) -> set[int]:
-         return self._all_stop_token_ids
 diff --git a/vllm/v1/core/sched/scheduler.py b/vllm/v1/core/sched/scheduler.py
 --- a/vllm/v1/core/sched/scheduler.py
 +++ b/vllm/v1/core/sched/scheduler.py

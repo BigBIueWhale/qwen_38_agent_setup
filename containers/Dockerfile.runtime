@@ -238,6 +238,21 @@ RUN printf '%s  %s\n' \
   "${RENDER_SERVING_UPSTREAM_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/scale_out/render/serving.py \
   | sha256sum --check --strict
 
+ARG CHAT_API_ROUTER_UPSTREAM_FILE_SHA256
+ARG CHAT_BATCH_SERVING_UPSTREAM_FILE_SHA256
+ARG COMPLETION_API_ROUTER_UPSTREAM_FILE_SHA256
+ARG TITOTO_API_ROUTER_UPSTREAM_FILE_SHA256
+ARG RUN_BATCH_UPSTREAM_FILE_SHA256
+ARG ENGINE_CLIENT_PROTOCOL_UPSTREAM_FILE_SHA256
+RUN printf '%s  %s\n' \
+  "${CHAT_API_ROUTER_UPSTREAM_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/chat_completion/api_router.py \
+  "${CHAT_BATCH_SERVING_UPSTREAM_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/chat_completion/batch_serving.py \
+  "${COMPLETION_API_ROUTER_UPSTREAM_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/completion/api_router.py \
+  "${TITOTO_API_ROUTER_UPSTREAM_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/scale_out/token_in_token_out/api_router.py \
+  "${RUN_BATCH_UPSTREAM_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/run_batch.py \
+  "${ENGINE_CLIENT_PROTOCOL_UPSTREAM_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/engine/protocol.py \
+  | sha256sum --check --strict
+
 ARG ONLINE_DERENDERER_UPSTREAM_FILE_SHA256
 RUN printf '%s  %s\n' \
   "${ONLINE_DERENDERER_UPSTREAM_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/renderers/online_derenderer.py \
@@ -376,6 +391,12 @@ ARG BASE_RENDERER_PATCHED_FILE_SHA256
 ARG ONLINE_DERENDERER_PATCHED_FILE_SHA256
 ARG COMPLETION_SERVING_PATCHED_FILE_SHA256
 ARG RENDER_SERVING_PATCHED_FILE_SHA256
+ARG CHAT_API_ROUTER_PATCHED_FILE_SHA256
+ARG CHAT_BATCH_SERVING_PATCHED_FILE_SHA256
+ARG COMPLETION_API_ROUTER_PATCHED_FILE_SHA256
+ARG TITOTO_API_ROUTER_PATCHED_FILE_SHA256
+ARG RUN_BATCH_PATCHED_FILE_SHA256
+ARG ENGINE_CLIENT_PROTOCOL_PATCHED_FILE_SHA256
 ARG BLOCK_POOL_PATCHED_FILE_SHA256
 ARG SINGLE_TYPE_KV_CACHE_MANAGER_PATCHED_FILE_SHA256
 ARG KV_OFFLOAD_CPU_COMMON_PATCHED_FILE_SHA256
@@ -710,6 +731,20 @@ COPY --chmod=0644 vllm/vllm/entrypoints/scale_out/render/serving.py /usr/local/l
 RUN printf '%s  %s\n' \
   "${COMPLETION_SERVING_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/completion/serving.py \
   "${RENDER_SERVING_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/scale_out/render/serving.py \
+  | sha256sum --check --strict
+COPY --chmod=0644 vllm/vllm/entrypoints/openai/chat_completion/api_router.py /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/chat_completion/api_router.py
+COPY --chmod=0644 vllm/vllm/entrypoints/openai/chat_completion/batch_serving.py /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/chat_completion/batch_serving.py
+COPY --chmod=0644 vllm/vllm/entrypoints/openai/completion/api_router.py /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/completion/api_router.py
+COPY --chmod=0644 vllm/vllm/entrypoints/scale_out/token_in_token_out/api_router.py /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/scale_out/token_in_token_out/api_router.py
+COPY --chmod=0644 vllm/vllm/entrypoints/openai/run_batch.py /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/run_batch.py
+COPY --chmod=0644 vllm/vllm/engine/protocol.py /usr/local/lib/python3.12/dist-packages/vllm/engine/protocol.py
+RUN printf '%s  %s\n' \
+  "${CHAT_API_ROUTER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/chat_completion/api_router.py \
+  "${CHAT_BATCH_SERVING_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/chat_completion/batch_serving.py \
+  "${COMPLETION_API_ROUTER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/completion/api_router.py \
+  "${TITOTO_API_ROUTER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/scale_out/token_in_token_out/api_router.py \
+  "${RUN_BATCH_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/run_batch.py \
+  "${ENGINE_CLIENT_PROTOCOL_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/engine/protocol.py \
   | sha256sum --check --strict
 COPY --chmod=0644 vllm/vllm/renderers/online_derenderer.py /usr/local/lib/python3.12/dist-packages/vllm/renderers/online_derenderer.py
 RUN printf '%s  %s\n' \

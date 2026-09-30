@@ -276,34 +276,36 @@ It is intentionally reconstructed by the ordered, reviewed semantic transformati
 | patches/vllm-qwen38-numerical-audits.patch | a73aa2f2ae3f82010eb2bafcdf663c2fe14854c30165dbc4d8457725bc3b6632 |
 | patches/vllm-turboquant-fail-closed-guards.patch | 7282d1d4d7a17b40ab8626c82f478bbb938c548451b7793df8233562a9e24c7c |
 | patches/vllm-kv-offload-pinning-fail-closed.patch | 1857071c38d081bb95e3cca12153cebce096649084950b99229104fdae029ca6 |
-| patches/vllm-shared-prefix-cache-and-user-capacity.patch | 96d9a7805f76eda6c8b20451aabd8cbb49482158c6d71c6f0db571a6711f3776 |
-| patches/vllm-exact-reasoning-usage.patch | c6a880c0a15056792286f74bf32a4e554f70de05a82615522086ef4ca1cf2db3 |
-| patches/vllm-anthropic-input-fidelity.patch | c2063d509fc90929f7d6018796f753da6445f12a4b4b19181e377f772b923a49 |
+| patches/vllm-shared-prefix-cache-and-user-capacity.patch | b7e9e13a6ccb4d61694a29cb35b54cc6ecd7351c367c67d1e8336b795adf4acc |
+| patches/vllm-exact-reasoning-usage.patch | 2179e27460e4239367ac7e2dd3828b9b3db463e79d87ad81433d00fbc6b12395 |
+| patches/vllm-anthropic-input-fidelity.patch | d02af26157a63ca64f29b080a9d19a6c50bda8d94d0649679a6c1d72f708172c |
 | patches/vllm-qwen-exact-tool-language.patch | fe4e46cb7444c80646537da63ab1ac12c54e7eebb04c0735a4243d8b7e7943d2 |
 | patches/vllm-png-source-admission.patch | b9091c5c227151ec00131a854d927a9405396244a9a59bd4d6e297dd67ea3306 |
 | patches/vllm-kv-physical-free-memory.patch | 21f8993033c78971d4f7a660fe9906e054ec658139e83fc37b7121f1d8d91289 |
 | patches/vllm-qwen-single-call-grammar.patch | 2ae587bdde25b974cd88c5c351162fe809ee92b11d22ac0037f38411c8467b8b |
-| patches/vllm-responses-history-integrity.patch | 117c17c114d7e91e57045a8e80b6eeac283c1ab56bdaf135019ad3c372a42186 |
-| patches/vllm-responses-stream-identity.patch | eccec34b8dd211f444065ef60b6b8075161efc790b61db4640104e3747763478 |
-| patches/vllm-anthropic-terminal-metadata.patch | 7885e27d8f9259e106bd8c2f3ccdefa3fd276649658ea521b50ecf85d83113c5 |
-| patches/vllm-generation-sampling-resolution.patch | a70b88b8e1fa3801e7d5e0a2c6a66f8608ab6e8534b67aafd832bf566d2d2c7a |
-| patches/vllm-sampling-decoding-boundary.patch | aaed899245dcfa877d8c1c19f2834317a7326695372c6810267b21dd3337f913 |
-| patches/vllm-token-generation-result-integrity.patch | c9d4e45adbb475c3e9796d1e0907b2f0d98cc384a34829a34e05ccdd33cc65c1 |
-| patches/vllm-raw-image-token-transport.patch | cab095d4b4fce8ee0e34d4b4cd18a066afdeb14da98ff09e1b57072e3cb565fd |
+| patches/vllm-responses-history-integrity.patch | a378fe1e3cb4fc215a90776b1ea260d5a8a1b265ae5aacfc5febad75cf3ec4cf |
+| patches/vllm-responses-stream-identity.patch | 451ab26fda73a0d71861159c91ffa69aa6cd9456f303a3ff682f43398695a522 |
+| patches/vllm-anthropic-terminal-metadata.patch | 7f6f8e0ff2df3234365be1a549bc6c13a07ec3f82890bccb1f0da497ade95361 |
+| patches/vllm-generation-sampling-resolution.patch | f352470cfd07b0c7768c3533971629ba65e0b9f5bb9e8f72c528b049f54ea4dd |
+| patches/vllm-sampling-decoding-boundary.patch | 85cfffb303c52128b7e3183e5b3d18c3d1f8a906b7b1b6f9d1ddc8010de4bc0f |
+| patches/vllm-token-generation-result-integrity.patch | 94344dd0d8bbd9bc9963d2c4ed730eda2c02aa6e6d1e6c217ba538d7446af96a |
+| patches/vllm-raw-image-token-transport.patch | fc6590677b110bf6743d6f0dc983def61f4d0ffb6804f8944739272508be1220 |
 | patches/vllm-xml-text-fidelity.patch | 73e973029f05bd88e5faa7bc1f5a38bac75ef5afcd562981be0961c3b830c6ab |
 | patches/vllm-phase-aware-parser-terminals.patch | 8e9adb65b71b6ba7e3e79ea50ecc37ca9129820ac94a41c71c5286d8d5de68f8 |
 | patches/vllm-input-stream-agent-identity.patch | f812362220f83b904d56e55e9c359918990c55e39d7a0750d1011840d377dfb4 |
-| patches/vllm-tool-output-completion.patch | 1bdbf346fce5376ec87208dd4fffc2afa9abfde997c35b403a8cc7c4dc3b02fa |
+| patches/vllm-tool-output-completion.patch | 081c62e507fca24dc2d27f71f9fae7f8f511a5d545d4a447f0c8a8e7328d8eb3 |
 | patches/vllm-one-way-thinking-boundary.patch | 63a69aea8a184a3875f50673a55058fb9e14dc3178abd8c5510de2770022f346 |
 | patches/vllm-schema-faithful-xml.patch | bd5475972df5b62dd4a0b2b67e68640987f018cf9b14870edf6569a6b0cd8dcc |
 | patches/vllm-token-text-provenance.patch | 954b36cb444f7e644e29d13f7a9d3c000512a0d616bbf2b6cd3cb8f4e880dd44 |
-| patches/vllm-precise-request-errors.patch | 055c3348b1a0c801ad6c8202d13659471106d0ff8a9b958efe1df16e25e9e588 |
+| patches/vllm-precise-request-errors.patch | 4a5afc49e3cee76395dd3122878582f2b3884885decad26c4658796307d21ed9 |
 | patches/vllm-qwen-canonical-parameter-framing.patch | d438f9106c4a989d64837c21f5491d946065e6721570ad47664513347f150064 |
 | patches/vllm-qwen-owned-tool-grammar.patch | 81b3f760a7aa670496deb1252ee3713d452ab62debec88062bbe4cadceb6c849 |
 | patches/vllm-qwen-unique-tool-parameters.patch | 6a76a61c743807215555cbd6b3bbdd8fcaba4abcaca69ef000d301df6c792d3b |
+| patches/vllm-generation-admission-before-response.patch | 6c8b7e41034c2774a3051cda0fddd9cfc2662e176f96a3375086f0253bb81697 |
+| patches/vllm-kv-scope-single-flight.patch | cc5e52403afd4e4764693da552e9252bbf204793566fff6a27fb87b4dbd28d13 |
 
-The reconstructed tree has 96 reviewed runtime-source changes, 1 new runtime source,
-7 runtime-source deletions, 69 existing-test changes, 11 new tests,
+The reconstructed tree has 102 reviewed runtime-source changes, 1 new runtime source,
+7 runtime-source deletions, 81 existing-test changes, 14 new tests,
 and 3 test deletions. The authoritative
 counts are derived and printed by ./scripts/build-vllm.sh check, never restated
 by hand there. The landmark-aware Python patcher calculates every mutation
@@ -355,11 +357,11 @@ Pinned build inputs and products:
 | Offline archive | artifacts/qwen38-vllm-images-runtime-v26.tar |
 | Archive size | 8,561,236,480 bytes, mode 0600 |
 | Archive SHA-256 | c77ba706f884b74e92e3c8ec810cef76ac015e1abc053dac8c4154d1b5e13e92 |
-| Runtime Dockerfile SHA-256 | 8228f07e2fb7f6bce892a69f7e1bceb1a9f3f794a830cdd572905a92ff2429bd |
-| Docker context allowlist SHA-256 | a5de9a3cef2f73a812c7e2a923bab3ed3e0f1ab6947868b492d181cfb020feff |
-| Build verifier SHA-256 | 94e92727af1a6230016e4ce411aed798d043b13067439399b550f870d8cf1523 |
-| Runtime validator SHA-256 | c44b3430de4d61cd779dc2b1fa67b99e43835483bfbc5e354d45f16e5e26c1e8 |
-| Runtime lock SHA-256 | 9852a25a752d062a51deb79071977fa3066d93bb003570578b9670830ec8295d |
+| Runtime Dockerfile SHA-256 | 32e336990ec85b890f7b03ddc9797baea14576f38bde01da64264b3615c17b15 |
+| Docker context allowlist SHA-256 | c0a54d4706ae24c88b03f4cfb1b21e7c75e415fa6d7ba4dd4fd4d36ef8a8c30c |
+| Build verifier SHA-256 | 2a4c4a92fc5858e9662c67f6cadc69ab52cbc26468bc74cd8334c6becaa8673a |
+| Runtime validator SHA-256 | 2ad831d8a71adf0db4c8a923d063d32df7358250d1d0d97d76c2979ce9fe7fab |
+| Runtime lock SHA-256 | 8d2db765d02a099a2a7d31a200c2888efb2e6941e32aecb2391d5a75ea91df8b |
 
 The runtime tag names the pinned image and nothing else. A build used to load its
 image under that tag before comparing the image ID with the pin, so a build that
@@ -487,15 +489,52 @@ Consequences:
 ### Shared prefixes and agent IDs
 
 Every generation request supplies an opaque `kv_scope` agent ID containing a
-non-whitespace character. The protocol models reject an empty or whitespace-only
-value. Absence is refused at the one boundary every generative request passes,
-`require_kv_scope` in `vllm/vllm/v1/engine/input_processor.py`, reached through
-`AsyncLLM.add_request`; a non-streaming request without it receives HTTP 400
-naming the field. The supported generation APIs are Chat Completions (including
-batch Chat), Completions, Responses, Anthropic Messages and token-in-token-out
-generate: five protocol families and six routes. Generative scoring and Cohere
-are not mounted; neither is part of this deployment's agent-identity contract.
-Rendering and pooling allocate no KV and do not require an ID.
+non-whitespace character, and one ID names one line of work: send the same ID
+for every request that continues a conversation, and a new, never-used ID for a
+fork or a subagent. The generation request models require the field and the
+served OpenAPI schema declares it required; the render models they share their
+shape with (`/v1/chat/completions/render`, `/v1/completions/render`, and the
+token request those return) allocate no KV and have no such field. A request
+that omits the ID, or sends a blank one, is refused with HTTP 400 stating that
+rule. The same rule is the engine's invariant for every other caller:
+`require_kv_scope` in `vllm/vllm/v1/engine/input_processor.py` refuses a direct
+SamplingParams caller that names no line of work. The supported generation
+APIs are Chat Completions (including batch Chat), Completions, Responses,
+Anthropic Messages and token-in-token-out generate: five protocol families and
+six routes. Generative scoring and Cohere are not mounted; neither is part of
+this deployment's agent-identity contract. Pooling allocates no KV and does not
+require an ID.
+
+Every generation route finishes admission before it answers. Input validation,
+the ID rules and the overlap rule below are applied by `AsyncLLM.admit` before
+a streaming response is returned, so each refusal is an HTTP 400 on streaming
+and non-streaming requests alike, never an error inside a stream already
+answered 200. The admitted stream owns its request: a client that disconnects,
+or a response that is never read, aborts it. What can still fail after the
+status line (the engine failing mid-generation) ends a Chat, Completions,
+Anthropic or token stream with its error chunk, and a Responses stream with its
+`error` event.
+
+One line of work generates one sequence per request, so the ID can name it:
+`n` must be 1 on Chat Completions, Completions and token generation (and on the
+batch route, as must `best_of`), and a Completions request carries one prompt.
+Several samples or several prompts are several lines: send one request each,
+each with its own new ID; they share any common prompt prefix by content
+(below). The batch route takes one ID per conversation, as a list in the order
+of `messages`, all distinct.
+
+A line of work also has at most one request in flight. The frontend refuses a
+second request under an ID whose earlier request has not finished, with HTTP 400
+naming the ID and the request in flight: wait for it to finish or abort it, since
+a continuation must not overlap its predecessor, and give a concurrent line of
+work its own new ID. The frontend answers this because it is one API server
+process that admits every generation request; the engine refuses to start with
+more than one (`--api-server-count` other than 1). An ID is free again as soon
+as its request's last output is produced, before the response's last byte, so a
+continuation sent after reading a response to its end is admitted. The cost: a
+client that times out and re-sends before the server has aborted its first
+request (the server aborts it when it notices the disconnect) gets this
+refusal, and must retry once that abort has happened.
 
 The ID never enters a block hash and never restricts a lookup. Prefix lookup
 matches content and `cache_salt` alone, in the GPU block pool and the CPU tier,
@@ -548,9 +587,9 @@ the subagent allocates beyond the free pool; losing the parent's recurrent-state
 blocks there forfeits its GPU hit and leaves the CPU copy, if it survived, as
 the parent's only cached context.
 
-Each of several forks or subagents needs its own ID. The batch route submits
-every conversation under the batch's one ID, so after completion the ID retains
-only one of their contexts.
+Each of several forks or subagents needs its own ID, and the server refuses
+the ways one ID could name several at once: overlapping requests, `n > 1`,
+several prompts, and a batch that repeats an ID.
 
 Scoping mistakes never change output. They cost retention:
 
@@ -564,11 +603,12 @@ Scoping mistakes never change output. They cost retention:
   so least-recently-used release and the retained-context bound can take other
   agents' contexts first.
 
-Nothing verifies correct use. The server checks that the ID is present and
-contains a non-whitespace character, and that an input stream keeps one ID
+Beyond that, nothing verifies correct use. The server checks that the ID is
+present and contains a non-whitespace character, that it has one request in
+flight and one sequence per request, and that an input stream keeps one ID
 across its chunks: a change is refused before dispatch and aborts only that
 stream's request. It cannot tell a continuation, retry, fork or subagent apart.
-Correct scoping rests entirely on the caller. Its effects are visible only as
+Correct scoping rests on the caller. Its effects are visible only as
 prefill latency, the served cached-token count
 (`prompt_tokens_details.cached_tokens` on Chat Completions; see
 [Exact served usage](#exact-served-usage)) and the server's prefix-cache metrics.
@@ -1114,8 +1154,9 @@ one of the six mounted generation routes — Chat Completions and its batch form
 Responses, Anthropic Messages, and token-in-token-out generate — a non-streaming
 request that is complete except for `kv_scope`, and each answers HTTP 400 naming the field: as
 `error.param` on the OpenAI-shaped surfaces, and as an `invalid_request_error`
-whose message names it on the Anthropic surface, because the Anthropic router maps
-the engine's request-validation error exactly as it maps typed request validation.
+whose message names it on the Anthropic surface, because the Anthropic router
+answers the request model's refusal in its own envelope, exactly as it answers
+typed request validation.
 Every other probe sends the identity `scripts/probe_scope.py` mints for its run on
 every generative request, so the suite runs under the rule it proves.
 

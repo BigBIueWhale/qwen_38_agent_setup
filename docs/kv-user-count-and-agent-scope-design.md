@@ -2,10 +2,20 @@
 
 ## Identity and matching
 
-Every generation request supplies `kv_scope`, an opaque, nonempty agent ID.
-Use the same ID for successive requests from the same agent. Whitespace-only
+Every generation request supplies `kv_scope`, an opaque, nonempty agent ID
+that names one line of work. Use the same ID for every request that continues a
+conversation, and a new, never-used ID for a fork or a subagent. Whitespace-only
 IDs are invalid; other strings are preserved exactly. The server assigns no
 meaning to punctuation, session names, or the relationship between IDs.
+
+A line of work has at most one request in flight and generates one sequence per
+request. The frontend refuses a second request under an ID whose earlier
+request has not finished, and refuses `n > 1` or several Completions prompts
+under one ID; the batch route names one distinct ID per conversation. The one
+API server process admits every generation request, which is what lets it see
+every request in flight; the engine refuses to start with several. Every
+refusal is made at admission, which each generation surface completes before it
+answers, so it is an HTTP error of its own rather than an error inside a stream.
 
 Prefix lookup matches content and `cache_salt` alone, as upstream vLLM does.
 The ID never enters a block hash and never restricts a lookup: every request
@@ -23,10 +33,12 @@ For example:
 4. Releasing A removes A's retention references. B's retained context keeps
    P and B1 resident while B is retained.
 
-The required ID travels through each generation protocol's sampling
-parameters to the engine request and offload request context. The common
-engine validation also covers direct sampling callers. Rendering and
-pooling do not allocate a generation context and do not require an ID.
+The generation request models require the ID and the served schema declares
+it; the render models they share their shape with have no ID. It travels
+through the sampling parameters to the engine request and offload request
+context. The common engine validation holds the same rules for direct sampling
+callers. Rendering and pooling do not allocate a generation context and do not
+require an ID.
 An ongoing input stream belongs to its admitted agent ID. Per-chunk sampling
 parameters may change generation settings but must retain that exact ID.
 An ID change is refused before dispatch and aborts only that stream's request.
@@ -173,7 +185,9 @@ The source tests exercise content matching under new and existing IDs, shared
 eviction, whole-agent retention and its bound, attention prefix aliases, sparse
 window availability and fills, transfer failures, complete-context retention,
 secondary promotion/export, geometry and sizing, and required opaque IDs on
-generation surfaces. Scheduler and manager tests use metadata and disposable containers;
+generation surfaces, admission before the status line on every generation route, and the
+one-request-in-flight rule. Scheduler and manager tests use metadata and
+disposable containers;
 they do not require a GPU or model execution.
 
 The deployment's landmark transformations, reviewed diffs, source hashes and

@@ -5,7 +5,10 @@ from __future__ import annotations
 
 import msgspec
 
-from vllm.entrypoints.openai.chat_completion.protocol import ChatCompletionRequest
+from vllm.entrypoints.openai.chat_completion.protocol import (
+    ChatCompletionGenerationRequest,
+    ChatCompletionRequest,
+)
 from vllm.entrypoints.openai.responses.protocol import ResponsesRequest
 from vllm.exceptions import VLLMValidationError
 from vllm.sampling_params import SamplingParams
@@ -80,11 +83,12 @@ defaults = {
 }
 
 
-def chat_request(**kwargs) -> ChatCompletionRequest:
-    return ChatCompletionRequest(
+def chat_request(**kwargs) -> ChatCompletionGenerationRequest:
+    return ChatCompletionGenerationRequest(
         model="qwen3.8",
         messages=[{"role": "user", "content": "test"}],
         max_tokens=200_000,
+        kv_scope="agent",
         **kwargs,
     )
 
@@ -123,6 +127,7 @@ def responses_request(**kwargs) -> ResponsesRequest:
         model="qwen3.8",
         input="test",
         max_output_tokens=200_000,
+        kv_scope="agent",
         **kwargs,
     )
 
@@ -153,17 +158,25 @@ for invalid in (0, -2, True, 1.5):
 
 # Every generation protocol resolves the configured sampling policy before
 # constructing the engine request. Render output preserves explicit values.
-from vllm.entrypoints.openai.completion.protocol import CompletionRequest
-from vllm.entrypoints.scale_out.token_in_token_out.protocol import GenerateRequest
+import json
 
-completion = CompletionRequest(model="qwen3.8", prompt="test", kv_scope="agent")
+from vllm.entrypoints.openai.completion.protocol import (
+    CompletionGenerationRequest,
+    CompletionRequest,
+)
+from vllm.entrypoints.scale_out.token_in_token_out.protocol import (
+    GenerateRequest,
+    TokenGenerationRequest,
+)
+
+completion = CompletionGenerationRequest(model="qwen3.8", prompt="test", kv_scope="agent")
 assert completion.max_tokens is None
 completion_params = completion.to_sampling_params(200_000, defaults)
 assert completion_params.thinking_token_budget is None
 assert completion_params.final_response_token_budget is None
 assert completion_params.top_p == 0.95 and completion_params.top_k == 20
 
-supplied = GenerateRequest.model_validate({
+supplied = TokenGenerationRequest.model_validate({
     "token_ids": [1, 2, 3], "kv_scope": "agent", "sampling_params": {"min_tokens": 64},
 })
 resolved = supplied.to_sampling_params(200_000, defaults)
@@ -173,10 +186,13 @@ assert resolved.thinking_token_budget is None
 assert resolved.final_response_token_budget is None
 assert supplied.sampling_params == {"min_tokens": 64}
 
+# Rendering names no agent; the caller names its line of work to generate.
 rendered = GenerateRequest(
-    token_ids=[1, 2, 3], kv_scope="agent", sampling_params=SamplingParams(max_tokens=16),
+    token_ids=[1, 2, 3], sampling_params=SamplingParams(max_tokens=16),
 )
-restored = GenerateRequest.model_validate_json(rendered.model_dump_json())
+restored = TokenGenerationRequest.model_validate(
+    {**json.loads(rendered.model_dump_json()), "kv_scope": "agent"}
+)
 assert restored.sampling_params["max_tokens"] == 16
 resolved = restored.to_sampling_params(16, defaults)
 assert resolved.max_tokens == 16 and resolved.top_p == 1.0 and resolved.top_k == 0
@@ -197,8 +213,10 @@ phase_budgets = {"thinking_token_budget": 128, "final_response_token_budget": 20
 for request in (
     chat_request(**phase_budgets),
     responses_request(**phase_budgets),
-    CompletionRequest(model="qwen3.8", prompt="test", kv_scope="agent", **phase_budgets),
-    GenerateRequest.model_validate({
+    CompletionGenerationRequest(
+        model="qwen3.8", prompt="test", kv_scope="agent", **phase_budgets,
+    ),
+    TokenGenerationRequest.model_validate({
         "token_ids": [1, 2, 3], "kv_scope": "agent", "sampling_params": phase_budgets,
     }),
 ):

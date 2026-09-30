@@ -39,9 +39,10 @@ diff --git a/tests/entrypoints/scale_out/render/test_render_multimodal.py b/test
  
  @pytest.mark.asyncio
 diff --git a/tests/entrypoints/scale_out/token_in_token_out/test_raw_images.py b/tests/entrypoints/scale_out/token_in_token_out/test_raw_images.py
+new file mode 100644
 --- /dev/null
 +++ b/tests/entrypoints/scale_out/token_in_token_out/test_raw_images.py
-@@ -0,0 +1,322 @@
+@@ -0,0 +1,329 @@
 +# SPDX-License-Identifier: Apache-2.0
 +# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
 +"""Raw image inputs and exact rendered token geometry, without a model run."""
@@ -50,7 +51,10 @@ diff --git a/tests/entrypoints/scale_out/token_in_token_out/test_raw_images.py b
 +
 +import pytest
 +
-+from vllm.entrypoints.scale_out.token_in_token_out.protocol import GenerateRequest
++from vllm.entrypoints.scale_out.token_in_token_out.protocol import (
++    GenerateRequest,
++    TokenGenerationRequest,
++)
 +from vllm.exceptions import VLLMValidationError
 +from vllm.model_executor.models.qwen3_vl import Qwen3VLMultiModalProcessor
 +from vllm.multimodal.processing.context import TimingContext
@@ -63,7 +67,7 @@ diff --git a/tests/entrypoints/scale_out/token_in_token_out/test_raw_images.py b
 +
 +
 +def request(**fields):
-+    return GenerateRequest.model_validate(dict(
++    return TokenGenerationRequest.model_validate(dict(
 +        token_ids=[1], sampling_params={}, kv_scope='agent', **fields))
 +
 +
@@ -238,10 +242,14 @@ diff --git a/tests/entrypoints/scale_out/token_in_token_out/test_raw_images.py b
 +    rendered.online_renderer = SimpleNamespace(render_chat=AsyncMock(return_value=(
 +        [], [{'type': 'multimodal', 'prompt_token_ids': tokens}]
 +    )))
-+    chat = ChatCompletionRequest(model='model', stream=stream, kv_scope='agent',
++    chat = ChatCompletionRequest(model='model', stream=stream,
 +        cache_salt='salt', messages=[{'role': 'user', 'content': parts}])
 +    outgoing = await rendered.render_chat_request(chat)
-+    incoming = GenerateRequest.model_validate_json(outgoing.model_dump_json())
++    # Rendering names no line of work; the caller names one to generate.
++    rendered_json = GenerateRequest.model_validate_json(outgoing.model_dump_json())
++    assert 'kv_scope' not in rendered_json.model_dump()
++    incoming = TokenGenerationRequest.model_validate(
++        {**rendered_json.model_dump(), 'kv_scope': 'agent'})
 +    assert incoming.token_ids == tokens
 +    assert [part.model_dump() for part in incoming.content_parts] == parts
 +    assert 'features' not in incoming.model_dump()
@@ -365,19 +373,22 @@ diff --git a/tests/entrypoints/scale_out/token_in_token_out/test_raw_images.py b
 +        for item, length in zip(result['mm_kwargs']['image'], lengths):
 +            assert item['pixel_values'].data.shape[0] == length * 4
 diff --git a/tests/entrypoints/scale_out/token_in_token_out/test_raw_media_boundary.py b/tests/entrypoints/scale_out/token_in_token_out/test_raw_media_boundary.py
+new file mode 100644
 --- /dev/null
 +++ b/tests/entrypoints/scale_out/token_in_token_out/test_raw_media_boundary.py
-@@ -0,0 +1,50 @@
+@@ -0,0 +1,52 @@
 +# SPDX-License-Identifier: Apache-2.0
 +# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
 +import pytest
 +from pydantic import ValidationError
-+from vllm.entrypoints.scale_out.token_in_token_out.protocol import GenerateRequest
++from vllm.entrypoints.scale_out.token_in_token_out.protocol import (
++    TokenGenerationRequest,
++)
 +
 +PNG = 'data:image/png;base64,aGVsbG8='
 +
 +def request(**fields):
-+    return GenerateRequest.model_validate(dict(
++    return TokenGenerationRequest.model_validate(dict(
 +        token_ids=[1], sampling_params={}, kv_scope='agent', **fields))
 +
 +@pytest.mark.parametrize('stream', [False, True])
@@ -411,10 +422,10 @@ diff --git a/tests/entrypoints/scale_out/token_in_token_out/test_raw_media_bound
 +
 +def test_raw_png_transport_preserves_original_data_url():
 +    supplied = {'type': 'image_url', 'image_url': {'url': PNG, 'detail': 'high'}}
-+    parsed = GenerateRequest.model_validate_json(
++    parsed = TokenGenerationRequest.model_validate_json(
 +        request(content_parts=[supplied]).model_dump_json())
 +    assert parsed.content_parts[0].model_dump() == supplied
-+    schema = GenerateRequest.model_json_schema()
++    schema = TokenGenerationRequest.model_json_schema()
 +    assert 'features' not in schema['properties']
 +    assert schema['additionalProperties'] is False
 +
@@ -1127,19 +1138,24 @@ diff --git a/vllm/entrypoints/scale_out/token_in_token_out/protocol.py b/vllm/en
      Field,
      GetCoreSchemaHandler,
      field_validator,
-@@ -40,42 +41,18 @@
+@@ -46,42 +47,18 @@
  ####### Tokens IN <> Tokens OUT #######
  
  
 -class PlaceholderRangeInfo(BaseModel):
 -    """Serializable placeholder location for a single multi-modal item."""
--
++class InlinePNGSource(BaseModel):
++    """Original encoded image bytes, with the deployment's full image detail."""
+ 
 -    offset: int
 -    """Start index of the placeholder tokens in the prompt."""
--
++    model_config = ConfigDict(extra="forbid")
++    url: str = Field(pattern=r"^data:image/png;base64,")
++    detail: Literal["auto", "high"] = "auto"
+ 
 -    length: int
 -    """Number of placeholder tokens."""
--
+ 
 -    # TODO: add ``is_embed: list[bool] | None`` once the /generate side
 -    # consumes features — some models (e.g. Qwen-VL) use sparse
 -    # placeholder masks that cannot be recomputed from offset+length alone.
@@ -1167,14 +1183,6 @@ diff --git a/vllm/entrypoints/scale_out/token_in_token_out/protocol.py b/vllm/en
 -    the item should be resolved from cache.  The entire field is
 -    ``None`` for metadata-only (cache-hit) responses.
 -    """
-+class InlinePNGSource(BaseModel):
-+    """Original encoded image bytes, with the deployment's full image detail."""
-+
-+    model_config = ConfigDict(extra="forbid")
-+    url: str = Field(pattern=r"^data:image/png;base64,")
-+    detail: Literal["auto", "high"] = "auto"
-+
-+
 +class InlinePNGPart(BaseModel):
 +    model_config = ConfigDict(extra="forbid")
 +    type: Literal["image_url"]
@@ -1182,7 +1190,7 @@ diff --git a/vllm/entrypoints/scale_out/token_in_token_out/protocol.py b/vllm/en
  
  
  class SamplingParamsInput(dict[str, Any]):
-@@ -120,6 +97,8 @@
+@@ -126,6 +103,8 @@
  
  
  class GenerateRequest(BaseModel):
@@ -1191,7 +1199,7 @@ diff --git a/vllm/entrypoints/scale_out/token_in_token_out/protocol.py b/vllm/en
      request_id: str = Field(
          default_factory=lambda: f"{random_uuid()}",
          description=(
-@@ -153,18 +132,10 @@
+@@ -159,18 +138,10 @@
      them (Fast tokenizer, text input, no multimodal data). List length
      equals `token_ids` length when present. None otherwise."""
  
@@ -1239,8 +1247,8 @@ diff --git a/vllm/entrypoints/scale_out/token_in_token_out/serving.py b/vllm/ent
  
 -from .mm_serde import decode_mm_kwargs_item
  from .protocol import (
-     GenerateRequest,
      GenerateResponse,
+     GenerateResponseChoice,
 @@ -181,51 +176,14 @@
              tracker = AsyncMultiModalItemTracker(self.model_config)
              mm_parser = tracker.create_parser()

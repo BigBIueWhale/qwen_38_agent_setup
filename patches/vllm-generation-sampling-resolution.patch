@@ -16,7 +16,7 @@ diff --git a/tests/entrypoints/openai/test_render_token_offsets.py b/tests/entry
 diff --git a/tests/entrypoints/scale_out/token_in_token_out/test_generate_stream.py b/tests/entrypoints/scale_out/token_in_token_out/test_generate_stream.py
 --- a/tests/entrypoints/scale_out/token_in_token_out/test_generate_stream.py
 +++ b/tests/entrypoints/scale_out/token_in_token_out/test_generate_stream.py
-@@ -19,7 +19,6 @@
+@@ -20,7 +20,6 @@
  from vllm.entrypoints.scale_out.token_in_token_out.serving import ServingTokens
  from vllm.logprobs import Logprob
  from vllm.outputs import CompletionOutput, RequestOutput
@@ -24,20 +24,20 @@ diff --git a/tests/entrypoints/scale_out/token_in_token_out/test_generate_stream
  from vllm.renderers.online_renderer import OnlineRenderer
  from vllm.sampling_params import SamplingParams
  from vllm.v1.engine.async_llm import AsyncLLM
-@@ -79,12 +78,6 @@
-     model_config: MockModelConfig
-     parallel_config: MockParallelConfig
+@@ -82,12 +81,6 @@
      scheduler_config: MockSchedulerConfig = field(default_factory=MockSchedulerConfig)
--
--
+ 
+ 
 -def _build_renderer(model_config: MockModelConfig):
 -    return renderer_from_config(
 -        MockVllmConfig(model_config, parallel_config=MockParallelConfig()),
 -    )
- 
- 
+-
+-
  def _build_serving_tokens(engine: AsyncLLM, **kwargs) -> ServingTokens:
-@@ -158,7 +151,9 @@
+     models = OpenAIServingModels(
+         engine_client=engine,
+@@ -159,7 +152,9 @@
          engine.model_config, parallel_config=MockParallelConfig()
      )
      engine.input_processor = MagicMock()
@@ -51,7 +51,7 @@ diff --git a/tests/entrypoints/scale_out/token_in_token_out/test_generate_stream
 diff --git a/tests/entrypoints/scale_out/token_in_token_out/test_protocol.py b/tests/entrypoints/scale_out/token_in_token_out/test_protocol.py
 --- a/tests/entrypoints/scale_out/token_in_token_out/test_protocol.py
 +++ b/tests/entrypoints/scale_out/token_in_token_out/test_protocol.py
-@@ -1,70 +1,336 @@
+@@ -1,70 +1,350 @@
  # SPDX-License-Identifier: Apache-2.0
  # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
 -"""Unit tests for the token_in_token_out request/response protocol.
@@ -64,23 +64,33 @@ diff --git a/tests/entrypoints/scale_out/token_in_token_out/test_protocol.py b/t
  
  import json
  
-+import pytest
-+from pydantic import ValidationError
-+
-+from vllm.entrypoints.anthropic.protocol import AnthropicMessagesRequest
-+from vllm.entrypoints.anthropic.serving import AnthropicServingMessages
-+from vllm.entrypoints.openai.chat_completion.protocol import ChatCompletionRequest
-+from vllm.entrypoints.openai.completion.protocol import CompletionRequest
-+from vllm.entrypoints.openai.responses.protocol import ResponsesRequest
- from vllm.entrypoints.scale_out.token_in_token_out.protocol import GenerateRequest
-+from vllm.exceptions import VLLMValidationError
- from vllm.sampling_params import SamplingParams
- 
+-from vllm.entrypoints.scale_out.token_in_token_out.protocol import GenerateRequest
+-from vllm.sampling_params import SamplingParams
+-
 -
 -def _base_payload() -> dict:
 -    return {"token_ids": [1, 2, 3], "sampling_params": {}}
--
--
++import pytest
++from pydantic import ValidationError
+ 
++from vllm.entrypoints.anthropic.protocol import AnthropicMessagesRequest
++from vllm.entrypoints.anthropic.serving import AnthropicServingMessages
++from vllm.entrypoints.openai.chat_completion.protocol import (
++    ChatCompletionGenerationRequest,
++    ChatCompletionRequest,
++)
++from vllm.entrypoints.openai.completion.protocol import (
++    CompletionGenerationRequest,
++    CompletionRequest,
++)
++from vllm.entrypoints.openai.responses.protocol import ResponsesRequest
++from vllm.entrypoints.scale_out.token_in_token_out.protocol import (
++    GenerateRequest,
++    TokenGenerationRequest,
++)
++from vllm.exceptions import VLLMValidationError
++from vllm.sampling_params import SamplingParams
+ 
 -def test_omitted_max_tokens_is_not_provided():
 -    """Body without ``max_tokens`` must surface as 'not provided' so the
 -    server can apply its own default instead of the dataclass 16."""
@@ -140,7 +150,7 @@ diff --git a/tests/entrypoints/scale_out/token_in_token_out/test_protocol.py b/t
 +
 +
 +def generate(settings):
-+    return GenerateRequest.model_validate({
++    return TokenGenerationRequest.model_validate({
 +        "token_ids": [1, 2, 3], "sampling_params": settings, "kv_scope": "agent",
 +    })
 +
@@ -162,7 +172,9 @@ diff --git a/tests/entrypoints/scale_out/token_in_token_out/test_protocol.py b/t
 +        "min_p": 0.0, "presence_penalty": 0.0, "repetition_penalty": 1.0,
 +        "thinking_token_budget": None,
 +    }
-+    request = GenerateRequest.model_validate_json(generate(settings).model_dump_json())
++    request = TokenGenerationRequest.model_validate_json(
++        generate(settings).model_dump_json()
++    )
 +    assert request.sampling_params == settings
 +    resolved = request.to_sampling_params(16, DEFAULTS)
 +    for key, value in settings.items():
@@ -172,7 +184,7 @@ diff --git a/tests/entrypoints/scale_out/token_in_token_out/test_protocol.py b/t
 +
 +def test_rendered_params_keep_default_valued_settings_after_serialization():
 +    source = SamplingParams(max_tokens=16, thinking_token_budget=None)
-+    rendered = GenerateRequest(token_ids=[1, 2, 3], sampling_params=source, kv_scope="agent")
++    rendered = GenerateRequest(token_ids=[1, 2, 3], sampling_params=source)
 +    serialized = json.loads(rendered.model_dump_json())
 +    assert serialized["sampling_params"]["max_tokens"] == 16
 +    assert serialized["sampling_params"]["temperature"] == 1.0
@@ -196,10 +208,10 @@ diff --git a/tests/entrypoints/scale_out/token_in_token_out/test_protocol.py b/t
 +def test_every_surface_applies_the_same_final_answer_ceiling(surface, supplied, expected):
 +    common = {"final_response_token_budget": supplied, "kv_scope": "agent"}
 +    if surface == "chat":
-+        request = ChatCompletionRequest(model="m", messages=[{"role": "user", "content": "hi"}], **common)
++        request = ChatCompletionGenerationRequest(model="m", messages=[{"role": "user", "content": "hi"}], **common)
 +        params = request.to_sampling_params(509, DEFAULTS)
 +    elif surface == "completion":
-+        params = CompletionRequest(model="m", prompt="hi", **common).to_sampling_params(509, DEFAULTS)
++        params = CompletionGenerationRequest(model="m", prompt="hi", **common).to_sampling_params(509, DEFAULTS)
 +    elif surface == "responses":
 +        params = ResponsesRequest(model="m", input="hi", **common).to_sampling_params(509, DEFAULTS)
 +    else:
@@ -239,10 +251,10 @@ diff --git a/tests/entrypoints/scale_out/token_in_token_out/test_protocol.py b/t
 +    elif surface == "completion":
 +        request = CompletionRequest(model="m", prompt="hi")
 +    elif surface == "responses":
-+        request = ResponsesRequest(model="m", input="hi")
++        request = ResponsesRequest(model="m", input="hi", kv_scope="agent")
 +    elif surface == "anthropic":
 +        request = AnthropicServingMessages._convert_anthropic_to_openai_request(
-+            AnthropicMessagesRequest(model="m", messages=[{"role": "user", "content": "hi"}], max_tokens=509)
++            AnthropicMessagesRequest(model="m", messages=[{"role": "user", "content": "hi"}], max_tokens=509, kv_scope="agent")
 +        )
 +    else:
 +        request = generate({})
@@ -258,7 +270,7 @@ diff --git a/tests/entrypoints/scale_out/token_in_token_out/test_protocol.py b/t
 +    elif surface == "completion":
 +        request = CompletionRequest(model="m", prompt="hi", presence_penalty=0.0)
 +    elif surface == "responses":
-+        request = ResponsesRequest(model="m", input="hi", presence_penalty=0.0)
++        request = ResponsesRequest(model="m", input="hi", presence_penalty=0.0, kv_scope="agent")
 +    else:
 +        request = generate({"presence_penalty": 0.0})
 +    assert request.to_sampling_params(509, DEFAULTS).presence_penalty == 0.0
@@ -409,8 +421,7 @@ diff --git a/tests/entrypoints/scale_out/token_in_token_out/test_protocol.py b/t
 +        render_completion=AsyncMock(return_value=[prompt]),
 +    )
 +    kwargs = {"model": "model", "max_tokens": requested_max, "temperature": 1.0,
-+              "top_p": 1.0, "top_k": 0, "thinking_token_budget": None,
-+              "kv_scope": "agent"}
++              "top_p": 1.0, "top_k": 0, "thinking_token_budget": None}
 +    if surface == "chat":
 +        request = ChatCompletionRequest(messages=[{"role": "user", "content": "hi"}], **kwargs)
 +        rendered = await render.render_chat_request(request)
@@ -418,7 +429,11 @@ diff --git a/tests/entrypoints/scale_out/token_in_token_out/test_protocol.py b/t
 +        request = CompletionRequest(prompt="hi", **kwargs)
 +        rendered, = await render.render_completion_request(request)
 +    payload = rendered.model_dump_json()
-+    incoming = GenerateRequest.model_validate_json(payload)
++    assert "kv_scope" not in json.loads(payload)
++    # Rendering names no line of work; the caller adds one to generate.
++    incoming = TokenGenerationRequest.model_validate(
++        {**json.loads(payload), "kv_scope": "agent"}
++    )
 +    assert incoming.sampling_params["max_tokens"] == expected_max
 +    params = incoming.to_sampling_params(expected_max, {**DEFAULTS, "top_p": 0.2})
 +    assert params.max_tokens == expected_max
@@ -453,21 +468,27 @@ diff --git a/tests/entrypoints/scale_out/token_in_token_out/test_protocol.py b/t
 diff --git a/tests/entrypoints/test_kv_scope_protocol.py b/tests/entrypoints/test_kv_scope_protocol.py
 --- a/tests/entrypoints/test_kv_scope_protocol.py
 +++ b/tests/entrypoints/test_kv_scope_protocol.py
-@@ -63,7 +63,9 @@
-     GenerateRequest,
+@@ -92,6 +92,7 @@
+ 
+ _SAMPLING_SURFACES = [
+     ChatCompletionGenerationRequest, CompletionGenerationRequest, ResponsesRequest,
++    TokenGenerationRequest,
  ]
  
--_OPENAI_SURFACES = [ChatCompletionRequest, CompletionRequest, ResponsesRequest]
-+_OPENAI_SURFACES = [
-+    ChatCompletionRequest, CompletionRequest, ResponsesRequest, GenerateRequest,
-+]
+ 
+@@ -165,7 +166,7 @@
  
  
- def _sampling_params_for(request):
+ @pytest.mark.parametrize(
+-    "request_cls", [ChatCompletionRequest, CompletionRequest]
++    "request_cls", [ChatCompletionRequest, CompletionRequest, GenerateRequest]
+ )
+ def test_rendered_sampling_parameters_carry_no_scope(request_cls):
+     request = request_cls(**_minimal_payload(request_cls))
 diff --git a/vllm/entrypoints/openai/chat_completion/protocol.py b/vllm/entrypoints/openai/chat_completion/protocol.py
 --- a/vllm/entrypoints/openai/chat_completion/protocol.py
 +++ b/vllm/entrypoints/openai/chat_completion/protocol.py
-@@ -46,6 +46,7 @@
+@@ -47,6 +47,7 @@
  from vllm.sampling_params import (
      BeamSearchParams,
      FinalResponseTokenBudget,
@@ -475,7 +496,7 @@ diff --git a/vllm/entrypoints/openai/chat_completion/protocol.py b/vllm/entrypoi
      RepetitionDetectionParams,
      RequestOutputKind,
      SamplingParams,
-@@ -228,7 +229,7 @@
+@@ -231,7 +232,7 @@
      )
      max_completion_tokens: int | None = None
      n: int | None = 1
@@ -484,7 +505,7 @@ diff --git a/vllm/entrypoints/openai/chat_completion/protocol.py b/vllm/entrypoi
      response_format: AnyResponseFormat | None = None
      seed: int | None = Field(None, ge=_INT64_MIN, le=_INT64_MAX)
      stop: StopParam = []
-@@ -717,17 +718,10 @@
+@@ -706,17 +707,10 @@
              thinking_token_budget = default_sampling_params.get(
                  "thinking_token_budget"
              )
@@ -508,7 +529,7 @@ diff --git a/vllm/entrypoints/openai/chat_completion/protocol.py b/vllm/entrypoi
 diff --git a/vllm/entrypoints/openai/completion/protocol.py b/vllm/entrypoints/openai/completion/protocol.py
 --- a/vllm/entrypoints/openai/completion/protocol.py
 +++ b/vllm/entrypoints/openai/completion/protocol.py
-@@ -27,6 +27,8 @@
+@@ -28,6 +28,8 @@
  from vllm.renderers import TokenizeParams
  from vllm.sampling_params import (
      BeamSearchParams,
@@ -517,7 +538,7 @@ diff --git a/vllm/entrypoints/openai/completion/protocol.py b/vllm/entrypoints/o
      RepetitionDetectionParams,
      RequestOutputKind,
      SamplingParams,
-@@ -58,9 +60,9 @@
+@@ -61,9 +63,9 @@
      frequency_penalty: float | None = 0.0
      logit_bias: dict[str, float] | None = None
      logprobs: int | None = None
@@ -529,7 +550,7 @@ diff --git a/vllm/entrypoints/openai/completion/protocol.py b/vllm/entrypoints/o
      seed: int | None = Field(None, ge=_INT64_MIN, le=_INT64_MAX)
      stop: StopParam = []
      stream: bool | None = False
-@@ -253,6 +255,8 @@
+@@ -242,6 +244,8 @@
          "can detect such behavior and terminate early, saving time and tokens.",
      )
  
@@ -538,7 +559,7 @@ diff --git a/vllm/entrypoints/openai/completion/protocol.py b/vllm/entrypoints/o
      thinking_token_budget: ThinkingTokenBudget = Field(
          default=None,
          description=(
-@@ -333,6 +337,15 @@
+@@ -322,6 +326,15 @@
              default_sampling_params = {}
  
          # Default parameters
@@ -554,8 +575,8 @@ diff --git a/vllm/entrypoints/openai/completion/protocol.py b/vllm/entrypoints/o
          if (repetition_penalty := self.repetition_penalty) is None:
              repetition_penalty = default_sampling_params.get(
                  "repetition_penalty",
-@@ -384,7 +397,7 @@
-             extra_args["kv_scope"] = self.kv_scope
+@@ -371,7 +384,7 @@
+             extra_args["ec_transfer_params"] = self.ec_transfer_params
          return SamplingParams.from_optional(
              n=self.n,
 -            presence_penalty=self.presence_penalty,
@@ -563,7 +584,7 @@ diff --git a/vllm/entrypoints/openai/completion/protocol.py b/vllm/entrypoints/o
              frequency_penalty=self.frequency_penalty,
              repetition_penalty=repetition_penalty,
              temperature=temperature,
-@@ -414,17 +427,10 @@
+@@ -401,20 +414,13 @@
              extra_args=extra_args or None,
              skip_clone=True,  # Created fresh per request, safe to skip clone
              repetition_detection=self.repetition_detection,
@@ -572,21 +593,24 @@ diff --git a/vllm/entrypoints/openai/completion/protocol.py b/vllm/entrypoints/o
 +            final_response_token_budget=final_response_token_budget,
              routed_experts_prompt_start=self.routed_experts_prompt_start,
          )
--
--    @model_validator(mode="before")
--    @classmethod
+ 
+     @model_validator(mode="before")
+     @classmethod
 -    def normalize_null_max_tokens(cls, data):
 -        if isinstance(data, dict) and data.get("max_tokens") is None:
 -            data = data.copy()
 -            data["max_tokens"] = cls.model_fields["max_tokens"].default
 -        return data
- 
-     @model_validator(mode="before")
-     @classmethod
+-
+-    @model_validator(mode="before")
+-    @classmethod
+     def validate_response_format(cls, data):
+         response_format = data.get("response_format")
+         if response_format is None:
 diff --git a/vllm/entrypoints/openai/responses/protocol.py b/vllm/entrypoints/openai/responses/protocol.py
 --- a/vllm/entrypoints/openai/responses/protocol.py
 +++ b/vllm/entrypoints/openai/responses/protocol.py
-@@ -69,6 +69,7 @@
+@@ -73,6 +73,7 @@
  from vllm.renderers import ChatParams, TokenizeParams, merge_kwargs
  from vllm.sampling_params import (
      FinalResponseTokenBudget,
@@ -594,7 +618,7 @@ diff --git a/vllm/entrypoints/openai/responses/protocol.py b/vllm/entrypoints/op
      RequestOutputKind,
      SamplingParams,
      StructuredOutputsParams,
-@@ -464,17 +465,10 @@
+@@ -457,17 +458,10 @@
              thinking_token_budget = default_sampling_params.get(
                  "thinking_token_budget"
              )
@@ -615,7 +639,7 @@ diff --git a/vllm/entrypoints/openai/responses/protocol.py b/vllm/entrypoints/op
  
          stop = self.stop if self.stop else []
          if isinstance(stop, str):
-@@ -492,6 +486,7 @@
+@@ -484,6 +478,7 @@
              temperature=temperature,
              top_p=top_p,
              top_k=top_k,
@@ -626,7 +650,7 @@ diff --git a/vllm/entrypoints/openai/responses/protocol.py b/vllm/entrypoints/op
 diff --git a/vllm/entrypoints/scale_out/token_in_token_out/protocol.py b/vllm/entrypoints/scale_out/token_in_token_out/protocol.py
 --- a/vllm/entrypoints/scale_out/token_in_token_out/protocol.py
 +++ b/vllm/entrypoints/scale_out/token_in_token_out/protocol.py
-@@ -1,14 +1,19 @@
+@@ -1,15 +1,20 @@
  # SPDX-License-Identifier: Apache-2.0
  # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
 -from typing import Any, Literal, TypeAlias
@@ -643,31 +667,29 @@ diff --git a/vllm/entrypoints/scale_out/token_in_token_out/protocol.py b/vllm/en
      field_validator,
      model_validator,
  )
-+
-+from pydantic_core import core_schema
  
++from pydantic_core import core_schema
++
  from vllm.config import ModelConfig
  from vllm.entrypoints.openai.chat_completion.protocol import (
-@@ -23,7 +28,12 @@
- from vllm.entrypoints.openai.engine.protocol import StreamOptions, UsageInfo
+     ChatCompletionLogProbs,
+@@ -28,9 +33,12 @@
  from vllm.logprobs import Logprob
  from vllm.renderers import TokenizeParams
--from vllm.sampling_params import SamplingParams
-+from vllm.sampling_params import (
+ from vllm.sampling_params import (
 +    FinalResponseTokenBudget,
-+    SamplingParams,
+     SamplingParams,
 +    ThinkingTokenBudget,
+     require_kv_scope_value,
+     require_one_sequence,
 +    resolve_final_response_token_budget,
-+)
+ )
  from vllm.utils import random_uuid
  
- ####### Tokens IN <> Tokens OUT #######
-@@ -65,6 +75,47 @@
-     the item should be resolved from cache.  The entire field is
-     ``None`` for metadata-only (cache-hit) responses.
+@@ -75,6 +83,47 @@
      """
-+
-+
+ 
+ 
 +class SamplingParamsInput(dict[str, Any]):
 +    """Supplied settings, before model defaults and prompt length are known.
 +
@@ -707,10 +729,12 @@ diff --git a/vllm/entrypoints/scale_out/token_in_token_out/protocol.py b/vllm/en
 +                }, extra_behavior="forbid"),
 +            ),
 +        )
- 
- 
++
++
  class GenerateRequest(BaseModel):
-@@ -114,7 +165,7 @@
+     request_id: str = Field(
+         default_factory=lambda: f"{random_uuid()}",
+@@ -122,7 +171,7 @@
              raise ValueError("content_parts and features are mutually exclusive")
          return self
  
@@ -719,10 +743,10 @@ diff --git a/vllm/entrypoints/scale_out/token_in_token_out/protocol.py b/vllm/en
      """The sampling parameters for the model."""
  
      model: str | None = None
-@@ -167,38 +218,30 @@
+@@ -161,38 +210,28 @@
+             "ECTransfer parameters used for encoder-cache disaggregated serving."
          ),
      )
- 
 -    # Tracks which keys the caller explicitly set inside ``sampling_params``
 -    # when the request was parsed from a JSON body. Lets the server tell
 -    # "client said max_tokens=16" from "client said nothing → dataclass
@@ -771,8 +795,6 @@ diff --git a/vllm/entrypoints/scale_out/token_in_token_out/protocol.py b/vllm/en
 +                *(self.sampling_params.get("stop_token_ids") or []), *default_stops,
 +            ]))
 +        extra_args = dict(values.get("extra_args") or {})
-+        if self.kv_scope is not None:
-+            extra_args["kv_scope"] = self.kv_scope
 +        if self.kv_transfer_params:
 +            extra_args["kv_transfer_params"] = deepcopy(self.kv_transfer_params)
 +        if self.ec_transfer_params:
@@ -782,6 +804,20 @@ diff --git a/vllm/entrypoints/scale_out/token_in_token_out/protocol.py b/vllm/en
  
      def build_tok_params(self, model_config: ModelConfig) -> TokenizeParams:
          return TokenizeParams(
+@@ -225,6 +264,13 @@
+             )
+         return data
+ 
++    def to_sampling_params(
++        self, max_tokens: int, default_sampling_params: dict[str, Any],
++    ) -> SamplingParams:
++        params = super().to_sampling_params(max_tokens, default_sampling_params)
++        params.extra_args = {**(params.extra_args or {}), "kv_scope": self.kv_scope}
++        return params
++
+ 
+ class GenerateResponseChoice(BaseModel):
+     index: int
 diff --git a/vllm/entrypoints/scale_out/token_in_token_out/serving.py b/vllm/entrypoints/scale_out/token_in_token_out/serving.py
 --- a/vllm/entrypoints/scale_out/token_in_token_out/serving.py
 +++ b/vllm/entrypoints/scale_out/token_in_token_out/serving.py
@@ -798,11 +834,10 @@ diff --git a/vllm/entrypoints/scale_out/token_in_token_out/serving.py b/vllm/ent
          self.default_sampling_params = self.model_config.get_diff_sampling_param()
          mc = self.model_config
          self.override_max_tokens = (
-@@ -128,18 +126,6 @@
-         request_metadata = RequestResponseMetadata(request_id=request_id)
+@@ -129,18 +127,6 @@
          if raw_request:
              raw_request.state.request_metadata = request_metadata
--
+ 
 -        sampling_params = request.sampling_params
 -        max_num_seqs = self.engine_client.vllm_config.scheduler_config.max_num_seqs
 -        if sampling_params.n > max_num_seqs:
@@ -814,10 +849,11 @@ diff --git a/vllm/entrypoints/scale_out/token_in_token_out/serving.py b/vllm/ent
 -            msgspec.msgpack.encode(sampling_params)
 -        except (OverflowError, TypeError, ValueError) as e:
 -            return self.create_error_response(e)
- 
+-
          engine_input: EngineInput
          if request.content_parts:
-@@ -203,32 +189,31 @@
+             tracker = AsyncMultiModalItemTracker(self.model_config)
+@@ -203,32 +189,32 @@
          # Schedule the request and get the result generator.
          result_generator: AsyncGenerator[RequestOutput, None] | None = None
  
@@ -832,7 +868,6 @@ diff --git a/vllm/entrypoints/scale_out/token_in_token_out/serving.py b/vllm/ent
 -                input_length=self._extract_prompt_len(engine_input),
 -                default_sampling_params=self.default_sampling_params,
 -                override_max_tokens=self.override_max_tokens,
--            )
 +        max_tokens = get_max_tokens(
 +            max_model_len=self.model_config.max_model_len,
 +            max_tokens=request.sampling_params.get("max_tokens"),
@@ -848,7 +883,7 @@ diff --git a/vllm/entrypoints/scale_out/token_in_token_out/serving.py b/vllm/ent
 +            return self.create_error_response(
 +                f"sampling_params.n must be at most the server's max_num_seqs "
 +                f"({max_num_seqs}), got {sampling_params.n}."
-+            )
+             )
 +        try:
 +            msgspec.msgpack.encode(sampling_params)
 +        except (OverflowError, TypeError, ValueError) as e:
@@ -858,19 +893,19 @@ diff --git a/vllm/entrypoints/scale_out/token_in_token_out/serving.py b/vllm/ent
              sampling_params.detokenize = False
          if request.stream:
              sampling_params.output_kind = RequestOutputKind.DELTA
--
--        # Token-in-token-out embeds SamplingParams directly, so the identity
--        # fields fold into extra_args here instead of a to_sampling_params
--        # conversion — same destination as every other protocol surface.
--        if request.kv_scope is not None:
--            extra_args = dict(sampling_params.extra_args or {})
--            if request.kv_scope is not None:
--                extra_args["kv_scope"] = request.kv_scope
--            sampling_params.extra_args = extra_args
  
+-        # Token-in-token-out embeds SamplingParams directly, so the identity
+-        # folds into extra_args here instead of a to_sampling_params
+-        # conversion — same destination as every other protocol surface.
+-        sampling_params.extra_args = {
+-            **(sampling_params.extra_args or {}),
+-            "kv_scope": request.kv_scope,
+-        }
+-
          self._log_inputs(
              request_id,
-@@ -267,10 +252,12 @@
+             engine_input,
+@@ -266,10 +252,12 @@
                  request_id,
                  model_name,
                  request_metadata,
@@ -884,7 +919,7 @@ diff --git a/vllm/entrypoints/scale_out/token_in_token_out/serving.py b/vllm/ent
          )
  
      async def serve_tokens_full_generator(
-@@ -280,10 +267,10 @@
+@@ -279,10 +267,10 @@
          request_id: str,
          model_name: str,
          request_metadata: RequestResponseMetadata,
@@ -896,7 +931,7 @@ diff --git a/vllm/entrypoints/scale_out/token_in_token_out/serving.py b/vllm/ent
  
          try:
              async for res in result_generator:
-@@ -392,12 +379,12 @@
+@@ -391,12 +379,12 @@
          request_id: str,
          model_name: str,
          request_metadata: RequestResponseMetadata,
@@ -913,12 +948,10 @@ diff --git a/vllm/entrypoints/scale_out/token_in_token_out/serving.py b/vllm/ent
 diff --git a/vllm/sampling_params.py b/vllm/sampling_params.py
 --- a/vllm/sampling_params.py
 +++ b/vllm/sampling_params.py
-@@ -241,6 +241,17 @@
- 
- def _get_llg_tokenizer(tokenizer: TokenizerLike) -> Any:
+@@ -289,6 +289,17 @@
      return tokenizer.llg_tokenizer if is_mistral_tokenizer(tokenizer) else None
-+
-+
+ 
+ 
 +def resolve_final_response_token_budget(
 +    requested: int | None, server_budget: int | None,
 +) -> int | None:
@@ -928,6 +961,8 @@ diff --git a/vllm/sampling_params.py b/vllm/sampling_params.py
 +    if server_budget is None:
 +        return requested
 +    return server_budget if requested is None else min(requested, server_budget)
- 
- 
++
++
  class SamplingParams(
+     PydanticMsgspecMixin,
+     msgspec.Struct,

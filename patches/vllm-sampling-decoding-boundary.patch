@@ -273,9 +273,10 @@ diff --git a/tests/entrypoints/openai/completion/test_completion.py b/tests/entr
          # test streaming
          batch = await client.completions.create(
 diff --git a/tests/entrypoints/openai/test_beam_search_boundary.py b/tests/entrypoints/openai/test_beam_search_boundary.py
+new file mode 100644
 --- /dev/null
 +++ b/tests/entrypoints/openai/test_beam_search_boundary.py
-@@ -0,0 +1,75 @@
+@@ -0,0 +1,84 @@
 +# SPDX-License-Identifier: Apache-2.0
 +# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
 +"""Unsupported decoding is refused before rendering on either transport."""
@@ -287,9 +288,13 @@ diff --git a/tests/entrypoints/openai/test_beam_search_boundary.py b/tests/entry
 +
 +from vllm.entrypoints.openai.chat_completion.protocol import (
 +    BatchChatCompletionRequest,
++    ChatCompletionGenerationRequest,
 +    ChatCompletionRequest,
 +)
-+from vllm.entrypoints.openai.completion.protocol import CompletionRequest
++from vllm.entrypoints.openai.completion.protocol import (
++    CompletionGenerationRequest,
++    CompletionRequest,
++)
 +from vllm.entrypoints.serve.exception_handling.handlers.vllm_error import (
 +    vllm_error_handler,
 +)
@@ -297,22 +302,27 @@ diff --git a/tests/entrypoints/openai/test_beam_search_boundary.py b/tests/entry
 +
 +
 +SURFACES = [
-+    (ChatCompletionRequest, "/v1/chat/completions"),
++    (ChatCompletionGenerationRequest, "/v1/chat/completions"),
 +    (ChatCompletionRequest, "/v1/chat/completions/render"),
-+    (CompletionRequest, "/v1/completions"),
++    (CompletionGenerationRequest, "/v1/completions"),
 +    (CompletionRequest, "/v1/completions/render"),
 +    (BatchChatCompletionRequest, "/v1/chat/completions/batch"),
 +]
 +
 +
 +def payload(request_type, **kwargs):
-+    if request_type is CompletionRequest:
++    if issubclass(request_type, CompletionRequest):
 +        prompt = {"prompt": "hello"}
 +    elif request_type is BatchChatCompletionRequest:
 +        prompt = {"messages": [[{"role": "user", "content": "hello"}]]}
 +    else:
 +        prompt = {"messages": [{"role": "user", "content": "hello"}]}
-+    return {"model": "m", "kv_scope": "opaque agent", **prompt, **kwargs}
++    # Generation names its line of work; rendering has no agent ID to name.
++    if request_type is BatchChatCompletionRequest:
++        prompt["kv_scope"] = ["opaque agent"]
++    elif request_type in (ChatCompletionGenerationRequest, CompletionGenerationRequest):
++        prompt["kv_scope"] = "opaque agent"
++    return {"model": "m", **prompt, **kwargs}
 +
 +
 +@pytest.mark.asyncio
@@ -397,12 +407,10 @@ diff --git a/tests/entrypoints/serve/lora/test_lora_adapters.py b/tests/entrypoi
 diff --git a/tests/test_request_input_bounds.py b/tests/test_request_input_bounds.py
 --- a/tests/test_request_input_bounds.py
 +++ b/tests/test_request_input_bounds.py
-@@ -178,41 +178,6 @@
- 
-     with pytest.raises(VLLMValidationError, match="beam_width must be at most 4"):
+@@ -183,41 +183,6 @@
          BeamSearchParams(beam_width=5, max_tokens=1)
--
--
+ 
+ 
 -def test_chat_beam_conversion_rejects_n_before_stream_state_allocation(
 -    monkeypatch: pytest.MonkeyPatch,
 -):
@@ -436,9 +444,11 @@ diff --git a/tests/test_request_input_bounds.py b/tests/test_request_input_bound
 -    params = request.to_beam_search_params(max_tokens=1, default_sampling_params={})
 -
 -    assert params.beam_width == 4
- 
- 
+-
+-
  # --- DeepSeek encoders: the last-user scan runs once per conversation ------
+ 
+ 
 diff --git a/vllm/entrypoints/openai/chat_completion/protocol.py b/vllm/entrypoints/openai/chat_completion/protocol.py
 --- a/vllm/entrypoints/openai/chat_completion/protocol.py
 +++ b/vllm/entrypoints/openai/chat_completion/protocol.py
@@ -450,7 +460,7 @@ diff --git a/vllm/entrypoints/openai/chat_completion/protocol.py b/vllm/entrypoi
      DeltaMessage,
      FunctionCall,
      FunctionDefinition,
-@@ -44,7 +45,6 @@
+@@ -45,7 +46,6 @@
  from vllm.logprobs import Logprob
  from vllm.renderers import ChatParams, TokenizeParams, merge_kwargs
  from vllm.sampling_params import (
@@ -458,7 +468,7 @@ diff --git a/vllm/entrypoints/openai/chat_completion/protocol.py b/vllm/entrypoi
      FinalResponseTokenBudget,
      resolve_final_response_token_budget,
      RepetitionDetectionParams,
-@@ -267,7 +267,7 @@
+@@ -270,7 +270,7 @@
      user: str | None = None
  
      # --8<-- [start:chat-completion-sampling-params]
@@ -467,11 +477,10 @@ diff --git a/vllm/entrypoints/openai/chat_completion/protocol.py b/vllm/entrypoi
      top_k: int | None = None
      min_p: float | None = None
      repetition_penalty: float | None = None
-@@ -655,24 +655,6 @@
-         "top_k": 0,
+@@ -645,24 +645,6 @@
          "min_p": 0.0,
      }
--
+ 
 -    def to_beam_search_params(
 -        self, max_tokens: int, default_sampling_params: dict
 -    ) -> BeamSearchParams:
@@ -489,10 +498,11 @@ diff --git a/vllm/entrypoints/openai/chat_completion/protocol.py b/vllm/entrypoi
 -            length_penalty=self.length_penalty,
 -            include_stop_str_in_output=self.include_stop_str_in_output,
 -        )
- 
+-
      def extract_structured_outputs(self) -> StructuredOutputsParams | None:
          """Normalize request constraints into ``StructuredOutputsParams``."""
-@@ -840,12 +822,6 @@
+         return structured_outputs_from_response_format(
+@@ -827,12 +809,6 @@
      def check_logprobs(cls, data):
          if not isinstance(data, dict):
              return data
@@ -505,7 +515,7 @@ diff --git a/vllm/entrypoints/openai/chat_completion/protocol.py b/vllm/entrypoi
          if data.get("logprob_token_ids") and not data.get("logprobs"):
              raise VLLMValidationError(
                  "when using `logprob_token_ids`, `logprobs` must be set to true.",
-@@ -1133,7 +1109,7 @@
+@@ -1155,7 +1131,7 @@
  
      # vLLM extensions
      best_of: int | None = None
@@ -514,7 +524,7 @@ diff --git a/vllm/entrypoints/openai/chat_completion/protocol.py b/vllm/entrypoi
      top_k: int | None = None
      min_p: float | None = None
      repetition_penalty: float | None = None
-@@ -1177,12 +1153,6 @@
+@@ -1193,12 +1169,6 @@
              data = data.model_dump(exclude_unset=True)
          if not isinstance(data, dict):
              return data
@@ -640,10 +650,10 @@ diff --git a/vllm/entrypoints/openai/completion/protocol.py b/vllm/entrypoints/o
  from vllm.entrypoints.openai.engine.protocol import (
      AnyResponseFormat,
 +    BeamSearchDisabled,
+     KvScope,
      OpenAIBaseModel,
      PerRequestTimingMetrics,
-     StopParam,
-@@ -26,7 +27,6 @@
+@@ -27,7 +28,6 @@
  from vllm.logprobs import Logprob
  from vllm.renderers import TokenizeParams
  from vllm.sampling_params import (
@@ -651,7 +661,7 @@ diff --git a/vllm/entrypoints/openai/completion/protocol.py b/vllm/entrypoints/o
      FinalResponseTokenBudget,
      resolve_final_response_token_budget,
      RepetitionDetectionParams,
-@@ -73,7 +73,7 @@
+@@ -76,7 +76,7 @@
      user: str | None = None
  
      # --8<-- [start:completion-sampling-params]
@@ -660,11 +670,10 @@ diff --git a/vllm/entrypoints/openai/completion/protocol.py b/vllm/entrypoints/o
      top_k: int | None = None
      min_p: float | None = None
      repetition_penalty: float | None = None
-@@ -299,27 +299,6 @@
-         "top_k": 0,
+@@ -289,27 +289,6 @@
          "min_p": 0.0,
      }
--
+ 
 -    def to_beam_search_params(
 -        self,
 -        max_tokens: int,
@@ -685,10 +694,11 @@ diff --git a/vllm/entrypoints/openai/completion/protocol.py b/vllm/entrypoints/o
 -            length_penalty=self.length_penalty,
 -            include_stop_str_in_output=self.include_stop_str_in_output,
 -        )
- 
+-
      def extract_structured_outputs(self) -> StructuredOutputsParams | None:
          """Normalize request constraints into ``StructuredOutputsParams``."""
-@@ -494,12 +473,6 @@
+         return structured_outputs_from_response_format(
+@@ -481,12 +460,6 @@
      @model_validator(mode="before")
      @classmethod
      def check_logprobs(cls, data):
@@ -794,12 +804,10 @@ diff --git a/vllm/entrypoints/openai/engine/protocol.py b/vllm/entrypoints/opena
      ConfigDict,
      Field,
      model_serializer,
-@@ -31,6 +32,20 @@
- StopParam: TypeAlias = (
-     str | Annotated[list[str], Field(max_length=envs.VLLM_MAX_STOP_STRINGS)] | None
- )
-+
-+
+@@ -52,6 +53,20 @@
+ ]
+ 
+ 
 +def _reject_beam_search(value: Any) -> Any:
 +    if value is True:
 +        raise VLLMValidationError(
@@ -812,9 +820,11 @@ diff --git a/vllm/entrypoints/openai/engine/protocol.py b/vllm/entrypoints/opena
 +BeamSearchDisabled: TypeAlias = Annotated[
 +    Literal[False], BeforeValidator(_reject_beam_search)
 +]
- 
- 
++
++
  class OpenAIBaseModel(BaseModel):
+     # OpenAI API does allow extra fields
+     model_config = ConfigDict(extra="allow")
 diff --git a/vllm/entrypoints/scale_out/render/serving.py b/vllm/entrypoints/scale_out/render/serving.py
 --- a/vllm/entrypoints/scale_out/render/serving.py
 +++ b/vllm/entrypoints/scale_out/render/serving.py

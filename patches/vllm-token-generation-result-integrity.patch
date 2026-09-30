@@ -81,7 +81,7 @@ diff --git a/tests/entrypoints/scale_out/derender/test_terminal_metadata.py b/te
 diff --git a/tests/entrypoints/scale_out/token_in_token_out/test_generate_stream.py b/tests/entrypoints/scale_out/token_in_token_out/test_generate_stream.py
 --- a/tests/entrypoints/scale_out/token_in_token_out/test_generate_stream.py
 +++ b/tests/entrypoints/scale_out/token_in_token_out/test_generate_stream.py
-@@ -266,7 +266,7 @@
+@@ -270,7 +270,7 @@
  
  @pytest.mark.asyncio
  async def test_stream_error_mid_generation():
@@ -90,7 +90,7 @@ diff --git a/tests/entrypoints/scale_out/token_in_token_out/test_generate_stream
      engine = _mock_engine()
  
      async def mock_generate(*args, **kwargs):
-@@ -294,7 +294,7 @@
+@@ -299,7 +299,7 @@
      assert any("Internal server error" in chunk for chunk in chunks), (
          f"Expected error message in chunks: {chunks}"
      )
@@ -99,7 +99,7 @@ diff --git a/tests/entrypoints/scale_out/token_in_token_out/test_generate_stream
  
  
  @pytest.mark.asyncio
-@@ -326,7 +326,7 @@
+@@ -332,7 +332,7 @@
      assert any("Internal server error" in chunk for chunk in chunks), (
          f"Expected error message in chunks: {chunks}"
      )
@@ -108,7 +108,7 @@ diff --git a/tests/entrypoints/scale_out/token_in_token_out/test_generate_stream
  
  
  @pytest.mark.asyncio
-@@ -573,3 +573,188 @@
+@@ -585,3 +585,138 @@
      # Zero cached tokens must be present, not omitted
      assert usage_chunk["usage"]["prompt_tokens_details"] is not None
      assert usage_chunk["usage"]["prompt_tokens_details"]["cached_tokens"] == 0
@@ -130,7 +130,8 @@ diff --git a/tests/entrypoints/scale_out/token_in_token_out/test_generate_stream
 +
 +    engine.generate = MagicMock(side_effect=generate)
 +    serving = _build_serving_tokens(engine)
-+    request = GenerateRequest(token_ids=[1], sampling_params={'logprobs': 0}, stream=stream)
++    request = TokenGenerationRequest(token_ids=[1], sampling_params={'logprobs': 0},
++        stream=stream, kv_scope='agent')
 +    response = await serving.serve_tokens(request)
 +    if stream:
 +        events = _parse_sse_chunks([event async for event in response])
@@ -145,63 +146,16 @@ diff --git a/tests/entrypoints/scale_out/token_in_token_out/test_generate_stream
 +    assert choice['logprobs']['content'] == []
 +
 +
-+@pytest.mark.asyncio
 +@pytest.mark.parametrize('stream', [False, True])
-+async def test_parallel_sampling_keeps_staggered_choices_and_total_usage(stream):
-+    from types import SimpleNamespace
-+    from vllm.sampling_params import RequestOutputKind
-+    from vllm.v1.engine.parallel_sampling import ParentRequest
++def test_parallel_sampling_is_refused_before_dispatch(stream):
++    """One kv_scope names one line of work: n > 1 never reaches the engine."""
++    from vllm.exceptions import VLLMValidationError
 +
-+    engine = _mock_engine()
-+
-+    async def generate(prompt, params, request_id, **kwargs):
-+        assert params.output_kind == (
-+            RequestOutputKind.DELTA if stream else RequestOutputKind.FINAL_ONLY)
-+        parent = ParentRequest(SimpleNamespace(
-+            params=params, request_id=request_id, external_req_id=request_id))
-+        children = [parent.get_child_info(i)[0] for i in range(params.n)]
-+        steps = [(1, [81], None), (0, [90], 'stop'), (1, [82], 'length')]
-+        for index, tokens, reason in steps:
-+            if not stream and reason is None:
-+                continue
-+            if not stream and index == 1:
-+                tokens = [81, 82]
-+            res = _make_request_output(request_id, tokens, reason, index=index)
-+            res.outputs[0].stop_reason = 'final_response_token_budget' if reason == 'length' else None
-+            outputs, finished = parent.get_outputs(children[index], res.outputs[0])
-+            if outputs:
-+                res.outputs, res.finished = outputs, finished
-+                yield res
-+
-+    engine.generate = MagicMock(side_effect=generate)
-+    serving = _build_serving_tokens(engine)
-+    request = GenerateRequest(
-+        token_ids=[1, 2, 3], sampling_params={'n': 2}, stream=stream,
-+        stream_options=StreamOptions(include_usage=True, continuous_usage_stats=True))
-+    response = await serving.serve_tokens(request)
-+    if stream:
-+        events = _parse_sse_chunks([event async for event in response])
-+        assert events[-1] == '[DONE]'
-+        chunks = [event for event in events[:-1] if event['choices']]
-+        assert [event['usage']['completion_tokens'] for event in chunks] == [1, 2, 3]
-+        tokens = {i: [] for i in range(2)}
-+        terminals = {}
-+        for event in chunks:
-+            for choice in event['choices']:
-+                tokens[choice['index']].extend(choice['token_ids'])
-+                if choice['finish_reason'] is not None:
-+                    terminals[choice['index']] = (choice['finish_reason'], choice['stop_reason'])
-+        usage = events[-2]['usage']
-+    else:
-+        assert [choice.index for choice in response.choices] == [0, 1]
-+        tokens = {choice.index: choice.token_ids for choice in response.choices}
-+        terminals = {choice.index: (choice.finish_reason, choice.stop_reason) for choice in response.choices}
-+        usage = response.usage.model_dump()
-+    assert tokens == {0: [90], 1: [81, 82]}
-+    assert terminals == {0: ('stop', None), 1: ('length', 'final_response_token_budget')}
-+    assert usage['prompt_tokens'] == 3
-+    assert usage['completion_tokens'] == 3
-+    assert usage['total_tokens'] == 6
++    with pytest.raises(VLLMValidationError, match='one request per sequence') as refused:
++        TokenGenerationRequest(
++            token_ids=[1, 2, 3], sampling_params={'n': 2}, stream=stream,
++            stream_options=StreamOptions(include_usage=True), kv_scope='agent')
++    assert refused.value.parameter == 'n'
 +
 +
 +@pytest.mark.asyncio
@@ -209,14 +163,13 @@ diff --git a/tests/entrypoints/scale_out/token_in_token_out/test_generate_stream
 +@pytest.mark.parametrize('fault', [
 +    'empty_iterator', 'missing_terminal', 'missing_choice', 'missing_request_terminal',
 +    'engine_error', 'empty_engine_error', 'duplicate_choice', 'out_of_range',
-+    'after_request_terminal', 'after_choice_terminal', 'unknown_cause',
++    'after_request_terminal', 'unknown_cause',
 +    'stop_without_finish', 'missing_prompt',
 +])
 +async def test_generation_integrity_failures_are_errors_on_both_transports(stream, fault):
 +    from vllm.entrypoints.openai.engine.protocol import ErrorResponse
 +
 +    engine = _mock_engine()
-+    n = 2 if fault in ('missing_choice', 'after_choice_terminal') else 1
 +    res = _make_request_output('req', [9], 'stop', True)
 +    outputs = [res]
 +    if fault == 'empty_iterator':
@@ -224,7 +177,7 @@ diff --git a/tests/entrypoints/scale_out/token_in_token_out/test_generate_stream
 +    elif fault == 'missing_terminal':
 +        res.outputs[0].finish_reason = None
 +    elif fault == 'missing_choice':
-+        pass
++        res.outputs = []
 +    elif fault == 'missing_request_terminal':
 +        res.finished = False
 +    elif fault in ('engine_error', 'empty_engine_error'):
@@ -237,9 +190,6 @@ diff --git a/tests/entrypoints/scale_out/token_in_token_out/test_generate_stream
 +        res.outputs[0].index = 1
 +    elif fault == 'after_request_terminal':
 +        outputs.append(res)
-+    elif fault == 'after_choice_terminal':
-+        res.finished = False
-+        outputs.append(_make_request_output('req', [8], 'stop', False))
 +    elif fault == 'unknown_cause':
 +        res.outputs[0].finish_reason = 'invented'
 +    elif fault == 'stop_without_finish':
@@ -255,8 +205,8 @@ diff --git a/tests/entrypoints/scale_out/token_in_token_out/test_generate_stream
 +
 +    engine.generate = MagicMock(side_effect=generate)
 +    serving = _build_serving_tokens(engine)
-+    request = GenerateRequest(token_ids=[1], sampling_params={'n': n}, stream=stream,
-+        stream_options=StreamOptions(include_usage=True))
++    request = TokenGenerationRequest(token_ids=[1], sampling_params={}, stream=stream,
++        stream_options=StreamOptions(include_usage=True), kv_scope='agent')
 +    response = await serving.serve_tokens(request)
 +    if stream:
 +        events = _parse_sse_chunks([event async for event in response])
@@ -276,11 +226,11 @@ diff --git a/tests/entrypoints/scale_out/token_in_token_out/test_generate_stream
 +    for kind in RequestOutputKind:
 +        with pytest.raises(ValidationError, match='output_kind'):
 +            GenerateRequest(token_ids=[1], stream=stream, sampling_params={'output_kind': kind})
-+        request = GenerateRequest(token_ids=[1], stream=stream,
++        request = TokenGenerationRequest(token_ids=[1], stream=stream,
 +            sampling_params=SamplingParams(output_kind=kind), kv_scope='agent')
 +        encoded = request.model_dump_json()
 +        assert 'output_kind' not in encoded
-+        decoded = GenerateRequest.model_validate_json(encoded)
++        decoded = TokenGenerationRequest.model_validate_json(encoded)
 +        assert decoded.to_sampling_params(99, {'output_kind': kind}).output_kind == (
 +            RequestOutputKind.DELTA if stream else RequestOutputKind.FINAL_ONLY)
 +
@@ -300,7 +250,7 @@ diff --git a/tests/entrypoints/scale_out/token_in_token_out/test_generate_stream
 diff --git a/tests/entrypoints/scale_out/token_in_token_out/test_protocol.py b/tests/entrypoints/scale_out/token_in_token_out/test_protocol.py
 --- a/tests/entrypoints/scale_out/token_in_token_out/test_protocol.py
 +++ b/tests/entrypoints/scale_out/token_in_token_out/test_protocol.py
-@@ -157,7 +157,7 @@
+@@ -168,7 +168,7 @@
      assert (params.top_p, params.top_k, params.min_p) == (1.0, 0, 0.0)
  
  
@@ -309,7 +259,7 @@ diff --git a/tests/entrypoints/scale_out/token_in_token_out/test_protocol.py b/t
  def test_engine_internal_fields_are_not_request_settings(key):
      with pytest.raises(ValidationError):
          generate({key: 1})
-@@ -250,8 +250,9 @@
+@@ -261,8 +261,9 @@
      assert params.top_k == settings.get("top_k", DEFAULTS["top_k"])
      assert params.thinking_token_budget == settings.get("thinking_token_budget", 200)
      assert params.extra_args["kv_scope"] == "agent"
@@ -321,7 +271,7 @@ diff --git a/tests/entrypoints/scale_out/token_in_token_out/test_protocol.py b/t
      assert request.model_dump_json() == before
  
  
-@@ -321,7 +322,7 @@
+@@ -335,7 +336,7 @@
      assert "default" not in sampling["properties"]["max_tokens"]
      assert {"temperature", "top_p", "top_k", "thinking_token_budget",
              "final_response_token_budget", "structured_outputs"} <= sampling["properties"].keys()
@@ -333,15 +283,15 @@ diff --git a/tests/entrypoints/scale_out/token_in_token_out/test_protocol.py b/t
 diff --git a/vllm/entrypoints/scale_out/token_in_token_out/protocol.py b/vllm/entrypoints/scale_out/token_in_token_out/protocol.py
 --- a/vllm/entrypoints/scale_out/token_in_token_out/protocol.py
 +++ b/vllm/entrypoints/scale_out/token_in_token_out/protocol.py
-@@ -30,6 +30,7 @@
+@@ -34,6 +34,7 @@
  from vllm.renderers import TokenizeParams
  from vllm.sampling_params import (
      FinalResponseTokenBudget,
 +    RequestOutputKind,
      SamplingParams,
      ThinkingTokenBudget,
-     resolve_final_response_token_budget,
-@@ -88,7 +89,7 @@
+     require_kv_scope_value,
+@@ -94,7 +95,7 @@
      def __get_pydantic_core_schema__(
          cls, source_type: Any, handler: GetCoreSchemaHandler,
      ) -> core_schema.CoreSchema:
@@ -350,7 +300,7 @@ diff --git a/vllm/entrypoints/scale_out/token_in_token_out/protocol.py b/vllm/en
          hints = get_type_hints(SamplingParams)
          fields = {
              field.name: hints[field.name]
-@@ -224,6 +225,9 @@
+@@ -216,6 +217,9 @@
          """Resolve one fresh, validated engine request from supplied settings."""
          values = deepcopy({**default_sampling_params, **self.sampling_params})
          values["max_tokens"] = max_tokens
@@ -360,8 +310,8 @@ diff --git a/vllm/entrypoints/scale_out/token_in_token_out/protocol.py b/vllm/en
          values["final_response_token_budget"] = resolve_final_response_token_budget(
              self.sampling_params.get("final_response_token_budget"),
              default_sampling_params.get("final_response_token_budget"),
-@@ -250,12 +254,15 @@
-         )
+@@ -272,12 +276,15 @@
+         return params
  
  
 +GenerateFinishReason = Literal["stop", "length", "abort"]
@@ -379,7 +329,7 @@ diff --git a/vllm/entrypoints/scale_out/token_in_token_out/protocol.py b/vllm/en
      # Per-token expert routing decisions, base64-encoded ``.npy`` bytes
      # (numpy serialization). Shape after decode:
      #   (num_tokens - 1, num_layers, num_experts_per_tok) dtype uint8/uint16/int32
-@@ -270,8 +277,8 @@
+@@ -292,8 +299,8 @@
  
      @field_validator("token_ids")
      @classmethod
@@ -390,7 +340,7 @@ diff --git a/vllm/entrypoints/scale_out/token_in_token_out/protocol.py b/vllm/en
              raise ValueError("token_ids must not contain negative values")
          return v
  
-@@ -279,8 +286,9 @@
+@@ -301,8 +308,9 @@
  class GenerateResponseStreamChoice(BaseModel):
      index: int
      logprobs: ChatCompletionLogProbs | None = None
@@ -417,12 +367,10 @@ diff --git a/vllm/entrypoints/scale_out/token_in_token_out/serving.py b/vllm/ent
  from vllm.utils.collection_utils import as_list
  from vllm.utils.serial_utils import numpy2base64
  
-@@ -55,6 +55,55 @@
- )
- 
+@@ -57,6 +57,55 @@
  logger = init_logger(__name__)
-+
-+
+ 
+ 
 +class _GenerateOutputState:
 +    """Evidence for a complete engine result, shared by both transports."""
 +
@@ -470,9 +418,11 @@ diff --git a/vllm/entrypoints/scale_out/token_in_token_out/serving.py b/vllm/ent
 +    def finish(self) -> None:
 +        if not self.finished:
 +            raise GenerationError("Engine output ended before all choices completed")
- 
- 
++
++
  class ServingTokens(GenerateBaseServing):
+     """Provides Tokens IN <> Tokens OUT functionality to vLLM API."""
+ 
 @@ -212,8 +261,6 @@
  
          if self.force_no_detokenize:

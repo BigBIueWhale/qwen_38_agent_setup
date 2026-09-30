@@ -22,11 +22,21 @@ EXPECTED_STATUS=$' M tests/config/test_config_utils.py
  M tests/entrypoints/anthropic/test_anthropic_messages_conversion.py
  M tests/entrypoints/multimodal/openai/chat_completion/test_video.py
  M tests/entrypoints/multimodal/openai/chat_completion/test_vision.py
+ M tests/entrypoints/openai/chat_completion/test_chat_error.py
  M tests/entrypoints/openai/chat_completion/test_logprob_token_ids.py
+ M tests/entrypoints/openai/chat_completion/test_serving_chat.py
  M tests/entrypoints/openai/completion/test_completion.py
+ M tests/entrypoints/openai/completion/test_completion_error.py
+ M tests/entrypoints/openai/completion/test_lora_resolvers.py
+ M tests/entrypoints/openai/responses/test_function_call_parsing.py
+ M tests/entrypoints/openai/responses/test_parsable_context_unit.py
  M tests/entrypoints/openai/responses/test_responses_utils.py
+ M tests/entrypoints/openai/responses/test_sampling_params.py
  M tests/entrypoints/openai/responses/test_serving_responses.py
+ M tests/entrypoints/openai/test_reasoning_enable_thinking.py
+ M tests/entrypoints/openai/test_render_parity.py
  M tests/entrypoints/openai/test_render_token_offsets.py
+ M tests/entrypoints/openai/test_session_id.py
  M tests/entrypoints/scale_out/derender/test_derender.py
  M tests/entrypoints/scale_out/render/test_render_multimodal.py
  M tests/entrypoints/scale_out/token_in_token_out/test_generate_stream.py
@@ -58,7 +68,9 @@ EXPECTED_STATUS=$' M tests/config/test_config_utils.py
  M tests/renderers/test_hf.py
  M tests/test_request_input_bounds.py
  M tests/test_sampling_params.py
+ M tests/tool_parsers/test_poolside_v1_tool_parser.py
  M tests/tool_parsers/test_structural_tag_registry.py
+ M tests/tool_use/test_gemma4_responses_adjust_request.py
  M tests/v1/core/test_prefix_caching.py
  M tests/v1/e2e/general/test_context_length.py
  M tests/v1/engine/test_output_processor.py
@@ -95,15 +107,19 @@ EXPECTED_STATUS=$' M tests/config/test_config_utils.py
  M vllm/distributed/kv_transfer/kv_connector/v1/offloading/config.py
  M vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py
  M vllm/engine/arg_utils.py
+ M vllm/engine/protocol.py
  M vllm/entrypoints/anthropic/api_router.py
  M vllm/entrypoints/anthropic/protocol.py
  M vllm/entrypoints/anthropic/serving.py
  M vllm/entrypoints/chat_utils.py
  M vllm/entrypoints/generate/api_router.py
  M vllm/entrypoints/llm.py
+ M vllm/entrypoints/openai/chat_completion/api_router.py
+ M vllm/entrypoints/openai/chat_completion/batch_serving.py
  M vllm/entrypoints/openai/chat_completion/protocol.py
  M vllm/entrypoints/openai/chat_completion/serving.py
  M vllm/entrypoints/openai/cli_args.py
+ M vllm/entrypoints/openai/completion/api_router.py
  M vllm/entrypoints/openai/completion/protocol.py
  M vllm/entrypoints/openai/completion/serving.py
  M vllm/entrypoints/openai/engine/protocol.py
@@ -112,8 +128,10 @@ EXPECTED_STATUS=$' M tests/config/test_config_utils.py
  M vllm/entrypoints/openai/responses/serving.py
  M vllm/entrypoints/openai/responses/streaming_events.py
  M vllm/entrypoints/openai/responses/utils.py
+ M vllm/entrypoints/openai/run_batch.py
  M vllm/entrypoints/scale_out/derender/serving.py
  M vllm/entrypoints/scale_out/render/serving.py
+ M vllm/entrypoints/scale_out/token_in_token_out/api_router.py
  D vllm/entrypoints/scale_out/token_in_token_out/mm_serde.py
  M vllm/entrypoints/scale_out/token_in_token_out/protocol.py
  M vllm/entrypoints/scale_out/token_in_token_out/serving.py
@@ -196,11 +214,14 @@ EXPECTED_STATUS=$' M tests/config/test_config_utils.py
 ?? tests/entrypoints/scale_out/derender/test_terminal_metadata.py
 ?? tests/entrypoints/scale_out/token_in_token_out/test_raw_images.py
 ?? tests/entrypoints/scale_out/token_in_token_out/test_raw_media_boundary.py
+?? tests/entrypoints/test_generation_admission.py
 ?? tests/entrypoints/test_kv_scope_protocol.py
 ?? tests/parser/engine/test_qwen_terminal_authority.py
 ?? tests/parser/engine/test_qwen_xml_fidelity.py
 ?? tests/parser/engine/test_reasoning_token_count.py
 ?? tests/v1/core/test_kv_cache_users_sizing.py
+?? tests/v1/engine/test_async_llm_admission.py
+?? tests/v1/engine/test_kv_scope_single_flight.py
 ?? tests/v1/worker/test_workspace.py
 ?? vllm/v1/structured_output/stop_checker.py'
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
@@ -296,6 +317,8 @@ EXACT_REASONING_USAGE_PATCH_FILE="${PROJECT_DIR}/patches/vllm-exact-reasoning-us
 CANONICAL_FRAMING_PATCH_FILE="${PROJECT_DIR}/patches/vllm-qwen-canonical-parameter-framing.patch"
 QWEN_OWNED_GRAMMAR_PATCH_FILE="${PROJECT_DIR}/patches/vllm-qwen-owned-tool-grammar.patch"
 QWEN_UNIQUE_PARAMETERS_PATCH_FILE="${PROJECT_DIR}/patches/vllm-qwen-unique-tool-parameters.patch"
+GENERATION_ADMISSION_PATCH_FILE="${PROJECT_DIR}/patches/vllm-generation-admission-before-response.patch"
+KV_SCOPE_SINGLE_FLIGHT_PATCH_FILE="${PROJECT_DIR}/patches/vllm-kv-scope-single-flight.patch"
 
 TURBOQUANT_REL="vllm/v1/attention/backends/turboquant_attn.py"
 TOOL_SCHEMA_REL="vllm/tool_parsers/structural_tag_registry.py"
@@ -519,7 +542,9 @@ printf '%s  %s\n' \
   "${EXACT_REASONING_USAGE_PATCH_DIFF_SHA256}" "${EXACT_REASONING_USAGE_PATCH_FILE}" \
   "${CANONICAL_FRAMING_PATCH_DIFF_SHA256}" "${CANONICAL_FRAMING_PATCH_FILE}" \
   "${QWEN_OWNED_GRAMMAR_PATCH_DIFF_SHA256}" "${QWEN_OWNED_GRAMMAR_PATCH_FILE}" \
-  "${QWEN_UNIQUE_PARAMETERS_PATCH_DIFF_SHA256}" "${QWEN_UNIQUE_PARAMETERS_PATCH_FILE}" | \
+  "${QWEN_UNIQUE_PARAMETERS_PATCH_DIFF_SHA256}" "${QWEN_UNIQUE_PARAMETERS_PATCH_FILE}" \
+  "${GENERATION_ADMISSION_PATCH_DIFF_SHA256}" "${GENERATION_ADMISSION_PATCH_FILE}" \
+  "${KV_SCOPE_SINGLE_FLIGHT_PATCH_DIFF_SHA256}" "${KV_SCOPE_SINGLE_FLIGHT_PATCH_FILE}" | \
   sha256sum --check --strict
 
 printf '%s  %s\n' \
@@ -769,6 +794,15 @@ printf '%s  %s\n' \
 printf '%s  %s\n' \
   "${COMPLETION_SERVING_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/entrypoints/openai/completion/serving.py" \
   "${RENDER_SERVING_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/entrypoints/scale_out/render/serving.py" \
+  | sha256sum --check --strict
+
+printf '%s  %s\n' \
+  "${CHAT_API_ROUTER_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/entrypoints/openai/chat_completion/api_router.py" \
+  "${CHAT_BATCH_SERVING_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/entrypoints/openai/chat_completion/batch_serving.py" \
+  "${COMPLETION_API_ROUTER_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/entrypoints/openai/completion/api_router.py" \
+  "${TITOTO_API_ROUTER_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/entrypoints/scale_out/token_in_token_out/api_router.py" \
+  "${RUN_BATCH_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/entrypoints/openai/run_batch.py" \
+  "${ENGINE_CLIENT_PROTOCOL_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/engine/protocol.py" \
   | sha256sum --check --strict
 
 printf '%s  %s\n' \
@@ -1121,6 +1155,18 @@ docker buildx build --progress=plain \
   --build-arg "GENERATE_RESULT_PATCH_DIFF_SHA256=${GENERATE_RESULT_PATCH_DIFF_SHA256}" \
   --build-arg "COMPLETION_SERVING_UPSTREAM_FILE_SHA256=${COMPLETION_SERVING_UPSTREAM_FILE_SHA256}" \
   --build-arg "COMPLETION_SERVING_PATCHED_FILE_SHA256=${COMPLETION_SERVING_PATCHED_FILE_SHA256}" \
+  --build-arg "CHAT_API_ROUTER_UPSTREAM_FILE_SHA256=${CHAT_API_ROUTER_UPSTREAM_FILE_SHA256}" \
+  --build-arg "CHAT_API_ROUTER_PATCHED_FILE_SHA256=${CHAT_API_ROUTER_PATCHED_FILE_SHA256}" \
+  --build-arg "CHAT_BATCH_SERVING_UPSTREAM_FILE_SHA256=${CHAT_BATCH_SERVING_UPSTREAM_FILE_SHA256}" \
+  --build-arg "CHAT_BATCH_SERVING_PATCHED_FILE_SHA256=${CHAT_BATCH_SERVING_PATCHED_FILE_SHA256}" \
+  --build-arg "COMPLETION_API_ROUTER_UPSTREAM_FILE_SHA256=${COMPLETION_API_ROUTER_UPSTREAM_FILE_SHA256}" \
+  --build-arg "COMPLETION_API_ROUTER_PATCHED_FILE_SHA256=${COMPLETION_API_ROUTER_PATCHED_FILE_SHA256}" \
+  --build-arg "TITOTO_API_ROUTER_UPSTREAM_FILE_SHA256=${TITOTO_API_ROUTER_UPSTREAM_FILE_SHA256}" \
+  --build-arg "TITOTO_API_ROUTER_PATCHED_FILE_SHA256=${TITOTO_API_ROUTER_PATCHED_FILE_SHA256}" \
+  --build-arg "RUN_BATCH_UPSTREAM_FILE_SHA256=${RUN_BATCH_UPSTREAM_FILE_SHA256}" \
+  --build-arg "RUN_BATCH_PATCHED_FILE_SHA256=${RUN_BATCH_PATCHED_FILE_SHA256}" \
+  --build-arg "ENGINE_CLIENT_PROTOCOL_UPSTREAM_FILE_SHA256=${ENGINE_CLIENT_PROTOCOL_UPSTREAM_FILE_SHA256}" \
+  --build-arg "ENGINE_CLIENT_PROTOCOL_PATCHED_FILE_SHA256=${ENGINE_CLIENT_PROTOCOL_PATCHED_FILE_SHA256}" \
   --build-arg "RENDER_SERVING_UPSTREAM_FILE_SHA256=${RENDER_SERVING_UPSTREAM_FILE_SHA256}" \
   --build-arg "RENDER_SERVING_PATCHED_FILE_SHA256=${RENDER_SERVING_PATCHED_FILE_SHA256}" \
   --build-arg "SAMPLING_BOUNDARY_PATCH_DIFF_SHA256=${SAMPLING_BOUNDARY_PATCH_DIFF_SHA256}" \
@@ -1256,6 +1302,12 @@ actual_installed_report="$(
     /usr/local/lib/python3.12/dist-packages/vllm/renderers/base.py \
     /usr/local/lib/python3.12/dist-packages/vllm/renderers/online_derenderer.py \
     /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/completion/serving.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/chat_completion/api_router.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/chat_completion/batch_serving.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/completion/api_router.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/scale_out/token_in_token_out/api_router.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/run_batch.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/engine/protocol.py \
     /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/scale_out/render/serving.py \
     /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/responses/context.py \
     /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/responses/protocol.py \
@@ -1318,6 +1370,12 @@ expected_installed_report="$(printf '%s  %s\n' \
   "${BASE_RENDERER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/renderers/base.py \
   "${ONLINE_DERENDERER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/renderers/online_derenderer.py \
   "${COMPLETION_SERVING_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/completion/serving.py \
+  "${CHAT_API_ROUTER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/chat_completion/api_router.py \
+  "${CHAT_BATCH_SERVING_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/chat_completion/batch_serving.py \
+  "${COMPLETION_API_ROUTER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/completion/api_router.py \
+  "${TITOTO_API_ROUTER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/scale_out/token_in_token_out/api_router.py \
+  "${RUN_BATCH_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/run_batch.py \
+  "${ENGINE_CLIENT_PROTOCOL_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/engine/protocol.py \
   "${RENDER_SERVING_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/scale_out/render/serving.py \
   "${RESPONSES_CONTEXT_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/responses/context.py \
   "${RESPONSES_PROTOCOL_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/responses/protocol.py \

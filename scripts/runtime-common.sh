@@ -752,6 +752,12 @@ assert_running_profile() {
       /usr/local/lib/python3.12/dist-packages/vllm/renderers/base.py \
       /usr/local/lib/python3.12/dist-packages/vllm/renderers/online_derenderer.py \
       /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/completion/serving.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/chat_completion/api_router.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/chat_completion/batch_serving.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/completion/api_router.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/scale_out/token_in_token_out/api_router.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/run_batch.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/engine/protocol.py \
       /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/scale_out/render/serving.py \
       /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/responses/context.py \
       /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/responses/protocol.py \
@@ -814,6 +820,12 @@ assert_running_profile() {
     "${BASE_RENDERER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/renderers/base.py \
     "${ONLINE_DERENDERER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/renderers/online_derenderer.py \
     "${COMPLETION_SERVING_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/completion/serving.py \
+    "${CHAT_API_ROUTER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/chat_completion/api_router.py \
+    "${CHAT_BATCH_SERVING_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/chat_completion/batch_serving.py \
+    "${COMPLETION_API_ROUTER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/completion/api_router.py \
+    "${TITOTO_API_ROUTER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/scale_out/token_in_token_out/api_router.py \
+    "${RUN_BATCH_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/run_batch.py \
+    "${ENGINE_CLIENT_PROTOCOL_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/engine/protocol.py \
     "${RENDER_SERVING_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/scale_out/render/serving.py \
     "${RESPONSES_CONTEXT_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/responses/context.py \
     "${RESPONSES_PROTOCOL_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/responses/protocol.py \

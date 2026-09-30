@@ -1,8 +1,7 @@
 diff --git a/tests/entrypoints/anthropic/test_anthropic_messages_conversion.py b/tests/entrypoints/anthropic/test_anthropic_messages_conversion.py
 --- a/tests/entrypoints/anthropic/test_anthropic_messages_conversion.py
 +++ b/tests/entrypoints/anthropic/test_anthropic_messages_conversion.py
-@@ -1604,10 +1604,10 @@
- 
+@@ -1608,8 +1608,8 @@
      @pytest.mark.parametrize(
          ("exc", "status", "error_type"),
          [
@@ -13,9 +12,7 @@ diff --git a/tests/entrypoints/anthropic/test_anthropic_messages_conversion.py b
              (
                  VLLMValidationError("kv_scope is required", parameter="kv_scope"),
                  400,
-                 "invalid_request_error",
-@@ -1621,11 +1621,9 @@
-     @pytest.mark.parametrize("stream", [False, True])
+@@ -1625,9 +1625,7 @@
      def test_a_refusal_is_classified_as_the_openai_surface_classifies_it(
          self, route, stream, exc, status, error_type
      ):
@@ -26,9 +23,7 @@ diff --git a/tests/entrypoints/anthropic/test_anthropic_messages_conversion.py b
          app = self._make_api_app(exc)
          with TestClient(app, raise_server_exceptions=False) as client:
              response = client.post(route, json=self._body | {"stream": stream})
- 
-@@ -1690,35 +1688,80 @@
- 
+@@ -1694,25 +1692,31 @@
      @pytest.mark.parametrize("route", ["/v1/messages", "/v1/messages/count_tokens"])
      @pytest.mark.parametrize("stream", [False, True])
      @pytest.mark.parametrize("gate", ["template", "image", "length"])
@@ -67,13 +62,10 @@ diff --git a/tests/entrypoints/anthropic/test_anthropic_messages_conversion.py b
                  )
  
          app = self._make_api_app(reject)
-         with TestClient(app, raise_server_exceptions=False) as client:
-             response = client.post(route, json=self._body | {"stream": stream})
-         assert response.status_code == 400
-         assert response.json()["error"]["type"] == "invalid_request_error"
+@@ -1723,6 +1727,45 @@
          assert response.headers["content-type"] == "application/json"
-+
-+
+ 
+ 
 +@pytest.fixture(scope="module")
 +def refusal_tokenizer():
 +    from tokenizers import Tokenizer, models
@@ -111,10 +103,11 @@ diff --git a/tests/entrypoints/anthropic/test_anthropic_messages_conversion.py b
 +    class TemplateError(Exception):
 +        pass
 +    assert create_error_response(TemplateError("server bug")).error.code == 500
- 
- 
++
++
  class TestAnthropicTerminalMetadata:
      @pytest.mark.asyncio
+     @pytest.mark.parametrize(
 diff --git a/tests/entrypoints/serve/exception_handling/test_http_status_metrics.py b/tests/entrypoints/serve/exception_handling/test_http_status_metrics.py
 --- a/tests/entrypoints/serve/exception_handling/test_http_status_metrics.py
 +++ b/tests/entrypoints/serve/exception_handling/test_http_status_metrics.py
@@ -866,7 +859,7 @@ diff --git a/vllm/renderers/hf.py b/vllm/renderers/hf.py
 diff --git a/tests/entrypoints/scale_out/token_in_token_out/test_raw_images.py b/tests/entrypoints/scale_out/token_in_token_out/test_raw_images.py
 --- a/tests/entrypoints/scale_out/token_in_token_out/test_raw_images.py
 +++ b/tests/entrypoints/scale_out/token_in_token_out/test_raw_images.py
-@@ -232,7 +232,7 @@
+@@ -239,7 +239,7 @@
      serving, dispatched = serving_tokens(image_model, AsyncMock())
      req = request(stream=stream, content_parts=[
          {'type': 'image_url', 'image_url': {'url': PNG}}])

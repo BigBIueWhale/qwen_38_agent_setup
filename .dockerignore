@@ -127,6 +127,12 @@
 !vllm/vllm/v1/kv_offload/cpu/common.py
 !scripts/shared_prefix_cache_unit.py
 !vllm/vllm/entrypoints/openai/completion/serving.py
+!vllm/vllm/entrypoints/openai/chat_completion/api_router.py
+!vllm/vllm/entrypoints/openai/chat_completion/batch_serving.py
+!vllm/vllm/entrypoints/openai/completion/api_router.py
+!vllm/vllm/entrypoints/scale_out/token_in_token_out/api_router.py
+!vllm/vllm/entrypoints/openai/run_batch.py
+!vllm/vllm/engine/protocol.py
 !vllm/vllm/entrypoints/scale_out/render/
 !vllm/vllm/entrypoints/scale_out/render/serving.py
 !vllm/vllm/renderers/online_derenderer.py

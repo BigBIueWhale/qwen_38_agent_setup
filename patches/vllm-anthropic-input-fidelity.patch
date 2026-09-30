@@ -25,16 +25,16 @@ diff --git a/tests/entrypoints/anthropic/test_anthropic_messages_conversion.py b
      DeltaFunctionCall,
      DeltaMessage,
      DeltaToolCall,
-@@ -47,6 +50,8 @@
- from vllm.entrypoints.serve.exception_handling.handlers.validation import (
+@@ -48,6 +51,8 @@
      validation_exception_handler,
  )
-+
-+from vllm.exceptions import VLLMValidationError
  
++from vllm.exceptions import VLLMValidationError
++
  _convert = AnthropicServingMessages._convert_anthropic_to_openai_request
  _img_url = AnthropicServingMessages._convert_image_source_to_url
-@@ -93,25 +98,28 @@
+ 
+@@ -94,25 +99,28 @@
          }
          assert _img_url(source) == "https://example.com/image.jpg"
  
@@ -46,27 +46,24 @@ diff --git a/tests/entrypoints/anthropic/test_anthropic_messages_conversion.py b
              "data": "UklGR",
          }
 -        assert _img_url(source) == "data:image/webp;base64,UklGR"
--
--    def test_missing_media_type_defaults_to_jpeg(self):
 +        with pytest.raises(VLLMValidationError):
 +            _img_url(source)
-+
+ 
+-    def test_missing_media_type_defaults_to_jpeg(self):
 +    def test_missing_media_type_is_refused(self):
          source = {"type": "base64", "data": "abc123"}
 -        assert _img_url(source) == "data:image/jpeg;base64,abc123"
--
--    def test_url_source_missing_url_returns_empty(self):
 +        with pytest.raises(VLLMValidationError):
 +            _img_url(source)
-+
+ 
+-    def test_url_source_missing_url_returns_empty(self):
 +    def test_url_source_missing_url_is_refused(self):
          source = {"type": "url"}
 -        assert _img_url(source) == ""
--
--    def test_empty_source_returns_data_uri_shell(self):
 +        with pytest.raises(VLLMValidationError):
 +            _img_url(source)
-+
+ 
+-    def test_empty_source_returns_data_uri_shell(self):
 +    def test_empty_source_is_refused(self):
          source: dict = {}
 -        assert _img_url(source) == "data:image/jpeg;base64,"
@@ -75,7 +72,7 @@ diff --git a/tests/entrypoints/anthropic/test_anthropic_messages_conversion.py b
  
  
  # ======================================================================
-@@ -1440,3 +1448,274 @@
+@@ -1442,3 +1450,275 @@
  
          assert response.status_code == HTTPStatus.BAD_REQUEST
          handler.create_messages.assert_not_awaited()
@@ -232,6 +229,7 @@ diff --git a/tests/entrypoints/anthropic/test_anthropic_messages_conversion.py b
 +        "model": "test-model",
 +        "max_tokens": 1,
 +        "messages": [{"role": "user", "content": "Hello"}],
++        "kv_scope": "agent",
 +    }
 +
 +    @pytest.mark.parametrize(
@@ -580,8 +578,8 @@ diff --git a/vllm/entrypoints/anthropic/api_router.py b/vllm/entrypoints/anthrop
 diff --git a/vllm/entrypoints/anthropic/protocol.py b/vllm/entrypoints/anthropic/protocol.py
 --- a/vllm/entrypoints/anthropic/protocol.py
 +++ b/vllm/entrypoints/anthropic/protocol.py
-@@ -10,6 +10,44 @@
- import vllm.envs as envs
+@@ -12,6 +12,44 @@
+ from vllm.sampling_params import require_kv_scope_value
  
  
 +ANTHROPIC_API_PATH_PREFIX = "/v1/messages"
@@ -625,11 +623,10 @@ diff --git a/vllm/entrypoints/anthropic/protocol.py b/vllm/entrypoints/anthropic
  class AnthropicError(BaseModel):
      """Error structure for Anthropic API"""
  
-@@ -22,6 +60,16 @@
- 
+@@ -25,6 +63,16 @@
      type: Literal["error"] = "error"
      error: AnthropicError
-+
+ 
 +    @classmethod
 +    def for_status(cls, status_code: int, message: str) -> "AnthropicErrorResponse":
 +        """The envelope for a refusal already classified by HTTP status."""
@@ -639,9 +636,10 @@ diff --git a/vllm/entrypoints/anthropic/protocol.py b/vllm/entrypoints/anthropic
 +                message=message,
 +            )
 +        )
- 
++
  
  class AnthropicUsage(BaseModel):
+     """Token usage information"""
 diff --git a/vllm/entrypoints/anthropic/serving.py b/vllm/entrypoints/anthropic/serving.py
 --- a/vllm/entrypoints/anthropic/serving.py
 +++ b/vllm/entrypoints/anthropic/serving.py
@@ -653,7 +651,7 @@ diff --git a/vllm/entrypoints/anthropic/serving.py b/vllm/entrypoints/anthropic/
      AnthropicMessagesRequest,
      AnthropicMessagesResponse,
      AnthropicOutputConfig,
-@@ -48,9 +49,13 @@
+@@ -49,10 +50,14 @@
  from vllm.entrypoints.openai.models.serving import OpenAIServingModels
  from vllm.entrypoints.serve.exception_handling.utils import sanitize_message
  from vllm.entrypoints.serve.utils.request_logger import RequestLogger
@@ -661,13 +659,14 @@ diff --git a/vllm/entrypoints/anthropic/serving.py b/vllm/entrypoints/anthropic/
  from vllm.renderers.online_renderer import OnlineRenderer
  
  logger = logging.getLogger(__name__)
-+
+ 
 +# State the caller's error flag in the rendered tool result.
 +TOOL_RESULT_ERROR_LINE = "Tool result flagged is_error: true."
- 
++
  
  def _build_anthropic_usage(
-@@ -170,7 +175,7 @@
+     usage: UsageInfo | None,
+@@ -171,7 +176,7 @@
              return True
  
      @staticmethod
@@ -676,7 +675,7 @@ diff --git a/vllm/entrypoints/anthropic/serving.py b/vllm/entrypoints/anthropic/
          """Convert an Anthropic image source to an OpenAI-compatible URL.
  
          Anthropic supports two image source types:
-@@ -180,15 +185,35 @@
+@@ -181,15 +186,35 @@
          For base64 sources, this constructs a proper data URI that
          downstream processors (e.g. vLLM's media connector) can handle.
          """
@@ -721,7 +720,7 @@ diff --git a/vllm/entrypoints/anthropic/serving.py b/vllm/entrypoints/anthropic/
  
      @classmethod
      def _convert_anthropic_to_openai_request(
-@@ -353,9 +378,10 @@
+@@ -354,9 +379,10 @@
          """Convert individual content block"""
          if block.type == "text" and block.text:
              content_parts.append({"type": "text", "text": block.text})
@@ -735,7 +734,7 @@ diff --git a/vllm/entrypoints/anthropic/serving.py b/vllm/entrypoints/anthropic/
          elif block.type == "thinking" and block.thinking is not None:
              reasoning_parts.append(block.thinking)
          elif block.type == "redacted_thinking":
-@@ -413,39 +439,62 @@
+@@ -414,40 +440,63 @@
          appears inside the originating ``<tool_response>``.  Moving images to a
          synthetic later user message changes the trained prompt structure,
          multimodal marker positions, and prefix-cache identity.
@@ -804,16 +803,17 @@ diff --git a/vllm/entrypoints/anthropic/serving.py b/vllm/entrypoints/anthropic/
 +                        parameter="messages",
 +                    )
              tool_text = "\n".join(text_parts)
-+
+ 
 +        if block.is_error:
 +            tool_content_parts.insert(
 +                0, {"type": "text", "text": TOOL_RESULT_ERROR_LINE}
 +            )
 +            tool_text = "\n".join(filter(None, (TOOL_RESULT_ERROR_LINE, tool_text)))
- 
++
          openai_messages.append(
              {
-@@ -803,9 +852,15 @@
+                 "role": "tool",
+@@ -804,9 +853,15 @@
                          )
                          yield wrap_data_with_event(data, "message_stop")
                      else:
@@ -832,7 +832,7 @@ diff --git a/vllm/entrypoints/anthropic/serving.py b/vllm/entrypoints/anthropic/
  
                          if first_item:
                              chunk = AnthropicStreamEvent(
-@@ -991,7 +1046,7 @@
+@@ -992,7 +1047,7 @@
                      error_response = AnthropicStreamEvent(
                          type="error",
                          error=AnthropicError(
@@ -841,7 +841,7 @@ diff --git a/vllm/entrypoints/anthropic/serving.py b/vllm/entrypoints/anthropic/
                              message="Invalid data format received",
                          ),
                      )
-@@ -1003,7 +1058,7 @@
+@@ -1004,7 +1059,7 @@
              error_response = AnthropicStreamEvent(
                  type="error",
                  error=AnthropicError(

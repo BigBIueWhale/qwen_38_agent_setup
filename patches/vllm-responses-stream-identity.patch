@@ -18,7 +18,7 @@ diff --git a/tests/entrypoints/openai/responses/test_serving_responses.py b/test
  
  
  class MockConversationContext(ConversationContext):
-@@ -355,10 +356,17 @@
+@@ -357,11 +358,18 @@
  
      class FakeTokenizer:
          def __init__(self):
@@ -30,14 +30,15 @@ diff --git a/tests/entrypoints/openai/responses/test_serving_responses.py b/test
  
          def get_vocab(self):
              return self._vocab
-+
+ 
 +        def decode(self, token_ids, **kwargs):
 +            pieces = {token_id: piece for piece, token_id in self._vocab.items()}
 +            return "".join(pieces[token_id] for token_id in token_ids)
- 
++
      # Force non-harmony, SimpleContext path
      monkeypatch.setattr(envs, "VLLM_USE_EXPERIMENTAL_PARSER_CONTEXT", False)
-@@ -396,7 +404,7 @@
+ 
+@@ -398,7 +406,7 @@
  
      # Build a SimpleContext with thinking tokens in the output.
      context = SimpleContext(response_parser=response_parser)
@@ -46,7 +47,7 @@ diff --git a/tests/entrypoints/openai/responses/test_serving_responses.py b/test
      completion = CompletionOutput(
          index=0,
          text="<think>reason</think>final",
-@@ -433,7 +441,8 @@
+@@ -435,7 +443,8 @@
          request_metadata=metadata,
      )
  
@@ -56,7 +57,7 @@ diff --git a/tests/entrypoints/openai/responses/test_serving_responses.py b/test
  
  
  class TestExtractAllowedToolsFromMcpRequests:
-@@ -1232,3 +1241,115 @@
+@@ -1235,3 +1244,116 @@
          assert len(function_done) == 1
          assert function_done[0].item.name == "get_weather"
          assert function_done[0].item.arguments == tool_args
@@ -103,7 +104,7 @@ diff --git a/tests/entrypoints/openai/responses/test_serving_responses.py b/test
 +            ))
 +            yield context
 +
-+    request = ResponsesRequest(input="question", tools=[], stream=True)
++    request = ResponsesRequest(input="question", tools=[], stream=True, kv_scope="agent")
 +    events = [event async for event in serving.responses_stream_generator(
 +        request, SamplingParams(max_tokens=20), outputs(), context, "model",
 +        MagicMock(), RequestResponseMetadata(request_id="req"), created_time=123,
@@ -159,6 +160,7 @@ diff --git a/tests/entrypoints/openai/responses/test_serving_responses.py b/test
 +
 +    request = ResponsesRequest(
 +        input="q", stream=stream, include=["message.output_text.logprobs"],
++        kv_scope="agent",
 +    )
 +    args = (request, SamplingParams(max_tokens=20), outputs(), context, "model",
 +            MagicMock(), RequestResponseMetadata(request_id="req"))
