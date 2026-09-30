@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Exercise exact-sized long-context retrieval against a local vLLM API.
 
-This script runs inside the network-isolated serving container, launched as
-one agent by the probe launcher:
+This script runs inside the network-isolated serving container, launched by
+the probe launcher; each target is its own single-turn conversation with its
+own agent ID:
 
     ./scripts/run-probe.sh long_context_probe.py --targets 32768 131072 261120
 
@@ -20,7 +21,7 @@ import time
 import urllib.error
 import urllib.request
 
-from probe_scope import KV_SCOPE
+from probe_scope import new_conversation
 
 DEFAULT_URL = "http://127.0.0.1:8000"
 DEFAULT_MODEL = "qwen3.8-27b-nvfp4-k8v4"
@@ -160,7 +161,7 @@ def run_probe(
         "model": model,
         "messages": messages,
         "max_tokens": max_tokens,
-        "kv_scope": KV_SCOPE,
+        "kv_scope": new_conversation(f"target-{target}"),
     }
     started = time.monotonic()
     response = post_json(

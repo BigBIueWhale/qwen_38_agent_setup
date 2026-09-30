@@ -34,7 +34,7 @@ from vllm.entrypoints.openai.chat_completion.protocol import (
 from vllm.parser.qwen3 import Qwen3Parser
 from vllm.tokenizers.detokenizer_utils import detokenize_incrementally
 
-from probe_scope import KV_SCOPE
+from probe_scope import new_conversation
 
 
 MODEL = "qwen3.8-27b-nvfp4-k8v4"
@@ -482,7 +482,7 @@ def synthetic_roundtrip(tokenizer: Any) -> dict[str, Any]:
     }
 
 
-def live_call_payload(stream: bool) -> dict[str, Any]:
+def live_call_payload(stream: bool, kv_scope: str) -> dict[str, Any]:
     return {
         "model": MODEL,
         "messages": [
@@ -501,7 +501,7 @@ def live_call_payload(stream: bool) -> dict[str, Any]:
         "max_tokens": 1_024,
         "stream": stream,
         "return_prompt_text": True,
-        "kv_scope": KV_SCOPE,
+        "kv_scope": kv_scope,
         **({"stream_options": {"include_usage": True}} if stream else {}),
     }
 
@@ -524,7 +524,9 @@ def validate_live_call(message: dict[str, Any], finish_reason: str | None) -> No
 
 
 def live_stream_nonstream() -> dict[str, Any]:
-    nonstream = post_json("/v1/chat/completions", live_call_payload(False))
+    # The streamed request redraws the same turn, so both are one conversation.
+    scope = new_conversation("live-tool-call")
+    nonstream = post_json("/v1/chat/completions", live_call_payload(False, scope))
     nonstream_choice = nonstream["choices"][0]
     nonstream_message = nonstream_choice["message"]
     validate_live_call(nonstream_message, nonstream_choice.get("finish_reason"))
@@ -541,7 +543,7 @@ def live_stream_nonstream() -> dict[str, Any]:
     stream_finish = None
     stream_prompt = None
     saw_done = False
-    for event in iter_sse("/v1/chat/completions", live_call_payload(True)):
+    for event in iter_sse("/v1/chat/completions", live_call_payload(True, scope)):
         if event == "[DONE]":
             saw_done = True
             continue
@@ -578,7 +580,7 @@ def live_stream_nonstream() -> dict[str, Any]:
     for message in (nonstream_message, stream_message):
         call = message["tool_calls"][0]
         history = [
-            *live_call_payload(False)["messages"],
+            *live_call_payload(False, scope)["messages"],
             {
                 "role": "assistant",
                 "content": message.get("content") or None,

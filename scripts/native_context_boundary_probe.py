@@ -18,7 +18,7 @@ from typing import Any
 
 from transformers import AutoTokenizer
 
-from probe_scope import KV_SCOPE
+from probe_scope import new_conversation
 
 
 MODEL = "qwen3.8-27b-nvfp4-k8v4"
@@ -175,7 +175,7 @@ def main() -> None:
             "messages": accepted_messages,
             "max_tokens": 1,
             "cache_salt": f"{args.salt}-accepted-cache",
-            "kv_scope": KV_SCOPE,
+            "kv_scope": new_conversation("accepted-boundary"),
         },
         timeout=3_600,
     )
@@ -200,7 +200,7 @@ def main() -> None:
             "messages": rejected_messages,
             "max_tokens": 1,
             "cache_salt": f"{args.salt}-rejected-cache",
-            "kv_scope": KV_SCOPE,
+            "kv_scope": new_conversation("rejected-boundary"),
         },
         timeout=300,
     )

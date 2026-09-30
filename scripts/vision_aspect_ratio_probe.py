@@ -13,7 +13,7 @@ from typing import Any
 from PIL import Image, ImageDraw, ImageFont
 from transformers import AutoTokenizer
 
-from probe_scope import KV_SCOPE
+from probe_scope import new_conversation
 from vision_quality_probe import IMAGE_PIXELS, MODEL, post_json
 
 
@@ -281,7 +281,10 @@ def main() -> None:
                 f"{image.width}x{image.height}"
             ),
             "stream": False,
-            "kv_scope": KV_SCOPE,
+            # Each shape is a fresh, independent single-turn conversation.
+            "kv_scope": new_conversation(
+                f"shape-{index}-{image.width}x{image.height}"
+            ),
         }
         started = time.monotonic()
         status, response = post_json(

@@ -8,6 +8,9 @@ rendered prompt, and legacy `reasoning_content` on Chat Completions ingress
 must normalize to the canonical `reasoning` field with identical token
 accounting. Effort aliasing, weaker-mode rejection, and both phase-budget
 gates are asserted on single-turn requests.
+
+Every generation request here stands alone -- no request continues another's
+history -- so each carries its own new agent ID.
 """
 
 from __future__ import annotations
@@ -17,7 +20,7 @@ import json
 import urllib.error
 import urllib.request
 
-from probe_scope import KV_SCOPE
+from probe_scope import new_conversation
 
 
 BASE_URL = "http://127.0.0.1:8000"
@@ -64,12 +67,12 @@ def tokenize(messages: list[dict], **template_kwargs) -> dict:
     return response
 
 
-def chat_prompt_tokens(messages: list[dict], **template_kwargs) -> int:
+def chat_prompt_tokens(messages: list[dict], label: str, **template_kwargs) -> int:
     payload: dict = {
         "model": MODEL,
         "messages": messages,
         "max_tokens": 1,
-        "kv_scope": KV_SCOPE,
+        "kv_scope": new_conversation(label),
     }
     if template_kwargs:
         payload["chat_template_kwargs"] = template_kwargs
@@ -119,9 +122,9 @@ def main() -> None:
         },
         history[2],
     ]
-    canonical_tokens = chat_prompt_tokens(history)
-    legacy_tokens = chat_prompt_tokens(legacy_history)
-    stripped_tokens = chat_prompt_tokens(stripped_history)
+    canonical_tokens = chat_prompt_tokens(history, "canonical-reasoning-history")
+    legacy_tokens = chat_prompt_tokens(legacy_history, "legacy-reasoning-history")
+    stripped_tokens = chat_prompt_tokens(stripped_history, "stripped-history")
     if legacy_tokens != canonical_tokens:
         raise RuntimeError(
             "Chat Completions did not normalize legacy reasoning_content to "
@@ -145,12 +148,16 @@ def main() -> None:
         "model": MODEL,
         "messages": simple,
         "max_tokens": 128,
-        "kv_scope": KV_SCOPE,
     }
-    openai_low = dict(openai_base, reasoning_effort="low")
+    openai_low = dict(
+        openai_base,
+        reasoning_effort="low",
+        kv_scope=new_conversation("openai-low-effort"),
+    )
     openai_disabled = dict(
         openai_base,
         chat_template_kwargs={"enable_thinking": False},
+        kv_scope=new_conversation("openai-thinking-disabled"),
     )
     openai_low_status = require_rejected(
         "/v1/chat/completions", openai_low, "only xhigh"
@@ -163,16 +170,23 @@ def main() -> None:
         "model": MODEL,
         "messages": simple,
         "max_tokens": 128,
-        "kv_scope": KV_SCOPE,
     }
     anthropic_disabled_status = require_rejected(
         "/v1/messages",
-        dict(anthropic_base, thinking={"type": "disabled"}),
+        dict(
+            anthropic_base,
+            thinking={"type": "disabled"},
+            kv_scope=new_conversation("anthropic-thinking-disabled"),
+        ),
         "cannot be disabled",
     )
     anthropic_low_status = require_rejected(
         "/v1/messages",
-        dict(anthropic_base, output_config={"effort": "low"}),
+        dict(
+            anthropic_base,
+            output_config={"effort": "low"},
+            kv_scope=new_conversation("anthropic-low-effort"),
+        ),
         "only high",
     )
 
@@ -182,7 +196,7 @@ def main() -> None:
             "model": MODEL,
             "messages": simple,
             "max_tokens": 512,
-            "kv_scope": KV_SCOPE,
+            "kv_scope": new_conversation("anthropic-adaptive-max"),
             "thinking": {"type": "adaptive"},
             "output_config": {"effort": "max"},
         },
@@ -199,7 +213,7 @@ def main() -> None:
             "model": MODEL,
             "messages": simple,
             "max_tokens": 256,
-            "kv_scope": KV_SCOPE,
+            "kv_scope": new_conversation("anthropic-thinking-budget"),
             "thinking": {"type": "enabled", "budget_tokens": 32},
             "output_config": {"effort": "xhigh"},
         },
@@ -229,7 +243,7 @@ def main() -> None:
                 }
             ],
             "max_tokens": 1024,
-            "kv_scope": KV_SCOPE,
+            "kv_scope": new_conversation("final-response-budget"),
             "final_response_token_budget": 5,
         },
     )

@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
-# Run one probe against the live backend, as one agent.
+# Run one probe against the live backend.
 #
 # Every probe is a caller of the sole deployment and runs inside the serving
 # container, where the real tokenizer, the installed vLLM sources, and the
 # server's private loopback live. The suite is staged whole into the
 # container's bounded scratch tmpfs and the named probe is run by file, so it
-# can import its siblings and can name itself: scripts/probe_scope.py mints the
-# kv_scope every generative request carries from the file the interpreter was
-# given and a fresh run id. The container's own shell owns the staging
+# can import its siblings and can name itself: scripts/probe_scope.py mints a
+# new kv_scope for each conversation the probe holds from the file the
+# interpreter was given, a fresh run id and a sequence number. The
+# container's own shell owns the staging
 # directory for its whole life, so nothing persists whatever the probe's
 # status and however this launcher ends.
 set -Eeuo pipefail

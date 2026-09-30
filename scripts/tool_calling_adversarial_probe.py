@@ -27,7 +27,7 @@ from vllm.parser.qwen3 import Qwen3Parser
 from vllm.tool_parsers.structural_tag_registry import get_model_structural_tag
 from vllm.v1.structured_output import StructuredOutputManager
 
-from probe_scope import KV_SCOPE
+from probe_scope import new_conversation
 
 
 MODEL = "qwen3.8-27b-nvfp4-k8v4"
@@ -381,6 +381,8 @@ def openai_stream_call() -> dict[str, Any]:
         },
         {"role": "user", "content": f"Read {PATH}."},
     ]
+    # The tool call and its continuation are one conversation.
+    scope = new_conversation("openai-tool-loop")
     payload = {
         "model": MODEL,
         "messages": initial_messages,
@@ -390,7 +392,7 @@ def openai_stream_call() -> dict[str, Any]:
         "max_tokens": 1_024,
         "stream": True,
         "stream_options": {"include_usage": True},
-        "kv_scope": KV_SCOPE,
+        "kv_scope": scope,
     }
     calls: dict[int, dict[str, str]] = {}
     reasoning = ""
@@ -448,7 +450,7 @@ def openai_stream_call() -> dict[str, Any]:
         "tool_choice": "auto",
         "max_tokens": 1_024,
         "stream": True,
-        "kv_scope": KV_SCOPE,
+        "kv_scope": scope,
     }
     answer = ""
     continuation_finish = None
@@ -528,6 +530,8 @@ def collect_anthropic_stream(payload: dict[str, Any]) -> dict[str, Any]:
 
 def anthropic_stream_call() -> dict[str, Any]:
     first_user = {"role": "user", "content": f"Read {PATH}."}
+    # The tool call and its continuation are one conversation.
+    scope = new_conversation("anthropic-tool-loop")
     payload = {
         "model": MODEL,
         "system": "You MUST call read_file exactly once before answering.",
@@ -536,7 +540,7 @@ def anthropic_stream_call() -> dict[str, Any]:
         "tool_choice": {"type": "any", "disable_parallel_tool_use": True},
         "max_tokens": 1_024,
         "stream": True,
-        "kv_scope": KV_SCOPE,
+        "kv_scope": scope,
     }
     first = collect_anthropic_stream(payload)
     uses = [block for block in first["content"] if block.get("type") == "tool_use"]
@@ -568,7 +572,7 @@ def anthropic_stream_call() -> dict[str, Any]:
             "tool_choice": {"type": "auto", "disable_parallel_tool_use": True},
             "max_tokens": 1_024,
             "stream": True,
-            "kv_scope": KV_SCOPE,
+            "kv_scope": scope,
         }
     )
     answer = "".join(
@@ -595,6 +599,7 @@ def anthropic_stream_call() -> dict[str, Any]:
 
 
 def live_policy_probe() -> dict[str, Any]:
+    # Each request below stands alone, so each carries its own new agent ID.
     no_tool = post_json(
         "/v1/chat/completions",
         {
@@ -608,7 +613,7 @@ def live_policy_probe() -> dict[str, Any]:
             "tools": [read_file_tool(False)],
             "tool_choice": "none",
             "max_tokens": 512,
-            "kv_scope": KV_SCOPE,
+            "kv_scope": new_conversation("tool-choice-none"),
         },
     )["choices"][0]
     if no_tool["message"].get("tool_calls"):
@@ -632,7 +637,7 @@ def live_policy_probe() -> dict[str, Any]:
             "tool_choice": "required",
             "parallel_tool_calls": False,
             "max_tokens": 1_024,
-            "kv_scope": KV_SCOPE,
+            "kv_scope": new_conversation("parallel-calls-disabled"),
         },
     )["choices"][0]
     parallel_calls = parallel["message"].get("tool_calls") or []
@@ -646,7 +651,7 @@ def live_policy_probe() -> dict[str, Any]:
             {"role": "tool", "tool_call_id": "orphan", "content": "bad"},
         ],
         "max_tokens": 16,
-        "kv_scope": KV_SCOPE,
+        "kv_scope": new_conversation("openai-orphan-tool-result"),
     }
     openai_error = expect_http_400("/v1/chat/completions", malformed_openai)
     malformed_anthropic = {
@@ -660,7 +665,7 @@ def live_policy_probe() -> dict[str, Any]:
             }
         ],
         "max_tokens": 16,
-        "kv_scope": KV_SCOPE,
+        "kv_scope": new_conversation("anthropic-orphan-tool-result"),
     }
     anthropic_error = expect_http_400(
         "/v1/messages", malformed_anthropic, ANTHROPIC_HEADERS

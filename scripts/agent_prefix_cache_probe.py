@@ -7,6 +7,13 @@ model-generated tool call, submits its result, and compares that continuation
 against the identical history under a fresh cache salt. Prometheus counter
 deltas prove cache attribution; wall-clock streaming TTFT proves practical
 latency impact.
+
+The tool-call turn and its continuation are one conversation under one agent
+ID. Between the continuation and the control, a fork keeps that conversation's
+history through the tool result and asks a different question under a new,
+never-used ID and the same cache salt: prefix lookup matches content and
+cache_salt whatever the ID, so the fork must reuse at least what the parent's
+continuation reused. The fresh-salt control is a conversation of its own.
 """
 
 from __future__ import annotations
@@ -24,7 +31,7 @@ from typing import Any
 
 from transformers import AutoTokenizer
 
-from probe_scope import KV_SCOPE
+from probe_scope import new_conversation
 
 
 MODEL = "qwen3.8-27b-nvfp4-k8v4"
@@ -33,6 +40,10 @@ TARGET_PROMPT_TOKENS = 65_536
 FILLER = " The inert ledger contains an ordinary verified archive entry."
 TOOL_PATH = "/workspace/cache-proof.txt"
 TOOL_RESULT = "CACHE_TOOL_RESULT=verified-agentic-round-trip"
+FORK_QUESTION = (
+    "Fork check: without calling any tool, state in one word whether the "
+    "ledger above is inert data."
+)
 
 
 def tool() -> dict[str, Any]:
@@ -116,6 +127,34 @@ def iter_timed_sse(
             elapsed = time.monotonic() - started
             data = "\n".join(data_lines)
             yield elapsed, data if data == "[DONE]" else json.loads(data)
+
+
+def rendered_prompt_ids(payload: dict[str, Any]) -> list[int]:
+    """Return the exact prompt token IDs the server renders for a request.
+
+    The render endpoint allocates no KV and needs no agent ID, so the
+    transport, salt and ID fields are left out of what it is sent.
+    """
+    rendered = request_json(
+        "/v1/chat/completions/render",
+        {
+            key: value
+            for key, value in payload.items()
+            if key not in {"stream", "stream_options", "cache_salt", "kv_scope"}
+        },
+    )
+    assert isinstance(rendered, dict)
+    return [int(token_id) for token_id in rendered["token_ids"]]
+
+
+def common_prefix_length(first: list[int], second: list[int]) -> int:
+    """Return how many leading token IDs two prompts share."""
+    shared = 0
+    for left, right in zip(first, second):
+        if left != right:
+            break
+        shared += 1
+    return shared
 
 
 def metric_snapshot() -> dict[str, int]:
@@ -339,6 +378,8 @@ def main() -> None:
 
     shared_salt = f"{args.salt}-shared"
     control_salt = f"{args.salt}-fresh-control"
+    # One conversation: the tool-call turn and its tool-result continuation.
+    parent_scope = new_conversation("parent")
     initial_payload = {
         "model": MODEL,
         "messages": messages,
@@ -349,7 +390,7 @@ def main() -> None:
         "stream": True,
         "stream_options": {"include_usage": True},
         "cache_salt": shared_salt,
-        "kv_scope": KV_SCOPE,
+        "kv_scope": parent_scope,
     }
     before = metric_snapshot()
     initial, after_initial, initial_delta = inference_delta(initial_payload, before)
@@ -392,16 +433,36 @@ def main() -> None:
         "max_tokens": 1,
         "stream": True,
         "stream_options": {"include_usage": True},
-        "kv_scope": KV_SCOPE,
     }
 
-    cached_payload = {**continuation_base, "cache_salt": shared_salt}
+    cached_payload = {
+        **continuation_base,
+        "cache_salt": shared_salt,
+        "kv_scope": parent_scope,
+    }
     cached, after_cached, cached_delta = inference_delta(
         cached_payload,
         after_initial,
     )
-    control_payload = {**continuation_base, "cache_salt": control_salt}
-    control, _, control_delta = inference_delta(control_payload, after_cached)
+    # The fork keeps the parent's history through the tool result, then asks
+    # something the parent never did, under a new ID and the parent's salt. It
+    # runs before the control so nothing but the parent's own requests has
+    # allocated since the parent's continuation.
+    fork_scope = new_conversation("fork")
+    fork_payload = {
+        **continuation_base,
+        "messages": history + [{"role": "user", "content": FORK_QUESTION}],
+        "cache_salt": shared_salt,
+        "kv_scope": fork_scope,
+    }
+    fork, after_fork, fork_delta = inference_delta(fork_payload, after_cached)
+    control_scope = new_conversation("fresh-control")
+    control_payload = {
+        **continuation_base,
+        "cache_salt": control_salt,
+        "kv_scope": control_scope,
+    }
+    control, _, control_delta = inference_delta(control_payload, after_fork)
 
     block_size = before["block_size"]
     minimum_expected_hit = max(0, local_count - 2 * block_size)
@@ -427,6 +488,49 @@ def main() -> None:
             f"Measured prefix-cache TTFT speedup was only {speedup:.2f}x"
         )
 
+    fork_usage = fork["usage"] or {}
+    fork_cached_tokens = (fork_usage.get("prompt_tokens_details") or {}).get(
+        "cached_tokens"
+    )
+    if not isinstance(fork_cached_tokens, int):
+        raise AssertionError(f"The fork was served no cached_tokens: {fork_usage}")
+    # inference_delta proved hits + local compute == the fork's prompt tokens,
+    # so no tokens came from the external tier and the served count must be
+    # exactly the local hits the metrics attribute to the fork.
+    if fork_cached_tokens != fork_delta["hits"]:
+        raise AssertionError(
+            f"The fork was served cached_tokens={fork_cached_tokens}, but the "
+            f"prefix-cache metrics attribute {fork_delta['hits']} hit tokens to it"
+        )
+    parent_ids = rendered_prompt_ids(cached_payload)
+    fork_ids = rendered_prompt_ids(fork_payload)
+    rendered_lengths = (len(parent_ids), len(fork_ids))
+    served_lengths = (cached["usage"]["prompt_tokens"], fork_usage["prompt_tokens"])
+    if rendered_lengths != served_lengths:
+        raise AssertionError(
+            "Rendered and served prompt lengths of the parent's continuation and "
+            f"the fork disagree: rendered={rendered_lengths}, served={served_lengths}"
+        )
+    shared_prefix = common_prefix_length(parent_ids, fork_ids)
+    if shared_prefix < cached_delta["hits"]:
+        raise AssertionError(
+            f"The fork shares only its first {shared_prefix} tokens with its "
+            f"parent's history, fewer than the {cached_delta['hits']} the "
+            "parent's continuation reused: it was not built from that history"
+        )
+    # Everything the parent's continuation reused lies inside the shared
+    # prefix and was resident when the fork ran. The ceiling above that
+    # depends on where recurrent-state checkpoints exist, so the block-aligned
+    # shared prefix is reported rather than asserted.
+    if fork_delta["hits"] < cached_delta["hits"]:
+        raise AssertionError(
+            f"The fork under a new kv_scope reused only {fork_delta['hits']} "
+            f"tokens; its first {shared_prefix} tokens are its parent's history, "
+            f"of which the parent's continuation had just reused "
+            f"{cached_delta['hits']}, and prefix lookup matches content and "
+            "cache_salt whatever the ID"
+        )
+
     result = {
         "probe_salt": args.salt,
         "requested_prompt_target": args.target,
@@ -434,6 +538,11 @@ def main() -> None:
         "live_tokenize_prompt_tokens": live_count,
         "filler_repetitions": repetitions,
         "kv_block_size_tokens": block_size,
+        "kv_scopes": {
+            "parent": parent_scope,
+            "fork": fork_scope,
+            "fresh_control": control_scope,
+        },
         "initial_tool_turn": {
             "prompt_tokens": initial["usage"]["prompt_tokens"],
             "cache_metric_delta": initial_delta,
@@ -453,6 +562,24 @@ def main() -> None:
             "first_event_seconds": round(cached["first_event_seconds"], 3),
             "total_seconds": round(cached["terminal_seconds"], 3),
             "finish_reason": cached["finish_reason"],
+        },
+        "fork_under_new_kv_scope": {
+            "history_messages_kept_from_parent": len(history),
+            "prompt_tokens": fork_usage["prompt_tokens"],
+            "served_cached_prompt_tokens": fork_cached_tokens,
+            "cache_metric_delta": fork_delta,
+            "shared_prefix_tokens_with_parent": shared_prefix,
+            "block_aligned_shared_prefix_tokens": (
+                shared_prefix // block_size * block_size
+            ),
+            "minimum_asserted_reuse_tokens": cached_delta["hits"],
+            "reused_fraction_of_shared_prefix": round(
+                fork_delta["hits"] / shared_prefix,
+                6,
+            ),
+            "first_event_seconds": round(fork["first_event_seconds"], 3),
+            "total_seconds": round(fork["terminal_seconds"], 3),
+            "finish_reason": fork["finish_reason"],
         },
         "identical_fresh_salt_control": {
             "prompt_tokens": control["usage"]["prompt_tokens"],

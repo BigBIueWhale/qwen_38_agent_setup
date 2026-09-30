@@ -6,6 +6,11 @@ The probe runs inside the pinned runtime image.  It uses a unique lossless
 both OpenAI Chat and Anthropic Messages, and authoritative vLLM counters.
 No output-byte determinism is assumed; the semantic invariant is retrieval of
 an exact value that exists only in the historical tool-result image.
+
+The cold request and its three warm redraws -- the same final turn over the same
+history, through both protocols -- are one conversation under one agent ID. The
+changed-image and moved-image controls are histories of their own, each under
+its own new ID. Render-only requests allocate no KV and carry no ID.
 """
 
 from __future__ import annotations
@@ -27,7 +32,7 @@ from transformers import AutoTokenizer
 from vllm.entrypoints.anthropic.protocol import AnthropicMessagesRequest
 from vllm.entrypoints.anthropic.serving import AnthropicServingMessages
 
-from probe_scope import KV_SCOPE
+from probe_scope import new_conversation
 
 
 BASE_URL = "http://127.0.0.1:8000"
@@ -134,9 +139,11 @@ def openai_messages(data_url: str, *, moved: bool = False) -> list[dict[str, Any
     ]
 
 
-def anthropic_payload(data_url: str, *, stream: bool, salt: str) -> dict[str, Any]:
+def anthropic_payload(
+    data_url: str, *, stream: bool, salt: str, kv_scope: str | None
+) -> dict[str, Any]:
     encoded = data_url.split(",", 1)[1]
-    return {
+    payload = {
         "model": MODEL,
         "system": (
             "Images returned by tools are evidence owned by that exact tool "
@@ -183,12 +190,14 @@ def anthropic_payload(data_url: str, *, stream: bool, salt: str) -> dict[str, An
         "max_tokens": 16_384,
         "cache_salt": salt,
         "stream": stream,
-        "kv_scope": KV_SCOPE,
     }
+    if kv_scope is not None:
+        payload["kv_scope"] = kv_scope
+    return payload
 
 
 def openai_payload(
-    data_url: str, *, stream: bool, salt: str, moved: bool = False
+    data_url: str, *, stream: bool, salt: str, kv_scope: str, moved: bool = False
 ) -> dict[str, Any]:
     payload = {
         "model": MODEL,
@@ -196,7 +205,7 @@ def openai_payload(
         "max_tokens": 16_384,
         "cache_salt": salt,
         "stream": stream,
-        "kv_scope": KV_SCOPE,
+        "kv_scope": kv_scope,
     }
     if stream:
         payload["stream_options"] = {"include_usage": True}
@@ -363,7 +372,7 @@ def render_proof(
     assert isinstance(openai_render, dict)
 
     anthropic_request = AnthropicMessagesRequest.model_validate(
-        anthropic_payload(data_url, stream=False, salt="render-only")
+        anthropic_payload(data_url, stream=False, salt="render-only", kv_scope=None)
     )
     converted = AnthropicServingMessages._convert_anthropic_to_openai_request(
         anthropic_request, merge_inline_system=True
@@ -641,29 +650,42 @@ def main() -> None:
 
     render, moved_render = render_proof(tokenizer, data_url)
     salt = "vision-history-cache-" + uuid.uuid4().hex
+    history_scope = new_conversation("tool-image-history")
 
     snapshot = settled_metric_snapshot()
     cold_stream, snapshot = measured(
         lambda: collect_openai_stream(
-            openai_payload(data_url, stream=True, salt=salt), code
+            openai_payload(
+                data_url, stream=True, salt=salt, kv_scope=history_scope
+            ),
+            code,
         ),
         snapshot,
     )
     warm_nonstream, snapshot = measured(
         lambda: nonstream_openai(
-            openai_payload(data_url, stream=False, salt=salt), code
+            openai_payload(
+                data_url, stream=False, salt=salt, kv_scope=history_scope
+            ),
+            code,
         ),
         snapshot,
     )
     cross_protocol_stream, snapshot = measured(
         lambda: collect_anthropic_stream(
-            anthropic_payload(data_url, stream=True, salt=salt), code
+            anthropic_payload(
+                data_url, stream=True, salt=salt, kv_scope=history_scope
+            ),
+            code,
         ),
         snapshot,
     )
     cross_protocol_nonstream, snapshot = measured(
         lambda: nonstream_anthropic(
-            anthropic_payload(data_url, stream=False, salt=salt), code
+            anthropic_payload(
+                data_url, stream=False, salt=salt, kv_scope=history_scope
+            ),
+            code,
         ),
         snapshot,
     )
@@ -673,6 +695,7 @@ def main() -> None:
                 changed_url,
                 stream=True,
                 salt=salt + "-changed-bytes",
+                kv_scope=new_conversation("changed-image-control"),
             ),
             changed_code,
         ),
@@ -680,7 +703,14 @@ def main() -> None:
     )
     moved_control, _ = measured(
         lambda: collect_openai_stream(
-            openai_payload(data_url, stream=True, salt=salt, moved=True), None
+            openai_payload(
+                data_url,
+                stream=True,
+                salt=salt,
+                kv_scope=new_conversation("moved-image-control"),
+                moved=True,
+            ),
+            None,
         ),
         snapshot,
     )

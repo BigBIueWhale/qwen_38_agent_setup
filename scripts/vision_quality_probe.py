@@ -22,7 +22,7 @@ from typing import Any
 
 from PIL import Image, ImageDraw, ImageFont
 
-from probe_scope import KV_SCOPE
+from probe_scope import new_conversation
 
 
 BASE_URL = "http://127.0.0.1:8000"
@@ -165,7 +165,7 @@ def content_for(images: list[ProbeImage]) -> list[dict[str, Any]]:
     return content
 
 
-def completion_payload(images: list[ProbeImage]) -> dict[str, Any]:
+def completion_payload(images: list[ProbeImage], kv_scope: str) -> dict[str, Any]:
     return {
         "model": MODEL,
         "messages": [
@@ -188,7 +188,7 @@ def completion_payload(images: list[ProbeImage]) -> dict[str, Any]:
         "reasoning_effort": "xhigh",
         "max_tokens": 4_096,
         "stream": False,
-        "kv_scope": KV_SCOPE,
+        "kv_scope": kv_scope,
     }
 
 
@@ -201,7 +201,7 @@ def run_quality_probe(count: int, timeout: int) -> None:
     generation_started = time.monotonic()
     status, response = post_json(
         "/v1/chat/completions",
-        completion_payload(images),
+        completion_payload(images, new_conversation(f"transcribe-{count}-images")),
         timeout=timeout,
     )
     elapsed = time.monotonic() - generation_started
@@ -246,7 +246,9 @@ def run_quality_probe(count: int, timeout: int) -> None:
 
 def run_count_rejection(timeout: int) -> None:
     image = make_image(0)
-    payload = completion_payload([image] * (MAX_IMAGES + 1))
+    payload = completion_payload(
+        [image] * (MAX_IMAGES + 1), new_conversation("over-count-rejection")
+    )
     payload["max_tokens"] = 1
     status, response = post_json("/v1/chat/completions", payload, timeout=timeout)
     if status != 400:

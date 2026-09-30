@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Validate the Responses API tool loop used by current OpenAI Codex clients."""
+"""Validate the Responses API tool loop used by current OpenAI Codex clients.
+
+The loop is one conversation under one agent ID: the tool-call turn and its
+streamed redraw, then the continuation and its streamed redraw.
+"""
 
 from __future__ import annotations
 
@@ -8,7 +12,7 @@ import json
 import urllib.error
 import urllib.request
 
-from probe_scope import KV_SCOPE
+from probe_scope import new_conversation
 
 
 BASE_URL = "http://127.0.0.1:8000"
@@ -48,7 +52,7 @@ def request(payload: dict, *, stream: bool = False):
     return response
 
 
-def base_payload(*, stream: bool) -> dict:
+def base_payload(*, stream: bool, kv_scope: str) -> dict:
     return {
         "model": MODEL,
         "instructions": (
@@ -61,7 +65,7 @@ def base_payload(*, stream: bool) -> dict:
         "max_output_tokens": 1_024,
         "stream": stream,
         "store": False,
-        "kv_scope": KV_SCOPE,
+        "kv_scope": kv_scope,
         "reasoning": {"effort": "xhigh"},
         "chat_template_kwargs": {
             "enable_thinking": True,
@@ -90,10 +94,13 @@ def validate_call(call: dict) -> None:
         raise RuntimeError(f"Incorrect Responses function call: {call}")
 
 
-def continuation_payload(first: dict, *, stream: bool) -> dict:
-    payload = base_payload(stream=stream)
+def continuation_payload(first: dict, *, stream: bool, kv_scope: str) -> dict:
+    payload = base_payload(stream=stream, kv_scope=kv_scope)
     payload["input"] = [
-        {"role": "user", "content": base_payload(stream=False)["input"]},
+        {
+            "role": "user",
+            "content": base_payload(stream=False, kv_scope=kv_scope)["input"],
+        },
         *first["output"],
         {
             "type": "function_call_output",
@@ -156,13 +163,16 @@ def assert_equivalent_final_responses(nonstream: dict, streamed: dict) -> None:
 
 def main() -> None:
     argparse.ArgumentParser(description=__doc__).parse_args()
-    nonstream_first = request(base_payload(stream=False))
+    scope = new_conversation("tool-loop")
+    nonstream_first = request(base_payload(stream=False, kv_scope=scope))
     nonstream_calls = function_calls(nonstream_first["output"])
     if len(nonstream_calls) != 1:
         raise RuntimeError(f"Expected one non-stream function call: {nonstream_first}")
     validate_call(nonstream_calls[0])
 
-    stream_events, stream_first = read_sse(request(base_payload(stream=True), stream=True))
+    stream_events, stream_first = read_sse(
+        request(base_payload(stream=True, kv_scope=scope), stream=True)
+    )
     stream_calls = function_calls(stream_first["output"])
     if len(stream_calls) != 1:
         raise RuntimeError(f"Expected one streamed function call: {stream_first}")
@@ -176,9 +186,14 @@ def main() -> None:
             f"{first_nonstream_semantics!r} != {first_stream_semantics!r}"
         )
 
-    nonstream_final = request(continuation_payload(nonstream_first, stream=False))
+    nonstream_final = request(
+        continuation_payload(nonstream_first, stream=False, kv_scope=scope)
+    )
     _, stream_final = read_sse(
-        request(continuation_payload(nonstream_first, stream=True), stream=True)
+        request(
+            continuation_payload(nonstream_first, stream=True, kv_scope=scope),
+            stream=True,
+        )
     )
     final_nonstream_semantics = semantic_summary(nonstream_final)
     final_stream_semantics = semantic_summary(stream_final)

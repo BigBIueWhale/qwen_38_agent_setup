@@ -118,11 +118,14 @@ Each `scripts/test-*.sh` runner is one probe with its canonical arguments. The
 launcher refuses a container that is not the locked name running the pinned
 image, stages the suite into that container's bounded scratch tmpfs, and runs
 the named probe by file. That is what lets a probe carry the identity the
-backend requires of every generative caller: `scripts/probe_scope.py` mints one
-`kv_scope` per run from the probe's own file name and a fresh run id — one
-stable ID per agent for the life of the run. This naming convention belongs to
-the probe; the backend treats the ID as opaque. The launcher runs probes by file,
-which supplies the name used by this convention.
+backend requires of every generative caller: `scripts/probe_scope.py` mints a
+new `kv_scope` for each conversation a probe holds, from the probe's own file
+name, a fresh run id, a sequence number and a label. A probe sends that ID on
+every request that continues the conversation, including a redraw of one of its
+turns, and mints a new one for a fork, a control or an independent request.
+This naming convention belongs to the probe; the backend treats the ID as
+opaque. The launcher runs probes by file, which supplies the name used by this
+convention.
 
 The build is reproducible on a given host: layer timestamps are normalised to
 `SOURCE_DATE_EPOCH`, so re-deriving the source tree does not change the image
@@ -1156,9 +1159,19 @@ request that is complete except for `kv_scope`, and each answers HTTP 400 naming
 `error.param` on the OpenAI-shaped surfaces, and as an `invalid_request_error`
 whose message names it on the Anthropic surface, because the Anthropic router
 answers the request model's refusal in its own envelope, exactly as it answers
-typed request validation.
-Every other probe sends the identity `scripts/probe_scope.py` mints for its run on
-every generative request, so the suite runs under the rule it proves.
+typed request validation. The probe also sends the five streaming routes the same request with
+`stream: true`, which must be refused with HTTP 400 before any status line, and
+holds one conversation's stream open while a non-streaming and a streaming
+request under its ID must each be refused with HTTP 400 naming that ID, after
+which the open stream must still finish. The agent prefix-cache probe forks its
+conversation: after the parent's cached continuation, the parent's history plus
+a new question is sent under a new ID and the parent's salt, and the fork's
+served `cached_tokens`, metric delta and shared prefix are recorded; the fork
+must reuse at least what the parent's continuation reused. These streaming,
+overlap and fork checks have not yet run against a live server; they were
+exercised only against a loopback stub. Every probe mints one ID per
+conversation with `scripts/probe_scope.py`, so the suite runs under the rule it
+proves.
 
 The installed-image focused suites passed:
 

@@ -5,6 +5,10 @@ This runs inside the pinned serving container so every parser check uses the
 real checkpoint tokenizer and the exact installed vLLM code.  It covers both
 controlled token replay and live max-token truncation across Chat Completions,
 Anthropic Messages, and OpenAI Responses.
+
+Each surface's live check draws one single-turn conversation again and again --
+budget retries, then redraws per tool choice and transport -- and no request
+continues another's output, so each surface's draws share one agent ID.
 """
 
 from __future__ import annotations
@@ -30,7 +34,7 @@ from vllm.entrypoints.openai.responses.streaming_events import (
 from vllm.parser.qwen3 import Qwen3Parser
 from vllm.tokenizers.detokenizer_utils import NativeDecodeStream
 
-from probe_scope import KV_SCOPE
+from probe_scope import new_conversation
 
 
 BASE_URL = "http://127.0.0.1:8000"
@@ -446,7 +450,9 @@ def long_responses_tool() -> dict[str, Any]:
     }
 
 
-def chat_payload(tool_choice: str, budget: int, *, stream: bool) -> dict[str, Any]:
+def chat_payload(
+    tool_choice: str, budget: int, *, stream: bool, kv_scope: str
+) -> dict[str, Any]:
     return {
         "model": MODEL,
         "messages": [
@@ -465,7 +471,7 @@ def chat_payload(tool_choice: str, budget: int, *, stream: bool) -> dict[str, An
         "thinking_token_budget": FAULT_INJECTION_THINKING_BUDGET,
         "return_token_ids": True,
         "stream": stream,
-        "kv_scope": KV_SCOPE,
+        "kv_scope": kv_scope,
         **({"stream_options": {"include_usage": True}} if stream else {}),
     }
 
@@ -539,12 +545,14 @@ def assert_chat_truncation(
     }
 
 
-def find_truncated_chat_budget(tokenizer: Any) -> tuple[int, dict[str, Any]]:
+def find_truncated_chat_budget(
+    tokenizer: Any, kv_scope: str
+) -> tuple[int, dict[str, Any]]:
     diagnostics: list[str] = []
     for budget in BUDGET_CANDIDATES:
         response = post_json(
             "/v1/chat/completions",
-            chat_payload("required", budget, stream=False),
+            chat_payload("required", budget, stream=False, kv_scope=kv_scope),
         )
         choice = response["choices"][0]
         result = {
@@ -594,7 +602,8 @@ def find_truncated_chat_budget(tokenizer: Any) -> tuple[int, dict[str, Any]]:
 
 
 def live_chat_truncation(tokenizer: Any) -> tuple[int, dict[str, Any]]:
-    budget, baseline = find_truncated_chat_budget(tokenizer)
+    scope = new_conversation("chat-truncation")
+    budget, baseline = find_truncated_chat_budget(tokenizer, scope)
     results: dict[str, Any] = {"required_nonstream": baseline}
     for tool_choice, stream in (
         ("required", True),
@@ -603,13 +612,15 @@ def live_chat_truncation(tokenizer: Any) -> tuple[int, dict[str, Any]]:
     ):
         label = f"OpenAI {tool_choice} {'stream' if stream else 'non-stream'}"
         if stream:
-            result = collect_chat_stream(chat_payload(tool_choice, budget, stream=True))
+            result = collect_chat_stream(
+                chat_payload(tool_choice, budget, stream=True, kv_scope=scope)
+            )
             if not result["done"]:
                 raise AssertionError(f"{label} omitted [DONE]")
         else:
             response = post_json(
                 "/v1/chat/completions",
-                chat_payload(tool_choice, budget, stream=False),
+                chat_payload(tool_choice, budget, stream=False, kv_scope=scope),
             )
             choice = response["choices"][0]
             result = {
@@ -631,7 +642,7 @@ def live_chat_truncation(tokenizer: Any) -> tuple[int, dict[str, Any]]:
     return budget, results
 
 
-def anthropic_payload(budget: int, *, stream: bool) -> dict[str, Any]:
+def anthropic_payload(budget: int, *, stream: bool, kv_scope: str) -> dict[str, Any]:
     return {
         "model": MODEL,
         "system": "Call write_exact immediately. Do not explain.",
@@ -646,14 +657,15 @@ def anthropic_payload(budget: int, *, stream: bool) -> dict[str, Any]:
             "budget_tokens": FAULT_INJECTION_THINKING_BUDGET,
         },
         "stream": stream,
-        "kv_scope": KV_SCOPE,
+        "kv_scope": kv_scope,
     }
 
 
 def live_anthropic_truncation(budget: int) -> dict[str, Any]:
+    scope = new_conversation("anthropic-truncation")
     response = post_json(
         "/v1/messages",
-        anthropic_payload(budget, stream=False),
+        anthropic_payload(budget, stream=False, kv_scope=scope),
         ANTHROPIC_HEADERS,
     )
     uses = [block for block in response["content"] if block.get("type") == "tool_use"]
@@ -673,7 +685,7 @@ def live_anthropic_truncation(budget: int) -> dict[str, Any]:
     saw_message_stop = False
     for event_name, event in iter_sse(
         "/v1/messages",
-        anthropic_payload(budget, stream=True),
+        anthropic_payload(budget, stream=True, kv_scope=scope),
         ANTHROPIC_HEADERS,
     ):
         if event == "[DONE]":
@@ -716,7 +728,7 @@ def live_anthropic_truncation(budget: int) -> dict[str, Any]:
     }
 
 
-def responses_payload(budget: int, *, stream: bool) -> dict[str, Any]:
+def responses_payload(budget: int, *, stream: bool, kv_scope: str) -> dict[str, Any]:
     return {
         "model": MODEL,
         "instructions": "Call write_exact immediately. Do not explain.",
@@ -734,7 +746,7 @@ def responses_payload(budget: int, *, stream: bool) -> dict[str, Any]:
             "enable_thinking": True,
             "reasoning_effort": "xhigh",
         },
-        "kv_scope": KV_SCOPE,
+        "kv_scope": kv_scope,
     }
 
 
@@ -762,14 +774,17 @@ def assert_incomplete_response(
 
 
 def live_responses_truncation(budget: int) -> dict[str, Any]:
-    nonstream = post_json("/v1/responses", responses_payload(budget, stream=False))
+    scope = new_conversation("responses-truncation")
+    nonstream = post_json(
+        "/v1/responses", responses_payload(budget, stream=False, kv_scope=scope)
+    )
     assert_incomplete_response(nonstream, budget, "Responses non-stream")
 
     event_types: list[str] = []
     done_statuses: list[str | None] = []
     final_response = None
     for event_name, event in iter_sse(
-        "/v1/responses", responses_payload(budget, stream=True)
+        "/v1/responses", responses_payload(budget, stream=True, kv_scope=scope)
     ):
         if event == "[DONE]":
             continue

@@ -10,7 +10,7 @@ from typing import Any
 
 from transformers import AutoTokenizer
 
-from probe_scope import KV_SCOPE
+from probe_scope import new_conversation
 from vision_quality_probe import IMAGE_PIXELS, MAX_IMAGES, make_image, post_json
 
 
@@ -159,7 +159,7 @@ def fit_live_exact(
 
 
 def completion_payload(
-    messages: list[dict[str, Any]], cache_salt: str
+    messages: list[dict[str, Any]], cache_salt: str, kv_scope: str
 ) -> dict[str, Any]:
     return {
         "model": MODEL,
@@ -174,7 +174,7 @@ def completion_payload(
         "max_tokens": 1,
         "cache_salt": cache_salt,
         "stream": False,
-        "kv_scope": KV_SCOPE,
+        "kv_scope": kv_scope,
     }
 
 
@@ -224,7 +224,9 @@ def main() -> None:
     accepted_status, accepted = post_json(
         "/v1/chat/completions",
         completion_payload(
-            accepted_messages, f"{args.salt}-accepted-cold-cache"
+            accepted_messages,
+            f"{args.salt}-accepted-cold-cache",
+            new_conversation("accepted-boundary"),
         ),
         timeout=3_600,
     )
@@ -246,7 +248,9 @@ def main() -> None:
     rejected_status, rejected = post_json(
         "/v1/chat/completions",
         completion_payload(
-            rejected_messages, f"{args.salt}-rejected-cold-cache"
+            rejected_messages,
+            f"{args.salt}-rejected-cold-cache",
+            new_conversation("rejected-boundary"),
         ),
         timeout=600,
     )
