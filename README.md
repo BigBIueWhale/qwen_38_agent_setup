@@ -44,7 +44,7 @@ There is one supported mode:
 | Agent-service release | Pinned by the agent-service release lock, which owns every agent and service image identity |
 | Agent-service listener | 127.0.0.1:8090 only |
 | Launch profile and cache volume | socket-isolated-nonroot-vision-k8v4-agent-v21 |
-| Image profile | socket-isolated-nonroot-vision-k8v4-agent-v26 |
+| Image profile | socket-isolated-nonroot-vision-k8v4-agent-v27 |
 | Runtime image | sha256:dcc869c00e726abd801d3217ef5acb9350e8e1044085ebc0fbcb6c5d8eac9210 |
 
 This is not a text-only profile with an optional vision switch. It is not a
@@ -354,17 +354,17 @@ Pinned build inputs and products:
 |---|---|
 | Immutable base tag | qwen38-vllm:main-9df9b0b |
 | Immutable base ID | sha256:fa4a002a88b7043a1a89966dea8a500fe9696f84e75730d9da916f916048d401 |
-| Runtime tag | qwen38-vllm:qwen38-27b-nvfp4-k8v4-runtime-v26 |
+| Runtime tag | qwen38-vllm:qwen38-27b-nvfp4-k8v4-runtime-v27 |
 | Runtime ID | sha256:dcc869c00e726abd801d3217ef5acb9350e8e1044085ebc0fbcb6c5d8eac9210 |
-| Runtime identity tag | qwen38-vllm:runtime-v26-dcc869c00e726abd801d3217ef5acb9350e8e1044085ebc0fbcb6c5d8eac9210 |
-| Offline archive | artifacts/qwen38-vllm-images-runtime-v26.tar |
+| Runtime identity tag | qwen38-vllm:runtime-v27-dcc869c00e726abd801d3217ef5acb9350e8e1044085ebc0fbcb6c5d8eac9210 |
+| Offline archive | artifacts/qwen38-vllm-images-runtime-v27.tar |
 | Archive size | 8,561,236,480 bytes, mode 0600 |
 | Archive SHA-256 | c77ba706f884b74e92e3c8ec810cef76ac015e1abc053dac8c4154d1b5e13e92 |
 | Runtime Dockerfile SHA-256 | 32e336990ec85b890f7b03ddc9797baea14576f38bde01da64264b3615c17b15 |
 | Docker context allowlist SHA-256 | c0a54d4706ae24c88b03f4cfb1b21e7c75e415fa6d7ba4dd4fd4d36ef8a8c30c |
 | Build verifier SHA-256 | 2a4c4a92fc5858e9662c67f6cadc69ab52cbc26468bc74cd8334c6becaa8673a |
 | Runtime validator SHA-256 | 2ad831d8a71adf0db4c8a923d063d32df7358250d1d0d97d76c2979ce9fe7fab |
-| Runtime lock SHA-256 | 8d2db765d02a099a2a7d31a200c2888efb2e6941e32aecb2391d5a75ea91df8b |
+| Runtime lock SHA-256 | 6bf2a8e5ee6f945b2b28209511edd5de2caf85c61f67bdae78916c8f7e1305fb |
 
 The runtime tag names the pinned image and nothing else. A build used to load its
 image under that tag before comparing the image ID with the pin, so a build that
