@@ -101,7 +101,7 @@ fi
 host_isolation_check_on() (
   # Named apart from the check's own locals: bash scopes dynamically, so the
   # fake must not read a variable the check itself declares.
-  local fake_security_options="$1"
+  local fake_security_options="$1" fake_gpu_capability="${2:-${VALIDATED_CUDA_CAPABILITY}}"
   docker() {
     case "$*" in
       "version --format {{.Server.Version}}")
@@ -122,11 +122,11 @@ host_isolation_check_on() (
     esac
   }
   nvidia-smi() {
-    [[ "$*" == '--query-gpu=memory.total --format=csv,noheader,nounits' ]] || {
+    [[ "$*" == '--query-gpu=memory.total,compute_cap --format=csv,noheader,nounits' ]] || {
       printf 'unexpected fake nvidia-smi invocation: %s\n' "$*" >&2
       return 97
     }
-    printf '%s\n' "${MINIMUM_GPU_MEMORY_MIB}"
+    printf '%s, %s\n' "${MINIMUM_GPU_MEMORY_MIB}" "${fake_gpu_capability}"
   }
   # git and ss only have to exist; these bodies run only if the check misuses
   # them.
@@ -191,5 +191,24 @@ done < <(host_isolation_cases)
   exit 1
 }
 
-printf 'RUNTIME_COMMON_CONTRACT_OK functions=%s host-isolation=%s-accepted-%s-refused\n' \
+# A GPU of any other compute capability is refused before launch as outside the
+# validated lock, naming what was validated, what was found and the next action;
+# the engine's own refusal of a GPU without native FP4 is a separate property.
+accepted_security_options="$(host_isolation_cases | awk -F $'\x1f' '$1 == "accept" {print $2; exit}')"
+for capability in 10.0 9.0 12.1; do
+  if capability_output="$(host_isolation_check_on "${accepted_security_options}" "${capability}" 2>&1)"; then
+    printf 'ERROR: the host check accepted compute capability %s.\n' "${capability}" >&2
+    exit 1
+  fi
+  [[ "${capability_output}" == *"ERROR: GPU compute capability ${capability} is outside the validated lock."* && \
+     "${capability_output}" == *"Validated: ${VALIDATED_CUDA_CAPABILITY} -- the image's kernels are built for it"* && \
+     "${capability_output}" == *"Found:     ${capability}"* && \
+     "${capability_output}" == *"Next:      serve on a compute capability ${VALIDATED_CUDA_CAPABILITY} GPU"* ]] || {
+    printf 'ERROR: the host check did not refuse compute capability %s by its own statement:\n%s\n' \
+      "${capability}" "${capability_output}" >&2
+    exit 1
+  }
+done
+
+printf 'RUNTIME_COMMON_CONTRACT_OK functions=%s host-isolation=%s-accepted-%s-refused capability-refusals=3\n' \
   "${#required_functions[@]}" "${host_isolation_accepted}" "${host_isolation_refused}"

@@ -2756,6 +2756,35 @@ def _validate_admission_after(state: State) -> None:
     }, label=label)
 
 
+def _validate_native_fp4_before(state: State) -> None:
+    label = "native NVFP4 kernel precondition"
+    kernels = "vllm/model_executor/kernels/linear/__init__.py"
+    require_text(state, kernels, "NVFP4 linear falling back to the slow and unoptimized",
+                 label=label)
+    forbid_text(state, kernels, "does not compute in FP4", label=label)
+
+
+def _validate_native_fp4_after(state: State) -> None:
+    label = "native NVFP4 kernel required"
+    kernels = "vllm/model_executor/kernels/linear/__init__.py"
+    _require_in_symbol(state, kernels, "init_nvfp4_linear_kernel", (
+        "substitutes = () if use_a16 else (*a16_kernels, EmulationNvFp4LinearKernel)",
+        "requested = _LINEAR_BACKEND_KERNEL_MAP.get(linear_backend, set())",
+        "if kernel_cls in substitutes and kernel_cls not in requested:",
+        "capability.as_version_str()", "does not compute in FP4",
+    ), label=label)
+    forbid_text(state, kernels, "NVFP4 linear falling back to the slow and unoptimized",
+                label=label)
+    require_python_symbols(state,
+        "tests/model_executor/kernels/test_nvfp4_native_selection.py", {
+            "test_a_gpu_without_native_fp4_refuses_instead_of_marlin": None,
+            "test_emulation_is_not_substituted_either": None,
+            "test_a_native_kernel_is_selected_ahead_of_substitutes": None,
+            "test_a_named_substitute_is_served": None,
+            "test_weight_only_checkpoints_keep_marlin": None,
+        }, label=label)
+
+
 def _validate_template_authorship_before(state: State) -> None:
     label = "template-authored control tokens precondition"
     hf = "vllm/renderers/hf.py"
@@ -2864,6 +2893,23 @@ def validate_final(state: State) -> None:
 
 
 CONTRACTS: Mapping[str, SemanticContract] = {
+    "nvfp4-native-kernel-required": SemanticContract(
+        rationale=(
+            "Upstream's automatic NVFP4 kernel selection falls through to Marlin "
+            "(weight-only W4A16) or emulation on a GPU without native FP4 and "
+            "only warns, so a W4A4 checkpoint is served with different "
+            "arithmetic. Selection refuses an implicit substitute at layer "
+            "construction, naming the device capability and why each native "
+            "kernel is unavailable; a substitute named with --linear-backend is "
+            "still served."
+        ),
+        removal_condition=(
+            "Remove when pinned upstream refuses to substitute a weight-only or "
+            "emulated kernel for an NVFP4 W4A4 layer unless it is requested."
+        ),
+        validate_before=_validate_native_fp4_before,
+        validate_after=_validate_native_fp4_after,
+    ),
     "template-authored-control-tokens": SemanticContract(
         rationale=(
             "Upstream renders the chat template to one string and tokenizes it "

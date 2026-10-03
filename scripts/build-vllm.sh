@@ -145,6 +145,7 @@ EXPECTED_STATUS=$' M tests/config/test_config_utils.py
  M vllm/entrypoints/serve/utils/api_utils.py
  D vllm/entrypoints/serve/utils/tool_calls_utils.py
  M vllm/envs.py
+ M vllm/model_executor/kernels/linear/__init__.py
  M vllm/model_executor/models/qwen3_vl.py
  M vllm/multimodal/media/connector.py
  M vllm/multimodal/media/image.py
@@ -217,6 +218,7 @@ EXPECTED_STATUS=$' M tests/config/test_config_utils.py
 ?? tests/entrypoints/scale_out/token_in_token_out/test_raw_media_boundary.py
 ?? tests/entrypoints/test_generation_admission.py
 ?? tests/entrypoints/test_kv_scope_protocol.py
+?? tests/model_executor/kernels/test_nvfp4_native_selection.py
 ?? tests/parser/engine/test_qwen_terminal_authority.py
 ?? tests/parser/engine/test_qwen_xml_fidelity.py
 ?? tests/parser/engine/test_reasoning_token_count.py
@@ -247,6 +249,7 @@ TOOL_OUTPUT_PARSER_UNIT_FILE="${PROJECT_DIR}/scripts/tool_output_parser_unit.py"
 REASONING_USAGE_UNIT_FILE="${PROJECT_DIR}/scripts/reasoning_usage_unit.py"
 QWEN_GRAMMAR_UNIT_FILE="${PROJECT_DIR}/scripts/qwen_grammar_unit.py"
 TEMPLATE_AUTHORSHIP_UNIT_FILE="${PROJECT_DIR}/scripts/template_authorship_unit.py"
+NATIVE_FP4_SELECTION_UNIT_FILE="${PROJECT_DIR}/scripts/native_fp4_selection_unit.py"
 SOURCE_PATCH_DIR="${PROJECT_DIR}/patches/source_patch_v1"
 SOURCE_PATCH_MANIFEST="${SOURCE_PATCH_DIR}/manifest.sha256"
 GENERATED_STAGES_REL="patches/source_patch_v1/generated_vllm_stages.py"
@@ -324,6 +327,7 @@ QWEN_UNIQUE_PARAMETERS_PATCH_FILE="${PROJECT_DIR}/patches/vllm-qwen-unique-tool-
 GENERATION_ADMISSION_PATCH_FILE="${PROJECT_DIR}/patches/vllm-generation-admission-before-response.patch"
 KV_SCOPE_SINGLE_FLIGHT_PATCH_FILE="${PROJECT_DIR}/patches/vllm-kv-scope-single-flight.patch"
 TEMPLATE_AUTHORED_CONTROL_TOKENS_PATCH_FILE="${PROJECT_DIR}/patches/vllm-template-authored-control-tokens.patch"
+NVFP4_NATIVE_KERNEL_PATCH_FILE="${PROJECT_DIR}/patches/vllm-nvfp4-native-kernel-required.patch"
 
 TURBOQUANT_REL="vllm/v1/attention/backends/turboquant_attn.py"
 TOOL_SCHEMA_REL="vllm/tool_parsers/structural_tag_registry.py"
@@ -550,7 +554,8 @@ printf '%s  %s\n' \
   "${QWEN_UNIQUE_PARAMETERS_PATCH_DIFF_SHA256}" "${QWEN_UNIQUE_PARAMETERS_PATCH_FILE}" \
   "${GENERATION_ADMISSION_PATCH_DIFF_SHA256}" "${GENERATION_ADMISSION_PATCH_FILE}" \
   "${KV_SCOPE_SINGLE_FLIGHT_PATCH_DIFF_SHA256}" "${KV_SCOPE_SINGLE_FLIGHT_PATCH_FILE}" \
-  "${TEMPLATE_AUTHORED_CONTROL_TOKENS_PATCH_DIFF_SHA256}" "${TEMPLATE_AUTHORED_CONTROL_TOKENS_PATCH_FILE}" | \
+  "${TEMPLATE_AUTHORED_CONTROL_TOKENS_PATCH_DIFF_SHA256}" "${TEMPLATE_AUTHORED_CONTROL_TOKENS_PATCH_FILE}" \
+  "${NVFP4_NATIVE_KERNEL_PATCH_DIFF_SHA256}" "${NVFP4_NATIVE_KERNEL_PATCH_FILE}" | \
   sha256sum --check --strict
 
 printf '%s  %s\n' \
@@ -892,6 +897,7 @@ printf '%s  %s\n' \
   "${HF_RENDERER_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/renderers/hf.py" \
   "${TEMPLATE_AUTHORSHIP_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/renderers/template_authorship.py" \
   "${SCORING_IO_PROCESSOR_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/entrypoints/pooling/scoring/io_processor.py" \
+  "${LINEAR_KERNELS_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/model_executor/kernels/linear/__init__.py" \
   | sha256sum --check --strict
 
 printf '%s  %s\n' \
@@ -908,7 +914,8 @@ printf '%s  %s\n' \
   "${TOOL_OUTPUT_PARSER_UNIT_SHA256}" "${TOOL_OUTPUT_PARSER_UNIT_FILE}" \
   "${REASONING_USAGE_UNIT_SHA256}" "${REASONING_USAGE_UNIT_FILE}" \
   "${QWEN_GRAMMAR_UNIT_SHA256}" "${QWEN_GRAMMAR_UNIT_FILE}" \
-  "${TEMPLATE_AUTHORSHIP_UNIT_SHA256}" "${TEMPLATE_AUTHORSHIP_UNIT_FILE}" | \
+  "${TEMPLATE_AUTHORSHIP_UNIT_SHA256}" "${TEMPLATE_AUTHORSHIP_UNIT_FILE}" \
+  "${NATIVE_FP4_SELECTION_UNIT_SHA256}" "${NATIVE_FP4_SELECTION_UNIT_FILE}" | \
   sha256sum --check --strict
 
 docker run --rm --network none --read-only \
@@ -931,7 +938,7 @@ while IFS= read -r status_line; do
       ;;
   esac
 done <<<"${EXPECTED_STATUS}"
-for unit in chat_template_retention_unit tool_output_parser_unit vision_contract_unit reasoning_usage_unit shared_prefix_cache_unit phase_budget_unit generate_result_unit raw_media_unit qwen_grammar_unit template_authorship_unit; do
+for unit in chat_template_retention_unit tool_output_parser_unit vision_contract_unit reasoning_usage_unit shared_prefix_cache_unit phase_budget_unit generate_result_unit raw_media_unit qwen_grammar_unit template_authorship_unit native_fp4_selection_unit; do
   docker run --rm --network none --read-only --user "$(id -u):$(id -g)" \
     --tmpfs /tmp:rw,nodev,nosuid,size=256m \
     --env PYTHONDONTWRITEBYTECODE=1 --env CUDA_VISIBLE_DEVICES= \
@@ -1057,6 +1064,8 @@ docker buildx build --progress=plain \
   --build-arg "TEMPLATE_AUTHORSHIP_PATCHED_FILE_SHA256=${TEMPLATE_AUTHORSHIP_PATCHED_FILE_SHA256}" \
   --build-arg "SCORING_IO_PROCESSOR_PATCHED_FILE_SHA256=${SCORING_IO_PROCESSOR_PATCHED_FILE_SHA256}" \
   --build-arg "SCORING_IO_PROCESSOR_UPSTREAM_FILE_SHA256=${SCORING_IO_PROCESSOR_UPSTREAM_FILE_SHA256}" \
+  --build-arg "LINEAR_KERNELS_PATCHED_FILE_SHA256=${LINEAR_KERNELS_PATCHED_FILE_SHA256}" \
+  --build-arg "LINEAR_KERNELS_UPSTREAM_FILE_SHA256=${LINEAR_KERNELS_UPSTREAM_FILE_SHA256}" \
   --build-arg "EXCEPTION_REGISTRATION_PATCHED_FILE_SHA256=${EXCEPTION_REGISTRATION_PATCHED_FILE_SHA256}" \
   --build-arg "EXCEPTION_REGISTRATION_UPSTREAM_FILE_SHA256=${EXCEPTION_REGISTRATION_UPSTREAM_FILE_SHA256}" \
   --build-arg "DETOKENIZER_UTILS_PATCHED_FILE_SHA256=${DETOKENIZER_UTILS_PATCHED_FILE_SHA256}" \
@@ -1112,6 +1121,7 @@ docker buildx build --progress=plain \
   --build-arg "TOOL_OUTPUT_PARSER_UNIT_SHA256=${TOOL_OUTPUT_PARSER_UNIT_SHA256}" \
   --build-arg "QWEN_GRAMMAR_UNIT_SHA256=${QWEN_GRAMMAR_UNIT_SHA256}" \
   --build-arg "TEMPLATE_AUTHORSHIP_UNIT_SHA256=${TEMPLATE_AUTHORSHIP_UNIT_SHA256}" \
+  --build-arg "NATIVE_FP4_SELECTION_UNIT_SHA256=${NATIVE_FP4_SELECTION_UNIT_SHA256}" \
   --build-arg "TURBOQUANT_PATCH_DIFF_SHA256=${TURBOQUANT_PATCH_DIFF_SHA256}" \
   --build-arg "TOOL_SCHEMA_PATCH_DIFF_SHA256=${TOOL_SCHEMA_PATCH_DIFF_SHA256}" \
   --build-arg "AGENT_DEFAULTS_PATCH_DIFF_SHA256=${AGENT_DEFAULTS_PATCH_DIFF_SHA256}" \
@@ -1290,6 +1300,7 @@ actual_installed_report="$(
     /usr/local/lib/python3.12/dist-packages/vllm/renderers/hf.py \
     /usr/local/lib/python3.12/dist-packages/vllm/renderers/template_authorship.py \
     /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/pooling/scoring/io_processor.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/model_executor/kernels/linear/__init__.py \
     /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/serve/exception_handling/register.py \
     /usr/local/lib/python3.12/dist-packages/vllm/tokenizers/detokenizer_utils.py \
     /usr/local/lib/python3.12/dist-packages/vllm/tool_parsers/utils.py \
@@ -1360,6 +1371,7 @@ expected_installed_report="$(printf '%s  %s\n' \
   "${HF_RENDERER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/renderers/hf.py \
   "${TEMPLATE_AUTHORSHIP_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/renderers/template_authorship.py \
   "${SCORING_IO_PROCESSOR_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/pooling/scoring/io_processor.py \
+  "${LINEAR_KERNELS_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/model_executor/kernels/linear/__init__.py \
   "${EXCEPTION_REGISTRATION_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/serve/exception_handling/register.py \
   "${DETOKENIZER_UTILS_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/tokenizers/detokenizer_utils.py \
   "${TOOL_PARSER_UTILS_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/tool_parsers/utils.py \
@@ -1431,6 +1443,7 @@ additional_installed_report="$(
     /opt/qwen38/qwen38_context_unit.py \
     /opt/qwen38/chat_template_retention_unit.py \
     /opt/qwen38/template_authorship_unit.py \
+    /opt/qwen38/native_fp4_selection_unit.py \
     /opt/qwen38/nvfp4_kernel_unit.py
 )"
 expected_additional_installed_report="$(printf '%s  %s\n' \
@@ -1451,6 +1464,7 @@ expected_additional_installed_report="$(printf '%s  %s\n' \
   "${QWEN38_CONTEXT_UNIT_SHA256}" /opt/qwen38/qwen38_context_unit.py \
   "${CHAT_TEMPLATE_RETENTION_UNIT_SHA256}" /opt/qwen38/chat_template_retention_unit.py \
   "${TEMPLATE_AUTHORSHIP_UNIT_SHA256}" /opt/qwen38/template_authorship_unit.py \
+  "${NATIVE_FP4_SELECTION_UNIT_SHA256}" /opt/qwen38/native_fp4_selection_unit.py \
   "${NVFP4_KERNEL_UNIT_SHA256}" /opt/qwen38/nvfp4_kernel_unit.py)"
 if [[ "${additional_installed_report}" != "${expected_additional_installed_report}" ]]; then
   echo "Built image contains unexpected vision/runtime bytes." >&2

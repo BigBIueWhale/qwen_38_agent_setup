@@ -174,4 +174,8 @@
 !vllm/vllm/entrypoints/pooling/scoring/
 !vllm/vllm/entrypoints/pooling/scoring/io_processor.py
 !scripts/template_authorship_unit.py
+!vllm/vllm/model_executor/kernels/
+!vllm/vllm/model_executor/kernels/linear/
+!vllm/vllm/model_executor/kernels/linear/__init__.py
+!scripts/native_fp4_selection_unit.py
 !scripts/qwen_grammar_unit.py

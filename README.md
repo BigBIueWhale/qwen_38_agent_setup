@@ -307,9 +307,10 @@ It is intentionally reconstructed by the ordered, reviewed semantic transformati
 | patches/vllm-generation-admission-before-response.patch | 6c8b7e41034c2774a3051cda0fddd9cfc2662e176f96a3375086f0253bb81697 |
 | patches/vllm-kv-scope-single-flight.patch | cc5e52403afd4e4764693da552e9252bbf204793566fff6a27fb87b4dbd28d13 |
 | patches/vllm-template-authored-control-tokens.patch | dd43b43e5ad972c0b7622a3288d6d47cf2b11d24c17e11dda9a5c89a8a8ff542 |
+| patches/vllm-nvfp4-native-kernel-required.patch | 9d9ce188b6670d687a725c4cdca37478f9dc78ef9f19685ddbcf5e9edd53b8b7 |
 
-The reconstructed tree has 103 reviewed runtime-source changes, 2 new runtime sources,
-7 runtime-source deletions, 81 existing-test changes, 15 new tests,
+The reconstructed tree has 104 reviewed runtime-source changes, 2 new runtime sources,
+7 runtime-source deletions, 81 existing-test changes, 16 new tests,
 and 3 test deletions. The authoritative
 counts are derived and printed by ./scripts/build-vllm.sh check, never restated
 by hand there. The landmark-aware Python patcher calculates every mutation
@@ -361,11 +362,11 @@ Pinned build inputs and products:
 | Offline archive | artifacts/qwen38-vllm-images-runtime-v27.tar |
 | Archive size | 8,561,267,712 bytes, mode 0600 |
 | Archive SHA-256 | 48cc3978e66e4d18f0a10752dbdfa08917f00d5dc9d75f7653b35b4a207d31a4 |
-| Runtime Dockerfile SHA-256 | dcbd7ec419301d0c56cd545aafd2fd249c3362bc2e02427dd6e505e8db34b3a7 |
-| Docker context allowlist SHA-256 | 4b293594032d2bfbb3d08c85f1b67810ec66541413011564584836e05edc8d63 |
-| Build verifier SHA-256 | ce5cbac366ec10fd1f339ce94453c81ff0b6a1f593e7541ca3ceebf33601312f |
-| Runtime validator SHA-256 | f3f882c912d72ef04bf0e5cac51d638b47f7d4e2352829661d638d260833ae03 |
-| Runtime lock SHA-256 | 74bd846106bf0244148bb05dec60ce6e350c8de7f96dad4acc5bcb9ad3d80609 |
+| Runtime Dockerfile SHA-256 | ac744a9870051f4ada5c05c7ed2562da166dbbd4028c2ffb5d037eb8a92e61bd |
+| Docker context allowlist SHA-256 | 0478aa5fae53be4a60a60682a732b96a30b9ebbd6fcdc024107eb358be157183 |
+| Build verifier SHA-256 | 11842c47812b39c8c8cda2541a714444c8b186d35b8115511c1cff00004d28bc |
+| Runtime validator SHA-256 | 6685952b62fb9a0cfd592b3ee1b4753c50322702739d2b051b63e7837958abb1 |
+| Runtime lock SHA-256 | 9e1a8096babef3770fbfd894f3113d7f5a28452663eadbf7cb5617aa55d50c4f |
 
 The runtime tag names the pinned image and nothing else. A build used to load its
 image under that tag before comparing the image ID with the pin, so a build that
@@ -1459,10 +1460,27 @@ Host requirements are functional, not identity pins: the invoked tools must
 exist, Docker must respond with its NVIDIA runtime, the daemon must report the
 container isolation [`scripts/host-isolation.sh`](scripts/host-isolation.sh)
 requires, and exactly one GPU with at least 32,607 MiB — the calibration floor
-of the locked VRAM/KV budget — must be present. Exact host software versions,
-binary hashes, and GPU/driver identity are deliberately not asserted; pinning
-them tied the deployment to one specific computer without making inference any
-more correct.
+of the locked VRAM/KV budget — and compute capability 12.0 must be present.
+Exact host software versions, binary hashes, and GPU/driver identity are
+deliberately not asserted; pinning them tied the deployment to one specific
+computer without making inference any more correct.
+
+Two different facts refuse a GPU, each by its own statement. A GPU without
+native FP4 cannot compute the checkpoint's NVFP4 W4A4 layers: vLLM's kernel
+selection used to fall through to Marlin (W4A16, 16-bit activations) or
+emulation with a warning, serving different arithmetic, and now refuses at
+layer construction, before any weight loads, naming the device capability and
+why each native kernel is unavailable (stage `nvfp4-native-kernel-required`,
+proven on CPU by `scripts/native_fp4_selection_unit.py`). Only naming the
+substitute with `--linear-backend`, which this locked command does not, serves
+it. Separately, `VALIDATED_CUDA_CAPABILITY` declares the one capability the
+image is built for (the base image compiles with `TORCH_CUDA_ARCH_LIST=12.0`)
+and every GPU gate ran on; the launcher refuses any other before starting
+anything, as outside the validated lock, and says how to validate one. It names
+an instruction set, not a card: every 12.0 GPU passes, and a B200 is refused
+because this image was never built or validated for 10.0, not because it lacks
+FP4. The runtime report the running container is checked against is software
+versions only.
 
 The isolation rule is one file that agent_service carries byte-identically. It
 parses `docker info` SecurityOptions into names and attributes and requires

@@ -81,13 +81,14 @@ check_host_prerequisites() {
   # daemon must report the container isolation the profile depends on, as
   # scripts/host-isolation.sh states it -- the one rule agent_service carries
   # byte-identically -- and exactly one GPU with at least the memory the
-  # locked KV/VRAM budget was calibrated for must be present. Exact host
-  # software versions, binary hashes, and GPU/driver identity are
-  # deliberately not asserted: they tie the deployment to one specific
-  # computer without making inference any more correct. Everything inside the
-  # pinned images remains exact.
+  # locked KV/VRAM budget was calibrated for, and of the compute capability the
+  # image is built and validated for, must be present. Exact host software
+  # versions, binary hashes, and GPU/driver identity are deliberately not
+  # asserted: they tie the deployment to one specific computer without making
+  # inference any more correct. Everything inside the pinned images remains
+  # exact.
   local command_name docker_server security_options isolation_refusals runtimes
-  local gpu_report gpu_count gpu_memory
+  local gpu_report gpu_count gpu_memory gpu_capability
   for command_name in docker git nvidia-smi sha256sum ss; do
     require_command "${command_name}"
   done
@@ -110,17 +111,23 @@ check_host_prerequisites() {
 
   gpu_report="$(
     nvidia-smi \
-      --query-gpu=memory.total \
+      --query-gpu=memory.total,compute_cap \
       --format=csv,noheader,nounits
   )"
   gpu_count="$(wc -l <<<"${gpu_report}")"
   require_equal "GPU count" "${gpu_count}" "1"
-  gpu_memory="${gpu_report//[[:space:]]/}"
+  IFS=, read -r gpu_memory gpu_capability <<<"${gpu_report//[[:space:]]/}"
   [[ "${gpu_memory}" =~ ^[0-9]+$ ]] || die "nvidia-smi reported a non-numeric GPU memory total: ${gpu_report}"
   if (( gpu_memory < MINIMUM_GPU_MEMORY_MIB )); then
     die "GPU memory is below the locked VRAM budget's calibration floor." \
       "Required: at least ${MINIMUM_GPU_MEMORY_MIB} MiB" \
       "Found:    ${gpu_memory} MiB"
+  fi
+  if [[ "${gpu_capability}" != "${VALIDATED_CUDA_CAPABILITY}" ]]; then
+    die "GPU compute capability ${gpu_capability:-<none reported>} is outside the validated lock." \
+      "Validated: ${VALIDATED_CUDA_CAPABILITY} -- the image's kernels are built for it and every GPU gate ran on it." \
+      "Found:     ${gpu_capability:-<none reported>}" \
+      "Next:      serve on a compute capability ${VALIDATED_CUDA_CAPABILITY} GPU, or build the image for this capability, pass its GPU units and probes on it, and then change VALIDATED_CUDA_CAPABILITY."
   fi
 }
 
@@ -443,7 +450,7 @@ assert_runtime_versions() {
   local actual_report
   actual_report="$(
     docker exec "${CONTAINER_NAME}" python3 -c \
-      'import importlib.metadata as m, platform, torch, transformers, vllm; names=["tokenizers","safetensors","compressed-tensors","flashinfer-python","triton","numpy","fastapi","uvicorn"]; print("python="+platform.python_version()); print("vllm="+vllm.__version__); print("torch="+torch.__version__); print("transformers="+transformers.__version__); [print(n+"="+m.version(n)) for n in names]; print("torch_cuda="+str(torch.version.cuda)); print("cuda_capability="+".".join(map(str,torch.cuda.get_device_capability())))'
+      'import importlib.metadata as m, platform, torch, transformers, vllm; names=["tokenizers","safetensors","compressed-tensors","flashinfer-python","triton","numpy","fastapi","uvicorn"]; print("python="+platform.python_version()); print("vllm="+vllm.__version__); print("torch="+torch.__version__); print("transformers="+transformers.__version__); [print(n+"="+m.version(n)) for n in names]; print("torch_cuda="+str(torch.version.cuda))'
   )"
   if [[ "${actual_report}" != "${EXPECTED_RUNTIME_REPORT}" ]]; then
     die "Container software versions differ from the validated lock." \
@@ -727,6 +734,7 @@ assert_running_profile() {
       /usr/local/lib/python3.12/dist-packages/vllm/renderers/hf.py \
       /usr/local/lib/python3.12/dist-packages/vllm/renderers/template_authorship.py \
       /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/pooling/scoring/io_processor.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/model_executor/kernels/linear/__init__.py \
       /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/serve/exception_handling/register.py \
       /usr/local/lib/python3.12/dist-packages/vllm/tokenizers/detokenizer_utils.py \
       /usr/local/lib/python3.12/dist-packages/vllm/tool_parsers/utils.py \
@@ -797,6 +805,7 @@ assert_running_profile() {
     "${HF_RENDERER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/renderers/hf.py \
     "${TEMPLATE_AUTHORSHIP_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/renderers/template_authorship.py \
     "${SCORING_IO_PROCESSOR_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/pooling/scoring/io_processor.py \
+    "${LINEAR_KERNELS_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/model_executor/kernels/linear/__init__.py \
     "${EXCEPTION_REGISTRATION_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/serve/exception_handling/register.py \
     "${DETOKENIZER_UTILS_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/tokenizers/detokenizer_utils.py \
     "${TOOL_PARSER_UTILS_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/tool_parsers/utils.py \

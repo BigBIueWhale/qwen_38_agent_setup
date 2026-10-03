@@ -82,7 +82,8 @@ readonly QWEN_UNIQUE_PARAMETERS_PATCH_DIFF_SHA256="6a76a61c743807215555cbd6b3bbd
 readonly GENERATION_ADMISSION_PATCH_DIFF_SHA256="6c8b7e41034c2774a3051cda0fddd9cfc2662e176f96a3375086f0253bb81697"
 readonly KV_SCOPE_SINGLE_FLIGHT_PATCH_DIFF_SHA256="cc5e52403afd4e4764693da552e9252bbf204793566fff6a27fb87b4dbd28d13"
 readonly TEMPLATE_AUTHORED_CONTROL_TOKENS_PATCH_DIFF_SHA256="dd43b43e5ad972c0b7622a3288d6d47cf2b11d24c17e11dda9a5c89a8a8ff542"
-readonly SOURCE_PATCH_MANIFEST_SHA256="2fec42c796840cbf1a1e38ebdab96bb732ed6d48248ca0b3db35342bd068b65e"
+readonly NVFP4_NATIVE_KERNEL_PATCH_DIFF_SHA256="9d9ce188b6670d687a725c4cdca37478f9dc78ef9f19685ddbcf5e9edd53b8b7"
+readonly SOURCE_PATCH_MANIFEST_SHA256="ab876f2bc2288ec94a0139ffe1902dd03f4f9407522ce98fc49beffdb60449fd"
 # Cardinality of config/deployment-inputs.sha256. The hash manifest alone
 # proves the listed bytes but cannot see a quietly grown or shrunk allowlist,
 # so the reviewed file count is pinned as well. It is declared exactly once,
@@ -91,7 +92,7 @@ readonly SOURCE_PATCH_MANIFEST_SHA256="2fec42c796840cbf1a1e38ebdab96bb732ed6d482
 # was added — the validator then refused a correct manifest. Every consumer
 # (build-vllm.sh, runtime-common.sh, generate-deployment-input-manifest.sh)
 # reads this declaration.
-readonly DEPLOYMENT_INPUT_FILE_COUNT="120"
+readonly DEPLOYMENT_INPUT_FILE_COUNT="122"
 readonly TURBOQUANT_PATCHED_FILE_SHA256="ccda36577e4fb0052f370169dce4b649bad890b8b440a82e584acd3dd92a6d86"
 readonly TURBOQUANT_STORE_PATCHED_FILE_SHA256="298645bff68c6adab58261862602b86e7e714c3552a9fd89102d9ccd2b83e9f7"
 readonly TURBOQUANT_DECODE_PATCHED_FILE_SHA256="dab8b65ab7ddd6582de16e1fc7b1360ab0061b4a2a2b114f5d87ea0532fd726f"
@@ -162,6 +163,7 @@ readonly NVFP4_KERNEL_UNIT_SHA256="2fce56060c9589d46e50371c8de456a6b9a65b906d95d
 readonly REASONING_USAGE_UNIT_SHA256="464c663e52ad4d162c2ebb90b5703cf61bac106addef9d8e96d8db7b2001235f"
 readonly QWEN_GRAMMAR_UNIT_SHA256="e22b61830cf17ea3f160d71f12928374bbb01f4b2b156f4870667c866beca14a"
 readonly TEMPLATE_AUTHORSHIP_UNIT_SHA256="78f17c3ee861f4cb6a3bb56304cee6a6b1dd98bc62dce2403d79162a3bf0b1cb"
+readonly NATIVE_FP4_SELECTION_UNIT_SHA256="95fe8a9bb65f7c7f78f621c10621729b20dd67614a09ddedc67f573ba6a09707"
 readonly TURBOQUANT_UPSTREAM_FILE_SHA256="48994be137f3d25d4ee4f79ba2b89b0a6c3d988085079ffea1d241a34c2c755f"
 readonly TOOL_SCHEMA_UPSTREAM_FILE_SHA256="015b989c567c6794e6dbbba72af88694470421adab13775c95b50efe9eedd2b7"
 readonly MODEL_CONFIG_UPSTREAM_FILE_SHA256="17c687232886184f0390f38fc1c2c8ae078eaf24ebd1960a6b0c6a0669a35a98"
@@ -224,8 +226,8 @@ readonly TURBOQUANT_STORE_UPSTREAM_FILE_SHA256="6e6e2fe74a307d40f0be786ccbaea76d
 readonly TURBOQUANT_DECODE_UPSTREAM_FILE_SHA256="8e52678136449e4bbca2195fbcbb87426c955a2b1b8422e7ab9511e45ee5f5c6"
 readonly TURBOQUANT_GUARD_UNIT_SHA256="657189807e2966824c556a08eb78a9ed7891331f6de4f3b563cf6cfded15cf47"
 readonly SOURCE_DATE_EPOCH="1786751423"
-readonly RUNTIME_DOCKERFILE_SHA256="dcbd7ec419301d0c56cd545aafd2fd249c3362bc2e02427dd6e505e8db34b3a7"
-readonly DOCKERIGNORE_SHA256="4b293594032d2bfbb3d08c85f1b67810ec66541413011564584836e05edc8d63"
+readonly RUNTIME_DOCKERFILE_SHA256="ac744a9870051f4ada5c05c7ed2562da166dbbd4028c2ffb5d037eb8a92e61bd"
+readonly DOCKERIGNORE_SHA256="0478aa5fae53be4a60a60682a732b96a30b9ebbd6fcdc024107eb358be157183"
 
 # Functional host contract only. Exact host software versions, binary
 # hashes, and GPU/driver identity are deliberately not pinned: they tie the
@@ -238,6 +240,12 @@ readonly DOCKERIGNORE_SHA256="4b293594032d2bfbb3d08c85f1b67810ec6654141301156458
 # remains exact.
 readonly EXPECTED_CONTAINER_APPARMOR_PROFILE="docker-default"
 readonly MINIMUM_GPU_MEMORY_MIB="32607"
+# The one GPU compute capability this image is built and validated for. The
+# pinned base image compiles vLLM's kernels with TORCH_CUDA_ARCH_LIST=12.0, and
+# every GPU gate -- the NVFP4 kernel unit, the numerical audits and the probes --
+# ran on 12.0. It names an instruction set, not a card: every 12.0 GPU passes.
+# Whether a GPU can compute these weights natively is the engine's own refusal.
+readonly VALIDATED_CUDA_CAPABILITY="12.0"
 
 readonly LISTEN_HOST="127.0.0.1"
 readonly LISTEN_PORT="8000"
@@ -249,7 +257,7 @@ readonly TMP_TMPFS_OPTIONS="rw,nosuid,nodev,exec,size=2g,mode=1777"
 readonly RUN_TMPFS_OPTIONS="rw,nosuid,nodev,noexec,size=64m,uid=2000,gid=0,mode=0700"
 readonly STARTUP_TIMEOUT_SECONDS="600"
 
-readonly EXPECTED_RUNTIME_REPORT=$'python=3.12.3\nvllm=0.27.2rc1.dev106+g9df9b0b0a\ntorch=2.13.0+cu130\ntransformers=5.15.0\ntokenizers=0.22.2\nsafetensors=0.8.0\ncompressed-tensors=0.17.0\nflashinfer-python=0.6.16.post3\ntriton=3.7.1\nnumpy=2.3.5\nfastapi=0.136.3\nuvicorn=0.52.3\ntorch_cuda=13.0\ncuda_capability=12.0'
+readonly EXPECTED_RUNTIME_REPORT=$'python=3.12.3\nvllm=0.27.2rc1.dev106+g9df9b0b0a\ntorch=2.13.0+cu130\ntransformers=5.15.0\ntokenizers=0.22.2\nsafetensors=0.8.0\ncompressed-tensors=0.17.0\nflashinfer-python=0.6.16.post3\ntriton=3.7.1\nnumpy=2.3.5\nfastapi=0.136.3\nuvicorn=0.52.3\ntorch_cuda=13.0'
 
 RUNTIME_ENV=(
   "HOME=/home/vllm"
@@ -575,5 +583,7 @@ readonly HF_RENDERER_UPSTREAM_FILE_SHA256="b0e83d95fc0aca6e248e28aa727d795bd74da
 readonly TEMPLATE_AUTHORSHIP_PATCHED_FILE_SHA256="1bedb926a6d3d03c2360e4694aa90128900bd145d3480769cc2bd0f8a6cf4486"
 readonly SCORING_IO_PROCESSOR_PATCHED_FILE_SHA256="aaa0d78c9432298095134f2fc5f07ca18f613b139912aef01a43ade162bdb5d4"
 readonly SCORING_IO_PROCESSOR_UPSTREAM_FILE_SHA256="d10e7153cb345d8a34d8c4d6e1c53e7b6adcf29d494368f03e3a0f07ebe290f2"
+readonly LINEAR_KERNELS_PATCHED_FILE_SHA256="a75bc8943db386b6de3164963a2be22d44f93df24d62d07ce3736929d92cb1fc"
+readonly LINEAR_KERNELS_UPSTREAM_FILE_SHA256="813ef122fb5d50555eaa46eecd2a7a2b28b808b397e12cb81c3b36f9c91f02d5"
 
 readonly PRECISE_REQUEST_ERRORS_PATCH_DIFF_SHA256="4a5afc49e3cee76395dd3122878582f2b3884885decad26c4658796307d21ed9"

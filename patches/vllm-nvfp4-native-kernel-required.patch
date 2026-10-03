@@ -1,0 +1,142 @@
+diff --git a/tests/model_executor/kernels/test_nvfp4_native_selection.py b/tests/model_executor/kernels/test_nvfp4_native_selection.py
+new file mode 100644
+--- /dev/null
++++ b/tests/model_executor/kernels/test_nvfp4_native_selection.py
+@@ -0,0 +1,94 @@
++# SPDX-License-Identifier: Apache-2.0
++# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
++"""NVFP4 W4A4 layers are served by a native FP4 kernel or refused at load."""
++
++from __future__ import annotations
++
++import pytest
++
++import vllm.model_executor.kernels.linear as linear
++from vllm.model_executor.kernels.linear import (
++    _POSSIBLE_NVFP4_KERNELS,
++    init_nvfp4_linear_kernel,
++)
++from vllm.model_executor.kernels.linear.nvfp4.cutlass import (
++    CutlassNvFp4LinearKernel,
++)
++from vllm.model_executor.kernels.linear.nvfp4.emulation import (
++    EmulationNvFp4LinearKernel,
++)
++from vllm.model_executor.kernels.linear.nvfp4.flashinfer import (
++    FlashInferCudnnNvFp4LinearKernel,
++    FlashInferTrtllmNvFp4LinearKernel,
++)
++from vllm.model_executor.kernels.linear.nvfp4.marlin import (
++    MarlinNvFp4LinearKernel,
++)
++from vllm.platforms import PlatformEnum
++from vllm.platforms.interface import DeviceCapability
++
++
++def device(monkeypatch, capability, supported, backend="auto") -> None:
++    """A CUDA device of `capability` on which only `supported` kernels run."""
++    monkeypatch.setattr(linear.current_platform, "_enum", PlatformEnum.CUDA)
++    monkeypatch.setattr(
++        linear.current_platform,
++        "get_device_capability",
++        lambda device_id=0: DeviceCapability(*capability),
++    )
++    monkeypatch.setattr(linear, "_get_linear_backend", lambda: backend)
++    for kernel in _POSSIBLE_NVFP4_KERNELS[PlatformEnum.CUDA]:
++        result = (True, None) if kernel in supported else (False, "not here")
++        monkeypatch.setattr(
++            kernel,
++            "is_supported",
++            classmethod(lambda cls, compute_capability=None, r=result: r),
++        )
++        monkeypatch.setattr(
++            kernel, "can_implement", classmethod(lambda cls, config: (True, None))
++        )
++
++
++def test_a_gpu_without_native_fp4_refuses_instead_of_marlin(monkeypatch):
++    # An H200: Marlin runs, as do FlashInfer kernels with no capability check.
++    device(
++        monkeypatch,
++        (9, 0),
++        {
++            MarlinNvFp4LinearKernel,
++            FlashInferTrtllmNvFp4LinearKernel,
++            FlashInferCudnnNvFp4LinearKernel,
++            EmulationNvFp4LinearKernel,
++        },
++    )
++    with pytest.raises(ValueError, match="native FP4 kernel") as refusal:
++        init_nvfp4_linear_kernel()
++    assert "compute capability 9.0" in str(refusal.value)
++    assert "MarlinNvFp4LinearKernel, does not compute in FP4" in str(refusal.value)
++    assert "CutlassNvFp4LinearKernel: not here" in str(refusal.value)
++
++
++def test_emulation_is_not_substituted_either(monkeypatch):
++    device(monkeypatch, (8, 0), {EmulationNvFp4LinearKernel})
++    with pytest.raises(ValueError, match="EmulationNvFp4LinearKernel, does not"):
++        init_nvfp4_linear_kernel()
++
++
++def test_a_native_kernel_is_selected_ahead_of_substitutes(monkeypatch):
++    device(
++        monkeypatch,
++        (12, 0),
++        {CutlassNvFp4LinearKernel, MarlinNvFp4LinearKernel, EmulationNvFp4LinearKernel},
++    )
++    assert isinstance(init_nvfp4_linear_kernel(), CutlassNvFp4LinearKernel)
++
++
++def test_a_named_substitute_is_served(monkeypatch):
++    device(monkeypatch, (9, 0), {MarlinNvFp4LinearKernel}, backend="marlin")
++    assert isinstance(init_nvfp4_linear_kernel(), MarlinNvFp4LinearKernel)
++
++
++def test_weight_only_checkpoints_keep_marlin(monkeypatch):
++    device(monkeypatch, (9, 0), {MarlinNvFp4LinearKernel})
++    kernel = init_nvfp4_linear_kernel(use_a16=True)
++    assert isinstance(kernel, MarlinNvFp4LinearKernel)
+diff --git a/vllm/model_executor/kernels/linear/__init__.py b/vllm/model_executor/kernels/linear/__init__.py
+--- a/vllm/model_executor/kernels/linear/__init__.py
++++ b/vllm/model_executor/kernels/linear/__init__.py
+@@ -1069,6 +1069,13 @@
+     # Apply --linear-backend filtering when set.
+     possible = _resolve_backend_kernels(possible, "NVFP4")
+ 
++    # A W4A4 layer is computed in FP4 by a native kernel. Marlin and Humming
++    # keep 16-bit activations and emulation dequantizes, so each computes
++    # different arithmetic than the checkpoint declares: selection never
++    # substitutes one; only naming it with --linear-backend serves it.
++    substitutes = () if use_a16 else (*a16_kernels, EmulationNvFp4LinearKernel)
++    requested = _LINEAR_BACKEND_KERNEL_MAP.get(linear_backend, set())
++
+     failure_reasons = []
+     for kernel_cls in possible:
+         if kernel_cls.__name__ in envs.VLLM_DISABLED_KERNELS:
+@@ -1087,14 +1094,17 @@
+             failure_reasons.append(f"{kernel_cls.__name__}: {reason}")
+             continue
+ 
+-        if kernel_cls is EmulationNvFp4LinearKernel and failure_reasons:
+-            logger.warning_once(
+-                "NVFP4 linear falling back to the slow and unoptimized "
+-                "emulation backend as no optimized backend is available "
+-                "(unavailable reasons:\n - %s\n). "
+-                "In case you expect one of these backends to be used, "
+-                "please verify your environment.",
+-                "\n - ".join(failure_reasons),
++        if kernel_cls in substitutes and kernel_cls not in requested:
++            capability = current_platform.get_device_capability()
++            device = "unknown" if capability is None else capability.as_version_str()
++            raise ValueError(
++                "NVFP4 W4A4 layers need a native FP4 kernel, and this device "
++                f"(compute capability {device}) has none: "
++                f"{'; '.join(failure_reasons)}. The next candidate, "
++                f"{kernel_cls.__name__}, does not compute in FP4, so it is not "
++                "substituted. Serve this checkpoint on a GPU with native FP4 "
++                "(compute capability 10.x or 12.x), or name the substitute "
++                "with --linear-backend to serve its arithmetic knowingly."
+             )
+ 
+         logger.info_once("Using %s for NVFP4 GEMM", kernel_cls.__name__)
