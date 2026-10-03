@@ -1762,10 +1762,10 @@ def _validate_kv_physical_after(state: State) -> None:
     label = "KV physical bound result"
     _require_in_symbol(state, "vllm/v1/worker/gpu_worker.py",
                        "Worker.determine_available_memory", (
-        "kv_physical_bound = (\n            self.init_snapshot.free_memory",
-        "- profile_result.non_kv_cache_memory",
-        "- cudagraph_memory_estimate_applied",
-        "int(kv_physical_bound)",
+        "kv_physical_bound = ",
+        "self.init_snapshot.free_memory\n"
+        "            - profile_result.non_kv_cache_memory\n"
+        "            - cudagraph_memory_estimate_applied",
     ), label=label)
     require_python_symbols(state, "tests/v1/worker/test_gpu_worker.py", {
         "test_physical_bound_charges_preexisting_residents_once": None,
@@ -2969,6 +2969,31 @@ def _validate_grammar_read_arguments_after(state: State) -> None:
     }, label=label)
 
 
+def _validate_plan_bound_before(state: State) -> None:
+    require_text(state, "vllm/v1/worker/gpu_worker.py",
+                 "- int(self.total_consumed)",
+                 label="Startup plan admission bound precondition")
+
+
+def _validate_plan_bound_after(state: State) -> None:
+    label = "Startup plan persists the admission bound"
+    worker = "vllm/v1/worker/gpu_worker.py"
+    # One quantity: determine_available_memory derives the bound once and
+    # admits against it; the plan persists that same value, before the
+    # reservation a plan-shortcut boot applies to it again.
+    _require_in_symbol(state, worker, "Worker.determine_available_memory", (
+        "self.kv_physical_bound = int(",
+        "self.kv_physical_bound,",
+    ), label=label)
+    _require_in_symbol(state, worker, "Worker.compile_or_warm_up_model", (
+        "maybe_save_startup_plan(self, self.kv_physical_bound)",
+    ), label=label)
+    forbid_text(state, worker, "- int(self.total_consumed)", label=label)
+    require_python_symbols(state, "tests/v1/worker/test_gpu_worker.py", {
+        "test_plan_shortcut_boot_admits_against_the_profiled_bound": None,
+    }, label=label)
+
+
 def validate_final(state: State) -> None:
     """Reassert every durable semantic invariant on the complete tree.
 
@@ -2984,6 +3009,22 @@ def validate_final(state: State) -> None:
 
 
 CONTRACTS: Mapping[str, SemanticContract] = {
+    "startup-plan-admission-bound": SemanticContract(
+        rationale=(
+            "kv-physical-free-memory bounds the declared KV capacity by memory "
+            "initially free, but the startup plan still persisted the card's "
+            "total memory minus measured residents, so a plan-shortcut boot "
+            "admitted against a larger bound than the profiled boot it "
+            "replaces whenever memory was occupied before profiling. The plan "
+            "persists the one bound determine_available_memory derives."
+        ),
+        removal_condition=(
+            "Remove when pinned upstream persists the same admission bound its "
+            "profiled boot admits against."
+        ),
+        validate_before=_validate_plan_bound_before,
+        validate_after=_validate_plan_bound_after,
+    ),
     "qwen-arguments-read-by-grammar": SemanticContract(
         rationale=(
             "The Qwen grammar admits a JSON value whose strings carry "

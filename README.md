@@ -309,6 +309,7 @@ It is intentionally reconstructed by the ordered, reviewed semantic transformati
 | patches/vllm-template-authored-control-tokens.patch | dd43b43e5ad972c0b7622a3288d6d47cf2b11d24c17e11dda9a5c89a8a8ff542 |
 | patches/vllm-nvfp4-native-kernel-required.patch | 9d9ce188b6670d687a725c4cdca37478f9dc78ef9f19685ddbcf5e9edd53b8b7 |
 | patches/vllm-qwen-arguments-read-by-grammar.patch | fa0480f239cdb0de4dd4508ac151fadc1c6a5f76dcf7b15798dcac932ae33371 |
+| patches/vllm-startup-plan-admission-bound.patch | 994f9aabc61b3d7473e83593a5279b2759ce4413ceb1ea212ae33be342df0019 |
 
 The reconstructed tree has 104 reviewed runtime-source changes, 2 new runtime sources,
 7 runtime-source deletions, 81 existing-test changes, 16 new tests,
@@ -365,9 +366,9 @@ Pinned build inputs and products:
 | Archive SHA-256 | 48cc3978e66e4d18f0a10752dbdfa08917f00d5dc9d75f7653b35b4a207d31a4 |
 | Runtime Dockerfile SHA-256 | ac744a9870051f4ada5c05c7ed2562da166dbbd4028c2ffb5d037eb8a92e61bd |
 | Docker context allowlist SHA-256 | 0478aa5fae53be4a60a60682a732b96a30b9ebbd6fcdc024107eb358be157183 |
-| Build verifier SHA-256 | c06b748c523454a0c98660e9696b385591ccec046c9ba5bbde503a9567356b81 |
+| Build verifier SHA-256 | 3ec082de1cce4fd9ea15ba40b7a4c599c19b5e0ec29d34c62f74c33e1f66440e |
 | Runtime validator SHA-256 | 6685952b62fb9a0cfd592b3ee1b4753c50322702739d2b051b63e7837958abb1 |
-| Runtime lock SHA-256 | 8f9ba04ef15eccdd449e87886ed6c92f7e6363e57bc58a9cec97128a90fe70af |
+| Runtime lock SHA-256 | 7c358e038ff1ecd1bf5a70d1b1e86f6f562c2efb6cc5c86b02647a09f94de29c |
 
 The runtime tag names the pinned image and nothing else. A build used to load its
 image under that tag before comparing the image ID with the pin, so a build that

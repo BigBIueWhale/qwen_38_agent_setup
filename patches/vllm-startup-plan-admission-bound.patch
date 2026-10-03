@@ -1,0 +1,132 @@
+diff --git a/tests/v1/worker/test_gpu_worker.py b/tests/v1/worker/test_gpu_worker.py
+--- a/tests/v1/worker/test_gpu_worker.py
++++ b/tests/v1/worker/test_gpu_worker.py
+@@ -143,3 +143,74 @@
+     )
+     runner.profile_run.assert_called_once_with()
+     runner.profile_cudagraph_memory.assert_called_once_with()
++
++
++@pytest.mark.parametrize("initial_residents", [0, 2 * GiB_bytes])
++def test_plan_shortcut_boot_admits_against_the_profiled_bound(
++    plan_env, monkeypatch, initial_residents
++):
++    """A persisted plan carries the one admission bound a profiled boot derives.
++
++    The profiled boot keeps the bound it returns before the multimodal IPC
++    reservation, and that is what the plan persists; a later boot that applies
++    the plan reserves it again and so admits against exactly the same number.
++    """
++    from vllm.v1.worker import gpu_worker
++
++    total = 32 * GiB_bytes
++    initially_free = total - initial_residents
++    weights, peak, graph, frontend = 20 * GiB_bytes, GiB_bytes, GiB_bytes // 2, 1 << 28
++    profile = SimpleNamespace(
++        total_consumed=weights,
++        transient_peak_headroom=peak,
++        non_kv_cache_memory=weights + peak,
++        weights_memory=weights,
++        after_profile=SimpleNamespace(free_memory=initially_free - weights),
++    )
++
++    def worker():
++        return SimpleNamespace(
++            init_snapshot=SimpleNamespace(free_memory=initially_free, total_memory=total),
++            requested_memory=int(total * 0.92),
++            cache_config=SimpleNamespace(
++                kv_cache_memory_bytes=None, gpu_memory_utilization=0.92
++            ),
++            model_config=SimpleNamespace(multimodal_config=object()),
++            parallel_config=SimpleNamespace(_api_process_count=1, world_size=1),
++            rank=0,
++            model_runner=SimpleNamespace(
++                model_memory_usage=weights,
++                profile_run=Mock(),
++                profile_cudagraph_memory=Mock(return_value=graph),
++            ),
++            vllm_config=SimpleNamespace(
++                compute_hash=lambda: "plan-bound",
++                compilation_config=SimpleNamespace(
++                    cudagraph_mode=gpu_worker.CUDAGraphMode.FULL
++                ),
++            ),
++        )
++
++    monkeypatch.setenv("VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS", "1")
++    with (
++        patch.object(gpu_worker, "memory_profiling", return_value=nullcontext(profile)),
++        patch.object(
++            gpu_worker, "current_platform", SimpleNamespace(is_cuda_alike=lambda: True)
++        ),
++        patch.object(
++            gpu_worker, "reserve_mm_ipc_gpu_memory",
++            side_effect=lambda n, *args: n - frontend,
++        ),
++    ):
++        profiled = worker()
++        admitted = gpu_worker.Worker.determine_available_memory(profiled)
++        assert profiled.kv_physical_bound == admitted + frontend
++        assert profiled.kv_physical_bound == (
++            initially_free - weights - peak - graph
++        )
++        maybe_save_startup_plan(profiled, profiled.kv_physical_bound)
++
++        shortcut = worker()
++        assert gpu_worker.Worker.determine_available_memory(shortcut) == admitted
++        assert shortcut.cache_config.kv_cache_memory_bytes == profiled.kv_physical_bound
++        shortcut.model_runner.profile_cudagraph_memory.assert_not_called()
+diff --git a/vllm/v1/worker/gpu_worker.py b/vllm/v1/worker/gpu_worker.py
+--- a/vllm/v1/worker/gpu_worker.py
++++ b/vllm/v1/worker/gpu_worker.py
+@@ -575,7 +575,7 @@
+             - profile_result.non_kv_cache_memory
+             - cudagraph_memory_estimate_applied
+         )
+-        kv_physical_bound = (
++        self.kv_physical_bound = int(
+             self.init_snapshot.free_memory
+             - profile_result.non_kv_cache_memory
+             - cudagraph_memory_estimate_applied
+@@ -603,7 +603,7 @@
+             "estimate.",
+             format_gib(self.available_kv_cache_memory_bytes),
+             format_gib(self.requested_memory),
+-            format_gib(kv_physical_bound),
++            format_gib(self.kv_physical_bound),
+             format_gib(self.init_snapshot.free_memory),
+             format_gib(profile_result.non_kv_cache_memory),
+             format_gib(profile_result.weights_memory),
+@@ -650,7 +650,7 @@
+                 )
+ 
+         return reserve_mm_ipc_gpu_memory(
+-            int(kv_physical_bound),
++            self.kv_physical_bound,
+             self.model_config.multimodal_config,
+             getattr(self.parallel_config, "_api_process_count", 1),
+         )
+@@ -832,17 +832,12 @@
+ 
+             logger.info(msg)
+ 
+-            # Persist the same admission bound determine_available_memory
+-            # derived (the whole card minus every measured resident), so a
+-            # plan-shortcut boot reaches the same authoritative decision —
+-            # persisting the conservative estimate here would quietly
+-            # re-subordinate the declaration to it.
+-            maybe_save_startup_plan(
+-                self,
+-                int(self.init_snapshot.total_memory)
+-                - int(self.total_consumed)
+-                - int(self.peak_activation_memory),
+-            )
++            # Persist the admission bound determine_available_memory derived,
++            # before the multimodal IPC reservation a plan-shortcut boot
++            # applies to it again, so that boot reaches the same
++            # authoritative decision -- persisting the conservative estimate
++            # here would quietly re-subordinate the declaration to it.
++            maybe_save_startup_plan(self, self.kv_physical_bound)
+ 
+         if self.use_v2_model_runner:
+             # V2: Run full execute_model + sample_tokens to JIT compile triton kernels.

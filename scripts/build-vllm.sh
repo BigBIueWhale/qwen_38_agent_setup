@@ -329,6 +329,7 @@ KV_SCOPE_SINGLE_FLIGHT_PATCH_FILE="${PROJECT_DIR}/patches/vllm-kv-scope-single-f
 TEMPLATE_AUTHORED_CONTROL_TOKENS_PATCH_FILE="${PROJECT_DIR}/patches/vllm-template-authored-control-tokens.patch"
 NVFP4_NATIVE_KERNEL_PATCH_FILE="${PROJECT_DIR}/patches/vllm-nvfp4-native-kernel-required.patch"
 QWEN_ARGUMENTS_READ_BY_GRAMMAR_PATCH_FILE="${PROJECT_DIR}/patches/vllm-qwen-arguments-read-by-grammar.patch"
+STARTUP_PLAN_BOUND_PATCH_FILE="${PROJECT_DIR}/patches/vllm-startup-plan-admission-bound.patch"
 
 TURBOQUANT_REL="vllm/v1/attention/backends/turboquant_attn.py"
 TOOL_SCHEMA_REL="vllm/tool_parsers/structural_tag_registry.py"
@@ -557,7 +558,8 @@ printf '%s  %s\n' \
   "${KV_SCOPE_SINGLE_FLIGHT_PATCH_DIFF_SHA256}" "${KV_SCOPE_SINGLE_FLIGHT_PATCH_FILE}" \
   "${TEMPLATE_AUTHORED_CONTROL_TOKENS_PATCH_DIFF_SHA256}" "${TEMPLATE_AUTHORED_CONTROL_TOKENS_PATCH_FILE}" \
   "${NVFP4_NATIVE_KERNEL_PATCH_DIFF_SHA256}" "${NVFP4_NATIVE_KERNEL_PATCH_FILE}" \
-  "${QWEN_ARGUMENTS_READ_BY_GRAMMAR_PATCH_DIFF_SHA256}" "${QWEN_ARGUMENTS_READ_BY_GRAMMAR_PATCH_FILE}" | \
+  "${QWEN_ARGUMENTS_READ_BY_GRAMMAR_PATCH_DIFF_SHA256}" "${QWEN_ARGUMENTS_READ_BY_GRAMMAR_PATCH_FILE}" \
+  "${STARTUP_PLAN_BOUND_PATCH_DIFF_SHA256}" "${STARTUP_PLAN_BOUND_PATCH_FILE}" | \
   sha256sum --check --strict
 
 printf '%s  %s\n' \
