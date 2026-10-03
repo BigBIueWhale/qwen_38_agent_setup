@@ -16,220 +16,6 @@ USAGE
 # mode wearing the first one's clothes.
 (($# == 1)) || usage
 MODE="$1"
-EXPECTED_STATUS=$' M tests/config/test_config_utils.py
- M tests/distributed/test_rocm_quick_reduce.py
- M tests/engine/test_arg_utils.py
- M tests/entrypoints/anthropic/test_anthropic_messages_conversion.py
- M tests/entrypoints/multimodal/openai/chat_completion/test_video.py
- M tests/entrypoints/multimodal/openai/chat_completion/test_vision.py
- M tests/entrypoints/openai/chat_completion/test_chat_error.py
- M tests/entrypoints/openai/chat_completion/test_logprob_token_ids.py
- M tests/entrypoints/openai/chat_completion/test_serving_chat.py
- M tests/entrypoints/openai/completion/test_completion.py
- M tests/entrypoints/openai/completion/test_completion_error.py
- M tests/entrypoints/openai/completion/test_lora_resolvers.py
- M tests/entrypoints/openai/responses/test_function_call_parsing.py
- M tests/entrypoints/openai/responses/test_parsable_context_unit.py
- M tests/entrypoints/openai/responses/test_responses_utils.py
- M tests/entrypoints/openai/responses/test_sampling_params.py
- M tests/entrypoints/openai/responses/test_serving_responses.py
- M tests/entrypoints/openai/test_reasoning_enable_thinking.py
- M tests/entrypoints/openai/test_render_parity.py
- M tests/entrypoints/openai/test_render_token_offsets.py
- M tests/entrypoints/openai/test_session_id.py
- M tests/entrypoints/scale_out/derender/test_derender.py
- M tests/entrypoints/scale_out/render/test_render_multimodal.py
- M tests/entrypoints/scale_out/token_in_token_out/test_generate_stream.py
- D tests/entrypoints/scale_out/token_in_token_out/test_mm_serde.py
- M tests/entrypoints/scale_out/token_in_token_out/test_protocol.py
- M tests/entrypoints/scale_out/token_in_token_out/test_serving_multimodal_tokens.py
- M tests/entrypoints/serve/exception_handling/test_http_status_metrics.py
- M tests/entrypoints/serve/exception_handling/test_validation_exception_handler.py
- M tests/entrypoints/serve/lora/test_lora_adapters.py
- M tests/entrypoints/serve/utils/test_api_utils.py
- M tests/entrypoints/unit_tests/test_chat_utils.py
- M tests/evals/gsm8k/test_gsm8k_offloading.py
- M tests/models/language/pooling/test_reward.py
- M tests/multimodal/media/test_connector.py
- M tests/multimodal/media/test_image.py
- M tests/parser/engine/replay_harness.py
- M tests/parser/engine/streaming_helpers.py
- M tests/parser/engine/test_delegating_replay.py
- M tests/parser/engine/test_engine.py
- M tests/parser/engine/test_nemotron_v3.py
- M tests/parser/engine/test_parser_engine.py
- M tests/parser/engine/test_qwen3.py
- M tests/parser/engine/test_qwen3_reasoning.py
- M tests/parser/engine/test_replay.py
- M tests/parser/engine/test_seed_oss.py
- M tests/parser/engine/test_token_id_scanner.py
- M tests/parser/engine/trace_builder.py
- M tests/quantization/test_turboquant.py
- M tests/renderers/test_hf.py
- M tests/test_request_input_bounds.py
- M tests/test_sampling_params.py
- M tests/tool_parsers/test_poolside_v1_tool_parser.py
- M tests/tool_parsers/test_structural_tag_registry.py
- M tests/tool_use/test_gemma4_responses_adjust_request.py
- M tests/v1/core/test_prefix_caching.py
- M tests/v1/e2e/general/test_context_length.py
- M tests/v1/engine/test_output_processor.py
- M tests/v1/kv_connector/nixl_integration/run_multi_connector_accuracy_test.sh
- M tests/v1/kv_connector/nixl_integration/run_multi_connector_edge_case_test.sh
- M tests/v1/kv_connector/nixl_integration/spec_decode_acceptance_test.sh
- M tests/v1/kv_connector/unit/offloading_connector/test_config.py
- M tests/v1/kv_connector/unit/offloading_connector/test_events.py
- M tests/v1/kv_connector/unit/offloading_connector/test_scheduler.py
- M tests/v1/kv_connector/unit/offloading_connector/test_worker.py
- M tests/v1/kv_connector/unit/test_config.py
- M tests/v1/kv_connector/unit/test_hma_auto_config.py
- M tests/v1/kv_connector/unit/test_offloading_connector.py
- D tests/v1/kv_offload/cpu/policies/__init__.py
- D tests/v1/kv_offload/cpu/policies/test_factory.py
- M tests/v1/kv_offload/cpu/test_manager.py
- M tests/v1/kv_offload/test_factory.py
- M tests/v1/kv_offload/test_file_mapper.py
- M tests/v1/kv_offload/tiering/p2p/run_accuracy_test.sh
- M tests/v1/kv_offload/tiering/test_fs_tier.py
- M tests/v1/kv_offload/tiering/test_obj_tier.py
- M tests/v1/kv_offload/tiering/test_tiering_offloading.py
- M tests/v1/logits_processors/test_correctness.py
- M tests/v1/simple_kv_offload/test_integration.py
- M tests/v1/simple_kv_offload/test_scheduler.py
- M tests/v1/streaming_input/test_async_llm_streaming.py
- M tests/v1/structured_output/test_backend_xgrammar_stop_tokens.py
- M tests/v1/worker/test_gpu_model_runner_mm_gather.py
- M tests/v1/worker/test_gpu_worker.py
- M vllm/config/cache.py
- M vllm/config/model.py
- M vllm/config/reasoning.py
- M vllm/config/vllm.py
- M vllm/distributed/kv_transfer/kv_connector/v1/offloading/config.py
- M vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py
- M vllm/engine/arg_utils.py
- M vllm/engine/protocol.py
- M vllm/entrypoints/anthropic/api_router.py
- M vllm/entrypoints/anthropic/protocol.py
- M vllm/entrypoints/anthropic/serving.py
- M vllm/entrypoints/chat_utils.py
- M vllm/entrypoints/generate/api_router.py
- M vllm/entrypoints/llm.py
- M vllm/entrypoints/openai/chat_completion/api_router.py
- M vllm/entrypoints/openai/chat_completion/batch_serving.py
- M vllm/entrypoints/openai/chat_completion/protocol.py
- M vllm/entrypoints/openai/chat_completion/serving.py
- M vllm/entrypoints/openai/cli_args.py
- M vllm/entrypoints/openai/completion/api_router.py
- M vllm/entrypoints/openai/completion/protocol.py
- M vllm/entrypoints/openai/completion/serving.py
- M vllm/entrypoints/openai/engine/protocol.py
- M vllm/entrypoints/openai/responses/context.py
- M vllm/entrypoints/openai/responses/protocol.py
- M vllm/entrypoints/openai/responses/serving.py
- M vllm/entrypoints/openai/responses/streaming_events.py
- M vllm/entrypoints/openai/responses/utils.py
- M vllm/entrypoints/openai/run_batch.py
- M vllm/entrypoints/pooling/scoring/io_processor.py
- M vllm/entrypoints/scale_out/derender/serving.py
- M vllm/entrypoints/scale_out/render/serving.py
- M vllm/entrypoints/scale_out/token_in_token_out/api_router.py
- D vllm/entrypoints/scale_out/token_in_token_out/mm_serde.py
- M vllm/entrypoints/scale_out/token_in_token_out/protocol.py
- M vllm/entrypoints/scale_out/token_in_token_out/serving.py
- M vllm/entrypoints/serve/exception_handling/error_response.py
- M vllm/entrypoints/serve/exception_handling/handlers/exception.py
- M vllm/entrypoints/serve/exception_handling/handlers/http.py
- M vllm/entrypoints/serve/exception_handling/handlers/validation.py
- M vllm/entrypoints/serve/exception_handling/handlers/vllm_error.py
- M vllm/entrypoints/serve/exception_handling/register.py
- M vllm/entrypoints/serve/tokenize/protocol.py
- M vllm/entrypoints/serve/utils/api_utils.py
- D vllm/entrypoints/serve/utils/tool_calls_utils.py
- M vllm/envs.py
- M vllm/model_executor/kernels/linear/__init__.py
- M vllm/model_executor/models/qwen3_vl.py
- M vllm/multimodal/media/connector.py
- M vllm/multimodal/media/image.py
- M vllm/multimodal/processing/inputs.py
- M vllm/multimodal/processing/processor.py
- M vllm/parser/abstract_parser.py
- M vllm/parser/deepseek_v32.py
- M vllm/parser/deepseek_v4.py
- M vllm/parser/engine/adapters.py
- M vllm/parser/engine/events.py
- M vllm/parser/engine/parser_engine.py
- M vllm/parser/engine/parser_engine_config.py
- M vllm/parser/engine/streaming_parser_engine.py
- M vllm/parser/engine/token_id_scanner.py
- M vllm/parser/gemma4.py
- M vllm/parser/glm47_moe.py
- M vllm/parser/inkling.py
- M vllm/parser/kimi_k2.py
- M vllm/parser/minimax_m2.py
- M vllm/parser/mistral.py
- M vllm/parser/qwen3.py
- M vllm/reasoning/abs_reasoning_parsers.py
- M vllm/renderers/base.py
- M vllm/renderers/hf.py
- M vllm/renderers/online_derenderer.py
- M vllm/renderers/params.py
- M vllm/sampling_params.py
- M vllm/tokenizers/detokenizer_utils.py
- M vllm/tool_parsers/abstract_tool_parser.py
- M vllm/tool_parsers/structural_tag_registry.py
- M vllm/tool_parsers/utils.py
- M vllm/v1/attention/backends/turboquant_attn.py
- M vllm/v1/attention/ops/triton_turboquant_decode.py
- M vllm/v1/attention/ops/triton_turboquant_store.py
- M vllm/v1/core/block_pool.py
- M vllm/v1/core/kv_cache_utils.py
- M vllm/v1/core/sched/scheduler.py
- M vllm/v1/core/sched/utils.py
- M vllm/v1/core/single_type_kv_cache_manager.py
- M vllm/v1/engine/async_llm.py
- M vllm/v1/engine/detokenizer.py
- M vllm/v1/engine/input_processor.py
- M vllm/v1/engine/output_processor.py
- M vllm/v1/kv_offload/base.py
- M vllm/v1/kv_offload/config.py
- M vllm/v1/kv_offload/cpu/common.py
- M vllm/v1/kv_offload/cpu/gpu_worker.py
- M vllm/v1/kv_offload/cpu/manager.py
- D vllm/v1/kv_offload/cpu/policies/__init__.py
- D vllm/v1/kv_offload/cpu/policies/arc.py
- D vllm/v1/kv_offload/cpu/policies/base.py
- D vllm/v1/kv_offload/cpu/policies/factory.py
- D vllm/v1/kv_offload/cpu/policies/lru.py
- M vllm/v1/kv_offload/cpu/spec.py
- M vllm/v1/kv_offload/tiering/manager.py
- M vllm/v1/kv_offload/tiering/spec.py
- M vllm/v1/request.py
- M vllm/v1/sample/thinking_budget_state.py
- M vllm/v1/structured_output/__init__.py
- M vllm/v1/structured_output/backend_types.py
- M vllm/v1/structured_output/backend_xgrammar.py
- M vllm/v1/worker/gpu_model_runner.py
- M vllm/v1/worker/gpu_worker.py
- M vllm/v1/worker/startup_plan.py
- M vllm/v1/worker/workspace.py
-?? tests/entrypoints/openai/chat_completion/test_parallel_tool_call_integrity.py
-?? tests/entrypoints/openai/test_beam_search_boundary.py
-?? tests/entrypoints/scale_out/derender/test_terminal_metadata.py
-?? tests/entrypoints/scale_out/token_in_token_out/test_raw_images.py
-?? tests/entrypoints/scale_out/token_in_token_out/test_raw_media_boundary.py
-?? tests/entrypoints/test_generation_admission.py
-?? tests/entrypoints/test_kv_scope_protocol.py
-?? tests/model_executor/kernels/test_nvfp4_native_selection.py
-?? tests/parser/engine/test_qwen_terminal_authority.py
-?? tests/parser/engine/test_qwen_xml_fidelity.py
-?? tests/parser/engine/test_reasoning_token_count.py
-?? tests/renderers/test_template_authorship.py
-?? tests/v1/core/test_kv_cache_users_sizing.py
-?? tests/v1/engine/test_async_llm_admission.py
-?? tests/v1/engine/test_kv_scope_single_flight.py
-?? tests/v1/worker/test_workspace.py
-?? vllm/renderers/template_authorship.py
-?? vllm/v1/structured_output/stop_checker.py'
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
 # shellcheck source=../config/runtime-v1.sh
@@ -461,6 +247,25 @@ if [[ "${actual_base_image_id}" != "${EXPECTED_BASE_IMAGE_ID}" ]]; then
   exit 1
 fi
 
+# The footprint the reviewed patch set leaves on a checkout of VLLM_COMMIT, as
+# git reports it. It is derived from the committed stage data, whose every
+# identity the transaction below proves, so it can describe no other patch set.
+REVIEWED_STATUS="$(
+  docker run --rm \
+    --network none \
+    --read-only \
+    --user "$(id -u):$(id -g)" \
+    --tmpfs /tmp:rw,nodev,nosuid,size=256m \
+    --env PYTHONPYCACHEPREFIX=/tmp/pycache \
+    --entrypoint python3 \
+    --volume "${PROJECT_DIR}:/project:ro" \
+    --workdir /project \
+    "${BASE_IMAGE_TAG}" \
+    -c 'from patches.source_patch_v1.apply_vllm_patchset import build_patchset
+print("\n".join(build_patchset().worktree_status()))'
+)"
+readonly REVIEWED_STATUS
+
 # Every identity this repository has itself shipped for a path, read out of
 # its own history: the FINAL_FILES of each committed revision of the generated
 # stage data. This is what lets "provably stale" be a statement about
@@ -487,7 +292,7 @@ actual_status="$(git -C "${VLLM_DIR}" status --short --untracked-files=all)"
 # the reconstruction's.
 live_paths_outside_set="$(
   sed -n 's/^...//p' <<<"${actual_status}" \
-    | grep -Fxv -f <(sed -n 's/^...//p' <<<"${EXPECTED_STATUS}") || true
+    | grep -Fxv -f <(sed -n 's/^...//p' <<<"${REVIEWED_STATUS}") || true
 )"
 unnamed_live_paths="${live_paths_outside_set}"
 if [[ -n "${live_paths_outside_set}" ]]; then
@@ -511,7 +316,7 @@ fi
 # pulled stage retired, is behind, not damaged, and that is precisely what
 # `materialise` repairs; every other mode still requires the exact reviewed
 # state.
-if [[ "${MODE}" != "materialise" && "${actual_status}" != "${EXPECTED_STATUS}" ]]; then
+if [[ "${MODE}" != "materialise" && "${actual_status}" != "${REVIEWED_STATUS}" ]]; then
   echo "Refusing unexpected vLLM worktree state:" >&2
   printf '%s\n' "${actual_status}" >&2
   echo "The live tree is behind the reviewed patch set." >&2
@@ -656,7 +461,7 @@ docker run --rm \
 reproduced_status="$(
   git -C "${VERIFY_WORKTREE}" status --short --untracked-files=all
 )"
-if [[ "${reproduced_status}" != "${EXPECTED_STATUS}" ]]; then
+if [[ "${reproduced_status}" != "${REVIEWED_STATUS}" ]]; then
   echo "Reviewed patches produced an unexpected vLLM worktree state:" >&2
   printf '%s\n' "${reproduced_status}" >&2
   exit 1
@@ -718,7 +523,7 @@ while IFS= read -r status_line; do
     echo "Next: ./scripts/build-vllm.sh materialise" >&2
     exit 1
   fi
-done <<<"${EXPECTED_STATUS}"
+done <<<"${REVIEWED_STATUS}"
 remove_verify_worktree
 trap cleanup_build_export EXIT
 
@@ -945,7 +750,7 @@ while IFS= read -r status_line; do
       parser_unit_mounts+=(--volume "${VLLM_DIR}/${path}:/usr/local/lib/python3.12/dist-packages/${path}:ro")
       ;;
   esac
-done <<<"${EXPECTED_STATUS}"
+done <<<"${REVIEWED_STATUS}"
 for unit in chat_template_retention_unit tool_output_parser_unit vision_contract_unit reasoning_usage_unit shared_prefix_cache_unit phase_budget_unit generate_result_unit raw_media_unit qwen_grammar_unit template_authorship_unit native_fp4_selection_unit; do
   docker run --rm --network none --read-only --user "$(id -u):$(id -g)" \
     --tmpfs /tmp:rw,nodev,nosuid,size=256m \
@@ -958,16 +763,16 @@ git -C "${VLLM_DIR}" diff --check
 
 if [[ "${MODE}" == "check" ]]; then
   # Every count below is derived from the objects this run just verified —
-  # EXPECTED_STATUS and the deployment-input manifest — never restated by
+  # REVIEWED_STATUS and the deployment-input manifest — never restated by
   # hand: a hand count here is one more copy that can drift from the thing
   # it describes.
-  modified_runtime_count="$(grep -c '^ M vllm/' <<<"${EXPECTED_STATUS}" || :)"
-  new_runtime_count="$(grep -c '^?? vllm/' <<<"${EXPECTED_STATUS}" || :)"
-  deleted_runtime_count="$(grep -c '^ D vllm/' <<<"${EXPECTED_STATUS}" || :)"
-  modified_test_count="$(grep -c '^ M tests/' <<<"${EXPECTED_STATUS}" || :)"
-  new_test_count="$(grep -c '^?? tests/' <<<"${EXPECTED_STATUS}" || :)"
-  deleted_test_count="$(grep -c '^ D tests/' <<<"${EXPECTED_STATUS}" || :)"
-  modified_doc_count="$(grep -c '^ M docs/' <<<"${EXPECTED_STATUS}" || :)"
+  modified_runtime_count="$(grep -c '^ M vllm/' <<<"${REVIEWED_STATUS}" || :)"
+  new_runtime_count="$(grep -c '^?? vllm/' <<<"${REVIEWED_STATUS}" || :)"
+  deleted_runtime_count="$(grep -c '^ D vllm/' <<<"${REVIEWED_STATUS}" || :)"
+  modified_test_count="$(grep -c '^ M tests/' <<<"${REVIEWED_STATUS}" || :)"
+  new_test_count="$(grep -c '^?? tests/' <<<"${REVIEWED_STATUS}" || :)"
+  deleted_test_count="$(grep -c '^ D tests/' <<<"${REVIEWED_STATUS}" || :)"
+  modified_doc_count="$(grep -c '^ M docs/' <<<"${REVIEWED_STATUS}" || :)"
   review_diff_count="$(grep -c '^[0-9a-f]\{64\}  patches/vllm-.*\.patch$' \
     "${DEPLOYMENT_INPUT_MANIFEST}" || :)"
   echo "Pinned base image, vLLM commit, transactional landmark patcher," \

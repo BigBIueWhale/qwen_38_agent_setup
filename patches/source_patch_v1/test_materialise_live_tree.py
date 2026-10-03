@@ -404,7 +404,7 @@ class BuildScriptContractTests(unittest.TestCase):
         # lets the verb repair a tree missing paths a pulled stage added.
         self.assertIn(
             'if [[ "${MODE}" != "materialise" && '
-            '"${actual_status}" != "${EXPECTED_STATUS}" ]]; then',
+            '"${actual_status}" != "${REVIEWED_STATUS}" ]]; then',
             self.script,
         )
 

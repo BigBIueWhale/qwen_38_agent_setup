@@ -349,8 +349,10 @@ materialising the explainable subset would leave a tree nobody could reason abou
 afterwards, so there is no partial mode. `check` and `build` read that tree and never
 write it, and the mode argument is required rather than defaulted, so the verb is
 reachable only by name. The remaining half of the fix is to build from the
-reconstruction itself, after which the worktree status gate, the file-by-file
-comparison and EXPECTED_STATUS describe nothing and are removed with it.
+reconstruction itself, after which the worktree status gate and the file-by-file
+comparison describe nothing and are removed with it. The footprint both are held
+to -- which paths the patch set changes, creates and deletes -- is derived from the
+committed stage data by the framework, never listed by hand.
 
 Pinned build inputs and products:
 
@@ -366,9 +368,9 @@ Pinned build inputs and products:
 | Archive SHA-256 | 48cc3978e66e4d18f0a10752dbdfa08917f00d5dc9d75f7653b35b4a207d31a4 |
 | Runtime Dockerfile SHA-256 | b89e080a0c98fe80add8c0a72ba57be3fea9389b69cc2a39d9929e78ca07d800 |
 | Docker context allowlist SHA-256 | 77b0c5dab61f5d56ddc6b9749b4fba1a3c7c45129d37481f7a0f9f88de80a186 |
-| Build verifier SHA-256 | 7b3b8bf54eb9750931aab209f5886f0f24717b7f8df209b0db0a323de3c41640 |
+| Build verifier SHA-256 | 246e51c445f5b0eb842103f03b047a4eb51cfe25af6350d22ec30ca598fc28a7 |
 | Runtime validator SHA-256 | 0bc9042cf21c4149f4d8ff71f1bb568ae7856df887e39760c416eda2699383f4 |
-| Runtime lock SHA-256 | b6e9db7c6fe33ab1018dfd9060dd13fd3f831d43f514d20924ba09bb54063b7d |
+| Runtime lock SHA-256 | e0b55ce4dfa23bffc96bfc8de6b3527fafe601d65f8cd21ee30485f27f60c485 |
 
 The runtime tag names the pinned image and nothing else. A build used to load its
 image under that tag before comparing the image ID with the pin, so a build that

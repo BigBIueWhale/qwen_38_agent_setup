@@ -86,7 +86,7 @@ readonly NVFP4_NATIVE_KERNEL_PATCH_DIFF_SHA256="9d9ce188b6670d687a725c4cdca37478
 readonly QWEN_ARGUMENTS_READ_BY_GRAMMAR_PATCH_DIFF_SHA256="fa0480f239cdb0de4dd4508ac151fadc1c6a5f76dcf7b15798dcac932ae33371"
 readonly STARTUP_PLAN_BOUND_PATCH_DIFF_SHA256="994f9aabc61b3d7473e83593a5279b2759ce4413ceb1ea212ae33be342df0019"
 readonly TEMPLATE_REFUSAL_PARAMETER_PATCH_DIFF_SHA256="f78e5a791fa23844b1a9c37752bf5a916053c86cfde8ff00eedadd02b935a897"
-readonly SOURCE_PATCH_MANIFEST_SHA256="9237d70d90b0d51199a99b6b78fd47746a753add60ae0583619ea27a90965100"
+readonly SOURCE_PATCH_MANIFEST_SHA256="b9fe5ed949f21d97005aaa28242f07d95bb91981d87ff5b3f4f37f12cad286f7"
 # Cardinality of config/deployment-inputs.sha256. The hash manifest alone
 # proves the listed bytes but cannot see a quietly grown or shrunk allowlist,
 # so the reviewed file count is pinned as well. It is declared exactly once,

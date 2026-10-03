@@ -219,6 +219,36 @@ class PatchSet:
                 f"{self.name}: invalid final digest for {path}",
             )
 
+    def worktree_status(self) -> tuple[str, ...]:
+        """How ``git status --short --untracked-files=all`` reports the result.
+
+        This is the patch set's whole footprint on a checkout of its source
+        revision: a path is listed when its final state differs from its
+        pristine one -- `` M`` changed, `` D`` deleted, ``??`` created -- and
+        every other path is untouched. The pristine state of a path is the
+        first identity a stage requires of it, and the final state is
+        ``final_files`` (absent for a deleted path), so the listing is derived
+        from the data the transaction proves rather than kept beside it.
+        Tracked paths come first and untracked ones after, each in path order,
+        as git lists them.
+        """
+        pristine: dict[str, str | None] = {}
+        for stage in self.stages:
+            for contract in stage.files:
+                pristine.setdefault(contract.path, contract.before_sha256)
+        tracked: list[str] = []
+        untracked: list[str] = []
+        for path in sorted(pristine):
+            before, after = pristine[path], self.final_files.get(path)
+            if before is None:
+                if after is not None:
+                    untracked.append(f"?? {path}")
+            elif after is None:
+                tracked.append(f" D {path}")
+            elif after != before:
+                tracked.append(f" M {path}")
+        return tuple(tracked + untracked)
+
 
 @dataclass(frozen=True)
 class PatchResult:

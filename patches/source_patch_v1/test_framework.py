@@ -590,3 +590,92 @@ class DeletionTransactionTests(unittest.TestCase):
         self.assertEqual(
             (self.source / "kept.py").read_text(encoding="utf-8"), kept_before
         )
+
+
+class WorktreeStatusTests(unittest.TestCase):
+    """The footprint a build checks its reconstruction against is derived."""
+
+    def setUp(self) -> None:
+        self.temporary = tempfile.TemporaryDirectory(prefix="source-patch-test-")
+        root = Path(self.temporary.name)
+        self.source = root / "source"
+        self.artifact = root / "artifact"
+        self.source.mkdir()
+        self.artifact.mkdir()
+        (self.source / "identity.txt").write_text(
+            "pinned-revision\n", encoding="utf-8"
+        )
+
+    def tearDown(self) -> None:
+        self.temporary.cleanup()
+
+    def _tree(self) -> dict[str, str]:
+        return {
+            path.relative_to(self.source).as_posix(): sha256_bytes(path.read_bytes())
+            for path in self.source.rglob("*")
+            if path.is_file()
+        }
+
+    def test_status_is_exactly_what_the_transaction_changes(self) -> None:
+        # One path of each kind: changed, created, deleted, changed and then
+        # restored by a later stage, and untouched. Only the first three differ
+        # from the source revision afterwards.
+        original = {
+            "pkg/changed.py": "def value():\n    return 1\n",
+            "pkg/doomed.py": "def dead_code():\n    return None\n",
+            "pkg/restored.py": "def flag():\n    return True\n",
+            "z_untouched.py": "def other():\n    return 0\n",
+        }
+        for path, text in original.items():
+            target = self.source / path
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(text, encoding="utf-8")
+        changed_after = "def value():\n    return 2\n"
+        created = "def fresh():\n    return 3\n"
+        restored_middle = "def flag():\n    return False\n"
+        first = _stage(
+            self.artifact,
+            name="first",
+            transformations=(
+                ("pkg/changed.py", original["pkg/changed.py"], changed_after),
+                ("pkg/created.py", "", created),
+                ("pkg/restored.py", original["pkg/restored.py"], restored_middle),
+            ),
+        )
+        second = _stage(
+            self.artifact,
+            name="second",
+            transformations=(
+                ("pkg/restored.py", restored_middle, original["pkg/restored.py"]),
+            ),
+        )
+        third = _deletion_stage(
+            self.artifact,
+            name="third",
+            deletions=(("pkg/doomed.py", original["pkg/doomed.py"]),),
+        )
+        patchset = _patchset(
+            (first, second, third),
+            final_files={
+                "pkg/changed.py": sha256_text(changed_after),
+                "pkg/created.py": sha256_text(created),
+                "pkg/restored.py": sha256_text(original["pkg/restored.py"]),
+            },
+        )
+        before = self._tree()
+
+        SourcePatchTransaction(self.source, self.artifact, patchset).apply()
+
+        after = self._tree()
+        self.assertEqual(
+            patchset.worktree_status(),
+            (" M pkg/changed.py", " D pkg/doomed.py", "?? pkg/created.py"),
+        )
+        observed = {
+            path
+            for path in set(before) | set(after)
+            if before.get(path) != after.get(path)
+        }
+        self.assertEqual(
+            {line[3:] for line in patchset.worktree_status()}, observed
+        )
