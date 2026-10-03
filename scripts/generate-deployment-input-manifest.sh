@@ -61,7 +61,6 @@ while IFS= read -r -d '' path; do
   count=$((count + 1))
 done < <(
   git -C "${PROJECT_DIR}" ls-files -z -- \
-    .dockerignore \
     chat_template.jinja \
     config/runtime-v1.sh \
     containers/Dockerfile.runtime \

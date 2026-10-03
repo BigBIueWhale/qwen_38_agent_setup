@@ -92,16 +92,17 @@ continues after a mismatch, or calls a mutable network fallback.
 Advanced reproducibility operations are deliberately separate from serving mode:
 
     ./scripts/build-vllm.sh check
-    ./scripts/build-vllm.sh materialise
     ./scripts/build-vllm.sh build
+    ./scripts/build-vllm.sh materialise DIRECTORY
     ./scripts/restore-images.sh
 
 The check reconstructs the source tree from the pinned upstream commit through every
-landmark-aware transformation. Materialise writes that reconstruction into the live `vllm/`
-tree wherever the live bytes are provably stale and refuses the whole run otherwise; it is the
-only command here that writes that tree, and the mode argument is required so it cannot happen
-by default. The build runs offline from the exact base image and fails unless it produces
-the pinned image ID. Restore verifies the pinned local archive before loading it.
+landmark-aware transformation and assembles the build context from that
+reconstruction. The build does the same, then runs offline from the exact base image
+on that context, and fails unless it produces the pinned image ID. Materialise writes
+the verified reconstruction to a new directory, as a tree in which to author a stage;
+nothing reads it. The mode argument is required, so none of these happens by default.
+Restore verifies the pinned local archive before loading it.
 
 `check` verifies the Dockerfile's hashes and packaging contracts and runs build
 units offline, the Qwen grammar unit among them; it does not execute the
@@ -128,20 +129,19 @@ This naming convention belongs to the probe; the backend treats the ID as
 opaque. The launcher runs probes by file, which supplies the name used by this
 convention.
 
-The build is reproducible on a given host: layer timestamps are normalised to
-`SOURCE_DATE_EPOCH`, so re-deriving the source tree does not change the image
-ID. It is not bit-identical across hosts, and the offline archive rather than a
-rebuild is how a second machine obtains the pinned image. Two things prevent
-cross-host identity, both measured rather than assumed. Byte-compilation writes
-`.pyc` files whose headers embed each source file's mtime, so the one layer that
-runs Python differs while every other layer matches; normalising that would
-mean touching only the copied files, since every one of the base image's 4,821
-vLLM files postdates `SOURCE_DATE_EPOCH` and a blanket `find -newermt` would
-rewrite the whole tree into a new layer. Separately, the host Docker and buildx
-versions are deliberately not pinned, and differing builders can serialise
-identically-specified layers differently. The archive is the stronger guarantee
-in any case: it makes both machines byte-identical by construction rather than
-by two builds happening to agree.
+The build is reproducible on a given host. Every file in the build context
+carries `SOURCE_DATE_EPOCH` as its mtime and fixed permissions, and the export
+clamps every layer timestamp to it, so reconstructing the source tree afresh for
+each build does not change the image ID. Byte-compilation writes `.pyc` files
+whose headers embed each copied source file's mtime; those headers therefore
+carry `SOURCE_DATE_EPOCH` too, rather than the moment some checkout was written,
+which was one of the two measured causes of different image IDs across hosts.
+The other remains: the host Docker and buildx versions are deliberately not
+pinned, and differing builders can serialise identically-specified layers
+differently. Whether two hosts now produce one ID has not been measured, so the
+offline archive rather than a rebuild is how a second machine obtains the pinned
+image; it makes both machines byte-identical by construction rather than by two
+builds happening to agree.
 
 ### Security and host boundary
 
@@ -320,39 +320,35 @@ them; they are not restated here. The landmark-aware Python patcher calculates e
 and complete pre/post hashes, performs atomic transactions with rollback, and is
 itself covered by thirteen failure-path tests. The
 unified diffs remain review artifacts, but they do not select mutation locations.
-The build check rejects an extra dirty file, ambiguous landmark, missing hunk, wrong
-stage, changed final hash, whitespace error, partial intermediate state, concurrent
-source drift, or a reconstruction that disagrees with the live `vllm/` tree.
+The build check rejects an ambiguous landmark, missing hunk, wrong stage, changed
+final hash, whitespace error, partial intermediate state, concurrent source drift, or
+a reconstruction whose footprint is not exactly the patch set's.
 
-That last comparison rests on unmanaged state, stated here rather than left to be
-rediscovered. The reconstruction is authoritative: it is built from the reviewed
-diffs and the committed landmark blocks into a disposable worktree, and every stage
-validates complete pre/post hashes. The live `vllm/` tree it is finally compared
-against is neither authoritative nor managed. Changing a patch stage therefore
-updates the reviewed diffs on every machine that pulls and leaves that tree behind on
-all of them; the comparison then fails against the reconstruction and names the file
-whose new stage the tree is missing, which reads as a patch defect and is not one.
-The build consumes that same tree -- containers/Dockerfile.runtime copies its files
-out of the build context -- so this comparison is still the only thing tying shipped
-bytes to the reviewed patches, and it must not simply be deleted.
+The image is built from that reconstruction and from nothing else. Every stage is
+applied from the pinned commit to a worktree of the build's own under complete
+pre/post hashes, and git must then find that worktree changed in exactly the paths
+the committed stage data changes, creates and deletes -- a footprint the framework
+derives from that data, never a list kept by hand. The build context is copied out
+of the reconstruction: each file `containers/Dockerfile.runtime` copies, from the
+reconstruction when it lies under `vllm/` and from this repository otherwise, and the
+Dockerfile itself, each at mode 0644 with `SOURCE_DATE_EPOCH` as its mtime. The CPU
+units run against those same copies. What the check proves is therefore what the
+image carries, and nothing but this repository's files, the pinned commit and the
+base image can enter it.
 
-`./scripts/build-vllm.sh materialise` is the sanctioned way through it, and the only
-command here that writes that tree. It writes from the reconstruction the same run
-has just proved, and only where the live bytes are *provably stale*: either an
-identity this repository itself shipped for that path at some committed revision --
-the FINAL_FILES of every committed revision of the generated stage data -- or the
-pristine upstream identity the patch set starts that path from. Both proofs are read
-from committed data, never from the tree being examined. That tree is also where a
-human edits to author a new stage, so a single difference that cannot be proved stale
-refuses the whole run and writes nothing at all, naming the path and what to do next;
-materialising the explainable subset would leave a tree nobody could reason about
-afterwards, so there is no partial mode. `check` and `build` read that tree and never
-write it, and the mode argument is required rather than defaulted, so the verb is
-reachable only by name. The remaining half of the fix is to build from the
-reconstruction itself, after which the worktree status gate and the file-by-file
-comparison describe nothing and are removed with it. The footprint both are held
-to -- which paths the patch set changes, creates and deletes -- is derived from the
-committed stage data by the framework, never listed by hand.
+The `vllm/` submodule is the pinned upstream checkout and nothing else. No check or
+build reads its files -- they reach it only through git, for the pinned commit's
+objects -- and git reports an edit there like any other uncommitted change, which
+`start.sh` and `status.sh` refuse. A stage is authored in a tree of its own:
+`./scripts/build-vllm.sh materialise DIRECTORY` runs the same verification as `check`
+and writes the verified reconstruction to DIRECTORY, a new detached worktree of the
+submodule at the pinned commit, with the reconstruction recorded in its index.
+`git -C DIRECTORY diff` is then exactly what the author changes on top of it (after
+`git add --intent-to-add` for a new file), which is the review diff
+`patches/source_patch_v1/compile_review_diff.py` compiles into stage data. The verb
+refuses a directory that exists, so it never writes over work, and a reconstruction
+that fails any step is removed rather than left behind. The tree is removed with
+`git -C vllm worktree remove --force DIRECTORY`.
 
 Pinned build inputs and products:
 
@@ -367,10 +363,9 @@ Pinned build inputs and products:
 | Archive size | 8,561,267,712 bytes, mode 0600 |
 | Archive SHA-256 | 48cc3978e66e4d18f0a10752dbdfa08917f00d5dc9d75f7653b35b4a207d31a4 |
 | Runtime Dockerfile SHA-256 | b89e080a0c98fe80add8c0a72ba57be3fea9389b69cc2a39d9929e78ca07d800 |
-| Docker context allowlist SHA-256 | 77b0c5dab61f5d56ddc6b9749b4fba1a3c7c45129d37481f7a0f9f88de80a186 |
-| Build verifier SHA-256 | 246e51c445f5b0eb842103f03b047a4eb51cfe25af6350d22ec30ca598fc28a7 |
-| Runtime validator SHA-256 | 0bc9042cf21c4149f4d8ff71f1bb568ae7856df887e39760c416eda2699383f4 |
-| Runtime lock SHA-256 | e0b55ce4dfa23bffc96bfc8de6b3527fafe601d65f8cd21ee30485f27f60c485 |
+| Build verifier SHA-256 | 4b9325d01fe46d1e1d4905076ea0937225a0287588d1155f2f3f5f980fd6e21d |
+| Runtime validator SHA-256 | bd59abf9d28614e8285247d2f41d30b216bc8decd799b2044677ac661afac7d5 |
+| Runtime lock SHA-256 | dadf0f6361aa1427dec021c26337267a400ed5e0c50862c9ed1a7530a1f22b3e |
 
 The runtime tag names the pinned image and nothing else. A build used to load its
 image under that tag before comparing the image ID with the pin, so a build that
@@ -396,13 +391,14 @@ Every reviewed runtime file, including both TurboQuant kernels, is copied and
 hash-checked against its upstream and patched identities. A CPU Triton-interpreter
 build unit executes the installed K8V4 store with finite, NaN, infinity and
 metadata-overflow inputs and checks the decode hardware guard. A separate recipe
-unit refuses missing copies, context entries or installed-file checks. The GPU
+unit refuses missing copies or installed-file checks. The GPU
 numerical unit remains a release gate; CPU interpretation is not GPU acceptance.
 
 The final runtime layer does no package resolution or installation. It is built with
-pull=false, network=none, provenance=false, an exact base ID, an allowlisted context,
-upstream installed-file hashes, final installed-file hashes, and build-time invariant
-tests. Independent offline builds produced the identical v13 image ID.
+pull=false, network=none, provenance=false, an exact base ID, a context assembled
+from the reconstruction, upstream installed-file hashes, final installed-file hashes,
+and build-time invariant tests. Independent offline builds produced the identical v13
+image ID.
 
 The local repository identity is Ronen Zyroff <rzyroff@gmail.com>. Global Git
 configuration is untouched. Large checkpoint trees, image archives, caches,

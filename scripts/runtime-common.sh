@@ -136,8 +136,7 @@ require_clean_committed_repository() {
   repository_status="$(
     git -C "${PROJECT_DIR}" status \
       --porcelain=v1 \
-      --untracked-files=all \
-      --ignore-submodules=dirty
+      --untracked-files=all
   )"
   if [[ -n "${repository_status}" ]]; then
     die "The backend deployment repository has uncommitted or untracked inputs." \

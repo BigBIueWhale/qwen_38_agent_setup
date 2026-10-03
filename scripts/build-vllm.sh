@@ -3,10 +3,12 @@ set -euo pipefail
 
 usage() {
   cat >&2 <<'USAGE'
-Usage: build-vllm.sh {build|check|materialise}
-  build        verify every pinned input, then build and export the runtime image
+Usage: build-vllm.sh {build|check|materialise DIRECTORY}
+  build        verify every pinned input, then build the runtime image from the
+               verified reconstruction and export it
   check        verify every pinned input and stop; nothing is written
-  materialise  write the live vllm/ tree from the verified reconstruction
+  materialise  write the verified reconstruction to DIRECTORY, a new tree in
+               which to author a stage; nothing reads it
 USAGE
   exit 2
 }
@@ -14,54 +16,90 @@ USAGE
 # The mode is required. It defaulted to `build`, which made the longest and
 # only image-producing action the one you got by typing nothing -- a second
 # mode wearing the first one's clothes.
-(($# == 1)) || usage
+(($# >= 1)) || usage
 MODE="$1"
+case "${MODE}" in
+  build|check)
+    (($# == 1)) || usage
+    ;;
+  materialise)
+    (($# == 2)) || usage
+    ;;
+  *)
+    usage
+    ;;
+esac
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
 # shellcheck source=../config/runtime-v1.sh
 source "${PROJECT_DIR}/config/runtime-v1.sh"
 VLLM_DIR="${PROJECT_DIR}/vllm"
 DOCKERFILE="${PROJECT_DIR}/containers/Dockerfile.runtime"
-DOCKERIGNORE="${PROJECT_DIR}/.dockerignore"
-TEMPLATE_FILE="${PROJECT_DIR}/chat_template.jinja"
-PHASE_BUDGET_UNIT_FILE="${PROJECT_DIR}/scripts/phase_budget_unit.py"
-VISION_WORKSPACE_UNIT_FILE="${PROJECT_DIR}/scripts/vision_workspace_unit.py"
-VISION_CONTRACT_UNIT_FILE="${PROJECT_DIR}/scripts/vision_contract_unit.py"
-VISION_MLP_UNIT_FILE="${PROJECT_DIR}/scripts/vision_mlp_unit.py"
-TURBOQUANT_K8V4_UNIT_FILE="${PROJECT_DIR}/scripts/turboquant_k8v4_unit.py"
-QWEN38_CONTEXT_UNIT_FILE="${PROJECT_DIR}/scripts/qwen38_context_unit.py"
-CHAT_TEMPLATE_RETENTION_UNIT_FILE="${PROJECT_DIR}/scripts/chat_template_retention_unit.py"
-NVFP4_KERNEL_UNIT_FILE="${PROJECT_DIR}/scripts/nvfp4_kernel_unit.py"
-TOOL_OUTPUT_PARSER_UNIT_FILE="${PROJECT_DIR}/scripts/tool_output_parser_unit.py"
-REASONING_USAGE_UNIT_FILE="${PROJECT_DIR}/scripts/reasoning_usage_unit.py"
-QWEN_GRAMMAR_UNIT_FILE="${PROJECT_DIR}/scripts/qwen_grammar_unit.py"
-TEMPLATE_AUTHORSHIP_UNIT_FILE="${PROJECT_DIR}/scripts/template_authorship_unit.py"
-NATIVE_FP4_SELECTION_UNIT_FILE="${PROJECT_DIR}/scripts/native_fp4_selection_unit.py"
 SOURCE_PATCH_DIR="${PROJECT_DIR}/patches/source_patch_v1"
 SOURCE_PATCH_MANIFEST="${SOURCE_PATCH_DIR}/manifest.sha256"
-GENERATED_STAGES_REL="patches/source_patch_v1/generated_vllm_stages.py"
 DEPLOYMENT_INPUT_MANIFEST="${PROJECT_DIR}/config/deployment-inputs.sha256"
-RUNTIME_COMMON_CONTRACT_TEST="${PROJECT_DIR}/scripts/test-runtime-common-contract.sh"
 README_FILE="${PROJECT_DIR}/README.md"
 MODEL_MANIFEST_DIR="${PROJECT_DIR}/manifests"
 
+# The authoring tree is a directory this run creates. The verb never writes
+# into one that exists, so it cannot write over anybody's work, and it needs
+# no proof about what such a tree holds.
+if [[ "${MODE}" == "materialise" ]]; then
+  if ! authoring_parent="$(cd -- "$(dirname -- "$2")" 2>/dev/null && pwd)"; then
+    echo "The directory that would hold the authoring tree does not exist: $(dirname -- "$2")" >&2
+    echo "Next: create it, or name a new directory in one that exists." >&2
+    exit 1
+  fi
+  AUTHORING_TREE="${authoring_parent}/$(basename -- "$2")"
+  if [[ -e "${AUTHORING_TREE}" || -L "${AUTHORING_TREE}" ]]; then
+    echo "Refusing to materialise into ${AUTHORING_TREE}: it already exists." >&2
+    echo "This verb writes only a new tree, so it never writes over a tree that holds work." >&2
+    echo "Next: name a directory that does not exist yet." >&2
+    exit 1
+  fi
+  readonly AUTHORING_TREE
+fi
+
 # The image is exported to a tarball and loaded, rather than tagged directly,
-# so that `rewrite-timestamp=true` can normalise every layer timestamp to
-# SOURCE_DATE_EPOCH. Without it the COPY layers keep the build context's file
-# mtimes, and two machines holding byte-identical trees produce different image
-# IDs purely because their checkouts happened at different moments -- which is
-# exactly what happened, and what made EXPECTED_IMAGE_ID unreachable anywhere
-# except the machine that first wrote the tree.
+# so that `rewrite-timestamp=true` can clamp every layer timestamp to
+# SOURCE_DATE_EPOCH: files a RUN step writes carry the moment of the build
+# otherwise. The build context gets its own timestamps from the assembly below
+# rather than from any checkout, because COPY keeps them and the .pyc files
+# the build's units write embed them.
 BUILD_EXPORT_DIR="$(mktemp -d "${TMPDIR:-/tmp}/qwen38-vllm-build.XXXXXX")"
 case "${BUILD_EXPORT_DIR}" in
   "${TMPDIR:-/tmp}"/qwen38-vllm-build.*) ;;
   *) echo "Unexpected temporary build-export directory: ${BUILD_EXPORT_DIR}" >&2; exit 1 ;;
 esac
 readonly BUILD_EXPORT_DIR
-cleanup_build_export() {
-  rm -rf -- "${BUILD_EXPORT_DIR}"
+# The reconstruction is a worktree registered in the submodule's repository,
+# so it is removed through git, never by deleting its directory alone.
+if [[ "${MODE}" == "materialise" ]]; then
+  RECONSTRUCTION="${AUTHORING_TREE}"
+else
+  RECONSTRUCTION="${BUILD_EXPORT_DIR}/reconstruction"
+fi
+readonly RECONSTRUCTION
+reconstruction_held=false
+remove_reconstruction() {
+  if ! git -C "${VLLM_DIR}" worktree remove --force "${RECONSTRUCTION}"; then
+    printf 'ERROR: failed to remove the reconstruction worktree: %s\n' \
+      "${RECONSTRUCTION}" >&2
+    return 1
+  fi
+  reconstruction_held=false
 }
-trap cleanup_build_export EXIT
+cleanup() {
+  local status=$?
+  trap - EXIT
+  if [[ "${reconstruction_held}" == true && -e "${RECONSTRUCTION}" ]] &&
+      ! remove_reconstruction; then
+    status=1
+  fi
+  rm -rf -- "${BUILD_EXPORT_DIR}"
+  exit "${status}"
+}
+trap cleanup EXIT
 RUNTIME_ARCHIVE="${BUILD_EXPORT_DIR}/runtime.tar"
 readonly RUNTIME_ARCHIVE
 # The build is loaded under a name of this run's own, never under IMAGE_TAG.
@@ -118,68 +156,6 @@ NVFP4_NATIVE_KERNEL_PATCH_FILE="${PROJECT_DIR}/patches/vllm-nvfp4-native-kernel-
 QWEN_ARGUMENTS_READ_BY_GRAMMAR_PATCH_FILE="${PROJECT_DIR}/patches/vllm-qwen-arguments-read-by-grammar.patch"
 STARTUP_PLAN_BOUND_PATCH_FILE="${PROJECT_DIR}/patches/vllm-startup-plan-admission-bound.patch"
 TEMPLATE_REFUSAL_PARAMETER_PATCH_FILE="${PROJECT_DIR}/patches/vllm-template-refusals-name-their-parameter.patch"
-
-TURBOQUANT_REL="vllm/v1/attention/backends/turboquant_attn.py"
-TOOL_SCHEMA_REL="vllm/tool_parsers/structural_tag_registry.py"
-MODEL_CONFIG_REL="vllm/config/model.py"
-ANTHROPIC_PROTOCOL_REL="vllm/entrypoints/anthropic/protocol.py"
-ANTHROPIC_SERVING_REL="vllm/entrypoints/anthropic/serving.py"
-CHAT_PROTOCOL_REL="vllm/entrypoints/openai/chat_completion/protocol.py"
-SAMPLING_PARAMS_REL="vllm/sampling_params.py"
-SCHED_UTILS_REL="vllm/v1/core/sched/utils.py"
-INPUT_PROCESSOR_REL="vllm/v1/engine/input_processor.py"
-REQUEST_REL="vllm/v1/request.py"
-QWEN3_PARSER_REL="vllm/parser/qwen3.py"
-STRUCTURED_OUTPUT_REL="vllm/v1/structured_output/__init__.py"
-ANTHROPIC_API_ROUTER_REL="vllm/entrypoints/anthropic/api_router.py"
-CHAT_SERVING_REL="vllm/entrypoints/openai/chat_completion/serving.py"
-RESPONSES_CONTEXT_REL="vllm/entrypoints/openai/responses/context.py"
-RESPONSES_PROTOCOL_REL="vllm/entrypoints/openai/responses/protocol.py"
-RESPONSES_SERVING_REL="vllm/entrypoints/openai/responses/serving.py"
-RESPONSES_STREAMING_REL="vllm/entrypoints/openai/responses/streaming_events.py"
-RESPONSES_UTILS_REL="vllm/entrypoints/openai/responses/utils.py"
-PARSER_ENGINE_REL="vllm/parser/engine/parser_engine.py"
-KV_OFFLOAD_WORKER_REL="vllm/v1/kv_offload/cpu/gpu_worker.py"
-WORKSPACE_REL="vllm/v1/worker/workspace.py"
-GPU_MODEL_RUNNER_REL="vllm/v1/worker/gpu_model_runner.py"
-API_UTILS_REL="vllm/entrypoints/serve/utils/api_utils.py"
-ENVS_REL="vllm/envs.py"
-CHAT_UTILS_REL="vllm/entrypoints/chat_utils.py"
-MEDIA_CONNECTOR_REL="vllm/multimodal/media/connector.py"
-IMAGE_MEDIA_REL="vllm/multimodal/media/image.py"
-RENDER_PARAMS_REL="vllm/renderers/params.py"
-QWEN3_VL_MODEL_REL="vllm/model_executor/models/qwen3_vl.py"
-CACHE_CONFIG_REL="vllm/config/cache.py"
-VLLM_CONFIG_REL="vllm/config/vllm.py"
-ARG_UTILS_REL="vllm/engine/arg_utils.py"
-LLM_ENTRYPOINT_REL="vllm/entrypoints/llm.py"
-KV_CACHE_UTILS_REL="vllm/v1/core/kv_cache_utils.py"
-GPU_WORKER_REL="vllm/v1/worker/gpu_worker.py"
-STARTUP_PLAN_REL="vllm/v1/worker/startup_plan.py"
-KV_OFFLOAD_CONFIG_REL="vllm/v1/kv_offload/config.py"
-KV_OFFLOAD_BASE_REL="vllm/v1/kv_offload/base.py"
-KV_OFFLOAD_CPU_SPEC_REL="vllm/v1/kv_offload/cpu/spec.py"
-KV_OFFLOAD_CPU_MANAGER_REL="vllm/v1/kv_offload/cpu/manager.py"
-KV_TIERING_SPEC_REL="vllm/v1/kv_offload/tiering/spec.py"
-KV_TIERING_MANAGER_REL="vllm/v1/kv_offload/tiering/manager.py"
-OFFLOAD_CONNECTOR_CONFIG_REL="vllm/distributed/kv_transfer/kv_connector/v1/offloading/config.py"
-OFFLOAD_CONNECTOR_SCHEDULER_REL="vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py"
-COMPLETION_PROTOCOL_REL="vllm/entrypoints/openai/completion/protocol.py"
-GENERATE_API_ROUTER_REL="vllm/entrypoints/generate/api_router.py"
-CLI_ARGS_REL="vllm/entrypoints/openai/cli_args.py"
-TITOTO_PROTOCOL_REL="vllm/entrypoints/scale_out/token_in_token_out/protocol.py"
-TITOTO_SERVING_REL="vllm/entrypoints/scale_out/token_in_token_out/serving.py"
-ABSTRACT_PARSER_REL="vllm/parser/abstract_parser.py"
-PARSER_ADAPTERS_REL="vllm/parser/engine/adapters.py"
-ENGINE_PROTOCOL_REL="vllm/entrypoints/openai/engine/protocol.py"
-
-case "${MODE}" in
-  build|check|materialise)
-    ;;
-  *)
-    usage
-    ;;
-esac
 
 if [[ ! -f "${DEPLOYMENT_INPUT_MANIFEST}" || -L "${DEPLOYMENT_INPUT_MANIFEST}" ]]; then
   echo "Deployment-input manifest is missing or is not a regular non-symlink file." >&2
@@ -266,64 +242,6 @@ print("\n".join(build_patchset().worktree_status()))'
 )"
 readonly REVIEWED_STATUS
 
-# Every identity this repository has itself shipped for a path, read out of
-# its own history: the FINAL_FILES of each committed revision of the generated
-# stage data. This is what lets "provably stale" be a statement about
-# committed data rather than about the tree being examined.
-SHIPPED_IDENTITIES="${BUILD_EXPORT_DIR}/shipped-identities"
-write_shipped_identities() {
-  : >"${SHIPPED_IDENTITIES}"
-  local revision
-  while IFS= read -r revision; do
-    git -C "${PROJECT_DIR}" show "${revision}:${GENERATED_STAGES_REL}" \
-      | sed -n '/^FINAL_FILES = {/,$p' \
-      | sed -n "s/.*'\([^']\{1,\}\)': '\([0-9a-f]\{64\}\)'.*/\2 \1 ${revision}/p" \
-      >>"${SHIPPED_IDENTITIES}"
-  done < <(git -C "${PROJECT_DIR}" log --format=%H -- "${GENERATED_STAGES_REL}")
-}
-
-actual_status="$(git -C "${VLLM_DIR}" status --short --untracked-files=all)"
-# A path the live tree changes that the reviewed patch set does not name is
-# authored work or damage in every mode: no committed identity describes it,
-# and nothing here may write over it. A path an earlier committed revision
-# patched is named by that history instead: the patch set retired it, so the
-# live tree is behind on it rather than damaged, and the verb that writes the
-# live tree proves its bytes against the shipped identities before restoring
-# the reconstruction's.
-live_paths_outside_set="$(
-  sed -n 's/^...//p' <<<"${actual_status}" \
-    | grep -Fxv -f <(sed -n 's/^...//p' <<<"${REVIEWED_STATUS}") || true
-)"
-unnamed_live_paths="${live_paths_outside_set}"
-if [[ -n "${live_paths_outside_set}" ]]; then
-  write_shipped_identities
-  unnamed_live_paths="$(
-    grep -Fxv -f <(cut -d' ' -f2 "${SHIPPED_IDENTITIES}" | sort -u) \
-      <<<"${live_paths_outside_set}" || true
-  )"
-fi
-if [[ -n "${unnamed_live_paths}" ]]; then
-  echo "Refusing a vLLM worktree that changes paths the reviewed patch set" \
-    "does not name:" >&2
-  sed 's/^/  /' <<<"${unnamed_live_paths}" >&2
-  echo "These are hand-authored edits or a damaged tree; nothing was written." >&2
-  echo "Next: compile authored work into a reviewed stage with" \
-    "patches/source_patch_v1/compile_review_diff.py and commit it, or remove" \
-    "the paths deliberately; no mode here will decide that for you." >&2
-  exit 1
-fi
-# A tree merely missing paths a pulled stage added, or still holding a path a
-# pulled stage retired, is behind, not damaged, and that is precisely what
-# `materialise` repairs; every other mode still requires the exact reviewed
-# state.
-if [[ "${MODE}" != "materialise" && "${actual_status}" != "${REVIEWED_STATUS}" ]]; then
-  echo "Refusing unexpected vLLM worktree state:" >&2
-  printf '%s\n' "${actual_status}" >&2
-  echo "The live tree is behind the reviewed patch set." >&2
-  echo "Next: ./scripts/build-vllm.sh materialise" >&2
-  exit 1
-fi
-
 printf '%s  %s\n' \
   "${TURBOQUANT_PATCH_DIFF_SHA256}" "${TURBOQUANT_PATCH_FILE}" \
   "${TOOL_SCHEMA_PATCH_DIFF_SHA256}" "${TOOL_SCHEMA_PATCH_FILE}" \
@@ -393,7 +311,6 @@ docker run --rm \
   "${BASE_IMAGE_TAG}" \
   -m unittest -v \
   patches.source_patch_v1.test_framework \
-  patches.source_patch_v1.test_materialise_live_tree \
   scripts.runtime_image_unit
 
 # The served chat template is a landmark-aware transformation, and
@@ -417,34 +334,15 @@ docker run --rm \
     --model "/project/${MODEL_DIR_NAME}" \
     --check
 
-# Prove that the landmark-aware transaction recreates this exact worktree from
-# the pinned upstream commit. The reviewed diffs are independently hashed and
-# parsed as review evidence, but they never select mutation locations. The
-# private worktree is discarded on every failure and never becomes a runtime.
-VERIFY_WORKTREE="$(mktemp -d "${TMPDIR:-/tmp}/qwen38-vllm-verify.XXXXXX")"
-remove_verify_worktree() {
-  if ! git -C "${VLLM_DIR}" worktree remove --force "${VERIFY_WORKTREE}"; then
-    printf 'ERROR: failed to remove the exact disposable verification worktree: %s\n' \
-      "${VERIFY_WORKTREE}" >&2
-    return 1
-  fi
-}
-# The verification worktree exists only inside this section, so its cleanup
-# takes the EXIT trap over from the export directory's and hands it back
-# afterwards: a trap that merely replaced the earlier one would leave the
-# export directory -- and, in build mode, the runtime archive written into
-# it -- behind on every run.
-cleanup_verify_worktree() {
-  local status=$?
-  trap - EXIT
-  if ! remove_verify_worktree; then
-    status=1
-  fi
-  cleanup_build_export
-  exit "${status}"
-}
-trap cleanup_verify_worktree EXIT
-git -C "${VLLM_DIR}" worktree add --detach "${VERIFY_WORKTREE}" \
+# The image is built from the reconstruction, and from nothing else under
+# vllm/: the landmark-aware transaction recreates the reviewed tree from the
+# pinned upstream commit in a worktree of this run's own, and the build context
+# is copied out of it. The vllm/ checkout is reached only through git, for the
+# commit's objects. The reviewed diffs are independently hashed and parsed as
+# review evidence, but they never select mutation locations. A reconstruction
+# that fails any step is removed and reaches no context and no author.
+reconstruction_held=true
+git -C "${VLLM_DIR}" worktree add --detach "${RECONSTRUCTION}" \
   "${VLLM_COMMIT}" >/dev/null
 docker run --rm \
   --network none \
@@ -454,292 +352,125 @@ docker run --rm \
   --env PYTHONPYCACHEPREFIX=/tmp/pycache \
   --entrypoint python3 \
   --volume "${PROJECT_DIR}:/project:ro" \
-  --volume "${VERIFY_WORKTREE}:/source:rw" \
+  --volume "${RECONSTRUCTION}:/source:rw" \
   --workdir /project \
   "${BASE_IMAGE_TAG}" \
   -m patches.source_patch_v1.apply_vllm_patchset /source /project
-reproduced_status="$(
-  git -C "${VERIFY_WORKTREE}" status --short --untracked-files=all
+# The transaction proved every path its stages name. git proves the rest: the
+# reconstruction differs from the pinned commit in exactly those paths.
+reconstruction_status="$(
+  git -C "${RECONSTRUCTION}" status --short --untracked-files=all
 )"
-if [[ "${reproduced_status}" != "${REVIEWED_STATUS}" ]]; then
-  echo "Reviewed patches produced an unexpected vLLM worktree state:" >&2
-  printf '%s\n' "${reproduced_status}" >&2
+if [[ "${reconstruction_status}" != "${REVIEWED_STATUS}" ]]; then
+  echo "The reviewed patch set left a footprint on the reconstruction other than its own." >&2
+  echo "Derived from the committed stage data:" >&2
+  printf '%s\n' "${REVIEWED_STATUS}" | sed 's/^/  /' >&2
+  echo "Found by git in the reconstruction:" >&2
+  printf '%s\n' "${reconstruction_status}" | sed 's/^/  /' >&2
+  echo "The transaction writes only the paths its stages name, so this is a defect" \
+    "in the patch framework or the stage data, not in any tree you hold." >&2
+  echo "Nothing was built or written." >&2
   exit 1
 fi
+git -C "${RECONSTRUCTION}" diff --check
 
-# The reconstruction is proved at this point: every stage applied from the
-# pinned commit under complete pre/post hashes, and its worktree state is
-# exactly the reviewed one. Only here, and only when the operator asked for it
-# by name, may it be written to the unmanaged live tree. A reconstruction that
-# did not verify has already exited above and is never written anywhere.
 if [[ "${MODE}" == "materialise" ]]; then
-  write_shipped_identities
-  if [[ ! -s "${SHIPPED_IDENTITIES}" ]]; then
-    echo "MATERIALISE REFUSED: no committed final identity was found for" \
-      "${GENERATED_STAGES_REL}; a tree without that history cannot prove" \
-      "staleness, and nothing was written." >&2
-    exit 1
-  fi
-
-  docker run --rm \
-    --network none \
-    --read-only \
-    --user "$(id -u):$(id -g)" \
-    --tmpfs /tmp:rw,nodev,nosuid,size=512m \
-    --env PYTHONPYCACHEPREFIX=/tmp/pycache \
-    --entrypoint python3 \
-    --volume "${PROJECT_DIR}:/project:ro" \
-    --volume "${VERIFY_WORKTREE}:/reconstruction:ro" \
-    --volume "${VLLM_DIR}:/live:rw" \
-    --volume "${SHIPPED_IDENTITIES}:/shipped:ro" \
-    --workdir /project \
-    "${BASE_IMAGE_TAG}" \
-    -m patches.source_patch_v1.materialise_live_tree \
-    --reconstruction /reconstruction --live /live --shipped /shipped
-  remove_verify_worktree
-  trap cleanup_build_export EXIT
+  # The tree's index records the reconstruction, so `git diff` there shows
+  # exactly what an author changes on top of it.
+  git -C "${RECONSTRUCTION}" add --all
+  reconstruction_held=false
+  printf 'Materialised the verified reconstruction at %s:\n' "${RECONSTRUCTION}"
+  printf 'vLLM %s with every reviewed stage applied, and recorded in its index.\n' \
+    "${VLLM_COMMIT}"
+  printf 'Nothing reads this tree. Author a stage there: git -C %q diff is then\n' \
+    "${RECONSTRUCTION}"
+  printf 'exactly your change, the review diff patches/source_patch_v1/compile_review_diff.py\n'
+  printf 'compiles (run git add --intent-to-add on a new file first).\n'
+  printf 'Remove it with: git -C %q worktree remove --force %q\n' \
+    "${PROJECT_DIR}/vllm" "${RECONSTRUCTION}"
   exit 0
 fi
 
-while IFS= read -r status_line; do
-  relative_path="${status_line:3}"
-  if [[ "${status_line:0:2}" == " D" ]]; then
-    # A deletion is reproduced only when the path is absent on BOTH sides;
-    # cmp cannot say that, and a survivor on either side is drift.
-    if [[ -e "${VERIFY_WORKTREE}/${relative_path}" \
-       || -e "${VLLM_DIR}/${relative_path}" ]]; then
-      echo "Reviewed patches do not reproduce deletion of ${relative_path}." >&2
-      echo "The reconstruction is authoritative and the live tree is behind it." >&2
-      echo "Next: ./scripts/build-vllm.sh materialise" >&2
-      exit 1
-    fi
-    continue
-  fi
-  if ! cmp -s \
-    "${VERIFY_WORKTREE}/${relative_path}" \
-    "${VLLM_DIR}/${relative_path}"; then
-    echo "Reviewed patches do not reproduce ${relative_path}." >&2
-    echo "The reconstruction is authoritative and the live tree is behind it." >&2
-    echo "Next: ./scripts/build-vllm.sh materialise" >&2
+# The build context is exactly what the runtime Dockerfile copies -- each file
+# from the reconstruction when it lies under vllm/, from this repository
+# otherwise -- and the Dockerfile itself. Every file is 0644, every directory
+# 0755 and every timestamp SOURCE_DATE_EPOCH, so the context records the
+# committed inputs and nothing of the machine or the moment that assembled it:
+# COPY keeps these timestamps, and the .pyc files the build's units write
+# embed them.
+BUILD_CONTEXT="${BUILD_EXPORT_DIR}/context"
+readonly BUILD_CONTEXT
+context_sources="$(
+  sed -e ':joined' -e '/\\$/{N;s/\\\n/ /;b joined' -e '}' "${DOCKERFILE}" |
+    awk '$1 == "COPY" || $1 == "ADD" {
+      if ($1 == "COPY" && NF == 4 && $2 == "--chmod=0644") print $3
+      else print "UNREADABLE " $0
+    }'
+)"
+if grep -q '^UNREADABLE ' <<<"${context_sources}"; then
+  echo "The runtime Dockerfile reads its context in a form the context assembly does not:" >&2
+  sed -n 's/^UNREADABLE /  /p' <<<"${context_sources}" >&2
+  echo "Every context file is copied by one 'COPY --chmod=0644 SOURCE DESTINATION'." >&2
+  echo "Next: write the instruction in that form, or extend this assembly to the new one." >&2
+  exit 1
+fi
+install -d -m 0755 "${BUILD_CONTEXT}"
+while IFS= read -r context_source; do
+  case "${context_source}" in
+    vllm/*) context_origin="${RECONSTRUCTION}/${context_source#vllm/}" ;;
+    *) context_origin="${PROJECT_DIR}/${context_source}" ;;
+  esac
+  if [[ ! -f "${context_origin}" || -L "${context_origin}" ]]; then
+    echo "The runtime Dockerfile copies ${context_source}, and ${context_origin}" \
+      "is not a regular file." >&2
+    echo "Next: copy only files the reviewed patch set or this repository holds." >&2
     exit 1
   fi
-done <<<"${REVIEWED_STATUS}"
-remove_verify_worktree
-trap cleanup_build_export EXIT
+  install -D -m 0644 -- "${context_origin}" "${BUILD_CONTEXT}/${context_source}"
+done <<<"${context_sources}"
+install -D -m 0644 -- "${DOCKERFILE}" "${BUILD_CONTEXT}/containers/Dockerfile.runtime"
+find "${BUILD_CONTEXT}" -mindepth 1 -type d -exec chmod 0755 {} +
+find "${BUILD_CONTEXT}" -exec touch --no-dereference --date="@${SOURCE_DATE_EPOCH}" {} +
+remove_reconstruction
 
+# The lock pins every file of this repository the image carries; each pin must
+# describe the copy in the context. The reviewed vLLM files need no line here:
+# scripts/runtime_image_unit.py proves every pin the Dockerfile names equals
+# the stage data's final identity, and the transaction proved the
+# reconstruction holds exactly those.
 printf '%s  %s\n' \
-  "${TURBOQUANT_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${TURBOQUANT_REL}" \
-  "${TURBOQUANT_DECODE_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/v1/attention/ops/triton_turboquant_decode.py" \
-  "${TURBOQUANT_STORE_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/v1/attention/ops/triton_turboquant_store.py" \
-  "${TOOL_SCHEMA_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${TOOL_SCHEMA_REL}" \
-  "${TOOL_PARSER_ABSTRACT_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/tool_parsers/abstract_tool_parser.py" \
-  "${MODEL_CONFIG_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${MODEL_CONFIG_REL}" \
-  "${ANTHROPIC_PROTOCOL_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${ANTHROPIC_PROTOCOL_REL}" \
-  "${ANTHROPIC_SERVING_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${ANTHROPIC_SERVING_REL}" \
-  "${ERROR_RESPONSE_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/entrypoints/serve/exception_handling/error_response.py" \
-  "${EXCEPTION_EXCEPTION_HANDLER_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/entrypoints/serve/exception_handling/handlers/exception.py" \
-  "${HTTP_EXCEPTION_HANDLER_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/entrypoints/serve/exception_handling/handlers/http.py" \
-  "${VALIDATION_EXCEPTION_HANDLER_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/entrypoints/serve/exception_handling/handlers/validation.py" \
-  "${VLLM_ERROR_EXCEPTION_HANDLER_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/entrypoints/serve/exception_handling/handlers/vllm_error.py" \
-  "${CHAT_PROTOCOL_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${CHAT_PROTOCOL_REL}" \
-  "${SAMPLING_PARAMS_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${SAMPLING_PARAMS_REL}" \
-  "${SCHED_UTILS_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${SCHED_UTILS_REL}" \
-  "${INPUT_PROCESSOR_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${INPUT_PROCESSOR_REL}" \
-  "${REQUEST_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${REQUEST_REL}" \
-  "${QWEN3_PARSER_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${QWEN3_PARSER_REL}" \
-  "${STRUCTURED_OUTPUT_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${STRUCTURED_OUTPUT_REL}" \
-  "${ANTHROPIC_API_ROUTER_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${ANTHROPIC_API_ROUTER_REL}" \
-  "${CHAT_SERVING_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${CHAT_SERVING_REL}" \
-  "${RESPONSES_CONTEXT_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${RESPONSES_CONTEXT_REL}" \
-  "${RESPONSES_PROTOCOL_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${RESPONSES_PROTOCOL_REL}" \
-  "${RESPONSES_SERVING_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${RESPONSES_SERVING_REL}" \
-  "${RESPONSES_STREAMING_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${RESPONSES_STREAMING_REL}" \
-  "${RESPONSES_UTILS_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${RESPONSES_UTILS_REL}" \
-  "${PARSER_ENGINE_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${PARSER_ENGINE_REL}" \
-  "${KV_OFFLOAD_WORKER_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${KV_OFFLOAD_WORKER_REL}" \
-  "${AGENT_CHAT_TEMPLATE_SHA256}" "${TEMPLATE_FILE}" \
-  "${PHASE_BUDGET_UNIT_SHA256}" "${PHASE_BUDGET_UNIT_FILE}" | \
+  "${AGENT_CHAT_TEMPLATE_SHA256}" "${BUILD_CONTEXT}/chat_template.jinja" \
+  "${PHASE_BUDGET_UNIT_SHA256}" "${BUILD_CONTEXT}/scripts/phase_budget_unit.py" \
+  "${VISION_WORKSPACE_UNIT_SHA256}" "${BUILD_CONTEXT}/scripts/vision_workspace_unit.py" \
+  "${VISION_CONTRACT_UNIT_SHA256}" "${BUILD_CONTEXT}/scripts/vision_contract_unit.py" \
+  "${VISION_MLP_UNIT_SHA256}" "${BUILD_CONTEXT}/scripts/vision_mlp_unit.py" \
+  "${SHARED_PREFIX_CACHE_UNIT_SHA256}" "${BUILD_CONTEXT}/scripts/shared_prefix_cache_unit.py" \
+  "${RAW_MEDIA_UNIT_SHA256}" "${BUILD_CONTEXT}/scripts/raw_media_unit.py" \
+  "${GENERATE_RESULT_UNIT_SHA256}" "${BUILD_CONTEXT}/scripts/generate_result_unit.py" \
+  "${TURBOQUANT_GUARD_UNIT_SHA256}" "${BUILD_CONTEXT}/scripts/turboquant_guard_unit.py" \
+  "${TURBOQUANT_K8V4_UNIT_SHA256}" "${BUILD_CONTEXT}/scripts/turboquant_k8v4_unit.py" \
+  "${QWEN38_CONTEXT_UNIT_SHA256}" "${BUILD_CONTEXT}/scripts/qwen38_context_unit.py" \
+  "${CHAT_TEMPLATE_RETENTION_UNIT_SHA256}" "${BUILD_CONTEXT}/scripts/chat_template_retention_unit.py" \
+  "${NVFP4_KERNEL_UNIT_SHA256}" "${BUILD_CONTEXT}/scripts/nvfp4_kernel_unit.py" \
+  "${TOOL_OUTPUT_PARSER_UNIT_SHA256}" "${BUILD_CONTEXT}/scripts/tool_output_parser_unit.py" \
+  "${REASONING_USAGE_UNIT_SHA256}" "${BUILD_CONTEXT}/scripts/reasoning_usage_unit.py" \
+  "${QWEN_GRAMMAR_UNIT_SHA256}" "${BUILD_CONTEXT}/scripts/qwen_grammar_unit.py" \
+  "${TEMPLATE_AUTHORSHIP_UNIT_SHA256}" "${BUILD_CONTEXT}/scripts/template_authorship_unit.py" \
+  "${NATIVE_FP4_SELECTION_UNIT_SHA256}" "${BUILD_CONTEXT}/scripts/native_fp4_selection_unit.py" \
+  "${RUNTIME_DOCKERFILE_SHA256}" "${BUILD_CONTEXT}/containers/Dockerfile.runtime" | \
   sha256sum --check --strict
 
-printf '%s  %s\n' \
-  "${WORKSPACE_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${WORKSPACE_REL}" \
-  "${GPU_MODEL_RUNNER_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${GPU_MODEL_RUNNER_REL}" \
-  "${API_UTILS_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${API_UTILS_REL}" \
-  "${ENVS_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${ENVS_REL}" \
-  "${CHAT_UTILS_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${CHAT_UTILS_REL}" \
-  "${MEDIA_CONNECTOR_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${MEDIA_CONNECTOR_REL}" \
-  "${IMAGE_MEDIA_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${IMAGE_MEDIA_REL}" \
-  "${RENDER_PARAMS_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${RENDER_PARAMS_REL}" \
-  "${QWEN3_VL_MODEL_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${QWEN3_VL_MODEL_REL}" \
-  "${VISION_WORKSPACE_UNIT_SHA256}" "${VISION_WORKSPACE_UNIT_FILE}" \
-  "${VISION_CONTRACT_UNIT_SHA256}" "${VISION_CONTRACT_UNIT_FILE}" \
-  "${VISION_MLP_UNIT_SHA256}" "${VISION_MLP_UNIT_FILE}" | \
-  sha256sum --check --strict
-
-printf '%s  %s\n' \
-  "${CACHE_CONFIG_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${CACHE_CONFIG_REL}" \
-  "${VLLM_CONFIG_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${VLLM_CONFIG_REL}" \
-  "${ARG_UTILS_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${ARG_UTILS_REL}" \
-  "${LLM_ENTRYPOINT_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${LLM_ENTRYPOINT_REL}" \
-  "${KV_CACHE_UTILS_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${KV_CACHE_UTILS_REL}" \
-  "${GPU_WORKER_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${GPU_WORKER_REL}" \
-  "${STARTUP_PLAN_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${STARTUP_PLAN_REL}" \
-  "${KV_OFFLOAD_CONFIG_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${KV_OFFLOAD_CONFIG_REL}" \
-  "${KV_OFFLOAD_BASE_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${KV_OFFLOAD_BASE_REL}" \
-  "${KV_OFFLOAD_CPU_SPEC_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${KV_OFFLOAD_CPU_SPEC_REL}" \
-  "${KV_OFFLOAD_CPU_MANAGER_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${KV_OFFLOAD_CPU_MANAGER_REL}" \
-  "${KV_TIERING_SPEC_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${KV_TIERING_SPEC_REL}" \
-  "${KV_TIERING_MANAGER_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${KV_TIERING_MANAGER_REL}" \
-  "${OFFLOAD_CONNECTOR_CONFIG_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${OFFLOAD_CONNECTOR_CONFIG_REL}" \
-  "${OFFLOAD_CONNECTOR_SCHEDULER_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${OFFLOAD_CONNECTOR_SCHEDULER_REL}" \
-  "${COMPLETION_PROTOCOL_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${COMPLETION_PROTOCOL_REL}" \
-  "${GENERATE_API_ROUTER_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${GENERATE_API_ROUTER_REL}" \
-  "${CLI_ARGS_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${CLI_ARGS_REL}" \
-  "${TITOTO_PROTOCOL_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${TITOTO_PROTOCOL_REL}" \
-  "${TITOTO_SERVING_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${TITOTO_SERVING_REL}" \
-  "${ABSTRACT_PARSER_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${ABSTRACT_PARSER_REL}" \
-  "${PARSER_ADAPTERS_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${PARSER_ADAPTERS_REL}" \
-  "${PARSER_EVENTS_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/parser/engine/events.py" \
-  "${PARSER_ENGINE_CONFIG_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/parser/engine/parser_engine_config.py" \
-  "${STREAMING_PARSER_ENGINE_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/parser/engine/streaming_parser_engine.py" \
-  "${TOKEN_ID_SCANNER_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/parser/engine/token_id_scanner.py" \
-  "${ENGINE_PROTOCOL_PATCHED_FILE_SHA256}" "${VLLM_DIR}/${ENGINE_PROTOCOL_REL}" | \
-  sha256sum --check --strict
-
-printf '%s  %s\n' \
-  "${BLOCK_POOL_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/v1/core/block_pool.py" \
-  "${SINGLE_TYPE_KV_CACHE_MANAGER_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/v1/core/single_type_kv_cache_manager.py" \
-  "${KV_OFFLOAD_CPU_COMMON_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/v1/kv_offload/cpu/common.py" \
-  "${SHARED_PREFIX_CACHE_UNIT_SHA256}" "${PROJECT_DIR}/scripts/shared_prefix_cache_unit.py" \
-  "${RAW_MEDIA_UNIT_SHA256}" "${PROJECT_DIR}/scripts/raw_media_unit.py" \
-  "${GENERATE_RESULT_UNIT_SHA256}" "${PROJECT_DIR}/scripts/generate_result_unit.py" | sha256sum --check --strict
-
-printf '%s  %s\n' \
-  "${COMPLETION_SERVING_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/entrypoints/openai/completion/serving.py" \
-  "${RENDER_SERVING_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/entrypoints/scale_out/render/serving.py" \
-  | sha256sum --check --strict
-
-printf '%s  %s\n' \
-  "${CHAT_API_ROUTER_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/entrypoints/openai/chat_completion/api_router.py" \
-  "${CHAT_BATCH_SERVING_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/entrypoints/openai/chat_completion/batch_serving.py" \
-  "${COMPLETION_API_ROUTER_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/entrypoints/openai/completion/api_router.py" \
-  "${TITOTO_API_ROUTER_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/entrypoints/scale_out/token_in_token_out/api_router.py" \
-  "${RUN_BATCH_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/entrypoints/openai/run_batch.py" \
-  "${ENGINE_CLIENT_PROTOCOL_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/engine/protocol.py" \
-  | sha256sum --check --strict
-
-printf '%s  %s\n' \
-  "${ONLINE_DERENDERER_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/renderers/online_derenderer.py" \
-  | sha256sum --check --strict
-
-printf '%s  %s\n' \
-  "${DERENDER_SERVING_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/entrypoints/scale_out/derender/serving.py" \
-  "${MM_PROCESSOR_INPUTS_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/multimodal/processing/inputs.py" \
-  "${MM_PROCESSOR_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/multimodal/processing/processor.py" \
-  "${BASE_RENDERER_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/renderers/base.py" \
-  | sha256sum --check --strict
-
-printf '%s  %s\n' \
-  "${DEEPSEEK_V32_PARSER_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/parser/deepseek_v32.py" \
-  "${DEEPSEEK_V4_PARSER_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/parser/deepseek_v4.py" \
-  "${INKLING_PARSER_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/parser/inkling.py" \
-  "${KIMI_K2_PARSER_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/parser/kimi_k2.py" \
-  | sha256sum --check --strict
-
-printf '%s  %s\n' \
-  "${GEMMA4_PARSER_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/parser/gemma4.py" \
-  "${GLM47_PARSER_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/parser/glm47_moe.py" \
-  "${MINIMAX_M2_PARSER_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/parser/minimax_m2.py" \
-  "${MISTRAL_PARSER_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/parser/mistral.py" \
-  | sha256sum --check --strict
-
-printf '%s  %s\n' \
-  "${ASYNC_LLM_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/v1/engine/async_llm.py" \
-  | sha256sum --check --strict
-
-printf '%s  %s\n' \
-  "${V1_SCHEDULER_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/v1/core/sched/scheduler.py" \
-  | sha256sum --check --strict
-
-printf '%s  %s\n' \
-  "${V1_DETOKENIZER_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/v1/engine/detokenizer.py" \
-  | sha256sum --check --strict
-
-printf '%s  %s\n' \
-  "${V1_OUTPUT_PROCESSOR_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/v1/engine/output_processor.py" \
-  | sha256sum --check --strict
-
-printf '%s  %s\n' \
-  "${STRUCTURED_OUTPUT_BACKEND_TYPES_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/v1/structured_output/backend_types.py" \
-  | sha256sum --check --strict
-
-printf '%s  %s\n' \
-  "${XGRAMMAR_BACKEND_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/v1/structured_output/backend_xgrammar.py" \
-  | sha256sum --check --strict
-
-printf '%s  %s\n' \
-  "${STRUCTURAL_TAG_STOP_CHECKER_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/v1/structured_output/stop_checker.py" \
-  | sha256sum --check --strict
-
-printf '%s  %s\n' \
-  "${REASONING_CONFIG_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/config/reasoning.py" \
-  | sha256sum --check --strict
-
-printf '%s  %s\n' \
-  "${BASE_REASONING_PARSER_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/reasoning/abs_reasoning_parsers.py" \
-  | sha256sum --check --strict
-
-printf '%s  %s\n' \
-  "${V1_THINKING_BUDGET_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/v1/sample/thinking_budget_state.py" \
-  | sha256sum --check --strict
-
-printf '%s  %s\n' \
-  "${TOOL_PARSER_UTILS_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/tool_parsers/utils.py" \
-  | sha256sum --check --strict
-
-printf '%s  %s\n' \
-  "${DETOKENIZER_UTILS_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/tokenizers/detokenizer_utils.py" \
-  | sha256sum --check --strict
-
-printf '%s  %s\n' \
-  "${EXCEPTION_REGISTRATION_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/entrypoints/serve/exception_handling/register.py" \
-  | sha256sum --check --strict
-
-printf '%s  %s\n' \
-  "${HF_RENDERER_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/renderers/hf.py" \
-  "${TEMPLATE_AUTHORSHIP_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/renderers/template_authorship.py" \
-  "${SCORING_IO_PROCESSOR_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/entrypoints/pooling/scoring/io_processor.py" \
-  "${LINEAR_KERNELS_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/model_executor/kernels/linear/__init__.py" \
-  "${TOKENIZE_PROTOCOL_PATCHED_FILE_SHA256}" "${VLLM_DIR}/vllm/entrypoints/serve/tokenize/protocol.py" \
-  | sha256sum --check --strict
-
-printf '%s  %s\n' \
-  "${RUNTIME_DOCKERFILE_SHA256}" "${DOCKERFILE}" \
-  "${DOCKERIGNORE_SHA256}" "${DOCKERIGNORE}" | \
-  sha256sum --check --strict
-
-printf '%s  %s\n' \
-  "${TURBOQUANT_GUARD_UNIT_SHA256}" "${PROJECT_DIR}/scripts/turboquant_guard_unit.py" \
-  "${TURBOQUANT_K8V4_UNIT_SHA256}" "${TURBOQUANT_K8V4_UNIT_FILE}" \
-  "${QWEN38_CONTEXT_UNIT_SHA256}" "${QWEN38_CONTEXT_UNIT_FILE}" \
-  "${CHAT_TEMPLATE_RETENTION_UNIT_SHA256}" "${CHAT_TEMPLATE_RETENTION_UNIT_FILE}" \
-  "${NVFP4_KERNEL_UNIT_SHA256}" "${NVFP4_KERNEL_UNIT_FILE}" \
-  "${TOOL_OUTPUT_PARSER_UNIT_SHA256}" "${TOOL_OUTPUT_PARSER_UNIT_FILE}" \
-  "${REASONING_USAGE_UNIT_SHA256}" "${REASONING_USAGE_UNIT_FILE}" \
-  "${QWEN_GRAMMAR_UNIT_SHA256}" "${QWEN_GRAMMAR_UNIT_FILE}" \
-  "${TEMPLATE_AUTHORSHIP_UNIT_SHA256}" "${TEMPLATE_AUTHORSHIP_UNIT_FILE}" \
-  "${NATIVE_FP4_SELECTION_UNIT_SHA256}" "${NATIVE_FP4_SELECTION_UNIT_FILE}" | \
-  sha256sum --check --strict
-
+# The units below run the context's own copies: the bytes they prove are the
+# bytes the image carries.
 docker run --rm --network none --read-only \
   --user "$(id -u):$(id -g)" \
   --tmpfs /tmp:rw,nodev,nosuid,size=128m \
   --env PYTHONPYCACHEPREFIX=/tmp/pycache \
   --env CUDA_VISIBLE_DEVICES= --env TRITON_INTERPRET=1 \
-  --volume "${PROJECT_DIR}:/project:ro" \
-  --volume "${VLLM_DIR}/vllm/v1/attention/ops/triton_turboquant_store.py:/usr/local/lib/python3.12/dist-packages/vllm/v1/attention/ops/triton_turboquant_store.py:ro" \
-  --volume "${VLLM_DIR}/vllm/v1/attention/ops/triton_turboquant_decode.py:/usr/local/lib/python3.12/dist-packages/vllm/v1/attention/ops/triton_turboquant_decode.py:ro" \
-  --entrypoint python3 "${BASE_IMAGE_TAG}" /project/scripts/turboquant_guard_unit.py
+  --volume "${BUILD_CONTEXT}:/context:ro" \
+  --volume "${BUILD_CONTEXT}/vllm/vllm/v1/attention/ops/triton_turboquant_store.py:/usr/local/lib/python3.12/dist-packages/vllm/v1/attention/ops/triton_turboquant_store.py:ro" \
+  --volume "${BUILD_CONTEXT}/vllm/vllm/v1/attention/ops/triton_turboquant_decode.py:/usr/local/lib/python3.12/dist-packages/vllm/v1/attention/ops/triton_turboquant_decode.py:ro" \
+  --entrypoint python3 "${BASE_IMAGE_TAG}" /context/scripts/turboquant_guard_unit.py
 
 # Execute CPU contract units against the complete reviewed runtime overlay.
 parser_unit_mounts=()
@@ -747,7 +478,7 @@ while IFS= read -r status_line; do
   case "${status_line}" in
     " M vllm/"*|"?? vllm/"*)
       path="${status_line:3}"
-      parser_unit_mounts+=(--volume "${VLLM_DIR}/${path}:/usr/local/lib/python3.12/dist-packages/${path}:ro")
+      parser_unit_mounts+=(--volume "${BUILD_CONTEXT}/vllm/${path}:/usr/local/lib/python3.12/dist-packages/${path}:ro")
       ;;
   esac
 done <<<"${REVIEWED_STATUS}"
@@ -755,11 +486,9 @@ for unit in chat_template_retention_unit tool_output_parser_unit vision_contract
   docker run --rm --network none --read-only --user "$(id -u):$(id -g)" \
     --tmpfs /tmp:rw,nodev,nosuid,size=256m \
     --env PYTHONDONTWRITEBYTECODE=1 --env CUDA_VISIBLE_DEVICES= \
-    --volume "${TEMPLATE_FILE}:/opt/qwen38/chat_template.jinja:ro" --volume "${PROJECT_DIR}:/project:ro" "${parser_unit_mounts[@]}" \
-    --entrypoint python3 "${BASE_IMAGE_TAG}" "/project/scripts/${unit}.py"
+    --volume "${BUILD_CONTEXT}/chat_template.jinja:/opt/qwen38/chat_template.jinja:ro" --volume "${BUILD_CONTEXT}:/context:ro" "${parser_unit_mounts[@]}" \
+    --entrypoint python3 "${BASE_IMAGE_TAG}" "/context/scripts/${unit}.py"
 done
-
-git -C "${VLLM_DIR}" diff --check
 
 if [[ "${MODE}" == "check" ]]; then
   # Every count below is derived from the objects this run just verified —
@@ -1070,8 +799,8 @@ docker buildx build --progress=plain \
   --build-arg "ENGINE_PROTOCOL_PATCHED_FILE_SHA256=${ENGINE_PROTOCOL_PATCHED_FILE_SHA256}" \
   --build-arg "SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH}" \
   --output "type=docker,dest=${RUNTIME_ARCHIVE},name=${BUILD_LOAD_TAG},rewrite-timestamp=true" \
-  --file "${DOCKERFILE}" \
-  "${PROJECT_DIR}"
+  --file "${BUILD_CONTEXT}/containers/Dockerfile.runtime" \
+  "${BUILD_CONTEXT}"
 docker load --input "${RUNTIME_ARCHIVE}"
 
 actual_image_id="$(docker image inspect --format '{{.Id}}' "${BUILD_LOAD_TAG}")"

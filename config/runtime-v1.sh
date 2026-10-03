@@ -86,7 +86,7 @@ readonly NVFP4_NATIVE_KERNEL_PATCH_DIFF_SHA256="9d9ce188b6670d687a725c4cdca37478
 readonly QWEN_ARGUMENTS_READ_BY_GRAMMAR_PATCH_DIFF_SHA256="fa0480f239cdb0de4dd4508ac151fadc1c6a5f76dcf7b15798dcac932ae33371"
 readonly STARTUP_PLAN_BOUND_PATCH_DIFF_SHA256="994f9aabc61b3d7473e83593a5279b2759ce4413ceb1ea212ae33be342df0019"
 readonly TEMPLATE_REFUSAL_PARAMETER_PATCH_DIFF_SHA256="f78e5a791fa23844b1a9c37752bf5a916053c86cfde8ff00eedadd02b935a897"
-readonly SOURCE_PATCH_MANIFEST_SHA256="b9fe5ed949f21d97005aaa28242f07d95bb91981d87ff5b3f4f37f12cad286f7"
+readonly SOURCE_PATCH_MANIFEST_SHA256="bbce1123edc080110dd702d3abc8af7eaf3f9588f14d4e731484c312246c7389"
 # Cardinality of config/deployment-inputs.sha256. The hash manifest alone
 # proves the listed bytes but cannot see a quietly grown or shrunk allowlist,
 # so the reviewed file count is pinned as well. It is declared exactly once,
@@ -95,7 +95,7 @@ readonly SOURCE_PATCH_MANIFEST_SHA256="b9fe5ed949f21d97005aaa28242f07d95bb91981d
 # was added — the validator then refused a correct manifest. Every consumer
 # (build-vllm.sh, runtime-common.sh, generate-deployment-input-manifest.sh)
 # reads this declaration.
-readonly DEPLOYMENT_INPUT_FILE_COUNT="125"
+readonly DEPLOYMENT_INPUT_FILE_COUNT="122"
 readonly TURBOQUANT_PATCHED_FILE_SHA256="ccda36577e4fb0052f370169dce4b649bad890b8b440a82e584acd3dd92a6d86"
 readonly TURBOQUANT_STORE_PATCHED_FILE_SHA256="298645bff68c6adab58261862602b86e7e714c3552a9fd89102d9ccd2b83e9f7"
 readonly TURBOQUANT_DECODE_PATCHED_FILE_SHA256="dab8b65ab7ddd6582de16e1fc7b1360ab0061b4a2a2b114f5d87ea0532fd726f"
@@ -230,7 +230,6 @@ readonly TURBOQUANT_DECODE_UPSTREAM_FILE_SHA256="8e52678136449e4bbca2195fbcbb874
 readonly TURBOQUANT_GUARD_UNIT_SHA256="657189807e2966824c556a08eb78a9ed7891331f6de4f3b563cf6cfded15cf47"
 readonly SOURCE_DATE_EPOCH="1786751423"
 readonly RUNTIME_DOCKERFILE_SHA256="b89e080a0c98fe80add8c0a72ba57be3fea9389b69cc2a39d9929e78ca07d800"
-readonly DOCKERIGNORE_SHA256="77b0c5dab61f5d56ddc6b9749b4fba1a3c7c45129d37481f7a0f9f88de80a186"
 
 # Functional host contract only. Exact host software versions, binary
 # hashes, and GPU/driver identity are deliberately not pinned: they tie the

@@ -47,7 +47,6 @@ class RuntimeImageTest(unittest.TestCase):
         recipe = (ROOT / "containers/Dockerfile.runtime").read_text()
         joined = recipe.replace("\\\n", " ")
         copies = dict(re.findall(r"^COPY --chmod=0644\s+(\S+)\s+(\S+)$", joined, re.M))
-        allowed = set((ROOT / ".dockerignore").read_text().splitlines())
         build = (ROOT / "scripts/build-vllm.sh").read_text()
         runtime = (ROOT / "scripts/runtime-common.sh").read_text()
         for path in FINAL_FILES:
@@ -57,7 +56,6 @@ class RuntimeImageTest(unittest.TestCase):
                 source = f"vllm/{path}"
                 installed = f"/usr/local/lib/python3.12/dist-packages/{path}"
                 self.assertEqual(copies.get(source), installed)
-                self.assertIn("!" + source, allowed)
                 # Both the upstream verifier and the final layer hash this path.
                 self.assertGreaterEqual(recipe.count(installed), 3)
                 self.assertGreaterEqual(build.count(installed), 2)
@@ -136,6 +134,41 @@ class RuntimeImageTest(unittest.TestCase):
             "RUN CUDA_VISIBLE_DEVICES= python3 /opt/qwen38/qwen_grammar_unit.py",
             recipe,
         )
+
+
+
+class BuildScriptTest(unittest.TestCase):
+    """The build reads the verified reconstruction, never the vllm/ checkout."""
+
+    def setUp(self):
+        self.script = (ROOT / "scripts/build-vllm.sh").read_text()
+
+    def test_the_mode_argument_is_required(self):
+        self.assertNotIn('MODE="${1:-build}"', self.script)
+        self.assertIn('MODE="$1"', self.script)
+
+    def test_usage_names_every_mode(self):
+        usage = self.script.split("<<'USAGE'", 1)[1].split("USAGE", 1)[0]
+        for mode in ("build", "check", "materialise"):
+            with self.subTest(mode=mode):
+                self.assertIn(f"\n  {mode}", usage)
+
+    def test_the_vllm_checkout_is_reached_only_through_git(self):
+        # The submodule directory is used only as the repository that holds the
+        # pinned commit; no path into its checked-out files appears, so nothing
+        # an edit there leaves can reach a check, a context or an image.
+        self.assertNotIn('"${VLLM_DIR}/', self.script)
+        self.assertEqual(
+            self.script.count("${VLLM_DIR}"),
+            self.script.count('git -C "${VLLM_DIR}"'),
+        )
+
+    def test_the_image_is_built_from_the_assembled_context(self):
+        invocation = self.script.split("docker buildx build", 1)[1]
+        invocation = invocation.split("\ndocker load", 1)[0]
+        self.assertIn('--file "${BUILD_CONTEXT}/containers/Dockerfile.runtime"', invocation)
+        self.assertTrue(invocation.rstrip().endswith('"${BUILD_CONTEXT}"'))
+        self.assertNotIn("${PROJECT_DIR}", invocation)
 
 
 if __name__ == "__main__":
