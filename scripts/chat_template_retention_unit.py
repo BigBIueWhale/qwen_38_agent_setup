@@ -36,7 +36,7 @@ def load_template(path: str = TEMPLATE_PATH):
         source = handle.read()
     environment = Environment(loader=BaseLoader(), extensions=[loopcontrols])
 
-    def raise_exception(message: str) -> None:
+    def raise_exception(message: str, variable: str | None = None) -> None:
         raise TemplateRefusal(message)
 
     environment.globals["raise_exception"] = raise_exception
@@ -89,21 +89,65 @@ def assert_template_error_classification() -> None:
     from vllm.entrypoints.serve.exception_handling.error_response import create_error_response
     from vllm.renderers.hf import safe_apply_chat_template
 
+    from vllm.entrypoints.openai.chat_completion.protocol import ChatCompletionRequest
+    from vllm.entrypoints.openai.responses.protocol import ResponsesRequest
+    from vllm.entrypoints.serve.tokenize.protocol import TokenizeChatRequest
+
     tokenizer = TokenizersBackend(tokenizer_object=Tokenizer(models.WordLevel({"hi": 0})))
     messages = [{"role": "user", "content": "hi"}]
     with open(TEMPLATE_PATH, encoding="utf-8") as handle:
         source = handle.read()
-    try:
-        safe_apply_chat_template(SimpleNamespace(), tokenizer, messages,
-            chat_template=source, preserve_thinking=False,
-            raise_exception="a request cannot replace the guard")
-    except VLLMValidationError as error:
-        assert "cannot be discarded" in str(error)
-        response = create_error_response(error)
-        assert response.error.code == 400
-        assert response.error.param == "messages"
-    else:
-        raise AssertionError("The served template did not return a typed refusal")
+    # The served launch's defaults, which no request refusal may be blamed on.
+    defaults = {"enable_thinking": True, "reasoning_effort": "xhigh"}
+
+    def refusal(request, conversation=messages, server_defaults=defaults):
+        params = request.build_chat_params(source, "openai").with_defaults(
+            server_defaults
+        )
+        try:
+            safe_apply_chat_template(SimpleNamespace(), tokenizer, conversation,
+                parameter_names=params.parameter_names,
+                raise_exception="a request cannot replace the guard",
+                **params.get_apply_chat_template_kwargs())
+        except VLLMValidationError as error:
+            response = create_error_response(error)
+            assert response.error.code == 400
+            return str(error), response.error.param
+        raise AssertionError(f"The served template did not refuse {request!r}")
+
+    # Every template refusal names the request parameter that supplied the
+    # value the template refused, on each surface that renders it.
+    chat = dict(model="m", messages=messages)
+    responses = dict(model="m", input="hi", kv_scope="unit")
+    for request, conversation, cause, param in (
+        (ChatCompletionRequest(**chat, chat_template_kwargs={"preserve_thinking": False}),
+         messages, "cannot be discarded", "chat_template_kwargs.preserve_thinking"),
+        (ChatCompletionRequest(**chat, reasoning_effort="medium"),
+         messages, "Unexpected reasoning effort medium", "reasoning_effort"),
+        (ChatCompletionRequest(**chat, reasoning_effort="none"),
+         messages, "Thinking cannot be disabled", "reasoning_effort"),
+        (ChatCompletionRequest(**chat, chat_template_kwargs={"enable_thinking": False}),
+         messages, "Thinking cannot be disabled", "chat_template_kwargs.enable_thinking"),
+        (ChatCompletionRequest(**chat, chat_template_kwargs={"reasoning_effort": "low"}),
+         messages, "Unexpected reasoning effort low",
+         "chat_template_kwargs.reasoning_effort"),
+        (ChatCompletionRequest(**chat), [{"role": "narrator", "content": "hi"}],
+         "Unexpected message role", "messages"),
+        (ResponsesRequest(**responses, reasoning={"effort": "low"}),
+         messages, "Unexpected reasoning effort low", "reasoning.effort"),
+        (ResponsesRequest(**responses), [{"role": "narrator", "content": "hi"}],
+         "Unexpected message role", "input"),
+        (TokenizeChatRequest(**chat, chat_template_kwargs={"preserve_thinking": False}),
+         messages, "cannot be discarded", "chat_template_kwargs.preserve_thinking"),
+    ):
+        message, observed = refusal(request, conversation)
+        assert cause in message, (message, cause)
+        assert observed == param, (type(request).__name__, cause, observed, param)
+    # A value the server's own defaults supplied is no request parameter's
+    # fault, and the refusal names none.
+    message, observed = refusal(ChatCompletionRequest(**chat), messages,
+                                {"enable_thinking": True, "reasoning_effort": "low"})
+    assert "Unexpected reasoning effort low" in message and observed is None, observed
 
     for template in ("{% broken %}", "{{ absent.required() }}"):
         try:

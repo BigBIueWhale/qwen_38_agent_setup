@@ -368,6 +368,11 @@ RUN printf '%s  %s\n' \
   "${LINEAR_KERNELS_UPSTREAM_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/model_executor/kernels/linear/__init__.py \
   | sha256sum --check --strict
 
+ARG TOKENIZE_PROTOCOL_UPSTREAM_FILE_SHA256
+RUN printf '%s  %s\n' \
+  "${TOKENIZE_PROTOCOL_UPSTREAM_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/serve/tokenize/protocol.py \
+  | sha256sum --check --strict
+
 ARG SCORING_IO_PROCESSOR_UPSTREAM_FILE_SHA256
 RUN printf '%s  %s\n' \
   "${SCORING_IO_PROCESSOR_UPSTREAM_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/pooling/scoring/io_processor.py \
@@ -378,6 +383,7 @@ ARG HF_RENDERER_PATCHED_FILE_SHA256
 ARG TEMPLATE_AUTHORSHIP_PATCHED_FILE_SHA256
 ARG SCORING_IO_PROCESSOR_PATCHED_FILE_SHA256
 ARG LINEAR_KERNELS_PATCHED_FILE_SHA256
+ARG TOKENIZE_PROTOCOL_PATCHED_FILE_SHA256
 ARG EXCEPTION_REGISTRATION_PATCHED_FILE_SHA256
 ARG DETOKENIZER_UTILS_PATCHED_FILE_SHA256
 ARG TOOL_PARSER_UTILS_PATCHED_FILE_SHA256
@@ -867,6 +873,10 @@ RUN printf '%s  %s\n' \
 COPY --chmod=0644 vllm/vllm/model_executor/kernels/linear/__init__.py /usr/local/lib/python3.12/dist-packages/vllm/model_executor/kernels/linear/__init__.py
 RUN printf '%s  %s\n' \
   "${LINEAR_KERNELS_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/model_executor/kernels/linear/__init__.py \
+  | sha256sum --check --strict
+COPY --chmod=0644 vllm/vllm/entrypoints/serve/tokenize/protocol.py /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/serve/tokenize/protocol.py
+RUN printf '%s  %s\n' \
+  "${TOKENIZE_PROTOCOL_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/serve/tokenize/protocol.py \
   | sha256sum --check --strict
 COPY --chmod=0644 chat_template.jinja /opt/qwen38/chat_template.jinja
 COPY --chmod=0644 scripts/phase_budget_unit.py /opt/qwen38/phase_budget_unit.py

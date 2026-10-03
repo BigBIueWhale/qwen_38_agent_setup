@@ -1,0 +1,373 @@
+diff --git a/tests/renderers/test_hf.py b/tests/renderers/test_hf.py
+--- a/tests/renderers/test_hf.py
++++ b/tests/renderers/test_hf.py
+@@ -904,3 +904,79 @@
+         assert len(conversation) == original_len
+         assert conversation[0]["role"] == "user"
+         assert conversation[1]["role"] == "system"
++
++
++_REFUSING_TEMPLATE = (
++    "{%- if not messages %}{{ raise_exception('No messages.', 'messages') }}{% endif %}"
++    "{%- if reasoning_effort is defined and reasoning_effort != 'xhigh' %}"
++    "{{ raise_exception('Unexpected effort.', 'reasoning_effort') }}{% endif %}"
++    "{%- if enable_thinking is defined and enable_thinking is false %}"
++    "{{ raise_exception('Thinking cannot be disabled.', 'enable_thinking') }}{% endif %}"
++    "{%- if refuse_unnamed is defined %}{{ raise_exception('Unnamed.') }}{% endif %}"
++    "{{ messages[0]['content'] }}"
++)
++
++
++def _template_refusal_parameter(request, conversation, server_defaults=None):
++    from types import SimpleNamespace
++
++    from tokenizers import Tokenizer, models
++    from transformers import TokenizersBackend
++
++    tokenizer = TokenizersBackend(tokenizer_object=Tokenizer(models.WordLevel({"hi": 0})))
++    params = request.build_chat_params(_REFUSING_TEMPLATE, "openai").with_defaults(
++        server_defaults
++    )
++    with pytest.raises(VLLMValidationError) as refusal:
++        safe_apply_chat_template(
++            SimpleNamespace(), tokenizer, conversation,
++            parameter_names=params.parameter_names,
++            **params.get_apply_chat_template_kwargs(),
++        )
++    return refusal.value.parameter
++
++
++@pytest.mark.parametrize(
++    ("surface", "fields", "conversation", "parameter"),
++    [
++        ("chat", {"reasoning_effort": "low"}, None, "reasoning_effort"),
++        ("chat", {"reasoning_effort": "none"}, None, "reasoning_effort"),
++        ("chat", {"chat_template_kwargs": {"reasoning_effort": "low"}}, None,
++         "chat_template_kwargs.reasoning_effort"),
++        ("chat", {"chat_template_kwargs": {"enable_thinking": False}}, None,
++         "chat_template_kwargs.enable_thinking"),
++        ("chat", {}, [], "messages"),
++        ("chat", {"chat_template_kwargs": {"refuse_unnamed": True}}, None, None),
++        ("responses", {"reasoning": {"effort": "low"}}, None, "reasoning.effort"),
++        ("responses", {}, [], "input"),
++        ("tokenize", {"chat_template_kwargs": {"reasoning_effort": "low"}}, None,
++         "chat_template_kwargs.reasoning_effort"),
++    ],
++)
++def test_template_refusal_names_the_request_parameter(
++    surface, fields, conversation, parameter
++):
++    """A template refusal names the request parameter behind the variable the
++    template refused, never one the request did not use."""
++    from vllm.entrypoints.openai.responses.protocol import ResponsesRequest
++    from vllm.entrypoints.serve.tokenize.protocol import TokenizeChatRequest
++
++    messages = [{"role": "user", "content": "hi"}]
++    request = {
++        "chat": lambda: ChatCompletionRequest(model="m", messages=messages, **fields),
++        "responses": lambda: ResponsesRequest(
++            model="m", input="hi", kv_scope="unit", **fields
++        ),
++        "tokenize": lambda: TokenizeChatRequest(model="m", messages=messages, **fields),
++    }[surface]()
++    observed = _template_refusal_parameter(
++        request, messages if conversation is None else conversation
++    )
++    assert observed == parameter
++
++
++def test_template_refusal_of_a_server_default_names_no_request_parameter():
++    request = ChatCompletionRequest(model="m", messages=[{"role": "user", "content": "hi"}])
++    assert _template_refusal_parameter(
++        request, [{"role": "user", "content": "hi"}], {"reasoning_effort": "low"}
++    ) is None
+diff --git a/vllm/entrypoints/openai/chat_completion/protocol.py b/vllm/entrypoints/openai/chat_completion/protocol.py
+--- a/vllm/entrypoints/openai/chat_completion/protocol.py
++++ b/vllm/entrypoints/openai/chat_completion/protocol.py
+@@ -44,7 +44,8 @@
+ from vllm.exceptions import VLLMValidationError
+ from vllm.logger import init_logger
+ from vllm.logprobs import Logprob
+-from vllm.renderers import ChatParams, TokenizeParams, merge_kwargs
++from vllm.renderers import ChatParams, TokenizeParams
++from vllm.renderers.params import request_chat_template_kwargs
+ from vllm.sampling_params import (
+     FinalResponseTokenBudget,
+     resolve_final_response_token_budget,
+@@ -584,11 +585,13 @@
+         default_template: str | None,
+         default_template_content_format: ChatTemplateContentFormatOption,
+     ) -> ChatParams:
+-        extra_kwargs: dict[str, Any] = dict(
+-            add_generation_prompt=self.add_generation_prompt,
+-            continue_final_message=self.continue_final_message,
+-            documents=self.documents,
+-            reasoning_effort=self.reasoning_effort,
++        fields: dict[str, tuple[Any, str]] = dict(
++            add_generation_prompt=(self.add_generation_prompt, "add_generation_prompt"),
++            continue_final_message=(
++                self.continue_final_message, "continue_final_message"
++            ),
++            documents=(self.documents, "documents"),
++            reasoning_effort=(self.reasoning_effort, "reasoning_effort"),
+         )
+ 
+         # When reasoning is requested, activate thinking for models whose
+@@ -597,15 +600,19 @@
+         # variable, resolve_chat_template_kwargs filters it out harmlessly.
+         user_kwargs = self.chat_template_kwargs or {}
+         if self.reasoning_effort is not None and "enable_thinking" not in user_kwargs:
+-            extra_kwargs["enable_thinking"] = self.reasoning_effort != "none"
++            fields["enable_thinking"] = (
++                self.reasoning_effort != "none", "reasoning_effort"
++            )
++        chat_template_kwargs, parameter_names = request_chat_template_kwargs(
++            self.chat_template_kwargs, fields
++        )
++        parameter_names.update(messages="messages", tools="tools")
+ 
+         return ChatParams(
+             chat_template=self.chat_template or default_template,
+             chat_template_content_format=default_template_content_format,
+-            chat_template_kwargs=merge_kwargs(
+-                self.chat_template_kwargs,
+-                extra_kwargs,
+-            ),
++            chat_template_kwargs=chat_template_kwargs,
++            parameter_names=parameter_names,
+             media_io_kwargs=self.media_io_kwargs,
+             return_assistant_tokens_mask=bool(self.return_assistant_tokens_mask),
+             # No-tools requests default to tool_choice="none" at the API
+diff --git a/vllm/entrypoints/openai/responses/protocol.py b/vllm/entrypoints/openai/responses/protocol.py
+--- a/vllm/entrypoints/openai/responses/protocol.py
++++ b/vllm/entrypoints/openai/responses/protocol.py
+@@ -71,7 +71,8 @@
+ )
+ from vllm.exceptions import VLLMValidationError
+ from vllm.logger import init_logger
+-from vllm.renderers import ChatParams, TokenizeParams, merge_kwargs
++from vllm.renderers import ChatParams, TokenizeParams
++from vllm.renderers.params import request_chat_template_kwargs
+ from vllm.sampling_params import (
+     FinalResponseTokenBudget,
+     resolve_final_response_token_budget,
+@@ -353,10 +354,10 @@
+         reasoning = self.reasoning
+         reasoning_effort = None if reasoning is None else reasoning.effort
+ 
+-        extra_kwargs: dict[str, Any] = dict(
+-            add_generation_prompt=not continue_final,
+-            continue_final_message=continue_final,
+-            reasoning_effort=reasoning_effort,
++        fields: dict[str, tuple[Any, str]] = dict(
++            add_generation_prompt=(not continue_final, "input"),
++            continue_final_message=(continue_final, "input"),
++            reasoning_effort=(reasoning_effort, "reasoning.effort"),
+         )
+ 
+         # When reasoning is requested, activate thinking for models whose
+@@ -365,15 +366,17 @@
+         # variable, resolve_chat_template_kwargs filters it out harmlessly.
+         user_kwargs = self.chat_template_kwargs or {}
+         if reasoning_effort is not None and "enable_thinking" not in user_kwargs:
+-            extra_kwargs["enable_thinking"] = reasoning_effort != "none"
++            fields["enable_thinking"] = (reasoning_effort != "none", "reasoning.effort")
++        chat_template_kwargs, parameter_names = request_chat_template_kwargs(
++            self.chat_template_kwargs, fields
++        )
++        parameter_names.update(messages="input", tools="tools")
+ 
+         return ChatParams(
+             chat_template=default_template,
+             chat_template_content_format=default_template_content_format,
+-            chat_template_kwargs=merge_kwargs(
+-                self.chat_template_kwargs,
+-                extra_kwargs,
+-            ),
++            chat_template_kwargs=chat_template_kwargs,
++            parameter_names=parameter_names,
+             media_io_kwargs=self.media_io_kwargs,
+             tool_choice=self.tool_choice if self.tools else None,
+         )
+diff --git a/vllm/entrypoints/serve/tokenize/protocol.py b/vllm/entrypoints/serve/tokenize/protocol.py
+--- a/vllm/entrypoints/serve/tokenize/protocol.py
++++ b/vllm/entrypoints/serve/tokenize/protocol.py
+@@ -18,7 +18,8 @@
+     OpenAIBaseModel,
+ )
+ from vllm.exceptions import VLLMValidationError
+-from vllm.renderers import ChatParams, TokenizeParams, merge_kwargs
++from vllm.renderers import ChatParams, TokenizeParams
++from vllm.renderers.params import request_chat_template_kwargs
+ 
+ 
+ class TokenizeCompletionRequest(OpenAIBaseModel):
+@@ -132,16 +133,23 @@
+         default_template: str | None,
+         default_template_content_format: ChatTemplateContentFormatOption,
+     ) -> ChatParams:
++        chat_template_kwargs, parameter_names = request_chat_template_kwargs(
++            self.chat_template_kwargs,
++            dict(
++                add_generation_prompt=(
++                    self.add_generation_prompt, "add_generation_prompt"
++                ),
++                continue_final_message=(
++                    self.continue_final_message, "continue_final_message"
++                ),
++            ),
++        )
++        parameter_names.update(messages="messages", tools="tools")
+         return ChatParams(
+             chat_template=self.chat_template or default_template,
+             chat_template_content_format=default_template_content_format,
+-            chat_template_kwargs=merge_kwargs(
+-                self.chat_template_kwargs,
+-                dict(
+-                    add_generation_prompt=self.add_generation_prompt,
+-                    continue_final_message=self.continue_final_message,
+-                ),
+-            ),
++            chat_template_kwargs=chat_template_kwargs,
++            parameter_names=parameter_names,
+             media_io_kwargs=self.media_io_kwargs,
+         )
+ 
+diff --git a/vllm/renderers/hf.py b/vllm/renderers/hf.py
+--- a/vllm/renderers/hf.py
++++ b/vllm/renderers/hf.py
+@@ -7,9 +7,9 @@
+ import itertools
+ import weakref
+ from collections import defaultdict, deque
+-from collections.abc import Sequence
++from collections.abc import Callable, Mapping, Sequence
+ from functools import lru_cache
+-from typing import TYPE_CHECKING, Any, Final, NamedTuple, cast
++from typing import TYPE_CHECKING, Any, Final, NamedTuple, NoReturn, cast
+ 
+ import jinja2
+ import jinja2.ext
+@@ -672,8 +672,21 @@
+     return {k: v for k, v in chat_template_kwargs.items() if k in accept_vars}
+ 
+ 
+-def _raise_template_validation_error(message: str) -> None:
+-    raise VLLMValidationError(message, parameter="messages")
++def _template_refusal(
++    parameter_names: Mapping[str, str],
++) -> Callable[..., NoReturn]:
++    """The template's deliberate request guard, refusing as a client error.
++
++    A template names the variable its refusal concerns:
++    ``raise_exception(message, 'reasoning_effort')``. The refusal names the
++    request parameter that supplied that variable, and no parameter when the
++    template names none or the value did not come from the request.
++    """
++
++    def raise_exception(message: str, variable: str | None = None) -> NoReturn:
++        raise VLLMValidationError(message, parameter=parameter_names.get(variable))
++
++    return raise_exception
+ 
+ 
+ class RenderedChat(NamedTuple):
+@@ -699,6 +712,7 @@
+     *,
+     tools: list[dict[str, Any]] | None = None,
+     chat_template: str | None = None,
++    parameter_names: Mapping[str, str] | None = None,
+     **kwargs,
+ ) -> RenderedChat:
+     chat_template = resolve_chat_template(
+@@ -747,10 +761,11 @@
+         **render_options,
+         special_tokens=tokenizer.special_tokens_map,
+         variables=resolved_kwargs,
+-        # Only the template's deliberate request guard declares a client error.
+-        # Syntax, undefined variables and unexpected renderer failures retain
+-        # their original server cause. Request kwargs cannot replace this guard.
+-        raise_exception=_raise_template_validation_error,
++        # Only the template's deliberate request guard declares a client error,
++        # naming the request parameter behind the variable it refuses. Syntax,
++        # undefined variables and unexpected renderer failures retain their
++        # original server cause. Request kwargs cannot replace this guard.
++        raise_exception=_template_refusal(parameter_names or {}),
+     )
+     return RenderedChat(text, GENERATION_TAG.search(chat_template) is not None)
+ 
+@@ -994,6 +1009,7 @@
+             model_config,
+             tokenizer,
+             conversation,
++            parameter_names=params.parameter_names,
+             **chat_template_kwargs,
+         )
+         text = rendered.text
+diff --git a/vllm/renderers/params.py b/vllm/renderers/params.py
+--- a/vllm/renderers/params.py
++++ b/vllm/renderers/params.py
+@@ -41,6 +41,22 @@
+     return defaults | {k: v for k, v in overrides.items() if v not in unset_values}
+ 
+ 
++def request_chat_template_kwargs(
++    chat_template_kwargs: dict[str, Any] | None,
++    fields: dict[str, tuple[Any, str]],
++) -> tuple[dict[str, Any], dict[str, str]]:
++    """Merge a request's ``chat_template_kwargs`` with the template variables
++    its own fields set, each given as its value and the request parameter that
++    supplied it, and name the parameter behind every variable the request set.
++    A field left unset supplies nothing and names nothing."""
++    set_fields = merge_kwargs(None, {name: value for name, (value, _) in fields.items()})
++    parameter_names = {
++        name: f"chat_template_kwargs.{name}" for name in chat_template_kwargs or {}
++    }
++    parameter_names.update({name: fields[name][1] for name in set_fields})
++    return merge_kwargs(chat_template_kwargs, set_fields), parameter_names
++
++
+ def recursively_merge_kwargs(
+     defaults: dict[str, Any] | None,
+     overrides: dict[str, Any] | None,
+@@ -82,6 +98,11 @@
+     chat_template_kwargs: dict[str, Any] = field(default_factory=dict)
+     """The kwargs to pass to the chat template."""
+ 
++    parameter_names: dict[str, str] = field(default_factory=dict)
++    """For each chat template variable the request supplied -- including
++    ``messages`` and ``tools`` -- the request parameter that supplied it, which
++    a template refusal of that variable names."""
++
+     media_io_kwargs: dict[str, dict[str, Any]] | None = None
+     """Per-modality kwargs for media I/O (loading/decoding images, videos, etc.)."""
+ 
+@@ -142,6 +163,7 @@
+                 default_chat_template_kwargs,
+                 self.chat_template_kwargs,
+             ),
++            parameter_names=self.parameter_names,
+             media_io_kwargs=merge_media_io_kwargs(
+                 default_media_io_kwargs,
+                 self.media_io_kwargs,
+diff --git a/vllm/renderers/template_authorship.py b/vllm/renderers/template_authorship.py
+--- a/vllm/renderers/template_authorship.py
++++ b/vllm/renderers/template_authorship.py
+@@ -514,7 +514,7 @@
+     return separator.join(_keep_authorship(item) for item in value)
+ 
+ 
+-def _raise_exception(message: str) -> None:
++def _raise_exception(message: str, variable: str | None = None) -> None:
+     raise jinja2.exceptions.TemplateError(message)
+ 
+ 
+@@ -571,7 +571,7 @@
+     continue_final_message: bool | str,
+     special_tokens: Mapping[str, Any],
+     variables: Mapping[str, Any],
+-    raise_exception: Callable[[str], None],
++    raise_exception: Callable[..., None],
+ ) -> AuthoredText:
+     """Render a chat template exactly as transformers does, with authorship.
+ 

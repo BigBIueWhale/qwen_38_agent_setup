@@ -424,8 +424,12 @@ for rejected in (
     else:
         raise AssertionError(f"unsafe thinking configuration was accepted: {rejected}")
 
-def raise_exception(message):
-    raise RuntimeError(message)
+class TemplateRefusal(RuntimeError):
+    """A template refusal and the template variable it names."""
+
+
+def raise_exception(message, variable=None):
+    raise TemplateRefusal(message, variable)
 
 environment = ImmutableSandboxedEnvironment(
     trim_blocks=True,
@@ -451,17 +455,22 @@ base_context = {
 rendered = template.render(**base_context, reasoning_effort="max")
 assert "OLD_HIDDEN_TRACE" in rendered
 assert template.render(**base_context, reasoning_effort="high") == rendered
-for rejected_context in (
-    {"reasoning_effort": "medium"},
-    {"reasoning_effort": "low"},
-    {"enable_thinking": False},
+# Each refusal names the template variable it refuses, which is what lets the
+# server name the request parameter that supplied it.
+for rejected_context, variable in (
+    ({"reasoning_effort": "medium"}, "reasoning_effort"),
+    ({"reasoning_effort": "low"}, "reasoning_effort"),
+    ({"enable_thinking": False}, "enable_thinking"),
+    ({"preserve_thinking": False}, "preserve_thinking"),
+    ({"messages": []}, "messages"),
+    ({"messages": [{"role": "narrator", "content": "x"}]}, "messages"),
 ):
     context = dict(base_context)
     context.update(rejected_context)
     try:
         template.render(**context)
-    except RuntimeError:
-        pass
+    except TemplateRefusal as refusal:
+        assert refusal.args[1] == variable, (rejected_context, refusal.args)
     else:
         raise AssertionError(f"unsafe template configuration was accepted: {rejected_context}")
 

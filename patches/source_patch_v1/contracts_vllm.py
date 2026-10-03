@@ -2654,14 +2654,14 @@ def _validate_precise_errors_after(state: State) -> None:
         "status_code = HTTPStatus.INTERNAL_SERVER_ERROR",
     ), label=label)
     hf = "vllm/renderers/hf.py"
+    # The template's deliberate guard is a typed request refusal; every other
+    # template failure keeps its server cause.
     source = _require_in_symbol(state, hf, "safe_apply_chat_template", (
-        "_raise_template_validation_error",
+        "raise_exception",
     ), label=label)
     _require("except Exception" not in source and "raise ValueError(str(e))" not in source,
              label + ": template bugs must retain their original server cause")
-    _require_in_symbol(state, hf, "_raise_template_validation_error", (
-        'raise VLLMValidationError(message, parameter="messages")',
-    ), label=label)
+    require_text(state, hf, "raise VLLMValidationError(message, parameter=", label=label)
     _require_in_symbol(state, "vllm/multimodal/media/image.py", "ImageMediaIO.load_bytes", (
         "raise VLLMServerError(", "raise VLLMValidationError(",
         "Image.open(BytesIO(data))", "image.load()",
@@ -2805,7 +2805,7 @@ def _validate_template_authorship_after(state: State) -> None:
     forbid_text(state, hf, "parse_dec_only_prompt", label=label)
     _require_in_symbol(state, hf, "safe_apply_chat_template", (
         "render_chat_template(", "special_tokens=tokenizer.special_tokens_map",
-        "raise_exception=_raise_template_validation_error",
+        "raise_exception=_",
     ), label=label)
     _require_in_symbol(state, hf, "HfRenderer.__init__", (
         "isinstance(self.tokenizer, TokenizersBackend)",
@@ -2994,6 +2994,67 @@ def _validate_plan_bound_after(state: State) -> None:
     }, label=label)
 
 
+def _validate_refusal_parameter_before(state: State) -> None:
+    require_text(state, "vllm/renderers/hf.py",
+                 "def _raise_template_validation_error(",
+                 label="Template refusal parameter precondition")
+
+
+def _validate_refusal_parameter_after(state: State) -> None:
+    label = "Template refusals name the request parameter"
+    hf = "vllm/renderers/hf.py"
+    params = "vllm/renderers/params.py"
+    # The template names the variable it refuses; the refusal names the
+    # request parameter that supplied it, and none it cannot attribute.
+    require_python_symbols(state, hf, {"_template_refusal": ("parameter_names",)},
+                           label=label)
+    _require_in_symbol(state, hf, "_template_refusal", (
+        "def raise_exception(message: str, variable: str | None = None) -> NoReturn:",
+        "raise VLLMValidationError(message, parameter=parameter_names.get(variable))",
+    ), label=label)
+    _require_in_symbol(state, hf, "safe_apply_chat_template", (
+        "raise_exception=_template_refusal(parameter_names or {})",
+    ), label=label)
+    require_text(state, hf, "parameter_names=params.parameter_names", label=label)
+    forbid_text(state, hf, 'parameter="messages"', label=label)
+    forbid_text(state, hf, "_raise_template_validation_error", label=label)
+    # One record of where each template variable came from, built in the same
+    # merge that sets its value, on every request surface that renders.
+    require_python_symbols(state, params, {
+        "request_chat_template_kwargs": ("chat_template_kwargs", "fields"),
+    }, label=label)
+    require_text(state, params,
+                 "parameter_names: dict[str, str] = field(default_factory=dict)",
+                 label=label)
+    _require_in_symbol(state, params, "ChatParams.with_defaults", (
+        "parameter_names=self.parameter_names",
+    ), label=label)
+    for path, symbol, conversation, effort in (
+        ("vllm/entrypoints/openai/chat_completion/protocol.py",
+         "ChatCompletionRequest.build_chat_params", '"messages"', '"reasoning_effort")'),
+        ("vllm/entrypoints/openai/responses/protocol.py",
+         "ResponsesRequest.build_chat_params", '"input"', '"reasoning.effort")'),
+    ):
+        _require_in_symbol(state, path, symbol, (
+            "request_chat_template_kwargs(",
+            f"parameter_names.update(messages={conversation}, tools=\"tools\")",
+            effort, "parameter_names=parameter_names",
+        ), label=label)
+    _require_in_symbol(state, "vllm/entrypoints/serve/tokenize/protocol.py",
+        "TokenizeChatRequest.build_chat_params", (
+            "request_chat_template_kwargs(",
+            'parameter_names.update(messages="messages", tools="tools")',
+            "parameter_names=parameter_names",
+        ), label=label)
+    require_python_symbols(state, "vllm/renderers/template_authorship.py", {
+        "_raise_exception": ("message", "variable"),
+    }, label=label)
+    require_python_symbols(state, "tests/renderers/test_hf.py", {
+        "test_template_refusal_names_the_request_parameter": None,
+        "test_template_refusal_of_a_server_default_names_no_request_parameter": None,
+    }, label=label)
+
+
 def validate_final(state: State) -> None:
     """Reassert every durable semantic invariant on the complete tree.
 
@@ -3009,6 +3070,23 @@ def validate_final(state: State) -> None:
 
 
 CONTRACTS: Mapping[str, SemanticContract] = {
+    "template-refusals-name-their-parameter": SemanticContract(
+        rationale=(
+            "Every chat template refusal became a request error naming "
+            "parameter 'messages', so a caller who sent an unsupported "
+            "reasoning_effort or preserve_thinking: false was told the "
+            "conversation was at fault. The template names the variable each "
+            "refusal concerns, every surface records the request parameter "
+            "behind each template variable it sets, and the refusal names that "
+            "parameter, or none when the value did not come from the request."
+        ),
+        removal_condition=(
+            "Remove when pinned upstream names the request parameter behind "
+            "the template variable a chat template refuses."
+        ),
+        validate_before=_validate_refusal_parameter_before,
+        validate_after=_validate_refusal_parameter_after,
+    ),
     "startup-plan-admission-bound": SemanticContract(
         rationale=(
             "kv-physical-free-memory bounds the declared KV capacity by memory "

@@ -310,12 +310,11 @@ It is intentionally reconstructed by the ordered, reviewed semantic transformati
 | patches/vllm-nvfp4-native-kernel-required.patch | 9d9ce188b6670d687a725c4cdca37478f9dc78ef9f19685ddbcf5e9edd53b8b7 |
 | patches/vllm-qwen-arguments-read-by-grammar.patch | fa0480f239cdb0de4dd4508ac151fadc1c6a5f76dcf7b15798dcac932ae33371 |
 | patches/vllm-startup-plan-admission-bound.patch | 994f9aabc61b3d7473e83593a5279b2759ce4413ceb1ea212ae33be342df0019 |
+| patches/vllm-template-refusals-name-their-parameter.patch | f78e5a791fa23844b1a9c37752bf5a916053c86cfde8ff00eedadd02b935a897 |
 
-The reconstructed tree has 104 reviewed runtime-source changes, 2 new runtime sources,
-7 runtime-source deletions, 81 existing-test changes, 16 new tests,
-and 3 test deletions. The authoritative
-counts are derived and printed by ./scripts/build-vllm.sh check, never restated
-by hand there. The landmark-aware Python patcher calculates every mutation
+The reconstructed tree's runtime-source and test changes, new files and
+deletions are counted by ./scripts/build-vllm.sh check, which derives and prints
+them; they are not restated here. The landmark-aware Python patcher calculates every mutation
 (including file deletions) before writing, validates unique structural landmarks
 and complete pre/post hashes, performs atomic transactions with rollback, and is
 itself covered by thirteen failure-path tests. The
@@ -364,11 +363,11 @@ Pinned build inputs and products:
 | Offline archive | artifacts/qwen38-vllm-images-runtime-v27.tar |
 | Archive size | 8,561,267,712 bytes, mode 0600 |
 | Archive SHA-256 | 48cc3978e66e4d18f0a10752dbdfa08917f00d5dc9d75f7653b35b4a207d31a4 |
-| Runtime Dockerfile SHA-256 | ac744a9870051f4ada5c05c7ed2562da166dbbd4028c2ffb5d037eb8a92e61bd |
-| Docker context allowlist SHA-256 | 0478aa5fae53be4a60a60682a732b96a30b9ebbd6fcdc024107eb358be157183 |
-| Build verifier SHA-256 | 3ec082de1cce4fd9ea15ba40b7a4c599c19b5e0ec29d34c62f74c33e1f66440e |
-| Runtime validator SHA-256 | 6685952b62fb9a0cfd592b3ee1b4753c50322702739d2b051b63e7837958abb1 |
-| Runtime lock SHA-256 | 7c358e038ff1ecd1bf5a70d1b1e86f6f562c2efb6cc5c86b02647a09f94de29c |
+| Runtime Dockerfile SHA-256 | b89e080a0c98fe80add8c0a72ba57be3fea9389b69cc2a39d9929e78ca07d800 |
+| Docker context allowlist SHA-256 | 77b0c5dab61f5d56ddc6b9749b4fba1a3c7c45129d37481f7a0f9f88de80a186 |
+| Build verifier SHA-256 | 7b3b8bf54eb9750931aab209f5886f0f24717b7f8df209b0db0a323de3c41640 |
+| Runtime validator SHA-256 | b040f5c1a9777fb5c84eff30f28236a53fff574a71b05c92348d950ec7b5279b |
+| Runtime lock SHA-256 | b6e9db7c6fe33ab1018dfd9060dd13fd3f831d43f514d20924ba09bb54063b7d |
 
 The runtime tag names the pinned image and nothing else. A build used to load its
 image under that tag before comparing the image ID with the pin, so a build that
@@ -1138,7 +1137,11 @@ feedback. The parser does not silently delete or rename them.
 Request errors are classified at their cause. Deliberate template guards,
 image-data refusals and context-length refusals are typed client errors.
 Unexpected Python exceptions, template bugs and server configuration failures
-remain server errors; a raw ValueError does not imply HTTP 400.
+remain server errors; a raw ValueError does not imply HTTP 400. Each template
+guard names the template variable it refuses, and the refusal names the request
+parameter that supplied it -- `reasoning_effort`, `reasoning.effort`,
+`chat_template_kwargs.preserve_thinking`, `messages` or `input` -- and no
+parameter when the value came from the server's own defaults.
 
 Reasoning and tool boundaries retain their actual token positions through
 Unicode decoding and caller-stop holdback. A stripped marker cannot bind to

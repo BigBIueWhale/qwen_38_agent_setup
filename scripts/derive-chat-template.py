@@ -4,6 +4,8 @@
 The served template is not the model's. It rejects `enable_thinking: false`,
 accepts only `xhigh` reasoning effort, and renders every assistant turn in the
 history with its reasoning, refusing any `preserve_thinking` other than `true`.
+Every refusal names the template variable it concerns, so the server can name
+the request parameter that supplied it.
 Those differences were previously carried as an edited file whose bytes were
 pinned but whose derivation existed nowhere, so nothing could answer "what did
 we change, and is the served template still exactly that change applied to the
@@ -41,7 +43,7 @@ SOURCE_TEMPLATE_SHA256 = (
     "12827f24b742ea4e80cdc12dbcf9622227056b9f797252a3149263d4f9aaadce"
 )
 DERIVED_TEMPLATE_SHA256 = (
-    "07f545cd8ed9232f2b24d79010fad187f92e5b25b532448eb9017c0f8b8c2088"
+    "3b5bcc18141cca486335c8f16c2cfa8f5bf4aa3529b6f6cfb3ed4d7513d5cd85"
 )
 
 # A shedding rule was built here and removed. It worked exactly as designed --
@@ -138,7 +140,7 @@ STAGE_A_THINKING_GATE = (
     "thinking-cannot-be-disabled",
     "{%- if enable_thinking is undefined or enable_thinking is true %}\n",
     "{%- if enable_thinking is defined and enable_thinking is false %}\n"
-    "    {{- raise_exception('Thinking cannot be disabled in this correctness-first profile.') }}\n"
+    "    {{- raise_exception('Thinking cannot be disabled in this correctness-first profile.', 'enable_thinking') }}\n"
     "{%- else %}\n",
 )
 
@@ -159,7 +161,7 @@ STAGE_A_EFFORT_IS_XHIGH_ONLY = (
     "        {%- set reasoning_instructions = 'Reasoning effort is set to low. Keep your thinking brief and focused, moving directly to the conclusion without unnecessary elaboration.' %}\n"
     "    {%- endif %}\n",
     "    {%- if resolved_reasoning_effort != 'xhigh' %}\n"
-    "        {{- raise_exception('Unexpected reasoning effort ' ~ reasoning_effort ~ '. This correctness-first profile accepts only xhigh; high and max are aliases for xhigh.') }}\n"
+    "        {{- raise_exception('Unexpected reasoning effort ' ~ reasoning_effort ~ '. This correctness-first profile accepts only xhigh; high and max are aliases for xhigh.', 'reasoning_effort') }}\n"
     "    {%- endif %}\n"
     "    {%- set reasoning_instructions = 'Reasoning effort is set to xhigh. Please think carefully through the task, validate key assumptions, consider plausible alternatives, and prioritize correctness, consistency, and clarity in the final answer.' %}\n",
 )
@@ -199,7 +201,8 @@ STAGE_B_REFUSE_DISCARD = (
     "{%- if preserve_thinking is defined and preserve_thinking is not true %}\n"
     "    {{- raise_exception('Historical thinking cannot be discarded in this "
     "correctness-first profile. Every assistant turn in the conversation is "
-    "rendered with its reasoning, and preserve_thinking accepts only true.') }}\n"
+    "rendered with its reasoning, and preserve_thinking accepts only true.', "
+    "'preserve_thinking') }}\n"
     "{%- endif %}\n",
 )
 
@@ -216,6 +219,40 @@ STAGE_B_ALWAYS_RENDER_REASONING = (
 )
 
 STAGE_B = (STAGE_B_REFUSE_DISCARD, STAGE_B_ALWAYS_RENDER_REASONING)
+
+
+# --- Stage C: every refusal names what it refuses -------------------------
+#
+# The server turns a template refusal into a request error naming the request
+# parameter at fault, and only the template knows which of its variables it
+# refused. Its own refusals name theirs above; the model's refuse the
+# conversation, and name `messages`. The argument is the refusal's, not the
+# prompt's: nothing the model reads changes.
+
+_CONVERSATION_REFUSALS = (
+    "'System message cannot contain images.'",
+    "'System message cannot contain videos.'",
+    "'Unexpected item type in content.'",
+    "'Unexpected content type.'",
+    "'No messages provided.'",
+    "'System message must be at the beginning.'",
+    "'Tool call is missing a function name.'",
+    "'Tool call arguments for function \"' + (tool_call.name | string) + '\" were "
+    "passed as a JSON string. Parse them into an object before calling "
+    "apply_chat_template.'",
+    "'Tool call arguments for function \"' + (tool_call.name | string) + '\" must be "
+    "an object/mapping or a JSON string.'",
+    "'Unexpected message role.'",
+)
+
+STAGE_C = tuple(
+    (
+        f"conversation-refusal-{index}-names-messages",
+        f"raise_exception({message}) }}}}",
+        f"raise_exception({message}, 'messages') }}}}",
+    )
+    for index, message in enumerate(_CONVERSATION_REFUSALS, 1)
+)
 
 
 STAGE_A = (
@@ -248,7 +285,7 @@ TRAILER = (
 
 def derive(source: str) -> str:
     text = source
-    for name, before, after in (*STAGE_A, *STAGE_B, TRAILER):
+    for name, before, after in (*STAGE_A, *STAGE_B, *STAGE_C, TRAILER):
         text = apply_stage(text, name, before, after)
     return text
 

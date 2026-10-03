@@ -735,6 +735,7 @@ assert_running_profile() {
       /usr/local/lib/python3.12/dist-packages/vllm/renderers/template_authorship.py \
       /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/pooling/scoring/io_processor.py \
       /usr/local/lib/python3.12/dist-packages/vllm/model_executor/kernels/linear/__init__.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/serve/tokenize/protocol.py \
       /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/serve/exception_handling/register.py \
       /usr/local/lib/python3.12/dist-packages/vllm/tokenizers/detokenizer_utils.py \
       /usr/local/lib/python3.12/dist-packages/vllm/tool_parsers/utils.py \
@@ -806,6 +807,7 @@ assert_running_profile() {
     "${TEMPLATE_AUTHORSHIP_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/renderers/template_authorship.py \
     "${SCORING_IO_PROCESSOR_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/pooling/scoring/io_processor.py \
     "${LINEAR_KERNELS_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/model_executor/kernels/linear/__init__.py \
+    "${TOKENIZE_PROTOCOL_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/serve/tokenize/protocol.py \
     "${EXCEPTION_REGISTRATION_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/serve/exception_handling/register.py \
     "${DETOKENIZER_UTILS_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/tokenizers/detokenizer_utils.py \
     "${TOOL_PARSER_UTILS_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/tool_parsers/utils.py \
