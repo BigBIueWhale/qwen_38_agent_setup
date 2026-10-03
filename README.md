@@ -74,7 +74,7 @@ error.
   and relay readiness events, then validates the complete live configuration before
   reporting success. Re-running it validates the existing owned topology rather than
   starting a duplicate.
-- status.sh validates host prerequisites, thirty-five ordered vLLM transformations, every reviewed
+- status.sh validates host prerequisites, every ordered vLLM transformation, every reviewed
   source and test file, the model manifest, image archive, image identity and labels,
   command and environment, mounts, runtime packages, API identity, listener,
   hardening, and live health. HEALTHY means all checks passed.
@@ -95,8 +95,8 @@ Advanced reproducibility operations are deliberately separate from serving mode:
     ./scripts/build-vllm.sh build
     ./scripts/restore-images.sh
 
-The check reconstructs the source tree from the pinned upstream commit through all thirty-five
-landmark-aware transformations. Materialise writes that reconstruction into the live `vllm/`
+The check reconstructs the source tree from the pinned upstream commit through every
+landmark-aware transformation. Materialise writes that reconstruction into the live `vllm/`
 tree wherever the live bytes are provably stale and refuses the whole run otherwise; it is the
 only command here that writes that tree, and the mode argument is required so it cannot happen
 by default. The build runs offline from the exact base image and fails unless it produces
@@ -306,9 +306,10 @@ It is intentionally reconstructed by the ordered, reviewed semantic transformati
 | patches/vllm-qwen-unique-tool-parameters.patch | 6a76a61c743807215555cbd6b3bbdd8fcaba4abcaca69ef000d301df6c792d3b |
 | patches/vllm-generation-admission-before-response.patch | 6c8b7e41034c2774a3051cda0fddd9cfc2662e176f96a3375086f0253bb81697 |
 | patches/vllm-kv-scope-single-flight.patch | cc5e52403afd4e4764693da552e9252bbf204793566fff6a27fb87b4dbd28d13 |
+| patches/vllm-template-authored-control-tokens.patch | dd43b43e5ad972c0b7622a3288d6d47cf2b11d24c17e11dda9a5c89a8a8ff542 |
 
-The reconstructed tree has 102 reviewed runtime-source changes, 1 new runtime source,
-7 runtime-source deletions, 81 existing-test changes, 14 new tests,
+The reconstructed tree has 103 reviewed runtime-source changes, 2 new runtime sources,
+7 runtime-source deletions, 81 existing-test changes, 15 new tests,
 and 3 test deletions. The authoritative
 counts are derived and printed by ./scripts/build-vllm.sh check, never restated
 by hand there. The landmark-aware Python patcher calculates every mutation
@@ -360,11 +361,11 @@ Pinned build inputs and products:
 | Offline archive | artifacts/qwen38-vllm-images-runtime-v27.tar |
 | Archive size | 8,561,267,712 bytes, mode 0600 |
 | Archive SHA-256 | 48cc3978e66e4d18f0a10752dbdfa08917f00d5dc9d75f7653b35b4a207d31a4 |
-| Runtime Dockerfile SHA-256 | 32e336990ec85b890f7b03ddc9797baea14576f38bde01da64264b3615c17b15 |
-| Docker context allowlist SHA-256 | c0a54d4706ae24c88b03f4cfb1b21e7c75e415fa6d7ba4dd4fd4d36ef8a8c30c |
-| Build verifier SHA-256 | 2a4c4a92fc5858e9662c67f6cadc69ab52cbc26468bc74cd8334c6becaa8673a |
-| Runtime validator SHA-256 | 2ad831d8a71adf0db4c8a923d063d32df7358250d1d0d97d76c2979ce9fe7fab |
-| Runtime lock SHA-256 | d4af8e4669eb36685b40237030b9ed2bdda8a3e79192923f10a3ca89092551b7 |
+| Runtime Dockerfile SHA-256 | dcbd7ec419301d0c56cd545aafd2fd249c3362bc2e02427dd6e505e8db34b3a7 |
+| Docker context allowlist SHA-256 | 4b293594032d2bfbb3d08c85f1b67810ec66541413011564584836e05edc8d63 |
+| Build verifier SHA-256 | ce5cbac366ec10fd1f339ce94453c81ff0b6a1f593e7541ca3ceebf33601312f |
+| Runtime validator SHA-256 | f3f882c912d72ef04bf0e5cac51d638b47f7d4e2352829661d638d260833ae03 |
+| Runtime lock SHA-256 | 74bd846106bf0244148bb05dec60ce6e350c8de7f96dad4acc5bcb9ad3d80609 |
 
 The runtime tag names the pinned image and nothing else. A build used to load its
 image under that tag before comparing the image ID with the pin, so a build that
@@ -488,6 +489,79 @@ Consequences:
   Qwen3_5ForConditionalGeneration.
 - Request-side media limits, processor overrides, and lower image-detail choices are
   rejected by the strict image patch rather than silently replacing the profile.
+
+### Only the template writes control tokens
+
+The served tokenizer marks `<|im_start|>`, `<|im_end|>`, `<|endoftext|>` and the
+vision, audio and speech markers as special tokens, and `<tool_call>`,
+`</tool_call>`, `<think>`, `</think>`, `<tool_response>`, `</tool_response>` and
+the fill-in-the-middle markers as added tokens that are not special;
+`split_special_tokens` is false. Upstream vLLM renders the chat template to one
+string and tokenizes that string whole, so request text that spells one of those
+markers -- a file the model reads, a command's output, a tool result, a user
+message, the model's own earlier turn as the client re-sends it -- becomes that
+control token: a forged turn boundary, thinking boundary or tool call, and a way
+for a repository to end a turn and open another inside what should be inert
+content. Setting `split_special_tokens` would not end it: the template's own
+`<|im_start|>` is in the same string and would be split too, and `<tool_call>`
+and `</think>` are not special, so they would not be split at all.
+
+The template renders with authorship (`vllm/renderers/template_authorship.py`,
+stage `template-authored-control-tokens`). Every character of the rendered prompt
+carries whether the template or the request wrote it. The template's constants
+and the tokenizer's special-token variables are the template's; every string the
+request supplies -- messages, reasoning, tool calls and their arguments, tool
+results, tool schemas, documents, request template arguments -- is the request's,
+and authorship follows the text through the operations templates apply to it
+(concatenation, macros, `trim`, slicing, `split`, `join`, `replace`, `tojson`,
+`safe`). Encoding matches the added vocabulary only in text the template wrote
+and encodes the text between those tokens with no added vocabulary at all, so
+request text can only become ordinary vocabulary (every id below 248,044),
+whatever bytes it holds. Nothing the model reads is rewritten: a file holding
+`<|im_end|>` reaches the model as those ten characters, in the ordinary tokens
+that spell them. The template's markers are the ids they always were, and a
+prompt whose request text spells no added token encodes to exactly the ids the
+whole-string encoding gives. A chat is rendered straight to token ids; its text
+is kept for logging and `echo`, never tokenized again.
+
+Text produced by a template operation that does not carry authorship has no
+author. If such text spells an added token, nobody can say whether the template
+or the request wrote it, and rendering refuses with a server error naming the
+token and its position. `scripts/template_authorship_unit.py` proves both halves
+for the served template in every build and check: statically, every filter and
+method it applies keeps authorship or yields no text; by rendering, a
+conversation that takes every branch of the template, with every request field
+spelling every added token of the served vocabulary, encodes to exactly the
+added tokens of the same conversation with those spellings removed. vLLM's
+`string` content format writes multimodal placeholders into message text, so it
+is refused for multimodal requests (this deployment serves `openai`), and chat
+rendering needs a tokenizers-backed tokenizer.
+
+Proven offline against the served tokenizer and template, no model: every
+request body of the two recorded runs (548 prompts, 61,395,519 tokens, both
+bundles hash-verified) renders through the served chat path to identical ids,
+identical text and the same 95,404 added-token ids before and after, and every
+prompt's ids decode back to its text. Every added-token spelling placed in a
+file read, a command output, a user message, the system prompt, the model's
+history (content, reasoning, tool-call names and arguments), a tool schema, a
+continued final message, and beside an image yields exactly the template's
+markers; before, the same content forged up to 313 more, and an `<|image_pad|>`
+spelled in the text ahead of an image took that image's 70 embedding positions
+while the image's own placeholder stayed a single unexpanded token.
+
+What changes for the model, stated rather than hidden: when the model itself
+emits a control-token id where the template writes none -- the tool grammar
+lets a string argument contain `</think>` or `<tool_call>` as an id -- the
+client keeps text, and that text returns in its history as the ordinary tokens
+that spell it. Before, every ordinary-token spelling the model wrote came back
+as a control token it never wrote. The mismatch that remains begins with the
+model's own emission of a control id where no template would write one, and the
+agent service records the generated ids that show it.
+
+Surfaces where the client writes the prompt itself have no template, and their
+client is the author of every token: `/v1/completions` with a text prompt,
+`/inference/v1/generate` with token ids, and `kv_transfer_params.prompt_token_ids`,
+which replaces templating on Chat Completions and Responses requests.
 
 ### Shared prefixes and agent IDs
 

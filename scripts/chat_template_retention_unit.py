@@ -95,7 +95,7 @@ def assert_template_error_classification() -> None:
         source = handle.read()
     try:
         safe_apply_chat_template(SimpleNamespace(), tokenizer, messages,
-            chat_template=source, tokenize=False, preserve_thinking=False,
+            chat_template=source, preserve_thinking=False,
             raise_exception="a request cannot replace the guard")
     except VLLMValidationError as error:
         assert "cannot be discarded" in str(error)
@@ -108,7 +108,7 @@ def assert_template_error_classification() -> None:
     for template in ("{% broken %}", "{{ absent.required() }}"):
         try:
             safe_apply_chat_template(SimpleNamespace(), tokenizer, messages,
-                chat_template=template, tokenize=False)
+                chat_template=template)
         except Exception as error:
             assert create_error_response(error).error.code == 500
         else:

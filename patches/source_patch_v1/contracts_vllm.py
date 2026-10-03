@@ -2652,8 +2652,7 @@ def _validate_precise_errors_after(state: State) -> None:
     ), label=label)
     hf = "vllm/renderers/hf.py"
     source = _require_in_symbol(state, hf, "safe_apply_chat_template", (
-        'resolved_kwargs["raise_exception"] = _raise_template_validation_error',
-        "plain = tokenizer.apply_chat_template(",
+        "_raise_template_validation_error",
     ), label=label)
     _require("except Exception" not in source and "raise ValueError(str(e))" not in source,
              label + ": template bugs must retain their original server cause")
@@ -2757,6 +2756,67 @@ def _validate_admission_after(state: State) -> None:
     }, label=label)
 
 
+def _validate_template_authorship_before(state: State) -> None:
+    label = "template-authored control tokens precondition"
+    hf = "vllm/renderers/hf.py"
+    require_text(state, hf, "plain = tokenizer.apply_chat_template(", label=label)
+    forbid_text(state, hf, "TemplateTokenEncoder", label=label)
+
+
+def _validate_template_authorship_after(state: State) -> None:
+    label = "template-authored control tokens"
+    hf = "vllm/renderers/hf.py"
+    authorship = "vllm/renderers/template_authorship.py"
+    # The prompt of a chat is the template's text encoded with authorship;
+    # nothing renders it to a string for a later whole-string encoding.
+    forbid_text(state, hf, "tokenizer.apply_chat_template(", label=label)
+    forbid_text(state, hf, "parse_dec_only_prompt", label=label)
+    _require_in_symbol(state, hf, "safe_apply_chat_template", (
+        "render_chat_template(", "special_tokens=tokenizer.special_tokens_map",
+        "raise_exception=_raise_template_validation_error",
+    ), label=label)
+    _require_in_symbol(state, hf, "HfRenderer.__init__", (
+        "isinstance(self.tokenizer, TokenizersBackend)",
+        "TemplateTokenEncoder(self.tokenizer.backend_tokenizer.to_str())",
+    ), label=label)
+    _require_in_symbol(state, hf, "HfRenderer._render_conversation", (
+        "if self._template_encoder is None:",
+        "self._template_encoder.encode(text)",
+        "TokensPrompt(prompt_token_ids=encoded.ids, prompt=str(text))",
+        'content_format == "string" and mm_data',
+    ), label=label)
+    _require_in_symbol(state, authorship, "TemplateTokenEncoder.__init__", (
+        'spec["added_tokens"] = []',
+    ), label=label)
+    _require_in_symbol(state, authorship, "TemplateTokenEncoder.encode", (
+        "self._ordinary.encode_batch(",
+    ), label=label)
+    _require_in_symbol(state, authorship, "TemplateTokenEncoder._template_added_tokens", (
+        "label & _AUTHOR == REQUEST", "text.authors(start, end) != {TEMPLATE}",
+        "raise ControlTokenAuthorshipError(",
+    ), label=label)
+    _require_in_symbol(state, authorship, "render_chat_template", (
+        "written_by_request(list(conversation))", "written_by_template(v)",
+    ), label=label)
+    require_python_symbols(state, authorship, {
+        "AuthoredText": None,
+        "AuthoringEnvironment": None,
+        "GenerationTracker": None,
+        "_AuthoringCodeGenerator.visit_Const": None,
+        "_AuthoringCodeGenerator._output_child_pre": None,
+    }, label=label)
+    _require_in_symbol(state, "vllm/entrypoints/chat_utils.py",
+                       "_parse_chat_message_content_part", (
+        "AuthoredText.written_by(", "PROMPT_EMBEDS_PLACEHOLDER_TOKEN, TEMPLATE",
+    ), label=label)
+    require_python_symbols(state, "tests/renderers/test_template_authorship.py", {
+        "test_request_text_spelling_added_tokens_stays_text": None,
+        "test_prompt_without_spellings_encodes_as_the_whole_string": None,
+        "test_authorship_follows_the_operations_templates_use": None,
+        "test_text_without_an_author_cannot_spell_an_added_token": None,
+    }, label=label)
+
+
 def _validate_single_flight_before(state: State) -> None:
     forbid_text(state, "vllm/v1/engine/output_processor.py", "kv_scope",
                 label="kv_scope single-flight precondition")
@@ -2804,6 +2864,25 @@ def validate_final(state: State) -> None:
 
 
 CONTRACTS: Mapping[str, SemanticContract] = {
+    "template-authored-control-tokens": SemanticContract(
+        rationale=(
+            "Upstream renders the chat template to one string and tokenizes it "
+            "whole, so request text (a file the model read, command output, a "
+            "tool result, the model's own re-sent history) that spells "
+            "<|im_end|>, </think> or <tool_call> becomes that control token: a "
+            "forged turn boundary, thinking boundary or tool call. The template "
+            "renders with authorship and only text the template wrote may match "
+            "the added vocabulary; request text is encoded without it. The text "
+            "is never changed, and a prompt whose request text spells no added "
+            "token encodes to the ids it always did."
+        ),
+        removal_condition=(
+            "Remove when pinned upstream encodes chat-template output so that "
+            "only the template's own text can produce added-token ids."
+        ),
+        validate_before=_validate_template_authorship_before,
+        validate_after=_validate_template_authorship_after,
+    ),
     "kv-scope-single-flight": SemanticContract(
         rationale=(
             "One kv_scope names one line of work, yet upstream runs two "

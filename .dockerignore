@@ -169,4 +169,9 @@
 !vllm/vllm/tokenizers/detokenizer_utils.py
 !vllm/vllm/entrypoints/serve/exception_handling/register.py
 !vllm/vllm/renderers/hf.py
+!vllm/vllm/renderers/template_authorship.py
+!vllm/vllm/entrypoints/pooling/
+!vllm/vllm/entrypoints/pooling/scoring/
+!vllm/vllm/entrypoints/pooling/scoring/io_processor.py
+!scripts/template_authorship_unit.py
 !scripts/qwen_grammar_unit.py
