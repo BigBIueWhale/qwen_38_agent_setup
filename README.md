@@ -15,8 +15,9 @@ workstation.
 
 ### Bottom line
 
-The v23 source revision awaits its offline image build, adoption and release
-validation. Prior live results below describe the versions that earned them.
+This source revision awaits its offline image build, adoption and release
+validation; the runtime image pinned below was built from an earlier one.
+Prior live results below describe the versions that earned them.
 The audit resolution record in `docs/model-output-and-audit-fixes.md` lists the
 source fixes and their container validation. Anthropic tool results now refuse
 unsupported nested content, preserve `is_error` in the rendered result, and return
@@ -867,7 +868,7 @@ upstream card, exact tokenizer, vLLM request accounting, and the live boundary a
     262143 prompt + 1 output = 262144 total  -> accepted
     262144 prompt + 1 output = 262145 total -> HTTP 400
 
-The accepted multimodal boundary included all eighteen maximum-size images and
+The accepted multimodal boundary included all fifteen maximum-size images and
 245,745 tokens of multimodal expansion. No YaRN, long-context environment override,
 or nominal one-million setting is enabled.
 
@@ -1308,8 +1309,8 @@ rerun after every runtime-profile change before that image is accepted:
    official-norm repair proof: pass.
 3. Exact network-none vLLM namespace, fixed bridge/Unix socket, host-loopback-only
    ingress, and no published Docker ports: pass.
-4. MTP/speculation absent, CPU weight offload zero, KV offload confined to the
-   declared 7,747,584,000-byte ARC host tier, CUDA graphs retained: pass.
+4. MTP/speculation absent, CPU weight offload and KV offload both zero, CUDA
+   graphs retained: pass.
 5. Exact xhigh defaults, high/max alias identity, low/disabled rejection: pass.
 6. Exact five-real-token final-response phase stop: pass.
 7. OpenAI/Anthropic tool loops, adversarial grammar, orphan rejection, and
