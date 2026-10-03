@@ -1,0 +1,1168 @@
+diff --git a/tests/parser/engine/test_qwen_xml_fidelity.py b/tests/parser/engine/test_qwen_xml_fidelity.py
+--- a/tests/parser/engine/test_qwen_xml_fidelity.py
++++ b/tests/parser/engine/test_qwen_xml_fidelity.py
+@@ -435,3 +435,109 @@
+             '</parameter>\n</function>\n</tool_call>')
+     with pytest.raises(RuntimeError, match='Qwen XML argument decoding failed'):
+         parse(body, chunk_size)
++
++
++TODO_SCHEMA = {'type': 'object', 'required': ['todos'], 'properties': {
++    'todos': {'type': 'array', 'items': {'type': 'object',
++        'required': ['content', 'status'],
++        'properties': {'content': {'type': 'string'},
++                       'status': {'type': 'string', 'enum': ['pending', 'done']}}}}}}
++MARKUP = ['</parameter>', '</parameter>\n<parameter=todos>\nnext',
++          'a</parameter> then </function> b', '</parameter></function></tool_call>',
++          '<parameter=todos>', '</think><tool_call>']
++
++
++def _grammar_accepts(schema, call):
++    import xgrammar as xgr
++    from xgrammar.testing import _is_grammar_accept_string
++    from vllm.tool_parsers.structural_tag_registry import get_model_structural_tag
++
++    request = ChatCompletionRequest(messages=[], tools=[{
++        'type': 'function', 'function': {'name': 'write', 'parameters': schema},
++    }])
++    return _is_grammar_accept_string(xgr.Grammar.from_structural_tag(
++        get_model_structural_tag('qwen_3_coder', request.tools, 'auto', False)), call)
++
++
++@pytest.mark.parametrize('chunk_size', [None, 1, 3, 13])
++@pytest.mark.parametrize('additional', [False, None])
++@pytest.mark.parametrize('content', MARKUP)
++def test_json_value_strings_carry_parameter_markup(content, additional, chunk_size):
++    """A JSON value ends at the first closer outside its strings.
++
++    The grammar admits any string inside an array or object value, markup
++    included, so the call is published exactly as written: not cut at the
++    marker, refused as a repeated parameter, or returned as content.
++    """
++    schema = dict(TODO_SCHEMA)
++    if additional is False:
++        schema['additionalProperties'] = False
++    todos = [{'content': content, 'status': 'pending'}]
++    call = ('<tool_call>\n<function=write>\n<parameter=todos>\n' + json.dumps(todos)
++            + '\n</parameter>\n</function>\n</tool_call>')
++    assert _grammar_accepts(schema, call)
++    reasoning, content_text, calls = parse('plan</think>' + call, chunk_size,
++                                           schema=schema)
++    assert (reasoning, content_text) == ('plan', '')
++    assert [json.loads(c) for c in calls] == [{'todos': todos}]
++
++
++@pytest.mark.parametrize('chunk_size', [None, 1, 13])
++def test_open_declared_slot_reads_its_declared_production(chunk_size):
++    """A declared name whose slot is open is read by its declared production.
++
++    With undeclared names admitted, the same text also parses as the array
++    cut at its inner closer followed by a second ``path``; that reading is a
++    repeat the model did not write, and the declared one is read instead.
++    """
++    schema = {'type': 'object', 'required': ['path'], 'properties': {
++        'path': {'type': 'string'},
++        'ignore': {'type': 'array', 'items': {'type': 'string'}}}}
++    ignore = ['x</parameter>\n<parameter=path>\ny']
++    call = ('<tool_call>\n<function=write>\n<parameter=path>\n/a\n</parameter>\n'
++            '<parameter=ignore>\n' + json.dumps(ignore)
++            + '\n</parameter>\n</function>\n</tool_call>')
++    assert _grammar_accepts(schema, call)
++    _, _, calls = parse('plan</think>' + call, chunk_size, schema=schema)
++    assert [json.loads(c) for c in calls] == [{'path': '/a', 'ignore': ignore}]
++
++
++@pytest.mark.parametrize('chunk_size', [None, 1, 13])
++def test_whole_body_closes_at_the_wrapper_while_a_json_reading_is_open(chunk_size):
++    """The call closes where the grammar's only surviving reading closes it.
++
++    After ``["x</parameter>`` the array's string is still open, but the
++    undeclared slot has also closed a raw value, and a newline then cannot
++    continue a JSON string: the wrapper ends the call, read by the reading
++    the grammar kept.
++    """
++    schema = {'type': 'object', 'properties': {
++        'ignore': {'type': 'array', 'items': {'type': 'string'}}}}
++    call = ('<tool_call>\n<function=write>\n<parameter=ignore>\n["x</parameter>\n'
++            '</function>\n</tool_call>')
++    assert _grammar_accepts(schema, call)
++    reasoning, content, calls = parse('plan</think>' + call, chunk_size, schema=schema)
++    assert (reasoning, content) == ('plan', '')
++    assert [json.loads(c) for c in calls] == [{'ignore': '["x'}]
++
++
++@pytest.mark.parametrize('chunk_size', [None, 1, 3])
++def test_truncated_json_value_is_the_unfinished_parameter(chunk_size):
++    schema = dict(TODO_SCHEMA, additionalProperties=False)
++    text = ('plan</think><tool_call>\n<function=write>\n<parameter=todos>\n'
++            '[{"content": "a</parameter> b')
++    _, _, calls = parse(text, chunk_size, schema=schema, finish='length')
++    assert [json.loads(c) for c in calls] == [
++        {'todos': '[{"content": "a</parameter> b'}]
++
++
++@pytest.mark.parametrize('chunk_size', [None, 1, 3, 13])
++def test_closing_sequence_inside_a_raw_value_does_not_end_the_call(chunk_size):
++    """A raw value may carry the call's own closing sequence before its closer."""
++    value = 'a\n</function>\n</tool_call>\nb'
++    call = ('<tool_call>\n<function=write>\n<parameter=text>\n' + value
++            + '\n</parameter>\n</function>\n</tool_call>')
++    assert _grammar_accepts(TOOL['function']['parameters'], call)
++    reasoning, content, calls = parse('plan</think>' + call, chunk_size)
++    assert (reasoning, content) == ('plan', '')
++    assert [json.loads(c) for c in calls] == [{'text': value}]
+diff --git a/tests/tool_parsers/test_structural_tag_registry.py b/tests/tool_parsers/test_structural_tag_registry.py
+--- a/tests/tool_parsers/test_structural_tag_registry.py
++++ b/tests/tool_parsers/test_structural_tag_registry.py
+@@ -36,6 +36,7 @@
+     XGRAMMAR_BUILTIN_STRUCTURAL_TAG_MODELS,
+     get_function_parameters,
+     get_model_structural_tag,
++    read_qwen_arguments,
+ )
+ 
+ 
+@@ -913,6 +914,85 @@
+     assert _is_grammar_accept_string(grammar, _qwen_call("v", "anything"))
+ 
+ 
++_QWEN_READING_PARAMETERS = {
++    "type": "object",
++    "required": ["city"],
++    "properties": {
++        "city": {"type": "string"},
++        "tags": {"type": "array", "items": {"type": "string"}},
++        "unit": {"type": "string", "enum": ["C", "F", "a</parameter>b"]},
++        "days": {"type": "integer"},
++    },
++}
++
++
++@pytest.mark.parametrize(
++    ("body", "parameters"),
++    [
++        (
++            "\n<parameter=city>\nParis</function>\n</tool_call>\n</parameter>\n",
++            (("city", "\nParis</function>\n</tool_call>\n"),),
++        ),
++        (
++            '\n<parameter=city>\nP\n</parameter>\n<parameter=tags>\n'
++            '["</parameter>\\n<parameter=city>", "</function>"]\n</parameter>\n',
++            (
++                ("city", "\nP\n"),
++                ("tags", '\n["</parameter>\\n<parameter=city>", "</function>"]\n'),
++            ),
++        ),
++        (
++            "\n<parameter=city>\nP\n</parameter>\n<parameter=unit>\n"
++            "a</parameter>b\n</parameter>\n",
++            (("city", "\nP\n"), ("unit", "\na</parameter>b\n")),
++        ),
++        (
++            # ``days`` before ``unit`` leaves ``unit``'s slot behind, so it is
++            # an undeclared name read on the raw channel.
++            "\n<parameter=city>\nP\n</parameter>\n<parameter=days>\n3\n"
++            "</parameter>\n<parameter=unit>\nC\n</parameter>\n",
++            (("city", "\nP\n"), ("days", "\n3\n"), ("unit", "\nC\n")),
++        ),
++    ],
++)
++def test_qwen3_arguments_are_read_by_the_grammar_productions(body, parameters):
++    """The reader and the grammar are one definition of the argument body.
++
++    Every body here is accepted by the rendered grammar, and the reader
++    returns the parameters the grammar's productions close -- a raw value up
++    to its closer, a JSON value up to the first closer outside its strings,
++    a constant whole -- and every prefix of the body is a reading too.
++    """
++    grammar = Grammar.from_structural_tag(
++        get_model_structural_tag(
++            model="qwen_3_coder",
++            tools=_qwen_schema_tools(_QWEN_READING_PARAMETERS),
++            tool_choice="auto",
++            reasoning=False,
++        )
++    )
++    call = "<tool_call>\n<function=get_weather>" + body + "</function>\n</tool_call>"
++    assert _is_grammar_accept_string(grammar, call)
++    reading = read_qwen_arguments(body, _QWEN_READING_PARAMETERS)
++    assert reading is not None and reading.complete
++    assert reading.parameters == parameters
++    for cut in range(len(body)):
++        prefix = read_qwen_arguments(body[:cut], _QWEN_READING_PARAMETERS)
++        assert prefix is not None, body[:cut]
++
++
++def test_qwen3_reader_has_no_reading_of_text_the_grammar_never_writes():
++    parameters = {
++        "type": "object",
++        "additionalProperties": False,
++        "properties": {"tags": {"type": "array"}},
++    }
++    assert read_qwen_arguments("\n<parameter=tags>\nnot json\n</parameter>\n",
++                               parameters) is None
++    assert read_qwen_arguments("\n<parameter=other>\n[]\n</parameter>\n",
++                               parameters) is None
++
++
+ def test_get_function_parameters_relaxes_function_strict_false():
+     function = SimpleNamespace(
+         parameters={"type": "object", "properties": {}},
+diff --git a/vllm/parser/engine/parser_engine.py b/vllm/parser/engine/parser_engine.py
+--- a/vllm/parser/engine/parser_engine.py
++++ b/vllm/parser/engine/parser_engine.py
+@@ -26,7 +26,11 @@
+ from vllm.logger import init_logger
+ from vllm.parser.abstract_parser import Parser, StreamState
+ from vllm.parser.engine.events import EventType, SemanticEvent
+-from vllm.parser.engine.parser_engine_config import ParserEngineConfig, ParserState
++from vllm.parser.engine.parser_engine_config import (
++    ArgumentsReading,
++    ParserEngineConfig,
++    ParserState,
++)
+ from vllm.parser.engine.streaming_parser_engine import StreamingParserEngine
+ from vllm.tool_parsers.utils import (
+     coerce_to_schema_type,
+@@ -122,8 +126,18 @@
+         self._tool_parser = None
+         self.parser_engine_config = parser_engine_config
+         self._engine = StreamingParserEngine(
+-            parser_engine_config, tokenizer, vocab=self.vocab
++            parser_engine_config, tokenizer, vocab=self.vocab,
++            arguments_reading=self._tool_arguments_reading,
+         )
++        if (
++            self._engine.requires_tool_closer
++            and parser_engine_config.arguments_reading is None
++        ):
++            raise ValueError(
++                f"Parser format {parser_engine_config.name!r} closes calls with "
++                "a wrapper but declares no arguments_reading, so no wrapper "
++                "could be told apart from text inside a value."
++            )
+ 
+         self._has_reasoning = (
+             "THINK_END" in parser_engine_config.token_id_terminals
+@@ -1359,6 +1373,13 @@
+         result = self._arg_converter(raw_args, partial)
+         return self._fix_arg_types(result, func_name) if result else result
+ 
++    def _tool_arguments_reading(
++        self, func_name: str, raw_args: str
++    ) -> ArgumentsReading:
++        """How the format reads a call's argument text so far."""
++        assert self.parser_engine_config.arguments_reading is not None
++        return self.parser_engine_config.arguments_reading(raw_args)
++
+     def _extract_args_json(self, raw_args: str, func_name: str) -> str:
+         if not raw_args.strip():
+             return "{}"
+diff --git a/vllm/parser/engine/parser_engine_config.py b/vllm/parser/engine/parser_engine_config.py
+--- a/vllm/parser/engine/parser_engine_config.py
++++ b/vllm/parser/engine/parser_engine_config.py
+@@ -32,9 +32,6 @@
+     TOOL_PREAMBLE = auto()
+     TOOL_NAME = auto()
+     TOOL_ARGS = auto()
+-    # Inside one parameter's value: only the value closer ends it, so the
+-    # format's other markup may appear in the value as ordinary text.
+-    TOOL_PARAM_VALUE = auto()
+     TOOL_BETWEEN = auto()
+ 
+ 
+@@ -53,6 +50,19 @@
+ 
+ 
+ @dataclass(frozen=True, slots=True)
++class ArgumentsReading:
++    """How a format reads a call's argument text so far.
++
++    ``complete`` means the text is a whole argument body. ``inside_parameter``
++    means some reading of it ends inside a parameter's opener or value, so
++    text after it may still belong to that parameter.
++    """
++
++    complete: bool
++    inside_parameter: bool
++
++
++@dataclass(frozen=True, slots=True)
+ class Transition:
+     next_state: ParserState
+     events: tuple[EventType, ...] = field(default_factory=tuple)
+@@ -84,7 +94,6 @@
+             ParserState.REASONING: EventType.REASONING_CHUNK,
+             ParserState.TOOL_NAME: EventType.TOOL_NAME,
+             ParserState.TOOL_ARGS: EventType.ARG_VALUE_CHUNK,
+-            ParserState.TOOL_PARAM_VALUE: EventType.ARG_VALUE_CHUNK,
+         },
+     )
+ 
+@@ -98,6 +107,11 @@
+ 
+     arg_converter: Callable[[str, bool], str] | None = None
+ 
++    # For a format whose calls close with a wrapper: how it reads a call's
++    # argument text, which decides whether a closing wrapper after the text
++    # ends the call or continues a value.
++    arguments_reading: Callable[[str], ArgumentsReading] | None = None
++
+     stream_arg_deltas: bool = True
+ 
+     tool_args_json: bool = True
+diff --git a/vllm/parser/engine/streaming_parser_engine.py b/vllm/parser/engine/streaming_parser_engine.py
+--- a/vllm/parser/engine/streaming_parser_engine.py
++++ b/vllm/parser/engine/streaming_parser_engine.py
+@@ -5,7 +5,7 @@
+ 
+ from __future__ import annotations
+ 
+-from collections.abc import Sequence
++from collections.abc import Callable, Sequence
+ from dataclasses import dataclass
+ 
+ from vllm.parser.engine.events import EventType, SemanticEvent
+@@ -17,6 +17,7 @@
+     TerminalDef,
+ )
+ from vllm.parser.engine.parser_engine_config import (
++    ArgumentsReading,
+     ParserEngineConfig,
+     ParserState,
+     Transition,
+@@ -121,6 +122,7 @@
+         tokenizer,
+         initial_state: ParserState | None = None,
+         vocab: dict[str, int] | None = None,
++        arguments_reading: Callable[[str, str], ArgumentsReading] | None = None,
+     ) -> None:
+         self.config = config
+ 
+@@ -177,6 +179,17 @@
+             EventType.TOOL_CALL_CLOSED in tr.events
+             for tr in config.transitions.values()
+         )
++        # A call that closes with a wrapper ends at the wrapper only when its
++        # arguments are not still inside a parameter: there the same text is
++        # part of a value. That is the format's reading of the arguments, given
++        # the call's function name and its argument text so far.
++        if self.requires_tool_closer and arguments_reading is None:
++            raise ValueError(
++                f"Parser format {config.name!r} closes calls with a wrapper, "
++                "so its engine needs the format's reading of a call's arguments; "
++                "construct it with arguments_reading."
++            )
++        self._arguments_reading = arguments_reading
+ 
+         self.skip_tool_parsing = False
+         self.reset(initial_state=initial_state)
+@@ -199,6 +212,12 @@
+         self._header_name: str = ""
+         self._between_text: str = ""
+         self._between_text_open: bool = False
++        # The call being read: its function name and argument text so far, and
++        # a function closer held until what follows it shows whether it ended
++        # the call.
++        self._call_name: str = ""
++        self._call_arguments: list[str] = []
++        self._held_function_end: str = ""
+ 
+     def reset(self, initial_state: ParserState | None = None) -> None:
+         """Reset mutable state for reuse across requests.
+@@ -304,12 +323,17 @@
+         elif self.state in (
+             ParserState.TOOL_PREAMBLE,
+             ParserState.TOOL_ARGS,
+-            ParserState.TOOL_PARAM_VALUE,
+             ParserState.TOOL_NAME,
+             ParserState.TOOL_BETWEEN,
+         ):
+             # A call cut before its closing wrapper ends here without
+             # TOOL_CALL_CLOSED, so it is reported as open, never as complete.
++            # A function closer still held belongs to the arguments when they
++            # can only be read as still inside a parameter.
++            if self.state == ParserState.TOOL_BETWEEN and not self._between_text_open:
++                reading = self._call_reading()
++                if reading.inside_parameter and not reading.complete:
++                    events.extend(self._resume_arguments(""))
+             if self.tool_index >= 0:
+                 if self.requires_tool_closer:
+                     self.raw_tool_calls[self.tool_index] = RawToolCall(
+@@ -365,11 +389,30 @@
+             ParserState.TOOL_PREAMBLE,
+             ParserState.TOOL_NAME,
+             ParserState.TOOL_ARGS,
+-            ParserState.TOOL_PARAM_VALUE,
+             ParserState.TOOL_BETWEEN,
+         }
+     )
+ 
++    def _call_reading(self) -> ArgumentsReading:
++        assert self._arguments_reading is not None
++        return self._arguments_reading(
++            self._call_name, "".join(self._call_arguments)
++        )
++
++    def _resume_arguments(self, text: str) -> list[SemanticEvent]:
++        """Give a held function closer, and what followed it, back to the
++        arguments: it was text inside a value, not the end of the call."""
++        held = self._held_function_end + self._between_text + text
++        self._held_function_end = ""
++        self._between_text = ""
++        self.state = ParserState.TOOL_ARGS
++        self._call_arguments.append(held)
++        return [
++            SemanticEvent(
++                EventType.ARG_VALUE_CHUNK, value=held, tool_index=self.tool_index
++            )
++        ]
++
+     def _abandon_preamble(self) -> list[SemanticEvent]:
+         """Give back an opener the trigger did not follow, as content."""
+         text = self._preamble_opener + self._preamble_text
+@@ -465,26 +508,42 @@
+         key = (self.state, terminal)
+         transition = self.config.transitions.get(key)
+ 
+-        if (
+-            self.requires_tool_closer
+-            and self.state == ParserState.TOOL_BETWEEN
+-            and transition is not None
+-            and EventType.TOOL_CALL_CLOSED in transition.events
+-            and (self._between_text != "\n" or self._between_text_open)
+-        ):
+-            self._raw_tool_parts.append(value)
+-            raw = "".join(self._raw_tool_parts)
+-            self.raw_tool_calls[self.tool_index] = RawToolCall(raw, closed=False)
+-            self._raw_tool_parts.clear()
+-            self.state = ParserState.CONTENT
+-            self._reset_preamble_state()
+-            return [
+-                SemanticEvent(
+-                    EventType.TOOL_CALL_ABANDONED,
+-                    value=raw,
+-                    tool_index=self.tool_index,
+-                ),
+-            ]
++        if self.requires_tool_closer and self.state == ParserState.TOOL_BETWEEN:
++            # The call ends at the format's closing sequence -- the function
++            # closer, its newline, the call closer -- unless the arguments
++            # before it can only be read as still inside a parameter. A
++            # function closer anything else follows was text inside a
++            # parameter when the arguments can be read that way; otherwise the
++            # span is not a call and is given back whole.
++            closes = (
++                transition is not None
++                and EventType.TOOL_CALL_CLOSED in transition.events
++            )
++            reading = None if self._between_text_open else self._call_reading()
++            ends_call = (
++                reading is not None
++                and closes
++                and self._between_text == "\n"
++                and (reading.complete or not reading.inside_parameter)
++            )
++            if not ends_call and reading is not None and reading.inside_parameter:
++                events = self._resume_arguments("")
++                events.extend(self._on_terminal(terminal, value))
++                return events
++            if not ends_call and closes:
++                self._raw_tool_parts.append(value)
++                raw = "".join(self._raw_tool_parts)
++                self.raw_tool_calls[self.tool_index] = RawToolCall(raw, closed=False)
++                self._raw_tool_parts.clear()
++                self.state = ParserState.CONTENT
++                self._reset_preamble_state()
++                return [
++                    SemanticEvent(
++                        EventType.TOOL_CALL_ABANDONED,
++                        value=raw,
++                        tool_index=self.tool_index,
++                    ),
++                ]
+ 
+         if transition is None:
+             # The projected skip state may not define the wrapper closer.
+@@ -561,14 +620,21 @@
+             return []
+         if self.state == ParserState.TOOL_NAME:
+             self._header_name += text
+-        if (
+-            self.state == ParserState.TOOL_BETWEEN
+-            and self.config.tool_preamble_text is not None
+-        ):
+-            # Between a call's end and its closer the format allows only the
+-            # newline.  It is held until the closer discards it; anything
+-            # else the model put there is its text, kept whole.
++        if self.state == ParserState.TOOL_BETWEEN and self.requires_tool_closer:
++            # Between the function closer and the call closer the format
++            # allows only the newline. Text that can still become that
++            # sequence is held. Anything else shows the function closer was
++            # inside a parameter when the arguments can be read that way;
++            # otherwise it is the model's text, kept whole, and the span is
++            # given back at the call closer.
+             self._between_text += text
++            if not self._between_text_open:
++                if ("\n" + self.config.terminals["TOOL_END"]).startswith(
++                    self._between_text
++                ):
++                    return []
++                if self._call_reading().inside_parameter:
++                    return self._resume_arguments("")
+             if not self._between_text.strip():
+                 return []
+             kept, self._between_text = self._between_text, ""
+@@ -577,6 +643,7 @@
+                 SemanticEvent(EventType.TEXT_CHUNK, value=kept, tool_index=self.tool_index)
+             ]
+         if self.state == ParserState.TOOL_ARGS:
++            self._call_arguments.append(text)
+             if self.config.tool_args_json:
+                 return self._feed_args_text(text)
+             return [
+@@ -606,7 +673,7 @@
+         if self.requires_tool_closer and previous_state in self._TOOL_STATES:
+             self._raw_tool_parts.append(value)
+         message_header = ""
+-        arg_states = (ParserState.TOOL_ARGS, ParserState.TOOL_PARAM_VALUE)
++        arg_states = (ParserState.TOOL_ARGS,)
+ 
+         if (
+             self.state in arg_states
+@@ -634,11 +701,17 @@
+                 self._raw_tool_parts = [value]
+         elif self.state == ParserState.TOOL_ARGS:
+             # The header closed: the call is real and its text is spoken for.
++            name = self._header_name
+             self._reset_preamble_state()
++            self._call_name = name
++        elif self.state == ParserState.TOOL_BETWEEN and self.requires_tool_closer:
++            # Held until what follows shows whether it ended the call.
++            self._held_function_end = value
+         elif previous_state == ParserState.TOOL_BETWEEN:
+             # The closer arrived: the format's own newline before it is not text.
+             self._between_text = ""
+             self._between_text_open = False
++            self._held_function_end = ""
+ 
+         for event_type in transition.events:
+             if event_type == EventType.TOOL_CALL_START:
+diff --git a/vllm/parser/qwen3.py b/vllm/parser/qwen3.py
+--- a/vllm/parser/qwen3.py
++++ b/vllm/parser/qwen3.py
+@@ -34,11 +34,13 @@
+ from vllm.parser.engine.events import EventType
+ from vllm.parser.engine.parser_engine import ParserEngine
+ from vllm.parser.engine.parser_engine_config import (
++    ArgumentsReading,
+     ParserEngineConfig,
+     ParserState,
+     TokenTerminal,
+     Transition,
+ )
++from vllm.tool_parsers.structural_tag_registry import read_qwen_arguments
+ from vllm.tool_parsers.utils import find_tool_schema
+ 
+ if TYPE_CHECKING:
+@@ -58,11 +60,12 @@
+ PARAM_START = "<parameter="
+ PARAM_END = "</parameter>"
+ 
+-# A value ends only at its own closer.  The grammar excludes ``</parameter>``
+-# and ``<parameter=`` from an unconstrained value and nothing else, so any
+-# other markup inside a value -- ``</function>``, ``</tool_call>``, a bare
+-# ``<parameter`` -- is the value's text; a value with no closer is the final,
+-# cut-off one.
++# Argument text is read by the grammar's own productions
++# (``read_qwen_arguments``): a value ends at its own closer, which for a JSON
++# value is the first one outside its strings. Text the grammar has no reading
++# of at all is output no grammar constrained -- a parser registered without
++# one -- and is read as the transport always read it: each value runs to the
++# next closer, and a value with no closer is the final, cut-off one.
+ _PARAM_RE = re.compile(
+     r"<parameter=([^>]*)>"
+     r"(.*?)"
+@@ -259,30 +262,50 @@
+     return value
+ 
+ 
++def _transport_parameters(
++    raw_args: str,
++) -> tuple[list[tuple[str, str]], tuple[str, str] | None]:
++    """Read argument text no grammar constrained: values run to the next closer."""
++    closed = [(match.group(1), match.group(2)) for match in _PARAM_RE.finditer(raw_args)]
++    m = _PARTIAL_PARAM_RE.search(_PARAM_RE.sub("", raw_args))
++    return closed, (m.group(1), m.group(2)) if m else None
++
++
++def _qwen3_arguments_reading(
++    raw_args: str, schema: dict | None = None
++) -> ArgumentsReading:
++    """How a call's argument text reads, which decides whether the call's
++    closing wrapper after it ends the call or continues a parameter."""
++    reading = read_qwen_arguments(raw_args, schema or {})
++    if reading is not None:
++        return ArgumentsReading(reading.complete, reading.inside_parameter)
++    inside = PARAM_START in _PARAM_RE.sub("", raw_args)
++    return ArgumentsReading(complete=not inside, inside_parameter=inside)
++
++
+ def _qwen3_arg_converter(
+     raw_args: str, partial: bool, schema: dict | None = None
+ ) -> str:
+-    params: dict[str, str] = {}
++    reading = read_qwen_arguments(raw_args, schema or {})
++    if reading is None:
++        closed, unfinished = _transport_parameters(raw_args)
++    else:
++        closed, unfinished = list(reading.parameters), reading.unfinished
+ 
+-    for match in _PARAM_RE.finditer(raw_args):
+-        name = match.group(1)
+-        value = match.group(2)
++    params: dict[str, str] = {}
++    for name, value in closed:
+         if name in params:
+             raise ValueError(f"Qwen XML repeats parameter {name!r}")
+         params[name] = _unframe_parameter_value(value, complete=True)
+ 
+     # An unfinished parameter is a raw diagnostic on both transports.
+-    remaining = _PARAM_RE.sub("", raw_args)
+-    m = _PARTIAL_PARAM_RE.search(remaining)
+-    if m:
+-        name = m.group(1)
+-        value = m.group(2)
+-        if name:
+-            if name in params:
+-                raise ValueError(f"Qwen XML repeats parameter {name!r}")
+-            params[name] = _unframe_parameter_value(value, complete=False)
++    if unfinished is not None:
++        name, value = unfinished
++        if name in params:
++            raise ValueError(f"Qwen XML repeats parameter {name!r}")
++        params[name] = _unframe_parameter_value(value, complete=False)
+ 
+-    if schema and m is None:
++    if schema and unfinished is None:
+         return _decode_xml_parameters(params, schema)
+ 
+     return json.dumps(params, ensure_ascii=False)
+@@ -365,26 +388,28 @@
+                 ParserState.TOOL_ARGS,
+                 (),
+             ),
++            # Parameter markup inside the arguments is argument text: the
++            # grammar's reading of it decides where each value ends, so a
++            # value may carry any markup its production admits -- a raw value
++            # ``</function>``, a JSON string ``</parameter>``. The call ends
++            # at ``</function>`` ``\n`` ``</tool_call>`` unless the arguments
++            # can only be read as still inside a parameter
++            # (``arguments_reading``); the engine holds the function closer
++            # until then, and gives it back to the arguments when anything
++            # else follows and they can be read as inside a parameter.
+             (ParserState.TOOL_ARGS, "FUNC_END"): Transition(
+                 ParserState.TOOL_BETWEEN,
+-                (EventType.TOOL_CALL_END,),
+-            ),
+-            (ParserState.TOOL_ARGS, "PARAM_START"): Transition(
+-                ParserState.TOOL_PARAM_VALUE,
+-                (EventType.ARG_VALUE_CHUNK,),
+-            ),
+-            (ParserState.TOOL_PARAM_VALUE, "PARAM_END"): Transition(
+-                ParserState.TOOL_ARGS,
+-                (EventType.ARG_VALUE_CHUNK,),
++                (),
+             ),
+             (ParserState.TOOL_BETWEEN, "TOOL_END"): Transition(
+                 ParserState.CONTENT,
+-                (EventType.TOOL_CALL_CLOSED,),
++                (EventType.TOOL_CALL_END, EventType.TOOL_CALL_CLOSED),
+             ),
+         },
+         tool_preamble_text="\n",
+         validate_tool_names=False,
+         arg_converter=_qwen3_arg_converter,
++        arguments_reading=_qwen3_arguments_reading,
+         stream_arg_deltas=False,
+         strip_trailing_reasoning_whitespace=False,
+         tool_args_json=False,
+@@ -416,6 +441,13 @@
+     # pass splits on the same ids the streaming tool pass sees.
+     batch_tool_pass_uses_ids = True
+ 
++    def _tool_arguments_reading(
++        self, func_name: str, raw_args: str
++    ) -> ArgumentsReading:
++        return _qwen3_arguments_reading(
++            raw_args, find_tool_schema(self._tools, func_name)
++        )
++
+     def _convert_tool_arguments(
+         self, raw_args: str, func_name: str, partial: bool
+     ) -> str:
+diff --git a/vllm/tool_parsers/structural_tag_registry.py b/vllm/tool_parsers/structural_tag_registry.py
+--- a/vllm/tool_parsers/structural_tag_registry.py
++++ b/vllm/tool_parsers/structural_tag_registry.py
+@@ -1,7 +1,10 @@
+ # SPDX-License-Identifier: Apache-2.0
+ # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
+ 
+-from collections.abc import Callable, Sequence
++import json
++import re
++from collections.abc import Callable, Iterator, Sequence
++from dataclasses import dataclass
+ from typing import Any, Literal, TypeAlias
+ 
+ from openai.types.responses import FunctionTool
+@@ -663,6 +666,12 @@
+ # required chain, and its treatment of enums, constants and references. One
+ # production it deliberately does not have is XGrammar's constrained-string
+ # regex; ``_QWEN_REFUSED_STRING_KEYS`` refuses that declaration instead.
++#
++# The language is defined once, as ``_QwenArguments``: which production each
++# parameter's value is written in and where undeclared names may appear. The
++# grammar is rendered from it, and ``read_qwen_arguments`` reads a call's
++# argument text by the same productions, so the parser reads exactly what the
++# grammar admitted -- including a JSON value whose strings carry the closer.
+ _QWEN_PARAM_OPEN = "<parameter="
+ _QWEN_PARAM_CLOSE = "</parameter>"
+ _QWEN_CALL_BEGIN_PREFIX = "<tool_call>\n<function="
+@@ -685,6 +694,40 @@
+ _QWEN_REFUSED_STRING_KEYS = ("pattern", "format", "minLength", "maxLength")
+ 
+ 
++@dataclass(frozen=True)
++class _QwenValue:
++    """The production one parameter's value is written in.
++
++    ``json`` is the schema of a JSON document and ``constants`` the strings a
++    constant value is one of, each padded by whitespace; a value with neither
++    rides the raw channel: text carrying neither parameter marker.
++    ``unconstrained`` names the keys of a raw string the raw channel cannot
++    enforce, which the grammar refuses to render.
++    """
++
++    json: dict[str, Any] | None = None
++    constants: tuple[str, ...] = ()
++    unconstrained: tuple[str, ...] = ()
++
++
++@dataclass(frozen=True)
++class _QwenParameter:
++    name: str
++    required: bool
++    value: _QwenValue
++
++
++@dataclass(frozen=True)
++class _QwenArguments:
++    """A tool's argument body: its declared parameters in declared order, an
++    optional one skippable and a required one not, then any number of
++    parameters named by ``_QWEN_VARIABLE_NAME`` in ``extra``'s production --
++    none when ``extra`` is None."""
++
++    declared: tuple[_QwenParameter, ...]
++    extra: _QwenValue | None
++
++
+ def _qwen_raw_value() -> AnyTextFormat:
+     """The raw string channel: any text carrying neither parameter marker.
+ 
+@@ -766,11 +809,11 @@
+     return prop
+ 
+ 
+-def _qwen_value(prop: Any, root: dict[str, Any], tool: str, parameter: str) -> Any:
+-    """Build the value production for one parameter, or refuse to have one."""
++def _qwen_production(prop: Any, root: dict[str, Any]) -> _QwenValue:
++    """Decide the production one parameter's value is written in."""
+     resolved = _qwen_resolve(prop, root)
+     if not isinstance(resolved, dict) or not resolved:
+-        return _qwen_raw_value()
++        return _QwenValue()
+     reference = resolved.get("$ref")
+     if isinstance(reference, str) and reference.startswith("#/"):
+         # A local reference this builder could not follow -- missing, or
+@@ -779,7 +822,7 @@
+         # model: a dangling reference is refused outright, and a self-referring
+         # one compiles to a production nothing satisfies. Answering an
+         # unresolvable schema with "any text" would fail open.
+-        return _qwen_padded(JSONSchemaFormat(json_schema=_qwen_embed(resolved, root)))
++        return _QwenValue(json=_qwen_embed(resolved, root))
+     json_type = resolved.get("type")
+     enum_values = resolved.get("enum")
+     if enum_values is None and isinstance(resolved.get("const"), str):
+@@ -789,24 +832,11 @@
+         and enum_values
+         and all(isinstance(value, str) for value in enum_values)
+     ):
+-        branches = [ConstStringFormat(value=value) for value in enum_values]
+-        return _qwen_padded(
+-            branches[0] if len(branches) == 1 else OrFormat(elements=branches)
+-        )
++        return _QwenValue(constants=tuple(enum_values))
+     if json_type == "string":
+-        refused = [key for key in _QWEN_REFUSED_STRING_KEYS if key in resolved]
+-        if refused:
+-            raise VLLMValidationError(
+-                f"Tool {tool!r} parameter {parameter!r} declares "
+-                f"{', '.join(refused)} on a string. The Qwen XML transport "
+-                "emits string values raw, and the raw channel excludes "
+-                f"{_QWEN_PARAM_OPEN!r} so that a value cannot absorb the next "
+-                "parameter's opener; that exclusion cannot be written inside a "
+-                "length-bounded regex, so this constraint has no grammar. "
+-                "Declare the parameter without it and validate it in the tool.",
+-                parameter="tools",
+-            )
+-        return _qwen_raw_value()
++        return _QwenValue(unconstrained=tuple(
++            key for key in _QWEN_REFUSED_STRING_KEYS if key in resolved
++        ))
+     if (
+         json_type is None
+         or isinstance(json_type, list)
+@@ -817,23 +847,72 @@
+         # XGrammar's ``xml_any`` is the raw channel unioned with JSON arrays and
+         # objects, and both of those are already raw text without a closer, so
+         # the union accepts exactly the raw channel's language.
+-        return _qwen_raw_value()
+-    return _qwen_padded(JSONSchemaFormat(json_schema=_qwen_embed(resolved, root)))
++        return _QwenValue()
++    return _QwenValue(json=_qwen_embed(resolved, root))
+ 
+ 
+-def _qwen_any_parameter(extra: Any, root: dict[str, Any], tool: str) -> TagFormat:
++def _qwen_productions(parameters: dict[str, Any] | bool) -> _QwenArguments:
++    """Decide a tool's argument body: declared order, required chain, extras."""
++    if not isinstance(parameters, dict):
++        return _QwenArguments(declared=(), extra=_QwenValue())
++    # The parameters document may itself be a ``$ref`` or a single-branch
++    # ``allOf`` wrapper. Reading ``properties`` straight off the wrapper finds
++    # none and leaves every argument unconstrained, so the body is read off the
++    # resolved document while references still resolve against the original.
++    root = parameters
++    resolved = _qwen_resolve(parameters, root)
++    if not isinstance(resolved, dict):
++        resolved = parameters
++    properties = resolved.get("properties")
++    additional = resolved.get("additionalProperties")
++    extra = (
++        None if additional is False else _qwen_production(
++            additional if isinstance(additional, dict) else {}, root
++        )
++    )
++    if not isinstance(properties, dict):
++        properties = {}
++    required = set(resolved.get("required") or [])
++    return _QwenArguments(
++        declared=tuple(
++            _QwenParameter(key, key in required, _qwen_production(prop, root))
++            for key, prop in properties.items()
++        ),
++        extra=extra,
++    )
++
++
++def _qwen_value(value: _QwenValue, tool: str, parameter: str) -> Any:
++    """Render one value production, or refuse to have one."""
++    if value.unconstrained:
++        raise VLLMValidationError(
++            f"Tool {tool!r} parameter {parameter!r} declares "
++            f"{', '.join(value.unconstrained)} on a string. The Qwen XML "
++            "transport emits string values raw, and the raw channel excludes "
++            f"{_QWEN_PARAM_OPEN!r} so that a value cannot absorb the next "
++            "parameter's opener; that exclusion cannot be written inside a "
++            "length-bounded regex, so this constraint has no grammar. "
++            "Declare the parameter without it and validate it in the tool.",
++            parameter="tools",
++        )
++    if value.json is not None:
++        return _qwen_padded(JSONSchemaFormat(json_schema=value.json))
++    if value.constants:
++        branches = [ConstStringFormat(value=constant) for constant in value.constants]
++        return _qwen_padded(
++            branches[0] if len(branches) == 1 else OrFormat(elements=branches)
++        )
++    return _qwen_raw_value()
++
++
++def _qwen_any_parameter(extra: _QwenValue, tool: str) -> TagFormat:
+     """One parameter whose name the schema does not declare."""
+     return TagFormat(
+         begin=_QWEN_PARAM_OPEN,
+         content=SequenceFormat(
+             elements=[
+                 RegexFormat(pattern=_QWEN_VARIABLE_NAME + ">"),
+-                _qwen_value(
+-                    extra if isinstance(extra, dict) else {},
+-                    root,
+-                    tool,
+-                    "additionalProperties",
+-                ),
++                _qwen_value(extra, tool, "additionalProperties"),
+             ]
+         ),
+         end=_QWEN_PARAM_CLOSE,
+@@ -841,50 +920,34 @@
+ 
+ 
+ def _qwen_arguments(parameters: dict[str, Any] | bool, tool: str) -> Any:
+-    """Build a tool's argument body: declared order, required chain, extras."""
+-    if not isinstance(parameters, dict):
+-        return StarFormat(
+-            content=SequenceFormat(
+-                elements=[_qwen_whitespace(), _qwen_any_parameter(None, {}, tool)]
+-            )
+-        )
+-    # The parameters document may itself be a ``$ref`` or a single-branch
+-    # ``allOf`` wrapper. Reading ``properties`` straight off the wrapper finds
+-    # none and leaves every argument unconstrained, so the body is read off the
+-    # resolved document while references still resolve against the original.
+-    root = parameters
+-    resolved = _qwen_resolve(parameters, root)
+-    if not isinstance(resolved, dict):
+-        resolved = parameters
+-    properties = resolved.get("properties")
+-    additional = resolved.get("additionalProperties")
+-    if not isinstance(properties, dict) or not properties:
+-        if additional is False:
++    """Render a tool's argument body from its productions."""
++    arguments = _qwen_productions(parameters)
++    if not arguments.declared:
++        if arguments.extra is None:
+             return _qwen_whitespace()
+         return StarFormat(
+             content=SequenceFormat(
+                 elements=[
+                     _qwen_whitespace(),
+-                    _qwen_any_parameter(additional, root, tool),
++                    _qwen_any_parameter(arguments.extra, tool),
+                 ]
+             )
+         )
+-    required = set(resolved.get("required") or [])
+     elements: list[Any] = [_qwen_whitespace()]
+-    for key, prop in properties.items():
++    for parameter in arguments.declared:
+         tag = TagFormat(
+-            begin=f"{_QWEN_PARAM_OPEN}{key}>",
+-            content=_qwen_value(prop, root, tool, key),
++            begin=f"{_QWEN_PARAM_OPEN}{parameter.name}>",
++            content=_qwen_value(parameter.value, tool, parameter.name),
+             end=_QWEN_PARAM_CLOSE,
+         )
+-        elements.append(tag if key in required else OptionalFormat(content=tag))
++        elements.append(tag if parameter.required else OptionalFormat(content=tag))
+         elements.append(_qwen_whitespace())
+-    if additional is not False:
++    if arguments.extra is not None:
+         elements.append(
+             StarFormat(
+                 content=SequenceFormat(
+                     elements=[
+-                        _qwen_any_parameter(additional, root, tool),
++                        _qwen_any_parameter(arguments.extra, tool),
+                         _qwen_whitespace(),
+                     ]
+                 )
+@@ -893,6 +956,198 @@
+     return SequenceFormat(elements=elements)
+ 
+ 
++@dataclass(frozen=True)
++class QwenArgumentReading:
++    """A Qwen tool call's argument text, read by the grammar's productions.
++
++    ``parameters`` are the parameters the text closes, in the order written,
++    each as its name and the value text between its opener and its closer.
++    ``complete`` is true when the text is a whole argument body. Otherwise the
++    text is the beginning of one, and ``unfinished`` is the parameter it ends
++    inside -- its name and its value text so far -- or None when it ends
++    between parameters or inside an opener. ``inside_parameter`` is true when
++    some reading of the text ends inside a parameter's opener or value, so
++    that text after it may still belong to that parameter, whichever reading
++    is preferred.
++    """
++
++    parameters: tuple[tuple[str, str], ...]
++    complete: bool
++    unfinished: tuple[str, str] | None
++    inside_parameter: bool
++
++
++_QWEN_PADDING = re.compile(_QWEN_WHITESPACE)
++_QWEN_UNDECLARED_NAME = re.compile(_QWEN_VARIABLE_NAME + ">")
++_QWEN_JSON = json.JSONDecoder()
++
++
++def _qwen_skip_padding(text: str, position: int) -> int:
++    return _QWEN_PADDING.match(text, position).end()
++
++
++def _qwen_json_closer(text: str, position: int) -> int | None:
++    """The first closer outside a JSON string, or None if the text ends first.
++
++    JSON outside its strings is brackets, separators, numbers, literals and
++    whitespace, so a closer there is the value's own; inside a string it is
++    the value's text.
++    """
++    in_string = escaped = False
++    for index in range(position, len(text)):
++        char = text[index]
++        if in_string:
++            if escaped:
++                escaped = False
++            elif char == "\\":
++                escaped = True
++            elif char == '"':
++                in_string = False
++        elif char == '"':
++            in_string = True
++        elif text.startswith(_QWEN_PARAM_CLOSE, index):
++            return index
++    return None
++
++
++def _qwen_value_ends(value: _QwenValue, text: str, start: int) -> Iterator[int | None]:
++    """Where a value written in ``value``'s production may end.
++
++    Yields the index of each closer that can end it, in the grammar's order,
++    and None when the text ends inside the value.
++    """
++    if value.json is not None:
++        begin = _qwen_skip_padding(text, start)
++        closer = _qwen_json_closer(text, begin)
++        if closer is None:
++            yield None
++            return
++        try:
++            _, end = _QWEN_JSON.raw_decode(text, begin)
++        except ValueError:
++            return
++        if _qwen_skip_padding(text, end) == closer:
++            yield closer
++        return
++    if value.constants:
++        begin = _qwen_skip_padding(text, start)
++        unfinished = begin == len(text)
++        for constant in value.constants:
++            if text.startswith(constant, begin):
++                after = _qwen_skip_padding(text, begin + len(constant))
++                if text.startswith(_QWEN_PARAM_CLOSE, after):
++                    yield after
++                elif _QWEN_PARAM_CLOSE.startswith(text[after:]):
++                    unfinished = True
++            elif constant.startswith(text[begin:]):
++                unfinished = True
++        if unfinished:
++            yield None
++        return
++    closer = text.find(_QWEN_PARAM_CLOSE, start)
++    opener = text.find(_QWEN_PARAM_OPEN, start)
++    if closer < 0:
++        if opener < 0:
++            yield None
++    elif opener < 0 or opener > closer:
++        yield closer
++
++
++def read_qwen_arguments(
++    text: str, parameters: dict[str, Any] | bool
++) -> QwenArgumentReading | None:
++    """Read a call's argument text the way the Qwen grammar admits it.
++
++    ``parameters`` is the tool's parameters document, from which the grammar
++    was rendered. A declared parameter is read by its declared production
++    while its slot is reachable and by the undeclared one only otherwise; a
++    whole body is preferred to a beginning of one. None means the grammar has
++    no reading of the text at all: it is neither an argument body nor the
++    beginning of one, which output the grammar constrained never is.
++    """
++    arguments = _qwen_productions(parameters)
++    declared = arguments.declared
++    remaining_required = [
++        any(parameter.required for parameter in declared[index:])
++        for index in range(len(declared) + 1)
++    ]
++
++    def openers(position: int, index: int):
++        """Each production a parameter opener here can start, in order."""
++        name_start = position + len(_QWEN_PARAM_OPEN)
++        for slot in range(index, len(declared)):
++            parameter = declared[slot]
++            if text.startswith(parameter.name + ">", name_start):
++                yield (
++                    parameter.name, parameter.value, slot + 1,
++                    name_start + len(parameter.name) + 1,
++                )
++            if parameter.required:
++                break
++        if arguments.extra is not None and not remaining_required[index]:
++            match = _QWEN_UNDECLARED_NAME.match(text, name_start)
++            if match is not None:
++                yield match.group()[:-1], arguments.extra, len(declared), match.end()
++
++    def opener_unfinished(position: int, index: int) -> bool:
++        """Whether the text ends inside an opener one of the productions starts."""
++        rest = text[position:]
++        if _QWEN_PARAM_OPEN.startswith(rest):
++            return True
++        if not rest.startswith(_QWEN_PARAM_OPEN) or ">" in rest:
++            return False
++        name = rest[len(_QWEN_PARAM_OPEN):]
++        for slot in range(index, len(declared)):
++            if declared[slot].name.startswith(name):
++                return True
++            if declared[slot].required:
++                break
++        return (
++            arguments.extra is not None
++            and not remaining_required[index]
++            and (not name or re.fullmatch(_QWEN_VARIABLE_NAME, name) is not None)
++        )
++
++    memo: dict[tuple[int, int], dict[str, Any]] = {}
++
++    def endings(position: int, index: int) -> dict[str, Any]:
++        """The first reading from here, in the grammar's order, for each way the
++        text can end: a whole body, inside a value, inside an opener, or between
++        parameters with a required one still to come."""
++        key = (position, index)
++        if key not in memo:
++            found = memo[key] = {}
++            position = _qwen_skip_padding(text, position)
++            if position == len(text):
++                found["whole" if not remaining_required[index] else "between"] = (
++                    (), None,
++                )
++            elif opener_unfinished(position, index):
++                found["opener"] = ((), None)
++            elif text.startswith(_QWEN_PARAM_OPEN, position):
++                for name, value, after, start in openers(position, index):
++                    for closer in _qwen_value_ends(value, text, start):
++                        if closer is None:
++                            found.setdefault("value", ((), (name, text[start:])))
++                            continue
++                        rest = endings(closer + len(_QWEN_PARAM_CLOSE), after)
++                        for kind, (closed, unfinished) in rest.items():
++                            found.setdefault(kind, (
++                                ((name, text[start:closer]),) + closed, unfinished,
++                            ))
++        return memo[key]
++
++    found = endings(0, 0)
++    for kind in ("whole", "value", "opener", "between"):
++        if kind in found:
++            closed, unfinished = found[kind]
++            return QwenArgumentReading(
++                closed, kind == "whole", unfinished,
++                "value" in found or "opener" in found,
++            )
++    return None
++
++
+ def _qwen_tool_tags(tools: list[FunctionToolParam]) -> list[TagFormat]:
+     return [
+         TagFormat(

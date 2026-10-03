@@ -1686,7 +1686,7 @@ def _validate_qwen_language_after(state: State) -> None:
     parser = "vllm/parser/engine/parser_engine.py"
     abstract = "vllm/parser/abstract_parser.py"
     for text in ('tool_preamble_text="\\n"',
-                 '(ParserState.TOOL_PARAM_VALUE, "PARAM_END")',
+                 '(ParserState.TOOL_BETWEEN, "TOOL_END")',
                  'batch_tool_pass_uses_ids = True'):
         require_text(state, qwen, text, label=label)
     for text in ('(ParserState.CONTENT, "FUNC_PREFIX")',
@@ -2164,7 +2164,7 @@ def _validate_qwen_grammar_after(state: State) -> None:
             "parallel_tool_calls",
         ),
         "_qwen_raw_value": (),
-        "_qwen_value": ("prop", "root", "tool", "parameter"),
+        "_qwen_value": None,
         "_qwen_arguments": ("parameters", "tool"),
         "_qwen_resolve": ("prop", "root", "seen"),
         "_qwen_definitions": ("root",),
@@ -2174,20 +2174,21 @@ def _validate_qwen_grammar_after(state: State) -> None:
     # tables must travel with it or its references dangle and the tool stops
     # building at all. The parameters document may itself be a wrapper, whose
     # unresolved ``properties`` would leave every argument unconstrained.
-    _require_in_symbol(state, registry, "_qwen_value", (
-        "_qwen_embed(resolved, root)",
-    ), label=label)
-    _require_in_symbol(state, registry, "_qwen_arguments", (
+    # Both JSON productions -- an unfollowable local reference and every
+    # other non-string type -- carry the root definition tables.
+    require_text(state, registry, "_qwen_embed(resolved, root)", count=2,
+                 label=label)
+    for text in (
         "resolved = _qwen_resolve(parameters, root)",
         'properties = resolved.get("properties")',
         'required = set(resolved.get("required") or [])',
-    ), label=label)
-    # An unresolvable local reference is refused by the JSON channel, never
-    # answered with the raw any-text channel.
-    _require_in_symbol(state, registry, "_qwen_value", (
+        # An unresolvable local reference is refused by the JSON channel,
+        # never answered with the raw any-text channel.
         'reference = resolved.get("$ref")',
-        'reference.startswith("#/")',
-    ), label=label)
+    ):
+        require_text(state, registry, text, label=label)
+    require_text(state, registry, 'reference.startswith("#/")', count=2,
+                 label=label)
     require_text(state, registry, '@register_vllm_structural_tag("qwen_3_coder")',
                  label=label)
     require_text(state, registry, '_QWEN_PARAM_OPEN = "<parameter="', label=label)
@@ -2206,8 +2207,10 @@ def _validate_qwen_grammar_after(state: State) -> None:
     # fix, rather than served on a channel that silently drops the exclusion.
     forbid_text(state, registry, "_QWEN_STRING_CONSTRAINTS", label=label)
     forbid_text(state, registry, 'RegexFormat(pattern="[^]"', label=label)
+    require_text(state, registry,
+                 "for key in _QWEN_REFUSED_STRING_KEYS if key in resolved",
+                 label=label)
     _require_in_symbol(state, registry, "_qwen_value", (
-        "refused = [key for key in _QWEN_REFUSED_STRING_KEYS if key in resolved]",
         "raise VLLMValidationError(",
         "Declare the parameter without it and validate it in the tool.",
         'parameter="tools",',
@@ -2558,7 +2561,7 @@ def _validate_xml_schema_after(state: State) -> None:
         "find_tool_schema(self._tools, func_name)", "_qwen3_arg_converter(",
     ), label=label)
     _require_in_symbol(state, qwen, "_qwen3_arg_converter", (
-        "if schema and m is None:", "return _decode_xml_parameters(params, schema)",
+        "if schema and ", "return _decode_xml_parameters(params, schema)",
     ), label=label)
     _require_in_symbol(state, qwen, "_decode_xml_parameters", (
         "object_pairs_hook=_unique_json_object", "parse_constant=_reject_non_json_number",
@@ -2878,6 +2881,94 @@ def _validate_single_flight_after(state: State) -> None:
     }, label=label)
 
 
+def _validate_grammar_read_arguments_before(state: State) -> None:
+    label = "Qwen arguments read by the grammar precondition"
+    forbid_text(state, "vllm/tool_parsers/structural_tag_registry.py",
+                "def read_qwen_arguments(", label=label)
+    require_text(state, "vllm/parser/qwen3.py",
+                 '(ParserState.TOOL_PARAM_VALUE, "PARAM_END")', label=label)
+
+
+def _validate_grammar_read_arguments_after(state: State) -> None:
+    label = "Qwen arguments read by the grammar"
+    registry = "vllm/tool_parsers/structural_tag_registry.py"
+    qwen = "vllm/parser/qwen3.py"
+    engine = "vllm/parser/engine/streaming_parser_engine.py"
+    config = "vllm/parser/engine/parser_engine_config.py"
+    require_python_symbols(state, registry, {
+        "QwenArgumentReading": None,
+        "read_qwen_arguments": ("text", "parameters"),
+        "_qwen_productions": ("parameters",),
+        "_qwen_production": ("prop", "root"),
+        "_qwen_value": ("value", "tool", "parameter"),
+        "_qwen_value_ends": ("value", "text", "start"),
+        "_qwen_json_closer": ("text", "position"),
+    }, label=label)
+    # One definition: the grammar is rendered from the productions the reader
+    # reads by, so the two cannot disagree about where a value ends.
+    for symbol in ("_qwen_arguments", "read_qwen_arguments"):
+        _require_in_symbol(state, registry, symbol, (
+            "arguments = _qwen_productions(parameters)",
+        ), label=label)
+    # A JSON value ends at the first closer outside its strings, and is a JSON
+    # value up to it; a raw value ends at its first closer with no opener
+    # before it.
+    _require_in_symbol(state, registry, "_qwen_json_closer", (
+        "elif text.startswith(_QWEN_PARAM_CLOSE, index):",
+    ), label=label)
+    _require_in_symbol(state, registry, "_qwen_value_ends", (
+        "_QWEN_JSON.raw_decode(text, begin)",
+        "elif opener < 0 or opener > closer:",
+    ), label=label)
+    # The parser reads by that definition, and keeps the repeat refusal.
+    _require_in_symbol(state, qwen, "_qwen3_arg_converter", (
+        "reading = read_qwen_arguments(raw_args, schema or {})",
+        "if schema and unfinished is None:",
+        'raise ValueError(f"Qwen XML repeats parameter {name!r}")',
+    ), label=label)
+    _require_in_symbol(state, qwen, "_qwen3_arguments_reading", (
+        "return ArgumentsReading(reading.complete, reading.inside_parameter)",
+    ), label=label)
+    _require_in_symbol(state, qwen, "qwen3_config", (
+        "arguments_reading=_qwen3_arguments_reading",
+        "(EventType.TOOL_CALL_END, EventType.TOOL_CALL_CLOSED)",
+    ), label=label)
+    _require_in_symbol(state, qwen, "Qwen3Parser._tool_arguments_reading", (
+        "find_tool_schema(self._tools, func_name)",
+    ), label=label)
+    # The engine has no second notion of being inside a value: the format's
+    # reading of the arguments decides whether the closing sequence ends the
+    # call and whether a held function closer was text inside a parameter.
+    for path in (qwen, engine, config):
+        forbid_text(state, path, "TOOL_PARAM_VALUE", label=label)
+    require_python_symbols(state, config, {"ArgumentsReading": None}, label=label)
+    require_text(state, config,
+                 "arguments_reading: Callable[[str], ArgumentsReading] | None = None",
+                 label=label)
+    _require_in_symbol(state, engine, "StreamingParserEngine._on_terminal", (
+        "self._call_reading()", "self._resume_arguments(",
+        "reading.complete or not reading.inside_parameter",
+    ), label=label)
+    _require_in_symbol(state, engine, "StreamingParserEngine._emit_for_state", (
+        "self._call_reading().inside_parameter",
+    ), label=label)
+    _require_in_symbol(state, "vllm/parser/engine/parser_engine.py",
+        "ParserEngine.__init__", (
+            "arguments_reading=self._tool_arguments_reading",
+        ), label=label)
+    require_python_symbols(state, "tests/parser/engine/test_qwen_xml_fidelity.py", {
+        "test_json_value_strings_carry_parameter_markup": None,
+        "test_open_declared_slot_reads_its_declared_production": None,
+        "test_whole_body_closes_at_the_wrapper_while_a_json_reading_is_open": None,
+        "test_truncated_json_value_is_the_unfinished_parameter": None,
+        "test_closing_sequence_inside_a_raw_value_does_not_end_the_call": None,
+    }, label=label)
+    require_python_symbols(state, "tests/tool_parsers/test_structural_tag_registry.py", {
+        "test_qwen3_arguments_are_read_by_the_grammar_productions": None,
+        "test_qwen3_reader_has_no_reading_of_text_the_grammar_never_writes": None,
+    }, label=label)
+
+
 def validate_final(state: State) -> None:
     """Reassert every durable semantic invariant on the complete tree.
 
@@ -2893,6 +2984,25 @@ def validate_final(state: State) -> None:
 
 
 CONTRACTS: Mapping[str, SemanticContract] = {
+    "qwen-arguments-read-by-grammar": SemanticContract(
+        rationale=(
+            "The Qwen grammar admits a JSON value whose strings carry "
+            "</parameter>, <parameter=NAME> or </function>, but the parser cut "
+            "every value at its first </parameter> and ended the call at the "
+            "first </function> after one: a grammar-legal call was published "
+            "truncated, refused as a repeated parameter (HTTP 500) or returned "
+            "as content. The grammar's productions are decided once; the "
+            "grammar is rendered from them and the parser reads argument text "
+            "by them, and a call ends only at its closing sequence after "
+            "arguments that read whole."
+        ),
+        removal_condition=(
+            "Remove when pinned upstream reads Qwen XML tool arguments by the "
+            "same productions as the grammar that constrained them."
+        ),
+        validate_before=_validate_grammar_read_arguments_before,
+        validate_after=_validate_grammar_read_arguments_after,
+    ),
     "nvfp4-native-kernel-required": SemanticContract(
         rationale=(
             "Upstream's automatic NVFP4 kernel selection falls through to Marlin "

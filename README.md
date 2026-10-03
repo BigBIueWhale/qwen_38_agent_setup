@@ -308,6 +308,7 @@ It is intentionally reconstructed by the ordered, reviewed semantic transformati
 | patches/vllm-kv-scope-single-flight.patch | cc5e52403afd4e4764693da552e9252bbf204793566fff6a27fb87b4dbd28d13 |
 | patches/vllm-template-authored-control-tokens.patch | dd43b43e5ad972c0b7622a3288d6d47cf2b11d24c17e11dda9a5c89a8a8ff542 |
 | patches/vllm-nvfp4-native-kernel-required.patch | 9d9ce188b6670d687a725c4cdca37478f9dc78ef9f19685ddbcf5e9edd53b8b7 |
+| patches/vllm-qwen-arguments-read-by-grammar.patch | fa0480f239cdb0de4dd4508ac151fadc1c6a5f76dcf7b15798dcac932ae33371 |
 
 The reconstructed tree has 104 reviewed runtime-source changes, 2 new runtime sources,
 7 runtime-source deletions, 81 existing-test changes, 16 new tests,
@@ -364,9 +365,9 @@ Pinned build inputs and products:
 | Archive SHA-256 | 48cc3978e66e4d18f0a10752dbdfa08917f00d5dc9d75f7653b35b4a207d31a4 |
 | Runtime Dockerfile SHA-256 | ac744a9870051f4ada5c05c7ed2562da166dbbd4028c2ffb5d037eb8a92e61bd |
 | Docker context allowlist SHA-256 | 0478aa5fae53be4a60a60682a732b96a30b9ebbd6fcdc024107eb358be157183 |
-| Build verifier SHA-256 | 11842c47812b39c8c8cda2541a714444c8b186d35b8115511c1cff00004d28bc |
+| Build verifier SHA-256 | c06b748c523454a0c98660e9696b385591ccec046c9ba5bbde503a9567356b81 |
 | Runtime validator SHA-256 | 6685952b62fb9a0cfd592b3ee1b4753c50322702739d2b051b63e7837958abb1 |
-| Runtime lock SHA-256 | 9e1a8096babef3770fbfd894f3113d7f5a28452663eadbf7cb5617aa55d50c4f |
+| Runtime lock SHA-256 | 8f9ba04ef15eccdd449e87886ed6c92f7e6363e57bc58a9cec97128a90fe70af |
 
 The runtime tag names the pinned image and nothing else. A build used to load its
 image under that tag before comparing the image ID with the pin, so a build that
@@ -1157,7 +1158,8 @@ trailing parameter on either transport, including schemas that allow additional
 properties. The error names the repeated parameter and directs the caller to
 inspect the generated call and retry.
 
-A parameter value may carry neither its own `</parameter>` closer nor the next
+A raw parameter value -- a string, or a value whose schema leaves its type
+open -- may carry neither its own `</parameter>` closer nor the next
 parameter's `<parameter=` opener. vLLM owns the Qwen structural tag so it can
 exclude both: excluding only the closer let a value absorb the following opener,
 which produced not a parse error but a different, well-formed, schema-satisfying
@@ -1169,10 +1171,23 @@ exclusion — xgrammar's regex engine has no lookahead, so forbidding a fixed
 substring is only an unrolled DFA, which cannot then carry a length bound. There
 is no grammar that both bounds the value and keeps the opener ungenerable, so
 there is one string channel rather than a second one that drops the exclusion;
-declare the parameter without the constraint and validate it in the tool. A tool
-argument therefore cannot carry the literal `<parameter=`, the same limitation
-the format already had for the exact closer; tool authors needing either
-sequence must use another representation.
+declare the parameter without the constraint and validate it in the tool. A
+string argument therefore cannot carry the literal `<parameter=`, the same
+limitation the format already had for the exact closer; tool authors needing
+either sequence in a string must use another representation.
+
+A JSON value -- an array, object, number, boolean or null parameter -- may
+carry both markers, and `</function>`, inside its strings: the grammar admits
+any JSON string there. The parser reads argument text by the grammar's own
+productions rather than by a pattern of its own. Which production each
+parameter's value is written in is decided once, the grammar is rendered from
+that decision and the parser reads by it, so a JSON value ends at the first
+closer outside its strings, and `</function>`, a newline and `</tool_call>` end
+the call unless its arguments can only be read as still inside a parameter --
+then they are that parameter's text. A declared parameter is
+read by its declared production while its slot is still open, and by the
+undeclared-name production only after that. A call that names a parameter twice
+in that reading is refused as before.
 
 A parameter value is framed by the transport, not by the value. The served
 template renders `<parameter=NAME>`, a newline, the value, a newline, and

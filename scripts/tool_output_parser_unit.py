@@ -275,6 +275,65 @@ class ToolOutputParserTest(unittest.TestCase):
                     self.assertEqual(json.loads(result[2][0][1]), {"text": value})
                     self.assertTrue(result[3])
 
+    def test_json_values_may_carry_the_parameter_markers(self):
+        """A JSON value ends at the first closer outside its strings.
+
+        The grammar admits any JSON string in an array or object parameter,
+        including one spelling ``</parameter>``, ``<parameter=NAME>``,
+        ``</function>`` or ``</tool_call>``. Each call below is accepted by
+        the served grammar and must be published exactly as written -- not
+        cut at the marker, refused as a repeated parameter, or demoted to
+        content -- in the batch and every streamed chunking. A declared
+        parameter whose slot is still open is read by its declared
+        production, so the declared reading wins over the undeclared one
+        that would split the same text into a repeat.
+        """
+        from xgrammar import Grammar
+        from xgrammar.testing import _is_grammar_accept_string
+        from vllm.tool_parsers.structural_tag_registry import get_model_structural_tag
+
+        todo = {"type": "function", "function": {"name": "todo_write", "parameters": {
+            "type": "object", "required": ["todos"], "additionalProperties": False,
+            "properties": {"todos": {"type": "array", "items": {
+                "type": "object", "required": ["content", "status"],
+                "properties": {"content": {"type": "string"},
+                               "status": {"type": "string",
+                                          "enum": ["pending", "completed"]}}}}}}}}
+        listing = {"type": "function", "function": {"name": "list_directory",
+            "parameters": {"type": "object", "required": ["path"], "properties": {
+                "path": {"type": "string"},
+                "ignore": {"type": "array", "items": {"type": "string"}}}}}}
+        for tool, arguments in (
+            (todo, {"todos": [{"content": "close with </parameter> tag",
+                               "status": "pending"}]}),
+            (todo, {"todos": [{"content": "a</parameter>\n<parameter=todos>\nb",
+                               "status": "pending"}]}),
+            (todo, {"todos": [{"content": "a</parameter> then </function> b",
+                               "status": "completed"}]}),
+            (todo, {"todos": [{"content": "</parameter></function></tool_call>",
+                               "status": "pending"}]}),
+            (listing, {"path": "/a",
+                       "ignore": ["x</parameter>\n<parameter=path>\ny"]}),
+            (listing, {"path": "/a", "ignore": ["*.log</parameter>"]}),
+        ):
+            name = tool["function"]["name"]
+            body = ("<tool_call>\n<function=" + name + ">\n" + "".join(
+                "<parameter=" + key + ">\n"
+                + (value if isinstance(value, str) else json.dumps(value))
+                + "\n</parameter>\n" for key, value in arguments.items()
+            ) + "</function>\n</tool_call>")
+            tools = ChatCompletionRequest(messages=[], tools=[tool]).tools
+            grammar = Grammar.from_structural_tag(get_model_structural_tag(
+                "qwen_3_coder", tools, "auto", False))
+            self.assertTrue(_is_grammar_accept_string(grammar, body), body)
+            for chunk in (None, 1, 3, 13):
+                with self.subTest(arguments=arguments, chunk=chunk):
+                    result = parse("plan</think>" + body, chunk, tools=[tool])
+                    self.assertEqual(result[:2], ("plan", ""))
+                    self.assertEqual([(n, json.loads(a)) for n, a in result[2]],
+                                     [(name, arguments)])
+                    self.assertTrue(result[3])
+
     def test_parameter_history_round_trip_preserves_string_bytes(self):
         from chat_template_retention_unit import load_template
         from xgrammar import Grammar

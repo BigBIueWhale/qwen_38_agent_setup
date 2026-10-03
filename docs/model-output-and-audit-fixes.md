@@ -503,11 +503,14 @@ Bare function markup, stray openers, empty wrappers and unfinished
 function headers return as content. With no declared tools or `tool_choice:
 none`, the model's call-shaped text remains visible and produces no call.
 
-A parameter value ends only at the exact `</parameter>` delimiter.
+A raw parameter value ends only at the exact `</parameter>` delimiter.
 `</function>`, `</tool_call>`, `</think>`, `<parameter=` and variations such as
 `</parameter >` remain part of that value. The format cannot carry the exact
 parameter closer inside a string; tool authors needing that sequence must use
-another representation, such as encoded input decoded by their tool.
+another representation, such as encoded input decoded by their tool. A JSON
+value ends at the first delimiter outside its own strings, which may carry any
+of these markers: the parser reads arguments by the grammar's productions
+(`vllm-qwen-arguments-read-by-grammar.patch`).
 
 The batch tool pass receives the generated IDs after the parser's first exact
 reasoning boundary. Streaming retains those IDs when detokenization delays
