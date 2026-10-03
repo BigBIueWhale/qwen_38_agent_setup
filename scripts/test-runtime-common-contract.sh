@@ -13,6 +13,9 @@ fi
 required_functions=(
   die
   capture_child_wait_status
+  lock_value
+  write_lock_values
+  settle_produced_identity
   require_command
   require_equal
   require_clean_committed_repository
@@ -210,5 +213,98 @@ for capability in 10.0 9.0 12.1; do
   }
 done
 
-printf 'RUNTIME_COMMON_CONTRACT_OK functions=%s host-isolation=%s-accepted-%s-refused capability-refusals=3\n' \
-  "${#required_functions[@]}" "${host_isolation_accepted}" "${host_isolation_refused}"
+# A produced identity is written by the step that produced it and verified by
+# every later run of the same inputs, on a scratch copy of the real lock, for
+# both pairs the lock holds: the image a build makes and the archive a save
+# writes. A run of the same inputs that produces anything else is refused and
+# changes nothing -- the reproducibility guarantee -- and a run of other inputs
+# records its own, rewriting only those two lines in the shape the paired
+# repository reads.
+digest_of() {
+  local digest
+  digest="$(printf '%s' "$1" | sha256sum)"
+  printf '%s\n' "${digest%% *}"
+}
+pin_scratch="$(mktemp -d)"
+pin_lock="${pin_scratch}/runtime-v1.sh"
+settled_pairs=0
+for pair in EXPECTED_IMAGE_ID:IMAGE_BUILD_INPUTS_SHA256:sha256: \
+            IMAGE_ARCHIVE_SHA256:IMAGE_ARCHIVE_INPUTS_SHA256:; do
+  identity_name="${pair%%:*}"
+  inputs_name="${pair#*:}"
+  identity_prefix="${inputs_name#*:}"
+  inputs_name="${inputs_name%%:*}"
+  cp -- "${PROJECT_DIR}/config/runtime-v1.sh" "${pin_lock}"
+  chmod 0640 "${pin_lock}"
+  first_inputs="$(digest_of "first inputs of ${identity_name}")"
+  other_inputs="$(digest_of "other inputs of ${identity_name}")"
+  first_identity="${identity_prefix}$(digest_of "first ${identity_name}")"
+  other_identity="${identity_prefix}$(digest_of "other ${identity_name}")"
+
+  settle_produced_identity outcome "${pin_lock}" "${identity_name}" "${inputs_name}" \
+    "${first_identity}" "${first_inputs}" "Synthetic refusal." "Next: synthetic."
+  [[ "${outcome}" == written ]] || {
+    printf 'ERROR: new inputs for %s were %s, not written.\n' "${identity_name}" "${outcome}" >&2
+    exit 1
+  }
+  diff <(grep -v "^readonly \(${identity_name}\|${inputs_name}\)=" "${PROJECT_DIR}/config/runtime-v1.sh") \
+       <(grep -v "^readonly \(${identity_name}\|${inputs_name}\)=" "${pin_lock}") >/dev/null || {
+    printf 'ERROR: writing %s changed lines other than its own two.\n' "${identity_name}" >&2
+    exit 1
+  }
+  [[ "$(grep -c "^readonly ${identity_name}=\"${first_identity}\"\$" "${pin_lock}")" == 1 && \
+     "$(grep -c "^readonly ${inputs_name}=\"${first_inputs}\"\$" "${pin_lock}")" == 1 ]] || {
+    printf 'ERROR: %s and %s were not written as readonly NAME="value" lines.\n' \
+      "${identity_name}" "${inputs_name}" >&2
+    exit 1
+  }
+  [[ "$(stat -c %a "${pin_lock}")" == 640 ]] || {
+    printf 'ERROR: writing %s changed the lock'"'"'s mode.\n' "${identity_name}" >&2
+    exit 1
+  }
+  cp -- "${pin_lock}" "${pin_scratch}/written"
+
+  settle_produced_identity outcome "${pin_lock}" "${identity_name}" "${inputs_name}" \
+    "${first_identity}" "${first_inputs}" "Synthetic refusal." "Next: synthetic."
+  [[ "${outcome}" == verified ]] && cmp -s "${pin_lock}" "${pin_scratch}/written" || {
+    printf 'ERROR: a second run of the same inputs reproducing %s was not verified unchanged.\n' \
+      "${identity_name}" >&2
+    exit 1
+  }
+
+  if refusal_output="$(
+    (
+      settle_produced_identity outcome "${pin_lock}" "${identity_name}" "${inputs_name}" \
+        "${other_identity}" "${first_inputs}" \
+        "Synthetic mismatch for ${identity_name}." "Next: synthetic next action."
+    ) 2>&1
+  )"; then
+    printf 'ERROR: a second run of the same inputs producing another %s was accepted.\n' \
+      "${identity_name}" >&2
+    exit 1
+  fi
+  [[ "${refusal_output}" == *"ERROR: Synthetic mismatch for ${identity_name}."* && \
+     "${refusal_output}" == *"Pinned:   ${first_identity} (${identity_name})"* && \
+     "${refusal_output}" == *"Produced: ${other_identity}"* && \
+     "${refusal_output}" == *"Inputs:   ${first_inputs} (${inputs_name})"* && \
+     "${refusal_output}" == *"Next: synthetic next action."* && \
+     "${refusal_output}" == *"${pin_lock} was not changed."* ]] && \
+    cmp -s "${pin_lock}" "${pin_scratch}/written" || {
+    printf 'ERROR: the same-inputs mismatch for %s was not refused unchanged by its own statement:\n%s\n' \
+      "${identity_name}" "${refusal_output}" >&2
+    exit 1
+  }
+
+  settle_produced_identity outcome "${pin_lock}" "${identity_name}" "${inputs_name}" \
+    "${other_identity}" "${other_inputs}" "Synthetic refusal." "Next: synthetic."
+  [[ "${outcome}" == written && \
+     "$(grep -c "^readonly ${identity_name}=\"${other_identity}\"\$" "${pin_lock}")" == 1 ]] || {
+    printf 'ERROR: other inputs did not record their own %s.\n' "${identity_name}" >&2
+    exit 1
+  }
+  settled_pairs=$((settled_pairs + 1))
+done
+rm -rf -- "${pin_scratch}"
+
+printf 'RUNTIME_COMMON_CONTRACT_OK functions=%s host-isolation=%s-accepted-%s-refused capability-refusals=3 produced-identities=%s\n' \
+  "${#required_functions[@]}" "${host_isolation_accepted}" "${host_isolation_refused}" "${settled_pairs}"

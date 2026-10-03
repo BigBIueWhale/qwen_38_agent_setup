@@ -7,6 +7,7 @@ readonly CONTAINER_NAME="qwen38-agent-native"
 readonly CONTAINER_LABEL="Qwen_best_model_ever"
 readonly IMAGE_TAG="qwen38-vllm:qwen38-27b-nvfp4-k8v4-runtime-v27"
 readonly EXPECTED_IMAGE_ID="sha256:b850afc5b01b74399706ce33f1316b589e22a31b042834ba58661dc4b58b96e6"
+readonly IMAGE_BUILD_INPUTS_SHA256=""
 readonly RELAY_IMAGE_TAG="qwen38-fixed-relay:1.0.0"
 readonly EXPECTED_RELAY_IMAGE_ID="sha256:869cc8dc77736fe3f39dbfb07e1677df4a4b25928980f38efd22d1f0117c0b87"
 readonly RELAY_SOURCE_SHA256="051dc82af7b9b12e229f9a127183d051ef47a6d44f03d99346762e84bd69c815"
@@ -22,15 +23,28 @@ readonly BASE_IMAGE_TAG="qwen38-vllm:main-9df9b0b"
 readonly EXPECTED_BASE_IMAGE_ID="sha256:fa4a002a88b7043a1a89966dea8a500fe9696f84e75730d9da916f916048d401"
 readonly IMAGE_ARCHIVE_NAME="qwen38-vllm-images-runtime-v27.tar"
 readonly IMAGE_ARCHIVE_SHA256="48cc3978e66e4d18f0a10752dbdfa08917f00d5dc9d75f7653b35b4a207d31a4"
+readonly IMAGE_ARCHIVE_INPUTS_SHA256="6c4fa128f8cbef63491b48da905cddfd6c77039f4d225ed4b55a438c59306912"
+# The runtime image and its archive are pinned by the steps that produce them,
+# never by hand: ./scripts/build-vllm.sh build writes EXPECTED_IMAGE_ID and
+# IMAGE_BUILD_INPUTS_SHA256, and ./scripts/save-images.sh writes
+# IMAGE_ARCHIVE_SHA256 and IMAGE_ARCHIVE_INPUTS_SHA256. Each *_INPUTS_SHA256 is
+# the digest of everything its step produced the artifact from: for the image,
+# the base image, every build option and argument and every file of the build
+# context; for the archive, the two images and the tags they are saved under.
+# A step whose inputs have the recorded digest must reproduce the pinned
+# identity and is refused otherwise; a step of other inputs writes both values.
+# An empty digest records no inputs, so the next run of that step writes its
+# pin. The image pin and the archive pin are committed together.
+#
 # IMAGE_TAG names the pinned image and nothing else: build-vllm.sh moves it only
-# to a build that reproduced EXPECTED_IMAGE_ID, and restore-images.sh only by
-# loading the archive IMAGE_ARCHIVE_SHA256 pins. Every runtime image also
-# carries an identity tag: the release its archive is named for (runtime-vN)
-# and the image's own ID, so each tag names one image. The pinned image keeps a
-# name when a re-pin moves IMAGE_TAG to another, and a build that does not
-# reproduce the pin is named by its own identity instead of taking the pinned
-# image's tag. Both tags are derived here, from what this lock already holds,
-# and nowhere else.
+# to a build it has just verified against EXPECTED_IMAGE_ID or written into it,
+# and restore-images.sh only by loading the archive IMAGE_ARCHIVE_SHA256 pins.
+# Every runtime image also carries an identity tag: the release its archive is
+# named for (runtime-vN) and the image's own ID, so each tag names one image.
+# The pinned image keeps a name when a re-pin moves IMAGE_TAG to another, and a
+# build that does not reproduce the pin is named by its own identity instead of
+# taking the pinned image's tag. Both tags are derived here, from what this
+# lock already holds, and nowhere else.
 readonly IMAGE_ARCHIVE_STEM="${IMAGE_ARCHIVE_NAME%.tar}"
 readonly IMAGE_IDENTITY_TAG_PREFIX="${IMAGE_TAG%%:*}:${IMAGE_ARCHIVE_STEM#qwen38-vllm-images-}-"
 readonly IMAGE_IDENTITY_TAG="${IMAGE_IDENTITY_TAG_PREFIX}${EXPECTED_IMAGE_ID#sha256:}"

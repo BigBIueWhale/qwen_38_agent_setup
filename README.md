@@ -15,8 +15,8 @@ workstation.
 
 ### Bottom line
 
-This source revision awaits its offline image build, adoption and release
-validation; the runtime image pinned below was built from an earlier one.
+This source revision awaits its offline image build and release validation; the
+runtime image `config/runtime-v1.sh` pins was built from an earlier one.
 Prior live results below describe the versions that earned them.
 The audit resolution record in `docs/model-output-and-audit-fixes.md` lists the
 source fixes and their container validation. Anthropic tool results now refuse
@@ -46,7 +46,7 @@ There is one supported mode:
 | Agent-service listener | 127.0.0.1:8090 only |
 | Launch profile and cache volume | socket-isolated-nonroot-vision-k8v4-agent-v21 |
 | Image profile | socket-isolated-nonroot-vision-k8v4-agent-v27 |
-| Runtime image | sha256:b850afc5b01b74399706ce33f1316b589e22a31b042834ba58661dc4b58b96e6 |
+| Runtime image | Pinned in `config/runtime-v1.sh` by the build that made it |
 
 This is not a text-only profile with an optional vision switch. It is not a
 one-million-token profile. It has no MTP, eager-mode, lower-quality image, alternate
@@ -94,15 +94,19 @@ Advanced reproducibility operations are deliberately separate from serving mode:
     ./scripts/build-vllm.sh check
     ./scripts/build-vllm.sh build
     ./scripts/build-vllm.sh materialise DIRECTORY
+    ./scripts/save-images.sh
     ./scripts/restore-images.sh
 
 The check reconstructs the source tree from the pinned upstream commit through every
 landmark-aware transformation and assembles the build context from that
 reconstruction. The build does the same, then runs offline from the exact base image
-on that context, and fails unless it produces the pinned image ID. Materialise writes
-the verified reconstruction to a new directory, as a tree in which to author a stage;
-nothing reads it. The mode argument is required, so none of these happens by default.
-Restore verifies the pinned local archive before loading it.
+on that context and pins what it made: a build of the inputs the pinned image was
+built from must reproduce its ID and fails otherwise, and a build of any other inputs
+writes its own ID into `config/runtime-v1.sh`. Materialise writes the verified
+reconstruction to a new directory, as a tree in which to author a stage; nothing
+reads it. The mode argument is required, so none of these happens by default. Save
+archives the pinned images and pins the archive by the same rule, and restore
+verifies the pinned local archive before loading it.
 
 `check` verifies the Dockerfile's hashes and packaging contracts and runs build
 units offline, the Qwen grammar unit among them; it does not execute the
@@ -357,15 +361,17 @@ Pinned build inputs and products:
 | Immutable base tag | qwen38-vllm:main-9df9b0b |
 | Immutable base ID | sha256:fa4a002a88b7043a1a89966dea8a500fe9696f84e75730d9da916f916048d401 |
 | Runtime tag | qwen38-vllm:qwen38-27b-nvfp4-k8v4-runtime-v27 |
-| Runtime ID | sha256:b850afc5b01b74399706ce33f1316b589e22a31b042834ba58661dc4b58b96e6 |
-| Runtime identity tag | qwen38-vllm:runtime-v27-b850afc5b01b74399706ce33f1316b589e22a31b042834ba58661dc4b58b96e6 |
 | Offline archive | artifacts/qwen38-vllm-images-runtime-v27.tar |
-| Archive size | 8,561,267,712 bytes, mode 0600 |
-| Archive SHA-256 | 48cc3978e66e4d18f0a10752dbdfa08917f00d5dc9d75f7653b35b4a207d31a4 |
 | Runtime Dockerfile SHA-256 | b89e080a0c98fe80add8c0a72ba57be3fea9389b69cc2a39d9929e78ca07d800 |
-| Build verifier SHA-256 | 4b9325d01fe46d1e1d4905076ea0937225a0287588d1155f2f3f5f980fd6e21d |
-| Runtime validator SHA-256 | bd59abf9d28614e8285247d2f41d30b216bc8decd799b2044677ac661afac7d5 |
-| Runtime lock SHA-256 | dadf0f6361aa1427dec021c26337267a400ed5e0c50862c9ed1a7530a1f22b3e |
+| Build verifier SHA-256 | 8117ea40572f22b217fc022953af1147af285eda9137ede307ec49c0da6c1e98 |
+| Runtime validator SHA-256 | 3247412ab19e412f2af168f0e7e8d20fd09adfd91d27f811f7bfe21b43282d77 |
+
+The runtime image's ID and the archive's SHA-256 live in `config/runtime-v1.sh`
+alone, which is also where `agent_service` reads them and their history. The build
+writes the first and `./scripts/save-images.sh` the second, each together with the
+digest of the inputs it was produced from, and a later run of the same inputs must
+reproduce what is pinned: a build is refused if it makes another image, and a save
+if it writes other bytes.
 
 The runtime tag names the pinned image and nothing else. A build used to load its
 image under that tag before comparing the image ID with the pin, so a build that
@@ -374,8 +380,9 @@ untagged and indistinguishable from a failed build. That happened twice: the v23
 tag on the machine that cut v23 names an image no lock ever pinned, while the
 pinned v23 image is untagged, and the first v19 image lost its tag when v19 was
 re-pinned. Now `./scripts/build-vllm.sh build` loads its image under a name of
-the run's own, checks it by its ID, and moves the runtime tag only to a build
-that reproduced the pin; `./scripts/restore-images.sh` moves it only by loading
+the run's own, checks it by its ID, and moves the runtime tag only to the image it
+then pins -- one that reproduced the pin, or the build of new inputs that wrote
+it; `./scripts/restore-images.sh` moves it only by loading
 the archive the lock pins. Every runtime image also carries an identity tag --
 the release its archive is named for and the image's own ID, derived in
 [`config/runtime-v1.sh`](config/runtime-v1.sh) from values the lock already holds:

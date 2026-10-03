@@ -48,6 +48,72 @@ require_command() {
       "Do not install an arbitrary replacement. Restore the pinned host prerequisite."
 }
 
+# A value the lock declares as `readonly NAME="value"`, exactly once. That
+# line shape is also what the paired repository's collect.py and
+# collect-hook.sh read, in this file and in its history.
+lock_value() {
+  local lock="$1" name="$2" output_name="$3" lines
+  lines="$(grep "^readonly ${name}=\"[^\"]*\"\$" "${lock}" || true)"
+  [[ -n "${lines}" && "${lines}" != *$'\n'* ]] ||
+    die "${lock} must declare ${name} exactly once, as readonly ${name}=\"...\"."
+  lines="${lines#*=\"}"
+  printf -v "${output_name}" '%s' "${lines%\"}"
+}
+
+# Rewrites exactly the named `readonly NAME="value"` lines of the lock and
+# nothing else, all at once or not at all.
+write_lock_values() {
+  local lock="$1" assignment name value current staged
+  local -a edits=()
+  shift
+  for assignment in "$@"; do
+    name="${assignment%%=*}"
+    value="${assignment#*=}"
+    [[ "${name}" =~ ^[A-Z][A-Z0-9_]*$ && "${value}" =~ ^[0-9a-z:]+$ ]] ||
+      die "Refusing to write ${assignment} into ${lock}: it is not a lock identity."
+    # Only a line the lock declares exactly once is rewritten.
+    lock_value "${lock}" "${name}" current
+    edits+=(-e "s|^readonly ${name}=\"[^\"]*\"\$|readonly ${name}=\"${value}\"|")
+  done
+  staged="$(mktemp "${lock%/*}/.${lock##*/}.XXXXXX")"
+  if ! sed "${edits[@]}" "${lock}" >"${staged}" ||
+      ! chmod --reference="${lock}" "${staged}" ||
+      ! mv -- "${staged}" "${lock}"; then
+    rm -f -- "${staged}"
+    die "Could not rewrite ${lock}; it was left as it was."
+  fi
+}
+
+# The one rule for an identity a step produces -- the image a build makes, the
+# archive a save writes. The lock holds the identity together with the digest
+# of the inputs that produced it, and both are written only here, by the step
+# that observed them, never by hand. A step whose inputs have the recorded
+# digest must have reproduced the recorded identity and is refused otherwise;
+# a step of any other inputs records its own. The outcome, `verified` or
+# `written`, is stored in the named variable. Lines after the six operands
+# are the refusal: its statement first, then what the caller knows of the
+# inputs and the next action.
+settle_produced_identity() {
+  local output_name="$1" lock="$2" identity_name="$3" inputs_name="$4"
+  local produced="$5" inputs="$6" pinned recorded_inputs
+  shift 6
+  lock_value "${lock}" "${identity_name}" pinned
+  lock_value "${lock}" "${inputs_name}" recorded_inputs
+  if [[ "${inputs}" == "${recorded_inputs}" ]]; then
+    [[ "${produced}" == "${pinned}" ]] ||
+      die "$1" \
+        "Pinned:   ${pinned} (${identity_name})" \
+        "Produced: ${produced}" \
+        "Inputs:   ${inputs} (${inputs_name}), the ones the pinned identity was produced from" \
+        "${@:2}" \
+        "${lock} was not changed."
+    printf -v "${output_name}" '%s' verified
+    return
+  fi
+  write_lock_values "${lock}" "${identity_name}=${produced}" "${inputs_name}=${inputs}"
+  printf -v "${output_name}" '%s' written
+}
+
 require_equal() {
   local description="$1" observed="$2" expected="$3"
   if [[ "${observed}" != "${expected}" ]]; then
