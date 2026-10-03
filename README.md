@@ -366,7 +366,7 @@ Pinned build inputs and products:
 | Runtime Dockerfile SHA-256 | b89e080a0c98fe80add8c0a72ba57be3fea9389b69cc2a39d9929e78ca07d800 |
 | Docker context allowlist SHA-256 | 77b0c5dab61f5d56ddc6b9749b4fba1a3c7c45129d37481f7a0f9f88de80a186 |
 | Build verifier SHA-256 | 7b3b8bf54eb9750931aab209f5886f0f24717b7f8df209b0db0a323de3c41640 |
-| Runtime validator SHA-256 | b040f5c1a9777fb5c84eff30f28236a53fff574a71b05c92348d950ec7b5279b |
+| Runtime validator SHA-256 | 0bc9042cf21c4149f4d8ff71f1bb568ae7856df887e39760c416eda2699383f4 |
 | Runtime lock SHA-256 | b6e9db7c6fe33ab1018dfd9060dd13fd3f831d43f514d20924ba09bb54063b7d |
 
 The runtime tag names the pinned image and nothing else. A build used to load its
