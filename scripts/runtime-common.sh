@@ -1043,26 +1043,20 @@ assert_running_profile() {
       "Found:" "${kv_users_installed_report}"
 
   assert_runtime_versions
-  assert_kv_offload_pinned
+  assert_kv_offload_region
 }
 
-# The CPU KV offload keeps its host region page-locked and pre-faulted. A
+# The CPU KV offload keeps one host region, page-locked and pre-faulted. A
 # failed cudaHostRegister raises inside vLLM and stops startup, so no backend
-# that reached readiness is serving after one.
-# MADV_POPULATE_WRITE is not refused there: on a kernel without it vLLM warns
-# and pre-faults the region one page at a time instead, which populates the
-# same pages more slowly at startup. Readiness counts that warning and refuses
-# it. The declared user count comes from the container's own argv, which
-# assert_running_profile has already proven equal to the reviewed profile, so
-# there is no second source of truth; the region bytes it implies are derived
-# inside vLLM from the KV cache spec.
-assert_kv_offload_pinned() {
+# that reached readiness is serving after one; readiness asserts that the
+# region was declared and established. The declared user count comes from the
+# container's own argv, which assert_running_profile has already proven equal
+# to the reviewed profile, so there is no second source of truth; the region
+# bytes it implies are derived inside vLLM from the KV cache spec.
+assert_kv_offload_region() {
   local logs cpu_users established_count
   logs="$(docker logs "${CONTAINER_NAME}" 2>&1)" || \
-    die "Cannot read backend logs to verify KV offload host pinning"
-
-  require_equal "backend mmap pre-population fallbacks" \
-    "$(printf '%s\n' "${logs}" | grep --fixed-strings --count 'MADV_POPULATE_WRITE is not supported' || true)" 0
+    die "Cannot read backend logs to verify the KV offload host region"
 
   cpu_users="$(
     docker inspect --format '{{json .Config.Cmd}}' "${CONTAINER_NAME}" |

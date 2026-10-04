@@ -365,7 +365,7 @@ Pinned build inputs and products:
 | Offline archive | artifacts/qwen38-vllm-images-runtime-v27.tar |
 | Runtime Dockerfile SHA-256 | b89e080a0c98fe80add8c0a72ba57be3fea9389b69cc2a39d9929e78ca07d800 |
 | Build verifier SHA-256 | 9db3d70a987481ee7063a09642c4e9920014abed84bfbc7b6b12c5aee3b2a819 |
-| Runtime validator SHA-256 | 3247412ab19e412f2af168f0e7e8d20fd09adfd91d27f811f7bfe21b43282d77 |
+| Runtime validator SHA-256 | 7f2efa6c5d7b821f9d4ad277fa80566d35da28e1393eecd195be53bd9dabd5dc |
 
 The runtime image's ID and the archive's SHA-256 live in `config/runtime-v1.sh`
 alone, which is also where `agent_service` reads them and their history. The build
