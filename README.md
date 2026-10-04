@@ -15,8 +15,8 @@ workstation.
 
 ### Bottom line
 
-This source revision awaits its offline image build and release validation; the
-runtime image `config/runtime-v1.sh` pins was built from an earlier one.
+The runtime image `config/runtime-v1.sh` pins awaits release validation;
+`./scripts/build-vllm.sh check` states whether it was built from this source revision.
 Prior live results below describe the versions that earned them.
 The audit resolution record in `docs/model-output-and-audit-fixes.md` lists the
 source fixes and their container validation. Anthropic tool results now refuse
