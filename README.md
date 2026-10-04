@@ -45,7 +45,7 @@ There is one supported mode:
 | Agent-service release | Pinned by the agent-service release lock, which owns every agent and service image identity |
 | Agent-service listener | 127.0.0.1:8090 only |
 | Launch profile and cache volume | socket-isolated-nonroot-vision-k8v4-agent-v21 |
-| Image profile | socket-isolated-nonroot-vision-k8v4-agent-v27 |
+| Image profile | Declared in `config/runtime-v1.sh`, and baked into the image as its profile label by the build |
 | Runtime image | Pinned in `config/runtime-v1.sh` by the build that made it |
 
 This is not a text-only profile with an optional vision switch. It is not a
@@ -361,18 +361,18 @@ Pinned build inputs and products:
 |---|---|
 | Immutable base tag | qwen38-vllm:main-9df9b0b |
 | Immutable base ID | sha256:fa4a002a88b7043a1a89966dea8a500fe9696f84e75730d9da916f916048d401 |
-| Runtime tag | qwen38-vllm:qwen38-27b-nvfp4-k8v4-runtime-v27 |
-| Offline archive | artifacts/qwen38-vllm-images-runtime-v27.tar |
 | Runtime Dockerfile SHA-256 | b89e080a0c98fe80add8c0a72ba57be3fea9389b69cc2a39d9929e78ca07d800 |
 | Build verifier SHA-256 | 9db3d70a987481ee7063a09642c4e9920014abed84bfbc7b6b12c5aee3b2a819 |
 | Runtime validator SHA-256 | 7f2efa6c5d7b821f9d4ad277fa80566d35da28e1393eecd195be53bd9dabd5dc |
 
-The runtime image's ID and the archive's SHA-256 live in `config/runtime-v1.sh`
-alone, which is also where `agent_service` reads them and their history. The build
-writes the first and `./scripts/save-images.sh` the second, each together with the
-digest of the inputs it was produced from, and a later run of the same inputs must
-reproduce what is pinned: a build is refused if it makes another image, and a save
-if it writes other bytes.
+The runtime image's profile, tag and archive name, which every release advances
+together, are declared in `config/runtime-v1.sh`, and the archive lives under
+`artifacts/` by that name. The runtime image's ID and the archive's SHA-256 live
+in the lock alone, which is also where `agent_service` reads them and their
+history. The build writes the first and `./scripts/save-images.sh` the second,
+each together with the digest of the inputs it was produced from, and a later run
+of the same inputs must reproduce what is pinned: a build is refused if it makes
+another image, and a save if it writes other bytes.
 
 The runtime tag names the pinned image and nothing else. A build used to load its
 image under that tag before comparing the image ID with the pin, so a build that
