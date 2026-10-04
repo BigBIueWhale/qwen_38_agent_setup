@@ -316,6 +316,7 @@ It is intentionally reconstructed by the ordered, reviewed semantic transformati
 | patches/vllm-qwen-arguments-read-by-grammar.patch | fa0480f239cdb0de4dd4508ac151fadc1c6a5f76dcf7b15798dcac932ae33371 |
 | patches/vllm-startup-plan-admission-bound.patch | 994f9aabc61b3d7473e83593a5279b2759ce4413ceb1ea212ae33be342df0019 |
 | patches/vllm-template-refusals-name-their-parameter.patch | f78e5a791fa23844b1a9c37752bf5a916053c86cfde8ff00eedadd02b935a897 |
+| patches/vllm-qwen-repeated-parameter-refusal.patch | e6217bcd1fae538ef97dacd523c3b994f594826502961c24c3aa47402b668fa9 |
 
 The reconstructed tree's runtime-source and test changes, new files and
 deletions are counted by ./scripts/build-vllm.sh check, which derives and prints
@@ -363,7 +364,7 @@ Pinned build inputs and products:
 | Runtime tag | qwen38-vllm:qwen38-27b-nvfp4-k8v4-runtime-v27 |
 | Offline archive | artifacts/qwen38-vllm-images-runtime-v27.tar |
 | Runtime Dockerfile SHA-256 | b89e080a0c98fe80add8c0a72ba57be3fea9389b69cc2a39d9929e78ca07d800 |
-| Build verifier SHA-256 | 8117ea40572f22b217fc022953af1147af285eda9137ede307ec49c0da6c1e98 |
+| Build verifier SHA-256 | 9db3d70a987481ee7063a09642c4e9920014abed84bfbc7b6b12c5aee3b2a819 |
 | Runtime validator SHA-256 | 3247412ab19e412f2af168f0e7e8d20fd09adfd91d27f811f7bfe21b43282d77 |
 
 The runtime image's ID and the archive's SHA-256 live in `config/runtime-v1.sh`
@@ -1162,11 +1163,16 @@ prefer their original string representation. Encoded JSON objects, arrays and
 numbers keep their original representation. Cut or untypable values stay raw
 for diagnostics and client validation. All parameter constraints are available
 before argument JSON is emitted; executable calls still wait for EOS.
-If one call repeats a parameter name, decoding refuses the call before its
-earlier value can be replaced. This covers complete output and an unfinished
+If one call repeats a parameter name, decoding refuses the call before either
+value can replace the other. This covers complete output and an unfinished
 trailing parameter on either transport, including schemas that allow additional
-properties. The error names the repeated parameter and directs the caller to
-inspect the generated call and retry.
+properties. The response is the unprocessable-entity refusal, status 422, that
+a well-formed request gets when what it leads to cannot be served, typed as
+`RepeatedToolParameterError` -- inside a stream already under way, its error
+event with that type and code -- naming the call's tool and the repeated
+parameter and no request parameter, and no call is published. The model wrote
+the repeat; the request was sound and the server did not fail, so the refusal is
+no 5xx, and its next action is the caller's: generate the response again.
 
 A raw parameter value -- a string, or a value whose schema leaves its type
 open -- may carry neither its own `</parameter>` closer nor the next
@@ -1197,7 +1203,7 @@ the call unless its arguments can only be read as still inside a parameter --
 then they are that parameter's text. A declared parameter is
 read by its declared production while its slot is still open, and by the
 undeclared-name production only after that. A call that names a parameter twice
-in that reading is refused as before.
+in that reading is refused as above.
 
 A parameter value is framed by the transport, not by the value. The served
 template renders `<parameter=NAME>`, a newline, the value, a newline, and

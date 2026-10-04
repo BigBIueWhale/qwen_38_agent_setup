@@ -155,6 +155,7 @@ NVFP4_NATIVE_KERNEL_PATCH_FILE="${PROJECT_DIR}/patches/vllm-nvfp4-native-kernel-
 QWEN_ARGUMENTS_READ_BY_GRAMMAR_PATCH_FILE="${PROJECT_DIR}/patches/vllm-qwen-arguments-read-by-grammar.patch"
 STARTUP_PLAN_BOUND_PATCH_FILE="${PROJECT_DIR}/patches/vllm-startup-plan-admission-bound.patch"
 TEMPLATE_REFUSAL_PARAMETER_PATCH_FILE="${PROJECT_DIR}/patches/vllm-template-refusals-name-their-parameter.patch"
+QWEN_REPEATED_PARAMETER_REFUSAL_PATCH_FILE="${PROJECT_DIR}/patches/vllm-qwen-repeated-parameter-refusal.patch"
 
 if [[ ! -f "${DEPLOYMENT_INPUT_MANIFEST}" || -L "${DEPLOYMENT_INPUT_MANIFEST}" ]]; then
   echo "Deployment-input manifest is missing or is not a regular non-symlink file." >&2
@@ -285,7 +286,8 @@ printf '%s  %s\n' \
   "${NVFP4_NATIVE_KERNEL_PATCH_DIFF_SHA256}" "${NVFP4_NATIVE_KERNEL_PATCH_FILE}" \
   "${QWEN_ARGUMENTS_READ_BY_GRAMMAR_PATCH_DIFF_SHA256}" "${QWEN_ARGUMENTS_READ_BY_GRAMMAR_PATCH_FILE}" \
   "${STARTUP_PLAN_BOUND_PATCH_DIFF_SHA256}" "${STARTUP_PLAN_BOUND_PATCH_FILE}" \
-  "${TEMPLATE_REFUSAL_PARAMETER_PATCH_DIFF_SHA256}" "${TEMPLATE_REFUSAL_PARAMETER_PATCH_FILE}" | \
+  "${TEMPLATE_REFUSAL_PARAMETER_PATCH_DIFF_SHA256}" "${TEMPLATE_REFUSAL_PARAMETER_PATCH_FILE}" \
+  "${QWEN_REPEATED_PARAMETER_REFUSAL_PATCH_DIFF_SHA256}" "${QWEN_REPEATED_PARAMETER_REFUSAL_PATCH_FILE}" | \
   sha256sum --check --strict
 
 printf '%s  %s\n' \

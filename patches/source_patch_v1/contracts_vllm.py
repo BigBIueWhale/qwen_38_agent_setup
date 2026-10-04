@@ -2271,15 +2271,16 @@ def _validate_unique_parameters_before(state: State) -> None:
 def _validate_unique_parameters_after(state: State) -> None:
     label = "Qwen unique tool parameters"
     qwen = "vllm/parser/qwen3.py"
+    # A name already in the arguments is refused before either value can
+    # replace the other, on complete and unfinished output alike; how the
+    # refusal is answered is qwen-repeated-parameter-refusal's.
     _require_in_symbol(state, qwen, "_qwen3_arg_converter", (
         "if name in params:",
-        'raise ValueError(f"Qwen XML repeats parameter {name!r}")',
         "_unframe_parameter_value(value, complete=True)",
         "_unframe_parameter_value(value, complete=False)",
     ), label=label)
     _require_in_symbol(state, qwen, "Qwen3Parser._convert_tool_arguments", (
-        'f"Qwen XML argument decoding failed: {exc}; "',
-        "inspect the generated call and retry",
+        "Qwen XML argument decoding failed: {exc}",
         "raise RuntimeError(",
     ), label=label)
     require_python_symbols(state, "tests/parser/engine/test_qwen3.py", {
@@ -2924,7 +2925,7 @@ def _validate_grammar_read_arguments_after(state: State) -> None:
     _require_in_symbol(state, qwen, "_qwen3_arg_converter", (
         "reading = read_qwen_arguments(raw_args, schema or {})",
         "if schema and unfinished is None:",
-        'raise ValueError(f"Qwen XML repeats parameter {name!r}")',
+        "if name in params:",
     ), label=label)
     _require_in_symbol(state, qwen, "_qwen3_arguments_reading", (
         "return ArgumentsReading(reading.complete, reading.inside_parameter)",
@@ -3055,6 +3056,79 @@ def _validate_refusal_parameter_after(state: State) -> None:
     }, label=label)
 
 
+def _validate_repeated_parameter_refusal_before(state: State) -> None:
+    label = "Qwen repeated parameter refusal precondition"
+    require_text(state, "vllm/parser/qwen3.py",
+                 'raise ValueError(f"Qwen XML repeats parameter {name!r}")',
+                 count=2, label=label)
+    forbid_text(state, "vllm/entrypoints/openai/engine/protocol.py",
+                "RepeatedToolParameterError", label=label)
+
+
+def _validate_repeated_parameter_refusal_after(state: State) -> None:
+    label = "Qwen repeated parameter refusal"
+    protocol = "vllm/entrypoints/openai/engine/protocol.py"
+    errors = "vllm/entrypoints/serve/exception_handling/error_response.py"
+    qwen = "vllm/parser/qwen3.py"
+    # The refusal is typed, names the call and the parameter, and states the
+    # next action; the request was sound and the server did not fail, so it
+    # is a 422 on the one error surface every refusal is answered on.
+    require_python_symbols(state, protocol, {
+        "RepeatedToolParameterError": None,
+        "RepeatedToolParameterError.__init__": (
+            "self", "tool", "repeated_parameter",
+        ),
+    }, label=label)
+    # It is the unprocessable-entity refusal, whose request parameter is none.
+    require_text(state, protocol,
+                 "class RepeatedToolParameterError(VLLMUnprocessableEntityError):",
+                 label=label)
+    _require_in_symbol(state, protocol, "RepeatedToolParameterError.__init__", (
+        "{repeated_parameter!r} more than once.",
+        "the response again.",
+        "self.repeated_parameter = repeated_parameter",
+    ), label=label)
+    _require_in_symbol(state, errors, "create_error_response", (
+        "if isinstance(exc, RepeatedToolParameterError):",
+        'err_type = "RepeatedToolParameterError"',
+        "status_code = HTTPStatus.UNPROCESSABLE_ENTITY",
+    ), label=label)
+    # The converter signals a repeat with an exception the engine's
+    # provisional-converter fallback (ValueError, TypeError) cannot catch,
+    # and the parser answers it with the refusal; no call is published.
+    require_text(state, qwen, "class _RepeatedParameter(Exception):", label=label)
+    require_text(state, qwen, "raise _RepeatedParameter(name)", count=2, label=label)
+    forbid_text(state, qwen, "Qwen XML repeats parameter", label=label)
+    forbid_text(state, qwen, "inspect the generated call", label=label)
+    _require_in_symbol(state, qwen, "Qwen3Parser._convert_tool_arguments", (
+        "except _RepeatedParameter as repeat:",
+        "raise RepeatedToolParameterError(func_name, repeat.name) from repeat",
+    ), label=label)
+    # A refusal inside a stream is answered as one, not logged as a failure.
+    _require_in_symbol(state, "vllm/entrypoints/openai/chat_completion/serving.py",
+        "OpenAIServingChat.chat_completion_stream_generator", (
+            "except RepeatedToolParameterError as e:",
+        ), label=label)
+    _require_in_symbol(state, "vllm/entrypoints/openai/responses/serving.py",
+        "OpenAIServingResponses.responses_stream_generator", (
+            "except RepeatedToolParameterError as e:",
+        ), label=label)
+    require_python_symbols(state, "tests/parser/engine/test_qwen_xml_fidelity.py", {
+        "test_repeated_parameter_refuses_the_call_instead_of_replacing_text": None,
+    }, label=label)
+    require_python_symbols(
+        state,
+        "tests/entrypoints/openai/chat_completion/"
+        "test_repeated_tool_parameter_refusal.py",
+        {
+            "test_the_refusal_is_a_typed_422_naming_the_call_and_parameter": None,
+            "test_a_stream_ends_in_the_refusal_and_publishes_no_call": None,
+            "test_a_whole_response_is_refused_before_any_body": None,
+        },
+        label=label,
+    )
+
+
 def validate_final(state: State) -> None:
     """Reassert every durable semantic invariant on the complete tree.
 
@@ -3070,6 +3144,24 @@ def validate_final(state: State) -> None:
 
 
 CONTRACTS: Mapping[str, SemanticContract] = {
+    "qwen-repeated-parameter-refusal": SemanticContract(
+        rationale=(
+            "A Qwen tool call that names one parameter twice was refused with "
+            "a RuntimeError, so the response was an HTTP 500 whose message "
+            "told the caller to inspect the call the response had discarded. "
+            "The model wrote the repeat; the request was sound and the server "
+            "did not fail. The parser answers it with the unprocessable-entity "
+            "refusal (422), typed as its own and naming the call and the "
+            "parameter, on the error surface every refusal is answered on, "
+            "and no call is published."
+        ),
+        removal_condition=(
+            "Remove when pinned upstream answers a Qwen XML tool call that "
+            "repeats a parameter with a typed refusal naming it."
+        ),
+        validate_before=_validate_repeated_parameter_refusal_before,
+        validate_after=_validate_repeated_parameter_refusal_after,
+    ),
     "template-refusals-name-their-parameter": SemanticContract(
         rationale=(
             "Every chat template refusal became a request error naming "

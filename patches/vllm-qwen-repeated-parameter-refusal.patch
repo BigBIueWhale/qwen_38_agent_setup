@@ -1,0 +1,406 @@
+diff --git a/tests/entrypoints/openai/chat_completion/test_repeated_tool_parameter_refusal.py b/tests/entrypoints/openai/chat_completion/test_repeated_tool_parameter_refusal.py
+new file mode 100644
+--- /dev/null
++++ b/tests/entrypoints/openai/chat_completion/test_repeated_tool_parameter_refusal.py
+@@ -0,0 +1,158 @@
++# SPDX-License-Identifier: Apache-2.0
++# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
++"""A call that names a parameter twice is refused on the wire, not failed."""
++
++import json
++from http import HTTPStatus
++from unittest.mock import MagicMock
++
++import pytest
++
++from vllm.entrypoints.anthropic.protocol import AnthropicErrorResponse
++from vllm.entrypoints.openai.chat_completion.protocol import ChatCompletionRequest
++from vllm.entrypoints.openai.chat_completion.serving import OpenAIServingChat
++from vllm.entrypoints.openai.engine.protocol import (
++    RepeatedToolParameterError,
++    RequestResponseMetadata,
++)
++from vllm.entrypoints.serve.exception_handling.error_response import (
++    create_error_response,
++)
++from vllm.exceptions import VLLMServerError, VLLMUnprocessableEntityError
++from vllm.outputs import CompletionOutput, RequestOutput
++from vllm.parser import ParserManager
++
++MARKERS = {"</think>": 20000, "<tool_call>": 20001, "</tool_call>": 20002}
++TEXT = {v: k for k, v in MARKERS.items()}
++TOOLS = [{"type": "function", "function": {
++    "name": "read", "parameters": {
++        "type": "object", "properties": {"path": {"type": "string"}},
++        "required": ["path"],
++    },
++}}]
++BODY = (
++    "plan</think><tool_call>\n<function=read>\n"
++    "<parameter=path>\na\n</parameter>\n<parameter=path>\nb\n</parameter>\n"
++    "</function>\n</tool_call>"
++)
++
++
++def _encode(text):
++    ids = []
++    while text:
++        marker = next((m for m in MARKERS if text.startswith(m)), None)
++        if marker:
++            ids.append(MARKERS[marker])
++            text = text[len(marker):]
++        else:
++            ids.append(ord(text[0]))
++            text = text[1:]
++    return ids
++
++
++def _decode(ids):
++    return "".join(TEXT.get(i, chr(i)) for i in ids)
++
++
++def _serving():
++    serving = OpenAIServingChat.__new__(OpenAIServingChat)
++    serving.response_role = "assistant"
++    serving.parser_cls = ParserManager.get_parser(
++        tool_parser_name="qwen3_coder", reasoning_parser_name="qwen3",
++        enable_auto_tools=True,
++    )
++    serving.model_config = None
++    serving.enable_auto_tools = True
++    serving.enable_prompt_tokens_details = False
++    serving.enable_log_outputs = False
++    serving.enable_log_deltas = False
++    serving.enable_force_include_usage = False
++    serving.request_logger = None
++    serving.system_fingerprint = None
++    serving.enable_per_request_metrics = False
++    return serving
++
++
++def _arguments(stream, chunk_size):
++    ids = _encode(BODY)
++    request = ChatCompletionRequest(
++        model="unit", messages=[{"role": "user", "content": "read"}], tools=TOOLS,
++        tool_choice="auto", stream=stream, kv_scope="unit",
++        stream_options={"include_usage": True} if stream else None,
++    )
++    tokenizer = MagicMock()
++    tokenizer.get_vocab.return_value = MARKERS
++    tokenizer.all_special_tokens = list(MARKERS)
++    tokenizer.all_special_ids = list(MARKERS.values())
++    tokenizer.decode.side_effect = _decode
++
++    async def outputs():
++        size = chunk_size or len(ids)
++        for start in range(0, len(ids), size):
++            group = ids[start:start + size]
++            last = start + size >= len(ids)
++            yield RequestOutput(
++                request_id="unit", prompt="prompt", prompt_token_ids=[1, 2, 3],
++                prompt_logprobs=None, outputs=[CompletionOutput(
++                    index=0, text=_decode(group), token_ids=group,
++                    cumulative_logprob=None, logprobs=None,
++                    finish_reason="stop" if last else None, stop_reason=None,
++                )], finished=last,
++            )
++
++    return request, tokenizer, dict(
++        request=request, result_generator=outputs(), request_id="chatcmpl-unit",
++        model_name="unit", conversation=[{"role": "user", "content": "read"}],
++        tokenizer=tokenizer,
++        request_metadata=RequestResponseMetadata(request_id="unit"),
++    )
++
++
++def test_the_refusal_is_a_typed_422_naming_the_call_and_parameter():
++    refusal = RepeatedToolParameterError("read", "path")
++    # The unprocessable-entity refusal a well-formed request gets when what it
++    # leads to cannot be served, never a server error.
++    assert isinstance(refusal, VLLMUnprocessableEntityError)
++    assert not isinstance(refusal, VLLMServerError)
++    error = create_error_response(refusal).error
++    assert error.code == HTTPStatus.UNPROCESSABLE_ENTITY.value
++    assert error.type == "RepeatedToolParameterError"
++    # No request parameter is at fault: the model wrote the repeat.
++    assert error.param is None
++    assert "call to 'read' names parameter 'path' more than once" in error.message
++    assert error.message.endswith("Generate the response again.")
++    anthropic = AnthropicErrorResponse.for_status(error.code, error.message)
++    assert anthropic.error.type == "invalid_request_error"
++
++
++@pytest.mark.asyncio
++@pytest.mark.parametrize("chunk_size", [None, 1, 13])
++async def test_a_stream_ends_in_the_refusal_and_publishes_no_call(chunk_size):
++    _, _, kwargs = _arguments(True, chunk_size)
++    events = [
++        event async for event in _serving().chat_completion_stream_generator(**kwargs)
++    ]
++    assert events[-1] == "data: [DONE]\n\n"
++    payloads = [json.loads(event[len("data: "):]) for event in events[:-1]]
++    *chunks, last = payloads
++    assert last == {"error": {
++        "message": create_error_response(
++            RepeatedToolParameterError("read", "path")
++        ).error.message,
++        "type": "RepeatedToolParameterError", "param": None, "code": 422,
++    }}
++    for chunk in chunks:
++        assert "error" not in chunk
++        for choice in chunk["choices"]:
++            assert not choice["delta"].get("tool_calls")
++            assert choice.get("finish_reason") is None
++
++
++@pytest.mark.asyncio
++async def test_a_whole_response_is_refused_before_any_body():
++    request, tokenizer, kwargs = _arguments(False, None)
++    serving = _serving()
++    kwargs["parser"] = serving.parser_cls(tokenizer, request.tools)
++    with pytest.raises(RepeatedToolParameterError) as refused:
++        await serving.chat_completion_full_generator(**kwargs)
++    assert (refused.value.tool, refused.value.repeated_parameter) == ("read", "path")
+diff --git a/tests/parser/engine/test_qwen3.py b/tests/parser/engine/test_qwen3.py
+--- a/tests/parser/engine/test_qwen3.py
++++ b/tests/parser/engine/test_qwen3.py
+@@ -783,10 +783,14 @@
+         ],
+     )
+     def test_repeated_parameter_cannot_overwrite_model_output(self, raw, partial):
+-        from vllm.parser.qwen3 import _qwen3_arg_converter
++        from vllm.parser.qwen3 import _qwen3_arg_converter, _RepeatedParameter
+ 
+-        with pytest.raises(ValueError, match="repeats parameter 'city'"):
++        with pytest.raises(_RepeatedParameter) as repeat:
+             _qwen3_arg_converter(raw, partial)
++        assert repeat.value.name == "city"
++        # The engine's provisional-converter fallback catches these, and would
++        # publish the argument text as the call's arguments.
++        assert not isinstance(repeat.value, (ValueError, TypeError))
+ 
+     def test_multiline_param_values(self):
+         from vllm.parser.qwen3 import (
+diff --git a/tests/parser/engine/test_qwen_xml_fidelity.py b/tests/parser/engine/test_qwen_xml_fidelity.py
+--- a/tests/parser/engine/test_qwen_xml_fidelity.py
++++ b/tests/parser/engine/test_qwen_xml_fidelity.py
+@@ -109,17 +109,30 @@
+           '\n</function></tool_call><think>\n', '"quoted"\n\\path\n']
+ 
+ 
+-@pytest.mark.parametrize('chunk_size', [None, 7])
+-def test_repeated_parameter_refuses_the_call_instead_of_replacing_text(chunk_size):
++@pytest.mark.parametrize('chunk_size', [None, 1, 7])
++@pytest.mark.parametrize('second,finish', [
++    ('<parameter=text>\nsecond\n</parameter>\n</function>\n</tool_call>', 'stop'),
++    # A call its limit stopped inside the repeat: the repeat came first.
++    ('<parameter=text>\nsec', 'length'),
++])
++def test_repeated_parameter_refuses_the_call_instead_of_replacing_text(
++    chunk_size, second, finish,
++):
++    from vllm.entrypoints.openai.engine.protocol import RepeatedToolParameterError
++
+     text = ('plan</think><tool_call>\n<function=write>\n'
+-            '<parameter=text>\nfirst\n</parameter>\n'
+-            '<parameter=text>\nsecond\n</parameter>\n'
+-            '</function>\n</tool_call>')
+-    with pytest.raises(RuntimeError, match="repeats parameter 'text'; .*retry"):
+-        parse(text, chunk_size, schema={
++            '<parameter=text>\nfirst\n</parameter>\n' + second)
++    with pytest.raises(RepeatedToolParameterError) as refused:
++        parse(text, chunk_size, finish=finish, schema={
+             'type': 'object', 'properties': {'text': {'type': 'string'}},
+             'required': ['text'], 'additionalProperties': True,
+         })
++    assert (refused.value.tool, refused.value.repeated_parameter) == ('write', 'text')
++    # No request parameter is at fault.
++    assert refused.value.parameter is None
++    assert "call to 'write' names parameter 'text' more than once" in str(
++        refused.value)
++    assert str(refused.value).endswith('Generate the response again.')
+ 
+ 
+ @pytest.mark.parametrize('chunk_size', [None, 1, 2, 3, 7, 13, 64])
+diff --git a/vllm/entrypoints/openai/chat_completion/serving.py b/vllm/entrypoints/openai/chat_completion/serving.py
+--- a/vllm/entrypoints/openai/chat_completion/serving.py
++++ b/vllm/entrypoints/openai/chat_completion/serving.py
+@@ -43,6 +43,7 @@
+     FunctionCall,
+     PerRequestTimingMetrics,
+     PromptTokenUsageInfo,
++    RepeatedToolParameterError,
+     RequestResponseMetadata,
+     ToolCall,
+     UsageInfo,
+@@ -898,6 +899,9 @@
+ 
+         except GenerationError as e:
+             yield f"data: {self._convert_generation_error_to_streaming_response(e)}\n\n"
++        except RepeatedToolParameterError as e:
++            # The model's slip, refused as such; the server did not fail.
++            yield f"data: {self.create_streaming_error_response(e)}\n\n"
+         except Exception as e:
+             logger.exception("Error in chat completion stream generator.")
+             data = self.create_streaming_error_response(e)
+diff --git a/vllm/entrypoints/openai/engine/protocol.py b/vllm/entrypoints/openai/engine/protocol.py
+--- a/vllm/entrypoints/openai/engine/protocol.py
++++ b/vllm/entrypoints/openai/engine/protocol.py
+@@ -21,7 +21,11 @@
+ import vllm.envs as envs
+ from vllm.config.utils import replace
+ from vllm.entrypoints.chat_utils import make_tool_call_id
+-from vllm.exceptions import VLLMServerError, VLLMValidationError
++from vllm.exceptions import (
++    VLLMServerError,
++    VLLMUnprocessableEntityError,
++    VLLMValidationError,
++)
+ from vllm.logger import init_logger
+ from vllm.sampling_params import StructuredOutputsParams
+ from vllm.utils import random_uuid
+@@ -462,3 +466,28 @@
+     def __init__(self, message: str = "Internal server error"):
+         super().__init__(message)
+         self.status_code = HTTPStatus.INTERNAL_SERVER_ERROR
++
++
++class RepeatedToolParameterError(VLLMUnprocessableEntityError):
++    """The model wrote a tool call that names one parameter more than once.
++
++    A call's arguments are an object, and an object holds each name once, so
++    the call cannot be returned as it was written: either value would be
++    dropped. The response is refused instead, naming the call and the
++    parameter. It is an unprocessable-entity refusal, the one a well-formed
++    request gets when what it leads to cannot be served: the request was
++    sound and the server did not fail, so it is no 5xx, and no request
++    parameter is at fault. The next action is the caller's, to generate the
++    response again.
++    """
++
++    def __init__(self, tool: str, repeated_parameter: str) -> None:
++        super().__init__(
++            f"The model's call to {tool!r} names parameter "
++            f"{repeated_parameter!r} more than once. A call's arguments are an "
++            "object that holds each name once, so the call is refused rather "
++            "than returned with one of the model's values dropped. Generate "
++            "the response again."
++        )
++        self.tool = tool
++        self.repeated_parameter = repeated_parameter
+diff --git a/vllm/entrypoints/openai/responses/serving.py b/vllm/entrypoints/openai/responses/serving.py
+--- a/vllm/entrypoints/openai/responses/serving.py
++++ b/vllm/entrypoints/openai/responses/serving.py
+@@ -38,6 +38,7 @@
+ from vllm.entrypoints.openai.engine.protocol import (
+     DeltaMessage,
+     ErrorResponse,
++    RepeatedToolParameterError,
+     RequestResponseMetadata,
+ )
+ from vllm.entrypoints.openai.models.serving import OpenAIServingModels
+@@ -1616,6 +1617,9 @@
+                     )
+         except GenerationError as e:
+             yield _increment_sequence_number_and_return(self._stream_error_event(e))
++        except RepeatedToolParameterError as e:
++            # The model's slip, refused as such; the server did not fail.
++            yield _increment_sequence_number_and_return(self._stream_error_event(e))
+         except Exception as e:
+             logger.exception("Error in Responses stream generator.")
+             yield _increment_sequence_number_and_return(self._stream_error_event(e))
+diff --git a/vllm/entrypoints/serve/exception_handling/error_response.py b/vllm/entrypoints/serve/exception_handling/error_response.py
+--- a/vllm/entrypoints/serve/exception_handling/error_response.py
++++ b/vllm/entrypoints/serve/exception_handling/error_response.py
+@@ -14,6 +14,7 @@
+     ErrorInfo,
+     ErrorResponse,
+     GenerationError,
++    RepeatedToolParameterError,
+ )
+ from vllm.logger import init_logger
+ 
+@@ -60,7 +61,14 @@
+             VLLMValidationError,
+         )
+ 
+-        if isinstance(exc, VLLMValidationError):
++        if isinstance(exc, RepeatedToolParameterError):
++            # An unprocessable-entity refusal named by its own type, so a
++            # caller can tell it from the others: the model's output is what
++            # cannot be served, and the caller generates the response again.
++            err_type = "RepeatedToolParameterError"
++            status_code = HTTPStatus.UNPROCESSABLE_ENTITY
++            param = None
++        elif isinstance(exc, VLLMValidationError):
+             err_type = "BadRequestError"
+             status_code = HTTPStatus.BAD_REQUEST
+             param = exc.parameter
+diff --git a/vllm/parser/qwen3.py b/vllm/parser/qwen3.py
+--- a/vllm/parser/qwen3.py
++++ b/vllm/parser/qwen3.py
+@@ -31,6 +31,7 @@
+ from jsonschema import Draft202012Validator
+ from referencing import Registry
+ 
++from vllm.entrypoints.openai.engine.protocol import RepeatedToolParameterError
+ from vllm.parser.engine.events import EventType
+ from vllm.parser.engine.parser_engine import ParserEngine
+ from vllm.parser.engine.parser_engine_config import (
+@@ -175,6 +176,20 @@
+         return {"allOf": constraints} if constraints else True
+ 
+ 
++class _RepeatedParameter(Exception):
++    """Argument text that names a parameter it already named.
++
++    The converter knows the arguments and the parser the call they belong
++    to, so the parser turns this into the refusal it answers with. It is no
++    ValueError: the engine's provisional-converter fallback catches those and
++    would publish the argument text as the call's arguments.
++    """
++
++    def __init__(self, name: str) -> None:
++        super().__init__(name)
++        self.name = name
++
++
+ def _unique_json_object(pairs: list[tuple[str, object]]) -> dict:
+     result = dict(pairs)
+     if len(result) != len(pairs):
+@@ -295,14 +310,14 @@
+     params: dict[str, str] = {}
+     for name, value in closed:
+         if name in params:
+-            raise ValueError(f"Qwen XML repeats parameter {name!r}")
++            raise _RepeatedParameter(name)
+         params[name] = _unframe_parameter_value(value, complete=True)
+ 
+     # An unfinished parameter is a raw diagnostic on both transports.
+     if unfinished is not None:
+         name, value = unfinished
+         if name in params:
+-            raise ValueError(f"Qwen XML repeats parameter {name!r}")
++            raise _RepeatedParameter(name)
+         params[name] = _unframe_parameter_value(value, complete=False)
+ 
+     if schema and unfinished is None:
+@@ -455,13 +470,14 @@
+             return _qwen3_arg_converter(
+                 raw_args, partial, find_tool_schema(self._tools, func_name)
+             )
++        except _RepeatedParameter as repeat:
++            # The model's slip, answered as a refusal naming the call and the
++            # parameter rather than returned with one of the two values.
++            raise RepeatedToolParameterError(func_name, repeat.name) from repeat
+         except (TypeError, ValueError) as exc:
+             # Malformed parameter text is handled inside the decoder. An error
+             # here must not enter the engine's provisional-converter fallback.
+-            raise RuntimeError(
+-                f"Qwen XML argument decoding failed: {exc}; "
+-                "inspect the generated call and retry"
+-            ) from exc
++            raise RuntimeError(f"Qwen XML argument decoding failed: {exc}") from exc
+ 
+     def extract_batch_content_ids(self, token_ids, *, token_offset: int = 0):
+         if not token_ids:

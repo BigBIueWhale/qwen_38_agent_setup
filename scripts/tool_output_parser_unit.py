@@ -434,6 +434,38 @@ class ToolOutputParserTest(unittest.TestCase):
                     result = parse("plan</think>" + body, chunk)
                     self.assertEqual(result[2], [(name, '{"text": "kept"}')])
 
+    def test_a_repeated_parameter_is_refused_naming_the_call(self):
+        from vllm.entrypoints.openai.engine.protocol import (
+            RepeatedToolParameterError,
+        )
+        from vllm.entrypoints.serve.exception_handling.error_response import (
+            create_error_response,
+        )
+
+        parameters = dict(TOOL["function"]["parameters"], additionalProperties=True)
+        tool = dict(TOOL, function=dict(TOOL["function"], parameters=parameters))
+        first = "<tool_call>\n<function=write>\n<parameter=text>\nfirst\n</parameter>\n"
+        for second, finish in (
+            ("<parameter=text>\nsecond\n</parameter>\n</function>\n</tool_call>",
+             "stop"),
+            ("<parameter=text>\nsec", "length"),
+        ):
+            for chunk in (1, 13, None):
+                with self.subTest(finish=finish, chunk=chunk):
+                    with self.assertRaises(RepeatedToolParameterError) as refused:
+                        parse("plan</think>" + first + second, chunk,
+                              tools=[tool], finish=finish)
+                    self.assertEqual(
+                        (refused.exception.tool,
+                         refused.exception.repeated_parameter),
+                        ("write", "text"),
+                    )
+                    error = create_error_response(refused.exception).error
+                    self.assertEqual(
+                        (error.code, error.type, error.param),
+                        (422, "RepeatedToolParameterError", None),
+                    )
+
     def test_native_grammar_suspends_text_stops_inside_values(self):
         from vllm import SamplingParams
         from vllm.sampling_params import StructuredOutputsParams
