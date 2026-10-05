@@ -8,14 +8,10 @@ vLLM/Pillow/Jinja dependencies. It does not use a host Python environment.
 from __future__ import annotations
 
 import asyncio
-import os
 import struct
 import zlib
 from io import BytesIO
 from types import SimpleNamespace
-
-os.environ["VLLM_QWEN38_STRICT_IMAGE_CONTRACT"] = "1"
-os.environ["VLLM_MAX_IMAGE_PIXELS"] = "16777216"
 
 from PIL import Image
 
@@ -106,6 +102,22 @@ def test_decoder() -> str:
         "aspect ratio <= 30:1",
         lambda: image_io.load_bytes(png_bytes(size=(1, 31))),
     )
+    # The pixel bound is the contract's own: nothing about how the image is
+    # launched sets it. The refusal reads the header, so the oversized source
+    # needs no pixels.
+    oversized = (
+        b"\x89PNG\r\n\x1a\n"
+        + chunk(b"IHDR", struct.pack(">IIBBBBB", 4097, 4096, 8, 2, 0, 0, 0))
+        + chunk(b"IDAT", zlib.compress(b""))
+        + chunk(b"IEND", b"")
+    )
+    expect(
+        VLLMValidationError,
+        "accepts at most 16777216 pixels",
+        lambda: image_io.load_bytes(oversized),
+    )
+    largest = image_io.load_bytes(png_bytes(size=(4096, 4096)))
+    assert largest.media.size == (4096, 4096)
 
     with BytesIO() as output:
         first = Image.new("RGB", (8, 8), (1, 2, 3))

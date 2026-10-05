@@ -1,7 +1,7 @@
 diff --git a/tests/entrypoints/anthropic/test_anthropic_messages_conversion.py b/tests/entrypoints/anthropic/test_anthropic_messages_conversion.py
 --- a/tests/entrypoints/anthropic/test_anthropic_messages_conversion.py
 +++ b/tests/entrypoints/anthropic/test_anthropic_messages_conversion.py
-@@ -1716,7 +1716,6 @@
+@@ -1714,7 +1714,6 @@
                      MagicMock(), refusal_tokenizer,
                      [{"role": "user", "content": "hi"}],
                      chat_template="{{ raise_exception('history refused') }}",
@@ -9,7 +9,7 @@ diff --git a/tests/entrypoints/anthropic/test_anthropic_messages_conversion.py b
                  )
  
          app = self._make_api_app(reject)
-@@ -1736,15 +1735,20 @@
+@@ -1734,15 +1733,20 @@
  
  @pytest.mark.parametrize("error", [ValueError("decoder bug"), TypeError("internal type"),
                                    OverflowError("internal overflow")])
@@ -36,7 +36,7 @@ diff --git a/tests/entrypoints/anthropic/test_anthropic_messages_conversion.py b
      assert raised.value is error
      assert create_error_response(error).error.code == 500
  
-@@ -1755,7 +1759,7 @@
+@@ -1753,7 +1757,7 @@
      from vllm.entrypoints.serve.exception_handling.error_response import create_error_response
      with pytest.raises(Exception) as raised:
          safe_apply_chat_template(MagicMock(), refusal_tokenizer,
@@ -338,7 +338,7 @@ diff --git a/vllm/entrypoints/chat_utils.py b/vllm/entrypoints/chat_utils.py
  from vllm.transformers_utils.processor import get_video_processor_cls_name
  from vllm.utils import random_uuid
  from vllm.utils.collection_utils import is_list_of
-@@ -1907,7 +1908,14 @@
+@@ -1890,7 +1891,14 @@
              # Chat templates don't know about the "prompt_embeds" modality,
              # emit the single sentinel token as text so the template renders
              # it inline. The renderer later expands it to N tokens post-tokenize.

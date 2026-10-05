@@ -72,7 +72,7 @@ diff --git a/tests/entrypoints/anthropic/test_anthropic_messages_conversion.py b
  
  
  # ======================================================================
-@@ -1442,3 +1450,275 @@
+@@ -1442,3 +1450,274 @@
  
          assert response.status_code == HTTPStatus.BAD_REQUEST
          handler.create_messages.assert_not_awaited()
@@ -327,7 +327,6 @@ diff --git a/tests/entrypoints/anthropic/test_anthropic_messages_conversion.py b
 +        from vllm.renderers.hf import safe_apply_chat_template
 +        import jinja2
 +
-+        monkeypatch.setenv("VLLM_QWEN38_STRICT_IMAGE_CONTRACT", "1")
 +
 +        async def reject(*args):
 +            if gate == "length":

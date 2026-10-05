@@ -49,7 +49,7 @@ diff --git a/tests/entrypoints/anthropic/test_anthropic_messages_conversion.py b
  
  
  class TestMessageStartIncludesTypeAndRole:
-@@ -1722,3 +1721,145 @@
+@@ -1721,3 +1720,145 @@
          assert response.status_code == 400
          assert response.json()["error"]["type"] == "invalid_request_error"
          assert response.headers["content-type"] == "application/json"

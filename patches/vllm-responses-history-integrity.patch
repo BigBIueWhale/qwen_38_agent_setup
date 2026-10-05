@@ -217,7 +217,7 @@ diff --git a/tests/entrypoints/openai/responses/test_responses_utils.py b/tests/
 diff --git a/vllm/entrypoints/chat_utils.py b/vllm/entrypoints/chat_utils.py
 --- a/vllm/entrypoints/chat_utils.py
 +++ b/vllm/entrypoints/chat_utils.py
-@@ -2143,6 +2143,89 @@
+@@ -2126,6 +2126,89 @@
      return "random"
  
  

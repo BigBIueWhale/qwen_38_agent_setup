@@ -702,8 +702,8 @@ def _validate_vision_before(state: State) -> None:
     )
     forbid_text(
         state,
-        "vllm/envs.py",
-        "VLLM_QWEN38_STRICT_IMAGE_CONTRACT",
+        "vllm/entrypoints/chat_utils.py",
+        "_enforce_qwen38_strict_content_part",
         label=label,
     )
     require_text(
@@ -765,24 +765,46 @@ def _validate_vision_after(state: State) -> None:
         state, chat, "_enforce_qwen38_strict_content_part", label=label
     )
     for needle in (
-        "if not envs.VLLM_QWEN38_STRICT_IMAGE_CONTRACT:",
         "if part.get(\"uuid\") is not None:",
         'if part_type == "image_url":',
         'detail not in ("auto", "high")',
         'elif part_type == "input_image":',
     ):
         _require(needle in strict_part, f"{label}: pre-I/O media gate missing {needle!r}")
+    # The contract is the served image's own: it holds for every caller and
+    # every launch, so none of its gates consults a launch setting.
+    _require(
+        "envs." not in strict_part,
+        f"{label}: the pre-I/O media gate depends on a launch setting",
+    )
 
     for qualname in ("MediaConnector.fetch_image", "MediaConnector.fetch_image_async"):
         connector_source = _symbol_source(state, connector, qualname, label=label)
         _require(
-            'not image_url.startswith(\n            "data:image/png;base64,"' in connector_source,
+            'if not image_url.startswith(\n            "data:image/png;base64,"' in connector_source,
             f"{label}: {qualname} does not reject non-canonical URLs before I/O",
+        )
+        _require(
+            "if envs." not in connector_source,
+            f"{label}: {qualname} gates the image contract on a launch setting",
+        )
+    for qualname, needle in (
+        ("ImageMediaIO.__init__", 'if image_mode != "RGB":'),
+        ("ImageMediaIO.__init__", "if self.rgba_background_color != (255, 255, 255):"),
+        ("ImageMediaIO.load_base64", 'if media_type != "image/png":'),
+    ):
+        _require(
+            needle in _symbol_source(state, image, qualname, label=label),
+            f"{label}: {qualname} does not apply the image contract unconditionally",
         )
 
     image_source = _symbol_source(state, image, "ImageMediaIO.load_bytes", label=label)
+    _require(
+        "if envs." not in image_source,
+        f"{label}: the decoded-image gate depends on a launch setting",
+    )
     for needle in (
-        "required_max_pixels = 16_777_216",
+        "if w * h > QWEN38_MAX_IMAGE_PIXELS:",
         'if image.format != "PNG":',
         'image.mode not in ("RGB", "RGBA")',
         "QWEN38_MAX_PROVEN_IMAGE_ASPECT_RATIO",
@@ -795,9 +817,19 @@ def _validate_vision_after(state: State) -> None:
         "QWEN38_MAX_PROVEN_IMAGE_ASPECT_RATIO = 30",
         label=label,
     )
+    require_text(
+        state,
+        image,
+        "QWEN38_MAX_IMAGE_PIXELS = 16_777_216",
+        label=label,
+    )
     render_source = _symbol_source(state, render, "ChatParams.with_defaults", label=label)
     for needle in ("if self.media_io_kwargs:", "if self.mm_processor_kwargs:", '"add_vision_id"'):
         _require(needle in render_source, f"{label}: request override gate missing {needle!r}")
+    _require(
+        "envs." not in render_source,
+        f"{label}: the request override gate depends on a launch setting",
+    )
 
     mlp = _symbol_source(state, vision_model, "Qwen3_VisionMLP.forward", label=label)
     _require_ordered(
@@ -2664,8 +2696,7 @@ def _validate_precise_errors_after(state: State) -> None:
              label + ": template bugs must retain their original server cause")
     require_text(state, hf, "raise VLLMValidationError(message, parameter=", label=label)
     _require_in_symbol(state, "vllm/multimodal/media/image.py", "ImageMediaIO.load_bytes", (
-        "raise VLLMServerError(", "raise VLLMValidationError(",
-        "Image.open(BytesIO(data))", "image.load()",
+        "raise VLLMValidationError(", "Image.open(BytesIO(data))", "image.load()",
     ), label=label)
     loader = _find_symbol(state, "vllm/multimodal/media/image.py",
                           "ImageMediaIO.load_bytes", label=label)
@@ -3736,8 +3767,11 @@ CONTRACTS: Mapping[str, SemanticContract] = {
             "The sole deployment requires chronological tool-result media, canonical "
             "lossless/static PNG inputs, the released full pixel budget, BF16 vision, and "
             "enough phase-local VRAM without reducing text context. Strict validation must "
-            "occur before I/O; mutually exclusive encoder/text workspaces must release and "
-            "restore even on failure, with physical driver-visible headroom."
+            "occur before I/O, and the image contract is the served image's own: it holds "
+            "for every caller and every launch, so no setting of how the image is started "
+            "serves JPEG, a remote URL or a low-detail image. Mutually exclusive "
+            "encoder/text workspaces must release and restore even on failure, with "
+            "physical driver-visible headroom."
         ),
         removal_condition=(
             "Remove only when pinned upstream natively preserves tool-media chronology, "

@@ -307,7 +307,7 @@ diff --git a/vllm/renderers/hf.py b/vllm/renderers/hf.py
 diff --git a/vllm/renderers/params.py b/vllm/renderers/params.py
 --- a/vllm/renderers/params.py
 +++ b/vllm/renderers/params.py
-@@ -41,6 +41,22 @@
+@@ -40,6 +40,22 @@
      return defaults | {k: v for k, v in overrides.items() if v not in unset_values}
  
  
@@ -330,7 +330,7 @@ diff --git a/vllm/renderers/params.py b/vllm/renderers/params.py
  def recursively_merge_kwargs(
      defaults: dict[str, Any] | None,
      overrides: dict[str, Any] | None,
-@@ -82,6 +98,11 @@
+@@ -81,6 +97,11 @@
      chat_template_kwargs: dict[str, Any] = field(default_factory=dict)
      """The kwargs to pass to the chat template."""
  
@@ -342,7 +342,7 @@ diff --git a/vllm/renderers/params.py b/vllm/renderers/params.py
      media_io_kwargs: dict[str, dict[str, Any]] | None = None
      """Per-modality kwargs for media I/O (loading/decoding images, videos, etc.)."""
  
-@@ -142,6 +163,7 @@
+@@ -140,6 +161,7 @@
                  default_chat_template_kwargs,
                  self.chat_template_kwargs,
              ),

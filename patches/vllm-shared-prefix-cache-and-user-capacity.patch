@@ -7154,7 +7154,7 @@ diff --git a/vllm/entrypoints/scale_out/token_in_token_out/serving.py b/vllm/ent
 diff --git a/vllm/envs.py b/vllm/envs.py
 --- a/vllm/envs.py
 +++ b/vllm/envs.py
-@@ -2121,10 +2121,6 @@
+@@ -2114,10 +2114,6 @@
      "VLLM_XPU_USE_SAMPLER_KERNEL": lambda: bool(
          int(os.getenv("VLLM_XPU_USE_SAMPLER_KERNEL", "1"))
      ),

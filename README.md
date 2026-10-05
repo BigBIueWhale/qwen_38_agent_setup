@@ -280,24 +280,24 @@ It is intentionally reconstructed by the ordered, reviewed semantic transformati
 | patches/vllm-qwen-implicit-tool-grammar-boundary.patch | d231c6e2e7040c4cd4b38432cb8c794805afddbf2c6e4f7ff6febb78e3fd9f48 |
 | patches/vllm-anthropic-validation-http400.patch | b4c3327ca4e513b9a58edc3e9aca978d324a27032511f9868d5f941411941bcf |
 | patches/vllm-tool-truncation-finish-reason.patch | 1a220f6db9b40967d867b3cfb1a92d95d907ca059718ffe61772b4cb4409f551 |
-| patches/vllm-qwen38-vision-runtime.patch | f92603724861da5b5a364f43e57d3f95ef43a9dded8ae645278373850db3140f |
+| patches/vllm-qwen38-vision-runtime.patch | 47007141c259b50464e5cbff414094060e0529278aeb4d02d291ae291d9a7cd3 |
 | patches/vllm-qwen38-numerical-audits.patch | a73aa2f2ae3f82010eb2bafcdf663c2fe14854c30165dbc4d8457725bc3b6632 |
 | patches/vllm-turboquant-fail-closed-guards.patch | 7282d1d4d7a17b40ab8626c82f478bbb938c548451b7793df8233562a9e24c7c |
 | patches/vllm-kv-offload-pinning-fail-closed.patch | 1857071c38d081bb95e3cca12153cebce096649084950b99229104fdae029ca6 |
-| patches/vllm-shared-prefix-cache-and-user-capacity.patch | b7e9e13a6ccb4d61694a29cb35b54cc6ecd7351c367c67d1e8336b795adf4acc |
+| patches/vllm-shared-prefix-cache-and-user-capacity.patch | d19609d842871a3476faa4fde6e6ed81a6b9cd7d23261acd9dd81a04bd9b34b3 |
 | patches/vllm-exact-reasoning-usage.patch | 2179e27460e4239367ac7e2dd3828b9b3db463e79d87ad81433d00fbc6b12395 |
-| patches/vllm-anthropic-input-fidelity.patch | d02af26157a63ca64f29b080a9d19a6c50bda8d94d0649679a6c1d72f708172c |
+| patches/vllm-anthropic-input-fidelity.patch | 126f002321100271897a93ddbe212cc37e5d014d0ab745bcd2ce6037f224c5b3 |
 | patches/vllm-qwen-exact-tool-language.patch | fe4e46cb7444c80646537da63ab1ac12c54e7eebb04c0735a4243d8b7e7943d2 |
-| patches/vllm-png-source-admission.patch | b9091c5c227151ec00131a854d927a9405396244a9a59bd4d6e297dd67ea3306 |
+| patches/vllm-png-source-admission.patch | b1b684a96d7243ae647d4d8ce2fe69b7330b3ab243ea77903c4cfb346bc80549 |
 | patches/vllm-kv-physical-free-memory.patch | 21f8993033c78971d4f7a660fe9906e054ec658139e83fc37b7121f1d8d91289 |
 | patches/vllm-qwen-single-call-grammar.patch | 2ae587bdde25b974cd88c5c351162fe809ee92b11d22ac0037f38411c8467b8b |
-| patches/vllm-responses-history-integrity.patch | a378fe1e3cb4fc215a90776b1ea260d5a8a1b265ae5aacfc5febad75cf3ec4cf |
+| patches/vllm-responses-history-integrity.patch | 0c0e2bcbb203fd4b40452849f7ebd0e34aa64bdc5b1a86fd110afac60b01f125 |
 | patches/vllm-responses-stream-identity.patch | 451ab26fda73a0d71861159c91ffa69aa6cd9456f303a3ff682f43398695a522 |
-| patches/vllm-anthropic-terminal-metadata.patch | 7f6f8e0ff2df3234365be1a549bc6c13a07ec3f82890bccb1f0da497ade95361 |
+| patches/vllm-anthropic-terminal-metadata.patch | d09c3b0ba5658b864131c46202f53a4b611ca0395bd068feb1a054fcc70f2364 |
 | patches/vllm-generation-sampling-resolution.patch | f352470cfd07b0c7768c3533971629ba65e0b9f5bb9e8f72c528b049f54ea4dd |
 | patches/vllm-sampling-decoding-boundary.patch | 85cfffb303c52128b7e3183e5b3d18c3d1f8a906b7b1b6f9d1ddc8010de4bc0f |
 | patches/vllm-token-generation-result-integrity.patch | 94344dd0d8bbd9bc9963d2c4ed730eda2c02aa6e6d1e6c217ba538d7446af96a |
-| patches/vllm-raw-image-token-transport.patch | fc6590677b110bf6743d6f0dc983def61f4d0ffb6804f8944739272508be1220 |
+| patches/vllm-raw-image-token-transport.patch | 7ff7f7fdc9d72fec7948de4cd8968e157756345ab8487281a36689ed3aa82a63 |
 | patches/vllm-xml-text-fidelity.patch | 73e973029f05bd88e5faa7bc1f5a38bac75ef5afcd562981be0961c3b830c6ab |
 | patches/vllm-phase-aware-parser-terminals.patch | 8e9adb65b71b6ba7e3e79ea50ecc37ca9129820ac94a41c71c5286d8d5de68f8 |
 | patches/vllm-input-stream-agent-identity.patch | f812362220f83b904d56e55e9c359918990c55e39d7a0750d1011840d377dfb4 |
@@ -305,17 +305,17 @@ It is intentionally reconstructed by the ordered, reviewed semantic transformati
 | patches/vllm-one-way-thinking-boundary.patch | 63a69aea8a184a3875f50673a55058fb9e14dc3178abd8c5510de2770022f346 |
 | patches/vllm-schema-faithful-xml.patch | bd5475972df5b62dd4a0b2b67e68640987f018cf9b14870edf6569a6b0cd8dcc |
 | patches/vllm-token-text-provenance.patch | 954b36cb444f7e644e29d13f7a9d3c000512a0d616bbf2b6cd3cb8f4e880dd44 |
-| patches/vllm-precise-request-errors.patch | 4a5afc49e3cee76395dd3122878582f2b3884885decad26c4658796307d21ed9 |
+| patches/vllm-precise-request-errors.patch | 6ebbc277c2a6f523d520b75d3afe75dd13c745449eea63e037856e8351ac05ad |
 | patches/vllm-qwen-canonical-parameter-framing.patch | d438f9106c4a989d64837c21f5491d946065e6721570ad47664513347f150064 |
 | patches/vllm-qwen-owned-tool-grammar.patch | 81b3f760a7aa670496deb1252ee3713d452ab62debec88062bbe4cadceb6c849 |
 | patches/vllm-qwen-unique-tool-parameters.patch | 6a76a61c743807215555cbd6b3bbdd8fcaba4abcaca69ef000d301df6c792d3b |
-| patches/vllm-generation-admission-before-response.patch | 6c8b7e41034c2774a3051cda0fddd9cfc2662e176f96a3375086f0253bb81697 |
+| patches/vllm-generation-admission-before-response.patch | 59678e08ffb6e4b5cc2d8d01b7876e4732e9b6e5fc7b128c544540aace8464b4 |
 | patches/vllm-kv-scope-single-flight.patch | cc5e52403afd4e4764693da552e9252bbf204793566fff6a27fb87b4dbd28d13 |
-| patches/vllm-template-authored-control-tokens.patch | dd43b43e5ad972c0b7622a3288d6d47cf2b11d24c17e11dda9a5c89a8a8ff542 |
+| patches/vllm-template-authored-control-tokens.patch | fd1bc02bb877bd07fd0f2002033c75233b81cd51aa20a1eae72391b26ccf108c |
 | patches/vllm-nvfp4-native-kernel-required.patch | 9d9ce188b6670d687a725c4cdca37478f9dc78ef9f19685ddbcf5e9edd53b8b7 |
 | patches/vllm-qwen-arguments-read-by-grammar.patch | fa0480f239cdb0de4dd4508ac151fadc1c6a5f76dcf7b15798dcac932ae33371 |
 | patches/vllm-startup-plan-admission-bound.patch | 994f9aabc61b3d7473e83593a5279b2759ce4413ceb1ea212ae33be342df0019 |
-| patches/vllm-template-refusals-name-their-parameter.patch | f78e5a791fa23844b1a9c37752bf5a916053c86cfde8ff00eedadd02b935a897 |
+| patches/vllm-template-refusals-name-their-parameter.patch | 587facad35a115822bb6af2baefc00604fa87e1e96d0e6d85919115821a1ccd5 |
 | patches/vllm-qwen-repeated-parameter-refusal.patch | e6217bcd1fae538ef97dacd523c3b994f594826502961c24c3aa47402b668fa9 |
 
 The reconstructed tree's runtime-source and test changes, new files and
@@ -470,9 +470,7 @@ The exact relevant environment includes:
     TRANSFORMERS_OFFLINE=1
     VLLM_NO_USAGE_STATS=1
     VLLM_ENFORCE_STRICT_TOOL_CALLING=1
-    VLLM_QWEN38_STRICT_IMAGE_CONTRACT=1
     VLLM_QWEN38_VISION_HEADROOM_BYTES=671088640
-    VLLM_MAX_IMAGE_PIXELS=16777216
     GLOO_SOCKET_IFNAME=lo
     NCCL_SOCKET_IFNAME=lo
 
@@ -497,7 +495,7 @@ Consequences:
 - trust_remote_code remains false. Current vLLM resolves the architecture natively as
   Qwen3_5ForConditionalGeneration.
 - Request-side media limits, processor overrides, and lower image-detail choices are
-  rejected by the strict image patch rather than silently replacing the profile.
+  rejected by the image's own media contract rather than silently replacing the profile.
 
 ### Only the template writes control tokens
 
@@ -985,7 +983,9 @@ therefore separates three claims:
 3. Locally proved: full-budget images work at square and at both portrait/landscape
    endpoints through 30:1; the deployment rejects anything beyond 30:1.
 
-The transport/decoder contract is intentionally narrower and fail-closed:
+The transport/decoder contract is intentionally narrower and fail-closed, and it is
+the image's own: it holds for every caller and every launch of the image, not only
+for a stack started by this repository's launcher.
 
 - only an exact inline data:image/png;base64, URL is accepted;
 - remote URLs, file URLs, JPEG, WebP, GIF, BMP, SVG, animated PNG, and video are

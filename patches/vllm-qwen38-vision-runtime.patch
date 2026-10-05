@@ -107,15 +107,7 @@ diff --git a/tests/entrypoints/unit_tests/test_chat_utils.py b/tests/entrypoints
 index 2778770e373ba50c356410e2d619d5f61e6187e4..0ce1634348473c408151603fe109d6fdb4cc6c22 100644
 --- a/tests/entrypoints/unit_tests/test_chat_utils.py
 +++ b/tests/entrypoints/unit_tests/test_chat_utils.py
-@@ -10,6 +10,7 @@ from unittest.mock import MagicMock
- import pytest
- import torch
- 
-+import vllm.envs as envs
- from vllm.assets.audio import AudioAsset
- from vllm.assets.image import ImageAsset
- from vllm.assets.video import VideoAsset
-@@ -18,6 +19,7 @@ from vllm.entrypoints.chat_utils import (
+@@ -18,6 +18,7 @@ from vllm.entrypoints.chat_utils import (
      MEDIA_CONNECTOR_REGISTRY,
      AsyncMultiModalItemTracker,
      ConversationMessage,
@@ -123,7 +115,7 @@ index 2778770e373ba50c356410e2d619d5f61e6187e4..0ce1634348473c408151603fe109d6fd
      _postprocess_messages,
      parse_chat_messages,
      parse_chat_messages_async,
-@@ -29,6 +31,7 @@ from vllm.multimodal.utils import (
+@@ -29,6 +30,7 @@ from vllm.multimodal.utils import (
      encode_image_url,
      encode_video_url,
  )
@@ -131,12 +123,11 @@ index 2778770e373ba50c356410e2d619d5f61e6187e4..0ce1634348473c408151603fe109d6fd
  from vllm.utils.serial_utils import tensor2base64
  
  KIMI_K2_5_MODEL_ID = "moonshotai/Kimi-K2.5"
-@@ -38,6 +41,60 @@ QWEN25OMNI_MODEL_ID = "Qwen/Qwen2.5-Omni-7B"
+@@ -38,6 +40,58 @@ QWEN25OMNI_MODEL_ID = "Qwen/Qwen2.5-Omni-7B"
  MISTRAL_MODEL_ID = "mistralai/Mistral-Small-3.1-24B-Instruct-2503"
  
  
 +def test_qwen38_strict_content_part_contract(monkeypatch):
-+    monkeypatch.setattr(envs, "VLLM_QWEN38_STRICT_IMAGE_CONTRACT", True)
 +    canonical = {
 +        "type": "image_url",
 +        "image_url": {
@@ -176,7 +167,6 @@ index 2778770e373ba50c356410e2d619d5f61e6187e4..0ce1634348473c408151603fe109d6fd
 +
 +
 +def test_qwen38_strict_request_overrides_fail_closed(monkeypatch):
-+    monkeypatch.setattr(envs, "VLLM_QWEN38_STRICT_IMAGE_CONTRACT", True)
 +
 +    with pytest.raises(VLLMValidationError, match="media_io_kwargs"):
 +        ChatParams(media_io_kwargs={"image": {"image_mode": None}}).with_defaults()
@@ -196,17 +186,186 @@ diff --git a/tests/multimodal/media/test_connector.py b/tests/multimodal/media/t
 index b222d57d3c24872ef5c5660dc38f2ea3b9a0bd59..164f4cad2ca2c4411d6862a46a793cf7e75468c9 100644
 --- a/tests/multimodal/media/test_connector.py
 +++ b/tests/multimodal/media/test_connector.py
-@@ -17,7 +17,9 @@ import requests
+@@ -9,15 +9,14 @@ import time
+ from io import BytesIO
+ from tempfile import NamedTemporaryFile, TemporaryDirectory
+ 
+-import aiohttp
+ import numpy as np
+ import pybase64 as base64
+ import pytest
+-import requests
  import torch
  from PIL import Image, ImageChops
  
-+import vllm.envs as envs
  from vllm.assets.base import VLLM_S3_BUCKET_URL
 +from vllm.exceptions import VLLMUnprocessableEntityError
  from vllm.multimodal.image import convert_image_mode
  from vllm.multimodal.inputs import PlaceholderRange
  from vllm.multimodal.media import MediaConnector
-@@ -569,4 +571,32 @@ def test_get_cached_bytes_file_deleted_before_read():
+@@ -113,33 +112,5 @@ async def test_fetch_image_base64(
+ 
+ 
+-@pytest.mark.asyncio
+-async def test_fetch_image_keep_original_mode():
+-    """media_io_kwargs can disable the default RGB conversion."""
+-    # RGBA image: opaque black pixel on a fully transparent background
+-    rgba_image = Image.new("RGBA", (4, 4), (0, 0, 0, 0))
+-    rgba_image.putpixel((2, 2), (0, 0, 0, 255))
+-    buffer = BytesIO()
+-    rgba_image.save(buffer, "PNG")
+-    data_url = (
+-        f"data:image/png;base64,{base64.b64encode(buffer.getvalue()).decode('utf-8')}"
+-    )
+-
+-    # Default behavior: RGBA is composited onto a white background
+-    default_image = MediaConnector().fetch_image(data_url)
+-    assert default_image.mode == "RGB"
+-    assert default_image.getpixel((0, 0)) == (255, 255, 255)
+-    assert default_image.getpixel((2, 2)) == (0, 0, 0)
+-
+-    # image_mode=None via media_io_kwargs: original mode is preserved
+-    connector = MediaConnector(media_io_kwargs={"image": {"image_mode": None}})
+-    image_sync = connector.fetch_image(data_url)
+-    image_async = await connector.fetch_image_async(data_url)
+-    for image in (image_sync, image_async):
+-        assert image.mode == "RGBA"
+-        assert image.getpixel((0, 0)) == (0, 0, 0, 0)
+-        assert image.getpixel((2, 2)) == (0, 0, 0, 255)
+-
+-
+ @pytest.mark.asyncio
+ @pytest.mark.parametrize("image_url", TEST_IMAGE_ASSETS, indirect=True)
+ async def test_fetch_image_local_files(image_url: str):
+@@ -182,22 +153,5 @@ async def test_fetch_image_local_files(image_url: str):
+ 
+ 
+-@pytest.mark.asyncio
+-async def test_fetch_image_local_files_relative_allowed_path(tmp_path, monkeypatch):
+-    media_dir = tmp_path / "media"
+-    media_dir.mkdir()
+-    image_path = media_dir / "image.png"
+-    Image.new("RGB", (1, 1), color=(255, 0, 0)).save(image_path)
+-
+-    monkeypatch.chdir(tmp_path)
+-    local_connector = MediaConnector(allowed_local_media_path="media")
+-
+-    image_sync = local_connector.fetch_image(image_path.as_uri())
+-    image_async = await local_connector.fetch_image_async(image_path.as_uri())
+-
+-    assert image_sync.size == (1, 1)
+-    assert not ImageChops.difference(image_sync, image_async).getbbox()
+-
+-
+ @pytest.mark.asyncio
+ @pytest.mark.parametrize("image_url", [TEST_IMAGE_ASSETS[0]], indirect=True)
+ async def test_fetch_image_local_files_with_space_in_name(image_url: str):
+@@ -225,42 +179,4 @@ async def test_fetch_image_local_files_with_space_in_name(image_url: str):
+         assert not ImageChops.difference(image_sync, image_async).getbbox()
+ 
+ 
+-@pytest.mark.asyncio
+-async def test_fetch_image_data_url_with_params():
+-    """RFC 2397 allows parameters between the mediatype and the base64
+-    marker; they must not be rejected or leak into the media type."""
+-    connector = MediaConnector()
+-
+-    image = Image.new("RGB", (4, 4), color=(255, 0, 0))
+-    with NamedTemporaryFile(suffix=".png") as f:
+-        image.save(f.name)
+-        base64_image = base64.b64encode(f.read()).decode("utf-8")
+-
+-    data_url = f"data:image/png;charset=utf-8;base64,{base64_image}"
+-    image_sync = connector.fetch_image(data_url)
+-    image_async = await connector.fetch_image_async(data_url)
+-    assert _image_equals(image_sync, image_async)
+-
+-
+-def test_fetch_image_data_url_malformed():
+-    connector = MediaConnector()
+-
+-    with pytest.raises(ValueError, match="missing ','"):
+-        connector.fetch_image("data:image/png;base64")
+-
+-    with pytest.raises(NotImplementedError, match="base64"):
+-        connector.fetch_image("data:text/plain,hello")
+-
+-    # ";base64" requires the ";"; here "base64" is a (bogus) media type.
+-    with pytest.raises(NotImplementedError, match="base64"):
+-        connector.fetch_image("data:base64,aGVsbG8=")
+-
+-    # Strict RFC 2397 grammar: lowercase "base64", no whitespace.
+-    with pytest.raises(NotImplementedError, match="base64"):
+-        connector.fetch_image("data:image/png;BASE64,aGVsbG8=")
+-
+-    with pytest.raises(NotImplementedError, match="base64"):
+-        connector.fetch_image("data:image/png; base64,aGVsbG8=")
+-
+-
+ @pytest.mark.asyncio
+@@ -407,61 +323,6 @@ async def test_allowed_media_domains(video_url: str, num_frames: int):
+         _, _ = await connector.fetch_video_async(disallowed_url)
+ 
+ 
+-@pytest.mark.asyncio
+-async def test_ssrf_bypass_backslash_in_url(local_asset_server):
+-    """Verify that backslash-@ URL parsing confusion cannot bypass the
+-    allowed_media_domains check (GHSA-v359-jj2v-j536).
+-
+-    urllib3.parse_url() and aiohttp/yarl disagree on how to parse a
+-    backslash before ``@``.  urllib3 treats ``\\`` as part of the path
+-    (encoding it as ``%5C``), while yarl treats it as a userinfo
+-    separator, changing the effective host.  The fix normalises the URL
+-    through urllib3 *before* handing it to aiohttp so both layers agree.
+-    """
+-    port = local_asset_server.port
+-    asset = TEST_IMAGE_ASSETS[0]
+-
+-    # Craft the bypass payload: urllib3 sees host=127.0.0.1, but an
+-    # un-patched aiohttp would see host=example.com.
+-    bypass_url = f"http://127.0.0.1:{port}\\@example.com/{asset}"
+-
+-    connector = MediaConnector(
+-        allowed_media_domains=["127.0.0.1"],
+-    )
+-
+-    # After the fix the request is made to 127.0.0.1 (the local asset
+-    # server) using the normalised URL.  The normalised path will be
+-    # /%5C@example.com/<asset> which won't match any file the server
+-    # knows about, so we expect an HTTP error — but crucially NOT a
+-    # successful fetch from example.com.
+-    with pytest.raises(requests.exceptions.HTTPError):
+-        connector.fetch_image(bypass_url)
+-
+-    with pytest.raises(aiohttp.ClientResponseError):
+-        await connector.fetch_image_async(bypass_url)
+-
+-
+-@pytest.mark.asyncio
+-async def test_ssrf_bypass_backslash_disallowed_domain():
+-    """The reverse direction: even when the *attacker-controlled* host
+-    appears in the urllib3-parsed hostname position the allowlist must
+-    still block it.
+-    """
+-    # urllib3.parse_url sees host=example.com which is NOT in the
+-    # allowlist, so this must be rejected before any request is made.
+-    bypass_url = "https://example.com\\@safe.example.org/image.png"
+-
+-    connector = MediaConnector(
+-        allowed_media_domains=["safe.example.org"],
+-    )
+-
+-    with pytest.raises(ValueError, match="allowed domains"):
+-        connector.fetch_image(bypass_url)
+-
+-    with pytest.raises(ValueError, match="allowed domains"):
+-        await connector.fetch_image_async(bypass_url)
+-
+-
+ def _make_cached_connector(cache_dir, *, max_mb=10, ttl_hours=24):
+     """Create a MediaConnector with caching enabled via monkeypatched internals.
+ 
+@@ -569,4 +430,30 @@ def test_get_cached_bytes_file_deleted_before_read():
          # Delete the file to simulate concurrent eviction
          connector._media_cache_path(url).unlink()
  
@@ -216,8 +375,6 @@ index b222d57d3c24872ef5c5660dc38f2ea3b9a0bd59..164f4cad2ca2c4411d6862a46a793cf7
 +
 +@pytest.mark.asyncio
 +async def test_qwen38_strict_connector_accepts_only_exact_inline_png(monkeypatch):
-+    monkeypatch.setattr(envs, "VLLM_QWEN38_STRICT_IMAGE_CONTRACT", True)
-+    monkeypatch.setattr(envs, "VLLM_MAX_IMAGE_PIXELS", 16_777_216)
 +
 +    image = Image.new("RGB", (4, 4), (1, 2, 3))
 +    with BytesIO() as buffer:
@@ -244,13 +401,13 @@ diff --git a/tests/multimodal/media/test_image.py b/tests/multimodal/media/test_
 index 5bbf54b7872e9d115e400274401d87acbc1e53b5..92cb451e9bbebfbe34656576c8ba6899a6406984 100644
 --- a/tests/multimodal/media/test_image.py
 +++ b/tests/multimodal/media/test_image.py
-@@ -1,11 +1,13 @@
+@@ -1,11 +1,12 @@
  # SPDX-License-Identifier: Apache-2.0
  # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
 +from io import BytesIO
  from pathlib import Path
  
- import numpy as np
+-import numpy as np
  import pytest
  from PIL import Image
  
@@ -258,7 +415,154 @@ index 5bbf54b7872e9d115e400274401d87acbc1e53b5..92cb451e9bbebfbe34656576c8ba6899
  from vllm.multimodal.media import ImageMediaIO
  
  pytestmark = pytest.mark.cpu_test
-@@ -282,3 +284,73 @@ def test_image_pixel_limit_disabled(monkeypatch):
+@@ -14,146 +15,4 @@ ASSETS_DIR = Path(__file__).parent.parent / "assets"
+ assert ASSETS_DIR.exists()
+ 
+ 
+-def test_image_media_io_rgba_custom_background(tmp_path):
+-    """Test RGBA to RGB conversion with custom background colors."""
+-    # Create a simple RGBA image with transparent and opaque pixels
+-    rgba_image = Image.new("RGBA", (10, 10), (255, 0, 0, 255))  # Red with full opacity
+-
+-    # Make top-left quadrant transparent
+-    for i in range(5):
+-        for j in range(5):
+-            rgba_image.putpixel((i, j), (0, 0, 0, 0))  # Fully transparent
+-
+-    # Save the test image to tmp_path
+-    test_image_path = tmp_path / "test_rgba.png"
+-    rgba_image.save(test_image_path)
+-
+-    # Test 1: Default white background (backward compatibility)
+-    image_io_default = ImageMediaIO()
+-    converted_default = image_io_default.load_file(test_image_path)
+-    default_numpy = np.array(converted_default)
+-
+-    # Check transparent pixels are white
+-    assert default_numpy[0][0][0] == 255  # R
+-    assert default_numpy[0][0][1] == 255  # G
+-    assert default_numpy[0][0][2] == 255  # B
+-    # Check opaque pixels remain red
+-    assert default_numpy[5][5][0] == 255  # R
+-    assert default_numpy[5][5][1] == 0  # G
+-    assert default_numpy[5][5][2] == 0  # B
+-
+-    # Test 2: Custom black background via kwargs
+-    image_io_black = ImageMediaIO(rgba_background_color=(0, 0, 0))
+-    converted_black = image_io_black.load_file(test_image_path)
+-    black_numpy = np.array(converted_black)
+-
+-    # Check transparent pixels are black
+-    assert black_numpy[0][0][0] == 0  # R
+-    assert black_numpy[0][0][1] == 0  # G
+-    assert black_numpy[0][0][2] == 0  # B
+-    # Check opaque pixels remain red
+-    assert black_numpy[5][5][0] == 255  # R
+-    assert black_numpy[5][5][1] == 0  # G
+-    assert black_numpy[5][5][2] == 0  # B
+-
+-    # Test 3: Custom blue background via kwargs (as list)
+-    image_io_blue = ImageMediaIO(rgba_background_color=[0, 0, 255])
+-    converted_blue = image_io_blue.load_file(test_image_path)
+-    blue_numpy = np.array(converted_blue)
+-
+-    # Check transparent pixels are blue
+-    assert blue_numpy[0][0][0] == 0  # R
+-    assert blue_numpy[0][0][1] == 0  # G
+-    assert blue_numpy[0][0][2] == 255  # B
+-
+-    # Test 4: Test with load_bytes method
+-    with open(test_image_path, "rb") as f:
+-        image_data = f.read()
+-
+-    image_io_green = ImageMediaIO(rgba_background_color=(0, 255, 0))
+-    converted_green = image_io_green.load_bytes(image_data)
+-    green_numpy = np.array(converted_green)
+-
+-    # Check transparent pixels are green
+-    assert green_numpy[0][0][0] == 0  # R
+-    assert green_numpy[0][0][1] == 255  # G
+-    assert green_numpy[0][0][2] == 0  # B
+-
+-
+-def test_image_media_io_no_mode_conversion(tmp_path):
+-    """image_mode=None skips conversion and preserves the original mode."""
+-    # RGBA image: opaque black pixel on a fully transparent background
+-    rgba_image = Image.new("RGBA", (10, 10), (0, 0, 0, 0))
+-    rgba_image.putpixel((5, 5), (0, 0, 0, 255))
+-    test_image_path = tmp_path / "test_rgba.png"
+-    rgba_image.save(test_image_path)
+-
+-    # Default behavior: RGBA is composited onto a white background
+-    image_io_default = ImageMediaIO()
+-    converted_default = image_io_default.load_file(test_image_path)
+-    assert converted_default.media.mode == "RGB"
+-    assert converted_default.media.getpixel((0, 0)) == (255, 255, 255)
+-    assert converted_default.media.getpixel((5, 5)) == (0, 0, 0)
+-
+-    # image_mode=None: original mode and alpha channel are preserved
+-    image_io_keep = ImageMediaIO(image_mode=None)
+-    converted_keep = image_io_keep.load_file(test_image_path)
+-    assert converted_keep.media.mode == "RGBA"
+-    assert converted_keep.media.getpixel((0, 0)) == (0, 0, 0, 0)
+-    assert converted_keep.media.getpixel((5, 5)) == (0, 0, 0, 255)
+-
+-
+-def test_image_media_io_rgba_background_color_validation():
+-    """Test that invalid rgba_background_color values are properly rejected."""
+-
+-    # Test invalid types
+-    with pytest.raises(
+-        ValueError, match="rgba_background_color must be a list or tuple"
+-    ):
+-        ImageMediaIO(rgba_background_color="255,255,255")
+-
+-    with pytest.raises(
+-        ValueError, match="rgba_background_color must be a list or tuple"
+-    ):
+-        ImageMediaIO(rgba_background_color=255)
+-
+-    # Test wrong number of elements
+-    with pytest.raises(
+-        ValueError, match="rgba_background_color must be a list or tuple"
+-    ):
+-        ImageMediaIO(rgba_background_color=(255, 255))
+-
+-    with pytest.raises(
+-        ValueError, match="rgba_background_color must be a list or tuple"
+-    ):
+-        ImageMediaIO(rgba_background_color=(255, 255, 255, 255))
+-
+-    # Test non-integer values
+-    with pytest.raises(
+-        ValueError, match="rgba_background_color must be a list or tuple"
+-    ):
+-        ImageMediaIO(rgba_background_color=(255.0, 255.0, 255.0))
+-
+-    with pytest.raises(
+-        ValueError, match="rgba_background_color must be a list or tuple"
+-    ):
+-        ImageMediaIO(rgba_background_color=(255, "255", 255))
+-
+-    # Test out of range values
+-    with pytest.raises(
+-        ValueError, match="rgba_background_color must be a list or tuple"
+-    ):
+-        ImageMediaIO(rgba_background_color=(256, 255, 255))
+-
+-    with pytest.raises(
+-        ValueError, match="rgba_background_color must be a list or tuple"
+-    ):
+-        ImageMediaIO(rgba_background_color=(255, -1, 255))
+-
+-    # Test that valid values work
+-    ImageMediaIO(rgba_background_color=(0, 0, 0))  # Should not raise
+-    ImageMediaIO(rgba_background_color=[255, 255, 255])  # Should not raise
+-    ImageMediaIO(rgba_background_color=(128, 128, 128))  # Should not raise
+-
+-
+ def test_image_media_io_load_bytes(tmp_path):
+@@ -282,3 +141,70 @@ def test_image_pixel_limit_disabled(monkeypatch):
      image_io = ImageMediaIO()
      result = image_io.load_bytes(data)
      assert result.media.size == (1000, 1000)
@@ -274,8 +578,6 @@ index 5bbf54b7872e9d115e400274401d87acbc1e53b5..92cb451e9bbebfbe34656576c8ba6899
 +
 +
 +def test_qwen38_strict_image_contract_accepts_rgb_and_rgba(monkeypatch):
-+    monkeypatch.setattr(envs, "VLLM_QWEN38_STRICT_IMAGE_CONTRACT", True)
-+    monkeypatch.setattr(envs, "VLLM_MAX_IMAGE_PIXELS", 16_777_216)
 +
 +    image_io = ImageMediaIO()
 +    assert image_io.load_bytes(_png_bytes()).media.mode == "RGB"
@@ -286,8 +588,6 @@ index 5bbf54b7872e9d115e400274401d87acbc1e53b5..92cb451e9bbebfbe34656576c8ba6899
 +
 +
 +def test_qwen38_strict_image_contract_rejects_ambiguous_inputs(monkeypatch):
-+    monkeypatch.setattr(envs, "VLLM_QWEN38_STRICT_IMAGE_CONTRACT", True)
-+    monkeypatch.setattr(envs, "VLLM_MAX_IMAGE_PIXELS", 16_777_216)
 +
 +    with pytest.raises(ValueError, match="requires image_mode='RGB'"):
 +        ImageMediaIO(image_mode=None)
@@ -329,9 +629,10 @@ index 5bbf54b7872e9d115e400274401d87acbc1e53b5..92cb451e9bbebfbe34656576c8ba6899
 +    with pytest.raises(ValueError, match="single-frame PNG"):
 +        image_io.load_bytes(animated_png)
 +
-+    monkeypatch.setattr(envs, "VLLM_MAX_IMAGE_PIXELS", 16_777_215)
-+    with pytest.raises(ValueError, match="requires VLLM_MAX_IMAGE_PIXELS"):
-+        image_io.load_bytes(_png_bytes())
++    # The bound is the contract's own: no launch setting lifts it.
++    monkeypatch.setattr(envs, "VLLM_MAX_IMAGE_PIXELS", 0)
++    with pytest.raises(ValueError, match="at most 16777216 pixels"):
++        image_io.load_bytes(_png_bytes(size=(4097, 4096)))
 diff --git a/tests/quantization/test_turboquant.py b/tests/quantization/test_turboquant.py
 index 04a365b48dc13a89f0e4b0a3314731b0b8e5ff45..a12d12bb14a119613c1433e95ec3939cccd8f25a 100644
 --- a/tests/quantization/test_turboquant.py
@@ -708,7 +1009,7 @@ diff --git a/vllm/entrypoints/chat_utils.py b/vllm/entrypoints/chat_utils.py
 index 30b6ecc76be1bf4e2f1e5e1741b40fc8fddb41b7..b7e302f569f8a9d601e3fa22ce6f82af29706551 100644
 --- a/vllm/entrypoints/chat_utils.py
 +++ b/vllm/entrypoints/chat_utils.py
-@@ -1532,6 +1532,92 @@ def _collect_extra_fields(part: dict[str, Any]) -> dict[str, Any]:
+@@ -1532,6 +1532,89 @@ def _collect_extra_fields(part: dict[str, Any]) -> dict[str, Any]:
      return {k: v for k, v in part.items() if k not in _KNOWN_CONTENT_PART_FIELDS}
  
  
@@ -720,9 +1021,6 @@ index 30b6ecc76be1bf4e2f1e5e1741b40fc8fddb41b7..b7e302f569f8a9d601e3fa22ce6f82af
 +    always derived from the actual accepted PNG bytes rather than a caller-
 +    supplied UUID.
 +    """
-+    if not envs.VLLM_QWEN38_STRICT_IMAGE_CONTRACT:
-+        return
-+
 +    part_type = part.get("type")
 +    if not isinstance(part_type, str):
 +        raise VLLMValidationError(
@@ -801,7 +1099,7 @@ index 30b6ecc76be1bf4e2f1e5e1741b40fc8fddb41b7..b7e302f569f8a9d601e3fa22ce6f82af
  def _parse_chat_message_content_mm_part(
      part: ChatCompletionContentPartParam,
  ) -> tuple[str, _ContentPart]:
-@@ -1552,15 +1638,23 @@ def _parse_chat_message_content_mm_part(
+@@ -1552,18 +1635,12 @@ def _parse_chat_message_content_mm_part(
      assert isinstance(
          part, dict
      )  # This is needed to avoid mypy errors: part.get() from str
@@ -815,19 +1113,12 @@ index 30b6ecc76be1bf4e2f1e5e1741b40fc8fddb41b7..b7e302f569f8a9d601e3fa22ce6f82af
 -        # Special case for 'image_url.detail'
 -        # We only support 'auto', which is the default
 -        if part_type == "image_url" and part.get("detail", "auto") != "auto":
-+        # Special case for nested OpenAI Chat 'image_url.detail'.
-+        if part_type == "image_url" and isinstance(part.get("image_url"), dict):
-+            detail = part["image_url"].get("detail", "auto")  # type: ignore[index]
-+        else:
-+            detail = "auto"
-+        if (
-+            part_type == "image_url"
-+            and detail != "auto"
-+            and not envs.VLLM_QWEN38_STRICT_IMAGE_CONTRACT
-+        ):
-             logger.warning(
-                 "'image_url.detail' is currently not supported and will be ignored."
-             )
+-            logger.warning(
+-                "'image_url.detail' is currently not supported and will be ignored."
+-            )
+-
+         return part_type, content
+ 
 diff --git a/vllm/entrypoints/serve/utils/api_utils.py b/vllm/entrypoints/serve/utils/api_utils.py
 index c75cd16e54f469233448b9748948c2dc0b609dbc..40b33f85056e75297015f28f688db63cbbd3e9bd 100644
 --- a/vllm/entrypoints/serve/utils/api_utils.py
@@ -850,25 +1141,18 @@ diff --git a/vllm/envs.py b/vllm/envs.py
 index 07a22dc7c794905c9076f9b8d2701d740e1023d3..ca7a31d2b07811385a4bf9a82afd019dff929388 100755
 --- a/vllm/envs.py
 +++ b/vllm/envs.py
-@@ -81,6 +81,8 @@ if TYPE_CHECKING:
+@@ -81,6 +81,7 @@ if TYPE_CHECKING:
      VLLM_MAX_AUDIO_DECODE_BYTES: int = 268_435_456
      VLLM_MAX_AUDIO_PREPROCESS_WORKERS: int = max(1, min(os.cpu_count() or 1, 2))
      VLLM_MAX_IMAGE_PIXELS: int = 178_956_970
-+    VLLM_QWEN38_STRICT_IMAGE_CONTRACT: bool = False
 +    VLLM_QWEN38_VISION_HEADROOM_BYTES: int = 0
      VLLM_VIDEO_LOADER_BACKEND: str = "opencv"
      VLLM_MEDIA_CONNECTOR: str = "http"
      VLLM_MM_HASHER_ALGORITHM: str = "blake3"
-@@ -1022,6 +1024,19 @@ environment_variables: dict[str, Callable[[], Any]] = {
+@@ -1022,6 +1023,13 @@ environment_variables: dict[str, Callable[[], Any]] = {
      "VLLM_MAX_IMAGE_PIXELS": lambda: int(
          os.getenv("VLLM_MAX_IMAGE_PIXELS", "178956970")
      ),
-+    # Project-specific, fail-closed media contract for the pinned Qwen3.8
-+    # deployment.  This is deliberately opt-in so upstream vLLM behaviour is
-+    # unchanged outside the immutable runtime built by this repository.
-+    "VLLM_QWEN38_STRICT_IMAGE_CONTRACT": lambda: bool(
-+        int(os.getenv("VLLM_QWEN38_STRICT_IMAGE_CONTRACT", "0"))
-+    ),
 +    # Extra phase-local bytes reserved alongside the TurboQuant continuation
 +    # workspace. The allocation is released while the mutually exclusive
 +    # multimodal encoder runs, then restored before language-model execution.
@@ -879,11 +1163,10 @@ index 07a22dc7c794905c9076f9b8d2701d740e1023d3..ca7a31d2b07811385a4bf9a82afd019d
      # Backend for Video IO — selects the frame-sampling algorithm.
      # - "opencv": uniform sampling.
      # - "opencv_dynamic": duration-aware dynamic sampling.
-@@ -2281,6 +2296,8 @@ def compile_factors() -> dict[str, object]:
+@@ -2281,6 +2289,7 @@ def compile_factors() -> dict[str, object]:
          "VLLM_MAX_AUDIO_DECODE_BYTES",
          "VLLM_MAX_AUDIO_PREPROCESS_WORKERS",
          "VLLM_MAX_IMAGE_PIXELS",
-+        "VLLM_QWEN38_STRICT_IMAGE_CONTRACT",
 +        "VLLM_QWEN38_VISION_HEADROOM_BYTES",
          "VLLM_VIDEO_LOADER_BACKEND",
          "VLLM_MEDIA_CONNECTOR",
@@ -929,7 +1212,7 @@ index fed41657e98c3aef8a9d2ee887d88beeb6ac01fe..4a5ef2328b95698e958ac25be6b20d5a
          `media_io_kwargs={"image": {"image_mode": None}}` to keep the
          original image mode (e.g. preserving the alpha channel).
          """
-+        if envs.VLLM_QWEN38_STRICT_IMAGE_CONTRACT and not image_url.startswith(
++        if not image_url.startswith(
 +            "data:image/png;base64,"
 +        ):
 +            raise VLLMUnprocessableEntityError(
@@ -947,7 +1230,7 @@ index fed41657e98c3aef8a9d2ee887d88beeb6ac01fe..4a5ef2328b95698e958ac25be6b20d5a
          `media_io_kwargs={"image": {"image_mode": None}}` to keep the
          original image mode (e.g. preserving the alpha channel).
          """
-+        if envs.VLLM_QWEN38_STRICT_IMAGE_CONTRACT and not image_url.startswith(
++        if not image_url.startswith(
 +            "data:image/png;base64,"
 +        ):
 +            raise VLLMUnprocessableEntityError(
@@ -965,19 +1248,23 @@ diff --git a/vllm/multimodal/media/image.py b/vllm/multimodal/media/image.py
 index d9fc2132ed55f5bab010262a1ab94b439bf2f3ec..9bf666cd31db47329e79613a5e80a3af8f212958 100644
 --- a/vllm/multimodal/media/image.py
 +++ b/vllm/multimodal/media/image.py
-@@ -17,6 +17,7 @@ from ..image import convert_image_mode, normalize_image, rgba_to_rgb
+@@ -17,6 +17,11 @@ from ..image import convert_image_mode, normalize_image, rgba_to_rgb
  from .base import MediaIO, MediaWithBytes
  
  MAGIC_NUMPY_PREFIX = b"\x93NUMPY"  # https://numpy.org/devdocs/reference/generated/numpy.lib.format.html#format-version-1-0
 +QWEN38_MAX_PROVEN_IMAGE_ASPECT_RATIO = 30
++# The released Qwen3.8 image processor's full pixel budget (its
++# size.longest_edge, 4,096 x 4,096): the largest image the contract accepts,
++# so the processor never reduces an accepted image.
++QWEN38_MAX_IMAGE_PIXELS = 16_777_216
  
  
  class ImageMediaIO(MediaIO[Image.Image]):
-@@ -28,6 +29,12 @@ class ImageMediaIO(MediaIO[Image.Image]):
+@@ -28,6 +33,12 @@ class ImageMediaIO(MediaIO[Image.Image]):
      def __init__(self, image_mode: str | None = "RGB", **kwargs) -> None:
          super().__init__()
  
-+        if envs.VLLM_QWEN38_STRICT_IMAGE_CONTRACT and image_mode != "RGB":
++        if image_mode != "RGB":
 +            raise ValueError(
 +                "The Qwen3.8 image contract requires image_mode='RGB'; "
 +                "per-request image-mode changes are forbidden."
@@ -986,14 +1273,11 @@ index d9fc2132ed55f5bab010262a1ab94b439bf2f3ec..9bf666cd31db47329e79613a5e80a3af
          # Target mode for loaded images; `None` keeps the original mode
          # (i.e. no conversion, alpha channel is preserved as-is).
          self.image_mode = image_mode
-@@ -58,6 +65,15 @@ class ImageMediaIO(MediaIO[Image.Image]):
+@@ -58,6 +69,12 @@ class ImageMediaIO(MediaIO[Image.Image]):
              )
          self.rgba_background_color = rgba_bg
  
-+        if (
-+            envs.VLLM_QWEN38_STRICT_IMAGE_CONTRACT
-+            and self.rgba_background_color != (255, 255, 255)
-+        ):
++        if self.rgba_background_color != (255, 255, 255):
 +            raise ValueError(
 +                "The Qwen3.8 image contract requires RGBA images to be "
 +                "composited on the pinned white (255, 255, 255) background."
@@ -1002,64 +1286,59 @@ index d9fc2132ed55f5bab010262a1ab94b439bf2f3ec..9bf666cd31db47329e79613a5e80a3af
      def _convert_image_mode(
          self, image: Image.Image | MediaWithBytes[Image.Image]
      ) -> Image.Image:
-@@ -78,6 +94,49 @@ class ImageMediaIO(MediaIO[Image.Image]):
+@@ -78,6 +95,47 @@ class ImageMediaIO(MediaIO[Image.Image]):
              image = Image.open(BytesIO(data))
              w, h = image.size
              max_pixels = envs.VLLM_MAX_IMAGE_PIXELS
-+            if envs.VLLM_QWEN38_STRICT_IMAGE_CONTRACT:
-+                required_max_pixels = 16_777_216
-+                if max_pixels != required_max_pixels:
-+                    raise ValueError(
-+                        "The Qwen3.8 image contract requires "
-+                        f"VLLM_MAX_IMAGE_PIXELS={required_max_pixels}; found "
-+                        f"{max_pixels}."
-+                    )
-+                if image.format != "PNG":
-+                    raise ValueError(
-+                        "The Qwen3.8 image contract accepts only decoded PNG "
-+                        f"files; detected {image.format or 'unknown format'}."
-+                    )
-+                if getattr(image, "is_animated", False) or getattr(
-+                    image, "n_frames", 1
-+                ) != 1:
-+                    raise ValueError(
-+                        "The Qwen3.8 image contract accepts only static, "
-+                        "single-frame PNG files; animated PNG is forbidden."
-+                    )
-+                if image.mode not in ("RGB", "RGBA"):
-+                    raise ValueError(
-+                        "The Qwen3.8 image contract accepts only 8-bit RGB or "
-+                        f"RGBA PNG source pixels; detected mode {image.mode!r}."
-+                    )
-+                if image.mode == "RGB" and "transparency" in image.info:
-+                    raise ValueError(
-+                        "The Qwen3.8 image contract requires transparent PNG "
-+                        "pixels to use explicit 8-bit RGBA, not an RGB tRNS key."
-+                    )
-+                short_edge = min(w, h)
-+                long_edge = max(w, h)
-+                if (
-+                    short_edge <= 0
-+                    or long_edge
-+                    > short_edge * QWEN38_MAX_PROVEN_IMAGE_ASPECT_RATIO
-+                ):
-+                    raise ValueError(
-+                        "The Qwen3.8 deployment's empirically proven full-quality "
-+                        "contract requires image aspect ratio "
-+                        f"<= {QWEN38_MAX_PROVEN_IMAGE_ASPECT_RATIO}:1; received "
-+                        f"{w}x{h}."
-+                    )
++            if image.format != "PNG":
++                raise ValueError(
++                    "The Qwen3.8 image contract accepts only decoded PNG "
++                    f"files; detected {image.format or 'unknown format'}."
++                )
++            if getattr(image, "is_animated", False) or getattr(
++                image, "n_frames", 1
++            ) != 1:
++                raise ValueError(
++                    "The Qwen3.8 image contract accepts only static, "
++                    "single-frame PNG files; animated PNG is forbidden."
++                )
++            if image.mode not in ("RGB", "RGBA"):
++                raise ValueError(
++                    "The Qwen3.8 image contract accepts only 8-bit RGB or "
++                    f"RGBA PNG source pixels; detected mode {image.mode!r}."
++                )
++            if image.mode == "RGB" and "transparency" in image.info:
++                raise ValueError(
++                    "The Qwen3.8 image contract requires transparent PNG "
++                    "pixels to use explicit 8-bit RGBA, not an RGB tRNS key."
++                )
++            short_edge = min(w, h)
++            long_edge = max(w, h)
++            if (
++                short_edge <= 0
++                or long_edge
++                > short_edge * QWEN38_MAX_PROVEN_IMAGE_ASPECT_RATIO
++            ):
++                raise ValueError(
++                    "The Qwen3.8 deployment's empirically proven full-quality "
++                    "contract requires image aspect ratio "
++                    f"<= {QWEN38_MAX_PROVEN_IMAGE_ASPECT_RATIO}:1; received "
++                    f"{w}x{h}."
++                )
++            if w * h > QWEN38_MAX_IMAGE_PIXELS:
++                raise ValueError(
++                    "The Qwen3.8 image contract accepts at most "
++                    f"{QWEN38_MAX_IMAGE_PIXELS} pixels; received {w}x{h} "
++                    f"({w * h} pixels)."
++                )
              if max_pixels > 0 and w * h > max_pixels:
                  raise ValueError(
                      f"Image dimensions {w}x{h} ({w * h} pixels) exceed "
-@@ -99,6 +158,14 @@ class ImageMediaIO(MediaIO[Image.Image]):
+@@ -99,6 +157,11 @@ class ImageMediaIO(MediaIO[Image.Image]):
          return MediaWithBytes(converted, data, io_config)
  
      def load_base64(self, media_type: str, data: str) -> MediaWithBytes[Image.Image]:
-+        if (
-+            envs.VLLM_QWEN38_STRICT_IMAGE_CONTRACT
-+            and media_type != "image/png"
-+        ):
++        if media_type != "image/png":
 +            raise ValueError(
 +                "The Qwen3.8 image contract requires the exact data-URL "
 +                f"media type 'image/png'; received {media_type!r}."
@@ -1071,43 +1350,34 @@ diff --git a/vllm/renderers/params.py b/vllm/renderers/params.py
 index c0e2d2129e545a500d9b74c944c3da4810d3e65a..4e08236cbb2e49386c6be1fdf43930be5d05f878 100644
 --- a/vllm/renderers/params.py
 +++ b/vllm/renderers/params.py
-@@ -3,6 +3,7 @@
- from dataclasses import dataclass, field
- from typing import TYPE_CHECKING, Any, Literal, TypeVar
- 
-+import vllm.envs as envs
- from vllm.exceptions import VLLMValidationError
- from vllm.inputs import EmbedsPrompt, TextPrompt, TokensPrompt
- from vllm.logger import init_logger
-@@ -102,6 +103,31 @@ class ChatParams:
+@@ -102,6 +102,30 @@ class ChatParams:
          default_media_io_kwargs: dict[str, dict[str, Any]] | None = None,
          default_mm_processor_kwargs: dict[str, Any] | None = None,
      ):
-+        if envs.VLLM_QWEN38_STRICT_IMAGE_CONTRACT:
-+            if self.media_io_kwargs:
-+                raise VLLMValidationError(
-+                    "Request-level media_io_kwargs are forbidden by the "
-+                    "Qwen3.8 image contract; the sole server-side RGB/RGBA PNG "
-+                    "decode path cannot be overridden.",
-+                    parameter="media_io_kwargs",
-+                )
-+            if self.mm_processor_kwargs:
-+                raise VLLMValidationError(
-+                    "Request-level mm_processor_kwargs are forbidden by the "
-+                    "Qwen3.8 image contract; the checkpoint's pinned full-quality "
-+                    "processor settings cannot be overridden.",
-+                    parameter="mm_processor_kwargs",
-+                )
-+            if (
-+                "add_vision_id" in self.chat_template_kwargs
-+                and self.chat_template_kwargs["add_vision_id"] is not False
-+            ):
-+                raise VLLMValidationError(
-+                    "chat_template_kwargs.add_vision_id must remain false in the "
-+                    "sole Qwen3.8 prompt format.",
-+                    parameter="chat_template_kwargs.add_vision_id",
-+                    value=self.chat_template_kwargs["add_vision_id"],
-+                )
++        if self.media_io_kwargs:
++            raise VLLMValidationError(
++                "Request-level media_io_kwargs are forbidden by the "
++                "Qwen3.8 image contract; the sole server-side RGB/RGBA PNG "
++                "decode path cannot be overridden.",
++                parameter="media_io_kwargs",
++            )
++        if self.mm_processor_kwargs:
++            raise VLLMValidationError(
++                "Request-level mm_processor_kwargs are forbidden by the "
++                "Qwen3.8 image contract; the checkpoint's pinned full-quality "
++                "processor settings cannot be overridden.",
++                parameter="mm_processor_kwargs",
++            )
++        if (
++            "add_vision_id" in self.chat_template_kwargs
++            and self.chat_template_kwargs["add_vision_id"] is not False
++        ):
++            raise VLLMValidationError(
++                "chat_template_kwargs.add_vision_id must remain false in the "
++                "sole Qwen3.8 prompt format.",
++                parameter="chat_template_kwargs.add_vision_id",
++                value=self.chat_template_kwargs["add_vision_id"],
++            )
          if (
              not default_chat_template_kwargs
              and not default_media_io_kwargs
@@ -1563,3 +1833,1019 @@ index 1c502bfd8ff11b4ceadedac20c6ae00023ee2b4c..d93389883be183e8609a56f84af5cce1
  def unlock_workspace() -> None:
      """Unlock the workspace to allow growth.
  
+diff --git a/tests/benchmarks/test_custom_image_dataset.py b/tests/benchmarks/test_custom_image_dataset.py
+index f2a48abe6041d4a87d93d2005ff6b28d14f44161..6439803f65ad2edd6209f2be6081ed9f6f186dc4 100644
+--- a/tests/benchmarks/test_custom_image_dataset.py
++++ b/tests/benchmarks/test_custom_image_dataset.py
+@@ -2,15 +2,11 @@
+ # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
+ import json
+ from argparse import Namespace
+-from io import BytesIO
+ from pathlib import Path
+ from typing import Any
+ 
+-import pybase64 as base64
+ import pytest
+-from PIL import Image
+ 
+-import vllm.benchmarks.datasets.datasets as datasets_module
+ from vllm.benchmarks.datasets import CustomImageDataset, get_samples
+ from vllm.benchmarks.lib.endpoint_request_func import (
+     RequestFuncInput,
+@@ -37,22 +33,6 @@ def _write_jsonl(path: Path, rows: list[dict[str, Any]]) -> None:
+             f.write(json.dumps(row) + "\n")
+ 
+ 
+-def _write_png(path: Path, color: tuple[int, int, int] = (255, 0, 0)) -> None:
+-    Image.new("RGB", (1, 1), color=color).save(path)
+-
+-
+-def _decode_data_url(data_url: str) -> tuple[str, bytes]:
+-    prefix, image_base64 = data_url.split(",", 1)
+-    return prefix, base64.b64decode(image_base64)
+-
+-
+-def _assert_png_data_url(data_url: str) -> None:
+-    prefix, image_bytes = _decode_data_url(data_url)
+-    assert prefix == "data:image/png;base64"
+-    with Image.open(BytesIO(image_bytes)) as image:
+-        image.verify()
+-
+-
+ def _args_for_custom_image(dataset_path: Path) -> Namespace:
+     return Namespace(
+         dataset_name="custom_image",
+@@ -251,103 +231,6 @@ def test_custom_image_dataset_wraps_interleaved_content_for_multimodal_chat(
+     assert _get_chat_messages(request_input) == sample.prompt
+ 
+ 
+-@pytest.mark.benchmark
+-def test_custom_image_dataset_encodes_image_media_when_requested(
+-    tmp_path: Path,
+-    monkeypatch: pytest.MonkeyPatch,
+-) -> None:
+-    image_a = tmp_path / "chart_a.png"
+-    image_b = tmp_path / "chart b.png"
+-    _write_png(image_a, color=(255, 0, 0))
+-    _write_png(image_b, color=(0, 255, 0))
+-    data_url = "data:image/png;base64,Zm9v"
+-    remote_url = "https://example.com/chart.png"
+-    original_fetch_image = datasets_module.fetch_image
+-
+-    def fake_fetch_image(image_url: str) -> Image.Image:
+-        if image_url == remote_url:
+-            return Image.new("RGB", (1, 1), color=(0, 0, 255))
+-        return original_fetch_image(image_url)
+-
+-    monkeypatch.setattr(datasets_module, "fetch_image", fake_fetch_image)
+-
+-    jsonl = tmp_path / "images.jsonl"
+-    _write_jsonl(
+-        jsonl,
+-        [
+-            {
+-                "prompt": "Compare the charts.",
+-                "image_files": [
+-                    str(image_a),
+-                    image_b.as_uri(),
+-                    remote_url,
+-                    data_url,
+-                ],
+-            }
+-        ],
+-    )
+-
+-    dataset = CustomImageDataset(dataset_path=str(jsonl), disable_shuffle=True)
+-    samples = dataset.sample(
+-        tokenizer=_Tokenizer(),
+-        num_requests=1,
+-        output_len=32,
+-        ensure_client_side_data=True,
+-    )
+-
+-    assert len(samples) == 1
+-    assert isinstance(samples[0].multi_modal_data, list)
+-    image_urls = [part["image_url"]["url"] for part in samples[0].multi_modal_data]
+-
+-    _assert_png_data_url(image_urls[0])
+-    _assert_png_data_url(image_urls[1])
+-    _assert_png_data_url(image_urls[2])
+-    assert image_urls[3] == data_url
+-
+-
+-@pytest.mark.benchmark
+-def test_custom_image_dataset_encodes_interleaved_image_media(
+-    tmp_path: Path,
+-) -> None:
+-    image_a = tmp_path / "chart_a.png"
+-    image_b = tmp_path / "chart_b.png"
+-    _write_png(image_a, color=(255, 0, 0))
+-    _write_png(image_b, color=(0, 255, 0))
+-    jsonl = tmp_path / "images.jsonl"
+-    _write_jsonl(
+-        jsonl,
+-        [
+-            {
+-                "content": [
+-                    {"type": "text", "text": "Compare "},
+-                    {"type": "image", "image": str(image_a)},
+-                    {
+-                        "type": "image_url",
+-                        "image_url": {
+-                            "url": image_b.as_uri(),
+-                            "detail": "low",
+-                        },
+-                    },
+-                ],
+-            }
+-        ],
+-    )
+-
+-    dataset = CustomImageDataset(dataset_path=str(jsonl), disable_shuffle=True)
+-    samples = dataset.sample(
+-        tokenizer=_Tokenizer(),
+-        num_requests=1,
+-        output_len=32,
+-        ensure_client_side_data=True,
+-    )
+-
+-    sample = samples[0]
+-    assert isinstance(sample.prompt, list)
+-    _assert_png_data_url(sample.prompt[1]["image_url"]["url"])
+-    _assert_png_data_url(sample.prompt[2]["image_url"]["url"])
+-    assert sample.prompt[2]["image_url"]["detail"] == "low"
+-
+-
+ @pytest.mark.benchmark
+ def test_custom_image_dataset_rejects_invalid_image_media(
+     tmp_path: Path,
+diff --git a/tests/entrypoints/openai/test_render_parity.py b/tests/entrypoints/openai/test_render_parity.py
+index 57a113117fc03e9ad9935a41493aa7e92aa7f447..e2f79ff09f88d916d988ed7e7cc0c1fa4632c572 100644
+--- a/tests/entrypoints/openai/test_render_parity.py
++++ b/tests/entrypoints/openai/test_render_parity.py
+@@ -450,7 +450,7 @@ class TestReasoningRenderParity:
+ @pytest.mark.asyncio
+ class TestTemplateKwargsRenderParity:
+     async def test_passthrough_fields(self, online_renderer, serving_responses):
+-        """chat_template_kwargs / media_io_kwargs / mm_processor_kwargs parity."""
++        """chat_template_kwargs parity."""
+         await _assert_parity(
+             online_renderer,
+             serving_responses,
+@@ -463,8 +463,6 @@ class TestTemplateKwargsRenderParity:
+                 "tool_choice": "auto",
+                 "reasoning_effort": "medium",
+                 "chat_template_kwargs": {"custom_flag": True},
+-                "media_io_kwargs": {"image": {"max_pixels": 512}},
+-                "mm_processor_kwargs": {"num_crops": 2},
+             },
+             responses_kwargs={
+                 "instructions": "Be helpful.",
+@@ -473,7 +471,5 @@ class TestTemplateKwargsRenderParity:
+                 "tool_choice": "auto",
+                 "reasoning": Reasoning(effort="medium"),
+                 "chat_template_kwargs": {"custom_flag": True},
+-                "media_io_kwargs": {"image": {"max_pixels": 512}},
+-                "mm_processor_kwargs": {"num_crops": 2},
+             },
+         )
+diff --git a/tests/multimodal/media/test_unprocessable_entity_error.py b/tests/multimodal/media/test_unprocessable_entity_error.py
+index bca2ac5f5e253f6cb4bb1d23493cb9fc6445f7e0..fb761ba6f8f6132a105a84521ef6a8c68efd2453 100644
+--- a/tests/multimodal/media/test_unprocessable_entity_error.py
++++ b/tests/multimodal/media/test_unprocessable_entity_error.py
+@@ -1,21 +1,12 @@
+ # SPDX-License-Identifier: Apache-2.0
+ # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
+ 
+-"""Tests for VLLMUnprocessableEntityError and media fetch error handling.
+-
+-Verifies that unprocessable image URLs (404, 403, DNS failures, etc.) return
+-HTTP 422 instead of 500.
+-"""
++"""Tests for VLLMUnprocessableEntityError."""
+ 
+ from http import HTTPStatus
+-from unittest.mock import AsyncMock, MagicMock, patch
+-
+-import aiohttp
+-import pytest
+ 
+ from vllm.entrypoints.serve import create_error_response
+ from vllm.exceptions import VLLMClientError, VLLMUnprocessableEntityError
+-from vllm.multimodal.media import MediaConnector
+ 
+ 
+ class TestVLLMUnprocessableEntityError:
+@@ -40,101 +31,6 @@ class TestVLLMUnprocessableEntityError:
+         assert isinstance(exc, VLLMClientError)
+ 
+ 
+-class TestMediaConnectorErrorHandling:
+-    """Tests for MediaConnector error handling."""
+-
+-    @pytest.mark.asyncio
+-    async def test_fetch_image_async_404(self):
+-        connector = MediaConnector()
+-
+-        with patch.object(
+-            connector.connection, "async_get_bytes", new_callable=AsyncMock
+-        ) as mock_get:
+-            mock_get.side_effect = aiohttp.ClientResponseError(
+-                request_info=MagicMock(),
+-                history=(),
+-                status=404,
+-                message="Not Found",
+-            )
+-
+-            with pytest.raises(VLLMUnprocessableEntityError) as exc_info:
+-                await connector.fetch_image_async("https://example.com/missing.jpg")
+-
+-            assert exc_info.value.parameter == "image_url"
+-
+-    @pytest.mark.asyncio
+-    async def test_fetch_image_async_dns_error(self):
+-        """DNS errors are transient and should remain as-is for retry."""
+-        connector = MediaConnector()
+-
+-        with patch.object(
+-            connector.connection, "async_get_bytes", new_callable=AsyncMock
+-        ) as mock_get:
+-            mock_get.side_effect = aiohttp.ClientConnectorDNSError(
+-                connection_key=MagicMock(),
+-                os_error=MagicMock(),
+-            )
+-
+-            with pytest.raises(aiohttp.ClientConnectorDNSError) as exc_info:
+-                await connector.fetch_image_async(
+-                    "https://nonexistent.example/image.jpg"
+-                )
+-
+-            assert isinstance(exc_info.value, aiohttp.ClientConnectorDNSError)
+-
+-    @pytest.mark.asyncio
+-    async def test_fetch_image_async_500_preserved(self):
+-        """5xx errors should remain as server errors."""
+-        connector = MediaConnector()
+-
+-        with patch.object(
+-            connector.connection, "async_get_bytes", new_callable=AsyncMock
+-        ) as mock_get:
+-            mock_get.side_effect = aiohttp.ClientResponseError(
+-                request_info=MagicMock(),
+-                history=(),
+-                status=500,
+-                message="Internal Server Error",
+-            )
+-
+-            with pytest.raises(aiohttp.ClientResponseError) as exc_info:
+-                await connector.fetch_image_async("https://example.com/image.jpg")
+-
+-            assert exc_info.value.status == 500
+-
+-    def test_fetch_image_404(self):
+-        connector = MediaConnector()
+-
+-        with patch.object(
+-            connector.connection, "get_bytes", new_callable=MagicMock
+-        ) as mock_get:
+-            mock_get.side_effect = aiohttp.ClientResponseError(
+-                request_info=MagicMock(),
+-                history=(),
+-                status=404,
+-                message="Not Found",
+-            )
+-
+-            with pytest.raises(VLLMUnprocessableEntityError) as exc_info:
+-                connector.fetch_image("https://example.com/missing.jpg")
+-
+-            assert exc_info.value.parameter == "image_url"
+-
+-    def test_fetch_image_connection_error(self):
+-        """Connection errors are transient and should remain as-is for retry."""
+-        connector = MediaConnector()
+-
+-        with patch.object(
+-            connector.connection, "get_bytes", new_callable=MagicMock
+-        ) as mock_get:
+-            mock_get.side_effect = aiohttp.ClientConnectionError("Connection refused")
+-
+-            with pytest.raises(aiohttp.ClientConnectionError) as exc_info:
+-                connector.fetch_image("https://example.com/image.jpg")
+-
+-            assert isinstance(exc_info.value, aiohttp.ClientConnectionError)
+-
+-
+ class TestErrorResponse:
+     """Tests for error response creation."""
+ 
+diff --git a/tests/multimodal/media/test_video.py b/tests/multimodal/media/test_video.py
+index 186678f3c19a8468e729f32b6e6f7a3b78dd0536..6ec76022bf05d3ebe2594bd26e6b4ba260067683 100644
+--- a/tests/multimodal/media/test_video.py
++++ b/tests/multimodal/media/test_video.py
+@@ -276,85 +276,6 @@ def _make_jpeg_b64_frames(n: int, width: int = 8, height: int = 8) -> list[str]:
+     return frames
+ 
+ 
+-def test_load_base64_jpeg_returns_metadata():
+-    """Regression test: load_base64 with video/jpeg must return metadata.
+-
+-    Previously, base64 JPEG frame sequences returned an empty dict for
+-    metadata, which broke downstream consumers that rely on fields like
+-    total_num_frames and fps. See PR #37301.
+-    """
+-
+-    num_test_frames = 3
+-
+-    b64_frames = _make_jpeg_b64_frames(num_test_frames)
+-    data = ",".join(b64_frames)
+-
+-    imageio = ImageMediaIO()
+-    videoio = VideoMediaIO(imageio, num_frames=num_test_frames)
+-    frames, metadata = videoio.load_base64("video/jpeg", data)
+-
+-    # Frames array shape: (num_frames, H, W, 3)
+-    assert frames.shape[0] == num_test_frames
+-
+-    # All required metadata keys must be present
+-    required_keys = {
+-        "total_num_frames",
+-        "fps",
+-        "duration",
+-        "video_backend",
+-        "frames_indices",
+-        "do_sample_frames",
+-    }
+-    assert required_keys.issubset(metadata.keys()), (
+-        f"Missing metadata keys: {required_keys - metadata.keys()}"
+-    )
+-
+-    assert metadata["total_num_frames"] == num_test_frames
+-    assert metadata["video_backend"] == "jpeg_sequence"
+-    assert metadata["frames_indices"] == list(range(num_test_frames))
+-    assert metadata["do_sample_frames"] is False
+-    # Default fps=1 → duration == num_frames
+-    assert metadata["fps"] == 1.0
+-    assert metadata["duration"] == float(num_test_frames)
+-
+-
+-def test_load_base64_jpeg_enforces_num_frames_limit():
+-    """Frames beyond num_frames must be truncated in the video/jpeg path.
+-
+-    Without the limit an attacker can send thousands of base64 JPEG frames
+-    in a single request and exhaust server memory (OOM).
+-    """
+-    num_frames_limit = 4
+-    sent_frames = 20
+-
+-    b64_frames = _make_jpeg_b64_frames(sent_frames)
+-    data = ",".join(b64_frames)
+-
+-    imageio = ImageMediaIO()
+-    videoio = VideoMediaIO(imageio, num_frames=num_frames_limit)
+-    frames, metadata = videoio.load_base64("video/jpeg", data)
+-
+-    assert frames.shape[0] == num_frames_limit
+-    assert metadata["total_num_frames"] == num_frames_limit
+-    assert metadata["frames_indices"] == list(range(num_frames_limit))
+-
+-
+-def test_load_base64_jpeg_no_limit_when_num_frames_negative():
+-    """When num_frames is -1, all frames should be loaded without truncation."""
+-    sent_frames = 10
+-
+-    b64_frames = _make_jpeg_b64_frames(sent_frames)
+-    data = ",".join(b64_frames)
+-
+-    imageio = ImageMediaIO()
+-    videoio = VideoMediaIO(imageio, num_frames=-1)
+-    frames, metadata = videoio.load_base64("video/jpeg", data)
+-
+-    assert frames.shape[0] == sent_frames
+-    assert metadata["total_num_frames"] == sent_frames
+-    assert metadata["frames_indices"] == list(range(sent_frames))
+-
+-
+ def test_load_base64_jpeg_raises_on_zero_num_frames():
+     """num_frames=0 is invalid and should raise ValueError."""
+     b64_frames = _make_jpeg_b64_frames(3)
+diff --git a/tests/multimodal/test_hasher.py b/tests/multimodal/test_hasher.py
+index 4810081ad40c0a0fde5d68c0c0e935f0e400a606..c4402a5cefb1fe102f6118804118712009882e07 100644
+--- a/tests/multimodal/test_hasher.py
++++ b/tests/multimodal/test_hasher.py
+@@ -172,32 +172,6 @@ def test_hash_image_exif_id():
+     )
+ 
+ 
+-def _rgba_png_bytes() -> bytes:
+-    image = Image.new("RGBA", (8, 8), (255, 0, 0, 128))
+-    buf = BytesIO()
+-    image.save(buf, format="PNG")
+-    return buf.getvalue()
+-
+-
+-def test_hash_collision_media_io_config():
+-    data = _rgba_png_bytes()
+-    white = ImageMediaIO(rgba_background_color=(255, 255, 255)).load_bytes(data)
+-    black = ImageMediaIO(rgba_background_color=(0, 0, 0)).load_bytes(data)
+-    white2 = ImageMediaIO(rgba_background_color=(255, 255, 255)).load_bytes(data)
+-    keep = ImageMediaIO(image_mode=None).load_bytes(data)
+-
+-    hasher = MultiModalHasher
+-    assert hasher.hash_kwargs("blake3", image=white) != hasher.hash_kwargs(
+-        "blake3", image=black
+-    )
+-    assert hasher.hash_kwargs("blake3", image=white) != hasher.hash_kwargs(
+-        "blake3", image=keep
+-    )
+-    assert hasher.hash_kwargs("blake3", image=white) == hasher.hash_kwargs(
+-        "blake3", image=white2
+-    )
+-
+-
+ def test_hash_media_io_noop_config_preserves_hash():
+     image = Image.new("RGB", (8, 8), (0, 128, 255))
+     buf = BytesIO()
+diff --git a/tests/renderers/test_chat_utils_prompt_embeds.py b/tests/renderers/test_chat_utils_prompt_embeds.py
+deleted file mode 100644
+index b537d2a13a027a2e8197603dfe9600d22641cb3c..0000000000000000000000000000000000000000
+--- a/tests/renderers/test_chat_utils_prompt_embeds.py
++++ /dev/null
+@@ -1,577 +0,0 @@
+-# SPDX-License-Identifier: Apache-2.0
+-# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
+-
+-"""Offline unit tests for `prompt_embeds` chat-completion content parts."""
+-
+-from __future__ import annotations
+-
+-import inspect
+-import io
+-from typing import Final
+-from unittest import mock
+-
+-import pybase64 as base64
+-import pytest
+-import regex as re
+-import torch
+-from transformers import AutoTokenizer
+-
+-from vllm.entrypoints.chat_utils import (
+-    _ENABLE_PROMPT_EMBEDS_ERROR,
+-    _PROMPT_EMBEDS_MISSING_DATA_ERROR,
+-    _RESERVED_PLACEHOLDER_IN_TEXT_ERROR,
+-    MM_PARSER_MAP,
+-    MODALITY_PLACEHOLDERS_MAP,
+-    PROMPT_EMBEDS_PLACEHOLDER_TOKEN,
+-    parse_chat_messages,
+-    parse_chat_messages_async,
+-)
+-from vllm.exceptions import VLLMValidationError
+-from vllm.renderers.hf import (
+-    _PROMPT_EMBEDS_PLACEHOLDER_SPAN_MISMATCH_ERROR,
+-    _build_mixed_prompt_embeds,
+-    _build_prompt_embeds_positions,
+-    _build_prompt_embeds_updates,
+-    _ensure_prompt_embeds_placeholder_token,
+-    _expand_prompt_embeds_placeholders,
+-)
+-
+-# Cover distinct tokenizer families:
+-#   GPT2TokenizerFast  (BPE, OpenAI-style)
+-#   Qwen2TokenizerFast (SentencePiece BPE variant)
+-#   BertTokenizerFast  (WordPiece)
+-TOKENIZER_IDS: Final[list[str]] = [
+-    "openai-community/gpt2",
+-    "Qwen/Qwen2.5-1.5B-Instruct",
+-    "bert-base-uncased",
+-]
+-
+-
+-@pytest.fixture(params=TOKENIZER_IDS, ids=TOKENIZER_IDS)
+-def tokenizer(request):
+-    """A fresh tokenizer instance per tokenizer family."""
+-    return AutoTokenizer.from_pretrained(request.param)
+-
+-
+-# Minimal chat template that works with any tokenizer.  Iterates
+-# `message.content` as either a string or a list of dicts (openai format).
+-_SIMPLE_CHAT_TEMPLATE: Final[str] = (
+-    "{% for m in messages %}"
+-    "{% if m['content'] is string %}{{m['content']}}"
+-    "{% else %}{% for p in m['content'] %}{{p['text']}}{% endfor %}"
+-    "{% endif %}\n{% endfor %}"
+-)
+-
+-
+-async def _maybe_await(fn, *args, **kwargs):
+-    """Call *fn* and `await` the result if it's a coroutine."""
+-    result = fn(*args, **kwargs)
+-    if inspect.iscoroutine(result):
+-        result = await result
+-    return result
+-
+-
+-# Parametrize over sync / async parse paths so every end-to-end test
+-# exercises both.
+-_PARSE_FUNCTIONS = [parse_chat_messages, parse_chat_messages_async]
+-
+-
+-@pytest.fixture(params=_PARSE_FUNCTIONS, ids=["sync", "async"])
+-def parse_fn(request):
+-    """Either the sync or async `parse_chat_messages` callable."""
+-    return request.param
+-
+-
+-def _encode_tensor(t: torch.Tensor) -> str:
+-    buf = io.BytesIO()
+-    torch.save(t, buf)
+-    return base64.b64encode(buf.getvalue()).decode("utf-8")
+-
+-
+-_MOCK_HIDDEN_SIZE: Final[int] = 8
+-_MOCK_DTYPE: Final[torch.dtype] = torch.float32
+-
+-
+-def _make_mock_model_config(*, enable_prompt_embeds: bool = True) -> mock.MagicMock:
+-    mc = mock.MagicMock()
+-    mc.enable_prompt_embeds = enable_prompt_embeds
+-    mc.multimodal_config = None
+-    mc.allowed_local_media_path = None
+-    mc.allowed_media_domains = None
+-    # Test text-only code path in `MultiModalItemTracker.resolve_items`.
+-    mc.is_multimodal_model = False
+-    # `safe_load_prompt_embeds` pins each tensor to the model's hidden_size
+-    # and dtype, so the mock must return concrete values.
+-    mc.get_hidden_size.return_value = _MOCK_HIDDEN_SIZE
+-    mc.dtype = _MOCK_DTYPE
+-    return mc
+-
+-
+-def test_prompt_embeds_keys_registered():
+-    assert "prompt_embeds" in MODALITY_PLACEHOLDERS_MAP
+-    assert MODALITY_PLACEHOLDERS_MAP["prompt_embeds"] == "<##PROMPT_EMBEDS##>"
+-    assert "prompt_embeds" in MM_PARSER_MAP
+-
+-
+-def test_ensure_placeholder_token_is_single_token_and_idempotent(tokenizer):
+-    """Ensure the placeholder token is a single token and that multiple calls to
+-    "ensure" are idempotent, across all tokenizer families."""
+-    tid1 = _ensure_prompt_embeds_placeholder_token(tokenizer)
+-    tid2 = _ensure_prompt_embeds_placeholder_token(tokenizer)
+-    assert tid1 == tid2
+-
+-    ids = tokenizer.encode(PROMPT_EMBEDS_PLACEHOLDER_TOKEN, add_special_tokens=False)
+-    assert ids == [tid1]
+-
+-    # Repeating it in a string N times must produce exactly that many tokens.
+-    N = 5
+-    ids_rep = tokenizer.encode(
+-        PROMPT_EMBEDS_PLACEHOLDER_TOKEN * N, add_special_tokens=False
+-    )
+-    assert ids_rep == [tid1] * N
+-
+-
+-def test_parse_chat_messages_openai_format():
+-    NUM_TOKENS = 3
+-    t = torch.randn(NUM_TOKENS, _MOCK_HIDDEN_SIZE, dtype=_MOCK_DTYPE)
+-    b64 = _encode_tensor(t)
+-    mc = _make_mock_model_config()
+-
+-    messages = [
+-        {
+-            "role": "user",
+-            "content": [
+-                {"type": "text", "text": "Hello "},
+-                {"type": "prompt_embeds", "data": b64},
+-                {"type": "text", "text": " world"},
+-            ],
+-        }
+-    ]
+-    conv, mm_data, _ = parse_chat_messages(
+-        messages,
+-        mc,
+-        content_format="openai",
+-    )
+-    # The middle content part is rewritten to a single placeholder-token
+-    # sentinel.
+-    texts = [p["text"] for p in conv[0]["content"]]
+-    assert texts == [
+-        "Hello ",
+-        PROMPT_EMBEDS_PLACEHOLDER_TOKEN,
+-        " world",
+-    ]
+-    assert mm_data is not None and "prompt_embeds" in mm_data
+-    assert torch.equal(mm_data["prompt_embeds"][0], t)
+-
+-
+-# Each layout entry is one content part:
+-#   ("text", "A")  -> {"type": "text", "text": "A"}
+-#   ("embed", N)   -> {"type": "prompt_embeds", "data": <base64 of (N, H) tensor>}
+-@pytest.mark.parametrize(
+-    "layout",
+-    [
+-        # Case: Single embed only.
+-        [("embed", 2)],
+-        # Case: Embed at the start of the message.
+-        [("embed", 3), ("text", "B")],
+-        # Case: Embed at the end of the message.
+-        [("text", "A"), ("embed", 1)],
+-        # Case: Embed sandwiched between text spans.
+-        [("text", "A"), ("embed", 2), ("text", "B")],
+-        # Case: Multiple embeds with text in between.
+-        [("text", "A"), ("embed", 2), ("text", "B"), ("embed", 3)],
+-        # Case: Adjacent embeds with no separating text.
+-        [("embed", 1), ("embed", 2)],
+-        # Case: Multiple text spans before a trailing embed.
+-        [("text", "A"), ("text", "B"), ("embed", 1)],
+-        # Case: Long-ish run mixing both kinds.
+-        [
+-            ("text", "head"),
+-            ("embed", 4),
+-            ("text", "mid"),
+-            ("embed", 1),
+-            ("embed", 2),
+-            ("text", "tail"),
+-        ],
+-    ],
+-    ids=[
+-        "single-embed",
+-        "embed-then-text",
+-        "text-then-embed",
+-        "text-embed-text",
+-        "text-embed-text-embed",
+-        "adjacent-embeds",
+-        "text-text-embed",
+-        "long-mixed-run",
+-    ],
+-)
+-@pytest.mark.parametrize(
+-    "interleave_mm_strings",
+-    # `None`: text-only path where `multimodal_config` is absent.
+-    # `False`: non-interleave multimodal path (the common default).
+-    # `True`: sentinel-substitution interleave path.
+-    # All three must preserve the request ordering of prompt_embeds
+-    # relative to surrounding text because prompt_embeds are spliced at the
+-    # token offset during rendering.
+-    [None, False, True],
+-    ids=["text-only", "interleave-off", "interleave-on"],
+-)
+-def test_parse_chat_messages_string_format_preserves_position(
+-    layout, interleave_mm_strings
+-):
+-    mc = _make_mock_model_config()
+-    if interleave_mm_strings is not None:
+-        mm_cfg = mock.MagicMock()
+-        mm_cfg.interleave_mm_strings = interleave_mm_strings
+-        mc.multimodal_config = mm_cfg
+-
+-    content: list[dict] = []
+-    expected_parts: list[str] = []
+-    expected_embeds: list[torch.Tensor] = []
+-    for kind, value in layout:
+-        if kind == "text":
+-            content.append({"type": "text", "text": value})
+-            expected_parts.append(value)
+-        else:  # prompt embeds
+-            num_tokens = value
+-            t = torch.randn(num_tokens, _MOCK_HIDDEN_SIZE, dtype=_MOCK_DTYPE)
+-            expected_embeds.append(t)
+-            content.append({"type": "prompt_embeds", "data": _encode_tensor(t)})
+-            # Parser emits ONE sentinel per part.
+-            expected_parts.append(PROMPT_EMBEDS_PLACEHOLDER_TOKEN)
+-
+-    messages = [{"role": "user", "content": content}]
+-    conv, mm_data, _ = parse_chat_messages(
+-        messages,
+-        mc,
+-        content_format="string",
+-    )
+-
+-    assert conv[0]["content"] == "\n".join(expected_parts)
+-    assert mm_data is not None and "prompt_embeds" in mm_data
+-    assert len(mm_data["prompt_embeds"]) == len(expected_embeds)
+-    for got, want in zip(mm_data["prompt_embeds"], expected_embeds, strict=True):
+-        assert torch.equal(got, want)
+-
+-
+-def test_parse_chat_messages_requires_flag():
+-    t = torch.randn(2, 4)
+-    b64 = _encode_tensor(t)
+-    mc = _make_mock_model_config(enable_prompt_embeds=False)
+-
+-    messages = [
+-        {
+-            "role": "user",
+-            "content": [{"type": "prompt_embeds", "data": b64}],
+-        }
+-    ]
+-    with pytest.raises(VLLMValidationError, match=_ENABLE_PROMPT_EMBEDS_ERROR):
+-        parse_chat_messages(
+-            messages,
+-            mc,
+-            content_format="openai",
+-        )
+-
+-
+-def test_parse_chat_messages_rejects_missing_data():
+-    # `data` is marked `Required` on `ChatCompletionContentPartPromptEmbedsParam`;
+-    # malformed requests without `data` must surface a clear validation error
+-    # rather than being silently dropped.
+-    mc = _make_mock_model_config()
+-    messages = [
+-        {
+-            "role": "user",
+-            "content": [{"type": "prompt_embeds"}],  # no `data`
+-        }
+-    ]
+-    with pytest.raises(VLLMValidationError, match=_PROMPT_EMBEDS_MISSING_DATA_ERROR):
+-        parse_chat_messages(
+-            messages,
+-            mc,
+-            content_format="openai",
+-        )
+-
+-
+-# Reserved placeholder guard: when `enable_prompt_embeds=True` the tokenizer is
+-# mutated to make `<prompt_embeds>` a single unsplittable token. Any user text
+-# containing that literal sequence would tokenize to the same sentinel ID and
+-# be mistaken for a splice point, so we reject it at parse time.
+-_PLACEHOLDER_ERROR_PATTERN: Final[str] = re.sub(
+-    r"\\{[^}]*\\}", ".*", re.escape(_RESERVED_PLACEHOLDER_IN_TEXT_ERROR)
+-)
+-
+-
+-@pytest.mark.parametrize(
+-    "content",
+-    [
+-        # Case: Top-level string content (wrapped as a single text part).
+-        f"hello {PROMPT_EMBEDS_PLACEHOLDER_TOKEN} world",
+-        # Case: List with a typed text part containing the placeholder.
+-        [{"type": "text", "text": f"leading {PROMPT_EMBEDS_PLACEHOLDER_TOKEN}"}],
+-        # Case: List with a plain-string part (no wrapping dict).
+-        [f"raw string {PROMPT_EMBEDS_PLACEHOLDER_TOKEN}"],
+-    ],
+-    ids=["top-level-string", "typed-text-part", "plain-string-part"],
+-)
+-def test_parse_chat_messages_rejects_placeholder_in_user_text(content):
+-    mc = _make_mock_model_config()  # enable_prompt_embeds=True by default
+-    messages = [{"role": "user", "content": content}]
+-    with pytest.raises(VLLMValidationError, match=_PLACEHOLDER_ERROR_PATTERN):
+-        parse_chat_messages(messages, mc, content_format="openai")
+-
+-
+-def test_parse_chat_messages_allows_placeholder_in_text_when_feature_disabled():
+-    # When `enable_prompt_embeds=False` the tokenizer is never mutated, so the
+-    # literal `<prompt_embeds>` is just ordinary text and must pass through.
+-    mc = _make_mock_model_config(enable_prompt_embeds=False)
+-    messages = [
+-        {
+-            "role": "user",
+-            "content": f"benign mention of {PROMPT_EMBEDS_PLACEHOLDER_TOKEN} here",
+-        }
+-    ]
+-    conv, mm_data, _ = parse_chat_messages(messages, mc, content_format="openai")
+-    assert mm_data is None or "prompt_embeds" not in mm_data
+-    # Text reaches the rendered conversation unchanged.
+-    texts = [p["text"] for p in conv[0]["content"]]
+-    assert PROMPT_EMBEDS_PLACEHOLDER_TOKEN in "".join(texts)
+-
+-
+-# Token-stream spec: ints are regular token IDs, tuples `(N,)` expand to
+-# a placeholder span of length N (creates corresponding `(N, H)` tensor).
+-# `expected` lists the `(start_idx, length)` pairs that
+-# `_build_prompt_embeds_positions` should return.
+-@pytest.mark.parametrize(
+-    "stream, expected",
+-    [
+-        # Case: Single run in the middle.
+-        ([10, 20, (3,), 30], [(2, 3)]),
+-        # Case: Single run at the start.
+-        ([(2,), 10, 20], [(0, 2)]),
+-        # Case: Single run at the end.
+-        ([10, 20, (4,)], [(2, 4)]),
+-        # Case: Two runs with tokens between.
+-        ([1, (2,), 2, 3, (3,), 4], [(1, 2), (5, 3)]),
+-        # Case: Adjacent runs (no separating tokens).
+-        ([(1,), (2,)], [(0, 1), (1, 2)]),
+-        # Case: Three runs.
+-        ([5, (2,), 6, (1,), 7, (3,), 8], [(1, 2), (4, 1), (6, 3)]),
+-    ],
+-    ids=[
+-        "single-middle",
+-        "single-start",
+-        "single-end",
+-        "two-runs-separated",
+-        "two-runs-adjacent",
+-        "three-runs",
+-    ],
+-)
+-def test_build_positions(tokenizer, stream, expected):
+-    H = 4
+-    tid = _ensure_prompt_embeds_placeholder_token(tokenizer)
+-    tensors: list[torch.Tensor] = []
+-    token_ids: list[int] = []
+-    for item in stream:
+-        if isinstance(item, tuple):
+-            length = item[0]
+-            tensors.append(torch.randn(length, H))
+-            token_ids.extend([tid] * length)
+-        else:
+-            token_ids.append(item)
+-    mm_updates = _build_prompt_embeds_updates(tensors, tid)
+-    positions = _build_prompt_embeds_positions(token_ids, len(tensors), mm_updates)
+-    assert positions == expected
+-
+-
+-def test_build_positions_length_mismatch(tokenizer):
+-    N1, H1 = 2, 4
+-    N2, H2 = 3, 4
+-    tid = _ensure_prompt_embeds_placeholder_token(tokenizer)
+-    # 2 tensors expected but only a single placeholder run in the token
+-    # stream (simulating dropping the second one).
+-    tensors = [torch.randn(N1, H1), torch.randn(N2, H2)]
+-    token_ids = [1, tid, tid, 2, 3]
+-    mm_updates = _build_prompt_embeds_updates(tensors, tid)
+-    # The error constant is a `str.format` template, escape it and turn
+-    # the `{field}` placeholders into `.*` so it matches any substitution.
+-    pattern = re.sub(
+-        r"\\{[^}]*\\}", ".*", re.escape(_PROMPT_EMBEDS_PLACEHOLDER_SPAN_MISMATCH_ERROR)
+-    )
+-    with pytest.raises(ValueError, match=pattern):
+-        _build_prompt_embeds_positions(token_ids, len(tensors), mm_updates)
+-
+-
+-# ints  = regular token IDs (any value)
+-# (N,)  = embed span of length N
+-@pytest.mark.parametrize(
+-    "stream",
+-    [
+-        [10, 20, (3,), 30],
+-        [(2,), 10, 20],
+-        [10, 20, (4,)],
+-        [1, (2,), 2, 3, (3,), 4],
+-        [(1,), (2,)],
+-        [5, (2,), 6, (1,), 7, (3,), 8],
+-    ],
+-    ids=[
+-        "single-middle",
+-        "single-start",
+-        "single-end",
+-        "two-spans-separated",
+-        "two-spans-adjacent",
+-        "three-spans",
+-    ],
+-)
+-def test_build_mixed_prompt_embeds(stream):
+-    H = 8
+-    _PLACEHOLDER = 0  # sentinel for embed positions in token_ids
+-
+-    tensors: list[torch.Tensor] = []
+-    token_ids: list[int] = []
+-    positions: list[tuple[int, int]] = []
+-    cursor = 0
+-    for item in stream:
+-        if isinstance(item, tuple):
+-            length = item[0]
+-            tensors.append(torch.randn(length, H))
+-            positions.append((cursor, length))
+-            token_ids.extend([_PLACEHOLDER] * length)
+-            cursor += length
+-        else:
+-            token_ids.append(item)
+-            cursor += 1
+-
+-    embeds, mask = _build_mixed_prompt_embeds(token_ids, tensors, positions)
+-
+-    assert embeds.shape == (len(token_ids), H)
+-    assert len(mask) == len(token_ids)
+-
+-    # Mask: False exactly at embed positions, True everywhere else.
+-    expected_mask = torch.ones(len(token_ids), dtype=torch.bool)
+-    for start, length in positions:
+-        expected_mask[start : start + length] = False
+-    assert mask == expected_mask.tolist()
+-
+-    # Embed rows match input tensors at the right positions.
+-    for tensor, (start, length) in zip(tensors, positions):
+-        assert torch.equal(embeds[start : start + length], tensor)
+-
+-    # Non-embed positions remain zero-filled.
+-    assert torch.all(embeds[expected_mask] == 0)
+-
+-
+-# End-to-end tests: each runs both sync and async parse paths via the
+-# `parse_fn` fixture.
+-
+-
+-@pytest.mark.asyncio
+-@pytest.mark.parametrize("role", ["user", "system"])
+-async def test_end_to_end_expand_and_build(tokenizer, parse_fn, role):
+-    """Full renderer pipeline: parse -> chat template -> expand -> locate
+-    -> build mixed prompt, across tokenizers, roles, and sync/async."""
+-    tokenizer.chat_template = _SIMPLE_CHAT_TEMPLATE
+-    tid = _ensure_prompt_embeds_placeholder_token(tokenizer)
+-
+-    LEN_A, LEN_B = 3, 2
+-    t_a = torch.randn(LEN_A, _MOCK_HIDDEN_SIZE, dtype=_MOCK_DTYPE)
+-    t_b = torch.randn(LEN_B, _MOCK_HIDDEN_SIZE, dtype=_MOCK_DTYPE)
+-    NUM_TENSORS = 2
+-
+-    mc = _make_mock_model_config()
+-
+-    messages = [
+-        {
+-            "role": role,
+-            "content": [
+-                {"type": "text", "text": "Hello "},
+-                {"type": "prompt_embeds", "data": _encode_tensor(t_a)},
+-                {"type": "text", "text": " world "},
+-                {"type": "prompt_embeds", "data": _encode_tensor(t_b)},
+-                {"type": "text", "text": "!"},
+-            ],
+-        }
+-    ]
+-
+-    conv, mm_data, _ = await _maybe_await(
+-        parse_fn, messages, mc, content_format="openai"
+-    )
+-    tensors = list(mm_data["prompt_embeds"])
+-    assert len(tensors) == NUM_TENSORS
+-
+-    # Tokenize: each prompt_embeds part becomes 1 placeholder token.
+-    # `return_dict=False` to get a flat `list[int]` on transformers v5
+-    # (where the default flipped to True and yields a `BatchEncoding` dict).
+-    token_ids = tokenizer.apply_chat_template(conv, tokenize=True, return_dict=False)
+-    assert sum(t == tid for t in token_ids) == NUM_TENSORS
+-
+-    # Expand, locate, and build.
+-    mm_updates = _build_prompt_embeds_updates(tensors, tid)
+-    expanded = _expand_prompt_embeds_placeholders(token_ids, mm_updates)
+-    assert len(expanded) == len(token_ids) + LEN_A + LEN_B - NUM_TENSORS
+-
+-    positions = _build_prompt_embeds_positions(expanded, len(tensors), mm_updates)
+-    assert positions[0][1] == LEN_A
+-    assert positions[1][1] == LEN_B
+-
+-    embeds, mask = _build_mixed_prompt_embeds(expanded, tensors, positions)
+-    assert embeds.shape == (len(expanded), _MOCK_HIDDEN_SIZE)
+-    assert mask.count(False) == LEN_A + LEN_B
+-    assert torch.equal(embeds[positions[0][0] : positions[0][0] + LEN_A], t_a)
+-    assert torch.equal(embeds[positions[1][0] : positions[1][0] + LEN_B], t_b)
+-
+-
+-@pytest.mark.asyncio
+-async def test_end_to_end_multi_message_conversation(tokenizer, parse_fn):
+-    """Full pipeline with prompt_embeds spread across system + user messages,
+-    verifying ordering and positioning in the final token stream."""
+-    tokenizer.chat_template = _SIMPLE_CHAT_TEMPLATE
+-    tid = _ensure_prompt_embeds_placeholder_token(tokenizer)
+-
+-    LEN_SYS, LEN_USR = 4, 3
+-    t_sys = torch.randn(LEN_SYS, _MOCK_HIDDEN_SIZE, dtype=_MOCK_DTYPE)
+-    t_usr = torch.randn(LEN_USR, _MOCK_HIDDEN_SIZE, dtype=_MOCK_DTYPE)
+-    NUM_TENSORS = 2  # t_sys and t_usr.
+-
+-    mc = _make_mock_model_config()
+-
+-    messages = [
+-        {
+-            "role": "system",
+-            "content": [
+-                {"type": "text", "text": "You are helpful."},
+-                {"type": "prompt_embeds", "data": _encode_tensor(t_sys)},
+-            ],
+-        },
+-        {
+-            "role": "user",
+-            "content": [
+-                {"type": "prompt_embeds", "data": _encode_tensor(t_usr)},
+-                {"type": "text", "text": "Summarize."},
+-            ],
+-        },
+-    ]
+-
+-    conv, mm_data, _ = await _maybe_await(
+-        parse_fn, messages, mc, content_format="openai"
+-    )
+-    tensors = list(mm_data["prompt_embeds"])
+-    assert len(tensors) == NUM_TENSORS
+-
+-    # Tokenize, expand, locate, and build.
+-    # `return_dict=False` to get a flat `list[int]` on transformers v5
+-    # (where the default flipped to True and yields a `BatchEncoding` dict).
+-    token_ids = tokenizer.apply_chat_template(conv, tokenize=True, return_dict=False)
+-    mm_updates = _build_prompt_embeds_updates(tensors, tid)
+-    expanded = _expand_prompt_embeds_placeholders(token_ids, mm_updates)
+-    positions = _build_prompt_embeds_positions(expanded, len(tensors), mm_updates)
+-
+-    assert positions[0][1] == LEN_SYS
+-    assert positions[1][1] == LEN_USR
+-    # System embed must appear before user embed in the token stream.
+-    assert positions[0][0] < positions[1][0]
+-
+-    embeds, mask = _build_mixed_prompt_embeds(expanded, tensors, positions)
+-    assert embeds.shape == (len(expanded), _MOCK_HIDDEN_SIZE)
+-    assert mask.count(False) == LEN_SYS + LEN_USR
+-    assert torch.equal(embeds[positions[0][0] : positions[0][0] + LEN_SYS], t_sys)
+-    assert torch.equal(embeds[positions[1][0] : positions[1][0] + LEN_USR], t_usr)
