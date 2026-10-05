@@ -311,7 +311,7 @@ It is intentionally reconstructed by the ordered, reviewed semantic transformati
 | patches/vllm-qwen-unique-tool-parameters.patch | 6a76a61c743807215555cbd6b3bbdd8fcaba4abcaca69ef000d301df6c792d3b |
 | patches/vllm-generation-admission-before-response.patch | 59678e08ffb6e4b5cc2d8d01b7876e4732e9b6e5fc7b128c544540aace8464b4 |
 | patches/vllm-kv-scope-single-flight.patch | cc5e52403afd4e4764693da552e9252bbf204793566fff6a27fb87b4dbd28d13 |
-| patches/vllm-template-authored-control-tokens.patch | fd1bc02bb877bd07fd0f2002033c75233b81cd51aa20a1eae72391b26ccf108c |
+| patches/vllm-template-authored-control-tokens.patch | 1f6b9e898c3b7d3620d2ad3ee8dce70aa7d320e211788ff4fe030468870bc37b |
 | patches/vllm-nvfp4-native-kernel-required.patch | 9d9ce188b6670d687a725c4cdca37478f9dc78ef9f19685ddbcf5e9edd53b8b7 |
 | patches/vllm-qwen-arguments-read-by-grammar.patch | fa0480f239cdb0de4dd4508ac151fadc1c6a5f76dcf7b15798dcac932ae33371 |
 | patches/vllm-startup-plan-admission-bound.patch | 994f9aabc61b3d7473e83593a5279b2759ce4413ceb1ea212ae33be342df0019 |
@@ -361,9 +361,9 @@ Pinned build inputs and products:
 |---|---|
 | Immutable base tag | qwen38-vllm:main-9df9b0b |
 | Immutable base ID | sha256:fa4a002a88b7043a1a89966dea8a500fe9696f84e75730d9da916f916048d401 |
-| Runtime Dockerfile SHA-256 | b89e080a0c98fe80add8c0a72ba57be3fea9389b69cc2a39d9929e78ca07d800 |
-| Build verifier SHA-256 | 9db3d70a987481ee7063a09642c4e9920014abed84bfbc7b6b12c5aee3b2a819 |
-| Runtime validator SHA-256 | 7f2efa6c5d7b821f9d4ad277fa80566d35da28e1393eecd195be53bd9dabd5dc |
+| Runtime Dockerfile SHA-256 | 74930391a0b301937bb7a76a8aa770f17b1dc5cc49c97791427ffcda94871a20 |
+| Build verifier SHA-256 | 90d98d9879d854cd2eeae992774329e2cc52a5a1e8ca04237e9351c35fe10516 |
+| Runtime validator SHA-256 | 39f818797bc1034a772f45d9059fd95115b25ed06c5cba75e890db39a7049027 |
 
 The runtime image's profile, tag and archive name, which every release advances
 together, are declared in `config/runtime-v1.sh`, and the archive lives under
@@ -566,9 +566,11 @@ model's own emission of a control id where no template would write one, and the
 agent service records the generated ids that show it.
 
 Surfaces where the client writes the prompt itself have no template, and their
-client is the author of every token: `/v1/completions` with a text prompt,
-`/inference/v1/generate` with token ids, and `kv_transfer_params.prompt_token_ids`,
-which replaces templating on Chat Completions and Responses requests.
+client is the author of every token: `/v1/completions` with a text prompt and
+`/inference/v1/generate` with token ids. Every chat surface -- Chat Completions,
+Responses and Anthropic Messages -- has the template as the one writer of its
+prompt: nothing a chat request carries, for the KV connector or otherwise, takes
+the rendered prompt's place.
 
 ### Shared prefixes and agent IDs
 

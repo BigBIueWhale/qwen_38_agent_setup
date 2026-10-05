@@ -2825,6 +2825,8 @@ def _validate_template_authorship_before(state: State) -> None:
     hf = "vllm/renderers/hf.py"
     require_text(state, hf, "plain = tokenizer.apply_chat_template(", label=label)
     forbid_text(state, hf, "TemplateTokenEncoder", label=label)
+    require_text(state, "vllm/renderers/online_renderer.py",
+                 "def _reused_prompt_token_ids(", label=label)
 
 
 def _validate_template_authorship_after(state: State) -> None:
@@ -2849,6 +2851,22 @@ def _validate_template_authorship_after(state: State) -> None:
         "TokensPrompt(prompt_token_ids=encoded.ids, prompt=str(text))",
         'content_format == "string" and mm_data',
     ), label=label)
+    # Every chat surface renders its prompt through the template; no request
+    # field supplies the prompt's ids in its place.
+    online = "vllm/renderers/online_renderer.py"
+    forbid_text(state, online, "kv_transfer_params", label=label)
+    _require_in_symbol(state, online, "OnlineRenderer.preprocess_chat", (
+        "renderer.render_chat_async(",
+    ), label=label)
+    _require(
+        "tokens_input(" not in _symbol_source(
+            state, online, "OnlineRenderer.preprocess_chat", label=label),
+        f"{label}: a chat prompt is built from ids the request supplied",
+    )
+    require_python_symbols(
+        state, "tests/entrypoints/openai/chat_completion/test_serving_chat.py", {
+            "test_make_request_with_harmony_renders_the_messages": ("monkeypatch",),
+        }, label=label)
     _require_in_symbol(state, authorship, "TemplateTokenEncoder.__init__", (
         'spec["added_tokens"] = []',
     ), label=label)
@@ -3272,11 +3290,22 @@ CONTRACTS: Mapping[str, SemanticContract] = {
             "renders with authorship and only text the template wrote may match "
             "the added vocabulary; request text is encoded without it. The text "
             "is never changed, and a prompt whose request text spells no added "
-            "token encodes to the ids it always did."
+            "token encodes to the ids it always did. The template is also the "
+            "only writer of a chat prompt: upstream's chat renderer takes the ids "
+            "in kv_transfer_params.prompt_token_ids, which disaggregated serving "
+            "uses to hand a prefill node's ids to the decode node, as the prompt "
+            "in place of rendering, so a caller could write any id -- a turn "
+            "boundary, a tool call, a thinking boundary -- past the template on "
+            "Chat Completions, Responses and Anthropic Messages alike. A guarantee "
+            "with that door is not one, so every chat request is rendered. The "
+            "cost: a decode node renders the messages it is sent, as the prefill "
+            "node did, rather than reusing that node's ids."
         ),
         removal_condition=(
             "Remove when pinned upstream encodes chat-template output so that "
-            "only the template's own text can produce added-token ids."
+            "only the template's own text can produce added-token ids, and "
+            "renders every chat request rather than taking its ids from the "
+            "request."
         ),
         validate_before=_validate_template_authorship_before,
         validate_after=_validate_template_authorship_after,

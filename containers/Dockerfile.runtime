@@ -361,6 +361,11 @@ RUN printf '%s  %s\n' \
   "${HF_RENDERER_UPSTREAM_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/renderers/hf.py \
   | sha256sum --check --strict
 
+ARG ONLINE_RENDERER_UPSTREAM_FILE_SHA256
+RUN printf '%s  %s\n' \
+  "${ONLINE_RENDERER_UPSTREAM_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/renderers/online_renderer.py \
+  | sha256sum --check --strict
+
 RUN test ! -e /usr/local/lib/python3.12/dist-packages/vllm/renderers/template_authorship.py
 
 ARG LINEAR_KERNELS_UPSTREAM_FILE_SHA256
@@ -381,6 +386,7 @@ RUN printf '%s  %s\n' \
 FROM upstream-verifier AS runtime
 ARG HF_RENDERER_PATCHED_FILE_SHA256
 ARG TEMPLATE_AUTHORSHIP_PATCHED_FILE_SHA256
+ARG ONLINE_RENDERER_PATCHED_FILE_SHA256
 ARG SCORING_IO_PROCESSOR_PATCHED_FILE_SHA256
 ARG LINEAR_KERNELS_PATCHED_FILE_SHA256
 ARG TOKENIZE_PROTOCOL_PATCHED_FILE_SHA256
@@ -865,6 +871,10 @@ RUN printf '%s  %s\n' \
 COPY --chmod=0644 vllm/vllm/renderers/template_authorship.py /usr/local/lib/python3.12/dist-packages/vllm/renderers/template_authorship.py
 RUN printf '%s  %s\n' \
   "${TEMPLATE_AUTHORSHIP_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/renderers/template_authorship.py \
+  | sha256sum --check --strict
+COPY --chmod=0644 vllm/vllm/renderers/online_renderer.py /usr/local/lib/python3.12/dist-packages/vllm/renderers/online_renderer.py
+RUN printf '%s  %s\n' \
+  "${ONLINE_RENDERER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/renderers/online_renderer.py \
   | sha256sum --check --strict
 COPY --chmod=0644 vllm/vllm/entrypoints/pooling/scoring/io_processor.py /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/pooling/scoring/io_processor.py
 RUN printf '%s  %s\n' \

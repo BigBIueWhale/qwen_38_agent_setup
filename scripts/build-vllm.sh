@@ -529,6 +529,8 @@ image_build_options=(
   --build-arg "HF_RENDERER_PATCHED_FILE_SHA256=${HF_RENDERER_PATCHED_FILE_SHA256}"
   --build-arg "HF_RENDERER_UPSTREAM_FILE_SHA256=${HF_RENDERER_UPSTREAM_FILE_SHA256}"
   --build-arg "TEMPLATE_AUTHORSHIP_PATCHED_FILE_SHA256=${TEMPLATE_AUTHORSHIP_PATCHED_FILE_SHA256}"
+  --build-arg "ONLINE_RENDERER_UPSTREAM_FILE_SHA256=${ONLINE_RENDERER_UPSTREAM_FILE_SHA256}"
+  --build-arg "ONLINE_RENDERER_PATCHED_FILE_SHA256=${ONLINE_RENDERER_PATCHED_FILE_SHA256}"
   --build-arg "SCORING_IO_PROCESSOR_PATCHED_FILE_SHA256=${SCORING_IO_PROCESSOR_PATCHED_FILE_SHA256}"
   --build-arg "SCORING_IO_PROCESSOR_UPSTREAM_FILE_SHA256=${SCORING_IO_PROCESSOR_UPSTREAM_FILE_SHA256}"
   --build-arg "LINEAR_KERNELS_PATCHED_FILE_SHA256=${LINEAR_KERNELS_PATCHED_FILE_SHA256}"
@@ -887,6 +889,7 @@ actual_installed_report="$(
     /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/chat_completion/serving.py \
     /usr/local/lib/python3.12/dist-packages/vllm/renderers/hf.py \
     /usr/local/lib/python3.12/dist-packages/vllm/renderers/template_authorship.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/renderers/online_renderer.py \
     /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/pooling/scoring/io_processor.py \
     /usr/local/lib/python3.12/dist-packages/vllm/model_executor/kernels/linear/__init__.py \
     /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/serve/tokenize/protocol.py \
@@ -959,6 +962,7 @@ expected_installed_report="$(printf '%s  %s\n' \
   "${CHAT_SERVING_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/chat_completion/serving.py \
   "${HF_RENDERER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/renderers/hf.py \
   "${TEMPLATE_AUTHORSHIP_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/renderers/template_authorship.py \
+  "${ONLINE_RENDERER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/renderers/online_renderer.py \
   "${SCORING_IO_PROCESSOR_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/pooling/scoring/io_processor.py \
   "${LINEAR_KERNELS_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/model_executor/kernels/linear/__init__.py \
   "${TOKENIZE_PROTOCOL_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/serve/tokenize/protocol.py \
