@@ -846,12 +846,25 @@ def _validate_vision_after(state: State) -> None:
         location=f"{vision_model}:Qwen3_VisionMLP.forward",
     )
 
-    for needle in (
+    require_text(
+        state,
+        turbo,
         '_CONTINUATION_WORKSPACE_NAME = "turboquant_continuation_prefill"',
-        '_VISION_HEADROOM_WORKSPACE_NAME = "qwen38_vision_encoder_headroom"',
-        "reserve_raw_cuda_headroom",
+        label=label,
+    )
+    # The encoder's room is the continuation workspace it releases plus what
+    # text execution leaves free. A reserve held through text execution and
+    # released around encoding adds nothing to that room -- its bytes are free
+    # then whether or not it was held -- and only takes them from text
+    # execution, so no such reserve, and no setting sizing one, exists.
+    for path, retired in (
+        (turbo, "reserve_raw_cuda_headroom"),
+        (turbo, "VLLM_QWEN38_VISION_HEADROOM_BYTES"),
+        (workspace, "reserve_raw_cuda_headroom"),
+        (workspace, "cudaMalloc"),
+        ("vllm/envs.py", "VLLM_QWEN38_VISION_HEADROOM_BYTES"),
     ):
-        require_text(state, turbo, needle, label=label)
+        forbid_text(state, path, retired, label=label)
     require_text(
         state,
         turbo,
@@ -881,7 +894,6 @@ def _validate_vision_after(state: State) -> None:
                 "name",
                 "*shapes_and_dtypes",
             ),
-            "WorkspaceManager.reserve_raw_cuda_headroom": ("self", "name", "size"),
             "WorkspaceManager.release_reclaimable_workspaces": ("self",),
             "WorkspaceManager.restore_reclaimable_workspaces": ("self",),
             "release_reclaimable_workspaces": (),
@@ -902,10 +914,7 @@ def _validate_vision_after(state: State) -> None:
         location=f"{workspace}:release_reclaimable_workspaces",
     )
     for needle, count in (
-        ('ctypes.CDLL("libcudart.so.13")', 1),
-        ("runtime.cudaMemset(pointer, 0, size)", 1),
-        ("runtime.cudaDeviceSynchronize()", 1),
-        ("if self._reclaimable_workspaces_released:", 3),
+        ("if self._reclaimable_workspaces_released:", 2),
         ("self._reclaimable_workspaces_released = True", 1),
         ("self._reclaimable_workspaces_released = False", 2),
     ):
@@ -928,7 +937,6 @@ def _validate_vision_after(state: State) -> None:
             "test_reclaimable_workspace_release_preserves_primary",
             "test_reclaimable_workspace_context_restores_after_error",
             "test_nested_reclaimable_workspace_release_fails_closed",
-            "test_raw_cuda_headroom_is_physically_freed_and_restored",
         ),
     }
     for path, symbols in test_contracts.items():
@@ -3930,8 +3938,7 @@ CONTRACTS: Mapping[str, SemanticContract] = {
             "occur before I/O, and the image contract is the served image's own: it holds "
             "for every caller and every launch, so no setting of how the image is started "
             "serves JPEG, a remote URL or a low-detail image. Mutually exclusive "
-            "encoder/text workspaces must release and restore even on failure, with "
-            "physical driver-visible headroom."
+            "encoder/text workspaces must release and restore even on failure."
         ),
         removal_condition=(
             "Remove only when pinned upstream natively preserves tool-media chronology, "

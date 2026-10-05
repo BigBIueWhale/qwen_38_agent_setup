@@ -70,10 +70,10 @@ index 3adaf26..e91e2e4 100644
              _FP8_E4B15[device] = 0
      return _FP8_E4B15[device]
 diff --git a/vllm/v1/attention/backends/turboquant_attn.py b/vllm/v1/attention/backends/turboquant_attn.py
-index 94d9ebd..8f06bc3 100644
+index 92f0949..5882cc2 100644
 --- a/vllm/v1/attention/backends/turboquant_attn.py
 +++ b/vllm/vllm/v1/attention/backends/turboquant_attn.py
-@@ -564,6 +564,17 @@ class TurboQuantAttentionImpl(AttentionImpl["TurboQuantMetadata"]):
+@@ -551,6 +551,17 @@ class TurboQuantAttentionImpl(AttentionImpl["TurboQuantMetadata"]):
  
          k = key[:N].view(N, self.num_kv_heads, self.head_size)
          v = value[:N].view(N, self.num_kv_heads, self.head_size)

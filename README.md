@@ -280,16 +280,16 @@ It is intentionally reconstructed by the ordered, reviewed semantic transformati
 | patches/vllm-qwen-implicit-tool-grammar-boundary.patch | d231c6e2e7040c4cd4b38432cb8c794805afddbf2c6e4f7ff6febb78e3fd9f48 |
 | patches/vllm-anthropic-validation-http400.patch | b4c3327ca4e513b9a58edc3e9aca978d324a27032511f9868d5f941411941bcf |
 | patches/vllm-tool-truncation-finish-reason.patch | 1a220f6db9b40967d867b3cfb1a92d95d907ca059718ffe61772b4cb4409f551 |
-| patches/vllm-qwen38-vision-runtime.patch | 47007141c259b50464e5cbff414094060e0529278aeb4d02d291ae291d9a7cd3 |
-| patches/vllm-qwen38-numerical-audits.patch | a73aa2f2ae3f82010eb2bafcdf663c2fe14854c30165dbc4d8457725bc3b6632 |
-| patches/vllm-turboquant-fail-closed-guards.patch | 7282d1d4d7a17b40ab8626c82f478bbb938c548451b7793df8233562a9e24c7c |
+| patches/vllm-qwen38-vision-runtime.patch | dba583483c76e877920ccc29d31b96779669f300ec3e92dcfeff717c133a7bf4 |
+| patches/vllm-qwen38-numerical-audits.patch | dc0b947db3727b522427a204edd1a930d637476a0f66d7d30e2da65c144ac944 |
+| patches/vllm-turboquant-fail-closed-guards.patch | 099bbb99806151fbce342bb4863b32b12fb741669169a3a30365f77b4176bc0d |
 | patches/vllm-kv-offload-pinning-fail-closed.patch | 1857071c38d081bb95e3cca12153cebce096649084950b99229104fdae029ca6 |
 | patches/vllm-generation-requires-agent-id.patch | fb46fefd8ab49b4c26d84613cbee0ee21addfa2772810f271e066ccb7e9f43a0 |
 | patches/vllm-attention-growth-keeps-prefix-hash.patch | a6c38a841c05bcd4f5bfc573c99f1c4a849e7399af05b1e53096e15a43a97632 |
 | patches/vllm-grouped-kv-specs-use-layer-geometry.patch | 6bb249bc143a179ca317c72d2bf70ec118baa6f12dca19c0a59da2e3c935b814 |
 | patches/vllm-agent-grouped-offload-retention.patch | 1f87f7f9528b31ff99865ca3a53b17cd00cb00fcc88b14252c38147a192616a7 |
 | patches/vllm-agentless-generation-routes-unmounted.patch | aad1dd0ff38d76d08ac5793bcf1daca4b0872c562f44cdd5c3a5b09cb1c51f72 |
-| patches/vllm-kv-capacity-in-declared-users.patch | f9f65d2b4fd047d9553e0dc12f4b693575a0cc46aeb063dd855e3b280b4275e8 |
+| patches/vllm-kv-capacity-in-declared-users.patch | 7a3d2c0ce43e468ed2177f567ac1eb31a70a95e525496a2d8b27f3330f214441 |
 | patches/vllm-kv-declaration-within-physical-bound.patch | c80ae7afa8392c600f6c6f74d6748a2bc14f3aebc4dd0fa2e5a63f79dfaef3d5 |
 | patches/vllm-exact-reasoning-usage.patch | 2179e27460e4239367ac7e2dd3828b9b3db463e79d87ad81433d00fbc6b12395 |
 | patches/vllm-anthropic-input-fidelity.patch | 126f002321100271897a93ddbe212cc37e5d014d0ab745bcd2ce6037f224c5b3 |
@@ -475,7 +475,6 @@ The exact relevant environment includes:
     HF_HUB_OFFLINE=1
     TRANSFORMERS_OFFLINE=1
     VLLM_ENFORCE_STRICT_TOOL_CALLING=1
-    VLLM_QWEN38_VISION_HEADROOM_BYTES=671088640
     GLOO_SOCKET_IFNAME=lo
     NCCL_SOCKET_IFNAME=lo
 
@@ -859,10 +858,17 @@ without mislabelling an orchestration failure as a TurboQuant or NVFP4 defect.
 Vision adds the complete BF16 tower and transient encoder/MLP activations. vLLM logs
 21.34 GiB loaded model memory, 6.45 GiB KV reservation, 1,024 MiB reclaimable
 TurboQuant workspace, and about 0.06 GiB CUDA graph capture. The vision patch
-temporarily releases that workspace plus a fixed 640 MiB raw headroom around vision
-encoding, then restores them exactly. It does not change cache capacity, text
-prefill size, graphs, weight precision, or image precision. Logs from maximum images
-show release/restoration and no OOM, retry, preemption, or fallback.
+temporarily releases that workspace around vision encoding, then restores it
+exactly. It does not change cache capacity, text prefill size, graphs, weight
+precision, or image precision. Logs from maximum images show release/restoration
+and no OOM, retry, preemption, or fallback.
+
+No other reserve is held for the encoder. A reserve held through text execution
+and released around encoding would add nothing to the encoder's room -- its bytes
+are free during encoding whether or not it was held -- and would only take them
+from text execution. The v13 image below held one, 640 MiB of raw CUDA memory
+released and restored with the workspace; its free readings are taken with it
+held.
 
 On the exact final v13 live image:
 
@@ -874,7 +880,8 @@ On the exact final v13 live image:
 
 The post-suite reading is an observed residency point, not a claim that generation
 always peaks at exactly that number. The small global free number is not the memory available during a vision
-encode; the exact patch deliberately makes 1,664 MiB available around that phase.
+encode: the 1,024 MiB workspace is released around that phase (on v13, with the
+640 MiB reserve).
 The full-context and maximum-image runs completed, so residency is proven by
 execution rather than inferred from an idle screenshot.
 

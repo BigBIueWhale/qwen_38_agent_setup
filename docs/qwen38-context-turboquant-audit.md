@@ -152,10 +152,12 @@ cannot provide the native context alongside these weights on a 32-GiB card.
 
 The 6.45-GiB cache reservation and native text context are never reduced to enable
 vision. The complete BF16 vision tower remains loaded. Around vision encoding only,
-the runtime temporarily releases the reclaimable 1,024-MiB TurboQuant workspace and
-a fixed 640-MiB raw CUDA reserve, then recreates and verifies both. This creates
-1,664 MiB of transient working room without changing weights, KV capacity, prefill
-chunk size, CUDA graphs, image pixels, or attention precision.
+the runtime temporarily releases the reclaimable 1,024-MiB TurboQuant workspace,
+then recreates it. The encoder works in that room plus whatever text execution
+leaves free, without changing weights, KV capacity, prefill chunk size, CUDA graphs,
+image pixels, or attention precision. No separate reserve is held for it: one held
+through text execution and released around encoding would add nothing to the
+encoder's room and would only take its bytes from text execution.
 
 Image preprocessing uses the released dynamic-resolution grid. Position IDs and
 prefix-cache identity include the image at its chronological message location.

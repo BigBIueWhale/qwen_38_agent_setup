@@ -637,7 +637,7 @@ diff --git a/tests/quantization/test_turboquant.py b/tests/quantization/test_tur
 index 04a365b48dc13a89f0e4b0a3314731b0b8e5ff45..a12d12bb14a119613c1433e95ec3939cccd8f25a 100644
 --- a/tests/quantization/test_turboquant.py
 +++ b/tests/quantization/test_turboquant.py
-@@ -362,7 +362,13 @@ class TestTurboQuantWorkspaceReservation:
+@@ -362,7 +362,10 @@ class TestTurboQuantWorkspaceReservation:
  
          class FakeWorkspaceManager:
              def get_simultaneous(self, *shapes_and_dtypes):
@@ -646,25 +646,10 @@ index 04a365b48dc13a89f0e4b0a3314731b0b8e5ff45..a12d12bb14a119613c1433e95ec3939c
 +
 +            def get_reclaimable_simultaneous(self, name, *shapes_and_dtypes):
 +                calls.append(("reclaimable", name, shapes_and_dtypes))
-+
-+            def reserve_raw_cuda_headroom(self, name, size):
-+                calls.append(("raw-headroom", name, size))
  
          monkeypatch.setattr(
              turboquant_attn,
-@@ -374,6 +380,11 @@ class TestTurboQuantWorkspaceReservation:
-             "is_workspace_manager_initialized",
-             lambda: True,
-         )
-+        monkeypatch.setattr(
-+            turboquant_attn.envs,
-+            "VLLM_QWEN38_VISION_HEADROOM_BYTES",
-+            1024,
-+        )
- 
-         turboquant_attn.TurboQuantMetadataBuilder(
-             kv_cache_spec=self._fake_kv_cache_spec(),
-@@ -384,13 +395,26 @@ class TestTurboQuantWorkspaceReservation:
+@@ -384,13 +387,21 @@ class TestTurboQuantWorkspaceReservation:
  
          assert calls == [
              (
@@ -678,8 +663,10 @@ index 04a365b48dc13a89f0e4b0a3314731b0b8e5ff45..a12d12bb14a119613c1433e95ec3939c
 +                    ((16, 8, 128), torch.float16),
 +                    ((16, 8), torch.float32),
 +                ),
-+            ),
-+            (
+             ),
+             (
+-                ((1, 4, 8192, 128), torch.float16),
+-                ((1, 4, 8192, 128), torch.float16),
 +                "reclaimable",
 +                "turboquant_continuation_prefill",
 +                (
@@ -687,16 +674,9 @@ index 04a365b48dc13a89f0e4b0a3314731b0b8e5ff45..a12d12bb14a119613c1433e95ec3939c
 +                    ((1, 4, 8192, 128), torch.float16),
 +                ),
              ),
-             (
--                ((1, 4, 8192, 128), torch.float16),
--                ((1, 4, 8192, 128), torch.float16),
-+                "raw-headroom",
-+                "qwen38_vision_encoder_headroom",
-+                1024,
-             ),
          ]
  
-@@ -403,7 +427,13 @@ class TestTurboQuantWorkspaceReservation:
+@@ -403,7 +414,10 @@ class TestTurboQuantWorkspaceReservation:
  
          class FakeWorkspaceManager:
              def get_simultaneous(self, *shapes_and_dtypes):
@@ -705,25 +685,10 @@ index 04a365b48dc13a89f0e4b0a3314731b0b8e5ff45..a12d12bb14a119613c1433e95ec3939c
 +
 +            def get_reclaimable_simultaneous(self, name, *shapes_and_dtypes):
 +                calls.append(("reclaimable", name, shapes_and_dtypes))
-+
-+            def reserve_raw_cuda_headroom(self, name, size):
-+                calls.append(("raw-headroom", name, size))
  
          monkeypatch.setattr(
              turboquant_attn,
-@@ -415,6 +445,11 @@ class TestTurboQuantWorkspaceReservation:
-             "is_workspace_manager_initialized",
-             lambda: True,
-         )
-+        monkeypatch.setattr(
-+            turboquant_attn.envs,
-+            "VLLM_QWEN38_VISION_HEADROOM_BYTES",
-+            1024,
-+        )
- 
-         turboquant_attn.TurboQuantMetadataBuilder(
-             kv_cache_spec=self._fake_kv_cache_spec(),
-@@ -425,9 +460,13 @@ class TestTurboQuantWorkspaceReservation:
+@@ -425,9 +439,13 @@ class TestTurboQuantWorkspaceReservation:
  
          assert calls == [
              (
@@ -814,10 +779,10 @@ index a86e77c8f52fb2843b20c912fbaa5e7d3af11a83..9f549b6070922137b5e77d7073875026
 +    assert events == ["release", "encode", "restore"]
 diff --git a/tests/v1/worker/test_workspace.py b/tests/v1/worker/test_workspace.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..2dbd6d6f2a65b7e9f1eca2d4252b9c0f48139e78
+index 0000000000000000000000000000000000000000..5b7941b47063f79e5ae0f6143be86e9b733ad627
 --- /dev/null
 +++ b/tests/v1/worker/test_workspace.py
-@@ -0,0 +1,121 @@
+@@ -0,0 +1,93 @@
 +# SPDX-License-Identifier: Apache-2.0
 +# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
 +
@@ -911,34 +876,6 @@ index 0000000000000000000000000000000000000000..2dbd6d6f2a65b7e9f1eca2d4252b9c0f
 +        "phase-local", ((64,), torch.float32)
 +    )
 +    assert restored.shape == (64,)
-+
-+
-+def test_raw_cuda_headroom_is_physically_freed_and_restored(monkeypatch):
-+    allocations = []
-+    frees = []
-+
-+    def allocate(size):
-+        allocations.append(size)
-+        return 0x1000 + len(allocations)
-+
-+    monkeypatch.setattr(workspace, "_raw_cuda_malloc_committed", allocate)
-+    monkeypatch.setattr(workspace, "_raw_cuda_free", frees.append)
-+    monkeypatch.setattr(torch.accelerator, "empty_cache", lambda: None)
-+    manager = workspace.WorkspaceManager(torch.device("cuda"))
-+
-+    manager.reserve_raw_cuda_headroom("physical-headroom", 1024)
-+    manager.lock()
-+    assert manager.release_reclaimable_workspaces() == 1024
-+    with pytest.raises(AssertionError, match="Model phases must not overlap"):
-+        manager.reserve_raw_cuda_headroom("physical-headroom", 1024)
-+    assert manager.restore_reclaimable_workspaces() == 1024
-+
-+    assert allocations == [1024, 1024]
-+    assert frees == [0x1001]
-+    manager.reserve_raw_cuda_headroom("physical-headroom", 1024)
-+    assert allocations == [1024, 1024]
-+    with pytest.raises(AssertionError, match="changed size"):
-+        manager.reserve_raw_cuda_headroom("physical-headroom", 2048)
 diff --git a/vllm/entrypoints/anthropic/serving.py b/vllm/entrypoints/anthropic/serving.py
 index 7e8e4441efee914aca39aef7e739acc8b303686e..f04a1e2b5961096757432fa2dba5a5ab81151c3c 100644
 --- a/vllm/entrypoints/anthropic/serving.py
@@ -1137,40 +1074,6 @@ index c75cd16e54f469233448b9748948c2dc0b609dbc..40b33f85056e75297015f28f688db63c
      platform_max_tokens = current_platform.get_max_output_tokens(input_length)
      fallback_max_tokens = (
          max_tokens
-diff --git a/vllm/envs.py b/vllm/envs.py
-index 07a22dc7c794905c9076f9b8d2701d740e1023d3..ca7a31d2b07811385a4bf9a82afd019dff929388 100755
---- a/vllm/envs.py
-+++ b/vllm/envs.py
-@@ -81,6 +81,7 @@ if TYPE_CHECKING:
-     VLLM_MAX_AUDIO_DECODE_BYTES: int = 268_435_456
-     VLLM_MAX_AUDIO_PREPROCESS_WORKERS: int = max(1, min(os.cpu_count() or 1, 2))
-     VLLM_MAX_IMAGE_PIXELS: int = 178_956_970
-+    VLLM_QWEN38_VISION_HEADROOM_BYTES: int = 0
-     VLLM_VIDEO_LOADER_BACKEND: str = "opencv"
-     VLLM_MEDIA_CONNECTOR: str = "http"
-     VLLM_MM_HASHER_ALGORITHM: str = "blake3"
-@@ -1022,6 +1023,13 @@ environment_variables: dict[str, Callable[[], Any]] = {
-     "VLLM_MAX_IMAGE_PIXELS": lambda: int(
-         os.getenv("VLLM_MAX_IMAGE_PIXELS", "178956970")
-     ),
-+    # Extra phase-local bytes reserved alongside the TurboQuant continuation
-+    # workspace. The allocation is released while the mutually exclusive
-+    # multimodal encoder runs, then restored before language-model execution.
-+    # Default zero keeps upstream behaviour unchanged.
-+    "VLLM_QWEN38_VISION_HEADROOM_BYTES": lambda: int(
-+        os.getenv("VLLM_QWEN38_VISION_HEADROOM_BYTES", "0")
-+    ),
-     # Backend for Video IO — selects the frame-sampling algorithm.
-     # - "opencv": uniform sampling.
-     # - "opencv_dynamic": duration-aware dynamic sampling.
-@@ -2281,6 +2289,7 @@ def compile_factors() -> dict[str, object]:
-         "VLLM_MAX_AUDIO_DECODE_BYTES",
-         "VLLM_MAX_AUDIO_PREPROCESS_WORKERS",
-         "VLLM_MAX_IMAGE_PIXELS",
-+        "VLLM_QWEN38_VISION_HEADROOM_BYTES",
-         "VLLM_VIDEO_LOADER_BACKEND",
-         "VLLM_MEDIA_CONNECTOR",
-         "VLLM_OBJECT_STORAGE_SHM_BUFFER_NAME",
 diff --git a/vllm/model_executor/models/qwen3_vl.py b/vllm/model_executor/models/qwen3_vl.py
 index 89495ff94902bd028bab6fd10748b7b42e184484..7d37c984ebc4fa102fd2952886b3175621552e2d 100644
 --- a/vllm/model_executor/models/qwen3_vl.py
@@ -1385,48 +1288,25 @@ diff --git a/vllm/v1/attention/backends/turboquant_attn.py b/vllm/v1/attention/b
 index cf153a5a2422c9d6f5e9aca520246ddf338129ec..f7038b24d9c7983c7065d54fa78eaa299d3c0995 100644
 --- a/vllm/v1/attention/backends/turboquant_attn.py
 +++ b/vllm/v1/attention/backends/turboquant_attn.py
-@@ -25,6 +25,7 @@ from typing import Any, ClassVar
- import torch
- import torch.nn.functional as F
- 
-+import vllm.envs as envs
- from vllm.config import get_current_vllm_config
- from vllm.config.cache import CacheDType
- from vllm.logger import init_logger
-@@ -82,6 +83,8 @@ if _HAS_FLASH_ATTN:
+@@ -82,6 +82,7 @@ if _HAS_FLASH_ATTN:
  # kernel can read them efficiently. This avoids O(cached_len) dequant work
  # per continuation, eliminating the O(N²/chunk_size) collapse at long context.
  _CONTINUATION_DECODE_THRESHOLD = 128
 +_CONTINUATION_WORKSPACE_NAME = "turboquant_continuation_prefill"
-+_VISION_HEADROOM_WORKSPACE_NAME = "qwen38_vision_encoder_headroom"
  
  
  def _soa_imports():
-@@ -285,10 +288,22 @@ class TurboQuantMetadataBuilder(AttentionMetadataBuilder[TurboQuantMetadata]):
+@@ -285,7 +286,8 @@ class TurboQuantMetadataBuilder(AttentionMetadataBuilder[TurboQuantMetadata]):
          max_cached_len = max(0, model_config.max_model_len - 1)
          alloc_len = round_up(max_cached_len, self.kv_cache_spec.block_size)
          cache_buf_shape = (1, num_kv_heads, alloc_len, head_size)
 -        current_workspace_manager().get_simultaneous(
-+        vision_headroom_bytes = envs.VLLM_QWEN38_VISION_HEADROOM_BYTES
-+        if vision_headroom_bytes < 0:
-+            raise ValueError(
-+                "VLLM_QWEN38_VISION_HEADROOM_BYTES must be non-negative, got "
-+                f"{vision_headroom_bytes}."
-+            )
 +        current_workspace_manager().get_reclaimable_simultaneous(
 +            _CONTINUATION_WORKSPACE_NAME,
              (cache_buf_shape, torch.float16),
              (cache_buf_shape, torch.float16),
          )
-+        if vision_headroom_bytes:
-+            current_workspace_manager().reserve_raw_cuda_headroom(
-+                _VISION_HEADROOM_WORKSPACE_NAME,
-+                vision_headroom_bytes,
-+            )
- 
-     def build_for_cudagraph_capture(
-         self, common_attn_metadata: CommonAttentionMetadata
-@@ -978,9 +993,12 @@ class TurboQuantAttentionImpl(AttentionImpl["TurboQuantMetadata"]):
+@@ -978,9 +980,12 @@ class TurboQuantAttentionImpl(AttentionImpl["TurboQuantMetadata"]):
              # and the runtime allocations without increasing reserved memory.
              full_alloc_len = math.ceil(seq_len / block_size) * block_size
              full_shape = (full_alloc_len, Hk, D)
@@ -1442,7 +1322,7 @@ index cf153a5a2422c9d6f5e9aca520246ddf338129ec..f7038b24d9c7983c7065d54fa78eaa29
              )
              k_full = k_full_buf[:seq_len]
              v_full = v_full_buf[:seq_len]
-@@ -994,9 +1012,12 @@ class TurboQuantAttentionImpl(AttentionImpl["TurboQuantMetadata"]):
+@@ -994,9 +999,12 @@ class TurboQuantAttentionImpl(AttentionImpl["TurboQuantMetadata"]):
              buf_shape = (1, Hk, alloc_len, D)
              # MSE-key modes still need separate FP16 dequant buffers because
              # their inverse rotation produces the final contiguous K tensor.
@@ -1490,11 +1370,8 @@ diff --git a/vllm/v1/worker/workspace.py b/vllm/v1/worker/workspace.py
 index 1c502bfd8ff11b4ceadedac20c6ae00023ee2b4c..d93389883be183e8609a56f84af5cce1670c4503 100644
 --- a/vllm/v1/worker/workspace.py
 +++ b/vllm/v1/worker/workspace.py
-@@ -1,10 +1,13 @@
- # SPDX-License-Identifier: Apache-2.0
- # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
+@@ -3,8 +3,10 @@
  
-+import ctypes
  import inspect
  import os
 +from contextlib import contextmanager
@@ -1504,97 +1381,17 @@ index 1c502bfd8ff11b4ceadedac20c6ae00023ee2b4c..d93389883be183e8609a56f84af5cce1
  
  import torch
  
-@@ -24,6 +27,77 @@ def _compute_bytes(shape: tuple[int, ...], dtype: torch.dtype) -> int:
- _MB = 1024**2
- _GiB = 1024**3
- 
-+_CUDA_SUCCESS = 0
-+_cuda_runtime: ctypes.CDLL | None = None
-+
-+
-+def _get_cuda_runtime() -> ctypes.CDLL:
-+    """Load the CUDA 13 runtime pinned by the immutable serving image."""
-+    global _cuda_runtime
-+    if _cuda_runtime is None:
-+        runtime = ctypes.CDLL("libcudart.so.13")
-+        runtime.cudaMalloc.argtypes = [
-+            ctypes.POINTER(ctypes.c_void_p),
-+            ctypes.c_size_t,
-+        ]
-+        runtime.cudaMalloc.restype = ctypes.c_int
-+        runtime.cudaMemset.argtypes = [
-+            ctypes.c_void_p,
-+            ctypes.c_int,
-+            ctypes.c_size_t,
-+        ]
-+        runtime.cudaMemset.restype = ctypes.c_int
-+        runtime.cudaFree.argtypes = [ctypes.c_void_p]
-+        runtime.cudaFree.restype = ctypes.c_int
-+        runtime.cudaDeviceSynchronize.argtypes = []
-+        runtime.cudaDeviceSynchronize.restype = ctypes.c_int
-+        runtime.cudaGetErrorString.argtypes = [ctypes.c_int]
-+        runtime.cudaGetErrorString.restype = ctypes.c_char_p
-+        _cuda_runtime = runtime
-+    return _cuda_runtime
-+
-+
-+def _check_cuda_runtime(status: int, operation: str) -> None:
-+    if status == _CUDA_SUCCESS:
-+        return
-+    runtime = _get_cuda_runtime()
-+    error = runtime.cudaGetErrorString(status)
-+    detail = error.decode("utf-8", errors="replace") if error else "unknown error"
-+    raise RuntimeError(f"{operation} failed with CUDA error {status}: {detail}")
-+
-+
-+def _raw_cuda_malloc_committed(size: int) -> int:
-+    """Allocate and physically commit bytes outside PyTorch's caching allocator."""
-+    runtime = _get_cuda_runtime()
-+    pointer = ctypes.c_void_p()
-+    _check_cuda_runtime(
-+        runtime.cudaMalloc(ctypes.byref(pointer), size),
-+        f"cudaMalloc({size})",
-+    )
-+    if pointer.value is None:
-+        raise RuntimeError("cudaMalloc succeeded without returning a pointer.")
-+    try:
-+        _check_cuda_runtime(
-+            runtime.cudaMemset(pointer, 0, size),
-+            f"cudaMemset({size})",
-+        )
-+        _check_cuda_runtime(
-+            runtime.cudaDeviceSynchronize(),
-+            "cudaDeviceSynchronize after headroom commit",
-+        )
-+    except BaseException:
-+        runtime.cudaFree(pointer)
-+        raise
-+    return int(pointer.value)
-+
-+
-+def _raw_cuda_free(pointer: int) -> None:
-+    runtime = _get_cuda_runtime()
-+    _check_cuda_runtime(
-+        runtime.cudaFree(ctypes.c_void_p(pointer)),
-+        "cudaFree(headroom)",
-+    )
-+
- # Global workspace manager instance
- _manager: "WorkspaceManager | None" = None
- 
-@@ -42,6 +116,11 @@ class WorkspaceManager:
+@@ -42,6 +44,9 @@ class WorkspaceManager:
          self._current_workspaces: list[torch.Tensor | None] = [
              None
          ] * self._num_ubatches
 +        self._reclaimable_workspaces: dict[str, list[torch.Tensor | None]] = {}
 +        self._reclaimable_workspace_sizes: dict[str, list[int]] = {}
-+        self._raw_cuda_headroom_sizes: dict[str, int] = {}
-+        self._raw_cuda_headroom_pointers: dict[str, int | None] = {}
 +        self._reclaimable_workspaces_released = False
          self._locked: bool = False
  
      @staticmethod
-@@ -116,6 +195,220 @@ class WorkspaceManager:
+@@ -116,6 +121,165 @@ class WorkspaceManager:
              for i in range(len(shapes_and_dtypes))
          ]
  
@@ -1674,52 +1471,6 @@ index 1c502bfd8ff11b4ceadedac20c6ae00023ee2b4c..d93389883be183e8609a56f84af5cce1
 +            for i in range(len(shapes_and_dtypes))
 +        ]
 +
-+    def reserve_raw_cuda_headroom(self, name: str, size: int) -> None:
-+        """Reserve driver-visible CUDA memory that can be freed for another phase.
-+
-+        PyTorch caching-allocator segments can remain physically mapped after every
-+        tensor view is dropped and ``empty_cache`` is called. Such a tensor is not a
-+        valid defensive headroom guarantee. This reservation deliberately lives
-+        outside the caching allocator: ``cudaFree`` must increase driver-visible
-+        free memory before the vision encoder begins, and ``cudaMalloc`` restores
-+        the same committed reservation before text execution resumes.
-+        """
-+        if self._reclaimable_workspaces_released:
-+            raise AssertionError(
-+                f"Raw CUDA headroom '{name}' was requested while reclaimable "
-+                "workspaces are released. Model phases must not overlap."
-+            )
-+        if self._device.type != "cuda":
-+            raise AssertionError(
-+                f"Raw CUDA headroom '{name}' requires a CUDA workspace manager."
-+            )
-+        if size <= 0:
-+            raise ValueError(f"Raw CUDA headroom size must be positive, got {size}.")
-+
-+        previous_size = self._raw_cuda_headroom_sizes.get(name)
-+        if previous_size is not None:
-+            if previous_size != size:
-+                raise AssertionError(
-+                    f"Raw CUDA headroom '{name}' changed size from "
-+                    f"{previous_size} to {size} bytes."
-+                )
-+            assert self._raw_cuda_headroom_pointers[name] is not None
-+            return
-+        if self._locked:
-+            raise AssertionError(
-+                f"Raw CUDA headroom '{name}' cannot be added after workspace lock."
-+            )
-+
-+        pointer = _raw_cuda_malloc_committed(size)
-+        self._raw_cuda_headroom_sizes[name] = size
-+        self._raw_cuda_headroom_pointers[name] = pointer
-+        if envs.VLLM_DEBUG_WORKSPACE:
-+            logger.info(
-+                "[WORKSPACE DEBUG] Reserved raw CUDA headroom '%s': %.2f MB",
-+                name,
-+                size / _MB,
-+            )
-+
 +    def _driver_free_bytes(self) -> int | None:
 +        if self._device.type != "cuda":
 +            return None
@@ -1735,11 +1486,6 @@ index 1c502bfd8ff11b4ceadedac20c6ae00023ee2b4c..d93389883be183e8609a56f84af5cce1
 +            self._driver_free_bytes() if envs.VLLM_DEBUG_WORKSPACE else None
 +        )
 +        released_bytes = 0
-+        for name, pointer in self._raw_cuda_headroom_pointers.items():
-+            assert pointer is not None
-+            _raw_cuda_free(pointer)
-+            self._raw_cuda_headroom_pointers[name] = None
-+            released_bytes += self._raw_cuda_headroom_sizes[name]
 +        for workspaces in self._reclaimable_workspaces.values():
 +            released_bytes += sum(self._workspace_size_bytes(ws) for ws in workspaces)
 +            for ubatch_id in range(self._num_ubatches):
@@ -1789,10 +1535,6 @@ index 1c502bfd8ff11b4ceadedac20c6ae00023ee2b4c..d93389883be183e8609a56f84af5cce1
 +                    (size,), dtype=torch.uint8, device=self._device
 +                )
 +                restored_bytes += size
-+        for name, size in self._raw_cuda_headroom_sizes.items():
-+            assert self._raw_cuda_headroom_pointers[name] is None
-+            self._raw_cuda_headroom_pointers[name] = _raw_cuda_malloc_committed(size)
-+            restored_bytes += size
 +        self._reclaimable_workspaces_released = False
 +
 +        if envs.VLLM_DEBUG_WORKSPACE and restored_bytes:
@@ -1815,7 +1557,7 @@ index 1c502bfd8ff11b4ceadedac20c6ae00023ee2b4c..d93389883be183e8609a56f84af5cce1
      def _ensure_workspace_size(self, required_bytes: int) -> torch.Tensor:
          """Ensure workspace is allocated and large enough, return current workspace.
  
-@@ -258,6 +551,17 @@ def lock_workspace() -> None:
+@@ -258,6 +422,17 @@ def lock_workspace() -> None:
      current_workspace_manager().lock()
  
  

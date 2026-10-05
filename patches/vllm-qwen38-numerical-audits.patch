@@ -1,8 +1,8 @@
 diff --git a/tests/quantization/test_turboquant.py b/tests/quantization/test_turboquant.py
-index a12d12bb14..7cff80fcfd 100644
+index be2653330e..0455e86f2e 100644
 --- a/tests/quantization/test_turboquant.py
 +++ b/tests/quantization/test_turboquant.py
-@@ -707,7 +707,189 @@ class TestHadamardRotation:
+@@ -686,7 +686,189 @@ class TestHadamardRotation:
  
  @pytest.mark.skipif(not GPGPU_AVAILABLE, reason="GPGPU not available")
  class TestStoreDecodeRoundTrip:
@@ -194,7 +194,7 @@ index a12d12bb14..7cff80fcfd 100644
      @pytest.mark.parametrize(
          "preset",
 diff --git a/vllm/v1/attention/backends/turboquant_attn.py b/vllm/v1/attention/backends/turboquant_attn.py
-index f7038b24d9..94d9ebd440 100644
+index f2f789adfb..92f0949bfd 100644
 --- a/vllm/v1/attention/backends/turboquant_attn.py
 +++ b/vllm/v1/attention/backends/turboquant_attn.py
 @@ -3,17 +3,19 @@

@@ -91,15 +91,10 @@ def test_turboquant_reservation_routing() -> None:
         def get_reclaimable_simultaneous(self, name, *shapes_and_dtypes):
             calls.append(("reclaimable", name, shapes_and_dtypes))
 
-        def reserve_raw_cuda_headroom(self, name, size):
-            calls.append(("raw-headroom", name, size))
-
     original_manager = turboquant_attn.current_workspace_manager
     original_initialized = turboquant_attn.is_workspace_manager_initialized
-    original_headroom = turboquant_attn.envs.VLLM_QWEN38_VISION_HEADROOM_BYTES
     turboquant_attn.current_workspace_manager = lambda: FakeWorkspaceManager()
     turboquant_attn.is_workspace_manager_initialized = lambda: True
-    turboquant_attn.envs.VLLM_QWEN38_VISION_HEADROOM_BYTES = 1024
     try:
         vllm_config = SimpleNamespace(
             scheduler_config=SimpleNamespace(
@@ -137,62 +132,15 @@ def test_turboquant_reservation_routing() -> None:
     finally:
         turboquant_attn.current_workspace_manager = original_manager
         turboquant_attn.is_workspace_manager_initialized = original_initialized
-        turboquant_attn.envs.VLLM_QWEN38_VISION_HEADROOM_BYTES = original_headroom
 
-    assert [call[0] for call in calls] == [
-        "primary",
-        "reclaimable",
-        "raw-headroom",
-    ]
+    # The continuation workspace is the only phase-local reservation: a
+    # raw reserve would be a call this fake manager does not answer.
+    assert [call[0] for call in calls] == ["primary", "reclaimable"]
     assert calls[1][1] == "turboquant_continuation_prefill"
     assert calls[1][2] == (
         ((1, 4, 8192, 128), torch.float16),
         ((1, 4, 8192, 128), torch.float16),
     )
-    assert calls[2] == (
-        "raw-headroom",
-        "qwen38_vision_encoder_headroom",
-        1024,
-    )
-
-
-def test_raw_cuda_headroom_lifetime() -> None:
-    allocations = []
-    frees = []
-    original_allocate = workspace._raw_cuda_malloc_committed
-    original_free = workspace._raw_cuda_free
-    original_empty_cache = torch.accelerator.empty_cache
-    workspace._raw_cuda_malloc_committed = lambda size: (
-        allocations.append(size) or (0x1000 + len(allocations))
-    )
-    workspace._raw_cuda_free = frees.append
-    torch.accelerator.empty_cache = lambda: None
-    try:
-        manager = workspace.WorkspaceManager(torch.device("cuda"))
-        manager.reserve_raw_cuda_headroom("physical-headroom", 1024)
-        manager.lock()
-        assert manager.release_reclaimable_workspaces() == 1024
-        try:
-            manager.reserve_raw_cuda_headroom("physical-headroom", 1024)
-        except AssertionError as exc:
-            assert "Model phases must not overlap" in str(exc)
-        else:
-            raise AssertionError("released raw headroom was accessible")
-        assert manager.restore_reclaimable_workspaces() == 1024
-        assert allocations == [1024, 1024]
-        assert frees == [0x1001]
-        manager.reserve_raw_cuda_headroom("physical-headroom", 1024)
-        assert allocations == [1024, 1024]
-        try:
-            manager.reserve_raw_cuda_headroom("physical-headroom", 2048)
-        except AssertionError as exc:
-            assert "changed size" in str(exc)
-        else:
-            raise AssertionError("raw headroom size change was accepted")
-    finally:
-        workspace._raw_cuda_malloc_committed = original_allocate
-        workspace._raw_cuda_free = original_free
-        torch.accelerator.empty_cache = original_empty_cache
 
 
 def test_model_runner_phase_boundary() -> None:
@@ -239,6 +187,5 @@ def test_model_runner_phase_boundary() -> None:
 if __name__ == "__main__":
     test_workspace_lifetime()
     test_turboquant_reservation_routing()
-    test_raw_cuda_headroom_lifetime()
     test_model_runner_phase_boundary()
     print("vision workspace unit: passed")

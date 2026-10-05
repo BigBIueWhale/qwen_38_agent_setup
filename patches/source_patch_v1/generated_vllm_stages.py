@@ -3467,7 +3467,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '\n'})},
  {'name': 'qwen38-vision-runtime',
   'review_patch': 'patches/vllm-qwen38-vision-runtime.patch',
-  'review_sha256': '47007141c259b50464e5cbff414094060e0529278aeb4d02d291ae291d9a7cd3',
+  'review_sha256': 'dba583483c76e877920ccc29d31b96779669f300ec3e92dcfeff717c133a7bf4',
   'files': ({'path': 'tests/entrypoints/anthropic/test_anthropic_messages_conversion.py',
              'before_sha256': '51c0ff68800ca0323740628a523ca8a4a3ab813480cc6bca4859ef021c9e03ed',
              'after_sha256': 'e6fa915c7f58e252d0da33bb5de31215cd1dacab1292e9ad5c8d116a7551f942'},
@@ -3485,13 +3485,13 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'after_sha256': '024c891ebfeb2bfb5d369921a0d9440f972e2647a72193e25170ae68d20791f4'},
             {'path': 'tests/quantization/test_turboquant.py',
              'before_sha256': '8c4f0a5cdf4bacea650aa09f39d03d0793940e15650666dd99f39a8f386245cc',
-             'after_sha256': '262bf8425ce30fdcf424936bc5e154ab9ca98049401b55c45bc611e4362ca416'},
+             'after_sha256': '799ff914f92b4acfd52d698c1625a8db96356576ceb2728c6aee18742ee32729'},
             {'path': 'tests/v1/worker/test_gpu_model_runner_mm_gather.py',
              'before_sha256': '7e3f276ad8a49f3adae28cca0cd3c9a3e5e36f8667af8cb383f8e124dda99ad5',
              'after_sha256': '7076e2415a3a1246d6f1e22e978a4c32e7b87713d6d7ae5743960c3d31592759'},
             {'path': 'tests/v1/worker/test_workspace.py',
              'before_sha256': None,
-             'after_sha256': '26db5624d8b60db86792762c0f2765fe13ccaa6bfc82ce655c147379fd79b76e'},
+             'after_sha256': 'b5aec4cedc880276f8dec0fa68b146e4802eb30c641839e3fc788126029b091f'},
             {'path': 'vllm/entrypoints/anthropic/serving.py',
              'before_sha256': 'b283dc7f47fe1cbb57f5a9cc4000a27ff5106e94d5caf152e5f7142e8a056e19',
              'after_sha256': '0e67a46639b5369fad8de21a31799b4fe2bfbbd93c5d1df02911f0f98a08a43c'},
@@ -3501,9 +3501,6 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
             {'path': 'vllm/entrypoints/serve/utils/api_utils.py',
              'before_sha256': '14ca06f57d110b05f561812f84115bd7c380ad18e0fd0d0b2acaaab0e21fdd74',
              'after_sha256': '5c6fbd5ff02c042d6f96bfbe7f4d784f97dbfa8029bc09e059c66c16a807f74b'},
-            {'path': 'vllm/envs.py',
-             'before_sha256': '6bca0f24e5e9eec31b374c17cd9a7dac8cc548c95a9846826c08c62d4e04189f',
-             'after_sha256': 'aa4b30a470704dc5de3adce2a125c10d53c238bfad301b529c3dbd13cdae08b7'},
             {'path': 'vllm/model_executor/models/qwen3_vl.py',
              'before_sha256': 'b7ae6775e74cbcdb6e62d7fca9284e848f1f653caf53912f4dec64dc16ab96e3',
              'after_sha256': 'e271b7bbda10dc047d36b96fdbe9a7fd1806f1390bf7bb0aa3d3948f7f037cfa'},
@@ -3518,13 +3515,13 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'after_sha256': '9d7b49102bb1dc835491d686af574814b05e13f8b7c66ec1bcd57f3e5bb6ae86'},
             {'path': 'vllm/v1/attention/backends/turboquant_attn.py',
              'before_sha256': '0aa02c874d33c1113a49cb1aab49cfdc53e6a0d77fdc9ba91f7f89e6bddc0367',
-             'after_sha256': '1ae979841b20ffc2d0db63b30a9ecc4928548b9854983fd98aa9c2c0808e441d'},
+             'after_sha256': '3da6b10ab399fdc3bba4fbda85dd0c86c99fccf6c998061d68096ba5649646aa'},
             {'path': 'vllm/v1/worker/gpu_model_runner.py',
              'before_sha256': '7d5888ea176f34441553a4a0262f137433369e7b86076503ea54fbaee52d5554',
              'after_sha256': 'a7bed200b304fdc17320a30178ded7669d4677e787947470b872ef0ec14b6c8b'},
             {'path': 'vllm/v1/worker/workspace.py',
              'before_sha256': 'd0650393bc657064acc97fe2b227ebff8f85799a8f727a8c136098f1f79964df',
-             'after_sha256': 'b859dfdc5676f90a0b00718e34adcd0a02d266be1543ca146eebb724a9235c00'},
+             'after_sha256': '168ceb92560698ad90016bf6a29a15776fe2a01ac7c27d67bfecc9cb5fc538c1'},
             {'path': 'tests/benchmarks/test_custom_image_dataset.py',
              'before_sha256': 'c7e44e30549ca4a3c3095d988874dbd9a2cfee6afe086a65ce2a0b0f4559e3a8',
              'after_sha256': 'fe1335948a03c5dd4c4673b5925cebd27d46a5956832092bebbbd53d47993bac'},
@@ -5401,9 +5398,6 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '                calls.append(("reclaimable", name, '
                       'shapes_and_dtypes))\n'
                       '\n'
-                      '            def reserve_raw_cuda_headroom(self, name, size):\n'
-                      '                calls.append(("raw-headroom", name, size))\n'
-                      '\n'
                       '        monkeypatch.setattr(\n'
                       '            turboquant_attn,\n'
                       '            "current_workspace_manager",\n'
@@ -5432,58 +5426,9 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '                calls.append(("reclaimable", name, '
                              'shapes_and_dtypes))\n'
                              '\n'
-                             '            def reserve_raw_cuda_headroom(self, name, '
-                             'size):\n'
-                             '                calls.append(("raw-headroom", name, '
-                             'size))\n'
-                             '\n'
                              '        monkeypatch.setattr(\n'
                              '            turboquant_attn,\n'},
             {'name': 'tests/quantization/test_turboquant.py:landmark-2',
-             'path': 'tests/quantization/test_turboquant.py',
-             'before': '        monkeypatch.setattr(\n'
-                       '            turboquant_attn,\n'
-                       '            "is_workspace_manager_initialized",\n'
-                       '            lambda: True,\n'
-                       '        )\n'
-                       '\n'
-                       '        turboquant_attn.TurboQuantMetadataBuilder(\n'
-                       '            kv_cache_spec=self._fake_kv_cache_spec(),\n'
-                       '            layer_names=["layers.0.self_attn.attn"],\n'
-                       '            vllm_config=self._fake_vllm_config(),\n',
-             'after': '        monkeypatch.setattr(\n'
-                      '            turboquant_attn,\n'
-                      '            "is_workspace_manager_initialized",\n'
-                      '            lambda: True,\n'
-                      '        )\n'
-                      '        monkeypatch.setattr(\n'
-                      '            turboquant_attn.envs,\n'
-                      '            "VLLM_QWEN38_VISION_HEADROOM_BYTES",\n'
-                      '            1024,\n'
-                      '        )\n'
-                      '\n'
-                      '        turboquant_attn.TurboQuantMetadataBuilder(\n'
-                      '            kv_cache_spec=self._fake_kv_cache_spec(),\n'
-                      '            layer_names=["layers.0.self_attn.attn"],\n'
-                      '            vllm_config=self._fake_vllm_config(),\n',
-             'review_before': '            "is_workspace_manager_initialized",\n'
-                              '            lambda: True,\n'
-                              '        )\n'
-                              '\n'
-                              '        turboquant_attn.TurboQuantMetadataBuilder(\n'
-                              '            kv_cache_spec=self._fake_kv_cache_spec(),\n',
-             'review_after': '            "is_workspace_manager_initialized",\n'
-                             '            lambda: True,\n'
-                             '        )\n'
-                             '        monkeypatch.setattr(\n'
-                             '            turboquant_attn.envs,\n'
-                             '            "VLLM_QWEN38_VISION_HEADROOM_BYTES",\n'
-                             '            1024,\n'
-                             '        )\n'
-                             '\n'
-                             '        turboquant_attn.TurboQuantMetadataBuilder(\n'
-                             '            kv_cache_spec=self._fake_kv_cache_spec(),\n'},
-            {'name': 'tests/quantization/test_turboquant.py:landmark-3',
              'path': 'tests/quantization/test_turboquant.py',
              'before': '\n'
                        '        assert calls == [\n'
@@ -5516,11 +5461,6 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '                    ((1, 4, 8192, 128), torch.float16),\n'
                       '                    ((1, 4, 8192, 128), torch.float16),\n'
                       '                ),\n'
-                      '            ),\n'
-                      '            (\n'
-                      '                "raw-headroom",\n'
-                      '                "qwen38_vision_encoder_headroom",\n'
-                      '                1024,\n'
                       '            ),\n'
                       '        ]\n'
                       '\n',
@@ -5556,14 +5496,9 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '                    ((1, 4, 8192, 128), torch.float16),\n'
                              '                ),\n'
                              '            ),\n'
-                             '            (\n'
-                             '                "raw-headroom",\n'
-                             '                "qwen38_vision_encoder_headroom",\n'
-                             '                1024,\n'
-                             '            ),\n'
                              '        ]\n'
                              '\n'},
-            {'name': 'tests/quantization/test_turboquant.py:landmark-4',
+            {'name': 'tests/quantization/test_turboquant.py:landmark-3',
              'path': 'tests/quantization/test_turboquant.py',
              'before': '    def '
                        'test_metadata_builder_skips_continuation_prefill_when_disabled(\n'
@@ -5604,9 +5539,6 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '                calls.append(("reclaimable", name, '
                       'shapes_and_dtypes))\n'
                       '\n'
-                      '            def reserve_raw_cuda_headroom(self, name, size):\n'
-                      '                calls.append(("raw-headroom", name, size))\n'
-                      '\n'
                       '        monkeypatch.setattr(\n'
                       '            turboquant_attn,\n'
                       '            "current_workspace_manager",\n'
@@ -5635,60 +5567,9 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '                calls.append(("reclaimable", name, '
                              'shapes_and_dtypes))\n'
                              '\n'
-                             '            def reserve_raw_cuda_headroom(self, name, '
-                             'size):\n'
-                             '                calls.append(("raw-headroom", name, '
-                             'size))\n'
-                             '\n'
                              '        monkeypatch.setattr(\n'
                              '            turboquant_attn,\n'},
-            {'name': 'tests/quantization/test_turboquant.py:landmark-5',
-             'path': 'tests/quantization/test_turboquant.py',
-             'before': '        monkeypatch.setattr(\n'
-                       '            turboquant_attn,\n'
-                       '            "is_workspace_manager_initialized",\n'
-                       '            lambda: True,\n'
-                       '        )\n'
-                       '\n'
-                       '        turboquant_attn.TurboQuantMetadataBuilder(\n'
-                       '            kv_cache_spec=self._fake_kv_cache_spec(),\n'
-                       '            layer_names=["layers.0.self_attn.attn"],\n'
-                       '            '
-                       'vllm_config=self._fake_vllm_config(enable_chunked_prefill=False),\n',
-             'after': '        monkeypatch.setattr(\n'
-                      '            turboquant_attn,\n'
-                      '            "is_workspace_manager_initialized",\n'
-                      '            lambda: True,\n'
-                      '        )\n'
-                      '        monkeypatch.setattr(\n'
-                      '            turboquant_attn.envs,\n'
-                      '            "VLLM_QWEN38_VISION_HEADROOM_BYTES",\n'
-                      '            1024,\n'
-                      '        )\n'
-                      '\n'
-                      '        turboquant_attn.TurboQuantMetadataBuilder(\n'
-                      '            kv_cache_spec=self._fake_kv_cache_spec(),\n'
-                      '            layer_names=["layers.0.self_attn.attn"],\n'
-                      '            '
-                      'vllm_config=self._fake_vllm_config(enable_chunked_prefill=False),\n',
-             'review_before': '            "is_workspace_manager_initialized",\n'
-                              '            lambda: True,\n'
-                              '        )\n'
-                              '\n'
-                              '        turboquant_attn.TurboQuantMetadataBuilder(\n'
-                              '            kv_cache_spec=self._fake_kv_cache_spec(),\n',
-             'review_after': '            "is_workspace_manager_initialized",\n'
-                             '            lambda: True,\n'
-                             '        )\n'
-                             '        monkeypatch.setattr(\n'
-                             '            turboquant_attn.envs,\n'
-                             '            "VLLM_QWEN38_VISION_HEADROOM_BYTES",\n'
-                             '            1024,\n'
-                             '        )\n'
-                             '\n'
-                             '        turboquant_attn.TurboQuantMetadataBuilder(\n'
-                             '            kv_cache_spec=self._fake_kv_cache_spec(),\n'},
-            {'name': 'tests/quantization/test_turboquant.py:landmark-6',
+            {'name': 'tests/quantization/test_turboquant.py:landmark-4',
              'path': 'tests/quantization/test_turboquant.py',
              'before': '\n'
                        '        assert calls == [\n'
@@ -6024,44 +5905,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '    (restored,) = manager.get_reclaimable_simultaneous(\n'
                       '        "phase-local", ((64,), torch.float32)\n'
                       '    )\n'
-                      '    assert restored.shape == (64,)\n'
-                      '\n'
-                      '\n'
-                      'def '
-                      'test_raw_cuda_headroom_is_physically_freed_and_restored(monkeypatch):\n'
-                      '    allocations = []\n'
-                      '    frees = []\n'
-                      '\n'
-                      '    def allocate(size):\n'
-                      '        allocations.append(size)\n'
-                      '        return 0x1000 + len(allocations)\n'
-                      '\n'
-                      '    monkeypatch.setattr(workspace, '
-                      '"_raw_cuda_malloc_committed", allocate)\n'
-                      '    monkeypatch.setattr(workspace, "_raw_cuda_free", '
-                      'frees.append)\n'
-                      '    monkeypatch.setattr(torch.accelerator, "empty_cache", '
-                      'lambda: None)\n'
-                      '    manager = workspace.WorkspaceManager(torch.device("cuda"))\n'
-                      '\n'
-                      '    manager.reserve_raw_cuda_headroom("physical-headroom", '
-                      '1024)\n'
-                      '    manager.lock()\n'
-                      '    assert manager.release_reclaimable_workspaces() == 1024\n'
-                      '    with pytest.raises(AssertionError, match="Model phases must '
-                      'not overlap"):\n'
-                      '        manager.reserve_raw_cuda_headroom("physical-headroom", '
-                      '1024)\n'
-                      '    assert manager.restore_reclaimable_workspaces() == 1024\n'
-                      '\n'
-                      '    assert allocations == [1024, 1024]\n'
-                      '    assert frees == [0x1001]\n'
-                      '    manager.reserve_raw_cuda_headroom("physical-headroom", '
-                      '1024)\n'
-                      '    assert allocations == [1024, 1024]\n'
-                      '    with pytest.raises(AssertionError, match="changed size"):\n'
-                      '        manager.reserve_raw_cuda_headroom("physical-headroom", '
-                      '2048)\n',
+                      '    assert restored.shape == (64,)\n',
              'review_before': '',
              'review_after': '# SPDX-License-Identifier: Apache-2.0\n'
                              '# SPDX-FileCopyrightText: Copyright contributors to the '
@@ -6174,52 +6018,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    (restored,) = manager.get_reclaimable_simultaneous(\n'
                              '        "phase-local", ((64,), torch.float32)\n'
                              '    )\n'
-                             '    assert restored.shape == (64,)\n'
-                             '\n'
-                             '\n'
-                             'def '
-                             'test_raw_cuda_headroom_is_physically_freed_and_restored(monkeypatch):\n'
-                             '    allocations = []\n'
-                             '    frees = []\n'
-                             '\n'
-                             '    def allocate(size):\n'
-                             '        allocations.append(size)\n'
-                             '        return 0x1000 + len(allocations)\n'
-                             '\n'
-                             '    monkeypatch.setattr(workspace, '
-                             '"_raw_cuda_malloc_committed", allocate)\n'
-                             '    monkeypatch.setattr(workspace, "_raw_cuda_free", '
-                             'frees.append)\n'
-                             '    monkeypatch.setattr(torch.accelerator, '
-                             '"empty_cache", lambda: None)\n'
-                             '    manager = '
-                             'workspace.WorkspaceManager(torch.device("cuda"))\n'
-                             '\n'
-                             '    '
-                             'manager.reserve_raw_cuda_headroom("physical-headroom", '
-                             '1024)\n'
-                             '    manager.lock()\n'
-                             '    assert manager.release_reclaimable_workspaces() == '
-                             '1024\n'
-                             '    with pytest.raises(AssertionError, match="Model '
-                             'phases must not overlap"):\n'
-                             '        '
-                             'manager.reserve_raw_cuda_headroom("physical-headroom", '
-                             '1024)\n'
-                             '    assert manager.restore_reclaimable_workspaces() == '
-                             '1024\n'
-                             '\n'
-                             '    assert allocations == [1024, 1024]\n'
-                             '    assert frees == [0x1001]\n'
-                             '    '
-                             'manager.reserve_raw_cuda_headroom("physical-headroom", '
-                             '1024)\n'
-                             '    assert allocations == [1024, 1024]\n'
-                             '    with pytest.raises(AssertionError, match="changed '
-                             'size"):\n'
-                             '        '
-                             'manager.reserve_raw_cuda_headroom("physical-headroom", '
-                             '2048)\n'},
+                             '    assert restored.shape == (64,)\n'},
             {'name': 'vllm/entrypoints/anthropic/serving.py:landmark-1',
              'path': 'vllm/entrypoints/anthropic/serving.py',
              'before': '    def _convert_user_tool_result(\n'
@@ -6795,120 +6594,6 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'current_platform.get_max_output_tokens(input_length)\n'
                              '    fallback_max_tokens = (\n'
                              '        max_tokens\n'},
-            {'name': 'vllm/envs.py:landmark-1',
-             'path': 'vllm/envs.py',
-             'before': '    VLLM_MAX_AUDIO_DECODE_BYTES: int = 268_435_456\n'
-                       '    VLLM_MAX_AUDIO_PREPROCESS_WORKERS: int = max(1, '
-                       'min(os.cpu_count() or 1, 2))\n'
-                       '    VLLM_MAX_IMAGE_PIXELS: int = 178_956_970\n'
-                       '    VLLM_VIDEO_LOADER_BACKEND: str = "opencv"\n'
-                       '    VLLM_MEDIA_CONNECTOR: str = "http"\n'
-                       '    VLLM_MM_HASHER_ALGORITHM: str = "blake3"\n',
-             'after': '    VLLM_MAX_AUDIO_DECODE_BYTES: int = 268_435_456\n'
-                      '    VLLM_MAX_AUDIO_PREPROCESS_WORKERS: int = max(1, '
-                      'min(os.cpu_count() or 1, 2))\n'
-                      '    VLLM_MAX_IMAGE_PIXELS: int = 178_956_970\n'
-                      '    VLLM_QWEN38_VISION_HEADROOM_BYTES: int = 0\n'
-                      '    VLLM_VIDEO_LOADER_BACKEND: str = "opencv"\n'
-                      '    VLLM_MEDIA_CONNECTOR: str = "http"\n'
-                      '    VLLM_MM_HASHER_ALGORITHM: str = "blake3"\n',
-             'review_before': '    VLLM_MAX_AUDIO_DECODE_BYTES: int = 268_435_456\n'
-                              '    VLLM_MAX_AUDIO_PREPROCESS_WORKERS: int = max(1, '
-                              'min(os.cpu_count() or 1, 2))\n'
-                              '    VLLM_MAX_IMAGE_PIXELS: int = 178_956_970\n'
-                              '    VLLM_VIDEO_LOADER_BACKEND: str = "opencv"\n'
-                              '    VLLM_MEDIA_CONNECTOR: str = "http"\n'
-                              '    VLLM_MM_HASHER_ALGORITHM: str = "blake3"\n',
-             'review_after': '    VLLM_MAX_AUDIO_DECODE_BYTES: int = 268_435_456\n'
-                             '    VLLM_MAX_AUDIO_PREPROCESS_WORKERS: int = max(1, '
-                             'min(os.cpu_count() or 1, 2))\n'
-                             '    VLLM_MAX_IMAGE_PIXELS: int = 178_956_970\n'
-                             '    VLLM_QWEN38_VISION_HEADROOM_BYTES: int = 0\n'
-                             '    VLLM_VIDEO_LOADER_BACKEND: str = "opencv"\n'
-                             '    VLLM_MEDIA_CONNECTOR: str = "http"\n'
-                             '    VLLM_MM_HASHER_ALGORITHM: str = "blake3"\n'},
-            {'name': 'vllm/envs.py:landmark-2',
-             'path': 'vllm/envs.py',
-             'before': '    "VLLM_MAX_IMAGE_PIXELS": lambda: int(\n'
-                       '        os.getenv("VLLM_MAX_IMAGE_PIXELS", "178956970")\n'
-                       '    ),\n'
-                       '    # Backend for Video IO — selects the frame-sampling '
-                       'algorithm.\n'
-                       '    # - "opencv": uniform sampling.\n'
-                       '    # - "opencv_dynamic": duration-aware dynamic sampling.\n',
-             'after': '    "VLLM_MAX_IMAGE_PIXELS": lambda: int(\n'
-                      '        os.getenv("VLLM_MAX_IMAGE_PIXELS", "178956970")\n'
-                      '    ),\n'
-                      '    # Extra phase-local bytes reserved alongside the TurboQuant '
-                      'continuation\n'
-                      '    # workspace. The allocation is released while the mutually '
-                      'exclusive\n'
-                      '    # multimodal encoder runs, then restored before '
-                      'language-model execution.\n'
-                      '    # Default zero keeps upstream behaviour unchanged.\n'
-                      '    "VLLM_QWEN38_VISION_HEADROOM_BYTES": lambda: int(\n'
-                      '        os.getenv("VLLM_QWEN38_VISION_HEADROOM_BYTES", "0")\n'
-                      '    ),\n'
-                      '    # Backend for Video IO — selects the frame-sampling '
-                      'algorithm.\n'
-                      '    # - "opencv": uniform sampling.\n'
-                      '    # - "opencv_dynamic": duration-aware dynamic sampling.\n',
-             'review_before': '    "VLLM_MAX_IMAGE_PIXELS": lambda: int(\n'
-                              '        os.getenv("VLLM_MAX_IMAGE_PIXELS", '
-                              '"178956970")\n'
-                              '    ),\n'
-                              '    # Backend for Video IO — selects the frame-sampling '
-                              'algorithm.\n'
-                              '    # - "opencv": uniform sampling.\n'
-                              '    # - "opencv_dynamic": duration-aware dynamic '
-                              'sampling.\n',
-             'review_after': '    "VLLM_MAX_IMAGE_PIXELS": lambda: int(\n'
-                             '        os.getenv("VLLM_MAX_IMAGE_PIXELS", "178956970")\n'
-                             '    ),\n'
-                             '    # Extra phase-local bytes reserved alongside the '
-                             'TurboQuant continuation\n'
-                             '    # workspace. The allocation is released while the '
-                             'mutually exclusive\n'
-                             '    # multimodal encoder runs, then restored before '
-                             'language-model execution.\n'
-                             '    # Default zero keeps upstream behaviour unchanged.\n'
-                             '    "VLLM_QWEN38_VISION_HEADROOM_BYTES": lambda: int(\n'
-                             '        os.getenv("VLLM_QWEN38_VISION_HEADROOM_BYTES", '
-                             '"0")\n'
-                             '    ),\n'
-                             '    # Backend for Video IO — selects the frame-sampling '
-                             'algorithm.\n'
-                             '    # - "opencv": uniform sampling.\n'
-                             '    # - "opencv_dynamic": duration-aware dynamic '
-                             'sampling.\n'},
-            {'name': 'vllm/envs.py:landmark-3',
-             'path': 'vllm/envs.py',
-             'before': '        "VLLM_MAX_AUDIO_DECODE_BYTES",\n'
-                       '        "VLLM_MAX_AUDIO_PREPROCESS_WORKERS",\n'
-                       '        "VLLM_MAX_IMAGE_PIXELS",\n'
-                       '        "VLLM_VIDEO_LOADER_BACKEND",\n'
-                       '        "VLLM_MEDIA_CONNECTOR",\n'
-                       '        "VLLM_OBJECT_STORAGE_SHM_BUFFER_NAME",\n',
-             'after': '        "VLLM_MAX_AUDIO_DECODE_BYTES",\n'
-                      '        "VLLM_MAX_AUDIO_PREPROCESS_WORKERS",\n'
-                      '        "VLLM_MAX_IMAGE_PIXELS",\n'
-                      '        "VLLM_QWEN38_VISION_HEADROOM_BYTES",\n'
-                      '        "VLLM_VIDEO_LOADER_BACKEND",\n'
-                      '        "VLLM_MEDIA_CONNECTOR",\n'
-                      '        "VLLM_OBJECT_STORAGE_SHM_BUFFER_NAME",\n',
-             'review_before': '        "VLLM_MAX_AUDIO_DECODE_BYTES",\n'
-                              '        "VLLM_MAX_AUDIO_PREPROCESS_WORKERS",\n'
-                              '        "VLLM_MAX_IMAGE_PIXELS",\n'
-                              '        "VLLM_VIDEO_LOADER_BACKEND",\n'
-                              '        "VLLM_MEDIA_CONNECTOR",\n'
-                              '        "VLLM_OBJECT_STORAGE_SHM_BUFFER_NAME",\n',
-             'review_after': '        "VLLM_MAX_AUDIO_DECODE_BYTES",\n'
-                             '        "VLLM_MAX_AUDIO_PREPROCESS_WORKERS",\n'
-                             '        "VLLM_MAX_IMAGE_PIXELS",\n'
-                             '        "VLLM_QWEN38_VISION_HEADROOM_BYTES",\n'
-                             '        "VLLM_VIDEO_LOADER_BACKEND",\n'
-                             '        "VLLM_MEDIA_CONNECTOR",\n'
-                             '        "VLLM_OBJECT_STORAGE_SHM_BUFFER_NAME",\n'},
             {'name': 'vllm/model_executor/models/qwen3_vl.py:landmark-1',
              'path': 'vllm/model_executor/models/qwen3_vl.py',
              'before': '        )\n'
@@ -7604,34 +7289,6 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '            and not default_media_io_kwargs\n'},
             {'name': 'vllm/v1/attention/backends/turboquant_attn.py:landmark-1',
              'path': 'vllm/v1/attention/backends/turboquant_attn.py',
-             'before': 'import torch\n'
-                       'import torch.nn.functional as F\n'
-                       '\n'
-                       'from vllm.config import get_current_vllm_config\n'
-                       'from vllm.config.cache import CacheDType\n'
-                       'from vllm.logger import init_logger\n',
-             'after': 'import torch\n'
-                      'import torch.nn.functional as F\n'
-                      '\n'
-                      'import vllm.envs as envs\n'
-                      'from vllm.config import get_current_vllm_config\n'
-                      'from vllm.config.cache import CacheDType\n'
-                      'from vllm.logger import init_logger\n',
-             'review_before': 'import torch\n'
-                              'import torch.nn.functional as F\n'
-                              '\n'
-                              'from vllm.config import get_current_vllm_config\n'
-                              'from vllm.config.cache import CacheDType\n'
-                              'from vllm.logger import init_logger\n',
-             'review_after': 'import torch\n'
-                             'import torch.nn.functional as F\n'
-                             '\n'
-                             'import vllm.envs as envs\n'
-                             'from vllm.config import get_current_vllm_config\n'
-                             'from vllm.config.cache import CacheDType\n'
-                             'from vllm.logger import init_logger\n'},
-            {'name': 'vllm/v1/attention/backends/turboquant_attn.py:landmark-2',
-             'path': 'vllm/v1/attention/backends/turboquant_attn.py',
              'before': '# kernel can read them efficiently. This avoids O(cached_len) '
                        'dequant work\n'
                        '# per continuation, eliminating the O(N²/chunk_size) collapse '
@@ -7647,8 +7304,6 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '_CONTINUATION_DECODE_THRESHOLD = 128\n'
                       '_CONTINUATION_WORKSPACE_NAME = '
                       '"turboquant_continuation_prefill"\n'
-                      '_VISION_HEADROOM_WORKSPACE_NAME = '
-                      '"qwen38_vision_encoder_headroom"\n'
                       '\n'
                       '\n'
                       'def _soa_imports():\n',
@@ -7667,12 +7322,10 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '_CONTINUATION_DECODE_THRESHOLD = 128\n'
                              '_CONTINUATION_WORKSPACE_NAME = '
                              '"turboquant_continuation_prefill"\n'
-                             '_VISION_HEADROOM_WORKSPACE_NAME = '
-                             '"qwen38_vision_encoder_headroom"\n'
                              '\n'
                              '\n'
                              'def _soa_imports():\n'},
-            {'name': 'vllm/v1/attention/backends/turboquant_attn.py:landmark-3',
+            {'name': 'vllm/v1/attention/backends/turboquant_attn.py:landmark-2',
              'path': 'vllm/v1/attention/backends/turboquant_attn.py',
              'before': '        max_cached_len = max(0, model_config.max_model_len - '
                        '1)\n'
@@ -7683,39 +7336,19 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                        '        current_workspace_manager().get_simultaneous(\n'
                        '            (cache_buf_shape, torch.float16),\n'
                        '            (cache_buf_shape, torch.float16),\n'
-                       '        )\n'
-                       '\n'
-                       '    def build_for_cudagraph_capture(\n'
-                       '        self, common_attn_metadata: CommonAttentionMetadata\n',
+                       '        )\n',
              'after': '        max_cached_len = max(0, model_config.max_model_len - '
                       '1)\n'
                       '        alloc_len = round_up(max_cached_len, '
                       'self.kv_cache_spec.block_size)\n'
                       '        cache_buf_shape = (1, num_kv_heads, alloc_len, '
                       'head_size)\n'
-                      '        vision_headroom_bytes = '
-                      'envs.VLLM_QWEN38_VISION_HEADROOM_BYTES\n'
-                      '        if vision_headroom_bytes < 0:\n'
-                      '            raise ValueError(\n'
-                      '                "VLLM_QWEN38_VISION_HEADROOM_BYTES must be '
-                      'non-negative, got "\n'
-                      '                f"{vision_headroom_bytes}."\n'
-                      '            )\n'
                       '        '
                       'current_workspace_manager().get_reclaimable_simultaneous(\n'
                       '            _CONTINUATION_WORKSPACE_NAME,\n'
                       '            (cache_buf_shape, torch.float16),\n'
                       '            (cache_buf_shape, torch.float16),\n'
-                      '        )\n'
-                      '        if vision_headroom_bytes:\n'
-                      '            '
-                      'current_workspace_manager().reserve_raw_cuda_headroom(\n'
-                      '                _VISION_HEADROOM_WORKSPACE_NAME,\n'
-                      '                vision_headroom_bytes,\n'
-                      '            )\n'
-                      '\n'
-                      '    def build_for_cudagraph_capture(\n'
-                      '        self, common_attn_metadata: CommonAttentionMetadata\n',
+                      '        )\n',
              'review_before': '        max_cached_len = max(0, '
                               'model_config.max_model_len - 1)\n'
                               '        alloc_len = round_up(max_cached_len, '
@@ -7725,42 +7358,20 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                               '        current_workspace_manager().get_simultaneous(\n'
                               '            (cache_buf_shape, torch.float16),\n'
                               '            (cache_buf_shape, torch.float16),\n'
-                              '        )\n'
-                              '\n'
-                              '    def build_for_cudagraph_capture(\n'
-                              '        self, common_attn_metadata: '
-                              'CommonAttentionMetadata\n',
+                              '        )\n',
              'review_after': '        max_cached_len = max(0, '
                              'model_config.max_model_len - 1)\n'
                              '        alloc_len = round_up(max_cached_len, '
                              'self.kv_cache_spec.block_size)\n'
                              '        cache_buf_shape = (1, num_kv_heads, alloc_len, '
                              'head_size)\n'
-                             '        vision_headroom_bytes = '
-                             'envs.VLLM_QWEN38_VISION_HEADROOM_BYTES\n'
-                             '        if vision_headroom_bytes < 0:\n'
-                             '            raise ValueError(\n'
-                             '                "VLLM_QWEN38_VISION_HEADROOM_BYTES must '
-                             'be non-negative, got "\n'
-                             '                f"{vision_headroom_bytes}."\n'
-                             '            )\n'
                              '        '
                              'current_workspace_manager().get_reclaimable_simultaneous(\n'
                              '            _CONTINUATION_WORKSPACE_NAME,\n'
                              '            (cache_buf_shape, torch.float16),\n'
                              '            (cache_buf_shape, torch.float16),\n'
-                             '        )\n'
-                             '        if vision_headroom_bytes:\n'
-                             '            '
-                             'current_workspace_manager().reserve_raw_cuda_headroom(\n'
-                             '                _VISION_HEADROOM_WORKSPACE_NAME,\n'
-                             '                vision_headroom_bytes,\n'
-                             '            )\n'
-                             '\n'
-                             '    def build_for_cudagraph_capture(\n'
-                             '        self, common_attn_metadata: '
-                             'CommonAttentionMetadata\n'},
-            {'name': 'vllm/v1/attention/backends/turboquant_attn.py:landmark-4',
+                             '        )\n'},
+            {'name': 'vllm/v1/attention/backends/turboquant_attn.py:landmark-3',
              'path': 'vllm/v1/attention/backends/turboquant_attn.py',
              'before': '            # and the runtime allocations without increasing '
                        'reserved memory.\n'
@@ -7816,7 +7427,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '            )\n'
                              '            k_full = k_full_buf[:seq_len]\n'
                              '            v_full = v_full_buf[:seq_len]\n'},
-            {'name': 'vllm/v1/attention/backends/turboquant_attn.py:landmark-5',
+            {'name': 'vllm/v1/attention/backends/turboquant_attn.py:landmark-4',
              'path': 'vllm/v1/attention/backends/turboquant_attn.py',
              'before': '            buf_shape = (1, Hk, alloc_len, D)\n'
                        '            # MSE-key modes still need separate FP16 dequant '
@@ -7955,10 +7566,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '            scheduler_output\n'},
             {'name': 'vllm/v1/worker/workspace.py:landmark-1',
              'path': 'vllm/v1/worker/workspace.py',
-             'before': '# SPDX-License-Identifier: Apache-2.0\n'
-                       '# SPDX-FileCopyrightText: Copyright contributors to the vLLM '
-                       'project\n'
-                       '\n'
+             'before': '\n'
                        'import inspect\n'
                        'import os\n'
                        'from itertools import accumulate\n'
@@ -7966,11 +7574,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                        '\n'
                        'import torch\n'
                        '\n',
-             'after': '# SPDX-License-Identifier: Apache-2.0\n'
-                      '# SPDX-FileCopyrightText: Copyright contributors to the vLLM '
-                      'project\n'
-                      '\n'
-                      'import ctypes\n'
+             'after': '\n'
                       'import inspect\n'
                       'import os\n'
                       'from contextlib import contextmanager\n'
@@ -7980,10 +7584,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '\n'
                       'import torch\n'
                       '\n',
-             'review_before': '# SPDX-License-Identifier: Apache-2.0\n'
-                              '# SPDX-FileCopyrightText: Copyright contributors to the '
-                              'vLLM project\n'
-                              '\n'
+             'review_before': '\n'
                               'import inspect\n'
                               'import os\n'
                               'from itertools import accumulate\n'
@@ -7991,11 +7592,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                               '\n'
                               'import torch\n'
                               '\n',
-             'review_after': '# SPDX-License-Identifier: Apache-2.0\n'
-                             '# SPDX-FileCopyrightText: Copyright contributors to the '
-                             'vLLM project\n'
-                             '\n'
-                             'import ctypes\n'
+             'review_after': '\n'
                              'import inspect\n'
                              'import os\n'
                              'from contextlib import contextmanager\n'
@@ -8006,190 +7603,6 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'import torch\n'
                              '\n'},
             {'name': 'vllm/v1/worker/workspace.py:landmark-2',
-             'path': 'vllm/v1/worker/workspace.py',
-             'before': '_MB = 1024**2\n'
-                       '_GiB = 1024**3\n'
-                       '\n'
-                       '# Global workspace manager instance\n'
-                       '_manager: "WorkspaceManager | None" = None\n'
-                       '\n',
-             'after': '_MB = 1024**2\n'
-                      '_GiB = 1024**3\n'
-                      '\n'
-                      '_CUDA_SUCCESS = 0\n'
-                      '_cuda_runtime: ctypes.CDLL | None = None\n'
-                      '\n'
-                      '\n'
-                      'def _get_cuda_runtime() -> ctypes.CDLL:\n'
-                      '    """Load the CUDA 13 runtime pinned by the immutable serving '
-                      'image."""\n'
-                      '    global _cuda_runtime\n'
-                      '    if _cuda_runtime is None:\n'
-                      '        runtime = ctypes.CDLL("libcudart.so.13")\n'
-                      '        runtime.cudaMalloc.argtypes = [\n'
-                      '            ctypes.POINTER(ctypes.c_void_p),\n'
-                      '            ctypes.c_size_t,\n'
-                      '        ]\n'
-                      '        runtime.cudaMalloc.restype = ctypes.c_int\n'
-                      '        runtime.cudaMemset.argtypes = [\n'
-                      '            ctypes.c_void_p,\n'
-                      '            ctypes.c_int,\n'
-                      '            ctypes.c_size_t,\n'
-                      '        ]\n'
-                      '        runtime.cudaMemset.restype = ctypes.c_int\n'
-                      '        runtime.cudaFree.argtypes = [ctypes.c_void_p]\n'
-                      '        runtime.cudaFree.restype = ctypes.c_int\n'
-                      '        runtime.cudaDeviceSynchronize.argtypes = []\n'
-                      '        runtime.cudaDeviceSynchronize.restype = ctypes.c_int\n'
-                      '        runtime.cudaGetErrorString.argtypes = [ctypes.c_int]\n'
-                      '        runtime.cudaGetErrorString.restype = ctypes.c_char_p\n'
-                      '        _cuda_runtime = runtime\n'
-                      '    return _cuda_runtime\n'
-                      '\n'
-                      '\n'
-                      'def _check_cuda_runtime(status: int, operation: str) -> None:\n'
-                      '    if status == _CUDA_SUCCESS:\n'
-                      '        return\n'
-                      '    runtime = _get_cuda_runtime()\n'
-                      '    error = runtime.cudaGetErrorString(status)\n'
-                      '    detail = error.decode("utf-8", errors="replace") if error '
-                      'else "unknown error"\n'
-                      '    raise RuntimeError(f"{operation} failed with CUDA error '
-                      '{status}: {detail}")\n'
-                      '\n'
-                      '\n'
-                      'def _raw_cuda_malloc_committed(size: int) -> int:\n'
-                      '    """Allocate and physically commit bytes outside PyTorch\'s '
-                      'caching allocator."""\n'
-                      '    runtime = _get_cuda_runtime()\n'
-                      '    pointer = ctypes.c_void_p()\n'
-                      '    _check_cuda_runtime(\n'
-                      '        runtime.cudaMalloc(ctypes.byref(pointer), size),\n'
-                      '        f"cudaMalloc({size})",\n'
-                      '    )\n'
-                      '    if pointer.value is None:\n'
-                      '        raise RuntimeError("cudaMalloc succeeded without '
-                      'returning a pointer.")\n'
-                      '    try:\n'
-                      '        _check_cuda_runtime(\n'
-                      '            runtime.cudaMemset(pointer, 0, size),\n'
-                      '            f"cudaMemset({size})",\n'
-                      '        )\n'
-                      '        _check_cuda_runtime(\n'
-                      '            runtime.cudaDeviceSynchronize(),\n'
-                      '            "cudaDeviceSynchronize after headroom commit",\n'
-                      '        )\n'
-                      '    except BaseException:\n'
-                      '        runtime.cudaFree(pointer)\n'
-                      '        raise\n'
-                      '    return int(pointer.value)\n'
-                      '\n'
-                      '\n'
-                      'def _raw_cuda_free(pointer: int) -> None:\n'
-                      '    runtime = _get_cuda_runtime()\n'
-                      '    _check_cuda_runtime(\n'
-                      '        runtime.cudaFree(ctypes.c_void_p(pointer)),\n'
-                      '        "cudaFree(headroom)",\n'
-                      '    )\n'
-                      '\n'
-                      '# Global workspace manager instance\n'
-                      '_manager: "WorkspaceManager | None" = None\n'
-                      '\n',
-             'review_before': '_MB = 1024**2\n'
-                              '_GiB = 1024**3\n'
-                              '\n'
-                              '# Global workspace manager instance\n'
-                              '_manager: "WorkspaceManager | None" = None\n'
-                              '\n',
-             'review_after': '_MB = 1024**2\n'
-                             '_GiB = 1024**3\n'
-                             '\n'
-                             '_CUDA_SUCCESS = 0\n'
-                             '_cuda_runtime: ctypes.CDLL | None = None\n'
-                             '\n'
-                             '\n'
-                             'def _get_cuda_runtime() -> ctypes.CDLL:\n'
-                             '    """Load the CUDA 13 runtime pinned by the immutable '
-                             'serving image."""\n'
-                             '    global _cuda_runtime\n'
-                             '    if _cuda_runtime is None:\n'
-                             '        runtime = ctypes.CDLL("libcudart.so.13")\n'
-                             '        runtime.cudaMalloc.argtypes = [\n'
-                             '            ctypes.POINTER(ctypes.c_void_p),\n'
-                             '            ctypes.c_size_t,\n'
-                             '        ]\n'
-                             '        runtime.cudaMalloc.restype = ctypes.c_int\n'
-                             '        runtime.cudaMemset.argtypes = [\n'
-                             '            ctypes.c_void_p,\n'
-                             '            ctypes.c_int,\n'
-                             '            ctypes.c_size_t,\n'
-                             '        ]\n'
-                             '        runtime.cudaMemset.restype = ctypes.c_int\n'
-                             '        runtime.cudaFree.argtypes = [ctypes.c_void_p]\n'
-                             '        runtime.cudaFree.restype = ctypes.c_int\n'
-                             '        runtime.cudaDeviceSynchronize.argtypes = []\n'
-                             '        runtime.cudaDeviceSynchronize.restype = '
-                             'ctypes.c_int\n'
-                             '        runtime.cudaGetErrorString.argtypes = '
-                             '[ctypes.c_int]\n'
-                             '        runtime.cudaGetErrorString.restype = '
-                             'ctypes.c_char_p\n'
-                             '        _cuda_runtime = runtime\n'
-                             '    return _cuda_runtime\n'
-                             '\n'
-                             '\n'
-                             'def _check_cuda_runtime(status: int, operation: str) -> '
-                             'None:\n'
-                             '    if status == _CUDA_SUCCESS:\n'
-                             '        return\n'
-                             '    runtime = _get_cuda_runtime()\n'
-                             '    error = runtime.cudaGetErrorString(status)\n'
-                             '    detail = error.decode("utf-8", errors="replace") if '
-                             'error else "unknown error"\n'
-                             '    raise RuntimeError(f"{operation} failed with CUDA '
-                             'error {status}: {detail}")\n'
-                             '\n'
-                             '\n'
-                             'def _raw_cuda_malloc_committed(size: int) -> int:\n'
-                             '    """Allocate and physically commit bytes outside '
-                             'PyTorch\'s caching allocator."""\n'
-                             '    runtime = _get_cuda_runtime()\n'
-                             '    pointer = ctypes.c_void_p()\n'
-                             '    _check_cuda_runtime(\n'
-                             '        runtime.cudaMalloc(ctypes.byref(pointer), '
-                             'size),\n'
-                             '        f"cudaMalloc({size})",\n'
-                             '    )\n'
-                             '    if pointer.value is None:\n'
-                             '        raise RuntimeError("cudaMalloc succeeded without '
-                             'returning a pointer.")\n'
-                             '    try:\n'
-                             '        _check_cuda_runtime(\n'
-                             '            runtime.cudaMemset(pointer, 0, size),\n'
-                             '            f"cudaMemset({size})",\n'
-                             '        )\n'
-                             '        _check_cuda_runtime(\n'
-                             '            runtime.cudaDeviceSynchronize(),\n'
-                             '            "cudaDeviceSynchronize after headroom '
-                             'commit",\n'
-                             '        )\n'
-                             '    except BaseException:\n'
-                             '        runtime.cudaFree(pointer)\n'
-                             '        raise\n'
-                             '    return int(pointer.value)\n'
-                             '\n'
-                             '\n'
-                             'def _raw_cuda_free(pointer: int) -> None:\n'
-                             '    runtime = _get_cuda_runtime()\n'
-                             '    _check_cuda_runtime(\n'
-                             '        runtime.cudaFree(ctypes.c_void_p(pointer)),\n'
-                             '        "cudaFree(headroom)",\n'
-                             '    )\n'
-                             '\n'
-                             '# Global workspace manager instance\n'
-                             '_manager: "WorkspaceManager | None" = None\n'
-                             '\n'},
-            {'name': 'vllm/v1/worker/workspace.py:landmark-3',
              'path': 'vllm/v1/worker/workspace.py',
              'before': '        self._current_workspaces: list[torch.Tensor | None] = '
                        '[\n'
@@ -8205,9 +7618,6 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '        self._reclaimable_workspaces: dict[str, '
                       'list[torch.Tensor | None]] = {}\n'
                       '        self._reclaimable_workspace_sizes: dict[str, list[int]] '
-                      '= {}\n'
-                      '        self._raw_cuda_headroom_sizes: dict[str, int] = {}\n'
-                      '        self._raw_cuda_headroom_pointers: dict[str, int | None] '
                       '= {}\n'
                       '        self._reclaimable_workspaces_released = False\n'
                       '        self._locked: bool = False\n'
@@ -8228,15 +7638,11 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'list[torch.Tensor | None]] = {}\n'
                              '        self._reclaimable_workspace_sizes: dict[str, '
                              'list[int]] = {}\n'
-                             '        self._raw_cuda_headroom_sizes: dict[str, int] = '
-                             '{}\n'
-                             '        self._raw_cuda_headroom_pointers: dict[str, int '
-                             '| None] = {}\n'
                              '        self._reclaimable_workspaces_released = False\n'
                              '        self._locked: bool = False\n'
                              '\n'
                              '    @staticmethod\n'},
-            {'name': 'vllm/v1/worker/workspace.py:landmark-4',
+            {'name': 'vllm/v1/worker/workspace.py:landmark-3',
              'path': 'vllm/v1/worker/workspace.py',
              'before': '            for i in range(len(shapes_and_dtypes))\n'
                        '        ]\n'
@@ -8343,69 +7749,6 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '            for i in range(len(shapes_and_dtypes))\n'
                       '        ]\n'
                       '\n'
-                      '    def reserve_raw_cuda_headroom(self, name: str, size: int) '
-                      '-> None:\n'
-                      '        """Reserve driver-visible CUDA memory that can be freed '
-                      'for another phase.\n'
-                      '\n'
-                      '        PyTorch caching-allocator segments can remain '
-                      'physically mapped after every\n'
-                      '        tensor view is dropped and ``empty_cache`` is called. '
-                      'Such a tensor is not a\n'
-                      '        valid defensive headroom guarantee. This reservation '
-                      'deliberately lives\n'
-                      '        outside the caching allocator: ``cudaFree`` must '
-                      'increase driver-visible\n'
-                      '        free memory before the vision encoder begins, and '
-                      '``cudaMalloc`` restores\n'
-                      '        the same committed reservation before text execution '
-                      'resumes.\n'
-                      '        """\n'
-                      '        if self._reclaimable_workspaces_released:\n'
-                      '            raise AssertionError(\n'
-                      '                f"Raw CUDA headroom \'{name}\' was requested '
-                      'while reclaimable "\n'
-                      '                "workspaces are released. Model phases must not '
-                      'overlap."\n'
-                      '            )\n'
-                      '        if self._device.type != "cuda":\n'
-                      '            raise AssertionError(\n'
-                      '                f"Raw CUDA headroom \'{name}\' requires a CUDA '
-                      'workspace manager."\n'
-                      '            )\n'
-                      '        if size <= 0:\n'
-                      '            raise ValueError(f"Raw CUDA headroom size must be '
-                      'positive, got {size}.")\n'
-                      '\n'
-                      '        previous_size = '
-                      'self._raw_cuda_headroom_sizes.get(name)\n'
-                      '        if previous_size is not None:\n'
-                      '            if previous_size != size:\n'
-                      '                raise AssertionError(\n'
-                      '                    f"Raw CUDA headroom \'{name}\' changed size '
-                      'from "\n'
-                      '                    f"{previous_size} to {size} bytes."\n'
-                      '                )\n'
-                      '            assert self._raw_cuda_headroom_pointers[name] is '
-                      'not None\n'
-                      '            return\n'
-                      '        if self._locked:\n'
-                      '            raise AssertionError(\n'
-                      '                f"Raw CUDA headroom \'{name}\' cannot be added '
-                      'after workspace lock."\n'
-                      '            )\n'
-                      '\n'
-                      '        pointer = _raw_cuda_malloc_committed(size)\n'
-                      '        self._raw_cuda_headroom_sizes[name] = size\n'
-                      '        self._raw_cuda_headroom_pointers[name] = pointer\n'
-                      '        if envs.VLLM_DEBUG_WORKSPACE:\n'
-                      '            logger.info(\n'
-                      '                "[WORKSPACE DEBUG] Reserved raw CUDA headroom '
-                      '\'%s\': %.2f MB",\n'
-                      '                name,\n'
-                      '                size / _MB,\n'
-                      '            )\n'
-                      '\n'
                       '    def _driver_free_bytes(self) -> int | None:\n'
                       '        if self._device.type != "cuda":\n'
                       '            return None\n'
@@ -8424,13 +7767,6 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       'envs.VLLM_DEBUG_WORKSPACE else None\n'
                       '        )\n'
                       '        released_bytes = 0\n'
-                      '        for name, pointer in '
-                      'self._raw_cuda_headroom_pointers.items():\n'
-                      '            assert pointer is not None\n'
-                      '            _raw_cuda_free(pointer)\n'
-                      '            self._raw_cuda_headroom_pointers[name] = None\n'
-                      '            released_bytes += '
-                      'self._raw_cuda_headroom_sizes[name]\n'
                       '        for workspaces in '
                       'self._reclaimable_workspaces.values():\n'
                       '            released_bytes += '
@@ -8491,13 +7827,6 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       'device=self._device\n'
                       '                )\n'
                       '                restored_bytes += size\n'
-                      '        for name, size in '
-                      'self._raw_cuda_headroom_sizes.items():\n'
-                      '            assert self._raw_cuda_headroom_pointers[name] is '
-                      'None\n'
-                      '            self._raw_cuda_headroom_pointers[name] = '
-                      '_raw_cuda_malloc_committed(size)\n'
-                      '            restored_bytes += size\n'
                       '        self._reclaimable_workspaces_released = False\n'
                       '\n'
                       '        if envs.VLLM_DEBUG_WORKSPACE and restored_bytes:\n'
@@ -8634,70 +7963,6 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '            for i in range(len(shapes_and_dtypes))\n'
                              '        ]\n'
                              '\n'
-                             '    def reserve_raw_cuda_headroom(self, name: str, size: '
-                             'int) -> None:\n'
-                             '        """Reserve driver-visible CUDA memory that can '
-                             'be freed for another phase.\n'
-                             '\n'
-                             '        PyTorch caching-allocator segments can remain '
-                             'physically mapped after every\n'
-                             '        tensor view is dropped and ``empty_cache`` is '
-                             'called. Such a tensor is not a\n'
-                             '        valid defensive headroom guarantee. This '
-                             'reservation deliberately lives\n'
-                             '        outside the caching allocator: ``cudaFree`` must '
-                             'increase driver-visible\n'
-                             '        free memory before the vision encoder begins, '
-                             'and ``cudaMalloc`` restores\n'
-                             '        the same committed reservation before text '
-                             'execution resumes.\n'
-                             '        """\n'
-                             '        if self._reclaimable_workspaces_released:\n'
-                             '            raise AssertionError(\n'
-                             '                f"Raw CUDA headroom \'{name}\' was '
-                             'requested while reclaimable "\n'
-                             '                "workspaces are released. Model phases '
-                             'must not overlap."\n'
-                             '            )\n'
-                             '        if self._device.type != "cuda":\n'
-                             '            raise AssertionError(\n'
-                             '                f"Raw CUDA headroom \'{name}\' requires '
-                             'a CUDA workspace manager."\n'
-                             '            )\n'
-                             '        if size <= 0:\n'
-                             '            raise ValueError(f"Raw CUDA headroom size '
-                             'must be positive, got {size}.")\n'
-                             '\n'
-                             '        previous_size = '
-                             'self._raw_cuda_headroom_sizes.get(name)\n'
-                             '        if previous_size is not None:\n'
-                             '            if previous_size != size:\n'
-                             '                raise AssertionError(\n'
-                             '                    f"Raw CUDA headroom \'{name}\' '
-                             'changed size from "\n'
-                             '                    f"{previous_size} to {size} bytes."\n'
-                             '                )\n'
-                             '            assert '
-                             'self._raw_cuda_headroom_pointers[name] is not None\n'
-                             '            return\n'
-                             '        if self._locked:\n'
-                             '            raise AssertionError(\n'
-                             '                f"Raw CUDA headroom \'{name}\' cannot be '
-                             'added after workspace lock."\n'
-                             '            )\n'
-                             '\n'
-                             '        pointer = _raw_cuda_malloc_committed(size)\n'
-                             '        self._raw_cuda_headroom_sizes[name] = size\n'
-                             '        self._raw_cuda_headroom_pointers[name] = '
-                             'pointer\n'
-                             '        if envs.VLLM_DEBUG_WORKSPACE:\n'
-                             '            logger.info(\n'
-                             '                "[WORKSPACE DEBUG] Reserved raw CUDA '
-                             'headroom \'%s\': %.2f MB",\n'
-                             '                name,\n'
-                             '                size / _MB,\n'
-                             '            )\n'
-                             '\n'
                              '    def _driver_free_bytes(self) -> int | None:\n'
                              '        if self._device.type != "cuda":\n'
                              '            return None\n'
@@ -8717,14 +7982,6 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'envs.VLLM_DEBUG_WORKSPACE else None\n'
                              '        )\n'
                              '        released_bytes = 0\n'
-                             '        for name, pointer in '
-                             'self._raw_cuda_headroom_pointers.items():\n'
-                             '            assert pointer is not None\n'
-                             '            _raw_cuda_free(pointer)\n'
-                             '            self._raw_cuda_headroom_pointers[name] = '
-                             'None\n'
-                             '            released_bytes += '
-                             'self._raw_cuda_headroom_sizes[name]\n'
                              '        for workspaces in '
                              'self._reclaimable_workspaces.values():\n'
                              '            released_bytes += '
@@ -8790,13 +8047,6 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'device=self._device\n'
                              '                )\n'
                              '                restored_bytes += size\n'
-                             '        for name, size in '
-                             'self._raw_cuda_headroom_sizes.items():\n'
-                             '            assert '
-                             'self._raw_cuda_headroom_pointers[name] is None\n'
-                             '            self._raw_cuda_headroom_pointers[name] = '
-                             '_raw_cuda_malloc_committed(size)\n'
-                             '            restored_bytes += size\n'
                              '        self._reclaimable_workspaces_released = False\n'
                              '\n'
                              '        if envs.VLLM_DEBUG_WORKSPACE and '
@@ -8827,7 +8077,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '        """Ensure workspace is allocated and large '
                              'enough, return current workspace.\n'
                              '\n'},
-            {'name': 'vllm/v1/worker/workspace.py:landmark-5',
+            {'name': 'vllm/v1/worker/workspace.py:landmark-4',
              'path': 'vllm/v1/worker/workspace.py',
              'before': '    current_workspace_manager().lock()\n'
                        '\n'
@@ -11463,13 +10713,13 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'review_after': ''})},
  {'name': 'qwen38-numerical-audits',
   'review_patch': 'patches/vllm-qwen38-numerical-audits.patch',
-  'review_sha256': 'a73aa2f2ae3f82010eb2bafcdf663c2fe14854c30165dbc4d8457725bc3b6632',
+  'review_sha256': 'dc0b947db3727b522427a204edd1a930d637476a0f66d7d30e2da65c144ac944',
   'files': ({'path': 'tests/quantization/test_turboquant.py',
-             'before_sha256': '262bf8425ce30fdcf424936bc5e154ab9ca98049401b55c45bc611e4362ca416',
-             'after_sha256': '6b872b2d50c047bee80a190678305f8962bb837cc48cac745cbda49acb154d7d'},
+             'before_sha256': '799ff914f92b4acfd52d698c1625a8db96356576ceb2728c6aee18742ee32729',
+             'after_sha256': '3df754d759133bfbc1e0b7526f38eeec620a0e0405417ae1b352713bccb76963'},
             {'path': 'vllm/v1/attention/backends/turboquant_attn.py',
-             'before_sha256': '1ae979841b20ffc2d0db63b30a9ecc4928548b9854983fd98aa9c2c0808e441d',
-             'after_sha256': '59faab97fa3331028ac76dc63732e6eca239d0f7a83b79e18fd30c6d9b92c2df'}),
+             'before_sha256': '3da6b10ab399fdc3bba4fbda85dd0c86c99fccf6c998061d68096ba5649646aa',
+             'after_sha256': '160a62e69c0f974a31f91227f2a901314fab0252b7cecb6f5150f634dc921849'}),
   'edits': ({'name': 'tests/quantization/test_turboquant.py:landmark-1',
              'path': 'tests/quantization/test_turboquant.py',
              'before': '\n'
@@ -12052,7 +11302,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'import contextlib\n'})},
  {'name': 'turboquant-fail-closed-guards',
   'review_patch': 'patches/vllm-turboquant-fail-closed-guards.patch',
-  'review_sha256': '7282d1d4d7a17b40ab8626c82f478bbb938c548451b7793df8233562a9e24c7c',
+  'review_sha256': '099bbb99806151fbce342bb4863b32b12fb741669169a3a30365f77b4176bc0d',
   'files': ({'path': 'vllm/v1/attention/ops/triton_turboquant_store.py',
              'before_sha256': '6e6e2fe74a307d40f0be786ccbaea76d989e3c7b5985f3144a5218c61bf6d902',
              'after_sha256': '298645bff68c6adab58261862602b86e7e714c3552a9fd89102d9ccd2b83e9f7'},
@@ -12060,8 +11310,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': '8e52678136449e4bbca2195fbcbb87426c955a2b1b8422e7ab9511e45ee5f5c6',
              'after_sha256': 'dab8b65ab7ddd6582de16e1fc7b1360ab0061b4a2a2b114f5d87ea0532fd726f'},
             {'path': 'vllm/v1/attention/backends/turboquant_attn.py',
-             'before_sha256': '59faab97fa3331028ac76dc63732e6eca239d0f7a83b79e18fd30c6d9b92c2df',
-             'after_sha256': 'ccda36577e4fb0052f370169dce4b649bad890b8b440a82e584acd3dd92a6d86'}),
+             'before_sha256': '160a62e69c0f974a31f91227f2a901314fab0252b7cecb6f5150f634dc921849',
+             'after_sha256': 'c3fef60cfa031a139bed6f413b2c40d0ea3bc6b48992455404a09459abbfa282'}),
   'edits': ({'name': 'vllm/v1/attention/ops/triton_turboquant_store.py:landmark-1',
              'path': 'vllm/v1/attention/ops/triton_turboquant_store.py',
              'before': '            mask=val_mask,\n'
@@ -34933,7 +34183,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'models; default) or\n'})},
  {'name': 'kv-capacity-in-declared-users',
   'review_patch': 'patches/vllm-kv-capacity-in-declared-users.patch',
-  'review_sha256': 'f9f65d2b4fd047d9553e0dc12f4b693575a0cc46aeb063dd855e3b280b4275e8',
+  'review_sha256': '7a3d2c0ce43e468ed2177f567ac1eb31a70a95e525496a2d8b27f3330f214441',
   'files': ({'path': 'tests/config/test_config_utils.py',
              'before_sha256': 'ca93f4a4de7c00f353e1de0f73a81ff632c5731c15904aec4bcb165b751ddd87',
              'after_sha256': '4f5ea0399cc3b4f9603df07e2cc26d32e1eddf6b98a36c0f30d580321879c038'},
@@ -35019,8 +34269,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': '52de4ac99489e004ef6c61d0bedc84aa96020dd58b8bd1ae500814b548b2b83e',
              'after_sha256': '79f9bb1212884746964a347f7e4b39087b5ac084b1d72821a12efd2fb85bcb03'},
             {'path': 'vllm/envs.py',
-             'before_sha256': 'aa4b30a470704dc5de3adce2a125c10d53c238bfad301b529c3dbd13cdae08b7',
-             'after_sha256': 'f16ede7c57f56f6be1f0d038aa7b279ea93d26ee5f8d5a19b9aed8d67a64e08e'},
+             'before_sha256': '6bca0f24e5e9eec31b374c17cd9a7dac8cc548c95a9846826c08c62d4e04189f',
+             'after_sha256': '8deb7d4d06ed01a6088501286c282c12427c3d80f24a80aa19f390d7a6bbf422'},
             {'path': 'vllm/v1/core/kv_cache_utils.py',
              'before_sha256': '6a9e86af1cf129555535e66eb966faf5e21a974c4b6e7ba6a81af40c29501cfa',
              'after_sha256': '79c7730dbfe63a3ae177507629aa19864eab52796a239ebcbce315fe98dbb407'},
@@ -117604,7 +116854,7 @@ FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5d
  'tests/parser/engine/test_seed_oss.py': '9f2af2c75f71c6fb280f2a2a4a2bb8eaecf1c919c083e6c925f6d6f81cc2c236',
  'tests/parser/engine/test_token_id_scanner.py': '5e4524f0bc2096c0962246eac497ad014f7da4026d5265a39e3fea52d2a0a0e8',
  'tests/parser/engine/trace_builder.py': '12311dc9d1686394bc7b4499e32b353dabe02c650942c0c9d3d376da5e55fcb0',
- 'tests/quantization/test_turboquant.py': '6b872b2d50c047bee80a190678305f8962bb837cc48cac745cbda49acb154d7d',
+ 'tests/quantization/test_turboquant.py': '3df754d759133bfbc1e0b7526f38eeec620a0e0405417ae1b352713bccb76963',
  'tests/renderers/test_hf.py': 'd6a2cc3febe2fc86138f019345a263018b63aea131541f9d82753c8d15260425',
  'tests/renderers/test_template_authorship.py': 'b2b34a541fa8d5e1155ab87d6d4e781c40bb01762042d44dd6da48668a32691d',
  'tests/test_request_input_bounds.py': '6d5796773be3daa15c1dc369bed3bb36fec877b4735389a6893d7236aa25cd38',
@@ -117642,7 +116892,7 @@ FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5d
  'tests/v1/structured_output/test_backend_xgrammar_stop_tokens.py': '5bccea5e5739b479439ef4be796dce56af686581064f6eb1ba0feab87238050a',
  'tests/v1/worker/test_gpu_model_runner_mm_gather.py': '7076e2415a3a1246d6f1e22e978a4c32e7b87713d6d7ae5743960c3d31592759',
  'tests/v1/worker/test_gpu_worker.py': '5a385d1aa588bb46b3b4356e08d9c45a115d6c616c66e804021e5458f388cbb3',
- 'tests/v1/worker/test_workspace.py': '26db5624d8b60db86792762c0f2765fe13ccaa6bfc82ce655c147379fd79b76e',
+ 'tests/v1/worker/test_workspace.py': 'b5aec4cedc880276f8dec0fa68b146e4802eb30c641839e3fc788126029b091f',
  'vllm/config/cache.py': '82ab839cacb2e30f62f485c9e3ea32440fbf27beef00d1c60220f9776eb1ef43',
  'vllm/config/model.py': '6a0b5fdcb292fef440ee59321b7db437dae2cd5fd80eb2372fa3647fb163a3cf',
  'vllm/config/reasoning.py': '29a3bb76af99f67a7706f365fbcd3362205ef8af9db46b7f167374e68f8146ae',
@@ -117686,7 +116936,7 @@ FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5d
  'vllm/entrypoints/serve/exception_handling/register.py': '258381b32ca89f2df8b1eeda31f67d6a97bbf351e940f214b5251ab61acfc92c',
  'vllm/entrypoints/serve/tokenize/protocol.py': 'df1c91d3627f2fefa92404f67e1a27b134aa887bffdfc75298d6f26cfdf87ac5',
  'vllm/entrypoints/serve/utils/api_utils.py': '3e3a36b5884cdcd7949b87de4e1077f197b33c96ff96b4a227489bcfa4153b44',
- 'vllm/envs.py': 'f16ede7c57f56f6be1f0d038aa7b279ea93d26ee5f8d5a19b9aed8d67a64e08e',
+ 'vllm/envs.py': '8deb7d4d06ed01a6088501286c282c12427c3d80f24a80aa19f390d7a6bbf422',
  'vllm/model_executor/kernels/linear/__init__.py': 'a75bc8943db386b6de3164963a2be22d44f93df24d62d07ce3736929d92cb1fc',
  'vllm/model_executor/models/qwen3_vl.py': 'ea95a10579dd80233621d50734af1b83f0230c3020d7a6f07f4715f7f491ab85',
  'vllm/multimodal/media/connector.py': '3f95bb96764cc7214c3a11e7f15e48525c5f65a2ba12c1185baa0d9e5108fc6e',
@@ -117721,7 +116971,7 @@ FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5d
  'vllm/tool_parsers/abstract_tool_parser.py': '91f4f3184e7f0eb6bc9e76d9ce4d3063cff58e0de8afc409038139e48314d0c8',
  'vllm/tool_parsers/structural_tag_registry.py': 'c4681b268008b4d4df5a3fd9d2dc08e802a783b1c45f05a99e858017b1c96cca',
  'vllm/tool_parsers/utils.py': '0399a0392644876bbcbdc2e9137b417aa842e7306a09a36d9836ef1d249de05d',
- 'vllm/v1/attention/backends/turboquant_attn.py': 'ccda36577e4fb0052f370169dce4b649bad890b8b440a82e584acd3dd92a6d86',
+ 'vllm/v1/attention/backends/turboquant_attn.py': 'c3fef60cfa031a139bed6f413b2c40d0ea3bc6b48992455404a09459abbfa282',
  'vllm/v1/attention/ops/triton_turboquant_decode.py': 'dab8b65ab7ddd6582de16e1fc7b1360ab0061b4a2a2b114f5d87ea0532fd726f',
  'vllm/v1/attention/ops/triton_turboquant_store.py': '298645bff68c6adab58261862602b86e7e714c3552a9fd89102d9ccd2b83e9f7',
  'vllm/v1/core/block_pool.py': '7370727256c2743a952053572503e6bd8f51c61edf8cddf030e34898c8d2903f',
@@ -117750,4 +117000,4 @@ FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5d
  'vllm/v1/worker/gpu_model_runner.py': 'a7bed200b304fdc17320a30178ded7669d4677e787947470b872ef0ec14b6c8b',
  'vllm/v1/worker/gpu_worker.py': 'fab29d47bdd160a1a5d9b6277ce482af86f42eb2e95b6dc53b46abc2b636d5bc',
  'vllm/v1/worker/startup_plan.py': '2f4f50c34201390e50e10b578bc4cd964a4f5729334225fc30d815bb704aa81f',
- 'vllm/v1/worker/workspace.py': 'b859dfdc5676f90a0b00718e34adcd0a02d266be1543ca146eebb724a9235c00'}
+ 'vllm/v1/worker/workspace.py': '168ceb92560698ad90016bf6a29a15776fe2a01ac7c27d67bfecc9cb5fc538c1'}
