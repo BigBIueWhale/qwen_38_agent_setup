@@ -1172,13 +1172,19 @@ LABEL org.opencontainers.image.revision="9df9b0b0a1816b6d0d0f6ecd0da563cc37fd72f
       qwen38.project="Qwen_best_model_ever" \
       qwen38.runtime.profile="${IMAGE_PROFILE_VERSION}"
 
+# DO_NOT_TRACK=1 turns off every usage report the image can send, whatever
+# starts it and whatever network it has: vLLM's usage reporter (stats.vllm.ai,
+# on by default upstream) reads it as VLLM_DO_NOT_TRACK, and huggingface_hub's
+# telemetry reads it too. One variable, so the property has one representation.
 ENV HOME=/home/vllm \
     VLLM_CACHE_ROOT=/home/vllm/.cache/vllm \
     XDG_CACHE_HOME=/home/vllm/.cache/vllm/xdg-cache \
     XDG_CONFIG_HOME=/home/vllm/.cache/vllm/xdg-config \
     CUDA_CACHE_PATH=/home/vllm/.cache/vllm/cuda \
     HF_HOME=/home/vllm/.cache/vllm/huggingface \
-    PYTHONDONTWRITEBYTECODE=1
+    PYTHONDONTWRITEBYTECODE=1 \
+    DO_NOT_TRACK=1
+RUN CUDA_VISIBLE_DEVICES= python3 -c 'from huggingface_hub import constants; from vllm.usage.usage_lib import is_usage_stats_enabled; assert not is_usage_stats_enabled(), "vLLM usage reporting is on"; assert constants.HF_HUB_DISABLE_TELEMETRY, "huggingface_hub telemetry is on"'
 
 USER 2000:0
 ENTRYPOINT ["vllm", "serve"]

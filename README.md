@@ -367,7 +367,7 @@ Pinned build inputs and products:
 |---|---|
 | Immutable base tag | qwen38-vllm:main-9df9b0b |
 | Immutable base ID | sha256:fa4a002a88b7043a1a89966dea8a500fe9696f84e75730d9da916f916048d401 |
-| Runtime Dockerfile SHA-256 | e431d44840b8c6250be313f61f83a4ac8bb2b744f0c7dca4abc62d7864b1cdf6 |
+| Runtime Dockerfile SHA-256 | b30a81d597b7e31eb61a4aa403775f4a0b1bf9d77a9be4ffc0f85293ac4711e8 |
 | Build verifier SHA-256 | 353a853dad8d888a95948918567c80ee195522f46a349d65e657a27446b33d32 |
 | Runtime validator SHA-256 | 39f818797bc1034a772f45d9059fd95115b25ed06c5cba75e890db39a7049027 |
 
@@ -474,11 +474,15 @@ The exact relevant environment includes:
 
     HF_HUB_OFFLINE=1
     TRANSFORMERS_OFFLINE=1
-    VLLM_NO_USAGE_STATS=1
     VLLM_ENFORCE_STRICT_TOOL_CALLING=1
     VLLM_QWEN38_VISION_HEADROOM_BYTES=671088640
     GLOO_SOCKET_IFNAME=lo
     NCCL_SOCKET_IFNAME=lo
+
+The image itself sets `DO_NOT_TRACK=1`, so usage reporting is off whatever
+starts it: vLLM's usage reporter (stats.vllm.ai, on by default upstream) and
+huggingface_hub's telemetry both read that one variable, and the build asserts
+both are off in the image it produces.
 
 Consequences:
 
