@@ -1,0 +1,158 @@
+diff --git a/tests/entrypoints/test_kv_scope_protocol.py b/tests/entrypoints/test_kv_scope_protocol.py
+index c54d0af012ebac01b502ec102a9424bcf80dead4..61f885017f9baa669c194f4a3bbb255f2c6ecbe1 100644
+--- a/tests/entrypoints/test_kv_scope_protocol.py
++++ b/tests/entrypoints/test_kv_scope_protocol.py
+@@ -331,6 +331,26 @@ def _app():
+     return app
+ 
+ 
++def test_every_mounted_generative_route_is_an_identity_surface():
++    # The generate router assembly must register every supported surface and
++    # must not contain a route that reaches the engine without being able to
++    # name an agent. A guarded registration would make the endpoint set
++    # depend on which optional SDKs happen to import, which is exactly the
++    # half-present shape this fork forbids.
++    paths = {getattr(route, "path", "") for route in _app().routes}
++    assert not any(path.startswith("/cohere") for path in paths), paths
++    assert "/generative_scoring" not in paths, sorted(paths)
++    for required in (
++        "/v1/chat/completions",
++        "/v1/chat/completions/batch",
++        "/v1/completions",
++        "/v1/responses",
++        "/v1/messages",
++        "/inference/v1/generate",
++    ):
++        assert required in paths, (required, sorted(paths))
++
++
+ def _body_schema(schema: dict, path: str) -> dict:
+     content = schema["paths"][path]["post"]["requestBody"]["content"]
+     ref = content["application/json"]["schema"]
+diff --git a/vllm/entrypoints/generate/api_router.py b/vllm/entrypoints/generate/api_router.py
+index 92c564ac31dabcf7c5790d04d0f4d4f114d8357a..70486a8011217aea515cb58be7a8ef23039421ae 100644
+--- a/vllm/entrypoints/generate/api_router.py
++++ b/vllm/entrypoints/generate/api_router.py
+@@ -4,8 +4,6 @@ from typing import TYPE_CHECKING
+ 
+ from fastapi import FastAPI
+ 
+-import vllm.envs as envs
+-
+ if TYPE_CHECKING:
+     from argparse import Namespace
+ 
+@@ -43,15 +41,23 @@ def register_generate_api_routers(app: FastAPI):
+ 
+     register_anthropic_api_router(app)
+ 
+-    from vllm.entrypoints.cohere.api_router import (
+-        attach_router as register_cohere_api_router,
+-    )
+-
+-    register_cohere_api_router(app)
+-
+-    from .generative_scoring.api_router import register_generative_scoring_api_router
+-
+-    register_generative_scoring_api_router(app)
++    # The Cohere HTTP surface is deliberately not registered. Upstream gates
++    # it on a try/except import of the optional `cohere` SDK plus an env
++    # flag — an endpoint whose existence is the accident of what happens to
++    # be installed. This image is built --network none without that SDK, so
++    # the surface could never be imported, mounted, or verified; leaving the
++    # guarded registration in place would keep a half-present mode that a
++    # stray package install could silently activate. Its absence is enforced
++    # here instead, and the image build asserts no /cohere route exists.
++    #
++    # /generative_scoring is withheld for the same reason, from the other
++    # direction: it reaches the engine's generative path, so its blocks land
++    # in the host KV tier, but its request model names no agent and there is
++    # no agent for a one-shot scoring call to name. Every mounted generative
++    # route on this server is an identity surface, and a route whose only
++    # possible answer is "you named no agent" is exactly the half-present
++    # mode the Cohere removal exists to prevent. The image build asserts no
++    # /generative_scoring route exists.
+ 
+ 
+ async def init_generate_state(
+@@ -64,22 +70,6 @@ async def init_generate_state(
+     from vllm.entrypoints.anthropic.serving import AnthropicServingMessages
+     from vllm.entrypoints.chat_utils import load_chat_template
+ 
+-    # The Cohere serving handler depends on the optional `cohere` SDK for
+-    # its wire-format protocol models, and is additionally gated on the
+-    # `VLLM_ENABLE_COHERE_API` env flag (see
+-    # `vllm.entrypoints.cohere.api_router.attach_router`). Skip the import
+-    # entirely when the endpoint isn't going to be exposed, both because
+-    # the SDK may not be installed and because the serving object holds
+-    # nontrivial state (chat handler, warmup) that would otherwise be
+-    # unused.
+-    if envs.VLLM_ENABLE_COHERE_API:
+-        try:
+-            from vllm.entrypoints.cohere.serving import CohereServingChatV2
+-        except ImportError:
+-            CohereServingChatV2 = None  # type: ignore[assignment,misc]
+-    else:
+-        CohereServingChatV2 = None  # type: ignore[assignment,misc]
+-
+     from vllm.entrypoints.mcp.tool_server import (
+         DemoToolServer,
+         MCPToolServer,
+@@ -212,32 +202,9 @@ async def init_generate_state(
+         if "generate" in supported_tasks
+         else None
+     )
+-    state.cohere_serving_chat_v2 = (
+-        CohereServingChatV2(
+-            engine_client,
+-            state.openai_serving_models,
+-            args.response_role,
+-            online_renderer=state.online_renderer,
+-            request_logger=request_logger,
+-            chat_template=resolved_chat_template,
+-            chat_template_content_format=args.chat_template_content_format,
+-            return_tokens_as_token_ids=args.return_tokens_as_token_ids,
+-            enable_auto_tools=args.enable_auto_tool_choice,
+-            tool_parser=args.tool_call_parser,
+-            reasoning_parser=args.structured_outputs_config.reasoning_parser,
+-            enable_prompt_tokens_details=args.enable_prompt_tokens_details,
+-            enable_force_include_usage=args.enable_force_include_usage,
+-            default_chat_template_kwargs=default_chat_template_kwargs,
+-            is_reasoning_model=args.cohere_is_reasoning_model,
+-        )
+-        if CohereServingChatV2 is not None and "generate" in supported_tasks
+-        else None
+-    )
+ 
+-    from .generative_scoring.serving import ServingGenerativeScoring
+-
+-    state.serving_generative_scoring = ServingGenerativeScoring(
+-        engine_client,
+-        state.openai_serving_models,
+-        request_logger=request_logger,
+-    )
++    # No serving_generative_scoring handler is built: /generative_scoring is
++    # not mounted, because it reaches the engine's generative path while its
++    # request model names no agent, and the host KV tier has no context to
++    # file such blocks under. Constructing the handler anyway would leave a
++    # reachable object for a stray registration to pick up.
+diff --git a/vllm/entrypoints/openai/cli_args.py b/vllm/entrypoints/openai/cli_args.py
+index b387fb63573ab05f527850742c2012c38ec6b853..4f39b449b8f03cf9e948fb4a74ceda8d23b98e73 100644
+--- a/vllm/entrypoints/openai/cli_args.py
++++ b/vllm/entrypoints/openai/cli_args.py
+@@ -148,15 +148,6 @@ class BaseFrontendArgs:
+     """If set to False, output deltas will not be logged. Relevant only if 
+     --enable-log-outputs is set.
+     """
+-    cohere_is_reasoning_model: bool = True
+-    """Cohere ``/cohere/v2/chat`` only. Whether the served model is a
+-    reasoning Command-family model. When True (default), the assistant's
+-    chain-of-thought is surfaced as a ``thinking`` content block (or
+-    ``content-*`` events on the stream). When False, reasoning is
+-    surfaced as Cohere's ``tool_plan`` field (or ``tool-plan-delta``
+-    events) whenever the model emits tool calls, matching older non-
+-    reasoning Command models. Has no effect on the non-Cohere
+-    endpoints."""
+     cohere_format: str = "cmd4"
+     """Cohere ``--tokenizer-mode cohere`` only. Which Cohere prompt
+     format to render: ``cmd4`` (current Command A+ models; default) or

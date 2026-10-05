@@ -1092,26 +1092,8 @@ def _validate_kv_pin_after(state: State) -> None:
     )
 
 
-def _validate_shared_prefix_cache_before(state: State) -> None:
-    label = "shared prefix cache precondition"
-    spec = "vllm/v1/kv_offload/cpu/spec.py"
-    manager = "vllm/v1/kv_offload/cpu/manager.py"
-    cache = "vllm/config/cache.py"
-    # The byte-denominated and policy-selecting world this stage replaces.
-    require_text(
-        state,
-        spec,
-        'cpu_bytes_to_use must be specified in kv_connector_extra_config',
-        label=label,
-    )
-    require_text(
-        state, spec, 'self.extra_config.get("eviction_policy", "lru")', label=label
-    )
-    require_text(state, manager, "CachePolicyFactory", count=3, label=label)
-    require_text(state, cache, "kv_offloading_size: float | None = None", label=label)
-    require_text(
-        state, "vllm/v1/kv_offload/cpu/policies/factory.py", '"arc"', label=label
-    )
+def _validate_agent_id_before(state: State) -> None:
+    label = "generation agent ID precondition"
     for path in (
         "vllm/entrypoints/openai/chat_completion/protocol.py",
         "vllm/entrypoints/openai/completion/protocol.py",
@@ -1138,107 +1120,10 @@ def _validate_shared_prefix_cache_before(state: State) -> None:
         "async def generate(request: GenerateRequest, raw_request: Request):",
         label=label,
     )
-    generate_router = "vllm/entrypoints/generate/api_router.py"
-    require_text(
-        state, generate_router, "register_cohere_api_router(app)", label=label
-    )
-    require_text(
-        state, generate_router, "state.cohere_serving_chat_v2", label=label
-    )
-    require_text(
-        state,
-        "vllm/entrypoints/openai/cli_args.py",
-        "cohere_is_reasoning_model: bool = True",
-        label=label,
-    )
 
 
-def _validate_shared_prefix_cache_after(state: State) -> None:
-    label = "shared prefix cache result"
-    spec = "vllm/v1/kv_offload/cpu/spec.py"
-    manager = "vllm/v1/kv_offload/cpu/manager.py"
-    cache = "vllm/config/cache.py"
-    kv_utils = "vllm/v1/core/kv_cache_utils.py"
-
-    for path in (
-        "vllm/v1/kv_offload/cpu/policies/__init__.py",
-        "vllm/v1/kv_offload/cpu/policies/base.py",
-        "vllm/v1/kv_offload/cpu/policies/factory.py",
-        "vllm/v1/kv_offload/cpu/policies/lru.py",
-        "vllm/v1/kv_offload/cpu/policies/arc.py",
-        "tests/v1/kv_offload/cpu/policies/__init__.py",
-        "tests/v1/kv_offload/cpu/policies/test_factory.py",
-    ):
-        _require(path not in state, f"{label}: deleted policy module is present: {path}")
-    require_text(state, spec, "cpu_kv_cache_users must be specified", label=label)
-    require_text(state, spec, "Unknown kv_connector_extra_config keys", label=label)
-    require_text(state, spec, "self.num_blocks = cpu_kv_cache_users * chunks_per_user", label=label)
-    require_python_symbols(state, manager, {
-        "CPUOffloadingManager.__init__": ["self", "num_blocks", "enable_events"],
-    }, label=label)
-
-    # Lookup matches content and cache_salt alone, in every tier, as upstream
-    # does: no membership view, acquisition or per-agent catalog exists to
-    # make an ID with cached blocks miss data another ID computed.
-    for path in (
-        "vllm/v1/core/block_pool.py",
-        "vllm/v1/core/single_type_kv_cache_manager.py",
-        manager,
-        "vllm/v1/kv_offload/base.py",
-        "vllm/v1/kv_offload/tiering/manager.py",
-        "vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py",
-    ):
-        for text in ("prefix_cache.", "PrefixCache", "cache_view", "begin_lookup"):
-            forbid_text(state, path, text, label=label)
-    # The agent ID groups retention. Whole agents are released in
-    # least-recently-used order, never the storing one; references held by
-    # surviving contexts protect shared chunks; retained contexts are bounded
-    # by the chunk count; sparse rows record the data actually written.
-    for text in (
-        "self._references.setdefault(key, set()).add(req_id)",
-        "not required or not self._has_content(key, required, req_context)",
-        "self._references.get(key, set()) <= released_requests",
-        "if victim == agent_id:",
-        "self._forget_agent(victim)",
-        "if self._blocks[key].ref_cnt != 0:",
-        "while len(self._idle_context) > self._num_blocks:",
-        "        if key not in self._complete_blocks:",
-    ):
-        require_text(state, manager, text, label=label)
-    require_text(state, manager, "self._available_content[key] = content[key]",
-                 count=2, label=label)
-    # Attention growth keeps the block's earlier immutable prefix reachable.
-    require_text(state, "vllm/v1/core/block_pool.py", "*, is_recurrent: bool,",
-                 count=2, label=label)
-    tiering = "vllm/v1/kv_offload/tiering/manager.py"
-    require_text(state, tiering, "if success and complete_keys:", label=label)
-
-    # GPU tier: the byte flag is gone, the count is required, and the pool
-    # is derived rather than filled to whatever memory happened to be free.
-    require_text(state, cache, "kv_cache_users: int | None = None", label=label)
-    forbid_text(state, cache, "kv_offloading_size", label=label)
-    require_text(
-        state,
-        "vllm/engine/arg_utils.py",
-        '"--kv-cache-users", **cache_kwargs["kv_cache_users"]',
-        label=label,
-    )
-    forbid_text(state, "vllm/engine/arg_utils.py", "kv-cache-memory-bytes", label=label)
-    forbid_text(state, "vllm/engine/arg_utils.py", "kv_offloading_size", label=label)
-    require_text(
-        state, kv_utils, "needed_blocks = users * per_user_blocks + 1", label=label
-    )
-    require_text(
-        state, kv_utils, "--kv-cache-users was not", label=label
-    )
-    require_text(
-        state,
-        kv_utils,
-        "num_gpu_blocks_override cannot be combined",
-        label=label,
-    )
-    forbid_text(state, "vllm/config/vllm.py", "cpu_bytes_to_use", label=label)
-
+def _validate_agent_id_after(state: State) -> None:
+    label = "generation agent ID result"
     # Every generation request model requires the agent ID, and the served
     # schema says so; the render models it shares its shape with allocate no
     # KV and have no ID. The chat module carries the single conversation and
@@ -1295,6 +1180,191 @@ def _validate_shared_prefix_cache_after(state: State) -> None:
         "and a new, never-used kv_scope for a fork or a subagent",
     ):
         require_text(state, sampling, text, label=label)
+    input_processor = "vllm/v1/engine/input_processor.py"
+    require_text(
+        state, input_processor, "def require_kv_scope(params: SamplingParams) -> str:",
+        label=label,
+    )
+    require_text(state, input_processor, "require_kv_scope(params)", count=1, label=label)
+    _require_ordered(
+        _source(state, input_processor, label=label),
+        (
+            "scope = require_kv_scope_value(",
+            'params.extra_args.get("kv_scope") if params.extra_args else None',
+            'require_one_sequence(params.n, "n")',
+        ),
+        label=label,
+        location=input_processor,
+    )
+
+
+def _validate_attention_prefix_hash_before(state: State) -> None:
+    label = "attention prefix hash precondition"
+    block_pool = "vllm/v1/core/block_pool.py"
+    # added: the pool drops a grown block's earlier hash whatever the block holds.
+    forbid_text(state, block_pool, "is_recurrent", label=label)
+    require_text(
+        state, block_pool,
+        "removed_hashes = self._remove_cached_block_hashes(blk)", label=label,
+    )
+
+
+def _validate_attention_prefix_hash_after(state: State) -> None:
+    label = "attention prefix hash result"
+    # Attention growth keeps the block's earlier immutable prefix reachable.
+    require_text(state, "vllm/v1/core/block_pool.py", "*, is_recurrent: bool,",
+                 count=2, label=label)
+
+
+def _validate_grouped_geometry_before(state: State) -> None:
+    label = "grouped KV spec geometry precondition"
+    kv_utils = "vllm/v1/core/kv_cache_utils.py"
+    # added: classification reads the group's wrapper spec.
+    forbid_text(state, kv_utils, "get_kv_cache_spec_for_block_geometry", label=label)
+    require_text(state, kv_utils, "if isinstance(g.kv_cache_spec, AttentionSpec)",
+                 label=label)
+
+
+def _validate_grouped_geometry_after(state: State) -> None:
+    label = "grouped KV spec geometry result"
+    kv_utils = "vllm/v1/core/kv_cache_utils.py"
+    offload_config = "vllm/distributed/kv_transfer/kv_connector/v1/offloading/config.py"
+    scheduler = "vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py"
+    # added: every classification resolves a grouped spec to its layers' geometry.
+    require_python_symbols(state, kv_utils, {
+        "get_kv_cache_spec_for_block_geometry": ["kv_cache_spec"],
+    }, label=label)
+    _require_in_symbol(state, kv_utils, "resolve_kv_cache_block_sizes", (
+        "group_specs = [get_kv_cache_spec_for_block_geometry(g.kv_cache_spec) for g in groups]",
+        "for spec in group_specs",
+    ), label=label)
+    require_text(
+        state, offload_config,
+        "if isinstance(get_kv_cache_spec_for_block_geometry(group.kv_cache_spec), AttentionSpec)",
+        label=label,
+    )
+    require_text(state, offload_config, '"mamba_cache_mode", None)', label=label)
+    require_text(state, scheduler, "if spec.config.groups[idx].mamba_cache_mode in (",
+                 label=label)
+    require_text(
+        state, scheduler,
+        'requires_cow_source=spec.config.groups[idx].mamba_cache_mode == "align",',
+        label=label,
+    )
+    # The window classification resolves the grouped spec wherever it lives.
+    defining = [
+        path for path in (offload_config, scheduler)
+        if "def get_sliding_window_size_in_chunks(" in _source(state, path, label=label)
+    ]
+    _require(len(defining) == 1,
+             f"{label}: window classification defined in {defining!r}")
+    _require_in_symbol(state, defining[0], "get_sliding_window_size_in_chunks", (
+        "kv_cache_spec = get_kv_cache_spec_for_block_geometry(kv_cache_spec)",
+    ), label=label)
+
+
+def _validate_agent_retention_before(state: State) -> None:
+    label = "agent-grouped retention precondition"
+    spec = "vllm/v1/kv_offload/cpu/spec.py"
+    manager = "vllm/v1/kv_offload/cpu/manager.py"
+    # The policy-selecting world this stage replaces.
+    require_text(
+        state, spec, 'self.extra_config.get("eviction_policy", "lru")', label=label
+    )
+    require_text(state, manager, "CachePolicyFactory", count=3, label=label)
+    require_text(
+        state, "vllm/v1/kv_offload/cpu/policies/factory.py", '"arc"', label=label
+    )
+
+
+def _validate_agent_retention_after(state: State) -> None:
+    label = "agent-grouped retention result"
+    spec = "vllm/v1/kv_offload/cpu/spec.py"
+    manager = "vllm/v1/kv_offload/cpu/manager.py"
+    tiering = "vllm/v1/kv_offload/tiering/manager.py"
+    for path in (
+        "vllm/v1/kv_offload/cpu/policies/__init__.py",
+        "vllm/v1/kv_offload/cpu/policies/base.py",
+        "vllm/v1/kv_offload/cpu/policies/factory.py",
+        "vllm/v1/kv_offload/cpu/policies/lru.py",
+        "vllm/v1/kv_offload/cpu/policies/arc.py",
+        "tests/v1/kv_offload/cpu/policies/__init__.py",
+        "tests/v1/kv_offload/cpu/policies/test_factory.py",
+    ):
+        _require(path not in state, f"{label}: deleted policy module is present: {path}")
+    require_python_symbols(state, manager, {
+        "CPUOffloadingManager.__init__": ["self", "num_blocks", "enable_events"],
+    }, label=label)
+    # added: no spec reads a policy or reuse-count store-filter key.
+    for path in (spec, "vllm/v1/kv_offload/tiering/spec.py"):
+        for text in ("eviction_policy", "store_threshold"):
+            forbid_text(state, path, text, label=label)
+    forbid_text(state, "vllm/v1/kv_offload/cpu/common.py", "STORES_SKIPPED", label=label)
+
+    # Lookup matches content and cache_salt alone, in every tier, as upstream
+    # does: no membership view, acquisition or per-agent catalog exists to
+    # make an ID with cached blocks miss data another ID computed.
+    for path in (
+        "vllm/v1/core/block_pool.py",
+        "vllm/v1/core/single_type_kv_cache_manager.py",
+        manager,
+        "vllm/v1/kv_offload/base.py",
+        tiering,
+        "vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py",
+    ):
+        for text in ("prefix_cache.", "PrefixCache", "cache_view", "begin_lookup"):
+            forbid_text(state, path, text, label=label)
+    # The agent ID groups retention. Whole agents are released in
+    # least-recently-used order, never the storing one; references held by
+    # surviving contexts protect shared chunks; retained contexts are bounded
+    # by the chunk count; sparse rows record the data actually written.
+    for text in (
+        "self._references.setdefault(key, set()).add(req_id)",
+        "not required or not self._has_content(key, required, req_context)",
+        "self._references.get(key, set()) <= released_requests",
+        "if victim == agent_id:",
+        "self._forget_agent(victim)",
+        "if self._blocks[key].ref_cnt != 0:",
+        "while len(self._idle_context) > self._num_blocks:",
+        "        if key not in self._complete_blocks:",
+    ):
+        require_text(state, manager, text, label=label)
+    require_text(state, manager, "self._available_content[key] = content[key]",
+                 count=2, label=label)
+    require_text(state, tiering, "if success and complete_keys:", label=label)
+    # The engine request carries the ID to the offload connector.
+    require_text(
+        state, "vllm/v1/request.py",
+        'self.kv_scope = sampling_params.extra_args.get("kv_scope")',
+        label=label,
+    )
+    require_text(
+        state,
+        "vllm/v1/kv_offload/base.py",
+        "kv_scope: str | None = None",
+        label=label,
+    )
+
+
+def _validate_agentless_routes_before(state: State) -> None:
+    label = "agentless generation routes precondition"
+    generate_router = "vllm/entrypoints/generate/api_router.py"
+    require_text(
+        state, generate_router, "register_cohere_api_router(app)", label=label
+    )
+    require_text(
+        state, generate_router, "state.cohere_serving_chat_v2", label=label
+    )
+    require_text(
+        state,
+        "vllm/entrypoints/openai/cli_args.py",
+        "cohere_is_reasoning_model: bool = True",
+        label=label,
+    )
+
+
+def _validate_agentless_routes_after(state: State) -> None:
+    label = "agentless generation routes result"
     generate_router = "vllm/entrypoints/generate/api_router.py"
     forbid_text(state, generate_router, "register_cohere_api_router", label=label)
     forbid_text(state, generate_router, "CohereServingChatV2", label=label)
@@ -1314,41 +1384,70 @@ def _validate_shared_prefix_cache_after(state: State) -> None:
         'cohere_format: str = "cmd4"',
         label=label,
     )
-    input_processor = "vllm/v1/engine/input_processor.py"
-    require_text(
-        state, input_processor, "def require_kv_scope(params: SamplingParams) -> str:",
-        label=label,
-    )
-    require_text(state, input_processor, "require_kv_scope(params)", count=1, label=label)
-    _require_ordered(
-        _source(state, input_processor, label=label),
-        (
-            "scope = require_kv_scope_value(",
-            'params.extra_args.get("kv_scope") if params.extra_args else None',
-            'require_one_sequence(params.n, "n")',
-        ),
-        label=label,
-        location=input_processor,
-    )
     # No surface may be mounted that reaches the engine without being able to
-    # name an agent; /generative_scoring is excised for that reason, exactly
-    # as the Cohere surface is.
+    # name an agent: neither /generative_scoring nor the Cohere chat endpoint
+    # is registered or served.
     forbid_text(
         state, generate_router, "register_generative_scoring_api_router", label=label
     )
     forbid_text(state, generate_router, "ServingGenerativeScoring", label=label)
-    scheduler = "vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py"
+
+
+def _validate_declared_capacity_before(state: State) -> None:
+    label = "declared KV capacity precondition"
+    spec = "vllm/v1/kv_offload/cpu/spec.py"
+    cache = "vllm/config/cache.py"
+    # The byte-denominated world this stage replaces.
     require_text(
-        state, "vllm/v1/request.py",
-        'self.kv_scope = sampling_params.extra_args.get("kv_scope")',
+        state,
+        spec,
+        'cpu_bytes_to_use must be specified in kv_connector_extra_config',
         label=label,
+    )
+    require_text(state, cache, "kv_offloading_size: float | None = None", label=label)
+
+
+def _validate_declared_capacity_after(state: State) -> None:
+    label = "declared KV capacity result"
+    spec = "vllm/v1/kv_offload/cpu/spec.py"
+    cache = "vllm/config/cache.py"
+    kv_utils = "vllm/v1/core/kv_cache_utils.py"
+    scheduler = "vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py"
+    require_text(state, spec, "cpu_kv_cache_users must be specified", label=label)
+    require_text(state, spec, "Unknown kv_connector_extra_config keys", label=label)
+    require_text(state, spec, "self.num_blocks = cpu_kv_cache_users * chunks_per_user", label=label)
+
+    # GPU tier: the byte flag is gone, the count is required, and the pool
+    # is derived rather than filled to whatever memory happened to be free.
+    require_text(state, cache, "kv_cache_users: int | None = None", label=label)
+    forbid_text(state, cache, "kv_offloading_size", label=label)
+    require_text(
+        state,
+        "vllm/engine/arg_utils.py",
+        '"--kv-cache-users", **cache_kwargs["kv_cache_users"]',
+        label=label,
+    )
+    forbid_text(state, "vllm/engine/arg_utils.py", "kv-cache-memory-bytes", label=label)
+    forbid_text(state, "vllm/engine/arg_utils.py", "kv_offloading_size", label=label)
+    require_text(
+        state, kv_utils, "needed_blocks = users * per_user_blocks + 1", label=label
+    )
+    require_text(
+        state, kv_utils, "--kv-cache-users was not", label=label
     )
     require_text(
         state,
-        "vllm/v1/kv_offload/base.py",
-        "kv_scope: str | None = None",
+        kv_utils,
+        "num_gpu_blocks_override cannot be combined",
         label=label,
     )
+    forbid_text(state, "vllm/config/vllm.py", "cpu_bytes_to_use", label=label)
+    # added: the backend selector and the environment switch existed only to
+    # route the removed byte size; neither survives it.
+    forbid_text(state, cache, "kv_offloading_backend", label=label)
+    forbid_text(state, "vllm/engine/arg_utils.py", "kv_offloading_backend", label=label)
+    forbid_text(state, "vllm/envs.py", "VLLM_USE_SIMPLE_KV_OFFLOAD", label=label)
+    forbid_text(state, "vllm/config/vllm.py", "VLLM_USE_SIMPLE_KV_OFFLOAD", label=label)
     # The window classification is derived once at the offloading boundary.
     require_text(
         state,
@@ -1359,6 +1458,38 @@ def _validate_shared_prefix_cache_after(state: State) -> None:
     forbid_text(
         state, scheduler, "def get_sliding_window_size_in_chunks(", label=label
     )
+
+
+def _validate_physical_bound_before(state: State) -> None:
+    label = "KV declaration physical bound precondition"
+    worker = "vllm/v1/worker/gpu_worker.py"
+    # added: the worker reports only the utilization estimate.
+    forbid_text(state, worker, "kv_physical_bound", label=label)
+    require_text(
+        state, worker,
+        "maybe_save_startup_plan(self, kv_cache_memory_bytes_to_requested_limit)",
+        label=label,
+    )
+
+
+def _validate_physical_bound_after(state: State) -> None:
+    label = "KV declaration physical bound result"
+    worker = "vllm/v1/worker/gpu_worker.py"
+    kv_utils = "vllm/v1/core/kv_cache_utils.py"
+    # added: the worker returns the physical bound, the declaration is checked
+    # against it, and no refusal advises raising the utilization estimate.
+    _require_ordered(
+        _symbol_source(state, worker, "Worker.determine_available_memory", label=label),
+        ("kv_physical_bound", "return reserve_mm_ipc_gpu_memory(", "kv_physical_bound"),
+        label=label,
+        location=f"{worker}:Worker.determine_available_memory",
+    )
+    require_text(
+        state, kv_utils,
+        "The declaration is AUTHORITATIVE against the bound the workers", label=label,
+    )
+    require_text(state, kv_utils, "but the card's physical KV bound is only", label=label)
+    forbid_text(state, kv_utils, "Try increasing `gpu_memory_utilization`", label=label)
 
 
 def _validate_reasoning_usage_before(state: State) -> None:
@@ -3867,29 +3998,180 @@ CONTRACTS: Mapping[str, SemanticContract] = {
         validate_before=_validate_kv_pin_before,
         validate_after=_validate_kv_pin_after,
     ),
-    "shared-prefix-cache-and-user-capacity": SemanticContract(
+    "generation-requires-agent-id": SemanticContract(
         rationale=(
-            "Both KV tiers are sized from declared full-length user contexts. "
-            "Prefix lookup matches content and cache_salt alone in every tier, "
-            "as upstream does. A required opaque agent ID groups retention: "
-            "the CPU tier keeps each ID's finished context for its next turn, "
-            "and pressure releases whole IDs in least-recently-used order while "
-            "references held by surviving contexts protect shared chunks. "
-            "Sparse CPU chunks advertise only written data, and secondary "
-            "storage receives canonical entries. An ID names one line of work, "
-            "which generates one sequence per request: generation request "
-            "models require it and state its rule, render models have none, a "
-            "batch names one ID per conversation, and n > 1 or several prompts "
-            "under one ID are refused, here and at the engine boundary for "
-            "every other caller."
+            "A generation names the line of work it belongs to with an opaque "
+            "agent ID, kv_scope: the same ID for every request that continues a "
+            "conversation, a new, never-used ID for a fork or a subagent, with no "
+            "lineage or format declared. Generation request models require it and "
+            "the served schema says so; the render models they share their shape "
+            "with allocate no KV and have no ID; a batch names one ID per "
+            "conversation. One line of work generates one sequence per request, so "
+            "n > 1, a batch best_of > 1, or several prompts under one ID are "
+            "refused by name. The engine boundary holds the same rule for every "
+            "caller that reaches it without a protocol model, direct SamplingParams "
+            "callers included. The ID is the key agent-grouped-offload-retention "
+            "groups what the KV tiers retain by."
         ),
         removal_condition=(
-            "Remove when pinned upstream provides the same user-count sizing, "
-            "agent-grouped complete-context retention, and content-accurate "
-            "offload transfer contracts across all generation consumers."
+            "Remove when pinned upstream requires an agent ID naming one line of "
+            "work on every generation surface and at its engine boundary, with one "
+            "sequence per ID."
         ),
-        validate_before=_validate_shared_prefix_cache_before,
-        validate_after=_validate_shared_prefix_cache_after,
+        validate_before=_validate_agent_id_before,
+        validate_after=_validate_agent_id_after,
+    ),
+    "attention-growth-keeps-prefix-hash": SemanticContract(
+        rationale=(
+            "An attention block only appends: when a block cached under a partial "
+            "prefix grows to a longer one, the data its earlier prefix names is "
+            "unchanged. Upstream removed the earlier prefix-cache hash when the "
+            "longer one was registered, so a later request ending at the earlier "
+            "point recomputed data the block still held. The block keeps every hash "
+            "it has carried until it is evicted, when all are released together. A "
+            "recurrent-state block is different -- its state at the longer prefix "
+            "replaces the earlier checkpoint -- so its earlier hash is removed. "
+            "Every caller states which kind of block it caches."
+        ),
+        removal_condition=(
+            "Remove when pinned upstream keeps a grown attention block reachable "
+            "under each shorter prefix it holds."
+        ),
+        validate_before=_validate_attention_prefix_hash_before,
+        validate_after=_validate_attention_prefix_hash_after,
+    ),
+    "grouped-kv-specs-use-layer-geometry": SemanticContract(
+        rationale=(
+            "A KV cache group whose layers share one attention type but differ in "
+            "shape carries a UniformTypeKVCacheSpecs wrapper, which is neither an "
+            "attention nor a Mamba spec. Upstream classified groups by that wrapper: "
+            "block-size resolution and the offloading boundary missed the "
+            "decode-context-parallel factor of a grouped attention group and the "
+            "cache mode of a grouped Mamba group, and the offload scheduler's window "
+            "classification asserted a full-attention spec and stopped the engine. "
+            "Every classification resolves a grouped spec to its layers' common "
+            "geometry first, so grouped and ungrouped descriptions of the same "
+            "layers yield the same block sizes, windows and recurrent-state "
+            "handling; the offloading boundary records each group's resolved Mamba "
+            "cache mode, which the scheduler reads for alignment and copy-on-write."
+        ),
+        removal_condition=(
+            "Remove when pinned upstream classifies UniformTypeKVCacheSpecs groups "
+            "by their layers' spec in block-size resolution and KV offloading."
+        ),
+        validate_before=_validate_grouped_geometry_before,
+        validate_after=_validate_grouped_geometry_after,
+    ),
+    "agent-grouped-offload-retention": SemanticContract(
+        rationale=(
+            "The CPU offload tier keeps, for each agent ID, the complete context its "
+            "next turn reads, and knows what every chunk holds. A request publishes "
+            "one working set across all KV groups -- the full-attention prefix, the "
+            "trailing window or recurrent state each group resumes from, and any "
+            "partial tail -- and only chunks a working set retains are stored. A "
+            "finished request's context is retained for the agent's next turn when "
+            "every chunk holds the data it needs, replacing the agent's previous "
+            "one. Capacity pressure reclaims unreferenced old windows first, then "
+            "releases whole agents in least-recently-used order, never the storing "
+            "one, while references held by surviving contexts protect shared chunks; "
+            "retained contexts are bounded by the chunk count. A coalesced chunk "
+            "advertises only the data actually written to it: lookup matches the "
+            "data a resume point requires, a fill completes a sparse chunk in place, "
+            "and secondary storage receives only complete canonical entries. Prefix "
+            "lookup matches content and cache_salt alone in every tier, as upstream "
+            "does; the ID groups retention and never restricts a match. The engine "
+            "request carries the ID to the offload connector. Upstream's pluggable "
+            "block-eviction policy sees request context only when blocks are "
+            "touched, never on insert, eviction or request finish, so it cannot "
+            "release whole agents; eviction is the manager's own, no policy or "
+            "policy-selection key exists, and stores are not filtered by reuse "
+            "count."
+        ),
+        removal_condition=(
+            "Remove when pinned upstream retains complete per-agent contexts, "
+            "releases whole agents under pressure, and tracks the data each offload "
+            "chunk holds, across all generation consumers."
+        ),
+        validate_before=_validate_agent_retention_before,
+        validate_after=_validate_agent_retention_after,
+    ),
+    "agentless-generation-routes-unmounted": SemanticContract(
+        rationale=(
+            "Every mounted route that reaches the generative engine is an identity "
+            "surface. /generative_scoring builds its sampling parameters without an "
+            "agent ID, and the Cohere chat endpoint converts each request into a "
+            "render-shaped chat request without one, so every generation either "
+            "makes is refused at the engine boundary for naming no line of work; a "
+            "mounted route whose only answer is that refusal is a half-present "
+            "surface. Upstream mounts the Cohere endpoint only when "
+            "VLLM_ENABLE_COHERE_API=1 and the optional cohere SDK imports; neither "
+            "route is registered here, no handler is built, and the Cohere-only "
+            "cohere_is_reasoning_model flag does not exist. The Cohere prompt "
+            "format, a tokenizer-mode feature, stays."
+        ),
+        removal_condition=(
+            "Remove when pinned upstream's /generative_scoring and Cohere chat "
+            "requests name an agent ID, or those routes stop reaching the "
+            "generative engine."
+        ),
+        validate_before=_validate_agentless_routes_before,
+        validate_after=_validate_agentless_routes_after,
+    ),
+    "kv-capacity-in-declared-users": SemanticContract(
+        rationale=(
+            "KV capacity is declared as a count of resident full-length user "
+            "contexts -- --kv-cache-users for the GPU pool, cpu_kv_cache_users for "
+            "the CPU offload tier -- and bytes are derived where page sizes and the "
+            "group structure exist, so one declaration is correct on any device and "
+            "parallel layout. The GPU pool holds exactly the declared contexts plus "
+            "the null block: surplus memory stays unclaimed, a shortfall refuses at "
+            "startup, and auto-fit searches the longest length whose declared "
+            "contexts fit. The CPU tier holds the declared contexts in chunks, "
+            "full-attention groups at full length and windowed or recurrent groups "
+            "at the trailing window a re-entry reads, which retention makes their "
+            "whole footprint; the window classification is derived once at the "
+            "offloading boundary because load planning and sizing must agree on "
+            "it. The other inputs that sized these two tiers are a second, byte- or "
+            "block-denominated mode that encodes one machine: "
+            "--kv-cache-memory-bytes sized the GPU "
+            "pool in bytes; --kv-offloading-size sized the CPU tier in GiB by "
+            "writing a cpu_bytes_to_use entry; --kv-offloading-backend only chose "
+            "which connector that size configured and did nothing without it; "
+            "VLLM_USE_SIMPLE_KV_OFFLOAD only switched that same written "
+            "configuration to the byte-sized SimpleCPUOffloadConnector. None of "
+            "them exists, the CPU spec does not read cpu_bytes_to_use, "
+            "num_gpu_blocks_override "
+            "beside a declaration is refused, and a kv_connector_extra_config key "
+            "the CPU spec does not read refuses at startup instead of being "
+            "ignored."
+        ),
+        removal_condition=(
+            "Remove when pinned upstream sizes both KV tiers from a declared count "
+            "of full-length contexts and accepts no byte- or block-denominated "
+            "sizing input."
+        ),
+        validate_before=_validate_declared_capacity_before,
+        validate_after=_validate_declared_capacity_after,
+    ),
+    "kv-declaration-within-physical-bound": SemanticContract(
+        rationale=(
+            "The declared GPU capacity is checked against what the card can "
+            "physically hold -- its memory minus every measured resident: weights, "
+            "non-torch allocations, the recurring activation peak and the opted-in "
+            "CUDA-graph charge -- not against profiling's estimate, which also "
+            "withholds the (1 - gpu_memory_utilization) reserve. A declaration the "
+            "card holds proceeds when the estimate would prefer less; one beyond "
+            "the physical bound refuses at startup naming the bound and what frees "
+            "it. The estimate stays informational, and the startup plan persists "
+            "the physical bound rather than the estimate."
+        ),
+        removal_condition=(
+            "Remove when pinned upstream checks a declared KV capacity against "
+            "physical device capacity and keeps the utilization holdback an "
+            "estimate only."
+        ),
+        validate_before=_validate_physical_bound_before,
+        validate_after=_validate_physical_bound_after,
     ),
     "exact-reasoning-usage": SemanticContract(
         rationale=(

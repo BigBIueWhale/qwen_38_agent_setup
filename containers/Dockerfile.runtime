@@ -506,7 +506,13 @@ ARG VISION_RUNTIME_PATCH_DIFF_SHA256
 ARG NUMERICAL_AUDITS_PATCH_DIFF_SHA256
 ARG TURBOQUANT_GUARDS_PATCH_DIFF_SHA256
 ARG KV_OFFLOAD_PINNING_PATCH_DIFF_SHA256
-ARG SHARED_PREFIX_CACHE_PATCH_DIFF_SHA256
+ARG GENERATION_AGENT_ID_PATCH_DIFF_SHA256
+ARG ATTENTION_PREFIX_HASH_PATCH_DIFF_SHA256
+ARG GROUPED_SPEC_GEOMETRY_PATCH_DIFF_SHA256
+ARG AGENT_OFFLOAD_RETENTION_PATCH_DIFF_SHA256
+ARG AGENTLESS_ROUTES_PATCH_DIFF_SHA256
+ARG KV_DECLARED_USERS_PATCH_DIFF_SHA256
+ARG KV_PHYSICAL_BOUND_PATCH_DIFF_SHA256
 ARG EXACT_REASONING_USAGE_PATCH_DIFF_SHA256
 ARG IMAGE_PROFILE_VERSION
 ARG CACHE_CONFIG_PATCHED_FILE_SHA256
@@ -546,8 +552,8 @@ ARG TEMPLATE_AUTHORSHIP_UNIT_SHA256
 ARG NATIVE_FP4_SELECTION_UNIT_SHA256
 # The verified pristine policy modules are removed, not replaced: the
 # scope-aware manager is the only eviction mode, and a stranded importable
-# copy of the pluggable LRU/ARC layer would be exactly the leftover this
-# stage exists to eliminate. Absence is asserted like any other hash.
+# copy of the pluggable LRU/ARC layer would be exactly the leftover the
+# agent-grouped offload retention stage exists to eliminate. Absence is asserted like any other hash.
 RUN rm /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/cpu/policies/__init__.py \
       /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/cpu/policies/base.py \
       /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/cpu/policies/factory.py \
@@ -1121,7 +1127,13 @@ LABEL org.opencontainers.image.revision="9df9b0b0a1816b6d0d0f6ecd0da563cc37fd72f
       qwen38.patch.numerical-audits.diff.sha256="${NUMERICAL_AUDITS_PATCH_DIFF_SHA256}" \
       qwen38.patch.turboquant-guards.diff.sha256="${TURBOQUANT_GUARDS_PATCH_DIFF_SHA256}" \
       qwen38.patch.kv-offload-pinning.diff.sha256="${KV_OFFLOAD_PINNING_PATCH_DIFF_SHA256}" \
-      qwen38.patch.shared-prefix-cache.diff.sha256="${SHARED_PREFIX_CACHE_PATCH_DIFF_SHA256}" \
+      qwen38.patch.generation-requires-agent-id.diff.sha256="${GENERATION_AGENT_ID_PATCH_DIFF_SHA256}" \
+      qwen38.patch.attention-growth-keeps-prefix-hash.diff.sha256="${ATTENTION_PREFIX_HASH_PATCH_DIFF_SHA256}" \
+      qwen38.patch.grouped-kv-specs-use-layer-geometry.diff.sha256="${GROUPED_SPEC_GEOMETRY_PATCH_DIFF_SHA256}" \
+      qwen38.patch.agent-grouped-offload-retention.diff.sha256="${AGENT_OFFLOAD_RETENTION_PATCH_DIFF_SHA256}" \
+      qwen38.patch.agentless-generation-routes-unmounted.diff.sha256="${AGENTLESS_ROUTES_PATCH_DIFF_SHA256}" \
+      qwen38.patch.kv-capacity-in-declared-users.diff.sha256="${KV_DECLARED_USERS_PATCH_DIFF_SHA256}" \
+      qwen38.patch.kv-declaration-within-physical-bound.diff.sha256="${KV_PHYSICAL_BOUND_PATCH_DIFF_SHA256}" \
       qwen38.patch.exact-reasoning-usage.diff.sha256="${EXACT_REASONING_USAGE_PATCH_DIFF_SHA256}" \
       qwen38.patch.exact-reasoning-usage.abstract-parser-file.sha256="${ABSTRACT_PARSER_PATCHED_FILE_SHA256}" \
       qwen38.patch.exact-reasoning-usage.adapters-file.sha256="${PARSER_ADAPTERS_PATCHED_FILE_SHA256}" \

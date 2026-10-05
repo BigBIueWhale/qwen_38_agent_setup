@@ -284,7 +284,13 @@ It is intentionally reconstructed by the ordered, reviewed semantic transformati
 | patches/vllm-qwen38-numerical-audits.patch | a73aa2f2ae3f82010eb2bafcdf663c2fe14854c30165dbc4d8457725bc3b6632 |
 | patches/vllm-turboquant-fail-closed-guards.patch | 7282d1d4d7a17b40ab8626c82f478bbb938c548451b7793df8233562a9e24c7c |
 | patches/vllm-kv-offload-pinning-fail-closed.patch | 1857071c38d081bb95e3cca12153cebce096649084950b99229104fdae029ca6 |
-| patches/vllm-shared-prefix-cache-and-user-capacity.patch | d19609d842871a3476faa4fde6e6ed81a6b9cd7d23261acd9dd81a04bd9b34b3 |
+| patches/vllm-generation-requires-agent-id.patch | fb46fefd8ab49b4c26d84613cbee0ee21addfa2772810f271e066ccb7e9f43a0 |
+| patches/vllm-attention-growth-keeps-prefix-hash.patch | a6c38a841c05bcd4f5bfc573c99f1c4a849e7399af05b1e53096e15a43a97632 |
+| patches/vllm-grouped-kv-specs-use-layer-geometry.patch | 6bb249bc143a179ca317c72d2bf70ec118baa6f12dca19c0a59da2e3c935b814 |
+| patches/vllm-agent-grouped-offload-retention.patch | 602ed3531faab2f76c094fe777f5772d93ad1e4e1f0deaac39f3438a1d460acf |
+| patches/vllm-agentless-generation-routes-unmounted.patch | aad1dd0ff38d76d08ac5793bcf1daca4b0872c562f44cdd5c3a5b09cb1c51f72 |
+| patches/vllm-kv-capacity-in-declared-users.patch | fdd113dbc3822543a95ea1bf5ef8323319754b14e6984cc9f26856236153c9b8 |
+| patches/vllm-kv-declaration-within-physical-bound.patch | c80ae7afa8392c600f6c6f74d6748a2bc14f3aebc4dd0fa2e5a63f79dfaef3d5 |
 | patches/vllm-exact-reasoning-usage.patch | 2179e27460e4239367ac7e2dd3828b9b3db463e79d87ad81433d00fbc6b12395 |
 | patches/vllm-anthropic-input-fidelity.patch | 126f002321100271897a93ddbe212cc37e5d014d0ab745bcd2ce6037f224c5b3 |
 | patches/vllm-qwen-exact-tool-language.patch | fe4e46cb7444c80646537da63ab1ac12c54e7eebb04c0735a4243d8b7e7943d2 |
@@ -361,8 +367,8 @@ Pinned build inputs and products:
 |---|---|
 | Immutable base tag | qwen38-vllm:main-9df9b0b |
 | Immutable base ID | sha256:fa4a002a88b7043a1a89966dea8a500fe9696f84e75730d9da916f916048d401 |
-| Runtime Dockerfile SHA-256 | 74930391a0b301937bb7a76a8aa770f17b1dc5cc49c97791427ffcda94871a20 |
-| Build verifier SHA-256 | 90d98d9879d854cd2eeae992774329e2cc52a5a1e8ca04237e9351c35fe10516 |
+| Runtime Dockerfile SHA-256 | e431d44840b8c6250be313f61f83a4ac8bb2b744f0c7dca4abc62d7864b1cdf6 |
+| Build verifier SHA-256 | 353a853dad8d888a95948918567c80ee195522f46a349d65e657a27446b33d32 |
 | Runtime validator SHA-256 | 39f818797bc1034a772f45d9059fd95115b25ed06c5cba75e890db39a7049027 |
 
 The runtime image's profile, tag and archive name, which every release advances

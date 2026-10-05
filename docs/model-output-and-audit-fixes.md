@@ -643,8 +643,10 @@ Harmony zero-delta item lifecycle; the deployed Qwen path does not use Harmony.
 
 ## Finding 9 and shared prefix caching
 
-`vllm-shared-prefix-cache-and-user-capacity.patch` defines the twelfth source
-stage. Every generation uses an opaque required agent ID. Prefix lookup matches
+Seven source stages carry it, one per reason, from
+`vllm-generation-requires-agent-id.patch` to
+`vllm-kv-declaration-within-physical-bound.patch`. Every generation uses an
+opaque required agent ID. Prefix lookup matches
 content and `cache_salt` alone in both tiers, as upstream does: the ID never
 restricts what a request may reuse, and `cache_salt` is what isolates callers.
 The ID groups what the CPU tier retains. No parent, lineage declaration or ID

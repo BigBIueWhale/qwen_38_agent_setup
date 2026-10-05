@@ -1,0 +1,1983 @@
+diff --git a/tests/config/test_config_utils.py b/tests/config/test_config_utils.py
+index 35bc1e167b5288a208dd8ca86e44785db27d727f..7eecd6421fef490c36120f67438d54327ce69d87 100644
+--- a/tests/config/test_config_utils.py
++++ b/tests/config/test_config_utils.py
+@@ -212,7 +212,11 @@ def test_cache_config_hash_ignores_kv_cache_sizing_knobs():
+     and forces a full recompile.
+     """
+     base_hash = CacheConfig().compute_hash()
+-    assert CacheConfig(kv_cache_memory_bytes=1 << 30).compute_hash() == base_hash
++    sized = CacheConfig(kv_cache_users=8)
++    # Internal availability state (startup plan / CPU backend), set
++    # post-init; there is no constructor inlet any more.
++    sized.kv_cache_memory_bytes = 1 << 30
++    assert sized.compute_hash() == base_hash
+     assert CacheConfig(gpu_memory_utilization=0.5).compute_hash() == base_hash
+ 
+ 
+diff --git a/tests/distributed/test_rocm_quick_reduce.py b/tests/distributed/test_rocm_quick_reduce.py
+index e422b032e2574a1ceaa685a13be98158590841c6..2db724dc70e23a4f8d017e0f6935bea18da1d949 100644
+--- a/tests/distributed/test_rocm_quick_reduce.py
++++ b/tests/distributed/test_rocm_quick_reduce.py
+@@ -267,7 +267,7 @@ MODEL_NAME = "Qwen/Qwen2.5-0.5B-Instruct"
+ E2E_PREFILL_TOKENS = 1024
+ E2E_MAX_MODEL_LEN = 1536
+ E2E_GPU_MEMORY_UTILIZATION = 0.3
+-E2E_KV_CACHE_MEMORY_BYTES = 2 << 30
++E2E_KV_CACHE_USERS = 4
+ 
+ _BACKGROUND_LINE = (
+     "Background filler: this archived operations memo repeats a routine status "
+@@ -482,7 +482,7 @@ def _run_generation(
+         _log(
+             f"starting generation: backend={backend} quant={quant_mode} "
+             f"gpu_memory_utilization={E2E_GPU_MEMORY_UTILIZATION} "
+-            f"kv_cache_bytes={E2E_KV_CACHE_MEMORY_BYTES} model={model_path}"
++            f"kv_cache_users={E2E_KV_CACHE_USERS} model={model_path}"
+         )
+ 
+         try:
+@@ -496,7 +496,7 @@ def _run_generation(
+                 max_model_len=E2E_MAX_MODEL_LEN,
+                 max_num_seqs=len(E2E_PROMPTS),
+                 gpu_memory_utilization=E2E_GPU_MEMORY_UTILIZATION,
+-                kv_cache_memory_bytes=E2E_KV_CACHE_MEMORY_BYTES,
++                kv_cache_users=E2E_KV_CACHE_USERS,
+                 seed=0,
+             )
+ 
+diff --git a/tests/engine/test_arg_utils.py b/tests/engine/test_arg_utils.py
+index 2feb9f7a039dc1dc3baad11ae3c2d1b4682c271e..7e82694e486e84a823220b12cbe3bb593ea9ef91 100644
+--- a/tests/engine/test_arg_utils.py
++++ b/tests/engine/test_arg_utils.py
+@@ -580,15 +580,13 @@ def test_human_readable_other_args():
+     args = parser.parse_args(["--max-num-scheduled-tokens", "10.5k"])
+     assert args.max_num_scheduled_tokens == 10500
+ 
+-    # Test kv_cache_memory_bytes (existing human-readable arg)
+-    args = parser.parse_args(["--kv-cache-memory-bytes", "100000"])
+-    assert args.kv_cache_memory_bytes == 100000
+-    args = parser.parse_args(["--kv-cache-memory-bytes", "100k"])
+-    assert args.kv_cache_memory_bytes == 100_000
+-    args = parser.parse_args(["--kv-cache-memory-bytes", "1M"])
+-    assert args.kv_cache_memory_bytes == 2**20
+-    args = parser.parse_args(["--kv-cache-memory-bytes", "1m"])
+-    assert args.kv_cache_memory_bytes == 1_000_000
++    # Byte-denominated KV sizing is gone: capacity is declared in user
++    # contexts, and the old flag must fail argument parsing outright
++    # rather than survive as an alias or fallback.
++    with pytest.raises(SystemExit):
++        parser.parse_args(["--kv-cache-memory-bytes", "100000"])
++    args = parser.parse_args(["--kv-cache-users", "3"])
++    assert args.kv_cache_users == 3
+ 
+     # Test max_num_batched_tokens (existing human-readable arg)
+     args = parser.parse_args(["--max-num-batched-tokens", "1024"])
+diff --git a/tests/evals/gsm8k/test_gsm8k_offloading.py b/tests/evals/gsm8k/test_gsm8k_offloading.py
+index ae4bff8fac264a5b06ea32c1498593b1cdf01955..c85b5db9f21cc0d66f752134d26521745e712df1 100644
+--- a/tests/evals/gsm8k/test_gsm8k_offloading.py
++++ b/tests/evals/gsm8k/test_gsm8k_offloading.py
+@@ -50,16 +50,23 @@ _OFFLOAD_SYNC_TIMEOUT = 60
+ 
+ 
+ def _kv_transfer_config(
+-    connector: str, cpu_gib: int = 4, spec_name: str = "CPUOffloadingSpec"
++    connector: str,
++    cpu_gib: int = 4,
++    spec_name: str = "CPUOffloadingSpec",
++    cpu_kv_cache_users: int = 4,
+ ) -> str:
+     if connector == "OffloadingConnector":
++        # The native offloading spec sizes its CPU tier as a declared count
++        # of resident full-length user contexts (bytes are derived from
++        # max_model_len and the KV cache spec); cpu_gib only applies to
++        # SimpleCPUOffloadConnector, which keeps its own byte contract.
+         return json.dumps(
+             {
+                 "kv_connector": "OffloadingConnector",
+                 "kv_role": "kv_both",
+                 "kv_connector_extra_config": {
+                     "spec_name": spec_name,
+-                    "cpu_bytes_to_use": cpu_gib << 30,
++                    "cpu_kv_cache_users": cpu_kv_cache_users,
+                 },
+             }
+         )
+@@ -245,6 +252,8 @@ def test_gsm8k_offloading_correctness(cfg: OffloadingModelConfig):
+         "--enforce-eager",
+         "--max-model-len",
+         "4096",
++        "--kv-cache-users",
++        "4",
+         "--enable-prefix-caching",
+         "--no-disable-hybrid-kv-cache-manager",
+         "--kv-transfer-config",
+diff --git a/tests/models/language/pooling/test_reward.py b/tests/models/language/pooling/test_reward.py
+index 111770863c38d8c59c26ae91d3ff2ebdb5a7b6c5..7ec1f2f358c9aa0ead01cd12ffe5f328221689da 100644
+--- a/tests/models/language/pooling/test_reward.py
++++ b/tests/models/language/pooling/test_reward.py
+@@ -113,7 +113,7 @@ def test_prm_models(
+         model,
+         max_model_len=1024,
+         dtype=dtype,
+-        kv_cache_memory_bytes=64 * MiB_bytes,
++        kv_cache_users=1,
+     ) as vllm_model:
+         assert vllm_model.llm.llm_engine.vllm_config.use_v2_model_runner
+         vllm_outputs = vllm_model.token_classify(math_step_prompts)
+@@ -161,7 +161,7 @@ def test_prm_models_with_golden_outputs(
+         model,
+         max_model_len=1024,
+         dtype=dtype,
+-        kv_cache_memory_bytes=64 * MiB_bytes,
++        kv_cache_users=1,
+     ) as vllm_model:
+         assert (
+             vllm_model.llm.llm_engine.vllm_config.use_v2_model_runner
+diff --git a/tests/v1/core/test_kv_cache_users_sizing.py b/tests/v1/core/test_kv_cache_users_sizing.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..88a57dd44c275528350460b8e8cafbe75d07596c
+--- /dev/null
++++ b/tests/v1/core/test_kv_cache_users_sizing.py
+@@ -0,0 +1,121 @@
++# SPDX-License-Identifier: Apache-2.0
++# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
++"""GPU KV capacity is derived from --kv-cache-users, not from free memory.
++
++The pool must hold exactly N declared full-length contexts (plus the null
++block) on any machine: the same declaration has to produce the same block
++count on a laptop GPU and on a B200, with surplus VRAM left unclaimed and a
++shortfall failing closed at startup. Byte- and block-denominated sizing
++inputs are refused, not reconciled.
++"""
++
++import pytest
++import torch
++
++from vllm.config import ModelConfig, VllmConfig
++from vllm.utils.math_utils import cdiv
++from vllm.v1.core.kv_cache_utils import get_kv_cache_configs
++from vllm.v1.kv_cache_interface import FullAttentionSpec
++
++pytestmark = pytest.mark.cpu_test
++
++BLOCK_SIZE = 16
++
++
++def _spec() -> FullAttentionSpec:
++    return FullAttentionSpec(
++        block_size=BLOCK_SIZE,
++        num_kv_heads=2,
++        head_size=64,
++        dtype=torch.float32,
++    )
++
++
++def _vllm_config(max_model_len: int, kv_cache_users: int | None) -> VllmConfig:
++    vllm_config = VllmConfig(model_config=ModelConfig(max_model_len=max_model_len))
++    vllm_config.cache_config.kv_cache_users = kv_cache_users
++    return vllm_config
++
++
++def _blocks_per_user(max_model_len: int) -> int:
++    return cdiv(max_model_len, BLOCK_SIZE)
++
++
++@pytest.mark.parametrize("users", [1, 3])
++@pytest.mark.parametrize("max_model_len", [16, 48, 50])
++def test_pool_holds_declared_users_plus_null_block(users, max_model_len):
++    spec = _spec()
++    vllm_config = _vllm_config(max_model_len, users)
++    expected_blocks = users * _blocks_per_user(max_model_len) + 1
++
++    # Surplus availability must not inflate the pool: "whatever fits" is the
++    # machine-specific sizing this flag exists to remove.
++    surplus = spec.page_size_bytes * (expected_blocks + 1000)
++    (kv_cache_config,) = get_kv_cache_configs(
++        vllm_config, [{"layer1": spec}], [surplus]
++    )
++
++    assert kv_cache_config.num_blocks == expected_blocks
++    assert kv_cache_config.kv_cache_tensors[0].size == (
++        spec.page_size_bytes * expected_blocks
++    )
++
++
++def test_declared_users_beyond_available_memory_fail_closed():
++    spec = _spec()
++    vllm_config = _vllm_config(64, 4)
++    expected_blocks = 4 * _blocks_per_user(64) + 1
++
++    with pytest.raises(ValueError, match="--kv-cache-users 4 requires"):
++        get_kv_cache_configs(
++            vllm_config,
++            [{"layer1": spec}],
++            [spec.page_size_bytes * (expected_blocks - 1)],
++        )
++
++
++def test_missing_kv_cache_users_fails_closed():
++    spec = _spec()
++    vllm_config = _vllm_config(16, None)
++    with pytest.raises(ValueError, match="--kv-cache-users was not"):
++        get_kv_cache_configs(
++            vllm_config, [{"layer1": spec}], [spec.page_size_bytes * 100]
++        )
++
++
++@pytest.mark.parametrize("bad_users", [0, -2])
++def test_non_positive_kv_cache_users_fails_closed(bad_users):
++    spec = _spec()
++    vllm_config = _vllm_config(16, bad_users)
++    with pytest.raises(ValueError, match="positive integer"):
++        get_kv_cache_configs(
++            vllm_config, [{"layer1": spec}], [spec.page_size_bytes * 100]
++        )
++
++
++def test_num_gpu_blocks_override_is_refused_alongside_users():
++    spec = _spec()
++    vllm_config = _vllm_config(16, 1)
++    vllm_config.cache_config.num_gpu_blocks_override = 128
++    with pytest.raises(ValueError, match="num_gpu_blocks_override"):
++        get_kv_cache_configs(
++            vllm_config, [{"layer1": spec}], [spec.page_size_bytes * 100]
++        )
++
++
++def test_per_worker_derivation_uses_projected_groups():
++    # PP: each stage holds N contexts of its own layers; a stage with more
++    # spare memory must not grow past the declaration.
++    spec = _spec()
++    vllm_config = _vllm_config(64, 2)
++    expected_blocks = 2 * _blocks_per_user(64) + 1
++    (config_a, config_b) = get_kv_cache_configs(
++        vllm_config,
++        [{"layer1": spec}, {"layer2": spec}],
++        [
++            spec.page_size_bytes * expected_blocks,
++            spec.page_size_bytes * expected_blocks * 5,
++        ],
++    )
++    assert config_a.num_blocks == expected_blocks
++    assert config_b.num_blocks == expected_blocks
+diff --git a/tests/v1/e2e/general/test_context_length.py b/tests/v1/e2e/general/test_context_length.py
+index 955e5c5bf02565c46f720a81b38ec7b115105412..b313a74b687e46de9f4c04fd8dd119d3fda77057 100644
+--- a/tests/v1/e2e/general/test_context_length.py
++++ b/tests/v1/e2e/general/test_context_length.py
+@@ -75,18 +75,17 @@ def test_auto_fit_max_model_len_rejects_oversized_input(
+     must see this reduced value and reject prompts that exceed it,
+     rather than accepting them and hanging."""
+ 
+-    # Use a small KV cache budget to force auto-fit to a small
+-    # max_model_len. Pin block_size=16 so the budget is independent
+-    # of the platform's default block size.
+-    kv_cache_bytes = 1_000_000  # 1 MB
+-
++    # Use a small utilization budget to force auto-fit to a reduced
++    # max_model_len for the single declared user. Pin block_size=16 so
++    # the budget is independent of the platform's default block size.
+     with vllm_runner(
+         model_name=model,
+         max_model_len=-1,
+         max_num_seqs=1,
+         enforce_eager=True,
+         block_size=16,
+-        kv_cache_memory_bytes=kv_cache_bytes,
++        kv_cache_users=1,
++        gpu_memory_utilization=0.02,
+         load_format="dummy",
+     ) as vllm_model:
+         auto_fitted_len = (
+diff --git a/tests/v1/kv_connector/nixl_integration/run_multi_connector_accuracy_test.sh b/tests/v1/kv_connector/nixl_integration/run_multi_connector_accuracy_test.sh
+index ca042dd8ed64e9a58d14b8bc09675ec11c6fd776..c8ad4a95f40374e8f4af7ee3aacef0f962549b7d 100644
+--- a/tests/v1/kv_connector/nixl_integration/run_multi_connector_accuracy_test.sh
++++ b/tests/v1/kv_connector/nixl_integration/run_multi_connector_accuracy_test.sh
+@@ -65,7 +65,7 @@ KV_CONFIG_NORMAL='{
+       {"kv_connector":"NixlConnector","kv_role":"kv_both",
+        "kv_buffer_device":"'$KV_BUFFER_DEVICE'"},
+       {"kv_connector":"OffloadingConnector","kv_role":"kv_both",
+-       "kv_connector_extra_config":{"cpu_bytes_to_use":1000000000}}
++       "kv_connector_extra_config":{"cpu_kv_cache_users":4}}
+     ]
+   }
+ }'
+@@ -82,7 +82,7 @@ KV_CONFIG_CROSS_LAYERS='{
+        "kv_buffer_device":"'$KV_BUFFER_DEVICE'",
+        "kv_connector_extra_config":{"enable_cross_layers_blocks":"True"}},
+       {"kv_connector":"OffloadingConnector","kv_role":"kv_both",
+-       "kv_connector_extra_config":{"cpu_bytes_to_use":1000000000}}
++       "kv_connector_extra_config":{"cpu_kv_cache_users":4}}
+     ]
+   }
+ }'
+@@ -146,6 +146,7 @@ run_tests_for_model() {
+     --enforce-eager \
+     --block-size ${BLOCK_SIZE} \
+     --max-model-len ${MAX_MODEL_LEN} \
++    --kv-cache-users 2 \
+     --gpu-memory-utilization $GPU_MEMORY_UTILIZATION \
+     --tensor-parallel-size 1 \
+     --kv-transfer-config '$kv_config'"
+@@ -172,6 +173,7 @@ run_tests_for_model() {
+     --enforce-eager \
+     --block-size ${BLOCK_SIZE} \
+     --max-model-len ${MAX_MODEL_LEN} \
++    --kv-cache-users 2 \
+     --gpu-memory-utilization $GPU_MEMORY_UTILIZATION \
+     --tensor-parallel-size 1 \
+     --kv-transfer-config '$kv_config'"
+diff --git a/tests/v1/kv_connector/nixl_integration/run_multi_connector_edge_case_test.sh b/tests/v1/kv_connector/nixl_integration/run_multi_connector_edge_case_test.sh
+index de6c9abcc6b0ce8af8e86159b544f1fbb39a2f06..ea766ba2e386bde389344ce8077e8fa6886b8f17 100644
+--- a/tests/v1/kv_connector/nixl_integration/run_multi_connector_edge_case_test.sh
++++ b/tests/v1/kv_connector/nixl_integration/run_multi_connector_edge_case_test.sh
+@@ -17,7 +17,7 @@
+ #
+ # Environment variables:
+ #   MODEL_NAMES              - model to test (default: Qwen/Qwen3-0.6B)
+-#   KV_CACHE_MEMORY_BYTES    - GPU KV cache size in bytes (default: 268435456 = 256 MiB)
++#   KV_CACHE_USERS           - GPU KV capacity in resident full-length contexts (default: 2)
+ #   BLOCK_SIZE               - KV cache block size (default: 128)
+ #   ATTENTION_BACKEND        - optional attention backend for vllm serve
+ #   VLLM_SERVE_EXTRA_ARGS    - comma-separated extra args for vllm serve
+@@ -32,7 +32,7 @@ else
+   MODELS=("Qwen/Qwen3-0.6B")
+ fi
+ 
+-KV_CACHE_MEMORY_BYTES=${KV_CACHE_MEMORY_BYTES:-268435456}  # 256 MiB
++KV_CACHE_USERS=${KV_CACHE_USERS:-2}
+ MAX_MODEL_LEN=${MAX_MODEL_LEN:-2048}
+ BLOCK_SIZE=${BLOCK_SIZE:-128}
+ ATTENTION_BACKEND=${ATTENTION_BACKEND:-}
+@@ -50,7 +50,7 @@ KV_CONFIG='{
+     "connectors":[
+       {"kv_connector":"NixlConnector","kv_role":"kv_both"},
+       {"kv_connector":"OffloadingConnector","kv_role":"kv_both",
+-       "kv_connector_extra_config":{"cpu_bytes_to_use":2147483648}}
++       "kv_connector_extra_config":{"cpu_kv_cache_users":4}}
+     ]
+   }
+ }'
+@@ -103,7 +103,7 @@ run_tests_for_model() {
+     --enforce-eager \
+     --block-size ${BLOCK_SIZE} \
+     --max-model-len $MAX_MODEL_LEN \
+-    --kv-cache-memory-bytes $KV_CACHE_MEMORY_BYTES \
++    --kv-cache-users $KV_CACHE_USERS \
+     --tensor-parallel-size 1 \
+     --kv-transfer-config '$KV_CONFIG'"
+ 
+@@ -129,7 +129,7 @@ run_tests_for_model() {
+     --enforce-eager \
+     --block-size ${BLOCK_SIZE} \
+     --max-model-len $MAX_MODEL_LEN \
+-    --kv-cache-memory-bytes $KV_CACHE_MEMORY_BYTES \
++    --kv-cache-users $KV_CACHE_USERS \
+     --tensor-parallel-size 1 \
+     --kv-transfer-config '$KV_CONFIG'"
+ 
+diff --git a/tests/v1/kv_connector/nixl_integration/spec_decode_acceptance_test.sh b/tests/v1/kv_connector/nixl_integration/spec_decode_acceptance_test.sh
+index 501ec332d69e440c451e280af96bc764a5b59512..c18b213459634aeb3e6064dcafacf39d3745cd8e 100644
+--- a/tests/v1/kv_connector/nixl_integration/spec_decode_acceptance_test.sh
++++ b/tests/v1/kv_connector/nixl_integration/spec_decode_acceptance_test.sh
+@@ -53,13 +53,13 @@ NUM_DECODE_INSTANCES=${NUM_DECODE_INSTANCES:-1}
+ PREFILLER_TP_SIZE=${PREFILLER_TP_SIZE:-1}
+ DECODER_TP_SIZE=${DECODER_TP_SIZE:-1}
+ GPU_MEMORY_UTILIZATION=${GPU_MEMORY_UTILIZATION:-0.7}
+-KV_CACHE_MEMORY_BYTES=${KV_CACHE_MEMORY_BYTES:-}
++KV_CACHE_USERS=${KV_CACHE_USERS:-}
+ BLOCK_SIZE=${BLOCK_SIZE:-16}
+ SERVER_HOST="${SERVER_HOST:-127.0.0.1}"
+ NIXL_SIDE_CHANNEL_HOST="${NIXL_SIDE_CHANNEL_HOST:-$SERVER_HOST}"
+ 
+-if [[ -n "$KV_CACHE_MEMORY_BYTES" ]]; then
+-  KV_CACHE_ARGS=(--kv-cache-memory-bytes "$KV_CACHE_MEMORY_BYTES")
++if [[ -n "$KV_CACHE_USERS" ]]; then
++  KV_CACHE_ARGS=(--kv-cache-users "$KV_CACHE_USERS")
+ else
+   KV_CACHE_ARGS=(--gpu-memory-utilization "$GPU_MEMORY_UTILIZATION")
+ fi
+diff --git a/tests/v1/kv_connector/unit/offloading_connector/test_events.py b/tests/v1/kv_connector/unit/offloading_connector/test_events.py
+index de3d3b04955e3d6cd7215900a9be071f80beeb60..f6865f17ae5c4086de09b831053328293e5e11f6 100644
+--- a/tests/v1/kv_connector/unit/offloading_connector/test_events.py
++++ b/tests/v1/kv_connector/unit/offloading_connector/test_events.py
+@@ -608,7 +608,7 @@ def test_tiering_accepts_self_describing_kv_events():
+         kv_role="kv_both",
+         kv_connector_extra_config={
+             "spec_name": "TieringOffloadingSpec",
+-            "cpu_bytes_to_use": 1 << 20,
++            "cpu_kv_cache_users": 1,
+             "self_describing_kv_events": True,
+             "secondary_tiers": [{"type": "example"}],
+         },
+diff --git a/tests/v1/kv_connector/unit/offloading_connector/test_scheduler.py b/tests/v1/kv_connector/unit/offloading_connector/test_scheduler.py
+index 0c1dab7769621eb1576442838d3a19b73feece56..68d63fddc7f28ae665cab89db8dc9038fe27831b 100644
+--- a/tests/v1/kv_connector/unit/offloading_connector/test_scheduler.py
++++ b/tests/v1/kv_connector/unit/offloading_connector/test_scheduler.py
+@@ -24,6 +24,7 @@ from vllm.distributed.kv_transfer.kv_connector.v1.offloading.common import (
+ )
+ from vllm.distributed.kv_transfer.kv_connector.v1.offloading.config import (
+     build_offloading_config,
++    get_sliding_window_size_in_chunks,
+ )
+ from vllm.distributed.kv_transfer.kv_connector.v1.offloading.metrics import (
+     OffloadingConnectorStats,
+@@ -32,7 +33,6 @@ from vllm.distributed.kv_transfer.kv_connector.v1.offloading.metrics import (
+ from vllm.distributed.kv_transfer.kv_connector.v1.offloading.scheduler import (
+     OffloadingConnectorScheduler,
+     RequestOffloadState,
+-    get_sliding_window_size_in_chunks,
+     is_store_reachable_swa_chunk,
+ )
+ from vllm.v1.core.kv_cache_manager import KVCacheBlocks
+diff --git a/tests/v1/kv_connector/unit/offloading_connector/test_worker.py b/tests/v1/kv_connector/unit/offloading_connector/test_worker.py
+index 8a1f3723c499a2bafd35a0ec6540a62fecca25bb..d5e379ef7bb313c0f37945bdeea0495f532f832e 100644
+--- a/tests/v1/kv_connector/unit/offloading_connector/test_worker.py
++++ b/tests/v1/kv_connector/unit/offloading_connector/test_worker.py
+@@ -181,7 +181,9 @@ def _offloading_config(rank: int = 0) -> OffloadingConfig:
+         enable_kv_cache_events=False,
+         extra_config={},
+         engine_id="test-engine",
+-        model=OffloadingModelConfig(name="test-model", dtype="float16"),
++        model=OffloadingModelConfig(
++            name="test-model", dtype="float16", max_model_len=128
++        ),
+         cache=OffloadingCacheConfig(tokens_per_hash=16, blocks_per_chunk=1),
+         parallel=OffloadingParallelConfig(
+             rank=rank,
+diff --git a/tests/v1/kv_connector/unit/test_config.py b/tests/v1/kv_connector/unit/test_config.py
+index 019b8d1504ace3b08b888ffb84052efe01875023..09d5b74a739fa354a2200d2beef227d700ef7e56 100644
+--- a/tests/v1/kv_connector/unit/test_config.py
++++ b/tests/v1/kv_connector/unit/test_config.py
+@@ -1,183 +1,63 @@
+ # SPDX-License-Identifier: Apache-2.0
+ # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
+ 
+ """Tests for KV cache offloading configuration."""
+ 
+ import pytest
+ 
+-from vllm.config import CacheConfig, KVTransferConfig, ParallelConfig, VllmConfig
+-from vllm.distributed.kv_transfer.kv_connector.factory import KVConnectorFactory
++from vllm.config import CacheConfig, KVTransferConfig, VllmConfig
+ 
+ pytestmark = pytest.mark.cpu_test
+ 
+ 
+-class _StubLMCacheMPConnector:
+-    """Stand-in for LMCacheMPConnector used in config-translation tests.
+-
+-    The real connector module hard-imports the optional ``lmcache`` package
+-    at module load time, which is not installed in the cpu_test image. This
+-    test only asserts on the connector *name* and the ``extra_config`` dict
+-    produced by ``VllmConfig``, never instantiates the connector, so a bare
+-    placeholder class is sufficient. Not subclassing ``SupportsHMA`` mirrors
+-    the real connector's HMA support (it does not support HMA either)."""
+-
+-
+-@pytest.fixture
+-def stub_lmcache_mp_connector(monkeypatch):
+-    """Replace the lazy loader so VllmConfig.__post_init__ does not import
+-    ``lmcache_mp_connector`` (and thus ``lmcache``) during config tests."""
+-    monkeypatch.setitem(
+-        KVConnectorFactory._registry,
+-        "LMCacheMPConnector",
+-        lambda: _StubLMCacheMPConnector,
+-    )
+-
+-
+-@pytest.mark.parametrize(
+-    "kv_offloading_backend,kv_offloading_size,tp,pp,expected_backend,expected_bytes",
+-    [
+-        ("native", 4.0, 1, 1, "OffloadingConnector", 4.0 * (1 << 30)),
+-        # bytes per rank: 8.0 GiB / (2 * 2) = 2.0 GiB
+-        ("native", 8.0, 2, 2, "OffloadingConnector", 8.0 * (1 << 30)),
+-        # ``lmcache`` backend now defaults to LMCacheMPConnector. The KV
+-        # storage capacity is owned by the standalone LMCache server, so
+-        # ``kv_offloading_size`` is intentionally not propagated.
+-        ("lmcache", 4.0, 1, 1, "LMCacheMPConnector", None),
+-        ("lmcache", 8.0, 2, 2, "LMCacheMPConnector", None),
+-        # When kv_offloading_size is None, offloading is disabled (backend is ignored)
+-        ("native", None, 1, 1, None, None),
+-    ],
+-)
+-def test_kv_connector(
+-    stub_lmcache_mp_connector,
+-    kv_offloading_backend,
+-    kv_offloading_size,
+-    tp,
+-    pp,
+-    expected_backend,
+-    expected_bytes,
+-):
+-    kv_transfer_config = (
+-        KVTransferConfig(kv_connector_extra_config={"existing_key": "existing_value"})
+-        if expected_backend is not None
+-        else None
+-    )
+-
+-    vllm_config = VllmConfig(
+-        cache_config=CacheConfig(
+-            kv_offloading_backend=kv_offloading_backend,
+-            kv_offloading_size=kv_offloading_size,
+-        ),
+-        kv_transfer_config=kv_transfer_config,
+-        parallel_config=ParallelConfig(
+-            tensor_parallel_size=tp, pipeline_parallel_size=pp
+-        ),
+-    )
+-
+-    # No KV transfer config expected
+-    if expected_backend is None:
+-        assert vllm_config.kv_transfer_config is expected_backend
+-        return
+-
+-    kv_transfer_config = vllm_config.kv_transfer_config
+-    kv_connector_extra_config = kv_transfer_config.kv_connector_extra_config
+-
+-    assert kv_transfer_config.kv_connector == expected_backend
+-    assert kv_transfer_config.kv_role == "kv_both"
+-
+-    if kv_offloading_backend == "native":
+-        assert kv_connector_extra_config["cpu_bytes_to_use"] == expected_bytes
+-        # Existing config should be preserved
+-        assert kv_connector_extra_config["existing_key"] == "existing_value"
+-    elif kv_offloading_backend == "lmcache":
+-        # MP mode does not push lmcache.local_cpu / max_local_cpu_size into
+-        # extra config (the LMCache server owns capacity). Pre-existing
+-        # extra config entries are preserved as-is.
+-        assert "lmcache.local_cpu" not in kv_connector_extra_config
+-        assert "lmcache.max_local_cpu_size" not in kv_connector_extra_config
+-        assert kv_connector_extra_config["existing_key"] == "existing_value"
+-
+-
+-def _build_config(
+-    *,
+-    kv_connector: str | None,
+-    enable_sleep_mode: bool = False,
+-    enable_cumem_allocator: bool = False,
+-) -> VllmConfig:
+-    """Build a VllmConfig that exercises _verify_kv_transfer_compat without
+-    requiring a real model (avoids HF downloads in CI)."""
+-    from types import SimpleNamespace
+-
+-    kv_transfer_config = (
+-        KVTransferConfig(kv_connector=kv_connector, kv_role="kv_both")
+-        if kv_connector is not None
+-        else None
+-    )
+-    cfg = VllmConfig.__new__(VllmConfig)
+-    cfg.kv_transfer_config = kv_transfer_config
+-    cfg.model_config = SimpleNamespace(
+-        enable_sleep_mode=enable_sleep_mode,
+-        enable_cumem_allocator=(enable_cumem_allocator or enable_sleep_mode),
+-    )
+-    cfg._verify_kv_transfer_compat()
+-    return cfg
++def test_byte_denominated_offloading_flags_are_gone():
++    """kv_offloading_size/kv_offloading_backend existed only to manufacture
++    a cpu_bytes_to_use entry for the native offloading spec. Capacity is now
++    declared as user contexts on the connector config itself, so the
++    convenience inlet must not quietly return."""
++    assert not hasattr(CacheConfig, "kv_offloading_size")
++    assert not hasattr(CacheConfig, "kv_offloading_backend")
+ 
+ 
+ @pytest.mark.parametrize(
+     "kv_connector", ["NixlConnector", "MooncakeConnectorV1", "SomeOOTConnector"]
+ )
+ def test_kv_connector_rejects_expandable_segments(monkeypatch, kv_connector):
+     """KV connectors that pin KV cache memory (e.g. via ibv_reg_mr) are
+     invalidated when expandable_segments lets the CUDA VMM allocator remap
+     the underlying physical pages. We can't enumerate every connector that
+     does this (especially OOT ones), so reject the combination whenever any
+     connector is configured."""
+     monkeypatch.setenv("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
+     with pytest.raises(ValueError, match="expandable_segments"):
+         _build_config(kv_connector=kv_connector)
+ 
+ 
+ def test_kv_connector_allows_expandable_segments_with_sleep_mode(monkeypatch):
+     """Sleep mode routes KV allocations through CuMemAllocator's pool, which
+     auto-disables expandable_segments (see #40812)."""
+     monkeypatch.setenv("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
+     _build_config(kv_connector="NixlConnector", enable_sleep_mode=True)
+ 
+ 
+ def test_kv_connector_allows_expandable_segments_with_cumem_allocator(
+     monkeypatch,
+ ):
+     """Manual CuMem allocation must also bypass expandable_segments."""
+     monkeypatch.setenv("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
+     _build_config(kv_connector="NixlConnector", enable_cumem_allocator=True)
+ 
+ 
+ def test_kv_connector_allows_other_alloc_conf(monkeypatch):
+     """Other PYTORCH_CUDA_ALLOC_CONF values must not be rejected."""
+     monkeypatch.setenv(
+         "PYTORCH_CUDA_ALLOC_CONF", "max_split_size_mb:512,expandable_segments:False"
+     )
+     _build_config(kv_connector="NixlConnector")
+ 
+ 
+ def test_no_kv_connector_ignores_expandable_segments(monkeypatch):
+     """The expandable_segments check only applies when a KV connector is
+     configured."""
+     monkeypatch.setenv("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
+     _build_config(kv_connector=None)
+-
+-
+-def test_kv_offloading_size_only_uses_native_default():
+-    """Test that setting only kv_offloading_size enables native offloading."""
+-    vllm_config = VllmConfig(
+-        cache_config=CacheConfig(
+-            kv_offloading_size=4.0,
+-            # kv_offloading_backend not set, should default to "native"
+-        ),
+-    )
+-
+-    kv_transfer_config = vllm_config.kv_transfer_config
+-    kv_connector_extra_config = kv_transfer_config.kv_connector_extra_config
+-    assert kv_transfer_config.kv_connector == "OffloadingConnector"
+-    assert kv_transfer_config.kv_role == "kv_both"
+-    assert kv_connector_extra_config["cpu_bytes_to_use"] == 4.0 * (1 << 30)
+diff --git a/tests/v1/kv_connector/unit/test_hma_auto_config.py b/tests/v1/kv_connector/unit/test_hma_auto_config.py
+index 9c6e0906f6753a0de161df52e276aee94a40755e..2c591daa1fdbc9c9d7005af74dd0dfc2241c252a 100644
+--- a/tests/v1/kv_connector/unit/test_hma_auto_config.py
++++ b/tests/v1/kv_connector/unit/test_hma_auto_config.py
+@@ -48,7 +48,7 @@ def mock_hybrid_kv_cache_supported(monkeypatch):
+                         {
+                             "kv_connector": "OffloadingConnector",
+                             "kv_role": "kv_both",
+-                            "kv_connector_extra_config": {"cpu_bytes_to_use": 1 << 30},
++                            "kv_connector_extra_config": {"cpu_kv_cache_users": 1},
+                         },
+                     ]
+                 },
+diff --git a/tests/v1/kv_connector/unit/test_offloading_connector.py b/tests/v1/kv_connector/unit/test_offloading_connector.py
+index 5a6ea10a685ce25ce624dcc4020b1a7158bc5aa6..5e9c622868d23b599503c4956d0b389e354e7f76 100644
+--- a/tests/v1/kv_connector/unit/test_offloading_connector.py
++++ b/tests/v1/kv_connector/unit/test_offloading_connector.py
+@@ -242,7 +242,7 @@ def test_cpu_offloading(
+     Tests OffloadingConnector with CPUOffloadingSpec.
+     """
+     # configure OffloadingConnector (spec_name=CPUOffloadingSpec by default)
+-    extra_config: dict = {"cpu_bytes_to_use": 500 << 20}
++    extra_config: dict = {"cpu_kv_cache_users": 4}
+     if cpu_block_size is not None:
+         extra_config["block_size"] = cpu_block_size
+     kv_transfer_config = KVTransferConfig(
+@@ -274,6 +274,7 @@ def test_cpu_offloading(
+     llm = LLM(
+         model=model,
+         max_model_len=4096,
++        kv_cache_users=2,
+         gpu_memory_utilization=0.5,
+         kv_events_config=kv_events_config,
+         kv_transfer_config=kv_transfer_config,
+@@ -302,7 +303,7 @@ def test_cpu_offloading_metrics() -> None:
+     """Verify that offloading Prometheus metrics (new flat and deprecated
+     labeled) are emitted after stores and loads."""
+     extra_config: dict = {
+-        "cpu_bytes_to_use": 500 << 20,
++        "cpu_kv_cache_users": 4,
+         "block_size": CPU_BLOCK_SIZES,
+     }
+     kv_transfer_config = KVTransferConfig(
+@@ -314,6 +315,7 @@ def test_cpu_offloading_metrics() -> None:
+     llm = LLM(
+         model="meta-llama/Llama-3.2-1B-Instruct",
+         max_model_len=4096,
++        kv_cache_users=2,
+         gpu_memory_utilization=0.5,
+         kv_transfer_config=kv_transfer_config,
+         disable_log_stats=False,
+@@ -445,7 +447,7 @@ def test_cpu_offloading_metrics() -> None:
+ def test_tiering_offloading() -> None:
+     """Tests OffloadingConnector with TieringOffloadingSpec."""
+     extra_config: dict = {
+-        "cpu_bytes_to_use": 500 << 20,
++        "cpu_kv_cache_users": 4,
+         "block_size": CPU_BLOCK_SIZES,
+         "spec_name": "TieringOffloadingSpec",
+         "secondary_tiers": [{"type": "example"}],
+@@ -471,6 +473,7 @@ def test_tiering_offloading() -> None:
+     llm = LLM(
+         model="meta-llama/Llama-3.2-1B-Instruct",
+         max_model_len=4096,
++        kv_cache_users=2,
+         gpu_memory_utilization=0.5,
+         kv_events_config=kv_events_config,
+         kv_transfer_config=kv_transfer_config,
+@@ -491,7 +494,7 @@ def test_fs_tiering_offloading(tmp_path) -> None:
+     """Tests OffloadingConnector with TieringOffloadingSpec
+     + fs secondary tier."""
+     extra_config: dict = {
+-        "cpu_bytes_to_use": 1 << 30,
++        "cpu_kv_cache_users": 4,
+         "block_size": CPU_BLOCK_SIZES,
+         "spec_name": "TieringOffloadingSpec",
+         "secondary_tiers": [{"type": "fs", "root_dir": str(tmp_path)}],
+@@ -517,6 +520,7 @@ def test_fs_tiering_offloading(tmp_path) -> None:
+     llm = LLM(
+         model="meta-llama/Llama-3.2-1B-Instruct",
+         max_model_len=4096,
++        kv_cache_users=2,
+         gpu_memory_utilization=0.5,
+         kv_events_config=kv_events_config,
+         kv_transfer_config=kv_transfer_config,
+@@ -553,13 +557,14 @@ def test_mamba_cpu_offload_boundary(
+         kv_connector="OffloadingConnector",
+         kv_role="kv_both",
+         kv_connector_extra_config={
+-            "cpu_bytes_to_use": 4 << 30,
++            "cpu_kv_cache_users": 4,
+             "block_size": block_size,
+         },
+     )
+     llm = LLM(
+         model=model,
+         max_model_len=block_size * 10,
++        kv_cache_users=2,
+         gpu_memory_utilization=0.85,
+         tensor_parallel_size=tp_size,
+         kv_transfer_config=kv_transfer_config,
+diff --git a/tests/v1/kv_offload/test_factory.py b/tests/v1/kv_offload/test_factory.py
+index 3064abed6b9a3ed3c8a4143f279f65c86576f817..924d97caaeb474ccfd3bbe7f368f6021f682f357 100644
+--- a/tests/v1/kv_offload/test_factory.py
++++ b/tests/v1/kv_offload/test_factory.py
+@@ -37,7 +37,8 @@ def restore_registry():
+ def _make_offloading_config(
+     *,
+     spec_name: str | None = "CPUOffloadingSpec",
+-    cpu_bytes_to_use: int | None = 65536,
++    cpu_kv_cache_users: int | None = 1,
++    max_model_len: int = 128,
+     worker_kv_bytes_per_block: int = 8,
+     groups: tuple[OffloadingGroupConfig, ...] | None = None,
+     tokens_per_hash: int = 16,
+@@ -58,8 +59,8 @@ def _make_offloading_config(
+     normalized_extra_config = dict(extra_config or {})
+     if spec_name is not None:
+         normalized_extra_config["spec_name"] = spec_name
+-    if cpu_bytes_to_use is not None:
+-        normalized_extra_config["cpu_bytes_to_use"] = cpu_bytes_to_use
++    if cpu_kv_cache_users is not None:
++        normalized_extra_config["cpu_kv_cache_users"] = cpu_kv_cache_users
+ 
+     if groups is None:
+         groups = (OffloadingGroupConfig(16, ("layer",)),)
+@@ -70,7 +71,9 @@ def _make_offloading_config(
+         enable_kv_cache_events=False,
+         extra_config=normalized_extra_config,
+         engine_id="test-engine",
+-        model=OffloadingModelConfig(name="test-model", dtype="float16"),
++        model=OffloadingModelConfig(
++            name="test-model", dtype="float16", max_model_len=max_model_len
++        ),
+         cache=OffloadingCacheConfig(
+             tokens_per_hash=tokens_per_hash,
+             blocks_per_chunk=blocks_per_chunk,
+@@ -144,8 +147,9 @@ def test_cpu_spec_sizes_normalized_worker_layout():
+     # (matching the shared region), so kv_bytes_per_chunk picks up padding
+     # while cpu_page_size_per_worker stays the un-padded per-worker slot.
+     alignment = SharedOffloadRegion.BLOCK_SIZE_ALIGNMENT
++    # 96-token contexts over 32-token chunks: one declared user is 3 chunks.
+     spec = _create_spec(
+-        cpu_bytes_to_use=alignment * 3,
++        max_model_len=96,
+         worker_kv_bytes_per_block=16,
+         blocks_per_chunk=2,
+         world_size=6,
+@@ -172,7 +176,7 @@ def test_tiering_spec_aligns_row_size():
+     alignment = SharedOffloadRegion.BLOCK_SIZE_ALIGNMENT
+     spec = _create_spec(
+         spec_name="TieringOffloadingSpec",
+-        cpu_bytes_to_use=alignment * 3,
++        max_model_len=96,
+         worker_kv_bytes_per_block=16,
+         blocks_per_chunk=2,
+         world_size=6,
+@@ -189,9 +193,11 @@ def test_tiering_spec_aligns_row_size():
+ @pytest.mark.parametrize("world_size", [2, 4, 8])
+ def test_tiering_spec_replicated_sizing_removes_world_factor(world_size: int):
+     worker_kv_bytes_per_block = SharedOffloadRegion.BLOCK_SIZE_ALIGNMENT
++    # Chunk-count capacity (128 tokens / 16-token blocks = 8 chunks/user) is
++    # topology-free by construction; the single-copy row math below is what
++    # the replicated layout must still get right.
+     spec = _create_spec(
+         spec_name="TieringOffloadingSpec",
+-        cpu_bytes_to_use=worker_kv_bytes_per_block * 8,
+         worker_kv_bytes_per_block=worker_kv_bytes_per_block,
+         world_size=world_size,
+         replicated_layout=True,
+@@ -210,7 +216,6 @@ def test_tiering_spec_create_worker_uses_single_slot_for_replicated_layout(monke
+     worker_kv_bytes_per_block = SharedOffloadRegion.BLOCK_SIZE_ALIGNMENT
+     spec = _create_spec(
+         spec_name="TieringOffloadingSpec",
+-        cpu_bytes_to_use=worker_kv_bytes_per_block * 8,
+         worker_kv_bytes_per_block=worker_kv_bytes_per_block,
+         world_size=4,
+         replicated_layout=True,
+@@ -282,7 +287,6 @@ def test_cpu_spec_replicated_sizing_on_shared_region(monkeypatch, world_size: in
+     monkeypatch.setattr(cpu_spec_module.current_platform, "is_cuda_alike", lambda: True)
+     worker_kv_bytes_per_block = SharedOffloadRegion.BLOCK_SIZE_ALIGNMENT
+     spec = _create_spec(
+-        cpu_bytes_to_use=worker_kv_bytes_per_block * 8,
+         worker_kv_bytes_per_block=worker_kv_bytes_per_block,
+         world_size=world_size,
+         replicated_layout=True,
+@@ -310,7 +314,6 @@ def test_cpu_spec_replicated_disabled_without_shared_region(
+     )
+     worker_kv_bytes_per_block = SharedOffloadRegion.BLOCK_SIZE_ALIGNMENT
+     spec = _create_spec(
+-        cpu_bytes_to_use=worker_kv_bytes_per_block * world_size * 2,
+         worker_kv_bytes_per_block=worker_kv_bytes_per_block,
+         world_size=world_size,
+         replicated_layout=True,
+@@ -320,7 +323,9 @@ def test_cpu_spec_replicated_disabled_without_shared_region(
+     assert spec.replicated_layout is False
+     assert spec.cpu_page_size_per_worker == worker_kv_bytes_per_block
+     assert spec.kv_bytes_per_chunk == worker_kv_bytes_per_block * world_size
+-    assert spec.num_blocks == 2
++    # Capacity is a chunk count (8 per declared user for 128/16), unchanged
++    # by how many per-rank copies each chunk carries.
++    assert spec.num_blocks == 8
+ 
+ 
+ @pytest.mark.parametrize("config_replicated", [True, False])
+@@ -337,7 +342,6 @@ def test_cpu_spec_replicated_layout_truth_matrix(
+     )
+     worker_kv_bytes_per_block = SharedOffloadRegion.BLOCK_SIZE_ALIGNMENT
+     spec = _create_spec(
+-        cpu_bytes_to_use=worker_kv_bytes_per_block * 8,
+         worker_kv_bytes_per_block=worker_kv_bytes_per_block,
+         world_size=4,
+         replicated_layout=config_replicated,
+@@ -352,7 +356,6 @@ def test_cpu_spec_create_worker_uses_mmap_on_cuda_alike(monkeypatch):
+ 
+     worker_kv_bytes_per_block = SharedOffloadRegion.BLOCK_SIZE_ALIGNMENT
+     spec = _create_spec(
+-        cpu_bytes_to_use=worker_kv_bytes_per_block * 8,
+         worker_kv_bytes_per_block=worker_kv_bytes_per_block,
+         world_size=4,
+     )
+@@ -463,7 +466,6 @@ def test_cpu_spec_create_worker_rank_assignment(
+     monkeypatch.setattr(cpu_spec_module.current_platform, "is_cuda_alike", lambda: True)
+     worker_kv_bytes_per_block = SharedOffloadRegion.BLOCK_SIZE_ALIGNMENT
+     spec = _create_spec(
+-        cpu_bytes_to_use=worker_kv_bytes_per_block * 8,
+         worker_kv_bytes_per_block=worker_kv_bytes_per_block,
+         world_size=world_size,
+         replicated_layout=replicated_layout,
+@@ -539,9 +541,57 @@ def test_unregistered_spec_without_module_path_raises():
+         OffloadingSpecFactory.create_spec(config)
+ 
+ 
+-def test_cpu_spec_missing_cpu_bytes_to_use_raises():
+-    with pytest.raises(Exception, match="cpu_bytes_to_use must be specified"):
+-        _create_spec(cpu_bytes_to_use=None)
++def test_cpu_spec_missing_cpu_kv_cache_users_raises():
++    with pytest.raises(ValueError, match="cpu_kv_cache_users must be specified"):
++        _create_spec(cpu_kv_cache_users=None)
++
++
++@pytest.mark.parametrize("bad_users", [0, -1, 1.5, "1", True])
++def test_cpu_spec_rejects_non_positive_or_non_integer_users(bad_users):
++    with pytest.raises(ValueError, match="positive integer"):
++        _create_spec(cpu_kv_cache_users=bad_users)
++
++
++def test_cpu_spec_unknown_extra_config_key_fails_startup():
++    with pytest.raises(ValueError, match="Unknown kv_connector_extra_config"):
++        _create_spec(extra_config={"definitely_not_a_knob": 1})
++
++
++def test_cpu_spec_user_count_scales_capacity():
++    # 128-token contexts over 16-token chunks: 8 chunks per declared user.
++    assert _create_spec(cpu_kv_cache_users=1).num_blocks == 8
++    assert _create_spec(cpu_kv_cache_users=4).num_blocks == 32
++
++
++def test_cpu_spec_windowed_group_counts_trailing_window_only():
++    # A full-attention group needs its whole prefix; a recurrent/windowed
++    # group is resident at the trailing window the load path reads. For a
++    # Mamba-style window of one chunk, one 128-token user is 8 + 1 chunks,
++    # not 8 + 8: counting every boundary snapshot would double the declared
++    # footprint for chunks a full-length re-entry never reads.
++    groups = (
++        OffloadingGroupConfig(16, ("full_layer",)),
++        OffloadingGroupConfig(16, ("mamba_layer",), sliding_window_size_in_chunks=1),
++    )
++    spec = _create_spec(groups=groups)
++    assert spec.num_blocks == 9
++
++
++def test_cpu_spec_window_wider_than_context_is_clamped():
++    groups = (
++        OffloadingGroupConfig(16, ("swa_layer",), sliding_window_size_in_chunks=99),
++    )
++    spec = _create_spec(groups=groups)
++    assert spec.num_blocks == 8
++
++
++def test_cpu_spec_counts_the_eagle_checkpoint_verified_by_lookup():
++    groups = (
++        OffloadingGroupConfig(16, ("full_layer",)),
++        OffloadingGroupConfig(16, ("draft_layer",), sliding_window_size_in_chunks=2,
++                              is_eagle_group=True),
++    )
++    assert _create_spec(groups=groups, cpu_kv_cache_users=3).num_blocks == 3 * (8 + 3)
+ 
+ 
+ def test_duplicate_registration_raises():
+diff --git a/tests/v1/kv_offload/test_file_mapper.py b/tests/v1/kv_offload/test_file_mapper.py
+index 9ba1e5648749553be0e7324738d65bdb63f414e8..db7484143e5ab93714b0245b94ef578ab796a5f0 100644
+--- a/tests/v1/kv_offload/test_file_mapper.py
++++ b/tests/v1/kv_offload/test_file_mapper.py
+@@ -36,6 +36,7 @@ def make_mapper_from_offloading_spec(**kwargs) -> FileMapper:
+         model=OffloadingModelConfig(
+             name=kwargs.get("model_name", "test-model"),
+             dtype=kwargs.get("dtype", "float16"),
++            max_model_len=kwargs.get("max_model_len", 128),
+         ),
+         cache=OffloadingCacheConfig(
+             tokens_per_hash=kwargs.get("tokens_per_hash", 16),
+diff --git a/tests/v1/kv_offload/tiering/p2p/run_accuracy_test.sh b/tests/v1/kv_offload/tiering/p2p/run_accuracy_test.sh
+index 89300376a78360207d9c2ee3fb7269df27ee8fa2..0ffe8706b1cfcfcc60b5eeef6b3124c8531ee97d 100644
+--- a/tests/v1/kv_offload/tiering/p2p/run_accuracy_test.sh
++++ b/tests/v1/kv_offload/tiering/p2p/run_accuracy_test.sh
+@@ -26,7 +26,7 @@
+ #   MAX_MODEL_LEN               default 512
+ #   PREFILL_BLOCK_SIZE          default 128
+ #   DECODE_BLOCK_SIZE           default 128
+-#   CPU_BYTES                   default 209715200 (200 MB)
++#   CPU_KV_CACHE_USERS          default 2 (resident full-length contexts)
+ #   VLLM_SERVE_EXTRA_ARGS       comma-separated extra args for vllm serve
+ #   --decoder-first             toggle decoder-first proxy mode
+ #
+@@ -91,7 +91,7 @@ GPU_MEMORY_UTILIZATION=${GPU_MEMORY_UTILIZATION:-0.45}
+ MAX_MODEL_LEN=${MAX_MODEL_LEN:-512}
+ PREFILL_BLOCK_SIZE=${PREFILL_BLOCK_SIZE:-128}
+ DECODE_BLOCK_SIZE=${DECODE_BLOCK_SIZE:-128}
+-CPU_BYTES=${CPU_BYTES:-209715200}
++CPU_KV_CACHE_USERS=${CPU_KV_CACHE_USERS:-2}
+ VLLM_SERVE_EXTRA_ARGS=${VLLM_SERVE_EXTRA_ARGS:-}
+ 
+ # Base ports — per-instance offsets layered on top.
+@@ -166,8 +166,8 @@ get_num_gpus() {
+ # Mirrors deploy_local.sh:131.
+ build_kv_config() {
+   local pd_port=$1
+-  printf '{"kv_connector":"OffloadingConnector","kv_role":"kv_both","kv_connector_extra_config":{"spec_name":"TieringOffloadingSpec","cpu_bytes_to_use":%s,"secondary_tiers":[{"type":"p2p","host":"%s","port":%s}]}}' \
+-    "${CPU_BYTES}" "${P2P_HOST}" "${pd_port}"
++  printf '{"kv_connector":"OffloadingConnector","kv_role":"kv_both","kv_connector_extra_config":{"spec_name":"TieringOffloadingSpec","cpu_kv_cache_users":%s,"secondary_tiers":[{"type":"p2p","host":"%s","port":%s}]}}' \
++    "${CPU_KV_CACHE_USERS}" "${P2P_HOST}" "${pd_port}"
+ }
+ 
+ # ---------------------------------------------------------------------------
+@@ -221,6 +221,7 @@ run_tests_for_model() {
+     --block-size ${PREFILL_BLOCK_SIZE} \
+     --gpu-memory-utilization ${GPU_MEMORY_UTILIZATION} \
+     --max-model-len ${MAX_MODEL_LEN} \
++    --kv-cache-users 2 \
+     --tensor-parallel-size ${PREFILLER_TP_SIZE} \
+     --kv-transfer-config '${kv_cfg}'"
+ 
+@@ -261,6 +262,7 @@ run_tests_for_model() {
+     --block-size ${DECODE_BLOCK_SIZE} \
+     --gpu-memory-utilization ${GPU_MEMORY_UTILIZATION} \
+     --max-model-len ${MAX_MODEL_LEN} \
++    --kv-cache-users 2 \
+     --kv-transfer-config '${kv_cfg}'"
+ 
+     # DP-EP attention mode: data-parallel + expert-parallel decode replicas
+diff --git a/tests/v1/kv_offload/tiering/test_fs_tier.py b/tests/v1/kv_offload/tiering/test_fs_tier.py
+index efeb59274fdb5ce5b9419c5738a8983ce4c3af1f..db3aecbe0cbdc0905c1a736f2f8f25530ac56229 100644
+--- a/tests/v1/kv_offload/tiering/test_fs_tier.py
++++ b/tests/v1/kv_offload/tiering/test_fs_tier.py
+@@ -71,7 +71,9 @@ def _make_offloading_spec(
+         enable_kv_cache_events=enable_kv_cache_events,
+         extra_config={},
+         engine_id="test-engine",
+-        model=OffloadingModelConfig(name="test-model", dtype="float32"),
++        model=OffloadingModelConfig(
++            name="test-model", dtype="float32", max_model_len=128
++        ),
+         cache=OffloadingCacheConfig(tokens_per_hash=16, blocks_per_chunk=1),
+         parallel=OffloadingParallelConfig(
+             rank=rank,
+diff --git a/tests/v1/kv_offload/tiering/test_obj_tier.py b/tests/v1/kv_offload/tiering/test_obj_tier.py
+index d0c4d4cb04e474970ea0066d30867640dc2d9dd3..8e935d7712a8803edeb88af09d0856fa5b658dc5 100644
+--- a/tests/v1/kv_offload/tiering/test_obj_tier.py
++++ b/tests/v1/kv_offload/tiering/test_obj_tier.py
+@@ -64,7 +64,9 @@ def _make_offloading_config(
+         enable_kv_cache_events=enable_kv_cache_events,
+         extra_config={},
+         engine_id="test-engine",
+-        model=OffloadingModelConfig(name="test/model", dtype="float16"),
++        model=OffloadingModelConfig(
++            name="test/model", dtype="float16", max_model_len=128
++        ),
+         cache=OffloadingCacheConfig(tokens_per_hash=16, blocks_per_chunk=1),
+         parallel=OffloadingParallelConfig(
+             rank=rank,
+diff --git a/tests/v1/simple_kv_offload/test_integration.py b/tests/v1/simple_kv_offload/test_integration.py
+index 02f6360e08e83ddf3defbdccc0d035fc5f45bd67..f7d0c4743407464953e5ccd5f9138d12229a6eaa 100644
+--- a/tests/v1/simple_kv_offload/test_integration.py
++++ b/tests/v1/simple_kv_offload/test_integration.py
+@@ -37,7 +37,7 @@ def _make_llm(model: str, lazy: bool, cpu_bytes_to_use: int) -> LLM:
+     )
+     return LLM(
+         model=model,
+-        kv_cache_memory_bytes=40 << 30,  # 40 GiB
++        kv_cache_users=4,
+         disable_hybrid_kv_cache_manager=False,
+         enable_prefix_caching=True,
+         kv_transfer_config=kv_transfer_config,
+diff --git a/vllm/config/cache.py b/vllm/config/cache.py
+index 654e9a53589ba86042fb8929764432656824fa9c..cc9b9d6ad101231c20f5507dc85206830b787225 100644
+--- a/vllm/config/cache.py
++++ b/vllm/config/cache.py
+@@ -38,7 +38,6 @@ CacheDType = Literal[
+ MambaDType = Literal["auto", "float32", "float16", "bfloat16"]
+ MambaCacheMode = Literal["all", "align", "none"]
+ PrefixCachingHashAlgo = Literal["sha256", "sha256_cbor", "xxhash", "xxhash_cbor"]
+-KVOffloadingBackend = Literal["native", "lmcache"]
+ 
+ 
+ @config
+@@ -177,25 +176,24 @@ class CacheConfig:
+     NOTE: KV cache sharing is not supported for MRv2 (v2 model runner).
+     """
+ 
+-    kv_cache_memory_bytes: int | None = None
+-    """Size of KV Cache per GPU in bytes. By default, this is set to None
+-    and vllm can automatically infer the kv cache size based on
+-    gpu_memory_utilization. However, users may want to manually specify
+-    the kv cache memory size. kv_cache_memory_bytes allows more fine-grain
+-    control of how much memory gets used when compared with using
+-    gpu_memory_utilization. Note that kv_cache_memory_bytes
+-    (when not-None) ignores gpu_memory_utilization"""
++    kv_cache_users: int | None = None
++    """GPU KV cache capacity, declared as a count of resident full-length
++    user contexts. Bytes are derived at engine initialization from
++    max_model_len and the KV cache spec — the only place page sizes and the
++    hybrid group structure exist — so the same declaration is correct on
++    any GPU and any TP layout. Required whenever the model has a KV cache;
++    engine initialization fails closed without it. There is deliberately no
++    byte-denominated companion: a byte value is only ever valid for the one
++    machine it was measured on."""
+ 
+-    kv_offloading_size: float | None = None
+-    """Size of the KV cache offloading buffer in GiB. When TP > 1, this is
+-    the total buffer size summed across all TP ranks. By default, this is set
+-    to None, which means no KV offloading is enabled. When set, vLLM will
+-    enable KV cache offloading to CPU using the kv_offloading_backend."""
+-
+-    kv_offloading_backend: KVOffloadingBackend = "native"
+-    """The backend to use for KV cache offloading. Supported backends include
+-    'native' (vLLM native CPU offloading), 'lmcache'.
+-    KV offloading is only activated when kv_offloading_size is set."""
++    kv_cache_memory_bytes: int | None = field(default=None, init=False)
++    """Internal availability state, never a user declaration: the CPU
++    backend derives it from VLLM_CPU_KVCACHE_SPACE, and the startup-plan
++    cache re-applies a previously measured profiling result to skip
++    re-profiling. Either way it only bounds what is available — the demand
++    derived from kv_cache_users must still fit inside it. The former CLI
++    and constructor inlets were removed because a byte declaration encodes
++    one specific machine."""
+ 
+     def compute_hash(self) -> str:
+         """
+@@ -212,6 +210,7 @@ class CacheConfig:
+         ignored_factors = {
+             # Runtime/derived knobs that don't affect compiled graph shape
+             "gpu_memory_utilization",
++            "kv_cache_users",
+             "kv_cache_memory_bytes",
+             "is_attention_free",
+             "num_gpu_blocks_override",
+diff --git a/vllm/config/vllm.py b/vllm/config/vllm.py
+index 2b5e512ccacf3d012d34a4947ada75a1abef2292..69f41ba9af0f1de3aa53594fdcfcec50828a8ea4 100644
+--- a/vllm/config/vllm.py
++++ b/vllm/config/vllm.py
+@@ -944,42 +944,6 @@ class VllmConfig:
+         )
+         speculative_config.num_speculative_tokens_per_batch_size = None
+ 
+-    def _post_init_kv_transfer_config(self) -> None:
+-        """Update KVTransferConfig based on top-level configs in VllmConfig.
+-
+-        Right now, this function reads the offloading settings from
+-        CacheConfig and configures the KVTransferConfig accordingly.
+-        """
+-        # KV offloading is only activated when kv_offloading_size is set.
+-        if (kv_offloading_size := self.cache_config.kv_offloading_size) is None:
+-            return
+-
+-        kv_offloading_backend = self.cache_config.kv_offloading_backend
+-
+-        # If no KVTransferConfig is provided, create a default one.
+-        if self.kv_transfer_config is None:
+-            self.kv_transfer_config = KVTransferConfig()
+-
+-        if kv_offloading_backend == "native":
+-            if envs.VLLM_USE_SIMPLE_KV_OFFLOAD:
+-                config_connector = "SimpleCPUOffloadConnector"
+-            else:
+-                config_connector = "OffloadingConnector"
+-            self.kv_transfer_config.kv_connector = config_connector
+-            self.kv_transfer_config.kv_connector_extra_config.update(
+-                {"cpu_bytes_to_use": kv_offloading_size * (1 << 30)}
+-            )
+-        elif kv_offloading_backend == "lmcache":
+-            # Default to LMCache multi-process (MP) mode. The actual KV
+-            # storage capacity is managed by the standalone LMCache server
+-            # process, so ``kv_offloading_size`` is not propagated here.
+-            # ``LMCacheMPConnector`` falls back to ``tcp://localhost:5555``
+-            # when host/port are not provided via extra_config.
+-            self.kv_transfer_config.kv_connector = "LMCacheMPConnector"
+-
+-        # This is the same for all backends
+-        self.kv_transfer_config.kv_role = "kv_both"
+-
+     def _verify_kv_transfer_compat(self) -> None:
+         """Reject configurations that silently corrupt KV transfers."""
+         if (
+@@ -1710,10 +1674,6 @@ class VllmConfig:
+                     "the `reasoning_start_str` and `reasoning_end_str`."
+                 )
+ 
+-        # Resolve kv_offloading-derived connector name into kv_transfer_config
+-        # before the HMA check below, which inspects the connector class.
+-        self._post_init_kv_transfer_config()
+-
+         # Hybrid KV cache manager (HMA) runtime rules:
+         # - Explicit enable (--no-disable-kv-cache-manager): error if runtime
+         #   disables it
+diff --git a/vllm/distributed/kv_transfer/kv_connector/v1/offloading/config.py b/vllm/distributed/kv_transfer/kv_connector/v1/offloading/config.py
+index e8d1c2838e1bd06836224189cbbb5cc5927bdc3e..f381c0849c8adf00858fa0886478255eab0f93ae 100644
+--- a/vllm/distributed/kv_transfer/kv_connector/v1/offloading/config.py
++++ b/vllm/distributed/kv_transfer/kv_connector/v1/offloading/config.py
+@@ -4,11 +4,16 @@
+ 
+ from typing import TYPE_CHECKING
+ 
++from vllm.utils.math_utils import cdiv
+ from vllm.v1.core.kv_cache_utils import (get_kv_cache_spec_for_block_geometry, resolve_kv_cache_block_sizes)
+ from vllm.v1.kv_cache_interface import (
+     AttentionSpec,
++    ChunkedLocalAttentionSpec,
+     FullAttentionSpec,
++    KVCacheSpec,
++    MambaSpec,
+     MLAAttentionSpec,
++    SlidingWindowSpec,
+ )
+ from vllm.v1.kv_offload.config import (
+     OffloadingCacheConfig,
+@@ -28,6 +33,38 @@ def is_kv_cache_tensor_packed(kv_cache_tensor: "KVCacheTensor") -> bool:
+     return bool(kv_cache_tensor.block_stride)
+ 
+ 
++def get_sliding_window_size_in_chunks(
++    kv_cache_spec: KVCacheSpec, tokens_per_chunk: int
++) -> int | None:
++    """Trailing chunks of a group that a load hit reads (None = full prefix).
++
++    This is the single classification both the scheduler's load planning and
++    the user-count capacity derivation consume, via
++    OffloadingGroupConfig.sliding_window_size_in_chunks. Keeping it at the
++    config boundary is load-bearing: if planning and sizing classified
++    windows independently, a drift between them would let a "resident user"
++    be declared while the tier physically cannot hold what that user's
++    full-length re-entry reads.
++    """
++    kv_cache_spec = get_kv_cache_spec_for_block_geometry(kv_cache_spec)
++
++    if isinstance(kv_cache_spec, SlidingWindowSpec):
++        assert kv_cache_spec.sliding_window > 0
++        return cdiv(kv_cache_spec.sliding_window, tokens_per_chunk)
++
++    if isinstance(kv_cache_spec, ChunkedLocalAttentionSpec):
++        # Attention never reaches back past one chunk
++        assert kv_cache_spec.attention_chunk_size > 0
++        return cdiv(kv_cache_spec.attention_chunk_size, tokens_per_chunk)
++
++    if isinstance(kv_cache_spec, MambaSpec):
++        # Mamba depends on a single state
++        return 1
++
++    assert isinstance(kv_cache_spec, FullAttentionSpec)
++    return None
++
++
+ def build_offloading_config(
+     vllm_config: "VllmConfig",
+     kv_cache_config: "KVCacheConfig",
+@@ -40,28 +77,20 @@ def build_offloading_config(
+     engine_id = kv_transfer_config.engine_id
+ 
+     parallel_config = vllm_config.parallel_config
+-    groups = tuple(
+-        OffloadingGroupConfig(
+-            tokens_per_block=(
+-                group.kv_cache_spec.block_size
+-                * (
+-                    parallel_config.decode_context_parallel_size
+-                    if isinstance(get_kv_cache_spec_for_block_geometry(group.kv_cache_spec), AttentionSpec)
+-                    else 1
+-                )
+-            ),
+-            layer_names=tuple(group.layer_names),
+-            sliding_window_tokens=getattr(get_kv_cache_spec_for_block_geometry(group.kv_cache_spec), "sliding_window", None),
+-            attention_chunk_size=getattr(get_kv_cache_spec_for_block_geometry(group.kv_cache_spec), "attention_chunk_size", None),
+-            mamba_cache_mode=getattr(get_kv_cache_spec_for_block_geometry(group.kv_cache_spec), "mamba_cache_mode", None),
++    group_tokens_per_block = tuple(
++        group.kv_cache_spec.block_size
++        * (
++            parallel_config.decode_context_parallel_size
++            if isinstance(get_kv_cache_spec_for_block_geometry(group.kv_cache_spec), AttentionSpec)
++            else 1
+         )
+         for group in kv_cache_config.kv_cache_groups
+     )
+ 
+     _, tokens_per_hash = resolve_kv_cache_block_sizes(kv_cache_config, vllm_config)
+-    for group in groups:
+-        assert group.tokens_per_block % tokens_per_hash == 0, (
+-            f"tokens_per_block={group.tokens_per_block} not divisible by "
++    for group_tokens in group_tokens_per_block:
++        assert group_tokens % tokens_per_hash == 0, (
++            f"tokens_per_block={group_tokens} not divisible by "
+             f"tokens_per_hash={tokens_per_hash}. "
+             f"Hybrid models (e.g. Mamba+Attention) need "
+             f"--enable-prefix-caching to align block sizes."
+@@ -86,7 +115,7 @@ def build_offloading_config(
+     elif tokens_per_chunk is not None:
+         tokens_per_chunk_int = int(tokens_per_chunk)
+ 
+-        unique_tokens_per_block = {group.tokens_per_block for group in groups}
++        unique_tokens_per_block = set(group_tokens_per_block)
+ 
+         assert len(unique_tokens_per_block) == 1, (
+             "If 'block_size' is specified in kv_connector_extra_config, "
+@@ -98,6 +127,36 @@ def build_offloading_config(
+         assert tokens_per_chunk_int % tokens_per_block == 0
+         blocks_per_chunk = tokens_per_chunk_int // tokens_per_block
+ 
++    eagle_groups = {
++        i for i, group in enumerate(kv_cache_config.kv_cache_groups)
++        if group.is_eagle_group
++    }
++    if (
++        not eagle_groups and vllm_config.speculative_config is not None
++        and vllm_config.speculative_config.use_eagle()
++    ):
++        eagle_groups = set(range(len(kv_cache_config.kv_cache_groups)))
++
++    # Group construction waits for blocks_per_chunk: the per-group hit
++    # window is denominated in chunks, and a chunk's token span is not
++    # known until the chunk coalescing factor is resolved above.
++    groups = tuple(
++        OffloadingGroupConfig(
++            tokens_per_block=group_tokens,
++            layer_names=tuple(group.layer_names),
++            is_eagle_group=idx in eagle_groups,
++            sliding_window_tokens=getattr(get_kv_cache_spec_for_block_geometry(group.kv_cache_spec), "sliding_window", None),
++            attention_chunk_size=getattr(get_kv_cache_spec_for_block_geometry(group.kv_cache_spec), "attention_chunk_size", None),
++            mamba_cache_mode=getattr(get_kv_cache_spec_for_block_geometry(group.kv_cache_spec), "mamba_cache_mode", None),
++            sliding_window_size_in_chunks=get_sliding_window_size_in_chunks(
++                group.kv_cache_spec, group_tokens * blocks_per_chunk
++            ),
++        )
++        for idx, (group, group_tokens) in enumerate(zip(
++            kv_cache_config.kv_cache_groups, group_tokens_per_block
++        ))
++    )
++
+     worker_kv_bytes_per_block = 0
+     if kv_cache_config.num_blocks > 0:
+         packed_tensors = tuple(
+@@ -203,6 +262,7 @@ def build_offloading_config(
+         model=OffloadingModelConfig(
+             name=vllm_config.model_config.model,
+             dtype=str(cache_dtype).removeprefix("torch."),
++            max_model_len=vllm_config.model_config.max_model_len,
+         ),
+         cache=OffloadingCacheConfig(
+             tokens_per_hash=tokens_per_hash,
+diff --git a/vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py b/vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py
+index f79c7d7da8df95e1c8b892a5c9324bf3ccebacbb..f727163b9e4c82d5176abf5e8f09acf829b3dce9 100644
+--- a/vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py
++++ b/vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py
+@@ -29,15 +29,9 @@ from vllm.distributed.kv_transfer.kv_connector.v1.offloading.metrics import (
+ from vllm.logger import init_logger
+ from vllm.utils.math_utils import cdiv, round_down
+ from vllm.v1.core.kv_cache_manager import KVCacheBlocks
+-from vllm.v1.core.kv_cache_utils import get_kv_cache_spec_for_block_geometry
+ from vllm.v1.core.sched.output import SchedulerOutput
+ from vllm.v1.kv_cache_interface import (
+-    ChunkedLocalAttentionSpec,
+-    FullAttentionSpec,
+     KVCacheConfig,
+-    KVCacheSpec,
+-    MambaSpec,
+-    SlidingWindowSpec,
+ )
+ from vllm.v1.kv_offload.base import (
+     GPULoadStoreSpec,
+@@ -110,28 +104,6 @@ class GroupOffloadConfig(NamedTuple):
+     is_eagle_group: bool = False
+ 
+ 
+-def get_sliding_window_size_in_chunks(
+-    kv_cache_spec: KVCacheSpec, tokens_per_chunk: int
+-) -> int | None:
+-    kv_cache_spec = get_kv_cache_spec_for_block_geometry(kv_cache_spec)
+-
+-    if isinstance(kv_cache_spec, SlidingWindowSpec):
+-        assert kv_cache_spec.sliding_window > 0
+-        return cdiv(kv_cache_spec.sliding_window, tokens_per_chunk)
+-
+-    if isinstance(kv_cache_spec, ChunkedLocalAttentionSpec):
+-        # Attention never reaches back past one chunk
+-        assert kv_cache_spec.attention_chunk_size > 0
+-        return cdiv(kv_cache_spec.attention_chunk_size, tokens_per_chunk)
+-
+-    if isinstance(kv_cache_spec, MambaSpec):
+-        # Mamba depends on a single state
+-        return 1
+-
+-    assert isinstance(kv_cache_spec, FullAttentionSpec)
+-    return None
+-
+-
+ def is_store_reachable_swa_chunk(
+     absolute_chunk_index: int,
+     storable_chunk_count: int,
+@@ -196,10 +168,11 @@ class SchedulerOffloadConfig(NamedTuple):
+         # architectures like DeepSeek V4 (MLA + SWA groups).
+         full_attn_tokens_per_chunk: set[int] = set()
+         for idx, tokens_per_block in enumerate(spec.tokens_per_block):
+-            kv_spec = kv_cache_config.kv_cache_groups[idx].kv_cache_spec
+-            sw = get_sliding_window_size_in_chunks(
+-                kv_spec, tokens_per_block * spec.blocks_per_chunk
+-            )
++            # The hit window is classified once, at the offloading config
++            # boundary, and shared with the capacity derivation in the CPU
++            # spec; recomputing it here could let load planning and declared
++            # capacity disagree about what a full-length re-entry reads.
++            sw = spec.config.groups[idx].sliding_window_size_in_chunks
+             if sw is None:
+                 full_attn_tokens_per_chunk.add(tokens_per_block * spec.blocks_per_chunk)
+ 
+@@ -223,18 +196,10 @@ class SchedulerOffloadConfig(NamedTuple):
+             return per_segment
+ 
+         eagle_groups = {
+-            idx
+-            for idx, g in enumerate(kv_cache_config.kv_cache_groups)
+-            if g.is_eagle_group
++            idx for idx, group in enumerate(spec.config.groups)
++            if group.is_eagle_group
+         }
+ 
+-        use_eagle = (
+-            vllm_config.speculative_config is not None
+-            and vllm_config.speculative_config.use_eagle()
+-        )
+-        if use_eagle and not eagle_groups:
+-            eagle_groups = set(range(len(kv_cache_config.kv_cache_groups)))
+-
+         if eagle_groups:
+             logger.info(
+                 "KV offloading: EAGLE/MTP draft attention groups %s "
+@@ -246,10 +211,7 @@ class SchedulerOffloadConfig(NamedTuple):
+         kv_group_configs_list: list[GroupOffloadConfig] = []
+         for idx, tokens_per_block in enumerate(spec.tokens_per_block):
+             kv_cache_group = kv_cache_config.kv_cache_groups[idx]
+-            kv_spec = kv_cache_group.kv_cache_spec
+-            sw = get_sliding_window_size_in_chunks(
+-                kv_spec, tokens_per_block * spec.blocks_per_chunk
+-            )
++            sw = spec.config.groups[idx].sliding_window_size_in_chunks
+             kv_group_configs_list.append(
+                 GroupOffloadConfig(
+                     group_idx=idx,
+diff --git a/vllm/engine/arg_utils.py b/vllm/engine/arg_utils.py
+index 44ee837c6fef64b4807a3f9afc636288fd2f8167..c7a723bd436674374208b2a01cb177766bbad464 100644
+--- a/vllm/engine/arg_utils.py
++++ b/vllm/engine/arg_utils.py
+@@ -69,7 +69,6 @@ from vllm.config import (
+ )
+ from vllm.config.cache import (
+     CacheDType,
+-    KVOffloadingBackend,
+     MambaCacheMode,
+     MambaDType,
+     PrefixCachingHashAlgo,
+@@ -275,7 +274,7 @@ def _expand_json_human_readable_numbers(val: str) -> str:
+     Based on :func:`human_readable_int` so that the ``k/m/g/t`` (decimal) and
+     ``K/M/G/T`` (binary) conventions work out the box.
+     Also works inside JSON config arguments such
+-    as ``--kv-transfer-config '{"cpu_bytes_to_use": 80m}'``.
++    as ``--mm-processor-kwargs '{"size": {"longest_edge": 16M}}'``.
+ 
+     Only bare (unquoted) tokens are replaced so that JSON string values
+     like ``"model_name"`` are never modified.
+@@ -365,7 +364,6 @@ def _compute_kwargs(cls: ConfigType) -> dict[str, dict[str, Any]]:
+             human_readable_int_args = {
+                 "max_num_batched_tokens",
+                 "max_num_scheduled_tokens",
+-                "kv_cache_memory_bytes",
+                 "safetensors_prefetch_block_size",
+             }
+             if name == "max_model_len":
+@@ -532,7 +530,7 @@ class EngineArgs:
+     offload_prefetch_step: int = PrefetchOffloadConfig.offload_prefetch_step
+     offload_params: set[str] = get_field(PrefetchOffloadConfig, "offload_params")
+     gpu_memory_utilization: float = CacheConfig.gpu_memory_utilization
+-    kv_cache_memory_bytes: int | None = CacheConfig.kv_cache_memory_bytes
++    kv_cache_users: int | None = CacheConfig.kv_cache_users
+     max_num_batched_tokens: int | None = None
+     max_num_scheduled_tokens: int | None = None
+     long_prefill_token_threshold: int = SchedulerConfig.long_prefill_token_threshold
+@@ -743,8 +741,6 @@ class EngineArgs:
+     )
+     enable_fault_tolerance: bool = ParallelConfig.enable_fault_tolerance
+ 
+-    kv_offloading_size: float | None = CacheConfig.kv_offloading_size
+-    kv_offloading_backend: KVOffloadingBackend = CacheConfig.kv_offloading_backend
+     tokens_only: bool = False
+ 
+     shutdown_timeout: int = 0
+@@ -1208,7 +1204,7 @@ class EngineArgs:
+             "--gpu-memory-utilization", **cache_kwargs["gpu_memory_utilization"]
+         )
+         cache_group.add_argument(
+-            "--kv-cache-memory-bytes", **cache_kwargs["kv_cache_memory_bytes"]
++            "--kv-cache-users", **cache_kwargs["kv_cache_users"]
+         )
+         cache_group.add_argument("--kv-cache-dtype", **cache_kwargs["cache_dtype"])
+         cache_group.add_argument(
+@@ -1249,12 +1245,6 @@ class EngineArgs:
+             "--replayssm-buffer-len", **cache_kwargs["replayssm_buffer_len"]
+         )
+         cache_group.add_argument("--use-replayssm", **cache_kwargs["use_replayssm"])
+-        cache_group.add_argument(
+-            "--kv-offloading-size", **cache_kwargs["kv_offloading_size"]
+-        )
+-        cache_group.add_argument(
+-            "--kv-offloading-backend", **cache_kwargs["kv_offloading_backend"]
+-        )
+ 
+         # Model weight offload related configs
+         offload_kwargs = get_kwargs(OffloadConfig)
+@@ -1994,7 +1984,7 @@ class EngineArgs:
+         cache_config = CacheConfig(
+             block_size=self.block_size,  # type: ignore[arg-type]
+             gpu_memory_utilization=self.gpu_memory_utilization,
+-            kv_cache_memory_bytes=self.kv_cache_memory_bytes,
++            kv_cache_users=self.kv_cache_users,
+             cache_dtype=resolved_cache_dtype,  # type: ignore[arg-type]
+             is_attention_free=model_config.is_attention_free,
+             num_gpu_blocks_override=self.num_gpu_blocks_override,
+@@ -2010,8 +2000,6 @@ class EngineArgs:
+             mamba_cache_mode=self.mamba_cache_mode,
+             replayssm_buffer_len=self.replayssm_buffer_len,
+             use_replayssm=self.use_replayssm,
+-            kv_offloading_size=self.kv_offloading_size,
+-            kv_offloading_backend=self.kv_offloading_backend,
+         )
+ 
+         if resolved_cache_dtype.startswith("turboquant_"):
+diff --git a/vllm/entrypoints/llm.py b/vllm/entrypoints/llm.py
+index e3d0b2f1e5203822b8c1bcfb959b04d6039b8070..6303cc48a4736308be9cbc0c8ac888ae4309906a 100644
+--- a/vllm/entrypoints/llm.py
++++ b/vllm/entrypoints/llm.py
+@@ -112,14 +112,11 @@ class LLM(BeamSearchOfflineMixin, PoolingOfflineMixin, OfflineInferenceMixin):
+             values will increase the KV cache size and thus improve the model's
+             throughput. However, if the value is too high, it may cause out-of-
+             memory (OOM) errors.
+-        kv_cache_memory_bytes: Size of KV Cache per GPU in bytes. By default,
+-            this is set to None and vllm can automatically infer the kv cache
+-            size based on gpu_memory_utilization. However, users may want to
+-            manually specify the kv cache memory size. kv_cache_memory_bytes
+-            allows more fine-grain control of how much memory gets used when
+-            compared with using gpu_memory_utilization. Note that
+-            kv_cache_memory_bytes (when not-None) ignores
+-            gpu_memory_utilization
++        kv_cache_users: GPU KV cache capacity, declared as a count of
++            resident full-length user contexts. Bytes are derived at engine
++            initialization from max_model_len and the KV cache spec, so the
++            same declaration is correct on any GPU and any TP layout.
++            Required whenever the model has a KV cache.
+         cpu_offload_gb: The size (GiB) of CPU memory to use for offloading
+             the model weights. This virtually increases the GPU memory space
+             you can use to hold the model weights, at the cost of CPU-GPU data
+@@ -214,7 +211,7 @@ class LLM(BeamSearchOfflineMixin, PoolingOfflineMixin, OfflineInferenceMixin):
+         | None = None,
+         profiler_config: dict[str, Any] | ProfilerConfig | None = None,
+         attention_config: dict[str, Any] | AttentionConfig | None = None,
+-        kv_cache_memory_bytes: int | None = None,
++        kv_cache_users: int | None = None,
+         compilation_config: int | dict[str, Any] | CompilationConfig | None = None,
+         quantization_config: dict[str, Any] | QuantizationConfigArgs | None = None,
+         logits_processors: list[str | type[LogitsProcessor]] | None = None,
+@@ -312,7 +309,7 @@ class LLM(BeamSearchOfflineMixin, PoolingOfflineMixin, OfflineInferenceMixin):
+             tokenizer_revision=tokenizer_revision,
+             seed=seed,
+             gpu_memory_utilization=gpu_memory_utilization,
+-            kv_cache_memory_bytes=kv_cache_memory_bytes,
++            kv_cache_users=kv_cache_users,
+             cpu_offload_gb=cpu_offload_gb,
+             offload_group_size=offload_group_size,
+             offload_num_in_group=offload_num_in_group,
+diff --git a/vllm/envs.py b/vllm/envs.py
+index 6b1a0660084b2e008d28db3a5f25e4d95cdb71d1..a8a2c1ff7721cf838494eca99cbc0ecf3492c2ab 100644
+--- a/vllm/envs.py
++++ b/vllm/envs.py
+@@ -2114,10 +2114,6 @@ environment_variables: dict[str, Callable[[], Any]] = {
+     "VLLM_XPU_USE_SAMPLER_KERNEL": lambda: bool(
+         int(os.getenv("VLLM_XPU_USE_SAMPLER_KERNEL", "1"))
+     ),
+-    # Enable simple KV offload.
+-    "VLLM_USE_SIMPLE_KV_OFFLOAD": lambda: bool(
+-        int(os.getenv("VLLM_USE_SIMPLE_KV_OFFLOAD", "0"))
+-    ),
+     # Direct DCP ops default on when applicable; set to 1 to enforce or 0 to disable.
+     "VLLM_USE_DIRECT_DCP_A2A": lambda: maybe_convert_bool(
+         os.getenv("VLLM_USE_DIRECT_DCP_A2A")
+diff --git a/vllm/v1/core/kv_cache_utils.py b/vllm/v1/core/kv_cache_utils.py
+index 1962813441c3d720ebdcf5246104f99b4573fa5e..128e76ac624e87dbbd0582b4d5acabf72bf6ff89 100644
+--- a/vllm/v1/core/kv_cache_utils.py
++++ b/vllm/v1/core/kv_cache_utils.py
+@@ -2007,13 +2007,31 @@ def _auto_fit_max_model_len(
+         )
+         return
+ 
+-    # Find the max_model_len that fits across all workers.
++    # Find the max_model_len that fits across all workers. Capacity is
++    # declared in resident user contexts, so the searched quantity is "the
++    # longest length whose N declared contexts plus the null block fit" —
++    # searching for one context and then demanding N of them would pick a
++    # length the admission check below immediately refuses.
++    declared_users = vllm_config.cache_config.kv_cache_users
++    assert declared_users is not None
+     auto_fit_max = original_max
+     limiting_worker_mem = available_memory[0]
+     for groups, avail_mem in zip(projected_groups_per_worker, available_memory):
+         if not groups:
+             continue
+-        worker_max = _estimate_max_model_len_from_groups(vllm_config, groups, avail_mem)
++        pool_bytes_per_block = _pool_bytes_per_block(vllm_config, groups)
++        # Rounded down to whole pool blocks: the admission check charges
++        # each context cdiv(bytes, block) whole blocks, so a byte-tight
++        # budget could still overflow by up to users-1 blocks of rounding.
++        per_context_budget = (
++            (avail_mem - pool_bytes_per_block)
++            // declared_users
++            // pool_bytes_per_block
++            * pool_bytes_per_block
++        )
++        worker_max = _estimate_max_model_len_from_groups(
++            vllm_config, groups, per_context_budget
++        )
+         if worker_max < auto_fit_max:
+             auto_fit_max = worker_max
+             limiting_worker_mem = avail_mem
+@@ -2165,27 +2183,32 @@ def get_kv_cache_configs(
+         for worker_spec in kv_cache_specs
+     ]
+ 
+-    # If `num_gpu_blocks_override` is set, the cache size that will actually
+-    # be allocated is decoupled from the profiled `available_memory`:
+-    # `may_override_num_blocks` in `get_kv_cache_config_from_groups` clamps
+-    # `num_blocks` to the override. Reflect that in `available_memory` here so
+-    # auto-fit, the admission check, and the per-worker config builder all
+-    # plan against the same effective capacity.
+-    override = vllm_config.cache_config.num_gpu_blocks_override
+-    if override is not None:
+-        adjusted_memory: list[int] = []
+-        for groups, avail_mem in zip(projected_groups_per_worker, available_memory):
+-            if not groups:
+-                adjusted_memory.append(avail_mem)
+-                continue
+-            bytes_per_block = _pool_bytes_per_block(vllm_config, groups)
+-            logger.info(
+-                "Overriding num_gpu_blocks=%d with num_gpu_blocks_override=%d",
+-                avail_mem // bytes_per_block,
+-                override,
++    # GPU KV capacity is declared as a count of resident full-length user
++    # contexts and derived here, where the spec exists. A block override
++    # is a second, block-denominated sizing channel; letting it clamp the
++    # pool below the declared count would silently break the declaration,
++    # so the combination is refused rather than reconciled.
++    if any(projected_groups_per_worker):
++        declared_users = vllm_config.cache_config.kv_cache_users
++        if declared_users is None:
++            raise ValueError(
++                "The model has a KV cache but --kv-cache-users was not "
++                "declared. GPU KV capacity is sized as a count of resident "
++                "full-length user contexts; bytes are derived internally "
++                "from max_model_len and the KV cache spec. There is no "
++                "byte-denominated alternative."
++            )
++        if declared_users < 1:
++            raise ValueError(
++                f"--kv-cache-users must be a positive integer, got "
++                f"{declared_users!r}."
++            )
++        if vllm_config.cache_config.num_gpu_blocks_override is not None:
++            raise ValueError(
++                "num_gpu_blocks_override cannot be combined with "
++                "--kv-cache-users: the declared user count is the only KV "
++                "sizing input."
+             )
+-            adjusted_memory.append(override * bytes_per_block)
+-        available_memory = adjusted_memory
+ 
+     if vllm_config.model_config.original_max_model_len == -1:
+         _auto_fit_max_model_len(
+@@ -2210,9 +2233,47 @@ def get_kv_cache_configs(
+         assert sum(len(group.layer_names) for group in projected_groups) == len(
+             kv_cache_spec_one_worker
+         ), "Some layers are not assigned to any group."
++        if not projected_groups:
++            # Attention-free projection: only the null block exists and no
++            # capacity is declared or derived for this worker.
++            kv_cache_configs.append(
++                get_kv_cache_config_from_groups(
++                    vllm_config, projected_groups, available_memory_one_worker
++                )
++            )
++            continue
++        # Derive the pool from the declaration, not from what happens to be
++        # free: N declared users means exactly N full-length contexts plus
++        # the null block, per worker over its own projected groups (each PP
++        # stage holds N contexts of its layers; TP sharding is already in
++        # the per-worker page sizes). _pool_bytes_per_block mirrors the
++        # divisor of every layout branch in get_kv_cache_config_from_groups,
++        # so handing it needed_bytes reproduces needed_blocks exactly.
++        # Surplus VRAM stays unclaimed — a pool sized to "whatever fits"
++        # would revive the machine-specific capacity this flag removes.
++        users = vllm_config.cache_config.kv_cache_users
++        assert users is not None
++        per_user_bytes = _max_memory_usage_bytes_from_groups(
++            vllm_config, projected_groups
++        )
++        pool_bytes_per_block = _pool_bytes_per_block(vllm_config, projected_groups)
++        per_user_blocks = cdiv(per_user_bytes, pool_bytes_per_block)
++        needed_blocks = users * per_user_blocks + 1
++        needed_bytes = needed_blocks * pool_bytes_per_block
++        if needed_bytes > available_memory_one_worker:
++            raise ValueError(
++                f"--kv-cache-users {users} requires "
++                f"{format_gib(needed_bytes)} GiB of KV cache "
++                f"({format_gib(per_user_bytes)} GiB per "
++                f"{vllm_config.model_config.max_model_len}-token context), "
++                f"but only {format_gib(available_memory_one_worker)} GiB of "
++                f"KV cache memory is available within the "
++                f"gpu_memory_utilization budget: declare fewer users, reduce "
++                f"max_model_len, or raise gpu_memory_utilization."
++            )
+         kv_cache_configs.append(
+             get_kv_cache_config_from_groups(
+-                vllm_config, projected_groups, available_memory_one_worker
++                vllm_config, projected_groups, needed_bytes
+             )
+         )
+ 
+diff --git a/vllm/v1/kv_offload/config.py b/vllm/v1/kv_offload/config.py
+index b8b0424a91255f5cf98878e9d8373b84dc429621..2a6e864397b133973d9d3c622fd437cf35dc02e2 100644
+--- a/vllm/v1/kv_offload/config.py
++++ b/vllm/v1/kv_offload/config.py
+@@ -14,6 +14,17 @@ class OffloadingGroupConfig:
+     tokens_per_block: int
+     # Layer names belonging to this group.
+     layer_names: tuple[str, ...]
++    # How many trailing chunks of this group a load hit actually reads:
++    # None for full attention (the whole prefix), cdiv(window, chunk) for
++    # sliding/chunked-local attention, 1 for recurrent state. Classified
++    # once at the boundary (build_offloading_config) because two consumers
++    # must agree on it exactly: the scheduler's load planning and the
++    # user-count capacity derivation in the CPU spec. A local recomputation
++    # in either place could drift and make the declared capacity silently
++    # smaller than what a full-length re-entry reads.
++    sliding_window_size_in_chunks: int | None = None
++    # Lookup verifies an additional checkpoint for draft attention.
++    is_eagle_group: bool = False
+     sliding_window_tokens: int | None = None
+     attention_chunk_size: int | None = None
+     mamba_cache_mode: str | None = None
+@@ -25,6 +36,12 @@ class OffloadingModelConfig:
+     name: str
+     # KV cache data type (e.g. "float16").
+     dtype: str
++    # Maximum context length in tokens. Capacity is declared in resident
++    # user contexts, so the byte derivation needs the context length here,
++    # inside the boundary where per-group chunk geometry also lives —
++    # deriving it engine-side and passing bytes would recreate the exact
++    # machine-specific constant this config exists to eliminate.
++    max_model_len: int
+ 
+ 
+ @dataclass(frozen=True)
+diff --git a/vllm/v1/kv_offload/cpu/gpu_worker.py b/vllm/v1/kv_offload/cpu/gpu_worker.py
+index 753fba6c4c6cbecfaa4327be59739a3553bfa680..b293b43109299253fadb220684eb1dc7d598166e 100644
+--- a/vllm/v1/kv_offload/cpu/gpu_worker.py
++++ b/vllm/v1/kv_offload/cpu/gpu_worker.py
+@@ -212,9 +212,9 @@ def pin_mmap_region(region: SharedOffloadRegion) -> None:
+             "transfer over unpinned DMA -- the slow path this offload exists "
+             "to avoid -- and nothing downstream reports which path was taken, "
+             "so the degradation would be invisible for the life of the "
+-            "process. Usual causes: RLIMIT_MEMLOCK below the configured "
+-            "cpu_bytes_to_use, insufficient free host memory, or a region "
+-            "larger than the driver will page-lock."
++            "process. Usual causes: RLIMIT_MEMLOCK below the region bytes "
++            "derived from cpu_kv_cache_users, insufficient free host memory, "
++            "or a region larger than the driver will page-lock."
+         )
+ 
+     logger.debug(
+diff --git a/vllm/v1/kv_offload/cpu/spec.py b/vllm/v1/kv_offload/cpu/spec.py
+index c25eb359f691c96c2af4692974746c2a271ea557..11bd1b292704f4ab6524d4f5d037ad0c17b70ed8 100644
+--- a/vllm/v1/kv_offload/cpu/spec.py
++++ b/vllm/v1/kv_offload/cpu/spec.py
+@@ -6,7 +6,7 @@ import torch
+ from typing_extensions import override
+ 
+ from vllm.platforms import current_platform
+-from vllm.utils.math_utils import round_up
++from vllm.utils.math_utils import cdiv, round_up
+ from vllm.v1.kv_offload.base import (
+     CanonicalKVCaches,
+     OffloadingCounterMetadata,
+@@ -27,6 +27,26 @@ from vllm.v1.kv_offload.cpu.shared_offload_region import SharedOffloadRegion
+ class CPUOffloadingSpec(OffloadingSpec):
+     BLOCK_SIZE_ALIGNMENT = SharedOffloadRegion.BLOCK_SIZE_ALIGNMENT
+ 
++    # Unknown configuration keys refuse at startup. Subclasses and
++    # out-of-tree specs declare their additional supported keys here.
++    EXTRA_CONFIG_KEYS: frozenset[str] = frozenset(
++        {
++            # OffloadingSpecFactory selection.
++            "spec_name",
++            "spec_module_path",
++            # Capacity, declared in resident full-length user contexts.
++            "cpu_kv_cache_users",
++            # Chunk geometry (mutually exclusive pair).
++            "blocks_per_chunk",
++            "block_size",
++            # OffloadingSpec base behavior.
++            "offload_prompt_only",
++            "self_describing_kv_events",
++            # Host byte-layout request, certified at worker registration.
++            "canonical_layout",
++        }
++    )
++
+     @classmethod
+     def build_metric_definitions(
+         cls, extra_config: dict[str, Any]
+@@ -64,13 +84,39 @@ class CPUOffloadingSpec(OffloadingSpec):
+         }
+         return definitions
+ 
++    @classmethod
++    def _validate_extra_config(cls, extra_config: dict[str, Any]) -> None:
++        unknown = sorted(set(extra_config) - cls.EXTRA_CONFIG_KEYS)
++        if unknown:
++            raise ValueError(
++                f"Unknown kv_connector_extra_config keys {unknown}. "
++                f"Accepted keys: {sorted(cls.EXTRA_CONFIG_KEYS)}."
++            )
++
+     def __init__(self, config: OffloadingConfig):
+         super().__init__(config)
+ 
+-        cpu_bytes_to_use = self.extra_config.get("cpu_bytes_to_use")
+-        if not cpu_bytes_to_use:
+-            raise Exception(
+-                "cpu_bytes_to_use must be specified in kv_connector_extra_config"
++        self._validate_extra_config(dict(self.extra_config))
++
++        raw_users = self.extra_config.get("cpu_kv_cache_users")
++        if raw_users is None:
++            raise ValueError(
++                "cpu_kv_cache_users must be specified in "
++                "kv_connector_extra_config: the host-RAM KV tier is sized as "
++                "a declared count of resident full-length user contexts."
++            )
++        try:
++            cpu_kv_cache_users = int(raw_users)
++        except (TypeError, ValueError):
++            cpu_kv_cache_users = 0
++        if (
++            isinstance(raw_users, bool)
++            or cpu_kv_cache_users < 1
++            or cpu_kv_cache_users != raw_users
++        ):
++            raise ValueError(
++                f"cpu_kv_cache_users must be a positive integer, got "
++                f"{raw_users!r}."
+             )
+ 
+         world_size = config.parallel.world_size
+@@ -86,18 +132,37 @@ class CPUOffloadingSpec(OffloadingSpec):
+             # calculate cpu_page_size_per_worker
+             self.cpu_page_size_per_worker = kv_bytes_per_chunk // num_copies
+ 
+-            # calculate num_blocks
+-            aligned_kv_bytes_per_chunk = round_up(
+-                kv_bytes_per_chunk, self.BLOCK_SIZE_ALIGNMENT
+-            )
+-            self.num_blocks = int(cpu_bytes_to_use) // aligned_kv_bytes_per_chunk
++            # One resident user context, in chunks. Full-attention groups
++            # need their whole prefix; windowed and recurrent groups are
++            # counted at the trailing window the load path actually reads
++            # (a Mamba 'align' context resumes from one state chunk), using
++            # the same per-group classification the connector scheduler
++            # plans loads with. Counting every boundary snapshot instead
++            # would roughly double the footprint for capacity a full-length
++            # re-entry never touches. Advancing contexts release obsolete
++            # window references. Chunk counts are topology-free — only
++            # kv_bytes_per_chunk above scales with world_size/num_copies —
++            # which is what makes the same declaration correct on one GPU
++            # and on a TP-8 node.
++            chunks_per_user = 0
++            for group in config.groups:
++                tokens_per_chunk = group.tokens_per_block * self.blocks_per_chunk
++                full_chunks = cdiv(config.model.max_model_len, tokens_per_chunk)
++                window = group.sliding_window_size_in_chunks
++                chunks_per_user += (
++                    full_chunks if window is None else min(window + int(group.is_eagle_group), full_chunks)
++                )
++            assert chunks_per_user > 0
++            self.num_blocks = cpu_kv_cache_users * chunks_per_user
+ 
+             # Expose aligned_kv_bytes_per_chunk as
+             # kv_bytes_per_chunk. Note that this might contain
+             # some padding. i.e. each offloaded block is of the form,
+             # |--- W0-B0---|---- W1-B0---| ... |---- Wn-B0---| *** maybe-pad *** |
+             # or |--- B0 (single copy) ---| *** maybe-pad *** |
+-            self.kv_bytes_per_chunk = aligned_kv_bytes_per_chunk
++            self.kv_bytes_per_chunk = round_up(
++                kv_bytes_per_chunk, self.BLOCK_SIZE_ALIGNMENT
++            )
+ 
+         # scheduler-side
+         self._manager: OffloadingManager | None = None
+diff --git a/vllm/v1/kv_offload/tiering/spec.py b/vllm/v1/kv_offload/tiering/spec.py
+index c8f06fe2b2fd3bcecb8f11aa43c3fc9525949960..4b09aab4bb30a730378d1cdf1ae5c12cfbab3bab 100644
+--- a/vllm/v1/kv_offload/tiering/spec.py
++++ b/vllm/v1/kv_offload/tiering/spec.py
+@@ -7,7 +7,10 @@ This spec creates a TieringOffloadingManager with a CPU primary tier
+ and configurable secondary tiers (e.g., Storage, Network).
+ 
+ Configuration via kv_connector_extra_config:
+-  - cpu_bytes_to_use: (required) Bytes to allocate for CPU primary tier
++  - cpu_kv_cache_users: (required) CPU primary-tier capacity, declared as a
++    count of resident full-length user contexts. Bytes are derived from
++    max_model_len and the KV cache spec; the primary tier is scope-aware
++    like the plain CPU spec, with no selectable eviction policy.
+   - block_size: (optional) Block size for offloaded blocks (default: GPU block size)
+   - secondary_tiers: (optional) List of secondary tier configurations
+     Each secondary tier config is a dict with:
+@@ -22,7 +25,7 @@ Configuration via kv_connector_extra_config:
+ 
+ Example configuration:
+ {
+-    "cpu_bytes_to_use": 10737418240,  # 10 GB
++    "cpu_kv_cache_users": 4,
+     "block_size": 16,
+     "secondary_tiers": [
+         {
+@@ -34,7 +37,7 @@ Example configuration:
+ 
+ Example out-of-tree tier configuration:
+ {
+-    "cpu_bytes_to_use": 10737418240,
++    "cpu_kv_cache_users": 4,
+     "secondary_tiers": [
+         {
+             "type": "MyCustomTier",
+@@ -243,6 +246,10 @@ class TieringOffloadingSpec(CPUOffloadingSpec):
+             metrics.update(tier_cls.build_metric_definitions(tier_config))
+         return metrics
+ 
++    EXTRA_CONFIG_KEYS: frozenset[str] = CPUOffloadingSpec.EXTRA_CONFIG_KEYS | {
++        "secondary_tiers",
++    }
++
+     def __init__(self, config: OffloadingConfig):
+         super().__init__(config)
+         # Redeclare for mypy: parent sets this but `--follow-imports skip` hides it
+diff --git a/vllm/v1/worker/gpu_worker.py b/vllm/v1/worker/gpu_worker.py
+index c0fb12a94891978d84ac9bffe158f6a219a1ea46..a17cd65ccff6a928bb18b185c7eb5da2ad3b4cb8 100644
+--- a/vllm/v1/worker/gpu_worker.py
++++ b/vllm/v1/worker/gpu_worker.py
+@@ -479,15 +479,11 @@ class Worker(WorkerBase):
+ 
+             msg = (
+                 f"Initial free memory {format_gib(self.init_snapshot.free_memory)} "
+-                f"GiB, reserved {format_gib(kv_cache_memory_bytes)} GiB memory for "
+-                "KV Cache as specified by kv_cache_memory_bytes config and "
+-                "skipped memory profiling. This does not respect the "
+-                "gpu_memory_utilization config. Only use kv_cache_memory_bytes "
+-                "config when you want manual control of KV cache memory "
+-                "size. If OOM'ed, check the difference of initial free "
+-                "memory between the current run and the previous run "
+-                "where kv_cache_memory_bytes is suggested and update it "
+-                "correspondingly."
++                f"GiB, treating {format_gib(kv_cache_memory_bytes)} GiB as the "
++                "available KV cache memory recorded by a persisted startup "
++                "plan; memory re-profiling was skipped. This is availability "
++                "only — the capacity demanded by --kv-cache-users must still "
++                "fit inside it, and the engine fails closed if it does not."
+             )
+             logger.info(msg)
+             return reserve_mm_ipc_gpu_memory(
+@@ -776,14 +772,13 @@ class Worker(WorkerBase):
+                 f"GiB for consumed memory (weights + non-torch), "
+                 f"{format_gib(self.peak_activation_memory)} GiB "
+                 f"for peak activation, and {format_gib(cuda_graph_memory_bytes)} "
+-                f"GiB for CUDAGraph memory. Replace gpu_memory_utilization "
+-                f"config with `--kv-cache-memory="
+-                f"{kv_cache_memory_bytes_to_requested_limit}` "
+-                f"({format_gib(kv_cache_memory_bytes_to_requested_limit)} GiB) to fit "
+-                f"into requested memory, or `--kv-cache-memory="
+-                f"{kv_cache_memory_bytes_to_gpu_limit}` "
+-                f"({format_gib(kv_cache_memory_bytes_to_gpu_limit)} GiB) to fully "
+-                f"utilize gpu memory. Current kv cache memory in use is "
++                f"GiB for CUDAGraph memory. Available KV cache memory within "
++                f"the requested budget is "
++                f"{format_gib(kv_cache_memory_bytes_to_requested_limit)} GiB "
++                f"({format_gib(kv_cache_memory_bytes_to_gpu_limit)} GiB to the "
++                f"GPU limit); the pool actually allocated is derived from "
++                f"--kv-cache-users, not from this headroom. Current kv cache "
++                f"memory in use is "
+                 f"{format_gib(self.available_kv_cache_memory_bytes)} GiB."
+             )
+ 
+diff --git a/vllm/v1/worker/startup_plan.py b/vllm/v1/worker/startup_plan.py
+index 2c494207070559c4d655346f4afcd7f165682f4d..e709aa010030d171ec9c8196d4010a25069c0850 100644
+--- a/vllm/v1/worker/startup_plan.py
++++ b/vllm/v1/worker/startup_plan.py
+@@ -132,9 +132,11 @@ def _applicable_kv_cache_memory_bytes(
+ 
+ 
+ def maybe_apply_startup_plan(worker: "Worker") -> None:
+-    """If enabled and ``--kv-cache-memory`` was not set explicitly, apply a
+-    persisted plan by setting ``worker.cache_config.kv_cache_memory_bytes``.
+-    No-op unless ``VLLM_ENABLE_STARTUP_PLAN=1``."""
++    """Apply a persisted availability plan by setting
++    ``worker.cache_config.kv_cache_memory_bytes`` (internal state — the
++    measured free-memory result of a previous boot's profiling, never a
++    user KV-size declaration). No-op unless ``VLLM_ENABLE_STARTUP_PLAN=1``
++    or if availability was already recorded."""
+     if (
+         not envs.VLLM_ENABLE_STARTUP_PLAN
+         or worker.cache_config.kv_cache_memory_bytes is not None

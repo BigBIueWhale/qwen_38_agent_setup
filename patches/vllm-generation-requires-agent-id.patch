@@ -1,0 +1,1681 @@
+diff --git a/tests/entrypoints/anthropic/test_anthropic_messages_conversion.py b/tests/entrypoints/anthropic/test_anthropic_messages_conversion.py
+index edb2341d0e394617366ce47620624d892049f6f2..5df0ef96af4b3930c179b3461e8d6f4eea29a814 100644
+--- a/tests/entrypoints/anthropic/test_anthropic_messages_conversion.py
++++ b/tests/entrypoints/anthropic/test_anthropic_messages_conversion.py
+@@ -60,6 +60,7 @@ def _make_request(
+         model="test-model",
+         max_tokens=128,
+         messages=messages,
++        kv_scope="agent",
+         **kwargs,
+     )
+ 
+@@ -1434,6 +1435,7 @@ class TestCacheSalt:
+                     "model": "test-model",
+                     "max_tokens": 1,
+                     "messages": [{"role": "user", "content": "Hello"}],
++                    "kv_scope": "agent",
+                     "cache_salt": "",
+                 },
+             )
+diff --git a/tests/entrypoints/openai/responses/test_function_call_parsing.py b/tests/entrypoints/openai/responses/test_function_call_parsing.py
+index f90a641db7fd55544d9cb9babe8a131f1c816c14..fb2a6ad968a4088d308ab704a6dd54c4b52043c9 100644
+--- a/tests/entrypoints/openai/responses/test_function_call_parsing.py
++++ b/tests/entrypoints/openai/responses/test_function_call_parsing.py
+@@ -16,6 +16,7 @@ def test_function_call_dict_converted_to_object():
+     # Create a request with function_call as dict
+     request_data = {
+         "model": "gpt-oss",
++        "kv_scope": "agent",
+         "input": [
+             {
+                 "type": "function_call",
+@@ -46,7 +47,7 @@ def test_direct_function_call_object_preservation():
+         arguments='{"symbol": "AAPL"}',
+     )
+ 
+-    request_data = {"model": "gpt-oss", "input": [function_call]}
++    request_data = {"model": "gpt-oss", "kv_scope": "agent", "input": [function_call]}
+ 
+     request = ResponsesRequest(**request_data)
+ 
+@@ -60,6 +61,7 @@ def test_mixed_input_types_with_function_calls():
+ 
+     request_data = {
+         "model": "gpt-oss",
++        "kv_scope": "agent",
+         "input": [
+             # Valid Message type
+             {
+@@ -114,6 +116,7 @@ def test_function_call_with_complex_arguments():
+ 
+     request_data = {
+         "model": "gpt-oss",
++        "kv_scope": "agent",
+         "input": [
+             {
+                 "type": "function_call",
+@@ -142,6 +145,7 @@ def test_invalid_function_call_fallback():
+     # Missing required field 'call_id'
+     request_data = {
+         "model": "gpt-oss",
++        "kv_scope": "agent",
+         "input": [
+             {"type": "function_call", "name": "incomplete_function", "arguments": "{}"}
+         ],
+@@ -157,7 +161,11 @@ def test_invalid_function_call_fallback():
+ 
+ def test_string_input_not_affected():
+     """Test that string input is not affected by the validator."""
+-    request_data = {"model": "gpt-oss", "input": "This is a simple string input"}
++    request_data = {
++        "model": "gpt-oss",
++        "kv_scope": "agent",
++        "input": "This is a simple string input",
++    }
+ 
+     request = ResponsesRequest(**request_data)
+ 
+@@ -167,7 +175,7 @@ def test_string_input_not_affected():
+ 
+ def test_empty_list_input():
+     """Test that empty list input is handled correctly."""
+-    request_data = {"model": "gpt-oss", "input": []}
++    request_data = {"model": "gpt-oss", "kv_scope": "agent", "input": []}
+ 
+     request = ResponsesRequest(**request_data)
+ 
+@@ -181,6 +189,7 @@ def test_function_call_output_not_affected():
+     # Test with FunctionCallOutput as dict (should not be parsed)
+     request_data = {
+         "model": "gpt-oss",
++        "kv_scope": "agent",
+         "input": [
+             {
+                 "type": "function_call_output",
+@@ -204,6 +213,7 @@ def test_mixed_function_call_and_output():
+     """Test that function_call is parsed while function_call_output is preserved."""
+     request_data = {
+         "model": "gpt-oss",
++        "kv_scope": "agent",
+         "input": [
+             # This should be parsed to ResponseFunctionToolCall
+             {
+@@ -243,6 +253,7 @@ def test_function_call_validation_failure_logs_debug(caplog):
+ 
+     request_data = {
+         "model": "gpt-oss",
++        "kv_scope": "agent",
+         "input": [
+             {
+                 "type": "function_call",
+@@ -294,6 +305,7 @@ def test_validator_handles_iterator_input():
+     # Mock data where input is an iterator (simulates Pydantic ValidatorIterator)
+     mock_data = {
+         "model": "test-model",
++        "kv_scope": "agent",
+         "input": iter(test_input_items),  # Iterator instead of list
+     }
+ 
+@@ -323,6 +335,7 @@ def test_validator_handles_empty_iterator():
+     """Test validator handles empty iterator gracefully."""
+     mock_data = {
+         "model": "test-model",
++        "kv_scope": "agent",
+         "input": iter([]),  # Empty iterator
+     }
+ 
+@@ -335,6 +348,7 @@ def test_assistant_string_content_stays_easyinput():
+     coerced into a ResponseOutputMessage."""
+     request_data = {
+         "model": "test-model",
++        "kv_scope": "agent",
+         "input": [
+             {"type": "message", "role": "assistant", "content": "hello"},
+         ],
+@@ -357,6 +371,7 @@ def test_assistant_output_style_content_coerced():
+     output_text items) should be coerced to ResponseOutputMessage."""
+     request_data = {
+         "model": "test-model",
++        "kv_scope": "agent",
+         "input": [
+             {
+                 "type": "message",
+diff --git a/tests/entrypoints/openai/responses/test_parsable_context_unit.py b/tests/entrypoints/openai/responses/test_parsable_context_unit.py
+index 2bad3032c46730881713ff58f70383cc746705d6..a7d8c8a6c3437fe63157db75f47548db3d53e59c 100644
+--- a/tests/entrypoints/openai/responses/test_parsable_context_unit.py
++++ b/tests/entrypoints/openai/responses/test_parsable_context_unit.py
+@@ -153,7 +153,7 @@ class _ToolCallingParser(DelegatingParser):
+ 
+ 
+ def _make_request(**overrides) -> ResponsesRequest:
+-    defaults = {"model": "test-model", "input": "test"}
++    defaults = {"model": "test-model", "input": "test", "kv_scope": "agent"}
+     defaults.update(overrides)
+     return ResponsesRequest.model_validate(defaults)
+ 
+diff --git a/tests/entrypoints/openai/responses/test_sampling_params.py b/tests/entrypoints/openai/responses/test_sampling_params.py
+index 6ede3f1f7f2849c6017c693b861e22efe6c5295b..6d27bb1ec62f7ec20902e8194aaadc34e492da90 100644
+--- a/tests/entrypoints/openai/responses/test_sampling_params.py
++++ b/tests/entrypoints/openai/responses/test_sampling_params.py
+@@ -26,6 +26,7 @@ class TestResponsesRequestSamplingParams:
+         request = ResponsesRequest(
+             model="test-model",
+             input="test input",
++            kv_scope="agent",
+             temperature=0.8,
+             top_p=0.95,
+             top_k=50,
+@@ -44,6 +45,7 @@ class TestResponsesRequestSamplingParams:
+         request = ResponsesRequest(
+             model="test-model",
+             input="test input",
++            kv_scope="agent",
+             repetition_penalty=1.2,
+             seed=42,
+             stop=["END", "STOP"],
+@@ -57,13 +59,14 @@ class TestResponsesRequestSamplingParams:
+         assert sampling_params.seed == 42
+         assert sampling_params.stop == ["END", "STOP"]
+         assert sampling_params.ignore_eos is True
+-        assert sampling_params.extra_args == {"custom": "value"}
++        assert sampling_params.extra_args == {"custom": "value", "kv_scope": "agent"}
+ 
+     def test_stop_string_conversion(self):
+         """Test that single stop string is converted to list."""
+         request = ResponsesRequest(
+             model="test-model",
+             input="test input",
++            kv_scope="agent",
+             stop="STOP",
+         )
+ 
+@@ -76,13 +79,14 @@ class TestResponsesRequestSamplingParams:
+         request = ResponsesRequest(
+             model="test-model",
+             input="test input",
++            kv_scope="agent",
+         )
+ 
+         sampling_params = request.to_sampling_params(default_max_tokens=1000)
+ 
+         assert sampling_params.repetition_penalty == 1.0  # None → 1.0
+         assert sampling_params.stop == []  # Empty list
+-        assert sampling_params.extra_args == {}  # Empty dict
++        assert sampling_params.extra_args == {"kv_scope": "agent"}  # The agent ID alone
+ 
+     def test_seed_bounds_validation(self):
+         """Test that seed values outside torch.long bounds are rejected."""
+@@ -91,6 +95,7 @@ class TestResponsesRequestSamplingParams:
+             ResponsesRequest(
+                 model="test-model",
+                 input="test input",
++                kv_scope="agent",
+                 seed=torch.iinfo(torch.long).min - 1,
+             )
+         assert "greater_than_equal" in str(exc_info.value).lower()
+@@ -100,6 +105,7 @@ class TestResponsesRequestSamplingParams:
+             ResponsesRequest(
+                 model="test-model",
+                 input="test input",
++                kv_scope="agent",
+                 seed=torch.iinfo(torch.long).max + 1,
+             )
+         assert "less_than_equal" in str(exc_info.value).lower()
+@@ -108,6 +114,7 @@ class TestResponsesRequestSamplingParams:
+         request_min = ResponsesRequest(
+             model="test-model",
+             input="test input",
++            kv_scope="agent",
+             seed=torch.iinfo(torch.long).min,
+         )
+         assert request_min.seed == torch.iinfo(torch.long).min
+@@ -115,6 +122,7 @@ class TestResponsesRequestSamplingParams:
+         request_max = ResponsesRequest(
+             model="test-model",
+             input="test input",
++            kv_scope="agent",
+             seed=torch.iinfo(torch.long).max,
+         )
+         assert request_max.seed == torch.iinfo(torch.long).max
+@@ -125,6 +133,7 @@ class TestResponsesRequestSamplingParams:
+         request = ResponsesRequest(
+             model="test-model",
+             input="test input",
++            kv_scope="agent",
+             structured_outputs=structured_outputs,
+         )
+ 
+@@ -138,6 +147,7 @@ class TestResponsesRequestSamplingParams:
+         request = ResponsesRequest(
+             model="test-model",
+             input="test input",
++            kv_scope="agent",
+             text=ResponseTextConfig.model_validate({"format": {"type": "json_object"}}),
+         )
+ 
+@@ -160,6 +170,7 @@ class TestResponsesRequestSamplingParams:
+         request = ResponsesRequest(
+             model="test-model",
+             input="test input",
++            kv_scope="agent",
+             structured_outputs=structured_outputs,
+             text=text_config,
+         )
+diff --git a/tests/entrypoints/openai/responses/test_serving_responses.py b/tests/entrypoints/openai/responses/test_serving_responses.py
+index 48b68e96d8b2ac36b112db75734e1d1c93fbd960..8cdd549606b8e583e88095ebc9301c6d395cf048 100644
+--- a/tests/entrypoints/openai/responses/test_serving_responses.py
++++ b/tests/entrypoints/openai/responses/test_serving_responses.py
+@@ -178,6 +178,7 @@ def test_response_created_event_uses_public_json_schema_alias() -> None:
+     request = ResponsesRequest(
+         model="test-model",
+         input="Alice and Bob are going to a science fair on Friday.",
++        kv_scope="agent",
+         text=text,
+     )
+     sampling_params = request.to_sampling_params(default_max_tokens=64)
+@@ -246,7 +247,7 @@ class TestInitializeToolSessions:
+     ):
+         """Test that method works correctly with only MCP tools"""
+ 
+-        request = ResponsesRequest(input="test input", tools=[])
++        request = ResponsesRequest(input="test input", tools=[], kv_scope="agent")
+ 
+         # Call the method
+         await serving_responses_instance._initialize_tool_sessions(
+@@ -260,7 +261,7 @@ class TestInitializeToolSessions:
+             {"type": "code_interpreter", "container": {"type": "auto"}},
+         ]
+ 
+-        request = ResponsesRequest(input="test input", tools=tools)
++        request = ResponsesRequest(input="test input", tools=tools, kv_scope="agent")
+ 
+         # Call the method
+         await serving_responses_instance._initialize_tool_sessions(
+@@ -275,6 +276,7 @@ class TestInitializeToolSessions:
+     ):
+         request = ResponsesRequest(
+             input="test input",
++            kv_scope="agent",
+             previous_input_messages=[
+                 {
+                     "role": "user",
+@@ -387,7 +389,7 @@ async def test_reasoning_tokens_counted_for_text_reasoning_model(monkeypatch):
+         reasoning_parser="qwen3",
+     )
+ 
+-    request = ResponsesRequest(input="hi", tools=[], stream=False)
++    request = ResponsesRequest(input="hi", tools=[], stream=False, kv_scope="agent")
+     response_parser = serving._make_response_parser(
+         request,
+         tokenizer,
+@@ -802,7 +804,7 @@ class TestStreamingReasoningToContentTransition:
+             for ctx in contexts:
+                 yield ctx
+ 
+-        request = ResponsesRequest(input="hi", tools=[], stream=True)
++        request = ResponsesRequest(input="hi", tools=[], stream=True, kv_scope="agent")
+         sampling_params = SamplingParams(max_tokens=64)
+         metadata = RequestResponseMetadata(request_id="req")
+         _identity_increment._counter = 0  # type: ignore
+@@ -869,7 +871,7 @@ class TestStreamingReasoningToContentTransition:
+             for ctx in contexts:
+                 yield ctx
+ 
+-        request = ResponsesRequest(input="hi", tools=[], stream=True)
++        request = ResponsesRequest(input="hi", tools=[], stream=True, kv_scope="agent")
+         sampling_params = SamplingParams(max_tokens=64)
+         metadata = RequestResponseMetadata(request_id="req")
+         _identity_increment._counter = 0  # type: ignore
+@@ -931,7 +933,7 @@ class TestStreamingReasoningToContentTransition:
+             for ctx in contexts:
+                 yield ctx
+ 
+-        request = ResponsesRequest(input="hi", tools=[], stream=True)
++        request = ResponsesRequest(input="hi", tools=[], stream=True, kv_scope="agent")
+         sampling_params = SamplingParams(max_tokens=64)
+         metadata = RequestResponseMetadata(request_id="req")
+         _identity_increment._counter = 0  # type: ignore
+@@ -994,6 +996,7 @@ class TestAutoToolStreaming:
+ 
+         request = ResponsesRequest(
+             input="hi",
++            kv_scope="agent",
+             tools=[
+                 {
+                     "type": "function",
+diff --git a/tests/entrypoints/openai/test_reasoning_enable_thinking.py b/tests/entrypoints/openai/test_reasoning_enable_thinking.py
+index 95606f626a0b3c52d71c2dfe5862799e3e787530..102d3b2b59a23ef89ed28e34819bc0ac420162b2 100644
+--- a/tests/entrypoints/openai/test_reasoning_enable_thinking.py
++++ b/tests/entrypoints/openai/test_reasoning_enable_thinking.py
+@@ -30,6 +30,7 @@ def _build_responses_request(**kwargs) -> ResponsesRequest:
+     defaults = dict(
+         model="test-model",
+         input=[{"role": "user", "content": "Hello"}],
++        kv_scope="agent",
+     )
+     defaults.update(kwargs)
+     return ResponsesRequest(**defaults)
+diff --git a/tests/entrypoints/openai/test_render_parity.py b/tests/entrypoints/openai/test_render_parity.py
+index e2f79ff09f88d916d988ed7e7cc0c1fa4632c572..70e08e0f2cf7a680d302b4f2956a2742a945a510 100644
+--- a/tests/entrypoints/openai/test_render_parity.py
++++ b/tests/entrypoints/openai/test_render_parity.py
+@@ -164,7 +164,7 @@ async def _assert_parity(
+ ) -> None:
+     """Build paired requests, capture HF render inputs, and assert equality."""
+     chat_req = ChatCompletionRequest(model=_MODEL, **chat_kwargs)
+-    responses_req = ResponsesRequest(model=_MODEL, **responses_kwargs)
++    responses_req = ResponsesRequest(model=_MODEL, kv_scope="agent", **responses_kwargs)
+     chat = await _capture_chat(online_renderer, chat_req)
+     responses = await _capture_responses(serving, responses_req)
+ 
+diff --git a/tests/entrypoints/openai/test_session_id.py b/tests/entrypoints/openai/test_session_id.py
+index d8f68c43ef8531a3bcb52c8690a8f1f8f056dc53..fed2a6db5b5022087442da6c12bc42d6951aef45 100644
+--- a/tests/entrypoints/openai/test_session_id.py
++++ b/tests/entrypoints/openai/test_session_id.py
+@@ -32,7 +32,7 @@ def _raw_request(headers: dict[str, str]) -> Request:
+             messages=[{"role": "user", "content": "hi"}],
+         ),
+         CompletionRequest(model="test-model", prompt="hi"),
+-        ResponsesRequest(model="test-model", input="hi"),
++        ResponsesRequest(model="test-model", input="hi", kv_scope="agent"),
+     ],
+ )
+ def test_get_session_id_accepts_body_field(openai_request):
+diff --git a/tests/entrypoints/scale_out/token_in_token_out/test_generate_stream.py b/tests/entrypoints/scale_out/token_in_token_out/test_generate_stream.py
+index 8936b19093b976e8db09406173632bc10a50da2e..cc6efb73b8e1fba5d9d65c068fb6000d2778db42 100644
+--- a/tests/entrypoints/scale_out/token_in_token_out/test_generate_stream.py
++++ b/tests/entrypoints/scale_out/token_in_token_out/test_generate_stream.py
+@@ -15,6 +15,7 @@ from vllm.entrypoints.openai.models.serving import OpenAIServingModels
+ from vllm.entrypoints.scale_out.token_in_token_out.protocol import (
+     GenerateRequest,
+     GenerateResponse,
++    TokenGenerationRequest,
+ )
+ from vllm.entrypoints.scale_out.token_in_token_out.serving import ServingTokens
+ from vllm.logprobs import Logprob
+@@ -187,8 +188,9 @@ async def test_serve_tokens_skips_mm_cache_for_remote_engine_execution():
+     engine.generate = MagicMock(side_effect=mock_generate)
+     serving = _build_serving_tokens(engine)
+ 
+-    request = GenerateRequest(
++    request = TokenGenerationRequest(
+         token_ids=[1, 2, 3],
++        kv_scope="agent",
+         sampling_params=SamplingParams(max_tokens=1),
+         model=MODEL_NAME,
+         stream=False,
+@@ -215,8 +217,9 @@ async def test_serve_tokens_threads_session_id_header_to_engine():
+     engine.generate = MagicMock(side_effect=mock_generate)
+     serving = _build_serving_tokens(engine)
+ 
+-    request = GenerateRequest(
++    request = TokenGenerationRequest(
+         token_ids=[1, 2, 3],
++        kv_scope="agent",
+         sampling_params=SamplingParams(max_tokens=1),
+         model=MODEL_NAME,
+         stream=False,
+@@ -244,8 +247,9 @@ async def test_stream_basic():
+     engine.generate = MagicMock(side_effect=mock_generate)
+     serving = _build_serving_tokens(engine)
+ 
+-    request = GenerateRequest(
++    request = TokenGenerationRequest(
+         token_ids=[1, 2, 3],
++        kv_scope="agent",
+         sampling_params=SamplingParams(max_tokens=10),
+         model=MODEL_NAME,
+         stream=True,
+@@ -283,8 +287,9 @@ async def test_stream_error_mid_generation():
+     engine.generate = MagicMock(side_effect=mock_generate)
+     serving = _build_serving_tokens(engine)
+ 
+-    request = GenerateRequest(
++    request = TokenGenerationRequest(
+         token_ids=[1, 2, 3],
++        kv_scope="agent",
+         sampling_params=SamplingParams(max_tokens=10),
+         model=MODEL_NAME,
+         stream=True,
+@@ -316,8 +321,9 @@ async def test_stream_error_with_empty_delta():
+     engine.generate = MagicMock(side_effect=mock_generate)
+     serving = _build_serving_tokens(engine)
+ 
+-    request = GenerateRequest(
++    request = TokenGenerationRequest(
+         token_ids=[1, 2, 3],
++        kv_scope="agent",
+         sampling_params=SamplingParams(max_tokens=10),
+         model=MODEL_NAME,
+         stream=True,
+@@ -349,8 +355,9 @@ async def test_stream_skips_empty_token_output():
+     engine.generate = MagicMock(side_effect=mock_generate)
+     serving = _build_serving_tokens(engine)
+ 
+-    request = GenerateRequest(
++    request = TokenGenerationRequest(
+         token_ids=[1, 2, 3],
++        kv_scope="agent",
+         sampling_params=SamplingParams(max_tokens=10),
+         model=MODEL_NAME,
+         stream=True,
+@@ -385,8 +392,9 @@ async def test_stream_include_usage():
+     engine.generate = MagicMock(side_effect=mock_generate)
+     serving = _build_serving_tokens(engine)
+ 
+-    request = GenerateRequest(
++    request = TokenGenerationRequest(
+         token_ids=[1, 2, 3],
++        kv_scope="agent",
+         sampling_params=SamplingParams(max_tokens=10),
+         model=MODEL_NAME,
+         stream=True,
+@@ -423,8 +431,9 @@ async def test_stream_continuous_usage():
+     engine.generate = MagicMock(side_effect=mock_generate)
+     serving = _build_serving_tokens(engine)
+ 
+-    request = GenerateRequest(
++    request = TokenGenerationRequest(
+         token_ids=[1, 2, 3],
++        kv_scope="agent",
+         sampling_params=SamplingParams(max_tokens=10),
+         model=MODEL_NAME,
+         stream=True,
+@@ -478,8 +487,9 @@ async def test_stream_with_logprobs():
+     engine.generate = MagicMock(side_effect=mock_generate)
+     serving = _build_serving_tokens(engine)
+ 
+-    request = GenerateRequest(
++    request = TokenGenerationRequest(
+         token_ids=[1, 2, 3],
++        kv_scope="agent",
+         sampling_params=SamplingParams(max_tokens=10, logprobs=1),
+         model=MODEL_NAME,
+         stream=True,
+@@ -517,8 +527,9 @@ async def test_stream_prompt_tokens_details():
+     engine.generate = MagicMock(side_effect=mock_generate)
+     serving = _build_serving_tokens(engine, enable_prompt_tokens_details=True)
+ 
+-    request = GenerateRequest(
++    request = TokenGenerationRequest(
+         token_ids=[1, 2, 3],
++        kv_scope="agent",
+         sampling_params=SamplingParams(max_tokens=10),
+         model=MODEL_NAME,
+         stream=True,
+@@ -558,8 +569,9 @@ async def test_stream_prompt_tokens_details_zero_cached():
+     engine.generate = MagicMock(side_effect=mock_generate)
+     serving = _build_serving_tokens(engine, enable_prompt_tokens_details=True)
+ 
+-    request = GenerateRequest(
++    request = TokenGenerationRequest(
+         token_ids=[1, 2, 3],
++        kv_scope="agent",
+         sampling_params=SamplingParams(max_tokens=10),
+         model=MODEL_NAME,
+         stream=True,
+diff --git a/tests/entrypoints/test_kv_scope_protocol.py b/tests/entrypoints/test_kv_scope_protocol.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..9677c19312b38ed1d66f1a724e40af2c305e062e
+--- /dev/null
++++ b/tests/entrypoints/test_kv_scope_protocol.py
+@@ -0,0 +1,377 @@
++# SPDX-License-Identifier: Apache-2.0
++# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
++"""Every generation surface names one line of work with an opaque kv_scope.
++
++Prefix reuse matches content and cache_salt whatever the ID. ID syntax does
++not encode ancestry. Generation request models require the ID and the served
++schema says so; the render models they share their shape with allocate no KV
++and have no ID. One line of work generates one sequence per request. The
++shared engine boundary holds the same rules for every other caller, direct
++SamplingParams callers included.
++"""
++
++import pytest
++from pydantic import BaseModel, ValidationError
++
++from vllm.entrypoints.anthropic.protocol import (
++    AnthropicCountTokensRequest,
++    AnthropicMessagesRequest,
++)
++from vllm.entrypoints.anthropic.serving import AnthropicServingMessages
++from vllm.entrypoints.openai.chat_completion.protocol import (
++    BatchChatCompletionRequest,
++    ChatCompletionGenerationRequest,
++    ChatCompletionRequest,
++)
++from vllm.entrypoints.openai.completion.protocol import (
++    CompletionGenerationRequest,
++    CompletionRequest,
++)
++from vllm.entrypoints.openai.responses.protocol import ResponsesRequest
++from vllm.entrypoints.scale_out.token_in_token_out.protocol import (
++    GenerateRequest,
++    TokenGenerationRequest,
++)
++from vllm.exceptions import VLLMValidationError
++from vllm.sampling_params import SamplingParams
++from vllm.v1.engine.input_processor import require_kv_scope
++
++pytestmark = pytest.mark.cpu_test
++
++_SCOPE = "toolu_01AbCdEf"
++_RULE = (
++    "send the same kv_scope for every request that continues a conversation, "
++    "and a new, never-used kv_scope for a fork or a subagent"
++)
++
++
++def _minimal_payload(request_cls: type[BaseModel]) -> dict:
++    """Smallest valid payload per protocol, before the identity fields."""
++    if issubclass(request_cls, ChatCompletionRequest):
++        return {"model": "m", "messages": [{"role": "user", "content": "hi"}]}
++    if request_cls is BatchChatCompletionRequest:
++        return {"model": "m", "messages": [[{"role": "user", "content": "hi"}]]}
++    if issubclass(request_cls, CompletionRequest):
++        return {"model": "m", "prompt": "hi"}
++    if request_cls is ResponsesRequest:
++        return {"model": "m", "input": "hi"}
++    if request_cls in (AnthropicMessagesRequest, AnthropicCountTokensRequest):
++        return {
++            "model": "m",
++            "max_tokens": 16,
++            "messages": [{"role": "user", "content": "hi"}],
++        }
++    if issubclass(request_cls, GenerateRequest):
++        return {
++            "request_id": "req-1",
++            "token_ids": [1, 2, 3],
++            "sampling_params": SamplingParams(),
++        }
++    raise AssertionError(f"unhandled protocol {request_cls}")
++
++
++def _scope_for(request_cls: type[BaseModel]):
++    return [_SCOPE] if request_cls is BatchChatCompletionRequest else _SCOPE
++
++
++GENERATION_REQUESTS = [
++    ChatCompletionGenerationRequest,
++    BatchChatCompletionRequest,
++    CompletionGenerationRequest,
++    ResponsesRequest,
++    AnthropicMessagesRequest,
++    TokenGenerationRequest,
++]
++
++RENDER_REQUESTS = [
++    ChatCompletionRequest,
++    CompletionRequest,
++    GenerateRequest,
++    AnthropicCountTokensRequest,
++]
++
++_SAMPLING_SURFACES = [
++    ChatCompletionGenerationRequest, CompletionGenerationRequest, ResponsesRequest,
++]
++
++
++def _sampling_params_for(request):
++    if isinstance(request, ResponsesRequest):
++        return request.to_sampling_params(
++            default_max_tokens=32, default_sampling_params={}
++        )
++    return request.to_sampling_params(max_tokens=32, default_sampling_params={})
++
++
++@pytest.mark.parametrize("request_cls", GENERATION_REQUESTS)
++def test_every_generation_surface_accepts_its_scope(request_cls):
++    request = request_cls(
++        **_minimal_payload(request_cls), kv_scope=_scope_for(request_cls)
++    )
++    assert request.kv_scope == _scope_for(request_cls)
++
++
++@pytest.mark.parametrize("request_cls", GENERATION_REQUESTS)
++def test_every_generation_surface_refuses_a_missing_scope_by_its_rule(request_cls):
++    # A named refusal, raised by the model before pydantic's generic one.
++    with pytest.raises(VLLMValidationError) as excinfo:
++        request_cls(**_minimal_payload(request_cls))
++    refusal = excinfo.value
++    assert refusal.parameter == "kv_scope"
++    assert _RULE in str(refusal)
++
++
++@pytest.mark.parametrize("scope", ["", " ", "\t\n"])
++@pytest.mark.parametrize("request_cls", GENERATION_REQUESTS)
++def test_every_generation_surface_refuses_a_blank_scope(request_cls, scope):
++    blank = [scope] if request_cls is BatchChatCompletionRequest else scope
++    with pytest.raises(VLLMValidationError) as excinfo:
++        request_cls(**_minimal_payload(request_cls), kv_scope=blank)
++    assert excinfo.value.parameter == "kv_scope"
++
++
++@pytest.mark.parametrize("request_cls", GENERATION_REQUESTS)
++def test_every_generation_schema_requires_the_scope(request_cls):
++    schema = request_cls.model_json_schema()
++    assert "kv_scope" in schema["required"]
++    assert "kv_scope" in schema["properties"]
++
++
++@pytest.mark.parametrize("request_cls", RENDER_REQUESTS)
++def test_render_requests_have_no_scope(request_cls):
++    # Rendering allocates no KV, so its models name no agent at all.
++    assert "kv_scope" not in request_cls.model_fields
++    assert "kv_scope" not in request_cls.model_json_schema()["properties"]
++    request_cls(**_minimal_payload(request_cls))
++
++
++def test_generation_models_warn_only_about_fields_they_lack():
++    # The base model caches its field names for the extra-field warning; the
++    # generation model must not inherit that cache and call kv_scope extra.
++    ChatCompletionRequest(**_minimal_payload(ChatCompletionRequest))
++    ChatCompletionGenerationRequest(
++        **_minimal_payload(ChatCompletionGenerationRequest), kv_scope=_SCOPE
++    )
++    assert "kv_scope" in ChatCompletionGenerationRequest.field_names
++    assert "kv_scope" not in ChatCompletionRequest.field_names
++
++
++@pytest.mark.parametrize("request_cls", _SAMPLING_SURFACES)
++def test_generation_surfaces_deliver_scope_into_extra_args(request_cls):
++    request = request_cls(**_minimal_payload(request_cls), kv_scope=_SCOPE)
++    sampling = _sampling_params_for(request)
++    assert sampling.extra_args is not None
++    assert sampling.extra_args["kv_scope"] == _SCOPE
++
++
++@pytest.mark.parametrize(
++    "request_cls", [ChatCompletionRequest, CompletionRequest]
++)
++def test_rendered_sampling_parameters_carry_no_scope(request_cls):
++    request = request_cls(**_minimal_payload(request_cls))
++    assert "kv_scope" not in (_sampling_params_for(request).extra_args or {})
++
++
++@pytest.mark.parametrize("request_cls", _SAMPLING_SURFACES)
++def test_the_engine_admits_a_request_that_names_its_line(request_cls):
++    request = request_cls(**_minimal_payload(request_cls), kv_scope=_SCOPE)
++    assert require_kv_scope(_sampling_params_for(request)) == _SCOPE
++
++
++def test_the_engine_refuses_to_generate_for_a_request_naming_no_line():
++    with pytest.raises(VLLMValidationError) as excinfo:
++        require_kv_scope(SamplingParams(max_tokens=1))
++    assert excinfo.value.parameter == "kv_scope"
++    assert _RULE in str(excinfo.value)
++
++
++@pytest.mark.parametrize("scope", ["", " ", "\t\n", 0, [], {}, b"x"])
++def test_the_engine_refuses_a_scope_that_is_not_a_non_empty_string(scope):
++    # Reaches the gate only through the direct SamplingParams path; the
++    # protocol models refuse these earlier. Both doors are shut.
++    params = SamplingParams(max_tokens=1, extra_args={"kv_scope": scope})
++    with pytest.raises(VLLMValidationError) as excinfo:
++        require_kv_scope(params)
++    assert excinfo.value.parameter == "kv_scope"
++
++
++def test_the_engine_refuses_fanning_one_line_into_several_sequences():
++    params = SamplingParams(max_tokens=1, n=2, extra_args={"kv_scope": _SCOPE})
++    with pytest.raises(VLLMValidationError) as excinfo:
++        require_kv_scope(params)
++    assert excinfo.value.parameter == "n"
++    assert "each with its own new kv_scope" in str(excinfo.value)
++
++
++@pytest.mark.parametrize(
++    "request_cls", [ChatCompletionGenerationRequest, CompletionGenerationRequest]
++)
++def test_n_above_one_is_refused_by_name(request_cls):
++    with pytest.raises(VLLMValidationError) as excinfo:
++        request_cls(**_minimal_payload(request_cls), kv_scope=_SCOPE, n=3)
++    refusal = excinfo.value
++    assert refusal.parameter == "n"
++    assert "Send one request per sequence instead" in str(refusal)
++    # The served schema states the same bound.
++    n_schema = request_cls.model_json_schema()["properties"]["n"]
++    integer = next(s for s in n_schema.get("anyOf", [n_schema]) if "maximum" in s)
++    assert (integer["minimum"], integer["maximum"]) == (1, 1)
++
++
++def test_token_generation_refuses_n_above_one_by_name():
++    payload = _minimal_payload(TokenGenerationRequest)
++    payload["sampling_params"] = SamplingParams(n=2)
++    with pytest.raises(VLLMValidationError) as excinfo:
++        TokenGenerationRequest(**payload, kv_scope=_SCOPE)
++    assert excinfo.value.parameter == "n"
++
++
++@pytest.mark.parametrize(
++    "prompt", [["a", "b"], [[1, 2], [3, 4]]]
++)
++def test_completion_generation_refuses_several_prompts(prompt):
++    with pytest.raises(VLLMValidationError) as excinfo:
++        CompletionGenerationRequest(model="m", prompt=prompt, kv_scope=_SCOPE)
++    refusal = excinfo.value
++    assert refusal.parameter == "prompt"
++    assert "each with its own new kv_scope" in str(refusal)
++
++
++@pytest.mark.parametrize("prompt", ["a", ["a"], [1, 2, 3], [[1, 2]]])
++def test_completion_generation_accepts_one_prompt(prompt):
++    CompletionGenerationRequest(model="m", prompt=prompt, kv_scope=_SCOPE)
++    # Rendering several prompts allocates nothing and stays available.
++    CompletionRequest(model="m", prompt=["a", "b"])
++
++
++@pytest.mark.parametrize("field", ["n", "best_of"])
++def test_a_batch_refuses_fanning_a_conversation_out(field):
++    with pytest.raises(VLLMValidationError) as excinfo:
++        BatchChatCompletionRequest(
++            model="m",
++            messages=[[{"role": "user", "content": "a"}]],
++            kv_scope=["line-a"],
++            **{field: 2},
++        )
++    assert excinfo.value.parameter == field
++    assert "each with its own new kv_scope" in str(excinfo.value)
++
++
++def test_a_batch_names_one_line_per_conversation():
++    batch = BatchChatCompletionRequest(
++        model="m",
++        messages=[
++            [{"role": "user", "content": "a"}],
++            [{"role": "user", "content": "b"}],
++        ],
++        kv_scope=["line-a", "line-b"],
++    )
++    singles = batch.to_chat_completion_requests()
++    assert [type(s) for s in singles] == [ChatCompletionGenerationRequest] * 2
++    assert [s.kv_scope for s in singles] == ["line-a", "line-b"]
++    assert [s.messages[0]["content"] for s in singles] == ["a", "b"]
++    assert require_kv_scope(_sampling_params_for(singles[1])) == "line-b"
++
++
++@pytest.mark.parametrize(
++    "scopes,message",
++    [
++        (["only-one"], "one agent ID per conversation"),
++        (["same", "same"], "names more than one conversation"),
++        ("one-for-all", "Input should be a valid list"),
++    ],
++)
++def test_a_batch_refuses_a_shared_or_miscounted_scope(scopes, message):
++    with pytest.raises((VLLMValidationError, ValidationError)) as excinfo:
++        BatchChatCompletionRequest(
++            model="m",
++            messages=[
++                [{"role": "user", "content": "a"}],
++                [{"role": "user", "content": "b"}],
++            ],
++            kv_scope=scopes,
++        )
++    assert message in str(excinfo.value)
++
++
++def test_anthropic_translation_forwards_the_scope_and_counts_without_one():
++    # Anthropic rides the chat pipeline; the translation passes identity
++    # through verbatim, and counting tokens is a render that names none.
++    request = AnthropicMessagesRequest(
++        **_minimal_payload(AnthropicMessagesRequest), kv_scope=_SCOPE
++    )
++    chat_request = AnthropicServingMessages._build_base_request(
++        request, [{"role": "user", "content": "hi"}]
++    )
++    assert isinstance(chat_request, ChatCompletionGenerationRequest)
++    assert chat_request.kv_scope == _SCOPE
++    count = AnthropicCountTokensRequest(
++        **_minimal_payload(AnthropicCountTokensRequest)
++    )
++    render = AnthropicServingMessages._build_base_request(
++        count, [{"role": "user", "content": "hi"}]
++    )
++    assert type(render) is ChatCompletionRequest
++
++
++def _app():
++    from types import SimpleNamespace
++
++    from fastapi import FastAPI
++
++    from vllm.entrypoints.generate.api_router import register_generate_api_routers
++    from vllm.entrypoints.scale_out.factories import register_scale_out_api_routers
++
++    app = FastAPI()
++    # The token-in-token-out attach reads app.state.args (tokens_only
++    # servers mount an extra abort route); mirror the minimal real state.
++    app.state.args = SimpleNamespace(tokens_only=False)
++    register_generate_api_routers(app)
++    register_scale_out_api_routers(app, ("generate",))
++    return app
++
++
++def _body_schema(schema: dict, path: str) -> dict:
++    content = schema["paths"][path]["post"]["requestBody"]["content"]
++    ref = content["application/json"]["schema"]
++    if "$ref" not in ref:
++        ref = next(item for item in ref.get("anyOf", ()) if "$ref" in item)
++    return schema["components"]["schemas"][ref["$ref"].rsplit("/", 1)[1]]
++
++
++@pytest.mark.parametrize(
++    "path",
++    [
++        "/v1/chat/completions",
++        "/v1/chat/completions/batch",
++        "/v1/completions",
++        "/v1/responses",
++        "/v1/messages",
++        "/inference/v1/generate",
++    ],
++)
++def test_the_served_schema_requires_the_scope_on_generation(path):
++    body = _body_schema(_app().openapi(), path)
++    assert "kv_scope" in body["required"], (path, body.get("required"))
++
++
++@pytest.mark.parametrize(
++    "path", ["/v1/chat/completions/render", "/v1/completions/render"]
++)
++def test_the_served_schema_has_no_scope_on_render(path):
++    schema = _app().openapi()
++    body = _body_schema(schema, path)
++    assert "kv_scope" not in body["properties"], path
++    # What a render returns is a token request that still has to name its
++    # line of work before it can be generated.
++    rendered = schema["components"]["schemas"]["GenerateRequest"]
++    assert "kv_scope" not in rendered["properties"]
++
++
++@pytest.mark.parametrize("scope", ["a", "unrelated ID", "α / β", " leading-and-trailing "])
++@pytest.mark.parametrize("request_cls", _SAMPLING_SURFACES)
++def test_agent_id_is_opaque_and_preserved_without_lineage_or_cache_salt(scope, request_cls):
++    request = request_cls(**_minimal_payload(request_cls), kv_scope=scope)
++    params = _sampling_params_for(request)
++    assert require_kv_scope(params) == scope
++    assert request.cache_salt is None
+diff --git a/tests/test_request_input_bounds.py b/tests/test_request_input_bounds.py
+index ecab38c922b1390e81f4f198741f3095b81ee647..c16f7bf6792d291387437582dd8fdd7ff63e4dcc 100644
+--- a/tests/test_request_input_bounds.py
++++ b/tests/test_request_input_bounds.py
+@@ -54,12 +54,15 @@ def _batch_chat_request(stop: list[str]) -> _StopRequest:
+     return BatchChatCompletionRequest(
+         model="test-model",
+         messages=[[{"role": "user", "content": "hello"}]],
++        kv_scope=["agent"],
+         stop=stop,
+     )
+ 
+ 
+ def _responses_request(stop: list[str]) -> _StopRequest:
+-    return ResponsesRequest(model="test-model", input="hello", stop=stop)
++    return ResponsesRequest(
++        model="test-model", input="hello", kv_scope="agent", stop=stop
++    )
+ 
+ 
+ REQUEST_BUILDERS: list[Callable[[list[str]], _StopRequest]] = [
+diff --git a/tests/tool_parsers/test_poolside_v1_tool_parser.py b/tests/tool_parsers/test_poolside_v1_tool_parser.py
+index de6e751e5c91b1f8c37fcb0596bbb775d80c41ec..4cb447d9acad5cc4f1270d4e5edb91bf0b7e6a9f 100644
+--- a/tests/tool_parsers/test_poolside_v1_tool_parser.py
++++ b/tests/tool_parsers/test_poolside_v1_tool_parser.py
+@@ -83,6 +83,7 @@ def _build_responses_request(
+     return ResponsesRequest(
+         model="poolside-test",
+         input=[{"role": "user", "content": "write the file"}],
++        kv_scope="agent",
+         tools=[_responses_write_file_tool()],
+         tool_choice=tool_choice,
+         stream=True,
+diff --git a/tests/tool_use/test_gemma4_responses_adjust_request.py b/tests/tool_use/test_gemma4_responses_adjust_request.py
+index 937be9d016a4b7f333bd4eb53236db26f8fd2ca2..c3e253a874cc6e5cd776774f92284142a771633c 100644
+--- a/tests/tool_use/test_gemma4_responses_adjust_request.py
++++ b/tests/tool_use/test_gemma4_responses_adjust_request.py
+@@ -61,6 +61,7 @@ def _build_responses_request(*, tool_choice: str | dict[str, Any]) -> ResponsesR
+     return ResponsesRequest(
+         model="gemma4-test",
+         input=[{"role": "user", "content": "What is the weather in Hanoi?"}],
++        kv_scope="agent",
+         tools=[_get_weather_tool()],
+         tool_choice=tool_choice,
+         stream=True,
+diff --git a/vllm/entrypoints/anthropic/protocol.py b/vllm/entrypoints/anthropic/protocol.py
+index ede9869ee3fb540507ae4ed51f05d0d85f88282a..47e47652fe7dc57599beea1ba0e73e799ac7aea3 100644
+--- a/vllm/entrypoints/anthropic/protocol.py
++++ b/vllm/entrypoints/anthropic/protocol.py
+@@ -8,6 +8,8 @@ from typing import Annotated, Any, Literal
+ from pydantic import BaseModel, Field, field_validator, model_validator
+ 
+ import vllm.envs as envs
++from vllm.entrypoints.openai.engine.protocol import KvScope
++from vllm.sampling_params import require_kv_scope_value
+ 
+ 
+ class AnthropicError(BaseModel):
+@@ -187,6 +189,8 @@ class AnthropicMessagesRequest(BaseModel):
+         default=None,
+         description="KVTransfer parameters used for disaggregated serving.",
+     )
++    kv_scope: KvScope
++
+     ec_transfer_params: dict[str, Any] | None = Field(
+         default=None,
+         description=(
+@@ -208,6 +212,13 @@ class AnthropicMessagesRequest(BaseModel):
+             raise ValueError("Model is required")
+         return v
+ 
++    @model_validator(mode="before")
++    @classmethod
++    def check_line_of_work(cls, data: Any) -> Any:
++        if isinstance(data, dict):
++            require_kv_scope_value(data.get("kv_scope"))
++        return data
++
+     @field_validator("max_tokens")
+     @classmethod
+     def validate_max_tokens(cls, v):
+diff --git a/vllm/entrypoints/anthropic/serving.py b/vllm/entrypoints/anthropic/serving.py
+index f04a1e2b5961096757432fa2dba5a5ab81151c3c..73f70c9b81c40dadd70334a445ad72c8d9aea61d 100644
+--- a/vllm/entrypoints/anthropic/serving.py
++++ b/vllm/entrypoints/anthropic/serving.py
+@@ -31,6 +31,7 @@ from vllm.entrypoints.anthropic.protocol import (
+ )
+ from vllm.entrypoints.chat_utils import ChatTemplateContentFormatOption
+ from vllm.entrypoints.openai.chat_completion.protocol import (
++    ChatCompletionGenerationRequest,
+     ChatCompletionNamedToolChoiceParam,
+     ChatCompletionRequest,
+     ChatCompletionResponse,
+@@ -470,7 +471,7 @@ class AnthropicServingMessages(OpenAIServingChat):
+         anthropic_request: AnthropicMessagesRequest | AnthropicCountTokensRequest,
+         openai_messages: list[dict[str, Any]],
+     ) -> ChatCompletionRequest:
+-        """Build base ChatCompletionRequest"""
++        """Build the chat request: a render for counting, a generation otherwise."""
+         if isinstance(anthropic_request, AnthropicCountTokensRequest):
+             return ChatCompletionRequest(
+                 model=anthropic_request.model,
+@@ -486,7 +487,7 @@ class AnthropicServingMessages(OpenAIServingChat):
+             if thinking.budget_tokens is not None:
+                 thinking_kwargs["thinking_token_budget"] = thinking.budget_tokens
+ 
+-        return ChatCompletionRequest(
++        return ChatCompletionGenerationRequest(
+             model=anthropic_request.model,
+             messages=openai_messages,
+             max_tokens=anthropic_request.max_tokens,
+@@ -497,6 +498,7 @@ class AnthropicServingMessages(OpenAIServingChat):
+             top_k=anthropic_request.top_k,
+             cache_salt=anthropic_request.cache_salt,
+             kv_transfer_params=anthropic_request.kv_transfer_params,
++            kv_scope=anthropic_request.kv_scope,
+             ec_transfer_params=anthropic_request.ec_transfer_params,
+             chat_template_kwargs=chat_template_kwargs or None,
+             **thinking_kwargs,
+diff --git a/vllm/entrypoints/openai/chat_completion/api_router.py b/vllm/entrypoints/openai/chat_completion/api_router.py
+index 6f3289ede42d5e02bf1cf06364191e92659a0735..c439098a5fef52d55acc4a30f28b58136ad1a8da 100644
+--- a/vllm/entrypoints/openai/chat_completion/api_router.py
++++ b/vllm/entrypoints/openai/chat_completion/api_router.py
+@@ -10,7 +10,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
+ from vllm.entrypoints.openai.chat_completion.batch_serving import OpenAIServingChatBatch
+ from vllm.entrypoints.openai.chat_completion.protocol import (
+     BatchChatCompletionRequest,
+-    ChatCompletionRequest,
++    ChatCompletionGenerationRequest,
+     ChatCompletionResponse,
+ )
+ from vllm.entrypoints.openai.chat_completion.serving import OpenAIServingChat
+@@ -50,7 +50,9 @@ def batch_chat(request: Request) -> OpenAIServingChatBatch | None:
+ )
+ @with_cancellation
+ @load_aware_call
+-async def create_chat_completion(request: ChatCompletionRequest, raw_request: Request):
++async def create_chat_completion(
++    request: ChatCompletionGenerationRequest, raw_request: Request
++):
+     metrics_header_format = raw_request.headers.get(
+         ENDPOINT_LOAD_METRICS_FORMAT_HEADER_LABEL, ""
+     )
+diff --git a/vllm/entrypoints/openai/chat_completion/batch_serving.py b/vllm/entrypoints/openai/chat_completion/batch_serving.py
+index 275ad13f06eea0701ac2bdce217987bacb26b94a..c0e22bb6b709b2a9613e0db3cffee9ee54fa3490 100644
+--- a/vllm/entrypoints/openai/chat_completion/batch_serving.py
++++ b/vllm/entrypoints/openai/chat_completion/batch_serving.py
+@@ -80,8 +80,9 @@ class OpenAIServingChatBatch(OpenAIServingChat):
+         all_conversations: list[list[ConversationMessage]] = []
+         all_engine_prompts: list[EngineInput] = []
+ 
+-        for messages in request.messages:
+-            single_request = request.to_chat_completion_request(messages)
++        for messages, single_request in zip(
++            request.messages, request.to_chat_completion_requests(), strict=True
++        ):
+             if renderer.use_harmony:
+                 conversation, engine_prompts = renderer._make_request_with_harmony(
+                     single_request, should_include_tools=tool_dicts is not None
+@@ -114,10 +115,7 @@ class OpenAIServingChatBatch(OpenAIServingChat):
+         """
+         tokenizer = self.renderer.tokenizer
+         assert tokenizer is not None
+-        single_requests = [
+-            request.to_chat_completion_request(messages)
+-            for messages in request.messages
+-        ]
++        single_requests = request.to_chat_completion_requests()
+ 
+         parser: Parser | None = None
+         if self.parser_cls is not None:
+diff --git a/vllm/entrypoints/openai/chat_completion/protocol.py b/vllm/entrypoints/openai/chat_completion/protocol.py
+index f8a4ca299e5cdde4a7887278c66a843786acda4c..a3356a8a0f67f3bb3e6fdcd2c7241d85be43c648 100644
+--- a/vllm/entrypoints/openai/chat_completion/protocol.py
++++ b/vllm/entrypoints/openai/chat_completion/protocol.py
+@@ -28,6 +28,7 @@ from vllm.entrypoints.openai.engine.protocol import (
+     DeltaMessage,
+     FunctionCall,
+     FunctionDefinition,
++    KvScope,
+     OpenAIBaseModel,
+     PerRequestTimingMetrics,
+     StopParam,
+@@ -50,6 +51,8 @@ from vllm.sampling_params import (
+     SamplingParams,
+     StructuredOutputsParams,
+     ThinkingTokenBudget,
++    require_kv_scope_value,
++    require_one_sequence,
+ )
+ from vllm.utils import random_uuid
+ 
+@@ -1154,6 +1157,38 @@ class ChatCompletionRequest(OpenAIBaseModel):
+         return data
+ 
+ 
++class ChatCompletionGenerationRequest(ChatCompletionRequest):
++    """A chat completion that generates, naming the line of work it belongs to.
++
++    ChatCompletionRequest is the shape rendering shares; rendering allocates no
++    KV and names no agent. Generation requires one kv_scope, which names one
++    line of work and so one sequence: n must be 1.
++    """
++
++    # The parent caches its own field names for the extra-field warning.
++    field_names: ClassVar[set[str] | None] = None
++
++    kv_scope: KvScope
++    n: Annotated[int, Field(ge=1, le=1)] | None = 1
++
++    @model_validator(mode="before")
++    @classmethod
++    def check_line_of_work(cls, data: Any) -> Any:
++        if isinstance(data, dict):
++            require_kv_scope_value(data.get("kv_scope"))
++            require_one_sequence(data.get("n"), "n")
++        return data
++
++    def to_sampling_params(
++        self,
++        max_tokens: int,
++        default_sampling_params: dict,
++    ) -> SamplingParams:
++        params = super().to_sampling_params(max_tokens, default_sampling_params)
++        params.extra_args = {**(params.extra_args or {}), "kv_scope": self.kv_scope}
++        return params
++
++
+ class BatchChatCompletionRequest(OpenAIBaseModel):
+     """Request model for the /v1/chat/completions/batch endpoint.
+ 
+@@ -1163,6 +1198,9 @@ class BatchChatCompletionRequest(OpenAIBaseModel):
+     independently and the response contains one choice per conversation,
+     indexed 0, 1, ..., N-1.
+ 
++    Each conversation is its own line of work, so ``kv_scope`` lists one
++    distinct agent ID per conversation, in the order of ``messages``.
++
+     Current limitations compared to the single-conversation endpoint:
+     - Streaming is not supported (``stream`` must be False or omitted).
+     - Tool use is not supported (``tools`` must be omitted).
+@@ -1219,6 +1257,13 @@ class BatchChatCompletionRequest(OpenAIBaseModel):
+     mm_processor_kwargs: dict[str, Any] | None = None
+     priority: int = Field(default=0, ge=_INT64_MIN, le=_INT64_MAX)
+     cache_salt: str | None = None
++    kv_scope: list[KvScope] = Field(
++        min_length=1,
++        description=(
++            "One agent ID per conversation, in the order of `messages`. Each "
++            "conversation is its own line of work, so the IDs are distinct."
++        ),
++    )
+     include_stop_str_in_output: bool = False
+     guided_decoding_backend: str | None = None
+     echo: bool = False
+@@ -1256,19 +1301,39 @@ class BatchChatCompletionRequest(OpenAIBaseModel):
+                 validate_structural_tag_response_format(response_format)
+         if (structured_outputs := data.get("structured_outputs")) is not None:
+             validate_structured_outputs_structural_tag(structured_outputs)
+-        n = data.get("n", 1)
+-        if n is not None and n != 1:
+-            raise VLLMValidationError(
+-                "Batch chat completions do not support `n > 1`. Please set `n` to 1.",
+-                parameter="n",
+-                value=n,
+-            )
++        # best_of reaches no sampling parameter; a value other than 1 would
++        # ask for a fan-out this route never performs.
++        require_one_sequence(data.get("n"), "n")
++        require_one_sequence(data.get("best_of"), "best_of")
++        scopes = data.get("kv_scope")
++        if not isinstance(scopes, list):
++            require_kv_scope_value(scopes)
++        else:
++            for scope in scopes:
++                require_kv_scope_value(scope)
++            conversations = data.get("messages")
++            if isinstance(conversations, list) and len(scopes) != len(conversations):
++                raise VLLMValidationError(
++                    f"kv_scope must list one agent ID per conversation: got "
++                    f"{len(scopes)} for {len(conversations)} conversations.",
++                    parameter="kv_scope",
++                )
++            repeated = [s for i, s in enumerate(scopes) if s in scopes[:i]]
++            if repeated:
++                raise VLLMValidationError(
++                    f"kv_scope {repeated[0]!r} names more than one conversation; "
++                    "each conversation is its own line of work and needs its "
++                    "own new kv_scope.",
++                    parameter="kv_scope",
++                )
+         return data
+ 
+-    def to_chat_completion_request(
+-        self, messages: list[ChatCompletionMessageParam]
+-    ) -> ChatCompletionRequest:
+-        """Build a single-conversation ChatCompletionRequest from one conversation."""
+-        data = self.model_dump(exclude={"messages"}, exclude_none=True)
+-        data["messages"] = messages
+-        return ChatCompletionRequest.model_validate(data)
++    def to_chat_completion_requests(self) -> list[ChatCompletionGenerationRequest]:
++        """One generation request per conversation, each under its own kv_scope."""
++        data = self.model_dump(exclude={"messages", "kv_scope"}, exclude_none=True)
++        return [
++            ChatCompletionGenerationRequest.model_validate(
++                {**data, "messages": messages, "kv_scope": scope}
++            )
++            for messages, scope in zip(self.messages, self.kv_scope, strict=True)
++        ]
+diff --git a/vllm/entrypoints/openai/completion/api_router.py b/vllm/entrypoints/openai/completion/api_router.py
+index 441aef165c47bb8bbce27cb674ead0d9cf10b796..22f5782e76486042c01789b063b694e3d93e1947 100644
+--- a/vllm/entrypoints/openai/completion/api_router.py
++++ b/vllm/entrypoints/openai/completion/api_router.py
+@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, FastAPI, Request
+ from fastapi.responses import JSONResponse, StreamingResponse
+ 
+ from vllm.entrypoints.openai.completion.protocol import (
+-    CompletionRequest,
++    CompletionGenerationRequest,
+     CompletionResponse,
+ )
+ from vllm.entrypoints.openai.completion.serving import OpenAIServingCompletion
+@@ -43,7 +43,9 @@ def completion(request: Request) -> OpenAIServingCompletion | None:
+ )
+ @with_cancellation
+ @load_aware_call
+-async def create_completion(request: CompletionRequest, raw_request: Request):
++async def create_completion(
++    request: CompletionGenerationRequest, raw_request: Request
++):
+     metrics_header_format = raw_request.headers.get(
+         ENDPOINT_LOAD_METRICS_FORMAT_HEADER_LABEL, ""
+     )
+diff --git a/vllm/entrypoints/openai/completion/protocol.py b/vllm/entrypoints/openai/completion/protocol.py
+index e4feece2e56f7fe6a84fe915495a8e7b4ccde365..2d1d52f03f246e48663058c8c8a58443ee340352 100644
+--- a/vllm/entrypoints/openai/completion/protocol.py
++++ b/vllm/entrypoints/openai/completion/protocol.py
+@@ -4,7 +4,7 @@
+ # Adapted from
+ # https://github.com/lm-sys/FastChat/blob/168ccc29d3f7edc50823016105c024fe2282732a/fastchat/protocol/openai_api_protocol.py
+ import time
+-from typing import Annotated, Any, Literal
++from typing import Annotated, Any, ClassVar, Literal
+ 
+ from pydantic import Field, model_validator
+ 
+@@ -12,6 +12,7 @@ import vllm.envs as envs
+ from vllm.config import ModelConfig
+ from vllm.entrypoints.openai.engine.protocol import (
+     AnyResponseFormat,
++    KvScope,
+     OpenAIBaseModel,
+     PerRequestTimingMetrics,
+     StopParam,
+@@ -32,6 +33,8 @@ from vllm.sampling_params import (
+     SamplingParams,
+     StructuredOutputsParams,
+     ThinkingTokenBudget,
++    require_kv_scope_value,
++    require_one_sequence,
+ )
+ from vllm.utils import random_uuid
+ from vllm.utils.collection_utils import is_list_of
+@@ -592,6 +595,49 @@ class CompletionRequest(OpenAIBaseModel):
+         return data
+ 
+ 
++class CompletionGenerationRequest(CompletionRequest):
++    """A completion that generates, naming the line of work it belongs to.
++
++    CompletionRequest is the shape rendering shares; rendering allocates no KV
++    and names no agent. Generation requires one kv_scope, which names one line
++    of work and so one sequence: one prompt, and n must be 1.
++    """
++
++    # The parent caches its own field names for the extra-field warning.
++    field_names: ClassVar[set[str] | None] = None
++
++    kv_scope: KvScope
++    n: Annotated[int, Field(ge=1, le=1)] = 1
++
++    @model_validator(mode="before")
++    @classmethod
++    def check_line_of_work(cls, data: Any) -> Any:
++        if isinstance(data, dict):
++            require_kv_scope_value(data.get("kv_scope"))
++            require_one_sequence(data.get("n"), "n")
++            prompt, embeds = data.get("prompt"), data.get("prompt_embeds")
++            count = 0
++            if isinstance(prompt, list) and prompt and not is_list_of(prompt, int):
++                count += len(prompt)
++            elif prompt is not None:
++                count += 1
++            if isinstance(embeds, list):
++                count += len(embeds)
++            elif embeds is not None:
++                count += 1
++            require_one_sequence(count, "prompt", "the number of prompts")
++        return data
++
++    def to_sampling_params(
++        self,
++        max_tokens: int,
++        default_sampling_params: dict | None = None,
++    ) -> SamplingParams:
++        params = super().to_sampling_params(max_tokens, default_sampling_params)
++        params.extra_args = {**(params.extra_args or {}), "kv_scope": self.kv_scope}
++        return params
++
++
+ class CompletionLogProbs(OpenAIBaseModel):
+     text_offset: list[int] = Field(default_factory=list)
+     token_logprobs: list[float | None] = Field(default_factory=list)
+diff --git a/vllm/entrypoints/openai/engine/protocol.py b/vllm/entrypoints/openai/engine/protocol.py
+index 4d07c294083225d996227105327f498367595439..0ae138f716f2fe31d7051e2fc7ab64c9b2cff5a3 100644
+--- a/vllm/entrypoints/openai/engine/protocol.py
++++ b/vllm/entrypoints/openai/engine/protocol.py
+@@ -33,6 +33,25 @@ StopParam: TypeAlias = (
+ )
+ 
+ 
++# The agent ID every generation request names. Generation request models
++# declare it required; render request models, which allocate no KV, do not
++# have it. The same rule is the engine's invariant for every other caller.
++KvScope: TypeAlias = Annotated[
++    str,
++    Field(
++        min_length=1,
++        pattern=r"\S",
++        description=(
++            "Opaque agent ID naming one line of work: the same ID for every "
++            "request that continues a conversation, a new, never-used ID for "
++            "a fork or a subagent. Prefix reuse matches content and "
++            "cache_salt, whatever the ID. No lineage declaration or ID format "
++            "is required."
++        ),
++    ),
++]
++
++
+ class OpenAIBaseModel(BaseModel):
+     # OpenAI API does allow extra fields
+     model_config = ConfigDict(extra="allow")
+diff --git a/vllm/entrypoints/openai/responses/protocol.py b/vllm/entrypoints/openai/responses/protocol.py
+index 368192298e063601583bea6b6aca9759c5c9710a..edf764492cf772d77716aa25f1d1d2034793f91e 100644
+--- a/vllm/entrypoints/openai/responses/protocol.py
++++ b/vllm/entrypoints/openai/responses/protocol.py
+@@ -63,7 +63,11 @@ from vllm.entrypoints.chat_utils import (
+     ChatCompletionMessageParam,
+     ChatTemplateContentFormatOption,
+ )
+-from vllm.entrypoints.openai.engine.protocol import OpenAIBaseModel, StopParam
++from vllm.entrypoints.openai.engine.protocol import (
++    KvScope,
++    OpenAIBaseModel,
++    StopParam,
++)
+ from vllm.exceptions import VLLMValidationError
+ from vllm.logger import init_logger
+ from vllm.renderers import ChatParams, TokenizeParams, merge_kwargs
+@@ -73,6 +77,7 @@ from vllm.sampling_params import (
+     SamplingParams,
+     StructuredOutputsParams,
+     ThinkingTokenBudget,
++    require_kv_scope_value,
+ )
+ from vllm.utils import random_uuid
+ 
+@@ -314,6 +319,8 @@ class ResponsesRequest(OpenAIBaseModel):
+         default=None,
+         description="KVTransfer parameters used for disaggregated serving.",
+     )
++    kv_scope: KvScope
++
+     ec_transfer_params: dict[str, Any] | None = Field(
+         default=None,
+         description=(
+@@ -471,6 +478,7 @@ class ResponsesRequest(OpenAIBaseModel):
+             extra_args["kv_transfer_params"] = self.kv_transfer_params
+         if self.ec_transfer_params:
+             extra_args["ec_transfer_params"] = self.ec_transfer_params
++        extra_args["kv_scope"] = self.kv_scope
+ 
+         return SamplingParams.from_optional(
+             temperature=temperature,
+@@ -506,6 +514,13 @@ class ResponsesRequest(OpenAIBaseModel):
+             and "message.output_text.logprobs" in self.include
+         )
+ 
++    @model_validator(mode="before")
++    @classmethod
++    def check_line_of_work(cls, data):
++        if isinstance(data, dict):
++            require_kv_scope_value(data.get("kv_scope"))
++        return data
++
+     @model_validator(mode="before")
+     @classmethod
+     def validate_background(cls, data):
+diff --git a/vllm/entrypoints/openai/run_batch.py b/vllm/entrypoints/openai/run_batch.py
+index e9b7c582d6de136af1479dc195b46ada15f9768f..bc5d7339c0c3b2aa9ef1a24e761538f086f0dcd9 100644
+--- a/vllm/entrypoints/openai/run_batch.py
++++ b/vllm/entrypoints/openai/run_batch.py
+@@ -33,7 +33,7 @@ from vllm.engine.arg_utils import AsyncEngineArgs
+ from vllm.engine.protocol import EngineClient
+ from vllm.entrypoints.openai.api_server import init_app_state
+ from vllm.entrypoints.openai.chat_completion.protocol import (
+-    ChatCompletionRequest,
++    ChatCompletionGenerationRequest,
+     ChatCompletionResponse,
+ )
+ from vllm.entrypoints.openai.cli_args import BaseFrontendArgs
+@@ -136,7 +136,7 @@ class BatchTranslationRequest(TranslationRequest):
+ 
+ 
+ BatchRequestInputBody: TypeAlias = (
+-    ChatCompletionRequest
++    ChatCompletionGenerationRequest
+     | EmbeddingRequest
+     | ScoreRequest
+     | RerankRequest
+@@ -173,7 +173,7 @@ class BatchRequestInput(OpenAIBaseModel):
+         # Use url to disambiguate models
+         url: str = info.data["url"]
+         if url == "/v1/chat/completions":
+-            return ChatCompletionRequest.model_validate(value)
++            return ChatCompletionGenerationRequest.model_validate(value)
+         if url == "/v1/embeddings":
+             return TypeAdapter(EmbeddingRequest).validate_python(value)
+         if url.endswith("/score"):
+diff --git a/vllm/entrypoints/scale_out/token_in_token_out/api_router.py b/vllm/entrypoints/scale_out/token_in_token_out/api_router.py
+index 30857e4c1cfa8e0b0688e299dcd74970d76b5ea7..0031b1605ebbe37dfe490ed4c074ce1ff1ad0384 100644
+--- a/vllm/entrypoints/scale_out/token_in_token_out/api_router.py
++++ b/vllm/entrypoints/scale_out/token_in_token_out/api_router.py
+@@ -20,8 +20,8 @@ from vllm.entrypoints.serve.utils.api_utils import (
+ from vllm.logger import init_logger
+ 
+ from .protocol import (
+-    GenerateRequest,
+     GenerateResponse,
++    TokenGenerationRequest,
+ )
+ from .serving import ServingTokens
+ 
+@@ -55,7 +55,7 @@ router = APIRouter()
+ )
+ @with_cancellation
+ @load_aware_call
+-async def generate(request: GenerateRequest, raw_request: Request):
++async def generate(request: TokenGenerationRequest, raw_request: Request):
+     handler = generate_tokens(raw_request)
+     if handler is None:
+         raise NotImplementedError("The model does not support generate tokens API")
+diff --git a/vllm/entrypoints/scale_out/token_in_token_out/protocol.py b/vllm/entrypoints/scale_out/token_in_token_out/protocol.py
+index f304bf677babef7050cf85b67164063df21cdd5e..c1c141ae159057ef662c8d75c1c0609400a19035 100644
+--- a/vllm/entrypoints/scale_out/token_in_token_out/protocol.py
++++ b/vllm/entrypoints/scale_out/token_in_token_out/protocol.py
+@@ -20,10 +20,18 @@ from vllm.entrypoints.openai.completion.protocol import (
+     CompletionRequest,
+     CompletionStreamResponse,
+ )
+-from vllm.entrypoints.openai.engine.protocol import StreamOptions, UsageInfo
++from vllm.entrypoints.openai.engine.protocol import (
++    KvScope,
++    StreamOptions,
++    UsageInfo,
++)
+ from vllm.logprobs import Logprob
+ from vllm.renderers import TokenizeParams
+-from vllm.sampling_params import SamplingParams
++from vllm.sampling_params import (
++    SamplingParams,
++    require_kv_scope_value,
++    require_one_sequence,
++)
+ from vllm.utils import random_uuid
+ 
+ ####### Tokens IN <> Tokens OUT #######
+@@ -153,7 +161,6 @@ class GenerateRequest(BaseModel):
+             "ECTransfer parameters used for encoder-cache disaggregated serving."
+         ),
+     )
+-
+     # Tracks which keys the caller explicitly set inside ``sampling_params``
+     # when the request was parsed from a JSON body. Lets the server tell
+     # "client said max_tokens=16" from "client said nothing → dataclass
+@@ -194,6 +201,31 @@ class GenerateRequest(BaseModel):
+         )
+ 
+ 
++class TokenGenerationRequest(GenerateRequest):
++    """A token-in-token-out generation, naming the line of work it belongs to.
++
++    GenerateRequest is the shape the render endpoints return; rendering
++    allocates no KV and names no agent. Generation requires one kv_scope,
++    which names one line of work and so one sequence: n must be 1.
++    """
++
++    kv_scope: KvScope
++
++    @model_validator(mode="before")
++    @classmethod
++    def check_line_of_work(cls, data: Any) -> Any:
++        if isinstance(data, dict):
++            require_kv_scope_value(data.get("kv_scope"))
++            sampling = data.get("sampling_params")
++            require_one_sequence(
++                sampling.get("n")
++                if isinstance(sampling, dict)
++                else getattr(sampling, "n", None),
++                "n",
++            )
++        return data
++
++
+ class GenerateResponseChoice(BaseModel):
+     index: int
+     logprobs: ChatCompletionLogProbs | None = None
+diff --git a/vllm/entrypoints/scale_out/token_in_token_out/serving.py b/vllm/entrypoints/scale_out/token_in_token_out/serving.py
+index 9e9ace877a7c86f6a207547e715c3cab22d4521d..64d6846012a6493d1c8a4f15adac2b31e4926eba 100644
+--- a/vllm/entrypoints/scale_out/token_in_token_out/serving.py
++++ b/vllm/entrypoints/scale_out/token_in_token_out/serving.py
+@@ -47,11 +47,11 @@ from vllm.utils.serial_utils import numpy2base64
+ 
+ from .mm_serde import decode_mm_kwargs_item
+ from .protocol import (
+-    GenerateRequest,
+     GenerateResponse,
+     GenerateResponseChoice,
+     GenerateResponseStreamChoice,
+     GenerateStreamResponse,
++    TokenGenerationRequest,
+ )
+ 
+ logger = init_logger(__name__)
+@@ -102,7 +102,7 @@ class ServingTokens(GenerateBaseServing):
+ 
+     async def serve_tokens(
+         self,
+-        request: GenerateRequest,
++        request: TokenGenerationRequest,
+         raw_request: Request | None = None,
+     ) -> GenerateResponse | ErrorResponse | AsyncGenerator[str, None]:
+         error_check_ret = await self._check_model(request)
+@@ -221,6 +221,14 @@ class ServingTokens(GenerateBaseServing):
+         if request.stream:
+             sampling_params.output_kind = RequestOutputKind.DELTA
+ 
++        # Token-in-token-out embeds SamplingParams directly, so the identity
++        # folds into extra_args here instead of a to_sampling_params
++        # conversion — same destination as every other protocol surface.
++        sampling_params.extra_args = {
++            **(sampling_params.extra_args or {}),
++            "kv_scope": request.kv_scope,
++        }
++
+         self._log_inputs(
+             request_id,
+             engine_input,
+@@ -266,7 +274,7 @@ class ServingTokens(GenerateBaseServing):
+ 
+     async def serve_tokens_full_generator(
+         self,
+-        request: GenerateRequest,
++        request: TokenGenerationRequest,
+         result_generator: AsyncGenerator[RequestOutput, None],
+         request_id: str,
+         model_name: str,
+@@ -378,7 +386,7 @@ class ServingTokens(GenerateBaseServing):
+ 
+     async def serve_tokens_stream_generator(
+         self,
+-        request: GenerateRequest,
++        request: TokenGenerationRequest,
+         result_generator: AsyncGenerator[RequestOutput, None],
+         request_id: str,
+         model_name: str,
+diff --git a/vllm/sampling_params.py b/vllm/sampling_params.py
+index 1b30cf3924412f69f2129d1fffe1cc0b13c411bc..9fed60450fbde530c6dd9f0eac11a6e811580827 100644
+--- a/vllm/sampling_params.py
++++ b/vllm/sampling_params.py
+@@ -32,6 +32,52 @@ MAX_LOGPROB_TOKEN_IDS = 128
+ the per-request row width allocated by the sampler's `LogprobTokenIdsState`."""
+ 
+ 
++# The agent-ID rule every generation obeys, whoever the caller. A kv_scope
++# names one line of work: a conversation and its continuations. A fork or a
++# subagent is a new line. One request of a line generates one sequence.
++KV_SCOPE_RULE = (
++    "send the same kv_scope for every request that continues a conversation, "
++    "and a new, never-used kv_scope for a fork or a subagent"
++)
++ONE_SEQUENCE_RULE = (
++    "one kv_scope names one line of work, which generates one sequence per "
++    "request. Send one request per sequence instead, each with its own new "
++    "kv_scope; they share any common prompt prefix by content"
++)
++
++
++def require_kv_scope_value(value: object) -> str:
++    """Refuse a generation that names no line of work, or names it blankly."""
++    if value is None:
++        raise VLLMValidationError(
++            f"kv_scope is required for generation: {KV_SCOPE_RULE}.",
++            parameter="kv_scope",
++        )
++    if not isinstance(value, str) or not value.strip():
++        raise VLLMValidationError(
++            "kv_scope must be an agent ID containing a non-whitespace "
++            f"character: {KV_SCOPE_RULE}.",
++            parameter="kv_scope",
++            value=value,
++        )
++    return value
++
++
++def require_one_sequence(
++    value: object, parameter: str, quantity: str | None = None
++) -> None:
++    """Refuse fanning one request, and so one kv_scope, into several sequences.
++
++    Anything but an integer is left to type validation.
++    """
++    if isinstance(value, int) and not isinstance(value, bool) and value != 1:
++        raise VLLMValidationError(
++            f"{quantity or parameter} must be 1: {ONE_SEQUENCE_RULE}.",
++            parameter=parameter,
++            value=value,
++        )
++
++
+ def _verify_num_sequences(value: int, parameter_name: str) -> None:
+     if not isinstance(value, int):
+         raise VLLMValidationError(
+diff --git a/vllm/v1/engine/input_processor.py b/vllm/v1/engine/input_processor.py
+index 0fa36770c5333eb51ed6c96683a45846ae5eacd3..132f55bbb7876d3e04d9a3aa418a529eb5d176f2 100644
+--- a/vllm/v1/engine/input_processor.py
++++ b/vllm/v1/engine/input_processor.py
+@@ -24,7 +24,11 @@ from vllm.multimodal.utils import argsort_mm_positions
+ from vllm.platforms import current_platform
+ from vllm.pooling_params import PoolingParams
+ from vllm.renderers import BaseRenderer, renderer_from_config
+-from vllm.sampling_params import SamplingParams
++from vllm.sampling_params import (
++    SamplingParams,
++    require_kv_scope_value,
++    require_one_sequence,
++)
+ from vllm.tasks import GENERATION_TASKS, POOLING_TASKS, SupportedTask
+ from vllm.tokenizers import TokenizerLike
+ from vllm.utils import length_from_prompt_token_ids_or_embeds, random_uuid
+@@ -35,6 +39,21 @@ from vllm.v1.engine import EngineCoreRequest
+ logger = init_logger(__name__)
+ 
+ 
++def require_kv_scope(params: SamplingParams) -> str:
++    """Require the agent-ID rule at the common generation boundary.
++
++    Every served generation protocol refuses a request that breaks it before
++    admission; this is the invariant for every caller, direct SamplingParams
++    callers included. A kv_scope names one line of work, which generates one
++    sequence per request, so fanning out n > 1 samples is refused too.
++    """
++    scope = require_kv_scope_value(
++        params.extra_args.get("kv_scope") if params.extra_args else None
++    )
++    require_one_sequence(params.n, "n")
++    return scope
++
++
+ class InputProcessor:
+     def __init__(
+         self,
+@@ -132,6 +151,7 @@ class InputProcessor:
+                     "not configured. Please set --reasoning-parser "
+                     "and/or --reasoning-config to use phase-specific budgets."
+                 )
++            require_kv_scope(params)
+         elif isinstance(params, PoolingParams):
+             supported_pooling_tasks = [
+                 task for task in supported_tasks if task in POOLING_TASKS

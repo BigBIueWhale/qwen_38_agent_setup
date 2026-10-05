@@ -1,0 +1,187 @@
+diff --git a/tests/v1/kv_connector/unit/offloading_connector/test_config.py b/tests/v1/kv_connector/unit/offloading_connector/test_config.py
+index 091b50fa1acbdd998cc469a48a216b2e8489ec68..1304a34537a5fbc852dfde39787800273af58237 100644
+--- a/tests/v1/kv_connector/unit/offloading_connector/test_config.py
++++ b/tests/v1/kv_connector/unit/offloading_connector/test_config.py
+@@ -94,6 +94,49 @@ def _make_kv_cache_config() -> KVCacheConfig:
+     )
+ 
+ 
++@pytest.mark.parametrize('kind', ['full', 'window', 'recurrent'])
++@pytest.mark.parametrize('dcp', [1, 2])
++def test_grouped_specs_keep_engine_and_offload_block_geometry_identical(kind, dcp):
++    from vllm.v1.core.kv_cache_utils import resolve_kv_cache_block_sizes
++    from vllm.distributed.kv_transfer.kv_connector.v1.offloading.scheduler import resolve_mamba_align_size
++
++    config = _make_vllm_config(
++        tensor_parallel_size=dcp, decode_context_parallel_size=dcp,
++        extra_config={'blocks_per_chunk': 3},
++    )
++    config.cache_config.prefix_match_unit = 8
++    full = FullAttentionSpec(block_size=16, num_kv_heads=1, head_size=1, dtype=torch.float32)
++    if kind == 'window':
++        other = SlidingWindowSpec(block_size=16, num_kv_heads=1, head_size=1,
++                                  dtype=torch.float32, sliding_window=80)
++    elif kind == 'recurrent':
++        other = MambaSpec(block_size=24, shapes=((1, 1),), dtypes=(torch.float32,),
++                          mamba_cache_mode='align')
++    else:
++        other = full
++
++    def kv_config(wrapped):
++        return KVCacheConfig(num_blocks=0, kv_cache_tensors=[], kv_cache_groups=[
++            KVCacheGroupSpec([f'{name}-a', f'{name}-b'],
++                UniformTypeKVCacheSpecs(block_size=spec.block_size,
++                    kv_cache_specs={f'{name}-a': spec, f'{name}-b': spec})
++                if wrapped else spec)
++            for name, spec in [('first', full), ('second', other)]
++        ])
++
++    grouped, individual = kv_config(True), kv_config(False)
++    assert resolve_kv_cache_block_sizes(grouped, config) == resolve_kv_cache_block_sizes(individual, config)
++    actual = build_offloading_config(config, grouped)
++    expected = build_offloading_config(config, individual)
++    assert actual.groups == expected.groups
++    assert actual.groups[0].tokens_per_block == 16 * dcp
++    scheduler = SchedulerOffloadConfig.from_spec(MockOffloadingSpec(actual), config, grouped)
++    if kind == 'recurrent':
++        assert actual.groups[1].tokens_per_block == 24
++        assert scheduler.kv_group_configs[1].requires_cow_source
++        assert resolve_mamba_align_size(MockOffloadingSpec(actual), grouped) == 72
++
++
+ def _make_sizing_kv_cache_config(packed: bool) -> KVCacheConfig:
+     num_blocks = 4
+     if packed:
+diff --git a/vllm/distributed/kv_transfer/kv_connector/v1/offloading/config.py b/vllm/distributed/kv_transfer/kv_connector/v1/offloading/config.py
+index a38b2ca7a41b5a6f1b7fb8e670a451b84e064ccb..b058d664fa245f0c0d9eeab5c5ae5542059c906b 100644
+--- a/vllm/distributed/kv_transfer/kv_connector/v1/offloading/config.py
++++ b/vllm/distributed/kv_transfer/kv_connector/v1/offloading/config.py
+@@ -4,7 +4,7 @@
+ 
+ from typing import TYPE_CHECKING
+ 
+-from vllm.v1.core.kv_cache_utils import resolve_kv_cache_block_sizes
++from vllm.v1.core.kv_cache_utils import (get_kv_cache_spec_for_block_geometry, resolve_kv_cache_block_sizes)
+ from vllm.v1.kv_cache_interface import (
+     AttentionSpec,
+     FullAttentionSpec,
+@@ -46,11 +46,12 @@ def build_offloading_config(
+                 group.kv_cache_spec.block_size
+                 * (
+                     parallel_config.decode_context_parallel_size
+-                    if isinstance(group.kv_cache_spec, AttentionSpec)
++                    if isinstance(get_kv_cache_spec_for_block_geometry(group.kv_cache_spec), AttentionSpec)
+                     else 1
+                 )
+             ),
+             layer_names=tuple(group.layer_names),
++            mamba_cache_mode=getattr(get_kv_cache_spec_for_block_geometry(group.kv_cache_spec), "mamba_cache_mode", None),
+         )
+         for group in kv_cache_config.kv_cache_groups
+     )
+diff --git a/vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py b/vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py
+index ebc9b87e129fdf1ba5fcd30fa8e1e04f9dcb304d..6c9340230d35714ee9d4b1b6028ed5ecadfc9820 100644
+--- a/vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py
++++ b/vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py
+@@ -29,6 +29,7 @@ from vllm.distributed.kv_transfer.kv_connector.v1.offloading.metrics import (
+ from vllm.logger import init_logger
+ from vllm.utils.math_utils import cdiv, round_down
+ from vllm.v1.core.kv_cache_manager import KVCacheBlocks
++from vllm.v1.core.kv_cache_utils import get_kv_cache_spec_for_block_geometry
+ from vllm.v1.core.sched.output import SchedulerOutput
+ from vllm.v1.kv_cache_interface import (
+     ChunkedLocalAttentionSpec,
+@@ -109,6 +110,8 @@ class GroupOffloadConfig(NamedTuple):
+ def get_sliding_window_size_in_chunks(
+     kv_cache_spec: KVCacheSpec, tokens_per_chunk: int
+ ) -> int | None:
++    kv_cache_spec = get_kv_cache_spec_for_block_geometry(kv_cache_spec)
++
+     if isinstance(kv_cache_spec, SlidingWindowSpec):
+         assert kv_cache_spec.sliding_window > 0
+         return cdiv(kv_cache_spec.sliding_window, tokens_per_chunk)
+@@ -158,8 +161,7 @@ def resolve_mamba_align_size(
+     """
+     mamba_align_size: int | None = None
+     for idx, tokens_per_block in enumerate(spec.tokens_per_block):
+-        kv_spec = kv_cache_config.kv_cache_groups[idx].kv_cache_spec
+-        if isinstance(kv_spec, MambaSpec) and kv_spec.mamba_cache_mode in (
++        if spec.config.groups[idx].mamba_cache_mode in (
+             "align",
+             "all",
+         ):
+@@ -260,10 +262,7 @@ class SchedulerOffloadConfig(NamedTuple):
+                     ),
+                     kv_event_group_spec=get_offloading_event_group_spec(kv_cache_group),
+                     is_eagle_group=idx in eagle_groups,
+-                    requires_cow_source=(
+-                        isinstance(kv_spec, MambaSpec)
+-                        and kv_spec.mamba_cache_mode == "align"
+-                    ),
++                    requires_cow_source=spec.config.groups[idx].mamba_cache_mode == "align",
+                 )
+             )
+         kv_group_configs = tuple(kv_group_configs_list)
+diff --git a/vllm/v1/core/kv_cache_utils.py b/vllm/v1/core/kv_cache_utils.py
+index ad51e4b2b39719693957902486414b41f35bc163..1962813441c3d720ebdcf5246104f99b4573fa5e 100644
+--- a/vllm/v1/core/kv_cache_utils.py
++++ b/vllm/v1/core/kv_cache_utils.py
+@@ -604,6 +604,14 @@ def hash_block_tokens(
+     )
+ 
+ 
++def get_kv_cache_spec_for_block_geometry(kv_cache_spec: KVCacheSpec) -> KVCacheSpec:
++    """Resolve the common block/window geometry of a grouped layer spec."""
++    if isinstance(kv_cache_spec, UniformTypeKVCacheSpecs):
++        assert UniformTypeKVCacheSpecs.is_uniform_type(kv_cache_spec.kv_cache_specs)
++        return next(iter(kv_cache_spec.kv_cache_specs.values()))
++    return kv_cache_spec
++
++
+ def resolve_kv_cache_block_sizes(
+     kv_cache_config: KVCacheConfig,
+     vllm_config: VllmConfig,
+@@ -625,16 +633,15 @@ def resolve_kv_cache_block_sizes(
+     cache_config = vllm_config.cache_config
+     dcp = vllm_config.parallel_config.decode_context_parallel_size
+     groups = kv_cache_config.kv_cache_groups
++    group_specs = [get_kv_cache_spec_for_block_geometry(g.kv_cache_spec) for g in groups]
+ 
+     if len(groups) <= 1:
+         bs = cache_config.block_size * dcp
+         return bs, bs
+ 
+     group_block_sizes = [
+-        g.kv_cache_spec.block_size * dcp
+-        if isinstance(g.kv_cache_spec, AttentionSpec)
+-        else g.kv_cache_spec.block_size
+-        for g in groups
++        spec.block_size * dcp if isinstance(spec, AttentionSpec) else spec.block_size
++        for spec in group_specs
+     ]
+     scheduler_block_size = math.lcm(*group_block_sizes)
+ 
+@@ -649,9 +656,8 @@ def resolve_kv_cache_block_sizes(
+     # scheduler block size. Read the mode from the resolved group spec because
+     # its block size may have been updated independently of cache_config.
+     if any(
+-        isinstance(g.kv_cache_spec, MambaSpec)
+-        and g.kv_cache_spec.mamba_cache_mode != "align"
+-        for g in groups
++        isinstance(spec, MambaSpec) and spec.mamba_cache_mode != "align"
++        for spec in group_specs
+     ):
+         return scheduler_block_size, scheduler_block_size
+ 
+diff --git a/vllm/v1/kv_offload/config.py b/vllm/v1/kv_offload/config.py
+index 26408d299221d8409080bd50a13ba2839c0a878d..39019de4cf9f0d94526200264f9782cd018e6c22 100644
+--- a/vllm/v1/kv_offload/config.py
++++ b/vllm/v1/kv_offload/config.py
+@@ -14,6 +14,7 @@ class OffloadingGroupConfig:
+     tokens_per_block: int
+     # Layer names belonging to this group.
+     layer_names: tuple[str, ...]
++    mamba_cache_mode: str | None = None
+ 
+ 
+ @dataclass(frozen=True)

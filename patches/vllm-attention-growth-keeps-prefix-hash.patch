@@ -1,0 +1,206 @@
+diff --git a/tests/v1/core/test_prefix_caching.py b/tests/v1/core/test_prefix_caching.py
+index 13ed7c7b9d8bbd30e9a9be1303a494970ce840b7..4f72f4371fab09a05c3529fa0cc4ccabee862fb9 100644
+--- a/tests/v1/core/test_prefix_caching.py
++++ b/tests/v1/core/test_prefix_caching.py
+@@ -1565,6 +1565,7 @@ def test_cache_blocks(hash_fn):
+         num_full_blocks=2,
+         block_size=block_size,
+         kv_cache_group_id=0,
++        is_recurrent=False,
+     )
+ 
+     assert len(block_pool.cached_block_hash_to_block) == 2
+@@ -1580,6 +1581,7 @@ def test_cache_blocks(hash_fn):
+         num_full_blocks=3,
+         block_size=block_size,
+         kv_cache_group_id=0,
++        is_recurrent=False,
+     )
+     assert len(block_pool.cached_block_hash_to_block) == 3
+     assert blocks[0].block_hash is not None
+@@ -1610,6 +1612,7 @@ def test_cache_blocks_multi_group():
+         num_full_blocks=2,
+         block_size=block_size,
+         kv_cache_group_id=0,
++        is_recurrent=False,
+     )
+     assert len(block_pool.cached_block_hash_to_block) == 2
+     assert len(req.block_hashes) == 3
+@@ -1624,6 +1627,7 @@ def test_cache_blocks_multi_group():
+         num_full_blocks=3,
+         block_size=block_size,
+         kv_cache_group_id=1,
++        is_recurrent=False,
+     )
+     assert len(block_pool.cached_block_hash_to_block) == 5
+     assert len(req.block_hashes) == 3
+@@ -2152,6 +2156,7 @@ def test_null_parent_block_hash():
+         num_full_blocks=num_full_blocks,
+         block_size=block_size,
+         kv_cache_group_id=kv_cache_group_id,
++        is_recurrent=False,
+     )
+ 
+     events = pool.take_events()
+@@ -2270,6 +2275,7 @@ def test_block_stored_event_group_idx(group_id: int):
+         num_full_blocks=2,
+         block_size=block_size,
+         kv_cache_group_id=group_id,
++        is_recurrent=False,
+     )
+ 
+     events = manager.take_events()
+@@ -2355,6 +2361,7 @@ def test_block_stored_event_group_idx_multiple_groups():
+         num_full_blocks=2,
+         block_size=block_size,
+         kv_cache_group_id=0,
++        is_recurrent=False,
+     )
+ 
+     # Cache blocks for group 1 (sliding-window)
+@@ -2366,6 +2373,7 @@ def test_block_stored_event_group_idx_multiple_groups():
+         num_full_blocks=2,
+         block_size=block_size,
+         kv_cache_group_id=1,
++        is_recurrent=False,
+     )
+ 
+     events = manager.take_events()
+@@ -2450,6 +2458,7 @@ def test_block_removed_event_group_idx(group_id: int):
+         num_full_blocks=2,
+         block_size=block_size,
+         kv_cache_group_id=group_id,
++        is_recurrent=False,
+     )
+ 
+     # Drain the BlockStored events so only eviction events remain later.
+@@ -4311,3 +4320,25 @@ def test_swa_shared_prefix_reuse_under_zero_retention(monkeypatch):
+     assert last_req_hit(retention=0, pin=False) == 0
+     # retention=0 with the pin keeps the junction window -> reuse restored.
+     assert last_req_hit(retention=0, pin=True) == 4 * block_size
++
++
++@pytest.mark.parametrize("is_recurrent", [False, True])
++def test_attention_extension_keeps_the_immutable_partial_prefix(is_recurrent):
++    """Extending an attention block leaves its shorter prefix valid, so the
++    partial entry stays reachable; a recurrent state replaces its checkpoint."""
++    pool = BlockPool(8, enable_caching=True, hash_block_size=4)
++    hashes = [BlockHash(bytes([i])) for i in range(1, 5)]
++    block = pool.get_new_blocks(1)[0]
++    writer = SimpleNamespace(block_hashes=hashes)
++    pool.cache_partial_block(writer, block, 8, 0, 16, is_recurrent=is_recurrent)
++    assert pool.get_cached_block(hashes[1], [0]) == [block]
++    pool.cache_full_blocks(writer, [block], 0, 1, 16, 0, is_recurrent=is_recurrent)
++    assert block.block_hash == make_block_hash_with_group_id(hashes[3], 0)
++    assert pool.get_cached_block(hashes[3], [0]) == [block]
++    if is_recurrent:
++        assert pool.get_cached_block(hashes[1], [0]) is None
++    else:
++        assert pool.get_cached_block(hashes[1], [0]) == [block]
++    pool._maybe_evict_cached_block(block)
++    assert pool.get_cached_block(hashes[1], [0]) is None
++    assert pool.get_cached_block(hashes[3], [0]) is None
+diff --git a/tests/v1/simple_kv_offload/test_scheduler.py b/tests/v1/simple_kv_offload/test_scheduler.py
+index 4f7761cf35b4ea4a3e69ea8ac3056787fd73720a..7d8bc5d29c360b4d2ddd3b8e076d94e4643549a7 100644
+--- a/tests/v1/simple_kv_offload/test_scheduler.py
++++ b/tests/v1/simple_kv_offload/test_scheduler.py
+@@ -325,6 +325,7 @@ def _allocate_gpu_blocks(
+             num_full_blocks=num_full,
+             block_size=BLOCK_SIZE,
+             kv_cache_group_id=group_id,
++            is_recurrent=False,
+         )
+     return blocks
+ 
+@@ -1628,6 +1629,7 @@ def _allocate_cp_gpu_blocks(
+             num_full_blocks=num_full,
+             block_size=virtual_block_size,
+             kv_cache_group_id=group_id,
++            is_recurrent=False,
+         )
+     return blocks
+ 
+diff --git a/vllm/v1/core/block_pool.py b/vllm/v1/core/block_pool.py
+index a8a6c1ca94dabfb8d432fdcfe0b3b21ca6f26d03..0f9c4d5aa6b93097e3ace06d4fe1b1800c3f604a 100644
+--- a/vllm/v1/core/block_pool.py
++++ b/vllm/v1/core/block_pool.py
+@@ -231,6 +231,7 @@ class BlockPool:
+         block_size: int,
+         kv_cache_group_id: int,
+         block_mask: list[bool] | None = None,
++        *, is_recurrent: bool,
+     ) -> None:
+         """Cache a list of full blocks for prefix caching.
+         This function takes a list of blocks that will have their block hash
+@@ -288,8 +289,16 @@ class BlockPool:
+                     blk.block_hash_num_tokens is not None
+                     and blk.block_hash_num_tokens < num_hash_tokens
+                 )
+-                removed_hashes = self._remove_cached_block_hashes(blk)
+-                self._emit_block_removed_events(removed_hashes)
++                if is_recurrent:
++                    removed_hashes = self._remove_cached_block_hashes(blk)
++                    self._emit_block_removed_events(removed_hashes)
++                else:
++                    # Attention appends data. Its earlier immutable prefix
++                    # remains a valid entry for a prefix that ends there.
++                    self.cached_block_hashes_by_block.setdefault(blk.block_id, set()).add(
++                        blk.block_hash
++                    )
++                    blk.reset_hash()
+             self._insert_block_hash(
+                 block_hash_with_group_id,
+                 blk,
+@@ -449,6 +458,7 @@ class BlockPool:
+         num_tokens: int,
+         kv_cache_group_id: int,
+         block_size: int,
++        *, is_recurrent: bool,
+     ) -> BlockHashWithGroupId | None:
+         """Register a partial prefix-cache entry for an existing block.
+ 
+@@ -503,8 +513,14 @@ class BlockPool:
+             and block.block_hash_num_tokens is not None
+             and block.block_hash_num_tokens < num_hash_blocks * self.hash_block_size
+         ):
+-            removed_hashes = self._remove_cached_block_hashes(block)
+-            self._emit_block_removed_events(removed_hashes)
++            if is_recurrent:
++                removed_hashes = self._remove_cached_block_hashes(block)
++                self._emit_block_removed_events(removed_hashes)
++            else:
++                self.cached_block_hashes_by_block.setdefault(block.block_id, set()).add(
++                    block.block_hash
++                )
++                block.reset_hash()
+         self._insert_block_hash(
+             block_hash_with_group_id,
+             block,
+diff --git a/vllm/v1/core/single_type_kv_cache_manager.py b/vllm/v1/core/single_type_kv_cache_manager.py
+index 75acb7f4973e83a2cf5464e789d5fa61618ea045..76cff743467ae67abbdb820b6a0909ab7bc1d412 100644
+--- a/vllm/v1/core/single_type_kv_cache_manager.py
++++ b/vllm/v1/core/single_type_kv_cache_manager.py
+@@ -469,6 +469,7 @@ class SingleTypeKVCacheManager(ABC):
+             block_size=self.block_size,
+             kv_cache_group_id=self.kv_cache_group_id,
+             block_mask=block_mask,
++            is_recurrent=isinstance(self.kv_cache_spec, MambaSpec),
+         )
+ 
+         self.num_cached_block[request.request_id] = num_full_blocks
+@@ -818,6 +819,7 @@ class FullAttentionManager(SingleTypeKVCacheManager):
+             num_tokens=boundary_tokens,
+             kv_cache_group_id=self.kv_cache_group_id,
+             block_size=self.block_size,
++            is_recurrent=isinstance(self.kv_cache_spec, MambaSpec),
+         )
+ 
+     def get_num_common_prefix_blocks(self, running_request_id: str) -> int:
+@@ -1748,6 +1750,7 @@ class MambaManager(SingleTypeKVCacheManager):
+             num_tokens=num_tokens,
+             kv_cache_group_id=self.kv_cache_group_id,
+             block_size=self.block_size,
++            is_recurrent=isinstance(self.kv_cache_spec, MambaSpec),
+         )
+         if partial_hash is not None:
+             self._partial_hit_reqs[request.request_id] = (block_idx, source_block)
