@@ -287,9 +287,9 @@ It is intentionally reconstructed by the ordered, reviewed semantic transformati
 | patches/vllm-generation-requires-agent-id.patch | fb46fefd8ab49b4c26d84613cbee0ee21addfa2772810f271e066ccb7e9f43a0 |
 | patches/vllm-attention-growth-keeps-prefix-hash.patch | a6c38a841c05bcd4f5bfc573c99f1c4a849e7399af05b1e53096e15a43a97632 |
 | patches/vllm-grouped-kv-specs-use-layer-geometry.patch | 6bb249bc143a179ca317c72d2bf70ec118baa6f12dca19c0a59da2e3c935b814 |
-| patches/vllm-agent-grouped-offload-retention.patch | 602ed3531faab2f76c094fe777f5772d93ad1e4e1f0deaac39f3438a1d460acf |
+| patches/vllm-agent-grouped-offload-retention.patch | 1f87f7f9528b31ff99865ca3a53b17cd00cb00fcc88b14252c38147a192616a7 |
 | patches/vllm-agentless-generation-routes-unmounted.patch | aad1dd0ff38d76d08ac5793bcf1daca4b0872c562f44cdd5c3a5b09cb1c51f72 |
-| patches/vllm-kv-capacity-in-declared-users.patch | fdd113dbc3822543a95ea1bf5ef8323319754b14e6984cc9f26856236153c9b8 |
+| patches/vllm-kv-capacity-in-declared-users.patch | f9f65d2b4fd047d9553e0dc12f4b693575a0cc46aeb063dd855e3b280b4275e8 |
 | patches/vllm-kv-declaration-within-physical-bound.patch | c80ae7afa8392c600f6c6f74d6748a2bc14f3aebc4dd0fa2e5a63f79dfaef3d5 |
 | patches/vllm-exact-reasoning-usage.patch | 2179e27460e4239367ac7e2dd3828b9b3db463e79d87ad81433d00fbc6b12395 |
 | patches/vllm-anthropic-input-fidelity.patch | 126f002321100271897a93ddbe212cc37e5d014d0ab745bcd2ce6037f224c5b3 |

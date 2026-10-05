@@ -19442,7 +19442,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '@dataclass(frozen=True)\n'})},
  {'name': 'agent-grouped-offload-retention',
   'review_patch': 'patches/vllm-agent-grouped-offload-retention.patch',
-  'review_sha256': '602ed3531faab2f76c094fe777f5772d93ad1e4e1f0deaac39f3438a1d460acf',
+  'review_sha256': '1f87f7f9528b31ff99865ca3a53b17cd00cb00fcc88b14252c38147a192616a7',
   'files': ({'path': 'tests/entrypoints/test_kv_scope_protocol.py',
              'before_sha256': '09f8ea8d34069a1a34186bcbde50a7e9a264b0111114a13f3c21636d669a3a58',
              'after_sha256': 'b382f37e4e3cc4e0c2cff434e8642b33289af560aeb5b6eac025238b264df633'},
@@ -19515,6 +19515,12 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
             {'path': 'vllm/v1/request.py',
              'before_sha256': '9894e1e7d12850796c04f2f17116f7cea58daaa78ec9e24294df136c37b41e60',
              'after_sha256': '6281dcb0f3562cf6cc365e8fa43b1fd8d4fe06e136900fd49d2cbe718cbd0839'},
+            {'path': 'tests/v1/kv_offload/tiering/test_fs_tier.py',
+             'before_sha256': 'a025a593cefad1a50753a17148ee8d876f686a3ab888e3c7b00198f58aa3cb5a',
+             'after_sha256': '4fdd70484844571bed1fe091b868eccea66e5f6f7c9122e0588f6833ca98f716'},
+            {'path': 'tests/v1/kv_offload/tiering/test_obj_tier.py',
+             'before_sha256': '19adfb9892fb7385cbb417ce83fbdde1fcc15df969bf7975749b31371c792c49',
+             'after_sha256': '460519e4068c5a63fe5e91c79dbc367b13e94e6604e6e5334a78c57c4ad71f3c'},
             {'path': 'tests/v1/kv_offload/cpu/policies/__init__.py',
              'before_sha256': 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
              'after_sha256': None},
@@ -34267,7 +34273,159 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'sampling_params.extra_args.get(\n'
                              '                    "kv_cache_report_mode", '
                              '"incremental"\n'
-                             '                )\n'})},
+                             '                )\n'},
+            {'name': 'tests/v1/kv_offload/tiering/test_fs_tier.py:landmark-1',
+             'path': 'tests/v1/kv_offload/tiering/test_fs_tier.py',
+             'before': '    manager = TieringOffloadingManager(primary_tier=primary, '
+                       'secondary_tiers=[tier])\n'
+                       '    try:\n'
+                       '        keys = [key(1), key(2)]\n'
+                       '        manager.on_new_request(_CTX)\n'
+                       '        assert manager.prepare_store(keys, _CTX) is not None\n'
+                       '        manager.complete_store(keys, _CTX)  # cascades to the '
+                       'fs tier\n'
+                       '\n'
+                       '        events: list[OffloadingEvent] = []\n'
+                       '        ctx = ScheduleEndContext(new_req_ids=[], '
+                       'preempted_req_ids=())\n',
+             'after': '    manager = TieringOffloadingManager(primary_tier=primary, '
+                      'secondary_tiers=[tier])\n'
+                      '    try:\n'
+                      '        keys = [key(1), key(2)]\n'
+                      '        # A generation request names its line of work and the '
+                      'data each key\n'
+                      '        # it stores holds (here one unit per key); the CPU tier '
+                      'retains by both.\n'
+                      '        request = ReqContext(\n'
+                      '            req_id="test",\n'
+                      '            kv_scope="test-agent",\n'
+                      '            prefix_content={k: (k,) for k in keys},\n'
+                      '        )\n'
+                      '        manager.on_new_request(request)\n'
+                      '        assert manager.prepare_store(keys, request) is not '
+                      'None\n'
+                      '        manager.complete_store(keys, request)  # cascades to '
+                      'the fs tier\n'
+                      '\n'
+                      '        events: list[OffloadingEvent] = []\n'
+                      '        ctx = ScheduleEndContext(new_req_ids=[], '
+                      'preempted_req_ids=())\n',
+             'review_before': '    manager = '
+                              'TieringOffloadingManager(primary_tier=primary, '
+                              'secondary_tiers=[tier])\n'
+                              '    try:\n'
+                              '        keys = [key(1), key(2)]\n'
+                              '        manager.on_new_request(_CTX)\n'
+                              '        assert manager.prepare_store(keys, _CTX) is not '
+                              'None\n'
+                              '        manager.complete_store(keys, _CTX)  # cascades '
+                              'to the fs tier\n'
+                              '\n'
+                              '        events: list[OffloadingEvent] = []\n'
+                              '        ctx = ScheduleEndContext(new_req_ids=[], '
+                              'preempted_req_ids=())\n',
+             'review_after': '    manager = '
+                             'TieringOffloadingManager(primary_tier=primary, '
+                             'secondary_tiers=[tier])\n'
+                             '    try:\n'
+                             '        keys = [key(1), key(2)]\n'
+                             '        # A generation request names its line of work '
+                             'and the data each key\n'
+                             '        # it stores holds (here one unit per key); the '
+                             'CPU tier retains by both.\n'
+                             '        request = ReqContext(\n'
+                             '            req_id="test",\n'
+                             '            kv_scope="test-agent",\n'
+                             '            prefix_content={k: (k,) for k in keys},\n'
+                             '        )\n'
+                             '        manager.on_new_request(request)\n'
+                             '        assert manager.prepare_store(keys, request) is '
+                             'not None\n'
+                             '        manager.complete_store(keys, request)  # '
+                             'cascades to the fs tier\n'
+                             '\n'
+                             '        events: list[OffloadingEvent] = []\n'
+                             '        ctx = ScheduleEndContext(new_req_ids=[], '
+                             'preempted_req_ids=())\n'},
+            {'name': 'tests/v1/kv_offload/tiering/test_obj_tier.py:landmark-1',
+             'path': 'tests/v1/kv_offload/tiering/test_obj_tier.py',
+             'before': '        )\n'
+                       '\n'
+                       '        keys = [key(1)]\n'
+                       '        primary_result = primary_tier.prepare_store(keys, '
+                       '_CTX)\n'
+                       '        assert primary_result is not None\n'
+                       '        primary_tier.complete_store(keys, _CTX, success=True)\n'
+                       '        job = manager.create_store_job(keys, _CTX)\n'
+                       '        obj_tier.submit_store(job)\n'
+                       '\n'
+                       '        block = primary_tier._policy.get(keys[0])\n'
+                       '        assert block is not None\n'
+                       '        assert block.ref_cnt == 1\n'
+                       '        assert len(manager._transfer_jobs) == 1\n',
+             'after': '        )\n'
+                      '\n'
+                      '        keys = [key(1)]\n'
+                      '        # A generation request names its line of work and the '
+                      'data each key\n'
+                      '        # it stores holds (here one unit per key); the CPU tier '
+                      'retains by both.\n'
+                      '        request = ReqContext(\n'
+                      '            req_id="test-req",\n'
+                      '            kv_scope="test-agent",\n'
+                      '            prefix_content={k: (k,) for k in keys},\n'
+                      '        )\n'
+                      '        primary_result = primary_tier.prepare_store(keys, '
+                      'request)\n'
+                      '        assert primary_result is not None\n'
+                      '        primary_tier.complete_store(keys, request, '
+                      'success=True)\n'
+                      '        job = manager.create_store_job(keys, request)\n'
+                      '        obj_tier.submit_store(job)\n'
+                      '\n'
+                      '        block = primary_tier._blocks.get(keys[0])\n'
+                      '        assert block is not None\n'
+                      '        assert block.ref_cnt == 1\n'
+                      '        assert len(manager._transfer_jobs) == 1\n',
+             'review_before': '        )\n'
+                              '\n'
+                              '        keys = [key(1)]\n'
+                              '        primary_result = '
+                              'primary_tier.prepare_store(keys, _CTX)\n'
+                              '        assert primary_result is not None\n'
+                              '        primary_tier.complete_store(keys, _CTX, '
+                              'success=True)\n'
+                              '        job = manager.create_store_job(keys, _CTX)\n'
+                              '        obj_tier.submit_store(job)\n'
+                              '\n'
+                              '        block = primary_tier._policy.get(keys[0])\n'
+                              '        assert block is not None\n'
+                              '        assert block.ref_cnt == 1\n'
+                              '        assert len(manager._transfer_jobs) == 1\n',
+             'review_after': '        )\n'
+                             '\n'
+                             '        keys = [key(1)]\n'
+                             '        # A generation request names its line of work '
+                             'and the data each key\n'
+                             '        # it stores holds (here one unit per key); the '
+                             'CPU tier retains by both.\n'
+                             '        request = ReqContext(\n'
+                             '            req_id="test-req",\n'
+                             '            kv_scope="test-agent",\n'
+                             '            prefix_content={k: (k,) for k in keys},\n'
+                             '        )\n'
+                             '        primary_result = '
+                             'primary_tier.prepare_store(keys, request)\n'
+                             '        assert primary_result is not None\n'
+                             '        primary_tier.complete_store(keys, request, '
+                             'success=True)\n'
+                             '        job = manager.create_store_job(keys, request)\n'
+                             '        obj_tier.submit_store(job)\n'
+                             '\n'
+                             '        block = primary_tier._blocks.get(keys[0])\n'
+                             '        assert block is not None\n'
+                             '        assert block.ref_cnt == 1\n'
+                             '        assert len(manager._transfer_jobs) == 1\n'})},
  {'name': 'agentless-generation-routes-unmounted',
   'review_patch': 'patches/vllm-agentless-generation-routes-unmounted.patch',
   'review_sha256': 'aad1dd0ff38d76d08ac5793bcf1daca4b0872c562f44cdd5c3a5b09cb1c51f72',
@@ -34775,7 +34933,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'models; default) or\n'})},
  {'name': 'kv-capacity-in-declared-users',
   'review_patch': 'patches/vllm-kv-capacity-in-declared-users.patch',
-  'review_sha256': 'fdd113dbc3822543a95ea1bf5ef8323319754b14e6984cc9f26856236153c9b8',
+  'review_sha256': 'f9f65d2b4fd047d9553e0dc12f4b693575a0cc46aeb063dd855e3b280b4275e8',
   'files': ({'path': 'tests/config/test_config_utils.py',
              'before_sha256': 'ca93f4a4de7c00f353e1de0f73a81ff632c5731c15904aec4bcb165b751ddd87',
              'after_sha256': '4f5ea0399cc3b4f9603df07e2cc26d32e1eddf6b98a36c0f30d580321879c038'},
@@ -34817,7 +34975,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'after_sha256': 'b8e5d70410134842f12a6a5274e3a60cf423549bd45ae923311fcbc618da6805'},
             {'path': 'tests/v1/kv_connector/unit/test_config.py',
              'before_sha256': '27e2eb147d74d99f820bb957935492b8c53e658d2d4034e2da8b75639c217333',
-             'after_sha256': 'd3159c374919b21ae96b9a9eab49c1b33340b249513f4354984bfc7ae21e1e2c'},
+             'after_sha256': '2cf96896c553f9baac251f14a86bb41291842c36992ae91a15402e3d586ba349'},
             {'path': 'tests/v1/kv_connector/unit/test_hma_auto_config.py',
              'before_sha256': '92eac3e5034bdd8b9dc84a5539f1a1a4d684915101b82f275046425b965b26d0',
              'after_sha256': '3b9bec3a98b2ee5dca12a315a58307389f517c850c7ce30eb26ce9f8ec305588'},
@@ -34834,11 +34992,11 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': '7c034ca72df21a79cf6a2ebcd2eda08723b834343dd2e9053e0fb7bb936eefee',
              'after_sha256': 'a8189fb7a0f618fe0a4ffe2d24acca45cfc8fe785c0aae2c22a1105fe05e96f9'},
             {'path': 'tests/v1/kv_offload/tiering/test_fs_tier.py',
-             'before_sha256': 'a025a593cefad1a50753a17148ee8d876f686a3ab888e3c7b00198f58aa3cb5a',
-             'after_sha256': 'ef7b3d28e0efe36157f10dae7b0a1b98ab0a1e54ed683cbd1647247c371eb861'},
+             'before_sha256': '4fdd70484844571bed1fe091b868eccea66e5f6f7c9122e0588f6833ca98f716',
+             'after_sha256': 'c170b6f37add5189a9e0d240a36835f69879d86afd9c81ebfec4e14acabec64a'},
             {'path': 'tests/v1/kv_offload/tiering/test_obj_tier.py',
-             'before_sha256': '19adfb9892fb7385cbb417ce83fbdde1fcc15df969bf7975749b31371c792c49',
-             'after_sha256': '9995d78ebe1d8037253362521119d4b4e2f2ee79f85629c668403ffd77962ba8'},
+             'before_sha256': '460519e4068c5a63fe5e91c79dbc367b13e94e6604e6e5334a78c57c4ad71f3c',
+             'after_sha256': 'f7e8f3250c2a79ede185dad669bf50b1bb81d01eac3744d98dc9d649a0ff53b6'},
             {'path': 'tests/v1/simple_kv_offload/test_integration.py',
              'before_sha256': '5b8c46633e031c6dfb3f8764871ec5070d86a09c3a246e8dfa1bc16453ebe866',
              'after_sha256': '0dd7471507c88e209fe6a72359dfc655368c836cbe2cd3d95e1c0f72d38a4241'},
@@ -36536,6 +36694,34 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '    assert not hasattr(CacheConfig, "kv_offloading_backend")\n'
                       '\n'
                       '\n'
+                      'def _build_config(\n'
+                      '    *,\n'
+                      '    kv_connector: str | None,\n'
+                      '    enable_sleep_mode: bool = False,\n'
+                      '    enable_cumem_allocator: bool = False,\n'
+                      ') -> VllmConfig:\n'
+                      '    """Build a VllmConfig that exercises '
+                      '_verify_kv_transfer_compat without\n'
+                      '    requiring a real model (avoids HF downloads in CI)."""\n'
+                      '    from types import SimpleNamespace\n'
+                      '\n'
+                      '    kv_transfer_config = (\n'
+                      '        KVTransferConfig(kv_connector=kv_connector, '
+                      'kv_role="kv_both")\n'
+                      '        if kv_connector is not None\n'
+                      '        else None\n'
+                      '    )\n'
+                      '    cfg = VllmConfig.__new__(VllmConfig)\n'
+                      '    cfg.kv_transfer_config = kv_transfer_config\n'
+                      '    cfg.model_config = SimpleNamespace(\n'
+                      '        enable_sleep_mode=enable_sleep_mode,\n'
+                      '        enable_cumem_allocator=(enable_cumem_allocator or '
+                      'enable_sleep_mode),\n'
+                      '    )\n'
+                      '    cfg._verify_kv_transfer_compat()\n'
+                      '    return cfg\n'
+                      '\n'
+                      '\n'
                       '@pytest.mark.parametrize(\n'
                       '    "kv_connector", ["NixlConnector", "MooncakeConnectorV1", '
                       '"SomeOOTConnector"]\n'
@@ -36882,6 +37068,35 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '"kv_offloading_size")\n'
                              '    assert not hasattr(CacheConfig, '
                              '"kv_offloading_backend")\n'
+                             '\n'
+                             '\n'
+                             'def _build_config(\n'
+                             '    *,\n'
+                             '    kv_connector: str | None,\n'
+                             '    enable_sleep_mode: bool = False,\n'
+                             '    enable_cumem_allocator: bool = False,\n'
+                             ') -> VllmConfig:\n'
+                             '    """Build a VllmConfig that exercises '
+                             '_verify_kv_transfer_compat without\n'
+                             '    requiring a real model (avoids HF downloads in '
+                             'CI)."""\n'
+                             '    from types import SimpleNamespace\n'
+                             '\n'
+                             '    kv_transfer_config = (\n'
+                             '        KVTransferConfig(kv_connector=kv_connector, '
+                             'kv_role="kv_both")\n'
+                             '        if kv_connector is not None\n'
+                             '        else None\n'
+                             '    )\n'
+                             '    cfg = VllmConfig.__new__(VllmConfig)\n'
+                             '    cfg.kv_transfer_config = kv_transfer_config\n'
+                             '    cfg.model_config = SimpleNamespace(\n'
+                             '        enable_sleep_mode=enable_sleep_mode,\n'
+                             '        enable_cumem_allocator=(enable_cumem_allocator '
+                             'or enable_sleep_mode),\n'
+                             '    )\n'
+                             '    cfg._verify_kv_transfer_compat()\n'
+                             '    return cfg\n'
                              '\n'
                              '\n'
                              '@pytest.mark.parametrize(\n'
@@ -117410,15 +117625,15 @@ FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5d
  'tests/v1/kv_connector/unit/offloading_connector/test_events.py': 'b773dc65b320dfa3952cc04f4732d6772ed3aa06eca49d2fa3a911c38fb74fc6',
  'tests/v1/kv_connector/unit/offloading_connector/test_scheduler.py': '016959d9e34301478f18401f66312ebbc9ac7801f71bae62a6ae9995729783f2',
  'tests/v1/kv_connector/unit/offloading_connector/test_worker.py': 'b8e5d70410134842f12a6a5274e3a60cf423549bd45ae923311fcbc618da6805',
- 'tests/v1/kv_connector/unit/test_config.py': 'd3159c374919b21ae96b9a9eab49c1b33340b249513f4354984bfc7ae21e1e2c',
+ 'tests/v1/kv_connector/unit/test_config.py': '2cf96896c553f9baac251f14a86bb41291842c36992ae91a15402e3d586ba349',
  'tests/v1/kv_connector/unit/test_hma_auto_config.py': '3b9bec3a98b2ee5dca12a315a58307389f517c850c7ce30eb26ce9f8ec305588',
  'tests/v1/kv_connector/unit/test_offloading_connector.py': '3192b3d8dff17cfcc57cc3920fe6061afd9bc6dde5aef70cfadbe7a258e2c63c',
  'tests/v1/kv_offload/cpu/test_manager.py': '1dea9c01dc15292db00ad856b0c4eade9ed4bd65bbf01620e72234b80ba991ab',
  'tests/v1/kv_offload/test_factory.py': '30697b1ef07da44f609a29c6638d634fd43f4cac81c753d16a4aca413e1416e2',
  'tests/v1/kv_offload/test_file_mapper.py': 'be0514f0a37a1c9932863bfc8638f57dd9de9d710c5ff63e71d69289d532a125',
  'tests/v1/kv_offload/tiering/p2p/run_accuracy_test.sh': 'a8189fb7a0f618fe0a4ffe2d24acca45cfc8fe785c0aae2c22a1105fe05e96f9',
- 'tests/v1/kv_offload/tiering/test_fs_tier.py': 'ef7b3d28e0efe36157f10dae7b0a1b98ab0a1e54ed683cbd1647247c371eb861',
- 'tests/v1/kv_offload/tiering/test_obj_tier.py': '9995d78ebe1d8037253362521119d4b4e2f2ee79f85629c668403ffd77962ba8',
+ 'tests/v1/kv_offload/tiering/test_fs_tier.py': 'c170b6f37add5189a9e0d240a36835f69879d86afd9c81ebfec4e14acabec64a',
+ 'tests/v1/kv_offload/tiering/test_obj_tier.py': 'f7e8f3250c2a79ede185dad669bf50b1bb81d01eac3744d98dc9d649a0ff53b6',
  'tests/v1/kv_offload/tiering/test_tiering_offloading.py': '2106bb9a5cf1dbbd9a869bc97b11e88aa55831a45bff13d27ab52c4dc96d8564',
  'tests/v1/logits_processors/test_correctness.py': 'ce76f8c40dd6028b195600a2733656a877952b01eacd55b63dd9e619dd2f1290',
  'tests/v1/simple_kv_offload/test_integration.py': '0dd7471507c88e209fe6a72359dfc655368c836cbe2cd3d95e1c0f72d38a4241',

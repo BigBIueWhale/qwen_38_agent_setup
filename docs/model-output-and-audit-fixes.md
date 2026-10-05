@@ -805,10 +805,12 @@ also remains unchanged.
 
 The optional run of these genuine `ValueError` cases was not all green: 12
 parameterized cases passed, five sizing cases could not construct their default
-model metadata offline, and three connector cases stopped at the preexisting
-missing `_build_config` helper. Their production paths still raise `ValueError`;
-these fixture problems are outside the retyped-refusal correction and remain
-unchanged. They are recorded in `build-refusal/genuine-value-errors-final.log`.
+model metadata offline, and three connector cases stopped at a missing
+`_build_config` helper, which the capacity stage had deleted together with the
+byte-sized offloading tests it retired; that stage keeps the helper. Their
+production paths still raise `ValueError`; the sizing fixtures' problem is outside
+the retyped-refusal correction and remains unchanged. Both are recorded in
+`build-refusal/genuine-value-errors-final.log`.
 
 The original full-context assertion fails against the typed runtime, and the old
 raw-image test fails on both transports. After correction, all 37 raw-image and

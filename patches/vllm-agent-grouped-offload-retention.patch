@@ -4904,3 +4904,56 @@ index 8969a7b92b04fb050429ee620b92e8759bf85a45..aeb3faafabd6283d4567b2aba637e22f
                  self.kv_cache_report_mode = sampling_params.extra_args.get(
                      "kv_cache_report_mode", "incremental"
                  )
+diff --git a/tests/v1/kv_offload/tiering/test_fs_tier.py b/tests/v1/kv_offload/tiering/test_fs_tier.py
+index efeb59274fdb5ce5b9419c5738a8983ce4c3af1f..7a9ea493ba9cbeb4d32c0f10ada3f943fbb507bc 100644
+--- a/tests/v1/kv_offload/tiering/test_fs_tier.py
++++ b/tests/v1/kv_offload/tiering/test_fs_tier.py
+@@ -906,9 +906,16 @@ def test_cascade_store_emits_fs_event_through_tiering_manager(tmp_path):
+     manager = TieringOffloadingManager(primary_tier=primary, secondary_tiers=[tier])
+     try:
+         keys = [key(1), key(2)]
+-        manager.on_new_request(_CTX)
+-        assert manager.prepare_store(keys, _CTX) is not None
+-        manager.complete_store(keys, _CTX)  # cascades to the fs tier
++        # A generation request names its line of work and the data each key
++        # it stores holds (here one unit per key); the CPU tier retains by both.
++        request = ReqContext(
++            req_id="test",
++            kv_scope="test-agent",
++            prefix_content={k: (k,) for k in keys},
++        )
++        manager.on_new_request(request)
++        assert manager.prepare_store(keys, request) is not None
++        manager.complete_store(keys, request)  # cascades to the fs tier
+ 
+         events: list[OffloadingEvent] = []
+         ctx = ScheduleEndContext(new_req_ids=[], preempted_req_ids=())
+diff --git a/tests/v1/kv_offload/tiering/test_obj_tier.py b/tests/v1/kv_offload/tiering/test_obj_tier.py
+index d0c4d4cb04e474970ea0066d30867640dc2d9dd3..2feafe7a7f8e064f08cb716851c7672508d1a0e2 100644
+--- a/tests/v1/kv_offload/tiering/test_obj_tier.py
++++ b/tests/v1/kv_offload/tiering/test_obj_tier.py
+@@ -551,13 +551,20 @@ class TestMockObjTierFailures:
+         )
+ 
+         keys = [key(1)]
+-        primary_result = primary_tier.prepare_store(keys, _CTX)
++        # A generation request names its line of work and the data each key
++        # it stores holds (here one unit per key); the CPU tier retains by both.
++        request = ReqContext(
++            req_id="test-req",
++            kv_scope="test-agent",
++            prefix_content={k: (k,) for k in keys},
++        )
++        primary_result = primary_tier.prepare_store(keys, request)
+         assert primary_result is not None
+-        primary_tier.complete_store(keys, _CTX, success=True)
+-        job = manager.create_store_job(keys, _CTX)
++        primary_tier.complete_store(keys, request, success=True)
++        job = manager.create_store_job(keys, request)
+         obj_tier.submit_store(job)
+ 
+-        block = primary_tier._policy.get(keys[0])
++        block = primary_tier._blocks.get(keys[0])
+         assert block is not None
+         assert block.ref_cnt == 1
+         assert len(manager._transfer_jobs) == 1
