@@ -1308,6 +1308,10 @@ def _validate_agent_retention_after(state: State) -> None:
         for text in ("eviction_policy", "store_threshold"):
             forbid_text(state, path, text, label=label)
     forbid_text(state, "vllm/v1/kv_offload/cpu/common.py", "STORES_SKIPPED", label=label)
+    # No metrics test configures the reuse threshold or asserts its counter.
+    forbid_text(state,
+                "tests/v1/kv_connector/unit/offloading_connector/test_metrics.py",
+                "store_threshold", label=label)
 
     # Lookup matches content and cache_salt alone, in every tier, as upstream
     # does: no membership view, acquisition or per-agent catalog exists to

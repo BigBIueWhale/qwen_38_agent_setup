@@ -4957,3 +4957,144 @@ index d0c4d4cb04e474970ea0066d30867640dc2d9dd3..2feafe7a7f8e064f08cb716851c76725
          assert block is not None
          assert block.ref_cnt == 1
          assert len(manager._transfer_jobs) == 1
+diff --git a/tests/v1/kv_connector/unit/offloading_connector/test_metrics.py b/tests/v1/kv_connector/unit/offloading_connector/test_metrics.py
+index 58bbd4091560f1d4d03010bf7d15970640c5be8c..31ee91c9aaaf52d5259ed0765212547707c542da 100644
+--- a/tests/v1/kv_connector/unit/offloading_connector/test_metrics.py
++++ b/tests/v1/kv_connector/unit/offloading_connector/test_metrics.py
+@@ -102,15 +102,10 @@ class _FakeMetric:
+ 
+ 
+ class _FakeVllmConfig:
+-    def __init__(
+-        self,
+-        store_threshold: int = 2,
+-        extra_config: dict[str, Any] | None = None,
+-    ):
+-        config = {"store_threshold": store_threshold}
+-        if extra_config is not None:
+-            config.update(extra_config)
+-        self.kv_transfer_config = SimpleNamespace(kv_connector_extra_config=config)
++    def __init__(self, extra_config: dict[str, Any] | None = None):
++        self.kv_transfer_config = SimpleNamespace(
++            kv_connector_extra_config=dict(extra_config or {})
++        )
+ 
+ 
+ def _spec_cls_with_metric_definitions(
+@@ -479,28 +474,39 @@ def test_reset():
+ 
+ 
+ def test_prom_metrics_observes_manager_counter():
+-    prom_metrics = OffloadPromMetrics(
+-        vllm_config=_FakeVllmConfig(),  # type: ignore[arg-type]
+-        metric_types={
+-            Gauge: _FakeMetric,
+-            Counter: _FakeMetric,
+-            Histogram: _FakeMetric,
+-        },
+-        labelnames=["model_name", "engine"],
+-        per_engine_labelvalues={0: ["model", "0"]},
+-    )
++    manager_counter = "vllm:kv_offload_manager_counter"
++    metric_definitions = {
++        manager_counter: OffloadingCounterMetadata(
++            documentation="counter the offloading manager reports",
++        ),
++    }
++    with patch.object(
++        OffloadingSpecFactory,
++        "get_spec_cls",
++        return_value=_spec_cls_with_metric_definitions(metric_definitions),
++    ):
++        prom_metrics = OffloadPromMetrics(
++            vllm_config=_FakeVllmConfig(),  # type: ignore[arg-type]
++            metric_types={
++                Gauge: _FakeMetric,
++                Counter: _FakeMetric,
++                Histogram: _FakeMetric,
++            },
++            labelnames=["model_name", "engine"],
++            per_engine_labelvalues={0: ["model", "0"]},
++        )
+ 
+     prom_metrics.observe(
+         {
+-            _StatsKey.TYPES: {STORES_SKIPPED: _MetricType.COUNTER},
+-            _StatsKey.DATA: {STORES_SKIPPED: {(): 7}},
++            _StatsKey.TYPES: {manager_counter: _MetricType.COUNTER},
++            _StatsKey.DATA: {manager_counter: {(): 7}},
+         }
+     )
+ 
+-    counter = prom_metrics.offloading_metrics[(0, STORES_SKIPPED, ())]
++    counter = prom_metrics.offloading_metrics[(0, manager_counter, ())]
+     assert counter.increments == [7]
+-    counter_def = prom_metrics._offloading_metric_defs[STORES_SKIPPED]
+-    assert counter_def.kwargs["name"] == "vllm:kv_offload_stores_skipped"
++    counter_def = prom_metrics._offloading_metric_defs[manager_counter]
++    assert counter_def.kwargs["name"] == manager_counter
+     assert counter.labelvalues == ("model", "0")
+ 
+ 
+@@ -568,7 +574,7 @@ def test_prom_metrics_observes_manager_gauge_and_histogram():
+         return_value=_spec_cls_with_metric_definitions(metric_definitions),
+     ):
+         prom_metrics = OffloadPromMetrics(
+-            vllm_config=_FakeVllmConfig(store_threshold=0),  # type: ignore[arg-type]
++            vllm_config=_FakeVllmConfig(),  # type: ignore[arg-type]
+             metric_types={
+                 Gauge: _FakeMetric,
+                 Counter: _FakeMetric,
+@@ -612,7 +618,7 @@ def test_prom_metrics_lazily_observes_labeled_metric():
+         return_value=_spec_cls_with_metric_definitions(metric_definitions),
+     ):
+         prom_metrics = OffloadPromMetrics(
+-            vllm_config=_FakeVllmConfig(store_threshold=0),  # type: ignore[arg-type]
++            vllm_config=_FakeVllmConfig(),  # type: ignore[arg-type]
+             metric_types={
+                 Gauge: _FakeMetric,
+                 Counter: _FakeMetric,
+@@ -651,7 +657,7 @@ def test_prom_metrics_rejects_wrong_label_count():
+         return_value=_spec_cls_with_metric_definitions(metric_definitions),
+     ):
+         prom_metrics = OffloadPromMetrics(
+-            vllm_config=_FakeVllmConfig(store_threshold=0),  # type: ignore[arg-type]
++            vllm_config=_FakeVllmConfig(),  # type: ignore[arg-type]
+             metric_types={
+                 Gauge: _FakeMetric,
+                 Counter: _FakeMetric,
+@@ -670,25 +676,9 @@ def test_prom_metrics_rejects_wrong_label_count():
+         )
+ 
+ 
+-def test_prom_metrics_uses_configured_manager_metrics():
+-    prom_metrics = OffloadPromMetrics(
+-        vllm_config=_FakeVllmConfig(store_threshold=0),  # type: ignore[arg-type]
+-        metric_types={
+-            Gauge: _FakeMetric,
+-            Counter: _FakeMetric,
+-            Histogram: _FakeMetric,
+-        },
+-        labelnames=["model_name", "engine"],
+-        per_engine_labelvalues={0: ["model", "0"]},
+-    )
+-
+-    assert STORES_SKIPPED not in prom_metrics._offloading_metric_metadata
+-
+-
+ def test_prom_metrics_registers_tiering_metrics_from_spec():
+     prom_metrics = OffloadPromMetrics(
+         vllm_config=_FakeVllmConfig(
+-            store_threshold=0,
+             extra_config={
+                 "spec_name": "TieringOffloadingSpec",
+                 "secondary_tiers": [],
+@@ -767,7 +757,7 @@ def test_prom_metrics_multi_engine_routing():
+ def test_prom_metrics_rejects_undeclared_metric():
+     """observe() asserts if a metric was never declared in metadata."""
+     prom_metrics = OffloadPromMetrics(
+-        vllm_config=_FakeVllmConfig(store_threshold=0),  # type: ignore[arg-type]
++        vllm_config=_FakeVllmConfig(),  # type: ignore[arg-type]
+         metric_types={
+             Gauge: _FakeMetric,
+             Counter: _FakeMetric,
