@@ -1575,7 +1575,7 @@ index 9e9ace877a7c86f6a207547e715c3cab22d4521d..64d6846012a6493d1c8a4f15adac2b31
          request_id: str,
          model_name: str,
 diff --git a/vllm/sampling_params.py b/vllm/sampling_params.py
-index 1b30cf3924412f69f2129d1fffe1cc0b13c411bc..9fed60450fbde530c6dd9f0eac11a6e811580827 100644
+index 1b30cf3924412f69f2129d1fffe1cc0b13c411bc..dd07fe560c394159993701403271d642664654bd 100644
 --- a/vllm/sampling_params.py
 +++ b/vllm/sampling_params.py
 @@ -32,6 +32,68 @@ MAX_LOGPROB_TOKEN_IDS = 128

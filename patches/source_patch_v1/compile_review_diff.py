@@ -67,17 +67,11 @@ def emit_python(value: object) -> str:
 
 
 def line_offset(text: str, one_based_line: int) -> int:
-    if one_based_line < 1:
-        raise PatchRefusedError(f"invalid one-based line {one_based_line}")
     lines = text.splitlines(keepends=True)
-    if one_based_line > len(lines) + 1:
-        # Hunk start lines are coordinates in the stage's ORIGINAL file, but
-        # hunks are applied sequentially: a large earlier deletion can leave
-        # the intermediate text shorter than a later hunk's original line.
-        # The offset is only a disambiguation hint — clamp it; uniqueness is
-        # still proven by the landmark checks, and the framework re-verifies
-        # every byte independently of these hints.
-        one_based_line = len(lines) + 1
+    if not 1 <= one_based_line <= len(lines) + 1:
+        raise PatchRefusedError(
+            f"line {one_based_line} is outside a {len(lines)}-line file"
+        )
     return sum(len(line) for line in lines[: one_based_line - 1])
 
 
@@ -98,8 +92,16 @@ def expand_to_unique_landmark(
     current: str,
     review_before: str,
     review_after: str,
-    old_start: int,
+    new_start: int,
 ) -> tuple[str, str]:
+    """Grow a hunk's blocks into landmarks that occur once, at the hunk's place.
+
+    A stage applies a file's hunks in order, so the text a hunk meets already
+    holds the earlier hunks' results and the hunk starts at its header's
+    new-file line. The review block must start exactly there: the header is a
+    coordinate the framework proves, never a hint to be satisfied by the
+    nearest occurrence.
+    """
     offsets = occurrence_offsets(current, review_before)
     if review_after == "":
         # Deleted-file hunk: must already describe the complete file, and
@@ -109,15 +111,19 @@ def expand_to_unique_landmark(
         raise PatchRefusedError(
             "a deleted-file review hunk must describe the complete file"
         )
-    if len(offsets) == 1 and current.count(review_after) == 0:
-        return review_before, review_after
     if review_before == "":
+        if current == "":
+            return review_before, review_after
         raise PatchRefusedError("new-file review hunk unexpectedly has source text")
 
-    expected_offset = line_offset(current, old_start)
-    selected = min(offsets, key=lambda offset: abs(offset - expected_offset))
-    if offsets.count(selected) != 1:
-        raise PatchRefusedError("cannot select a unique review-hunk occurrence")
+    selected = line_offset(current, new_start)
+    if selected not in offsets:
+        raise PatchRefusedError(
+            f"the review hunk's block does not start at line {new_start}, "
+            "where its header places it"
+        )
+    if len(offsets) == 1 and current.count(review_after) == 0:
+        return review_before, review_after
 
     line_starts = [0]
     for match in re.finditer("\n", current):
@@ -160,7 +166,8 @@ def main() -> None:
     for stage_arg in args.stage:
         review_file = artifact_root / stage_arg.review_path
         review_data = review_file.read_bytes()
-        parsed, deleted_paths = _parse_review_diff(review_data, label=stage_arg.name)
+        parsed, declared = _parse_review_diff(review_data, label=stage_arg.name)
+        deleted_paths = {path for path, file in declared.items() if file.deleted}
         touched = tuple(
             dict.fromkeys(
                 [edit.path for edit in parsed] + sorted(deleted_paths)
@@ -201,7 +208,7 @@ def main() -> None:
                 current,
                 parsed_edit.before,
                 parsed_edit.after,
-                parsed_edit.old_start,
+                parsed_edit.new_start,
             )
             before_count = current.count(landmark_before)
             if landmark_after == "":

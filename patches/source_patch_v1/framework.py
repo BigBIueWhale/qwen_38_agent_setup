@@ -6,8 +6,11 @@ edit names and validates the source block it understands, and the complete
 result is planned and checked before a disposable source tree is changed.
 
 Unified diffs remain review evidence.  They are parsed independently and must
-describe the exact same old/new blocks as the Python transformation data.
-They are never used to decide where or how to edit a file.
+describe the exact same old/new blocks as the Python transformation data, at
+the same place: every hunk must land at the line its header names, every
+index line must name the blobs the stage transforms, and every created or
+deleted file must be declared as one.  They are never used to decide where or
+how to edit a file.
 """
 
 from __future__ import annotations
@@ -37,6 +40,12 @@ def sha256_bytes(data: bytes) -> str:
 
 def sha256_text(text: str) -> str:
     return sha256_bytes(text.encode("utf-8"))
+
+
+def git_blob_id(text: str) -> str:
+    """The object id git gives a file's bytes, as a review diff's index line names it."""
+    data = text.encode("utf-8")
+    return hashlib.sha1(b"blob %d\0" % len(data) + data).hexdigest()
 
 
 # Digest of the empty file. A deletion of an empty file cannot carry a
@@ -95,6 +104,11 @@ class LandmarkEdit:
         _require(
             self.review_after in self.after,
             f"{self.name}: review-after block is not inside the result landmark",
+        )
+        _require(
+            self.review_before == "" or self.before.count(self.review_before) == 1,
+            f"{self.name}: the review-before block occurs more than once inside "
+            "its landmark, so the landmark does not say where it is",
         )
         if self.review_before == "":
             _require(
@@ -343,16 +357,30 @@ class _ParsedReviewEdit:
     new_start: int
 
 
+@dataclass(frozen=True)
+class _ParsedReviewFile:
+    """What one file's section of a review diff declares about the file."""
+
+    path: str
+    created: bool
+    deleted: bool
+    # The abbreviated blob ids of the file before and after the stage, when the
+    # section writes an index line.
+    blobs: tuple[str, str] | None
+
+
 _DIFF_HEADER = re.compile(r"^diff --git a/(.+) b/(.+)$")
 _HUNK_HEADER = re.compile(
     r"^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@"
 )
 _DELETED_FILE_HEADER = re.compile(r"^deleted file mode \d+$")
+_NEW_FILE_HEADER = re.compile(r"^new file mode \d+$")
+_INDEX_HEADER = re.compile(r"^index ([0-9a-f]{7,40})\.\.([0-9a-f]{7,40})(?: \d+)?$")
 
 
 def _parse_review_diff(
     data: bytes, *, label: str
-) -> tuple[tuple[_ParsedReviewEdit, ...], frozenset[str]]:
+) -> tuple[tuple[_ParsedReviewEdit, ...], dict[str, _ParsedReviewFile]]:
     try:
         text = data.decode("utf-8")
     except UnicodeDecodeError as exc:
@@ -360,9 +388,19 @@ def _parse_review_diff(
     _require("\r" not in text, f"{label}: review diff contains CR bytes")
     lines = text.splitlines(keepends=True)
     edits: list[_ParsedReviewEdit] = []
-    deleted_paths: set[str] = set()
+    files: dict[str, _ParsedReviewFile] = {}
     current_path: str | None = None
     index = 0
+
+    def declare(**declared: object) -> None:
+        _require(
+            current_path is not None,
+            f"{label}: file declaration without file header",
+        )
+        files[current_path] = _ParsedReviewFile(
+            **{**files[current_path].__dict__, **declared}
+        )
+
     while index < len(lines):
         raw = lines[index]
         match = _DIFF_HEADER.match(raw.rstrip("\n"))
@@ -373,18 +411,26 @@ def _parse_review_diff(
             )
             current_path = match.group(1)
             _safe_relative_path(current_path)
+            _require(
+                current_path not in files,
+                f"{label}: {current_path} has more than one section",
+            )
+            files[current_path] = _ParsedReviewFile(
+                current_path, created=False, deleted=False, blobs=None
+            )
             index += 1
             continue
         if _DELETED_FILE_HEADER.match(raw.rstrip("\n")):
-            _require(
-                current_path is not None,
-                f"{label}: deleted-file header without file header",
-            )
-            _require(
-                current_path not in deleted_paths,
-                f"{label}: duplicate deleted-file header for {current_path}",
-            )
-            deleted_paths.add(current_path)
+            declare(deleted=True)
+            index += 1
+            continue
+        if _NEW_FILE_HEADER.match(raw.rstrip("\n")):
+            declare(created=True)
+            index += 1
+            continue
+        index_match = _INDEX_HEADER.match(raw.rstrip("\n"))
+        if index_match:
+            declare(blobs=(index_match.group(1), index_match.group(2)))
             index += 1
             continue
         hunk_match = _HUNK_HEADER.match(raw.rstrip("\n"))
@@ -426,10 +472,10 @@ def _parse_review_diff(
             continue
         index += 1
     _require(
-        edits or deleted_paths,
+        edits or any(file.deleted for file in files.values()),
         f"{label}: review diff contains no hunks",
     )
-    return tuple(edits), frozenset(deleted_paths)
+    return tuple(edits), files
 
 
 class SourcePatchTransaction:
@@ -537,7 +583,9 @@ class SourcePatchTransaction:
                 f"expected {digest}, got {actual}",
             )
 
-    def _verify_review_artifact(self, stage: PatchStage) -> None:
+    def _verify_review_artifact(
+        self, stage: PatchStage
+    ) -> tuple[tuple[_ParsedReviewEdit, ...], dict[str, _ParsedReviewFile]]:
         path = self._artifact_path(stage.review_patch)
         data = path.read_bytes()
         actual_digest = sha256_bytes(data)
@@ -546,23 +594,36 @@ class SourcePatchTransaction:
             f"{stage.name}: review diff SHA-256 drift; expected "
             f"{stage.review_sha256}, got {actual_digest}",
         )
-        parsed, parsed_deleted = _parse_review_diff(data, label=stage.name)
+        parsed, declared = _parse_review_diff(data, label=stage.name)
         _require(
             len(parsed) == len(stage.edits),
             f"{stage.name}: review diff has {len(parsed)} hunks but the Python "
             f"patcher has {len(stage.edits)} landmark transformations",
         )
-        stage_deleted = frozenset(
-            contract.path
-            for contract in stage.files
-            if contract.after_sha256 is None
-        )
         _require(
-            parsed_deleted == stage_deleted,
-            f"{stage.name}: review diff declares deletions "
-            f"{sorted(parsed_deleted)!r} but the Python patcher declares "
-            f"{sorted(stage_deleted)!r}",
+            sorted(declared) == sorted(contract.path for contract in stage.files),
+            f"{stage.name}: review diff has sections for {sorted(declared)!r} "
+            "but the Python patcher changes "
+            f"{sorted(contract.path for contract in stage.files)!r}",
         )
+        for kind, parsed_paths, stage_paths in (
+            (
+                "deletions",
+                {path for path, file in declared.items() if file.deleted},
+                {c.path for c in stage.files if c.after_sha256 is None},
+            ),
+            (
+                "creations",
+                {path for path, file in declared.items() if file.created},
+                {c.path for c in stage.files if c.before_sha256 is None},
+            ),
+        ):
+            _require(
+                parsed_paths == stage_paths,
+                f"{stage.name}: review diff declares {kind} "
+                f"{sorted(parsed_paths)!r} but the Python patcher declares "
+                f"{sorted(stage_paths)!r}",
+            )
         expected = tuple(
             _ParsedReviewEdit(
                 edit.path,
@@ -578,6 +639,7 @@ class SourcePatchTransaction:
             f"{stage.name}: Python landmarks and review diff describe "
             "different transformations",
         )
+        return parsed, declared
 
     @staticmethod
     def _matches(state: Mapping[str, str], expected: Mapping[str, str]) -> bool:
@@ -626,8 +688,10 @@ class SourcePatchTransaction:
     def plan(self) -> tuple[dict[str, str], PatchResult]:
         state = self._read_state()
         self._verify_identity(state)
-        for stage in self.patchset.stages:
-            self._verify_review_artifact(stage)
+        reviews = {
+            stage.name: self._verify_review_artifact(stage)
+            for stage in self.patchset.stages
+        }
 
         deleted_paths = self._deleted_paths()
         if self._matches(state, self.patchset.final_files) and all(
@@ -660,6 +724,8 @@ class SourcePatchTransaction:
         for stage in self.patchset.stages:
             stage.validate_before(planned)
             contracts = {contract.path: contract for contract in stage.files}
+            coordinates, declared = reviews[stage.name]
+            stage_before = {path: planned.get(path) for path in contracts}
             for path, contract in contracts.items():
                 if contract.before_sha256 is None:
                     _require(path not in planned, f"{stage.name}: {path} already exists")
@@ -672,7 +738,7 @@ class SourcePatchTransaction:
                         f"{contract.before_sha256}, got {actual}",
                     )
 
-            for edit in stage.edits:
+            for edit, coordinate in zip(stage.edits, coordinates):
                 current = planned.get(edit.path, "")
                 if edit.after == "":
                     # Deleted-file hunk: by the LandmarkEdit grammar its
@@ -702,6 +768,20 @@ class SourcePatchTransaction:
                     f"{after_count} time(s) in {edit.path}; source is partial or "
                     "the landmarks overlap; no writes performed",
                 )
+                if edit.review_before:
+                    # Where the edit lands is proven, not only what it says:
+                    # within a stage a file's hunks apply in order, so each
+                    # one's review block starts at its header's new-file line.
+                    landed = current.index(edit.before) + len(
+                        edit.before.split(edit.review_before, 1)[0]
+                    )
+                    line = current.count("\n", 0, landed) + 1
+                    _require(
+                        line == coordinate.new_start,
+                        f"{stage.name}:{edit.name}: lands at line {line} of "
+                        f"{edit.path}, but its review hunk's header places it at "
+                        f"line {coordinate.new_start}; no writes performed",
+                    )
                 planned[edit.path] = current.replace(edit.before, edit.after, 1)
                 changed.add(edit.path)
 
@@ -729,6 +809,23 @@ class SourcePatchTransaction:
                         raise PatchRefusedError(
                             f"{stage.name}: transformed {path} is invalid Python: {exc}"
                         ) from exc
+            for path, review_file in declared.items():
+                if review_file.blobs is None:
+                    continue
+                transformed = tuple(
+                    git_blob_id(text) if text is not None else "0" * 40
+                    for text in (stage_before[path], planned.get(path))
+                )
+                _require(
+                    all(
+                        blob.startswith(named)
+                        for blob, named in zip(transformed, review_file.blobs)
+                    ),
+                    f"{stage.name}: the review diff's index line for {path} names "
+                    f"{'..'.join(review_file.blobs)}, but the stage transforms "
+                    f"{transformed[0][:len(review_file.blobs[0])]}.."
+                    f"{transformed[1][:len(review_file.blobs[1])]}; no writes performed",
+                )
             stage.validate_after(planned)
 
         _require(

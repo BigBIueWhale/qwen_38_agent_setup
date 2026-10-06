@@ -19,7 +19,7 @@ index fcdce3ef58..67593b4590 100644
          if any(p in config for p in available_params):
              diff_sampling_param = {
 diff --git a/vllm/entrypoints/anthropic/protocol.py b/vllm/entrypoints/anthropic/protocol.py
-index 02b9356113..cf52797461 100644
+index 02b9356113..ede9869ee3 100644
 --- a/vllm/entrypoints/anthropic/protocol.py
 +++ b/vllm/entrypoints/anthropic/protocol.py
 @@ -117,6 +117,38 @@ class AnthropicOutputConfig(BaseModel):
@@ -61,7 +61,7 @@ index 02b9356113..cf52797461 100644
  
  class AnthropicMessagesRequest(BaseModel):
      """Anthropic Messages API request"""
-@@ -136,6 +169,7 @@ class AnthropicMessagesRequest(BaseModel):
+@@ -136,6 +168,7 @@ class AnthropicMessagesRequest(BaseModel):
      tools: list[AnthropicTool] | None = None
      top_k: int | None = None
      top_p: float | None = None

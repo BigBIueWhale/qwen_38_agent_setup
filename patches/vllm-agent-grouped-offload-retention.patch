@@ -4878,7 +4878,7 @@ index bb0325ca2842286c522145a32f04728d107e27d8..c8f06fe2b2fd3bcecb8f11aa43c3fc95
                  len(secondary_tiers),
              )
 diff --git a/vllm/v1/request.py b/vllm/v1/request.py
-index 8969a7b92b04fb050429ee620b92e8759bf85a45..aeb3faafabd6283d4567b2aba637e22f2c350513 100644
+index 8969a7b92b04fb050429ee620b92e8759bf85a45..d190d2d5b04fdb31b2345aba362ad74f51f4616b 100644
 --- a/vllm/v1/request.py
 +++ b/vllm/v1/request.py
 @@ -106,6 +106,14 @@ class Request:

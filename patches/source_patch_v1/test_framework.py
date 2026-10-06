@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -18,6 +19,7 @@ from .framework import (
     PatchWriteError,
     SourcePatchTransaction,
     require_python_symbols,
+    git_blob_id,
     sha256_bytes,
     sha256_text,
 )
@@ -93,10 +95,20 @@ def _deletion_stage(
 
 
 def _review(path: str, before: str, after: str) -> str:
+    """git-style whole-file review; a created file is declared as one."""
     old_lines = before.count("\n")
     new_lines = after.count("\n")
     old = "".join(f"-{line}" for line in before.splitlines(keepends=True))
     new = "".join(f"+{line}" for line in after.splitlines(keepends=True))
+    if before == "":
+        return (
+            f"diff --git a/{path} b/{path}\n"
+            "new file mode 100644\n"
+            "--- /dev/null\n"
+            f"+++ b/{path}\n"
+            f"@@ -0,0 +1,{new_lines} @@\n"
+            f"{new}"
+        )
     return (
         f"diff --git a/{path} b/{path}\n"
         f"--- a/{path}\n"
@@ -248,6 +260,117 @@ class SourcePatchTransactionTests(unittest.TestCase):
             (self.source / "created.py").read_text(encoding="utf-8"), after
         )
         self.assertEqual((self.source / "created.py").stat().st_mode & 0o777, 0o644)
+
+    def _twin_stage(self, *, review: str, landmark_first: bool) -> PatchStage:
+        """A file with two identical blocks; the stage changes one of them."""
+        block = "handler()\n    value = 1\n"
+        changed = "handler()\n    value = 2\n"
+        before = "# first\n" + block + "# second\n" + block
+        after = (
+            "# first\n" + changed + "# second\n" + block
+            if landmark_first
+            else "# first\n" + block + "# second\n" + changed
+        )
+        marker = "# first\n" if landmark_first else "# second\n"
+        (self.source / "twin.txt").write_text(before, encoding="utf-8")
+        (self.artifact / "twin.patch").write_text(review, encoding="utf-8", newline="\n")
+        return PatchStage(
+            name="twin",
+            rationale="Synthetic placement used to prove the proof of placement.",
+            removal_condition="Remove when this framework test is removed.",
+            review_patch="twin.patch",
+            review_sha256=sha256_bytes(review.encode("utf-8")),
+            files=(FileIdentity("twin.txt", sha256_text(before), sha256_text(after)),),
+            edits=(
+                LandmarkEdit(
+                    name="twin.txt:landmark-1",
+                    path="twin.txt",
+                    before=marker + block,
+                    after=marker + changed,
+                    review_before=block,
+                    review_after=changed,
+                ),
+            ),
+            validate_before=_noop,
+            validate_after=_noop,
+        ), after
+
+    def test_a_hunk_must_land_at_the_line_its_header_names(self) -> None:
+        # The review names the second block (line 5); the data's landmark
+        # changes the first (line 2). Both describe the same blocks, so only
+        # placement tells them apart.
+        review = (
+            "diff --git a/twin.txt b/twin.txt\n--- a/twin.txt\n+++ b/twin.txt\n"
+            "@@ -5,2 +5,2 @@\n handler()\n-    value = 1\n+    value = 2\n"
+        )
+        stage, after = self._twin_stage(review=review, landmark_first=True)
+        patchset = _patchset((stage,), final_files={"twin.txt": sha256_text(after)})
+        with self.assertRaisesRegex(
+            PatchRefusedError, r"lands at line 2 of twin\.txt, but its review "
+            r"hunk's header places it at line 5"
+        ):
+            SourcePatchTransaction(self.source, self.artifact, patchset).apply()
+        self.assertNotIn("value = 2", (self.source / "twin.txt").read_text())
+
+        stage, after = self._twin_stage(review=review, landmark_first=False)
+        patchset = _patchset((stage,), final_files={"twin.txt": sha256_text(after)})
+        SourcePatchTransaction(self.source, self.artifact, patchset).apply()
+        self.assertEqual((self.source / "twin.txt").read_text(), after)
+
+    def test_an_index_line_must_name_the_blobs_the_stage_transforms(self) -> None:
+        block = "handler()\n    value = 1\n"
+        before = "# first\n" + block + "# second\n" + block
+        stage, after = self._twin_stage(review="", landmark_first=False)
+        for named_after, refused in ((git_blob_id(after), False), ("0" * 40, True)):
+            review = (
+                "diff --git a/twin.txt b/twin.txt\n"
+                f"index {git_blob_id(before)[:10]}..{named_after[:10]} 100644\n"
+                "--- a/twin.txt\n+++ b/twin.txt\n"
+                "@@ -5,2 +5,2 @@\n handler()\n-    value = 1\n+    value = 2\n"
+            )
+            stage, after = self._twin_stage(review=review, landmark_first=False)
+            patchset = _patchset(
+                (stage,), final_files={"twin.txt": sha256_text(after)}
+            )
+            transaction = SourcePatchTransaction(self.source, self.artifact, patchset)
+            if refused:
+                with self.assertRaisesRegex(PatchRefusedError, "index line for twin.txt"):
+                    transaction.plan()
+            else:
+                self.assertEqual(transaction.plan()[1].state, "planned")
+
+    def test_a_created_file_must_be_declared_as_one(self) -> None:
+        after = "def created():\n    return True\n"
+        stage = _stage(
+            self.artifact, name="create-file", transformations=(("created.py", "", after),)
+        )
+        undeclared = _review("created.py", "", after).replace("new file mode 100644\n", "")
+        (self.artifact / stage.review_patch).write_text(undeclared, encoding="utf-8")
+        stage = PatchStage(**{
+            **stage.__dict__, "review_sha256": sha256_bytes(undeclared.encode("utf-8"))
+        })
+        patchset = _patchset((stage,), final_files={"created.py": sha256_text(after)})
+        with self.assertRaisesRegex(PatchRefusedError, "declares creations"):
+            SourcePatchTransaction(self.source, self.artifact, patchset).apply()
+        self.assertFalse((self.source / "created.py").exists())
+
+    def test_the_compiler_anchors_a_hunk_at_its_header_line(self) -> None:
+        sys.path.insert(0, str(Path(framework.__file__).parent))
+        try:
+            import compile_review_diff as compiler
+        finally:
+            sys.path.pop(0)
+        block, changed = "handler()\n    value = 1\n", "handler()\n    value = 2\n"
+        current = "# first\n" + block + "# second\n" + block
+        before, after = compiler.expand_to_unique_landmark(current, block, changed, 5)
+        self.assertEqual(
+            current.replace(before, after, 1),
+            "# first\n" + block + "# second\n" + changed,
+        )
+        with self.assertRaisesRegex(
+            compiler.PatchRefusedError, "does not start at line 4"
+        ):
+            compiler.expand_to_unique_landmark(current, block, changed, 4)
 
     def test_unknown_source_drift_refuses_without_writes(self) -> None:
         before = "def value():\n    return 1\n"

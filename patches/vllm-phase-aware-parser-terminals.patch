@@ -269,6 +269,7 @@ diff --git a/tests/parser/engine/test_parser_engine.py b/tests/parser/engine/tes
          transitions={
              (ParserState.CONTENT, "TOOL_START"): Transition(
 diff --git a/tests/parser/engine/test_qwen_terminal_authority.py b/tests/parser/engine/test_qwen_terminal_authority.py
+new file mode 100644
 --- /dev/null
 +++ b/tests/parser/engine/test_qwen_terminal_authority.py
 @@ -0,0 +1,100 @@

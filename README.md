@@ -287,19 +287,19 @@ It is intentionally reconstructed by the ordered, reviewed semantic transformati
 |---|---|
 | patches/vllm-turboquant-k8v4-direct-workspace.patch | a9721067f1a7ee9497a4bd51e47e3a474561189e881b4704bfc4beac8ea48380 |
 | patches/vllm-enforce-auto-tool-schema.patch | 4f75c793a9c2cdcfb2fd0768ba49a4e34748d3a37d8392b07d3592ca50939c07 |
-| patches/vllm-qwen38-agent-defaults-and-thinking.patch | c3a7315c32f8b117066e851b123b7a1b446c2fcd4c8a1f2616774c8f9d668509 |
+| patches/vllm-qwen38-agent-defaults-and-thinking.patch | d8ef6daacef9dfc9c9f755ec19f574d98062b2c7a7da03564ab2ca036cf82561 |
 | patches/vllm-qwen38-separate-final-response-budget.patch | f20d7dff41931248272842ed2c7a163c6f013e405ccf35733c40ff131a2fc503 |
 | patches/vllm-qwen-implicit-tool-grammar-boundary.patch | d231c6e2e7040c4cd4b38432cb8c794805afddbf2c6e4f7ff6febb78e3fd9f48 |
 | patches/vllm-anthropic-validation-http400.patch | b4c3327ca4e513b9a58edc3e9aca978d324a27032511f9868d5f941411941bcf |
 | patches/vllm-tool-truncation-finish-reason.patch | 1a220f6db9b40967d867b3cfb1a92d95d907ca059718ffe61772b4cb4409f551 |
-| patches/vllm-qwen38-vision-runtime.patch | dba583483c76e877920ccc29d31b96779669f300ec3e92dcfeff717c133a7bf4 |
+| patches/vllm-qwen38-vision-runtime.patch | 55d646c690a11b1254e3df10dcb55b4b287fb8b4c7b14cc84164b827065d7c13 |
 | patches/vllm-qwen38-numerical-audits.patch | dc0b947db3727b522427a204edd1a930d637476a0f66d7d30e2da65c144ac944 |
-| patches/vllm-turboquant-fail-closed-guards.patch | 099bbb99806151fbce342bb4863b32b12fb741669169a3a30365f77b4176bc0d |
-| patches/vllm-kv-offload-pinning-fail-closed.patch | 1857071c38d081bb95e3cca12153cebce096649084950b99229104fdae029ca6 |
-| patches/vllm-generation-requires-agent-id.patch | c9eb622d308fbaf78cfe617a6a6e25874ea9fdcb5eb8002e81152d85f1982af4 |
+| patches/vllm-turboquant-fail-closed-guards.patch | b140445625c63a85d4cae5d878b1de472a9645b63e78c34249848082120b9ba3 |
+| patches/vllm-kv-offload-pinning-fail-closed.patch | 3a72f88d679a493d6ae0db6c05e171f9f0be6d44dca958ee351e6099df61a8ec |
+| patches/vllm-generation-requires-agent-id.patch | 4976d538eb98b6c424927a041e5885a7fd4004564a910cdb1c9faa56f4537f0d |
 | patches/vllm-attention-growth-keeps-prefix-hash.patch | a6c38a841c05bcd4f5bfc573c99f1c4a849e7399af05b1e53096e15a43a97632 |
 | patches/vllm-grouped-kv-specs-use-layer-geometry.patch | 6bb249bc143a179ca317c72d2bf70ec118baa6f12dca19c0a59da2e3c935b814 |
-| patches/vllm-agent-grouped-offload-retention.patch | 31384f411de30058d10ac67572b1e4abc9634bcb78a66d4b67c4f09f7f1f6439 |
+| patches/vllm-agent-grouped-offload-retention.patch | cd1df4ae8de44aa92a3130ec2ad6a4fa087520d13fc884826100f95dd9782afc |
 | patches/vllm-agentless-generation-routes-unmounted.patch | c321d15313839c28542a6fb4d754080443a86aeeecdcdfbc8ea7459a52364b0b |
 | patches/vllm-kv-capacity-in-declared-users.patch | 7a3d2c0ce43e468ed2177f567ac1eb31a70a95e525496a2d8b27f3330f214441 |
 | patches/vllm-kv-declaration-within-physical-bound.patch | c80ae7afa8392c600f6c6f74d6748a2bc14f3aebc4dd0fa2e5a63f79dfaef3d5 |
@@ -314,10 +314,10 @@ It is intentionally reconstructed by the ordered, reviewed semantic transformati
 | patches/vllm-anthropic-terminal-metadata.patch | d09c3b0ba5658b864131c46202f53a4b611ca0395bd068feb1a054fcc70f2364 |
 | patches/vllm-generation-sampling-resolution.patch | ebb88fa080f82512ed547debc3e7d7de73fe2b64cad56beacec8140c23ab56c1 |
 | patches/vllm-sampling-decoding-boundary.patch | 85cfffb303c52128b7e3183e5b3d18c3d1f8a906b7b1b6f9d1ddc8010de4bc0f |
-| patches/vllm-token-generation-result-integrity.patch | 94344dd0d8bbd9bc9963d2c4ed730eda2c02aa6e6d1e6c217ba538d7446af96a |
+| patches/vllm-token-generation-result-integrity.patch | bcb8e56c7f9f53563c16bc3adb8fc10796d0463ac5b85e52ecb367948efbb93e |
 | patches/vllm-raw-image-token-transport.patch | 7ff7f7fdc9d72fec7948de4cd8968e157756345ab8487281a36689ed3aa82a63 |
-| patches/vllm-xml-text-fidelity.patch | 73e973029f05bd88e5faa7bc1f5a38bac75ef5afcd562981be0961c3b830c6ab |
-| patches/vllm-phase-aware-parser-terminals.patch | 8e9adb65b71b6ba7e3e79ea50ecc37ca9129820ac94a41c71c5286d8d5de68f8 |
+| patches/vllm-xml-text-fidelity.patch | 91ff1c8c46336fc00745d84f31d7edecabebec5ff9c0f501d86a801e39e86870 |
+| patches/vllm-phase-aware-parser-terminals.patch | 3b6f1075e206370ebed7572852ac9bc559e80264ea6ed9e4b3850e30887dda28 |
 | patches/vllm-input-stream-agent-identity.patch | caee1588ff260cb866404a91889b3962f8f94b468fa5f5eb81720f1e8c88d67a |
 | patches/vllm-tool-output-completion.patch | 28f49b69af72f1caca3d716cdfe58b96626e1411c8599b49253946ee2cad6090 |
 | patches/vllm-one-way-thinking-boundary.patch | 63a69aea8a184a3875f50673a55058fb9e14dc3178abd8c5510de2770022f346 |
@@ -345,11 +345,17 @@ deletions are counted by ./scripts/build-vllm.sh check, which derives and prints
 them; they are not restated here. The landmark-aware Python patcher calculates every mutation
 (including file deletions) before writing, validates unique structural landmarks
 and complete pre/post hashes, performs atomic transactions with rollback, and is
-itself covered by thirteen failure-path tests. The
-unified diffs remain review artifacts, but they do not select mutation locations.
-The build check rejects an ambiguous landmark, missing hunk, wrong stage, changed
-final hash, whitespace error, partial intermediate state, concurrent source drift, or
-a reconstruction whose footprint is not exactly the patch set's.
+itself covered by failure-path tests that the check runs. The
+unified diffs remain review artifacts, but they do not select mutation locations:
+each stage's data and its review diff must describe the same blocks at the same
+place. Every hunk must land at the line its header names, every index line must
+name the blobs the stage transforms, and every created or deleted file must be
+declared as one, so a landmark that matched an identical block elsewhere in a file
+is refused rather than applied. The compiler that writes the data anchors each
+hunk at that line instead of choosing the nearest occurrence of its block.
+The build check rejects an ambiguous landmark, missing hunk, misplaced hunk, wrong
+stage, changed final hash, whitespace error, partial intermediate state, concurrent
+source drift, or a reconstruction whose footprint is not exactly the patch set's.
 
 The image is built from that reconstruction and from nothing else. Every stage is
 applied from the pinned commit to a worktree of the build's own under complete

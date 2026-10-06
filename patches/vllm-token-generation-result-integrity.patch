@@ -23,6 +23,7 @@ diff --git a/tests/entrypoints/scale_out/derender/test_derender.py b/tests/entry
  
  @pytest.mark.asyncio
 diff --git a/tests/entrypoints/scale_out/derender/test_terminal_metadata.py b/tests/entrypoints/scale_out/derender/test_terminal_metadata.py
+new file mode 100644
 --- /dev/null
 +++ b/tests/entrypoints/scale_out/derender/test_terminal_metadata.py
 @@ -0,0 +1,52 @@

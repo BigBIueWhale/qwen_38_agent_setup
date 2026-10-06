@@ -1,5 +1,5 @@
 diff --git a/vllm/v1/attention/ops/triton_turboquant_store.py b/vllm/v1/attention/ops/triton_turboquant_store.py
-index e680f68..19dd4c9 100644
+index e680f68..2d08b8d 100644
 --- a/vllm/v1/attention/ops/triton_turboquant_store.py
 +++ b/vllm/vllm/v1/attention/ops/triton_turboquant_store.py
 @@ -120,14 +120,31 @@ def _store_quantized_value(
