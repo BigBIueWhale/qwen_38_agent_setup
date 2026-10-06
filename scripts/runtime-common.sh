@@ -832,6 +832,8 @@ assert_running_profile() {
       /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/detokenizer.py \
       /usr/local/lib/python3.12/dist-packages/vllm/v1/core/sched/scheduler.py \
       /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/async_llm.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/generate/base/serving.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/__init__.py \
       /usr/local/lib/python3.12/dist-packages/vllm/parser/gemma4.py \
       /usr/local/lib/python3.12/dist-packages/vllm/parser/glm47_moe.py \
       /usr/local/lib/python3.12/dist-packages/vllm/parser/minimax_m2.py \
@@ -906,6 +908,8 @@ assert_running_profile() {
     "${V1_DETOKENIZER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/detokenizer.py \
     "${V1_SCHEDULER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/core/sched/scheduler.py \
     "${ASYNC_LLM_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/async_llm.py \
+    "${GENERATE_BASE_SERVING_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/generate/base/serving.py \
+    "${ENGINE_CORE_REQUEST_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/__init__.py \
     "${GEMMA4_PARSER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/gemma4.py \
     "${GLM47_PARSER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/glm47_moe.py \
     "${MINIMAX_M2_PARSER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/minimax_m2.py \

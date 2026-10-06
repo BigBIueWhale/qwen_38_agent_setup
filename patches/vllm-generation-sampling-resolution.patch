@@ -468,7 +468,7 @@ diff --git a/tests/entrypoints/scale_out/token_in_token_out/test_protocol.py b/t
 diff --git a/tests/entrypoints/test_kv_scope_protocol.py b/tests/entrypoints/test_kv_scope_protocol.py
 --- a/tests/entrypoints/test_kv_scope_protocol.py
 +++ b/tests/entrypoints/test_kv_scope_protocol.py
-@@ -92,6 +92,7 @@
+@@ -91,6 +91,7 @@
  
  _SAMPLING_SURFACES = [
      ChatCompletionGenerationRequest, CompletionGenerationRequest, ResponsesRequest,
@@ -476,7 +476,7 @@ diff --git a/tests/entrypoints/test_kv_scope_protocol.py b/tests/entrypoints/tes
  ]
  
  
-@@ -165,7 +166,7 @@
+@@ -164,7 +165,7 @@
  
  
  @pytest.mark.parametrize(
@@ -948,7 +948,7 @@ diff --git a/vllm/entrypoints/scale_out/token_in_token_out/serving.py b/vllm/ent
 diff --git a/vllm/sampling_params.py b/vllm/sampling_params.py
 --- a/vllm/sampling_params.py
 +++ b/vllm/sampling_params.py
-@@ -289,6 +289,17 @@
+@@ -305,6 +305,17 @@
      return tokenizer.llg_tokenizer if is_mistral_tokenizer(tokenizer) else None
  
  

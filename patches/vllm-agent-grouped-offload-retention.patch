@@ -1,5 +1,5 @@
 diff --git a/tests/entrypoints/test_kv_scope_protocol.py b/tests/entrypoints/test_kv_scope_protocol.py
-index 9677c19312b38ed1d66f1a724e40af2c305e062e..c54d0af012ebac01b502ec102a9424bcf80dead4 100644
+index e31c0e909a6f5c231be8dba1f70989e9e2f5ab64..872a720829adcd6e47721d9b7cf494860ec44e93 100644
 --- a/tests/entrypoints/test_kv_scope_protocol.py
 +++ b/tests/entrypoints/test_kv_scope_protocol.py
 @@ -2,12 +2,12 @@
@@ -4886,12 +4886,12 @@ index 8969a7b92b04fb050429ee620b92e8759bf85a45..aeb3faafabd6283d4567b2aba637e22f
          # E/P/D: Connector-specific encoder-cache transfer parameters.
          self.ec_transfer_params: dict[str, Any] | None = None
 +        # The agent owning this request's KV. Every generative request names
-+        # one -- the engine refuses to generate otherwise -- so the offload
-+        # tier always has a whole agent to give up under pressure. It stays
-+        # None only for a pooling request, which generates nothing and owns
-+        # no reusable context. Materialized here so the KV offload connector
-+        # reads identity off the Request the same way it reads
-+        # kv_transfer_params, on every protocol surface.
++        # one -- an engine request cannot be built for generation otherwise --
++        # so the offload tier always has a whole agent to give up under
++        # pressure. It stays None only for a pooling request, which generates
++        # nothing and owns no reusable context. Materialized here so the KV
++        # offload connector reads identity off the Request the same way it
++        # reads kv_transfer_params, on every protocol surface.
 +        self.kv_scope: str | None = None
  
          if pooling_params is not None:
@@ -5098,3 +5098,61 @@ index 58bbd4091560f1d4d03010bf7d15970640c5be8c..31ee91c9aaaf52d5259ed07652125477
          metric_types={
              Gauge: _FakeMetric,
              Counter: _FakeMetric,
+diff --git a/tests/v1/engine/test_engine_request_identity.py b/tests/v1/engine/test_engine_request_identity.py
+index c9343c090535dcabfa7bf0918c92978ca99b3d6a..f2cd9a3fffee84c111f862e72feed3839edb456f 100644
+--- a/tests/v1/engine/test_engine_request_identity.py
++++ b/tests/v1/engine/test_engine_request_identity.py
+@@ -15,6 +15,9 @@ from unittest.mock import AsyncMock
+ 
+ import pytest
+ 
++from vllm.distributed.kv_transfer.kv_connector.v1.offloading.scheduler import (
++    _create_req_context,
++)
+ from vllm.entrypoints.generate.base.serving import GenerateBaseServing
+ from vllm.entrypoints.openai.chat_completion.protocol import (
+     ChatCompletionGenerationRequest,
+@@ -25,6 +28,8 @@ from vllm.pooling_params import PoolingParams
+ from vllm.sampling_params import SamplingParams
+ from vllm.v1.engine import EngineCoreRequest
+ from vllm.v1.engine.async_llm import AsyncLLM
++from vllm.v1.kv_offload.base import ReqContext
++from vllm.v1.kv_offload.cpu.manager import CPUOffloadingManager
+ from vllm.v1.request import Request
+ from vllm.v1.serial_utils import MsgpackDecoder, MsgpackEncoder
+ 
+@@ -102,3 +107,34 @@ def test_a_rejected_remote_prefill_notifies_under_the_requests_own_scope():
+         data_parallel_rank=None,
+     )
+ 
++
++def test_the_notice_reaches_the_offload_tier_as_a_request_of_that_agent():
++    """The CPU tier accounts the notice under its agent and keeps what that
++    agent retained: a notice holds no KV, so finishing it releases nothing."""
++    engine_core = SimpleNamespace(add_request_async=AsyncMock())
++    asyncio.run(
++        AsyncLLM.notify_kv_transfer_request_rejected(
++            SimpleNamespace(engine_core=engine_core),
++            "rejected",
++            {"do_remote_prefill": True},
++            "agent-a",
++        )
++    )
++    (notice,) = engine_core.add_request_async.await_args.args
++    assert notice.abort_immediately
++    request = Request.from_engine_core_request(notice, None)
++    assert request.kv_scope == "agent-a"
++
++    manager = CPUOffloadingManager(4)
++    retained = ReqContext(req_id="earlier", kv_scope="agent-a",
++                          prefix_content={b"key": (b"key",)})
++    stored = manager.prepare_store([b"key"], retained)
++    manager.complete_store(stored.keys_to_store, retained)
++    manager.retain_context([b"key"], retained)
++    manager.on_request_finished(retained)
++
++    context = _create_req_context(request)
++    manager.on_new_request(context)
++    manager.on_request_finished(context)
++    assert manager._idle_context == {"agent-a": "earlier"}
++    assert set(manager._contexts) == {"earlier"}

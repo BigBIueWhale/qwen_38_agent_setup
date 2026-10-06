@@ -1111,8 +1111,18 @@ def _validate_agent_id_before(state: State) -> None:
         "vllm/entrypoints/openai/chat_completion/batch_serving.py",
         "vllm/entrypoints/openai/run_batch.py",
         "vllm/sampling_params.py",
+        "vllm/v1/engine/__init__.py",
+        "vllm/v1/engine/async_llm.py",
+        "vllm/engine/protocol.py",
+        "vllm/entrypoints/generate/base/serving.py",
     ):
         forbid_text(state, path, "kv_scope", label=label)
+    _require_in_symbol(
+        state, "vllm/v1/engine/async_llm.py",
+        "AsyncLLM.notify_kv_transfer_request_rejected",
+        ('extra_args={"kv_transfer_params": dict(kv_transfer_params)},',),
+        label=label,
+    )
     require_text(
         state, "vllm/entrypoints/openai/chat_completion/api_router.py",
         "async def create_chat_completion(request: ChatCompletionRequest, raw_request: Request):",
@@ -1188,22 +1198,51 @@ def _validate_agent_id_after(state: State) -> None:
         "and a new, never-used kv_scope for a fork or a subagent",
     ):
         require_text(state, sampling, text, label=label)
-    input_processor = "vllm/v1/engine/input_processor.py"
-    require_text(
-        state, input_processor, "def require_kv_scope(params: SamplingParams) -> str:",
-        label=label,
-    )
-    require_text(state, input_processor, "require_kv_scope(params)", count=1, label=label)
+    # The engine request type holds the rule: no generation can be built or
+    # decoded without the ID, whichever producer builds it -- the input
+    # processor, a caller that builds an engine request itself, or the
+    # engine's own notice that a KV-transfer request was refused.
     _require_ordered(
-        _source(state, input_processor, label=label),
+        _symbol_source(state, sampling, "require_kv_scope", label=label),
         (
             "scope = require_kv_scope_value(",
             'params.extra_args.get("kv_scope") if params.extra_args else None',
             'require_one_sequence(params.n, "n")',
         ),
         label=label,
-        location=input_processor,
+        location=sampling,
     )
+    _require_in_symbol(state, "vllm/v1/engine/__init__.py", "EngineCoreRequest.__post_init__", (
+        "if self.sampling_params is not None:",
+        "require_kv_scope(self.sampling_params)",
+    ), label=label)
+    forbid_text(state, "vllm/v1/engine/input_processor.py", "kv_scope", label=label)
+    _require_in_symbol(
+        state, "vllm/v1/engine/async_llm.py",
+        "AsyncLLM.notify_kv_transfer_request_rejected",
+        ("kv_scope: str,", '"kv_scope": kv_scope,'),
+        label=label,
+    )
+    require_python_symbols(state, "vllm/engine/protocol.py", {
+        "EngineClient.notify_kv_transfer_request_rejected": (
+            "self", "request_id", "kv_transfer_params", "kv_scope",
+            "data_parallel_rank",
+        ),
+    }, label=label)
+    _require_in_symbol(
+        state, "vllm/entrypoints/generate/base/serving.py",
+        "GenerateBaseServing._with_kv_transfer_rejection_cleanup",
+        ("ChatCompletionGenerationRequest", "CompletionGenerationRequest",
+         "request.kv_scope,"),
+        label=label,
+    )
+    require_python_symbols(state, "tests/v1/engine/test_engine_request_identity.py", {
+        "test_a_generation_without_an_identity_cannot_be_built": None,
+        "test_a_generation_of_several_sequences_cannot_be_built": None,
+        "test_a_pooling_request_names_no_line_of_work": None,
+        "test_the_engine_decodes_the_identity_it_was_sent": None,
+        "test_a_rejected_remote_prefill_notifies_under_the_requests_own_scope": None,
+    }, label=label)
 
 
 def _validate_attention_prefix_hash_before(state: State) -> None:
@@ -1356,6 +1395,9 @@ def _validate_agent_retention_after(state: State) -> None:
         "kv_scope: str | None = None",
         label=label,
     )
+    require_python_symbols(state, "tests/v1/engine/test_engine_request_identity.py", {
+        "test_the_notice_reaches_the_offload_tier_as_a_request_of_that_agent": None,
+    }, label=label)
 
 
 def _validate_agentless_routes_before(state: State) -> None:
@@ -4205,10 +4247,14 @@ CONTRACTS: Mapping[str, SemanticContract] = {
             "with allocate no KV and have no ID; a batch names one ID per "
             "conversation. One line of work generates one sequence per request, so "
             "n > 1, a batch best_of > 1, or several prompts under one ID are "
-            "refused by name. The engine boundary holds the same rule for every "
-            "caller that reaches it without a protocol model, direct SamplingParams "
-            "callers included. The ID is the key agent-grouped-offload-retention "
-            "groups what the KV tiers retain by."
+            "refused by name. The engine request type holds the same rule: no "
+            "generation can be built, or decoded by the engine, without the ID, so "
+            "it binds every producer -- the input processor, a caller that builds "
+            "an engine request itself, and the engine's own notice that a "
+            "KV-transfer request was refused before admission, which names the "
+            "refused request's ID. The ID is the key agent-grouped-offload-retention "
+            "groups what the KV tiers retain by, and that tier refuses a request "
+            "without one; a notice without one ended the engine core for every user."
         ),
         removal_condition=(
             "Remove when pinned upstream requires an agent ID naming one line of "

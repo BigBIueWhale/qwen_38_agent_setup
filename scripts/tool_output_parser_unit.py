@@ -526,7 +526,7 @@ class ToolOutputParserTest(unittest.TestCase):
         tools = ChatCompletionRequest(messages=[], tools=[TOOL]).tools
         tag = get_model_structural_tag("qwen_3_coder", tools, "auto", False)
         params = SamplingParams(stop=["HALT"], structured_outputs=StructuredOutputsParams(
-            structural_tag=tag.model_dump_json()))
+            structural_tag=tag.model_dump_json()), extra_args={"kv_scope": "unit"})
         request = EngineCoreRequest(
             request_id="unit", prompt_token_ids=[], mm_features=None,
             sampling_params=params, pooling_params=None, arrival_time=0,

@@ -517,10 +517,10 @@ index 8936b19093b976e8db09406173632bc10a50da2e..cc6efb73b8e1fba5d9d65c068fb6000d
          stream=True,
 diff --git a/tests/entrypoints/test_kv_scope_protocol.py b/tests/entrypoints/test_kv_scope_protocol.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..9677c19312b38ed1d66f1a724e40af2c305e062e
+index 0000000000000000000000000000000000000000..e31c0e909a6f5c231be8dba1f70989e9e2f5ab64
 --- /dev/null
 +++ b/tests/entrypoints/test_kv_scope_protocol.py
-@@ -0,0 +1,377 @@
+@@ -0,0 +1,376 @@
 +# SPDX-License-Identifier: Apache-2.0
 +# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
 +"""Every generation surface names one line of work with an opaque kv_scope.
@@ -556,8 +556,7 @@ index 0000000000000000000000000000000000000000..9677c19312b38ed1d66f1a724e40af2c
 +    TokenGenerationRequest,
 +)
 +from vllm.exceptions import VLLMValidationError
-+from vllm.sampling_params import SamplingParams
-+from vllm.v1.engine.input_processor import require_kv_scope
++from vllm.sampling_params import SamplingParams, require_kv_scope
 +
 +pytestmark = pytest.mark.cpu_test
 +
@@ -1579,7 +1578,7 @@ diff --git a/vllm/sampling_params.py b/vllm/sampling_params.py
 index 1b30cf3924412f69f2129d1fffe1cc0b13c411bc..9fed60450fbde530c6dd9f0eac11a6e811580827 100644
 --- a/vllm/sampling_params.py
 +++ b/vllm/sampling_params.py
-@@ -32,6 +32,52 @@ MAX_LOGPROB_TOKEN_IDS = 128
+@@ -32,6 +32,68 @@ MAX_LOGPROB_TOKEN_IDS = 128
  the per-request row width allocated by the sampler's `LogprobTokenIdsState`."""
  
  
@@ -1629,37 +1628,14 @@ index 1b30cf3924412f69f2129d1fffe1cc0b13c411bc..9fed60450fbde530c6dd9f0eac11a6e8
 +        )
 +
 +
- def _verify_num_sequences(value: int, parameter_name: str) -> None:
-     if not isinstance(value, int):
-         raise VLLMValidationError(
-diff --git a/vllm/v1/engine/input_processor.py b/vllm/v1/engine/input_processor.py
-index 0fa36770c5333eb51ed6c96683a45846ae5eacd3..132f55bbb7876d3e04d9a3aa418a529eb5d176f2 100644
---- a/vllm/v1/engine/input_processor.py
-+++ b/vllm/v1/engine/input_processor.py
-@@ -24,7 +24,11 @@ from vllm.multimodal.utils import argsort_mm_positions
- from vllm.platforms import current_platform
- from vllm.pooling_params import PoolingParams
- from vllm.renderers import BaseRenderer, renderer_from_config
--from vllm.sampling_params import SamplingParams
-+from vllm.sampling_params import (
-+    SamplingParams,
-+    require_kv_scope_value,
-+    require_one_sequence,
-+)
- from vllm.tasks import GENERATION_TASKS, POOLING_TASKS, SupportedTask
- from vllm.tokenizers import TokenizerLike
- from vllm.utils import length_from_prompt_token_ids_or_embeds, random_uuid
-@@ -35,6 +39,21 @@ from vllm.v1.engine import EngineCoreRequest
- logger = init_logger(__name__)
- 
- 
-+def require_kv_scope(params: SamplingParams) -> str:
-+    """Require the agent-ID rule at the common generation boundary.
++def require_kv_scope(params: "SamplingParams") -> str:
++    """Require the agent-ID rule of every generation, whoever builds it.
 +
-+    Every served generation protocol refuses a request that breaks it before
-+    admission; this is the invariant for every caller, direct SamplingParams
-+    callers included. A kv_scope names one line of work, which generates one
-+    sequence per request, so fanning out n > 1 samples is refused too.
++    A generation names the line of work its KV belongs to, and that line
++    generates one sequence per request. The engine request type applies this
++    when it is built, so no producer -- the input processor, a caller that
++    builds an engine request itself, or the engine's own notices -- can hand
++    the scheduler and the KV connectors a generation without an identity.
 +    """
 +    scope = require_kv_scope_value(
 +        params.extra_args.get("kv_scope") if params.extra_args else None
@@ -1668,14 +1644,517 @@ index 0fa36770c5333eb51ed6c96683a45846ae5eacd3..132f55bbb7876d3e04d9a3aa418a529e
 +    return scope
 +
 +
- class InputProcessor:
-     def __init__(
+ def _verify_num_sequences(value: int, parameter_name: str) -> None:
+     if not isinstance(value, int):
+         raise VLLMValidationError(
+diff --git a/tests/detokenizer/test_min_tokens.py b/tests/detokenizer/test_min_tokens.py
+index 37cc3ca1b1269c48037ebaefdf0a7a17f15e1351..e0c376094f59ec1300a86170ba003f7645d88f31 100644
+--- a/tests/detokenizer/test_min_tokens.py
++++ b/tests/detokenizer/test_min_tokens.py
+@@ -32,6 +32,7 @@ def test_min_tokens_with_stop(min_tokens: int, stop: str, truth: str):
+     params = SamplingParams(
+         stop=stop,
+         min_tokens=min_tokens,
++        extra_args={"kv_scope": "min-tokens"},
+     )
+     request = EngineCoreRequest(
+         request_id="",
+diff --git a/tests/detokenizer/test_stop_string_while_stop_model_terminates.py b/tests/detokenizer/test_stop_string_while_stop_model_terminates.py
+index 44215cb72ae11e04c633ffd36b05f9fb1f8a335c..16d42e8e2be7bba5205c2b6bb142d48c003faa6e 100644
+--- a/tests/detokenizer/test_stop_string_while_stop_model_terminates.py
++++ b/tests/detokenizer/test_stop_string_while_stop_model_terminates.py
+@@ -27,6 +27,7 @@ def _make_request(stop, include_stop_str_in_output: bool, min_tokens: int = 0):
+         stop=stop,
+         include_stop_str_in_output=include_stop_str_in_output,
+         min_tokens=min_tokens,
++        extra_args={"kv_scope": "test"},
+     )
+     # Keep other fields minimal for unit test purposes.
+     req = EngineCoreRequest(
+diff --git a/tests/tokenizers_/test_detokenize.py b/tests/tokenizers_/test_detokenize.py
+index ad399ba36dc174a86087f6b7f6069ced81bf9c0b..fffafd640b552bf98c20a63bbb597f00706a448c 100644
+--- a/tests/tokenizers_/test_detokenize.py
++++ b/tests/tokenizers_/test_detokenize.py
+@@ -61,6 +61,7 @@ def _run_incremental_decode(
+     params = SamplingParams(
+         skip_special_tokens=skip_special_tokens,
+         spaces_between_special_tokens=spaces_between_special_tokens,
++        extra_args={"kv_scope": "detokenize"},
+     )
+     request = EngineCoreRequest(
+         request_id="",
+diff --git a/tests/v1/engine/test_engine_core.py b/tests/v1/engine/test_engine_core.py
+index aa2a70559ddd9e941faa514761c12bdb127c19a3..66df628ed62e17569a8ac18feefdaeba526c1c4d 100644
+--- a/tests/v1/engine/test_engine_core.py
++++ b/tests/v1/engine/test_engine_core.py
+@@ -53,7 +53,7 @@ def make_request() -> EngineCoreRequest:
+         external_req_id=f"{request_id}-{uuid.uuid4()}",
+         prompt_token_ids=PROMPT_TOKENS,
+         mm_features=None,
+-        sampling_params=SamplingParams(),
++        sampling_params=SamplingParams(extra_args={"kv_scope": request_id}),
+         pooling_params=None,
+         arrival_time=time.time(),
+         lora_request=None,
+diff --git a/tests/v1/engine/test_engine_core_client.py b/tests/v1/engine/test_engine_core_client.py
+index 5a943e8d60445ce6f7e191851e40ae35facdbf88..473d668e235e0218f15858858d73e7d25e17e462 100644
+--- a/tests/v1/engine/test_engine_core_client.py
++++ b/tests/v1/engine/test_engine_core_client.py
+@@ -75,6 +75,7 @@ def make_request(
+     global _REQUEST_COUNTER
+     _REQUEST_COUNTER += 1
+     request_id = f"request-{_REQUEST_COUNTER}"
++    params.extra_args = {**(params.extra_args or {}), "kv_scope": request_id}
+     return EngineCoreRequest(
+         request_id=request_id,
+         external_req_id=f"{request_id}-{uuid.uuid4()}",
+diff --git a/tests/v1/engine/test_engine_request_identity.py b/tests/v1/engine/test_engine_request_identity.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..c9343c090535dcabfa7bf0918c92978ca99b3d6a
+--- /dev/null
++++ b/tests/v1/engine/test_engine_request_identity.py
+@@ -0,0 +1,104 @@
++# SPDX-License-Identifier: Apache-2.0
++# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
++"""Every engine request for generation names its line of work, by construction.
++
++The scheduler and the KV connectors read the agent ID off every request they are
++given, so the identity is part of the engine request type: it cannot be built,
++or decoded, for generation without one. That covers every producer -- the input
++processor, a caller that builds an engine request itself, and the engine's own
++notice that a KV-transfer request was rejected before admission.
++"""
++
++import asyncio
++from types import SimpleNamespace
++from unittest.mock import AsyncMock
++
++import pytest
++
++from vllm.entrypoints.generate.base.serving import GenerateBaseServing
++from vllm.entrypoints.openai.chat_completion.protocol import (
++    ChatCompletionGenerationRequest,
++)
++from vllm.entrypoints.openai.engine.protocol import ErrorInfo, ErrorResponse
++from vllm.exceptions import VLLMValidationError
++from vllm.pooling_params import PoolingParams
++from vllm.sampling_params import SamplingParams
++from vllm.v1.engine import EngineCoreRequest
++from vllm.v1.engine.async_llm import AsyncLLM
++from vllm.v1.request import Request
++from vllm.v1.serial_utils import MsgpackDecoder, MsgpackEncoder
++
++pytestmark = pytest.mark.cpu_test
++
++
++def _engine_request(sampling_params=None, pooling_params=None):
++    return EngineCoreRequest(
++        request_id="request",
++        prompt_token_ids=[1, 2, 3],
++        mm_features=None,
++        sampling_params=sampling_params,
++        pooling_params=pooling_params,
++        arrival_time=0.0,
++        lora_request=None,
++        cache_salt=None,
++        data_parallel_rank=None,
++    )
++
++
++@pytest.mark.parametrize("extra_args", [None, {}, {"kv_scope": "  "}])
++def test_a_generation_without_an_identity_cannot_be_built(extra_args):
++    with pytest.raises(VLLMValidationError) as excinfo:
++        _engine_request(SamplingParams(max_tokens=1, extra_args=extra_args))
++    assert excinfo.value.parameter == "kv_scope"
++
++
++def test_a_generation_of_several_sequences_cannot_be_built():
++    with pytest.raises(VLLMValidationError) as excinfo:
++        _engine_request(SamplingParams(n=2, extra_args={"kv_scope": "agent"}))
++    assert excinfo.value.parameter == "n"
++
++
++def test_a_pooling_request_names_no_line_of_work():
++    request = _engine_request(pooling_params=PoolingParams(task="embed"))
++    assert Request.from_engine_core_request(request, None).kv_scope is None
++
++
++def test_the_engine_decodes_the_identity_it_was_sent():
++    sent = _engine_request(SamplingParams(max_tokens=1, extra_args={"kv_scope": "a"}))
++    frames = MsgpackEncoder().encode(sent)
++    received = MsgpackDecoder(EngineCoreRequest).decode(frames)
++    assert Request.from_engine_core_request(received, None).kv_scope == "a"
++
++
++def test_a_rejected_remote_prefill_notifies_under_the_requests_own_scope():
++    """The notice stands for the rejected request and carries its identity."""
++    notify = AsyncMock()
++    serving = SimpleNamespace(
++        has_kv_connector=True,
++        engine_client=SimpleNamespace(notify_kv_transfer_request_rejected=notify),
++        _get_data_parallel_rank=lambda raw_request: None,
++    )
++    request = ChatCompletionGenerationRequest(
++        model="model",
++        messages=[{"role": "user", "content": "hi"}],
++        kv_scope="agent-a",
++        kv_transfer_params={"do_remote_prefill": True},
++    )
++    refusal = ErrorResponse(error=ErrorInfo(message="no", type="BadRequest", code=400))
++
++    async def refused():
++        return refusal
++
++    result = asyncio.run(
++        GenerateBaseServing._with_kv_transfer_rejection_cleanup(
++            serving, refused(), request, None
++        )
++    )
++    assert result is refusal
++    notify.assert_awaited_once_with(
++        request.request_id,
++        {"do_remote_prefill": True},
++        "agent-a",
++        data_parallel_rank=None,
++    )
++
+diff --git a/tests/v1/engine/test_fast_incdec_prefix_err.py b/tests/v1/engine/test_fast_incdec_prefix_err.py
+index 036a19b82579a7156440a2412cacc7668da261c5..f87b32758768bfad3bb2e31f44ba05290aeff865 100644
+--- a/tests/v1/engine/test_fast_incdec_prefix_err.py
++++ b/tests/v1/engine/test_fast_incdec_prefix_err.py
+@@ -24,7 +24,7 @@ def test_fast_inc_detok_invalid_utf8_err_case():
+ 
+     # Create a test request
+     prompt_token_ids = [107, 4606, 236787, 107]
+-    params = SamplingParams(skip_special_tokens=True)
++    params = SamplingParams(skip_special_tokens=True, extra_args={"kv_scope": "test"})
+     request = EngineCoreRequest(
+         request_id="test",
+         external_req_id="test-ext",
+diff --git a/tests/v1/engine/test_output_processor.py b/tests/v1/engine/test_output_processor.py
+index 51dbb9c9895228fc686e915ec7da1fa5ad25a3ee..c9cc1b72b2181e44c45b272648edecebba546e5a 100644
+--- a/tests/v1/engine/test_output_processor.py
++++ b/tests/v1/engine/test_output_processor.py
+@@ -71,6 +71,7 @@ def test_incremental_detokenization(
+             cache_salt=None,
+             data_parallel_rank=None,
+             sampling_params=SamplingParams(
++                extra_args={"kv_scope": f"request-{idx}-int"},
+                 skip_special_tokens=False,
+                 spaces_between_special_tokens=False,
+                 output_kind=request_output_kind,
+@@ -167,6 +168,7 @@ def test_request_stream_interval_raises_but_not_below_engine_default(
+             cache_salt=None,
+             data_parallel_rank=None,
+             sampling_params=SamplingParams(
++                extra_args={"kv_scope": f"request-{idx}-int"},
+                 skip_special_tokens=False,
+                 spaces_between_special_tokens=False,
+                 output_kind=RequestOutputKind.DELTA,
+@@ -568,6 +570,7 @@ def test_logprobs_processor(
+             cache_salt=None,
+             data_parallel_rank=None,
+             sampling_params=SamplingParams(
++                extra_args={"kv_scope": request_id_list[idx] + "-int"},
+                 skip_special_tokens=False,
+                 spaces_between_special_tokens=False,
+                 output_kind=request_output_kind,
+@@ -754,6 +757,7 @@ def test_stop_token(
+ 
+     # Make request.
+     request_id = "request-0"
++    sampling_params.extra_args = {"kv_scope": request_id}
+     request = EngineCoreRequest(
+         request_id=request_id,
+         external_req_id=request_id + "-ext",
+@@ -858,6 +862,7 @@ def test_stop_string(
+             cache_salt=None,
+             data_parallel_rank=None,
+             sampling_params=SamplingParams(
++                extra_args={"kv_scope": request_id_list[idx] + "-int"},
+                 skip_special_tokens=False,
+                 spaces_between_special_tokens=False,
+                 output_kind=RequestOutputKind.DELTA,
+@@ -989,7 +994,7 @@ def test_iteration_stats(dummy_test_vectors):
+             lora_request=None,
+             cache_salt=None,
+             data_parallel_rank=None,
+-            sampling_params=SamplingParams(),
++            sampling_params=SamplingParams(extra_args={"kv_scope": f"request-{idx}"}),
+             pooling_params=None,
+         )
+         for idx, prompt_tokens in enumerate(dummy_test_vectors.prompt_tokens)
+@@ -1076,7 +1081,9 @@ def test_lora_request_tracking(log_stats: bool, dummy_test_vectors):
+             lora_request=lora_assignments[idx],
+             cache_salt=None,
+             data_parallel_rank=None,
+-            sampling_params=SamplingParams(),
++            sampling_params=SamplingParams(
++                extra_args={"kv_scope": f"request-{idx}-int"}
++            ),
+             pooling_params=None,
+         )
+         for idx, prompt_tokens in enumerate(dummy_test_vectors.prompt_tokens)
+@@ -1397,7 +1404,11 @@ def test_abort_requests(runner: str, abort_by: str, dummy_test_vectors):
+             lora_request=None,
+             cache_salt=None,
+             data_parallel_rank=None,
+-            sampling_params=SamplingParams() if runner == "generate" else None,
++            sampling_params=(
++                SamplingParams(extra_args={"kv_scope": f"request-{idx}"})
++                if runner == "generate"
++                else None
++            ),
+             pooling_params=PoolingParams(task="embed") if runner == "pooling" else None,
+         )
+         for idx, prompt_tokens in enumerate(dummy_test_vectors.prompt_tokens)
+diff --git a/tests/v1/engine/test_parallel_sampling.py b/tests/v1/engine/test_parallel_sampling.py
+deleted file mode 100644
+index 72e3e4e351d10ca57eb360c153f80d30d352a23d..0000000000000000000000000000000000000000
+--- a/tests/v1/engine/test_parallel_sampling.py
++++ /dev/null
+@@ -1,99 +0,0 @@
+-# SPDX-License-Identifier: Apache-2.0
+-# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
+-
+-from copy import copy
+-
+-from vllm import SamplingParams
+-from vllm.outputs import CompletionOutput
+-from vllm.sampling_params import RequestOutputKind
+-from vllm.v1.engine import EngineCoreRequest
+-from vllm.v1.engine.parallel_sampling import ParentRequest
+-
+-
+-def test_parent_request_to_output_stream() -> None:
+-    parent_request = ParentRequest(make_request(SamplingParams(n=2)))
+-    parent_request.child_requests = {"child_id_0", "child_id_1"}
+-    output_0 = CompletionOutput(
+-        index=0, text="child 0", token_ids=[], cumulative_logprob=None, logprobs=None
+-    )
+-    output_1 = CompletionOutput(
+-        index=1, text="child 1", token_ids=[], cumulative_logprob=None, logprobs=None
+-    )
+-    # Request not finished
+-    assert ([output_0], False) == parent_request.get_outputs("child_id_0", output_0)
+-    assert ([output_1], False) == parent_request.get_outputs("child_id_1", output_1)
+-    assert ([output_0], False) == parent_request.get_outputs("child_id_0", output_0)
+-    assert ([output_1], False) == parent_request.get_outputs("child_id_1", output_1)
+-
+-    # output_1 finished
+-    output_1.finish_reason = "ended"
+-    assert ([output_0], False) == parent_request.get_outputs("child_id_0", output_0)
+-    assert ([output_1], False) == parent_request.get_outputs("child_id_1", output_1)
+-    # Finished output_1 had already returned, DO NOT returned again
+-    assert ([output_0], False) == parent_request.get_outputs("child_id_0", output_0)
+-    assert parent_request.get_outputs("child_id_1", output_1) == ([], False)
+-
+-    # output_0 finished
+-    output_0.finish_reason = "ended"
+-    assert ([output_0], True) == parent_request.get_outputs("child_id_0", output_0)
+-    assert parent_request.get_outputs("child_id_1", output_1) == ([], True)
+-    # Finished output_0 had already returned, DO NOT returned again
+-    assert parent_request.get_outputs("child_id_0", output_0) == ([], True)
+-    assert parent_request.get_outputs("child_id_1", output_1) == ([], True)
+-
+-
+-def test_parent_request_to_output_final_only() -> None:
+-    parent_request = ParentRequest(
+-        make_request(SamplingParams(n=2, output_kind=RequestOutputKind.FINAL_ONLY))
+-    )
+-    parent_request.child_requests = {"child_id_0", "child_id_1"}
+-    output_0 = CompletionOutput(
+-        index=0, text="child 0", token_ids=[], cumulative_logprob=None, logprobs=None
+-    )
+-    output_1 = CompletionOutput(
+-        index=1, text="child 1", token_ids=[], cumulative_logprob=None, logprobs=None
+-    )
+-    # Request not finished, return nothing
+-    assert parent_request.get_outputs("child_id_0", output_0) == ([], False)
+-    assert parent_request.get_outputs("child_id_1", output_1) == ([], False)
+-    # output_1 finished, but outputs won't be returned until all child requests finished
+-    output_1.finish_reason = "ended"
+-    assert parent_request.get_outputs("child_id_0", output_0) == ([], False)
+-    assert parent_request.get_outputs("child_id_1", output_1) == ([], False)
+-    # output_0 finished, as all child requests finished, the output would be returned
+-    output_0.finish_reason = "ended"
+-    assert ([output_0, output_1], True) == parent_request.get_outputs(
+-        "child_id_0", output_0
+-    )
+-    assert ([output_0, output_1], True) == parent_request.get_outputs(
+-        "child_id_1", output_1
+-    )
+-
+-
+-def test_parallel_sampling_child_requests_preserve_session_id() -> None:
+-    request = make_request(SamplingParams(n=2))
+-    request.session_id = "session-1"
+-    parent_request = ParentRequest(request)
+-
+-    for idx in range(parent_request.n):
+-        request_id, child_params = parent_request.get_child_info(idx)
+-        child_request = request if idx == parent_request.n - 1 else copy(request)
+-        child_request.request_id = request_id
+-        child_request.sampling_params = child_params
+-
+-        assert child_request.session_id == "session-1"
+-
+-
+-def make_request(sampling_params: SamplingParams) -> EngineCoreRequest:
+-    return EngineCoreRequest(
+-        request_id="parent_id",
+-        external_req_id="ext_parent_id",
+-        prompt_token_ids=None,
+-        mm_features=None,
+-        sampling_params=sampling_params,
+-        pooling_params=None,
+-        arrival_time=0.0,
+-        lora_request=None,
+-        cache_salt=None,
+-        data_parallel_rank=None,
+-    )
+diff --git a/tests/v1/test_request.py b/tests/v1/test_request.py
+index be417b9b2ff5b9e452ada32cb67c906057fb668f..12d2963673c8edc2412f0b27beaf77483dd12cc5 100644
+--- a/tests/v1/test_request.py
++++ b/tests/v1/test_request.py
+@@ -28,7 +28,9 @@ def test_request_copies_session_id_from_engine_core_request():
+         request_id="request-1",
+         prompt_token_ids=[1, 2, 3],
+         mm_features=None,
+-        sampling_params=SamplingParams(max_tokens=1),
++        sampling_params=SamplingParams(
++            max_tokens=1, extra_args={"kv_scope": "request-1"}
++        ),
+         pooling_params=None,
+         arrival_time=0.0,
+         lora_request=None,
+diff --git a/vllm/engine/protocol.py b/vllm/engine/protocol.py
+index 0f61b73839fb3ef8c79a39907a02f511a16fa103..6069b26141c259f1fd567c2597ceaeca3c4ecd05 100644
+--- a/vllm/engine/protocol.py
++++ b/vllm/engine/protocol.py
+@@ -115,12 +115,14 @@ class EngineClient(ABC):
          self,
-@@ -132,6 +151,7 @@ class InputProcessor:
-                     "not configured. Please set --reasoning-parser "
-                     "and/or --reasoning-config to use phase-specific budgets."
-                 )
-+            require_kv_scope(params)
-         elif isinstance(params, PoolingParams):
-             supported_pooling_tasks = [
-                 task for task in supported_tasks if task in POOLING_TASKS
+         request_id: str,
+         kv_transfer_params: dict[str, Any],
++        kv_scope: str,
+         *,
+         data_parallel_rank: int | None = None,
+     ) -> None:
+         """Notify the engine that a KV-transfer request was rejected before
+         engine admission, so connector-side cleanup can run (e.g. free
+-        prefill blocks pinned on the P node).
++        prefill blocks pinned on the P node). ``kv_scope`` is the rejected
++        request's own: the notice is an engine request of that line of work.
+         """
+         ...
+ 
+diff --git a/vllm/entrypoints/generate/base/serving.py b/vllm/entrypoints/generate/base/serving.py
+index 4f27b3bc350d6b0f68d52de9fb5cf60fa2ada262..d47535c226fe1a48b9956f9940ab0e8ae8d2da86 100644
+--- a/vllm/entrypoints/generate/base/serving.py
++++ b/vllm/entrypoints/generate/base/serving.py
+@@ -13,8 +13,14 @@ from starlette.datastructures import Headers
+ 
+ from vllm.engine.protocol import EngineClient
+ from vllm.entrypoints.generate.beam_search.online import BeamSearchOnlineMixin
+-from vllm.entrypoints.openai.chat_completion.protocol import ChatCompletionRequest
+-from vllm.entrypoints.openai.completion.protocol import CompletionRequest
++from vllm.entrypoints.openai.chat_completion.protocol import (
++    ChatCompletionGenerationRequest,
++    ChatCompletionRequest,
++)
++from vllm.entrypoints.openai.completion.protocol import (
++    CompletionGenerationRequest,
++    CompletionRequest,
++)
+ from vllm.entrypoints.openai.engine.protocol import (
+     ErrorResponse,
+     GenerationError,
+@@ -257,12 +263,17 @@ class GenerateBaseServing(BaseServing, BeamSearchOnlineMixin):
+     async def _with_kv_transfer_rejection_cleanup(
+         self,
+         awaitable: Awaitable[_T],
+-        request: ChatCompletionRequest | CompletionRequest | ResponsesRequest,
++        request: (
++            ChatCompletionGenerationRequest
++            | CompletionGenerationRequest
++            | ResponsesRequest
++        ),
+         raw_request: Request | None,
+     ) -> _T:
+         """Wrap a `create_*` coroutine so that, if it raises or returns an
+         ErrorResponse (i.e. the request never reached the engine), the KV
+-        connector is notified to free any pinned remote-prefill blocks."""
++        connector is notified to free any pinned remote-prefill blocks. The
++        notice names the rejected request's kv_scope."""
+         kv_transfer_params = self.has_kv_connector and request.kv_transfer_params
+         if not kv_transfer_params or not kv_transfer_params.get("do_remote_prefill"):
+             return await awaitable
+@@ -279,6 +290,7 @@ class GenerateBaseServing(BaseServing, BeamSearchOnlineMixin):
+                     await self.engine_client.notify_kv_transfer_request_rejected(
+                         request.request_id,
+                         kv_transfer_params,
++                        request.kv_scope,
+                         data_parallel_rank=self._get_data_parallel_rank(raw_request),
+                     )
+                 except Exception:
+diff --git a/vllm/v1/engine/__init__.py b/vllm/v1/engine/__init__.py
+index d70778eb51e316957b08d3aeb34e64e7306a9bb1..1812c6a19f5679ac90c0ccc4def6690216c2a09e 100644
+--- a/vllm/v1/engine/__init__.py
++++ b/vllm/v1/engine/__init__.py
+@@ -15,7 +15,7 @@ from vllm.config.kv_events import KVEventsConfig
+ from vllm.lora.request import LoRARequest
+ from vllm.multimodal.inputs import MultiModalFeatureSpec
+ from vllm.pooling_params import PoolingParams
+-from vllm.sampling_params import SamplingParams
++from vllm.sampling_params import SamplingParams, require_kv_scope
+ from vllm.v1.metrics.stats import PrefillStats, SchedulerStats
+ from vllm.v1.outputs import LogprobsLists, LogprobsTensors, SamplingMaskLists
+ from vllm.v1.serial_utils import UtilityResult
+@@ -150,6 +150,14 @@ class EngineCoreRequest(
+ 
+     session_id: str | None = None
+ 
++    def __post_init__(self) -> None:
++        # Every generation names the line of work its KV belongs to: the
++        # scheduler and the KV connectors read it off every request they are
++        # given. Holding it here, where an engine request is built and where
++        # the engine decodes one, leaves no producer that can omit it.
++        if self.sampling_params is not None:
++            require_kv_scope(self.sampling_params)
++
+     @property
+     def params(self) -> SamplingParams | PoolingParams:
+         """Return the processed params (sampling or pooling)."""
+diff --git a/vllm/v1/engine/async_llm.py b/vllm/v1/engine/async_llm.py
+index 540ad236068ef52b500f126a11d2cb12056cb25a..ca80f01e34a8cbeeb918e4b2433787531a956b2f 100644
+--- a/vllm/v1/engine/async_llm.py
++++ b/vllm/v1/engine/async_llm.py
+@@ -764,19 +764,26 @@ class AsyncLLM(EngineClient):
+         self,
+         request_id: str,
+         kv_transfer_params: dict[str, Any],
++        kv_scope: str,
+         *,
+         data_parallel_rank: int | None = None,
+     ) -> None:
+         """Submit a pre-aborted request so the connector's request_finished
+         hook runs to free any pre-admission KV-transfer resources (e.g. NIXL
+-        prefill blocks pinned on the P node)."""
++        prefill blocks pinned on the P node).
++
++        The notice stands for the rejected request, so it names that
++        request's line of work like every engine request does."""
+         request = EngineCoreRequest(
+             request_id=request_id,
+             prompt_token_ids=[0],
+             mm_features=None,
+             sampling_params=SamplingParams(
+                 max_tokens=1,
+-                extra_args={"kv_transfer_params": dict(kv_transfer_params)},
++                extra_args={
++                    "kv_transfer_params": dict(kv_transfer_params),
++                    "kv_scope": kv_scope,
++                },
+             ),
+             pooling_params=None,
+             arrival_time=time.time(),

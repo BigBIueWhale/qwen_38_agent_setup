@@ -11728,7 +11728,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'def _new_descriptor_buffers(\n'},)},
  {'name': 'generation-requires-agent-id',
   'review_patch': 'patches/vllm-generation-requires-agent-id.patch',
-  'review_sha256': 'fb46fefd8ab49b4c26d84613cbee0ee21addfa2772810f271e066ccb7e9f43a0',
+  'review_sha256': 'c9eb622d308fbaf78cfe617a6a6e25874ea9fdcb5eb8002e81152d85f1982af4',
   'files': ({'path': 'tests/entrypoints/anthropic/test_anthropic_messages_conversion.py',
              'before_sha256': 'e6fa915c7f58e252d0da33bb5de31215cd1dacab1292e9ad5c8d116a7551f942',
              'after_sha256': '55dbe9c3e8d541835a8b1864165762d7fad109a9ae2fe7268081043cfa8e533b'},
@@ -11758,7 +11758,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'after_sha256': '6471c9d9abd133865860d15c71f98f3a41cbdc365ae6aad5ded2597a5a2aa6ab'},
             {'path': 'tests/entrypoints/test_kv_scope_protocol.py',
              'before_sha256': None,
-             'after_sha256': '09f8ea8d34069a1a34186bcbde50a7e9a264b0111114a13f3c21636d669a3a58'},
+             'after_sha256': 'a72bed55bd6be62608ab12db1d5d47f0ab8ebc1ffab2ff4a25fb003e40045d13'},
             {'path': 'tests/test_request_input_bounds.py',
              'before_sha256': '0090315ba1e59d9460155b5b94a25c74be8823e735b2c748cd4315b1546af2a9',
              'after_sha256': '8f8073c8b27152ad898bc0a7d1d4963a26500fe4547b6365b51c6bc278797a71'},
@@ -11809,10 +11809,49 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'after_sha256': 'c0e27a111beb8854f91a34e840b25f76ea97042a6f68068b41dcedb366928532'},
             {'path': 'vllm/sampling_params.py',
              'before_sha256': 'cbd49b4d7a8b84f7cc2dfb43ea13381337d5408d4eaadcf8d1b91082c269a06b',
-             'after_sha256': '203221f14a7bd9c82abbe1bcaac75ce785b117792c79c84102c5fa2e69c37d99'},
-            {'path': 'vllm/v1/engine/input_processor.py',
-             'before_sha256': '2b9e64486ce316fb4bc2293f18b1f005ae2e4b9adc60e39331a5add342b4b018',
-             'after_sha256': '0ccad82d1979598e9acd1207791f2e78e4f1c666b7d45959420bffae14569be4'}),
+             'after_sha256': '4d0d346e238d67c60665bd6607ad8fc97757a5db744f85fc0d13c1e5f1014582'},
+            {'path': 'tests/detokenizer/test_min_tokens.py',
+             'before_sha256': '6f1e06b89f5eb3f96ef8e40bf4b1c6aa2ff23a756dc2367264325f99e1e7ea05',
+             'after_sha256': '20565f24bef5f120b87ecf1c727de1138d8ba7ac0272f05fc4781b04e68c49b8'},
+            {'path': 'tests/detokenizer/test_stop_string_while_stop_model_terminates.py',
+             'before_sha256': '8167e097ab5a023e445804055d99cc4867fbd7c395b4261e665bdcb8041ff104',
+             'after_sha256': 'a575db162d04feb30942438f02f89d7f69292ca66c4bd391e89b2755966c62f4'},
+            {'path': 'tests/tokenizers_/test_detokenize.py',
+             'before_sha256': 'aa97ff45456eb8a12042c505c099197be61765c1179bdb7f676113e9f12291aa',
+             'after_sha256': 'd84dff3048856b762c2993a3aa130c4f508bbce9c59c9a815dabbf3ce5a3f234'},
+            {'path': 'tests/v1/engine/test_engine_core.py',
+             'before_sha256': 'be80ca62f65027259555d4a42663d84e881b6582575f9d149781e9f2083fcfba',
+             'after_sha256': '7834fa7eaeb25518e4af756f0dc56c420a1c8e5c906057643a41241a17162485'},
+            {'path': 'tests/v1/engine/test_engine_core_client.py',
+             'before_sha256': '2213d91578b4e98bdce8ddde6507258fc03740dabfc70fdd915877f5db4cb4a1',
+             'after_sha256': 'f395ab80e7d75fce9007629c5a1c696ca675a41de25e9837d5916f8d1b916a2a'},
+            {'path': 'tests/v1/engine/test_engine_request_identity.py',
+             'before_sha256': None,
+             'after_sha256': '010e8067a1286824ea605231b5594c74efb29ad6c75cc7d7c8fba3c4b7f6a118'},
+            {'path': 'tests/v1/engine/test_fast_incdec_prefix_err.py',
+             'before_sha256': '48575b2ee9b201375c1ab182fa6a1fd495d986c1b41b026eb55ec7a4e7339fbb',
+             'after_sha256': '2a0cfd6b4d151db30253ac7cde7503838894eaefb71834bd7d5947f705017b53'},
+            {'path': 'tests/v1/engine/test_output_processor.py',
+             'before_sha256': 'eadb7ad8eb30e4ade9850afbb750ac2cc893fd8804a33def9a9678444e534249',
+             'after_sha256': 'dc38c5c4b963cbbd088c3db5f3ba97f8de49d6a3e712be4ace9145bfba012538'},
+            {'path': 'tests/v1/engine/test_parallel_sampling.py',
+             'before_sha256': '0eabadbda800141f7591766d928b4d38490f0d2e3047e99a1a650392d4f6a5e6',
+             'after_sha256': None},
+            {'path': 'tests/v1/test_request.py',
+             'before_sha256': 'f38ed993cf59f8880cbd925ae524b60ea08d2c4484ca8d524df8666a2f0c5f71',
+             'after_sha256': '6fa5d12659ebb955c0fec37b09074f75b5011e0ac6e7b7551b9175c99f5655d0'},
+            {'path': 'vllm/engine/protocol.py',
+             'before_sha256': '0ff96be1d77568bb3409702d1c460013170197bf1787c4bc5bcf0f07392290b3',
+             'after_sha256': 'e6850e22172f569f91bbcca34b7487df41534caeebbb37a888345fabaa848db1'},
+            {'path': 'vllm/entrypoints/generate/base/serving.py',
+             'before_sha256': '09b0237bd37c7dd719ed04e5b447efbb54941e0c19825e62138c8f6db4d3064e',
+             'after_sha256': '8857456bc7a0157497d03a95b90f7d60a6435615c8e06406437d90e016030c96'},
+            {'path': 'vllm/v1/engine/__init__.py',
+             'before_sha256': 'ac6a8de4fb5ffbbb1e30fa414e6d29fa977e425face6faf92439b15e4e35ca76',
+             'after_sha256': '1f52819297cc78bbe01450af3a1069c86513066a54eb4ac2b530565a96b55c46'},
+            {'path': 'vllm/v1/engine/async_llm.py',
+             'before_sha256': 'bceed0b3f5f0c834fef79525f2462a092f082390f0070526280abc95945837dd',
+             'after_sha256': '7f948316cd152c1d49bb064e6c40c4cd3cf3a148cc3416573dc6eb0c1e83d772'}),
   'edits': ({'name': 'tests/entrypoints/anthropic/test_anthropic_messages_conversion.py:landmark-1',
              'path': 'tests/entrypoints/anthropic/test_anthropic_messages_conversion.py',
              'before': '        model="test-model",\n'
@@ -13962,8 +14001,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '    TokenGenerationRequest,\n'
                       ')\n'
                       'from vllm.exceptions import VLLMValidationError\n'
-                      'from vllm.sampling_params import SamplingParams\n'
-                      'from vllm.v1.engine.input_processor import require_kv_scope\n'
+                      'from vllm.sampling_params import SamplingParams, '
+                      'require_kv_scope\n'
                       '\n'
                       'pytestmark = pytest.mark.cpu_test\n'
                       '\n'
@@ -14433,8 +14472,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    TokenGenerationRequest,\n'
                              ')\n'
                              'from vllm.exceptions import VLLMValidationError\n'
-                             'from vllm.sampling_params import SamplingParams\n'
-                             'from vllm.v1.engine.input_processor import '
+                             'from vllm.sampling_params import SamplingParams, '
                              'require_kv_scope\n'
                              '\n'
                              'pytestmark = pytest.mark.cpu_test\n'
@@ -17090,6 +17128,29 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '        )\n'
                       '\n'
                       '\n'
+                      'def require_kv_scope(params: "SamplingParams") -> str:\n'
+                      '    """Require the agent-ID rule of every generation, whoever '
+                      'builds it.\n'
+                      '\n'
+                      '    A generation names the line of work its KV belongs to, and '
+                      'that line\n'
+                      '    generates one sequence per request. The engine request type '
+                      'applies this\n'
+                      '    when it is built, so no producer -- the input processor, a '
+                      'caller that\n'
+                      "    builds an engine request itself, or the engine's own "
+                      'notices -- can hand\n'
+                      '    the scheduler and the KV connectors a generation without an '
+                      'identity.\n'
+                      '    """\n'
+                      '    scope = require_kv_scope_value(\n'
+                      '        params.extra_args.get("kv_scope") if params.extra_args '
+                      'else None\n'
+                      '    )\n'
+                      '    require_one_sequence(params.n, "n")\n'
+                      '    return scope\n'
+                      '\n'
+                      '\n'
                       'def _verify_num_sequences(value: int, parameter_name: str) -> '
                       'None:\n'
                       '    if not isinstance(value, int):\n'
@@ -17167,114 +17228,20 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '        )\n'
                              '\n'
                              '\n'
-                             'def _verify_num_sequences(value: int, parameter_name: '
-                             'str) -> None:\n'
-                             '    if not isinstance(value, int):\n'
-                             '        raise VLLMValidationError(\n'},
-            {'name': 'vllm/v1/engine/input_processor.py:landmark-1',
-             'path': 'vllm/v1/engine/input_processor.py',
-             'before': 'from vllm.platforms import current_platform\n'
-                       'from vllm.pooling_params import PoolingParams\n'
-                       'from vllm.renderers import BaseRenderer, renderer_from_config\n'
-                       'from vllm.sampling_params import SamplingParams\n'
-                       'from vllm.tasks import GENERATION_TASKS, POOLING_TASKS, '
-                       'SupportedTask\n'
-                       'from vllm.tokenizers import TokenizerLike\n'
-                       'from vllm.utils import length_from_prompt_token_ids_or_embeds, '
-                       'random_uuid\n',
-             'after': 'from vllm.platforms import current_platform\n'
-                      'from vllm.pooling_params import PoolingParams\n'
-                      'from vllm.renderers import BaseRenderer, renderer_from_config\n'
-                      'from vllm.sampling_params import (\n'
-                      '    SamplingParams,\n'
-                      '    require_kv_scope_value,\n'
-                      '    require_one_sequence,\n'
-                      ')\n'
-                      'from vllm.tasks import GENERATION_TASKS, POOLING_TASKS, '
-                      'SupportedTask\n'
-                      'from vllm.tokenizers import TokenizerLike\n'
-                      'from vllm.utils import length_from_prompt_token_ids_or_embeds, '
-                      'random_uuid\n',
-             'review_before': 'from vllm.platforms import current_platform\n'
-                              'from vllm.pooling_params import PoolingParams\n'
-                              'from vllm.renderers import BaseRenderer, '
-                              'renderer_from_config\n'
-                              'from vllm.sampling_params import SamplingParams\n'
-                              'from vllm.tasks import GENERATION_TASKS, POOLING_TASKS, '
-                              'SupportedTask\n'
-                              'from vllm.tokenizers import TokenizerLike\n'
-                              'from vllm.utils import '
-                              'length_from_prompt_token_ids_or_embeds, random_uuid\n',
-             'review_after': 'from vllm.platforms import current_platform\n'
-                             'from vllm.pooling_params import PoolingParams\n'
-                             'from vllm.renderers import BaseRenderer, '
-                             'renderer_from_config\n'
-                             'from vllm.sampling_params import (\n'
-                             '    SamplingParams,\n'
-                             '    require_kv_scope_value,\n'
-                             '    require_one_sequence,\n'
-                             ')\n'
-                             'from vllm.tasks import GENERATION_TASKS, POOLING_TASKS, '
-                             'SupportedTask\n'
-                             'from vllm.tokenizers import TokenizerLike\n'
-                             'from vllm.utils import '
-                             'length_from_prompt_token_ids_or_embeds, random_uuid\n'},
-            {'name': 'vllm/v1/engine/input_processor.py:landmark-2',
-             'path': 'vllm/v1/engine/input_processor.py',
-             'before': 'logger = init_logger(__name__)\n'
-                       '\n'
-                       '\n'
-                       'class InputProcessor:\n'
-                       '    def __init__(\n'
-                       '        self,\n',
-             'after': 'logger = init_logger(__name__)\n'
-                      '\n'
-                      '\n'
-                      'def require_kv_scope(params: SamplingParams) -> str:\n'
-                      '    """Require the agent-ID rule at the common generation '
-                      'boundary.\n'
-                      '\n'
-                      '    Every served generation protocol refuses a request that '
-                      'breaks it before\n'
-                      '    admission; this is the invariant for every caller, direct '
-                      'SamplingParams\n'
-                      '    callers included. A kv_scope names one line of work, which '
-                      'generates one\n'
-                      '    sequence per request, so fanning out n > 1 samples is '
-                      'refused too.\n'
-                      '    """\n'
-                      '    scope = require_kv_scope_value(\n'
-                      '        params.extra_args.get("kv_scope") if params.extra_args '
-                      'else None\n'
-                      '    )\n'
-                      '    require_one_sequence(params.n, "n")\n'
-                      '    return scope\n'
-                      '\n'
-                      '\n'
-                      'class InputProcessor:\n'
-                      '    def __init__(\n'
-                      '        self,\n',
-             'review_before': 'logger = init_logger(__name__)\n'
-                              '\n'
-                              '\n'
-                              'class InputProcessor:\n'
-                              '    def __init__(\n'
-                              '        self,\n',
-             'review_after': 'logger = init_logger(__name__)\n'
+                             'def require_kv_scope(params: "SamplingParams") -> str:\n'
+                             '    """Require the agent-ID rule of every generation, '
+                             'whoever builds it.\n'
                              '\n'
-                             '\n'
-                             'def require_kv_scope(params: SamplingParams) -> str:\n'
-                             '    """Require the agent-ID rule at the common '
-                             'generation boundary.\n'
-                             '\n'
-                             '    Every served generation protocol refuses a request '
-                             'that breaks it before\n'
-                             '    admission; this is the invariant for every caller, '
-                             'direct SamplingParams\n'
-                             '    callers included. A kv_scope names one line of work, '
-                             'which generates one\n'
-                             '    sequence per request, so fanning out n > 1 samples '
-                             'is refused too.\n'
+                             '    A generation names the line of work its KV belongs '
+                             'to, and that line\n'
+                             '    generates one sequence per request. The engine '
+                             'request type applies this\n'
+                             '    when it is built, so no producer -- the input '
+                             'processor, a caller that\n'
+                             "    builds an engine request itself, or the engine's own "
+                             'notices -- can hand\n'
+                             '    the scheduler and the KV connectors a generation '
+                             'without an identity.\n'
                              '    """\n'
                              '    scope = require_kv_scope_value(\n'
                              '        params.extra_args.get("kv_scope") if '
@@ -17284,49 +17251,1512 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    return scope\n'
                              '\n'
                              '\n'
-                             'class InputProcessor:\n'
-                             '    def __init__(\n'
-                             '        self,\n'},
-            {'name': 'vllm/v1/engine/input_processor.py:landmark-3',
-             'path': 'vllm/v1/engine/input_processor.py',
-             'before': '                    "not configured. Please set '
-                       '--reasoning-parser "\n'
-                       '                    "and/or --reasoning-config to use '
-                       'phase-specific budgets."\n'
-                       '                )\n'
-                       '        elif isinstance(params, PoolingParams):\n'
-                       '            supported_pooling_tasks = [\n'
-                       '                task for task in supported_tasks if task in '
-                       'POOLING_TASKS\n',
-             'after': '                    "not configured. Please set '
-                      '--reasoning-parser "\n'
-                      '                    "and/or --reasoning-config to use '
-                      'phase-specific budgets."\n'
-                      '                )\n'
-                      '            require_kv_scope(params)\n'
-                      '        elif isinstance(params, PoolingParams):\n'
-                      '            supported_pooling_tasks = [\n'
-                      '                task for task in supported_tasks if task in '
-                      'POOLING_TASKS\n',
-             'review_before': '                    "not configured. Please set '
-                              '--reasoning-parser "\n'
-                              '                    "and/or --reasoning-config to use '
-                              'phase-specific budgets."\n'
-                              '                )\n'
-                              '        elif isinstance(params, PoolingParams):\n'
-                              '            supported_pooling_tasks = [\n'
-                              '                task for task in supported_tasks if '
-                              'task in POOLING_TASKS\n',
-             'review_after': '                    "not configured. Please set '
-                             '--reasoning-parser "\n'
-                             '                    "and/or --reasoning-config to use '
-                             'phase-specific budgets."\n'
-                             '                )\n'
-                             '            require_kv_scope(params)\n'
-                             '        elif isinstance(params, PoolingParams):\n'
-                             '            supported_pooling_tasks = [\n'
-                             '                task for task in supported_tasks if task '
-                             'in POOLING_TASKS\n'})},
+                             'def _verify_num_sequences(value: int, parameter_name: '
+                             'str) -> None:\n'
+                             '    if not isinstance(value, int):\n'
+                             '        raise VLLMValidationError(\n'},
+            {'name': 'tests/detokenizer/test_min_tokens.py:landmark-1',
+             'path': 'tests/detokenizer/test_min_tokens.py',
+             'before': '    params = SamplingParams(\n'
+                       '        stop=stop,\n'
+                       '        min_tokens=min_tokens,\n'
+                       '    )\n'
+                       '    request = EngineCoreRequest(\n'
+                       '        request_id="",\n',
+             'after': '    params = SamplingParams(\n'
+                      '        stop=stop,\n'
+                      '        min_tokens=min_tokens,\n'
+                      '        extra_args={"kv_scope": "min-tokens"},\n'
+                      '    )\n'
+                      '    request = EngineCoreRequest(\n'
+                      '        request_id="",\n',
+             'review_before': '    params = SamplingParams(\n'
+                              '        stop=stop,\n'
+                              '        min_tokens=min_tokens,\n'
+                              '    )\n'
+                              '    request = EngineCoreRequest(\n'
+                              '        request_id="",\n',
+             'review_after': '    params = SamplingParams(\n'
+                             '        stop=stop,\n'
+                             '        min_tokens=min_tokens,\n'
+                             '        extra_args={"kv_scope": "min-tokens"},\n'
+                             '    )\n'
+                             '    request = EngineCoreRequest(\n'
+                             '        request_id="",\n'},
+            {'name': 'tests/detokenizer/test_stop_string_while_stop_model_terminates.py:landmark-1',
+             'path': 'tests/detokenizer/test_stop_string_while_stop_model_terminates.py',
+             'before': '        stop=stop,\n'
+                       '        '
+                       'include_stop_str_in_output=include_stop_str_in_output,\n'
+                       '        min_tokens=min_tokens,\n'
+                       '    )\n'
+                       '    # Keep other fields minimal for unit test purposes.\n'
+                       '    req = EngineCoreRequest(\n',
+             'after': '        stop=stop,\n'
+                      '        include_stop_str_in_output=include_stop_str_in_output,\n'
+                      '        min_tokens=min_tokens,\n'
+                      '        extra_args={"kv_scope": "test"},\n'
+                      '    )\n'
+                      '    # Keep other fields minimal for unit test purposes.\n'
+                      '    req = EngineCoreRequest(\n',
+             'review_before': '        stop=stop,\n'
+                              '        '
+                              'include_stop_str_in_output=include_stop_str_in_output,\n'
+                              '        min_tokens=min_tokens,\n'
+                              '    )\n'
+                              '    # Keep other fields minimal for unit test '
+                              'purposes.\n'
+                              '    req = EngineCoreRequest(\n',
+             'review_after': '        stop=stop,\n'
+                             '        '
+                             'include_stop_str_in_output=include_stop_str_in_output,\n'
+                             '        min_tokens=min_tokens,\n'
+                             '        extra_args={"kv_scope": "test"},\n'
+                             '    )\n'
+                             '    # Keep other fields minimal for unit test purposes.\n'
+                             '    req = EngineCoreRequest(\n'},
+            {'name': 'tests/tokenizers_/test_detokenize.py:landmark-1',
+             'path': 'tests/tokenizers_/test_detokenize.py',
+             'before': '    params = SamplingParams(\n'
+                       '        skip_special_tokens=skip_special_tokens,\n'
+                       '        '
+                       'spaces_between_special_tokens=spaces_between_special_tokens,\n'
+                       '    )\n'
+                       '    request = EngineCoreRequest(\n'
+                       '        request_id="",\n',
+             'after': '    params = SamplingParams(\n'
+                      '        skip_special_tokens=skip_special_tokens,\n'
+                      '        '
+                      'spaces_between_special_tokens=spaces_between_special_tokens,\n'
+                      '        extra_args={"kv_scope": "detokenize"},\n'
+                      '    )\n'
+                      '    request = EngineCoreRequest(\n'
+                      '        request_id="",\n',
+             'review_before': '    params = SamplingParams(\n'
+                              '        skip_special_tokens=skip_special_tokens,\n'
+                              '        '
+                              'spaces_between_special_tokens=spaces_between_special_tokens,\n'
+                              '    )\n'
+                              '    request = EngineCoreRequest(\n'
+                              '        request_id="",\n',
+             'review_after': '    params = SamplingParams(\n'
+                             '        skip_special_tokens=skip_special_tokens,\n'
+                             '        '
+                             'spaces_between_special_tokens=spaces_between_special_tokens,\n'
+                             '        extra_args={"kv_scope": "detokenize"},\n'
+                             '    )\n'
+                             '    request = EngineCoreRequest(\n'
+                             '        request_id="",\n'},
+            {'name': 'tests/v1/engine/test_engine_core.py:landmark-1',
+             'path': 'tests/v1/engine/test_engine_core.py',
+             'before': '        external_req_id=f"{request_id}-{uuid.uuid4()}",\n'
+                       '        prompt_token_ids=PROMPT_TOKENS,\n'
+                       '        mm_features=None,\n'
+                       '        sampling_params=SamplingParams(),\n'
+                       '        pooling_params=None,\n'
+                       '        arrival_time=time.time(),\n'
+                       '        lora_request=None,\n',
+             'after': '        external_req_id=f"{request_id}-{uuid.uuid4()}",\n'
+                      '        prompt_token_ids=PROMPT_TOKENS,\n'
+                      '        mm_features=None,\n'
+                      '        sampling_params=SamplingParams(extra_args={"kv_scope": '
+                      'request_id}),\n'
+                      '        pooling_params=None,\n'
+                      '        arrival_time=time.time(),\n'
+                      '        lora_request=None,\n',
+             'review_before': '        '
+                              'external_req_id=f"{request_id}-{uuid.uuid4()}",\n'
+                              '        prompt_token_ids=PROMPT_TOKENS,\n'
+                              '        mm_features=None,\n'
+                              '        sampling_params=SamplingParams(),\n'
+                              '        pooling_params=None,\n'
+                              '        arrival_time=time.time(),\n'
+                              '        lora_request=None,\n',
+             'review_after': '        external_req_id=f"{request_id}-{uuid.uuid4()}",\n'
+                             '        prompt_token_ids=PROMPT_TOKENS,\n'
+                             '        mm_features=None,\n'
+                             '        '
+                             'sampling_params=SamplingParams(extra_args={"kv_scope": '
+                             'request_id}),\n'
+                             '        pooling_params=None,\n'
+                             '        arrival_time=time.time(),\n'
+                             '        lora_request=None,\n'},
+            {'name': 'tests/v1/engine/test_engine_core_client.py:landmark-1',
+             'path': 'tests/v1/engine/test_engine_core_client.py',
+             'before': '    global _REQUEST_COUNTER\n'
+                       '    _REQUEST_COUNTER += 1\n'
+                       '    request_id = f"request-{_REQUEST_COUNTER}"\n'
+                       '    return EngineCoreRequest(\n'
+                       '        request_id=request_id,\n'
+                       '        external_req_id=f"{request_id}-{uuid.uuid4()}",\n',
+             'after': '    global _REQUEST_COUNTER\n'
+                      '    _REQUEST_COUNTER += 1\n'
+                      '    request_id = f"request-{_REQUEST_COUNTER}"\n'
+                      '    params.extra_args = {**(params.extra_args or {}), '
+                      '"kv_scope": request_id}\n'
+                      '    return EngineCoreRequest(\n'
+                      '        request_id=request_id,\n'
+                      '        external_req_id=f"{request_id}-{uuid.uuid4()}",\n',
+             'review_before': '    global _REQUEST_COUNTER\n'
+                              '    _REQUEST_COUNTER += 1\n'
+                              '    request_id = f"request-{_REQUEST_COUNTER}"\n'
+                              '    return EngineCoreRequest(\n'
+                              '        request_id=request_id,\n'
+                              '        '
+                              'external_req_id=f"{request_id}-{uuid.uuid4()}",\n',
+             'review_after': '    global _REQUEST_COUNTER\n'
+                             '    _REQUEST_COUNTER += 1\n'
+                             '    request_id = f"request-{_REQUEST_COUNTER}"\n'
+                             '    params.extra_args = {**(params.extra_args or {}), '
+                             '"kv_scope": request_id}\n'
+                             '    return EngineCoreRequest(\n'
+                             '        request_id=request_id,\n'
+                             '        '
+                             'external_req_id=f"{request_id}-{uuid.uuid4()}",\n'},
+            {'name': 'tests/v1/engine/test_engine_request_identity.py:landmark-1',
+             'path': 'tests/v1/engine/test_engine_request_identity.py',
+             'before': '',
+             'after': '# SPDX-License-Identifier: Apache-2.0\n'
+                      '# SPDX-FileCopyrightText: Copyright contributors to the vLLM '
+                      'project\n'
+                      '"""Every engine request for generation names its line of work, '
+                      'by construction.\n'
+                      '\n'
+                      'The scheduler and the KV connectors read the agent ID off every '
+                      'request they are\n'
+                      'given, so the identity is part of the engine request type: it '
+                      'cannot be built,\n'
+                      'or decoded, for generation without one. That covers every '
+                      'producer -- the input\n'
+                      'processor, a caller that builds an engine request itself, and '
+                      "the engine's own\n"
+                      'notice that a KV-transfer request was rejected before '
+                      'admission.\n'
+                      '"""\n'
+                      '\n'
+                      'import asyncio\n'
+                      'from types import SimpleNamespace\n'
+                      'from unittest.mock import AsyncMock\n'
+                      '\n'
+                      'import pytest\n'
+                      '\n'
+                      'from vllm.entrypoints.generate.base.serving import '
+                      'GenerateBaseServing\n'
+                      'from vllm.entrypoints.openai.chat_completion.protocol import (\n'
+                      '    ChatCompletionGenerationRequest,\n'
+                      ')\n'
+                      'from vllm.entrypoints.openai.engine.protocol import ErrorInfo, '
+                      'ErrorResponse\n'
+                      'from vllm.exceptions import VLLMValidationError\n'
+                      'from vllm.pooling_params import PoolingParams\n'
+                      'from vllm.sampling_params import SamplingParams\n'
+                      'from vllm.v1.engine import EngineCoreRequest\n'
+                      'from vllm.v1.engine.async_llm import AsyncLLM\n'
+                      'from vllm.v1.request import Request\n'
+                      'from vllm.v1.serial_utils import MsgpackDecoder, '
+                      'MsgpackEncoder\n'
+                      '\n'
+                      'pytestmark = pytest.mark.cpu_test\n'
+                      '\n'
+                      '\n'
+                      'def _engine_request(sampling_params=None, '
+                      'pooling_params=None):\n'
+                      '    return EngineCoreRequest(\n'
+                      '        request_id="request",\n'
+                      '        prompt_token_ids=[1, 2, 3],\n'
+                      '        mm_features=None,\n'
+                      '        sampling_params=sampling_params,\n'
+                      '        pooling_params=pooling_params,\n'
+                      '        arrival_time=0.0,\n'
+                      '        lora_request=None,\n'
+                      '        cache_salt=None,\n'
+                      '        data_parallel_rank=None,\n'
+                      '    )\n'
+                      '\n'
+                      '\n'
+                      '@pytest.mark.parametrize("extra_args", [None, {}, {"kv_scope": '
+                      '"  "}])\n'
+                      'def '
+                      'test_a_generation_without_an_identity_cannot_be_built(extra_args):\n'
+                      '    with pytest.raises(VLLMValidationError) as excinfo:\n'
+                      '        _engine_request(SamplingParams(max_tokens=1, '
+                      'extra_args=extra_args))\n'
+                      '    assert excinfo.value.parameter == "kv_scope"\n'
+                      '\n'
+                      '\n'
+                      'def test_a_generation_of_several_sequences_cannot_be_built():\n'
+                      '    with pytest.raises(VLLMValidationError) as excinfo:\n'
+                      '        _engine_request(SamplingParams(n=2, '
+                      'extra_args={"kv_scope": "agent"}))\n'
+                      '    assert excinfo.value.parameter == "n"\n'
+                      '\n'
+                      '\n'
+                      'def test_a_pooling_request_names_no_line_of_work():\n'
+                      '    request = '
+                      '_engine_request(pooling_params=PoolingParams(task="embed"))\n'
+                      '    assert Request.from_engine_core_request(request, '
+                      'None).kv_scope is None\n'
+                      '\n'
+                      '\n'
+                      'def test_the_engine_decodes_the_identity_it_was_sent():\n'
+                      '    sent = _engine_request(SamplingParams(max_tokens=1, '
+                      'extra_args={"kv_scope": "a"}))\n'
+                      '    frames = MsgpackEncoder().encode(sent)\n'
+                      '    received = '
+                      'MsgpackDecoder(EngineCoreRequest).decode(frames)\n'
+                      '    assert Request.from_engine_core_request(received, '
+                      'None).kv_scope == "a"\n'
+                      '\n'
+                      '\n'
+                      'def '
+                      'test_a_rejected_remote_prefill_notifies_under_the_requests_own_scope():\n'
+                      '    """The notice stands for the rejected request and carries '
+                      'its identity."""\n'
+                      '    notify = AsyncMock()\n'
+                      '    serving = SimpleNamespace(\n'
+                      '        has_kv_connector=True,\n'
+                      '        '
+                      'engine_client=SimpleNamespace(notify_kv_transfer_request_rejected=notify),\n'
+                      '        _get_data_parallel_rank=lambda raw_request: None,\n'
+                      '    )\n'
+                      '    request = ChatCompletionGenerationRequest(\n'
+                      '        model="model",\n'
+                      '        messages=[{"role": "user", "content": "hi"}],\n'
+                      '        kv_scope="agent-a",\n'
+                      '        kv_transfer_params={"do_remote_prefill": True},\n'
+                      '    )\n'
+                      '    refusal = ErrorResponse(error=ErrorInfo(message="no", '
+                      'type="BadRequest", code=400))\n'
+                      '\n'
+                      '    async def refused():\n'
+                      '        return refusal\n'
+                      '\n'
+                      '    result = asyncio.run(\n'
+                      '        '
+                      'GenerateBaseServing._with_kv_transfer_rejection_cleanup(\n'
+                      '            serving, refused(), request, None\n'
+                      '        )\n'
+                      '    )\n'
+                      '    assert result is refusal\n'
+                      '    notify.assert_awaited_once_with(\n'
+                      '        request.request_id,\n'
+                      '        {"do_remote_prefill": True},\n'
+                      '        "agent-a",\n'
+                      '        data_parallel_rank=None,\n'
+                      '    )\n'
+                      '\n',
+             'review_before': '',
+             'review_after': '# SPDX-License-Identifier: Apache-2.0\n'
+                             '# SPDX-FileCopyrightText: Copyright contributors to the '
+                             'vLLM project\n'
+                             '"""Every engine request for generation names its line of '
+                             'work, by construction.\n'
+                             '\n'
+                             'The scheduler and the KV connectors read the agent ID '
+                             'off every request they are\n'
+                             'given, so the identity is part of the engine request '
+                             'type: it cannot be built,\n'
+                             'or decoded, for generation without one. That covers '
+                             'every producer -- the input\n'
+                             'processor, a caller that builds an engine request '
+                             "itself, and the engine's own\n"
+                             'notice that a KV-transfer request was rejected before '
+                             'admission.\n'
+                             '"""\n'
+                             '\n'
+                             'import asyncio\n'
+                             'from types import SimpleNamespace\n'
+                             'from unittest.mock import AsyncMock\n'
+                             '\n'
+                             'import pytest\n'
+                             '\n'
+                             'from vllm.entrypoints.generate.base.serving import '
+                             'GenerateBaseServing\n'
+                             'from vllm.entrypoints.openai.chat_completion.protocol '
+                             'import (\n'
+                             '    ChatCompletionGenerationRequest,\n'
+                             ')\n'
+                             'from vllm.entrypoints.openai.engine.protocol import '
+                             'ErrorInfo, ErrorResponse\n'
+                             'from vllm.exceptions import VLLMValidationError\n'
+                             'from vllm.pooling_params import PoolingParams\n'
+                             'from vllm.sampling_params import SamplingParams\n'
+                             'from vllm.v1.engine import EngineCoreRequest\n'
+                             'from vllm.v1.engine.async_llm import AsyncLLM\n'
+                             'from vllm.v1.request import Request\n'
+                             'from vllm.v1.serial_utils import MsgpackDecoder, '
+                             'MsgpackEncoder\n'
+                             '\n'
+                             'pytestmark = pytest.mark.cpu_test\n'
+                             '\n'
+                             '\n'
+                             'def _engine_request(sampling_params=None, '
+                             'pooling_params=None):\n'
+                             '    return EngineCoreRequest(\n'
+                             '        request_id="request",\n'
+                             '        prompt_token_ids=[1, 2, 3],\n'
+                             '        mm_features=None,\n'
+                             '        sampling_params=sampling_params,\n'
+                             '        pooling_params=pooling_params,\n'
+                             '        arrival_time=0.0,\n'
+                             '        lora_request=None,\n'
+                             '        cache_salt=None,\n'
+                             '        data_parallel_rank=None,\n'
+                             '    )\n'
+                             '\n'
+                             '\n'
+                             '@pytest.mark.parametrize("extra_args", [None, {}, '
+                             '{"kv_scope": "  "}])\n'
+                             'def '
+                             'test_a_generation_without_an_identity_cannot_be_built(extra_args):\n'
+                             '    with pytest.raises(VLLMValidationError) as excinfo:\n'
+                             '        _engine_request(SamplingParams(max_tokens=1, '
+                             'extra_args=extra_args))\n'
+                             '    assert excinfo.value.parameter == "kv_scope"\n'
+                             '\n'
+                             '\n'
+                             'def '
+                             'test_a_generation_of_several_sequences_cannot_be_built():\n'
+                             '    with pytest.raises(VLLMValidationError) as excinfo:\n'
+                             '        _engine_request(SamplingParams(n=2, '
+                             'extra_args={"kv_scope": "agent"}))\n'
+                             '    assert excinfo.value.parameter == "n"\n'
+                             '\n'
+                             '\n'
+                             'def test_a_pooling_request_names_no_line_of_work():\n'
+                             '    request = '
+                             '_engine_request(pooling_params=PoolingParams(task="embed"))\n'
+                             '    assert Request.from_engine_core_request(request, '
+                             'None).kv_scope is None\n'
+                             '\n'
+                             '\n'
+                             'def test_the_engine_decodes_the_identity_it_was_sent():\n'
+                             '    sent = _engine_request(SamplingParams(max_tokens=1, '
+                             'extra_args={"kv_scope": "a"}))\n'
+                             '    frames = MsgpackEncoder().encode(sent)\n'
+                             '    received = '
+                             'MsgpackDecoder(EngineCoreRequest).decode(frames)\n'
+                             '    assert Request.from_engine_core_request(received, '
+                             'None).kv_scope == "a"\n'
+                             '\n'
+                             '\n'
+                             'def '
+                             'test_a_rejected_remote_prefill_notifies_under_the_requests_own_scope():\n'
+                             '    """The notice stands for the rejected request and '
+                             'carries its identity."""\n'
+                             '    notify = AsyncMock()\n'
+                             '    serving = SimpleNamespace(\n'
+                             '        has_kv_connector=True,\n'
+                             '        '
+                             'engine_client=SimpleNamespace(notify_kv_transfer_request_rejected=notify),\n'
+                             '        _get_data_parallel_rank=lambda raw_request: '
+                             'None,\n'
+                             '    )\n'
+                             '    request = ChatCompletionGenerationRequest(\n'
+                             '        model="model",\n'
+                             '        messages=[{"role": "user", "content": "hi"}],\n'
+                             '        kv_scope="agent-a",\n'
+                             '        kv_transfer_params={"do_remote_prefill": True},\n'
+                             '    )\n'
+                             '    refusal = '
+                             'ErrorResponse(error=ErrorInfo(message="no", '
+                             'type="BadRequest", code=400))\n'
+                             '\n'
+                             '    async def refused():\n'
+                             '        return refusal\n'
+                             '\n'
+                             '    result = asyncio.run(\n'
+                             '        '
+                             'GenerateBaseServing._with_kv_transfer_rejection_cleanup(\n'
+                             '            serving, refused(), request, None\n'
+                             '        )\n'
+                             '    )\n'
+                             '    assert result is refusal\n'
+                             '    notify.assert_awaited_once_with(\n'
+                             '        request.request_id,\n'
+                             '        {"do_remote_prefill": True},\n'
+                             '        "agent-a",\n'
+                             '        data_parallel_rank=None,\n'
+                             '    )\n'
+                             '\n'},
+            {'name': 'tests/v1/engine/test_fast_incdec_prefix_err.py:landmark-1',
+             'path': 'tests/v1/engine/test_fast_incdec_prefix_err.py',
+             'before': '\n'
+                       '    # Create a test request\n'
+                       '    prompt_token_ids = [107, 4606, 236787, 107]\n'
+                       '    params = SamplingParams(skip_special_tokens=True)\n'
+                       '    request = EngineCoreRequest(\n'
+                       '        request_id="test",\n'
+                       '        external_req_id="test-ext",\n',
+             'after': '\n'
+                      '    # Create a test request\n'
+                      '    prompt_token_ids = [107, 4606, 236787, 107]\n'
+                      '    params = SamplingParams(skip_special_tokens=True, '
+                      'extra_args={"kv_scope": "test"})\n'
+                      '    request = EngineCoreRequest(\n'
+                      '        request_id="test",\n'
+                      '        external_req_id="test-ext",\n',
+             'review_before': '\n'
+                              '    # Create a test request\n'
+                              '    prompt_token_ids = [107, 4606, 236787, 107]\n'
+                              '    params = SamplingParams(skip_special_tokens=True)\n'
+                              '    request = EngineCoreRequest(\n'
+                              '        request_id="test",\n'
+                              '        external_req_id="test-ext",\n',
+             'review_after': '\n'
+                             '    # Create a test request\n'
+                             '    prompt_token_ids = [107, 4606, 236787, 107]\n'
+                             '    params = SamplingParams(skip_special_tokens=True, '
+                             'extra_args={"kv_scope": "test"})\n'
+                             '    request = EngineCoreRequest(\n'
+                             '        request_id="test",\n'
+                             '        external_req_id="test-ext",\n'},
+            {'name': 'tests/v1/engine/test_output_processor.py:landmark-1',
+             'path': 'tests/v1/engine/test_output_processor.py',
+             'before': '            mm_features=None,\n'
+                       '            arrival_time=0,\n'
+                       '            lora_request=None,\n'
+                       '            cache_salt=None,\n'
+                       '            data_parallel_rank=None,\n'
+                       '            sampling_params=SamplingParams(\n'
+                       '                skip_special_tokens=False,\n'
+                       '                spaces_between_special_tokens=False,\n'
+                       '                output_kind=request_output_kind,\n'
+                       '                stop=[],\n'
+                       '                include_stop_str_in_output=False,\n'
+                       '            ),\n',
+             'after': '            mm_features=None,\n'
+                      '            arrival_time=0,\n'
+                      '            lora_request=None,\n'
+                      '            cache_salt=None,\n'
+                      '            data_parallel_rank=None,\n'
+                      '            sampling_params=SamplingParams(\n'
+                      '                extra_args={"kv_scope": f"request-{idx}-int"},\n'
+                      '                skip_special_tokens=False,\n'
+                      '                spaces_between_special_tokens=False,\n'
+                      '                output_kind=request_output_kind,\n'
+                      '                stop=[],\n'
+                      '                include_stop_str_in_output=False,\n'
+                      '            ),\n',
+             'review_before': '            cache_salt=None,\n'
+                              '            data_parallel_rank=None,\n'
+                              '            sampling_params=SamplingParams(\n'
+                              '                skip_special_tokens=False,\n'
+                              '                spaces_between_special_tokens=False,\n'
+                              '                output_kind=request_output_kind,\n',
+             'review_after': '            cache_salt=None,\n'
+                             '            data_parallel_rank=None,\n'
+                             '            sampling_params=SamplingParams(\n'
+                             '                extra_args={"kv_scope": '
+                             'f"request-{idx}-int"},\n'
+                             '                skip_special_tokens=False,\n'
+                             '                spaces_between_special_tokens=False,\n'
+                             '                output_kind=request_output_kind,\n'},
+            {'name': 'tests/v1/engine/test_output_processor.py:landmark-2',
+             'path': 'tests/v1/engine/test_output_processor.py',
+             'before': '            lora_request=None,\n'
+                       '            cache_salt=None,\n'
+                       '            data_parallel_rank=None,\n'
+                       '            sampling_params=SamplingParams(\n'
+                       '                skip_special_tokens=False,\n'
+                       '                spaces_between_special_tokens=False,\n'
+                       '                output_kind=RequestOutputKind.DELTA,\n'
+                       '                stop=[],\n',
+             'after': '            lora_request=None,\n'
+                      '            cache_salt=None,\n'
+                      '            data_parallel_rank=None,\n'
+                      '            sampling_params=SamplingParams(\n'
+                      '                extra_args={"kv_scope": f"request-{idx}-int"},\n'
+                      '                skip_special_tokens=False,\n'
+                      '                spaces_between_special_tokens=False,\n'
+                      '                output_kind=RequestOutputKind.DELTA,\n'
+                      '                stop=[],\n',
+             'review_before': '            cache_salt=None,\n'
+                              '            data_parallel_rank=None,\n'
+                              '            sampling_params=SamplingParams(\n'
+                              '                skip_special_tokens=False,\n'
+                              '                spaces_between_special_tokens=False,\n'
+                              '                output_kind=RequestOutputKind.DELTA,\n',
+             'review_after': '            cache_salt=None,\n'
+                             '            data_parallel_rank=None,\n'
+                             '            sampling_params=SamplingParams(\n'
+                             '                extra_args={"kv_scope": '
+                             'f"request-{idx}-int"},\n'
+                             '                skip_special_tokens=False,\n'
+                             '                spaces_between_special_tokens=False,\n'
+                             '                output_kind=RequestOutputKind.DELTA,\n'},
+            {'name': 'tests/v1/engine/test_output_processor.py:landmark-3',
+             'path': 'tests/v1/engine/test_output_processor.py',
+             'before': '            cache_salt=None,\n'
+                       '            data_parallel_rank=None,\n'
+                       '            sampling_params=SamplingParams(\n'
+                       '                skip_special_tokens=False,\n'
+                       '                spaces_between_special_tokens=False,\n'
+                       '                output_kind=request_output_kind,\n',
+             'after': '            cache_salt=None,\n'
+                      '            data_parallel_rank=None,\n'
+                      '            sampling_params=SamplingParams(\n'
+                      '                extra_args={"kv_scope": request_id_list[idx] + '
+                      '"-int"},\n'
+                      '                skip_special_tokens=False,\n'
+                      '                spaces_between_special_tokens=False,\n'
+                      '                output_kind=request_output_kind,\n',
+             'review_before': '            cache_salt=None,\n'
+                              '            data_parallel_rank=None,\n'
+                              '            sampling_params=SamplingParams(\n'
+                              '                skip_special_tokens=False,\n'
+                              '                spaces_between_special_tokens=False,\n'
+                              '                output_kind=request_output_kind,\n',
+             'review_after': '            cache_salt=None,\n'
+                             '            data_parallel_rank=None,\n'
+                             '            sampling_params=SamplingParams(\n'
+                             '                extra_args={"kv_scope": '
+                             'request_id_list[idx] + "-int"},\n'
+                             '                skip_special_tokens=False,\n'
+                             '                spaces_between_special_tokens=False,\n'
+                             '                output_kind=request_output_kind,\n'},
+            {'name': 'tests/v1/engine/test_output_processor.py:landmark-4',
+             'path': 'tests/v1/engine/test_output_processor.py',
+             'before': '\n'
+                       '    # Make request.\n'
+                       '    request_id = "request-0"\n'
+                       '    request = EngineCoreRequest(\n'
+                       '        request_id=request_id,\n'
+                       '        external_req_id=request_id + "-ext",\n',
+             'after': '\n'
+                      '    # Make request.\n'
+                      '    request_id = "request-0"\n'
+                      '    sampling_params.extra_args = {"kv_scope": request_id}\n'
+                      '    request = EngineCoreRequest(\n'
+                      '        request_id=request_id,\n'
+                      '        external_req_id=request_id + "-ext",\n',
+             'review_before': '\n'
+                              '    # Make request.\n'
+                              '    request_id = "request-0"\n'
+                              '    request = EngineCoreRequest(\n'
+                              '        request_id=request_id,\n'
+                              '        external_req_id=request_id + "-ext",\n',
+             'review_after': '\n'
+                             '    # Make request.\n'
+                             '    request_id = "request-0"\n'
+                             '    sampling_params.extra_args = {"kv_scope": '
+                             'request_id}\n'
+                             '    request = EngineCoreRequest(\n'
+                             '        request_id=request_id,\n'
+                             '        external_req_id=request_id + "-ext",\n'},
+            {'name': 'tests/v1/engine/test_output_processor.py:landmark-5',
+             'path': 'tests/v1/engine/test_output_processor.py',
+             'before': '            cache_salt=None,\n'
+                       '            data_parallel_rank=None,\n'
+                       '            sampling_params=SamplingParams(\n'
+                       '                skip_special_tokens=False,\n'
+                       '                spaces_between_special_tokens=False,\n'
+                       '                output_kind=RequestOutputKind.DELTA,\n',
+             'after': '            cache_salt=None,\n'
+                      '            data_parallel_rank=None,\n'
+                      '            sampling_params=SamplingParams(\n'
+                      '                extra_args={"kv_scope": request_id_list[idx] + '
+                      '"-int"},\n'
+                      '                skip_special_tokens=False,\n'
+                      '                spaces_between_special_tokens=False,\n'
+                      '                output_kind=RequestOutputKind.DELTA,\n',
+             'review_before': '            cache_salt=None,\n'
+                              '            data_parallel_rank=None,\n'
+                              '            sampling_params=SamplingParams(\n'
+                              '                skip_special_tokens=False,\n'
+                              '                spaces_between_special_tokens=False,\n'
+                              '                output_kind=RequestOutputKind.DELTA,\n',
+             'review_after': '            cache_salt=None,\n'
+                             '            data_parallel_rank=None,\n'
+                             '            sampling_params=SamplingParams(\n'
+                             '                extra_args={"kv_scope": '
+                             'request_id_list[idx] + "-int"},\n'
+                             '                skip_special_tokens=False,\n'
+                             '                spaces_between_special_tokens=False,\n'
+                             '                output_kind=RequestOutputKind.DELTA,\n'},
+            {'name': 'tests/v1/engine/test_output_processor.py:landmark-6',
+             'path': 'tests/v1/engine/test_output_processor.py',
+             'before': '            lora_request=None,\n'
+                       '            cache_salt=None,\n'
+                       '            data_parallel_rank=None,\n'
+                       '            sampling_params=SamplingParams(),\n'
+                       '            pooling_params=None,\n'
+                       '        )\n'
+                       '        for idx, prompt_tokens in '
+                       'enumerate(dummy_test_vectors.prompt_tokens)\n',
+             'after': '            lora_request=None,\n'
+                      '            cache_salt=None,\n'
+                      '            data_parallel_rank=None,\n'
+                      '            '
+                      'sampling_params=SamplingParams(extra_args={"kv_scope": '
+                      'f"request-{idx}"}),\n'
+                      '            pooling_params=None,\n'
+                      '        )\n'
+                      '        for idx, prompt_tokens in '
+                      'enumerate(dummy_test_vectors.prompt_tokens)\n',
+             'review_before': '            lora_request=None,\n'
+                              '            cache_salt=None,\n'
+                              '            data_parallel_rank=None,\n'
+                              '            sampling_params=SamplingParams(),\n'
+                              '            pooling_params=None,\n'
+                              '        )\n'
+                              '        for idx, prompt_tokens in '
+                              'enumerate(dummy_test_vectors.prompt_tokens)\n',
+             'review_after': '            lora_request=None,\n'
+                             '            cache_salt=None,\n'
+                             '            data_parallel_rank=None,\n'
+                             '            '
+                             'sampling_params=SamplingParams(extra_args={"kv_scope": '
+                             'f"request-{idx}"}),\n'
+                             '            pooling_params=None,\n'
+                             '        )\n'
+                             '        for idx, prompt_tokens in '
+                             'enumerate(dummy_test_vectors.prompt_tokens)\n'},
+            {'name': 'tests/v1/engine/test_output_processor.py:landmark-7',
+             'path': 'tests/v1/engine/test_output_processor.py',
+             'before': '            lora_request=lora_assignments[idx],\n'
+                       '            cache_salt=None,\n'
+                       '            data_parallel_rank=None,\n'
+                       '            sampling_params=SamplingParams(),\n'
+                       '            pooling_params=None,\n'
+                       '        )\n'
+                       '        for idx, prompt_tokens in '
+                       'enumerate(dummy_test_vectors.prompt_tokens)\n',
+             'after': '            lora_request=lora_assignments[idx],\n'
+                      '            cache_salt=None,\n'
+                      '            data_parallel_rank=None,\n'
+                      '            sampling_params=SamplingParams(\n'
+                      '                extra_args={"kv_scope": f"request-{idx}-int"}\n'
+                      '            ),\n'
+                      '            pooling_params=None,\n'
+                      '        )\n'
+                      '        for idx, prompt_tokens in '
+                      'enumerate(dummy_test_vectors.prompt_tokens)\n',
+             'review_before': '            lora_request=lora_assignments[idx],\n'
+                              '            cache_salt=None,\n'
+                              '            data_parallel_rank=None,\n'
+                              '            sampling_params=SamplingParams(),\n'
+                              '            pooling_params=None,\n'
+                              '        )\n'
+                              '        for idx, prompt_tokens in '
+                              'enumerate(dummy_test_vectors.prompt_tokens)\n',
+             'review_after': '            lora_request=lora_assignments[idx],\n'
+                             '            cache_salt=None,\n'
+                             '            data_parallel_rank=None,\n'
+                             '            sampling_params=SamplingParams(\n'
+                             '                extra_args={"kv_scope": '
+                             'f"request-{idx}-int"}\n'
+                             '            ),\n'
+                             '            pooling_params=None,\n'
+                             '        )\n'
+                             '        for idx, prompt_tokens in '
+                             'enumerate(dummy_test_vectors.prompt_tokens)\n'},
+            {'name': 'tests/v1/engine/test_output_processor.py:landmark-8',
+             'path': 'tests/v1/engine/test_output_processor.py',
+             'before': '            lora_request=None,\n'
+                       '            cache_salt=None,\n'
+                       '            data_parallel_rank=None,\n'
+                       '            sampling_params=SamplingParams() if runner == '
+                       '"generate" else None,\n'
+                       '            pooling_params=PoolingParams(task="embed") if '
+                       'runner == "pooling" else None,\n'
+                       '        )\n'
+                       '        for idx, prompt_tokens in '
+                       'enumerate(dummy_test_vectors.prompt_tokens)\n',
+             'after': '            lora_request=None,\n'
+                      '            cache_salt=None,\n'
+                      '            data_parallel_rank=None,\n'
+                      '            sampling_params=(\n'
+                      '                SamplingParams(extra_args={"kv_scope": '
+                      'f"request-{idx}"})\n'
+                      '                if runner == "generate"\n'
+                      '                else None\n'
+                      '            ),\n'
+                      '            pooling_params=PoolingParams(task="embed") if '
+                      'runner == "pooling" else None,\n'
+                      '        )\n'
+                      '        for idx, prompt_tokens in '
+                      'enumerate(dummy_test_vectors.prompt_tokens)\n',
+             'review_before': '            lora_request=None,\n'
+                              '            cache_salt=None,\n'
+                              '            data_parallel_rank=None,\n'
+                              '            sampling_params=SamplingParams() if runner '
+                              '== "generate" else None,\n'
+                              '            pooling_params=PoolingParams(task="embed") '
+                              'if runner == "pooling" else None,\n'
+                              '        )\n'
+                              '        for idx, prompt_tokens in '
+                              'enumerate(dummy_test_vectors.prompt_tokens)\n',
+             'review_after': '            lora_request=None,\n'
+                             '            cache_salt=None,\n'
+                             '            data_parallel_rank=None,\n'
+                             '            sampling_params=(\n'
+                             '                SamplingParams(extra_args={"kv_scope": '
+                             'f"request-{idx}"})\n'
+                             '                if runner == "generate"\n'
+                             '                else None\n'
+                             '            ),\n'
+                             '            pooling_params=PoolingParams(task="embed") '
+                             'if runner == "pooling" else None,\n'
+                             '        )\n'
+                             '        for idx, prompt_tokens in '
+                             'enumerate(dummy_test_vectors.prompt_tokens)\n'},
+            {'name': 'tests/v1/engine/test_parallel_sampling.py:landmark-1',
+             'path': 'tests/v1/engine/test_parallel_sampling.py',
+             'before': '# SPDX-License-Identifier: Apache-2.0\n'
+                       '# SPDX-FileCopyrightText: Copyright contributors to the vLLM '
+                       'project\n'
+                       '\n'
+                       'from copy import copy\n'
+                       '\n'
+                       'from vllm import SamplingParams\n'
+                       'from vllm.outputs import CompletionOutput\n'
+                       'from vllm.sampling_params import RequestOutputKind\n'
+                       'from vllm.v1.engine import EngineCoreRequest\n'
+                       'from vllm.v1.engine.parallel_sampling import ParentRequest\n'
+                       '\n'
+                       '\n'
+                       'def test_parent_request_to_output_stream() -> None:\n'
+                       '    parent_request = '
+                       'ParentRequest(make_request(SamplingParams(n=2)))\n'
+                       '    parent_request.child_requests = {"child_id_0", '
+                       '"child_id_1"}\n'
+                       '    output_0 = CompletionOutput(\n'
+                       '        index=0, text="child 0", token_ids=[], '
+                       'cumulative_logprob=None, logprobs=None\n'
+                       '    )\n'
+                       '    output_1 = CompletionOutput(\n'
+                       '        index=1, text="child 1", token_ids=[], '
+                       'cumulative_logprob=None, logprobs=None\n'
+                       '    )\n'
+                       '    # Request not finished\n'
+                       '    assert ([output_0], False) == '
+                       'parent_request.get_outputs("child_id_0", output_0)\n'
+                       '    assert ([output_1], False) == '
+                       'parent_request.get_outputs("child_id_1", output_1)\n'
+                       '    assert ([output_0], False) == '
+                       'parent_request.get_outputs("child_id_0", output_0)\n'
+                       '    assert ([output_1], False) == '
+                       'parent_request.get_outputs("child_id_1", output_1)\n'
+                       '\n'
+                       '    # output_1 finished\n'
+                       '    output_1.finish_reason = "ended"\n'
+                       '    assert ([output_0], False) == '
+                       'parent_request.get_outputs("child_id_0", output_0)\n'
+                       '    assert ([output_1], False) == '
+                       'parent_request.get_outputs("child_id_1", output_1)\n'
+                       '    # Finished output_1 had already returned, DO NOT returned '
+                       'again\n'
+                       '    assert ([output_0], False) == '
+                       'parent_request.get_outputs("child_id_0", output_0)\n'
+                       '    assert parent_request.get_outputs("child_id_1", output_1) '
+                       '== ([], False)\n'
+                       '\n'
+                       '    # output_0 finished\n'
+                       '    output_0.finish_reason = "ended"\n'
+                       '    assert ([output_0], True) == '
+                       'parent_request.get_outputs("child_id_0", output_0)\n'
+                       '    assert parent_request.get_outputs("child_id_1", output_1) '
+                       '== ([], True)\n'
+                       '    # Finished output_0 had already returned, DO NOT returned '
+                       'again\n'
+                       '    assert parent_request.get_outputs("child_id_0", output_0) '
+                       '== ([], True)\n'
+                       '    assert parent_request.get_outputs("child_id_1", output_1) '
+                       '== ([], True)\n'
+                       '\n'
+                       '\n'
+                       'def test_parent_request_to_output_final_only() -> None:\n'
+                       '    parent_request = ParentRequest(\n'
+                       '        make_request(SamplingParams(n=2, '
+                       'output_kind=RequestOutputKind.FINAL_ONLY))\n'
+                       '    )\n'
+                       '    parent_request.child_requests = {"child_id_0", '
+                       '"child_id_1"}\n'
+                       '    output_0 = CompletionOutput(\n'
+                       '        index=0, text="child 0", token_ids=[], '
+                       'cumulative_logprob=None, logprobs=None\n'
+                       '    )\n'
+                       '    output_1 = CompletionOutput(\n'
+                       '        index=1, text="child 1", token_ids=[], '
+                       'cumulative_logprob=None, logprobs=None\n'
+                       '    )\n'
+                       '    # Request not finished, return nothing\n'
+                       '    assert parent_request.get_outputs("child_id_0", output_0) '
+                       '== ([], False)\n'
+                       '    assert parent_request.get_outputs("child_id_1", output_1) '
+                       '== ([], False)\n'
+                       "    # output_1 finished, but outputs won't be returned until "
+                       'all child requests finished\n'
+                       '    output_1.finish_reason = "ended"\n'
+                       '    assert parent_request.get_outputs("child_id_0", output_0) '
+                       '== ([], False)\n'
+                       '    assert parent_request.get_outputs("child_id_1", output_1) '
+                       '== ([], False)\n'
+                       '    # output_0 finished, as all child requests finished, the '
+                       'output would be returned\n'
+                       '    output_0.finish_reason = "ended"\n'
+                       '    assert ([output_0, output_1], True) == '
+                       'parent_request.get_outputs(\n'
+                       '        "child_id_0", output_0\n'
+                       '    )\n'
+                       '    assert ([output_0, output_1], True) == '
+                       'parent_request.get_outputs(\n'
+                       '        "child_id_1", output_1\n'
+                       '    )\n'
+                       '\n'
+                       '\n'
+                       'def '
+                       'test_parallel_sampling_child_requests_preserve_session_id() -> '
+                       'None:\n'
+                       '    request = make_request(SamplingParams(n=2))\n'
+                       '    request.session_id = "session-1"\n'
+                       '    parent_request = ParentRequest(request)\n'
+                       '\n'
+                       '    for idx in range(parent_request.n):\n'
+                       '        request_id, child_params = '
+                       'parent_request.get_child_info(idx)\n'
+                       '        child_request = request if idx == parent_request.n - 1 '
+                       'else copy(request)\n'
+                       '        child_request.request_id = request_id\n'
+                       '        child_request.sampling_params = child_params\n'
+                       '\n'
+                       '        assert child_request.session_id == "session-1"\n'
+                       '\n'
+                       '\n'
+                       'def make_request(sampling_params: SamplingParams) -> '
+                       'EngineCoreRequest:\n'
+                       '    return EngineCoreRequest(\n'
+                       '        request_id="parent_id",\n'
+                       '        external_req_id="ext_parent_id",\n'
+                       '        prompt_token_ids=None,\n'
+                       '        mm_features=None,\n'
+                       '        sampling_params=sampling_params,\n'
+                       '        pooling_params=None,\n'
+                       '        arrival_time=0.0,\n'
+                       '        lora_request=None,\n'
+                       '        cache_salt=None,\n'
+                       '        data_parallel_rank=None,\n'
+                       '    )\n',
+             'after': '',
+             'review_before': '# SPDX-License-Identifier: Apache-2.0\n'
+                              '# SPDX-FileCopyrightText: Copyright contributors to the '
+                              'vLLM project\n'
+                              '\n'
+                              'from copy import copy\n'
+                              '\n'
+                              'from vllm import SamplingParams\n'
+                              'from vllm.outputs import CompletionOutput\n'
+                              'from vllm.sampling_params import RequestOutputKind\n'
+                              'from vllm.v1.engine import EngineCoreRequest\n'
+                              'from vllm.v1.engine.parallel_sampling import '
+                              'ParentRequest\n'
+                              '\n'
+                              '\n'
+                              'def test_parent_request_to_output_stream() -> None:\n'
+                              '    parent_request = '
+                              'ParentRequest(make_request(SamplingParams(n=2)))\n'
+                              '    parent_request.child_requests = {"child_id_0", '
+                              '"child_id_1"}\n'
+                              '    output_0 = CompletionOutput(\n'
+                              '        index=0, text="child 0", token_ids=[], '
+                              'cumulative_logprob=None, logprobs=None\n'
+                              '    )\n'
+                              '    output_1 = CompletionOutput(\n'
+                              '        index=1, text="child 1", token_ids=[], '
+                              'cumulative_logprob=None, logprobs=None\n'
+                              '    )\n'
+                              '    # Request not finished\n'
+                              '    assert ([output_0], False) == '
+                              'parent_request.get_outputs("child_id_0", output_0)\n'
+                              '    assert ([output_1], False) == '
+                              'parent_request.get_outputs("child_id_1", output_1)\n'
+                              '    assert ([output_0], False) == '
+                              'parent_request.get_outputs("child_id_0", output_0)\n'
+                              '    assert ([output_1], False) == '
+                              'parent_request.get_outputs("child_id_1", output_1)\n'
+                              '\n'
+                              '    # output_1 finished\n'
+                              '    output_1.finish_reason = "ended"\n'
+                              '    assert ([output_0], False) == '
+                              'parent_request.get_outputs("child_id_0", output_0)\n'
+                              '    assert ([output_1], False) == '
+                              'parent_request.get_outputs("child_id_1", output_1)\n'
+                              '    # Finished output_1 had already returned, DO NOT '
+                              'returned again\n'
+                              '    assert ([output_0], False) == '
+                              'parent_request.get_outputs("child_id_0", output_0)\n'
+                              '    assert parent_request.get_outputs("child_id_1", '
+                              'output_1) == ([], False)\n'
+                              '\n'
+                              '    # output_0 finished\n'
+                              '    output_0.finish_reason = "ended"\n'
+                              '    assert ([output_0], True) == '
+                              'parent_request.get_outputs("child_id_0", output_0)\n'
+                              '    assert parent_request.get_outputs("child_id_1", '
+                              'output_1) == ([], True)\n'
+                              '    # Finished output_0 had already returned, DO NOT '
+                              'returned again\n'
+                              '    assert parent_request.get_outputs("child_id_0", '
+                              'output_0) == ([], True)\n'
+                              '    assert parent_request.get_outputs("child_id_1", '
+                              'output_1) == ([], True)\n'
+                              '\n'
+                              '\n'
+                              'def test_parent_request_to_output_final_only() -> '
+                              'None:\n'
+                              '    parent_request = ParentRequest(\n'
+                              '        make_request(SamplingParams(n=2, '
+                              'output_kind=RequestOutputKind.FINAL_ONLY))\n'
+                              '    )\n'
+                              '    parent_request.child_requests = {"child_id_0", '
+                              '"child_id_1"}\n'
+                              '    output_0 = CompletionOutput(\n'
+                              '        index=0, text="child 0", token_ids=[], '
+                              'cumulative_logprob=None, logprobs=None\n'
+                              '    )\n'
+                              '    output_1 = CompletionOutput(\n'
+                              '        index=1, text="child 1", token_ids=[], '
+                              'cumulative_logprob=None, logprobs=None\n'
+                              '    )\n'
+                              '    # Request not finished, return nothing\n'
+                              '    assert parent_request.get_outputs("child_id_0", '
+                              'output_0) == ([], False)\n'
+                              '    assert parent_request.get_outputs("child_id_1", '
+                              'output_1) == ([], False)\n'
+                              "    # output_1 finished, but outputs won't be returned "
+                              'until all child requests finished\n'
+                              '    output_1.finish_reason = "ended"\n'
+                              '    assert parent_request.get_outputs("child_id_0", '
+                              'output_0) == ([], False)\n'
+                              '    assert parent_request.get_outputs("child_id_1", '
+                              'output_1) == ([], False)\n'
+                              '    # output_0 finished, as all child requests '
+                              'finished, the output would be returned\n'
+                              '    output_0.finish_reason = "ended"\n'
+                              '    assert ([output_0, output_1], True) == '
+                              'parent_request.get_outputs(\n'
+                              '        "child_id_0", output_0\n'
+                              '    )\n'
+                              '    assert ([output_0, output_1], True) == '
+                              'parent_request.get_outputs(\n'
+                              '        "child_id_1", output_1\n'
+                              '    )\n'
+                              '\n'
+                              '\n'
+                              'def '
+                              'test_parallel_sampling_child_requests_preserve_session_id() '
+                              '-> None:\n'
+                              '    request = make_request(SamplingParams(n=2))\n'
+                              '    request.session_id = "session-1"\n'
+                              '    parent_request = ParentRequest(request)\n'
+                              '\n'
+                              '    for idx in range(parent_request.n):\n'
+                              '        request_id, child_params = '
+                              'parent_request.get_child_info(idx)\n'
+                              '        child_request = request if idx == '
+                              'parent_request.n - 1 else copy(request)\n'
+                              '        child_request.request_id = request_id\n'
+                              '        child_request.sampling_params = child_params\n'
+                              '\n'
+                              '        assert child_request.session_id == "session-1"\n'
+                              '\n'
+                              '\n'
+                              'def make_request(sampling_params: SamplingParams) -> '
+                              'EngineCoreRequest:\n'
+                              '    return EngineCoreRequest(\n'
+                              '        request_id="parent_id",\n'
+                              '        external_req_id="ext_parent_id",\n'
+                              '        prompt_token_ids=None,\n'
+                              '        mm_features=None,\n'
+                              '        sampling_params=sampling_params,\n'
+                              '        pooling_params=None,\n'
+                              '        arrival_time=0.0,\n'
+                              '        lora_request=None,\n'
+                              '        cache_salt=None,\n'
+                              '        data_parallel_rank=None,\n'
+                              '    )\n',
+             'review_after': ''},
+            {'name': 'tests/v1/test_request.py:landmark-1',
+             'path': 'tests/v1/test_request.py',
+             'before': '        request_id="request-1",\n'
+                       '        prompt_token_ids=[1, 2, 3],\n'
+                       '        mm_features=None,\n'
+                       '        sampling_params=SamplingParams(max_tokens=1),\n'
+                       '        pooling_params=None,\n'
+                       '        arrival_time=0.0,\n'
+                       '        lora_request=None,\n',
+             'after': '        request_id="request-1",\n'
+                      '        prompt_token_ids=[1, 2, 3],\n'
+                      '        mm_features=None,\n'
+                      '        sampling_params=SamplingParams(\n'
+                      '            max_tokens=1, extra_args={"kv_scope": "request-1"}\n'
+                      '        ),\n'
+                      '        pooling_params=None,\n'
+                      '        arrival_time=0.0,\n'
+                      '        lora_request=None,\n',
+             'review_before': '        request_id="request-1",\n'
+                              '        prompt_token_ids=[1, 2, 3],\n'
+                              '        mm_features=None,\n'
+                              '        sampling_params=SamplingParams(max_tokens=1),\n'
+                              '        pooling_params=None,\n'
+                              '        arrival_time=0.0,\n'
+                              '        lora_request=None,\n',
+             'review_after': '        request_id="request-1",\n'
+                             '        prompt_token_ids=[1, 2, 3],\n'
+                             '        mm_features=None,\n'
+                             '        sampling_params=SamplingParams(\n'
+                             '            max_tokens=1, extra_args={"kv_scope": '
+                             '"request-1"}\n'
+                             '        ),\n'
+                             '        pooling_params=None,\n'
+                             '        arrival_time=0.0,\n'
+                             '        lora_request=None,\n'},
+            {'name': 'vllm/engine/protocol.py:landmark-1',
+             'path': 'vllm/engine/protocol.py',
+             'before': '        self,\n'
+                       '        request_id: str,\n'
+                       '        kv_transfer_params: dict[str, Any],\n'
+                       '        *,\n'
+                       '        data_parallel_rank: int | None = None,\n'
+                       '    ) -> None:\n'
+                       '        """Notify the engine that a KV-transfer request was '
+                       'rejected before\n'
+                       '        engine admission, so connector-side cleanup can run '
+                       '(e.g. free\n'
+                       '        prefill blocks pinned on the P node).\n'
+                       '        """\n'
+                       '        ...\n'
+                       '\n',
+             'after': '        self,\n'
+                      '        request_id: str,\n'
+                      '        kv_transfer_params: dict[str, Any],\n'
+                      '        kv_scope: str,\n'
+                      '        *,\n'
+                      '        data_parallel_rank: int | None = None,\n'
+                      '    ) -> None:\n'
+                      '        """Notify the engine that a KV-transfer request was '
+                      'rejected before\n'
+                      '        engine admission, so connector-side cleanup can run '
+                      '(e.g. free\n'
+                      '        prefill blocks pinned on the P node). ``kv_scope`` is '
+                      'the rejected\n'
+                      "        request's own: the notice is an engine request of that "
+                      'line of work.\n'
+                      '        """\n'
+                      '        ...\n'
+                      '\n',
+             'review_before': '        self,\n'
+                              '        request_id: str,\n'
+                              '        kv_transfer_params: dict[str, Any],\n'
+                              '        *,\n'
+                              '        data_parallel_rank: int | None = None,\n'
+                              '    ) -> None:\n'
+                              '        """Notify the engine that a KV-transfer request '
+                              'was rejected before\n'
+                              '        engine admission, so connector-side cleanup can '
+                              'run (e.g. free\n'
+                              '        prefill blocks pinned on the P node).\n'
+                              '        """\n'
+                              '        ...\n'
+                              '\n',
+             'review_after': '        self,\n'
+                             '        request_id: str,\n'
+                             '        kv_transfer_params: dict[str, Any],\n'
+                             '        kv_scope: str,\n'
+                             '        *,\n'
+                             '        data_parallel_rank: int | None = None,\n'
+                             '    ) -> None:\n'
+                             '        """Notify the engine that a KV-transfer request '
+                             'was rejected before\n'
+                             '        engine admission, so connector-side cleanup can '
+                             'run (e.g. free\n'
+                             '        prefill blocks pinned on the P node). '
+                             '``kv_scope`` is the rejected\n'
+                             "        request's own: the notice is an engine request "
+                             'of that line of work.\n'
+                             '        """\n'
+                             '        ...\n'
+                             '\n'},
+            {'name': 'vllm/entrypoints/generate/base/serving.py:landmark-1',
+             'path': 'vllm/entrypoints/generate/base/serving.py',
+             'before': '\n'
+                       'from vllm.engine.protocol import EngineClient\n'
+                       'from vllm.entrypoints.generate.beam_search.online import '
+                       'BeamSearchOnlineMixin\n'
+                       'from vllm.entrypoints.openai.chat_completion.protocol import '
+                       'ChatCompletionRequest\n'
+                       'from vllm.entrypoints.openai.completion.protocol import '
+                       'CompletionRequest\n'
+                       'from vllm.entrypoints.openai.engine.protocol import (\n'
+                       '    ErrorResponse,\n'
+                       '    GenerationError,\n',
+             'after': '\n'
+                      'from vllm.engine.protocol import EngineClient\n'
+                      'from vllm.entrypoints.generate.beam_search.online import '
+                      'BeamSearchOnlineMixin\n'
+                      'from vllm.entrypoints.openai.chat_completion.protocol import (\n'
+                      '    ChatCompletionGenerationRequest,\n'
+                      '    ChatCompletionRequest,\n'
+                      ')\n'
+                      'from vllm.entrypoints.openai.completion.protocol import (\n'
+                      '    CompletionGenerationRequest,\n'
+                      '    CompletionRequest,\n'
+                      ')\n'
+                      'from vllm.entrypoints.openai.engine.protocol import (\n'
+                      '    ErrorResponse,\n'
+                      '    GenerationError,\n',
+             'review_before': '\n'
+                              'from vllm.engine.protocol import EngineClient\n'
+                              'from vllm.entrypoints.generate.beam_search.online '
+                              'import BeamSearchOnlineMixin\n'
+                              'from vllm.entrypoints.openai.chat_completion.protocol '
+                              'import ChatCompletionRequest\n'
+                              'from vllm.entrypoints.openai.completion.protocol import '
+                              'CompletionRequest\n'
+                              'from vllm.entrypoints.openai.engine.protocol import (\n'
+                              '    ErrorResponse,\n'
+                              '    GenerationError,\n',
+             'review_after': '\n'
+                             'from vllm.engine.protocol import EngineClient\n'
+                             'from vllm.entrypoints.generate.beam_search.online import '
+                             'BeamSearchOnlineMixin\n'
+                             'from vllm.entrypoints.openai.chat_completion.protocol '
+                             'import (\n'
+                             '    ChatCompletionGenerationRequest,\n'
+                             '    ChatCompletionRequest,\n'
+                             ')\n'
+                             'from vllm.entrypoints.openai.completion.protocol import '
+                             '(\n'
+                             '    CompletionGenerationRequest,\n'
+                             '    CompletionRequest,\n'
+                             ')\n'
+                             'from vllm.entrypoints.openai.engine.protocol import (\n'
+                             '    ErrorResponse,\n'
+                             '    GenerationError,\n'},
+            {'name': 'vllm/entrypoints/generate/base/serving.py:landmark-2',
+             'path': 'vllm/entrypoints/generate/base/serving.py',
+             'before': '    async def _with_kv_transfer_rejection_cleanup(\n'
+                       '        self,\n'
+                       '        awaitable: Awaitable[_T],\n'
+                       '        request: ChatCompletionRequest | CompletionRequest | '
+                       'ResponsesRequest,\n'
+                       '        raw_request: Request | None,\n'
+                       '    ) -> _T:\n'
+                       '        """Wrap a `create_*` coroutine so that, if it raises '
+                       'or returns an\n'
+                       '        ErrorResponse (i.e. the request never reached the '
+                       'engine), the KV\n'
+                       '        connector is notified to free any pinned '
+                       'remote-prefill blocks."""\n'
+                       '        kv_transfer_params = self.has_kv_connector and '
+                       'request.kv_transfer_params\n'
+                       '        if not kv_transfer_params or not '
+                       'kv_transfer_params.get("do_remote_prefill"):\n'
+                       '            return await awaitable\n',
+             'after': '    async def _with_kv_transfer_rejection_cleanup(\n'
+                      '        self,\n'
+                      '        awaitable: Awaitable[_T],\n'
+                      '        request: (\n'
+                      '            ChatCompletionGenerationRequest\n'
+                      '            | CompletionGenerationRequest\n'
+                      '            | ResponsesRequest\n'
+                      '        ),\n'
+                      '        raw_request: Request | None,\n'
+                      '    ) -> _T:\n'
+                      '        """Wrap a `create_*` coroutine so that, if it raises or '
+                      'returns an\n'
+                      '        ErrorResponse (i.e. the request never reached the '
+                      'engine), the KV\n'
+                      '        connector is notified to free any pinned remote-prefill '
+                      'blocks. The\n'
+                      '        notice names the rejected request\'s kv_scope."""\n'
+                      '        kv_transfer_params = self.has_kv_connector and '
+                      'request.kv_transfer_params\n'
+                      '        if not kv_transfer_params or not '
+                      'kv_transfer_params.get("do_remote_prefill"):\n'
+                      '            return await awaitable\n',
+             'review_before': '    async def _with_kv_transfer_rejection_cleanup(\n'
+                              '        self,\n'
+                              '        awaitable: Awaitable[_T],\n'
+                              '        request: ChatCompletionRequest | '
+                              'CompletionRequest | ResponsesRequest,\n'
+                              '        raw_request: Request | None,\n'
+                              '    ) -> _T:\n'
+                              '        """Wrap a `create_*` coroutine so that, if it '
+                              'raises or returns an\n'
+                              '        ErrorResponse (i.e. the request never reached '
+                              'the engine), the KV\n'
+                              '        connector is notified to free any pinned '
+                              'remote-prefill blocks."""\n'
+                              '        kv_transfer_params = self.has_kv_connector and '
+                              'request.kv_transfer_params\n'
+                              '        if not kv_transfer_params or not '
+                              'kv_transfer_params.get("do_remote_prefill"):\n'
+                              '            return await awaitable\n',
+             'review_after': '    async def _with_kv_transfer_rejection_cleanup(\n'
+                             '        self,\n'
+                             '        awaitable: Awaitable[_T],\n'
+                             '        request: (\n'
+                             '            ChatCompletionGenerationRequest\n'
+                             '            | CompletionGenerationRequest\n'
+                             '            | ResponsesRequest\n'
+                             '        ),\n'
+                             '        raw_request: Request | None,\n'
+                             '    ) -> _T:\n'
+                             '        """Wrap a `create_*` coroutine so that, if it '
+                             'raises or returns an\n'
+                             '        ErrorResponse (i.e. the request never reached '
+                             'the engine), the KV\n'
+                             '        connector is notified to free any pinned '
+                             'remote-prefill blocks. The\n'
+                             "        notice names the rejected request's "
+                             'kv_scope."""\n'
+                             '        kv_transfer_params = self.has_kv_connector and '
+                             'request.kv_transfer_params\n'
+                             '        if not kv_transfer_params or not '
+                             'kv_transfer_params.get("do_remote_prefill"):\n'
+                             '            return await awaitable\n'},
+            {'name': 'vllm/entrypoints/generate/base/serving.py:landmark-3',
+             'path': 'vllm/entrypoints/generate/base/serving.py',
+             'before': '                    await '
+                       'self.engine_client.notify_kv_transfer_request_rejected(\n'
+                       '                        request.request_id,\n'
+                       '                        kv_transfer_params,\n'
+                       '                        '
+                       'data_parallel_rank=self._get_data_parallel_rank(raw_request),\n'
+                       '                    )\n'
+                       '                except Exception:\n',
+             'after': '                    await '
+                      'self.engine_client.notify_kv_transfer_request_rejected(\n'
+                      '                        request.request_id,\n'
+                      '                        kv_transfer_params,\n'
+                      '                        request.kv_scope,\n'
+                      '                        '
+                      'data_parallel_rank=self._get_data_parallel_rank(raw_request),\n'
+                      '                    )\n'
+                      '                except Exception:\n',
+             'review_before': '                    await '
+                              'self.engine_client.notify_kv_transfer_request_rejected(\n'
+                              '                        request.request_id,\n'
+                              '                        kv_transfer_params,\n'
+                              '                        '
+                              'data_parallel_rank=self._get_data_parallel_rank(raw_request),\n'
+                              '                    )\n'
+                              '                except Exception:\n',
+             'review_after': '                    await '
+                             'self.engine_client.notify_kv_transfer_request_rejected(\n'
+                             '                        request.request_id,\n'
+                             '                        kv_transfer_params,\n'
+                             '                        request.kv_scope,\n'
+                             '                        '
+                             'data_parallel_rank=self._get_data_parallel_rank(raw_request),\n'
+                             '                    )\n'
+                             '                except Exception:\n'},
+            {'name': 'vllm/v1/engine/__init__.py:landmark-1',
+             'path': 'vllm/v1/engine/__init__.py',
+             'before': 'from vllm.lora.request import LoRARequest\n'
+                       'from vllm.multimodal.inputs import MultiModalFeatureSpec\n'
+                       'from vllm.pooling_params import PoolingParams\n'
+                       'from vllm.sampling_params import SamplingParams\n'
+                       'from vllm.v1.metrics.stats import PrefillStats, '
+                       'SchedulerStats\n'
+                       'from vllm.v1.outputs import LogprobsLists, LogprobsTensors, '
+                       'SamplingMaskLists\n'
+                       'from vllm.v1.serial_utils import UtilityResult\n',
+             'after': 'from vllm.lora.request import LoRARequest\n'
+                      'from vllm.multimodal.inputs import MultiModalFeatureSpec\n'
+                      'from vllm.pooling_params import PoolingParams\n'
+                      'from vllm.sampling_params import SamplingParams, '
+                      'require_kv_scope\n'
+                      'from vllm.v1.metrics.stats import PrefillStats, SchedulerStats\n'
+                      'from vllm.v1.outputs import LogprobsLists, LogprobsTensors, '
+                      'SamplingMaskLists\n'
+                      'from vllm.v1.serial_utils import UtilityResult\n',
+             'review_before': 'from vllm.lora.request import LoRARequest\n'
+                              'from vllm.multimodal.inputs import '
+                              'MultiModalFeatureSpec\n'
+                              'from vllm.pooling_params import PoolingParams\n'
+                              'from vllm.sampling_params import SamplingParams\n'
+                              'from vllm.v1.metrics.stats import PrefillStats, '
+                              'SchedulerStats\n'
+                              'from vllm.v1.outputs import LogprobsLists, '
+                              'LogprobsTensors, SamplingMaskLists\n'
+                              'from vllm.v1.serial_utils import UtilityResult\n',
+             'review_after': 'from vllm.lora.request import LoRARequest\n'
+                             'from vllm.multimodal.inputs import '
+                             'MultiModalFeatureSpec\n'
+                             'from vllm.pooling_params import PoolingParams\n'
+                             'from vllm.sampling_params import SamplingParams, '
+                             'require_kv_scope\n'
+                             'from vllm.v1.metrics.stats import PrefillStats, '
+                             'SchedulerStats\n'
+                             'from vllm.v1.outputs import LogprobsLists, '
+                             'LogprobsTensors, SamplingMaskLists\n'
+                             'from vllm.v1.serial_utils import UtilityResult\n'},
+            {'name': 'vllm/v1/engine/__init__.py:landmark-2',
+             'path': 'vllm/v1/engine/__init__.py',
+             'before': '\n'
+                       '    session_id: str | None = None\n'
+                       '\n'
+                       '    @property\n'
+                       '    def params(self) -> SamplingParams | PoolingParams:\n'
+                       '        """Return the processed params (sampling or '
+                       'pooling)."""\n',
+             'after': '\n'
+                      '    session_id: str | None = None\n'
+                      '\n'
+                      '    def __post_init__(self) -> None:\n'
+                      '        # Every generation names the line of work its KV '
+                      'belongs to: the\n'
+                      '        # scheduler and the KV connectors read it off every '
+                      'request they are\n'
+                      '        # given. Holding it here, where an engine request is '
+                      'built and where\n'
+                      '        # the engine decodes one, leaves no producer that can '
+                      'omit it.\n'
+                      '        if self.sampling_params is not None:\n'
+                      '            require_kv_scope(self.sampling_params)\n'
+                      '\n'
+                      '    @property\n'
+                      '    def params(self) -> SamplingParams | PoolingParams:\n'
+                      '        """Return the processed params (sampling or '
+                      'pooling)."""\n',
+             'review_before': '\n'
+                              '    session_id: str | None = None\n'
+                              '\n'
+                              '    @property\n'
+                              '    def params(self) -> SamplingParams | '
+                              'PoolingParams:\n'
+                              '        """Return the processed params (sampling or '
+                              'pooling)."""\n',
+             'review_after': '\n'
+                             '    session_id: str | None = None\n'
+                             '\n'
+                             '    def __post_init__(self) -> None:\n'
+                             '        # Every generation names the line of work its KV '
+                             'belongs to: the\n'
+                             '        # scheduler and the KV connectors read it off '
+                             'every request they are\n'
+                             '        # given. Holding it here, where an engine '
+                             'request is built and where\n'
+                             '        # the engine decodes one, leaves no producer '
+                             'that can omit it.\n'
+                             '        if self.sampling_params is not None:\n'
+                             '            require_kv_scope(self.sampling_params)\n'
+                             '\n'
+                             '    @property\n'
+                             '    def params(self) -> SamplingParams | PoolingParams:\n'
+                             '        """Return the processed params (sampling or '
+                             'pooling)."""\n'},
+            {'name': 'vllm/v1/engine/async_llm.py:landmark-1',
+             'path': 'vllm/v1/engine/async_llm.py',
+             'before': '        self,\n'
+                       '        request_id: str,\n'
+                       '        kv_transfer_params: dict[str, Any],\n'
+                       '        *,\n'
+                       '        data_parallel_rank: int | None = None,\n'
+                       '    ) -> None:\n'
+                       '        """Submit a pre-aborted request so the connector\'s '
+                       'request_finished\n'
+                       '        hook runs to free any pre-admission KV-transfer '
+                       'resources (e.g. NIXL\n'
+                       '        prefill blocks pinned on the P node)."""\n'
+                       '        request = EngineCoreRequest(\n'
+                       '            request_id=request_id,\n'
+                       '            prompt_token_ids=[0],\n'
+                       '            mm_features=None,\n'
+                       '            sampling_params=SamplingParams(\n'
+                       '                max_tokens=1,\n'
+                       '                extra_args={"kv_transfer_params": '
+                       'dict(kv_transfer_params)},\n'
+                       '            ),\n'
+                       '            pooling_params=None,\n'
+                       '            arrival_time=time.time(),\n',
+             'after': '        self,\n'
+                      '        request_id: str,\n'
+                      '        kv_transfer_params: dict[str, Any],\n'
+                      '        kv_scope: str,\n'
+                      '        *,\n'
+                      '        data_parallel_rank: int | None = None,\n'
+                      '    ) -> None:\n'
+                      '        """Submit a pre-aborted request so the connector\'s '
+                      'request_finished\n'
+                      '        hook runs to free any pre-admission KV-transfer '
+                      'resources (e.g. NIXL\n'
+                      '        prefill blocks pinned on the P node).\n'
+                      '\n'
+                      '        The notice stands for the rejected request, so it names '
+                      'that\n'
+                      "        request's line of work like every engine request "
+                      'does."""\n'
+                      '        request = EngineCoreRequest(\n'
+                      '            request_id=request_id,\n'
+                      '            prompt_token_ids=[0],\n'
+                      '            mm_features=None,\n'
+                      '            sampling_params=SamplingParams(\n'
+                      '                max_tokens=1,\n'
+                      '                extra_args={\n'
+                      '                    "kv_transfer_params": '
+                      'dict(kv_transfer_params),\n'
+                      '                    "kv_scope": kv_scope,\n'
+                      '                },\n'
+                      '            ),\n'
+                      '            pooling_params=None,\n'
+                      '            arrival_time=time.time(),\n',
+             'review_before': '        self,\n'
+                              '        request_id: str,\n'
+                              '        kv_transfer_params: dict[str, Any],\n'
+                              '        *,\n'
+                              '        data_parallel_rank: int | None = None,\n'
+                              '    ) -> None:\n'
+                              '        """Submit a pre-aborted request so the '
+                              "connector's request_finished\n"
+                              '        hook runs to free any pre-admission KV-transfer '
+                              'resources (e.g. NIXL\n'
+                              '        prefill blocks pinned on the P node)."""\n'
+                              '        request = EngineCoreRequest(\n'
+                              '            request_id=request_id,\n'
+                              '            prompt_token_ids=[0],\n'
+                              '            mm_features=None,\n'
+                              '            sampling_params=SamplingParams(\n'
+                              '                max_tokens=1,\n'
+                              '                extra_args={"kv_transfer_params": '
+                              'dict(kv_transfer_params)},\n'
+                              '            ),\n'
+                              '            pooling_params=None,\n'
+                              '            arrival_time=time.time(),\n',
+             'review_after': '        self,\n'
+                             '        request_id: str,\n'
+                             '        kv_transfer_params: dict[str, Any],\n'
+                             '        kv_scope: str,\n'
+                             '        *,\n'
+                             '        data_parallel_rank: int | None = None,\n'
+                             '    ) -> None:\n'
+                             '        """Submit a pre-aborted request so the '
+                             "connector's request_finished\n"
+                             '        hook runs to free any pre-admission KV-transfer '
+                             'resources (e.g. NIXL\n'
+                             '        prefill blocks pinned on the P node).\n'
+                             '\n'
+                             '        The notice stands for the rejected request, so '
+                             'it names that\n'
+                             "        request's line of work like every engine request "
+                             'does."""\n'
+                             '        request = EngineCoreRequest(\n'
+                             '            request_id=request_id,\n'
+                             '            prompt_token_ids=[0],\n'
+                             '            mm_features=None,\n'
+                             '            sampling_params=SamplingParams(\n'
+                             '                max_tokens=1,\n'
+                             '                extra_args={\n'
+                             '                    "kv_transfer_params": '
+                             'dict(kv_transfer_params),\n'
+                             '                    "kv_scope": kv_scope,\n'
+                             '                },\n'
+                             '            ),\n'
+                             '            pooling_params=None,\n'
+                             '            arrival_time=time.time(),\n'})},
  {'name': 'attention-growth-keeps-prefix-hash',
   'review_patch': 'patches/vllm-attention-growth-keeps-prefix-hash.patch',
   'review_sha256': 'a6c38a841c05bcd4f5bfc573c99f1c4a849e7399af05b1e53096e15a43a97632',
@@ -18692,10 +20122,10 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '@dataclass(frozen=True)\n'})},
  {'name': 'agent-grouped-offload-retention',
   'review_patch': 'patches/vllm-agent-grouped-offload-retention.patch',
-  'review_sha256': 'c0ecad98c0bb03b70bd06ae980937981280ce98e7ff2503314912410932010a2',
+  'review_sha256': '31384f411de30058d10ac67572b1e4abc9634bcb78a66d4b67c4f09f7f1f6439',
   'files': ({'path': 'tests/entrypoints/test_kv_scope_protocol.py',
-             'before_sha256': '09f8ea8d34069a1a34186bcbde50a7e9a264b0111114a13f3c21636d669a3a58',
-             'after_sha256': 'b382f37e4e3cc4e0c2cff434e8642b33289af560aeb5b6eac025238b264df633'},
+             'before_sha256': 'a72bed55bd6be62608ab12db1d5d47f0ab8ebc1ffab2ff4a25fb003e40045d13',
+             'after_sha256': 'ababc51b4d4ba3eb770d32b2660d22f935d546a0c3be14e0939d6e0f4af32e13'},
             {'path': 'tests/evals/gsm8k/test_gsm8k_offloading.py',
              'before_sha256': '3e61db44e67ef27bb0c8351900a9f65db42ba86b543e0b569df9dc2f181d7612',
              'after_sha256': '9da02758f0acd74c7c8a25045269f732e17152ac173d08feee66b6bf04cbe605'},
@@ -18764,7 +20194,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'after_sha256': 'c4f95100df0deba2295294577c6e3cbebfb8332631cedadd63f81ffb2fc28770'},
             {'path': 'vllm/v1/request.py',
              'before_sha256': '9894e1e7d12850796c04f2f17116f7cea58daaa78ec9e24294df136c37b41e60',
-             'after_sha256': '6281dcb0f3562cf6cc365e8fa43b1fd8d4fe06e136900fd49d2cbe718cbd0839'},
+             'after_sha256': '80eb55815d50c131c6d40ea1ceb7f00453f898ec58441675234593c7e81b807d'},
             {'path': 'tests/v1/kv_offload/tiering/test_fs_tier.py',
              'before_sha256': 'a025a593cefad1a50753a17148ee8d876f686a3ab888e3c7b00198f58aa3cb5a',
              'after_sha256': '4fdd70484844571bed1fe091b868eccea66e5f6f7c9122e0588f6833ca98f716'},
@@ -18774,6 +20204,9 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
             {'path': 'tests/v1/kv_connector/unit/offloading_connector/test_metrics.py',
              'before_sha256': '044bb057cb9790d8922fdb9f115177ed12ea44dbf2517375d8f810c4eaf33cd4',
              'after_sha256': '5dde9ba0d291df16639a12aa7443c0d016831ffefd7e3086b468a868d0e422e9'},
+            {'path': 'tests/v1/engine/test_engine_request_identity.py',
+             'before_sha256': '010e8067a1286824ea605231b5594c74efb29ad6c75cc7d7c8fba3c4b7f6a118',
+             'after_sha256': 'b1c1e299a30f7707c7358bd52235e936fa820642996c239e29b392eccbd616fa'},
             {'path': 'tests/v1/kv_offload/cpu/policies/__init__.py',
              'before_sha256': 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
              'after_sha256': None},
@@ -33440,16 +34873,17 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '        self.ec_transfer_params: dict[str, Any] | None = None\n'
                       "        # The agent owning this request's KV. Every generative "
                       'request names\n'
-                      '        # one -- the engine refuses to generate otherwise -- so '
-                      'the offload\n'
-                      '        # tier always has a whole agent to give up under '
-                      'pressure. It stays\n'
-                      '        # None only for a pooling request, which generates '
-                      'nothing and owns\n'
-                      '        # no reusable context. Materialized here so the KV '
-                      'offload connector\n'
-                      '        # reads identity off the Request the same way it reads\n'
-                      '        # kv_transfer_params, on every protocol surface.\n'
+                      '        # one -- an engine request cannot be built for '
+                      'generation otherwise --\n'
+                      '        # so the offload tier always has a whole agent to give '
+                      'up under\n'
+                      '        # pressure. It stays None only for a pooling request, '
+                      'which generates\n'
+                      '        # nothing and owns no reusable context. Materialized '
+                      'here so the KV\n'
+                      '        # offload connector reads identity off the Request the '
+                      'same way it\n'
+                      '        # reads kv_transfer_params, on every protocol surface.\n'
                       '        self.kv_scope: str | None = None\n'
                       '\n'
                       '        if pooling_params is not None:\n'
@@ -33471,17 +34905,17 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'None\n'
                              "        # The agent owning this request's KV. Every "
                              'generative request names\n'
-                             '        # one -- the engine refuses to generate '
-                             'otherwise -- so the offload\n'
-                             '        # tier always has a whole agent to give up under '
-                             'pressure. It stays\n'
-                             '        # None only for a pooling request, which '
-                             'generates nothing and owns\n'
-                             '        # no reusable context. Materialized here so the '
-                             'KV offload connector\n'
-                             '        # reads identity off the Request the same way it '
-                             'reads\n'
-                             '        # kv_transfer_params, on every protocol '
+                             '        # one -- an engine request cannot be built for '
+                             'generation otherwise --\n'
+                             '        # so the offload tier always has a whole agent '
+                             'to give up under\n'
+                             '        # pressure. It stays None only for a pooling '
+                             'request, which generates\n'
+                             '        # nothing and owns no reusable context. '
+                             'Materialized here so the KV\n'
+                             '        # offload connector reads identity off the '
+                             'Request the same way it\n'
+                             '        # reads kv_transfer_params, on every protocol '
                              'surface.\n'
                              '        self.kv_scope: str | None = None\n'
                              '\n'
@@ -34212,13 +35646,183 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'ignore[arg-type]\n'
                              '        metric_types={\n'
                              '            Gauge: _FakeMetric,\n'
-                             '            Counter: _FakeMetric,\n'})},
+                             '            Counter: _FakeMetric,\n'},
+            {'name': 'tests/v1/engine/test_engine_request_identity.py:landmark-1',
+             'path': 'tests/v1/engine/test_engine_request_identity.py',
+             'before': '\n'
+                       'import pytest\n'
+                       '\n'
+                       'from vllm.entrypoints.generate.base.serving import '
+                       'GenerateBaseServing\n'
+                       'from vllm.entrypoints.openai.chat_completion.protocol import '
+                       '(\n'
+                       '    ChatCompletionGenerationRequest,\n',
+             'after': '\n'
+                      'import pytest\n'
+                      '\n'
+                      'from '
+                      'vllm.distributed.kv_transfer.kv_connector.v1.offloading.scheduler '
+                      'import (\n'
+                      '    _create_req_context,\n'
+                      ')\n'
+                      'from vllm.entrypoints.generate.base.serving import '
+                      'GenerateBaseServing\n'
+                      'from vllm.entrypoints.openai.chat_completion.protocol import (\n'
+                      '    ChatCompletionGenerationRequest,\n',
+             'review_before': '\n'
+                              'import pytest\n'
+                              '\n'
+                              'from vllm.entrypoints.generate.base.serving import '
+                              'GenerateBaseServing\n'
+                              'from vllm.entrypoints.openai.chat_completion.protocol '
+                              'import (\n'
+                              '    ChatCompletionGenerationRequest,\n',
+             'review_after': '\n'
+                             'import pytest\n'
+                             '\n'
+                             'from '
+                             'vllm.distributed.kv_transfer.kv_connector.v1.offloading.scheduler '
+                             'import (\n'
+                             '    _create_req_context,\n'
+                             ')\n'
+                             'from vllm.entrypoints.generate.base.serving import '
+                             'GenerateBaseServing\n'
+                             'from vllm.entrypoints.openai.chat_completion.protocol '
+                             'import (\n'
+                             '    ChatCompletionGenerationRequest,\n'},
+            {'name': 'tests/v1/engine/test_engine_request_identity.py:landmark-2',
+             'path': 'tests/v1/engine/test_engine_request_identity.py',
+             'before': 'from vllm.sampling_params import SamplingParams\n'
+                       'from vllm.v1.engine import EngineCoreRequest\n'
+                       'from vllm.v1.engine.async_llm import AsyncLLM\n'
+                       'from vllm.v1.request import Request\n'
+                       'from vllm.v1.serial_utils import MsgpackDecoder, '
+                       'MsgpackEncoder\n'
+                       '\n',
+             'after': 'from vllm.sampling_params import SamplingParams\n'
+                      'from vllm.v1.engine import EngineCoreRequest\n'
+                      'from vllm.v1.engine.async_llm import AsyncLLM\n'
+                      'from vllm.v1.kv_offload.base import ReqContext\n'
+                      'from vllm.v1.kv_offload.cpu.manager import '
+                      'CPUOffloadingManager\n'
+                      'from vllm.v1.request import Request\n'
+                      'from vllm.v1.serial_utils import MsgpackDecoder, '
+                      'MsgpackEncoder\n'
+                      '\n',
+             'review_before': 'from vllm.sampling_params import SamplingParams\n'
+                              'from vllm.v1.engine import EngineCoreRequest\n'
+                              'from vllm.v1.engine.async_llm import AsyncLLM\n'
+                              'from vllm.v1.request import Request\n'
+                              'from vllm.v1.serial_utils import MsgpackDecoder, '
+                              'MsgpackEncoder\n'
+                              '\n',
+             'review_after': 'from vllm.sampling_params import SamplingParams\n'
+                             'from vllm.v1.engine import EngineCoreRequest\n'
+                             'from vllm.v1.engine.async_llm import AsyncLLM\n'
+                             'from vllm.v1.kv_offload.base import ReqContext\n'
+                             'from vllm.v1.kv_offload.cpu.manager import '
+                             'CPUOffloadingManager\n'
+                             'from vllm.v1.request import Request\n'
+                             'from vllm.v1.serial_utils import MsgpackDecoder, '
+                             'MsgpackEncoder\n'
+                             '\n'},
+            {'name': 'tests/v1/engine/test_engine_request_identity.py:landmark-3',
+             'path': 'tests/v1/engine/test_engine_request_identity.py',
+             'before': '        "agent-a",\n'
+                       '        data_parallel_rank=None,\n'
+                       '    )\n'
+                       '\n',
+             'after': '        "agent-a",\n'
+                      '        data_parallel_rank=None,\n'
+                      '    )\n'
+                      '\n'
+                      '\n'
+                      'def '
+                      'test_the_notice_reaches_the_offload_tier_as_a_request_of_that_agent():\n'
+                      '    """The CPU tier accounts the notice under its agent and '
+                      'keeps what that\n'
+                      '    agent retained: a notice holds no KV, so finishing it '
+                      'releases nothing."""\n'
+                      '    engine_core = '
+                      'SimpleNamespace(add_request_async=AsyncMock())\n'
+                      '    asyncio.run(\n'
+                      '        AsyncLLM.notify_kv_transfer_request_rejected(\n'
+                      '            SimpleNamespace(engine_core=engine_core),\n'
+                      '            "rejected",\n'
+                      '            {"do_remote_prefill": True},\n'
+                      '            "agent-a",\n'
+                      '        )\n'
+                      '    )\n'
+                      '    (notice,) = engine_core.add_request_async.await_args.args\n'
+                      '    assert notice.abort_immediately\n'
+                      '    request = Request.from_engine_core_request(notice, None)\n'
+                      '    assert request.kv_scope == "agent-a"\n'
+                      '\n'
+                      '    manager = CPUOffloadingManager(4)\n'
+                      '    retained = ReqContext(req_id="earlier", '
+                      'kv_scope="agent-a",\n'
+                      '                          prefix_content={b"key": (b"key",)})\n'
+                      '    stored = manager.prepare_store([b"key"], retained)\n'
+                      '    manager.complete_store(stored.keys_to_store, retained)\n'
+                      '    manager.retain_context([b"key"], retained)\n'
+                      '    manager.on_request_finished(retained)\n'
+                      '\n'
+                      '    context = _create_req_context(request)\n'
+                      '    manager.on_new_request(context)\n'
+                      '    manager.on_request_finished(context)\n'
+                      '    assert manager._idle_context == {"agent-a": "earlier"}\n'
+                      '    assert set(manager._contexts) == {"earlier"}\n',
+             'review_before': '        data_parallel_rank=None,\n    )\n\n',
+             'review_after': '        data_parallel_rank=None,\n'
+                             '    )\n'
+                             '\n'
+                             '\n'
+                             'def '
+                             'test_the_notice_reaches_the_offload_tier_as_a_request_of_that_agent():\n'
+                             '    """The CPU tier accounts the notice under its agent '
+                             'and keeps what that\n'
+                             '    agent retained: a notice holds no KV, so finishing '
+                             'it releases nothing."""\n'
+                             '    engine_core = '
+                             'SimpleNamespace(add_request_async=AsyncMock())\n'
+                             '    asyncio.run(\n'
+                             '        AsyncLLM.notify_kv_transfer_request_rejected(\n'
+                             '            SimpleNamespace(engine_core=engine_core),\n'
+                             '            "rejected",\n'
+                             '            {"do_remote_prefill": True},\n'
+                             '            "agent-a",\n'
+                             '        )\n'
+                             '    )\n'
+                             '    (notice,) = '
+                             'engine_core.add_request_async.await_args.args\n'
+                             '    assert notice.abort_immediately\n'
+                             '    request = Request.from_engine_core_request(notice, '
+                             'None)\n'
+                             '    assert request.kv_scope == "agent-a"\n'
+                             '\n'
+                             '    manager = CPUOffloadingManager(4)\n'
+                             '    retained = ReqContext(req_id="earlier", '
+                             'kv_scope="agent-a",\n'
+                             '                          prefix_content={b"key": '
+                             '(b"key",)})\n'
+                             '    stored = manager.prepare_store([b"key"], retained)\n'
+                             '    manager.complete_store(stored.keys_to_store, '
+                             'retained)\n'
+                             '    manager.retain_context([b"key"], retained)\n'
+                             '    manager.on_request_finished(retained)\n'
+                             '\n'
+                             '    context = _create_req_context(request)\n'
+                             '    manager.on_new_request(context)\n'
+                             '    manager.on_request_finished(context)\n'
+                             '    assert manager._idle_context == {"agent-a": '
+                             '"earlier"}\n'
+                             '    assert set(manager._contexts) == {"earlier"}\n'})},
  {'name': 'agentless-generation-routes-unmounted',
   'review_patch': 'patches/vllm-agentless-generation-routes-unmounted.patch',
-  'review_sha256': 'aad1dd0ff38d76d08ac5793bcf1daca4b0872c562f44cdd5c3a5b09cb1c51f72',
+  'review_sha256': 'c321d15313839c28542a6fb4d754080443a86aeeecdcdfbc8ea7459a52364b0b',
   'files': ({'path': 'tests/entrypoints/test_kv_scope_protocol.py',
-             'before_sha256': 'b382f37e4e3cc4e0c2cff434e8642b33289af560aeb5b6eac025238b264df633',
-             'after_sha256': '1dffe7ebb2170455b496dbb15b92db13b71bb641e7460e57fca68edb033bffc8'},
+             'before_sha256': 'ababc51b4d4ba3eb770d32b2660d22f935d546a0c3be14e0939d6e0f4af32e13',
+             'after_sha256': 'b7b8a5edd2a045a6b7ace1d1aab87605681d3a1b96191f45cf2e39f8bb157925'},
             {'path': 'vllm/entrypoints/generate/api_router.py',
              'before_sha256': 'e428a6de4c01659de90e3cd88aed179595f4e48ffdf02ece0a6649750ebc71ab',
              'after_sha256': 'dffeda2c3ccc6cfe3d4945720a7378bab34e7c7c9959d020a9643675895a3ffd'},
@@ -60345,7 +61949,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'converter.")\n'})},
  {'name': 'generation-sampling-resolution',
   'review_patch': 'patches/vllm-generation-sampling-resolution.patch',
-  'review_sha256': 'f352470cfd07b0c7768c3533971629ba65e0b9f5bb9e8f72c528b049f54ea4dd',
+  'review_sha256': 'ebb88fa080f82512ed547debc3e7d7de73fe2b64cad56beacec8140c23ab56c1',
   'files': ({'path': 'tests/entrypoints/openai/test_render_token_offsets.py',
              'before_sha256': '223426750879932311a2f26377300df68ac13b2de1332c667c56b3bffb245b75',
              'after_sha256': '405e6e5592d4178fde073482558bb491fe201e3a3b706c25df104b136b8197a1'},
@@ -60356,8 +61960,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': 'fb2ff88c15028af53b5693036b2ad077306010d6220a7c60140fa6cd8d4c3ef1',
              'after_sha256': '018f35bf3570c8407a50694d4750a6ada1c6b9c8e00603e2e8669f69ebb577e4'},
             {'path': 'tests/entrypoints/test_kv_scope_protocol.py',
-             'before_sha256': '1dffe7ebb2170455b496dbb15b92db13b71bb641e7460e57fca68edb033bffc8',
-             'after_sha256': '498a1ac7172f996fe891b90b75e125629ac0d98f883b446b6478441e57eea43b'},
+             'before_sha256': 'b7b8a5edd2a045a6b7ace1d1aab87605681d3a1b96191f45cf2e39f8bb157925',
+             'after_sha256': '8421a84b21ddf78ec8a80fc0f3e46ac0ce07a3eaffdd12df240bbd75ba332c78'},
             {'path': 'vllm/entrypoints/openai/chat_completion/protocol.py',
              'before_sha256': 'a57b5a8cab8358a715cec3d79c2671bd66c8cfefc0c62cdab169159205b5006f',
              'after_sha256': '4a3285f5f8947dea200a303fa8021362915ade9e8d22fc3109b54cb70e86002c'},
@@ -60374,8 +61978,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': 'c0e27a111beb8854f91a34e840b25f76ea97042a6f68068b41dcedb366928532',
              'after_sha256': 'e5d29b141f4fafd89eebdbefe0d507ab97fe7d7b569021bbfb3219231ef220da'},
             {'path': 'vllm/sampling_params.py',
-             'before_sha256': '203221f14a7bd9c82abbe1bcaac75ce785b117792c79c84102c5fa2e69c37d99',
-             'after_sha256': '2d1f7665249bef9157412dc6ef31faf3c6c2a2ac1142a358f4c7628a1086e9cc'}),
+             'before_sha256': '4d0d346e238d67c60665bd6607ad8fc97757a5db744f85fc0d13c1e5f1014582',
+             'after_sha256': 'f6f262fb0be7e83246a2d16407d8f0fbdbc6603164711d86978371e425b61af1'}),
   'edits': ({'name': 'tests/entrypoints/openai/test_render_token_offsets.py:landmark-1',
              'path': 'tests/entrypoints/openai/test_render_token_offsets.py',
              'before': '    )\n'
@@ -78531,13 +80135,13 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '``</function>\\n</tool_call>``\n'})},
  {'name': 'input-stream-agent-identity',
   'review_patch': 'patches/vllm-input-stream-agent-identity.patch',
-  'review_sha256': 'f812362220f83b904d56e55e9c359918990c55e39d7a0750d1011840d377dfb4',
+  'review_sha256': 'caee1588ff260cb866404a91889b3962f8f94b468fa5f5eb81720f1e8c88d67a',
   'files': ({'path': 'tests/v1/streaming_input/test_async_llm_streaming.py',
              'before_sha256': '04a34ebf708313a315818051434bf0c626cb8a07f23e285e7759a3c0f6c3996b',
              'after_sha256': '83c121d706fb1f8a06ce94e7e85a5f49d0ce9c6a0282066a6276ff08e5f6400c'},
             {'path': 'vllm/v1/engine/async_llm.py',
-             'before_sha256': 'bceed0b3f5f0c834fef79525f2462a092f082390f0070526280abc95945837dd',
-             'after_sha256': '1fc980192b7d269128876f1658041140edcb987bbc70427cd69a8ec159b84f46'}),
+             'before_sha256': '7f948316cd152c1d49bb064e6c40c4cd3cf3a148cc3416573dc6eb0c1e83d772',
+             'after_sha256': 'c416a588e892c8cf70ab5383f73be9f8c4bfebbc332557561866b2c52fde6871'}),
   'edits': ({'name': 'tests/v1/streaming_input/test_async_llm_streaming.py:landmark-1',
              'path': 'tests/v1/streaming_input/test_async_llm_streaming.py',
              'before': '\n'
@@ -78915,49 +80519,42 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'internal=True)\n'},
             {'name': 'vllm/v1/engine/async_llm.py:landmark-1',
              'path': 'vllm/v1/engine/async_llm.py',
-             'before': 'from vllm.v1.engine import EngineCoreRequest, PauseMode\n'
-                       'from vllm.v1.engine.core_client import EngineCoreClient\n'
-                       'from vllm.v1.engine.exceptions import EngineDeadError, '
-                       'EngineGenerateError\n'
-                       'from vllm.v1.engine.input_processor import InputProcessor\n'
-                       'from vllm.v1.engine.output_processor import OutputProcessor, '
-                       'RequestOutputCollector\n'
-                       'from vllm.v1.engine.parallel_sampling import ParentRequest\n'
-                       'from vllm.v1.executor import Executor\n',
-             'after': 'from vllm.v1.engine import EngineCoreRequest, PauseMode\n'
-                      'from vllm.v1.engine.core_client import EngineCoreClient\n'
-                      'from vllm.v1.engine.exceptions import EngineDeadError, '
-                      'EngineGenerateError\n'
-                      'from vllm.v1.engine.input_processor import InputProcessor, '
-                      'require_kv_scope\n'
-                      'from vllm.v1.engine.output_processor import OutputProcessor, '
-                      'RequestOutputCollector\n'
-                      'from vllm.v1.engine.parallel_sampling import ParentRequest\n'
-                      'from vllm.v1.executor import Executor\n',
-             'review_before': 'from vllm.v1.engine import EngineCoreRequest, '
-                              'PauseMode\n'
-                              'from vllm.v1.engine.core_client import '
-                              'EngineCoreClient\n'
-                              'from vllm.v1.engine.exceptions import EngineDeadError, '
-                              'EngineGenerateError\n'
-                              'from vllm.v1.engine.input_processor import '
-                              'InputProcessor\n'
-                              'from vllm.v1.engine.output_processor import '
-                              'OutputProcessor, RequestOutputCollector\n'
-                              'from vllm.v1.engine.parallel_sampling import '
-                              'ParentRequest\n'
-                              'from vllm.v1.executor import Executor\n',
-             'review_after': 'from vllm.v1.engine import EngineCoreRequest, PauseMode\n'
-                             'from vllm.v1.engine.core_client import EngineCoreClient\n'
-                             'from vllm.v1.engine.exceptions import EngineDeadError, '
-                             'EngineGenerateError\n'
-                             'from vllm.v1.engine.input_processor import '
-                             'InputProcessor, require_kv_scope\n'
-                             'from vllm.v1.engine.output_processor import '
-                             'OutputProcessor, RequestOutputCollector\n'
-                             'from vllm.v1.engine.parallel_sampling import '
-                             'ParentRequest\n'
-                             'from vllm.v1.executor import Executor\n'},
+             'before': 'from vllm.pooling_params import PoolingParams\n'
+                       'from vllm.renderers import renderer_from_config\n'
+                       'from vllm.renderers.inputs.preprocess import '
+                       'extract_prompt_components\n'
+                       'from vllm.sampling_params import RequestOutputKind, '
+                       'SamplingParams\n'
+                       'from vllm.tasks import SupportedTask\n'
+                       'from vllm.tokenizers import TokenizerLike\n'
+                       'from vllm.tracing import init_tracer\n',
+             'after': 'from vllm.pooling_params import PoolingParams\n'
+                      'from vllm.renderers import renderer_from_config\n'
+                      'from vllm.renderers.inputs.preprocess import '
+                      'extract_prompt_components\n'
+                      'from vllm.sampling_params import RequestOutputKind, '
+                      'SamplingParams, require_kv_scope\n'
+                      'from vllm.tasks import SupportedTask\n'
+                      'from vllm.tokenizers import TokenizerLike\n'
+                      'from vllm.tracing import init_tracer\n',
+             'review_before': 'from vllm.pooling_params import PoolingParams\n'
+                              'from vllm.renderers import renderer_from_config\n'
+                              'from vllm.renderers.inputs.preprocess import '
+                              'extract_prompt_components\n'
+                              'from vllm.sampling_params import RequestOutputKind, '
+                              'SamplingParams\n'
+                              'from vllm.tasks import SupportedTask\n'
+                              'from vllm.tokenizers import TokenizerLike\n'
+                              'from vllm.tracing import init_tracer\n',
+             'review_after': 'from vllm.pooling_params import PoolingParams\n'
+                             'from vllm.renderers import renderer_from_config\n'
+                             'from vllm.renderers.inputs.preprocess import '
+                             'extract_prompt_components\n'
+                             'from vllm.sampling_params import RequestOutputKind, '
+                             'SamplingParams, require_kv_scope\n'
+                             'from vllm.tasks import SupportedTask\n'
+                             'from vllm.tokenizers import TokenizerLike\n'
+                             'from vllm.tracing import init_tracer\n'},
             {'name': 'vllm/v1/engine/async_llm.py:landmark-2',
              'path': 'vllm/v1/engine/async_llm.py',
              'before': '        session_id: str | None = None,\n'
@@ -79051,7 +80648,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '                        request_id=internal_req_id,\n'})},
  {'name': 'tool-output-completion',
   'review_patch': 'patches/vllm-tool-output-completion.patch',
-  'review_sha256': '081c62e507fca24dc2d27f71f9fae7f8f511a5d545d4a447f0c8a8e7328d8eb3',
+  'review_sha256': '28f49b69af72f1caca3d716cdfe58b96626e1411c8599b49253946ee2cad6090',
   'files': ({'path': 'tests/entrypoints/openai/chat_completion/test_parallel_tool_call_integrity.py',
              'before_sha256': 'a4a6547338dbf625e3041e2578f2a8e314aa14d1520468c69ee17ff22998d9a2',
              'after_sha256': 'e290f2c4df7bd842594db1fb4e66bf713bc6ff653cbadc8877958a955c0fa4c4'},
@@ -79068,8 +80665,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': '029468efd9149cb953ae7ba781db089ae1490b9d77eed7667931ce2d9855dc3a',
              'after_sha256': '9ce8ed07080994d48511465e8050a52ee1db8fdf5d0b2188bd6324b9276b3f97'},
             {'path': 'tests/v1/engine/test_output_processor.py',
-             'before_sha256': 'eadb7ad8eb30e4ade9850afbb750ac2cc893fd8804a33def9a9678444e534249',
-             'after_sha256': 'c3db074be5010ac0f4a353864b89a77b0a697c358dacd92faf291a794ad741f9'},
+             'before_sha256': 'dc38c5c4b963cbbd088c3db5f3ba97f8de49d6a3e712be4ace9145bfba012538',
+             'after_sha256': '252fcac7e3674b2308985403822978d68df753edb053cafa8042d85593fb6525'},
             {'path': 'tests/v1/structured_output/test_backend_xgrammar_stop_tokens.py',
              'before_sha256': '8a74b37b0b33dc2db25ad685f975530ca32c825c4f8e1e9f4998cbacf1e2b586',
              'after_sha256': '2d3bc4f13b371265b659858c5441d04c7a6e3e9f2286e6e932c63f3e2d356651'},
@@ -79101,8 +80698,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': '19887b06b24f2d83d69fcc1a1494c15d67dae6cc945a1bcd1ab9f5aa0c9284a5',
              'after_sha256': 'c93551f5e63e1b7e5d5bf105ca2e642a288644078feee561e8eef63267f7841d'},
             {'path': 'vllm/sampling_params.py',
-             'before_sha256': '2d1f7665249bef9157412dc6ef31faf3c6c2a2ac1142a358f4c7628a1086e9cc',
-             'after_sha256': '89227f35356be8a68fd1ff15a617036f2e4ed5673d8bc4aaca8d655befef8364'},
+             'before_sha256': 'f6f262fb0be7e83246a2d16407d8f0fbdbc6603164711d86978371e425b61af1',
+             'after_sha256': '29eb018fc1e5a3cec8b0b34901fd617b27ab893319f0df136314dda12843f073'},
             {'path': 'vllm/v1/core/sched/scheduler.py',
              'before_sha256': '4b79ab760c3864af6838d555c01335deea3aac97c9be2be415fa0e5dab32f07e',
              'after_sha256': '92a95c3223987c7eacafecb30d4cceb32bfc8a754718a69f97bc094f6253abf9'},
@@ -79110,8 +80707,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': 'bf00f90553b05358a2671466eabe3c3f2caee6b64a6ad64ad5544f7ffc997aa2',
              'after_sha256': 'bd79fd9adb8cff3a89559afa415ac7beca093ed523a0e86b73e72cd0628c4368'},
             {'path': 'vllm/v1/engine/async_llm.py',
-             'before_sha256': '1fc980192b7d269128876f1658041140edcb987bbc70427cd69a8ec159b84f46',
-             'after_sha256': 'ba58e5c36b1dd77da5f78f2611815e6d9fe0afbb395bf1de5d7869d1b91108af'},
+             'before_sha256': 'c416a588e892c8cf70ab5383f73be9f8c4bfebbc332557561866b2c52fde6871',
+             'after_sha256': '44f51898b882981e74cff3649bac1dde9fb904902e22d0b164879cfadfb29533'},
             {'path': 'vllm/v1/engine/detokenizer.py',
              'before_sha256': '213d71cf6eefcea061b28b656cf8a08af60c9f3513403e724b16876995f3de93',
              'after_sha256': '9d731589392c5da7bb707d9105e678aec992b406ff605146a9ff53a1f2c906bd'},
@@ -98418,8 +100015,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': '83c121d706fb1f8a06ce94e7e85a5f49d0ce9c6a0282066a6276ff08e5f6400c',
              'after_sha256': '72f195575d01e0ed48fa0b3d426951b46393cfde3f434a5863e6c169c82bf3ba'},
             {'path': 'vllm/engine/protocol.py',
-             'before_sha256': '0ff96be1d77568bb3409702d1c460013170197bf1787c4bc5bcf0f07392290b3',
-             'after_sha256': '3078176d33d0675a0c6302e815d288f7b1ca5c1f027a675866d652fc0b2f8895'},
+             'before_sha256': 'e6850e22172f569f91bbcca34b7487df41534caeebbb37a888345fabaa848db1',
+             'after_sha256': '2b0e0da7e5fdd88b7edc4c7a2c9b9648dfb5d41c152bcf0825073cb3bfe31fd9'},
             {'path': 'vllm/entrypoints/openai/chat_completion/batch_serving.py',
              'before_sha256': '104ef1737efe6208223a0ca98b79dc5f46b2fe09b75132ef63f211dc91f747ea',
              'after_sha256': '90dee26650b749fec50ebc7bcf461ae5566c48e66bd0ccdb2b6d726c1ae2dd7a'},
@@ -98439,8 +100036,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': '33fc93bdbf368ac1e7ddbb0a2c914db40ce0449b2dcd43291b5fe3868bf93198',
              'after_sha256': '4e76582db55dd262de822a59d61b954a7170a3af4f16ba9dcbf7ee9e400980ab'},
             {'path': 'vllm/v1/engine/async_llm.py',
-             'before_sha256': 'ba58e5c36b1dd77da5f78f2611815e6d9fe0afbb395bf1de5d7869d1b91108af',
-             'after_sha256': '8eca9ff72d8380f093a64f375ef916ab01bb84ede1cc540d98a90a8d62bfb026'}),
+             'before_sha256': '44f51898b882981e74cff3649bac1dde9fb904902e22d0b164879cfadfb29533',
+             'after_sha256': '086a605550a8181632d7521330e5fd0ae9295971ddf12c5f417d051862ad92c4'}),
   'edits': ({'name': 'tests/entrypoints/openai/chat_completion/test_chat_error.py:landmark-1',
              'path': 'tests/entrypoints/openai/chat_completion/test_chat_error.py',
              'before': '    async def mock_generate(*args, **kwargs):\n'
@@ -104185,16 +105782,16 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'internal=True)\n'})},
  {'name': 'kv-scope-single-flight',
   'review_patch': 'patches/vllm-kv-scope-single-flight.patch',
-  'review_sha256': 'cc5e52403afd4e4764693da552e9252bbf204793566fff6a27fb87b4dbd28d13',
+  'review_sha256': 'b84b915c38e2c1d32b278bf88dcd5ac7228b9a680b746e2842783dbe1942540a',
   'files': ({'path': 'tests/entrypoints/test_generation_admission.py',
              'before_sha256': '9ad68d36b656dd3e8f76bf2942b7b0de19a7b00efd9a3a09fbf9c2b5eeb9066b',
              'after_sha256': '21f70cf0354f6aef59480eb0cc1b2a6407ed94ca68887af65f95218200e8e409'},
             {'path': 'tests/v1/engine/test_kv_scope_single_flight.py',
              'before_sha256': None,
-             'after_sha256': '9c2c11a6da208256c9404af5d7b84cb59825fb8dcdcbef297de3311861a6f044'},
+             'after_sha256': 'b201e5a9ce502d182fcc5d5d10f2fc64333308642586398e9b594c79365af0a0'},
             {'path': 'vllm/v1/engine/async_llm.py',
-             'before_sha256': '8eca9ff72d8380f093a64f375ef916ab01bb84ede1cc540d98a90a8d62bfb026',
-             'after_sha256': '067c557e078347551ff87a3deaccadfb13ce4109d2a27013af39b013a1001456'},
+             'before_sha256': '086a605550a8181632d7521330e5fd0ae9295971ddf12c5f417d051862ad92c4',
+             'after_sha256': 'b1d06c39ee0cf2988496fac25ae87a079a9a2019fe9b9da8ef7a3a52bc9052a7'},
             {'path': 'vllm/v1/engine/output_processor.py',
              'before_sha256': '08361a6521cd1bc5e32e5c8cdaa6c1f8c6ca2e43c616729871c6d933a6f9d0f6',
              'after_sha256': '1b980af57c2dfe27dcda769d30aac09e4f97daa1a31cb51032075eb7a2097736'}),
@@ -104475,6 +106072,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       'import pytest\n'
                       '\n'
                       'from vllm.exceptions import VLLMValidationError\n'
+                      'from vllm.pooling_params import PoolingParams\n'
                       'from vllm.sampling_params import RequestOutputKind, '
                       'SamplingParams\n'
                       'from vllm.v1.engine import EngineCoreOutput, EngineCoreRequest, '
@@ -104488,8 +106086,13 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '\n'
                       'def _request(name: str, scope: str | None, *, resumable: bool = '
                       'False):\n'
-                      '    extra_args = None if scope is None else {"kv_scope": '
-                      'scope}\n'
+                      '    """A generation under ``scope``, or, with none, a pooling '
+                      'request.\n'
+                      '\n'
+                      '    Only a pooling request names no line of work: an engine '
+                      'request cannot be\n'
+                      '    built for generation without one.\n'
+                      '    """\n'
                       '    return EngineCoreRequest(\n'
                       '        request_id=f"{name}-internal",\n'
                       '        external_req_id=name,\n'
@@ -104499,12 +106102,14 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '        lora_request=None,\n'
                       '        cache_salt=None,\n'
                       '        data_parallel_rank=None,\n'
-                      '        sampling_params=SamplingParams(\n'
+                      '        sampling_params=None if scope is None else '
+                      'SamplingParams(\n'
                       '            max_tokens=4, detokenize=False, '
-                      'extra_args=extra_args,\n'
+                      'extra_args={"kv_scope": scope},\n'
                       '            output_kind=RequestOutputKind.DELTA,\n'
                       '        ),\n'
-                      '        pooling_params=None,\n'
+                      '        pooling_params=PoolingParams(task="embed") if scope is '
+                      'None else None,\n'
                       '        resumable=resumable,\n'
                       '    )\n'
                       '\n'
@@ -104562,7 +106167,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '\n'
                       '\n'
                       'def '
-                      'test_different_ids_and_unscoped_requests_run_side_by_side():\n'
+                      'test_different_ids_and_pooling_requests_run_side_by_side():\n'
                       '    processor = _processor()\n'
                       '    _add(processor, _request("a", "line-a"))\n'
                       '    _add(processor, _request("b", "line-b"))\n'
@@ -104652,6 +106257,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'import pytest\n'
                              '\n'
                              'from vllm.exceptions import VLLMValidationError\n'
+                             'from vllm.pooling_params import PoolingParams\n'
                              'from vllm.sampling_params import RequestOutputKind, '
                              'SamplingParams\n'
                              'from vllm.v1.engine import EngineCoreOutput, '
@@ -104665,8 +106271,13 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '\n'
                              'def _request(name: str, scope: str | None, *, resumable: '
                              'bool = False):\n'
-                             '    extra_args = None if scope is None else {"kv_scope": '
-                             'scope}\n'
+                             '    """A generation under ``scope``, or, with none, a '
+                             'pooling request.\n'
+                             '\n'
+                             '    Only a pooling request names no line of work: an '
+                             'engine request cannot be\n'
+                             '    built for generation without one.\n'
+                             '    """\n'
                              '    return EngineCoreRequest(\n'
                              '        request_id=f"{name}-internal",\n'
                              '        external_req_id=name,\n'
@@ -104676,12 +106287,14 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '        lora_request=None,\n'
                              '        cache_salt=None,\n'
                              '        data_parallel_rank=None,\n'
-                             '        sampling_params=SamplingParams(\n'
+                             '        sampling_params=None if scope is None else '
+                             'SamplingParams(\n'
                              '            max_tokens=4, detokenize=False, '
-                             'extra_args=extra_args,\n'
+                             'extra_args={"kv_scope": scope},\n'
                              '            output_kind=RequestOutputKind.DELTA,\n'
                              '        ),\n'
-                             '        pooling_params=None,\n'
+                             '        pooling_params=PoolingParams(task="embed") if '
+                             'scope is None else None,\n'
                              '        resumable=resumable,\n'
                              '    )\n'
                              '\n'
@@ -104746,7 +106359,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '\n'
                              '\n'
                              'def '
-                             'test_different_ids_and_unscoped_requests_run_side_by_side():\n'
+                             'test_different_ids_and_pooling_requests_run_side_by_side():\n'
                              '    processor = _processor()\n'
                              '    _add(processor, _request("a", "line-a"))\n'
                              '    _add(processor, _request("b", "line-b"))\n'
@@ -122586,6 +124199,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
 
 FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5dd4c4673b5925cebd27d46a5956832092bebbbd53d47993bac',
  'tests/config/test_config_utils.py': '4f5ea0399cc3b4f9603df07e2cc26d32e1eddf6b98a36c0f30d580321879c038',
+ 'tests/detokenizer/test_min_tokens.py': '20565f24bef5f120b87ecf1c727de1138d8ba7ac0272f05fc4781b04e68c49b8',
+ 'tests/detokenizer/test_stop_string_while_stop_model_terminates.py': 'a575db162d04feb30942438f02f89d7f69292ca66c4bd391e89b2755966c62f4',
  'tests/distributed/test_rocm_quick_reduce.py': 'bf6f8a5708568b1f4d96dcc59f42258f8680e5b03bb4abdddcb0c7ead9d414bd',
  'tests/engine/test_arg_utils.py': '858f15c077a1fa031228bcf8e2d92a7a479a07f2d7da32b106f8eab419b7901b',
  'tests/entrypoints/anthropic/test_anthropic_messages_conversion.py': '6bc3ec877070bd71bd337199de61e7afa6c017a18332d7c5ac4f745491d49cf8',
@@ -122624,7 +124239,7 @@ FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5d
  'tests/entrypoints/serve/lora/test_lora_adapters.py': '57dd9087c0c6f5d27ce93b217ca3e9edb74801c7249d298ce1e8cd03425b3b7e',
  'tests/entrypoints/serve/utils/test_api_utils.py': 'ef96041b54c496109f8eaa0dbb62d3465dbaf595a5a446bd588dd44ab304085d',
  'tests/entrypoints/test_generation_admission.py': '21f70cf0354f6aef59480eb0cc1b2a6407ed94ca68887af65f95218200e8e409',
- 'tests/entrypoints/test_kv_scope_protocol.py': '498a1ac7172f996fe891b90b75e125629ac0d98f883b446b6478441e57eea43b',
+ 'tests/entrypoints/test_kv_scope_protocol.py': '8421a84b21ddf78ec8a80fc0f3e46ac0ce07a3eaffdd12df240bbd75ba332c78',
  'tests/entrypoints/unit_tests/test_chat_utils.py': '23ecf6b73c1af45b9440f57b175660bfed485a5e2d4fe1b029cf012cd54f777b',
  'tests/evals/gsm8k/test_gsm8k_offloading.py': 'a7ced3b714c418120c2e4d5cfb55690d3b11baa96083256c2bb640dc80eec3f6',
  'tests/model_executor/kernels/test_nvfp4_native_selection.py': '5efbbf472bfe3257321ae27266a082002e567c9ae4a0a427cea654d652f7d74e',
@@ -122657,6 +124272,7 @@ FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5d
  'tests/renderers/test_template_authorship.py': 'b2b34a541fa8d5e1155ab87d6d4e781c40bb01762042d44dd6da48668a32691d',
  'tests/test_request_input_bounds.py': '6d5796773be3daa15c1dc369bed3bb36fec877b4735389a6893d7236aa25cd38',
  'tests/test_sampling_params.py': '9ce8ed07080994d48511465e8050a52ee1db8fdf5d0b2188bd6324b9276b3f97',
+ 'tests/tokenizers_/test_detokenize.py': 'd84dff3048856b762c2993a3aa130c4f508bbce9c59c9a815dabbf3ce5a3f234',
  'tests/tool_parsers/test_poolside_v1_tool_parser.py': '662d77a06519ce25598292366fa1dfa74ffa8c6559be9796e6dfb24a878e7539',
  'tests/tool_parsers/test_structural_tag_registry.py': '3fbc42eef3b13462d86990e287c15e35ae3d1faa8e5a0d9eb75b338787074540',
  'tests/tool_use/test_gemma4_responses_adjust_request.py': 'ac6531c1601139d42c6eb05d967653656c6926e145bc21b21e6236e8c95d68b5',
@@ -122664,8 +124280,12 @@ FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5d
  'tests/v1/core/test_prefix_caching.py': '7ceb00826d43dc4186bb746e64c6e650784d536a04127ccd7d02162f1fea4c4f',
  'tests/v1/e2e/general/test_context_length.py': '11f1dc8484d92d6414607a3cb1670d2832919166450f4ed684e1cdc59b4ead81',
  'tests/v1/engine/test_async_llm_admission.py': '4a5421ef0cffc3d68484ef0d8caf1d9082e7fc3ab0dc943e7488d59420b41ca5',
- 'tests/v1/engine/test_kv_scope_single_flight.py': '9c2c11a6da208256c9404af5d7b84cb59825fb8dcdcbef297de3311861a6f044',
- 'tests/v1/engine/test_output_processor.py': 'c3db074be5010ac0f4a353864b89a77b0a697c358dacd92faf291a794ad741f9',
+ 'tests/v1/engine/test_engine_core.py': '7834fa7eaeb25518e4af756f0dc56c420a1c8e5c906057643a41241a17162485',
+ 'tests/v1/engine/test_engine_core_client.py': 'f395ab80e7d75fce9007629c5a1c696ca675a41de25e9837d5916f8d1b916a2a',
+ 'tests/v1/engine/test_engine_request_identity.py': 'b1c1e299a30f7707c7358bd52235e936fa820642996c239e29b392eccbd616fa',
+ 'tests/v1/engine/test_fast_incdec_prefix_err.py': '2a0cfd6b4d151db30253ac7cde7503838894eaefb71834bd7d5947f705017b53',
+ 'tests/v1/engine/test_kv_scope_single_flight.py': 'b201e5a9ce502d182fcc5d5d10f2fc64333308642586398e9b594c79365af0a0',
+ 'tests/v1/engine/test_output_processor.py': '252fcac7e3674b2308985403822978d68df753edb053cafa8042d85593fb6525',
  'tests/v1/kv_connector/nixl_integration/run_multi_connector_accuracy_test.sh': '0307e35d5215f2b3baf35a2e637bd2ef048f054a7f0f9b3d05e861f0d2cbfc52',
  'tests/v1/kv_connector/nixl_integration/run_multi_connector_edge_case_test.sh': 'b82ae017b7b416e55987cb1ef685efad40a154cf5cb104d10319e816364b1d50',
  'tests/v1/kv_connector/nixl_integration/spec_decode_acceptance_test.sh': '2071951cbc6bb2e718c53521c831a073219426b024b2a090675beaaf42e64231',
@@ -122689,6 +124309,7 @@ FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5d
  'tests/v1/simple_kv_offload/test_scheduler.py': '430db8cc9d99844e7fd6099a6c7eac9ecadc4c0cff820db6ea62582de2443316',
  'tests/v1/streaming_input/test_async_llm_streaming.py': '72f195575d01e0ed48fa0b3d426951b46393cfde3f434a5863e6c169c82bf3ba',
  'tests/v1/structured_output/test_backend_xgrammar_stop_tokens.py': '5bccea5e5739b479439ef4be796dce56af686581064f6eb1ba0feab87238050a',
+ 'tests/v1/test_request.py': '6fa5d12659ebb955c0fec37b09074f75b5011e0ac6e7b7551b9175c99f5655d0',
  'tests/v1/worker/test_gpu_model_runner_mm_gather.py': '7076e2415a3a1246d6f1e22e978a4c32e7b87713d6d7ae5743960c3d31592759',
  'tests/v1/worker/test_gpu_worker.py': '5a385d1aa588bb46b3b4356e08d9c45a115d6c616c66e804021e5458f388cbb3',
  'tests/v1/worker/test_workspace.py': 'b5aec4cedc880276f8dec0fa68b146e4802eb30c641839e3fc788126029b091f',
@@ -122699,12 +124320,13 @@ FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5d
  'vllm/distributed/kv_transfer/kv_connector/v1/offloading/config.py': '328033f5240090ed684eeb4a96e67658b6839be9ccb6886483569c7bc2702c21',
  'vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py': 'd1ba74da27133f83979baf3c11d79e7fe1d1c783c191f0696f25636cecab3889',
  'vllm/engine/arg_utils.py': '88582e97c98ffcd16416e48eeea3db415cab1f33673c7ff8c1613fa83aad1eac',
- 'vllm/engine/protocol.py': '3078176d33d0675a0c6302e815d288f7b1ca5c1f027a675866d652fc0b2f8895',
+ 'vllm/engine/protocol.py': '2b0e0da7e5fdd88b7edc4c7a2c9b9648dfb5d41c152bcf0825073cb3bfe31fd9',
  'vllm/entrypoints/anthropic/api_router.py': '8d7d742f6e7d9f2fa9bbe1e57d6adbd4f2753075a083c7a7f93d39fc5ab474b6',
  'vllm/entrypoints/anthropic/protocol.py': '9808d00e7ecb3873e82955172ed1acae80c64f9cf4b0ba647c5a296a06ff6676',
  'vllm/entrypoints/anthropic/serving.py': '027c485896a24b533c4b5edcd0f4e2be96c5e29de9695ab88e70e60831ed8fd4',
  'vllm/entrypoints/chat_utils.py': 'f178be190e94c5298661f8bc3a53b2c6882ec9c6fb302d59accc83b0dbe9fca1',
  'vllm/entrypoints/generate/api_router.py': 'dffeda2c3ccc6cfe3d4945720a7378bab34e7c7c9959d020a9643675895a3ffd',
+ 'vllm/entrypoints/generate/base/serving.py': '8857456bc7a0157497d03a95b90f7d60a6435615c8e06406437d90e016030c96',
  'vllm/entrypoints/llm.py': '79f9bb1212884746964a347f7e4b39087b5ac084b1d72821a12efd2fb85bcb03',
  'vllm/entrypoints/openai/chat_completion/api_router.py': '9cb8a56328bcfea734cc252e1291b17aee6c42e7208c9c8f883ad5a434bace17',
  'vllm/entrypoints/openai/chat_completion/batch_serving.py': '90dee26650b749fec50ebc7bcf461ae5566c48e66bd0ccdb2b6d726c1ae2dd7a',
@@ -122766,7 +124388,7 @@ FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5d
  'vllm/renderers/online_renderer.py': '1f12e251def8f81f3cf68e0030ddaaa8c988ac00a9f694c0718dd2d1d5c8f36f',
  'vllm/renderers/params.py': '31572224d8ea355fb77d80e3725779436533108c78f779b94760c6e55e6f3bfd',
  'vllm/renderers/template_authorship.py': '3110bd0d138e29ef01a51f5c357a2e6dd000c0b8c26b7fea94a4161471e43cba',
- 'vllm/sampling_params.py': '89227f35356be8a68fd1ff15a617036f2e4ed5673d8bc4aaca8d655befef8364',
+ 'vllm/sampling_params.py': '29eb018fc1e5a3cec8b0b34901fd617b27ab893319f0df136314dda12843f073',
  'vllm/tokenizers/detokenizer_utils.py': '7718979d813ed00d41116d92a5abf81524e393693a6b28fa1c2a6d8ff66c880d',
  'vllm/tool_parsers/abstract_tool_parser.py': '91f4f3184e7f0eb6bc9e76d9ce4d3063cff58e0de8afc409038139e48314d0c8',
  'vllm/tool_parsers/structural_tag_registry.py': '9638ea980d7bf019ba3fe1fac1b12979df2ff7a51c94554a85500db2c3c40073',
@@ -122779,9 +124401,10 @@ FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5d
  'vllm/v1/core/sched/scheduler.py': '92a95c3223987c7eacafecb30d4cceb32bfc8a754718a69f97bc094f6253abf9',
  'vllm/v1/core/sched/utils.py': 'bd79fd9adb8cff3a89559afa415ac7beca093ed523a0e86b73e72cd0628c4368',
  'vllm/v1/core/single_type_kv_cache_manager.py': 'c96644fbb3404fe67151abdb46dcbfbde6788f7d65eb29c1ab8060caa0c628df',
- 'vllm/v1/engine/async_llm.py': '067c557e078347551ff87a3deaccadfb13ce4109d2a27013af39b013a1001456',
+ 'vllm/v1/engine/__init__.py': '1f52819297cc78bbe01450af3a1069c86513066a54eb4ac2b530565a96b55c46',
+ 'vllm/v1/engine/async_llm.py': 'b1d06c39ee0cf2988496fac25ae87a079a9a2019fe9b9da8ef7a3a52bc9052a7',
  'vllm/v1/engine/detokenizer.py': '3af97dd30fa95fb8e294b2de407012d365b124006ee324c576cba3d3a9d58c21',
- 'vllm/v1/engine/input_processor.py': '0ccad82d1979598e9acd1207791f2e78e4f1c666b7d45959420bffae14569be4',
+ 'vllm/v1/engine/input_processor.py': '2b9e64486ce316fb4bc2293f18b1f005ae2e4b9adc60e39331a5add342b4b018',
  'vllm/v1/engine/output_processor.py': '1b980af57c2dfe27dcda769d30aac09e4f97daa1a31cb51032075eb7a2097736',
  'vllm/v1/kv_offload/base.py': 'd3f86b26330e057a7b030c7b4e32417acf18822e443ebf224d9393e67b86acc1',
  'vllm/v1/kv_offload/config.py': '50daea7891442fa779743796c343fe0a09bdcd0266910bf83b35509e533c3b89',
@@ -122791,7 +124414,7 @@ FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5d
  'vllm/v1/kv_offload/cpu/spec.py': '02bb64e4052092229e372002acdedb5206d3709698e88ff4c5e33b26da836e93',
  'vllm/v1/kv_offload/tiering/manager.py': 'b63a0d85d3cff32a27f82ebc9df6749cf2e64e6fe439dcae7adad00000817a13',
  'vllm/v1/kv_offload/tiering/spec.py': 'a78615eeb2befe97739461b1db84b4fa79ebd3690fc63a807e2bed1ef2dc12f8',
- 'vllm/v1/request.py': '6281dcb0f3562cf6cc365e8fa43b1fd8d4fe06e136900fd49d2cbe718cbd0839',
+ 'vllm/v1/request.py': '80eb55815d50c131c6d40ea1ceb7f00453f898ec58441675234593c7e81b807d',
  'vllm/v1/sample/thinking_budget_state.py': '2de2bd4623f27a3f610c9f84b37cab0a9fb17d4da7574748994d4e209d89cb07',
  'vllm/v1/structured_output/__init__.py': '3ac80fb92f5ff57a44fcb800d96b46ad37987df55830568ea49ac303c4b472c8',
  'vllm/v1/structured_output/backend_types.py': '5b8b80b82ba998b8e860866c2d499d1412eb480d82f5bcf4e99fe742ed1c52e4',

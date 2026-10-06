@@ -6,13 +6,21 @@ import importlib.util
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
+from vllm.distributed.kv_transfer.kv_connector.v1.offloading.scheduler import (
+    _create_req_context,
+)
 from vllm.engine.protocol import StreamingInput
+from vllm.entrypoints.generate.base.serving import GenerateBaseServing
+from vllm.entrypoints.openai.chat_completion.protocol import ChatCompletionGenerationRequest
+from vllm.entrypoints.openai.engine.protocol import ErrorInfo, ErrorResponse
 from vllm.exceptions import VLLMValidationError
-from vllm.sampling_params import RequestOutputKind, SamplingParams
+from vllm.sampling_params import RequestOutputKind, SamplingParams, require_kv_scope
+from vllm.v1.engine import EngineCoreRequest
 from vllm.v1.engine.async_llm import AsyncLLM, InputStreamError
-from vllm.v1.engine.input_processor import InputProcessor, require_kv_scope
+from vllm.v1.engine.input_processor import InputProcessor
 from vllm.v1.kv_offload.base import LookupResult, ReqContext
 from vllm.v1.kv_offload.cpu.manager import CPUOffloadingManager
+from vllm.v1.request import Request
 
 
 def request(agent, content, required=None, produced=None):
@@ -81,6 +89,64 @@ async def check_stream_identity():
         assert not requests[-1].resumable
 
 
+async def check_rejection_notice_identity():
+    """A refused remote-prefill request's notice reaches the CPU tier as a
+    request of the refused request's own agent, and releases nothing it kept.
+    Without the identity the tier raised, and an exception there ends the
+    engine core for every user."""
+    for extra_args in (None, {}, {'kv_scope': ' '}):
+        try:
+            EngineCoreRequest(
+                request_id='r', prompt_token_ids=[0], mm_features=None,
+                sampling_params=SamplingParams(max_tokens=1, extra_args=extra_args),
+                pooling_params=None, arrival_time=0.0, lora_request=None,
+                cache_salt=None, data_parallel_rank=None,
+            )
+        except VLLMValidationError as error:
+            assert error.parameter == 'kv_scope', error.parameter
+        else:
+            raise AssertionError(f'an engine request generated with {extra_args!r}')
+
+    notify = AsyncMock()
+    serving = SimpleNamespace(
+        has_kv_connector=True,
+        engine_client=SimpleNamespace(notify_kv_transfer_request_rejected=notify),
+        _get_data_parallel_rank=lambda raw_request: None,
+    )
+    refused = ChatCompletionGenerationRequest(
+        model='m', messages=[{'role': 'user', 'content': 'hi'}], kv_scope='agent',
+        kv_transfer_params={'do_remote_prefill': True},
+    )
+    refusal = ErrorResponse(error=ErrorInfo(message='no', type='BadRequest', code=400))
+
+    async def rejected():
+        return refusal
+
+    assert await GenerateBaseServing._with_kv_transfer_rejection_cleanup(
+        serving, rejected(), refused, None) is refusal
+    (request_id, params, scope), _ = notify.await_args
+    assert (request_id, scope) == (refused.request_id, 'agent'), (request_id, scope)
+
+    engine_core = SimpleNamespace(add_request_async=AsyncMock())
+    await AsyncLLM.notify_kv_transfer_request_rejected(
+        SimpleNamespace(engine_core=engine_core), request_id, params, scope)
+    (notice,), _ = engine_core.add_request_async.await_args
+    assert notice.abort_immediately
+    notice = Request.from_engine_core_request(notice, None)
+    assert notice.kv_scope == 'agent'
+
+    manager = CPUOffloadingManager(4)
+    earlier = request('agent', {b'turn': (b'turn',)})
+    store(manager, earlier, [b'turn'])
+    manager.retain_context([b'turn'], earlier)
+    manager.on_request_finished(earlier)
+    context = _create_req_context(notice)
+    manager.on_new_request(context)
+    manager.on_request_finished(context)
+    assert manager._idle_context == {'agent': 'agent'}, manager._idle_context
+    assert manager.lookup(b'turn', earlier) is LookupResult.HIT
+
+
 def main():
     from fastapi import FastAPI
 
@@ -99,6 +165,7 @@ def main():
         "/v1/responses", "/v1/messages", "/inference/v1/generate",
     } <= paths, paths
     asyncio.run(check_stream_identity())
+    asyncio.run(check_rejection_notice_identity())
 
     # Lookup matches content alone. The membership catalog that once let only
     # an ID without cached blocks match another ID's data is gone.

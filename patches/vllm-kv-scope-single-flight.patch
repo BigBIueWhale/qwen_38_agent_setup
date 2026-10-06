@@ -99,7 +99,7 @@ diff --git a/tests/v1/engine/test_kv_scope_single_flight.py b/tests/v1/engine/te
 new file mode 100644
 --- /dev/null
 +++ b/tests/v1/engine/test_kv_scope_single_flight.py
-@@ -0,0 +1,141 @@
+@@ -0,0 +1,146 @@
 +# SPDX-License-Identifier: Apache-2.0
 +# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
 +"""A kv_scope names one line of work, which has at most one request in flight.
@@ -115,6 +115,7 @@ new file mode 100644
 +import pytest
 +
 +from vllm.exceptions import VLLMValidationError
++from vllm.pooling_params import PoolingParams
 +from vllm.sampling_params import RequestOutputKind, SamplingParams
 +from vllm.v1.engine import EngineCoreOutput, EngineCoreRequest, FinishReason
 +from vllm.v1.engine.async_llm import AsyncLLM
@@ -124,7 +125,11 @@ new file mode 100644
 +
 +
 +def _request(name: str, scope: str | None, *, resumable: bool = False):
-+    extra_args = None if scope is None else {"kv_scope": scope}
++    """A generation under ``scope``, or, with none, a pooling request.
++
++    Only a pooling request names no line of work: an engine request cannot be
++    built for generation without one.
++    """
 +    return EngineCoreRequest(
 +        request_id=f"{name}-internal",
 +        external_req_id=name,
@@ -134,11 +139,11 @@ new file mode 100644
 +        lora_request=None,
 +        cache_salt=None,
 +        data_parallel_rank=None,
-+        sampling_params=SamplingParams(
-+            max_tokens=4, detokenize=False, extra_args=extra_args,
++        sampling_params=None if scope is None else SamplingParams(
++            max_tokens=4, detokenize=False, extra_args={"kv_scope": scope},
 +            output_kind=RequestOutputKind.DELTA,
 +        ),
-+        pooling_params=None,
++        pooling_params=PoolingParams(task="embed") if scope is None else None,
 +        resumable=resumable,
 +    )
 +
@@ -188,7 +193,7 @@ new file mode 100644
 +    assert set(processor.request_states) == {"second-internal"}
 +
 +
-+def test_different_ids_and_unscoped_requests_run_side_by_side():
++def test_different_ids_and_pooling_requests_run_side_by_side():
 +    processor = _processor()
 +    _add(processor, _request("a", "line-a"))
 +    _add(processor, _request("b", "line-b"))

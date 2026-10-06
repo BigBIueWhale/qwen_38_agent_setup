@@ -128,15 +128,15 @@ diff --git a/tests/v1/streaming_input/test_async_llm_streaming.py b/tests/v1/str
 diff --git a/vllm/v1/engine/async_llm.py b/vllm/v1/engine/async_llm.py
 --- a/vllm/v1/engine/async_llm.py
 +++ b/vllm/v1/engine/async_llm.py
-@@ -41,7 +41,7 @@
- from vllm.v1.engine import EngineCoreRequest, PauseMode
- from vllm.v1.engine.core_client import EngineCoreClient
- from vllm.v1.engine.exceptions import EngineDeadError, EngineGenerateError
--from vllm.v1.engine.input_processor import InputProcessor
-+from vllm.v1.engine.input_processor import InputProcessor, require_kv_scope
- from vllm.v1.engine.output_processor import OutputProcessor, RequestOutputCollector
- from vllm.v1.engine.parallel_sampling import ParentRequest
- from vllm.v1.executor import Executor
+@@ -30,7 +30,7 @@
+ from vllm.pooling_params import PoolingParams
+ from vllm.renderers import renderer_from_config
+ from vllm.renderers.inputs.preprocess import extract_prompt_components
+-from vllm.sampling_params import RequestOutputKind, SamplingParams
++from vllm.sampling_params import RequestOutputKind, SamplingParams, require_kv_scope
+ from vllm.tasks import SupportedTask
+ from vllm.tokenizers import TokenizerLike
+ from vllm.tracing import init_tracer
 @@ -452,6 +452,7 @@
          session_id: str | None = None,
      ) -> RequestOutputCollector:

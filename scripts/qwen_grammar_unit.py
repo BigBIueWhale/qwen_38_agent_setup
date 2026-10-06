@@ -496,7 +496,7 @@ from vllm.engine.arg_utils import EngineArgs
 from vllm.v1.kv_offload.cpu.manager import CPUOffloadingManager
 from vllm.v1.kv_offload.cpu.spec import CPUOffloadingSpec
 from vllm.v1.kv_offload.base import ReqContext
-from vllm.v1.engine.input_processor import require_kv_scope
+from vllm.sampling_params import require_kv_scope
 
 chat_fields = dict(
     model="qwen3.8", messages=[{"role": "user", "content": "test"}], max_tokens=8,
@@ -524,8 +524,8 @@ scoped_sampling = scoped.to_sampling_params(8, defaults)
 assert scoped_sampling.extra_args["kv_scope"] == "agent_scope"
 assert require_kv_scope(scoped_sampling) == "agent_scope"
 
-# What the render models describe names no agent, and the engine refuses to
-# generate for it: the common gate holds for every caller, not only HTTP.
+# What the render models describe names no agent, and no engine request can
+# be built to generate for it: the gate holds for every caller, not only HTTP.
 for model in (ChatCompletionRequest, CompletionRequest, GenerateRequest):
     assert "kv_scope" not in model.model_fields, model.__name__
 unscoped_sampling = ChatCompletionRequest(**chat_fields).to_sampling_params(8, defaults)

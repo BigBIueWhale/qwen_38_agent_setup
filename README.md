@@ -296,11 +296,11 @@ It is intentionally reconstructed by the ordered, reviewed semantic transformati
 | patches/vllm-qwen38-numerical-audits.patch | dc0b947db3727b522427a204edd1a930d637476a0f66d7d30e2da65c144ac944 |
 | patches/vllm-turboquant-fail-closed-guards.patch | 099bbb99806151fbce342bb4863b32b12fb741669169a3a30365f77b4176bc0d |
 | patches/vllm-kv-offload-pinning-fail-closed.patch | 1857071c38d081bb95e3cca12153cebce096649084950b99229104fdae029ca6 |
-| patches/vllm-generation-requires-agent-id.patch | fb46fefd8ab49b4c26d84613cbee0ee21addfa2772810f271e066ccb7e9f43a0 |
+| patches/vllm-generation-requires-agent-id.patch | c9eb622d308fbaf78cfe617a6a6e25874ea9fdcb5eb8002e81152d85f1982af4 |
 | patches/vllm-attention-growth-keeps-prefix-hash.patch | a6c38a841c05bcd4f5bfc573c99f1c4a849e7399af05b1e53096e15a43a97632 |
 | patches/vllm-grouped-kv-specs-use-layer-geometry.patch | 6bb249bc143a179ca317c72d2bf70ec118baa6f12dca19c0a59da2e3c935b814 |
-| patches/vllm-agent-grouped-offload-retention.patch | c0ecad98c0bb03b70bd06ae980937981280ce98e7ff2503314912410932010a2 |
-| patches/vllm-agentless-generation-routes-unmounted.patch | aad1dd0ff38d76d08ac5793bcf1daca4b0872c562f44cdd5c3a5b09cb1c51f72 |
+| patches/vllm-agent-grouped-offload-retention.patch | 31384f411de30058d10ac67572b1e4abc9634bcb78a66d4b67c4f09f7f1f6439 |
+| patches/vllm-agentless-generation-routes-unmounted.patch | c321d15313839c28542a6fb4d754080443a86aeeecdcdfbc8ea7459a52364b0b |
 | patches/vllm-kv-capacity-in-declared-users.patch | 7a3d2c0ce43e468ed2177f567ac1eb31a70a95e525496a2d8b27f3330f214441 |
 | patches/vllm-kv-declaration-within-physical-bound.patch | c80ae7afa8392c600f6c6f74d6748a2bc14f3aebc4dd0fa2e5a63f79dfaef3d5 |
 | patches/vllm-exact-reasoning-usage.patch | 2179e27460e4239367ac7e2dd3828b9b3db463e79d87ad81433d00fbc6b12395 |
@@ -312,14 +312,14 @@ It is intentionally reconstructed by the ordered, reviewed semantic transformati
 | patches/vllm-responses-history-integrity.patch | 0c0e2bcbb203fd4b40452849f7ebd0e34aa64bdc5b1a86fd110afac60b01f125 |
 | patches/vllm-responses-stream-identity.patch | 451ab26fda73a0d71861159c91ffa69aa6cd9456f303a3ff682f43398695a522 |
 | patches/vllm-anthropic-terminal-metadata.patch | d09c3b0ba5658b864131c46202f53a4b611ca0395bd068feb1a054fcc70f2364 |
-| patches/vllm-generation-sampling-resolution.patch | f352470cfd07b0c7768c3533971629ba65e0b9f5bb9e8f72c528b049f54ea4dd |
+| patches/vllm-generation-sampling-resolution.patch | ebb88fa080f82512ed547debc3e7d7de73fe2b64cad56beacec8140c23ab56c1 |
 | patches/vllm-sampling-decoding-boundary.patch | 85cfffb303c52128b7e3183e5b3d18c3d1f8a906b7b1b6f9d1ddc8010de4bc0f |
 | patches/vllm-token-generation-result-integrity.patch | 94344dd0d8bbd9bc9963d2c4ed730eda2c02aa6e6d1e6c217ba538d7446af96a |
 | patches/vllm-raw-image-token-transport.patch | 7ff7f7fdc9d72fec7948de4cd8968e157756345ab8487281a36689ed3aa82a63 |
 | patches/vllm-xml-text-fidelity.patch | 73e973029f05bd88e5faa7bc1f5a38bac75ef5afcd562981be0961c3b830c6ab |
 | patches/vllm-phase-aware-parser-terminals.patch | 8e9adb65b71b6ba7e3e79ea50ecc37ca9129820ac94a41c71c5286d8d5de68f8 |
-| patches/vllm-input-stream-agent-identity.patch | f812362220f83b904d56e55e9c359918990c55e39d7a0750d1011840d377dfb4 |
-| patches/vllm-tool-output-completion.patch | 081c62e507fca24dc2d27f71f9fae7f8f511a5d545d4a447f0c8a8e7328d8eb3 |
+| patches/vllm-input-stream-agent-identity.patch | caee1588ff260cb866404a91889b3962f8f94b468fa5f5eb81720f1e8c88d67a |
+| patches/vllm-tool-output-completion.patch | 28f49b69af72f1caca3d716cdfe58b96626e1411c8599b49253946ee2cad6090 |
 | patches/vllm-one-way-thinking-boundary.patch | 63a69aea8a184a3875f50673a55058fb9e14dc3178abd8c5510de2770022f346 |
 | patches/vllm-schema-faithful-xml.patch | bd5475972df5b62dd4a0b2b67e68640987f018cf9b14870edf6569a6b0cd8dcc |
 | patches/vllm-token-text-provenance.patch | 954b36cb444f7e644e29d13f7a9d3c000512a0d616bbf2b6cd3cb8f4e880dd44 |
@@ -328,7 +328,7 @@ It is intentionally reconstructed by the ordered, reviewed semantic transformati
 | patches/vllm-qwen-owned-tool-grammar.patch | 8eca87e7046eb5b01f37ebc93cafaec01479558ef102201dd74ef3ae8ad8a665 |
 | patches/vllm-qwen-unique-tool-parameters.patch | 6a76a61c743807215555cbd6b3bbdd8fcaba4abcaca69ef000d301df6c792d3b |
 | patches/vllm-generation-admission-before-response.patch | 59678e08ffb6e4b5cc2d8d01b7876e4732e9b6e5fc7b128c544540aace8464b4 |
-| patches/vllm-kv-scope-single-flight.patch | cc5e52403afd4e4764693da552e9252bbf204793566fff6a27fb87b4dbd28d13 |
+| patches/vllm-kv-scope-single-flight.patch | b84b915c38e2c1d32b278bf88dcd5ac7228b9a680b746e2842783dbe1942540a |
 | patches/vllm-template-authored-control-tokens.patch | 1f6b9e898c3b7d3620d2ad3ee8dce70aa7d320e211788ff4fe030468870bc37b |
 | patches/vllm-nvfp4-native-kernel-required.patch | 9d9ce188b6670d687a725c4cdca37478f9dc78ef9f19685ddbcf5e9edd53b8b7 |
 | patches/vllm-qwen-arguments-read-by-grammar.patch | c8d40913648479bfaf0ee90d8274be5914bd15f7ef235d2c6017f351fb499c97 |
@@ -383,9 +383,9 @@ Pinned build inputs and products:
 |---|---|
 | Immutable base tag | qwen38-vllm:main-9df9b0b |
 | Immutable base ID | sha256:fa4a002a88b7043a1a89966dea8a500fe9696f84e75730d9da916f916048d401 |
-| Runtime Dockerfile SHA-256 | e58ca999ada5321cf77b4f50eaff9e72f04479a7924dc01f10e205c0f7528d61 |
-| Build verifier SHA-256 | e3371e220d7e3e3e346a0251cbabe4e1a98b7c8aaab53ec9ee379f2365454735 |
-| Runtime validator SHA-256 | d7b050d01a3a4bb32577c49e03d148f29eb1e89d92e375e45b096775423d0a36 |
+| Runtime Dockerfile SHA-256 | 393497d3d72151b6caa7a0b405dd4d983cd8a08e0d26bc43cb08d9f60d31fa41 |
+| Build verifier SHA-256 | d9625db290964628d5a43b134f2ad17c7a1d8e335de495703b20c7bbf9e1bbef |
+| Runtime validator SHA-256 | 357fdaed8d5a8ad0d901eaf07e5357722b74400c99d96b6f30572a557426b4fc |
 
 The runtime image's profile, tag and archive name, which every release advances
 together, are declared in `config/runtime-v1.sh`, and the archive lives under
