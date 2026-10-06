@@ -119,8 +119,9 @@ def generation(text, ids, finish, stop):
 
 
 def parse(text, chunk_size, *, tools=None, choice="auto", ids=None,
-          finish="stop", stop=None):
-    request = request_for(tools=tools, choice=choice)
+          finish="stop", stop=None, request=None):
+    if request is None:
+        request = request_for(tools=tools, choice=choice)
     parser = PARSER(TOKENIZER, request.tools, chat_template_kwargs=CHAT_TEMPLATE_KWARGS)
     ids, texts = generation(text, ids, finish, stop)
     if chunk_size is None:
@@ -660,6 +661,75 @@ class ToolOutputParserTest(unittest.TestCase):
                         parse("plan</think>\n\n" + call("one"), chunk, choice=choice)[:3],
                         ("plan", "\n\n", [("write", '{"text": "one"}')]),
                     )
+
+    def test_a_responses_choice_enforces_exactly_the_offered_functions(self):
+        """Responses offers a namespace's function under its flat name. The
+        prompt, the armed grammar and the parser read that one list: the
+        grammar admits a call to exactly the offered names the choice allows,
+        both transports parse it alike, and a choice the grammar cannot
+        enforce is refused naming the parameter, never a server error."""
+        from vllm.entrypoints.openai.responses.protocol import ResponsesRequest
+        from vllm.entrypoints.openai.responses.utils import construct_tool_dicts
+        from vllm.exceptions import VLLMValidationError
+
+        schema = TOOL["function"]["parameters"]
+        function = {"type": "function", "name": "write", "parameters": schema}
+        namespace = {"type": "namespace", "name": "fs", "description": "files",
+                     "tools": [{"type": "function", "name": "save",
+                                "parameters": schema}]}
+        hosted = {"type": "web_search_preview"}
+
+        def request(choice, tools=(function, namespace, hosted)):
+            return ResponsesRequest.model_validate(
+                {"model": "unit", "input": "test", "tools": list(tools),
+                 "tool_choice": choice, "kv_scope": "unit"})
+
+        def named(name):
+            return call("one").replace("<function=write>", f"<function={name}>")
+
+        def allowed(mode, name):
+            return {"type": "allowed_tools", "mode": mode,
+                    "tools": [{"type": "function", "name": name}]}
+
+        enforced = (
+            ("auto", {"write", "fs__save"}),
+            ("required", {"write", "fs__save"}),
+            ({"type": "function", "name": "fs__save"}, {"fs__save"}),
+            (allowed("auto", "fs__save"), {"fs__save"}),
+            (allowed("required", "write"), {"write"}),
+        )
+        for choice, callable_names in enforced:
+            offered = {tool["function"]["name"] for tool in
+                       construct_tool_dicts(request(choice).tools, choice)}
+            self.assertEqual(offered, {"write", "fs__save"})
+            for name in (*offered, "save"):
+                with self.subTest(choice=choice, name=name):
+                    matcher = grammar_matcher(request(choice))
+                    walked = all(matcher.accept_token(token)
+                                 for token in encode("\n\n" + named(name)))
+                    self.assertEqual(
+                        walked and matcher.accept_token(MODEL_EOS[0]),
+                        name in callable_names,
+                    )
+            for name in callable_names:
+                for chunk in (None, 1, 13):
+                    with self.subTest(choice=choice, name=name, chunk=chunk):
+                        self.assertEqual(
+                            parse("plan</think>\n\n" + named(name), chunk,
+                                  request=request(choice))[2],
+                            [(name, '{"text": "one"}')],
+                        )
+        refused = (
+            ({"type": "function", "name": "save"}, (function, namespace), "tool_choice"),
+            (hosted, (function, namespace, hosted), "tool_choice"),
+            (allowed("auto", "save"), (function, namespace), "tool_choice.tools[0]"),
+            ("required", (hosted,), "tool_choice"),
+        )
+        for choice, tools, parameter in refused:
+            with self.subTest(refused=choice, tools=tools):
+                with self.assertRaises(VLLMValidationError) as refusal:
+                    grammar_matcher(request(choice, tools))
+                self.assertEqual(refusal.exception.parameter, parameter)
 
 
 if __name__ == "__main__":

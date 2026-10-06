@@ -1,0 +1,735 @@
+diff --git a/tests/tool_parsers/test_structural_tag_registry.py b/tests/tool_parsers/test_structural_tag_registry.py
+index 1df9457ba69ba1e1ce9f780feac756d2ea890cad..cd0c8115a011819065c36b7c0213c5dac3355441 100644
+--- a/tests/tool_parsers/test_structural_tag_registry.py
++++ b/tests/tool_parsers/test_structural_tag_registry.py
+@@ -1237,3 +1237,90 @@ def test_kimi_k3_forced_tool_choice_builds_single_mandatory_call():
+     response_only = _k3_response("no call here")
+     assert _is_grammar_accept_string(grammar, ok)
+     assert not _is_grammar_accept_string(grammar, response_only)
++
++
++_RESPONSES_PATH = {
++    "type": "object",
++    "properties": {"path": {"type": "string"}},
++    "required": ["path"],
++}
++_RESPONSES_TOOLS = [
++    {"type": "function", "name": "read_file", "parameters": _RESPONSES_PATH},
++    {
++        "type": "namespace",
++        "name": "fs",
++        "description": "Files",
++        "tools": [{"type": "function", "name": "stat", "parameters": _RESPONSES_PATH}],
++    },
++]
++
++
++def _responses_request(tools, tool_choice):
++    from vllm.entrypoints.openai.responses.protocol import ResponsesRequest
++
++    return ResponsesRequest.model_validate(
++        {"input": "hi", "tools": tools, "tool_choice": tool_choice, "kv_scope": "a"}
++    )
++
++
++def _responses_call(name: str) -> str:
++    return (
++        f"<tool_call>\n<function={name}>\n<parameter=path>\na.txt\n</parameter>"
++        "\n</function>\n</tool_call>"
++    )
++
++
++@pytest.mark.parametrize(
++    "tool_choice, callable_names",
++    [
++        ("auto", {"read_file", "fs__stat"}),
++        ("required", {"read_file", "fs__stat"}),
++        ({"type": "function", "name": "fs__stat"}, {"fs__stat"}),
++        (
++            {
++                "type": "allowed_tools",
++                "mode": "auto",
++                "tools": [{"type": "function", "name": "read_file"}],
++            },
++            {"read_file"},
++        ),
++        (
++            {
++                "type": "allowed_tools",
++                "mode": "required",
++                "tools": [{"type": "function", "name": "fs__stat"}],
++            },
++            {"fs__stat"},
++        ),
++    ],
++)
++def test_qwen3_admits_the_names_the_responses_prompt_offers(
++    tool_choice, callable_names
++):
++    """The template offers a namespace's function under its flat name
++    (construct_tool_dicts); the grammar admits a call exactly to the offered
++    names the choice allows, and to nothing the model was never shown."""
++    from vllm.entrypoints.openai.responses.utils import construct_tool_dicts
++
++    request = _responses_request(_RESPONSES_TOOLS, tool_choice)
++    offered = {
++        tool["function"]["name"]
++        for tool in construct_tool_dicts(request.tools, request.tool_choice)
++    }
++    assert offered == {"read_file", "fs__stat"}
++    grammar = _qwen3_grammar(request.tool_choice, None, tools=request.tools)
++    for name in (*offered, "stat", "fs"):
++        assert _is_grammar_accept_string(grammar, _responses_call(name)) is (
++            name in callable_names
++        ), name
++
++
++def test_qwen3_required_refuses_tools_that_offer_no_function():
++    """A builtin tool is neither written into the prompt nor callable in this
++    format, so 'required' over builtins alone has nothing to require."""
++    from vllm.exceptions import VLLMValidationError
++
++    request = _responses_request([{"type": "web_search_preview"}], "required")
++    with pytest.raises(VLLMValidationError) as refused:
++        _qwen3_grammar(request.tool_choice, None, tools=request.tools)
++    assert refused.value.parameter == "tool_choice"
+diff --git a/tests/tool_use/test_responses_request_validations.py b/tests/tool_use/test_responses_request_validations.py
+index b50482960c820208d81fcd9aaae2fcdb1e5ce440..f4c7cf36c5723219424caf89575589ad1ca7274a 100644
+--- a/tests/tool_use/test_responses_request_validations.py
++++ b/tests/tool_use/test_responses_request_validations.py
+@@ -25,28 +25,56 @@ NAMED_TOOL_CHOICE = {
+     "name": "get_weather",
+ }
+ 
++NAMESPACE_TOOL = {
++    "type": "namespace",
++    "name": "fs",
++    "description": "Files",
++    "tools": [
++        {
++            "type": "function",
++            "name": "stat",
++            "parameters": {
++                "type": "object",
++                "properties": {"path": {"type": "string"}},
++                "required": ["path"],
++            },
++        }
++    ],
++}
++
++
++def _validate(body: dict) -> ResponsesRequest:
++    """Every generation names its line of work; these tests concern tools."""
++    return ResponsesRequest.model_validate({"kv_scope": "agent", **body})
++
++
++def _refusal(body: dict) -> VLLMValidationError:
++    with pytest.raises(VLLMValidationError) as caught:
++        _validate(body)
++    return caught.value
++
+ 
+ def test_responses_request_with_no_tools():
+     # tools key is not present — defaults tool_choice to "none"
+-    request = ResponsesRequest.model_validate({"input": "Hello", "model": "test-model"})
++    request = _validate({"input": "Hello", "model": "test-model"})
+     assert request.tool_choice == "none"
+ 
+     # tools key present but empty
+-    request = ResponsesRequest.model_validate(
++    request = _validate(
+         {"input": "Hello", "model": "test-model", "tools": []}
+     )
+     assert request.tool_choice == "none"
+ 
+ 
+ def test_responses_request_no_tools_tool_choice_none():
+-    request = ResponsesRequest.model_validate(
++    request = _validate(
+         {"input": "Hello", "model": "test-model", "tool_choice": "none"}
+     )
+     assert request.tool_choice == "none"
+ 
+ 
+ def test_responses_request_no_tools_tool_choice_auto():
+-    request = ResponsesRequest.model_validate(
++    request = _validate(
+         {"input": "Hello", "model": "test-model", "tool_choice": "auto"}
+     )
+     assert request.tool_choice == "none"
+@@ -60,12 +88,12 @@ def test_responses_request_required_without_tools(tools):
+     with pytest.raises(
+         VLLMValidationError, match="Tool choice 'required' must be specified"
+     ):
+-        ResponsesRequest.model_validate(kwargs)
++        _validate(kwargs)
+ 
+ 
+ def test_responses_request_named_tool_choice_without_tools():
+     with pytest.raises(VLLMValidationError, match="not found in 'tools' parameter"):
+-        ResponsesRequest.model_validate(
++        _validate(
+             {
+                 "input": "Hello",
+                 "model": "test-model",
+@@ -75,14 +103,14 @@ def test_responses_request_named_tool_choice_without_tools():
+ 
+ 
+ def test_responses_request_with_tools_default_tool_choice():
+-    request = ResponsesRequest.model_validate(
++    request = _validate(
+         {"input": "Hello", "model": "test-model", "tools": [SAMPLE_TOOL]}
+     )
+     assert request.tool_choice == "auto"
+ 
+ 
+ def test_responses_request_with_tools_tool_choice_none():
+-    request = ResponsesRequest.model_validate(
++    request = _validate(
+         {
+             "input": "Hello",
+             "model": "test-model",
+@@ -94,7 +122,7 @@ def test_responses_request_with_tools_tool_choice_none():
+ 
+ 
+ def test_responses_request_named_tool_choice_matching():
+-    request = ResponsesRequest.model_validate(
++    request = _validate(
+         {
+             "input": "Hello",
+             "model": "test-model",
+@@ -108,7 +136,7 @@ def test_responses_request_named_tool_choice_matching():
+ 
+ def test_responses_request_named_tool_choice_not_matching():
+     with pytest.raises(VLLMValidationError, match="not found in 'tools' parameter"):
+-        ResponsesRequest.model_validate(
++        _validate(
+             {
+                 "input": "Hello",
+                 "model": "test-model",
+@@ -119,7 +147,7 @@ def test_responses_request_named_tool_choice_not_matching():
+ 
+ 
+ def test_responses_request_with_tools_tool_choice_auto():
+-    request = ResponsesRequest.model_validate(
++    request = _validate(
+         {
+             "input": "Hello",
+             "model": "test-model",
+@@ -131,7 +159,7 @@ def test_responses_request_with_tools_tool_choice_auto():
+ 
+ 
+ def test_responses_request_with_tools_tool_choice_required():
+-    request = ResponsesRequest.model_validate(
++    request = _validate(
+         {
+             "input": "Hello",
+             "model": "test-model",
+@@ -143,14 +171,14 @@ def test_responses_request_with_tools_tool_choice_required():
+ 
+ 
+ def test_responses_request_empty_tools_tool_choice_none():
+-    request = ResponsesRequest.model_validate(
++    request = _validate(
+         {"input": "Hello", "model": "test-model", "tools": [], "tool_choice": "none"}
+     )
+     assert request.tool_choice == "none"
+ 
+ 
+ def test_responses_request_empty_tools_tool_choice_auto():
+-    request = ResponsesRequest.model_validate(
++    request = _validate(
+         {"input": "Hello", "model": "test-model", "tools": [], "tool_choice": "auto"}
+     )
+     assert request.tool_choice == "none"
+@@ -165,7 +193,7 @@ def test_responses_request_empty_tools_tool_choice_auto():
+ )
+ def test_responses_request_named_tool_choice_missing_name(tool_choice):
+     with pytest.raises(VLLMValidationError, match="not found in 'tools' parameter"):
+-        ResponsesRequest.model_validate(
++        _validate(
+             {
+                 "input": "Hello",
+                 "model": "test-model",
+@@ -177,7 +205,7 @@ def test_responses_request_named_tool_choice_missing_name(tool_choice):
+ 
+ def test_responses_request_empty_tools_named_tool_choice():
+     with pytest.raises(VLLMValidationError, match="not found in 'tools' parameter"):
+-        ResponsesRequest.model_validate(
++        _validate(
+             {
+                 "input": "Hello",
+                 "model": "test-model",
+@@ -202,7 +230,7 @@ def test_responses_request_empty_tools_named_tool_choice():
+ def test_responses_response_parallel_tool_calls_null_resolves_to_default(
+     value, expected
+ ):
+-    request = ResponsesRequest.model_validate(
++    request = _validate(
+         {"input": "Hello", "model": "test-model", "parallel_tool_calls": value}
+     )
+     sampling_params = request.to_sampling_params(default_max_tokens=16)
+@@ -220,7 +248,88 @@ def test_responses_response_parallel_tool_calls_null_resolves_to_default(
+ 
+ def test_responses_request_parallel_tool_calls_null_accepted():
+     """Client sending null must be accepted at request validation time."""
+-    req = ResponsesRequest.model_validate(
++    req = _validate(
+         {"input": "Hello", "model": "test-model", "parallel_tool_calls": None}
+     )
+     assert req.parallel_tool_calls is None
++
++
++def test_responses_request_names_a_namespace_function_by_its_flat_name():
++    """The template offers a namespace's function as ``fs__stat``; a choice
++    names it the way the model is offered it."""
++    request = _validate(
++        {
++            "input": "Hello",
++            "model": "test-model",
++            "tools": [SAMPLE_TOOL, NAMESPACE_TOOL],
++            "tool_choice": {"type": "function", "name": "fs__stat"},
++        }
++    )
++    assert request.tool_choice.name == "fs__stat"
++
++
++def test_responses_request_refuses_a_name_the_model_is_not_offered():
++    error = _refusal(
++        {
++            "input": "Hello",
++            "model": "test-model",
++            "tools": [SAMPLE_TOOL, NAMESPACE_TOOL],
++            "tool_choice": {"type": "function", "name": "stat"},
++        }
++    )
++    assert error.parameter == "tool_choice"
++    assert "fs__stat, get_weather" in str(error)
++
++
++@pytest.mark.parametrize("mode", ["auto", "required"])
++def test_responses_request_allowed_tools_lists_offered_functions(mode):
++    request = _validate(
++        {
++            "input": "Hello",
++            "model": "test-model",
++            "tools": [SAMPLE_TOOL, NAMESPACE_TOOL],
++            "tool_choice": {
++                "type": "allowed_tools",
++                "mode": mode,
++                "tools": [{"type": "function", "name": "fs__stat"}],
++            },
++        }
++    )
++    assert request.tool_choice.mode == mode
++
++
++@pytest.mark.parametrize(
++    "references, parameter",
++    [
++        ([], "tool_choice.tools"),
++        ([{"type": "function", "name": "stat"}], "tool_choice.tools[0]"),
++        ([{"type": "web_search_preview"}], "tool_choice.tools[0]"),
++    ],
++)
++def test_responses_request_allowed_tools_refuses_what_it_cannot_enforce(
++    references, parameter
++):
++    error = _refusal(
++        {
++            "input": "Hello",
++            "model": "test-model",
++            "tools": [SAMPLE_TOOL, NAMESPACE_TOOL, {"type": "web_search_preview"}],
++            "tool_choice": {"type": "allowed_tools", "mode": "auto", "tools": references},
++        }
++    )
++    assert error.parameter == parameter
++
++
++@pytest.mark.parametrize("tools", [[], [SAMPLE_TOOL, {"type": "web_search_preview"}]])
++def test_responses_request_refuses_a_hosted_tool_choice(tools):
++    """Only a function can be enforced; a hosted choice was neither armed nor
++    parsed, so the model's call to it reached the caller as text."""
++    error = _refusal(
++        {
++            "input": "Hello",
++            "model": "test-model",
++            "tools": tools,
++            "tool_choice": {"type": "web_search_preview"},
++        }
++    )
++    assert error.parameter == "tool_choice"
+diff --git a/vllm/entrypoints/openai/responses/protocol.py b/vllm/entrypoints/openai/responses/protocol.py
+index 5494548ca762b840352d21caba206842b1c97ae0..bfd66d665465022230bbc0fcd774c4672a6c78c0 100644
+--- a/vllm/entrypoints/openai/responses/protocol.py
++++ b/vllm/entrypoints/openai/responses/protocol.py
+@@ -50,6 +50,8 @@ from openai.types.responses.response_reasoning_item import (
+     Content as ResponseReasoningTextContent,
+ )
+ from openai.types.responses.tool import Tool
++from openai.types.responses.tool_choice_allowed import ToolChoiceAllowed
++from openai.types.responses.tool_choice_function import ToolChoiceFunction
+ from openai.types.shared import Metadata, Reasoning
+ from openai_harmony import Message as OpenAIHarmonyMessage
+ from pydantic import (
+@@ -665,28 +667,69 @@ class ResponsesRequest(OpenAIBaseModel):
+                     "Tool choice 'function' not found in 'tools' parameter.",
+                     parameter="tool_choice",
+                 )
+-        elif is_named_tool_choice and tools is not None:
+-            tool_name = tool_choice.get("name")
+-            tool_names = set()
+-            for tool in tools:
+-                if isinstance(tool, dict):
+-                    if tool.get("type") == "namespace":
+-                        namespace = tool.get("name")
+-                        for namespaced_tool in tool.get("tools", []):
+-                            namespaced_name = namespaced_tool.get("name")
+-                            tool_names.add(namespaced_name)
+-                            tool_names.add(f"{namespace}__{namespaced_name}")
+-                    else:
+-                        tool_names.add(tool.get("name"))
+-                else:
+-                    tool_names.add(getattr(tool, "name", None))
+-            if not tool_name or tool_name not in tool_names:
++        elif is_named_tool_choice and not tool_choice.get("name"):
++            raise VLLMValidationError(
++                "Tool choice 'function' not found in 'tools' parameter: it "
++                "names no function. Name one of the functions in `tools`.",
++                parameter="tool_choice",
++            )
++
++        return data
++
++    @model_validator(mode="after")
++    def check_tool_choice_calls_offered_functions(self) -> "ResponsesRequest":
++        """A choice is enforced by the tool grammar, which admits exactly the
++        functions the template offers the model, under the flat names it
++        offers them by. A choice the grammar cannot enforce is refused."""
++        choice = self.tool_choice
++        if isinstance(choice, str):
++            return self
++        # The tool parsers import this module.
++        from vllm.tool_parsers.utils import response_function_tool_names
++
++        offered = response_function_tool_names(self.tools)
++        offered_text = (
++            ", ".join(sorted(offered)) if offered else "none: `tools` declares no function"
++        )
++        if isinstance(choice, ToolChoiceFunction):
++            if choice.name not in offered:
+                 raise VLLMValidationError(
+-                    "Tool choice 'function' not found in 'tools' parameter.",
++                    f"Tool choice 'function' not found in 'tools' parameter: "
++                    f"{choice.name!r} is not a function the model is offered. "
++                    f"The model is offered: {offered_text}. A function inside "
++                    "a namespace is named by its namespace and its name joined "
++                    "by '__'.",
+                     parameter="tool_choice",
+                 )
+-
+-        return data
++        elif isinstance(choice, ToolChoiceAllowed):
++            if not choice.tools:
++                raise VLLMValidationError(
++                    "tool_choice allowed_tools names no function. Name at "
++                    "least one function from `tools`, or send tool_choice "
++                    "'none' to allow no call.",
++                    parameter="tool_choice.tools",
++                )
++            for index, reference in enumerate(choice.tools):
++                if (
++                    reference.get("type") != "function"
++                    or reference.get("name") not in offered
++                ):
++                    raise VLLMValidationError(
++                        f"tool_choice.tools[{index}] is {reference!r}; "
++                        "allowed_tools may list only functions the model is "
++                        "offered, as {'type': 'function', 'name': ...}. The "
++                        f"model is offered: {offered_text}.",
++                        parameter=f"tool_choice.tools[{index}]",
++                    )
++        else:
++            raise VLLMValidationError(
++                f"tool_choice of type {choice.type!r} cannot be enforced: the "
++                "model can be made to call only a function from `tools`. Send "
++                "'auto' or 'required', name a function, or list functions "
++                "under allowed_tools.",
++                parameter="tool_choice",
++            )
++        return self
+ 
+ 
+ class ResponsesResponse(OpenAIBaseModel):
+diff --git a/vllm/entrypoints/openai/responses/serving.py b/vllm/entrypoints/openai/responses/serving.py
+index 4fbff109f0a780de709e68b1b977907fdd4ba777..3d6d0a907d6f600f3537cedb22d72a95cc76968a 100644
+--- a/vllm/entrypoints/openai/responses/serving.py
++++ b/vllm/entrypoints/openai/responses/serving.py
+@@ -88,7 +88,6 @@ from vllm.entrypoints.openai.responses.utils import (
+     build_response_output_items,
+     construct_input_messages,
+     construct_tool_dicts,
+-    extract_function_tool_names,
+     extract_tool_types,
+ )
+ from vllm.entrypoints.serve.utils.api_utils import get_max_tokens
+@@ -104,6 +103,7 @@ from vllm.parser import Parser, ParserManager
+ from vllm.renderers.online_renderer import OnlineRenderer
+ from vllm.sampling_params import SamplingParams, StructuredOutputsParams
+ from vllm.tokenizers import TokenizerLike
++from vllm.tool_parsers.utils import response_function_tool_names
+ from vllm.utils import random_uuid
+ from vllm.utils.collection_utils import as_list
+ 
+@@ -467,7 +467,7 @@ class OpenAIServingResponses(GenerateBaseServing):
+             )
+ 
+             context: ConversationContext
+-            function_tool_names = extract_function_tool_names(request.tools)
++            function_tool_names = response_function_tool_names(request.tools)
+             if self.use_harmony:
+                 context = HarmonyContext(
+                     messages,
+diff --git a/vllm/entrypoints/openai/responses/utils.py b/vllm/entrypoints/openai/responses/utils.py
+index 59b0df7d697d670cc06fa1981ae06a74f6b6323a..4b1b67e85dc8b50303e28394f3cdcf1709d0885f 100644
+--- a/vllm/entrypoints/openai/responses/utils.py
++++ b/vllm/entrypoints/openai/responses/utils.py
+@@ -346,20 +346,6 @@ def _construct_message_from_response_item(
+     return deepcopy(item)  # type: ignore[arg-type]
+ 
+ 
+-def extract_function_tool_names(tools: list[Tool]) -> frozenset[str]:
+-    names = []
+-    for tool in tools:
+-        if tool.type == "function":
+-            names.append(tool.name)
+-        elif tool.type == "namespace":
+-            names.extend(
+-                flat_namespace_tool_name(tool.name, namespaced_tool.name)
+-                for namespaced_tool in tool.tools
+-                if namespaced_tool.type == "function"
+-            )
+-    return frozenset(names)
+-
+-
+ def extract_tool_types(tools: list[Tool]) -> set[str]:
+     """
+     Extracts the tool types from the given tools.
+diff --git a/vllm/parser/abstract_parser.py b/vllm/parser/abstract_parser.py
+index ad0e5914682a5b4644c8b727f75257a9d58681cc..78cb078bf5a4c3d48143540b65c7bbbaf86ff889 100644
+--- a/vllm/parser/abstract_parser.py
++++ b/vllm/parser/abstract_parser.py
+@@ -8,7 +8,7 @@ from collections.abc import Sequence
+ from dataclasses import dataclass, field
+ from functools import cached_property
+ 
+-from openai.types.responses import ToolChoiceFunction
++from openai.types.responses import ToolChoiceAllowed, ToolChoiceFunction
+ from pydantic import TypeAdapter, ValidationError
+ 
+ from vllm.entrypoints.chat_utils import (
+@@ -28,6 +28,7 @@ from vllm.entrypoints.openai.engine.protocol import (
+     FunctionDefinition,
+ )
+ from vllm.entrypoints.openai.responses.protocol import ResponsesRequest
++from vllm.exceptions import VLLMValidationError
+ from vllm.logger import init_logger
+ from vllm.parser.metrics import record_tool_parser_invocation
+ from vllm.parser.utils import count_history_tool_calls
+@@ -619,11 +620,18 @@ class DelegatingParser(Parser):
+             (ToolChoiceFunction, ChatCompletionNamedToolChoiceParam),
+         )
+         is_required_tool_choice = request.tool_choice == "required"
++        # allowed_tools is armed only as a tool grammar (_apply_structural_tag
++        # refuses it otherwise), whose calls are read like an auto turn's.
++        is_allowed_tool_choice = isinstance(request.tool_choice, ToolChoiceAllowed)
+         is_auto_tool_choice = enable_auto_tools and (
+             request.tool_choice == "auto"
+             or (
+                 not supports_required_and_named
+-                and (is_named_tool_choice or is_required_tool_choice)
++                and (
++                    is_named_tool_choice
++                    or is_required_tool_choice
++                    or is_allowed_tool_choice
++                )
+             )
+         )
+ 
+@@ -707,11 +715,7 @@ class DelegatingParser(Parser):
+     def _apply_structural_tag(
+         self, request: ChatCompletionRequest | ResponsesRequest
+     ) -> ChatCompletionRequest | ResponsesRequest:
+-        if (
+-            self._tool_parser is None
+-            or self._tool_parser.structural_tag_model is None
+-            or not request.tools
+-        ):
++        if self._tool_parser is None or not request.tools:
+             return request
+ 
+         need_tool_calling = (
+@@ -719,7 +723,11 @@ class DelegatingParser(Parser):
+             or request.tool_choice == "required"
+             or isinstance(
+                 request.tool_choice,
+-                (ChatCompletionNamedToolChoiceParam, ToolChoiceFunction),
++                (
++                    ChatCompletionNamedToolChoiceParam,
++                    ToolChoiceFunction,
++                    ToolChoiceAllowed,
++                ),
+             )
+         )
+         if not need_tool_calling:
+@@ -730,6 +738,15 @@ class DelegatingParser(Parser):
+             reasoning=False,
+         )
+         if structure_tag is None:
++            if isinstance(request.tool_choice, ToolChoiceAllowed):
++                # Only the grammar can keep the model to the listed subset.
++                raise VLLMValidationError(
++                    "tool_choice allowed_tools is enforced by a tool-call "
++                    "grammar, and this server's tool parser builds none. Send "
++                    "the allowed functions as `tools` with tool_choice 'auto' "
++                    "or 'required'.",
++                    parameter="tool_choice",
++                )
+             return request
+ 
+         structural_tag = json.dumps(structure_tag.model_dump())
+diff --git a/vllm/tool_parsers/structural_tag_registry.py b/vllm/tool_parsers/structural_tag_registry.py
+index 9019f53df2439b1141268d774b3ff24d22145cb7..cffd9945ead0fe57171860714532aa7f0ec2efe0 100644
+--- a/vllm/tool_parsers/structural_tag_registry.py
++++ b/vllm/tool_parsers/structural_tag_registry.py
+@@ -7,7 +7,7 @@ from collections.abc import Callable, Iterator, Sequence
+ from dataclasses import dataclass
+ from typing import Any, Literal, TypeAlias
+ 
+-from openai.types.responses import FunctionTool
++from openai.types.responses import FunctionTool, NamespaceTool
+ from openai.types.responses.response import ToolChoice as ResponsesToolChoice
+ from openai.types.responses.tool import Tool as ResponsesTool
+ from openai.types.responses.tool_choice_allowed import ToolChoiceAllowed
+@@ -38,6 +38,7 @@ from vllm.entrypoints.openai.chat_completion.protocol import (
+     ChatCompletionToolsParam,
+ )
+ from vllm.exceptions import VLLMValidationError
++from vllm.tool_parsers.utils import iter_response_function_tool_dicts
+ 
+ ToolChoice: TypeAlias = (
+     Literal["none", "auto", "required"]
+@@ -94,10 +95,13 @@ def _any_tool_strict(
+     tools: Sequence[ChatCompletionToolsParam | ResponsesTool],
+ ) -> bool:
+     for tool in tools:
+-        if isinstance(tool, FunctionTool) and tool.strict is True:
+-            return True
+         if isinstance(tool, ChatCompletionToolsParam) and tool.function.strict is True:
+             return True
++        if isinstance(tool, (FunctionTool, NamespaceTool)) and any(
++            function.get("strict") is True
++            for function in iter_response_function_tool_dicts([tool])
++        ):
++            return True
+     return False
+ 
+ 
+@@ -126,7 +130,7 @@ def get_model_structural_tag(
+     ):
+         return None
+ 
+-    dumped_tools = [_dump_tool_for_xgrammar(tool) for tool in tools]
++    dumped_tools = _dump_tools_for_xgrammar(tools)
+     if model == "qwen_3_coder":
+         # XGrammar deliberately interprets ``strict: false`` as an instruction
+         # to replace the parameter schema with ``true``. That best-effort
+@@ -170,24 +174,36 @@ def get_model_structural_tag(
+     )
+ 
+ 
+-def _dump_tool_for_xgrammar(
+-    tool: ChatCompletionToolsParam | ResponsesTool,
+-) -> dict[str, Any]:
+-    """Convert tool objects to xgrammar's Chat Completions tool protocol."""
++def _dump_tools_for_xgrammar(
++    tools: Sequence[ChatCompletionToolsParam | ResponsesTool],
++) -> list[dict[str, Any]]:
++    """Convert tool objects to xgrammar's Chat Completions tool protocol.
++
++    A Responses function tool, and each function of a namespace, is the
++    function the template shows the model: ``iter_response_function_tool_dicts``
++    gives the prompt, the grammar and the parser one list, so a namespace's
++    function is admitted under the same flat name the model is offered it by.
++    Any other Responses tool is a builtin to xgrammar.
++    """
++
++    dumped_tools: list[dict[str, Any]] = []
++    for tool in tools:
++        if isinstance(tool, (FunctionTool, NamespaceTool)):
++            dumped_tools.extend(
++                _dump_function_for_xgrammar(function)
++                for function in iter_response_function_tool_dicts([tool])
++            )
++        else:
++            dumped_tools.append(tool.model_dump(mode="json", exclude_none=True))
++    return dumped_tools
++
+ 
+-    if isinstance(tool, FunctionTool):
+-        function: dict[str, Any] = {"name": tool.name}
+-        if tool.description is not None:
+-            function["description"] = tool.description
+-        if tool.parameters is not None:
+-            function["parameters"] = tool.parameters
+-        if tool.strict is not None:
+-            function["strict"] = tool.strict
+-        return {"type": "function", "function": function}
+-    dumped_tool = tool.model_dump(mode="json", exclude_none=True)
+-    if isinstance(tool, ChatCompletionToolsParam):
+-        return dumped_tool
+-    return dict(dumped_tool)
++def _dump_function_for_xgrammar(function: dict[str, Any]) -> dict[str, Any]:
++    dumped: dict[str, Any] = {"name": function["name"]}
++    for key in ("description", "parameters", "strict"):
++        if function.get(key) is not None:
++            dumped[key] = function[key]
++    return {"type": "function", "function": dumped}
+ 
+ 
+ def _dump_tool_choice_for_xgrammar(
+@@ -1217,6 +1233,16 @@ def get_qwen_3_coder_structural_tag(
+             )
+         answer = tags[0]
+     else:
++        if not tags:
++            # Only a function can be called in this format: a builtin tool is
++            # neither written into the prompt nor callable here.
++            raise VLLMValidationError(
++                "tool_choice 'required' needs a function the model can call, "
++                "and `tools` declares none: the prompt offers the model only "
++                "function tools and the functions of a namespace. Declare a "
++                "function tool your client executes.",
++                parameter="tool_choice",
++            )
+         answer = TagsWithSeparatorFormat(
+             tags=tags,
+             separator="\n",
+diff --git a/vllm/tool_parsers/utils.py b/vllm/tool_parsers/utils.py
+index 164198bbdfbf747582fce4e13d4738bc0f468366..dd30ff796086137ff1a549b851e256154ffc6937 100644
+--- a/vllm/tool_parsers/utils.py
++++ b/vllm/tool_parsers/utils.py
+@@ -221,6 +221,12 @@ def iter_response_function_tool_dicts(
+     return function_tools
+ 
+ 
++def response_function_tool_names(tools: list[ResponsesTool]) -> frozenset[str]:
++    """The names the model is offered functions under: the flat names the
++    template is given by ``iter_response_function_tool_dicts``."""
++    return frozenset(tool["name"] for tool in iter_response_function_tool_dicts(tools))
++
++
+ def build_responses_tool_call_name_map(
+     tools: list[ResponsesTool] | None,
+ ) -> dict[str, ResponsesToolCallName]:

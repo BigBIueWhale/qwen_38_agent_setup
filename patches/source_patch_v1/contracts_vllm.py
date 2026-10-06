@@ -3540,6 +3540,62 @@ def _validate_call_only_separator_after(state: State) -> None:
     }, label=label)
 
 
+
+def _validate_responses_function_list_before(state: State) -> None:
+    label = "Responses one function list precondition"
+    registry = "vllm/tool_parsers/structural_tag_registry.py"
+    require_text(state, registry, "dumped_tools = [_dump_tool_for_xgrammar(tool) for tool in tools]",
+                 label=label)
+    require_text(state, "vllm/entrypoints/openai/responses/utils.py",
+                 "def extract_function_tool_names(", label=label)
+    forbid_text(state, "vllm/entrypoints/openai/responses/protocol.py",
+                "def check_tool_choice_calls_offered_functions(", label=label)
+
+
+def _validate_responses_function_list_after(state: State) -> None:
+    label = "Responses one function list"
+    registry = "vllm/tool_parsers/structural_tag_registry.py"
+    # The grammar is given the functions the template offers the model, under
+    # the flat names it offers them by; the parser resolves the same names.
+    _require_in_symbol(state, registry, "_dump_tools_for_xgrammar", (
+        "iter_response_function_tool_dicts([tool])",
+    ), label=label)
+    require_text(state, registry, "dumped_tools = _dump_tools_for_xgrammar(tools)", label=label)
+    forbid_text(state, registry, "_dump_tool_for_xgrammar(", label=label)
+    _require_in_symbol(state, registry, "get_qwen_3_coder_structural_tag", (
+        "tool_choice 'required' needs a function the model can call",
+    ), label=label)
+    require_python_symbols(state, "vllm/tool_parsers/utils.py", {
+        "response_function_tool_names": ("tools",),
+    }, label=label)
+    forbid_text(state, "vllm/entrypoints/openai/responses/utils.py",
+                "def extract_function_tool_names(", label=label)
+    # Every non-string choice is the one a grammar enforces, or refused.
+    _require_in_symbol(state, "vllm/entrypoints/openai/responses/protocol.py",
+        "ResponsesRequest.check_tool_choice_calls_offered_functions", (
+            "offered = response_function_tool_names(self.tools)",
+            "isinstance(choice, ToolChoiceFunction)",
+            "isinstance(choice, ToolChoiceAllowed)",
+            'parameter=f"tool_choice.tools[{index}]"',
+            "cannot be enforced",
+        ), label=label)
+    _require_in_symbol(state, "vllm/parser/abstract_parser.py",
+        "DelegatingParser._apply_structural_tag", (
+            "ToolChoiceAllowed,",
+            "tool_choice allowed_tools is enforced by a tool-call",
+        ), label=label)
+    require_python_symbols(state, "tests/tool_use/test_responses_request_validations.py", {
+        "test_responses_request_names_a_namespace_function_by_its_flat_name": None,
+        "test_responses_request_refuses_a_name_the_model_is_not_offered": None,
+        "test_responses_request_allowed_tools_lists_offered_functions": None,
+        "test_responses_request_allowed_tools_refuses_what_it_cannot_enforce": None,
+        "test_responses_request_refuses_a_hosted_tool_choice": None,
+    }, label=label)
+    require_python_symbols(state, "tests/tool_parsers/test_structural_tag_registry.py", {
+        "test_qwen3_admits_the_names_the_responses_prompt_offers": None,
+        "test_qwen3_required_refuses_tools_that_offer_no_function": None,
+    }, label=label)
+
 def validate_final(state: State) -> None:
     """Reassert every durable semantic invariant on the complete tree.
 
@@ -4522,5 +4578,30 @@ CONTRACTS: Mapping[str, SemanticContract] = {
         ),
         validate_before=_validate_call_only_separator_before,
         validate_after=_validate_call_only_separator_after,
+    ),
+    "responses-tools-are-one-function-list": SemanticContract(
+        rationale=(
+            "Responses offers a namespace's functions to the model under flat "
+            "names (namespace__name), and the parser resolves those names, but "
+            "the tool grammar was given the tools unflattened: XGrammar classed "
+            "a namespace as a builtin tool and the Qwen builder drops builtins, "
+            "so a call to a namespace function was masked at its first name "
+            "token, and with only namespace tools the grammar admitted any text, "
+            "an un-offered call included. The grammar now reads the one list "
+            "the template does. A named choice must use a name the model is "
+            "offered (the bare member name was accepted and the grammar then "
+            "raised a 500); allowed_tools arms the grammar to its listed subset "
+            "and mode instead of arming and parsing nothing while the tools "
+            "stay in the prompt; a choice no grammar enforces (hosted, MCP, "
+            "custom) is refused naming tool_choice; and required with no "
+            "function to call is a 400, where it was a KeyError 500."
+        ),
+        removal_condition=(
+            "Remove when pinned upstream gives the tool grammar the Responses "
+            "functions under the names the prompt offers, and refuses every "
+            "tool_choice it cannot enforce."
+        ),
+        validate_before=_validate_responses_function_list_before,
+        validate_after=_validate_responses_function_list_after,
     ),
 }
