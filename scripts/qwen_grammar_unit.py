@@ -618,4 +618,50 @@ for required_path in (
 ):
     assert required_path in route_paths, (required_path, sorted(route_paths))
 
+# Every vLLM-owned structural-tag builder is called with one argument list --
+# tools, built-in tools, the simplified choice, reasoning and the request's
+# call limit -- so every registered builder must take it, for every format this
+# image serves, not only Qwen's. The refusal for an unknown format offers what
+# the registry builds, read from the registry itself.
+import vllm.parser  # noqa: F401  (registers the Harmony builder)
+from vllm.entrypoints.openai.chat_completion.protocol import (
+    ChatCompletionNamedToolChoiceParam,
+)
+from vllm.tool_parsers.structural_tag_registry import (
+    _VLLM_STRUCTURAL_TAG_REGISTRY,
+    XGRAMMAR_BUILTIN_STRUCTURAL_TAG_MODELS,
+)
+from xgrammar import Grammar
+
+strict_tool = ChatCompletionToolsParam.model_validate({
+    "type": "function",
+    "function": {"name": "get_weather", "strict": True, "parameters": {
+        "type": "object", "properties": {"city": {"type": "string"}},
+        "required": ["city"],
+    }},
+})
+named = ChatCompletionNamedToolChoiceParam.model_validate(
+    {"type": "function", "function": {"name": "get_weather"}}
+)
+assert {"harmony", "hermes", "kimi_k3", "minimax", "qwen_3_coder"} <= set(
+    _VLLM_STRUCTURAL_TAG_REGISTRY
+), sorted(_VLLM_STRUCTURAL_TAG_REGISTRY)
+for builder_model in sorted(_VLLM_STRUCTURAL_TAG_REGISTRY):
+    for builder_choice in ("auto", "required", named):
+        for call_limit in (None, True, False):
+            built = get_model_structural_tag(
+                builder_model, [strict_tool], builder_choice, False,
+                parallel_tool_calls=call_limit,
+            )
+            assert built is not None, (builder_model, builder_choice, call_limit)
+            Grammar.from_structural_tag(built)
+try:
+    get_model_structural_tag("no_such_format", [strict_tool], "required", False)
+except ValueError as refusal:
+    assert str(refusal).endswith("supported types: " + repr(sorted(
+        XGRAMMAR_BUILTIN_STRUCTURAL_TAG_MODELS.union(_VLLM_STRUCTURAL_TAG_REGISTRY)
+    ))), refusal
+else:
+    raise AssertionError("an unknown structural-tag format was built")
+
 print("qwen-grammar-unit: PASS")

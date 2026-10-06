@@ -627,7 +627,9 @@ image_build_options=(
   --build-arg "MINIMAX_M2_PARSER_UPSTREAM_FILE_SHA256=${MINIMAX_M2_PARSER_UPSTREAM_FILE_SHA256}"
   --build-arg "MINIMAX_M2_PARSER_PATCHED_FILE_SHA256=${MINIMAX_M2_PARSER_PATCHED_FILE_SHA256}"
   --build-arg "MISTRAL_PARSER_UPSTREAM_FILE_SHA256=${MISTRAL_PARSER_UPSTREAM_FILE_SHA256}"
+  --build-arg "HARMONY_PARSER_UPSTREAM_FILE_SHA256=${HARMONY_PARSER_UPSTREAM_FILE_SHA256}"
   --build-arg "MISTRAL_PARSER_PATCHED_FILE_SHA256=${MISTRAL_PARSER_PATCHED_FILE_SHA256}"
+  --build-arg "HARMONY_PARSER_PATCHED_FILE_SHA256=${HARMONY_PARSER_PATCHED_FILE_SHA256}"
   --build-arg "PHASE_AWARE_PARSER_TERMINALS_PATCH_DIFF_SHA256=${PHASE_AWARE_PARSER_TERMINALS_PATCH_DIFF_SHA256}"
   --build-arg "TOOL_OUTPUT_COMPLETION_PATCH_DIFF_SHA256=${TOOL_OUTPUT_COMPLETION_PATCH_DIFF_SHA256}"
   --build-arg "ONE_WAY_THINKING_BOUNDARY_PATCH_DIFF_SHA256=${ONE_WAY_THINKING_BOUNDARY_PATCH_DIFF_SHA256}"
@@ -928,6 +930,7 @@ actual_installed_report="$(
     /usr/local/lib/python3.12/dist-packages/vllm/parser/glm47_moe.py \
     /usr/local/lib/python3.12/dist-packages/vllm/parser/minimax_m2.py \
     /usr/local/lib/python3.12/dist-packages/vllm/parser/mistral.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/parser/harmony.py \
     /usr/local/lib/python3.12/dist-packages/vllm/parser/deepseek_v32.py \
     /usr/local/lib/python3.12/dist-packages/vllm/parser/deepseek_v4.py \
     /usr/local/lib/python3.12/dist-packages/vllm/parser/inkling.py \
@@ -1001,6 +1004,7 @@ expected_installed_report="$(printf '%s  %s\n' \
   "${GLM47_PARSER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/glm47_moe.py \
   "${MINIMAX_M2_PARSER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/minimax_m2.py \
   "${MISTRAL_PARSER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/mistral.py \
+  "${HARMONY_PARSER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/harmony.py \
   "${DEEPSEEK_V32_PARSER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/deepseek_v32.py \
   "${DEEPSEEK_V4_PARSER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/deepseek_v4.py \
   "${INKLING_PARSER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/inkling.py \

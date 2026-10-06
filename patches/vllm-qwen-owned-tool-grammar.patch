@@ -17,7 +17,7 @@ diff --git a/vllm/tool_parsers/structural_tag_registry.py b/vllm/tool_parsers/st
      ],
      StructuralTag,
  ]
-@@ -63,14 +65,15 @@
+@@ -63,18 +65,16 @@
          "deepseek_r1",
          "deepseek_v3_1",
          "qwen_3_5",
@@ -29,13 +29,17 @@ diff --git a/vllm/tool_parsers/structural_tag_registry.py b/vllm/tool_parsers/st
      }
  )
 -VLLM_BUILTIN_STRUCTURAL_TAG_MODELS = frozenset({"hermes", "kimi_k3"})
-+VLLM_BUILTIN_STRUCTURAL_TAG_MODELS = frozenset(
-+    {"hermes", "kimi_k3", "minimax", "qwen_3_coder"}
-+)
- SUPPORTED_STRUCTURAL_TAG_MODELS = (
-     XGRAMMAR_BUILTIN_STRUCTURAL_TAG_MODELS | VLLM_BUILTIN_STRUCTURAL_TAG_MODELS
- )
-@@ -146,35 +149,24 @@
+-SUPPORTED_STRUCTURAL_TAG_MODELS = (
+-    XGRAMMAR_BUILTIN_STRUCTURAL_TAG_MODELS | VLLM_BUILTIN_STRUCTURAL_TAG_MODELS
+-)
+ 
++# The formats vLLM builds itself, keyed by the model a tool parser names in
++# ``structural_tag_model``. Registration is the only list of them: a second,
++# hand-kept set of the same names is what fell behind the builders twice.
+ _VLLM_STRUCTURAL_TAG_REGISTRY: dict[str, StructuralTagBuilder] = {}
+ 
+ 
+@@ -146,35 +146,26 @@
              builtin_tools,
              simplified_tool_choice,
              reasoning,
@@ -43,12 +47,15 @@ diff --git a/vllm/tool_parsers/structural_tag_registry.py b/vllm/tool_parsers/st
          )
  
      if model not in XGRAMMAR_BUILTIN_STRUCTURAL_TAG_MODELS:
+-        supported = sorted(SUPPORTED_STRUCTURAL_TAG_MODELS)
 +        # Deliberately not a typed request refusal: ``model`` is the tool
 +        # parser's own ``structural_tag_model`` class attribute, never a
 +        # request field, so an unsupported value means this deployment
 +        # registered a parser this module cannot serve. The caller has nothing
 +        # to change, and a bare ValueError is the 500 that says so.
-         supported = sorted(SUPPORTED_STRUCTURAL_TAG_MODELS)
++        supported = sorted(
++            XGRAMMAR_BUILTIN_STRUCTURAL_TAG_MODELS.union(_VLLM_STRUCTURAL_TAG_REGISTRY)
++        )
          raise ValueError(f"Unknown format type: {model}, supported types: {supported}")
  
 -    tag = get_xgrammar_model_structural_tag(
@@ -78,7 +85,118 @@ diff --git a/vllm/tool_parsers/structural_tag_registry.py b/vllm/tool_parsers/st
  
  
  def _dump_tool_for_xgrammar(
-@@ -642,3 +634,332 @@
+@@ -281,15 +272,19 @@
+     builtin_tools: list[BuiltinToolParam],
+     tool_choice: SimplifiedToolChoice,
+     reasoning: bool,
++    parallel_tool_calls: bool | None = None,
+ ) -> StructuralTag:
+     del builtin_tools, reasoning
+ 
+     tool_call_trigger = "<tool_call>"
++    single_call = parallel_tool_calls is False
+ 
+     if tool_choice == "auto":
+         tags = _hermes_tool_tags(tools)
+         suffix_tag = (
+-            TriggeredTagsFormat(triggers=[tool_call_trigger], tags=tags)
++            TriggeredTagsFormat(
++                triggers=[tool_call_trigger], tags=tags, stop_after_first=single_call
++            )
+             if tags
+             else AnyTextFormat()
+         )
+@@ -305,6 +300,7 @@
+             tags=_hermes_tool_tags(tools),
+             separator="",
+             at_least_one=True,
++            stop_after_first=single_call,
+         )
+ 
+     return StructuralTag(format=suffix_tag)
+@@ -330,12 +326,15 @@
+     builtin_tools: list[BuiltinToolParam],
+     tool_choice: SimplifiedToolChoice,
+     reasoning: bool,
++    parallel_tool_calls: bool | None = None,
+ ) -> StructuralTag:
+     del builtin_tools, reasoning
+ 
+     tool_call_begin = "<minimax:tool_call>\n"
+     tool_call_end = "</minimax:tool_call>"
+     tool_call_trigger = "<minimax:tool_call>"
++    # One invoke in one wrapper: the limit holds inside and across wrappers.
++    single_call = parallel_tool_calls is False
+ 
+     tags = _minimax_tool_tags(tools)
+ 
+@@ -350,11 +349,13 @@
+                             tags=tags,
+                             separator="",
+                             at_least_one=True,
++                            stop_after_first=single_call,
+                         ),
+                         end=tool_call_end,
+                     )
+                 ],
+                 excludes=["<think>", "</think>"],
++                stop_after_first=single_call,
+             )
+             if tags
+             else AnyTextFormat(excludes=["<think>", "</think>"])
+@@ -380,6 +381,7 @@
+                     tags=tags,
+                     separator="",
+                     at_least_one=True,
++                    stop_after_first=single_call,
+                 ),
+                 ConstStringFormat(value=tool_call_end),
+             ]
+@@ -602,13 +604,16 @@
+     ]
+ 
+ 
+-def _k3_tools_channel(tools: list[FunctionToolParam]) -> TagFormat:
++def _k3_tools_channel(
++    tools: list[FunctionToolParam], single_call: bool
++) -> TagFormat:
+     return TagFormat(
+         begin=_K3_TOOLS_OPEN,
+         content=TagsWithSeparatorFormat(
+             tags=[_k3_call_tag(tool) for tool in tools],
+             separator="",
+             at_least_one=True,
++            stop_after_first=single_call,
+         ),
+         end=_K3_TOOLS_CLOSE,
+     )
+@@ -620,8 +625,11 @@
+     builtin_tools: list[BuiltinToolParam],
+     tool_choice: SimplifiedToolChoice,
+     reasoning: bool,
++    parallel_tool_calls: bool | None = None,
+ ) -> StructuralTag:
+     del builtin_tools, reasoning
++    # The tools channel is the format's only place for calls, opened once.
++    single_call = parallel_tool_calls is False
+ 
+     trailer = OptionalFormat(content=ConstStringFormat(value=_K3_MESSAGE_CLOSE))
+ 
+@@ -631,14 +639,343 @@
+         )
+ 
+     if tool_choice == "auto":
+-        tools_part: Any = OptionalFormat(content=_k3_tools_channel(tools))
++        tools_part: Any = OptionalFormat(content=_k3_tools_channel(tools, single_call))
+     elif tool_choice == "forced":
+         # K3 rejects named tool choice upstream; treat defensively as a single
+         # mandatory call of the first tool.
+-        tools_part = _k3_tools_channel(tools[:1])
++        tools_part = _k3_tools_channel(tools[:1], single_call)
+     else:  # required
+-        tools_part = _k3_tools_channel(tools)
++        tools_part = _k3_tools_channel(tools, single_call)
+ 
      return StructuralTag(
          format=SequenceFormat(elements=[*_k3_response_prefix(), tools_part, trailer])
      )
@@ -430,30 +548,122 @@ diff --git a/vllm/parser/qwen3.py b/vllm/parser/qwen3.py
 diff --git a/tests/tool_parsers/test_structural_tag_registry.py b/tests/tool_parsers/test_structural_tag_registry.py
 --- a/tests/tool_parsers/test_structural_tag_registry.py
 +++ b/tests/tool_parsers/test_structural_tag_registry.py
-@@ -30,6 +30,7 @@
+@@ -30,8 +30,7 @@
  from vllm.tool_parsers.minimax_m2_tool_parser import MinimaxM2ToolParser
  from vllm.tool_parsers.qwen3_engine_tool_parser import Qwen3EngineToolParser
  from vllm.tool_parsers.structural_tag_registry import (
+-    SUPPORTED_STRUCTURAL_TAG_MODELS,
+-    VLLM_BUILTIN_STRUCTURAL_TAG_MODELS,
 +    _VLLM_STRUCTURAL_TAG_REGISTRY,
-     SUPPORTED_STRUCTURAL_TAG_MODELS,
-     VLLM_BUILTIN_STRUCTURAL_TAG_MODELS,
      XGRAMMAR_BUILTIN_STRUCTURAL_TAG_MODELS,
-@@ -77,7 +78,13 @@
-     assert SUPPORTED_STRUCTURAL_TAG_MODELS == (
-         XGRAMMAR_BUILTIN_STRUCTURAL_TAG_MODELS | VLLM_BUILTIN_STRUCTURAL_TAG_MODELS
+     get_function_parameters,
+     get_model_structural_tag,
+@@ -73,11 +72,69 @@
+     ]
+ 
+ 
+-def test_supported_structural_tag_models_include_vllm_builtins():
+-    assert SUPPORTED_STRUCTURAL_TAG_MODELS == (
+-        XGRAMMAR_BUILTIN_STRUCTURAL_TAG_MODELS | VLLM_BUILTIN_STRUCTURAL_TAG_MODELS
++def test_supported_structural_tag_models_include_vllm_builtins(sample_tools):
++    # The refusal offers what this process can build: XGrammar's builtins and
++    # every registered vLLM builder, read from the registry itself, so a
++    # builder can never be served while the refusal leaves it out.
++    with pytest.raises(ValueError, match="Unknown format type") as refusal:
++        get_model_structural_tag("no_such_format", sample_tools, "required", False)
++    offered = str(refusal.value)
++    expected = sorted(
++        XGRAMMAR_BUILTIN_STRUCTURAL_TAG_MODELS.union(_VLLM_STRUCTURAL_TAG_REGISTRY)
      )
 -    assert "hermes" in VLLM_BUILTIN_STRUCTURAL_TAG_MODELS
-+    # The named set is what an unknown model is offered in the refusal, and the
-+    # registry is what actually builds. A builder registered but left out of
-+    # the set still works, so the omission is invisible until someone reads a
-+    # refusal that does not list a model vLLM supports -- bind them instead.
-+    assert VLLM_BUILTIN_STRUCTURAL_TAG_MODELS == frozenset(
++    assert offered.endswith(f"supported types: {expected}")
++    assert {"harmony", "hermes", "kimi_k3", "minimax", "qwen_3_coder"} <= set(
 +        _VLLM_STRUCTURAL_TAG_REGISTRY
 +    )
++
++
++@pytest.mark.parametrize("model", sorted(_VLLM_STRUCTURAL_TAG_REGISTRY))
++@pytest.mark.parametrize("choice", ["auto", "required", "named"])
++@pytest.mark.parametrize("parallel_tool_calls", [None, True, False])
++def test_every_registered_builder_takes_the_dispatch_arguments(
++    model, choice, parallel_tool_calls, sample_tools_strict
++):
++    """Every builder is called with one argument list, so each must take it."""
++    selected = (
++        ChatCompletionNamedToolChoiceParam(
++            type="function", function=ChatCompletionNamedFunction(name="get_weather")
++        )
++        if choice == "named" else choice
++    )
++    tag = get_model_structural_tag(
++        model, sample_tools_strict, selected, False,
++        parallel_tool_calls=parallel_tool_calls,
++    )
++    assert isinstance(tag, StructuralTag)
++    Grammar.from_structural_tag(tag)
++
++
++_HERMES_CALL = '<tool_call>\n{"name": "get_weather", "arguments": {"city": "Paris"}}\n</tool_call>'
++_MINIMAX_INVOKE = '<invoke name="get_weather">\n<parameter name="city">Paris</parameter>\n</invoke>\n'
++
++
++@pytest.mark.parametrize("choice", ["auto", "required"])
++def test_hermes_parallel_off_ends_after_one_call(choice, sample_tools_strict):
++    for parallel, accepted in ((None, True), (True, True), (False, False)):
++        grammar = Grammar.from_structural_tag(get_model_structural_tag(
++            "hermes", sample_tools_strict, choice, False,
++            parallel_tool_calls=parallel,
++        ))
++        assert _is_grammar_accept_string(grammar, _HERMES_CALL)
++        assert _is_grammar_accept_string(grammar, _HERMES_CALL * 2) is accepted
++
++
++def test_minimax_parallel_off_ends_after_one_invoke(sample_tools_strict):
++    begin, end = "<minimax:tool_call>\n", "</minimax:tool_call>"
++    for parallel, accepted in ((None, True), (False, False)):
++        grammar = Grammar.from_structural_tag(get_model_structural_tag(
++            "minimax", sample_tools_strict, "required", False,
++            parallel_tool_calls=parallel,
++        ))
++        assert _is_grammar_accept_string(grammar, "\n" + begin + _MINIMAX_INVOKE + end)
++        assert _is_grammar_accept_string(
++            grammar, "\n" + begin + _MINIMAX_INVOKE * 2 + end
++        ) is accepted
  
  
  @pytest.mark.parametrize("model", sorted(XGRAMMAR_BUILTIN_STRUCTURAL_TAG_MODELS))
-@@ -509,9 +516,7 @@
+@@ -237,7 +294,7 @@
+ 
+ 
+ def test_kimi_k3_registered_as_vllm_builtin():
+-    assert "kimi_k3" in VLLM_BUILTIN_STRUCTURAL_TAG_MODELS
++    assert "kimi_k3" in _VLLM_STRUCTURAL_TAG_REGISTRY
+     assert KimiK3ToolParser.structural_tag_model == "kimi_k3"
+ 
+ 
+@@ -331,4 +388,21 @@
+     assert not _is_grammar_accept_string(_k3_grammar("required"), body)
+ 
+ 
++def test_kimi_k3_parallel_off_ends_after_one_call():
++    one = _k3_response() + _k3_tools(
++        _k3_call("get_weather", _k3_arg("city", "string", "Paris"), 1)
++    )
++    two = _k3_response() + _k3_tools(
++        _k3_call("get_weather", _k3_arg("city", "string", "Paris"), 1),
++        _k3_call("run_command", _k3_arg("command", "string", "ls"), 2),
++    )
++    for parallel, accepted in ((None, True), (False, False)):
++        grammar = Grammar.from_structural_tag(get_model_structural_tag(
++            "kimi_k3", _k3_tools_by_name(), "required", False,
++            parallel_tool_calls=parallel,
++        ))
++        assert _is_grammar_accept_string(grammar, one)
++        assert _is_grammar_accept_string(grammar, two) is accepted
++
++
+ def test_kimi_k3_schema_without_required_accepts_empty_call():
+@@ -509,9 +583,7 @@
      assert sample_tools_strict[0].function.parameters is not None
  
  
@@ -464,7 +674,7 @@ diff --git a/tests/tool_parsers/test_structural_tag_registry.py b/tests/tool_par
  def test_auto_tool_choice_skips_structural_tag_without_strict(
      model: str,
      sample_tools: list[ChatCompletionToolsParam],
-@@ -543,8 +548,53 @@
+@@ -543,8 +615,53 @@
      assert fmt["triggers"] == ["<tool_call>\n<function="]
      assert fmt["excludes"] == ["<think>", "</think>"]
      assert fmt["stop_after_first"] is False
@@ -520,7 +730,7 @@ diff --git a/tests/tool_parsers/test_structural_tag_registry.py b/tests/tool_par
      )
  
  
-@@ -657,6 +707,210 @@
+@@ -657,6 +774,210 @@
      assert not _is_grammar_accept_string(
          grammar, _QWEN3_CALL.replace("city", "colour")
      )
@@ -792,3 +1002,21 @@ diff --git a/tests/parser/engine/test_delegating_replay.py b/tests/parser/engine
      parser_cls = next(p.parser_cls for p in _PAIRINGS if p.name == "qwen3")
      vocab = {text: 20000 + n for n, text in enumerate([
          "<think>", "</think>", "<tool_call>", "</tool_call>",
+diff --git a/vllm/parser/harmony.py b/vllm/parser/harmony.py
+--- a/vllm/parser/harmony.py
++++ b/vllm/parser/harmony.py
+@@ -452,9 +452,12 @@
+     builtin_tools: list[BuiltinToolParam],
+     tool_choice: SimplifiedToolChoice,
+     reasoning: bool,
++    parallel_tool_calls: bool | None = None,
+ ) -> StructuralTag:
+-    # reasoning always enabled for Harmony
+-    del reasoning
++    # Reasoning is always enabled for Harmony. The grammar ends with the one
++    # message after the optional analysis and commentary ones, so a call ends
++    # the generation and ``parallel_tool_calls`` has no second call to forbid.
++    del reasoning, parallel_tool_calls
+ 
+     if builtin_tools:
+         # Fallback for built-in tools

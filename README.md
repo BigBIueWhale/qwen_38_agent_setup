@@ -313,13 +313,13 @@ It is intentionally reconstructed by the ordered, reviewed semantic transformati
 | patches/vllm-token-text-provenance.patch | 954b36cb444f7e644e29d13f7a9d3c000512a0d616bbf2b6cd3cb8f4e880dd44 |
 | patches/vllm-precise-request-errors.patch | 6ebbc277c2a6f523d520b75d3afe75dd13c745449eea63e037856e8351ac05ad |
 | patches/vllm-qwen-canonical-parameter-framing.patch | d438f9106c4a989d64837c21f5491d946065e6721570ad47664513347f150064 |
-| patches/vllm-qwen-owned-tool-grammar.patch | 81b3f760a7aa670496deb1252ee3713d452ab62debec88062bbe4cadceb6c849 |
+| patches/vllm-qwen-owned-tool-grammar.patch | 8eca87e7046eb5b01f37ebc93cafaec01479558ef102201dd74ef3ae8ad8a665 |
 | patches/vllm-qwen-unique-tool-parameters.patch | 6a76a61c743807215555cbd6b3bbdd8fcaba4abcaca69ef000d301df6c792d3b |
 | patches/vllm-generation-admission-before-response.patch | 59678e08ffb6e4b5cc2d8d01b7876e4732e9b6e5fc7b128c544540aace8464b4 |
 | patches/vllm-kv-scope-single-flight.patch | cc5e52403afd4e4764693da552e9252bbf204793566fff6a27fb87b4dbd28d13 |
 | patches/vllm-template-authored-control-tokens.patch | 1f6b9e898c3b7d3620d2ad3ee8dce70aa7d320e211788ff4fe030468870bc37b |
 | patches/vllm-nvfp4-native-kernel-required.patch | 9d9ce188b6670d687a725c4cdca37478f9dc78ef9f19685ddbcf5e9edd53b8b7 |
-| patches/vllm-qwen-arguments-read-by-grammar.patch | fa0480f239cdb0de4dd4508ac151fadc1c6a5f76dcf7b15798dcac932ae33371 |
+| patches/vllm-qwen-arguments-read-by-grammar.patch | c8d40913648479bfaf0ee90d8274be5914bd15f7ef235d2c6017f351fb499c97 |
 | patches/vllm-startup-plan-admission-bound.patch | 994f9aabc61b3d7473e83593a5279b2759ce4413ceb1ea212ae33be342df0019 |
 | patches/vllm-template-refusals-name-their-parameter.patch | 587facad35a115822bb6af2baefc00604fa87e1e96d0e6d85919115821a1ccd5 |
 | patches/vllm-qwen-repeated-parameter-refusal.patch | e6217bcd1fae538ef97dacd523c3b994f594826502961c24c3aa47402b668fa9 |
@@ -367,9 +367,9 @@ Pinned build inputs and products:
 |---|---|
 | Immutable base tag | qwen38-vllm:main-9df9b0b |
 | Immutable base ID | sha256:fa4a002a88b7043a1a89966dea8a500fe9696f84e75730d9da916f916048d401 |
-| Runtime Dockerfile SHA-256 | b30a81d597b7e31eb61a4aa403775f4a0b1bf9d77a9be4ffc0f85293ac4711e8 |
-| Build verifier SHA-256 | 353a853dad8d888a95948918567c80ee195522f46a349d65e657a27446b33d32 |
-| Runtime validator SHA-256 | 39f818797bc1034a772f45d9059fd95115b25ed06c5cba75e890db39a7049027 |
+| Runtime Dockerfile SHA-256 | cff9d2542df6a23cb095e2b2fba2b2e8e267b2d2055eb6c327e4a2798482a706 |
+| Build verifier SHA-256 | efbfa663f2ad240b01d434eb101d9f077f6bbe06cee3ce4635d3dc44a8a4f758 |
+| Runtime validator SHA-256 | 41c3c58044fba46b3ba33ec4a3c360753611d1099a9c44756f2c83737295ea26 |
 
 The runtime image's profile, tag and archive name, which every release advances
 together, are declared in `config/runtime-v1.sh`, and the archive lives under

@@ -819,6 +819,7 @@ assert_running_profile() {
       /usr/local/lib/python3.12/dist-packages/vllm/parser/glm47_moe.py \
       /usr/local/lib/python3.12/dist-packages/vllm/parser/minimax_m2.py \
       /usr/local/lib/python3.12/dist-packages/vllm/parser/mistral.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/parser/harmony.py \
       /usr/local/lib/python3.12/dist-packages/vllm/parser/deepseek_v32.py \
       /usr/local/lib/python3.12/dist-packages/vllm/parser/deepseek_v4.py \
       /usr/local/lib/python3.12/dist-packages/vllm/parser/inkling.py \
@@ -892,6 +893,7 @@ assert_running_profile() {
     "${GLM47_PARSER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/glm47_moe.py \
     "${MINIMAX_M2_PARSER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/minimax_m2.py \
     "${MISTRAL_PARSER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/mistral.py \
+    "${HARMONY_PARSER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/harmony.py \
     "${DEEPSEEK_V32_PARSER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/deepseek_v32.py \
     "${DEEPSEEK_V4_PARSER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/deepseek_v4.py \
     "${INKLING_PARSER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/inkling.py \

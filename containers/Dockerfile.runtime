@@ -287,11 +287,13 @@ ARG GEMMA4_PARSER_UPSTREAM_FILE_SHA256
 ARG GLM47_PARSER_UPSTREAM_FILE_SHA256
 ARG MINIMAX_M2_PARSER_UPSTREAM_FILE_SHA256
 ARG MISTRAL_PARSER_UPSTREAM_FILE_SHA256
+ARG HARMONY_PARSER_UPSTREAM_FILE_SHA256
 RUN printf '%s  %s\n' \
   "${GEMMA4_PARSER_UPSTREAM_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/gemma4.py \
   "${GLM47_PARSER_UPSTREAM_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/glm47_moe.py \
   "${MINIMAX_M2_PARSER_UPSTREAM_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/minimax_m2.py \
   "${MISTRAL_PARSER_UPSTREAM_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/mistral.py \
+  "${HARMONY_PARSER_UPSTREAM_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/harmony.py \
   | sha256sum --check --strict
 
 ARG ASYNC_LLM_UPSTREAM_FILE_SHA256
@@ -407,6 +409,7 @@ ARG GEMMA4_PARSER_PATCHED_FILE_SHA256
 ARG GLM47_PARSER_PATCHED_FILE_SHA256
 ARG MINIMAX_M2_PARSER_PATCHED_FILE_SHA256
 ARG MISTRAL_PARSER_PATCHED_FILE_SHA256
+ARG HARMONY_PARSER_PATCHED_FILE_SHA256
 ARG DEEPSEEK_V32_PARSER_PATCHED_FILE_SHA256
 ARG DEEPSEEK_V4_PARSER_PATCHED_FILE_SHA256
 ARG INKLING_PARSER_PATCHED_FILE_SHA256
@@ -812,11 +815,13 @@ COPY --chmod=0644 vllm/vllm/parser/gemma4.py /usr/local/lib/python3.12/dist-pack
 COPY --chmod=0644 vllm/vllm/parser/glm47_moe.py /usr/local/lib/python3.12/dist-packages/vllm/parser/glm47_moe.py
 COPY --chmod=0644 vllm/vllm/parser/minimax_m2.py /usr/local/lib/python3.12/dist-packages/vllm/parser/minimax_m2.py
 COPY --chmod=0644 vllm/vllm/parser/mistral.py /usr/local/lib/python3.12/dist-packages/vllm/parser/mistral.py
+COPY --chmod=0644 vllm/vllm/parser/harmony.py /usr/local/lib/python3.12/dist-packages/vllm/parser/harmony.py
 RUN printf '%s  %s\n' \
   "${GEMMA4_PARSER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/gemma4.py \
   "${GLM47_PARSER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/glm47_moe.py \
   "${MINIMAX_M2_PARSER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/minimax_m2.py \
   "${MISTRAL_PARSER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/mistral.py \
+  "${HARMONY_PARSER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/harmony.py \
   | sha256sum --check --strict
 COPY --chmod=0644 vllm/vllm/v1/engine/async_llm.py /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/async_llm.py
 RUN printf '%s  %s\n' \

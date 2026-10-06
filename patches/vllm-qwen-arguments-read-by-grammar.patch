@@ -114,7 +114,7 @@ diff --git a/tests/parser/engine/test_qwen_xml_fidelity.py b/tests/parser/engine
 diff --git a/tests/tool_parsers/test_structural_tag_registry.py b/tests/tool_parsers/test_structural_tag_registry.py
 --- a/tests/tool_parsers/test_structural_tag_registry.py
 +++ b/tests/tool_parsers/test_structural_tag_registry.py
-@@ -36,6 +36,7 @@
+@@ -34,6 +34,7 @@
      XGRAMMAR_BUILTIN_STRUCTURAL_TAG_MODELS,
      get_function_parameters,
      get_model_structural_tag,
@@ -122,7 +122,7 @@ diff --git a/tests/tool_parsers/test_structural_tag_registry.py b/tests/tool_par
  )
  
  
-@@ -913,6 +914,85 @@
+@@ -980,6 +981,85 @@
      assert _is_grammar_accept_string(grammar, _qwen_call("v", "anything"))
  
  
@@ -716,7 +716,7 @@ diff --git a/vllm/tool_parsers/structural_tag_registry.py b/vllm/tool_parsers/st
  from typing import Any, Literal, TypeAlias
  
  from openai.types.responses import FunctionTool
-@@ -663,6 +666,12 @@
+@@ -679,6 +682,12 @@
  # required chain, and its treatment of enums, constants and references. One
  # production it deliberately does not have is XGrammar's constrained-string
  # regex; ``_QWEN_REFUSED_STRING_KEYS`` refuses that declaration instead.
@@ -729,7 +729,7 @@ diff --git a/vllm/tool_parsers/structural_tag_registry.py b/vllm/tool_parsers/st
  _QWEN_PARAM_OPEN = "<parameter="
  _QWEN_PARAM_CLOSE = "</parameter>"
  _QWEN_CALL_BEGIN_PREFIX = "<tool_call>\n<function="
-@@ -685,6 +694,40 @@
+@@ -701,6 +710,40 @@
  _QWEN_REFUSED_STRING_KEYS = ("pattern", "format", "minLength", "maxLength")
  
  
@@ -770,7 +770,7 @@ diff --git a/vllm/tool_parsers/structural_tag_registry.py b/vllm/tool_parsers/st
  def _qwen_raw_value() -> AnyTextFormat:
      """The raw string channel: any text carrying neither parameter marker.
  
-@@ -766,11 +809,11 @@
+@@ -782,11 +825,11 @@
      return prop
  
  
@@ -785,7 +785,7 @@ diff --git a/vllm/tool_parsers/structural_tag_registry.py b/vllm/tool_parsers/st
      reference = resolved.get("$ref")
      if isinstance(reference, str) and reference.startswith("#/"):
          # A local reference this builder could not follow -- missing, or
-@@ -779,7 +822,7 @@
+@@ -795,7 +838,7 @@
          # model: a dangling reference is refused outright, and a self-referring
          # one compiles to a production nothing satisfies. Answering an
          # unresolvable schema with "any text" would fail open.
@@ -794,7 +794,7 @@ diff --git a/vllm/tool_parsers/structural_tag_registry.py b/vllm/tool_parsers/st
      json_type = resolved.get("type")
      enum_values = resolved.get("enum")
      if enum_values is None and isinstance(resolved.get("const"), str):
-@@ -789,24 +832,11 @@
+@@ -805,24 +848,11 @@
          and enum_values
          and all(isinstance(value, str) for value in enum_values)
      ):
@@ -823,7 +823,7 @@ diff --git a/vllm/tool_parsers/structural_tag_registry.py b/vllm/tool_parsers/st
      if (
          json_type is None
          or isinstance(json_type, list)
-@@ -817,23 +847,72 @@
+@@ -833,23 +863,72 @@
          # XGrammar's ``xml_any`` is the raw channel unioned with JSON arrays and
          # objects, and both of those are already raw text without a closer, so
          # the union accepts exactly the raw channel's language.
@@ -905,7 +905,7 @@ diff --git a/vllm/tool_parsers/structural_tag_registry.py b/vllm/tool_parsers/st
              ]
          ),
          end=_QWEN_PARAM_CLOSE,
-@@ -841,50 +920,34 @@
+@@ -857,50 +936,34 @@
  
  
  def _qwen_arguments(parameters: dict[str, Any] | bool, tool: str) -> Any:
@@ -967,7 +967,7 @@ diff --git a/vllm/tool_parsers/structural_tag_registry.py b/vllm/tool_parsers/st
                          _qwen_whitespace(),
                      ]
                  )
-@@ -893,6 +956,198 @@
+@@ -909,6 +972,198 @@
      return SequenceFormat(elements=elements)
  
  

@@ -2414,7 +2414,36 @@ def _validate_qwen_grammar_after(state: State) -> None:
     _require_in_symbol(state, "vllm/parser/qwen3.py", "_qwen3_arg_converter", (
         "_unframe_parameter_value(value, complete=True)",
     ), label=label)
+    # The dispatch calls every registered builder with one argument list, so
+    # every builder takes it -- the request's call limit included -- and holds
+    # the limit wherever its format can express a single call. The formats a
+    # refusal offers are read from the registry, the only list of them.
+    builder_params = (
+        "tools", "builtin_tools", "tool_choice", "reasoning", "parallel_tool_calls",
+    )
+    require_python_symbols(state, registry, {
+        "get_hermes_structural_tag": builder_params,
+        "get_minimax_structural_tag": builder_params,
+        "get_kimi_k3_structural_tag": builder_params,
+    }, label=label)
+    require_python_symbols(state, "vllm/parser/harmony.py", {
+        "get_harmony_structural_tag": builder_params,
+    }, label=label)
+    for builder in (
+        "get_hermes_structural_tag", "get_minimax_structural_tag",
+        "get_kimi_k3_structural_tag",
+    ):
+        _require_in_symbol(state, registry, builder, (
+            "single_call = parallel_tool_calls is False",
+        ), label=label)
+    for retired in ("VLLM_BUILTIN_STRUCTURAL_TAG_MODELS",
+                    "SUPPORTED_STRUCTURAL_TAG_MODELS"):
+        forbid_text(state, registry, retired, label=label)
+    _require_in_symbol(state, registry, "get_model_structural_tag", (
+        "XGRAMMAR_BUILTIN_STRUCTURAL_TAG_MODELS.union(_VLLM_STRUCTURAL_TAG_REGISTRY)",
+    ), label=label)
     require_python_symbols(state, "tests/tool_parsers/test_structural_tag_registry.py", {
+        "test_every_registered_builder_takes_the_dispatch_arguments": None,
         "test_qwen3_value_cannot_absorb_the_next_parameter_opener": None,
         "test_qwen3_auto_with_parallel_off_ends_the_turn_after_one_call": None,
         "test_qwen3_auto_tool_choice_is_constrained_without_strict": None,
@@ -2422,11 +2451,7 @@ def _validate_qwen_grammar_after(state: State) -> None:
         "test_qwen3_root_composition_still_binds_every_property": None,
         "test_qwen3_unresolvable_local_reference_is_refused": None,
         "test_qwen3_external_reference_stays_unconstrained": None,
-        # The named set is what a refusal offers and the registry is what
-        # builds; a builder registered but left out of the set works, so the
-        # omission is invisible until someone reads a refusal missing a model
-        # vLLM supports. The binding is asserted, not a literal membership
-        # list that would have to be rewritten for every new builder.
+        # The refusal offers what the registry builds, read from it.
         "test_supported_structural_tag_models_include_vllm_builtins": None,
     }, label=label)
 
@@ -3513,7 +3538,11 @@ CONTRACTS: Mapping[str, SemanticContract] = {
             "different call that was still well formed, ordered and "
             "schema-satisfying. The exclusion cannot be reached through the "
             "structural-tag API, so vLLM owns the Qwen tag and excludes the "
-            "opener too, reproducing every other production exactly."
+            "opener too, reproducing every other production exactly. Owning a "
+            "builder means taking the dispatch's one argument list, the "
+            "request's call limit included: every registered builder takes it "
+            "and holds the limit wherever its format can express one call, and "
+            "a refusal offers the formats the registry builds, read from it."
         ),
         removal_condition=(
             "Remove when XGrammar's Qwen template excludes the parameter opener "
