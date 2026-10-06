@@ -3474,6 +3474,30 @@ def _validate_unspecified_tool_choice_after(state: State) -> None:
         }, label=label)
 
 
+def _validate_call_only_separator_before(state: State) -> None:
+    _require_in_symbol(state, "vllm/tool_parsers/structural_tag_registry.py",
+                       "get_qwen_3_coder_structural_tag", ("suffix_tag = tags[0]",),
+                       label="Call-only answer separator precondition")
+
+
+def _validate_call_only_separator_after(state: State) -> None:
+    label = "Call-only answer separator"
+    registry = "vllm/tool_parsers/structural_tag_registry.py"
+    require_text(state, registry, '_QWEN_THINK_SUFFIX = "\\n\\n"', label=label)
+    # The template's blank line after </think> may begin a forced or required
+    # answer, and nothing else may; the reasoning-inclusive grammar writes it
+    # once, after its own closer.
+    _require_in_symbol(state, registry, "get_qwen_3_coder_structural_tag", (
+        "separator = ConstStringFormat(value=_QWEN_THINK_SUFFIX)",
+        "OptionalFormat(content=separator),",
+        "# Free text before the trigger already carries the blank line.",
+    ), label=label)
+    forbid_text(state, registry, "suffix_tag = tags[0]", label=label)
+    require_python_symbols(state, "tests/tool_parsers/test_structural_tag_registry.py", {
+        "test_qwen3_call_only_answer_may_follow_the_template_blank_line": None,
+    }, label=label)
+
+
 def validate_final(state: State) -> None:
     """Reassert every durable semantic invariant on the complete tree.
 
@@ -4433,5 +4457,24 @@ CONTRACTS: Mapping[str, SemanticContract] = {
         ),
         validate_before=_validate_unspecified_tool_choice_before,
         validate_after=_validate_unspecified_tool_choice_after,
+    ),
+    "call-only-answer-keeps-the-blank-line": SemanticContract(
+        rationale=(
+            "Under tool_choice required or a named function the Qwen grammar "
+            "began with <tool_call>, because XGrammar writes the template's "
+            "blank line after </think> only inside a reasoning prefix vLLM never "
+            "builds: the reasoning parser starts the grammar after reasoning "
+            "ends. A model trained on </think>, a blank line, then the call was "
+            "masked from that line on every forced or required call. The answer "
+            "may now begin with it, and nothing else may precede the call; it "
+            "stays optional because a <tool_call> that ends reasoning itself, "
+            "or a model that does not reason, starts the grammar at the call."
+        ),
+        removal_condition=(
+            "Remove when upstream's Qwen builder admits the template's blank "
+            "line before a forced or required call."
+        ),
+        validate_before=_validate_call_only_separator_before,
+        validate_after=_validate_call_only_separator_after,
     ),
 }

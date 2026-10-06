@@ -1,0 +1,111 @@
+diff --git a/tests/tool_parsers/test_structural_tag_registry.py b/tests/tool_parsers/test_structural_tag_registry.py
+index fb632424661485b95d9a60dcc6e0aeabe5f17e51..1df9457ba69ba1e1ce9f780feac756d2ea890cad 100644
+--- a/tests/tool_parsers/test_structural_tag_registry.py
++++ b/tests/tool_parsers/test_structural_tag_registry.py
+@@ -729,6 +729,28 @@ def test_qwen3_required_allows_several_calls_when_parallel_is_on():
+     assert _is_grammar_accept_string(grammar, _QWEN3_CALL + "\n" + _QWEN3_CALL)
+ 
+ 
++@pytest.mark.parametrize("choice", ["required", "named"])
++def test_qwen3_call_only_answer_may_follow_the_template_blank_line(choice):
++    """A forced or required call is generable in the shape the model is trained on.
++
++    The grammar starts after ``</think>``, where the template writes a blank line
++    before a call that is the whole answer; it starts at the call itself when a
++    ``<tool_call>`` ended reasoning, or when the model does not reason. Nothing
++    else may precede the call.
++    """
++    selected = (
++        ChatCompletionNamedToolChoiceParam(
++            type="function", function=ChatCompletionNamedFunction(name="get_weather")
++        )
++        if choice == "named" else choice
++    )
++    grammar = _qwen3_grammar(selected, None)
++    assert _is_grammar_accept_string(grammar, "\n\n" + _QWEN3_CALL)
++    assert _is_grammar_accept_string(grammar, _QWEN3_CALL)
++    for refused in ("\n", " ", "\n\n\n", "\n\n\n\n", "Calling it.\n\n"):
++        assert not _is_grammar_accept_string(grammar, refused + _QWEN3_CALL), refused
++
++
+ @pytest.mark.parametrize("reasoning", [False, True])
+ @pytest.mark.parametrize("choice", ["auto", "required", "named"])
+ def test_single_qwen_call_preserves_the_builtin_reasoning_prefix(reasoning, choice):
+diff --git a/vllm/tool_parsers/structural_tag_registry.py b/vllm/tool_parsers/structural_tag_registry.py
+index 85f74b03672d072f1d3b270881154e6844bed6bc..9019f53df2439b1141268d774b3ff24d22145cb7 100644
+--- a/vllm/tool_parsers/structural_tag_registry.py
++++ b/vllm/tool_parsers/structural_tag_registry.py
+@@ -675,9 +675,13 @@ def get_kimi_k3_structural_tag(
+ #
+ # Every other production this builder has reproduces XGrammar's Qwen language
+ # exactly, including its ``[ \n\t]*`` padding around every value, its ordered
+-# required chain, and its treatment of enums, constants and references. One
+-# production it deliberately does not have is XGrammar's constrained-string
+-# regex; ``_QWEN_REFUSED_STRING_KEYS`` refuses that declaration instead.
++# required chain, and its treatment of enums, constants and references, with
++# two deliberate differences. It has no constrained-string regex;
++# ``_QWEN_REFUSED_STRING_KEYS`` refuses that declaration instead. And a forced
++# or required call may follow the blank line the template writes after
++# ``</think>``: XGrammar writes that line only inside the reasoning prefix of a
++# grammar that contains the reasoning, which vLLM never builds, since the
++# reasoning parser starts the grammar after the reasoning has ended.
+ #
+ # The language is defined once, as ``_QwenArguments``: which production each
+ # parameter's value is written in and where undeclared names may appear. The
+@@ -1194,7 +1198,7 @@ def get_qwen_3_coder_structural_tag(
+     single_call = parallel_tool_calls is False
+ 
+     if tool_choice == "auto":
+-        suffix_tag: Any = (
++        answer: Any = (
+             TriggeredTagsFormat(
+                 triggers=[_QWEN_CALL_TRIGGER],
+                 tags=tags,
+@@ -1211,22 +1215,36 @@ def get_qwen_3_coder_structural_tag(
+                 "function this request also declares in `tools`.",
+                 parameter="tool_choice",
+             )
+-        suffix_tag = tags[0]
++        answer = tags[0]
+     else:
+-        suffix_tag = TagsWithSeparatorFormat(
++        answer = TagsWithSeparatorFormat(
+             tags=tags,
+             separator="\n",
+             at_least_one=True,
+             stop_after_first=single_call,
+         )
+ 
+-    if not reasoning:
+-        return StructuralTag(format=suffix_tag)
+-
+-    prefix_tag = SequenceFormat(
+-        elements=[
++    # The template closes reasoning with ``</think>`` and the blank line, then
++    # writes the answer: ``</think>\n\n<tool_call>`` for a turn that is only a
++    # call, which is the shape the model is trained to produce.
++    separator = ConstStringFormat(value=_QWEN_THINK_SUFFIX)
++    if reasoning:
++        # The grammar writes the reasoning and its closer itself.
++        return StructuralTag(format=SequenceFormat(elements=[
+             TagFormat(begin="", content=AnyTextFormat(), end=_QWEN_THINK_END),
+-            ConstStringFormat(value=_QWEN_THINK_SUFFIX),
+-        ]
+-    )
+-    return StructuralTag(format=SequenceFormat(elements=[prefix_tag, suffix_tag]))
++            separator,
++            answer,
++        ]))
++    if tool_choice == "auto":
++        # Free text before the trigger already carries the blank line.
++        return StructuralTag(format=answer)
++    # Otherwise the grammar begins where the reasoning parser found the end of
++    # reasoning: after ``</think>``, so the blank line comes first, or at a
++    # ``<tool_call>`` that ended reasoning itself, or at the first generated
++    # token when the model does not reason, where the call comes first. A
++    # forced or required answer is a call either way, so the blank line is the
++    # one thing that may precede it.
++    return StructuralTag(format=SequenceFormat(elements=[
++        OptionalFormat(content=separator),
++        answer,
++    ]))

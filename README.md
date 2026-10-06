@@ -338,6 +338,7 @@ It is intentionally reconstructed by the ordered, reviewed semantic transformati
 | patches/vllm-generated-tokens-survive-parsing.patch | 5a3649dc50d8f75a24474ce2a0776fd96cc51edf03f011d0887d84b4cb628e7a |
 | patches/vllm-include-reasoning-shapes-the-response.patch | 866f50c8e1f3d7f5cfe19e1432378b18309bbd8c3c49a6d2dccf657af99fb58d |
 | patches/vllm-unspecified-tool-choice-is-the-default.patch | 4d8aa3e0eca27197da16ee57db26ac89ae8811bb175c9a6126863d2967821ab5 |
+| patches/vllm-call-only-answer-keeps-the-blank-line.patch | ad1e558f8ba02c6889d9b4a79c6ec355e9bfa763bc007e5cae7e609be96ec084 |
 
 The reconstructed tree's runtime-source and test changes, new files and
 deletions are counted by ./scripts/build-vllm.sh check, which derives and prints
@@ -383,7 +384,7 @@ Pinned build inputs and products:
 | Immutable base tag | qwen38-vllm:main-9df9b0b |
 | Immutable base ID | sha256:fa4a002a88b7043a1a89966dea8a500fe9696f84e75730d9da916f916048d401 |
 | Runtime Dockerfile SHA-256 | e58ca999ada5321cf77b4f50eaff9e72f04479a7924dc01f10e205c0f7528d61 |
-| Build verifier SHA-256 | fedaa98f40d441d3cde6932c2fb768c85792d391695dcf3c6ac77e3b611eeaba |
+| Build verifier SHA-256 | e3371e220d7e3e3e346a0251cbabe4e1a98b7c8aaab53ec9ee379f2365454735 |
 | Runtime validator SHA-256 | d7b050d01a3a4bb32577c49e03d148f29eb1e89d92e375e45b096775423d0a36 |
 
 The runtime image's profile, tag and archive name, which every release advances
@@ -1175,7 +1176,12 @@ A tool choice that is not specified -- omitted or `null` -- is `auto` when tools
 are declared and `none` otherwise. The chat request and the Anthropic conversion
 decide it once, so one value decides both whether the call grammar is armed and
 whether calls are parsed; `none` is the only choice under which a call-shaped
-span is text.
+span is text. A forced (named) or `required` choice may begin with the blank line
+the template writes after `</think>`, so the call-only answer the model is
+trained on -- `</think>`, a blank line, `<tool_call>` -- is generable; nothing
+else may precede the call. XGrammar writes that line only inside a grammar that
+also covers the reasoning, which vLLM never builds, since the reasoning parser
+starts the grammar once reasoning has ended.
 
 Qwen's natural `</think>` token or implicit `<tool_call>` token ends thinking
 once per generation. The deployed V1 thinking-budget tracker and grammar

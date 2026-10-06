@@ -628,6 +628,39 @@ class ToolOutputParserTest(unittest.TestCase):
                     if not is_armed:
                         self.assertEqual(result[:2], ("plan", "\n\n" + call("one")))
 
+    def test_a_call_only_answer_follows_the_template_blank_line(self):
+        """A forced or required call is generable in the shape the template
+        renders and the model is trained on: ``</think>``, a blank line, the
+        call. The grammar starts after the reasoning closer, so the blank line
+        is its first token; nothing else may precede the call."""
+        from chat_template_retention_unit import load_template
+
+        rendered = load_template().render(messages=[
+            {"role": "user", "content": "test"},
+            {"role": "assistant", "reasoning_content": "plan", "content": "",
+             "tool_calls": [{"type": "function", "function": {
+                 "name": "write", "arguments": {"text": "one"}}}]},
+        ], tools=[TOOL], add_generation_prompt=False)
+        self.assertIn("plan\n</think>\n\n" + call("one") + "<|im_end|>", rendered)
+        for choice in ("required", {"type": "function", "function": {"name": "write"}}):
+            for prefix, accepted in (("\n\n", True), ("", True), ("\n", False),
+                                     ("Calling.\n\n", False)):
+                with self.subTest(choice=choice, prefix=prefix):
+                    matcher = grammar_matcher(request_for(choice=choice))
+                    walked = all(
+                        matcher.accept_token(token)
+                        for token in encode(prefix + call("one"))
+                    )
+                    self.assertEqual(
+                        walked and matcher.accept_token(MODEL_EOS[0]), accepted
+                    )
+            for chunk in (None, 1, 13):
+                with self.subTest(choice=choice, chunk=chunk):
+                    self.assertEqual(
+                        parse("plan</think>\n\n" + call("one"), chunk, choice=choice)[:3],
+                        ("plan", "\n\n", [("write", '{"text": "one"}')]),
+                    )
+
 
 if __name__ == "__main__":
     unittest.main()
