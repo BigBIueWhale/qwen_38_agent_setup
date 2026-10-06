@@ -42,6 +42,23 @@ require_no_arguments() {
   fi
 }
 
+# The value the launch gives an option of VLLM_ARGS, which it must give once:
+# the parsers and template arguments units and probes reproduce are read here,
+# never restated beside the launch.
+launch_arg_value() {
+  local option="$1" index count=0 value=""
+  for ((index = 0; index < ${#VLLM_ARGS[@]}; index++)); do
+    if [[ "${VLLM_ARGS[index]}" == "${option}" ]]; then
+      count=$((count + 1))
+      value="${VLLM_ARGS[index + 1]:-}"
+    fi
+  done
+  ((count == 1)) && [[ -n "${value}" ]] || die \
+    "The launch must give ${option} exactly once, with a value." \
+    "Found it ${count} times in VLLM_ARGS (config/runtime-v1.sh)."
+  printf '%s\n' "${value}"
+}
+
 require_command() {
   command -v "$1" >/dev/null 2>&1 || \
     die "Required command is unavailable: $1" \

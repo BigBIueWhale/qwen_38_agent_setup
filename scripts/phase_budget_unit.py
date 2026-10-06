@@ -238,8 +238,6 @@ for request_type, prompt in (
             raise AssertionError("beam decoding bypassed the sampling policy boundary")
 
 def check_one_way_thinking_boundary():
-    from pathlib import Path
-    import runpy
     from types import SimpleNamespace
     from unittest.mock import MagicMock, patch
 
@@ -254,11 +252,31 @@ def check_one_way_thinking_boundary():
     from vllm.v1.structured_output import StructuredOutputManager
     from vllm.sampling_params import StructuredOutputsParams
 
-    helpers = runpy.run_path(
-        str(Path(__file__).with_name("tool_output_parser_unit.py"))
-    )
-    markers, tool_schema = helpers["MARKERS"], helpers["TOOL"]
-    call, decode, encode = (helpers[name] for name in ("call", "decode", "encode"))
+    # The boundary is a matter of token ids, so a vocabulary of the four Qwen
+    # markers and one id per character is enough to drive it.
+    markers = {"<think>": 20000, "</think>": 20001,
+               "<tool_call>": 20002, "</tool_call>": 20003}
+    marker_text = {token: marker for marker, token in markers.items()}
+    tool_schema = {"type": "function", "function": {"name": "write", "parameters": {
+        "type": "object", "properties": {"text": {"type": "string"}},
+        "required": ["text"], "additionalProperties": False,
+    }}}
+
+    def encode(text):
+        ids = []
+        while text:
+            marker = next((m for m in markers if text.startswith(m)), None)
+            ids.append(markers[marker] if marker else ord(text[0]))
+            text = text[len(marker) if marker else 1:]
+        return ids
+
+    def decode(ids):
+        return "".join(marker_text.get(token, chr(token)) for token in ids)
+
+    def call(value):
+        return ("<tool_call>\n<function=write>\n<parameter=text>\n" + value
+                + "\n</parameter>\n</function>\n</tool_call>")
+
     tokenizer = MagicMock()
     tokenizer.get_vocab.return_value = markers
     tokenizer.decode.side_effect = decode

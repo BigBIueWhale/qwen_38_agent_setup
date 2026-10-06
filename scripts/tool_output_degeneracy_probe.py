@@ -31,9 +31,9 @@ from vllm.entrypoints.openai.responses.streaming_events import (
     SimpleStreamingEventProcessor,
     _StateType,
 )
-from vllm.parser.qwen3 import Qwen3Parser
 from vllm.tokenizers.detokenizer_utils import NativeDecodeStream
 
+from probe_parser import served_parser
 from probe_scope import new_conversation
 
 
@@ -158,7 +158,7 @@ def parse_nonstream(
     token_ids: list[int],
     request: ChatCompletionRequest,
 ) -> tuple[str, str, list[tuple[str, str]]]:
-    parser = Qwen3Parser(tokenizer, tools=request.tools)
+    parser = served_parser(tokenizer, request.tools)
     reasoning, content, calls = parser.parse_output(
         raw,
         request,
@@ -177,7 +177,7 @@ def parse_stream(
     *,
     chunk_size: int = 1,
 ) -> tuple[str, str, list[tuple[str, str]]]:
-    parser = Qwen3Parser(tokenizer, tools=request.tools)
+    parser = served_parser(tokenizer, request.tools)
     decoder = NativeDecodeStream(tokenizer.backend_tokenizer)
     reasoning_parts: list[str] = []
     content_parts: list[str] = []

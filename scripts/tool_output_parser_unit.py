@@ -1,21 +1,54 @@
 #!/usr/bin/env python3
-"""CPU checks of the installed Qwen parser's wire-visible language."""
+"""CPU checks of the installed Qwen parser's wire-visible language, run as
+serving runs it: the parser composition the launch selects, on the served
+tokenizer, fed the deltas its native decoder produces.
+
+The build mounts the served model's tokenizer and generation files, each checked
+against the model manifest, at ``SERVED_MODEL``, and names what the launch gives
+``--reasoning-parser``, ``--tool-call-parser`` and
+``--default-chat-template-kwargs`` in ``SERVED_REASONING_PARSER``,
+``SERVED_TOOL_CALL_PARSER`` and ``SERVED_CHAT_TEMPLATE_KWARGS``. Nothing here has
+a second tokenizer or a second composition to fall back to: run any other way,
+the unit fails at import, naming what it lacks.
+"""
 
 import json
+import os
 import unittest
 from unittest.mock import MagicMock
 
+from tokenizers import Tokenizer
+
 from vllm.entrypoints.openai.chat_completion.protocol import ChatCompletionRequest
 from vllm.parser import ParserManager
+from vllm.tokenizers import get_tokenizer
+from vllm.tokenizers.detokenizer_utils import NativeDecodeStream
 
 
+def _served(name):
+    try:
+        return os.environ[name]
+    except KeyError:
+        raise SystemExit(
+            f"{name} is not set. This unit runs the parser the launch serves on the "
+            "served tokenizer; run it through ./scripts/build-vllm.sh check."
+        ) from None
+
+
+SERVED_MODEL = _served("SERVED_MODEL")
+TOKENIZER = get_tokenizer(SERVED_MODEL)
+with open(os.path.join(SERVED_MODEL, "generation_config.json")) as config:
+    MODEL_EOS = tuple(json.load(config)["eos_token_id"])
+PARSER = ParserManager.get_parser(
+    tool_parser_name=_served("SERVED_TOOL_CALL_PARSER"),
+    reasoning_parser_name=_served("SERVED_REASONING_PARSER"),
+    enable_auto_tools=True,
+)
+CHAT_TEMPLATE_KWARGS = json.loads(_served("SERVED_CHAT_TEMPLATE_KWARGS"))
 MARKERS = {
-    "<think>": 20000,
-    "</think>": 20001,
-    "<tool_call>": 20002,
-    "</tool_call>": 20003,
+    marker: TOKENIZER.convert_tokens_to_ids(marker)
+    for marker in ("<think>", "</think>", "<tool_call>", "</tool_call>")
 }
-TEXT = {v: k for k, v in MARKERS.items()}
 TOOL = {
     "type": "function",
     "function": {
@@ -28,27 +61,27 @@ TOOL = {
         },
     },
 }
-PARSER = ParserManager.get_parser(
-    tool_parser_name="qwen3_coder", reasoning_parser_name="qwen3",
-    enable_auto_tools=True,
-)
+
+
+def _ordinary_tokenizer():
+    """The served pipeline without its added vocabulary: what spells a marker
+    with ordinary tokens, as request text does once the template has rendered."""
+    spec = json.loads(TOKENIZER.backend_tokenizer.to_str())
+    spec["added_tokens"] = []
+    return Tokenizer.from_str(json.dumps(spec))
+
+
+_ORDINARY = _ordinary_tokenizer()
 
 
 def encode(text):
-    ids = []
-    while text:
-        marker = next((m for m in MARKERS if text.startswith(m)), None)
-        if marker:
-            ids.append(MARKERS[marker])
-            text = text[len(marker):]
-        else:
-            ids.append(ord(text[0]))
-            text = text[1:]
-    return ids
+    """The ids the model generates for *text*: added-token spellings are ids."""
+    return TOKENIZER.encode(text, add_special_tokens=False)
 
 
-def decode(ids):
-    return "".join(TEXT.get(i, chr(i)) for i in ids)
+def ordinary(text):
+    """The ids that spell *text* without any added or special token."""
+    return _ORDINARY.encode(text, add_special_tokens=False).ids
 
 
 def call(value):
@@ -64,26 +97,36 @@ def call(value):
     )
 
 
+def request_for(*, tools=None, choice="auto"):
+    fields = {} if tools == [] else {"tool_choice": choice}
+    return ChatCompletionRequest(
+        model="unit", messages=[{"role": "user", "content": "test"}],
+        tools=[TOOL] if tools is None else tools or None, **fields,
+    )
+
+
+def generation(text, ids, finish, stop):
+    """The ids serving hands the parser and the text of each: a model EOS ends
+    the ids and the detokenizer gives it no text."""
+    ids = encode(text) if ids is None else list(ids)
+    if finish == "stop" and stop is None:
+        ids.append(MODEL_EOS[0])
+    decoder = NativeDecodeStream(TOKENIZER.backend_tokenizer)
+    texts = [decoder.step(token) or "" for token in ids]
+    if finish == "stop" and stop is None:
+        texts[-1] = ""
+    return ids, texts
+
+
 def parse(text, chunk_size, *, tools=None, choice="auto", ids=None,
           finish="stop", stop=None):
-    request = ChatCompletionRequest(
-        model="unit", messages=[{"role": "user", "content": "test"}],
-        tools=[TOOL] if tools is None else tools or None,
-        tool_choice=choice if tools != [] else None,
-    )
-    tokenizer = MagicMock()
-    tokenizer.get_vocab.return_value = MARKERS
-    tokenizer.decode.side_effect = decode
-    tokenizer.all_special_tokens = list(MARKERS)
-    tokenizer.all_special_ids = list(MARKERS.values())
-    parser = PARSER(
-        tokenizer, request.tools, chat_template_kwargs={"enable_thinking": True}
-    )
-    ids = encode(text) if ids is None else ids
+    request = request_for(tools=tools, choice=choice)
+    parser = PARSER(TOKENIZER, request.tools, chat_template_kwargs=CHAT_TEMPLATE_KWARGS)
+    ids, texts = generation(text, ids, finish, stop)
     if chunk_size is None:
         reasoning, content, calls = parser.parse_output(
-            text, request, enable_auto_tools=True, model_output_token_ids=ids,
-            finish_reason=finish, stop_reason=stop,
+            "".join(texts), request, enable_auto_tools=True,
+            model_output_token_ids=ids, finish_reason=finish, stop_reason=stop,
         )
         return (
             reasoning or "", content or "",
@@ -94,7 +137,8 @@ def parse(text, chunk_size, *, tools=None, choice="auto", ids=None,
         group = ids[start:start + chunk_size]
         last = start + chunk_size >= len(ids)
         delta = parser.parse_output_delta(
-            decode(group), group, request, prompt_token_ids=[1, 2, 3],
+            "".join(texts[start:start + chunk_size]), group, request,
+            prompt_token_ids=[1, 2, 3],
             finish_reason=finish if last else None, stop_reason=stop if last else None,
         )
         if not delta:
@@ -108,6 +152,21 @@ def parse(text, chunk_size, *, tools=None, choice="auto", ids=None,
                 args += c.function.arguments or ""
             calls[c.index] = name, args
     return reasoning, content, list(calls.values()), parser.tool_calls_complete
+
+
+def grammar_matcher(request):
+    """The decoding grammar the request arms, as the engine compiles it: on
+    the served vocabulary, with the model's EOS ids as its terminators."""
+    import xgrammar as xgr
+
+    armed = PARSER(
+        TOKENIZER, request.tools, chat_template_kwargs=CHAT_TEMPLATE_KWARGS
+    ).adjust_request(request)
+    info = xgr.TokenizerInfo.from_huggingface(TOKENIZER, stop_token_ids=list(MODEL_EOS))
+    compiled = xgr.GrammarCompiler(info, max_threads=1).compile_structural_tag(
+        armed.structured_outputs.structural_tag
+    )
+    return xgr.GrammarMatcher(compiled)
 
 
 class ToolOutputParserTest(unittest.TestCase):
@@ -374,27 +433,17 @@ class ToolOutputParserTest(unittest.TestCase):
                                      ("plan", body, []))
 
     def test_tool_grammar_recognizes_both_tokenizations_after_reasoning(self):
-        import xgrammar as xgr
-        from vllm.tool_parsers.structural_tag_registry import get_model_structural_tag
-
-        vocabulary = [chr(i) for i in range(128)] + list(MARKERS) + ["<eos>"]
-        info = xgr.TokenizerInfo(vocabulary, stop_token_ids=[132])
-        tools = ChatCompletionRequest(messages=[], tools=[TOOL]).tools
-        tag = get_model_structural_tag("qwen_3_coder", tools, "auto", False)
-        grammar = xgr.GrammarCompiler(info, max_threads=1).compile_structural_tag(tag)
-        grammar_ids = {token_id: 128 + index
-                       for index, token_id in enumerate(MARKERS.values())}
         body = call("literal syntax")
         text = "plan</think>" + body
-        for body_ids in (encode(body), [ord(c) for c in body]):
-            matcher = xgr.GrammarMatcher(grammar)
+        for body_ids in (encode(body), ordinary(body)):
+            matcher = grammar_matcher(request_for())
             for token_id in body_ids:
-                self.assertTrue(matcher.accept_token(grammar_ids.get(token_id, token_id)))
-            self.assertTrue(matcher.accept_token(132))
+                self.assertTrue(matcher.accept_token(token_id))
+            self.assertTrue(matcher.accept_token(MODEL_EOS[0]))
             self.assertTrue(matcher.is_terminated())
             ids = encode("plan</think>") + body_ids
             for chunk in (1, 13, None):
-                with self.subTest(chunk=chunk, body_ids=body_ids):
+                with self.subTest(chunk=chunk, ordinary=body_ids != encode(body)):
                     result = parse(text, chunk, ids=ids)
                     self.assertEqual(result[:2], ("plan", ""))
                     self.assertEqual(result[2], [("write", '{"text": "literal syntax"}')])
@@ -404,7 +453,7 @@ class ToolOutputParserTest(unittest.TestCase):
         reasoning = "plan </think> " + call("literal syntax")
         for chunk in (1, 13, None):
             with self.subTest(chunk=chunk):
-                result = parse(reasoning, chunk, ids=[ord(c) for c in reasoning])
+                result = parse(reasoning, chunk, ids=ordinary(reasoning))
                 self.assertEqual(result[:3], (reasoning, "", []))
 
     def test_only_an_observed_wrapper_closes_the_call(self):
@@ -499,14 +548,17 @@ class ToolOutputParserTest(unittest.TestCase):
         from vllm.v1.core.sched.utils import check_stop
         from vllm.v1.request import Request
 
-        for token in (248046, 248044):
+        for token in MODEL_EOS:
             params = SamplingParams(stop_token_ids=[7], extra_args={"kv_scope": "unit"})
-            params.update_from_generation_config({"eos_token_id": [248046, 248044]}, 248046)
+            params.update_from_generation_config(
+                {"eos_token_id": list(MODEL_EOS)}, MODEL_EOS[0]
+            )
             request = Request("unit", [1], params, None)
             request.append_output_token_ids(token)
             self.assertTrue(check_stop(request, 1024))
             self.assertIsNone(request.stop_reason)
             self.assertEqual(params.stop_token_ids, [7])
+
 
 
 if __name__ == "__main__":

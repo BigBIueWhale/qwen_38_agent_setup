@@ -3829,10 +3829,15 @@ CONTRACTS: Mapping[str, SemanticContract] = {
     ),
     "qwen-exact-tool-language": SemanticContract(
         rationale=(
-            "The parser invented calls from unarmed prose, consumed reserved markup "
-            "inside valid parameter values, and diverged in batch. Match the exact "
-            "trigger, keep disabled-tool output, carry the exact content IDs through "
-            "the reasoning split, and preserve content order and wrapper closure."
+            "A call is the grammar's exact trigger language and nothing looser: a "
+            "bare function opener, or a tool-call opener the trigger does not "
+            "follow, is content, and markup inside a parameter value is the "
+            "value's text. With tool_choice none, or no tools, a call-shaped span "
+            "is forwarded as the text it was. The batch tool pass splits on the "
+            "generated ids after the reasoning boundary, as streaming does, so a "
+            "text lookalike of a marker is content on both transports; a finished "
+            "parse releases content in the order generated and reports a call "
+            "cut before its wrapper as open."
         ),
         removal_condition=(
             "Remove when upstream matches the Qwen grammar's trigger and parameter "

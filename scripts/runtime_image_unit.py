@@ -112,11 +112,19 @@ class RuntimeImageTest(unittest.TestCase):
         )
 
     def test_parser_unit_is_executed_during_build(self):
-        recipe = (ROOT / "containers/Dockerfile.runtime").read_text()
-        self.assertIn(
-            "RUN CUDA_VISIBLE_DEVICES= "
-            "python3 /opt/qwen38/tool_output_parser_unit.py", recipe,
+        # The parser unit parses on the served model's tokenizer, which the
+        # image does not carry, so the build's unit loop runs it -- in check and
+        # in build -- with the manifest-checked files and the launch's parsers.
+        script = (ROOT / "scripts/build-vllm.sh").read_text()
+        loop = next(
+            line for line in script.splitlines() if line.startswith("for unit in ")
         )
+        self.assertIn(" tool_output_parser_unit ", loop)
+        self.assertIn('"${served_model_mounts[@]}"', script)
+        self.assertIn('"${served_parser_env[@]}"', script)
+        for option in ("--reasoning-parser", "--tool-call-parser",
+                       "--default-chat-template-kwargs"):
+            self.assertIn(f"$(launch_arg_value {option})", script)
 
     def test_shared_prefix_unit_is_executed_during_build(self):
         recipe = (ROOT / "containers/Dockerfile.runtime").read_text()

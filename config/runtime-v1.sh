@@ -107,7 +107,7 @@ readonly QWEN_ARGUMENTS_READ_BY_GRAMMAR_PATCH_DIFF_SHA256="c8d40913648479bfaf0ee
 readonly STARTUP_PLAN_BOUND_PATCH_DIFF_SHA256="994f9aabc61b3d7473e83593a5279b2759ce4413ceb1ea212ae33be342df0019"
 readonly TEMPLATE_REFUSAL_PARAMETER_PATCH_DIFF_SHA256="587facad35a115822bb6af2baefc00604fa87e1e96d0e6d85919115821a1ccd5"
 readonly QWEN_REPEATED_PARAMETER_REFUSAL_PATCH_DIFF_SHA256="e6217bcd1fae538ef97dacd523c3b994f594826502961c24c3aa47402b668fa9"
-readonly SOURCE_PATCH_MANIFEST_SHA256="55662c3163ffecb57420f113645ad9c84146955fc3a2332afbf4efe11e32c3ea"
+readonly SOURCE_PATCH_MANIFEST_SHA256="445d6e955a0ed94910d97c0069507b144c15f7597ff2dccab0e2feff6716b093"
 # Cardinality of config/deployment-inputs.sha256. The hash manifest alone
 # proves the listed bytes but cannot see a quietly grown or shrunk allowlist,
 # so the reviewed file count is pinned as well. It is declared exactly once,
@@ -116,7 +116,7 @@ readonly SOURCE_PATCH_MANIFEST_SHA256="55662c3163ffecb57420f113645ad9c84146955fc
 # was added — the validator then refused a correct manifest. Every consumer
 # (build-vllm.sh, runtime-common.sh, generate-deployment-input-manifest.sh)
 # reads this declaration.
-readonly DEPLOYMENT_INPUT_FILE_COUNT="129"
+readonly DEPLOYMENT_INPUT_FILE_COUNT="130"
 readonly TURBOQUANT_PATCHED_FILE_SHA256="c3fef60cfa031a139bed6f413b2c40d0ea3bc6b48992455404a09459abbfa282"
 readonly TURBOQUANT_STORE_PATCHED_FILE_SHA256="298645bff68c6adab58261862602b86e7e714c3552a9fd89102d9ccd2b83e9f7"
 readonly TURBOQUANT_DECODE_PATCHED_FILE_SHA256="dab8b65ab7ddd6582de16e1fc7b1360ab0061b4a2a2b114f5d87ea0532fd726f"
@@ -176,7 +176,7 @@ readonly ENGINE_PROTOCOL_PATCHED_FILE_SHA256="aac2094cff867c78ddf2e19829d17c24c3
 # bytes from the model's own template through named stages, and
 # ./scripts/build-vllm.sh check refuses if it cannot reproduce them.
 readonly AGENT_CHAT_TEMPLATE_SHA256="3b5bcc18141cca486335c8f16c2cfa8f5bf4aa3529b6f6cfb3ed4d7513d5cd85"
-readonly PHASE_BUDGET_UNIT_SHA256="da367db85e24f7983c0f76f152536723528e4de56a2b5013fe9dab8bb40eafb3"
+readonly PHASE_BUDGET_UNIT_SHA256="9833b3c96dc2e672bbbf733b5efe5be3b71d8cd56533f161bc834b9a50d26fb0"
 readonly VISION_WORKSPACE_UNIT_SHA256="680e5a44b3de60ead580832bbaba6f5395b64fe61741191b310ff9789d7cb52f"
 readonly VISION_CONTRACT_UNIT_SHA256="c6053d63fbd62b84aa8698c61b7d3aeda0cea2596afe52fcf20b49319d4712ef"
 readonly VISION_MLP_UNIT_SHA256="857ba547a099c6ba646210eb33dd7b159bf9a1972d1772ea396071c8d8e4f2e3"
@@ -250,7 +250,7 @@ readonly TURBOQUANT_STORE_UPSTREAM_FILE_SHA256="6e6e2fe74a307d40f0be786ccbaea76d
 readonly TURBOQUANT_DECODE_UPSTREAM_FILE_SHA256="8e52678136449e4bbca2195fbcbb87426c955a2b1b8422e7ab9511e45ee5f5c6"
 readonly TURBOQUANT_GUARD_UNIT_SHA256="657189807e2966824c556a08eb78a9ed7891331f6de4f3b563cf6cfded15cf47"
 readonly SOURCE_DATE_EPOCH="1786751423"
-readonly RUNTIME_DOCKERFILE_SHA256="cff9d2542df6a23cb095e2b2fba2b2e8e267b2d2055eb6c327e4a2798482a706"
+readonly RUNTIME_DOCKERFILE_SHA256="e58ca999ada5321cf77b4f50eaff9e72f04479a7924dc01f10e205c0f7528d61"
 
 # Functional host contract only. Exact host software versions, binary
 # hashes, and GPU/driver identity are deliberately not pinned: they tie the
@@ -438,7 +438,7 @@ readonly TOKEN_ID_SCANNER_PATCHED_FILE_SHA256="dc6aec25112eef55f7ace3d5e519a0ded
 
 readonly QWEN_LANGUAGE_PATCH_DIFF_SHA256="fe4e46cb7444c80646537da63ab1ac12c54e7eebb04c0735a4243d8b7e7943d2"
 
-readonly TOOL_OUTPUT_PARSER_UNIT_SHA256="6572718aed1921ec1de46e4a68020e23461d4e3809d859920d39a21a5935bbd3"
+readonly TOOL_OUTPUT_PARSER_UNIT_SHA256="72518865ef9687739e6037e4dd42ac026e24fd95c8397e05e981351075ca8d76"
 
 readonly PNG_SOURCE_PATCH_DIFF_SHA256="b1b684a96d7243ae647d4d8ce2fe69b7330b3ab243ea77903c4cfb346bc80549"
 

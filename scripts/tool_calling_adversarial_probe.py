@@ -23,10 +23,10 @@ from vllm.entrypoints.openai.chat_completion.protocol import (
     ChatCompletionRequest,
     ChatCompletionToolsParam,
 )
-from vllm.parser.qwen3 import Qwen3Parser
 from vllm.tool_parsers.structural_tag_registry import get_model_structural_tag
 from vllm.v1.structured_output import StructuredOutputManager
 
+from probe_parser import served_parser
 from probe_scope import new_conversation
 
 
@@ -317,11 +317,8 @@ def real_tokenizer_and_grammar_probe() -> dict[str, Any]:
     if not all(bypass.accept_token(token_id) for token_id in unknown_ids[1:]):
         raise AssertionError("Dropped-trigger sensitivity control unexpectedly rejected")
 
-    boundary_parser = object.__new__(Qwen3Parser)
-    boundary_parser._reasoning_start_token_id = expected_markers["<think>"][0]
-    boundary_parser._reasoning_end_token_id = expected_markers["</think>"][0]
-    boundary_parser._tool_call_token_id = expected_markers["<tool_call>"][0]
-    boundary_parser._tool_call_end_token_id = expected_markers["</tool_call>"][0]
+    # The structured-output gate's reasoner is the launch's reasoning parser.
+    boundary_parser = served_parser(tokenizer, [protocol_tool]).reasoning_parser
     implicit = [expected_markers["<think>"][0], 11, expected_markers["<tool_call>"][0]]
     implicit_index = StructuredOutputManager._find_reasoning_end_index(
         boundary_parser, implicit, 2
@@ -338,7 +335,7 @@ def real_tokenizer_and_grammar_probe() -> dict[str, Any]:
     if retained != expected_markers["<tool_call>"]:
         raise AssertionError(f"Implicit Qwen grammar trigger was trimmed: {retained}")
 
-    parser = Qwen3Parser(tokenizer, tools=[protocol_tool])
+    parser = served_parser(tokenizer, [protocol_tool])
     request = ChatCompletionRequest(
         model=MODEL,
         messages=[{"role": "user", "content": "test"}],
@@ -350,12 +347,17 @@ def real_tokenizer_and_grammar_probe() -> dict[str, Any]:
         f"<tool_call>\n<function=read_file>\n<parameter=path>{PATH}</parameter>\n"
         "</function>\n</tool_call>"
     )
-    parsed = parser.extract_tool_calls(raw, request)
-    if not parsed.tools_called or len(parsed.tool_calls) != 1:
-        raise AssertionError(f"Unified Qwen parser lost implicit tool call: {parsed}")
-    parsed_args = json.loads(parsed.tool_calls[0].function.arguments)
-    if parsed.tool_calls[0].function.name != "read_file" or parsed_args != {"path": PATH}:
-        raise AssertionError(f"Unified Qwen parser reconstructed wrong call: {parsed}")
+    # The served route reads a whole output with its generated ids.
+    _, _, parsed = parser.parse_output(
+        raw, request, finish_reason="stop", stop_reason=None,
+        enable_auto_tools=True,
+        model_output_token_ids=tokenizer.encode(raw, add_special_tokens=False),
+    )
+    if not parsed or len(parsed) != 1:
+        raise AssertionError(f"The served Qwen parser lost the implicit tool call: {parsed}")
+    parsed_args = json.loads(parsed[0].arguments)
+    if parsed[0].name != "read_file" or parsed_args != {"path": PATH}:
+        raise AssertionError(f"The served Qwen parser reconstructed the wrong call: {parsed}")
 
     return {
         "real_tokenizer_marker_ids": actual_markers,

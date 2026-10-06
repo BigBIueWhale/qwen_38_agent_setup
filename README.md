@@ -113,7 +113,19 @@ units offline, the Qwen grammar unit among them; it does not execute the
 Dockerfile. No build assertion is written only inside it any more: what the build
 alone still proves is the image's own assembly -- the copied modes, the removed
 modules and the upstream-verifier hashes -- together with the vision workspace and
-MLP units, which run only against the installed tree.
+MLP units, which run only against the installed tree. The parser unit parses as
+serving does: the reasoning and tool-call parsers the launch names, composed into
+the two-pass parser serving builds, with the launch's default template
+arguments, on the served model's tokenizer and generation files, each checked
+against the model manifest before it is mounted, fed the deltas the native
+decoder produces. The image does not carry that tokenizer, so the build runs this
+unit in check and in build rather than inside the Dockerfile. The probes that
+parse fixed outputs locally build the same composition (`scripts/probe_parser.py`),
+named by `run-probe.sh` from the launch. The vLLM test files the reviewed stages
+modify are review artifacts the check hashes and does not execute: no pinned
+input of the check can run them -- the base image has no test runner, and many
+need a GPU or hub downloads -- so what this deployment relies on is asserted by
+the units above.
 
 The live probes are launched the same way, through one launcher for the whole
 suite:
@@ -367,9 +379,9 @@ Pinned build inputs and products:
 |---|---|
 | Immutable base tag | qwen38-vllm:main-9df9b0b |
 | Immutable base ID | sha256:fa4a002a88b7043a1a89966dea8a500fe9696f84e75730d9da916f916048d401 |
-| Runtime Dockerfile SHA-256 | cff9d2542df6a23cb095e2b2fba2b2e8e267b2d2055eb6c327e4a2798482a706 |
-| Build verifier SHA-256 | efbfa663f2ad240b01d434eb101d9f077f6bbe06cee3ce4635d3dc44a8a4f758 |
-| Runtime validator SHA-256 | 41c3c58044fba46b3ba33ec4a3c360753611d1099a9c44756f2c83737295ea26 |
+| Runtime Dockerfile SHA-256 | e58ca999ada5321cf77b4f50eaff9e72f04479a7924dc01f10e205c0f7528d61 |
+| Build verifier SHA-256 | 1630e8bb91efc6c1cfe6e3eff23d907a24df3fdb489e92a2780b7b392b44d345 |
+| Runtime validator SHA-256 | d7b050d01a3a4bb32577c49e03d148f29eb1e89d92e375e45b096775423d0a36 |
 
 The runtime image's profile, tag and archive name, which every release advances
 together, are declared in `config/runtime-v1.sh`, and the archive lives under

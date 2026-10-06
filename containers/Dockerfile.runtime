@@ -1069,15 +1069,17 @@ RUN printf '%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  
       "${PHASE_BUDGET_UNIT_SHA256}" \
       /opt/qwen38/phase_budget_unit.py \
     | sha256sum --check --strict
-# Every installed unit is executed here, each as the file it ships as. The
-# grammar unit's assertions were an inline heredoc until they went stale
-# against the vLLM-owned Qwen builder and killed two multi-hour builds; as a
-# file the same bytes are also one of the units `./scripts/build-vllm.sh check`
-# runs in seconds, so the image and the check can never run different source.
+# Every installed unit that needs nothing beyond the image is executed here,
+# each as the file it ships as. The grammar unit's assertions were an inline
+# heredoc until they went stale against the vLLM-owned Qwen builder and killed
+# two multi-hour builds; as a file the same bytes are also one of the units
+# `./scripts/build-vllm.sh check` runs in seconds, so the image and the check
+# can never run different source. The parser unit parses on the served model's
+# tokenizer, which the image does not carry, so the build runs it -- in check
+# and in build -- on the context's copy of the bytes installed here.
 RUN CUDA_VISIBLE_DEVICES= python3 /opt/qwen38/shared_prefix_cache_unit.py
 RUN CUDA_VISIBLE_DEVICES= python3 /opt/qwen38/raw_media_unit.py
 RUN CUDA_VISIBLE_DEVICES= python3 /opt/qwen38/generate_result_unit.py
-RUN CUDA_VISIBLE_DEVICES= python3 /opt/qwen38/tool_output_parser_unit.py
 RUN CUDA_VISIBLE_DEVICES= TRITON_INTERPRET=1 python3 /opt/qwen38/turboquant_guard_unit.py
 RUN CUDA_VISIBLE_DEVICES= python3 /opt/qwen38/qwen_grammar_unit.py
 RUN CUDA_VISIBLE_DEVICES= python3 /opt/qwen38/chat_template_retention_unit.py

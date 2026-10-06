@@ -807,6 +807,29 @@ docker run --rm --network none --read-only \
   --entrypoint python3 "${BASE_IMAGE_TAG}" /context/scripts/turboquant_guard_unit.py
 
 # Execute CPU contract units against the complete reviewed runtime overlay.
+# They parse as serving does: with the parsers and template arguments the
+# launch selects, on the served model's tokenizer and generation files, each
+# checked against the model manifest before it is mounted.
+served_model_files=(tokenizer.json tokenizer_config.json vocab.json config.json generation_config.json)
+printf '%s  %s\n' "${MODEL_MANIFEST_SHA256}" "${MODEL_MANIFEST}" | \
+  sha256sum --check --strict >/dev/null
+served_model_mounts=()
+for served_file in "${served_model_files[@]}"; do
+  served_line="$(grep -E "^[0-9a-f]{64}  ${served_file//./\\.}\$" "${MODEL_MANIFEST}" || true)"
+  [[ -n "${served_line}" && "$(wc -l <<<"${served_line}")" == 1 ]] || \
+    die "The model manifest must pin ${served_file} exactly once." \
+      "Manifest: ${MODEL_MANIFEST}"
+  (cd -- "${MODEL_DIR}" && sha256sum --check --strict --quiet <<<"${served_line}") || \
+    die "The served model's ${served_file} differs from its manifest." \
+      "Directory: ${MODEL_DIR}" "Restore the pinned model files before checking."
+  served_model_mounts+=(--volume "${MODEL_DIR}/${served_file}:/served-model/${served_file}:ro")
+done
+served_parser_env=(
+  --env SERVED_MODEL=/served-model
+  --env "SERVED_REASONING_PARSER=$(launch_arg_value --reasoning-parser)"
+  --env "SERVED_TOOL_CALL_PARSER=$(launch_arg_value --tool-call-parser)"
+  --env "SERVED_CHAT_TEMPLATE_KWARGS=$(launch_arg_value --default-chat-template-kwargs)"
+)
 parser_unit_mounts=()
 while IFS= read -r status_line; do
   case "${status_line}" in
@@ -819,8 +842,8 @@ done <<<"${REVIEWED_STATUS}"
 for unit in chat_template_retention_unit tool_output_parser_unit vision_contract_unit reasoning_usage_unit shared_prefix_cache_unit phase_budget_unit generate_result_unit raw_media_unit qwen_grammar_unit template_authorship_unit native_fp4_selection_unit; do
   docker run --rm --network none --read-only --user "$(id -u):$(id -g)" \
     --tmpfs /tmp:rw,nodev,nosuid,size=256m \
-    --env PYTHONDONTWRITEBYTECODE=1 --env CUDA_VISIBLE_DEVICES= \
-    --volume "${BUILD_CONTEXT}/chat_template.jinja:/opt/qwen38/chat_template.jinja:ro" --volume "${BUILD_CONTEXT}:/context:ro" "${parser_unit_mounts[@]}" \
+    --env PYTHONDONTWRITEBYTECODE=1 --env CUDA_VISIBLE_DEVICES= "${served_parser_env[@]}" \
+    --volume "${BUILD_CONTEXT}/chat_template.jinja:/opt/qwen38/chat_template.jinja:ro" --volume "${BUILD_CONTEXT}:/context:ro" "${parser_unit_mounts[@]}" "${served_model_mounts[@]}" \
     --entrypoint python3 "${BASE_IMAGE_TAG}" "/context/scripts/${unit}.py"
 done
 
@@ -844,7 +867,8 @@ if [[ "${MODE}" == "check" ]]; then
     "${deleted_runtime_count} reviewed runtime source deletions," \
     "${modified_test_count} reviewed modified test files," \
     "${new_test_count} reviewed new test files," \
-    "${deleted_test_count} reviewed test deletions," \
+    "${deleted_test_count} reviewed test deletions (hashed review artifacts the" \
+    "check does not execute)," \
     "${modified_doc_count} reviewed modified documentation files," \
     "${review_diff_count} review diffs, agent template, numerical audit" \
     "units, and all build units are exact."

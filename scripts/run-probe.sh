@@ -15,8 +15,8 @@ set -Eeuo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
-# shellcheck source=../config/runtime-v1.sh
-source "${PROJECT_DIR}/config/runtime-v1.sh"
+# shellcheck source=runtime-common.sh
+source "${SCRIPT_DIR}/runtime-common.sh"
 
 if (($# < 1)); then
   printf 'Usage: %s <name>_probe.py [probe arguments...]\n' "$0" >&2
@@ -49,5 +49,12 @@ shift
 python3 -u "${stage}/${probe}" "$@"
 INNER
 )"
-tar --create --file - --directory "${SCRIPT_DIR}" probe_scope.py "${probes[@]##*/}" |
-  docker exec --interactive "${CONTAINER_NAME}" sh -c "${inside}" probe "${probe}" "$@"
+# A probe that parses locally builds the parser the launch serves
+# (scripts/probe_parser.py), named here from the launch itself.
+tar --create --file - --directory "${SCRIPT_DIR}" probe_scope.py probe_parser.py \
+    "${probes[@]##*/}" |
+  docker exec --interactive \
+    --env "SERVED_REASONING_PARSER=$(launch_arg_value --reasoning-parser)" \
+    --env "SERVED_TOOL_CALL_PARSER=$(launch_arg_value --tool-call-parser)" \
+    --env "SERVED_CHAT_TEMPLATE_KWARGS=$(launch_arg_value --default-chat-template-kwargs)" \
+    "${CONTAINER_NAME}" sh -c "${inside}" probe "${probe}" "$@"

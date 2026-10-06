@@ -31,9 +31,9 @@ from vllm.entrypoints.openai.chat_completion.protocol import (
     ChatCompletionRequest,
     ChatCompletionToolsParam,
 )
-from vllm.parser.qwen3 import Qwen3Parser
 from vllm.tokenizers.detokenizer_utils import detokenize_incrementally
 
+from probe_parser import served_parser
 from probe_scope import new_conversation
 
 
@@ -270,7 +270,7 @@ def parse_nonstream(
     raw_turn: str,
     request: ChatCompletionRequest,
 ) -> tuple[str, str, list[tuple[str, dict[str, Any]]], list[Any]]:
-    parser = Qwen3Parser(tokenizer, tools=request.tools)
+    parser = served_parser(tokenizer, request.tools)
     token_ids = tokenizer.encode(raw_turn, add_special_tokens=False)
     reasoning, content, calls = parser.parse(
         raw_turn,
@@ -286,7 +286,7 @@ def parse_streaming(
     raw_turn: str,
     request: ChatCompletionRequest,
 ) -> tuple[str, str, list[tuple[str, dict[str, Any]]]]:
-    parser = Qwen3Parser(tokenizer, tools=request.tools)
+    parser = served_parser(tokenizer, request.tools)
     all_token_ids = tokenizer.encode(raw_turn, add_special_tokens=False)
     previous_text = ""
     previous_tokens = None
