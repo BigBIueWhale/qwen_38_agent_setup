@@ -261,7 +261,10 @@ def controlled_policy_cases(
             "S7_surrounding_prose", prefix + "BEFORE" + body + "AFTER",
             (reasoning, "BEFOREAFTER", call),
         ),
-        ("S8_duplicate_closer", prefix + "</think>answer", (reasoning, "answer", [])),
+        (
+            "S8_duplicate_closer", prefix + "</think>answer",
+            (reasoning, "</think>answer", []),
+        ),
         (
             "S8_literal_opener", prefix + "literal <think> text",
             (reasoning, "literal <think> text", []),

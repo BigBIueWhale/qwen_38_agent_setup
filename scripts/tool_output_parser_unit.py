@@ -560,6 +560,44 @@ class ToolOutputParserTest(unittest.TestCase):
             self.assertEqual(params.stop_token_ids, [7])
 
 
+    def test_every_generated_token_survives_parsing(self):
+        """The parser deletes nothing the model generated.
+
+        Every special token of the served tokenizer that the format does not
+        act on -- the vision and audio markers among them -- is the text it
+        decodes to, in reasoning, in the answer, beside a call and inside a
+        value; so is a second ``</think>``. Batch and every chunking read the
+        same ids the same way, so text and ids cannot disagree. A model EOS
+        ends a generation, so it is not one of them.
+        """
+        specials = [
+            token for token in TOKENIZER.all_special_tokens
+            if token not in MARKERS
+            and TOKENIZER.convert_tokens_to_ids(token) not in MODEL_EOS
+        ]
+        self.assertIn("<|image_pad|>", specials)
+        for token in [*specials, "</think>"]:
+            cases = [
+                ("pl" + token + "an</think>\n\nanswer",
+                 ("pl" + token + "an", "\n\nanswer", [])),
+                ("plan</think>\n\nA" + token + "B",
+                 ("plan", "\n\nA" + token + "B", [])),
+                ("plan</think>\n\nSee " + token + ".\n" + call("v"),
+                 ("plan", "\n\nSee " + token + ".\n",
+                  [("write", json.dumps({"text": "v"}))])),
+                ("plan</think>\n\n" + call("a" + token + "b"),
+                 ("plan", "\n\n",
+                  [("write", json.dumps({"text": "a" + token + "b"},
+                                        ensure_ascii=False))])),
+            ]
+            if token == "</think>":
+                # Inside reasoning a closer ends it; that is not this token.
+                cases = cases[1:]
+            for text, expected in cases:
+                for chunk in (None, 1, 3, 1000):
+                    with self.subTest(token=token, text=text, chunk=chunk):
+                        self.assertEqual(parse(text, chunk)[:3], expected)
+
 
 if __name__ == "__main__":
     unittest.main()

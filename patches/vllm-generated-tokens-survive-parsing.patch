@@ -1,0 +1,757 @@
+diff --git a/tests/parser/engine/test_deepseek_v4.py b/tests/parser/engine/test_deepseek_v4.py
+index ba5ebf76ed673741e3da19fbe901441e4d0791eb..8f9beccfca95df407b21ef2a16627086d1858b11 100644
+--- a/tests/parser/engine/test_deepseek_v4.py
++++ b/tests/parser/engine/test_deepseek_v4.py
+@@ -970,8 +970,12 @@ class TestDelegatingParserLargeDelta:
+         ids=lambda c: f"chunk={c}",
+     )
+     def test_eos_not_leaked_when_reasoning_never_ends(self, chunk_size):
+-        """EOS must not leak into reasoning_content when the model never
+-        emits </think> (generation ends while still in REASONING state)."""
++        """EOS never enters reasoning_content when the model never emits
++        </think> (generation ends while still in REASONING state).
++
++        The detokenizer gives the stop token that ended the generation no
++        text, so its id arrives alone; the parser invents none for it.
++        """
+         eos_text = "<｜end▁of▁sentence｜>"
+         eos_id = 128801
+         vocab = {
+@@ -986,7 +990,7 @@ class TestDelegatingParserLargeDelta:
+             prefix = " " if tokens else ""
+             tokens.append((tid, prefix + word))
+             tid += 1
+-        tokens.append((eos_id, eos_text))
++        tokens.append((eos_id, ""))
+ 
+         tokenizer = MockTokenizer(vocab=vocab, tokens=tokens)
+         parser = _DeepSeekV4Delegating(
+@@ -1001,7 +1005,6 @@ class TestDelegatingParserLargeDelta:
+         )
+         output = collect_output(deltas)
+ 
+-        assert reasoning_text in output.reasoning
+-        assert eos_text not in output.reasoning
++        assert output.reasoning == reasoning_text
+         assert output.content == ""
+         assert output.tool_calls == []
+diff --git a/tests/parser/engine/test_gemma4_streaming_reasoning.py b/tests/parser/engine/test_gemma4_streaming_reasoning.py
+index 5f6b0a414e144cf6f4a37459e8a712a9472e8177..6bfd2af568c1c83e68912d33823b0202b1cbbd48 100644
+--- a/tests/parser/engine/test_gemma4_streaming_reasoning.py
++++ b/tests/parser/engine/test_gemma4_streaming_reasoning.py
+@@ -1481,10 +1481,10 @@ class TestBareThoughtWithoutChannelOpener:
+ 
+ # ── Regression: commas inside <|"|>-delimited string values ─────────
+ #
+-# _make_tokenizer sets all_special_tokens, which activates the auto-drop
+-# mechanism in _build_drop_info. If <|"|> is not in configured_texts,
+-# it gets silently dropped and commas inside string values become field
+-# separators, e.g. "San Francisco, CA" → {"location": "San Francisco"}.
++# _make_tokenizer sets all_special_tokens, so <|"|> arrives as a special
++# token. The parser keeps it as the text it decodes to; were it removed,
++# commas inside string values would become field separators, e.g.
++# "San Francisco, CA" → {"location": "San Francisco"}.
+ 
+ 
+ COMMA_TOKEN_SEQUENCE: list[tuple[int, str]] = [
+@@ -1528,10 +1528,9 @@ MULTI_COMMA_TOKEN_SEQUENCE: list[tuple[int, str]] = [
+ 
+ 
+ class TestCommaInStringValueRegression:
+-    """Regression: <|"|> delimiters must not be auto-dropped.
++    """Regression: <|"|> delimiters must survive parsing.
+ 
+-    When _build_drop_info discovers <|"|> as a special token and it is
+-    not in configured_texts, the delimiter is silently removed. Without
++    The delimiter is a special token the format reads as text. Without
+     it, _parse_gemma4_args treats commas inside string values as field
+     separators.
+     """
+diff --git a/tests/parser/engine/test_parser_engine.py b/tests/parser/engine/test_parser_engine.py
+index 23751d7ad0c2c8c3080ab10206439528ceaa148c..852e792d425a00117f2cf78369fb398fdf7ab810 100644
+--- a/tests/parser/engine/test_parser_engine.py
++++ b/tests/parser/engine/test_parser_engine.py
+@@ -1611,21 +1611,24 @@ class TestCoercionInstabilityRegression:
+         assert parsed["extra"] == "ok"
+ 
+ 
+-_DROP_VOCAB: dict[str, int] = {
++_SPECIAL_VOCAB: dict[str, int] = {
+     **_VOCAB,
+     "<bos>": 204,
+     "<eos>": 205,
+ }
+ 
+ 
+-class TestDropSpecialTokens:
+-    """Special token dropping via the __DROP__ terminal mechanism."""
++class TestSpecialTokensAreText:
++    """A special token the format does not act on is the text it decodes to.
+ 
+-    def test_drops_special_token_by_id_from_content(self):
+-        """A special token (not a configured terminal) is dropped when
+-        it arrives as its actual token ID."""
++    The parser reads the generation and deletes none of it, in every state:
++    content, reasoning, a forwarded span and a call's arguments. A stop token
++    contributes nothing only because the detokenizer gives it no text.
++    """
++
++    def test_special_token_by_id_stays_in_content(self):
+         config = ParserEngineConfig(
+-            name="drop_content_test",
++            name="special_content_test",
+             terminals={},
+             token_id_terminals={},
+             transitions={},
+@@ -1634,74 +1637,63 @@ class TestDropSpecialTokens:
+         )
+         engine = _make_engine(
+             config=config,
+-            vocab=_DROP_VOCAB,
+-            special_tokens=list(_DROP_VOCAB.keys()),
++            vocab=_SPECIAL_VOCAB,
++            special_tokens=list(_SPECIAL_VOCAB.keys()),
+         )
+         engine._engine.reset()
+         events = engine._engine.feed("hello<bos>world", [72, 204, 73])
+         delta = engine._events_to_delta(events)
+         assert delta is not None
+-        assert "<bos>" not in delta.content
+-        assert delta.content == "helloworld"
++        assert delta.content == "hello<bos>world"
+ 
+-    def test_drops_special_token_by_id_from_reasoning(self):
++    def test_special_token_by_id_stays_in_reasoning(self):
+         engine = _make_engine(
+-            vocab=_DROP_VOCAB,
+-            special_tokens=list(_DROP_VOCAB.keys()),
++            vocab=_SPECIAL_VOCAB,
++            special_tokens=list(_SPECIAL_VOCAB.keys()),
+         )
+         engine._engine.reset()
+         events = engine._engine.feed("thinking<eos>more", [72, 205, 73])
+         delta = engine._events_to_delta(events)
+         assert delta is not None
+-        assert "<eos>" not in delta.reasoning
+-        assert delta.reasoning == "thinkingmore"
++        assert delta.reasoning == "thinking<eos>more"
+ 
+-    def test_drops_via_text_fallback_when_no_token_ids(self):
+-        """When no token IDs are provided, text-based lexer catches
+-        drop tokens as a fallback."""
++    def test_special_token_text_without_ids_stays_text(self):
+         engine = _make_engine(
+-            vocab=_DROP_VOCAB,
+-            special_tokens=list(_DROP_VOCAB.keys()),
++            vocab=_SPECIAL_VOCAB,
++            special_tokens=list(_SPECIAL_VOCAB.keys()),
+         )
+         engine._engine.reset()
+         events = engine._engine.feed("hello<bos>world", [])
+         delta = engine._events_to_delta(events)
+         assert delta is not None
+-        assert "<bos>" not in delta.reasoning
++        assert delta.reasoning == "hello<bos>world"
+ 
+     def test_regular_tokens_spelling_special_survive(self):
+-        """Regular tokens that spell out a drop-token string survive
+-        when token IDs prove they are not the special token."""
+-        vocab = {**_DROP_VOCAB, "h": 72, "<": 73, "bos": 74, ">": 75, "w": 76}
++        vocab = {**_SPECIAL_VOCAB, "h": 72, "<": 73, "bos": 74, ">": 75, "w": 76}
+         engine = _make_engine(
+             vocab=vocab,
+-            special_tokens=list(_DROP_VOCAB.keys()),
++            special_tokens=list(_SPECIAL_VOCAB.keys()),
+         )
+         engine._engine.reset()
+-        # Feed regular token IDs (73, 74, 75) that spell <bos>,
+-        # not the special token ID 204.
+         events = engine._engine.feed("h<bos>w", [72, 73, 74, 75, 76])
+         delta = engine._events_to_delta(events)
+         assert delta is not None
+-        assert "<bos>" in delta.reasoning
++        assert delta.reasoning == "h<bos>w"
+ 
+-    def test_configured_terminal_not_treated_as_drop(self):
+-        """Tokens already in config.terminals (like <think>) are handled
+-        by the state machine, not the drop mechanism."""
++    def test_configured_terminal_is_structure(self):
++        """Tokens in config.terminals (like <think>) drive the state machine."""
+         engine = _make_engine(
+-            vocab=_DROP_VOCAB,
+-            special_tokens=list(_DROP_VOCAB.keys()),
++            vocab=_SPECIAL_VOCAB,
++            special_tokens=list(_SPECIAL_VOCAB.keys()),
+         )
+-        # Start from CONTENT so <think> triggers REASONING_START
+         engine._engine.reset(initial_state=ParserState.CONTENT)
+         events = engine._engine.feed("<think>", [200])
+-        has_reasoning_start = any(e.type == EventType.REASONING_START for e in events)
+-        assert has_reasoning_start
++        assert any(e.type == EventType.REASONING_START for e in events)
+ 
+-    def test_tool_name_not_affected_by_drops(self):
++    def test_tool_name_unaffected_by_special_tokens(self):
+         engine = _make_engine(
+-            vocab=_DROP_VOCAB,
+-            special_tokens=list(_DROP_VOCAB.keys()),
++            vocab=_SPECIAL_VOCAB,
++            special_tokens=list(_SPECIAL_VOCAB.keys()),
+         )
+         engine._engine.reset()
+         events = [
+@@ -1720,33 +1712,31 @@ class TestDropSpecialTokens:
+         ]
+         assert "get_weather" in names
+ 
+-    def test_adjacent_drop_tokens_by_id(self):
++    def test_adjacent_special_tokens_by_id(self):
+         engine = _make_engine(
+-            vocab=_DROP_VOCAB,
+-            special_tokens=list(_DROP_VOCAB.keys()),
++            vocab=_SPECIAL_VOCAB,
++            special_tokens=list(_SPECIAL_VOCAB.keys()),
+         )
+         engine._engine.reset()
+         events = engine._engine.feed("<bos><eos>", [204, 205])
+         delta = engine._events_to_delta(events)
+-        assert delta is None
++        assert delta is not None
++        assert delta.reasoning == "<bos><eos>"
+ 
+-    def test_no_special_tokens_means_no_drops(self):
+-        """Engine with no special tokens passes all text through."""
++    def test_no_special_tokens_passes_text_through(self):
+         engine = _make_engine(special_tokens=[])
+         engine._engine.reset()
+         events = engine._engine.feed("hello<bos>world", [])
+         delta = engine._events_to_delta(events)
+         assert delta is not None
+-        assert "<bos>" in delta.reasoning
++        assert delta.reasoning == "hello<bos>world"
+ 
+-    def test_drops_applied_with_skip_tool_parsing(self):
+-        """Drop tokens are always dropped, even with skip_tool_parsing.
+-        DROP_TERMINALs have no transitions by construction, so no parser
+-        pass can use them."""
++    def test_special_tokens_stay_with_skip_tool_parsing(self):
++        """The reasoning pass forwards them exactly as the tool pass reads them."""
+         for initial_state in (ParserState.REASONING, ParserState.CONTENT):
+             engine = _make_engine(
+-                vocab=_DROP_VOCAB,
+-                special_tokens=list(_DROP_VOCAB.keys()),
++                vocab=_SPECIAL_VOCAB,
++                special_tokens=list(_SPECIAL_VOCAB.keys()),
+             )
+             engine._engine.skip_tool_parsing = True
+             engine._engine.reset(initial_state=initial_state)
+@@ -1754,14 +1744,12 @@ class TestDropSpecialTokens:
+             delta = engine._events_to_delta(events)
+             assert delta is not None
+             output = (delta.reasoning or "") + (delta.content or "")
+-            assert "<bos>" not in output, f"<bos> leaked in state {initial_state}"
++            assert output == "hello<bos>world", initial_state
+ 
+-    def test_transitions_unaffected_by_drop_in_reasoning_with_skip_tool_parsing(self):
+-        """With skip_tool_parsing in REASONING state, drop tokens are
+-        removed but configured terminals still fire their transitions."""
++    def test_transitions_fire_beside_special_tokens_with_skip_tool_parsing(self):
+         engine = _make_engine(
+-            vocab=_DROP_VOCAB,
+-            special_tokens=list(_DROP_VOCAB.keys()),
++            vocab=_SPECIAL_VOCAB,
++            special_tokens=list(_SPECIAL_VOCAB.keys()),
+         )
+         engine._engine.skip_tool_parsing = True
+         engine._engine.reset()
+@@ -1773,14 +1761,13 @@ class TestDropSpecialTokens:
+         reasoning_text = "".join(
+             e.value for e in events if e.type == EventType.REASONING_CHUNK
+         )
+-        assert "<bos>" not in reasoning_text
++        assert reasoning_text == "thought<bos>"
+ 
+-    def test_drops_in_tool_args_state(self):
+-        """Drop tokens in TOOL_ARGS state are silently discarded."""
+-        vocab = {**_DROP_VOCAB, '{"a":1}': 300}
++    def test_special_token_stays_in_tool_args(self):
++        vocab = {**_SPECIAL_VOCAB, '{"a":1}': 300}
+         engine = _make_engine(
+             vocab=vocab,
+-            special_tokens=list(_DROP_VOCAB.keys()),
++            special_tokens=list(_SPECIAL_VOCAB.keys()),
+         )
+         engine._engine.reset(initial_state=ParserState.CONTENT)
+         events = engine._engine.feed(
+@@ -1788,16 +1775,12 @@ class TestDropSpecialTokens:
+             [202, 300, 204, 203],
+         )
+         arg_chunks = [e.value for e in events if e.type == EventType.ARG_VALUE_CHUNK]
+-        combined = "".join(arg_chunks)
+-        assert "<bos>" not in combined
+-        assert '{"a":1}' in combined
++        assert "".join(arg_chunks) == '{"a":1}<bos>'
+ 
+-    def test_mixed_configured_and_drop_terminals(self):
+-        """Configured terminals trigger transitions while drop terminals
+-        are silently removed in the same stream."""
++    def test_configured_and_special_terminals_in_one_stream(self):
+         engine = _make_engine(
+-            vocab=_DROP_VOCAB,
+-            special_tokens=list(_DROP_VOCAB.keys()),
++            vocab=_SPECIAL_VOCAB,
++            special_tokens=list(_SPECIAL_VOCAB.keys()),
+         )
+         engine._engine.reset()
+         events = engine._engine.feed("thought<bos></think>answer", [72, 204, 201, 73])
+@@ -1808,4 +1791,4 @@ class TestDropSpecialTokens:
+         reasoning_text = "".join(
+             e.value for e in events if e.type == EventType.REASONING_CHUNK
+         )
+-        assert "<bos>" not in reasoning_text
++        assert reasoning_text == "thought<bos>"
+diff --git a/tests/parser/engine/test_qwen3_reasoning.py b/tests/parser/engine/test_qwen3_reasoning.py
+index 9e58fb9b2c116a6b6327ef708f255a272bde2357..9a6710b5a0ac89dab6ab1bb90bb428f8cc88bfa6 100644
+--- a/tests/parser/engine/test_qwen3_reasoning.py
++++ b/tests/parser/engine/test_qwen3_reasoning.py
+@@ -150,12 +150,12 @@ class TestNonStreaming:
+         assert "</think>" not in (content or "")
+         assert "<think>" not in (content or "")
+ 
+-    def test_duplicate_think_end_absorbed(self, parser):
+-        """Duplicate </think> in CONTENT state must not leak."""
++    def test_second_think_end_is_content(self, parser):
++        """Reasoning ends once; a later </think> is text the model wrote."""
+         text = "Reasoning here.</think>Content here.</think>More content."
+         reasoning, content = parser.extract_reasoning(text, None)
+         assert reasoning == "Reasoning here."
+-        assert content == "Content here.More content."
++        assert content == "Content here.</think>More content."
+ 
+     def test_marker_inside_a_forwarded_tool_span_is_kept(self, parser):
+         """A marker the grammar allows inside a value is the value's text.
+@@ -404,8 +404,8 @@ class TestStreaming:
+         assert "</think>" not in content
+         assert "<think>" not in reasoning
+ 
+-    def test_streaming_duplicate_think_end_absorbed(self, parser):
+-        """Duplicate </think> token in CONTENT state must not leak."""
++    def test_streaming_second_think_end_is_content(self, parser):
++        """A second </think> token is content, exactly as in batch."""
+         reasoning, content = simulate_reasoning_streaming(
+             parser,
+             ["reasoning", "</think>", "content", "</think>", "more"],
+@@ -418,7 +418,7 @@ class TestStreaming:
+             ],
+         )
+         assert reasoning == "reasoning"
+-        assert content == "contentmore"
++        assert content == "content</think>more"
+ 
+ 
+ class TestTrailingWhitespaceStripping:
+diff --git a/tests/parser/engine/test_replay.py b/tests/parser/engine/test_replay.py
+index 6e8e5aaa8670bc64751ee6d3a664e175a81d63fd..06e390fe35ab3f4fda1be422f4b1e2b4f720e51b 100644
+--- a/tests/parser/engine/test_replay.py
++++ b/tests/parser/engine/test_replay.py
+@@ -13,6 +13,7 @@ is picked up with zero manual wiring.
+ from __future__ import annotations
+ 
+ import dataclasses
++import json
+ from typing import NamedTuple
+ 
+ import pytest
+@@ -552,12 +553,12 @@ class TestToolChoiceNoneStreamingParity:
+         )
+ 
+ 
+-_DROP_TOKENS = {"<bos>": 99990, "<eos>": 99991}
++_SPECIAL_TOKENS = {"<bos>": 99990, "<eos>": 99991}
+ 
+ 
+-def _inject_drop_tokens(sample):
++def _inject_special_tokens(sample):
+     """Insert <bos> at stream start and <eos> between the first two tokens."""
+-    new_vocab = {**sample.vocab, **_DROP_TOKENS}
++    new_vocab = {**sample.vocab, **_SPECIAL_TOKENS}
+     tokens = list(sample.tokens)
+     tokens.insert(0, (99990, "<bos>"))
+     if len(tokens) >= 3:
+@@ -567,9 +568,21 @@ def _inject_drop_tokens(sample):
+     return dataclasses.replace(sample, vocab=new_vocab, tokens=tokens)
+ 
+ 
+-class TestDropTokenReplay:
+-    """Verify unconfigured special tokens are silently dropped across
+-    all parsers and chunk sizes."""
++def _visible_text(output) -> str:
++    return output.reasoning + output.content + "".join(
++        call["arguments"] for call in output.tool_calls
++    )
++
++
++class TestSpecialTokenReplay:
++    """A special token the format does not act on is the text it decodes to.
++
++    ``<bos>`` opens the stream, where every format emits text, so it survives
++    exactly once. ``<eos>`` lands wherever the sample's second token puts it,
++    which for some formats is inside a call wrapper whose state keeps no text;
++    wherever it lands, streaming at every chunk size reads it exactly as the
++    non-streaming parse does, so text and token ids never disagree.
++    """
+ 
+     @pytest.mark.parametrize(
+         "parser_info",
+@@ -577,14 +590,17 @@ class TestDropTokenReplay:
+         ids=[p.name for p in _PARSERS],
+     )
+     @pytest.mark.parametrize("chunk_size", [1, 3, None])
+-    def test_drop_tokens_removed_from_output(self, parser_info, chunk_size):
++    def test_special_tokens_survive_as_text(self, parser_info, chunk_size):
+         for sample in parser_info.samples:
+-            injected = _inject_drop_tokens(sample)
++            injected = _inject_special_tokens(sample)
+             tokenizer = make_mock_tokenizer(injected)
+-            parser = _make_parser(parser_info.parser_cls, tokenizer, sample)
+-
++            batch = parse_non_streaming(
++                _make_parser(parser_info.parser_cls, tokenizer, sample),
++                injected,
++                _test_request(tools=sample.tools),
++            )
+             results = replay_streaming(
+-                parser,
++                _make_parser(parser_info.parser_cls, tokenizer, sample),
+                 injected.tokens,
+                 chunk_size=chunk_size,
+                 tools=sample.tools,
+@@ -592,36 +608,23 @@ class TestDropTokenReplay:
+             )
+             output = collect_output(results)
+ 
+-            assert_no_terminal_leakage(
+-                output,
+-                list(_DROP_TOKENS.keys()),
+-                context=f"parser={parser_info.name}, chunk={chunk_size}",
+-            )
+-            assert_parse_output(output, sample)
+-
+-
+-class TestDropTokenNonStreaming:
+-    """Non-streaming parse() must also strip unconfigured special tokens."""
+-
+-    @pytest.mark.parametrize(
+-        "parser_info",
+-        _PARSERS,
+-        ids=[p.name for p in _PARSERS],
+-    )
+-    def test_drop_tokens_removed_from_output(self, parser_info):
+-        for sample in parser_info.samples:
+-            injected = _inject_drop_tokens(sample)
+-            tokenizer = make_mock_tokenizer(injected)
+-            parser = _make_parser(parser_info.parser_cls, tokenizer, sample)
+-
+-            request = _test_request(tools=sample.tools)
+-            output = parse_non_streaming(parser, injected, request)
+-
+-            assert_no_terminal_leakage(
+-                output,
+-                list(_DROP_TOKENS.keys()),
+-                context=f"parser={parser_info.name}",
+-            )
++            context = f"parser={parser_info.name}, chunk={chunk_size}"
++            assert _visible_text(output).count("<bos>") == 1, context
++            assert _visible_text(batch).count("<bos>") == 1, context
++            assert (output.reasoning, output.content) == (
++                batch.reasoning, batch.content
++            ), context
++            assert [
++                (call["name"], json.loads(call["arguments"]))
++                for call in output.tool_calls
++            ] == [
++                (call["name"], json.loads(call["arguments"]))
++                for call in batch.tool_calls
++            ], context
++            if sample.expected_tool_calls is not None:
++                assert [call["name"] for call in output.tool_calls] == [
++                    call["name"] for call in sample.expected_tool_calls
++                ], context
+ 
+ 
+ class TestAdapterReferences:
+diff --git a/tests/tool_use/test_gemma4_responses_adjust_request.py b/tests/tool_use/test_gemma4_responses_adjust_request.py
+index c3e253a874cc6e5cd776774f92284142a771633c..2a9fc10e694ba5b1c045806967b9947e05929634 100644
+--- a/tests/tool_use/test_gemma4_responses_adjust_request.py
++++ b/tests/tool_use/test_gemma4_responses_adjust_request.py
+@@ -248,8 +248,8 @@ def test_gemma4_keeps_special_tokens_with_tools_thinking_disabled() -> None:
+ 
+ def test_gemma4_keeps_skip_special_tokens_false_when_nothing_to_preserve() -> None:
+     """No active tools + thinking disabled: ``skip_special_tokens`` stays
+-    ``False`` because the parser engine's ``__DROP__`` terminal mechanism
+-    strips unconfigured special tokens automatically.
++    ``False`` because the parser engine reads the generation's special tokens
++    itself: its terminals are structure and every other one is text.
+     """
+     parser = Gemma4ToolParser(_StubTokenizer())
+     request = _build_chat_request(
+diff --git a/vllm/parser/engine/parser_engine.py b/vllm/parser/engine/parser_engine.py
+index 84a8e10485a5e4dc29f163d120661bba213ac72b..b43755b16afb56a9ac2f646dd37c056dfc4041b6 100644
+--- a/vllm/parser/engine/parser_engine.py
++++ b/vllm/parser/engine/parser_engine.py
+@@ -96,7 +96,10 @@ class ParserEngine(Parser):
+     # reasoning boundary byte for byte, so the batch tool pass can be given
+     # the generated ids after that boundary and split on them exactly as
+     # the streaming tool pass does.  A grammar that rewrites the forwarded
+-    # text keeps the text-only batch tool pass.
++    # text keeps the text-only batch tool pass.  Construction refuses a grammar
++    # that sets this and acts on a terminal in content outside its tool
++    # language: that terminal's text would leave the forwarded text while its
++    # id stayed in the forwarded ids.
+     batch_tool_pass_uses_ids: bool = False
+ 
+     def extract_batch_content_ids(
+@@ -138,6 +141,21 @@ class ParserEngine(Parser):
+                 "a wrapper but declares no arguments_reading, so no wrapper "
+                 "could be told apart from text inside a value."
+             )
++        if self.batch_tool_pass_uses_ids:
++            consumed = sorted(
++                terminal
++                for state, terminal in parser_engine_config.transitions
++                if state is ParserState.CONTENT
++                and terminal not in self._engine._tool_terminals
++            )
++            if consumed:
++                raise ValueError(
++                    f"Parser format {parser_engine_config.name!r} gives its batch "
++                    "tool pass the generated ids after the reasoning boundary, so "
++                    "its reasoning pass must forward every byte after it, but it "
++                    f"acts on {consumed} in content. Treat them as text there, "
++                    "or keep the text-only batch tool pass."
++                )
+ 
+         self._has_reasoning = (
+             "THINK_END" in parser_engine_config.token_id_terminals
+diff --git a/vllm/parser/engine/parser_engine_config.py b/vllm/parser/engine/parser_engine_config.py
+index c68617df67df101a3ee2d1969eb7c9e136ee0a8a..8b1021b5f759ca08cec66c96ece9534a2705472e 100644
+--- a/vllm/parser/engine/parser_engine_config.py
++++ b/vllm/parser/engine/parser_engine_config.py
+@@ -118,9 +118,6 @@ class ParserEngineConfig:
+ 
+     arg_structural_chars: frozenset[str] | None = None
+ 
+-    # Special tokens exempt from auto-drop but not state-machine terminals.
+-    preserve_tokens: frozenset[str] = field(default_factory=frozenset)
+-
+     # Prevents trailing-whitespace accumulation across multi-turn conversations.
+     strip_trailing_reasoning_whitespace: bool = True
+ 
+diff --git a/vllm/parser/engine/streaming_parser_engine.py b/vllm/parser/engine/streaming_parser_engine.py
+index 1b6f92109cfe187f8fa931e22e2b124fd8cf0189..1db1096995ef79418c7cfac352be3130698f85ff 100644
+--- a/vllm/parser/engine/streaming_parser_engine.py
++++ b/vllm/parser/engine/streaming_parser_engine.py
+@@ -12,9 +12,7 @@ from vllm.parser.engine.events import EventType, SemanticEvent
+ from vllm.parser.engine.incremental_lexer import (
+     CONTENT_TERMINAL,
+     IncrementalLexer,
+-    LexerShape,
+     LexToken,
+-    TerminalDef,
+ )
+ from vllm.parser.engine.parser_engine_config import (
+     ArgumentsReading,
+@@ -23,7 +21,6 @@ from vllm.parser.engine.parser_engine_config import (
+     Transition,
+ )
+ from vllm.parser.engine.token_id_scanner import (
+-    DROP_TERMINAL,
+     LexerInput,
+     PreLexedTerminal,
+     TextChunk,
+@@ -31,68 +28,12 @@ from vllm.parser.engine.token_id_scanner import (
+ )
+ 
+ 
+-@dataclass(slots=True)
+-class _DropInfo:
+-    lexer_shape: LexerShape
+-    extra_token_ids: dict[int, str]
+-
+-
+ @dataclass(slots=True)
+ class RawToolCall:
+     text: str
+     closed: bool
+ 
+ 
+-def _build_drop_info(
+-    config: ParserEngineConfig,
+-    tokenizer,
+-) -> _DropInfo | None:
+-    try:
+-        special_tokens: list[str] = list(tokenizer.all_special_tokens)
+-        special_ids: list[int] = list(tokenizer.all_special_ids)
+-    except (AttributeError, NotImplementedError):
+-        return None
+-
+-    if not special_tokens:
+-        return None
+-
+-    configured_texts = (
+-        {spec.text for spec in config.token_id_terminals.values()}
+-        | set(config.terminals.values())
+-        | config.preserve_tokens
+-    )
+-
+-    extra_token_ids: dict[int, str] = {}
+-    drop_texts: set[str] = set()
+-    for text, tid in zip(special_tokens, special_ids):
+-        if text not in configured_texts:
+-            extra_token_ids[tid] = DROP_TERMINAL
+-            drop_texts.add(text)
+-
+-    if not drop_texts:
+-        return None
+-
+-    import regex as re
+-
+-    drop_terminal_defs = [
+-        TerminalDef(
+-            name=DROP_TERMINAL,
+-            pattern=re.compile(re.escape(text)),
+-            is_literal=True,
+-            literal=text,
+-        )
+-        for text in drop_texts
+-    ]
+-
+-    all_terminal_defs = list(config.terminal_defs) + drop_terminal_defs
+-    lexer_shape = LexerShape(all_terminal_defs)
+-
+-    return _DropInfo(
+-        lexer_shape=lexer_shape,
+-        extra_token_ids=extra_token_ids,
+-    )
+-
+-
+ class StreamingParserEngine:
+     """Consumes ``(delta_text, delta_token_ids)`` pairs and produces a
+     stream of :class:`SemanticEvent` instances.
+@@ -136,17 +77,9 @@ class StreamingParserEngine:
+                     if tid is not None:
+                         resolved_token_ids[tid] = terminal_name
+ 
+-        drop_info: _DropInfo | None = None
+-        if tokenizer is not None:
+-            drop_info = _build_drop_info(config, tokenizer)
+-
+-        lexer_shape = config.lexer_shape
+-        if drop_info is not None:
+-            resolved_token_ids.update(drop_info.extra_token_ids)
+-            lexer_shape = drop_info.lexer_shape
+-
++        # Every other token, special or not, is the text it decodes to: the
++        # parser reads the generation and deletes none of it.
+         self._resolved_token_ids = resolved_token_ids
+-        self._has_drops = drop_info is not None
+ 
+         self._scanner = TokenIDScanner(
+             resolved_token_ids,
+@@ -158,10 +91,10 @@ class StreamingParserEngine:
+             for name, spec in config.token_id_terminals.items()
+             if name in resolved_token_ids.values()
+         }
+-        if drop_info is not None:
+-            self._token_required_states[DROP_TERMINAL] = frozenset(ParserState)
+ 
+-        self._lexer = IncrementalLexer(lexer_shape, content_terminal=CONTENT_TERMINAL)
++        self._lexer = IncrementalLexer(
++            config.lexer_shape, content_terminal=CONTENT_TERMINAL
++        )
+ 
+         self._tool_terminals: frozenset[str] = frozenset(
+             terminal
+@@ -460,9 +393,6 @@ class StreamingParserEngine:
+                     self._in_skipped_parameter_value = False
+                 return self._emit_for_state(value)
+ 
+-        if self._has_drops and terminal == DROP_TERMINAL:
+-            return []
+-
+         if (
+             self.skip_tool_parsing
+             and self._in_skipped_tool_span
+diff --git a/vllm/parser/engine/token_id_scanner.py b/vllm/parser/engine/token_id_scanner.py
+index 2bbd1bda6b425acccc35976d1b21efc57f39bf25..8ae52aee1ae455401ce8abd5b9b17879ade90dcd 100644
+--- a/vllm/parser/engine/token_id_scanner.py
++++ b/vllm/parser/engine/token_id_scanner.py
+@@ -14,9 +14,6 @@ from tokenizers.decoders import ByteLevel
+ 
+ from vllm.tokenizers.detokenizer_utils import NativeDecodeStream
+ 
+-DROP_TERMINAL = "__DROP__"
+-
+-
+ @dataclass(slots=True)
+ class TextChunk:
+     text: str
+@@ -402,15 +399,7 @@ class TokenIDScanner:
+                 consumed = pos + len(anchor.text)
+             else:
+                 has_later_valid = any(p >= 0 for p in positions[i + 1 :])
+-                # DROP anchors (EOS, etc.) may have text that never
+-                # arrives in delta_text (stripped by detokenizer).
+-                # Don't defer remaining content waiting for text
+-                # that will never come.
+-                if (
+-                    not has_later_valid
+-                    and consumed < len(delta_text)
+-                    and anchor.terminal != DROP_TERMINAL
+-                ):
++                if not has_later_valid and consumed < len(delta_text):
+                     self._deferred_post_text += delta_text[consumed:]
+                     consumed = len(delta_text)
+                 self._deferred_terminals.append(anchor)
+diff --git a/vllm/parser/gemma4.py b/vllm/parser/gemma4.py
+index 31ce2f5907b3d80763f81f4c91e6538a25f836b8..545354b772f58a3e83fbbed62411442c86111602 100644
+--- a/vllm/parser/gemma4.py
++++ b/vllm/parser/gemma4.py
+@@ -377,7 +377,6 @@ def gemma4_config() -> ParserEngineConfig:
+         arg_converter=_gemma4_arg_converter,
+         tool_args_json=False,
+         arg_structural_chars=frozenset(",:{}[]<"),
+-        preserve_tokens=frozenset({STRING_DELIM}),
+     )
+ 
+ 
+diff --git a/vllm/parser/qwen3.py b/vllm/parser/qwen3.py
+index 9d74bd3d050d738e8f11ea2ec5b43b67d1ef89a3..03a52f051b2bd85d3135824b2700709b43a4a0b0 100644
+--- a/vllm/parser/qwen3.py
++++ b/vllm/parser/qwen3.py
+@@ -377,12 +377,6 @@ def qwen3_config(
+                 ParserState.CONTENT,
+                 (EventType.REASONING_END,),
+             ),
+-            # Absorb duplicate </think> — model may emit it after
+-            # already transitioning to CONTENT; drop it silently.
+-            (ParserState.CONTENT, "THINK_END"): Transition(
+-                ParserState.CONTENT,
+-                (),
+-            ),
+             # The opener ends reasoning where the grammar does, whether or
+             # not a call follows it; the call itself starts at the function
+             # opener, once the preamble proves the opener was the trigger.
+@@ -452,8 +446,10 @@ class Qwen3Parser(ParserEngine):
+     THINK_END = THINK_END
+     TOOL_START = TOOL_CALL_START
+     TOOL_END = TOOL_CALL_END
+-    # The reasoning pass forwards a tool span verbatim, so the batch tool
+-    # pass splits on the same ids the streaming tool pass sees.
++    # The reasoning pass forwards everything after the boundary as the text
++    # it was generated as -- content and tool spans alike, a second
++    # ``</think>`` included -- so the batch tool pass splits on the same ids
++    # the streaming tool pass sees.
+     batch_tool_pass_uses_ids = True
+ 
+     def _tool_arguments_reading(

@@ -3346,6 +3346,52 @@ def _validate_repeated_parameter_refusal_after(state: State) -> None:
     )
 
 
+def _validate_generated_tokens_before(state: State) -> None:
+    label = "Generated tokens survive parsing precondition"
+    require_text(state, "vllm/parser/engine/streaming_parser_engine.py",
+                 "def _build_drop_info(", label=label)
+    require_text(state, "vllm/parser/qwen3.py",
+                 '(ParserState.CONTENT, "THINK_END"): Transition(', label=label)
+
+
+def _validate_generated_tokens_after(state: State) -> None:
+    label = "Generated tokens survive parsing"
+    engine = "vllm/parser/engine/streaming_parser_engine.py"
+    scanner = "vllm/parser/engine/token_id_scanner.py"
+    # No terminal deletes what the model generated: a token the format does
+    # not act on is the text it decodes to, in every state.
+    for path in (engine, scanner):
+        for retired in ("DROP_TERMINAL", "__DROP__", "_build_drop_info", "_has_drops"):
+            forbid_text(state, path, retired, label=label)
+    for path in ("vllm/parser/engine/parser_engine_config.py", "vllm/parser/gemma4.py"):
+        forbid_text(state, path, "preserve_tokens", label=label)
+    # Reasoning ends once; a later closer is content, as a later opener is.
+    forbid_text(state, "vllm/parser/qwen3.py", '(ParserState.CONTENT, "THINK_END")',
+                label=label)
+    # A grammar whose batch tool pass splits on the forwarded content ids must
+    # forward every byte after the boundary; construction refuses one that
+    # acts on a terminal in content outside its tool language.
+    _require_in_symbol(state, "vllm/parser/engine/parser_engine.py",
+                       "ParserEngine.__init__", (
+        "if self.batch_tool_pass_uses_ids:",
+        "if state is ParserState.CONTENT",
+        "and terminal not in self._engine._tool_terminals",
+        "or keep the text-only batch tool pass.",
+    ), label=label)
+    require_python_symbols(state, "tests/parser/engine/test_parser_engine.py", {
+        "TestSpecialTokensAreText.test_special_token_by_id_stays_in_content": None,
+        "TestSpecialTokensAreText.test_special_token_stays_in_tool_args": None,
+        "TestSpecialTokensAreText.test_special_tokens_stay_with_skip_tool_parsing": None,
+    }, label=label)
+    require_python_symbols(state, "tests/parser/engine/test_replay.py", {
+        "TestSpecialTokenReplay.test_special_tokens_survive_as_text": None,
+    }, label=label)
+    require_python_symbols(state, "tests/parser/engine/test_qwen3_reasoning.py", {
+        "TestNonStreaming.test_second_think_end_is_content": None,
+        "TestStreaming.test_streaming_second_think_end_is_content": None,
+    }, label=label)
+
+
 def validate_final(state: State) -> None:
     """Reassert every durable semantic invariant on the complete tree.
 
@@ -4245,5 +4291,27 @@ CONTRACTS: Mapping[str, SemanticContract] = {
         ),
         validate_before=_validate_reasoning_usage_before,
         validate_after=_validate_reasoning_usage_after,
+    ),
+    "generated-tokens-survive-parsing": SemanticContract(
+        rationale=(
+            "The parser engine deleted every special token that is not one of "
+            "its format's terminals, and Qwen's grammar deleted a second "
+            "</think>, in reasoning, in the answer and inside a call's "
+            "arguments: a file write lost the vision markers the served template "
+            "itself spells. With the content ids forwarded beside the text, the "
+            "deleted token's id remained, so a whole response was a 500 and a "
+            "stream lost the token or failed by how its deltas were grouped. A "
+            "token the format does not act on is the text it decodes to, in "
+            "every state, which is how the grammar matches it; a stop token adds "
+            "nothing only because the detokenizer gives it no text. A grammar "
+            "that forwards content ids is refused at construction if it acts on "
+            "a terminal in content outside its tool language."
+        ),
+        removal_condition=(
+            "Remove when upstream's parser engine deletes no generated token and "
+            "its Qwen grammar reads a second </think> as content."
+        ),
+        validate_before=_validate_generated_tokens_before,
+        validate_after=_validate_generated_tokens_after,
     ),
 }
