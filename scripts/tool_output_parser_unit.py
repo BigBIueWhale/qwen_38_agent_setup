@@ -598,6 +598,36 @@ class ToolOutputParserTest(unittest.TestCase):
                     with self.subTest(token=token, text=text, chunk=chunk):
                         self.assertEqual(parse(text, chunk)[:3], expected)
 
+    def test_the_grammar_is_armed_exactly_where_calls_are_parsed(self):
+        """One value decides both: an omitted or null choice is "auto" with
+        tools, and "none" is the only choice under which nothing is a call."""
+        omitted = object()
+        text = "plan</think>\n\n" + call("one")
+        for choice in (omitted, None, "auto", "required",
+                       {"type": "function", "function": {"name": "write"}}, "none"):
+            fields = {} if choice is omitted else {"tool_choice": choice}
+            request = ChatCompletionRequest(
+                model="unit", messages=[{"role": "user", "content": "test"}],
+                tools=[TOOL], **fields,
+            )
+            armed = PARSER(
+                TOKENIZER, request.tools, chat_template_kwargs=CHAT_TEMPLATE_KWARGS
+            ).adjust_request(request)
+            is_armed = (
+                armed.structured_outputs is not None
+                and armed.structured_outputs.structural_tag is not None
+            )
+            self.assertEqual(is_armed, armed.tool_choice != "none")
+            for chunk in (None, 1, 13):
+                with self.subTest(choice=choice, chunk=chunk):
+                    result = parse(text, chunk, choice=(
+                        armed.tool_choice if isinstance(armed.tool_choice, str)
+                        else armed.tool_choice.model_dump()
+                    ))
+                    self.assertEqual(bool(result[2]), is_armed)
+                    if not is_armed:
+                        self.assertEqual(result[:2], ("plan", "\n\n" + call("one")))
+
 
 if __name__ == "__main__":
     unittest.main()

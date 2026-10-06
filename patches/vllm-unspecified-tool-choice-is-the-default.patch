@@ -1,0 +1,499 @@
+diff --git a/tests/entrypoints/anthropic/test_anthropic_messages_conversion.py b/tests/entrypoints/anthropic/test_anthropic_messages_conversion.py
+index a7bf432da5286afe92acb9c8f7eee6f8eb65d1c1..ae151c2484e4928a05f788cc957cc80ab20098b0 100644
+--- a/tests/entrypoints/anthropic/test_anthropic_messages_conversion.py
++++ b/tests/entrypoints/anthropic/test_anthropic_messages_conversion.py
+@@ -1908,3 +1908,34 @@ class TestAnthropicTerminalMetadata:
+         assert not any(kind == 'message_stop' for kind, _ in events)
+         assert any(data.get('delta', {}).get('text') == 'diagnostic' for _, data in events)
+         assert not any(data.get('delta', {}).get('text') == 'too late' for _, data in events)
++
++
++# ======================================================================
++# tool_choice not specified
++# ======================================================================
++
++
++class TestUnspecifiedToolChoice:
++    """No tool_choice means "auto" with tools and "none" without: the rule the
++    chat request applies to an omitted or null choice, so the converted request
++    arms the call grammar exactly where it parses calls."""
++
++    _TOOL = {
++        "name": "get_weather",
++        "description": "Weather",
++        "input_schema": {"type": "object", "properties": {}},
++    }
++
++    def test_with_tools_is_auto(self):
++        request = _make_request(
++            [{"role": "user", "content": "hi"}], tools=[self._TOOL]
++        )
++        assert _convert(request).tool_choice == "auto"
++
++    def test_without_tools_is_none(self):
++        request = _make_request([{"role": "user", "content": "hi"}])
++        assert _convert(request).tool_choice == "none"
++
++    def test_with_an_empty_tool_list_is_none(self):
++        request = _make_request([{"role": "user", "content": "hi"}], tools=[])
++        assert _convert(request).tool_choice == "none"
+diff --git a/tests/entrypoints/openai/chat_completion/test_unspecified_tool_choice.py b/tests/entrypoints/openai/chat_completion/test_unspecified_tool_choice.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..e1134f80a7004ec43b6b34f93a201f7c5eddf5c9
+--- /dev/null
++++ b/tests/entrypoints/openai/chat_completion/test_unspecified_tool_choice.py
+@@ -0,0 +1,165 @@
++# SPDX-License-Identifier: Apache-2.0
++# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
++"""A tool choice decides both whether the call grammar is armed and whether
++calls are parsed, so the two can never disagree. A choice that is not
++specified, omitted or null, is "auto" with tools and "none" without."""
++
++import json
++from unittest.mock import MagicMock
++
++import pytest
++
++from vllm.entrypoints.openai.chat_completion.protocol import ChatCompletionRequest
++from vllm.entrypoints.openai.chat_completion.serving import OpenAIServingChat
++from vllm.entrypoints.openai.engine.protocol import RequestResponseMetadata
++from vllm.outputs import CompletionOutput, RequestOutput
++from vllm.parser import ParserManager
++
++MARKERS = {"</think>": 20000, "<tool_call>": 20001, "</tool_call>": 20002}
++TEXT = {v: k for k, v in MARKERS.items()}
++TOOLS = [{"type": "function", "function": {
++    "name": "write", "parameters": {
++        "type": "object", "properties": {"text": {"type": "string"}},
++        "required": ["text"],
++    },
++}}]
++CALL = (
++    "<tool_call>\n<function=write>\n<parameter=text>\none\n</parameter>"
++    "\n</function>\n</tool_call>"
++)
++OMITTED = object()
++
++
++def _encode(text):
++    ids = []
++    while text:
++        marker = next((m for m in MARKERS if text.startswith(m)), None)
++        if marker:
++            ids.append(MARKERS[marker])
++            text = text[len(marker):]
++        else:
++            ids.append(ord(text[0]))
++            text = text[1:]
++    return ids
++
++
++def _decode(ids):
++    return "".join(TEXT.get(i, chr(i)) for i in ids)
++
++
++def _tokenizer():
++    tokenizer = MagicMock()
++    tokenizer.get_vocab.return_value = MARKERS
++    tokenizer.all_special_tokens = list(MARKERS)
++    tokenizer.all_special_ids = list(MARKERS.values())
++    tokenizer.decode.side_effect = _decode
++    return tokenizer
++
++
++def _serving():
++    serving = OpenAIServingChat.__new__(OpenAIServingChat)
++    serving.response_role = "assistant"
++    serving.parser_cls = ParserManager.get_parser(
++        tool_parser_name="qwen3_coder", reasoning_parser_name="qwen3",
++        enable_auto_tools=True,
++    )
++    serving.model_config = None
++    serving.enable_auto_tools = True
++    serving.enable_prompt_tokens_details = False
++    serving.enable_log_outputs = False
++    serving.enable_log_deltas = False
++    serving.enable_force_include_usage = False
++    serving.request_logger = None
++    serving.system_fingerprint = None
++    serving.enable_per_request_metrics = False
++    return serving
++
++
++@pytest.mark.parametrize(
++    "fields,expected",
++    [
++        ({"tools": TOOLS}, "auto"),
++        ({"tools": TOOLS, "tool_choice": None}, "auto"),
++        ({}, "none"),
++        ({"tool_choice": None}, "none"),
++    ],
++    ids=["omitted-with-tools", "null-with-tools", "omitted", "null"],
++)
++def test_an_unspecified_tool_choice_is_the_default_for_its_tools(fields, expected):
++    request = ChatCompletionRequest(
++        model="unit", messages=[{"role": "user", "content": "x"}], **fields
++    )
++    assert request.tool_choice == expected
++
++
++@pytest.mark.asyncio
++@pytest.mark.parametrize("stream", [False, True])
++@pytest.mark.parametrize(
++    "choice",
++    [OMITTED, None, "auto", "required",
++     {"type": "function", "function": {"name": "write"}}, "none"],
++    ids=["omitted", "null", "auto", "required", "named", "none"],
++)
++async def test_calls_are_parsed_exactly_where_the_grammar_is_armed(choice, stream):
++    fields = {} if choice is OMITTED else {"tool_choice": choice}
++    request = ChatCompletionRequest(
++        model="unit", messages=[{"role": "user", "content": "write"}], tools=TOOLS,
++        stream=stream, kv_scope="unit", **fields,
++    )
++    serving = _serving()
++    tokenizer = _tokenizer()
++    request = serving.parser_cls(tokenizer, request.tools).adjust_request(request)
++    armed = (
++        request.structured_outputs is not None
++        and request.structured_outputs.structural_tag is not None
++    )
++    ids = _encode("plan</think>\n\n" + CALL)
++
++    async def outputs():
++        # A non-streaming generation is read from its final output, whole.
++        size = 1 if stream else len(ids)
++        for start in range(0, len(ids), size):
++            group = ids[start:start + size]
++            last = start + size >= len(ids)
++            yield RequestOutput(
++                request_id="unit", prompt="prompt", prompt_token_ids=[1, 2, 3],
++                prompt_logprobs=None, outputs=[CompletionOutput(
++                    index=0, text=_decode(group), token_ids=group,
++                    cumulative_logprob=None, logprobs=None,
++                    finish_reason="stop" if last else None, stop_reason=None,
++                )], finished=last,
++            )
++
++    kwargs = dict(
++        request=request, result_generator=outputs(), request_id="chatcmpl-unit",
++        model_name="unit", conversation=[{"role": "user", "content": "write"}],
++        tokenizer=tokenizer, request_metadata=RequestResponseMetadata(request_id="unit"),
++    )
++    if not stream:
++        kwargs["parser"] = serving.parser_cls(tokenizer, request.tools)
++        response = await serving.chat_completion_full_generator(**kwargs)
++        message = response.choices[0].message
++        calls = [json.loads(c.function.arguments) for c in message.tool_calls]
++        content = message.content or ""
++    else:
++        arguments, content = {}, ""
++        async for event in serving.chat_completion_stream_generator(**kwargs):
++            if not event.startswith("data: ") or event.strip() == "data: [DONE]":
++                continue
++            for item in json.loads(event[6:]).get("choices", []):
++                content += item["delta"].get("content") or ""
++                for call_delta in item["delta"].get("tool_calls", []):
++                    index = call_delta["index"]
++                    arguments[index] = arguments.get(index, "") + (
++                        call_delta.get("function", {}).get("arguments") or ""
++                    )
++        calls = [json.loads(arguments[i]) for i in sorted(arguments)]
++
++    assert armed is (choice != "none")
++    if armed:
++        assert calls == [{"text": "one"}]
++        assert content.strip() == ""
++    else:
++        # Nothing could call a tool, so the call-shaped text is the model's text.
++        assert calls == []
++        assert content == "\n\n" + CALL
+diff --git a/tests/parser/mistral/test_tool_calls.py b/tests/parser/mistral/test_tool_calls.py
+index 99f99008d11d736333d751b894554c8b89a1cb44..8de5facfb3a6b8fed2ac85678c7f5e17771af394 100644
+--- a/tests/parser/mistral/test_tool_calls.py
++++ b/tests/parser/mistral/test_tool_calls.py
+@@ -46,9 +46,6 @@ from vllm.tokenizers.mistral import MistralTokenizer
+ from vllm.tool_parsers.mistral_tool_parser import MistralToolParser
+ 
+ _DUMMY_REQUEST = ChatCompletionRequest(messages=[], model="test")
+-# Minimal request for the engine driver: tool_choice=None falls through to
+-# auto extraction without triggering "tools must be set" validation.
+-_ENGINE_REQUEST = ChatCompletionRequest(messages=[], model="test", tool_choice=None)
+ 
+ 
+ @pytest.fixture(scope="module")
+@@ -258,7 +255,13 @@ def stream_delta_message_generator(
+             )
+             _engine_req = _engine_parser.adjust_request(_req_with_tools)
+         else:
+-            _engine_req = _ENGINE_REQUEST
++            # Calls are parsed only where they are possible: tools, not "none".
++            _engine_req = ChatCompletionRequest(
++                messages=[],
++                model="test",
++                tools=SAMPLE_TOOLS_DICTS,
++                tool_choice="auto",
++            )
+ 
+     previous_text = ""
+     previous_tokens = None
+@@ -1700,7 +1703,7 @@ def _make_request(**kwargs) -> ChatCompletionRequest:
+         ({"tool_choice": "auto"}, MistralToolChoiceEnum.auto, True),
+         ({"tool_choice": "none"}, MistralToolChoiceEnum.none, True),
+         ({"tool_choice": "required"}, MistralToolChoiceEnum.required, True),
+-        ({"tool_choice": None, "tools": None}, MistralToolChoiceEnum.auto, True),
++        ({"tool_choice": None, "tools": None}, MistralToolChoiceEnum.none, True),
+         (
+             {
+                 "tool_choice": {
+diff --git a/vllm/entrypoints/anthropic/serving.py b/vllm/entrypoints/anthropic/serving.py
+index 7bbe49d0309d8e8230878a4852acb2eaa3a849df..699c199b07296388ecd540590f863c4219142ffe 100644
+--- a/vllm/entrypoints/anthropic/serving.py
++++ b/vllm/entrypoints/anthropic/serving.py
+@@ -612,7 +612,7 @@ class AnthropicServingMessages(OpenAIServingChat):
+     ) -> None:
+         """Convert Anthropic tool_choice to OpenAI format"""
+         if anthropic_request.tool_choice is None:
+-            req.tool_choice = None
++            req.tool_choice = "auto" if anthropic_request.tools else "none"
+             return
+ 
+         req.parallel_tool_calls = (
+@@ -660,8 +660,6 @@ class AnthropicServingMessages(OpenAIServingChat):
+                 )
+             )
+ 
+-        if req.tool_choice is None:
+-            req.tool_choice = "auto"
+         req.tools = tools
+ 
+     async def create_messages(
+diff --git a/vllm/entrypoints/openai/chat_completion/protocol.py b/vllm/entrypoints/openai/chat_completion/protocol.py
+index 2c1f8db439cc213fc3e5042924a61f8e11c8b283..4cbf4f9c692fd1a4f0571e8843f5969df0b50c4f 100644
+--- a/vllm/entrypoints/openai/chat_completion/protocol.py
++++ b/vllm/entrypoints/openai/chat_completion/protocol.py
+@@ -247,7 +247,6 @@ class ChatCompletionRequest(OpenAIBaseModel):
+         | Literal["auto"]
+         | Literal["required"]
+         | ChatCompletionNamedToolChoiceParam
+-        | None
+     ) = "none"
+     reasoning_effort: (
+         Literal["none", "minimal", "low", "medium", "high", "xhigh", "max"] | None
+@@ -922,74 +921,73 @@ class ChatCompletionRequest(OpenAIBaseModel):
+                 parameter="tools",
+             )
+ 
+-        # if "tool_choice" is not specified but tools are provided,
+-        # default to "auto" tool_choice
+-        if "tool_choice" not in data and data.get("tools"):
+-            data["tool_choice"] = "auto"
++        # A tool choice that is not specified -- omitted or null -- is "auto"
++        # when tools are provided and "none" otherwise, so one value decides
++        # both whether the call grammar is armed and whether calls are parsed.
++        if data.get("tool_choice") is None:
++            data["tool_choice"] = "auto" if data.get("tools") else "none"
+ 
+-        # if "tool_choice" is "none" -- no validation is needed for tools
+-        if "tool_choice" in data and data["tool_choice"] == "none":
++        # "none" needs no tools
++        if data["tool_choice"] == "none":
+             return data
+ 
+-        # if "tool_choice" is specified -- validation
+-        if "tool_choice" in data and data["tool_choice"] is not None:
+-            # ensure that if "tool choice" is specified, tools are present
+-            if "tools" not in data or data["tools"] is None:
++        # ensure that if "tool choice" is specified, tools are present
++        if "tools" not in data or data["tools"] is None:
++            raise VLLMValidationError(
++                "When using `tool_choice`, `tools` must be set.",
++                parameter="tool_choice",
++            )
++
++        # make sure that tool choice is either a named tool
++        # OR that it's set to "auto" or "required"
++        if data["tool_choice"] not in ["auto", "required"] and not isinstance(
++            data["tool_choice"], dict
++        ):
++            raise VLLMValidationError(
++                f"Invalid value for `tool_choice`: {data['tool_choice']}! "
++                'Only named tools, "none", "auto" or "required" '
++                "are supported.",
++                parameter="tool_choice",
++            )
++
++        # ensure that if "tool_choice" is specified as an object,
++        # it matches a valid tool
++        correct_usage_message = (
++            'Correct usage: `{"type": "function",'
++            ' "function": {"name": "my_function"}}`'
++        )
++        if isinstance(data["tool_choice"], dict):
++            valid_tool = False
++            function = data["tool_choice"].get("function")
++            if not isinstance(function, dict):
+                 raise VLLMValidationError(
+-                    "When using `tool_choice`, `tools` must be set.",
+-                    parameter="tool_choice",
++                    f"Invalid value for `function`: `{function}` in "
++                    f"`tool_choice`! {correct_usage_message}",
++                    parameter="tool_choice.function",
+                 )
+-
+-            # make sure that tool choice is either a named tool
+-            # OR that it's set to "auto" or "required"
+-            if data["tool_choice"] not in ["auto", "required"] and not isinstance(
+-                data["tool_choice"], dict
+-            ):
++            if "name" not in function:
++                raise VLLMValidationError(
++                    f"Expected field `name` in `function` in "
++                    f"`tool_choice`! {correct_usage_message}",
++                    parameter="tool_choice.function.name",
++                )
++            function_name = function["name"]
++            if not isinstance(function_name, str) or len(function_name) == 0:
+                 raise VLLMValidationError(
+-                    f"Invalid value for `tool_choice`: {data['tool_choice']}! "
+-                    'Only named tools, "none", "auto" or "required" '
+-                    "are supported.",
++                    f"Invalid `name` in `function`: `{function_name}`"
++                    f" in `tool_choice`! {correct_usage_message}",
++                    parameter="tool_choice.function.name",
++                )
++            for tool in data["tools"]:
++                if tool["function"]["name"] == function_name:
++                    valid_tool = True
++                    break
++            if not valid_tool:
++                raise VLLMValidationError(
++                    "The tool specified in `tool_choice` does not match any"
++                    " of the specified `tools`",
+                     parameter="tool_choice",
+                 )
+-
+-            # ensure that if "tool_choice" is specified as an object,
+-            # it matches a valid tool
+-            correct_usage_message = (
+-                'Correct usage: `{"type": "function",'
+-                ' "function": {"name": "my_function"}}`'
+-            )
+-            if isinstance(data["tool_choice"], dict):
+-                valid_tool = False
+-                function = data["tool_choice"].get("function")
+-                if not isinstance(function, dict):
+-                    raise VLLMValidationError(
+-                        f"Invalid value for `function`: `{function}` in "
+-                        f"`tool_choice`! {correct_usage_message}",
+-                        parameter="tool_choice.function",
+-                    )
+-                if "name" not in function:
+-                    raise VLLMValidationError(
+-                        f"Expected field `name` in `function` in "
+-                        f"`tool_choice`! {correct_usage_message}",
+-                        parameter="tool_choice.function.name",
+-                    )
+-                function_name = function["name"]
+-                if not isinstance(function_name, str) or len(function_name) == 0:
+-                    raise VLLMValidationError(
+-                        f"Invalid `name` in `function`: `{function_name}`"
+-                        f" in `tool_choice`! {correct_usage_message}",
+-                        parameter="tool_choice.function.name",
+-                    )
+-                for tool in data["tools"]:
+-                    if tool["function"]["name"] == function_name:
+-                        valid_tool = True
+-                        break
+-                if not valid_tool:
+-                    raise VLLMValidationError(
+-                        "The tool specified in `tool_choice` does not match any"
+-                        " of the specified `tools`",
+-                        parameter="tool_choice",
+-                    )
+         return data
+ 
+     @model_validator(mode="before")
+diff --git a/vllm/entrypoints/openai/chat_completion/serving.py b/vllm/entrypoints/openai/chat_completion/serving.py
+index f2df8c6f72eb8534cd03dd61aa5cc4e947789b93..41682e8504d064164d1680d378de043cd9701bfa 100644
+--- a/vllm/entrypoints/openai/chat_completion/serving.py
++++ b/vllm/entrypoints/openai/chat_completion/serving.py
+@@ -994,8 +994,7 @@ class OpenAIServingChat(GenerateBaseServing):
+ 
+             auto_tools_called = False
+             is_named_tool_choice = (
+-                request.tool_choice is not None
+-                and type(request.tool_choice) is ChatCompletionNamedToolChoiceParam
++                type(request.tool_choice) is ChatCompletionNamedToolChoiceParam
+             )
+             is_required_tool_choice = request.tool_choice == "required"
+ 
+@@ -1023,7 +1022,7 @@ class OpenAIServingChat(GenerateBaseServing):
+ 
+             # if the request doesn't use tool choice
+             # OR specifies to not use a tool
+-            elif not request.tool_choice or request.tool_choice == "none":
++            elif request.tool_choice == "none":
+                 message = self._create_chat_message(
+                     role=role, reasoning=reasoning, content=content
+                 )
+@@ -1031,7 +1030,7 @@ class OpenAIServingChat(GenerateBaseServing):
+             # handle when there are tools and tool choice is auto
+             elif (
+                 request.tools
+-                and (request.tool_choice == "auto" or request.tool_choice is None)
++                and request.tool_choice == "auto"
+                 and self.enable_auto_tools
+                 and tool_parser_cls
+             ):
+diff --git a/vllm/parser/abstract_parser.py b/vllm/parser/abstract_parser.py
+index 5664b0e504446e2b3e167af652f53e205fc7761f..ad0e5914682a5b4644c8b727f75257a9d58681cc 100644
+--- a/vllm/parser/abstract_parser.py
++++ b/vllm/parser/abstract_parser.py
+@@ -621,7 +621,6 @@ class DelegatingParser(Parser):
+         is_required_tool_choice = request.tool_choice == "required"
+         is_auto_tool_choice = enable_auto_tools and (
+             request.tool_choice == "auto"
+-            or request.tool_choice is None
+             or (
+                 not supports_required_and_named
+                 and (is_named_tool_choice or is_required_tool_choice)
+diff --git a/vllm/parser/mistral.py b/vllm/parser/mistral.py
+index 787cac75288474360d9a146233cdd40da47c5d66..5a979c3e9a992dd9a2db61e7f1ebfa492a62ce1b 100644
+--- a/vllm/parser/mistral.py
++++ b/vllm/parser/mistral.py
+@@ -420,8 +420,6 @@ class MistralParser(ParserEngine):
+         match request.tool_choice:
+             case "none" | "auto" | "required":
+                 tool_choice = MistralToolChoiceEnum(request.tool_choice)
+-            case None:
+-                tool_choice = MistralToolChoiceEnum.auto
+             # _ == Named tool choice
+             case _:
+                 tool_choice = MistralNamedToolChoice.model_validate(
+diff --git a/vllm/tool_parsers/structural_tag_registry.py b/vllm/tool_parsers/structural_tag_registry.py
+index f96e02ea203d3ed85d87f5695bbb973169db6083..85f74b03672d072f1d3b270881154e6844bed6bc 100644
+--- a/vllm/tool_parsers/structural_tag_registry.py
++++ b/vllm/tool_parsers/structural_tag_registry.py
+@@ -43,7 +43,6 @@ ToolChoice: TypeAlias = (
+     Literal["none", "auto", "required"]
+     | ChatCompletionNamedToolChoiceParam
+     | ResponsesToolChoice
+-    | None
+ )
+ AllowedToolRef: TypeAlias = dict[str, object]
+ SimplifiedToolChoice: TypeAlias = Literal["auto", "required", "forced"]
+@@ -193,12 +192,9 @@ def _dump_tool_for_xgrammar(
+ 
+ def _dump_tool_choice_for_xgrammar(
+     tool_choice: ToolChoice,
+-) -> dict[str, Any] | str | None:
++) -> dict[str, Any] | str:
+     """Convert tool_choice objects to xgrammar's expected protocol."""
+ 
+-    if tool_choice is None:
+-        return None
+-
+     if isinstance(tool_choice, str):
+         return tool_choice
+ 

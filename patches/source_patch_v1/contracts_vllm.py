@@ -3426,6 +3426,54 @@ def _validate_include_reasoning_after(state: State) -> None:
         }, label=label)
 
 
+_CHAT_PROTOCOL = "vllm/entrypoints/openai/chat_completion/protocol.py"
+
+
+def _validate_unspecified_tool_choice_before(state: State) -> None:
+    require_text(state, _CHAT_PROTOCOL,
+                 'if "tool_choice" not in data and data.get("tools"):',
+                 label="Unspecified tool choice precondition")
+
+
+def _validate_unspecified_tool_choice_after(state: State) -> None:
+    label = "Unspecified tool choice"
+    anthropic = "vllm/entrypoints/anthropic/serving.py"
+    # Omitted and null are one value, decided once, so arming and parsing
+    # read the same choice; the field holds no null after validation.
+    _require_in_symbol(state, _CHAT_PROTOCOL, "ChatCompletionRequest.check_tool_usage", (
+        'if data.get("tool_choice") is None:',
+        'data["tool_choice"] = "auto" if data.get("tools") else "none"',
+        'if data["tool_choice"] == "none":',
+    ), label=label)
+    forbid_text(state, _CHAT_PROTOCOL,
+                'if "tool_choice" not in data and data.get("tools"):', label=label)
+    require_text(state, _CHAT_PROTOCOL,
+                 '        | ChatCompletionNamedToolChoiceParam\n    ) = "none"\n',
+                 label=label)
+    _require_in_symbol(state, anthropic, "AnthropicServingMessages._convert_tool_choice", (
+        'req.tool_choice = "auto" if anthropic_request.tools else "none"',
+    ), label=label)
+    forbid_text(state, anthropic, "req.tool_choice = None", label=label)
+    for path in ("vllm/parser/abstract_parser.py", _CHAT_SERVING):
+        forbid_text(state, path, "request.tool_choice is None", label=label)
+    forbid_text(state, _CHAT_SERVING, "not request.tool_choice", label=label)
+    forbid_text(state, "vllm/tool_parsers/structural_tag_registry.py",
+                "if tool_choice is None:", label=label)
+    forbid_text(state, "vllm/parser/mistral.py",
+                "case None:\n                tool_choice = MistralToolChoiceEnum.auto",
+                label=label)
+    require_python_symbols(state,
+        "tests/entrypoints/openai/chat_completion/test_unspecified_tool_choice.py", {
+            "test_an_unspecified_tool_choice_is_the_default_for_its_tools": None,
+            "test_calls_are_parsed_exactly_where_the_grammar_is_armed": None,
+        }, label=label)
+    require_python_symbols(state,
+        "tests/entrypoints/anthropic/test_anthropic_messages_conversion.py", {
+            "TestUnspecifiedToolChoice.test_with_tools_is_auto": None,
+            "TestUnspecifiedToolChoice.test_without_tools_is_none": None,
+        }, label=label)
+
+
 def validate_final(state: State) -> None:
     """Reassert every durable semantic invariant on the complete tree.
 
@@ -4366,5 +4414,24 @@ CONTRACTS: Mapping[str, SemanticContract] = {
         ),
         validate_before=_validate_include_reasoning_before,
         validate_after=_validate_include_reasoning_after,
+    ),
+    "unspecified-tool-choice-is-the-default": SemanticContract(
+        rationale=(
+            "An explicit null tool_choice with tools armed no grammar, which "
+            "needs auto, required or a named choice, while the parser read null "
+            "as auto: a stream published a call no grammar constrained, a whole "
+            "response deleted the call and its text, and parallel_tool_calls "
+            "false was held by nothing. A choice that is not specified, omitted "
+            "or null, is auto with tools and none without, decided once in the "
+            "chat request and in the Anthropic conversion, so null never reaches "
+            "the parser and one value decides both whether the call grammar is "
+            "armed and whether calls are parsed."
+        ),
+        removal_condition=(
+            "Remove when upstream defaults a null tool_choice exactly as an "
+            "omitted one."
+        ),
+        validate_before=_validate_unspecified_tool_choice_before,
+        validate_after=_validate_unspecified_tool_choice_after,
     ),
 }
