@@ -120584,7 +120584,174 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    # the streaming tool pass sees.\n'
                              '    batch_tool_pass_uses_ids = True\n'
                              '\n'
-                             '    def _tool_arguments_reading(\n'})})
+                             '    def _tool_arguments_reading(\n'})},
+ {'name': 'include-reasoning-shapes-the-response',
+  'review_patch': 'patches/vllm-include-reasoning-shapes-the-response.patch',
+  'review_sha256': '866f50c8e1f3d7f5cfe19e1432378b18309bbd8c3c49a6d2dccf657af99fb58d',
+  'files': ({'path': 'tests/entrypoints/openai/chat_completion/test_serving_chat.py',
+             'before_sha256': '80e601895d15af815ddc98233fc4aefdb656bdc682d24124d9047fad6d6057f6',
+             'after_sha256': '82a3f7dad3c315ce9fa205613f8ab817a879d1a3ddb9a8c3fa72d43af51412c9'},
+            {'path': 'vllm/entrypoints/openai/chat_completion/serving.py',
+             'before_sha256': '12c520ffa8cd4cf2c793e38a0756748fc48dae19b20fb9f94bceab94916e17a6',
+             'after_sha256': '9f6f58c30b0d995de4cb655ae201e6f2d556784fd18ae0e636294dfd49345f2a'}),
+  'edits': ({'name': 'tests/entrypoints/openai/chat_completion/test_serving_chat.py:landmark-1',
+             'path': 'tests/entrypoints/openai/chat_completion/test_serving_chat.py',
+             'before': '    assert await serving_chat.create_chat_completion(req) == '
+                       'MODEL_NAME\n'
+                       '\n'
+                       '\n'
+                       '@pytest.mark.asyncio\n'
+                       'async def test_serving_chat_should_set_correct_max_tokens():\n'
+                       '    mock_engine = MagicMock(spec=AsyncLLM)\n',
+             'after': '    assert await serving_chat.create_chat_completion(req) == '
+                      'MODEL_NAME\n'
+                      '\n'
+                      '\n'
+                      '@pytest.mark.asyncio\n'
+                      '@pytest.mark.parametrize("include_reasoning", [True, False])\n'
+                      'async def '
+                      'test_include_reasoning_leaves_the_reasoning_state_to_the_prompt(\n'
+                      '    include_reasoning,\n'
+                      '):\n'
+                      '    """``include_reasoning`` shapes the response, never what '
+                      'the model may\n'
+                      '    generate: whether reasoning has ended, which decides when a '
+                      'grammar starts\n'
+                      '    constraining, is read from the prompt the model '
+                      'continues."""\n'
+                      '    mock_engine = MagicMock(spec=AsyncLLM)\n'
+                      '    mock_engine.errored = False\n'
+                      '    mock_engine.model_config = MockModelConfig()\n'
+                      '    mock_engine.input_processor = MagicMock()\n'
+                      '    mock_engine.renderer = '
+                      '_build_renderer(mock_engine.model_config)\n'
+                      '\n'
+                      '    serving_chat = _build_serving_chat(mock_engine, '
+                      'reasoning_parser="qwen3")\n'
+                      '    req = ChatCompletionRequest(\n'
+                      '        model=MODEL_NAME,\n'
+                      '        messages=[{"role": "user", "content": "what is '
+                      '1+1?"}],\n'
+                      '        include_reasoning=include_reasoning,\n'
+                      '    )\n'
+                      '\n'
+                      '    with suppress(Exception):\n'
+                      '        await serving_chat.create_chat_completion(req)\n'
+                      '\n'
+                      '    assert '
+                      'mock_engine.admit.call_args.kwargs["reasoning_ended"] is False\n'
+                      '\n'
+                      '\n'
+                      '@pytest.mark.asyncio\n'
+                      'async def test_serving_chat_should_set_correct_max_tokens():\n'
+                      '    mock_engine = MagicMock(spec=AsyncLLM)\n',
+             'review_before': '    assert await '
+                              'serving_chat.create_chat_completion(req) == MODEL_NAME\n'
+                              '\n'
+                              '\n'
+                              '@pytest.mark.asyncio\n'
+                              'async def '
+                              'test_serving_chat_should_set_correct_max_tokens():\n'
+                              '    mock_engine = MagicMock(spec=AsyncLLM)\n',
+             'review_after': '    assert await '
+                             'serving_chat.create_chat_completion(req) == MODEL_NAME\n'
+                             '\n'
+                             '\n'
+                             '@pytest.mark.asyncio\n'
+                             '@pytest.mark.parametrize("include_reasoning", [True, '
+                             'False])\n'
+                             'async def '
+                             'test_include_reasoning_leaves_the_reasoning_state_to_the_prompt(\n'
+                             '    include_reasoning,\n'
+                             '):\n'
+                             '    """``include_reasoning`` shapes the response, never '
+                             'what the model may\n'
+                             '    generate: whether reasoning has ended, which decides '
+                             'when a grammar starts\n'
+                             '    constraining, is read from the prompt the model '
+                             'continues."""\n'
+                             '    mock_engine = MagicMock(spec=AsyncLLM)\n'
+                             '    mock_engine.errored = False\n'
+                             '    mock_engine.model_config = MockModelConfig()\n'
+                             '    mock_engine.input_processor = MagicMock()\n'
+                             '    mock_engine.renderer = '
+                             '_build_renderer(mock_engine.model_config)\n'
+                             '\n'
+                             '    serving_chat = _build_serving_chat(mock_engine, '
+                             'reasoning_parser="qwen3")\n'
+                             '    req = ChatCompletionRequest(\n'
+                             '        model=MODEL_NAME,\n'
+                             '        messages=[{"role": "user", "content": "what is '
+                             '1+1?"}],\n'
+                             '        include_reasoning=include_reasoning,\n'
+                             '    )\n'
+                             '\n'
+                             '    with suppress(Exception):\n'
+                             '        await serving_chat.create_chat_completion(req)\n'
+                             '\n'
+                             '    assert '
+                             'mock_engine.admit.call_args.kwargs["reasoning_ended"] is '
+                             'False\n'
+                             '\n'
+                             '\n'
+                             '@pytest.mark.asyncio\n'
+                             'async def '
+                             'test_serving_chat_should_set_correct_max_tokens():\n'
+                             '    mock_engine = MagicMock(spec=AsyncLLM)\n'},
+            {'name': 'vllm/entrypoints/openai/chat_completion/serving.py:landmark-1',
+             'path': 'vllm/entrypoints/openai/chat_completion/serving.py',
+             'before': '            )\n'
+                       '            session_id = self._get_session_id(request, '
+                       'raw_request)\n'
+                       '\n'
+                       '            if not request.include_reasoning:\n'
+                       '                reasoning_ended = True\n'
+                       '            elif request._grammar_from_parser:\n'
+                       '                # The Mistral grammar already includes an '
+                       'optional\n'
+                       '                # `think?` rule that handles both reasoning '
+                       'and\n'
+                       '                # non-reasoning outputs.\n',
+             'after': '            )\n'
+                      '            session_id = self._get_session_id(request, '
+                      'raw_request)\n'
+                      '\n'
+                      '            # Whether reasoning has ended is read from the '
+                      'prompt the model\n'
+                      '            # continues; ``include_reasoning`` only shapes the '
+                      'response.\n'
+                      '            if request._grammar_from_parser:\n'
+                      '                # The Mistral grammar already includes an '
+                      'optional\n'
+                      '                # `think?` rule that handles both reasoning '
+                      'and\n'
+                      '                # non-reasoning outputs.\n',
+             'review_before': '            )\n'
+                              '            session_id = self._get_session_id(request, '
+                              'raw_request)\n'
+                              '\n'
+                              '            if not request.include_reasoning:\n'
+                              '                reasoning_ended = True\n'
+                              '            elif request._grammar_from_parser:\n'
+                              '                # The Mistral grammar already includes '
+                              'an optional\n'
+                              '                # `think?` rule that handles both '
+                              'reasoning and\n'
+                              '                # non-reasoning outputs.\n',
+             'review_after': '            )\n'
+                             '            session_id = self._get_session_id(request, '
+                             'raw_request)\n'
+                             '\n'
+                             '            # Whether reasoning has ended is read from '
+                             'the prompt the model\n'
+                             '            # continues; ``include_reasoning`` only '
+                             'shapes the response.\n'
+                             '            if request._grammar_from_parser:\n'
+                             '                # The Mistral grammar already includes '
+                             'an optional\n'
+                             '                # `think?` rule that handles both '
+                             'reasoning and\n'
+                             '                # non-reasoning outputs.\n'})})
 
 FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5dd4c4673b5925cebd27d46a5956832092bebbbd53d47993bac',
  'tests/config/test_config_utils.py': '4f5ea0399cc3b4f9603df07e2cc26d32e1eddf6b98a36c0f30d580321879c038',
@@ -120598,7 +120765,7 @@ FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5d
  'tests/entrypoints/openai/chat_completion/test_logprob_token_ids.py': '3a208425a3acec91a63a0d66fd29a0edc6ddbeadb42c92b3b86afbfbf2e1363a',
  'tests/entrypoints/openai/chat_completion/test_parallel_tool_call_integrity.py': 'e290f2c4df7bd842594db1fb4e66bf713bc6ff653cbadc8877958a955c0fa4c4',
  'tests/entrypoints/openai/chat_completion/test_repeated_tool_parameter_refusal.py': 'b8a7eed51747dddf980145be2609cf1a8136465bf0068a0f3c7b85424ab9a9d9',
- 'tests/entrypoints/openai/chat_completion/test_serving_chat.py': '80e601895d15af815ddc98233fc4aefdb656bdc682d24124d9047fad6d6057f6',
+ 'tests/entrypoints/openai/chat_completion/test_serving_chat.py': '82a3f7dad3c315ce9fa205613f8ab817a879d1a3ddb9a8c3fa72d43af51412c9',
  'tests/entrypoints/openai/completion/test_completion.py': 'd9a783cc90cb99dc9c280cbe0e6fe043d116189b5ba61c05de13856ea7808c3f',
  'tests/entrypoints/openai/completion/test_completion_error.py': 'a0f5377bbf39bf9d411452353aa7aa8afb3eb6c6d583c9bcaf95df0e469a9749',
  'tests/entrypoints/openai/completion/test_lora_resolvers.py': '8dd3116102f4e1287364b9bd967a1e5aa3bc93eea2dfb4b7277cb16733781f4c',
@@ -120709,7 +120876,7 @@ FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5d
  'vllm/entrypoints/openai/chat_completion/api_router.py': '9cb8a56328bcfea734cc252e1291b17aee6c42e7208c9c8f883ad5a434bace17',
  'vllm/entrypoints/openai/chat_completion/batch_serving.py': '90dee26650b749fec50ebc7bcf461ae5566c48e66bd0ccdb2b6d726c1ae2dd7a',
  'vllm/entrypoints/openai/chat_completion/protocol.py': '1a11f9bc960903d6bbaddca8f339b4517378ef54b5ce0f35543ed34a757519ae',
- 'vllm/entrypoints/openai/chat_completion/serving.py': '12c520ffa8cd4cf2c793e38a0756748fc48dae19b20fb9f94bceab94916e17a6',
+ 'vllm/entrypoints/openai/chat_completion/serving.py': '9f6f58c30b0d995de4cb655ae201e6f2d556784fd18ae0e636294dfd49345f2a',
  'vllm/entrypoints/openai/cli_args.py': '2c74b481652e1b7154df7836a98eb3ef1377092dc8ac4ae02095160907b5e36e',
  'vllm/entrypoints/openai/completion/api_router.py': '95f7e88069d896bb2a616a50ca3c3c9d1fd1b2314b785b87696ad936fd205363',
  'vllm/entrypoints/openai/completion/protocol.py': 'a92405770e6d4f3b3732b0a42ebdc335441a448be9fc2ce4f92b02d16e6e0ca2',

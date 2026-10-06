@@ -3392,6 +3392,40 @@ def _validate_generated_tokens_after(state: State) -> None:
     }, label=label)
 
 
+_CHAT_SERVING = "vllm/entrypoints/openai/chat_completion/serving.py"
+
+
+def _validate_include_reasoning_before(state: State) -> None:
+    require_text(state, _CHAT_SERVING,
+                 "if not request.include_reasoning:\n                reasoning_ended = True",
+                 label="Response-only include_reasoning precondition")
+
+
+def _validate_include_reasoning_after(state: State) -> None:
+    label = "Response-only include_reasoning"
+    source = _symbol_source(state, _CHAT_SERVING,
+                            "OpenAIServingChat._create_chat_completion", label=label)
+    start = source.find("session_id = self._get_session_id(")
+    end = source.find("reasoning_ended=reasoning_ended,", start)
+    _require(start >= 0 and end > start,
+             f"{label}: the reasoning state is no longer decided before admission")
+    decision = [line for line in source[start:end].splitlines()
+                if not line.strip().startswith("#")]
+    # What the response shows never decides when a grammar starts: the state
+    # comes from the parser's reading of the prompt the model continues.
+    _require(not any("include_reasoning" in line for line in decision),
+             f"{label}: the reasoning state is derived from include_reasoning")
+    _require_ordered("\n".join(decision), (
+        "if request._grammar_from_parser:",
+        "reasoning_ended = True",
+        "reasoning_ended = parser.is_reasoning_end(prompt_token_ids or [])",
+    ), label=label, location=f"{_CHAT_SERVING}:OpenAIServingChat._create_chat_completion")
+    require_python_symbols(state,
+        "tests/entrypoints/openai/chat_completion/test_serving_chat.py", {
+            "test_include_reasoning_leaves_the_reasoning_state_to_the_prompt": None,
+        }, label=label)
+
+
 def validate_final(state: State) -> None:
     """Reassert every durable semantic invariant on the complete tree.
 
@@ -4313,5 +4347,24 @@ CONTRACTS: Mapping[str, SemanticContract] = {
         ),
         validate_before=_validate_generated_tokens_before,
         validate_after=_validate_generated_tokens_after,
+    ),
+    "include-reasoning-shapes-the-response": SemanticContract(
+        rationale=(
+            "Chat Completions read include_reasoning=false as reasoning having "
+            "already ended, which started the tool or output grammar at the "
+            "first generated token, inside the reasoning the template opens; "
+            "under auto tools the grammar excludes </think>, so the model could "
+            "only call a tool, stop or run to its limit, and the answer came back "
+            "empty. Responses documents the same field as hiding reasoning "
+            "without affecting inference. Whether reasoning has ended is read "
+            "from the prompt the model continues; include_reasoning only shapes "
+            "the response."
+        ),
+        removal_condition=(
+            "Remove when upstream's chat route no longer derives the reasoning "
+            "state from include_reasoning."
+        ),
+        validate_before=_validate_include_reasoning_before,
+        validate_after=_validate_include_reasoning_after,
     ),
 }

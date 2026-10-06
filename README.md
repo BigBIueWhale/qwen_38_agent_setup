@@ -336,6 +336,7 @@ It is intentionally reconstructed by the ordered, reviewed semantic transformati
 | patches/vllm-template-refusals-name-their-parameter.patch | 587facad35a115822bb6af2baefc00604fa87e1e96d0e6d85919115821a1ccd5 |
 | patches/vllm-qwen-repeated-parameter-refusal.patch | e6217bcd1fae538ef97dacd523c3b994f594826502961c24c3aa47402b668fa9 |
 | patches/vllm-generated-tokens-survive-parsing.patch | 5a3649dc50d8f75a24474ce2a0776fd96cc51edf03f011d0887d84b4cb628e7a |
+| patches/vllm-include-reasoning-shapes-the-response.patch | 866f50c8e1f3d7f5cfe19e1432378b18309bbd8c3c49a6d2dccf657af99fb58d |
 
 The reconstructed tree's runtime-source and test changes, new files and
 deletions are counted by ./scripts/build-vllm.sh check, which derives and prints
@@ -381,7 +382,7 @@ Pinned build inputs and products:
 | Immutable base tag | qwen38-vllm:main-9df9b0b |
 | Immutable base ID | sha256:fa4a002a88b7043a1a89966dea8a500fe9696f84e75730d9da916f916048d401 |
 | Runtime Dockerfile SHA-256 | e58ca999ada5321cf77b4f50eaff9e72f04479a7924dc01f10e205c0f7528d61 |
-| Build verifier SHA-256 | 77c909eeb62f0b65160cf430264227e166d12e116de531ec0b0244d5ccfa7510 |
+| Build verifier SHA-256 | 842cb4b1d1a293bbc59d9529309ef6741fecfc5a8b7fc30e7c8716d42c7d8088 |
 | Runtime validator SHA-256 | d7b050d01a3a4bb32577c49e03d148f29eb1e89d92e375e45b096775423d0a36 |
 
 The runtime image's profile, tag and archive name, which every release advances
@@ -1164,6 +1165,10 @@ whose text was gone, which the token-position scanner refuses: a whole response
 failed with 500 and a stream lost the token or failed, by how its deltas were
 grouped. A parser that forwards content ids is refused at construction if it
 acts on a terminal in content outside its tool language.
+
+`include_reasoning` decides only what a response shows: whether reasoning has
+ended, and so when a grammar starts constraining, is read from the prompt the
+model continues, on Chat Completions as on Responses.
 
 Qwen's natural `</think>` token or implicit `<tool_call>` token ends thinking
 once per generation. The deployed V1 thinking-budget tracker and grammar

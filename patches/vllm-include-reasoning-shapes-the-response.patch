@@ -1,0 +1,55 @@
+diff --git a/tests/entrypoints/openai/chat_completion/test_serving_chat.py b/tests/entrypoints/openai/chat_completion/test_serving_chat.py
+index 1cd3e669424d13041a59eef67b1e27505ec30abf..3b8155e47e6d1819084a67d94c708082d7fe32c4 100644
+--- a/tests/entrypoints/openai/chat_completion/test_serving_chat.py
++++ b/tests/entrypoints/openai/chat_completion/test_serving_chat.py
+@@ -879,6 +879,33 @@ async def test_serving_chat_returns_correct_model_name():
+     assert await serving_chat.create_chat_completion(req) == MODEL_NAME
+ 
+ 
++@pytest.mark.asyncio
++@pytest.mark.parametrize("include_reasoning", [True, False])
++async def test_include_reasoning_leaves_the_reasoning_state_to_the_prompt(
++    include_reasoning,
++):
++    """``include_reasoning`` shapes the response, never what the model may
++    generate: whether reasoning has ended, which decides when a grammar starts
++    constraining, is read from the prompt the model continues."""
++    mock_engine = MagicMock(spec=AsyncLLM)
++    mock_engine.errored = False
++    mock_engine.model_config = MockModelConfig()
++    mock_engine.input_processor = MagicMock()
++    mock_engine.renderer = _build_renderer(mock_engine.model_config)
++
++    serving_chat = _build_serving_chat(mock_engine, reasoning_parser="qwen3")
++    req = ChatCompletionRequest(
++        model=MODEL_NAME,
++        messages=[{"role": "user", "content": "what is 1+1?"}],
++        include_reasoning=include_reasoning,
++    )
++
++    with suppress(Exception):
++        await serving_chat.create_chat_completion(req)
++
++    assert mock_engine.admit.call_args.kwargs["reasoning_ended"] is False
++
++
+ @pytest.mark.asyncio
+ async def test_serving_chat_should_set_correct_max_tokens():
+     mock_engine = MagicMock(spec=AsyncLLM)
+diff --git a/vllm/entrypoints/openai/chat_completion/serving.py b/vllm/entrypoints/openai/chat_completion/serving.py
+index 522f19010324dd9d665a1d1219cf1527c3f57145..f2df8c6f72eb8534cd03dd61aa5cc4e947789b93 100644
+--- a/vllm/entrypoints/openai/chat_completion/serving.py
++++ b/vllm/entrypoints/openai/chat_completion/serving.py
+@@ -355,9 +355,9 @@ class OpenAIServingChat(GenerateBaseServing):
+             )
+             session_id = self._get_session_id(request, raw_request)
+ 
+-            if not request.include_reasoning:
+-                reasoning_ended = True
+-            elif request._grammar_from_parser:
++            # Whether reasoning has ended is read from the prompt the model
++            # continues; ``include_reasoning`` only shapes the response.
++            if request._grammar_from_parser:
+                 # The Mistral grammar already includes an optional
+                 # `think?` rule that handles both reasoning and
+                 # non-reasoning outputs.
