@@ -3826,6 +3826,41 @@ def _validate_batch_invariant_native_fp4_after(state: State) -> None:
             "test_a_disabled_native_kernel_is_named_as_the_next_action": None,
         }, label=label)
 
+def _validate_render_every_image_before(state: State) -> None:
+    label = "Render carries every image precondition"
+    forbid_text(state, "vllm/entrypoints/chat_utils.py", "IMAGE_PART_TYPES", label=label)
+    require_text(state, "vllm/entrypoints/scale_out/render/serving.py",
+                 'if part.get("type") == "image_url"', label=label)
+
+
+def _validate_render_every_image_after(state: State) -> None:
+    label = "Render carries every image"
+    chat_utils = "vllm/entrypoints/chat_utils.py"
+    render = "vllm/entrypoints/scale_out/render/serving.py"
+    # One decision of what an image part is, shared by chat and render.
+    require_text(state, chat_utils, 'IMAGE_PART_TYPES = ("image_url", "input_image")',
+                 label=label)
+    require_text(state, chat_utils, "elif part_type in IMAGE_PART_TYPES:", label=label)
+    _require_in_symbol(state, chat_utils, "content_part_image", (
+        "_parse_chat_message_content_mm_part(part)",
+        "if part_type not in IMAGE_PART_TYPES:",
+    ), label=label)
+    require_text(state, render, "content_part_image(part)", label=label)
+    forbid_text(state, render, 'if part.get("type") == "image_url"', label=label)
+    require_text(state, chat_utils, "input_image.detail is required", label=label)
+    # A rendered image span without its image is refused, not read as text.
+    require_python_symbols(state, "vllm/renderers/base.py", {
+        "BaseRenderer.require_no_rendered_media": ("self", "token_ids"),
+    }, label=label)
+    require_text(state, "vllm/entrypoints/scale_out/token_in_token_out/serving.py",
+                 "renderer.require_no_rendered_media(request.token_ids)", label=label)
+    require_python_symbols(
+        state, "tests/entrypoints/scale_out/token_in_token_out/test_raw_media_boundary.py", {
+            "test_render_carries_every_image_chat_renders": None,
+            "test_input_image_names_its_required_detail": None,
+            "test_rendered_media_spans_require_their_images": None,
+        }, label=label)
+
 def validate_final(state: State) -> None:
     """Reassert every durable semantic invariant on the complete tree.
 
@@ -4929,5 +4964,28 @@ CONTRACTS: Mapping[str, SemanticContract] = {
         ),
         validate_before=_validate_batch_invariant_native_fp4_before,
         validate_after=_validate_batch_invariant_native_fp4_after,
+    ),
+    "render-carries-every-image-chat-renders": SemanticContract(
+        rationale=(
+            "Chat renders an image_url and an input_image part alike, but the "
+            "render route carried only image_url parts to generation: an "
+            "input_image rendered its image pad tokens and arrived with no "
+            "image, so generate returned 200 and the model read bare pad "
+            "tokens as text. A mix of the two was refused naming the caller's "
+            "token_ids, and shapes chat accepts -- an extra key, a null uuid, a "
+            "plain-string item -- made render fail with a 500. One decision of "
+            "what an image part is (chat's own per-part parse) now feeds both, "
+            "and render carries exactly the images chat rendered, in order, in "
+            "the transport's one image shape. input_image.detail is required, "
+            "as upstream's type declares, and refused naming detail where its "
+            "absence was a 500; the generate text path refuses an image span "
+            "that arrives without its image."
+        ),
+        removal_condition=(
+            "Remove when pinned upstream's render route carries every image "
+            "part chat renders, read by chat's own part parser."
+        ),
+        validate_before=_validate_render_every_image_before,
+        validate_after=_validate_render_every_image_after,
     ),
 }

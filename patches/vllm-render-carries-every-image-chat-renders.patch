@@ -1,0 +1,344 @@
+diff --git a/tests/entrypoints/scale_out/token_in_token_out/test_protocol.py b/tests/entrypoints/scale_out/token_in_token_out/test_protocol.py
+index 3a27cd2bdb3f5c72893155b6196b309a8b5b611c..189a888138c335121b2a63571d915953a8e65410 100644
+--- a/tests/entrypoints/scale_out/token_in_token_out/test_protocol.py
++++ b/tests/entrypoints/scale_out/token_in_token_out/test_protocol.py
+@@ -221,9 +221,13 @@ async def test_serving_resolves_once_before_dispatch_on_both_transports(
+     serving._log_inputs = MagicMock()
+     serving._get_data_parallel_rank = MagicMock(return_value=None)
+     serving._get_session_id_from_headers = MagicMock(return_value=None)
+-    serving.online_renderer = SimpleNamespace(preprocess_completion=AsyncMock(
+-        return_value=[{"type": "token", "prompt_token_ids": [1, 2, 3]}],
+-    ))
++    checked = []
++    serving.online_renderer = SimpleNamespace(
++        preprocess_completion=AsyncMock(
++            return_value=[{"type": "token", "prompt_token_ids": [1, 2, 3]}],
++        ),
++        renderer=SimpleNamespace(require_no_rendered_media=checked.append),
++    )
+     captured = []
+ 
+     async def engine_generate(prompt, params, request_id, **kwargs):
+@@ -256,6 +260,8 @@ async def test_serving_resolves_once_before_dispatch_on_both_transports(
+         assert response.choices[0].finish_reason == "stop"
+         assert response.choices[0].token_ids == [4]
+     assert len(captured) == 1
++    # Ids that supply no image are checked for image spans before generating.
++    assert checked == [request.token_ids]
+     params = captured[0]
+     assert params.max_tokens == expected_max
+     assert params.final_response_token_budget == DEFAULTS["final_response_token_budget"]
+diff --git a/tests/entrypoints/scale_out/token_in_token_out/test_raw_media_boundary.py b/tests/entrypoints/scale_out/token_in_token_out/test_raw_media_boundary.py
+index 20ed74d824aa314799ff70a43b9e51567f8559dc..882de5c20bdd5032b5623c8b813cd70a7ec11e36 100644
+--- a/tests/entrypoints/scale_out/token_in_token_out/test_raw_media_boundary.py
++++ b/tests/entrypoints/scale_out/token_in_token_out/test_raw_media_boundary.py
+@@ -50,3 +50,117 @@ def test_raw_png_transport_preserves_original_data_url():
+     assert 'features' not in schema['properties']
+     assert schema['additionalProperties'] is False
+ 
++
++
++def _png_url():
++    import base64
++    import io
++
++    from PIL import Image
++
++    buffer = io.BytesIO()
++    Image.new('RGB', (8, 8)).save(buffer, format='PNG')
++    return 'data:image/png;base64,' + base64.b64encode(buffer.getvalue()).decode()
++
++
++def _rendered_by_chat(parts):
++    """The image sources the chat parser renders, in order."""
++    from types import SimpleNamespace
++
++    from vllm.entrypoints.chat_utils import _parse_chat_message_content_part
++
++    rendered = []
++    recorder = SimpleNamespace(
++        model_config=SimpleNamespace(enable_prompt_embeds=False),
++        parse_image=lambda url, uuid: rendered.append(url),
++    )
++    for part in parts:
++        _parse_chat_message_content_part(
++            part, recorder, wrap_dicts=True, interleave_strings=False)
++    return rendered
++
++
++@pytest.mark.asyncio
++async def test_render_carries_every_image_chat_renders(monkeypatch):
++    """Render carries exactly the images the chat parser renders, in order.
++
++    Both image part types, extra keys, a null uuid and a plain-string item
++    beside them render as chat renders them; each image travels in the
++    transport's one image shape, so a rendered span always has its image.
++    """
++    from types import SimpleNamespace
++    from unittest.mock import AsyncMock
++
++    import vllm.entrypoints.scale_out.render.serving as render_module
++    from vllm.entrypoints.openai.chat_completion.protocol import ChatCompletionRequest
++    from vllm.entrypoints.scale_out.render.serving import ServingRender
++
++    url = _png_url()
++    parts = [
++        {'type': 'image_url', 'image_url': {'url': url}},
++        {'type': 'image_url', 'image_url': {'url': url, 'detail': 'high'}},
++        {'type': 'input_image', 'image_url': url, 'detail': 'auto'},
++        {'type': 'image_url', 'image_url': {'url': url, 'name': 'x.png'}},
++        {'type': 'image_url', 'image_url': {'url': url}, 'cache_control': {}},
++        {'type': 'image_url', 'image_url': {'url': url}, 'uuid': None},
++        'plain text', {'type': 'text', 'text': 'describe'},
++    ]
++    render = object.__new__(ServingRender)
++    render._check_model = AsyncMock(return_value=None)
++    render.model_config = SimpleNamespace(max_model_len=64)
++    render.default_sampling_params = {}
++    render.override_max_tokens = None
++    render.online_renderer = SimpleNamespace(render_chat=AsyncMock(
++        return_value=([], [{'type': 'token', 'prompt_token_ids': [7, 8]}])))
++    monkeypatch.setattr(render_module, 'extract_prompt_components',
++                        lambda config, engine_input: SimpleNamespace(
++                            token_ids=engine_input['prompt_token_ids']))
++    monkeypatch.setattr(render_module, 'extract_prompt_len',
++                        lambda config, engine_input: 2)
++    request = ChatCompletionRequest(model='unit', messages=[
++        {'role': 'user', 'content': parts[:3]},
++        {'role': 'user', 'content': parts[3:]},
++    ])
++    generate = await render.render_chat_request(request)
++    assert [part.image_url.url for part in generate.content_parts] == (
++        _rendered_by_chat(parts))
++    assert [part.image_url.detail for part in generate.content_parts] == [
++        'auto', 'high', 'auto', 'auto', 'auto', 'auto']
++    # What render returns is what generation accepts.
++    TokenGenerationRequest.model_validate(
++        {**generate.model_dump(mode='json'), 'kv_scope': 'agent'})
++
++
++def test_input_image_names_its_required_detail():
++    from vllm.exceptions import VLLMValidationError
++
++    with pytest.raises(VLLMValidationError) as refused:
++        _rendered_by_chat([{'type': 'input_image', 'image_url': _png_url()}])
++    assert refused.value.parameter == 'detail'
++
++
++@pytest.mark.parametrize('tokens,refused', [
++    ([7, 8, 9], False), ([7, 102, 101, 101, 103, 8], True), ([7, 101, 8], True),
++])
++def test_rendered_media_spans_require_their_images(tokens, refused):
++    """Ids that supply no image hold no image span."""
++    from types import SimpleNamespace
++
++    from vllm.exceptions import VLLMValidationError
++    from vllm.model_executor.models.qwen3_vl import Qwen3VLMultiModalProcessor
++    from vllm.renderers.base import BaseRenderer
++
++    processor = object.__new__(Qwen3VLMultiModalProcessor)
++    processor.info = SimpleNamespace(
++        get_tokenizer=lambda: None,
++        get_hf_config=lambda: SimpleNamespace(
++            image_token_id=101, vision_start_token_id=102,
++            vision_end_token_id=103, video_token_id=104),
++    )
++    text_route = SimpleNamespace(mm_processor=processor)
++    if refused:
++        with pytest.raises(VLLMValidationError) as error:
++            BaseRenderer.require_no_rendered_media(text_route, tokens)
++        assert error.value.parameter == 'token_ids'
++    else:
++        BaseRenderer.require_no_rendered_media(text_route, tokens)
+diff --git a/vllm/entrypoints/chat_utils.py b/vllm/entrypoints/chat_utils.py
+index 89873b4a72e910eb7cb0efec3f9015962f81d948..ac546ce1e3413d11ab86f794e9e154ea0e76605d 100644
+--- a/vllm/entrypoints/chat_utils.py
++++ b/vllm/entrypoints/chat_utils.py
+@@ -1605,17 +1605,44 @@ def _enforce_qwen38_strict_content_part(part: dict[str, Any]) -> None:
+                 "image_url; file_id and uploaded-file indirection are forbidden.",
+                 parameter="image_url",
+             )
+-        detail = part.get("detail", "auto")
++        detail = part.get("detail")
+         if detail not in ("auto", "high"):
+             raise VLLMValidationError(
+-                "input_image.detail must be 'auto' or 'high'. Both use the "
+-                "sole full Qwen processor path; 'low' and unknown quality modes "
+-                "are forbidden.",
++                "input_image.detail is required and must be 'auto' or 'high'. "
++                "Both use the sole full Qwen processor path; 'low' and unknown "
++                "quality modes are forbidden.",
+                 parameter="detail",
+                 value=detail,
+             )
+ 
+ 
++# The content-part types the chat parser renders as images.
++IMAGE_PART_TYPES = ("image_url", "input_image")
++
++
++def content_part_image(
++    part: ChatCompletionContentPartParam,
++) -> tuple[str, Literal["auto", "high"]] | None:
++    """The inline image a content part supplies, with its detail, or None.
++
++    The part is parsed exactly as the chat renderer parses it, so the parts
++    chat renders as images are exactly the parts that return one: the render
++    route carries these to generation, and every image span it renders
++    arrives with its image.
++    """
++    if isinstance(part, str):
++        return None
++    part_type, content = _parse_chat_message_content_mm_part(part)
++    if part_type not in IMAGE_PART_TYPES:
++        return None
++    detail = (
++        part["detail"]
++        if part_type == "input_image"
++        else part["image_url"].get("detail", "auto")  # type: ignore[typeddict-item]
++    )
++    return cast(str, content), detail
++
++
+ def _parse_chat_message_content_mm_part(
+     part: ChatCompletionContentPartParam,
+ ) -> tuple[str, _ContentPart]:
+@@ -1840,7 +1867,7 @@ def _parse_chat_message_content_part(
+         image_content = cast(Image.Image, content) if content is not None else None
+         mm_parser.parse_image_pil(image_content, uuid)
+         modality = "image"
+-    elif part_type in ("image_url", "input_image"):
++    elif part_type in IMAGE_PART_TYPES:
+         str_content = cast(str, content)
+         mm_parser.parse_image(str_content, uuid)
+         modality = "image"
+diff --git a/vllm/entrypoints/scale_out/render/serving.py b/vllm/entrypoints/scale_out/render/serving.py
+index 5c202d5929801ac6ea87ab38bac968f873e884fc..a7e0ae55313849576596451d80aa2fdc353e3f8e 100644
+--- a/vllm/entrypoints/scale_out/render/serving.py
++++ b/vllm/entrypoints/scale_out/render/serving.py
+@@ -1,6 +1,7 @@
+ # SPDX-License-Identifier: Apache-2.0
+ # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
+ 
++from vllm.entrypoints.chat_utils import content_part_image
+ from vllm.entrypoints.openai.chat_completion.protocol import ChatCompletionRequest
+ from vllm.entrypoints.openai.completion.protocol import CompletionRequest
+ from vllm.entrypoints.openai.engine.protocol import ErrorResponse
+@@ -11,6 +12,7 @@ from vllm.entrypoints.openai.models.serving import (
+ from vllm.entrypoints.scale_out.token_in_token_out.protocol import (
+     GenerateRequest,
+     InlinePNGPart,
++    InlinePNGSource,
+ )
+ from vllm.entrypoints.serve.engine.serving import BaseServing
+ from vllm.entrypoints.serve.utils.api_utils import get_max_tokens
+@@ -121,17 +123,25 @@ class ServingRender(BaseServing):
+ 
+         request_id = f"chatcmpl-{random_uuid()}"
+ 
++        # Every image the renderer rendered, in its order: the parts chat
++        # renders as images, read by the same decision, each carried in the
++        # transport's one image shape.
++        content_parts = [
++            InlinePNGPart(
++                type="image_url", image_url=InlinePNGSource(url=url, detail=detail)
++            )
++            for message in request.messages
++            if isinstance(message.get("content"), list)
++            for part in message["content"]
++            if (image := content_part_image(part)) is not None
++            for url, detail in (image,)
++        ]
++
+         return GenerateRequest(
+             request_id=request_id,
+             token_ids=token_ids,
+             assistant_tokens_mask=assistant_tokens_mask,
+-            content_parts=[
+-                InlinePNGPart.model_validate(part)
+-                for message in request.messages
+-                if isinstance(message.get("content"), list)
+-                for part in message["content"]
+-                if part.get("type") == "image_url"
+-            ] or None,
++            content_parts=content_parts or None,
+             sampling_params=params,
+             model=request.model,
+             stream=bool(request.stream),
+diff --git a/vllm/entrypoints/scale_out/token_in_token_out/serving.py b/vllm/entrypoints/scale_out/token_in_token_out/serving.py
+index ea94bb6cf198c30c0c1c4b1b38796ddd1db3e171..381d99f072c8447d0ac6b31c33bde7366f88a8cd 100644
+--- a/vllm/entrypoints/scale_out/token_in_token_out/serving.py
++++ b/vllm/entrypoints/scale_out/token_in_token_out/serving.py
+@@ -186,6 +186,7 @@ class ServingTokens(GenerateBaseServing):
+                 )
+             )
+         else:
++            self.online_renderer.renderer.require_no_rendered_media(request.token_ids)
+             (engine_input,) = await self.online_renderer.preprocess_completion(
+                 request,
+                 prompt_input=request.token_ids,
+diff --git a/vllm/model_executor/models/qwen3_vl.py b/vllm/model_executor/models/qwen3_vl.py
+index 998e7308994c5cd799d6cb774a9dcdf07f4ce7b7..afd2ea0ed77cb0ca4142b39a1ab2a2261a456f43 100644
+--- a/vllm/model_executor/models/qwen3_vl.py
++++ b/vllm/model_executor/models/qwen3_vl.py
+@@ -1531,7 +1531,10 @@ class Qwen3VLMultiModalProcessor(BaseMultiModalProcessor[Qwen3VLProcessingInfo])
+                     for item in placeholders.get("image", [])]
+         if spans != expected:
+             raise VLLMValidationError(
+-                "Rendered image token spans do not match the supplied images",
++                f"token_ids hold {len(spans)} complete image span(s), which do "
++                f"not match the {len(expected)} supplied image(s) in order and "
++                "size. Send the token_ids and content_parts the render route "
++                "returned for this request, unchanged and together.",
+                 parameter="token_ids",
+             )
+         return placeholders
+diff --git a/vllm/multimodal/processing/processor.py b/vllm/multimodal/processing/processor.py
+index 808215f97e7e3d344861b263dd2e5a996c816fac..3ae53e63efe35238a58aafe7523d3d7bf456bfc1 100644
+--- a/vllm/multimodal/processing/processor.py
++++ b/vllm/multimodal/processing/processor.py
+@@ -1833,12 +1833,16 @@ class BaseMultiModalProcessor(ABC, Generic[_I]):
+         mm_prompt_updates: MultiModalPromptUpdates,
+     ) -> Mapping[str, list[PlaceholderFeaturesInfo]]:
+         placeholders = self._find_mm_placeholders(prompt_ids, mm_prompt_updates)
+-        if any(len(placeholders.get(modality, [])) != len(items)
+-               for modality, items in mm_prompt_updates.items()):
+-            raise VLLMValidationError(
+-                "Rendered image token spans do not match the supplied images",
+-                parameter="token_ids",
+-            )
++        for modality, items in mm_prompt_updates.items():
++            found = len(placeholders.get(modality, []))
++            if found != len(items):
++                raise VLLMValidationError(
++                    f"token_ids hold {found} complete {modality} span(s) for "
++                    f"{len(items)} supplied {modality} input(s). Send the "
++                    "token_ids and content_parts the render route returned for "
++                    "this request, unchanged and together.",
++                    parameter="token_ids",
++                )
+         return placeholders
+ 
+     def apply(
+diff --git a/vllm/renderers/base.py b/vllm/renderers/base.py
+index 1864ce3808688723734ed3f4c6d32735b082aa04..29be2fd3b2597f3c35bc9c93cfd776bc0ab1023a 100644
+--- a/vllm/renderers/base.py
++++ b/vllm/renderers/base.py
+@@ -163,6 +163,17 @@ class BaseRenderer(ABC, Generic[_T]):
+     def _decode(self, *args, **kwargs):
+         return self.get_tokenizer().decode(*args, **kwargs)
+ 
++    def require_no_rendered_media(self, token_ids: list[int]) -> None:
++        """Refuse a rendered media span in ids that supply no media.
++
++        Rendered ids that arrive with images resolve every span against them
++        (process_rendered_multimodal_async); ids that arrive with none must
++        hold none. The processor's rendered-span check decides both, so an
++        image span never reaches the model as bare placeholder text.
++        """
++        if self.mm_processor is not None:
++            self.mm_processor._find_rendered_prompt_placeholders(list(token_ids), {})
++
+     def get_mm_processor(self) -> "BaseMultiModalProcessor":
+         if self.mm_processor is None:
+             raise ValueError("Multi-modal processor not available for text-only models")

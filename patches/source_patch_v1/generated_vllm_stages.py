@@ -132574,7 +132574,1056 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '            )\n'
                              '\n'
                              '        logger.info_once("Using %s for NVFP4 GEMM", '
-                             'kernel_cls.__name__)\n'})})
+                             'kernel_cls.__name__)\n'})},
+ {'name': 'render-carries-every-image-chat-renders',
+  'review_patch': 'patches/vllm-render-carries-every-image-chat-renders.patch',
+  'review_sha256': '5e406e569b5777b572aeeb875a4afdcf5a0a18d07901aa9d9309977a57758124',
+  'files': ({'path': 'tests/entrypoints/scale_out/token_in_token_out/test_protocol.py',
+             'before_sha256': '64ae671e5da6f15c64b2d243b4a1bc3bdb0dd7b0b45f9288304a73e2ce9c7a1f',
+             'after_sha256': 'fc3d4cb03caedf41942409f0e93ec59e3a07ce511af798c10e87eaca104115c5'},
+            {'path': 'tests/entrypoints/scale_out/token_in_token_out/test_raw_media_boundary.py',
+             'before_sha256': 'e8359e55d9919cb95d358854521be90c3d8f7367ddc8eaedf12b7ca46cce2aa9',
+             'after_sha256': '119155ca00f4cb890976e438157fe0e437c491340d05233dc3483f38fd158785'},
+            {'path': 'vllm/entrypoints/chat_utils.py',
+             'before_sha256': 'f178be190e94c5298661f8bc3a53b2c6882ec9c6fb302d59accc83b0dbe9fca1',
+             'after_sha256': 'fb57ba6e099342ae339639eb14f2a1ded460519b7f7747ee2552e1ad34f738f5'},
+            {'path': 'vllm/entrypoints/scale_out/render/serving.py',
+             'before_sha256': '170d9ee1f5023075e128f9158b09ef33e4d653f3fb07ca73fd474cc5168b4f68',
+             'after_sha256': '5c610ac0bdca6dcb4071a7b7952ffd3711fc600b89a9eca6a3e56e44fd00a674'},
+            {'path': 'vllm/entrypoints/scale_out/token_in_token_out/serving.py',
+             'before_sha256': '4e76582db55dd262de822a59d61b954a7170a3af4f16ba9dcbf7ee9e400980ab',
+             'after_sha256': '8c1ebc921d377363cd26d2c9edf759e1192e4d4ad2f939e6bbd6daf1ec53f8ee'},
+            {'path': 'vllm/model_executor/models/qwen3_vl.py',
+             'before_sha256': 'ea95a10579dd80233621d50734af1b83f0230c3020d7a6f07f4715f7f491ab85',
+             'after_sha256': '4fc9811b7ef881347de0af9c39723aa9177dcd50dee9adce0a2cc12e637d8180'},
+            {'path': 'vllm/multimodal/processing/processor.py',
+             'before_sha256': '43aca2c9c8fbd6e8d825c7f6eeed460f19ee65504a8540ee6bc0f0f26b404ef7',
+             'after_sha256': 'bbf246946d967946db0f76908974e74a9d05a675c87e4e7937ee053f1aa29b2d'},
+            {'path': 'vllm/renderers/base.py',
+             'before_sha256': 'efc0e5706c2dbce32a645bb288e920515934566d23f1a54c4fbc4b6466b19a3e',
+             'after_sha256': '09b769d4cd5cbb84572a084e054f5bef3b51873a9222dba11a154f98477aeed8'}),
+  'edits': ({'name': 'tests/entrypoints/scale_out/token_in_token_out/test_protocol.py:landmark-1',
+             'path': 'tests/entrypoints/scale_out/token_in_token_out/test_protocol.py',
+             'before': '    serving._log_inputs = MagicMock()\n'
+                       '    serving._get_data_parallel_rank = '
+                       'MagicMock(return_value=None)\n'
+                       '    serving._get_session_id_from_headers = '
+                       'MagicMock(return_value=None)\n'
+                       '    serving.online_renderer = '
+                       'SimpleNamespace(preprocess_completion=AsyncMock(\n'
+                       '        return_value=[{"type": "token", "prompt_token_ids": '
+                       '[1, 2, 3]}],\n'
+                       '    ))\n'
+                       '    captured = []\n'
+                       '\n'
+                       '    async def engine_generate(prompt, params, request_id, '
+                       '**kwargs):\n',
+             'after': '    serving._log_inputs = MagicMock()\n'
+                      '    serving._get_data_parallel_rank = '
+                      'MagicMock(return_value=None)\n'
+                      '    serving._get_session_id_from_headers = '
+                      'MagicMock(return_value=None)\n'
+                      '    checked = []\n'
+                      '    serving.online_renderer = SimpleNamespace(\n'
+                      '        preprocess_completion=AsyncMock(\n'
+                      '            return_value=[{"type": "token", "prompt_token_ids": '
+                      '[1, 2, 3]}],\n'
+                      '        ),\n'
+                      '        '
+                      'renderer=SimpleNamespace(require_no_rendered_media=checked.append),\n'
+                      '    )\n'
+                      '    captured = []\n'
+                      '\n'
+                      '    async def engine_generate(prompt, params, request_id, '
+                      '**kwargs):\n',
+             'review_before': '    serving._log_inputs = MagicMock()\n'
+                              '    serving._get_data_parallel_rank = '
+                              'MagicMock(return_value=None)\n'
+                              '    serving._get_session_id_from_headers = '
+                              'MagicMock(return_value=None)\n'
+                              '    serving.online_renderer = '
+                              'SimpleNamespace(preprocess_completion=AsyncMock(\n'
+                              '        return_value=[{"type": "token", '
+                              '"prompt_token_ids": [1, 2, 3]}],\n'
+                              '    ))\n'
+                              '    captured = []\n'
+                              '\n'
+                              '    async def engine_generate(prompt, params, '
+                              'request_id, **kwargs):\n',
+             'review_after': '    serving._log_inputs = MagicMock()\n'
+                             '    serving._get_data_parallel_rank = '
+                             'MagicMock(return_value=None)\n'
+                             '    serving._get_session_id_from_headers = '
+                             'MagicMock(return_value=None)\n'
+                             '    checked = []\n'
+                             '    serving.online_renderer = SimpleNamespace(\n'
+                             '        preprocess_completion=AsyncMock(\n'
+                             '            return_value=[{"type": "token", '
+                             '"prompt_token_ids": [1, 2, 3]}],\n'
+                             '        ),\n'
+                             '        '
+                             'renderer=SimpleNamespace(require_no_rendered_media=checked.append),\n'
+                             '    )\n'
+                             '    captured = []\n'
+                             '\n'
+                             '    async def engine_generate(prompt, params, '
+                             'request_id, **kwargs):\n'},
+            {'name': 'tests/entrypoints/scale_out/token_in_token_out/test_protocol.py:landmark-2',
+             'path': 'tests/entrypoints/scale_out/token_in_token_out/test_protocol.py',
+             'before': '        assert response.choices[0].finish_reason == "stop"\n'
+                       '        assert response.choices[0].token_ids == [4]\n'
+                       '    assert len(captured) == 1\n'
+                       '    params = captured[0]\n'
+                       '    assert params.max_tokens == expected_max\n'
+                       '    assert params.final_response_token_budget == '
+                       'DEFAULTS["final_response_token_budget"]\n',
+             'after': '        assert response.choices[0].finish_reason == "stop"\n'
+                      '        assert response.choices[0].token_ids == [4]\n'
+                      '    assert len(captured) == 1\n'
+                      '    # Ids that supply no image are checked for image spans '
+                      'before generating.\n'
+                      '    assert checked == [request.token_ids]\n'
+                      '    params = captured[0]\n'
+                      '    assert params.max_tokens == expected_max\n'
+                      '    assert params.final_response_token_budget == '
+                      'DEFAULTS["final_response_token_budget"]\n',
+             'review_before': '        assert response.choices[0].finish_reason == '
+                              '"stop"\n'
+                              '        assert response.choices[0].token_ids == [4]\n'
+                              '    assert len(captured) == 1\n'
+                              '    params = captured[0]\n'
+                              '    assert params.max_tokens == expected_max\n'
+                              '    assert params.final_response_token_budget == '
+                              'DEFAULTS["final_response_token_budget"]\n',
+             'review_after': '        assert response.choices[0].finish_reason == '
+                             '"stop"\n'
+                             '        assert response.choices[0].token_ids == [4]\n'
+                             '    assert len(captured) == 1\n'
+                             '    # Ids that supply no image are checked for image '
+                             'spans before generating.\n'
+                             '    assert checked == [request.token_ids]\n'
+                             '    params = captured[0]\n'
+                             '    assert params.max_tokens == expected_max\n'
+                             '    assert params.final_response_token_budget == '
+                             'DEFAULTS["final_response_token_budget"]\n'},
+            {'name': 'tests/entrypoints/scale_out/token_in_token_out/test_raw_media_boundary.py:landmark-1',
+             'path': 'tests/entrypoints/scale_out/token_in_token_out/test_raw_media_boundary.py',
+             'before': "    assert 'features' not in schema['properties']\n"
+                       "    assert schema['additionalProperties'] is False\n"
+                       '\n',
+             'after': "    assert 'features' not in schema['properties']\n"
+                      "    assert schema['additionalProperties'] is False\n"
+                      '\n'
+                      '\n'
+                      '\n'
+                      'def _png_url():\n'
+                      '    import base64\n'
+                      '    import io\n'
+                      '\n'
+                      '    from PIL import Image\n'
+                      '\n'
+                      '    buffer = io.BytesIO()\n'
+                      "    Image.new('RGB', (8, 8)).save(buffer, format='PNG')\n"
+                      "    return 'data:image/png;base64,' + "
+                      'base64.b64encode(buffer.getvalue()).decode()\n'
+                      '\n'
+                      '\n'
+                      'def _rendered_by_chat(parts):\n'
+                      '    """The image sources the chat parser renders, in order."""\n'
+                      '    from types import SimpleNamespace\n'
+                      '\n'
+                      '    from vllm.entrypoints.chat_utils import '
+                      '_parse_chat_message_content_part\n'
+                      '\n'
+                      '    rendered = []\n'
+                      '    recorder = SimpleNamespace(\n'
+                      '        '
+                      'model_config=SimpleNamespace(enable_prompt_embeds=False),\n'
+                      '        parse_image=lambda url, uuid: rendered.append(url),\n'
+                      '    )\n'
+                      '    for part in parts:\n'
+                      '        _parse_chat_message_content_part(\n'
+                      '            part, recorder, wrap_dicts=True, '
+                      'interleave_strings=False)\n'
+                      '    return rendered\n'
+                      '\n'
+                      '\n'
+                      '@pytest.mark.asyncio\n'
+                      'async def '
+                      'test_render_carries_every_image_chat_renders(monkeypatch):\n'
+                      '    """Render carries exactly the images the chat parser '
+                      'renders, in order.\n'
+                      '\n'
+                      '    Both image part types, extra keys, a null uuid and a '
+                      'plain-string item\n'
+                      '    beside them render as chat renders them; each image travels '
+                      'in the\n'
+                      "    transport's one image shape, so a rendered span always has "
+                      'its image.\n'
+                      '    """\n'
+                      '    from types import SimpleNamespace\n'
+                      '    from unittest.mock import AsyncMock\n'
+                      '\n'
+                      '    import vllm.entrypoints.scale_out.render.serving as '
+                      'render_module\n'
+                      '    from vllm.entrypoints.openai.chat_completion.protocol '
+                      'import ChatCompletionRequest\n'
+                      '    from vllm.entrypoints.scale_out.render.serving import '
+                      'ServingRender\n'
+                      '\n'
+                      '    url = _png_url()\n'
+                      '    parts = [\n'
+                      "        {'type': 'image_url', 'image_url': {'url': url}},\n"
+                      "        {'type': 'image_url', 'image_url': {'url': url, "
+                      "'detail': 'high'}},\n"
+                      "        {'type': 'input_image', 'image_url': url, 'detail': "
+                      "'auto'},\n"
+                      "        {'type': 'image_url', 'image_url': {'url': url, 'name': "
+                      "'x.png'}},\n"
+                      "        {'type': 'image_url', 'image_url': {'url': url}, "
+                      "'cache_control': {}},\n"
+                      "        {'type': 'image_url', 'image_url': {'url': url}, "
+                      "'uuid': None},\n"
+                      "        'plain text', {'type': 'text', 'text': 'describe'},\n"
+                      '    ]\n'
+                      '    render = object.__new__(ServingRender)\n'
+                      '    render._check_model = AsyncMock(return_value=None)\n'
+                      '    render.model_config = SimpleNamespace(max_model_len=64)\n'
+                      '    render.default_sampling_params = {}\n'
+                      '    render.override_max_tokens = None\n'
+                      '    render.online_renderer = '
+                      'SimpleNamespace(render_chat=AsyncMock(\n'
+                      "        return_value=([], [{'type': 'token', "
+                      "'prompt_token_ids': [7, 8]}])))\n"
+                      '    monkeypatch.setattr(render_module, '
+                      "'extract_prompt_components',\n"
+                      '                        lambda config, engine_input: '
+                      'SimpleNamespace(\n'
+                      '                            '
+                      "token_ids=engine_input['prompt_token_ids']))\n"
+                      "    monkeypatch.setattr(render_module, 'extract_prompt_len',\n"
+                      '                        lambda config, engine_input: 2)\n'
+                      "    request = ChatCompletionRequest(model='unit', messages=[\n"
+                      "        {'role': 'user', 'content': parts[:3]},\n"
+                      "        {'role': 'user', 'content': parts[3:]},\n"
+                      '    ])\n'
+                      '    generate = await render.render_chat_request(request)\n'
+                      '    assert [part.image_url.url for part in '
+                      'generate.content_parts] == (\n'
+                      '        _rendered_by_chat(parts))\n'
+                      '    assert [part.image_url.detail for part in '
+                      'generate.content_parts] == [\n'
+                      "        'auto', 'high', 'auto', 'auto', 'auto', 'auto']\n"
+                      '    # What render returns is what generation accepts.\n'
+                      '    TokenGenerationRequest.model_validate(\n'
+                      "        {**generate.model_dump(mode='json'), 'kv_scope': "
+                      "'agent'})\n"
+                      '\n'
+                      '\n'
+                      'def test_input_image_names_its_required_detail():\n'
+                      '    from vllm.exceptions import VLLMValidationError\n'
+                      '\n'
+                      '    with pytest.raises(VLLMValidationError) as refused:\n'
+                      "        _rendered_by_chat([{'type': 'input_image', 'image_url': "
+                      '_png_url()}])\n'
+                      "    assert refused.value.parameter == 'detail'\n"
+                      '\n'
+                      '\n'
+                      "@pytest.mark.parametrize('tokens,refused', [\n"
+                      '    ([7, 8, 9], False), ([7, 102, 101, 101, 103, 8], True), '
+                      '([7, 101, 8], True),\n'
+                      '])\n'
+                      'def test_rendered_media_spans_require_their_images(tokens, '
+                      'refused):\n'
+                      '    """Ids that supply no image hold no image span."""\n'
+                      '    from types import SimpleNamespace\n'
+                      '\n'
+                      '    from vllm.exceptions import VLLMValidationError\n'
+                      '    from vllm.model_executor.models.qwen3_vl import '
+                      'Qwen3VLMultiModalProcessor\n'
+                      '    from vllm.renderers.base import BaseRenderer\n'
+                      '\n'
+                      '    processor = object.__new__(Qwen3VLMultiModalProcessor)\n'
+                      '    processor.info = SimpleNamespace(\n'
+                      '        get_tokenizer=lambda: None,\n'
+                      '        get_hf_config=lambda: SimpleNamespace(\n'
+                      '            image_token_id=101, vision_start_token_id=102,\n'
+                      '            vision_end_token_id=103, video_token_id=104),\n'
+                      '    )\n'
+                      '    text_route = SimpleNamespace(mm_processor=processor)\n'
+                      '    if refused:\n'
+                      '        with pytest.raises(VLLMValidationError) as error:\n'
+                      '            BaseRenderer.require_no_rendered_media(text_route, '
+                      'tokens)\n'
+                      "        assert error.value.parameter == 'token_ids'\n"
+                      '    else:\n'
+                      '        BaseRenderer.require_no_rendered_media(text_route, '
+                      'tokens)\n',
+             'review_before': "    assert 'features' not in schema['properties']\n"
+                              "    assert schema['additionalProperties'] is False\n"
+                              '\n',
+             'review_after': "    assert 'features' not in schema['properties']\n"
+                             "    assert schema['additionalProperties'] is False\n"
+                             '\n'
+                             '\n'
+                             '\n'
+                             'def _png_url():\n'
+                             '    import base64\n'
+                             '    import io\n'
+                             '\n'
+                             '    from PIL import Image\n'
+                             '\n'
+                             '    buffer = io.BytesIO()\n'
+                             "    Image.new('RGB', (8, 8)).save(buffer, format='PNG')\n"
+                             "    return 'data:image/png;base64,' + "
+                             'base64.b64encode(buffer.getvalue()).decode()\n'
+                             '\n'
+                             '\n'
+                             'def _rendered_by_chat(parts):\n'
+                             '    """The image sources the chat parser renders, in '
+                             'order."""\n'
+                             '    from types import SimpleNamespace\n'
+                             '\n'
+                             '    from vllm.entrypoints.chat_utils import '
+                             '_parse_chat_message_content_part\n'
+                             '\n'
+                             '    rendered = []\n'
+                             '    recorder = SimpleNamespace(\n'
+                             '        '
+                             'model_config=SimpleNamespace(enable_prompt_embeds=False),\n'
+                             '        parse_image=lambda url, uuid: '
+                             'rendered.append(url),\n'
+                             '    )\n'
+                             '    for part in parts:\n'
+                             '        _parse_chat_message_content_part(\n'
+                             '            part, recorder, wrap_dicts=True, '
+                             'interleave_strings=False)\n'
+                             '    return rendered\n'
+                             '\n'
+                             '\n'
+                             '@pytest.mark.asyncio\n'
+                             'async def '
+                             'test_render_carries_every_image_chat_renders(monkeypatch):\n'
+                             '    """Render carries exactly the images the chat parser '
+                             'renders, in order.\n'
+                             '\n'
+                             '    Both image part types, extra keys, a null uuid and a '
+                             'plain-string item\n'
+                             '    beside them render as chat renders them; each image '
+                             'travels in the\n'
+                             "    transport's one image shape, so a rendered span "
+                             'always has its image.\n'
+                             '    """\n'
+                             '    from types import SimpleNamespace\n'
+                             '    from unittest.mock import AsyncMock\n'
+                             '\n'
+                             '    import vllm.entrypoints.scale_out.render.serving as '
+                             'render_module\n'
+                             '    from '
+                             'vllm.entrypoints.openai.chat_completion.protocol import '
+                             'ChatCompletionRequest\n'
+                             '    from vllm.entrypoints.scale_out.render.serving '
+                             'import ServingRender\n'
+                             '\n'
+                             '    url = _png_url()\n'
+                             '    parts = [\n'
+                             "        {'type': 'image_url', 'image_url': {'url': "
+                             'url}},\n'
+                             "        {'type': 'image_url', 'image_url': {'url': url, "
+                             "'detail': 'high'}},\n"
+                             "        {'type': 'input_image', 'image_url': url, "
+                             "'detail': 'auto'},\n"
+                             "        {'type': 'image_url', 'image_url': {'url': url, "
+                             "'name': 'x.png'}},\n"
+                             "        {'type': 'image_url', 'image_url': {'url': url}, "
+                             "'cache_control': {}},\n"
+                             "        {'type': 'image_url', 'image_url': {'url': url}, "
+                             "'uuid': None},\n"
+                             "        'plain text', {'type': 'text', 'text': "
+                             "'describe'},\n"
+                             '    ]\n'
+                             '    render = object.__new__(ServingRender)\n'
+                             '    render._check_model = AsyncMock(return_value=None)\n'
+                             '    render.model_config = '
+                             'SimpleNamespace(max_model_len=64)\n'
+                             '    render.default_sampling_params = {}\n'
+                             '    render.override_max_tokens = None\n'
+                             '    render.online_renderer = '
+                             'SimpleNamespace(render_chat=AsyncMock(\n'
+                             "        return_value=([], [{'type': 'token', "
+                             "'prompt_token_ids': [7, 8]}])))\n"
+                             '    monkeypatch.setattr(render_module, '
+                             "'extract_prompt_components',\n"
+                             '                        lambda config, engine_input: '
+                             'SimpleNamespace(\n'
+                             '                            '
+                             "token_ids=engine_input['prompt_token_ids']))\n"
+                             '    monkeypatch.setattr(render_module, '
+                             "'extract_prompt_len',\n"
+                             '                        lambda config, engine_input: 2)\n'
+                             "    request = ChatCompletionRequest(model='unit', "
+                             'messages=[\n'
+                             "        {'role': 'user', 'content': parts[:3]},\n"
+                             "        {'role': 'user', 'content': parts[3:]},\n"
+                             '    ])\n'
+                             '    generate = await '
+                             'render.render_chat_request(request)\n'
+                             '    assert [part.image_url.url for part in '
+                             'generate.content_parts] == (\n'
+                             '        _rendered_by_chat(parts))\n'
+                             '    assert [part.image_url.detail for part in '
+                             'generate.content_parts] == [\n'
+                             "        'auto', 'high', 'auto', 'auto', 'auto', 'auto']\n"
+                             '    # What render returns is what generation accepts.\n'
+                             '    TokenGenerationRequest.model_validate(\n'
+                             "        {**generate.model_dump(mode='json'), 'kv_scope': "
+                             "'agent'})\n"
+                             '\n'
+                             '\n'
+                             'def test_input_image_names_its_required_detail():\n'
+                             '    from vllm.exceptions import VLLMValidationError\n'
+                             '\n'
+                             '    with pytest.raises(VLLMValidationError) as refused:\n'
+                             "        _rendered_by_chat([{'type': 'input_image', "
+                             "'image_url': _png_url()}])\n"
+                             "    assert refused.value.parameter == 'detail'\n"
+                             '\n'
+                             '\n'
+                             "@pytest.mark.parametrize('tokens,refused', [\n"
+                             '    ([7, 8, 9], False), ([7, 102, 101, 101, 103, 8], '
+                             'True), ([7, 101, 8], True),\n'
+                             '])\n'
+                             'def '
+                             'test_rendered_media_spans_require_their_images(tokens, '
+                             'refused):\n'
+                             '    """Ids that supply no image hold no image span."""\n'
+                             '    from types import SimpleNamespace\n'
+                             '\n'
+                             '    from vllm.exceptions import VLLMValidationError\n'
+                             '    from vllm.model_executor.models.qwen3_vl import '
+                             'Qwen3VLMultiModalProcessor\n'
+                             '    from vllm.renderers.base import BaseRenderer\n'
+                             '\n'
+                             '    processor = '
+                             'object.__new__(Qwen3VLMultiModalProcessor)\n'
+                             '    processor.info = SimpleNamespace(\n'
+                             '        get_tokenizer=lambda: None,\n'
+                             '        get_hf_config=lambda: SimpleNamespace(\n'
+                             '            image_token_id=101, '
+                             'vision_start_token_id=102,\n'
+                             '            vision_end_token_id=103, '
+                             'video_token_id=104),\n'
+                             '    )\n'
+                             '    text_route = '
+                             'SimpleNamespace(mm_processor=processor)\n'
+                             '    if refused:\n'
+                             '        with pytest.raises(VLLMValidationError) as '
+                             'error:\n'
+                             '            '
+                             'BaseRenderer.require_no_rendered_media(text_route, '
+                             'tokens)\n'
+                             "        assert error.value.parameter == 'token_ids'\n"
+                             '    else:\n'
+                             '        '
+                             'BaseRenderer.require_no_rendered_media(text_route, '
+                             'tokens)\n'},
+            {'name': 'vllm/entrypoints/chat_utils.py:landmark-1',
+             'path': 'vllm/entrypoints/chat_utils.py',
+             'before': '                "image_url; file_id and uploaded-file '
+                       'indirection are forbidden.",\n'
+                       '                parameter="image_url",\n'
+                       '            )\n'
+                       '        detail = part.get("detail", "auto")\n'
+                       '        if detail not in ("auto", "high"):\n'
+                       '            raise VLLMValidationError(\n'
+                       '                "input_image.detail must be \'auto\' or '
+                       '\'high\'. Both use the "\n'
+                       '                "sole full Qwen processor path; \'low\' and '
+                       'unknown quality modes "\n'
+                       '                "are forbidden.",\n'
+                       '                parameter="detail",\n'
+                       '                value=detail,\n'
+                       '            )\n'
+                       '\n'
+                       '\n'
+                       'def _parse_chat_message_content_mm_part(\n'
+                       '    part: ChatCompletionContentPartParam,\n'
+                       ') -> tuple[str, _ContentPart]:\n',
+             'after': '                "image_url; file_id and uploaded-file '
+                      'indirection are forbidden.",\n'
+                      '                parameter="image_url",\n'
+                      '            )\n'
+                      '        detail = part.get("detail")\n'
+                      '        if detail not in ("auto", "high"):\n'
+                      '            raise VLLMValidationError(\n'
+                      '                "input_image.detail is required and must be '
+                      '\'auto\' or \'high\'. "\n'
+                      '                "Both use the sole full Qwen processor path; '
+                      '\'low\' and unknown "\n'
+                      '                "quality modes are forbidden.",\n'
+                      '                parameter="detail",\n'
+                      '                value=detail,\n'
+                      '            )\n'
+                      '\n'
+                      '\n'
+                      '# The content-part types the chat parser renders as images.\n'
+                      'IMAGE_PART_TYPES = ("image_url", "input_image")\n'
+                      '\n'
+                      '\n'
+                      'def content_part_image(\n'
+                      '    part: ChatCompletionContentPartParam,\n'
+                      ') -> tuple[str, Literal["auto", "high"]] | None:\n'
+                      '    """The inline image a content part supplies, with its '
+                      'detail, or None.\n'
+                      '\n'
+                      '    The part is parsed exactly as the chat renderer parses it, '
+                      'so the parts\n'
+                      '    chat renders as images are exactly the parts that return '
+                      'one: the render\n'
+                      '    route carries these to generation, and every image span it '
+                      'renders\n'
+                      '    arrives with its image.\n'
+                      '    """\n'
+                      '    if isinstance(part, str):\n'
+                      '        return None\n'
+                      '    part_type, content = '
+                      '_parse_chat_message_content_mm_part(part)\n'
+                      '    if part_type not in IMAGE_PART_TYPES:\n'
+                      '        return None\n'
+                      '    detail = (\n'
+                      '        part["detail"]\n'
+                      '        if part_type == "input_image"\n'
+                      '        else part["image_url"].get("detail", "auto")  # type: '
+                      'ignore[typeddict-item]\n'
+                      '    )\n'
+                      '    return cast(str, content), detail\n'
+                      '\n'
+                      '\n'
+                      'def _parse_chat_message_content_mm_part(\n'
+                      '    part: ChatCompletionContentPartParam,\n'
+                      ') -> tuple[str, _ContentPart]:\n',
+             'review_before': '                "image_url; file_id and uploaded-file '
+                              'indirection are forbidden.",\n'
+                              '                parameter="image_url",\n'
+                              '            )\n'
+                              '        detail = part.get("detail", "auto")\n'
+                              '        if detail not in ("auto", "high"):\n'
+                              '            raise VLLMValidationError(\n'
+                              '                "input_image.detail must be \'auto\' or '
+                              '\'high\'. Both use the "\n'
+                              '                "sole full Qwen processor path; \'low\' '
+                              'and unknown quality modes "\n'
+                              '                "are forbidden.",\n'
+                              '                parameter="detail",\n'
+                              '                value=detail,\n'
+                              '            )\n'
+                              '\n'
+                              '\n'
+                              'def _parse_chat_message_content_mm_part(\n'
+                              '    part: ChatCompletionContentPartParam,\n'
+                              ') -> tuple[str, _ContentPart]:\n',
+             'review_after': '                "image_url; file_id and uploaded-file '
+                             'indirection are forbidden.",\n'
+                             '                parameter="image_url",\n'
+                             '            )\n'
+                             '        detail = part.get("detail")\n'
+                             '        if detail not in ("auto", "high"):\n'
+                             '            raise VLLMValidationError(\n'
+                             '                "input_image.detail is required and must '
+                             'be \'auto\' or \'high\'. "\n'
+                             '                "Both use the sole full Qwen processor '
+                             'path; \'low\' and unknown "\n'
+                             '                "quality modes are forbidden.",\n'
+                             '                parameter="detail",\n'
+                             '                value=detail,\n'
+                             '            )\n'
+                             '\n'
+                             '\n'
+                             '# The content-part types the chat parser renders as '
+                             'images.\n'
+                             'IMAGE_PART_TYPES = ("image_url", "input_image")\n'
+                             '\n'
+                             '\n'
+                             'def content_part_image(\n'
+                             '    part: ChatCompletionContentPartParam,\n'
+                             ') -> tuple[str, Literal["auto", "high"]] | None:\n'
+                             '    """The inline image a content part supplies, with '
+                             'its detail, or None.\n'
+                             '\n'
+                             '    The part is parsed exactly as the chat renderer '
+                             'parses it, so the parts\n'
+                             '    chat renders as images are exactly the parts that '
+                             'return one: the render\n'
+                             '    route carries these to generation, and every image '
+                             'span it renders\n'
+                             '    arrives with its image.\n'
+                             '    """\n'
+                             '    if isinstance(part, str):\n'
+                             '        return None\n'
+                             '    part_type, content = '
+                             '_parse_chat_message_content_mm_part(part)\n'
+                             '    if part_type not in IMAGE_PART_TYPES:\n'
+                             '        return None\n'
+                             '    detail = (\n'
+                             '        part["detail"]\n'
+                             '        if part_type == "input_image"\n'
+                             '        else part["image_url"].get("detail", "auto")  # '
+                             'type: ignore[typeddict-item]\n'
+                             '    )\n'
+                             '    return cast(str, content), detail\n'
+                             '\n'
+                             '\n'
+                             'def _parse_chat_message_content_mm_part(\n'
+                             '    part: ChatCompletionContentPartParam,\n'
+                             ') -> tuple[str, _ContentPart]:\n'},
+            {'name': 'vllm/entrypoints/chat_utils.py:landmark-2',
+             'path': 'vllm/entrypoints/chat_utils.py',
+             'before': '        image_content = cast(Image.Image, content) if content '
+                       'is not None else None\n'
+                       '        mm_parser.parse_image_pil(image_content, uuid)\n'
+                       '        modality = "image"\n'
+                       '    elif part_type in ("image_url", "input_image"):\n'
+                       '        str_content = cast(str, content)\n'
+                       '        mm_parser.parse_image(str_content, uuid)\n'
+                       '        modality = "image"\n',
+             'after': '        image_content = cast(Image.Image, content) if content '
+                      'is not None else None\n'
+                      '        mm_parser.parse_image_pil(image_content, uuid)\n'
+                      '        modality = "image"\n'
+                      '    elif part_type in IMAGE_PART_TYPES:\n'
+                      '        str_content = cast(str, content)\n'
+                      '        mm_parser.parse_image(str_content, uuid)\n'
+                      '        modality = "image"\n',
+             'review_before': '        image_content = cast(Image.Image, content) if '
+                              'content is not None else None\n'
+                              '        mm_parser.parse_image_pil(image_content, uuid)\n'
+                              '        modality = "image"\n'
+                              '    elif part_type in ("image_url", "input_image"):\n'
+                              '        str_content = cast(str, content)\n'
+                              '        mm_parser.parse_image(str_content, uuid)\n'
+                              '        modality = "image"\n',
+             'review_after': '        image_content = cast(Image.Image, content) if '
+                             'content is not None else None\n'
+                             '        mm_parser.parse_image_pil(image_content, uuid)\n'
+                             '        modality = "image"\n'
+                             '    elif part_type in IMAGE_PART_TYPES:\n'
+                             '        str_content = cast(str, content)\n'
+                             '        mm_parser.parse_image(str_content, uuid)\n'
+                             '        modality = "image"\n'},
+            {'name': 'vllm/entrypoints/scale_out/render/serving.py:landmark-1',
+             'path': 'vllm/entrypoints/scale_out/render/serving.py',
+             'before': '# SPDX-License-Identifier: Apache-2.0\n'
+                       '# SPDX-FileCopyrightText: Copyright contributors to the vLLM '
+                       'project\n'
+                       '\n'
+                       'from vllm.entrypoints.openai.chat_completion.protocol import '
+                       'ChatCompletionRequest\n'
+                       'from vllm.entrypoints.openai.completion.protocol import '
+                       'CompletionRequest\n'
+                       'from vllm.entrypoints.openai.engine.protocol import '
+                       'ErrorResponse\n',
+             'after': '# SPDX-License-Identifier: Apache-2.0\n'
+                      '# SPDX-FileCopyrightText: Copyright contributors to the vLLM '
+                      'project\n'
+                      '\n'
+                      'from vllm.entrypoints.chat_utils import content_part_image\n'
+                      'from vllm.entrypoints.openai.chat_completion.protocol import '
+                      'ChatCompletionRequest\n'
+                      'from vllm.entrypoints.openai.completion.protocol import '
+                      'CompletionRequest\n'
+                      'from vllm.entrypoints.openai.engine.protocol import '
+                      'ErrorResponse\n',
+             'review_before': '# SPDX-License-Identifier: Apache-2.0\n'
+                              '# SPDX-FileCopyrightText: Copyright contributors to the '
+                              'vLLM project\n'
+                              '\n'
+                              'from vllm.entrypoints.openai.chat_completion.protocol '
+                              'import ChatCompletionRequest\n'
+                              'from vllm.entrypoints.openai.completion.protocol import '
+                              'CompletionRequest\n'
+                              'from vllm.entrypoints.openai.engine.protocol import '
+                              'ErrorResponse\n',
+             'review_after': '# SPDX-License-Identifier: Apache-2.0\n'
+                             '# SPDX-FileCopyrightText: Copyright contributors to the '
+                             'vLLM project\n'
+                             '\n'
+                             'from vllm.entrypoints.chat_utils import '
+                             'content_part_image\n'
+                             'from vllm.entrypoints.openai.chat_completion.protocol '
+                             'import ChatCompletionRequest\n'
+                             'from vllm.entrypoints.openai.completion.protocol import '
+                             'CompletionRequest\n'
+                             'from vllm.entrypoints.openai.engine.protocol import '
+                             'ErrorResponse\n'},
+            {'name': 'vllm/entrypoints/scale_out/render/serving.py:landmark-2',
+             'path': 'vllm/entrypoints/scale_out/render/serving.py',
+             'before': 'from vllm.entrypoints.scale_out.token_in_token_out.protocol '
+                       'import (\n'
+                       '    GenerateRequest,\n'
+                       '    InlinePNGPart,\n'
+                       ')\n'
+                       'from vllm.entrypoints.serve.engine.serving import BaseServing\n'
+                       'from vllm.entrypoints.serve.utils.api_utils import '
+                       'get_max_tokens\n',
+             'after': 'from vllm.entrypoints.scale_out.token_in_token_out.protocol '
+                      'import (\n'
+                      '    GenerateRequest,\n'
+                      '    InlinePNGPart,\n'
+                      '    InlinePNGSource,\n'
+                      ')\n'
+                      'from vllm.entrypoints.serve.engine.serving import BaseServing\n'
+                      'from vllm.entrypoints.serve.utils.api_utils import '
+                      'get_max_tokens\n',
+             'review_before': 'from '
+                              'vllm.entrypoints.scale_out.token_in_token_out.protocol '
+                              'import (\n'
+                              '    GenerateRequest,\n'
+                              '    InlinePNGPart,\n'
+                              ')\n'
+                              'from vllm.entrypoints.serve.engine.serving import '
+                              'BaseServing\n'
+                              'from vllm.entrypoints.serve.utils.api_utils import '
+                              'get_max_tokens\n',
+             'review_after': 'from '
+                             'vllm.entrypoints.scale_out.token_in_token_out.protocol '
+                             'import (\n'
+                             '    GenerateRequest,\n'
+                             '    InlinePNGPart,\n'
+                             '    InlinePNGSource,\n'
+                             ')\n'
+                             'from vllm.entrypoints.serve.engine.serving import '
+                             'BaseServing\n'
+                             'from vllm.entrypoints.serve.utils.api_utils import '
+                             'get_max_tokens\n'},
+            {'name': 'vllm/entrypoints/scale_out/render/serving.py:landmark-3',
+             'path': 'vllm/entrypoints/scale_out/render/serving.py',
+             'before': '\n'
+                       '        request_id = f"chatcmpl-{random_uuid()}"\n'
+                       '\n'
+                       '        return GenerateRequest(\n'
+                       '            request_id=request_id,\n'
+                       '            token_ids=token_ids,\n'
+                       '            assistant_tokens_mask=assistant_tokens_mask,\n'
+                       '            content_parts=[\n'
+                       '                InlinePNGPart.model_validate(part)\n'
+                       '                for message in request.messages\n'
+                       '                if isinstance(message.get("content"), list)\n'
+                       '                for part in message["content"]\n'
+                       '                if part.get("type") == "image_url"\n'
+                       '            ] or None,\n'
+                       '            sampling_params=params,\n'
+                       '            model=request.model,\n'
+                       '            stream=bool(request.stream),\n',
+             'after': '\n'
+                      '        request_id = f"chatcmpl-{random_uuid()}"\n'
+                      '\n'
+                      '        # Every image the renderer rendered, in its order: the '
+                      'parts chat\n'
+                      '        # renders as images, read by the same decision, each '
+                      'carried in the\n'
+                      "        # transport's one image shape.\n"
+                      '        content_parts = [\n'
+                      '            InlinePNGPart(\n'
+                      '                type="image_url", '
+                      'image_url=InlinePNGSource(url=url, detail=detail)\n'
+                      '            )\n'
+                      '            for message in request.messages\n'
+                      '            if isinstance(message.get("content"), list)\n'
+                      '            for part in message["content"]\n'
+                      '            if (image := content_part_image(part)) is not None\n'
+                      '            for url, detail in (image,)\n'
+                      '        ]\n'
+                      '\n'
+                      '        return GenerateRequest(\n'
+                      '            request_id=request_id,\n'
+                      '            token_ids=token_ids,\n'
+                      '            assistant_tokens_mask=assistant_tokens_mask,\n'
+                      '            content_parts=content_parts or None,\n'
+                      '            sampling_params=params,\n'
+                      '            model=request.model,\n'
+                      '            stream=bool(request.stream),\n',
+             'review_before': '\n'
+                              '        request_id = f"chatcmpl-{random_uuid()}"\n'
+                              '\n'
+                              '        return GenerateRequest(\n'
+                              '            request_id=request_id,\n'
+                              '            token_ids=token_ids,\n'
+                              '            '
+                              'assistant_tokens_mask=assistant_tokens_mask,\n'
+                              '            content_parts=[\n'
+                              '                InlinePNGPart.model_validate(part)\n'
+                              '                for message in request.messages\n'
+                              '                if isinstance(message.get("content"), '
+                              'list)\n'
+                              '                for part in message["content"]\n'
+                              '                if part.get("type") == "image_url"\n'
+                              '            ] or None,\n'
+                              '            sampling_params=params,\n'
+                              '            model=request.model,\n'
+                              '            stream=bool(request.stream),\n',
+             'review_after': '\n'
+                             '        request_id = f"chatcmpl-{random_uuid()}"\n'
+                             '\n'
+                             '        # Every image the renderer rendered, in its '
+                             'order: the parts chat\n'
+                             '        # renders as images, read by the same decision, '
+                             'each carried in the\n'
+                             "        # transport's one image shape.\n"
+                             '        content_parts = [\n'
+                             '            InlinePNGPart(\n'
+                             '                type="image_url", '
+                             'image_url=InlinePNGSource(url=url, detail=detail)\n'
+                             '            )\n'
+                             '            for message in request.messages\n'
+                             '            if isinstance(message.get("content"), list)\n'
+                             '            for part in message["content"]\n'
+                             '            if (image := content_part_image(part)) is '
+                             'not None\n'
+                             '            for url, detail in (image,)\n'
+                             '        ]\n'
+                             '\n'
+                             '        return GenerateRequest(\n'
+                             '            request_id=request_id,\n'
+                             '            token_ids=token_ids,\n'
+                             '            '
+                             'assistant_tokens_mask=assistant_tokens_mask,\n'
+                             '            content_parts=content_parts or None,\n'
+                             '            sampling_params=params,\n'
+                             '            model=request.model,\n'
+                             '            stream=bool(request.stream),\n'},
+            {'name': 'vllm/entrypoints/scale_out/token_in_token_out/serving.py:landmark-1',
+             'path': 'vllm/entrypoints/scale_out/token_in_token_out/serving.py',
+             'before': '                )\n'
+                       '            )\n'
+                       '        else:\n'
+                       '            (engine_input,) = await '
+                       'self.online_renderer.preprocess_completion(\n'
+                       '                request,\n'
+                       '                prompt_input=request.token_ids,\n',
+             'after': '                )\n'
+                      '            )\n'
+                      '        else:\n'
+                      '            '
+                      'self.online_renderer.renderer.require_no_rendered_media(request.token_ids)\n'
+                      '            (engine_input,) = await '
+                      'self.online_renderer.preprocess_completion(\n'
+                      '                request,\n'
+                      '                prompt_input=request.token_ids,\n',
+             'review_before': '                )\n'
+                              '            )\n'
+                              '        else:\n'
+                              '            (engine_input,) = await '
+                              'self.online_renderer.preprocess_completion(\n'
+                              '                request,\n'
+                              '                prompt_input=request.token_ids,\n',
+             'review_after': '                )\n'
+                             '            )\n'
+                             '        else:\n'
+                             '            '
+                             'self.online_renderer.renderer.require_no_rendered_media(request.token_ids)\n'
+                             '            (engine_input,) = await '
+                             'self.online_renderer.preprocess_completion(\n'
+                             '                request,\n'
+                             '                prompt_input=request.token_ids,\n'},
+            {'name': 'vllm/model_executor/models/qwen3_vl.py:landmark-1',
+             'path': 'vllm/model_executor/models/qwen3_vl.py',
+             'before': '                    for item in placeholders.get("image", '
+                       '[])]\n'
+                       '        if spans != expected:\n'
+                       '            raise VLLMValidationError(\n'
+                       '                "Rendered image token spans do not match the '
+                       'supplied images",\n'
+                       '                parameter="token_ids",\n'
+                       '            )\n'
+                       '        return placeholders\n',
+             'after': '                    for item in placeholders.get("image", [])]\n'
+                      '        if spans != expected:\n'
+                      '            raise VLLMValidationError(\n'
+                      '                f"token_ids hold {len(spans)} complete image '
+                      'span(s), which do "\n'
+                      '                f"not match the {len(expected)} supplied '
+                      'image(s) in order and "\n'
+                      '                "size. Send the token_ids and content_parts the '
+                      'render route "\n'
+                      '                "returned for this request, unchanged and '
+                      'together.",\n'
+                      '                parameter="token_ids",\n'
+                      '            )\n'
+                      '        return placeholders\n',
+             'review_before': '                    for item in '
+                              'placeholders.get("image", [])]\n'
+                              '        if spans != expected:\n'
+                              '            raise VLLMValidationError(\n'
+                              '                "Rendered image token spans do not '
+                              'match the supplied images",\n'
+                              '                parameter="token_ids",\n'
+                              '            )\n'
+                              '        return placeholders\n',
+             'review_after': '                    for item in '
+                             'placeholders.get("image", [])]\n'
+                             '        if spans != expected:\n'
+                             '            raise VLLMValidationError(\n'
+                             '                f"token_ids hold {len(spans)} complete '
+                             'image span(s), which do "\n'
+                             '                f"not match the {len(expected)} supplied '
+                             'image(s) in order and "\n'
+                             '                "size. Send the token_ids and '
+                             'content_parts the render route "\n'
+                             '                "returned for this request, unchanged '
+                             'and together.",\n'
+                             '                parameter="token_ids",\n'
+                             '            )\n'
+                             '        return placeholders\n'},
+            {'name': 'vllm/multimodal/processing/processor.py:landmark-1',
+             'path': 'vllm/multimodal/processing/processor.py',
+             'before': '        mm_prompt_updates: MultiModalPromptUpdates,\n'
+                       '    ) -> Mapping[str, list[PlaceholderFeaturesInfo]]:\n'
+                       '        placeholders = self._find_mm_placeholders(prompt_ids, '
+                       'mm_prompt_updates)\n'
+                       '        if any(len(placeholders.get(modality, [])) != '
+                       'len(items)\n'
+                       '               for modality, items in '
+                       'mm_prompt_updates.items()):\n'
+                       '            raise VLLMValidationError(\n'
+                       '                "Rendered image token spans do not match the '
+                       'supplied images",\n'
+                       '                parameter="token_ids",\n'
+                       '            )\n'
+                       '        return placeholders\n'
+                       '\n'
+                       '    def apply(\n',
+             'after': '        mm_prompt_updates: MultiModalPromptUpdates,\n'
+                      '    ) -> Mapping[str, list[PlaceholderFeaturesInfo]]:\n'
+                      '        placeholders = self._find_mm_placeholders(prompt_ids, '
+                      'mm_prompt_updates)\n'
+                      '        for modality, items in mm_prompt_updates.items():\n'
+                      '            found = len(placeholders.get(modality, []))\n'
+                      '            if found != len(items):\n'
+                      '                raise VLLMValidationError(\n'
+                      '                    f"token_ids hold {found} complete '
+                      '{modality} span(s) for "\n'
+                      '                    f"{len(items)} supplied {modality} '
+                      'input(s). Send the "\n'
+                      '                    "token_ids and content_parts the render '
+                      'route returned for "\n'
+                      '                    "this request, unchanged and together.",\n'
+                      '                    parameter="token_ids",\n'
+                      '                )\n'
+                      '        return placeholders\n'
+                      '\n'
+                      '    def apply(\n',
+             'review_before': '        mm_prompt_updates: MultiModalPromptUpdates,\n'
+                              '    ) -> Mapping[str, list[PlaceholderFeaturesInfo]]:\n'
+                              '        placeholders = '
+                              'self._find_mm_placeholders(prompt_ids, '
+                              'mm_prompt_updates)\n'
+                              '        if any(len(placeholders.get(modality, [])) != '
+                              'len(items)\n'
+                              '               for modality, items in '
+                              'mm_prompt_updates.items()):\n'
+                              '            raise VLLMValidationError(\n'
+                              '                "Rendered image token spans do not '
+                              'match the supplied images",\n'
+                              '                parameter="token_ids",\n'
+                              '            )\n'
+                              '        return placeholders\n'
+                              '\n'
+                              '    def apply(\n',
+             'review_after': '        mm_prompt_updates: MultiModalPromptUpdates,\n'
+                             '    ) -> Mapping[str, list[PlaceholderFeaturesInfo]]:\n'
+                             '        placeholders = '
+                             'self._find_mm_placeholders(prompt_ids, '
+                             'mm_prompt_updates)\n'
+                             '        for modality, items in '
+                             'mm_prompt_updates.items():\n'
+                             '            found = len(placeholders.get(modality, []))\n'
+                             '            if found != len(items):\n'
+                             '                raise VLLMValidationError(\n'
+                             '                    f"token_ids hold {found} complete '
+                             '{modality} span(s) for "\n'
+                             '                    f"{len(items)} supplied {modality} '
+                             'input(s). Send the "\n'
+                             '                    "token_ids and content_parts the '
+                             'render route returned for "\n'
+                             '                    "this request, unchanged and '
+                             'together.",\n'
+                             '                    parameter="token_ids",\n'
+                             '                )\n'
+                             '        return placeholders\n'
+                             '\n'
+                             '    def apply(\n'},
+            {'name': 'vllm/renderers/base.py:landmark-1',
+             'path': 'vllm/renderers/base.py',
+             'before': '    def _decode(self, *args, **kwargs):\n'
+                       '        return self.get_tokenizer().decode(*args, **kwargs)\n'
+                       '\n'
+                       '    def get_mm_processor(self) -> "BaseMultiModalProcessor":\n'
+                       '        if self.mm_processor is None:\n'
+                       '            raise ValueError("Multi-modal processor not '
+                       'available for text-only models")\n',
+             'after': '    def _decode(self, *args, **kwargs):\n'
+                      '        return self.get_tokenizer().decode(*args, **kwargs)\n'
+                      '\n'
+                      '    def require_no_rendered_media(self, token_ids: list[int]) '
+                      '-> None:\n'
+                      '        """Refuse a rendered media span in ids that supply no '
+                      'media.\n'
+                      '\n'
+                      '        Rendered ids that arrive with images resolve every span '
+                      'against them\n'
+                      '        (process_rendered_multimodal_async); ids that arrive '
+                      'with none must\n'
+                      "        hold none. The processor's rendered-span check decides "
+                      'both, so an\n'
+                      '        image span never reaches the model as bare placeholder '
+                      'text.\n'
+                      '        """\n'
+                      '        if self.mm_processor is not None:\n'
+                      '            '
+                      'self.mm_processor._find_rendered_prompt_placeholders(list(token_ids), '
+                      '{})\n'
+                      '\n'
+                      '    def get_mm_processor(self) -> "BaseMultiModalProcessor":\n'
+                      '        if self.mm_processor is None:\n'
+                      '            raise ValueError("Multi-modal processor not '
+                      'available for text-only models")\n',
+             'review_before': '    def _decode(self, *args, **kwargs):\n'
+                              '        return self.get_tokenizer().decode(*args, '
+                              '**kwargs)\n'
+                              '\n'
+                              '    def get_mm_processor(self) -> '
+                              '"BaseMultiModalProcessor":\n'
+                              '        if self.mm_processor is None:\n'
+                              '            raise ValueError("Multi-modal processor not '
+                              'available for text-only models")\n',
+             'review_after': '    def _decode(self, *args, **kwargs):\n'
+                             '        return self.get_tokenizer().decode(*args, '
+                             '**kwargs)\n'
+                             '\n'
+                             '    def require_no_rendered_media(self, token_ids: '
+                             'list[int]) -> None:\n'
+                             '        """Refuse a rendered media span in ids that '
+                             'supply no media.\n'
+                             '\n'
+                             '        Rendered ids that arrive with images resolve '
+                             'every span against them\n'
+                             '        (process_rendered_multimodal_async); ids that '
+                             'arrive with none must\n'
+                             "        hold none. The processor's rendered-span check "
+                             'decides both, so an\n'
+                             '        image span never reaches the model as bare '
+                             'placeholder text.\n'
+                             '        """\n'
+                             '        if self.mm_processor is not None:\n'
+                             '            '
+                             'self.mm_processor._find_rendered_prompt_placeholders(list(token_ids), '
+                             '{})\n'
+                             '\n'
+                             '    def get_mm_processor(self) -> '
+                             '"BaseMultiModalProcessor":\n'
+                             '        if self.mm_processor is None:\n'
+                             '            raise ValueError("Multi-modal processor not '
+                             'available for text-only models")\n'})})
 
 FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5dd4c4673b5925cebd27d46a5956832092bebbbd53d47993bac',
  'tests/config/test_config_utils.py': '4f5ea0399cc3b4f9603df07e2cc26d32e1eddf6b98a36c0f30d580321879c038',
@@ -132613,9 +133662,9 @@ FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5d
  'tests/entrypoints/scale_out/derender/test_terminal_metadata.py': 'b1042e95e61ff955062c999dc470873533a0b6034842fca4d2aa2e497914b493',
  'tests/entrypoints/scale_out/render/test_render_multimodal.py': '369b8b8c33d901e4864c34bed123af4cbf8e7c69d5ec82730788b30298018fa8',
  'tests/entrypoints/scale_out/token_in_token_out/test_generate_stream.py': '13b1be9e04274bb00e881b08e5eeb3927429567f0392e8db65b469f26aa2b464',
- 'tests/entrypoints/scale_out/token_in_token_out/test_protocol.py': '64ae671e5da6f15c64b2d243b4a1bc3bdb0dd7b0b45f9288304a73e2ce9c7a1f',
+ 'tests/entrypoints/scale_out/token_in_token_out/test_protocol.py': 'fc3d4cb03caedf41942409f0e93ec59e3a07ce511af798c10e87eaca104115c5',
  'tests/entrypoints/scale_out/token_in_token_out/test_raw_images.py': '83c1abf97d37bf365b308ffd5c5d05f451bc54daf3863d9d8fce8151bbf30a2e',
- 'tests/entrypoints/scale_out/token_in_token_out/test_raw_media_boundary.py': 'e8359e55d9919cb95d358854521be90c3d8f7367ddc8eaedf12b7ca46cce2aa9',
+ 'tests/entrypoints/scale_out/token_in_token_out/test_raw_media_boundary.py': '119155ca00f4cb890976e438157fe0e437c491340d05233dc3483f38fd158785',
  'tests/entrypoints/scale_out/token_in_token_out/test_serving_multimodal_tokens.py': 'a3ce14b444a1e86bf3d8abfe707df20878ca08982c563cb89fce37bed26840d1',
  'tests/entrypoints/serve/exception_handling/test_http_status_metrics.py': '3a6f93e9c2ae479d81c8454dd94ab8a4bdf1fe62cf0e134496c7db98d77fcdd1',
  'tests/entrypoints/serve/exception_handling/test_validation_exception_handler.py': '1a4574a22f9dd00afccbb99dd0b113bb613fa99945e66a9effd3c5014aa886af',
@@ -132710,7 +133759,7 @@ FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5d
  'vllm/entrypoints/anthropic/api_router.py': '8d7d742f6e7d9f2fa9bbe1e57d6adbd4f2753075a083c7a7f93d39fc5ab474b6',
  'vllm/entrypoints/anthropic/protocol.py': 'a6b36585ab26bf55c15205b03f6bad9da3534a9ddd5918ea358f2945ff303fdc',
  'vllm/entrypoints/anthropic/serving.py': '089e60ed67e60717853e132f9d710c5542e9fa1f3b92d5a26033c8dadfc34eb4',
- 'vllm/entrypoints/chat_utils.py': 'f178be190e94c5298661f8bc3a53b2c6882ec9c6fb302d59accc83b0dbe9fca1',
+ 'vllm/entrypoints/chat_utils.py': 'fb57ba6e099342ae339639eb14f2a1ded460519b7f7747ee2552e1ad34f738f5',
  'vllm/entrypoints/generate/api_router.py': 'dffeda2c3ccc6cfe3d4945720a7378bab34e7c7c9959d020a9643675895a3ffd',
  'vllm/entrypoints/generate/base/serving.py': '8857456bc7a0157497d03a95b90f7d60a6435615c8e06406437d90e016030c96',
  'vllm/entrypoints/llm.py': '79f9bb1212884746964a347f7e4b39087b5ac084b1d72821a12efd2fb85bcb03',
@@ -132731,10 +133780,10 @@ FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5d
  'vllm/entrypoints/openai/run_batch.py': 'b33bb5bb911b300914c10ac7068610330706a4c3371211ea7a165c219139f89e',
  'vllm/entrypoints/pooling/scoring/io_processor.py': 'aaa0d78c9432298095134f2fc5f07ca18f613b139912aef01a43ade162bdb5d4',
  'vllm/entrypoints/scale_out/derender/serving.py': '3beb23995dddcfac4b98bf38f5948bd992ff06bf99290157317ba7018f57a6d7',
- 'vllm/entrypoints/scale_out/render/serving.py': '170d9ee1f5023075e128f9158b09ef33e4d653f3fb07ca73fd474cc5168b4f68',
+ 'vllm/entrypoints/scale_out/render/serving.py': '5c610ac0bdca6dcb4071a7b7952ffd3711fc600b89a9eca6a3e56e44fd00a674',
  'vllm/entrypoints/scale_out/token_in_token_out/api_router.py': 'e5f8519bfe5fd44989a1228df00886aefc13dce36bf6b59a430f64fd92b5165a',
  'vllm/entrypoints/scale_out/token_in_token_out/protocol.py': '29488a4819c8b9d6476d9b909341949a5fff434a5b485959b1338ec703cd1c23',
- 'vllm/entrypoints/scale_out/token_in_token_out/serving.py': '4e76582db55dd262de822a59d61b954a7170a3af4f16ba9dcbf7ee9e400980ab',
+ 'vllm/entrypoints/scale_out/token_in_token_out/serving.py': '8c1ebc921d377363cd26d2c9edf759e1192e4d4ad2f939e6bbd6daf1ec53f8ee',
  'vllm/entrypoints/serve/exception_handling/error_response.py': '67389b072fab088e8d29e30536dd80b7be1e8aded133976f3043b760a9ac73f9',
  'vllm/entrypoints/serve/exception_handling/handlers/exception.py': '644dbe4bca975923d66f5a929b10f61efb182667e33cd04f09ab496891af2764',
  'vllm/entrypoints/serve/exception_handling/handlers/http.py': '41021774f2fb3555129c74b8768ce200973f5fbcd0a5dbf8a017863657368868',
@@ -132745,11 +133794,11 @@ FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5d
  'vllm/entrypoints/serve/utils/api_utils.py': '3e3a36b5884cdcd7949b87de4e1077f197b33c96ff96b4a227489bcfa4153b44',
  'vllm/envs.py': '8deb7d4d06ed01a6088501286c282c12427c3d80f24a80aa19f390d7a6bbf422',
  'vllm/model_executor/kernels/linear/__init__.py': '3aa9c9f4c24e9c6130a851d3c87413dca0500b8107539feb262a6aa0b127122f',
- 'vllm/model_executor/models/qwen3_vl.py': 'ea95a10579dd80233621d50734af1b83f0230c3020d7a6f07f4715f7f491ab85',
+ 'vllm/model_executor/models/qwen3_vl.py': '4fc9811b7ef881347de0af9c39723aa9177dcd50dee9adce0a2cc12e637d8180',
  'vllm/multimodal/media/connector.py': '3f95bb96764cc7214c3a11e7f15e48525c5f65a2ba12c1185baa0d9e5108fc6e',
  'vllm/multimodal/media/image.py': '2858f153037359fc0a089e2b4aa21bfe97f1c38860a2118f48b501c0259cd329',
  'vllm/multimodal/processing/inputs.py': '389b97d942469c5600c6c321676497a0197eccec231aeabe0836080daaddafce',
- 'vllm/multimodal/processing/processor.py': '43aca2c9c8fbd6e8d825c7f6eeed460f19ee65504a8540ee6bc0f0f26b404ef7',
+ 'vllm/multimodal/processing/processor.py': 'bbf246946d967946db0f76908974e74a9d05a675c87e4e7937ee053f1aa29b2d',
  'vllm/parser/abstract_parser.py': 'b2f627c28667ec2a064898e627232a5ebb7f59826ad9b961359d56226ff2c2ec',
  'vllm/parser/deepseek_v32.py': '1fe0aec597caf6c10ff9905a3b1918c2a8608b5b1df32127ff8038c10f5d9b1c',
  'vllm/parser/deepseek_v4.py': 'a95f86eb4146d3096a73f1076260bbc58630a74c377b9da1d7e66d65e898465f',
@@ -132768,7 +133817,7 @@ FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5d
  'vllm/parser/mistral.py': '0b74821f7c68d5cf572760288d82bb40c19dfe0c88a6f9412befcaf1cfdcf6e8',
  'vllm/parser/qwen3.py': '676e5a88a159860084a9fe5903c639e091b3cec3e6650d00acf6a114b28e1333',
  'vllm/reasoning/abs_reasoning_parsers.py': 'ba4b1145048e5faa217e1ef4d849167ebd1fe7bcb9296fe2e9d2f17ce96607f7',
- 'vllm/renderers/base.py': 'efc0e5706c2dbce32a645bb288e920515934566d23f1a54c4fbc4b6466b19a3e',
+ 'vllm/renderers/base.py': '09b769d4cd5cbb84572a084e054f5bef3b51873a9222dba11a154f98477aeed8',
  'vllm/renderers/hf.py': 'b06cb298f586607a036c8d976e0a08ac64eb317bfb8af1d4dc5329e690fb5e88',
  'vllm/renderers/online_derenderer.py': 'dfb99f2ca4ed2f1c99ffd7ac6a150851af06f1f4ef53d6af6c9e2c6a9e810b29',
  'vllm/renderers/online_renderer.py': '1f12e251def8f81f3cf68e0030ddaaa8c988ac00a9f694c0718dd2d1d5c8f36f',
