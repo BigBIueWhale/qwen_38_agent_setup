@@ -315,7 +315,7 @@ It is intentionally reconstructed by the ordered, reviewed semantic transformati
 | patches/vllm-anthropic-input-fidelity.patch | 3252e25a6c2e9d8ee0eec4cb383fc292bff2afaac2e3becdc1006c68b3b02c3c |
 | patches/vllm-qwen-exact-tool-language.patch | e0bdd47262490c88bc600b858e3320efdd4dc4c80c218761fe01378b0e8c8134 |
 | patches/vllm-png-source-admission.patch | b1b684a96d7243ae647d4d8ce2fe69b7330b3ab243ea77903c4cfb346bc80549 |
-| patches/vllm-kv-physical-free-memory.patch | d9c1b5a9d2c20266246e856f2264ad9da0d624b797ca682671772b808febca82 |
+| patches/vllm-kv-physical-free-memory.patch | 2fa5466ef1c8c5bc8d9651e269d83d8f7496fb8a5097273cb2c626dc7707471c |
 | patches/vllm-qwen-single-call-grammar.patch | 878ba3d98284a326784ffced00a64b38dd827cbc80f136cf1e582df469c3eced |
 | patches/vllm-responses-history-integrity.patch | d2c6343087fc287eb6afe315cdfb9caa2909de140c82b57ee9d0c3ed9473983c |
 | patches/vllm-responses-stream-identity.patch | 9a3f1fb54f3e22f3df621ab681e675f7a916849bdceb6e555242df29d6028095 |
@@ -340,7 +340,7 @@ It is intentionally reconstructed by the ordered, reviewed semantic transformati
 | patches/vllm-template-authored-control-tokens.patch | 2a6e8b31826cf06d52acb3c87cae0c6c68a7acc2c8f01dd7848bc5e948977228 |
 | patches/vllm-nvfp4-native-kernel-required.patch | 9d9ce188b6670d687a725c4cdca37478f9dc78ef9f19685ddbcf5e9edd53b8b7 |
 | patches/vllm-qwen-arguments-read-by-grammar.patch | 9bf29aed999f1cfe12a58cc98b91fccafe615dfb7c22f13e9c681d1b54034837 |
-| patches/vllm-startup-plan-admission-bound.patch | 596e311a54f888e8589a0bdc9fba62b6bf779b11eabab8ca1d2b60b8cf9f9930 |
+| patches/vllm-startup-plan-admission-bound.patch | f440e51f45e936dd6d490d47f9675bece8bb78f7f46503b924a15e23689db0c3 |
 | patches/vllm-template-refusals-name-their-parameter.patch | 1f428332be39e4fb7f3c7f7eb5d6e3297f5dc70638fcd7f81d69b32f69d1fa26 |
 | patches/vllm-qwen-repeated-parameter-refusal.patch | af405e3be4a649264786bf7bc924c3e4053579eddde47030d9776eb1bc1c73c0 |
 | patches/vllm-generated-tokens-survive-parsing.patch | 3709ac24d4f098a27ffa57fedf9d3dec81a1e08392da07d225bb8b62d2e8ee2e |
@@ -936,6 +936,39 @@ are free during encoding whether or not it was held -- and would only take them
 from text execution. The v13 image below held one, 640 MiB of raw CUDA memory
 released and restored with the workspace; its free readings are taken with it
 held.
+
+The declared pool is admitted against a bound the engine derives at every startup
+from what it profiles; no number in the lock or the launcher sizes it. The bound is
+the device memory free when this instance started, minus what serving holds beside
+its pool:
+
+- the residents measured when profiling ends: weights, non-torch allocations,
+  every workspace (the 1,024 MiB continuation workspace among them) and the input
+  batch's block tables;
+- the peak of the profiled phases above them, each run in the residency serving
+  runs it in: the vision encoder at its full budget with the continuation workspace
+  released, then a 2,048-token text step with attention executed against a
+  stand-in pool at the full 262,144-token context, its encoder outputs still cached
+  and the workspace resident, then the sampler. The peak is therefore the larger of
+  the encoder's and the text step's with the workspace it holds;
+- the CUDA-graph estimate and the frontend's multimodal reservation.
+
+A warm pass before the measured one takes one-time compile and autotuning memory
+out of the measurement, and the stand-in pool's bytes come off the peak because the
+declared pool takes its place. The startup log states every term.
+
+The derivation assumes that the caching allocator places each phase's peak,
+counted in allocated bytes, in the room the bound leaves: zero fragmentation. It
+charges the pool its exact bytes, not the allocator's rounding of each pool tensor
+up to a 2 MiB multiple (at most 2 MiB per tensor, about 25 MB for this pool's
+sixteen). A run on the card confirms these assumptions and that the profiled text
+step runs on this model; it does not decide the bound, and a profile that fails
+stops startup rather than admitting the pool. By the v29 startup log's arithmetic
+(bound 6.93 GiB, pool 6.45 GiB, profiled peak 1.85 GiB, a 0.48 GiB margin), the
+one-user pool stays admitted unless the text step's peak with the workspace
+resident, plus the residents the profile now counts beside it (attention builders,
+block tables, TurboQuant's per-layer arange cache), exceeds about 2.3 GiB. Reading the
+code puts that near 1.75 GiB; the profile decides it at each startup.
 
 On the exact final v13 live image:
 

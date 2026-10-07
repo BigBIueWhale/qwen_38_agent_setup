@@ -1,29 +1,69 @@
 diff --git a/tests/v1/worker/test_gpu_worker.py b/tests/v1/worker/test_gpu_worker.py
 --- a/tests/v1/worker/test_gpu_worker.py
 +++ b/tests/v1/worker/test_gpu_worker.py
-@@ -1,8 +1,9 @@
+@@ -1,10 +1,12 @@
  # SPDX-License-Identifier: Apache-2.0
  # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
  
-+from contextlib import nullcontext
++from contextlib import contextmanager, nullcontext
  from types import SimpleNamespace
 -from unittest.mock import patch
 +from unittest.mock import Mock, patch
  
  import pytest
++import torch
  
-@@ -77,3 +78,68 @@
+ from vllm.utils.mem_constants import GiB_bytes
+ from vllm.v1.worker import startup_plan
+@@ -77,3 +79,230 @@
      explicit = _plan_worker(kv_bytes=7 * GiB_bytes)
      maybe_apply_startup_plan(explicit)
      assert explicit.cache_config.kv_cache_memory_bytes == 7 * GiB_bytes
++
++
++def _profiling_runner(events, weights, graph_memory, stand_in):
++    """The runner surface Worker.determine_available_memory profiles through,
++    recording the order in which the profile runs."""
++
++    @contextmanager
++    def profiling_kv_cache():
++        events.append("stand-in built")
++        try:
++            yield stand_in
++        finally:
++            events.append("stand-in removed")
++
++    def profile_cudagraph_memory():
++        events.append("graphs profiled")
++        return graph_memory
++
++    return SimpleNamespace(
++        model_memory_usage=weights,
++        profiling_kv_cache=profiling_kv_cache,
++        profile_served_phases=Mock(side_effect=lambda: events.append("phases")),
++        profile_run=Mock(side_effect=AssertionError("V1 profiles served phases")),
++        profile_cudagraph_memory=Mock(side_effect=profile_cudagraph_memory),
++    )
++
++
++def _recording_memory_profiling(events, profile):
++    @contextmanager
++    def memory_profiling(*args, **kwargs):
++        events.append("window opened")
++        yield profile
++        events.append("window closed")
++
++    return memory_profiling
 +
 +
 +@pytest.mark.parametrize("initial_residents", [0, 2 * GiB_bytes])
 +@pytest.mark.parametrize("activation_peak", [0, GiB_bytes])
 +@pytest.mark.parametrize("graph_memory", [0, GiB_bytes // 2])
 +@pytest.mark.parametrize("utilization", [0.5, 0.92])
++@pytest.mark.parametrize("stand_in", [0, 3 * (1 << 20)])
 +def test_physical_bound_charges_preexisting_residents_once(
-+    monkeypatch, initial_residents, activation_peak, graph_memory, utilization
++    monkeypatch, initial_residents, activation_peak, graph_memory, utilization,
++    stand_in,
 +):
 +    from vllm.v1.worker import gpu_worker
 +
@@ -31,19 +71,18 @@ diff --git a/tests/v1/worker/test_gpu_worker.py b/tests/v1/worker/test_gpu_worke
 +    initially_free = total - initial_residents
 +    weights = 20 * GiB_bytes
 +    frontend = GiB_bytes // 4
++    # The window's peak held the stand-in pool beside the phases' peak.
 +    profile = SimpleNamespace(
 +        total_consumed=weights,
-+        transient_peak_headroom=activation_peak,
-+        non_kv_cache_memory=weights + activation_peak,
++        transient_peak_headroom=activation_peak + stand_in,
++        non_kv_cache_memory=weights + activation_peak + stand_in,
 +        weights_memory=weights,
 +        after_profile=SimpleNamespace(free_memory=initially_free - weights),
 +    )
-+    runner = SimpleNamespace(
-+        model_memory_usage=weights,
-+        profile_run=Mock(),
-+        profile_cudagraph_memory=Mock(return_value=graph_memory),
-+    )
++    events: list[str] = []
++    runner = _profiling_runner(events, weights, graph_memory, stand_in)
 +    worker = SimpleNamespace(
++        use_v2_model_runner=False,
 +        init_snapshot=SimpleNamespace(free_memory=initially_free, total_memory=total),
 +        requested_memory=int(total * utilization),
 +        cache_config=SimpleNamespace(
@@ -61,7 +100,10 @@ diff --git a/tests/v1/worker/test_gpu_worker.py b/tests/v1/worker/test_gpu_worke
 +    monkeypatch.setenv("VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS", "1")
 +    with (
 +        patch.object(gpu_worker, "maybe_apply_startup_plan"),
-+        patch.object(gpu_worker, "memory_profiling", return_value=nullcontext(profile)),
++        patch.object(
++            gpu_worker, "memory_profiling",
++            _recording_memory_profiling(events, profile),
++        ),
 +        patch.object(
 +            gpu_worker, "current_platform", SimpleNamespace(is_cuda_alike=lambda: True)
 +        ),
@@ -69,22 +111,219 @@ diff --git a/tests/v1/worker/test_gpu_worker.py b/tests/v1/worker/test_gpu_worke
 +            gpu_worker, "reserve_mm_ipc_gpu_memory",
 +            side_effect=lambda n, *args: n - frontend,
 +        ),
++        patch.object(
++            gpu_worker, "current_workspace_manager",
++            lambda: SimpleNamespace(reclaimable_workspace_bytes=lambda: GiB_bytes),
++        ),
 +    ):
 +        bound = gpu_worker.Worker.determine_available_memory(worker)
 +    # Initial occupancy, profile residents, recurring peak, graph and frontend
-+    # reservation each consume physical memory exactly once.
++    # reservation each consume physical memory exactly once; the stand-in
++    # pool the profile attended to is the declared pool's place, not charged.
 +    assert bound == (
 +        total - initial_residents - weights - activation_peak - graph_memory - frontend
 +    )
 +    assert worker.available_kv_cache_memory_bytes == (
 +        int(total * utilization) - weights - activation_peak - graph_memory
 +    )
-+    runner.profile_run.assert_called_once_with()
-+    runner.profile_cudagraph_memory.assert_called_once_with()
++    assert profile.transient_peak_headroom == activation_peak
++    # A warm pass outside the window, then the measured pass with the stand-in
++    # pool living inside it, then the graph estimate.
++    assert events == [
++        "stand-in built", "phases", "stand-in removed",
++        "window opened", "stand-in built", "phases", "stand-in removed",
++        "window closed",
++        "graphs profiled",
++    ]
++    runner.profile_run.assert_not_called()
++
++
++def test_served_profile_encodes_with_workspace_released_and_attends_in_text():
++    """The profile runs each phase in the residency serving runs it in: the
++    encoder with the reclaimable workspace released, the text step with it
++    resident, attending over the longest context a request holds."""
++    from vllm.v1.worker import gpu_model_runner
++
++    events = []
++
++    @contextmanager
++    def release():
++        events.append("released")
++        try:
++            yield 0
++        finally:
++            events.append("restored")
++
++    runner = SimpleNamespace(
++        max_model_len=4096,
++        _run_dummy_encoder=lambda: events.append("encoder"),
++        _run_dummy_text_step=lambda **kwargs: events.append(("text", kwargs)),
++    )
++    with patch.object(gpu_model_runner, "release_reclaimable_workspaces", release):
++        gpu_model_runner.GPUModelRunner.profile_served_phases(runner)
++    assert events == [
++        "released", "encoder", "restored",
++        ("text", {"force_attention": True, "profile_seq_lens": 4096}),
++    ]
++
++
++@pytest.mark.parametrize("fails", [False, True])
++def test_profiling_kv_cache_yields_stand_in_bytes_and_always_removes_it(fails):
++    from vllm.v1.core import kv_cache_utils
++    from vllm.v1.worker import gpu_model_runner
++
++    groups = ["group"]
++    cleaned = []
++    runner = SimpleNamespace(
++        vllm_config=SimpleNamespace(),
++        _init_minimal_kv_cache_for_profiling=lambda: SimpleNamespace(
++            num_blocks=3, kv_cache_groups=groups
++        ),
++        _cleanup_profiling_kv_cache=lambda: cleaned.append(True),
++    )
++    divisor = Mock(return_value=1 << 20)
++    with patch.object(kv_cache_utils, "_pool_bytes_per_block", divisor):
++        try:
++            with gpu_model_runner.GPUModelRunner.profiling_kv_cache(runner) as nbytes:
++                # Counted by the divisor the declared pool is admitted by.
++                assert nbytes == 3 << 20
++                assert cleaned == []
++                if fails:
++                    raise RuntimeError("profile failed")
++        except RuntimeError:
++            assert fails
++    divisor.assert_called_once_with(runner.vllm_config, groups)
++    assert cleaned == [True]
++
++
++class _StopAtSeqLens(Exception):
++    pass
++
++
++@pytest.mark.parametrize(
++    ("num_tokens", "max_num_seqs", "profile_seq_lens", "expected"),
++    [
++        # Every request's context is the profiled length ...
++        (2048, 1, 262144, [262144]),
++        (12, 3, 16, [16, 16, 16]),
++        # ... unless its own query is longer: a context covers its query.
++        (29, 3, 10, [10, 10, 11]),
++    ],
++)
++def test_dummy_context_covers_its_own_query(
++    num_tokens, max_num_seqs, profile_seq_lens, expected
++):
++    from vllm.v1.worker import gpu_model_runner
++
++    captured = {}
++
++    def copy_(source, non_blocking=False):
++        captured["seq_lens"] = source[: len(expected)].tolist()
++        raise _StopAtSeqLens
++
++    batch_desc = SimpleNamespace(num_tokens=num_tokens, num_reqs=None)
++    runner = SimpleNamespace(
++        vllm_config=SimpleNamespace(
++            model_config=SimpleNamespace(multimodal_config=None),
++            parallel_config=SimpleNamespace(num_ubatches=1),
++        ),
++        uniform_decode_query_len=1,
++        max_num_tokens=num_tokens,
++        scheduler_config=SimpleNamespace(max_num_seqs=max_num_seqs),
++        _determine_batch_execution_and_padding=lambda **kwargs: (
++            gpu_model_runner.CUDAGraphMode.NONE, batch_desc, False, None, None
++        ),
++        dcp_world_size=1,
++        parallel_config=SimpleNamespace(cp_kv_cache_interleave_size=1),
++        _get_slot_mappings=lambda **kwargs: (None, None),
++        synchronize_input_prep=nullcontext,
++        optimistic_seq_lens_cpu=torch.zeros(8, dtype=torch.int32),
++        seq_lens=SimpleNamespace(copy_=copy_),
++    )
++    with pytest.raises(_StopAtSeqLens):
++        gpu_model_runner.GPUModelRunner._dummy_run(
++            runner, num_tokens, is_profile=True, force_attention=True,
++            profile_seq_lens=profile_seq_lens,
++        )
++    assert captured["seq_lens"] == expected
 diff --git a/vllm/v1/worker/gpu_worker.py b/vllm/v1/worker/gpu_worker.py
 --- a/vllm/v1/worker/gpu_worker.py
 +++ b/vllm/v1/worker/gpu_worker.py
-@@ -548,35 +548,33 @@
+@@ -84,7 +84,10 @@
+ )
+ from vllm.v1.worker.utils import is_residual_scattered_for_sp
+ from vllm.v1.worker.worker_base import CompilationTimes, WorkerBase
+-from vllm.v1.worker.workspace import init_workspace_manager
++from vllm.v1.worker.workspace import (
++    current_workspace_manager,
++    init_workspace_manager,
++)
+ 
+ from ...model_executor.model_loader import TensorizerLoader
+ from .gpu.warmup import warmup_kernels
+@@ -473,11 +476,27 @@
+         """
+         maybe_apply_startup_plan(self)
+ 
+-        if kv_cache_memory_bytes := self.cache_config.kv_cache_memory_bytes:
+-            # still need a profile run which compiles the model for
+-            # max_num_batched_tokens
+-            self.model_runner.profile_run()
++        if self.use_v2_model_runner:
++            # The V2 runner profiles the text step with attention skipped and
++            # builds its pool's attention backends, and the workspaces they
++            # reserve, only after profiling: its bound omits what that profile
++            # does not run.
++            profiling_kv_cache: Callable[[], AbstractContextManager[int]] = (
++                lambda: nullcontext(0)
++            )
++            profile = self.model_runner.profile_run
++        else:
++            profiling_kv_cache = self.model_runner.profiling_kv_cache
++            profile = self.model_runner.profile_served_phases
++
++        # A first pass compiles the model for max_num_batched_tokens and
++        # builds, JIT-compiles and autotunes every kernel the phases run, so
++        # the measured pass below sees serving's steady state, not startup's
++        # one-time scratch.
++        with profiling_kv_cache():
++            profile()
+ 
++        if kv_cache_memory_bytes := self.cache_config.kv_cache_memory_bytes:
+             msg = (
+                 f"Initial free memory {format_gib(self.init_snapshot.free_memory)} "
+                 f"GiB, treating {format_gib(kv_cache_memory_bytes)} GiB as the "
+@@ -493,13 +512,22 @@
+                 getattr(self.parallel_config, "_api_process_count", 1),
+             )
+ 
+-        # Execute a forward pass with dummy inputs to profile the memory usage
+-        # of the model.
+-        with memory_profiling(
+-            self.init_snapshot,
+-            weights_memory=int(self.model_runner.model_memory_usage),
+-        ) as profile_result:
+-            self.model_runner.profile_run()
++        # The measured pass. The stand-in pool lives only inside the window:
++        # the window's peak holds it -- the declared pool takes its place, so
++        # its bytes come off below -- and what stays consumed when the window
++        # closes is measured without it, including any memory its removal
++        # does not return.
++        with (
++            memory_profiling(
++                self.init_snapshot,
++                weights_memory=int(self.model_runner.model_memory_usage),
++            ) as profile_result,
++            profiling_kv_cache() as stand_in_pool_bytes,
++        ):
++            profile()
++        # The stand-in pool is KV cache, not a transient: off the peak.
++        profile_result.transient_peak_headroom -= stand_in_pool_bytes
++        profile_result.non_kv_cache_memory -= stand_in_pool_bytes
+ 
+         # Profile CUDA graph memory if graphs will be captured.
+         # ROCm is included: #44825 moved the profiler to
+@@ -548,35 +576,38 @@
          #    allocator reservations, the transient activation peak).
          #    Informational only. It may prefer a smaller pool than the
          #    declaration; that preference must not shrink or veto the
@@ -103,14 +342,19 @@ diff --git a/vllm/v1/worker/gpu_worker.py b/vllm/v1/worker/gpu_worker.py
 -        #    refused loudly at engine initialization; one that merely
 -        #    exceeds the estimate proceeds.
 +        # 2) The AUTHORITATIVE physical bound (returned): initially free
-+        #    memory minus the additional measured residents — weights,
-+        #    non-torch consumers, the transient activation peak that recurs
-+        #    on every forward pass, and the opted-in CUDA-graph charge. A
-+        #    declaration beyond THIS bound is refused loudly at engine
-+        #    initialization; one that merely exceeds the estimate proceeds.
-+        #    Residents allocated after profiling are in neither term: the
-+        #    TurboQuant continuation workspace, reserved when the profiling
-+        #    KV cache for CUDA-graph estimation is built, is one.
++        #    memory minus what serving holds beside its pool — the residents
++        #    measured when profiling ended (weights, non-torch consumers, the
++        #    workspaces, the input batch), the peak the profiled phases reach
++        #    above them, and the opted-in CUDA-graph charge. A declaration
++        #    beyond THIS bound is refused loudly at engine initialization;
++        #    one that merely exceeds the estimate proceeds.
++        #
++        #    The peak is the larger of the encoder phase's and the text
++        #    step's, each with the workspaces it holds: profiling runs both
++        #    in the residency serving runs them in (profile_served_phases),
++        #    so the reclaimable workspace released around encoding is
++        #    resident only through the text step and the sampler, where its
++        #    bytes and the step's activations coincide.
          #
          # The utilization factor is deliberately NOT charged against the
 -        # declared pool. The superseded --kv-cache-memory byte flag ignored
@@ -138,7 +382,7 @@ diff --git a/vllm/v1/worker/gpu_worker.py b/vllm/v1/worker/gpu_worker.py
              - profile_result.non_kv_cache_memory
              - cudagraph_memory_estimate_applied
          )
-@@ -597,14 +595,14 @@
+@@ -597,14 +628,14 @@
          logger.info_once(
              "Available KV cache memory: %s GiB (conservative estimate under "
              "the %s GiB utilization budget); physical KV bound: %s GiB "
@@ -155,3 +399,138 @@ diff --git a/vllm/v1/worker/gpu_worker.py b/vllm/v1/worker/gpu_worker.py
              format_gib(profile_result.non_kv_cache_memory),
              format_gib(profile_result.weights_memory),
              format_gib(profile_result.transient_peak_headroom),
+diff --git a/vllm/v1/worker/gpu_model_runner.py b/vllm/v1/worker/gpu_model_runner.py
+--- a/vllm/v1/worker/gpu_model_runner.py
++++ b/vllm/v1/worker/gpu_model_runner.py
+@@ -5978,9 +5978,10 @@
+             remove_lora: If False, dummy LoRAs are not destroyed after the run
+             num_active_loras: Number of distinct active LoRAs to capture for.
+                 LoRA is activated when num_active_loras > 0.
+-            profile_seq_lens: If provided, use this value for seq_lens instead
+-                of max_query_len. Used to profile attention workspace that
+-                scales with context length.
++            profile_seq_lens: If provided, each request's seq_len is this value
++                (or its own query length, if that is longer) instead of
++                max_query_len. Used to profile attention workspace that scales
++                with context length.
+         """
+         mm_config = self.vllm_config.model_config.multimodal_config
+         if mm_config and mm_config.mm_encoder_only:
+@@ -6126,7 +6127,10 @@
+             # Otherwise, it only happens for cudagraph_runtime_mode=FULL.
+             if force_attention or cudagraph_runtime_mode == CUDAGraphMode.FULL:
+                 if profile_seq_lens is not None:
+-                    seq_lens = profile_seq_lens  # type: ignore[assignment]
++                    # A request's context always covers its own query.
++                    seq_lens = torch.from_numpy(  # type: ignore[assignment]
++                        np.maximum(num_scheduled_tokens, profile_seq_lens)
++                    )
+                 elif create_mixed_batch:
+                     # In the mixed batch mode (used for FI warmup), we use
+                     # shorter sequence lengths to run faster.
+@@ -6558,7 +6562,35 @@
+         return self._dummy_pooler_run_task(hidden_states, max_task)
+ 
+     def profile_run(self) -> None:
++        """Warm the encoder and the text step without a KV cache, attention
++        skipped: the CPU backend's warm-up. GPU memory profiling runs
++        profile_served_phases instead."""
+         # Profile with multimodal encoder & encoder cache.
++        self._run_dummy_encoder()
++        self._run_dummy_text_step()
++
++    def profile_served_phases(self) -> None:
++        """Run each phase serving runs, at its largest, in the residency
++        serving runs it in. Runs inside profiling_kv_cache(), whose stand-in
++        pool the text step attends to.
++
++        The encoder encodes the largest batch the encoder budget admits with
++        the reclaimable workspaces released, exactly as _execute_mm_encoder
++        runs it, and its outputs stay cached through the text step, as they
++        stay while serving prefills the text that embeds them. The text step
++        is max_num_tokens tokens with attention executed and every request's
++        context at max_model_len, then the sampler; the reclaimable
++        workspaces are resident through both. A memory profile around this
++        therefore sees the peak of each phase together with the workspaces
++        resident in that phase, and only those.
++        """
++        with release_reclaimable_workspaces():
++            self._run_dummy_encoder()
++        self._run_dummy_text_step(
++            force_attention=True, profile_seq_lens=self.max_model_len
++        )
++
++    def _run_dummy_encoder(self) -> None:
+         if self.supports_mm_inputs:
+             mm_config = self.model_config.multimodal_config
+             if mm_config is not None and mm_config.skip_mm_profiling:
+@@ -6616,9 +6648,10 @@
+                         for i, output in enumerate(dummy_encoder_outputs):
+                             self.encoder_cache[f"tmp_{i}"] = output
+ 
++    def _run_dummy_text_step(self, **dummy_run_kwargs: Any) -> None:
+         # Add `is_profile` here to pre-allocate communication buffers
+         hidden_states, last_hidden_states = self._dummy_run(
+-            self.max_num_tokens, is_profile=True
++            self.max_num_tokens, is_profile=True, **dummy_run_kwargs
+         )
+         if get_pp_group().is_last_rank:
+             if self.is_pooling_model:
+@@ -6632,7 +6665,7 @@
+         self.encoder_cache.clear()
+         gc.collect()
+ 
+-    def _init_minimal_kv_cache_for_profiling(self) -> None:
++    def _init_minimal_kv_cache_for_profiling(self) -> KVCacheConfig:
+         from vllm.v1.core.kv_cache_utils import (
+             get_kv_cache_config_from_groups,
+             get_kv_cache_groups,
+@@ -6658,7 +6691,33 @@
+         self.initialize_kv_cache(minimal_config, is_profiling=True)
+         self.cache_config.num_gpu_blocks = minimal_config.num_blocks
+ 
+-        logger.debug("Initialized minimal KV cache for CUDA graph profiling")
++        logger.debug("Initialized minimal KV cache for profiling")
++        return minimal_config
++
++    @contextmanager
++    def profiling_kv_cache(self) -> Iterator[int]:
++        """Hold a stand-in for the KV pool while a startup profile runs.
++
++        The stand-in is the minimal KV cache, built the way the declared pool
++        is built: its attention backends and their metadata builders, every
++        workspace those reserve, and the input batch's block tables. Dummy
++        runs can execute attention against it, and a profile around it sees
++        what serving holds beside its pool. Yields the stand-in's bytes,
++        counted by the divisor the declared pool is admitted by: the declared
++        pool takes its place, so a profile charges them to it, not to the
++        residents. Removing the stand-in leaves the workspaces and the input
++        batch, which serving keeps.
++        """
++        from vllm.v1.core.kv_cache_utils import _pool_bytes_per_block
++
++        with set_current_vllm_config(self.vllm_config):
++            stand_in = self._init_minimal_kv_cache_for_profiling()
++        try:
++            yield stand_in.num_blocks * _pool_bytes_per_block(
++                self.vllm_config, stand_in.kv_cache_groups
++            )
++        finally:
++            self._cleanup_profiling_kv_cache()
+ 
+     @staticmethod
+     @contextmanager
+diff --git a/vllm/v1/worker/workspace.py b/vllm/v1/worker/workspace.py
+--- a/vllm/v1/worker/workspace.py
++++ b/vllm/v1/worker/workspace.py
+@@ -207,6 +207,10 @@
+             for i in range(len(shapes_and_dtypes))
+         ]
+ 
++    def reclaimable_workspace_bytes(self) -> int:
++        """Bytes the reclaimable workspaces hold while they are restored."""
++        return sum(sum(sizes) for sizes in self._reclaimable_workspace_sizes.values())
++
+     def _driver_free_bytes(self) -> int | None:
+         if self._device.type != "cuda":
+             return None

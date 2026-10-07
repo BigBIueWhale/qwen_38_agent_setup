@@ -2180,15 +2180,66 @@ def _validate_kv_physical_before(state: State) -> None:
 
 def _validate_kv_physical_after(state: State) -> None:
     label = "KV physical bound result"
-    _require_in_symbol(state, "vllm/v1/worker/gpu_worker.py",
-                       "Worker.determine_available_memory", (
+    worker = "vllm/v1/worker/gpu_worker.py"
+    runner = "vllm/v1/worker/gpu_model_runner.py"
+    _require_in_symbol(state, worker, "Worker.determine_available_memory", (
         "kv_physical_bound = ",
         "self.init_snapshot.free_memory\n"
         "            - profile_result.non_kv_cache_memory\n"
         "            - cudagraph_memory_estimate_applied",
     ), label=label)
+    # What the bound subtracts is what serving holds beside its pool: a warm
+    # pass outside the window, then the measured pass with a stand-in pool
+    # living only inside it and its bytes taken off the peak it held.
+    _require_ordered(
+        _symbol_source(state, worker, "Worker.determine_available_memory", label=label),
+        (
+            "with profiling_kv_cache():",
+            "profile()",
+            "memory_profiling(",
+            "profiling_kv_cache() as stand_in_pool_bytes,",
+            "profile()",
+            "profile_result.transient_peak_headroom -= stand_in_pool_bytes",
+            "profile_result.non_kv_cache_memory -= stand_in_pool_bytes",
+        ),
+        label=label,
+        location=f"{worker}:Worker.determine_available_memory",
+    )
+    # Each phase runs in the residency serving runs it in: the encoder with
+    # the reclaimable workspace released, the text step attending at full
+    # context with it resident.
+    _require_ordered(
+        _symbol_source(state, runner, "GPUModelRunner.profile_served_phases",
+                       label=label),
+        (
+            "with release_reclaimable_workspaces():",
+            "self._run_dummy_encoder()",
+            "self._run_dummy_text_step(",
+            "force_attention=True, profile_seq_lens=self.max_model_len",
+        ),
+        label=label,
+        location=f"{runner}:GPUModelRunner.profile_served_phases",
+    )
+    _require_ordered(
+        _symbol_source(state, runner, "GPUModelRunner.profiling_kv_cache", label=label),
+        (
+            "stand_in = self._init_minimal_kv_cache_for_profiling()",
+            "yield stand_in.num_blocks * _pool_bytes_per_block(",
+            "finally:",
+            "self._cleanup_profiling_kv_cache()",
+        ),
+        label=label,
+        location=f"{runner}:GPUModelRunner.profiling_kv_cache",
+    )
+    _require_in_symbol(state, runner, "GPUModelRunner._dummy_run", (
+        "np.maximum(num_scheduled_tokens, profile_seq_lens)",
+    ), label=label)
+    forbid_text(state, worker, "Residents allocated after profiling", label=label)
     require_python_symbols(state, "tests/v1/worker/test_gpu_worker.py", {
         "test_physical_bound_charges_preexisting_residents_once": None,
+        "test_served_profile_encodes_with_workspace_released_and_attends_in_text": None,
+        "test_profiling_kv_cache_yields_stand_in_bytes_and_always_removes_it": None,
+        "test_dummy_context_covers_its_own_query": None,
     }, label=label)
 
 
@@ -4811,12 +4862,18 @@ CONTRACTS: Mapping[str, SemanticContract] = {
     "kv-physical-free-memory": SemanticContract(
         rationale=(
             "The declared KV capacity cannot spend memory already occupied before "
-            "profiling. Bound it by initially free memory minus the profile delta, "
-            "recurring activation peak, CUDA graph and frontend reservations."
+            "profiling, nor memory serving holds beside its pool. Bound it by "
+            "initially free memory minus what stays resident after a profile that "
+            "runs each phase in the residency serving runs it in -- the encoder "
+            "with the reclaimable workspace released, the text step attending to "
+            "a stand-in pool at full context with it resident, the sampler -- the "
+            "peak of those phases above that with the stand-in pool taken off, "
+            "CUDA graph and frontend reservations."
         ),
         removal_condition=(
             "Remove when upstream's authoritative bound includes pre-snapshot "
-            "residents exactly once and keeps utilization as an estimate only."
+            "residents exactly once, profiles attention and every workspace in "
+            "the phase that holds it, and keeps utilization as an estimate only."
         ),
         validate_before=_validate_kv_physical_before,
         validate_after=_validate_kv_physical_after,

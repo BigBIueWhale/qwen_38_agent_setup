@@ -1,10 +1,10 @@
 diff --git a/tests/v1/worker/test_gpu_worker.py b/tests/v1/worker/test_gpu_worker.py
 --- a/tests/v1/worker/test_gpu_worker.py
 +++ b/tests/v1/worker/test_gpu_worker.py
-@@ -143,3 +143,74 @@
-     )
-     runner.profile_run.assert_called_once_with()
-     runner.profile_cudagraph_memory.assert_called_once_with()
+@@ -306,3 +306,82 @@
+             profile_seq_lens=profile_seq_lens,
+         )
+     assert captured["seq_lens"] == expected
 +
 +
 +@pytest.mark.parametrize("initial_residents", [0, 2 * GiB_bytes])
@@ -40,11 +40,8 @@ diff --git a/tests/v1/worker/test_gpu_worker.py b/tests/v1/worker/test_gpu_worke
 +            model_config=SimpleNamespace(multimodal_config=object()),
 +            parallel_config=SimpleNamespace(_api_process_count=1, world_size=1),
 +            rank=0,
-+            model_runner=SimpleNamespace(
-+                model_memory_usage=weights,
-+                profile_run=Mock(),
-+                profile_cudagraph_memory=Mock(return_value=graph),
-+            ),
++            use_v2_model_runner=False,
++            model_runner=_profiling_runner(events, weights, graph, 0),
 +            vllm_config=SimpleNamespace(
 +                compute_hash=lambda: "plan-bound",
 +                compilation_config=SimpleNamespace(
@@ -53,15 +50,23 @@ diff --git a/tests/v1/worker/test_gpu_worker.py b/tests/v1/worker/test_gpu_worke
 +            ),
 +        )
 +
++    events: list[str] = []
 +    monkeypatch.setenv("VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS", "1")
 +    with (
-+        patch.object(gpu_worker, "memory_profiling", return_value=nullcontext(profile)),
++        patch.object(
++            gpu_worker, "memory_profiling",
++            _recording_memory_profiling(events, profile),
++        ),
 +        patch.object(
 +            gpu_worker, "current_platform", SimpleNamespace(is_cuda_alike=lambda: True)
 +        ),
 +        patch.object(
 +            gpu_worker, "reserve_mm_ipc_gpu_memory",
 +            side_effect=lambda n, *args: n - frontend,
++        ),
++        patch.object(
++            gpu_worker, "current_workspace_manager",
++            lambda: SimpleNamespace(reclaimable_workspace_bytes=lambda: 0),
 +        ),
 +    ):
 +        profiled = worker()
@@ -72,14 +77,17 @@ diff --git a/tests/v1/worker/test_gpu_worker.py b/tests/v1/worker/test_gpu_worke
 +        )
 +        maybe_save_startup_plan(profiled, profiled.kv_physical_bound)
 +
++        events.clear()
 +        shortcut = worker()
 +        assert gpu_worker.Worker.determine_available_memory(shortcut) == admitted
 +        assert shortcut.cache_config.kv_cache_memory_bytes == profiled.kv_physical_bound
 +        shortcut.model_runner.profile_cudagraph_memory.assert_not_called()
++        # The shortcut boot only compiles: one pass, inside a stand-in, no window.
++        assert events == ["stand-in built", "phases", "stand-in removed"]
 diff --git a/vllm/v1/worker/gpu_worker.py b/vllm/v1/worker/gpu_worker.py
 --- a/vllm/v1/worker/gpu_worker.py
 +++ b/vllm/v1/worker/gpu_worker.py
-@@ -573,7 +573,7 @@
+@@ -606,7 +606,7 @@
              - profile_result.non_kv_cache_memory
              - cudagraph_memory_estimate_applied
          )
@@ -88,16 +96,37 @@ diff --git a/vllm/v1/worker/gpu_worker.py b/vllm/v1/worker/gpu_worker.py
              self.init_snapshot.free_memory
              - profile_result.non_kv_cache_memory
              - cudagraph_memory_estimate_applied
-@@ -601,7 +601,7 @@
+@@ -627,18 +627,24 @@
+         logger.debug(profile_result)
+         logger.info_once(
+             "Available KV cache memory: %s GiB (conservative estimate under "
+-            "the %s GiB utilization budget); physical KV bound: %s GiB "
+-            "(%s GiB initially free minus %s GiB of additional residents incl. "
+-            "weights %s GiB and activation peak %s GiB). The pool is sized "
++            "the %s GiB utilization budget); physical KV bound: %s GiB = "
++            "%s GiB initially free - %s GiB resident when profiling ended "
++            "(incl. weights %s GiB and the reclaimable workspace %s GiB) - "
++            "%s GiB peak of the profiled phases above that - %s GiB charged "
++            "CUDA-graph estimate. The phases attended to a %s GiB stand-in "
++            "pool, not charged: the declared pool takes its place. The pool is sized "
+             "by --kv-cache-users against the physical bound, not the "
              "estimate.",
              format_gib(self.available_kv_cache_memory_bytes),
              format_gib(self.requested_memory),
 -            format_gib(kv_physical_bound),
 +            format_gib(self.kv_physical_bound),
              format_gib(self.init_snapshot.free_memory),
-             format_gib(profile_result.non_kv_cache_memory),
+-            format_gib(profile_result.non_kv_cache_memory),
++            format_gib(profile_result.total_consumed),
              format_gib(profile_result.weights_memory),
-@@ -648,7 +648,7 @@
++            format_gib(current_workspace_manager().reclaimable_workspace_bytes()),
+             format_gib(profile_result.transient_peak_headroom),
++            format_gib(cudagraph_memory_estimate_applied),
++            format_gib(stand_in_pool_bytes),
+         )
+ 
+         if cudagraph_memory_estimate > 0:
+@@ -681,7 +687,7 @@
                  )
  
          return reserve_mm_ipc_gpu_memory(
@@ -106,7 +135,7 @@ diff --git a/vllm/v1/worker/gpu_worker.py b/vllm/v1/worker/gpu_worker.py
              self.model_config.multimodal_config,
              getattr(self.parallel_config, "_api_process_count", 1),
          )
-@@ -806,17 +806,12 @@
+@@ -839,17 +845,12 @@
  
              logger.info(msg)
  

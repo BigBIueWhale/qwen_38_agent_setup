@@ -104,7 +104,7 @@ readonly KV_SCOPE_SINGLE_FLIGHT_PATCH_DIFF_SHA256="b84b915c38e2c1d32b278bf88dcd5
 readonly TEMPLATE_AUTHORED_CONTROL_TOKENS_PATCH_DIFF_SHA256="2a6e8b31826cf06d52acb3c87cae0c6c68a7acc2c8f01dd7848bc5e948977228"
 readonly NVFP4_NATIVE_KERNEL_PATCH_DIFF_SHA256="9d9ce188b6670d687a725c4cdca37478f9dc78ef9f19685ddbcf5e9edd53b8b7"
 readonly QWEN_ARGUMENTS_READ_BY_GRAMMAR_PATCH_DIFF_SHA256="9bf29aed999f1cfe12a58cc98b91fccafe615dfb7c22f13e9c681d1b54034837"
-readonly STARTUP_PLAN_BOUND_PATCH_DIFF_SHA256="596e311a54f888e8589a0bdc9fba62b6bf779b11eabab8ca1d2b60b8cf9f9930"
+readonly STARTUP_PLAN_BOUND_PATCH_DIFF_SHA256="f440e51f45e936dd6d490d47f9675bece8bb78f7f46503b924a15e23689db0c3"
 readonly TEMPLATE_REFUSAL_PARAMETER_PATCH_DIFF_SHA256="1f428332be39e4fb7f3c7f7eb5d6e3297f5dc70638fcd7f81d69b32f69d1fa26"
 readonly QWEN_REPEATED_PARAMETER_REFUSAL_PATCH_DIFF_SHA256="af405e3be4a649264786bf7bc924c3e4053579eddde47030d9776eb1bc1c73c0"
 readonly GENERATED_TOKENS_SURVIVE_PARSING_PATCH_DIFF_SHA256="3709ac24d4f098a27ffa57fedf9d3dec81a1e08392da07d225bb8b62d2e8ee2e"
@@ -121,7 +121,7 @@ readonly RENDERED_PROMPT_NOT_TRUNCATED_PATCH_DIFF_SHA256="72e74c44c7c8b8ff3db8c7
 readonly KV_TRANSFER_PARAMS_DECLARED_PATCH_DIFF_SHA256="9742698af30ad79158f5430fb22987cafe4667f457771dd66b29b38a7376ce0e"
 readonly RESPONSES_TOOLS_NEVER_GIVEN_PATCH_DIFF_SHA256="ee2c83118ee21815cfb582d432c61b9bebbde1845858f4c294bab0ce392abf85"
 readonly CHAT_STREAM_LOGPROBS_PATCH_DIFF_SHA256="ca15dadd152454fe5b3fbcb710b8c7b5ce3221c038617b9e0d0985953aecbf47"
-readonly SOURCE_PATCH_MANIFEST_SHA256="b0dbaaad9a007a38801cd71ea9adb3423edc010243372d800c6d129ed58b49a1"
+readonly SOURCE_PATCH_MANIFEST_SHA256="5f4b50e4235cf2f0c8fede30b3bdbe87798efbb5c27b13f508642eb5cd2bb3ca"
 # Cardinality of config/deployment-inputs.sha256. The hash manifest alone
 # proves the listed bytes but cannot see a quietly grown or shrunk allowlist,
 # so the reviewed file count is pinned as well. It is declared exactly once,
@@ -154,8 +154,8 @@ readonly RESPONSES_STREAMING_PATCHED_FILE_SHA256="86a2600626f9100b6dcecca1876a5c
 readonly RESPONSES_UTILS_PATCHED_FILE_SHA256="27228c0eb46d68278d35a8d5558e86935b47b04378d6d62df9cd6500b8c3fa0a"
 readonly PARSER_ENGINE_PATCHED_FILE_SHA256="cdac491b61fe25c0c80cf56a1b8830541106c0dec27a2801aa2be8e9aeb38780"
 readonly KV_OFFLOAD_WORKER_PATCHED_FILE_SHA256="0cd50f3deea7c8e91de072dde5d55f96edb6c0b35525c2d144ade7ae4e1b8a91"
-readonly WORKSPACE_PATCHED_FILE_SHA256="14952bc14884394a74dcb937bcb1eecebffbf7579ca860601d9d02b6d5f8c611"
-readonly GPU_MODEL_RUNNER_PATCHED_FILE_SHA256="a7bed200b304fdc17320a30178ded7669d4677e787947470b872ef0ec14b6c8b"
+readonly WORKSPACE_PATCHED_FILE_SHA256="6749552a1aafdae3c6329b249f8135b5c6ae95992f54eaa65dd782c33afd2d26"
+readonly GPU_MODEL_RUNNER_PATCHED_FILE_SHA256="fa2e38d2aaab2d114384c381b2dc68a910935dd1741bda63ea9c4641c4005837"
 readonly API_UTILS_PATCHED_FILE_SHA256="3e3a36b5884cdcd7949b87de4e1077f197b33c96ff96b4a227489bcfa4153b44"
 readonly ENVS_PATCHED_FILE_SHA256="8deb7d4d06ed01a6088501286c282c12427c3d80f24a80aa19f390d7a6bbf422"
 readonly CHAT_UTILS_PATCHED_FILE_SHA256="b6a8c6ef3d744dd0aeafa5532d00f72299c0b4bb6de3216ad26735ef7530ccac"
@@ -168,7 +168,7 @@ readonly VLLM_CONFIG_PATCHED_FILE_SHA256="30f612691ee2a5a1511484fbcece4bd89ade72
 readonly ARG_UTILS_PATCHED_FILE_SHA256="88582e97c98ffcd16416e48eeea3db415cab1f33673c7ff8c1613fa83aad1eac"
 readonly LLM_ENTRYPOINT_PATCHED_FILE_SHA256="79f9bb1212884746964a347f7e4b39087b5ac084b1d72821a12efd2fb85bcb03"
 readonly KV_CACHE_UTILS_PATCHED_FILE_SHA256="f0a146b3f311d2ae983e3d05f1267d35492298cf45d5f171d1bfd3e8da019c40"
-readonly GPU_WORKER_PATCHED_FILE_SHA256="f3de6be99518adb82d091a1bd3ae954bd7b9859429545b290588d35dee4bc8e0"
+readonly GPU_WORKER_PATCHED_FILE_SHA256="8d60006acac1f7313147ad3a3f7448a3a7f91c8e2831fef6e800d9ec19b0cbc8"
 readonly STARTUP_PLAN_PATCHED_FILE_SHA256="2f4f50c34201390e50e10b578bc4cd964a4f5729334225fc30d815bb704aa81f"
 readonly KV_OFFLOAD_CONFIG_PATCHED_FILE_SHA256="50daea7891442fa779743796c343fe0a09bdcd0266910bf83b35509e533c3b89"
 readonly KV_OFFLOAD_BASE_PATCHED_FILE_SHA256="54b7b571e29073285a1aa3e8ccdd10dbdd35b72ee9fd8a0cdfaec1b9e4722d5a"
@@ -191,7 +191,7 @@ readonly ENGINE_PROTOCOL_PATCHED_FILE_SHA256="0d373e6820efe4bcbd625db972ba381a50
 # ./scripts/build-vllm.sh check refuses if it cannot reproduce them.
 readonly AGENT_CHAT_TEMPLATE_SHA256="3b5bcc18141cca486335c8f16c2cfa8f5bf4aa3529b6f6cfb3ed4d7513d5cd85"
 readonly PHASE_BUDGET_UNIT_SHA256="9833b3c96dc2e672bbbf733b5efe5be3b71d8cd56533f161bc834b9a50d26fb0"
-readonly VISION_WORKSPACE_UNIT_SHA256="13bb35a78a4ece90c05e1aaf744c4fb529b0871e65170b5594370d7122e9ff19"
+readonly VISION_WORKSPACE_UNIT_SHA256="4a462fe37e71297222bec792388d075110ce1a1253b7b50dd5ee75390de51f6a"
 readonly VISION_CONTRACT_UNIT_SHA256="c6053d63fbd62b84aa8698c61b7d3aeda0cea2596afe52fcf20b49319d4712ef"
 readonly VISION_MLP_UNIT_SHA256="857ba547a099c6ba646210eb33dd7b159bf9a1972d1772ea396071c8d8e4f2e3"
 readonly TURBOQUANT_K8V4_UNIT_SHA256="2121146ae781bb94bd4ae257fb6a26c40ef7f3b212e626845d0939756fe8a494"
@@ -355,10 +355,13 @@ VLLM_ARGS=(
   # (utilization budget minus every observed resident) may prefer a smaller
   # pool but cannot shrink or veto it. What CAN refuse the declaration is the
   # bound the engine derives: the device memory free at startup profiling,
-  # minus every resident profiling measured and the frontend reservations.
-  # The startup log states each term ("physical KV bound") and, after
-  # warm-up, the pool admitted against it. Residents allocated after profiling
-  # -- the TurboQuant continuation workspace -- are not in that bound.
+  # minus what serving holds beside its pool -- the residents profiling
+  # measured, the workspaces among them, and the peak of the phases it runs
+  # in the residency serving runs them in: the vision encoder with the
+  # TurboQuant continuation workspace released, the text step (attention
+  # executed at full context) and the sampler with it resident -- and the
+  # frontend reservations. The startup log states each term ("physical KV
+  # bound") and, after warm-up, the pool admitted against it.
   # Utilization stays at the vLLM default; it governs the startup
   # free-memory requirement and the informational estimate, not the
   # declared pool.
@@ -460,7 +463,7 @@ readonly TOOL_OUTPUT_PARSER_UNIT_SHA256="e83cb40d98d4cfe218efb33d7fc930064244f2b
 
 readonly PNG_SOURCE_PATCH_DIFF_SHA256="b1b684a96d7243ae647d4d8ce2fe69b7330b3ab243ea77903c4cfb346bc80549"
 
-readonly KV_PHYSICAL_PATCH_DIFF_SHA256="d9c1b5a9d2c20266246e856f2264ad9da0d624b797ca682671772b808febca82"
+readonly KV_PHYSICAL_PATCH_DIFF_SHA256="2fa5466ef1c8c5bc8d9651e269d83d8f7496fb8a5097273cb2c626dc7707471c"
 
 readonly TOOL_PARSER_ABSTRACT_UPSTREAM_FILE_SHA256="5826dee6676d2ffc88856ab498c6271296b17c6f743a96646a2fc49a9008d1d7"
 
