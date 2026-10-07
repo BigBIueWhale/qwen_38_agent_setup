@@ -4,8 +4,9 @@ set -euo pipefail
 usage() {
   cat >&2 <<'USAGE'
 Usage: build-vllm.sh {build|check|serve-check|materialise DIRECTORY}
-  build        verify every pinned input, then build the runtime image from the
-               verified reconstruction and export it
+  build        verify every pinned input, build the runtime image from the
+               verified reconstruction, run the units that need the GPU in it
+               on this host's GPU, and pin it
   check        verify every pinned input and stop; nothing is written
   serve-check  check, then refuse unless the pinned image was built from exactly
                these inputs; start.sh and status.sh run it before serving
@@ -34,6 +35,12 @@ esac
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=runtime-common.sh
 source "${SCRIPT_DIR}/runtime-common.sh"
+# A build pins only an image whose GPU units passed in it on this host
+# (run_gpu_release_units, below), so a host that cannot run them is refused
+# before anything is built.
+if [[ "${MODE}" == build ]]; then
+  check_host_prerequisites
+fi
 RUNTIME_LOCK="${PROJECT_DIR}/config/runtime-v1.sh"
 VLLM_DIR="${PROJECT_DIR}/vllm"
 DOCKERFILE="${PROJECT_DIR}/containers/Dockerfile.runtime"
@@ -1341,6 +1348,10 @@ if [[ "${actual_profile_label}" != "${IMAGE_PROFILE_VERSION}" ]]; then
   echo "Found:    ${actual_profile_label:-missing}" >&2
   exit 1
 fi
+
+# The units that need the GPU run in this image, on this host's GPU, before
+# anything pins it or moves IMAGE_TAG to it.
+run_gpu_release_units "${actual_image_id}"
 
 # The build is the only witness of the image it made, so it writes the pin
 # itself. A build of the inputs the pin was made from must reproduce it and is

@@ -365,6 +365,47 @@ check_model_files() {
   )
 }
 
+# The units that need the GPU: the installed TurboQuant K8V4 store and fused
+# decode against PyTorch references, and the checkpoint's worst-error NVFP4
+# layer through the production kernel. The image ships them and nothing else
+# runs them, so a build runs them in the image it has just made, before it may
+# pin it: on this host's GPU, with the verified model read-only at /model, as
+# the user and in the environment the server runs with. The kernel caches the
+# server keeps in its volume are a tmpfs here, unbounded as that volume is, so
+# the run writes nothing outside itself. A host without the validated GPU, a
+# model that differs from its manifest, or a unit that fails refuses the pin.
+readonly -a GPU_RELEASE_UNITS=(turboquant_k8v4_unit nvfp4_kernel_unit)
+run_gpu_release_units() {
+  local image_id="$1" unit runtime_environment
+  local -a environment_args=()
+  printf 'The image is pinned only once the units that need the GPU pass in it on this host.\n'
+  check_host_prerequisites
+  check_model_files
+  for runtime_environment in "${RUNTIME_ENV[@]}"; do
+    environment_args+=(--env "${runtime_environment}")
+  done
+  for unit in "${GPU_RELEASE_UNITS[@]}"; do
+    printf 'Running %s in %s on the GPU...\n' "${unit}" "${image_id}"
+    docker run --rm \
+      --gpus all \
+      --network none \
+      --restart no \
+      --user 2000:0 \
+      --read-only \
+      --tmpfs "/tmp:${TMP_TMPFS_OPTIONS}" \
+      --tmpfs /home/vllm/.cache/vllm:rw,nosuid,nodev,exec,uid=2000,gid=0,mode=0700 \
+      --cap-drop ALL \
+      --security-opt no-new-privileges:true \
+      "${environment_args[@]}" \
+      --volume "${MODEL_DIR}:/model:ro" \
+      --entrypoint python3 \
+      "${image_id}" "/opt/qwen38/${unit}.py" || \
+      die "The release unit ${unit} failed in ${image_id} on this host's GPU; the image was not pinned." \
+        "It ran the shipped /opt/qwen38/${unit}.py with ${MODEL_DIR} at /model; its output is above." \
+        "Next: the installed kernels, their numerics or the checkpoint differ from what the unit accepts. Find the cause, fix it, and build again."
+  done
+}
+
 listener_output() {
   ss -H -ltn "sport = :${LISTEN_PORT}"
 }

@@ -22,6 +22,8 @@ required_functions=(
   require_published_release
   check_host_prerequisites
   check_pinned_build_inputs
+  check_model_files
+  run_gpu_release_units
   require_image_built_from_inputs
   assert_running_profile
   host_isolation_refusal
@@ -214,6 +216,111 @@ for capability in 10.0 9.0 12.1; do
   }
 done
 
+# The units that need the GPU run in the image a build has made: each shipped
+# unit, on the GPU, with the verified model read-only at /model, as the server's
+# user and in its environment, and every one must pass. A host without the
+# validated GPU is refused before anything runs, and a unit that fails refuses
+# by name and stops. Docker, the GPU and the model check are faked to the given
+# host; the gate's Docker runs are recorded rather than executed.
+gpu_units_log="$(mktemp)"
+gpu_release_units_on() (
+  local fake_runtimes="$1" fake_capability="$2" failing_unit="$3"
+  docker() {
+    case "$*" in
+      "version --format {{.Server.Version}}") printf '%s\n' 29.8.1 ;;
+      "info --format {{json .SecurityOptions}}") printf '%s\n' "${accepted_security_options}" ;;
+      "info --format {{json .Runtimes}}") printf '%s\n' "${fake_runtimes}" ;;
+      "run --rm "*)
+        printf 'run %s\n' "${*:2}" >>"${gpu_units_log}"
+        [[ -z "${failing_unit}" || "$*" != *" /opt/qwen38/${failing_unit}.py" ]]
+        ;;
+      *)
+        printf 'unexpected fake Docker invocation: %s\n' "$*" >&2
+        return 97
+        ;;
+    esac
+  }
+  nvidia-smi() {
+    printf '%s, %s\n' "${MINIMUM_GPU_MEMORY_MIB}" "${fake_capability}"
+  }
+  # shellcheck disable=SC2317
+  git() { return 97; }
+  # shellcheck disable=SC2317
+  ss() { return 97; }
+  check_model_files() {
+    printf 'model verified\n' >>"${gpu_units_log}"
+  }
+  run_gpu_release_units sha256:0123abcd
+)
+nvidia_runtimes='{"nvidia":{"path":"nvidia-container-runtime"},"runc":{"path":"runc"}}'
+gpu_unit_cases=0
+for gpu_case in passes no-nvidia-runtime capability-9.0 turboquant-fails nvfp4-fails; do
+  : >"${gpu_units_log}"
+  runtimes="${nvidia_runtimes}" capability="${VALIDATED_CUDA_CAPABILITY}" failing=""
+  case "${gpu_case}" in
+    no-nvidia-runtime) runtimes='{"runc":{"path":"runc"}}' ;;
+    capability-9.0) capability=9.0 ;;
+    turboquant-fails) failing=turboquant_k8v4_unit ;;
+    nvfp4-fails) failing=nvfp4_kernel_unit ;;
+  esac
+  if gpu_output="$(gpu_release_units_on "${runtimes}" "${capability}" "${failing}" 2>&1)"; then
+    gpu_status=0
+  else
+    gpu_status=$?
+  fi
+  mapfile -t gpu_runs < <(grep '^run ' "${gpu_units_log}" || true)
+  case "${gpu_case}" in
+    passes)
+      [[ "${gpu_status}" == 0 && "${#gpu_runs[@]}" == "${#GPU_RELEASE_UNITS[@]}" && \
+         "$(head -n 1 "${gpu_units_log}")" == 'model verified' ]] || {
+        printf 'ERROR: the GPU units did not all run after the model check (exit %s):\n%s\n' \
+          "${gpu_status}" "$(cat "${gpu_units_log}")" >&2
+        exit 1
+      }
+      for index in "${!GPU_RELEASE_UNITS[@]}"; do
+        gpu_run="${gpu_runs[${index}]}"
+        for fragment in '--gpus all' '--network none' '--user 2000:0' '--read-only' \
+            "--volume ${MODEL_DIR}:/model:ro" '--env HOME=/home/vllm' \
+            "--entrypoint python3 sha256:0123abcd /opt/qwen38/${GPU_RELEASE_UNITS[${index}]}.py"; do
+          [[ "${gpu_run}" == *" ${fragment}"* ]] || {
+            printf 'ERROR: GPU unit run %s lacks "%s": %s\n' "${index}" "${fragment}" "${gpu_run}" >&2
+            exit 1
+          }
+        done
+        [[ "${gpu_run}" == *" /opt/qwen38/${GPU_RELEASE_UNITS[${index}]}.py" ]] || {
+          printf 'ERROR: GPU unit run %s does not end with its unit: %s\n' "${index}" "${gpu_run}" >&2
+          exit 1
+        }
+      done
+      ;;
+    no-nvidia-runtime|capability-9.0)
+      [[ "${gpu_status}" == 1 && "${#gpu_runs[@]}" == 0 && \
+         ! -s "${gpu_units_log}" && \
+         "${gpu_output}" == *'The image is pinned only once the units that need the GPU pass in it on this host.'* && \
+         ( "${gpu_output}" == *"ERROR: Docker's NVIDIA runtime is not configured."* || \
+           "${gpu_output}" == *'ERROR: GPU compute capability 9.0 is outside the validated lock.'* ) ]] || {
+        printf 'ERROR: a host without the validated GPU was not refused before any unit ran (%s, exit %s):\n%s\n' \
+          "${gpu_case}" "${gpu_status}" "${gpu_output}" >&2
+        exit 1
+      }
+      ;;
+    *-fails)
+      expected_runs=1
+      [[ "${failing}" == nvfp4_kernel_unit ]] && expected_runs=2
+      [[ "${gpu_status}" == 1 && "${#gpu_runs[@]}" == "${expected_runs}" && \
+         "${gpu_output}" == *"ERROR: The release unit ${failing} failed in sha256:0123abcd on this host's GPU; the image was not pinned."* && \
+         "${gpu_output}" == *"It ran the shipped /opt/qwen38/${failing}.py with ${MODEL_DIR} at /model"* && \
+         "${gpu_output}" == *'Next: '* ]] || {
+        printf 'ERROR: a failing %s was not refused by name after %s run(s) (exit %s):\n%s\n' \
+          "${failing}" "${expected_runs}" "${gpu_status}" "${gpu_output}" >&2
+        exit 1
+      }
+      ;;
+  esac
+  gpu_unit_cases=$((gpu_unit_cases + 1))
+done
+rm -f -- "${gpu_units_log}"
+
 # A produced identity is written by the step that produced it and verified by
 # every later run of the same inputs, on a scratch copy of the real lock, for
 # both pairs the lock holds: the image a build makes and the archive a save
@@ -339,5 +446,5 @@ fi
   exit 1
 }
 
-printf 'RUNTIME_COMMON_CONTRACT_OK functions=%s host-isolation=%s-accepted-%s-refused capability-refusals=3 produced-identities=%s stale-image-refusal=1\n' \
-  "${#required_functions[@]}" "${host_isolation_accepted}" "${host_isolation_refused}" "${settled_pairs}"
+printf 'RUNTIME_COMMON_CONTRACT_OK functions=%s host-isolation=%s-accepted-%s-refused capability-refusals=3 gpu-unit-cases=%s produced-identities=%s stale-image-refusal=1\n' \
+  "${#required_functions[@]}" "${host_isolation_accepted}" "${host_isolation_refused}" "${gpu_unit_cases}" "${settled_pairs}"

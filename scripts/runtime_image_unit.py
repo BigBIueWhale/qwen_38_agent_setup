@@ -133,13 +133,15 @@ class RuntimeImageTest(unittest.TestCase):
             recipe,
         )
 
-    def test_every_shipped_unit_is_executed_or_needs_the_card(self):
+    def test_every_shipped_unit_is_executed(self):
         # A unit the image ships and nothing runs reports as coverage it never
         # gives: qwen38_context_unit, which needs only the served config, was
-        # shipped and hashed for weeks and run by nothing. A unit runs in the
-        # image's own layers or in the build's unit loop. Only a unit that
-        # needs the GPU may do neither, and those are named here, with the
-        # reason, so no other unit can quietly join them.
+        # shipped and hashed for weeks and run by nothing, and the two GPU units
+        # were run by nothing until a build ran them. A unit runs in the image's
+        # own layers, in the build's CPU unit loop, or -- only if it needs the
+        # GPU -- in the image a build has made, on the GPU, before the build
+        # pins it. Those are named here, with the reason, so no other unit can
+        # quietly join them and leave the loop that check runs.
         needs_the_card = {
             # Triton store and fused decode on CUDA, against PyTorch references.
             "turboquant_k8v4_unit",
@@ -159,7 +161,13 @@ class RuntimeImageTest(unittest.TestCase):
         )
         in_check = set(loop.split(" in ", 1)[1].split(";", 1)[0].split())
         in_check |= set(re.findall(r"/context/scripts/(\w+_unit)\.py", script))
-        self.assertEqual(sorted(shipped - in_image - in_check), sorted(needs_the_card))
+        runtime = (ROOT / "scripts/runtime-common.sh").read_text()
+        on_the_card = set(re.search(
+            r"^readonly -a GPU_RELEASE_UNITS=\(([^)]*)\)$", runtime, re.M,
+        ).group(1).split())
+        self.assertEqual(on_the_card, needs_the_card)
+        self.assertEqual(sorted(shipped - in_image - in_check), sorted(on_the_card))
+        self.assertEqual(on_the_card & (in_image | in_check), set())
 
     def test_grammar_unit_is_executed_during_build(self):
         # The image must run the shipped file, not a copy of its assertions:
@@ -211,6 +219,24 @@ class BuildScriptTest(unittest.TestCase):
             self.script.count("${VLLM_DIR}"),
             self.script.count('git -C "${VLLM_DIR}"'),
         )
+
+    def test_a_build_pins_only_an_image_whose_gpu_units_passed(self):
+        # The GPU units run in the image the build has just made, after its
+        # installed bytes and label are verified and before anything pins it or
+        # moves the runtime tag to it; a host that cannot run them is refused
+        # before the image is built. What the gate itself does is the runtime
+        # contract test's.
+        script = self.script
+        gate = script.index('\nrun_gpu_release_units "${actual_image_id}"\n')
+        self.assertEqual(script.count('run_gpu_release_units "'), 1)
+        self.assertLess(
+            script.index("Built image carries the wrong runtime profile label."), gate)
+        self.assertLess(gate, script.index('settle_produced_identity pin_outcome "${RUNTIME_LOCK}"'))
+        self.assertLess(gate, script.index('docker tag "${actual_image_id}" "${IMAGE_TAG}"'))
+        early = script.index(
+            'if [[ "${MODE}" == build ]]; then\n  check_host_prerequisites\nfi\n')
+        self.assertLess(early, script.index("docker buildx build"))
+        self.assertLess(early, script.index("BUILD_EXPORT_DIR=\"$(mktemp"))
 
     def test_the_image_is_built_from_the_assembled_context(self):
         invocation = self.script.split("docker buildx build", 1)[1]

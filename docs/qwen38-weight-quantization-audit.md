@@ -158,5 +158,6 @@ above. The deployable correction is recreated with:
 
 The immutable runtime embeds the GPU kernel audit at
 `/opt/qwen38/nvfp4_kernel_unit.py`. It must be run with the corrected model mounted
-read-only at `/model` and the GPU assigned. A passing test prints all three measured
+read-only at `/model` and the GPU assigned; `./scripts/build-vllm.sh build` runs it
+so in every image it builds, before it pins the image. A passing test prints all three measured
 rows; a format, shape, kernel-selection, or tolerance change exits nonzero.

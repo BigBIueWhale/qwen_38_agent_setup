@@ -101,9 +101,11 @@ Advanced reproducibility operations are deliberately separate from serving mode:
 The check reconstructs the source tree from the pinned upstream commit through every
 landmark-aware transformation and assembles the build context from that
 reconstruction. The build does the same, then runs offline from the exact base image
-on that context and pins what it made: a build of the inputs the pinned image was
-built from must reproduce its ID and fails otherwise, and a build of any other inputs
-writes its own ID into `config/runtime-v1.sh`. Materialise writes the verified
+on that context, runs the units that need the GPU in the image it made on this
+host's GPU, and pins what it made only once they pass: a build of the inputs the
+pinned image was built from must reproduce its ID and fails otherwise, and a build of
+any other inputs writes its own ID into `config/runtime-v1.sh`. A host without the
+validated GPU is refused before anything is built. Materialise writes the verified
 reconstruction to a new directory, as a tree in which to author a stage; nothing
 reads it. `serve-check` is the check `start.sh` and `status.sh` run first: it
 also refuses, before any container is created, a revision whose image inputs
@@ -406,8 +408,8 @@ Pinned build inputs and products:
 | Immutable base tag | qwen38-vllm:main-9df9b0b |
 | Immutable base ID | sha256:fa4a002a88b7043a1a89966dea8a500fe9696f84e75730d9da916f916048d401 |
 | Runtime Dockerfile SHA-256 | 319a602d81d5f30696609ad36c9e3ea421c08ef5d97623222eeec6ba1866f4fe |
-| Build verifier SHA-256 | d8a8d38eda3e4ae90eb7d3747610770cce2ee774b68ba8d4747af356bfd941f3 |
-| Runtime validator SHA-256 | a7d6486f1f5b98fba351d1164759adf29277f51849963e71ba01b34b70695692 |
+| Build verifier SHA-256 | f833c238d36fafc0414d3188c0ac8b87d6b9f3c99e3855cf0d655a1959949ce2 |
+| Runtime validator SHA-256 | 65975561709b9876c31cd38a956971e7172ca7fc38cbdeac9733adec94a78d47 |
 
 The runtime image's profile, tag and archive name, which every release advances
 together, are declared in `config/runtime-v1.sh`, and the archive lives under
@@ -443,8 +445,13 @@ Every reviewed runtime file, including both TurboQuant kernels, is copied and
 hash-checked against its upstream and patched identities. A CPU Triton-interpreter
 build unit executes the installed K8V4 store with finite, NaN, infinity and
 metadata-overflow inputs and checks the decode hardware guard. A separate recipe
-unit refuses missing copies or installed-file checks. The GPU
-numerical unit remains a release gate; CPU interpretation is not GPU acceptance.
+unit refuses missing copies or installed-file checks. CPU interpretation is not GPU
+acceptance: the two units that need the GPU -- the installed K8V4 store and fused
+decode against PyTorch references, and the checkpoint's worst-error NVFP4 layer
+through the production kernel -- run in every image `./scripts/build-vllm.sh build`
+makes, on the host's GPU with the verified model read-only at `/model`, as the
+server's user and in its environment, and the build pins the image only if both
+pass. They are the only shipped units the CPU unit loop does not run.
 
 The final runtime layer does no package resolution or installation. It is built with
 pull=false, network=none, provenance=false, an exact base ID, a context assembled
