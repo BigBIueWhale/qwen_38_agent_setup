@@ -30,7 +30,10 @@ from vllm.entrypoints.openai.chat_completion.protocol import (
     ChatCompletionRequest,
     ChatCompletionToolsParam,
 )
-from vllm.entrypoints.openai.responses.protocol import ResponseIncompleteEvent
+from vllm.entrypoints.openai.responses.protocol import (
+    ResponseIncompleteEvent,
+    ResponsesRequest,
+)
 from vllm.entrypoints.openai.responses.streaming_events import (
     SimpleStreamingEventProcessor,
     _StateType,
@@ -663,5 +666,53 @@ except ValueError as refusal:
     ))), refusal
 else:
     raise AssertionError("an unknown structural-tag format was built")
+
+# One generation is decoded under one grammar. A tool choice that lets the
+# model call arms the tool-call grammar, which used to replace a caller's
+# output constraint without a word -- on every Qwen request with tools, since
+# every auto request arms. Every surface now refuses the pair, naming the
+# constraint as that surface spells it; under tool_choice "none" the constraint
+# is the request's only grammar and is kept.
+constraint_schema = {"type": "object", "properties": {"answer": {"type": "string"}}}
+chat_body = {"model": "m", "messages": [{"role": "user", "content": "hi"}]}
+chat_tool = {"type": "function", "function": {"name": "get_weather", "parameters": {
+    "type": "object", "properties": {"city": {"type": "string"}}}}}
+json_schema_format = {"type": "json_schema", "json_schema": {
+    "name": "answer", "schema": constraint_schema}}
+for build, constraint in (
+    (lambda: ChatCompletionRequest.model_validate(
+        {**chat_body, "tools": [chat_tool], "response_format": json_schema_format}),
+     "response_format"),
+    (lambda: ChatCompletionRequest.model_validate(
+        {**chat_body, "tools": [chat_tool], "tool_choice": "required",
+         "structured_outputs": {"regex": "[a-z]+"}}),
+     "structured_outputs"),
+    (lambda: ResponsesRequest.model_validate(
+        {"model": "m", "input": "hi", "kv_scope": "agent",
+         "tools": [{"type": "function", "name": "get_weather",
+                    "parameters": chat_tool["function"]["parameters"]}],
+         "text": {"format": {"type": "json_schema", "name": "answer",
+                             "schema": constraint_schema}}}),
+     "text.format"),
+    (lambda: AnthropicMessagesRequest.model_validate(
+        {"model": "m", "max_tokens": 8, "kv_scope": "agent",
+         "messages": [{"role": "user", "content": "hi"}],
+         "tools": [{"name": "get_weather",
+                    "input_schema": chat_tool["function"]["parameters"]}],
+         "output_config": {"format": {"type": "json_schema",
+                                      "schema": constraint_schema}}}),
+     "output_config.format"),
+):
+    try:
+        build()
+    except VLLMValidationError as refusal:
+        assert refusal.parameter == constraint, (constraint, refusal.parameter)
+    else:
+        raise AssertionError(f"{constraint} beside a callable tool was accepted")
+kept = ChatCompletionRequest.model_validate(
+    {**chat_body, "tools": [chat_tool], "tool_choice": "none",
+     "response_format": json_schema_format}
+)
+assert kept.extract_structured_outputs().json == constraint_schema
 
 print("qwen-grammar-unit: PASS")

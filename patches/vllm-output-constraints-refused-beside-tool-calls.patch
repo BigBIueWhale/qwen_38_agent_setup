@@ -1,0 +1,482 @@
+diff --git a/tests/entrypoints/openai/test_output_constraint_beside_tools.py b/tests/entrypoints/openai/test_output_constraint_beside_tools.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..4ff90f4ee57f304d933eebedac7847bb39c64005
+--- /dev/null
++++ b/tests/entrypoints/openai/test_output_constraint_beside_tools.py
+@@ -0,0 +1,156 @@
++# SPDX-License-Identifier: Apache-2.0
++# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
++"""An output constraint and a tool choice that can call are refused together.
++
++One generation is decoded under one grammar. A tool choice that lets the model
++call arms the tool-call grammar, which cannot also enforce the caller's output
++constraint, so the pair is refused on every surface, naming the constraint as
++the caller spelled it. With tool_choice "none" the constraint is the request's
++only grammar and reaches the sampling parameters unchanged.
++"""
++
++import pytest
++
++from vllm.entrypoints.anthropic.protocol import AnthropicMessagesRequest
++from vllm.entrypoints.openai.chat_completion.protocol import ChatCompletionRequest
++from vllm.entrypoints.openai.responses.protocol import ResponsesRequest
++from vllm.exceptions import VLLMValidationError
++
++_CHAT_TOOL = {
++    "type": "function",
++    "function": {
++        "name": "get_weather",
++        "parameters": {"type": "object", "properties": {"city": {"type": "string"}}},
++    },
++}
++_RESPONSES_TOOL = {
++    "type": "function",
++    "name": "get_weather",
++    "parameters": {"type": "object", "properties": {"city": {"type": "string"}}},
++}
++_ANTHROPIC_TOOL = {
++    "name": "get_weather",
++    "input_schema": {"type": "object", "properties": {"city": {"type": "string"}}},
++}
++_SCHEMA = {"type": "object", "properties": {"answer": {"type": "string"}}}
++
++_CHAT_CONSTRAINTS = [
++    ("response_format", {"type": "json_object"}),
++    ("response_format", {"type": "json_schema", "json_schema": {"name": "a", "schema": _SCHEMA}}),
++    ("structured_outputs", {"json": _SCHEMA}),
++    ("structured_outputs", {"regex": "[a-z]+"}),
++    ("structured_outputs", {"choice": ["yes", "no"]}),
++    ("structured_outputs", {"grammar": "root ::= 'yes'"}),
++]
++_CHAT_CALLING_CHOICES = [
++    None,
++    "auto",
++    "required",
++    {"type": "function", "function": {"name": "get_weather"}},
++]
++
++
++def _chat(**fields):
++    return ChatCompletionRequest.model_validate(
++        {"model": "m", "messages": [{"role": "user", "content": "hi"}], **fields}
++    )
++
++
++@pytest.mark.parametrize("constraint,value", _CHAT_CONSTRAINTS)
++@pytest.mark.parametrize("tool_choice", _CHAT_CALLING_CHOICES)
++def test_chat_refuses_a_constraint_beside_a_callable_tool(constraint, value, tool_choice):
++    fields = {"tools": [_CHAT_TOOL], constraint: value}
++    if tool_choice is not None:
++        fields["tool_choice"] = tool_choice
++    with pytest.raises(VLLMValidationError) as refusal:
++        _chat(**fields)
++    assert refusal.value.parameter == constraint
++    assert 'tool_choice "none"' in str(refusal.value)
++
++
++@pytest.mark.parametrize("constraint,value", _CHAT_CONSTRAINTS)
++def test_chat_keeps_the_constraint_when_no_tool_can_be_called(constraint, value):
++    request = _chat(tools=[_CHAT_TOOL], tool_choice="none", **{constraint: value})
++    assert request.extract_structured_outputs() is not None
++    assert _chat(**{constraint: value}).extract_structured_outputs() is not None
++
++
++def test_chat_text_format_is_no_constraint():
++    request = _chat(tools=[_CHAT_TOOL], response_format={"type": "text"})
++    assert request.tool_choice == "auto"
++    assert request.extract_structured_outputs() is None
++
++
++_RESPONSES_CONSTRAINTS = [
++    ("text.format", {"text": {"format": {"type": "json_object"}}}),
++    ("text.format", {"text": {"format": {"type": "json_schema", "name": "a", "schema": _SCHEMA}}}),
++    ("structured_outputs", {"structured_outputs": {"regex": "[a-z]+"}}),
++]
++
++
++def _responses(**fields):
++    return ResponsesRequest.model_validate(
++        {"model": "m", "input": "hi", "kv_scope": "agent", **fields}
++    )
++
++
++@pytest.mark.parametrize("constraint,fields", _RESPONSES_CONSTRAINTS)
++@pytest.mark.parametrize(
++    "tool_choice", [None, "auto", "required", {"type": "function", "name": "get_weather"}]
++)
++def test_responses_refuses_a_constraint_beside_a_callable_tool(constraint, fields, tool_choice):
++    extra = {} if tool_choice is None else {"tool_choice": tool_choice}
++    with pytest.raises(VLLMValidationError) as refusal:
++        _responses(tools=[_RESPONSES_TOOL], **fields, **extra)
++    assert refusal.value.parameter == constraint
++
++
++@pytest.mark.parametrize("constraint,fields", _RESPONSES_CONSTRAINTS)
++def test_responses_keeps_the_constraint_when_no_tool_can_be_called(constraint, fields):
++    request = _responses(tools=[_RESPONSES_TOOL], tool_choice="none", **fields)
++    assert request.extract_structured_outputs() is not None
++    assert _responses(**fields).extract_structured_outputs() is not None
++
++
++def test_responses_text_format_text_is_no_constraint():
++    request = _responses(tools=[_RESPONSES_TOOL], text={"format": {"type": "text"}})
++    assert request.extract_structured_outputs() is None
++
++
++def _anthropic(**fields):
++    return AnthropicMessagesRequest.model_validate(
++        {
++            "model": "m",
++            "max_tokens": 16,
++            "kv_scope": "agent",
++            "messages": [{"role": "user", "content": "hi"}],
++            **fields,
++        }
++    )
++
++
++_FORMAT = {"format": {"type": "json_schema", "schema": _SCHEMA}}
++
++
++@pytest.mark.parametrize(
++    "tool_choice",
++    [None, {"type": "auto"}, {"type": "any"}, {"type": "tool", "name": "get_weather"}],
++)
++def test_anthropic_refuses_an_output_format_beside_a_callable_tool(tool_choice):
++    extra = {} if tool_choice is None else {"tool_choice": tool_choice}
++    with pytest.raises(VLLMValidationError) as refusal:
++        _anthropic(tools=[_ANTHROPIC_TOOL], output_config=_FORMAT, **extra)
++    assert refusal.value.parameter == "output_config.format"
++
++
++def test_anthropic_keeps_the_output_format_when_no_tool_can_be_called():
++    request = _anthropic(
++        tools=[_ANTHROPIC_TOOL], tool_choice={"type": "none"}, output_config=_FORMAT
++    )
++    assert request.output_config.format.json_schema == _SCHEMA
++
++
++def test_anthropic_refuses_an_output_format_without_a_schema():
++    with pytest.raises(VLLMValidationError) as refusal:
++        _anthropic(output_config={"format": {"type": "json_schema"}})
++    assert refusal.value.parameter == "output_config.format.schema"
+diff --git a/tests/tool_use/test_chat_completion_request_validations.py b/tests/tool_use/test_chat_completion_request_validations.py
+index 1def2acc56cf5793e989934bb439f7949f136db2..63ba2f29953da69ec996d1494519f7c17c2f49bc 100644
+--- a/tests/tool_use/test_chat_completion_request_validations.py
++++ b/tests/tool_use/test_chat_completion_request_validations.py
+@@ -119,53 +119,6 @@ def test_no_reasoning_fields_unchanged():
+     assert "reasoning_content" not in assistant_msg
+ 
+ 
+-SAMPLE_TOOL = {
+-    "type": "function",
+-    "function": {
+-        "name": "get_weather",
+-        "description": "Get the weather",
+-        "parameters": {
+-            "type": "object",
+-            "properties": {"location": {"type": "string"}},
+-        },
+-    },
+-}
+-
+-
+-def test_structured_outputs_with_named_tool_choice_rejected():
+-    """structured_outputs cannot be combined with a named tool_choice."""
+-    with pytest.raises(
+-        VLLMValidationError,
+-        match="structured outputs or tools, not both",
+-    ):
+-        ChatCompletionRequest.model_validate(
+-            {
+-                "messages": [{"role": "user", "content": "Hello"}],
+-                "model": "facebook/opt-125m",
+-                "tools": [SAMPLE_TOOL],
+-                "tool_choice": {
+-                    "type": "function",
+-                    "function": {"name": "get_weather"},
+-                },
+-                "structured_outputs": {"json": {"type": "object"}},
+-            }
+-        )
+-
+-
+-def test_structured_outputs_with_auto_tool_choice_allowed():
+-    """structured_outputs with tool_choice 'auto' should be allowed."""
+-    request = ChatCompletionRequest.model_validate(
+-        {
+-            "messages": [{"role": "user", "content": "Hello"}],
+-            "model": "facebook/opt-125m",
+-            "tools": [SAMPLE_TOOL],
+-            "tool_choice": "auto",
+-            "structured_outputs": {"json": {"type": "object"}},
+-        }
+-    )
+-    assert request.tool_choice == "auto"
+-
+-
+ def test_multiple_structured_outputs_rejected():
+     """Only one kind of structured output constraint is allowed."""
+     with pytest.raises(
+diff --git a/tests/tool_use/test_chat_completions.py b/tests/tool_use/test_chat_completions.py
+index e5bb475875ac9d5c8a75e1f5096cb1cf0049d888..d79c10627230686a9543c090d6e2657229c06bd7 100644
+--- a/tests/tool_use/test_chat_completions.py
++++ b/tests/tool_use/test_chat_completions.py
+@@ -158,43 +158,33 @@ async def test_chat_completion_with_tools(
+     assert "".join(chunks) == output_text
+ 
+ 
+-# Regression test for https://github.com/vllm-project/vllm/issues/32006
+-# Engine crash when combining response_format: json_object with
+-# tool_choice: required
++# https://github.com/vllm-project/vllm/issues/32006: response_format beside
++# tool_choice "required" once reached the engine as two constraints.
+ @pytest.mark.asyncio
+ @pytest.mark.timeout(120)
+ async def test_response_format_with_tool_choice_required(
+     client: openai.AsyncOpenAI, server_config: ServerConfig
+ ):
+-    """
+-    Test that combining response_format: json_object with tool_choice: required
+-    doesn't crash the engine.
++    """response_format beside a tool choice that calls is refused, by name.
+ 
+-    Before the fix, this would cause a validation error:
+-    "You can only use one kind of structured outputs constraint but multiple
+-    are specified" because both json_object and json (from tool schema) would
+-    be set in StructuredOutputsParams.
++    The tool-call grammar a forced call needs cannot also enforce the output
++    constraint, so the request is a 400 naming response_format, never a
++    generation that silently drops one of the two.
+     """
+     models = await client.models.list()
+     model_name: str = models.data[0].id
+ 
+-    # This combination previously crashed the engine
+-    chat_completion = await client.chat.completions.create(
+-        messages=ensure_system_prompt(
+-            [{"role": "user", "content": "What is the weather in Dallas, Texas?"}],
+-            server_config,
+-        ),
+-        temperature=0,
+-        max_completion_tokens=150,
+-        model=model_name,
+-        tools=[WEATHER_TOOL],
+-        tool_choice="required",
+-        response_format={"type": "json_object"},
+-    )
+-
+-    # The fix clears response_format when tool_choice forces tool calling,
+-    # so the request should complete successfully with tool calls
+-    choice = chat_completion.choices[0]
+-    assert choice.finish_reason == "tool_calls"
+-    assert choice.message.tool_calls is not None
+-    assert len(choice.message.tool_calls) > 0
++    with pytest.raises(openai.BadRequestError) as refusal:
++        await client.chat.completions.create(
++            messages=ensure_system_prompt(
++                [{"role": "user", "content": "What is the weather in Dallas, Texas?"}],
++                server_config,
++            ),
++            temperature=0,
++            max_completion_tokens=150,
++            model=model_name,
++            tools=[WEATHER_TOOL],
++            tool_choice="required",
++            response_format={"type": "json_object"},
++        )
++    assert "response_format" in str(refusal.value)
+diff --git a/vllm/entrypoints/anthropic/protocol.py b/vllm/entrypoints/anthropic/protocol.py
+index 0f533af4db299d2dfdb5377eb3658678f23305d5..387c007daa382fe547d92697fe008b19bc826c81 100644
+--- a/vllm/entrypoints/anthropic/protocol.py
++++ b/vllm/entrypoints/anthropic/protocol.py
+@@ -8,7 +8,11 @@ from typing import Annotated, Any, Literal
+ from pydantic import BaseModel, Field, field_validator, model_validator
+ 
+ import vllm.envs as envs
+-from vllm.entrypoints.openai.engine.protocol import KvScope
++from vllm.entrypoints.openai.engine.protocol import (
++    KvScope,
++    output_constraint_beside_tool_calls,
++)
++from vllm.exceptions import VLLMValidationError
+ from vllm.sampling_params import require_kv_scope_value
+ 
+ 
+@@ -274,6 +278,29 @@ class AnthropicMessagesRequest(BaseModel):
+             raise ValueError("max_tokens must be positive")
+         return v
+ 
++    @model_validator(mode="after")
++    def check_output_format(self) -> "AnthropicMessagesRequest":
++        output_format = self.output_config.format if self.output_config else None
++        if output_format is None:
++            return self
++        if output_format.json_schema is None:
++            raise VLLMValidationError(
++                "output_config.format asks for json_schema output and carries "
++                "no schema to follow. Send the schema as "
++                "output_config.format.schema, or remove output_config.format.",
++                parameter="output_config.format.schema",
++            )
++        # An unspecified tool choice is "auto" when tools are declared.
++        if self.tools and (
++            self.tool_choice is None or self.tool_choice.type != "none"
++        ):
++            raise output_constraint_beside_tool_calls(
++                "output_config.format",
++                none_choice='tool_choice {"type": "none"}',
++                named_choice='tool_choice {"type": "tool", "name": ...}',
++            )
++        return self
++
+ 
+ class AnthropicDelta(BaseModel):
+     """Delta for streaming responses"""
+diff --git a/vllm/entrypoints/anthropic/serving.py b/vllm/entrypoints/anthropic/serving.py
+index 699c199b07296388ecd540590f863c4219142ffe..b88550dd7c534a0fb9ce676c1f3bc6e476a92fa1 100644
+--- a/vllm/entrypoints/anthropic/serving.py
++++ b/vllm/entrypoints/anthropic/serving.py
+@@ -578,7 +578,7 @@ class AnthropicServingMessages(OpenAIServingChat):
+         if isinstance(anthropic_request, AnthropicCountTokensRequest):
+             return
+         output_config: AnthropicOutputConfig | None = anthropic_request.output_config
+-        if output_config and output_config.format and output_config.format.json_schema:
++        if output_config and output_config.format:
+             req.response_format = ResponseFormat(
+                 type=output_config.format.type,
+                 json_schema=JsonSchemaResponseFormat(
+diff --git a/vllm/entrypoints/openai/chat_completion/protocol.py b/vllm/entrypoints/openai/chat_completion/protocol.py
+index 4cbf4f9c692fd1a4f0571e8843f5969df0b50c4f..0564f6f3e7ab87a2c966ac9636b5f608d6302ac6 100644
+--- a/vllm/entrypoints/openai/chat_completion/protocol.py
++++ b/vllm/entrypoints/openai/chat_completion/protocol.py
+@@ -37,6 +37,7 @@ from vllm.entrypoints.openai.engine.protocol import (
+     StreamOptions,
+     ToolCall,
+     UsageInfo,
++    output_constraint_beside_tool_calls,
+     structured_outputs_from_response_format,
+     validate_structural_tag_response_format,
+     validate_structured_outputs_structural_tag,
+@@ -892,16 +893,6 @@ class ChatCompletionRequest(OpenAIBaseModel):
+                 "You can only use one kind of constraints for structured "
+                 "outputs ('json', 'regex' or 'choice').",
+             )
+-        # you can only either use structured outputs or tools, not both
+-        if count > 0 and data.get("tool_choice", "none") not in (
+-            "none",
+-            "auto",
+-            "required",
+-        ):
+-            raise VLLMValidationError(
+-                "You can only either use constraints for structured outputs "
+-                "or tools, not both.",
+-            )
+         validate_structured_outputs_structural_tag(structured_outputs_kwargs)
+         return data
+ 
+@@ -988,6 +979,28 @@ class ChatCompletionRequest(OpenAIBaseModel):
+                     " of the specified `tools`",
+                     parameter="tool_choice",
+                 )
++
++        # The tool choice lets the model call, so the tool-call grammar is
++        # armed and an output constraint cannot also hold.
++        response_format = data.get("response_format")
++        format_type = (
++            response_format.get("type")
++            if isinstance(response_format, dict)
++            else getattr(response_format, "type", None)
++        )
++        for constraint, present in (
++            ("response_format", format_type not in (None, "text")),
++            ("structured_outputs", data.get("structured_outputs") is not None),
++        ):
++            if present:
++                raise output_constraint_beside_tool_calls(
++                    constraint,
++                    none_choice='tool_choice "none"',
++                    named_choice=(
++                        'tool_choice {"type": "function", "function": '
++                        '{"name": ...}}'
++                    ),
++                )
+         return data
+ 
+     @model_validator(mode="before")
+diff --git a/vllm/entrypoints/openai/engine/protocol.py b/vllm/entrypoints/openai/engine/protocol.py
+index 3167509faf5c6979db7186b2f820ccfc2559d195..31d1dd14dcb935e0a86ae3350e68868a286c5a6c 100644
+--- a/vllm/entrypoints/openai/engine/protocol.py
++++ b/vllm/entrypoints/openai/engine/protocol.py
+@@ -231,6 +231,29 @@ AnyResponseFormat: TypeAlias = (
+ )
+ 
+ 
++def output_constraint_beside_tool_calls(
++    constraint: str, *, none_choice: str, named_choice: str
++) -> VLLMValidationError:
++    """Refuse an output constraint in a request whose tool choice can call.
++
++    One generation is decoded under one grammar. A tool choice that lets the
++    model call a tool arms the tool-call grammar, which cannot also enforce an
++    output constraint, so serving both would mean dropping one of them without
++    the caller knowing. Every surface refuses the pair instead, naming its own
++    spelling of the constraint and of the choices that resolve it.
++    """
++    return VLLMValidationError(
++        f"{constraint} constrains the output, and the tool choice lets the "
++        "model call a tool. One generation is decoded under one grammar, and "
++        "the tool-call grammar a callable tool needs cannot also enforce an "
++        f"output constraint, so this server serves one or the other. Send "
++        f"{none_choice} to have the answer follow {constraint}, remove "
++        f"{constraint} to let the model call tools, or declare the answer as "
++        f"the parameters of a function and force that call with {named_choice}.",
++        parameter=constraint,
++    )
++
++
+ def structured_outputs_from_response_format(
+     structured_outputs: StructuredOutputsParams | None,
+     response_format: AnyResponseFormat | None,
+diff --git a/vllm/entrypoints/openai/responses/protocol.py b/vllm/entrypoints/openai/responses/protocol.py
+index 4012d68ad5c42a5579a726f29eb248fb3e414e07..ea184136e60c045292ae7bfe12809be47aa420c4 100644
+--- a/vllm/entrypoints/openai/responses/protocol.py
++++ b/vllm/entrypoints/openai/responses/protocol.py
+@@ -70,6 +70,7 @@ from vllm.entrypoints.openai.engine.protocol import (
+     KvScope,
+     OpenAIBaseModel,
+     StopParam,
++    output_constraint_beside_tool_calls,
+ )
+ from vllm.exceptions import VLLMValidationError
+ from vllm.logger import init_logger
+@@ -678,6 +679,29 @@ class ResponsesRequest(OpenAIBaseModel):
+                 parameter="tool_choice",
+             )
+ 
++        # A tool choice other than "none" lets the model call, so the
++        # tool-call grammar is armed and an output constraint cannot also hold.
++        if has_tools and data.get("tool_choice", "auto") != "none":
++            text = data.get("text")
++            text_format = (
++                text.get("format") if isinstance(text, dict)
++                else getattr(text, "format", None)
++            )
++            format_type = (
++                text_format.get("type") if isinstance(text_format, dict)
++                else getattr(text_format, "type", None)
++            )
++            for constraint, present in (
++                ("text.format", format_type not in (None, "text")),
++                ("structured_outputs", data.get("structured_outputs") is not None),
++            ):
++                if present:
++                    raise output_constraint_beside_tool_calls(
++                        constraint,
++                        none_choice='tool_choice "none"',
++                        named_choice='tool_choice {"type": "function", "name": ...}',
++                    )
++
+         return data
+ 
+     @model_validator(mode="after")

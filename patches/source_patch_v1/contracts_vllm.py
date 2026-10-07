@@ -3758,6 +3758,41 @@ def _validate_derender_stop_text_after(state: State) -> None:
             "test_derender_only_commits_closed_calls_at_eos": None,
         }, label=label)
 
+def _validate_output_constraint_beside_tools_before(state: State) -> None:
+    label = "Output constraint beside tool calls precondition"
+    forbid_text(state, "vllm/entrypoints/openai/engine/protocol.py",
+                "def output_constraint_beside_tool_calls(", label=label)
+    require_text(state, "vllm/entrypoints/openai/chat_completion/protocol.py",
+                 "You can only either use constraints for structured outputs ", label=label)
+
+
+def _validate_output_constraint_beside_tools_after(state: State) -> None:
+    label = "Output constraint beside tool calls"
+    # One refusal, named by each surface's own parameter, wherever a call can
+    # be made: the tool grammar would otherwise replace the caller's constraint.
+    require_python_symbols(state, "vllm/entrypoints/openai/engine/protocol.py", {
+        "output_constraint_beside_tool_calls": None,
+    }, label=label)
+    for path in (
+        "vllm/entrypoints/openai/chat_completion/protocol.py",
+        "vllm/entrypoints/openai/responses/protocol.py",
+        "vllm/entrypoints/anthropic/protocol.py",
+    ):
+        require_text(state, path, "raise output_constraint_beside_tool_calls(", label=label)
+    # Upstream's partial rule (json/regex/choice beside a named choice only,
+    # naming no parameter) is subsumed.
+    forbid_text(state, "vllm/entrypoints/openai/chat_completion/protocol.py",
+                "You can only either use constraints for structured outputs ", label=label)
+    forbid_text(state, "vllm/entrypoints/anthropic/serving.py",
+                "output_config.format and output_config.format.json_schema", label=label)
+    require_python_symbols(state, "tests/entrypoints/openai/test_output_constraint_beside_tools.py", {
+        "test_chat_refuses_a_constraint_beside_a_callable_tool": None,
+        "test_chat_keeps_the_constraint_when_no_tool_can_be_called": None,
+        "test_responses_refuses_a_constraint_beside_a_callable_tool": None,
+        "test_anthropic_refuses_an_output_format_beside_a_callable_tool": None,
+        "test_anthropic_refuses_an_output_format_without_a_schema": None,
+    }, label=label)
+
 def validate_final(state: State) -> None:
     """Reassert every durable semantic invariant on the complete tree.
 
@@ -4814,5 +4849,31 @@ CONTRACTS: Mapping[str, SemanticContract] = {
         ),
         validate_before=_validate_derender_stop_text_before,
         validate_after=_validate_derender_stop_text_after,
+    ),
+    "output-constraints-refused-beside-tool-calls": SemanticContract(
+        rationale=(
+            "Whenever a request could call a tool, the parser armed the tool "
+            "grammar over the whole output and discarded the caller's output "
+            "constraint -- response_format and structured_outputs on chat, "
+            "text.format and structured_outputs on Responses, and Anthropic's "
+            "output_config.format, which is converted to response_format after "
+            "the chat request is built -- and the Responses echo of text came "
+            "back null. Upstream replaced it under required, named or strict "
+            "auto; this fork arms every Qwen auto request, so it replaced it "
+            "always. A composed grammar has no shape the model was trained on "
+            "and no upstream counterpart, so the combination is refused with a "
+            "400 naming the constraint as the surface spells it, and the next "
+            "actions that exist: tool_choice none keeps the constraint, or a "
+            "forced call of a function whose parameters are the schema. An "
+            "Anthropic output format without a schema, which was ignored, is "
+            "refused too. Upstream's partial refusal is subsumed."
+        ),
+        removal_condition=(
+            "Remove when pinned upstream refuses, or composes, an output "
+            "constraint beside a callable tool on every surface instead of "
+            "replacing it."
+        ),
+        validate_before=_validate_output_constraint_beside_tools_before,
+        validate_after=_validate_output_constraint_beside_tools_after,
     ),
 }

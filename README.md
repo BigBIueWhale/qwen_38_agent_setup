@@ -342,6 +342,7 @@ It is intentionally reconstructed by the ordered, reviewed semantic transformati
 | patches/vllm-responses-tools-are-one-function-list.patch | c4f0cb9233fac4c8903c729434f7c7f85388084e7879d16bfbb852f1faf8700b |
 | patches/vllm-batch-parse-starts-where-the-prompt-leaves.patch | d3b517a2b8b968273c480fd59650df5441755a9d31527277675502a5bbef4700 |
 | patches/vllm-derender-text-is-the-detokenizers.patch | 1f733012c4c208a1f0a252518540bcddf5924152957cc96dce7783042f0df3c7 |
+| patches/vllm-output-constraints-refused-beside-tool-calls.patch | 788431f67e89c1e363b59e22373cc62e6a9b972061f76566d77709d367379a2a |
 
 The reconstructed tree's runtime-source and test changes, new files and
 deletions are counted by ./scripts/build-vllm.sh check, which derives and prints
@@ -393,7 +394,7 @@ Pinned build inputs and products:
 | Immutable base tag | qwen38-vllm:main-9df9b0b |
 | Immutable base ID | sha256:fa4a002a88b7043a1a89966dea8a500fe9696f84e75730d9da916f916048d401 |
 | Runtime Dockerfile SHA-256 | 393497d3d72151b6caa7a0b405dd4d983cd8a08e0d26bc43cb08d9f60d31fa41 |
-| Build verifier SHA-256 | 127e616e8e02826a6133d9ca6301df5d7a00da0181c59d2ba093a887003bd2ca |
+| Build verifier SHA-256 | 9d0ff628d40d8a2c1d5802ef26aec69b51bc2c25eaf8cffb5047f6b28a9db66d |
 | Runtime validator SHA-256 | 357fdaed8d5a8ad0d901eaf07e5357722b74400c99d96b6f30572a557426b4fc |
 
 The runtime image's profile, tag and archive name, which every release advances
@@ -1205,6 +1206,14 @@ choice must use a name the model is offered; `allowed_tools` arms the grammar to
 exactly the listed functions in its mode; `required` needs a function to call; and
 a choice no grammar can enforce -- a hosted, MCP or custom tool -- is refused
 naming `tool_choice` rather than left to publish the call as text.
+
+An output constraint cannot hold beside a callable tool, because the call grammar
+covers the whole output. A request that could call a tool and also constrains its
+output -- `response_format` or `structured_outputs` on chat, `text.format` or
+`structured_outputs` on Responses, `output_config.format` on Anthropic -- is
+refused with a 400 naming that parameter: `tool_choice` `none` keeps the
+constraint, and a forced call of a function whose parameters are the schema
+returns structured data through the grammar.
 
 Qwen's natural `</think>` token or implicit `<tool_call>` token ends thinking
 once per generation. The deployed V1 thinking-budget tracker and grammar
