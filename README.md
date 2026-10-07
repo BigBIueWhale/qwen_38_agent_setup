@@ -346,8 +346,8 @@ It is intentionally reconstructed by the ordered, reviewed semantic transformati
 | patches/vllm-generated-tokens-survive-parsing.patch | 3709ac24d4f098a27ffa57fedf9d3dec81a1e08392da07d225bb8b62d2e8ee2e |
 | patches/vllm-include-reasoning-shapes-the-response.patch | d3b41899464142ffffb04efd0b19647153e322b10c7f9fc1e14af0f290af98d1 |
 | patches/vllm-unspecified-tool-choice-is-the-default.patch | 367fedad65383375e377d7bc1e20cc3fdab4554d511b9437918004b25321d530 |
-| patches/vllm-call-only-answer-keeps-the-blank-line.patch | ad1e558f8ba02c6889d9b4a79c6ec355e9bfa763bc007e5cae7e609be96ec084 |
-| patches/vllm-responses-tools-are-one-function-list.patch | 6e1776efc90fb8f87f9c7886b3788850475b4ea500f5cafa7ca8ea348a6d79fc |
+| patches/vllm-call-only-answer-keeps-the-blank-line.patch | 57c69104cb5b569050098993f4abb4e7f88299a43b6ac41f22e267dd8ab177a2 |
+| patches/vllm-responses-tools-are-one-function-list.patch | aa54ae92344ca7c9bdfe014a9676b7b63716e3c677e64cee4a8a6ac3b0c104e5 |
 | patches/vllm-batch-parse-starts-where-the-prompt-leaves.patch | 352b37904e51dab650f4fb84b7ecd8f284f468d2602bcd1b021001a8d865ccc0 |
 | patches/vllm-derender-text-is-the-detokenizers.patch | 9d8f6d45beba5c79671444be4e9604c4352c7fe5346d78573bfc4fbc91bfb4b6 |
 | patches/vllm-output-constraints-refused-beside-tool-calls.patch | 01bfdf064fa8a83c68feb4f5477181bc3df2f6776e41ec91ac672e84ca562adb |

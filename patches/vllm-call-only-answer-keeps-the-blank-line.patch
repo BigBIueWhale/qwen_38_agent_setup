@@ -32,7 +32,7 @@ index fb632424661485b95d9a60dcc6e0aeabe5f17e51..1df9457ba69ba1e1ce9f780feac756d2
  @pytest.mark.parametrize("choice", ["auto", "required", "named"])
  def test_single_qwen_call_preserves_the_builtin_reasoning_prefix(reasoning, choice):
 diff --git a/vllm/tool_parsers/structural_tag_registry.py b/vllm/tool_parsers/structural_tag_registry.py
-index 85f74b03672d072f1d3b270881154e6844bed6bc..9019f53df2439b1141268d774b3ff24d22145cb7 100644
+index 85f74b03672d072f1d3b270881154e6844bed6bc..7ba80c2ca23e71f5be12b603dc1aa75ad25d2991 100644
 --- a/vllm/tool_parsers/structural_tag_registry.py
 +++ b/vllm/tool_parsers/structural_tag_registry.py
 @@ -675,9 +675,13 @@ def get_kimi_k3_structural_tag(
@@ -61,7 +61,7 @@ index 85f74b03672d072f1d3b270881154e6844bed6bc..9019f53df2439b1141268d774b3ff24d
              TriggeredTagsFormat(
                  triggers=[_QWEN_CALL_TRIGGER],
                  tags=tags,
-@@ -1211,22 +1215,36 @@ def get_qwen_3_coder_structural_tag(
+@@ -1211,22 +1215,46 @@ def get_qwen_3_coder_structural_tag(
                  "function this request also declares in `tools`.",
                  parameter="tool_choice",
              )
@@ -105,6 +105,16 @@ index 85f74b03672d072f1d3b270881154e6844bed6bc..9019f53df2439b1141268d774b3ff24d
 +    # token when the model does not reason, where the call comes first. A
 +    # forced or required answer is a call either way, so the blank line is the
 +    # one thing that may precede it.
++    # The grammar admits the line after any prompt, so after a prompt that
++    # already ends in it -- the model's own template with enable_thinking
++    # false ends its generation prompt ``<think>\n\n</think>\n\n`` -- the model
++    # could write a second. The served template ends no prompt in a blank
++    # line: its generation prompt ends ``<think>\n`` (it refuses
++    # enable_thinking=false, and without --trust-request-chat-template a
++    # request names no other template), a continued final message ends at
++    # ``</think>`` or at its stripped text, which the template itself
++    # continues with ``\n\n<tool_call>``, and a closed turn ends
++    # ``<|im_end|>\n``.
 +    return StructuralTag(format=SequenceFormat(elements=[
 +        OptionalFormat(content=separator),
 +        answer,

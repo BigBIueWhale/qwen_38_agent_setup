@@ -128722,13 +128722,13 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '\n'})},
  {'name': 'call-only-answer-keeps-the-blank-line',
   'review_patch': 'patches/vllm-call-only-answer-keeps-the-blank-line.patch',
-  'review_sha256': 'ad1e558f8ba02c6889d9b4a79c6ec355e9bfa763bc007e5cae7e609be96ec084',
+  'review_sha256': '57c69104cb5b569050098993f4abb4e7f88299a43b6ac41f22e267dd8ab177a2',
   'files': ({'path': 'tests/tool_parsers/test_structural_tag_registry.py',
              'before_sha256': '069d0f390832418ac8089d0499f47f6ea2704515d2cf47a1bf05cd318032aeaa',
              'after_sha256': '3fbc42eef3b13462d86990e287c15e35ae3d1faa8e5a0d9eb75b338787074540'},
             {'path': 'vllm/tool_parsers/structural_tag_registry.py',
              'before_sha256': 'b26afa7604527858d7c12b39b20a79bbd089995238ef55e1d0df3eb5d536ee7e',
-             'after_sha256': '9638ea980d7bf019ba3fe1fac1b12979df2ff7a51c94554a85500db2c3c40073'}),
+             'after_sha256': 'a8ef0a80ba38eb1321442bd67efd5c6b7462c4c884920027edb750d6be26891f'}),
   'edits': ({'name': 'tests/tool_parsers/test_structural_tag_registry.py:landmark-1',
              'path': 'tests/tool_parsers/test_structural_tag_registry.py',
              'before': '    assert _is_grammar_accept_string(grammar, _QWEN3_CALL + '
@@ -129019,6 +129019,25 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '    # forced or required answer is a call either way, so the '
                       'blank line is the\n'
                       '    # one thing that may precede it.\n'
+                      '    # The grammar admits the line after any prompt, so after a '
+                      'prompt that\n'
+                      "    # already ends in it -- the model's own template with "
+                      'enable_thinking\n'
+                      '    # false ends its generation prompt '
+                      '``<think>\\n\\n</think>\\n\\n`` -- the model\n'
+                      '    # could write a second. The served template ends no prompt '
+                      'in a blank\n'
+                      '    # line: its generation prompt ends ``<think>\\n`` (it '
+                      'refuses\n'
+                      '    # enable_thinking=false, and without '
+                      '--trust-request-chat-template a\n'
+                      '    # request names no other template), a continued final '
+                      'message ends at\n'
+                      '    # ``</think>`` or at its stripped text, which the template '
+                      'itself\n'
+                      '    # continues with ``\\n\\n<tool_call>``, and a closed turn '
+                      'ends\n'
+                      '    # ``<|im_end|>\\n``.\n'
                       '    return StructuralTag(format=SequenceFormat(elements=[\n'
                       '        OptionalFormat(content=separator),\n'
                       '        answer,\n'
@@ -129096,6 +129115,25 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    # forced or required answer is a call either way, so '
                              'the blank line is the\n'
                              '    # one thing that may precede it.\n'
+                             '    # The grammar admits the line after any prompt, so '
+                             'after a prompt that\n'
+                             "    # already ends in it -- the model's own template "
+                             'with enable_thinking\n'
+                             '    # false ends its generation prompt '
+                             '``<think>\\n\\n</think>\\n\\n`` -- the model\n'
+                             '    # could write a second. The served template ends no '
+                             'prompt in a blank\n'
+                             '    # line: its generation prompt ends ``<think>\\n`` '
+                             '(it refuses\n'
+                             '    # enable_thinking=false, and without '
+                             '--trust-request-chat-template a\n'
+                             '    # request names no other template), a continued '
+                             'final message ends at\n'
+                             '    # ``</think>`` or at its stripped text, which the '
+                             'template itself\n'
+                             '    # continues with ``\\n\\n<tool_call>``, and a closed '
+                             'turn ends\n'
+                             '    # ``<|im_end|>\\n``.\n'
                              '    return '
                              'StructuralTag(format=SequenceFormat(elements=[\n'
                              '        OptionalFormat(content=separator),\n'
@@ -129103,7 +129141,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    ]))\n'})},
  {'name': 'responses-tools-are-one-function-list',
   'review_patch': 'patches/vllm-responses-tools-are-one-function-list.patch',
-  'review_sha256': '6e1776efc90fb8f87f9c7886b3788850475b4ea500f5cafa7ca8ea348a6d79fc',
+  'review_sha256': 'aa54ae92344ca7c9bdfe014a9676b7b63716e3c677e64cee4a8a6ac3b0c104e5',
   'files': ({'path': 'tests/tool_parsers/test_structural_tag_registry.py',
              'before_sha256': '3fbc42eef3b13462d86990e287c15e35ae3d1faa8e5a0d9eb75b338787074540',
              'after_sha256': '7d1fd82dfcf43352ff4b6953418cf762128bea9b78207a2313d9df9cb19b5f4b'},
@@ -129123,8 +129161,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': 'eaffc8cd7340c05b76e5c3bc3541e65e327aa00927b7119d29b92a33d7c845ec',
              'after_sha256': 'a52399b65316163be152a4c3fa9fd832e80d293814ec421832438c00bb7e1816'},
             {'path': 'vllm/tool_parsers/structural_tag_registry.py',
-             'before_sha256': '9638ea980d7bf019ba3fe1fac1b12979df2ff7a51c94554a85500db2c3c40073',
-             'after_sha256': '34a5d36d9afa30bee6b79a6e8c95ff1fa56580c461fc55adf5cf0c28f3e6c0fc'},
+             'before_sha256': 'a8ef0a80ba38eb1321442bd67efd5c6b7462c4c884920027edb750d6be26891f',
+             'after_sha256': '02b776874c1ee5758bd0721ea1fba5f04b334e65d4a3f85c23851d8f324a32e6'},
             {'path': 'vllm/tool_parsers/utils.py',
              'before_sha256': '0399a0392644876bbcbdc2e9137b417aa842e7306a09a36d9836ef1d249de05d',
              'after_sha256': 'e2e93609470191c021cc9b67a781257b0bdb64954ca5a737faf972d27434f4a6'}),
@@ -145798,7 +145836,7 @@ FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5d
  'vllm/tokenizers/detokenizer_utils.py': '7718979d813ed00d41116d92a5abf81524e393693a6b28fa1c2a6d8ff66c880d',
  'vllm/tool_parsers/abstract_tool_parser.py': '91f4f3184e7f0eb6bc9e76d9ce4d3063cff58e0de8afc409038139e48314d0c8',
  'vllm/tool_parsers/poolside_v1_tool_parser.py': '5c99ae314256ef4e5ca076a96c9863413dc57bf074f3ac070b527be2d3fe0d8c',
- 'vllm/tool_parsers/structural_tag_registry.py': '34a5d36d9afa30bee6b79a6e8c95ff1fa56580c461fc55adf5cf0c28f3e6c0fc',
+ 'vllm/tool_parsers/structural_tag_registry.py': '02b776874c1ee5758bd0721ea1fba5f04b334e65d4a3f85c23851d8f324a32e6',
  'vllm/tool_parsers/utils.py': 'e2e93609470191c021cc9b67a781257b0bdb64954ca5a737faf972d27434f4a6',
  'vllm/v1/attention/backends/turboquant_attn.py': 'c3fef60cfa031a139bed6f413b2c40d0ea3bc6b48992455404a09459abbfa282',
  'vllm/v1/attention/ops/triton_turboquant_decode.py': 'dab8b65ab7ddd6582de16e1fc7b1360ab0061b4a2a2b114f5d87ea0532fd726f',

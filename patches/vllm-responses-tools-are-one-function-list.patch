@@ -600,7 +600,7 @@ index c011a54b2bd565e27ce88a3b509eae4013a86162..27a4f2773131719b7961222f50199221
  
          structural_tag = json.dumps(structure_tag.model_dump())
 diff --git a/vllm/tool_parsers/structural_tag_registry.py b/vllm/tool_parsers/structural_tag_registry.py
-index 9019f53df2439b1141268d774b3ff24d22145cb7..cffd9945ead0fe57171860714532aa7f0ec2efe0 100644
+index 7ba80c2ca23e71f5be12b603dc1aa75ad25d2991..2ba6ab295b7ef09d41626a595f2a1e4868b0733e 100644
 --- a/vllm/tool_parsers/structural_tag_registry.py
 +++ b/vllm/tool_parsers/structural_tag_registry.py
 @@ -7,7 +7,7 @@ from collections.abc import Callable, Iterator, Sequence
