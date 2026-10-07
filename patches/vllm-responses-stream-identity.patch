@@ -570,16 +570,31 @@ diff --git a/vllm/entrypoints/openai/responses/streaming_events.py b/vllm/entryp
                  summary=[],
              ),
          ),
-@@ -1243,6 +1262,8 @@
-                 self.state,
-                 incomplete=incomplete,
-             )
-+        if self.state.current_state == _StateType.CONTENT:
-+            return emit_simple_content_done(self.state, incomplete=incomplete)
-         return handlers.done_fn(self.state)
+@@ -1236,16 +1255,16 @@
+     def close_current(
+         self, *, incomplete: bool = False
+     ) -> list[StreamingResponsesResponse]:
+-        """Close the current state and emit its 'done' event sequence."""
++        """Close the current state and emit its 'done' event sequence.
++
++        ``incomplete`` is set only for the item open when the output-token
++        limit ended the generation; every item closed by the next one is one
++        the model finished.
++        """
+         handlers = self._STATE_HANDLERS.get(self.state.current_state)
+         if handlers is None:
+             return []
+-        if self.state.current_state == _StateType.TOOL_CALL:
+-            return emit_simple_tool_call_done(
+-                self.state,
+-                incomplete=incomplete,
+-            )
+-        return handlers.done_fn(self.state)
++        return handlers.done_fn(self.state, incomplete=incomplete)
  
      def open(
-@@ -1268,9 +1289,7 @@
+         self, target_state: _StateType, tool_call: Any = None
+@@ -1270,9 +1289,7 @@
          self,
          delta_message: DeltaMessage,
          output: CompletionOutput,

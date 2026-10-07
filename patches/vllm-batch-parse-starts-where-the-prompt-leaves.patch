@@ -64,7 +64,7 @@ index a7d8c8a6c3437fe63157db75f47548db3d53e59c..a16e62a9916f9cfbb3fd903e1e8424fd
          return None
  
 diff --git a/tests/entrypoints/openai/responses/test_serving_responses.py b/tests/entrypoints/openai/responses/test_serving_responses.py
-index 2b0465f925dd762be89f56c431ce0250cc5f9a34..1be8ebded8c94615128faad8721586fa712dcbc8 100644
+index d130d198c3cfa73e66410420a70684009e8ae33d..9d5bce263c0010f3e815f075e5d23fe859618fb0 100644
 --- a/tests/entrypoints/openai/responses/test_serving_responses.py
 +++ b/tests/entrypoints/openai/responses/test_serving_responses.py
 @@ -1408,6 +1408,7 @@ async def test_wrapped_call_output_uses_its_terminal_on_both_responses_paths(
@@ -75,7 +75,7 @@ index 2b0465f925dd762be89f56c431ce0250cc5f9a34..1be8ebded8c94615128faad8721586fa
          )
      else:
          context = SimpleContext(response_parser=parser)
-@@ -1443,3 +1444,64 @@ async def test_wrapped_call_output_uses_its_terminal_on_both_responses_paths(
+@@ -1451,3 +1452,64 @@ async def test_wrapped_call_output_uses_its_terminal_on_both_responses_paths(
          assert content == (cut if shape == "mixed" else "")
      assert parser.generated_token_count == len(ids)
      assert parser.reasoning_token_count == 4

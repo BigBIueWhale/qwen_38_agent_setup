@@ -623,6 +623,13 @@ def _validate_truncation_after(state: State) -> None:
         },
         label=label,
     )
+    # The stream hands the limit to the item it closes: a call open at the
+    # limit is closed incomplete and sends no arguments.done.
+    _require_in_symbol(
+        state, events, "SimpleStreamingEventProcessor.close_current",
+        ("incomplete=incomplete",),
+        label=label,
+    )
     require_python_symbols(
         state,
         utils,
@@ -663,13 +670,18 @@ def _validate_truncation_after(state: State) -> None:
     ):
         for needle in needles:
             require_text(state, path, needle, label=label)
-    require_text(
-        state,
-        utils,
-        'status="incomplete" if incomplete else "completed"',
-        count=2,
+    # The batch marks items as the stream closes them: the item the limit
+    # cut -- the last -- is incomplete, every earlier one completed.
+    _require_in_symbol(
+        state, utils, "build_response_output_items",
+        (
+            "if incomplete",
+            'return "incomplete" if index == last else "completed"',
+        ),
         label=label,
     )
+    require_text(state, utils, "status=status(len(outputs)),", count=3, label=label)
+    forbid_text(state, utils, 'status="incomplete" if incomplete else "completed"', label=label)
     parser_terminal = ast.unparse(
         _find_symbol(
             state,
@@ -4507,13 +4519,17 @@ CONTRACTS: Mapping[str, SemanticContract] = {
         rationale=(
             "A parser may recognize a partial tool prefix at max_tokens. Neither Chat nor "
             "Responses may promote that prefix to an executable terminal: length/incomplete "
-            "must survive streaming and batch paths, and Responses must omit arguments.done "
-            "and response.completed."
+            "must survive streaming and batch paths, and Responses must emit neither "
+            "arguments.done for the call the limit cut nor response.completed. Both "
+            "Responses transports mark items as the stream closes them: the item the "
+            "limit cut, the last, is incomplete; items the model finished before it "
+            "are completed."
         ),
         removal_condition=(
             "Remove when upstream preserves engine truncation across Chat and Responses "
-            "stream/batch parsing, marks every partial item incomplete, and exposes no "
-            "successful execution boundary under controlled token cuts."
+            "stream/batch parsing, marks the item the limit cut incomplete on both "
+            "transports, and exposes no execution boundary for it under controlled "
+            "token cuts."
         ),
         validate_before=_validate_truncation_before,
         validate_after=_validate_truncation_after,

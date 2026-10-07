@@ -224,10 +224,28 @@ index 9d8c5dafb9..5d4d1cc412 100644
                  )
 -            )
 diff --git a/vllm/entrypoints/openai/responses/streaming_events.py b/vllm/entrypoints/openai/responses/streaming_events.py
-index 531a35c572..90204374d7 100644
+index 531a35c572..f2ac7076de 100644
 --- a/vllm/entrypoints/openai/responses/streaming_events.py
 +++ b/vllm/entrypoints/openai/responses/streaming_events.py
-@@ -1069,9 +1069,14 @@ def emit_simple_tool_call_delta(
+@@ -978,6 +978,8 @@ def emit_simple_reasoning_delta(
+ 
+ def emit_simple_reasoning_done(
+     state: SimpleStreamingState,
++    *,
++    incomplete: bool = False,
+ ) -> list[StreamingResponsesResponse]:
+     part = ResponseReasoningTextContent(
+         text=state.accumulated_text,
+@@ -1007,7 +1009,7 @@ def emit_simple_reasoning_done(
+             item=ResponseReasoningItem(
+                 type="reasoning",
+                 content=[part],
+-                status="completed",
++                status="incomplete" if incomplete else "completed",
+                 id=state.current_item_id,
+                 summary=[],
+             ),
+@@ -1069,9 +1071,14 @@ def emit_simple_tool_call_delta(
  
  def emit_simple_tool_call_done(
      state: SimpleStreamingState,
@@ -243,7 +261,7 @@ index 531a35c572..90204374d7 100644
          events.append(
              ResponseFunctionCallArgumentsDoneEvent(
                  type="response.function_call_arguments.done",
-@@ -1092,7 +1097,7 @@ def emit_simple_tool_call_done(
+@@ -1092,7 +1099,7 @@ def emit_simple_tool_call_done(
                  name=state.tool_call_name,
                  namespace=state.tool_call_namespace,
                  arguments=state.accumulated_text,
@@ -252,7 +270,7 @@ index 531a35c572..90204374d7 100644
                  id=state.current_item_id,
                  call_id=state.tool_call_id,
              ),
-@@ -1226,11 +1231,18 @@ class SimpleStreamingEventProcessor:
+@@ -1226,11 +1233,18 @@ class SimpleStreamingEventProcessor:
              and self.state.tool_call_index != tool_call.index
          )
  
@@ -273,33 +291,71 @@ index 531a35c572..90204374d7 100644
  
      def open(
 diff --git a/vllm/entrypoints/openai/responses/utils.py b/vllm/entrypoints/openai/responses/utils.py
-index d3de64844a..c5ce8301d1 100644
+index d3de64844a..d2e8f9c09d 100644
 --- a/vllm/entrypoints/openai/responses/utils.py
 +++ b/vllm/entrypoints/openai/responses/utils.py
-@@ -55,6 +55,8 @@ def build_response_output_items(
+@@ -2,7 +2,7 @@
+ # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
+ 
+ from collections.abc import Iterable
+-from typing import Any
++from typing import Any, Literal
+ 
+ from openai.types.chat import (
+     ChatCompletionAssistantMessageParam,
+@@ -55,9 +55,28 @@ def build_response_output_items(
      tool_calls: list[FunctionCall] | None,
      logprobs: list[Logprob] | None = None,
      tools: list[Tool] | None = None,
 +    *,
 +    incomplete: bool = False,
  ) -> list[ResponseOutputItem]:
++    """The output items of one parsed generation, in the order it wrote them.
++
++    ``incomplete`` says the generation ended at the output-token limit. The
++    item it was writing when the limit cut it -- the last one -- is
++    incomplete; every item the model finished before the cut is completed.
++    That is how the stream closes items as they end, so both transports
++    report the same statuses; the response's own status says the turn was
++    cut.
++    """
      outputs: list[ResponseOutputItem] = []
      tool_call_name_map = build_responses_tool_call_name_map(tools)
-@@ -85,7 +87,7 @@ def build_response_output_items(
++    last = (
++        bool(reasoning) + bool(content) + len(tool_calls or []) - 1
++        if incomplete
++        else -1
++    )
++
++    def status(index: int) -> Literal["completed", "incomplete"]:
++        return "incomplete" if index == last else "completed"
+ 
+     if reasoning:
+         outputs.append(
+@@ -68,7 +87,7 @@ def build_response_output_items(
+                 content=[
+                     ResponseReasoningTextContent(text=reasoning, type="reasoning_text")
+                 ],
+-                status=None,
++                status=status(len(outputs)),
+             )
+         )
+ 
+@@ -85,7 +104,7 @@ def build_response_output_items(
                      )
                  ],
                  role="assistant",
 -                status="completed",
-+                status="incomplete" if incomplete else "completed",
++                status=status(len(outputs)),
                  type="message",
              )
          )
-@@ -101,7 +103,7 @@ def build_response_output_items(
+@@ -101,7 +120,7 @@ def build_response_output_items(
                      call_id=tool_call.id
                      or make_tool_call_id(func_name=tool_call.name, idx=idx),
                      type="function_call",
 -                    status="completed",
-+                    status="incomplete" if incomplete else "completed",
++                    status=status(len(outputs)),
                      name=call_name.name,
                      namespace=call_name.namespace,
                      arguments=tool_call.arguments,

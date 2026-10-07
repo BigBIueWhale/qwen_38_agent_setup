@@ -1080,6 +1080,104 @@ class ToolOutputParserTest(unittest.TestCase):
                 self.assertEqual(parse("plan</think>\n\nok", chunk)[:3],
                                  ("plan", "\n\nok", []))
 
+    def test_responses_reports_one_generation_alike_on_both_transports(self):
+        """The Responses route publishes one generation the same way whether it
+        streams or not: the same items, statuses and reasoning usage. A token
+        limit leaves the item it cut incomplete, and only that one; no
+        arguments.done is sent for a cut call."""
+        import asyncio
+
+        from vllm.entrypoints.openai.engine.protocol import RequestResponseMetadata
+        from vllm.entrypoints.openai.responses.context import SimpleContext
+        from vllm.entrypoints.openai.responses.protocol import ResponsesRequest
+        from vllm.entrypoints.openai.responses.serving import OpenAIServingResponses
+        from vllm.outputs import CompletionOutput, RequestOutput
+
+        engine = MagicMock()
+        engine.model_config.max_model_len = 100000
+        engine.model_config.get_diff_sampling_param.return_value = {}
+        serving = OpenAIServingResponses(
+            engine_client=engine, models=MagicMock(), online_renderer=MagicMock(),
+            request_logger=None, chat_template=None, chat_template_content_format="auto",
+            reasoning_parser=_served("SERVED_REASONING_PARSER"),
+            tool_parser=_served("SERVED_TOOL_CALL_PARSER"), enable_auto_tools=True,
+        )
+        tool = {"type": "function", **TOOL["function"]}
+
+        async def publish(text, finish, prompt, chunk):
+            request = ResponsesRequest.model_validate({
+                "model": "unit", "input": "test", "tools": [tool], "kv_scope": "unit",
+                "stream": chunk is not None,
+            })
+            serving.parser(TOKENIZER, request.tools,
+                           chat_template_kwargs=CHAT_TEMPLATE_KWARGS).adjust_request(request)
+            context = SimpleContext(response_parser=serving.parser(
+                TOKENIZER, request.tools, chat_template_kwargs=CHAT_TEMPLATE_KWARGS))
+            ids, texts = generation(text, None, finish, None)
+            step = chunk or len(ids)
+
+            async def outputs():
+                for start in range(0, len(ids), step):
+                    last = start + step >= len(ids)
+                    context.append_output(RequestOutput(
+                        request_id="unit", prompt="p", prompt_token_ids=prompt,
+                        prompt_logprobs=None, outputs=[CompletionOutput(
+                            index=0, text="".join(texts[start:start + step]),
+                            token_ids=ids[start:start + step], cumulative_logprob=None,
+                            logprobs=None, finish_reason=finish if last else None,
+                            stop_reason=None,
+                        )], finished=last,
+                    ))
+                    yield context
+
+            args = (request, request.to_sampling_params(1000, {}), outputs(), context,
+                    "unit", TOKENIZER, RequestResponseMetadata(request_id="unit"))
+            if chunk is None:
+                return await serving.responses_full_generator(*args, created_time=1), None
+            events = [event async for event in
+                      serving.responses_stream_generator(*args, created_time=1)]
+            done = [event.arguments for event in events
+                    if event.type == "response.function_call_arguments.done"]
+            return events[-1].response, done
+
+        def shape(response):
+            return response.status, response.usage.output_tokens_details.reasoning_tokens, [
+                (item.type, item.status,
+                 "".join(part.text for part in getattr(item, "content", None) or [])
+                 if item.type != "function_call" else item.arguments)
+                for item in response.output
+            ]
+
+        continued = rendered_prompt(
+            [{"role": "user", "content": "test"},
+             {"role": "assistant", "content": "The ans"}],
+            continue_final=True,
+        )
+        cut_second = ("plan</think>\n\n" + call("one") + "\n"
+                      + "<tool_call>\n<function=write>\n<parameter=text>\ntw")
+        cases = {
+            "two calls, the limit cuts the second": (cut_second, "length", OPEN_PROMPT, (
+                "incomplete", len(encode("plan")), [
+                    ("reasoning", "completed", "plan"),
+                    ("message", "completed", "\n\n\n"),
+                    ("function_call", "completed", '{"text": "one"}'),
+                    ("function_call", "incomplete", '{"text": "tw"}'),
+                ]), ['{"text": "one"}']),
+            "the limit cuts reasoning": ("plan more pla", "length", OPEN_PROMPT, (
+                "incomplete", len(encode("plan more pla")),
+                [("reasoning", "incomplete", "plan more pla")]), []),
+            "a continued final message": ("wer is 4.", "stop", continued, (
+                "completed", 0, [("message", "completed", "wer is 4.")]), []),
+        }
+        for name, (text, finish, prompt, expected, done) in cases.items():
+            for chunk in (None, 1, 4):
+                with self.subTest(case=name, chunk=chunk):
+                    response, arguments_done = asyncio.run(
+                        publish(text, finish, prompt, chunk))
+                    self.assertEqual(shape(response), expected)
+                    if chunk is not None:
+                        self.assertEqual(arguments_done, done)
+
     def test_include_reasoning_changes_nothing_the_route_admits(self):
         """include_reasoning shapes the response, never what the model may
         generate: the chat route admits the same prompt, sampling parameters

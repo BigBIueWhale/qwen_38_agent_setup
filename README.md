@@ -291,7 +291,7 @@ It is intentionally reconstructed by the ordered, reviewed semantic transformati
 | patches/vllm-qwen38-separate-final-response-budget.patch | f20d7dff41931248272842ed2c7a163c6f013e405ccf35733c40ff131a2fc503 |
 | patches/vllm-qwen-implicit-tool-grammar-boundary.patch | d231c6e2e7040c4cd4b38432cb8c794805afddbf2c6e4f7ff6febb78e3fd9f48 |
 | patches/vllm-anthropic-validation-http400.patch | b4c3327ca4e513b9a58edc3e9aca978d324a27032511f9868d5f941411941bcf |
-| patches/vllm-tool-truncation-finish-reason.patch | 1a220f6db9b40967d867b3cfb1a92d95d907ca059718ffe61772b4cb4409f551 |
+| patches/vllm-tool-truncation-finish-reason.patch | eb8406c77d3a57c6e4acc957aa0a331c2e9cb51262b8b08c78901aba51d3f52c |
 | patches/vllm-qwen38-vision-runtime.patch | 55d646c690a11b1254e3df10dcb55b4b287fb8b4c7b14cc84164b827065d7c13 |
 | patches/vllm-qwen38-numerical-audits.patch | dc0b947db3727b522427a204edd1a930d637476a0f66d7d30e2da65c144ac944 |
 | patches/vllm-turboquant-fail-closed-guards.patch | b140445625c63a85d4cae5d878b1de472a9645b63e78c34249848082120b9ba3 |
@@ -309,8 +309,8 @@ It is intentionally reconstructed by the ordered, reviewed semantic transformati
 | patches/vllm-png-source-admission.patch | b1b684a96d7243ae647d4d8ce2fe69b7330b3ab243ea77903c4cfb346bc80549 |
 | patches/vllm-kv-physical-free-memory.patch | 21f8993033c78971d4f7a660fe9906e054ec658139e83fc37b7121f1d8d91289 |
 | patches/vllm-qwen-single-call-grammar.patch | 878ba3d98284a326784ffced00a64b38dd827cbc80f136cf1e582df469c3eced |
-| patches/vllm-responses-history-integrity.patch | 0c0e2bcbb203fd4b40452849f7ebd0e34aa64bdc5b1a86fd110afac60b01f125 |
-| patches/vllm-responses-stream-identity.patch | 13de2609c6f80dcf722b61e8e02444e9c73572c65e511883318d2fa231a82f9f |
+| patches/vllm-responses-history-integrity.patch | 0a0a8f1e7606e82a2fa338443c67946dbd8dfc0fb71078a62407d4c879075cf3 |
+| patches/vllm-responses-stream-identity.patch | d4629bd0b979eb1978721d12733caae4acca2736d6ec870eb295f87316e67345 |
 | patches/vllm-anthropic-terminal-metadata.patch | d09c3b0ba5658b864131c46202f53a4b611ca0395bd068feb1a054fcc70f2364 |
 | patches/vllm-generation-sampling-resolution.patch | 4ac5c3d5f1b91d8873dbedac89e6a9a8c65b57c9432c3e0ed2435966dbe880be |
 | patches/vllm-sampling-decoding-boundary.patch | f7e0c0569bf70642f53ada3104389058851efd50f265ded882df27f1b518cbc3 |
@@ -319,7 +319,7 @@ It is intentionally reconstructed by the ordered, reviewed semantic transformati
 | patches/vllm-xml-text-fidelity.patch | 91ff1c8c46336fc00745d84f31d7edecabebec5ff9c0f501d86a801e39e86870 |
 | patches/vllm-phase-aware-parser-terminals.patch | 3b6f1075e206370ebed7572852ac9bc559e80264ea6ed9e4b3850e30887dda28 |
 | patches/vllm-input-stream-agent-identity.patch | caee1588ff260cb866404a91889b3962f8f94b468fa5f5eb81720f1e8c88d67a |
-| patches/vllm-tool-output-completion.patch | 41d49e00bd197fea0b449c2c0c0447d7afa2a55665221928e789c85aec9a957a |
+| patches/vllm-tool-output-completion.patch | 9cbb734b571b1800634e5172e16796de5bcb70b8c5e70c3cbc2226a2e3a39aed |
 | patches/vllm-one-way-thinking-boundary.patch | 63a69aea8a184a3875f50673a55058fb9e14dc3178abd8c5510de2770022f346 |
 | patches/vllm-schema-faithful-xml.patch | bd5475972df5b62dd4a0b2b67e68640987f018cf9b14870edf6569a6b0cd8dcc |
 | patches/vllm-token-text-provenance.patch | 954b36cb444f7e644e29d13f7a9d3c000512a0d616bbf2b6cd3cb8f4e880dd44 |
@@ -339,8 +339,8 @@ It is intentionally reconstructed by the ordered, reviewed semantic transformati
 | patches/vllm-include-reasoning-shapes-the-response.patch | d3b41899464142ffffb04efd0b19647153e322b10c7f9fc1e14af0f290af98d1 |
 | patches/vllm-unspecified-tool-choice-is-the-default.patch | 35be0035ab7ae64466a324bba0fd2a2004ba41fb254afbfd902319dcfa9ea6a7 |
 | patches/vllm-call-only-answer-keeps-the-blank-line.patch | ad1e558f8ba02c6889d9b4a79c6ec355e9bfa763bc007e5cae7e609be96ec084 |
-| patches/vllm-responses-tools-are-one-function-list.patch | c4f0cb9233fac4c8903c729434f7c7f85388084e7879d16bfbb852f1faf8700b |
-| patches/vllm-batch-parse-starts-where-the-prompt-leaves.patch | d3b517a2b8b968273c480fd59650df5441755a9d31527277675502a5bbef4700 |
+| patches/vllm-responses-tools-are-one-function-list.patch | c443c7a1235e5ffc2ddc1ddb001ce72c75468c246ab2d6ca6ebefa87d2ac0f59 |
+| patches/vllm-batch-parse-starts-where-the-prompt-leaves.patch | dfc0484af7234693e7df8ce8530e443fb6d58adef4d3145f74ad3a28ca9985a2 |
 | patches/vllm-derender-text-is-the-detokenizers.patch | 1f733012c4c208a1f0a252518540bcddf5924152957cc96dce7783042f0df3c7 |
 | patches/vllm-output-constraints-refused-beside-tool-calls.patch | 788431f67e89c1e363b59e22373cc62e6a9b972061f76566d77709d367379a2a |
 | patches/vllm-batch-invariance-substitutes-no-nvfp4-kernel.patch | c79baaee0a51275f5f522d266fe6b315c200e6951920c2454d5c80cadbb92f44 |
@@ -1120,10 +1120,10 @@ Responses streaming keeps each output item's ID and each function call's
 output uses the completed stream items, so callers can replay it with results
 correlated using the IDs first received in the stream; each streamed item is
 exactly the concatenation of its deltas, which the parser unit asserts for every
-engine chunking. Usage and the response's own status are the same on both
-paths. Item statuses are not: a truncated batch response marks every item
-incomplete, while the stream completes each item it closed before the cut. Nor
-are log probabilities: a batch message carries those of every generated token,
+engine chunking. Usage, the response's own status and every item's status are
+the same on both paths: in a truncated response the item the limit cut -- the
+last -- is incomplete, and the items it finished before the cut are completed.
+Log probabilities are not: a batch message carries those of every generated token,
 reasoning and calls included, and a streamed message those of each engine step
 that emitted its text, so their number depends on how the engine grouped tokens.
 
@@ -1348,8 +1348,10 @@ never promoted into a successful executable call:
 
 - Chat preserves finish_reason=length;
 - Anthropic preserves stop_reason=max_tokens;
-- Responses marks the response and function item incomplete, emits no executable
-  arguments-done/completed terminal, and ends with response.incomplete.
+- Responses ends a cut generation with response.incomplete, never
+  response.completed; the item the limit cut -- the last -- is incomplete, a cut
+  call emits no arguments-done, and items finished before the cut are completed,
+  on both transports.
 
 Anthropic streaming and batch responses derive their terminal metadata from the
 same observed completion cause and output. A matched stop string is reported as

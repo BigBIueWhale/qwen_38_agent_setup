@@ -2371,7 +2371,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '        return JSONResponse(\n'})},
  {'name': 'tool-truncation-finish-reason',
   'review_patch': 'patches/vllm-tool-truncation-finish-reason.patch',
-  'review_sha256': '1a220f6db9b40967d867b3cfb1a92d95d907ca059718ffe61772b4cb4409f551',
+  'review_sha256': 'eb8406c77d3a57c6e4acc957aa0a331c2e9cb51262b8b08c78901aba51d3f52c',
   'files': ({'path': 'vllm/entrypoints/openai/chat_completion/serving.py',
              'before_sha256': 'a42294241a5a2f0cfb115dfa09ded8cb08647f9c6ad98d22c71d3fac3bae3520',
              'after_sha256': 'da0922ec020e0d4cf0111af1bf00b534348ce13e6e19ac7ce50b3d6cbf58653a'},
@@ -2386,10 +2386,10 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'after_sha256': 'ee5f461f39c7a03fb4147d6f045c127b311785def7689e607002676de50f2f83'},
             {'path': 'vllm/entrypoints/openai/responses/streaming_events.py',
              'before_sha256': 'cf1d8f5e0619148374ce10be15b1a9f7640016d810f1fe766c2dd451a918aa1f',
-             'after_sha256': '5400a68d6219ca3944edb8a6d077da5e0ad0c767c34759dec7d35463dd1090b2'},
+             'after_sha256': '795c2bf69485a46a53ab1c3a86e63828d9249739a0c07b0c34be7299b951b5a4'},
             {'path': 'vllm/entrypoints/openai/responses/utils.py',
              'before_sha256': '577100edd0951f7f2936d2b37b7b4ec9a03d85088b35e49de6c0e9633a59adc2',
-             'after_sha256': '6c70148e6de4a9806f2e4e8fe3e02659780e86b6886601bb8a60b377235dc29d'},
+             'after_sha256': '90c48a7f52346b50d0929accbabeffbc88025f430cd595d066f470393e237b52'},
             {'path': 'vllm/parser/engine/parser_engine.py',
              'before_sha256': '3ac89a7f22f0e4f0d3f6f2365d79f64da9da217969793f6a33a6db9cf5ef60ff',
              'after_sha256': '9ffce8a3aac1d885cbbd4de269201ef32bdd6089b5f92d61f94eebf1130a5faf'}),
@@ -3143,6 +3143,68 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
             {'name': 'vllm/entrypoints/openai/responses/streaming_events.py:landmark-1',
              'path': 'vllm/entrypoints/openai/responses/streaming_events.py',
              'before': '\n'
+                       'def emit_simple_reasoning_done(\n'
+                       '    state: SimpleStreamingState,\n'
+                       ') -> list[StreamingResponsesResponse]:\n'
+                       '    part = ResponseReasoningTextContent(\n'
+                       '        text=state.accumulated_text,\n',
+             'after': '\n'
+                      'def emit_simple_reasoning_done(\n'
+                      '    state: SimpleStreamingState,\n'
+                      '    *,\n'
+                      '    incomplete: bool = False,\n'
+                      ') -> list[StreamingResponsesResponse]:\n'
+                      '    part = ResponseReasoningTextContent(\n'
+                      '        text=state.accumulated_text,\n',
+             'review_before': '\n'
+                              'def emit_simple_reasoning_done(\n'
+                              '    state: SimpleStreamingState,\n'
+                              ') -> list[StreamingResponsesResponse]:\n'
+                              '    part = ResponseReasoningTextContent(\n'
+                              '        text=state.accumulated_text,\n',
+             'review_after': '\n'
+                             'def emit_simple_reasoning_done(\n'
+                             '    state: SimpleStreamingState,\n'
+                             '    *,\n'
+                             '    incomplete: bool = False,\n'
+                             ') -> list[StreamingResponsesResponse]:\n'
+                             '    part = ResponseReasoningTextContent(\n'
+                             '        text=state.accumulated_text,\n'},
+            {'name': 'vllm/entrypoints/openai/responses/streaming_events.py:landmark-2',
+             'path': 'vllm/entrypoints/openai/responses/streaming_events.py',
+             'before': '            item=ResponseReasoningItem(\n'
+                       '                type="reasoning",\n'
+                       '                content=[part],\n'
+                       '                status="completed",\n'
+                       '                id=state.current_item_id,\n'
+                       '                summary=[],\n'
+                       '            ),\n',
+             'after': '            item=ResponseReasoningItem(\n'
+                      '                type="reasoning",\n'
+                      '                content=[part],\n'
+                      '                status="incomplete" if incomplete else '
+                      '"completed",\n'
+                      '                id=state.current_item_id,\n'
+                      '                summary=[],\n'
+                      '            ),\n',
+             'review_before': '            item=ResponseReasoningItem(\n'
+                              '                type="reasoning",\n'
+                              '                content=[part],\n'
+                              '                status="completed",\n'
+                              '                id=state.current_item_id,\n'
+                              '                summary=[],\n'
+                              '            ),\n',
+             'review_after': '            item=ResponseReasoningItem(\n'
+                             '                type="reasoning",\n'
+                             '                content=[part],\n'
+                             '                status="incomplete" if incomplete else '
+                             '"completed",\n'
+                             '                id=state.current_item_id,\n'
+                             '                summary=[],\n'
+                             '            ),\n'},
+            {'name': 'vllm/entrypoints/openai/responses/streaming_events.py:landmark-3',
+             'path': 'vllm/entrypoints/openai/responses/streaming_events.py',
+             'before': '\n'
                        'def emit_simple_tool_call_done(\n'
                        '    state: SimpleStreamingState,\n'
                        ') -> list[StreamingResponsesResponse]:\n'
@@ -3198,7 +3260,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '            ResponseFunctionCallArgumentsDoneEvent(\n'
                              '                '
                              'type="response.function_call_arguments.done",\n'},
-            {'name': 'vllm/entrypoints/openai/responses/streaming_events.py:landmark-2',
+            {'name': 'vllm/entrypoints/openai/responses/streaming_events.py:landmark-4',
              'path': 'vllm/entrypoints/openai/responses/streaming_events.py',
              'before': '                name=state.tool_call_name,\n'
                        '                namespace=state.tool_call_namespace,\n'
@@ -3230,7 +3292,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '                id=state.current_item_id,\n'
                              '                call_id=state.tool_call_id,\n'
                              '            ),\n'},
-            {'name': 'vllm/entrypoints/openai/responses/streaming_events.py:landmark-3',
+            {'name': 'vllm/entrypoints/openai/responses/streaming_events.py:landmark-5',
              'path': 'vllm/entrypoints/openai/responses/streaming_events.py',
              'before': '            and self.state.tool_call_index != tool_call.index\n'
                        '        )\n'
@@ -3305,39 +3367,174 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    def open(\n'},
             {'name': 'vllm/entrypoints/openai/responses/utils.py:landmark-1',
              'path': 'vllm/entrypoints/openai/responses/utils.py',
+             'before': '# SPDX-FileCopyrightText: Copyright contributors to the vLLM '
+                       'project\n'
+                       '\n'
+                       'from collections.abc import Iterable\n'
+                       'from typing import Any\n'
+                       '\n'
+                       'from openai.types.chat import (\n'
+                       '    ChatCompletionAssistantMessageParam,\n',
+             'after': '# SPDX-FileCopyrightText: Copyright contributors to the vLLM '
+                      'project\n'
+                      '\n'
+                      'from collections.abc import Iterable\n'
+                      'from typing import Any, Literal\n'
+                      '\n'
+                      'from openai.types.chat import (\n'
+                      '    ChatCompletionAssistantMessageParam,\n',
+             'review_before': '# SPDX-FileCopyrightText: Copyright contributors to the '
+                              'vLLM project\n'
+                              '\n'
+                              'from collections.abc import Iterable\n'
+                              'from typing import Any\n'
+                              '\n'
+                              'from openai.types.chat import (\n'
+                              '    ChatCompletionAssistantMessageParam,\n',
+             'review_after': '# SPDX-FileCopyrightText: Copyright contributors to the '
+                             'vLLM project\n'
+                             '\n'
+                             'from collections.abc import Iterable\n'
+                             'from typing import Any, Literal\n'
+                             '\n'
+                             'from openai.types.chat import (\n'
+                             '    ChatCompletionAssistantMessageParam,\n'},
+            {'name': 'vllm/entrypoints/openai/responses/utils.py:landmark-2',
+             'path': 'vllm/entrypoints/openai/responses/utils.py',
              'before': '    tool_calls: list[FunctionCall] | None,\n'
                        '    logprobs: list[Logprob] | None = None,\n'
                        '    tools: list[Tool] | None = None,\n'
                        ') -> list[ResponseOutputItem]:\n'
                        '    outputs: list[ResponseOutputItem] = []\n'
                        '    tool_call_name_map = '
-                       'build_responses_tool_call_name_map(tools)\n',
+                       'build_responses_tool_call_name_map(tools)\n'
+                       '\n'
+                       '    if reasoning:\n'
+                       '        outputs.append(\n',
              'after': '    tool_calls: list[FunctionCall] | None,\n'
                       '    logprobs: list[Logprob] | None = None,\n'
                       '    tools: list[Tool] | None = None,\n'
                       '    *,\n'
                       '    incomplete: bool = False,\n'
                       ') -> list[ResponseOutputItem]:\n'
+                      '    """The output items of one parsed generation, in the order '
+                      'it wrote them.\n'
+                      '\n'
+                      '    ``incomplete`` says the generation ended at the '
+                      'output-token limit. The\n'
+                      '    item it was writing when the limit cut it -- the last one '
+                      '-- is\n'
+                      '    incomplete; every item the model finished before the cut is '
+                      'completed.\n'
+                      '    That is how the stream closes items as they end, so both '
+                      'transports\n'
+                      "    report the same statuses; the response's own status says "
+                      'the turn was\n'
+                      '    cut.\n'
+                      '    """\n'
                       '    outputs: list[ResponseOutputItem] = []\n'
                       '    tool_call_name_map = '
-                      'build_responses_tool_call_name_map(tools)\n',
+                      'build_responses_tool_call_name_map(tools)\n'
+                      '    last = (\n'
+                      '        bool(reasoning) + bool(content) + len(tool_calls or []) '
+                      '- 1\n'
+                      '        if incomplete\n'
+                      '        else -1\n'
+                      '    )\n'
+                      '\n'
+                      '    def status(index: int) -> Literal["completed", '
+                      '"incomplete"]:\n'
+                      '        return "incomplete" if index == last else "completed"\n'
+                      '\n'
+                      '    if reasoning:\n'
+                      '        outputs.append(\n',
              'review_before': '    tool_calls: list[FunctionCall] | None,\n'
                               '    logprobs: list[Logprob] | None = None,\n'
                               '    tools: list[Tool] | None = None,\n'
                               ') -> list[ResponseOutputItem]:\n'
                               '    outputs: list[ResponseOutputItem] = []\n'
                               '    tool_call_name_map = '
-                              'build_responses_tool_call_name_map(tools)\n',
+                              'build_responses_tool_call_name_map(tools)\n'
+                              '\n'
+                              '    if reasoning:\n'
+                              '        outputs.append(\n',
              'review_after': '    tool_calls: list[FunctionCall] | None,\n'
                              '    logprobs: list[Logprob] | None = None,\n'
                              '    tools: list[Tool] | None = None,\n'
                              '    *,\n'
                              '    incomplete: bool = False,\n'
                              ') -> list[ResponseOutputItem]:\n'
+                             '    """The output items of one parsed generation, in the '
+                             'order it wrote them.\n'
+                             '\n'
+                             '    ``incomplete`` says the generation ended at the '
+                             'output-token limit. The\n'
+                             '    item it was writing when the limit cut it -- the '
+                             'last one -- is\n'
+                             '    incomplete; every item the model finished before the '
+                             'cut is completed.\n'
+                             '    That is how the stream closes items as they end, so '
+                             'both transports\n'
+                             "    report the same statuses; the response's own status "
+                             'says the turn was\n'
+                             '    cut.\n'
+                             '    """\n'
                              '    outputs: list[ResponseOutputItem] = []\n'
                              '    tool_call_name_map = '
-                             'build_responses_tool_call_name_map(tools)\n'},
-            {'name': 'vllm/entrypoints/openai/responses/utils.py:landmark-2',
+                             'build_responses_tool_call_name_map(tools)\n'
+                             '    last = (\n'
+                             '        bool(reasoning) + bool(content) + len(tool_calls '
+                             'or []) - 1\n'
+                             '        if incomplete\n'
+                             '        else -1\n'
+                             '    )\n'
+                             '\n'
+                             '    def status(index: int) -> Literal["completed", '
+                             '"incomplete"]:\n'
+                             '        return "incomplete" if index == last else '
+                             '"completed"\n'
+                             '\n'
+                             '    if reasoning:\n'
+                             '        outputs.append(\n'},
+            {'name': 'vllm/entrypoints/openai/responses/utils.py:landmark-3',
+             'path': 'vllm/entrypoints/openai/responses/utils.py',
+             'before': '                content=[\n'
+                       '                    '
+                       'ResponseReasoningTextContent(text=reasoning, '
+                       'type="reasoning_text")\n'
+                       '                ],\n'
+                       '                status=None,\n'
+                       '            )\n'
+                       '        )\n'
+                       '\n',
+             'after': '                content=[\n'
+                      '                    '
+                      'ResponseReasoningTextContent(text=reasoning, '
+                      'type="reasoning_text")\n'
+                      '                ],\n'
+                      '                status=status(len(outputs)),\n'
+                      '            )\n'
+                      '        )\n'
+                      '\n',
+             'review_before': '                content=[\n'
+                              '                    '
+                              'ResponseReasoningTextContent(text=reasoning, '
+                              'type="reasoning_text")\n'
+                              '                ],\n'
+                              '                status=None,\n'
+                              '            )\n'
+                              '        )\n'
+                              '\n',
+             'review_after': '                content=[\n'
+                             '                    '
+                             'ResponseReasoningTextContent(text=reasoning, '
+                             'type="reasoning_text")\n'
+                             '                ],\n'
+                             '                status=status(len(outputs)),\n'
+                             '            )\n'
+                             '        )\n'
+                             '\n'},
+            {'name': 'vllm/entrypoints/openai/responses/utils.py:landmark-4',
              'path': 'vllm/entrypoints/openai/responses/utils.py',
              'before': '                    )\n'
                        '                ],\n'
@@ -3349,8 +3546,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'after': '                    )\n'
                       '                ],\n'
                       '                role="assistant",\n'
-                      '                status="incomplete" if incomplete else '
-                      '"completed",\n'
+                      '                status=status(len(outputs)),\n'
                       '                type="message",\n'
                       '            )\n'
                       '        )\n',
@@ -3364,12 +3560,11 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'review_after': '                    )\n'
                              '                ],\n'
                              '                role="assistant",\n'
-                             '                status="incomplete" if incomplete else '
-                             '"completed",\n'
+                             '                status=status(len(outputs)),\n'
                              '                type="message",\n'
                              '            )\n'
                              '        )\n'},
-            {'name': 'vllm/entrypoints/openai/responses/utils.py:landmark-3',
+            {'name': 'vllm/entrypoints/openai/responses/utils.py:landmark-5',
              'path': 'vllm/entrypoints/openai/responses/utils.py',
              'before': '                    call_id=tool_call.id\n'
                        '                    or '
@@ -3383,8 +3578,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '                    or '
                       'make_tool_call_id(func_name=tool_call.name, idx=idx),\n'
                       '                    type="function_call",\n'
-                      '                    status="incomplete" if incomplete else '
-                      '"completed",\n'
+                      '                    status=status(len(outputs)),\n'
                       '                    name=call_name.name,\n'
                       '                    namespace=call_name.namespace,\n'
                       '                    arguments=tool_call.arguments,\n',
@@ -3400,8 +3594,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '                    or '
                              'make_tool_call_id(func_name=tool_call.name, idx=idx),\n'
                              '                    type="function_call",\n'
-                             '                    status="incomplete" if incomplete '
-                             'else "completed",\n'
+                             '                    status=status(len(outputs)),\n'
                              '                    name=call_name.name,\n'
                              '                    namespace=call_name.namespace,\n'
                              '                    arguments=tool_call.arguments,\n'},
@@ -57912,10 +58105,10 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'def _dump_tool_for_xgrammar(\n'})},
  {'name': 'responses-history-integrity',
   'review_patch': 'patches/vllm-responses-history-integrity.patch',
-  'review_sha256': '0c0e2bcbb203fd4b40452849f7ebd0e34aa64bdc5b1a86fd110afac60b01f125',
+  'review_sha256': '0a0a8f1e7606e82a2fa338443c67946dbd8dfc0fb71078a62407d4c879075cf3',
   'files': ({'path': 'tests/entrypoints/openai/responses/test_responses_utils.py',
              'before_sha256': 'e858ea25eb9e0fac456b34975f7149858b1c61a001d86f63afd06e801ff6a19b',
-             'after_sha256': '20841eeeaeacb6e3363b628e03a456e66acd71568bde9fe2727591146e3c904a'},
+             'after_sha256': 'abf41a337cbc2e1e05d2e931c356368dcdf6cf7e75136a3ee8cf2ade9397a109'},
             {'path': 'vllm/entrypoints/chat_utils.py',
              'before_sha256': 'e8675eb06fb554c84ad5e627e99e5b0ec7beefae64c4227f92eac96170eb4ec5',
              'after_sha256': '1ce1f63ca3483a6cd1fc12b10408392f852621d769e2e08f6082c608e47dd5ed'},
@@ -57923,8 +58116,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': 'afd4ebccd6bb8069604bedd408b60db5ea656dbf50af6ba3ba4d381595bdc5e7',
              'after_sha256': 'a57b5a8cab8358a715cec3d79c2671bd66c8cfefc0c62cdab169159205b5006f'},
             {'path': 'vllm/entrypoints/openai/responses/utils.py',
-             'before_sha256': '6c70148e6de4a9806f2e4e8fe3e02659780e86b6886601bb8a60b377235dc29d',
-             'after_sha256': '8d266a6a9a0f2d3c2d748e2bb4e8e69b2cdfb4a0488224e2a28d356cdf046b79'}),
+             'before_sha256': '90c48a7f52346b50d0929accbabeffbc88025f430cd595d066f470393e237b52',
+             'after_sha256': '522f71bc93aa354500f3f374fc58474202dcb4e997fe12a7d337d1ee006a6b10'}),
   'edits': ({'name': 'tests/entrypoints/openai/responses/test_responses_utils.py:landmark-1',
              'path': 'tests/entrypoints/openai/responses/test_responses_utils.py',
              'before': '# SPDX-License-Identifier: Apache-2.0\n'
@@ -58009,17 +58202,28 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    ResponseReasoningItem,\n'},
             {'name': 'tests/entrypoints/openai/responses/test_responses_utils.py:landmark-3',
              'path': 'tests/entrypoints/openai/responses/test_responses_utils.py',
-             'before': '    construct_input_messages,\n'
+             'before': '\n'
+                       'from vllm.entrypoints.openai.responses.utils import (\n'
+                       '    _construct_message_from_response_item,\n'
+                       '    construct_chat_messages_with_tool_call,\n'
+                       '    construct_input_messages,\n'
                        '    should_continue_final_message,\n'
                        ')\n'
                        '\n'
                        '\n'
                        'def _single_chat_message(item):\n',
-             'after': '    construct_input_messages,\n'
+             'after': '\n'
+                      'from vllm.entrypoints.openai.responses.utils import (\n'
+                      '    _construct_message_from_response_item,\n'
+                      '    build_response_output_items,\n'
+                      '    construct_chat_messages_with_tool_call,\n'
+                      '    construct_input_messages,\n'
                       '    should_continue_final_message,\n'
                       ')\n'
                       'from vllm.entrypoints.openai.chat_completion.protocol import '
                       'ChatCompletionRequest\n'
+                      'from vllm.entrypoints.openai.engine.protocol import '
+                      'FunctionCall\n'
                       'from vllm.entrypoints.openai.responses.protocol import '
                       'ResponsesRequest\n'
                       'from vllm.entrypoints.openai.responses.serving import '
@@ -58028,17 +58232,28 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '\n'
                       '\n'
                       'def _single_chat_message(item):\n',
-             'review_before': '    construct_input_messages,\n'
+             'review_before': '\n'
+                              'from vllm.entrypoints.openai.responses.utils import (\n'
+                              '    _construct_message_from_response_item,\n'
+                              '    construct_chat_messages_with_tool_call,\n'
+                              '    construct_input_messages,\n'
                               '    should_continue_final_message,\n'
                               ')\n'
                               '\n'
                               '\n'
                               'def _single_chat_message(item):\n',
-             'review_after': '    construct_input_messages,\n'
+             'review_after': '\n'
+                             'from vllm.entrypoints.openai.responses.utils import (\n'
+                             '    _construct_message_from_response_item,\n'
+                             '    build_response_output_items,\n'
+                             '    construct_chat_messages_with_tool_call,\n'
+                             '    construct_input_messages,\n'
                              '    should_continue_final_message,\n'
                              ')\n'
                              'from vllm.entrypoints.openai.chat_completion.protocol '
                              'import ChatCompletionRequest\n'
+                             'from vllm.entrypoints.openai.engine.protocol import '
+                             'FunctionCall\n'
                              'from vllm.entrypoints.openai.responses.protocol import '
                              'ResponsesRequest\n'
                              'from vllm.entrypoints.openai.responses.serving import '
@@ -58393,7 +58608,26 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '        with pytest.raises(VLLMValidationError, match="expected '
                       '\'a\'"):\n'
                       '            await serving._make_request(request, None)\n'
-                      '        renderer.preprocess_chat.assert_not_awaited()\n',
+                      '        renderer.preprocess_chat.assert_not_awaited()\n'
+                      '\n'
+                      '\n'
+                      'def test_the_limit_leaves_only_the_item_it_cut_incomplete():\n'
+                      '    """Every item the model finished before the token limit is '
+                      'completed; the\n'
+                      '    one it was writing, the last, is incomplete -- as the '
+                      'stream closes them."""\n'
+                      '    calls = [FunctionCall(id="a", name="f", arguments="{}"),\n'
+                      '             FunctionCall(id="b", name="f", arguments=\'{"x": '
+                      "1')]\n"
+                      '    items = build_response_output_items("plan", "text", calls, '
+                      'incomplete=True)\n'
+                      '    assert [item.status for item in items] == [\n'
+                      '        "completed", "completed", "completed", "incomplete"]\n'
+                      '    items = build_response_output_items("plan", None, None, '
+                      'incomplete=True)\n'
+                      '    assert [item.status for item in items] == ["incomplete"]\n'
+                      '    items = build_response_output_items("plan", "text", calls)\n'
+                      '    assert {item.status for item in items} == {"completed"}\n',
              'review_before': '        assert len(msgs) == 2\n'
                               '        assert msgs[0] == {"role": "system", "content": '
                               '"be helpful"}\n'
@@ -58589,7 +58823,32 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '        with pytest.raises(VLLMValidationError, '
                              'match="expected \'a\'"):\n'
                              '            await serving._make_request(request, None)\n'
-                             '        renderer.preprocess_chat.assert_not_awaited()\n'},
+                             '        renderer.preprocess_chat.assert_not_awaited()\n'
+                             '\n'
+                             '\n'
+                             'def '
+                             'test_the_limit_leaves_only_the_item_it_cut_incomplete():\n'
+                             '    """Every item the model finished before the token '
+                             'limit is completed; the\n'
+                             '    one it was writing, the last, is incomplete -- as '
+                             'the stream closes them."""\n'
+                             '    calls = [FunctionCall(id="a", name="f", '
+                             'arguments="{}"),\n'
+                             '             FunctionCall(id="b", name="f", '
+                             'arguments=\'{"x": 1\')]\n'
+                             '    items = build_response_output_items("plan", "text", '
+                             'calls, incomplete=True)\n'
+                             '    assert [item.status for item in items] == [\n'
+                             '        "completed", "completed", "completed", '
+                             '"incomplete"]\n'
+                             '    items = build_response_output_items("plan", None, '
+                             'None, incomplete=True)\n'
+                             '    assert [item.status for item in items] == '
+                             '["incomplete"]\n'
+                             '    items = build_response_output_items("plan", "text", '
+                             'calls)\n'
+                             '    assert {item.status for item in items} == '
+                             '{"completed"}\n'},
             {'name': 'vllm/entrypoints/chat_utils.py:landmark-1',
              'path': 'vllm/entrypoints/chat_utils.py',
              'before': '    return "random"\n'
@@ -59116,7 +59375,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                        'project\n'
                        '\n'
                        'from collections.abc import Iterable\n'
-                       'from typing import Any\n'
+                       'from typing import Any, Literal\n'
                        '\n'
                        'from openai.types.chat import (\n',
              'after': '# SPDX-FileCopyrightText: Copyright contributors to the vLLM '
@@ -59124,14 +59383,14 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '\n'
                       'from collections.abc import Iterable\n'
                       'from copy import deepcopy\n'
-                      'from typing import Any\n'
+                      'from typing import Any, Literal\n'
                       '\n'
                       'from openai.types.chat import (\n',
              'review_before': '# SPDX-FileCopyrightText: Copyright contributors to the '
                               'vLLM project\n'
                               '\n'
                               'from collections.abc import Iterable\n'
-                              'from typing import Any\n'
+                              'from typing import Any, Literal\n'
                               '\n'
                               'from openai.types.chat import (\n',
              'review_after': '# SPDX-FileCopyrightText: Copyright contributors to the '
@@ -59139,7 +59398,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '\n'
                              'from collections.abc import Iterable\n'
                              'from copy import deepcopy\n'
-                             'from typing import Any\n'
+                             'from typing import Any, Literal\n'
                              '\n'
                              'from openai.types.chat import (\n'},
             {'name': 'vllm/entrypoints/openai/responses/utils.py:landmark-2',
@@ -59340,15 +59599,13 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '\n'},
             {'name': 'vllm/entrypoints/openai/responses/utils.py:landmark-4',
              'path': 'vllm/entrypoints/openai/responses/utils.py',
-             'before': '            messages.append(message)\n'
-                       '\n'
-                       '    return messages\n'
+             'before': '    return messages\n'
                        '\n'
                        '\n'
-                       'def _construct_message_from_response_item(\n',
-             'after': '            messages.append(message)\n'
-                      '\n'
-                      '    return messages\n'
+                       'def _construct_message_from_response_item(\n'
+                       '    item: ResponseInputOutputItem,\n'
+                       '    prev_msg: ChatCompletionMessageParam | None = None,\n',
+             'after': '    return messages\n'
                       '\n'
                       '\n'
                       'def _assistant_content(content):\n'
@@ -59371,16 +59628,17 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '    return parts\n'
                       '\n'
                       '\n'
-                      'def _construct_message_from_response_item(\n',
-             'review_before': '            messages.append(message)\n'
+                      'def _construct_message_from_response_item(\n'
+                      '    item: ResponseInputOutputItem,\n'
+                      '    prev_msg: ChatCompletionMessageParam | None = None,\n',
+             'review_before': '    return messages\n'
                               '\n'
-                              '    return messages\n'
                               '\n'
-                              '\n'
-                              'def _construct_message_from_response_item(\n',
-             'review_after': '            messages.append(message)\n'
-                             '\n'
-                             '    return messages\n'
+                              'def _construct_message_from_response_item(\n'
+                              '    item: ResponseInputOutputItem,\n'
+                              '    prev_msg: ChatCompletionMessageParam | None = '
+                              'None,\n',
+             'review_after': '    return messages\n'
                              '\n'
                              '\n'
                              'def _assistant_content(content):\n'
@@ -59403,7 +59661,10 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    return parts\n'
                              '\n'
                              '\n'
-                             'def _construct_message_from_response_item(\n'},
+                             'def _construct_message_from_response_item(\n'
+                             '    item: ResponseInputOutputItem,\n'
+                             '    prev_msg: ChatCompletionMessageParam | None = '
+                             'None,\n'},
             {'name': 'vllm/entrypoints/openai/responses/utils.py:landmark-5',
              'path': 'vllm/entrypoints/openai/responses/utils.py',
              'before': '    elif isinstance(item, ResponseReasoningItem):\n'
@@ -59593,7 +59854,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'frozenset[str]:\n'})},
  {'name': 'responses-stream-identity',
   'review_patch': 'patches/vllm-responses-stream-identity.patch',
-  'review_sha256': '13de2609c6f80dcf722b61e8e02444e9c73572c65e511883318d2fa231a82f9f',
+  'review_sha256': 'd4629bd0b979eb1978721d12733caae4acca2736d6ec870eb295f87316e67345',
   'files': ({'path': 'tests/entrypoints/openai/responses/test_serving_responses.py',
              'before_sha256': '3b6763193980cefe67b693cf7b84428ffd2b58b49b0e59f18e81482d91fdd805',
              'after_sha256': '63eab4c4177c58df2d538dc2a94049a7e8a6526fa0af0c10873ad77248daae72'},
@@ -59601,8 +59862,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': '8b38cb52f9cf61085377c0a93f1393e93f09f00475057a1368b00703c10c2cd9',
              'after_sha256': '7b8197f6e922a9eba9c57d7d811f0749b1dbda41faab2555adc4c3377dcd7728'},
             {'path': 'vllm/entrypoints/openai/responses/streaming_events.py',
-             'before_sha256': '5400a68d6219ca3944edb8a6d077da5e0ad0c767c34759dec7d35463dd1090b2',
-             'after_sha256': '1d39608c0ddfb5466661fbe42d44f8c8b3584e9eeab36f3093c41734183efeba'}),
+             'before_sha256': '795c2bf69485a46a53ab1c3a86e63828d9249739a0c07b0c34be7299b951b5a4',
+             'after_sha256': 'd42b73604e9729d35fcc944c68b21e5a68f110be11327f65308dc8ee46daeffe'}),
   'edits': ({'name': 'tests/entrypoints/openai/responses/test_serving_responses.py:landmark-1',
              'path': 'tests/entrypoints/openai/responses/test_serving_responses.py',
              'before': '# SPDX-FileCopyrightText: Copyright contributors to the vLLM '
@@ -61371,37 +61632,88 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '        ),\n'},
             {'name': 'vllm/entrypoints/openai/responses/streaming_events.py:landmark-8',
              'path': 'vllm/entrypoints/openai/responses/streaming_events.py',
-             'before': '                self.state,\n'
+             'before': '    def close_current(\n'
+                       '        self, *, incomplete: bool = False\n'
+                       '    ) -> list[StreamingResponsesResponse]:\n'
+                       '        """Close the current state and emit its \'done\' event '
+                       'sequence."""\n'
+                       '        handlers = '
+                       'self._STATE_HANDLERS.get(self.state.current_state)\n'
+                       '        if handlers is None:\n'
+                       '            return []\n'
+                       '        if self.state.current_state == _StateType.TOOL_CALL:\n'
+                       '            return emit_simple_tool_call_done(\n'
+                       '                self.state,\n'
                        '                incomplete=incomplete,\n'
                        '            )\n'
                        '        return handlers.done_fn(self.state)\n'
                        '\n'
-                       '    def open(\n',
-             'after': '                self.state,\n'
-                      '                incomplete=incomplete,\n'
-                      '            )\n'
-                      '        if self.state.current_state == _StateType.CONTENT:\n'
-                      '            return emit_simple_content_done(self.state, '
-                      'incomplete=incomplete)\n'
-                      '        return handlers.done_fn(self.state)\n'
+                       '    def open(\n'
+                       '        self, target_state: _StateType, tool_call: Any = '
+                       'None\n',
+             'after': '    def close_current(\n'
+                      '        self, *, incomplete: bool = False\n'
+                      '    ) -> list[StreamingResponsesResponse]:\n'
+                      '        """Close the current state and emit its \'done\' event '
+                      'sequence.\n'
                       '\n'
-                      '    def open(\n',
-             'review_before': '                self.state,\n'
+                      '        ``incomplete`` is set only for the item open when the '
+                      'output-token\n'
+                      '        limit ended the generation; every item closed by the '
+                      'next one is one\n'
+                      '        the model finished.\n'
+                      '        """\n'
+                      '        handlers = '
+                      'self._STATE_HANDLERS.get(self.state.current_state)\n'
+                      '        if handlers is None:\n'
+                      '            return []\n'
+                      '        return handlers.done_fn(self.state, '
+                      'incomplete=incomplete)\n'
+                      '\n'
+                      '    def open(\n'
+                      '        self, target_state: _StateType, tool_call: Any = None\n',
+             'review_before': '    def close_current(\n'
+                              '        self, *, incomplete: bool = False\n'
+                              '    ) -> list[StreamingResponsesResponse]:\n'
+                              '        """Close the current state and emit its '
+                              '\'done\' event sequence."""\n'
+                              '        handlers = '
+                              'self._STATE_HANDLERS.get(self.state.current_state)\n'
+                              '        if handlers is None:\n'
+                              '            return []\n'
+                              '        if self.state.current_state == '
+                              '_StateType.TOOL_CALL:\n'
+                              '            return emit_simple_tool_call_done(\n'
+                              '                self.state,\n'
                               '                incomplete=incomplete,\n'
                               '            )\n'
                               '        return handlers.done_fn(self.state)\n'
                               '\n'
-                              '    def open(\n',
-             'review_after': '                self.state,\n'
-                             '                incomplete=incomplete,\n'
-                             '            )\n'
-                             '        if self.state.current_state == '
-                             '_StateType.CONTENT:\n'
-                             '            return emit_simple_content_done(self.state, '
-                             'incomplete=incomplete)\n'
-                             '        return handlers.done_fn(self.state)\n'
+                              '    def open(\n'
+                              '        self, target_state: _StateType, tool_call: Any '
+                              '= None\n',
+             'review_after': '    def close_current(\n'
+                             '        self, *, incomplete: bool = False\n'
+                             '    ) -> list[StreamingResponsesResponse]:\n'
+                             '        """Close the current state and emit its \'done\' '
+                             'event sequence.\n'
                              '\n'
-                             '    def open(\n'},
+                             '        ``incomplete`` is set only for the item open '
+                             'when the output-token\n'
+                             '        limit ended the generation; every item closed by '
+                             'the next one is one\n'
+                             '        the model finished.\n'
+                             '        """\n'
+                             '        handlers = '
+                             'self._STATE_HANDLERS.get(self.state.current_state)\n'
+                             '        if handlers is None:\n'
+                             '            return []\n'
+                             '        return handlers.done_fn(self.state, '
+                             'incomplete=incomplete)\n'
+                             '\n'
+                             '    def open(\n'
+                             '        self, target_state: _StateType, tool_call: Any = '
+                             'None\n'},
             {'name': 'vllm/entrypoints/openai/responses/streaming_events.py:landmark-9',
              'path': 'vllm/entrypoints/openai/responses/streaming_events.py',
              'before': '        self,\n'
@@ -81359,13 +81671,13 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '                        request_id=internal_req_id,\n'})},
  {'name': 'tool-output-completion',
   'review_patch': 'patches/vllm-tool-output-completion.patch',
-  'review_sha256': '41d49e00bd197fea0b449c2c0c0447d7afa2a55665221928e789c85aec9a957a',
+  'review_sha256': '9cbb734b571b1800634e5172e16796de5bcb70b8c5e70c3cbc2226a2e3a39aed',
   'files': ({'path': 'tests/entrypoints/openai/chat_completion/test_parallel_tool_call_integrity.py',
              'before_sha256': 'a4a6547338dbf625e3041e2578f2a8e314aa14d1520468c69ee17ff22998d9a2',
              'after_sha256': 'e290f2c4df7bd842594db1fb4e66bf713bc6ff653cbadc8877958a955c0fa4c4'},
             {'path': 'tests/entrypoints/openai/responses/test_serving_responses.py',
              'before_sha256': '63eab4c4177c58df2d538dc2a94049a7e8a6526fa0af0c10873ad77248daae72',
-             'after_sha256': 'ce5a325238d8c650968f59dc3d150ffc7574c224e60db2135e3fbce76d374fbd'},
+             'after_sha256': 'b2ef219d6fc9fe1fee04a641389451f263add461be2ce974bbb3dcc86d97e866'},
             {'path': 'tests/entrypoints/scale_out/derender/test_terminal_metadata.py',
              'before_sha256': '0451966ee298b08e799ef300029a144e66deb6debe5c1af43311aa1af622a277',
              'after_sha256': 'e3edf885a33aaecf5dd8d6fdeadad7f3eed60510eb4f43354f1273e52b974cfc'},
@@ -82238,7 +82550,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '@pytest.mark.parametrize("shape,finish_reason,stop_reason", [\n'
                       '    ("complete", "stop", None), ("cut", "stop", None),\n'
                       '    ("complete", "stop", "HALT"), ("complete", "stop", 9),\n'
-                      '    ("mixed", "stop", None), ("cut", "length", None),\n'
+                      '    ("mixed", "stop", None), ("cut", "length", None), ("mixed", '
+                      '"length", None),\n'
                       '])\n'
                       'async def '
                       'test_wrapped_call_output_uses_its_terminal_on_both_responses_paths(\n'
@@ -82320,8 +82633,20 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '                      for part in item.content if part.type == '
                       '"output_text")\n'
                       '    if finish_reason == "length":\n'
-                      '        assert len(calls) == 1\n'
-                      '        assert calls[0].status == "incomplete"\n'
+                      '        # The limit cut the last call; a call the model closed '
+                      'before it\n'
+                      '        # is complete on both paths alike.\n'
+                      '        assert [call.status for call in calls] == (\n'
+                      '            ["completed", "incomplete"] if shape == "mixed" '
+                      'else ["incomplete"]\n'
+                      '        )\n'
+                      '        if chunk_size is not None:\n'
+                      '            assert [event.arguments for event in events\n'
+                      '                    if event.type == '
+                      '"response.function_call_arguments.done"] == (\n'
+                      '                [\'{"text": "kept"}\'] if shape == "mixed" else '
+                      '[]\n'
+                      '            )\n'
                       '    elif stop_reason is not None or shape == "cut":\n'
                       '        assert calls == []\n'
                       '        assert content == body\n'
@@ -82353,7 +82678,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    ("complete", "stop", None), ("cut", "stop", None),\n'
                              '    ("complete", "stop", "HALT"), ("complete", "stop", '
                              '9),\n'
-                             '    ("mixed", "stop", None), ("cut", "length", None),\n'
+                             '    ("mixed", "stop", None), ("cut", "length", None), '
+                             '("mixed", "length", None),\n'
                              '])\n'
                              'async def '
                              'test_wrapped_call_output_uses_its_terminal_on_both_responses_paths(\n'
@@ -82440,8 +82766,20 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '                      for part in item.content if '
                              'part.type == "output_text")\n'
                              '    if finish_reason == "length":\n'
-                             '        assert len(calls) == 1\n'
-                             '        assert calls[0].status == "incomplete"\n'
+                             '        # The limit cut the last call; a call the model '
+                             'closed before it\n'
+                             '        # is complete on both paths alike.\n'
+                             '        assert [call.status for call in calls] == (\n'
+                             '            ["completed", "incomplete"] if shape == '
+                             '"mixed" else ["incomplete"]\n'
+                             '        )\n'
+                             '        if chunk_size is not None:\n'
+                             '            assert [event.arguments for event in events\n'
+                             '                    if event.type == '
+                             '"response.function_call_arguments.done"] == (\n'
+                             '                [\'{"text": "kept"}\'] if shape == '
+                             '"mixed" else []\n'
+                             '            )\n'
                              '    elif stop_reason is not None or shape == "cut":\n'
                              '        assert calls == []\n'
                              '        assert content == body\n'
@@ -124875,7 +125213,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    ]))\n'})},
  {'name': 'responses-tools-are-one-function-list',
   'review_patch': 'patches/vllm-responses-tools-are-one-function-list.patch',
-  'review_sha256': 'c4f0cb9233fac4c8903c729434f7c7f85388084e7879d16bfbb852f1faf8700b',
+  'review_sha256': 'c443c7a1235e5ffc2ddc1ddb001ce72c75468c246ab2d6ca6ebefa87d2ac0f59',
   'files': ({'path': 'tests/tool_parsers/test_structural_tag_registry.py',
              'before_sha256': '3fbc42eef3b13462d86990e287c15e35ae3d1faa8e5a0d9eb75b338787074540',
              'after_sha256': '7d1fd82dfcf43352ff4b6953418cf762128bea9b78207a2313d9df9cb19b5f4b'},
@@ -124889,8 +125227,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': '14ad1e85aa2cd455de3c9f6231220a4fa9d41806a054c0e8f7d2da64e596493e',
              'after_sha256': 'fdcb2a0602a1ec83db357a34c9b70b8c045bf255eac6acfda83f8cc6dc106604'},
             {'path': 'vllm/entrypoints/openai/responses/utils.py',
-             'before_sha256': '8d266a6a9a0f2d3c2d748e2bb4e8e69b2cdfb4a0488224e2a28d356cdf046b79',
-             'after_sha256': '42a5c0d56e6f556ec9449803af46fe47d96dc0b009529fe8f785e9af605b5188'},
+             'before_sha256': '522f71bc93aa354500f3f374fc58474202dcb4e997fe12a7d337d1ee006a6b10',
+             'after_sha256': 'b51b018482eb19482df18f84c6ae72b633f0de7b6f7c2d77842f7bc6608b91d6'},
             {'path': 'vllm/parser/abstract_parser.py',
              'before_sha256': 'eaffc8cd7340c05b76e5c3bc3541e65e327aa00927b7119d29b92a33d7c845ec',
              'after_sha256': 'a52399b65316163be152a4c3fa9fd832e80d293814ec421832438c00bb7e1816'},
@@ -127179,13 +127517,13 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              ') -> dict[str, ResponsesToolCallName]:\n'})},
  {'name': 'batch-parse-starts-where-the-prompt-leaves',
   'review_patch': 'patches/vllm-batch-parse-starts-where-the-prompt-leaves.patch',
-  'review_sha256': 'd3b517a2b8b968273c480fd59650df5441755a9d31527277675502a5bbef4700',
+  'review_sha256': 'dfc0484af7234693e7df8ce8530e443fb6d58adef4d3145f74ad3a28ca9985a2',
   'files': ({'path': 'tests/entrypoints/openai/responses/test_parsable_context_unit.py',
              'before_sha256': '8fd0bd655d13abdc9fe03e1c0bb0625225431624db8257e1db07c00ac3da2779',
              'after_sha256': '95f50d93d97370d426319b5dc94fce55b9cbca4ce9b3b95a930e42990dcbf4a2'},
             {'path': 'tests/entrypoints/openai/responses/test_serving_responses.py',
-             'before_sha256': 'ce5a325238d8c650968f59dc3d150ffc7574c224e60db2135e3fbce76d374fbd',
-             'after_sha256': '3bf75ab3385a9e43bfb6125c894c06770efa0aae92a054304826a3b02a3615cd'},
+             'before_sha256': 'b2ef219d6fc9fe1fee04a641389451f263add461be2ce974bbb3dcc86d97e866',
+             'after_sha256': '170cdad0dba045b64560bf7dc78434786ce21de2cce032cd18ed0ffa358c75bc'},
             {'path': 'tests/parser/engine/test_gemma4_streaming_reasoning.py',
              'before_sha256': '572f6a6e5f448861276bf272ec8b4be14434a9fd31312d087230f682a18f5e3e',
              'after_sha256': 'e491dbb881f33dfddbb07cb8fbebc6e5f6196c58a4b027cf04ba8095ea52f82e'},
@@ -134697,9 +135035,9 @@ FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5d
  'tests/entrypoints/openai/responses/test_function_call_parsing.py': '98877f2029119b7b7b753c4a9cbc315d3c0124885bba29a45004dc9fd1cfb267',
  'tests/entrypoints/openai/responses/test_parsable_context_unit.py': '95f50d93d97370d426319b5dc94fce55b9cbca4ce9b3b95a930e42990dcbf4a2',
  'tests/entrypoints/openai/responses/test_reasoning_usage_context.py': '46074423f3316b6380ecb50f17c6d26aa2fe49c5fa211cb08179ee5fb4347666',
- 'tests/entrypoints/openai/responses/test_responses_utils.py': '20841eeeaeacb6e3363b628e03a456e66acd71568bde9fe2727591146e3c904a',
+ 'tests/entrypoints/openai/responses/test_responses_utils.py': 'abf41a337cbc2e1e05d2e931c356368dcdf6cf7e75136a3ee8cf2ade9397a109',
  'tests/entrypoints/openai/responses/test_sampling_params.py': 'd4c56d82ae742e0c5075c189f91ac069f2ad0a61e336ee4f7fc178f46bf5f5b5',
- 'tests/entrypoints/openai/responses/test_serving_responses.py': '3bf75ab3385a9e43bfb6125c894c06770efa0aae92a054304826a3b02a3615cd',
+ 'tests/entrypoints/openai/responses/test_serving_responses.py': '170cdad0dba045b64560bf7dc78434786ce21de2cce032cd18ed0ffa358c75bc',
  'tests/entrypoints/openai/test_beam_search_boundary.py': '34bb27d9fc4952429dd4f31199a57ecef0ca049ac76c4040e548e9773fbd4cb1',
  'tests/entrypoints/openai/test_output_constraint_beside_tools.py': '836be0512b50a3c2877a99ef7166b59bc50c7aa535a7cf653edebf57028f9b39',
  'tests/entrypoints/openai/test_prompt_truncation_refused.py': 'db436cb68152f60985f802cb63ecaaaca47e6e857a82056751ed730566e3aa86',
@@ -134826,8 +135164,8 @@ FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5d
  'vllm/entrypoints/openai/responses/context.py': '2b84c0d0e733057b80e93075bbeae0a16a9a6a6274ad0b15d1506d1c77ce7a24',
  'vllm/entrypoints/openai/responses/protocol.py': '71108c0a82c83383a3e105f177f41190eb690c69f92c12cb43e1f4e4cd2c3262',
  'vllm/entrypoints/openai/responses/serving.py': '0a235c4b4681365d0c7c3fda940a5b4d57caee881a46d48fcfcfcc6f25c3a1dc',
- 'vllm/entrypoints/openai/responses/streaming_events.py': '1d39608c0ddfb5466661fbe42d44f8c8b3584e9eeab36f3093c41734183efeba',
- 'vllm/entrypoints/openai/responses/utils.py': '42a5c0d56e6f556ec9449803af46fe47d96dc0b009529fe8f785e9af605b5188',
+ 'vllm/entrypoints/openai/responses/streaming_events.py': 'd42b73604e9729d35fcc944c68b21e5a68f110be11327f65308dc8ee46daeffe',
+ 'vllm/entrypoints/openai/responses/utils.py': 'b51b018482eb19482df18f84c6ae72b633f0de7b6f7c2d77842f7bc6608b91d6',
  'vllm/entrypoints/openai/run_batch.py': 'b33bb5bb911b300914c10ac7068610330706a4c3371211ea7a165c219139f89e',
  'vllm/entrypoints/pooling/scoring/io_processor.py': 'aaa0d78c9432298095134f2fc5f07ca18f613b139912aef01a43ade162bdb5d4',
  'vllm/entrypoints/scale_out/derender/serving.py': '3beb23995dddcfac4b98bf38f5948bd992ff06bf99290157317ba7018f57a6d7',

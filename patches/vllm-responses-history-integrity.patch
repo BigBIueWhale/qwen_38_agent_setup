@@ -20,18 +20,24 @@ diff --git a/tests/entrypoints/openai/responses/test_responses_utils.py b/tests/
  from openai.types.responses.response_reasoning_item import (
      Content,
      ResponseReasoningItem,
-@@ -22,6 +25,10 @@
+@@ -18,10 +21,16 @@
+ 
+ from vllm.entrypoints.openai.responses.utils import (
+     _construct_message_from_response_item,
++    build_response_output_items,
+     construct_chat_messages_with_tool_call,
      construct_input_messages,
      should_continue_final_message,
  )
 +from vllm.entrypoints.openai.chat_completion.protocol import ChatCompletionRequest
++from vllm.entrypoints.openai.engine.protocol import FunctionCall
 +from vllm.entrypoints.openai.responses.protocol import ResponsesRequest
 +from vllm.entrypoints.openai.responses.serving import OpenAIServingResponses
 +from vllm.exceptions import VLLMValidationError
  
  
  def _single_chat_message(item):
-@@ -223,7 +230,7 @@
+@@ -223,7 +232,7 @@
              encrypted_content="TOP_SECRET_MESSAGE",
              status=None,
          )
@@ -40,7 +46,7 @@ diff --git a/tests/entrypoints/openai/responses/test_responses_utils.py b/tests/
              construct_chat_messages_with_tool_call([item])
  
          output_item = ResponseOutputMessage(
-@@ -350,7 +357,7 @@
+@@ -350,7 +359,7 @@
          assert formatted["reasoning"] == ""
  
      def test_encrypted_content_raises(self):
@@ -49,7 +55,7 @@ diff --git a/tests/entrypoints/openai/responses/test_responses_utils.py b/tests/
          item = ResponseReasoningItem(
              id="reasoning_6",
              summary=[
-@@ -369,12 +376,12 @@
+@@ -369,12 +378,12 @@
              encrypted_content="ENCRYPTED",
              status=None,
          )
@@ -65,7 +71,7 @@ diff --git a/tests/entrypoints/openai/responses/test_responses_utils.py b/tests/
          item = ResponseReasoningItem(
              id="reasoning_7",
              summary=[
-@@ -393,7 +400,7 @@
+@@ -393,7 +402,7 @@
              status=None,
          )
          formatted = _single_chat_message(item)
@@ -74,7 +80,7 @@ diff --git a/tests/entrypoints/openai/responses/test_responses_utils.py b/tests/
          mock_logger.warning.assert_called_once()
          assert (
              "summary text as reasoning content" in mock_logger.warning.call_args[0][0]
-@@ -900,3 +907,139 @@
+@@ -900,3 +909,153 @@
          assert len(msgs) == 2
          assert msgs[0] == {"role": "system", "content": "be helpful"}
          assert msgs[1] == {"role": "user", "content": "hello"}
@@ -214,6 +220,20 @@ diff --git a/tests/entrypoints/openai/responses/test_responses_utils.py b/tests/
 +        with pytest.raises(VLLMValidationError, match="expected 'a'"):
 +            await serving._make_request(request, None)
 +        renderer.preprocess_chat.assert_not_awaited()
++
++
++def test_the_limit_leaves_only_the_item_it_cut_incomplete():
++    """Every item the model finished before the token limit is completed; the
++    one it was writing, the last, is incomplete -- as the stream closes them."""
++    calls = [FunctionCall(id="a", name="f", arguments="{}"),
++             FunctionCall(id="b", name="f", arguments='{"x": 1')]
++    items = build_response_output_items("plan", "text", calls, incomplete=True)
++    assert [item.status for item in items] == [
++        "completed", "completed", "completed", "incomplete"]
++    items = build_response_output_items("plan", None, None, incomplete=True)
++    assert [item.status for item in items] == ["incomplete"]
++    items = build_response_output_items("plan", "text", calls)
++    assert {item.status for item in items} == {"completed"}
 diff --git a/vllm/entrypoints/chat_utils.py b/vllm/entrypoints/chat_utils.py
 --- a/vllm/entrypoints/chat_utils.py
 +++ b/vllm/entrypoints/chat_utils.py
@@ -416,7 +436,7 @@ diff --git a/vllm/entrypoints/openai/responses/utils.py b/vllm/entrypoints/opena
  
  from collections.abc import Iterable
 +from copy import deepcopy
- from typing import Any
+ from typing import Any, Literal
  
  from openai.types.chat import (
 @@ -30,13 +31,17 @@
@@ -438,7 +458,7 @@ diff --git a/vllm/entrypoints/openai/responses/utils.py b/vllm/entrypoints/opena
  from vllm.logger import init_logger
  from vllm.tool_parsers.utils import (
      build_responses_tool_call_name_map,
-@@ -181,27 +186,17 @@
+@@ -198,27 +203,17 @@
          # Filter out system messages from previous conversation -- per the
          # OpenAI spec, instructions should NOT carry over across responses.
          # The current request's instructions (if any) were already added above.
@@ -472,12 +492,10 @@ diff --git a/vllm/entrypoints/openai/responses/utils.py b/vllm/entrypoints/opena
      return messages
  
  
-@@ -221,6 +216,23 @@
-             messages.append(message)
- 
+@@ -240,6 +235,23 @@
      return messages
-+
-+
+ 
+ 
 +def _assistant_content(content):
 +    """Concatenate text blocks exactly; retain mixed parts for shared parsing."""
 +    if not isinstance(content, list):
@@ -493,10 +511,12 @@ diff --git a/vllm/entrypoints/openai/responses/utils.py b/vllm/entrypoints/opena
 +    ):
 +        return "".join(part["text"] for part in parts)
 +    return parts
- 
- 
++
++
  def _construct_message_from_response_item(
-@@ -275,11 +287,13 @@
+     item: ResponseInputOutputItem,
+     prev_msg: ChatCompletionMessageParam | None = None,
+@@ -292,11 +304,13 @@
      elif isinstance(item, ResponseReasoningItem):
          reasoning = ""
          if item.encrypted_content:
@@ -513,7 +533,7 @@ diff --git a/vllm/entrypoints/openai/responses/utils.py b/vllm/entrypoints/opena
              logger.warning(
                  "Using summary text as reasoning content for item %s. "
                  "Please use content instead of summary for "
-@@ -297,7 +311,7 @@
+@@ -314,7 +328,7 @@
              "reasoning": reasoning,
          }
      elif isinstance(item, ResponseOutputMessage):
@@ -522,7 +542,7 @@ diff --git a/vllm/entrypoints/openai/responses/utils.py b/vllm/entrypoints/opena
          if prev_assistant_msg:
              previous_content = prev_assistant_msg.get("content")
              if previous_content is None:
-@@ -321,20 +335,15 @@
+@@ -338,20 +352,15 @@
              tool_call_id=item.get("call_id"),
          )
      elif isinstance(item, dict) and item.get("role") == "assistant":

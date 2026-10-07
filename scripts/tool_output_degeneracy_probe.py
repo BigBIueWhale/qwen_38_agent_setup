@@ -804,16 +804,19 @@ def live_responses_truncation(budget: int) -> dict[str, Any]:
             final_response = event["response"]
     if "response.completed" in event_types:
         raise AssertionError("Responses stream emitted response.completed on truncation")
-    if "response.function_call_arguments.done" in event_types:
+    # The limit cut the last call; any call the model closed before it is
+    # complete and carries its arguments.done, the cut one never does.
+    if event_types.count("response.function_call_arguments.done") != len(done_statuses) - 1:
         raise AssertionError(
-            "Responses stream emitted executable arguments.done on truncation"
+            "Responses stream emitted arguments.done for the call the limit cut: "
+            f"{event_types}"
         )
     if final_response is None:
         raise AssertionError(f"Responses stream omitted response.incomplete: {event_types}")
     assert_incomplete_response(final_response, budget, "Responses stream final")
-    if done_statuses != ["incomplete"]:
+    if done_statuses[-1:] != ["incomplete"] or set(done_statuses[:-1]) - {"completed"}:
         raise AssertionError(
-            f"Responses output_item.done did not carry incomplete: {done_statuses}"
+            f"Responses output_item.done statuses are not the cut rule: {done_statuses}"
         )
     return {
         "nonstream_status": nonstream["status"],

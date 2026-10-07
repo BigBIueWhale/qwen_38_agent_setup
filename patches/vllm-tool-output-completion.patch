@@ -246,7 +246,7 @@ diff --git a/tests/entrypoints/openai/responses/test_serving_responses.py b/test
      if finish == "length":
          assert done[-1].status == "incomplete"
      else:
-@@ -1359,3 +1359,87 @@
+@@ -1359,3 +1359,95 @@
      assert response.status == ("incomplete" if finish == "length" else "completed")
      assert response.output[0].status == response.status
      assert response.output[0].content[0].logprobs == [logprob]
@@ -257,7 +257,7 @@ diff --git a/tests/entrypoints/openai/responses/test_serving_responses.py b/test
 +@pytest.mark.parametrize("shape,finish_reason,stop_reason", [
 +    ("complete", "stop", None), ("cut", "stop", None),
 +    ("complete", "stop", "HALT"), ("complete", "stop", 9),
-+    ("mixed", "stop", None), ("cut", "length", None),
++    ("mixed", "stop", None), ("cut", "length", None), ("mixed", "length", None),
 +])
 +async def test_wrapped_call_output_uses_its_terminal_on_both_responses_paths(
 +    chunk_size, shape, finish_reason, stop_reason,
@@ -322,8 +322,16 @@ diff --git a/tests/entrypoints/openai/responses/test_serving_responses.py b/test
 +    content = "".join(part.text for item in items if item.type == "message"
 +                      for part in item.content if part.type == "output_text")
 +    if finish_reason == "length":
-+        assert len(calls) == 1
-+        assert calls[0].status == "incomplete"
++        # The limit cut the last call; a call the model closed before it
++        # is complete on both paths alike.
++        assert [call.status for call in calls] == (
++            ["completed", "incomplete"] if shape == "mixed" else ["incomplete"]
++        )
++        if chunk_size is not None:
++            assert [event.arguments for event in events
++                    if event.type == "response.function_call_arguments.done"] == (
++                ['{"text": "kept"}'] if shape == "mixed" else []
++            )
 +    elif stop_reason is not None or shape == "cut":
 +        assert calls == []
 +        assert content == body
