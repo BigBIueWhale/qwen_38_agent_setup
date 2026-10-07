@@ -175,6 +175,7 @@ OUTPUT_CONSTRAINT_BESIDE_TOOLS_PATCH_FILE="${PROJECT_DIR}/patches/vllm-output-co
 BATCH_INVARIANT_NATIVE_FP4_PATCH_FILE="${PROJECT_DIR}/patches/vllm-batch-invariance-substitutes-no-nvfp4-kernel.patch"
 RENDER_EVERY_IMAGE_PATCH_FILE="${PROJECT_DIR}/patches/vllm-render-carries-every-image-chat-renders.patch"
 RENDERED_PROMPT_NOT_TRUNCATED_PATCH_FILE="${PROJECT_DIR}/patches/vllm-rendered-prompts-are-never-truncated.patch"
+KV_TRANSFER_PARAMS_DECLARED_PATCH_FILE="${PROJECT_DIR}/patches/vllm-kv-transfer-params-are-declared.patch"
 
 if [[ ! -f "${DEPLOYMENT_INPUT_MANIFEST}" || -L "${DEPLOYMENT_INPUT_MANIFEST}" ]]; then
   echo "Deployment-input manifest is missing or is not a regular non-symlink file." >&2
@@ -323,7 +324,8 @@ printf '%s  %s\n' \
   "${OUTPUT_CONSTRAINT_BESIDE_TOOLS_PATCH_DIFF_SHA256}" "${OUTPUT_CONSTRAINT_BESIDE_TOOLS_PATCH_FILE}" \
   "${BATCH_INVARIANT_NATIVE_FP4_PATCH_DIFF_SHA256}" "${BATCH_INVARIANT_NATIVE_FP4_PATCH_FILE}" \
   "${RENDER_EVERY_IMAGE_PATCH_DIFF_SHA256}" "${RENDER_EVERY_IMAGE_PATCH_FILE}" \
-  "${RENDERED_PROMPT_NOT_TRUNCATED_PATCH_DIFF_SHA256}" "${RENDERED_PROMPT_NOT_TRUNCATED_PATCH_FILE}" | \
+  "${RENDERED_PROMPT_NOT_TRUNCATED_PATCH_DIFF_SHA256}" "${RENDERED_PROMPT_NOT_TRUNCATED_PATCH_FILE}" \
+  "${KV_TRANSFER_PARAMS_DECLARED_PATCH_DIFF_SHA256}" "${KV_TRANSFER_PARAMS_DECLARED_PATCH_FILE}" | \
   sha256sum --check --strict
 
 printf '%s  %s\n' \
@@ -768,6 +770,30 @@ image_build_options=(
   --build-arg "STREAMING_PARSER_ENGINE_PATCHED_FILE_SHA256=${STREAMING_PARSER_ENGINE_PATCHED_FILE_SHA256}"
   --build-arg "TOKEN_ID_SCANNER_PATCHED_FILE_SHA256=${TOKEN_ID_SCANNER_PATCHED_FILE_SHA256}"
   --build-arg "ENGINE_PROTOCOL_PATCHED_FILE_SHA256=${ENGINE_PROTOCOL_PATCHED_FILE_SHA256}"
+  --build-arg "KV_TIERING_P2P_MANAGER_PATCHED_FILE_SHA256=${KV_TIERING_P2P_MANAGER_PATCHED_FILE_SHA256}"
+  --build-arg "KV_TIERING_P2P_MANAGER_UPSTREAM_FILE_SHA256=${KV_TIERING_P2P_MANAGER_UPSTREAM_FILE_SHA256}"
+  --build-arg "KV_TIERING_BASE_PATCHED_FILE_SHA256=${KV_TIERING_BASE_PATCHED_FILE_SHA256}"
+  --build-arg "KV_TIERING_BASE_UPSTREAM_FILE_SHA256=${KV_TIERING_BASE_UPSTREAM_FILE_SHA256}"
+  --build-arg "HIDDEN_STATES_CONNECTOR_PATCHED_FILE_SHA256=${HIDDEN_STATES_CONNECTOR_PATCHED_FILE_SHA256}"
+  --build-arg "HIDDEN_STATES_CONNECTOR_UPSTREAM_FILE_SHA256=${HIDDEN_STATES_CONNECTOR_UPSTREAM_FILE_SHA256}"
+  --build-arg "LMCACHE_MP_CONNECTOR_PATCHED_FILE_SHA256=${LMCACHE_MP_CONNECTOR_PATCHED_FILE_SHA256}"
+  --build-arg "LMCACHE_MP_CONNECTOR_UPSTREAM_FILE_SHA256=${LMCACHE_MP_CONNECTOR_UPSTREAM_FILE_SHA256}"
+  --build-arg "LMCACHE_CONNECTOR_PATCHED_FILE_SHA256=${LMCACHE_CONNECTOR_PATCHED_FILE_SHA256}"
+  --build-arg "LMCACHE_CONNECTOR_UPSTREAM_FILE_SHA256=${LMCACHE_CONNECTOR_UPSTREAM_FILE_SHA256}"
+  --build-arg "MORIIO_CONNECTOR_PATCHED_FILE_SHA256=${MORIIO_CONNECTOR_PATCHED_FILE_SHA256}"
+  --build-arg "MORIIO_CONNECTOR_UPSTREAM_FILE_SHA256=${MORIIO_CONNECTOR_UPSTREAM_FILE_SHA256}"
+  --build-arg "MOONCAKE_CONNECTOR_PATCHED_FILE_SHA256=${MOONCAKE_CONNECTOR_PATCHED_FILE_SHA256}"
+  --build-arg "MOONCAKE_CONNECTOR_UPSTREAM_FILE_SHA256=${MOONCAKE_CONNECTOR_UPSTREAM_FILE_SHA256}"
+  --build-arg "NIXL_CONNECTOR_PATCHED_FILE_SHA256=${NIXL_CONNECTOR_PATCHED_FILE_SHA256}"
+  --build-arg "NIXL_CONNECTOR_UPSTREAM_FILE_SHA256=${NIXL_CONNECTOR_UPSTREAM_FILE_SHA256}"
+  --build-arg "OFFLOAD_CONNECTOR_PATCHED_FILE_SHA256=${OFFLOAD_CONNECTOR_PATCHED_FILE_SHA256}"
+  --build-arg "OFFLOAD_CONNECTOR_UPSTREAM_FILE_SHA256=${OFFLOAD_CONNECTOR_UPSTREAM_FILE_SHA256}"
+  --build-arg "MULTI_CONNECTOR_PATCHED_FILE_SHA256=${MULTI_CONNECTOR_PATCHED_FILE_SHA256}"
+  --build-arg "MULTI_CONNECTOR_UPSTREAM_FILE_SHA256=${MULTI_CONNECTOR_UPSTREAM_FILE_SHA256}"
+  --build-arg "KV_CONNECTOR_BASE_PATCHED_FILE_SHA256=${KV_CONNECTOR_BASE_PATCHED_FILE_SHA256}"
+  --build-arg "KV_CONNECTOR_BASE_UPSTREAM_FILE_SHA256=${KV_CONNECTOR_BASE_UPSTREAM_FILE_SHA256}"
+  --build-arg "KV_CONNECTOR_FACTORY_PATCHED_FILE_SHA256=${KV_CONNECTOR_FACTORY_PATCHED_FILE_SHA256}"
+  --build-arg "KV_CONNECTOR_FACTORY_UPSTREAM_FILE_SHA256=${KV_CONNECTOR_FACTORY_UPSTREAM_FILE_SHA256}"
   --build-arg "NEMOTRON_V3_PARSER_PATCHED_FILE_SHA256=${NEMOTRON_V3_PARSER_PATCHED_FILE_SHA256}"
   --build-arg "NEMOTRON_V3_PARSER_UPSTREAM_FILE_SHA256=${NEMOTRON_V3_PARSER_UPSTREAM_FILE_SHA256}"
   --build-arg "GENERATE_INVOCATION_TYPES_PATCHED_FILE_SHA256=${GENERATE_INVOCATION_TYPES_PATCHED_FILE_SHA256}"
@@ -985,6 +1011,18 @@ actual_installed_report="$(
     /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/detokenizer.py \
     /usr/local/lib/python3.12/dist-packages/vllm/v1/core/sched/scheduler.py \
     /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/async_llm.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/tiering/p2p/manager.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/tiering/base.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/distributed/kv_transfer/kv_connector/v1/example_hidden_states_connector.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/distributed/kv_transfer/kv_connector/v1/lmcache_mp_connector.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/distributed/kv_transfer/kv_connector/v1/lmcache_connector.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/distributed/kv_transfer/kv_connector/v1/moriio/moriio_connector.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/distributed/kv_transfer/kv_connector/v1/mooncake/mooncake_connector.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/distributed/kv_transfer/kv_connector/v1/nixl/connector.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/distributed/kv_transfer/kv_connector/v1/offloading_connector.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/distributed/kv_transfer/kv_connector/v1/multi_connector.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/distributed/kv_transfer/kv_connector/v1/base.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/distributed/kv_transfer/kv_connector/factory.py \
     /usr/local/lib/python3.12/dist-packages/vllm/parser/nemotron_v3.py \
     /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/generate/factories.py \
     /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/generate/base/serving.py \
@@ -1063,6 +1101,18 @@ expected_installed_report="$(printf '%s  %s\n' \
   "${V1_DETOKENIZER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/detokenizer.py \
   "${V1_SCHEDULER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/core/sched/scheduler.py \
   "${ASYNC_LLM_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/async_llm.py \
+  "${KV_TIERING_P2P_MANAGER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/tiering/p2p/manager.py \
+  "${KV_TIERING_BASE_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/tiering/base.py \
+  "${HIDDEN_STATES_CONNECTOR_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/distributed/kv_transfer/kv_connector/v1/example_hidden_states_connector.py \
+  "${LMCACHE_MP_CONNECTOR_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/distributed/kv_transfer/kv_connector/v1/lmcache_mp_connector.py \
+  "${LMCACHE_CONNECTOR_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/distributed/kv_transfer/kv_connector/v1/lmcache_connector.py \
+  "${MORIIO_CONNECTOR_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/distributed/kv_transfer/kv_connector/v1/moriio/moriio_connector.py \
+  "${MOONCAKE_CONNECTOR_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/distributed/kv_transfer/kv_connector/v1/mooncake/mooncake_connector.py \
+  "${NIXL_CONNECTOR_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/distributed/kv_transfer/kv_connector/v1/nixl/connector.py \
+  "${OFFLOAD_CONNECTOR_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/distributed/kv_transfer/kv_connector/v1/offloading_connector.py \
+  "${MULTI_CONNECTOR_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/distributed/kv_transfer/kv_connector/v1/multi_connector.py \
+  "${KV_CONNECTOR_BASE_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/distributed/kv_transfer/kv_connector/v1/base.py \
+  "${KV_CONNECTOR_FACTORY_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/distributed/kv_transfer/kv_connector/factory.py \
   "${NEMOTRON_V3_PARSER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/nemotron_v3.py \
   "${GENERATE_INVOCATION_TYPES_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/generate/factories.py \
   "${GENERATE_BASE_SERVING_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/generate/base/serving.py \

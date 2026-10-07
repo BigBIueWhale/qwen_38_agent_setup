@@ -4,8 +4,11 @@
 import asyncio
 import importlib.util
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
+import vllm.v1.engine.input_processor as input_processor_module
+from vllm.config.kv_transfer import KVTransferConfig
+from vllm.distributed.kv_transfer.kv_connector.v1.base import KVTransferParamsKeys
 from vllm.distributed.kv_transfer.kv_connector.v1.offloading.scheduler import (
     _create_req_context,
 )
@@ -89,11 +92,108 @@ async def check_stream_identity():
         assert not requests[-1].resumable
 
 
+# The connector config/runtime-v1.sh launches: the CPU tier alone.
+DEPLOYED_KV_TRANSFER = KVTransferConfig(
+    kv_connector='OffloadingConnector', kv_role='kv_both',
+    kv_connector_extra_config={'cpu_kv_cache_users': 1},
+)
+NIXL_KV_TRANSFER = KVTransferConfig(kv_connector='NixlConnector', kv_role='kv_both')
+
+
+def admission(kv_transfer_config):
+    """The real InputProcessor, its tokenizer and multimodal parts stubbed."""
+    vllm_config = SimpleNamespace(
+        model_config=SimpleNamespace(try_get_generation_config=dict,
+                                     return_sampling_mask=False),
+        cache_config=None, lora_config=None, scheduler_config=None,
+        speculative_config=None, structured_outputs_config=None,
+        observability_config=None, use_v2_model_runner=False,
+        reasoning_config=None, kv_transfer_config=kv_transfer_config,
+    )
+    with patch.object(input_processor_module, 'InputPreprocessor'):
+        return InputProcessor(
+            vllm_config, SimpleNamespace(_executor=None, tokenizer=None),
+            mm_registry=SimpleNamespace(supports_multimodal_inputs=lambda _: False),
+        )
+
+
+def chat(**fields):
+    return ChatCompletionGenerationRequest(
+        model='m', messages=[{'role': 'user', 'content': 'hi'}], kv_scope='agent',
+        **fields,
+    )
+
+
+def admit(processor, **fields):
+    params = chat(**fields).to_sampling_params(8, {})
+    with patch.object(SamplingParams, 'verify'):
+        processor._validate_params(params, ('generate',))
+
+
+def refusal(processor, **fields):
+    try:
+        admit(processor, **fields)
+    except VLLMValidationError as error:
+        assert error.parameter == 'kv_transfer_params', error.parameter
+        return str(error)
+    raise AssertionError(f'admitted {fields!r}')
+
+
+def serving_over(processor):
+    notify = AsyncMock()
+    serving = GenerateBaseServing(SimpleNamespace(
+        model_config=None, renderer=None, input_processor=processor,
+        vllm_config=processor.vllm_config, notify_kv_transfer_request_rejected=notify,
+    ), None, request_logger=None)
+    return serving, notify
+
+
+async def refuse(serving, request):
+    refusal = ErrorResponse(error=ErrorInfo(message='no', type='BadRequest', code=400))
+
+    async def rejected():
+        return refusal
+
+    assert await serving._with_kv_transfer_rejection_cleanup(
+        rejected(), request, None) is refusal
+
+
+async def check_kv_transfer_params_admission():
+    """A request reaches the engine naming only kv_transfer_params the
+    configured connector takes. The deployed CPU tier takes max_offload_tokens
+    alone: it has no secondary tier for kv_load_tiers to select and no remote
+    prefill. Unrefused, both were accepted and never read, and a non-object
+    sent through vllm_xargs reached the connector, whose first read of it
+    raised in the engine core for every user."""
+    deployed = admission(DEPLOYED_KV_TRANSFER)
+    assert deployed.kv_transfer_params_keys == KVTransferParamsKeys(
+        keys=frozenset({'max_offload_tokens'})), deployed.kv_transfer_params_keys
+    admit(deployed, kv_transfer_params={'max_offload_tokens': 64})
+    for key in ('do_remote_prefill', 'kv_load_tiers', 'prompt_token_ids'):
+        message = refusal(deployed, kv_transfer_params={key: True})
+        assert f'key {key!r} is not a parameter of OffloadingConnector' in message, message
+        assert '(it takes max_offload_tokens)' in message, message
+    for smuggled in ('x', ['a'], 3):
+        message = refusal(deployed, vllm_xargs={'kv_transfer_params': smuggled})
+        assert 'must be an object of KV connector parameters' in message, message
+    message = refusal(admission(None), kv_transfer_params={'max_offload_tokens': 1})
+    assert 'reaches no KV connector: this server configures none' in message, message
+
+    # No connector here holds remote-prefill blocks, so a refused request
+    # that names some sends no notice into the engine.
+    for processor in (deployed, admission(None)):
+        serving, notify = serving_over(processor)
+        await refuse(serving, chat(kv_transfer_params={'do_remote_prefill': True}))
+        notify.assert_not_awaited()
+
+
 async def check_rejection_notice_identity():
-    """A refused remote-prefill request's notice reaches the CPU tier as a
-    request of the refused request's own agent, and releases nothing it kept.
-    Without the identity the tier raised, and an exception there ends the
-    engine core for every user."""
+    """A connector that takes do_remote_prefill is told of a refused request
+    that named remote-prefill blocks. The notice reaches the CPU tier (beside
+    such a connector under MultiConnector) as a request of the refused
+    request's own agent, and releases nothing it kept. Without the identity
+    the tier raised, and an exception there ends the engine core for every
+    user."""
     for extra_args in (None, {}, {'kv_scope': ' '}):
         try:
             EngineCoreRequest(
@@ -107,23 +207,9 @@ async def check_rejection_notice_identity():
         else:
             raise AssertionError(f'an engine request generated with {extra_args!r}')
 
-    notify = AsyncMock()
-    serving = SimpleNamespace(
-        has_kv_connector=True,
-        engine_client=SimpleNamespace(notify_kv_transfer_request_rejected=notify),
-        _get_data_parallel_rank=lambda raw_request: None,
-    )
-    refused = ChatCompletionGenerationRequest(
-        model='m', messages=[{'role': 'user', 'content': 'hi'}], kv_scope='agent',
-        kv_transfer_params={'do_remote_prefill': True},
-    )
-    refusal = ErrorResponse(error=ErrorInfo(message='no', type='BadRequest', code=400))
-
-    async def rejected():
-        return refusal
-
-    assert await GenerateBaseServing._with_kv_transfer_rejection_cleanup(
-        serving, rejected(), refused, None) is refusal
+    serving, notify = serving_over(admission(NIXL_KV_TRANSFER))
+    refused = chat(kv_transfer_params={'do_remote_prefill': True})
+    await refuse(serving, refused)
     (request_id, params, scope), _ = notify.await_args
     assert (request_id, scope) == (refused.request_id, 'agent'), (request_id, scope)
 
@@ -189,6 +275,7 @@ def main():
         else:
             raise AssertionError(f"{request_type.__name__} generates for no agent")
     asyncio.run(check_stream_identity())
+    asyncio.run(check_kv_transfer_params_admission())
     asyncio.run(check_rejection_notice_identity())
 
     # Lookup matches content alone. The membership catalog that once let only

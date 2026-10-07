@@ -3973,6 +3973,126 @@ def _validate_rendered_prompt_truncation_after(state: State) -> None:
         "test_responses_tokenizes_without_truncation": None,
     }, label=label)
 
+def _validate_kv_transfer_params_keys_before(state: State) -> None:
+    label = "declared kv_transfer_params keys precondition"
+    # added: connectors declare the request keys their protocol defines.
+    forbid_text(state, "vllm/distributed/kv_transfer/kv_connector/v1/base.py",
+                "KVTransferParamsKeys", label=label)
+    forbid_text(state, "vllm/v1/engine/input_processor.py", "kv_transfer_params",
+                label=label)
+    require_text(state, "vllm/entrypoints/generate/base/serving.py",
+                 "self.has_kv_connector = kv_transfer_config is not None", label=label)
+    scheduler = "vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py"
+    require_text(state, scheduler, 'KV_LOAD_TIERS_KEY = "kv_load_tiers"', label=label)
+    require_text(state, scheduler, 'params.get("max_offload_tokens")', label=label)
+
+
+def _validate_kv_transfer_params_keys_after(state: State) -> None:
+    label = "declared kv_transfer_params keys result"
+    v1 = "vllm/distributed/kv_transfer/kv_connector/v1/"
+    # A connector that declares nothing takes nothing; namespaces are prefixes.
+    _require_in_symbol(state, v1 + "base.py",
+                       "KVConnectorBase_V1.get_kv_transfer_params_keys",
+                       ("return KVTransferParamsKeys()",), label=label)
+    _require_in_symbol(state, v1 + "base.py", "KVTransferParamsKeys.defines", (
+        "key in self.keys or key.startswith(tuple(self.namespaces))",
+    ), label=label)
+    _require_in_symbol(state, v1 + "multi_connector.py",
+                       "MultiConnector.get_kv_transfer_params_keys", (
+        "keys |= connector_cls.get_kv_transfer_params_keys(child_config)",
+    ), label=label)
+    _require_in_symbol(state, "vllm/distributed/kv_transfer/kv_connector/factory.py",
+                       "KVConnectorFactory.get_kv_transfer_params_keys", (
+        "if vllm_config.kv_transfer_config is None:",
+        "return KVTransferParamsKeys()",
+        "connector_cls.get_kv_transfer_params_keys(vllm_config)",
+    ), label=label)
+    # The CPU tier acts on the store cap; the tier filter selects only among
+    # secondary tiers, so only a tiering spec that has one takes it.
+    _require_in_symbol(state, v1 + "offloading_connector.py",
+                       "OffloadingConnector.get_kv_transfer_params_keys", (
+        "keys=frozenset({MAX_OFFLOAD_TOKENS_KEY})",
+        "spec_cls.get_kv_transfer_params_keys(extra_config)",
+    ), label=label)
+    require_text(state, "vllm/v1/kv_offload/base.py",
+                 'KV_LOAD_TIERS_KEY = "kv_load_tiers"', label=label)
+    forbid_text(state, v1 + "offloading/scheduler.py",
+                'KV_LOAD_TIERS_KEY = "kv_load_tiers"', label=label)
+    _require_in_symbol(state, v1 + "offloading/scheduler.py",
+                       "RequestOffloadState.__post_init__",
+                       ("params.get(MAX_OFFLOAD_TOKENS_KEY)",), label=label)
+    _require_in_symbol(state, "vllm/v1/kv_offload/tiering/spec.py",
+                       "TieringOffloadingSpec.get_kv_transfer_params_keys", (
+        "frozenset({KV_LOAD_TIERS_KEY} if secondary_tier_configs else ())",
+        "tier_cls.get_kv_transfer_params_keys(tier_config)",
+    ), label=label)
+    # Every in-tree connector that reads request keys declares them, including
+    # those its request_finished returns for the peer node.
+    for path, qualname, needles in (
+        (v1 + "nixl/connector.py", "NixlBaseConnector",
+         ('"do_remote_prefill"', '"transfer_mode"')),
+        (v1 + "mooncake/mooncake_connector.py", "MooncakeConnector",
+         ('"remote_bootstrap_addr"',)),
+        (v1 + "moriio/moriio_connector.py", "MoRIIOConnector",
+         ('"is_request_leader"',)),
+        (v1 + "lmcache_connector.py", "LMCacheConnectorV1",
+         ("if not cls._uses_native_adapter(vllm_config):",
+          'namespaces=frozenset({"lmcache."})')),
+        (v1 + "lmcache_mp_connector.py", "LMCacheMPConnectorUpstream",
+         ('"num_lmcache_extra_cached_tokens"',)),
+        (v1 + "example_hidden_states_connector.py", "ExampleHiddenStatesConnector",
+         ('"hidden_states_path"', '"include_output_tokens"')),
+        ("vllm/v1/kv_offload/tiering/p2p/manager.py", "P2PSecondaryTierManager",
+         ("REMOTE_PREFILLER_KEY", "REMOTE_DECODER_KEY", "REMOTE_KV_SOURCE_KEY")),
+    ):
+        _require_in_symbol(state, path, f"{qualname}.get_kv_transfer_params_keys",
+                           needles, label=label)
+    # Admission refuses what no configured connector takes, and a non-object.
+    processor = "vllm/v1/engine/input_processor.py"
+    _require_in_symbol(state, processor, "InputProcessor.__init__", (
+        "KVConnectorFactory.get_kv_transfer_params_keys(",
+    ), label=label)
+    _require_in_symbol(state, processor, "InputProcessor._validate_params", (
+        "self._validate_kv_transfer_params(params)",
+    ), label=label)
+    _require_in_symbol(state, processor, "InputProcessor._validate_kv_transfer_params", (
+        "if not isinstance(kv_transfer_params, dict):",
+        "self.kv_transfer_params_keys.defines(key)",
+        'parameter="kv_transfer_params"',
+    ), label=label)
+    # Only a connector that takes do_remote_prefill is told of a refusal.
+    serving = "vllm/entrypoints/generate/base/serving.py"
+    forbid_text(state, serving, "has_kv_connector", label=label)
+    _require_in_symbol(state, serving, "GenerateBaseServing.__init__", (
+        'self.input_processor.kv_transfer_params_keys.defines("do_remote_prefill")',
+    ), label=label)
+    _require_in_symbol(state, serving,
+                       "GenerateBaseServing._with_kv_transfer_rejection_cleanup", (
+        "self.notifies_remote_prefill_rejection and request.kv_transfer_params",
+    ), label=label)
+    require_python_symbols(state, "tests/v1/kv_connector/unit/test_kv_transfer_params_keys.py", {
+        "test_a_connector_that_declares_nothing_takes_nothing": None,
+        "test_the_cpu_offload_tier_takes_only_its_store_cap": None,
+        "test_the_tier_filter_is_taken_only_beside_a_secondary_tier": None,
+        "test_multi_connector_takes_what_any_child_takes": None,
+        "test_lmcache_takes_its_namespace_only_through_its_native_adapter": None,
+        "test_every_key_a_connector_reads_or_returns_is_declared": None,
+        "test_a_connector_that_declares_nothing_reads_nothing": None,
+    }, label=label)
+    require_python_symbols(state, "tests/v1/engine/test_kv_transfer_params_admission.py", {
+        "test_the_cpu_offload_tier_admits_its_store_cap": None,
+        "test_a_key_the_configured_connector_does_not_take_is_refused_naming_both": None,
+        "test_without_a_connector_every_key_is_refused": None,
+        "test_a_connector_that_declares_nothing_is_named_as_declaring_nothing": None,
+        "test_kv_transfer_params_through_vllm_xargs_must_be_an_object": None,
+        "test_no_notice_without_a_connector_that_takes_remote_prefill": None,
+        "test_a_connector_that_takes_remote_prefill_is_told_of_the_refusal": None,
+    }, label=label)
+    require_python_symbols(state, "tests/entrypoints/openai/chat_completion/test_chat_completion.py", {
+        "test_kv_transfer_params_no_connector_takes_are_refused": None,
+    }, label=label)
+
+
 def validate_final(state: State) -> None:
     """Reassert every durable semantic invariant on the complete tree.
 
@@ -5132,5 +5252,35 @@ CONTRACTS: Mapping[str, SemanticContract] = {
         ),
         validate_before=_validate_rendered_prompt_truncation_before,
         validate_after=_validate_rendered_prompt_truncation_after,
+    ),
+    "kv-transfer-params-are-declared": SemanticContract(
+        rationale=(
+            "A request's kv_transfer_params are parameters of the configured KV "
+            "connector, and no connector said which it takes, so a key none reads "
+            "was accepted and never read: the caller believed a parameter acted. "
+            "Here the CPU tier acts on max_offload_tokens alone; kv_load_tiers "
+            "selects among secondary tiers this spec has none of; do_remote_prefill "
+            "is NIXL's, yet the frontend's rejection notice acted on it whatever "
+            "connector was configured. A string sent as kv_transfer_params through "
+            "vllm_xargs reached the connector, whose first read of it raised in the "
+            "engine core for every user. Each connector declares the keys its "
+            "protocol defines, as configured: those it reads and those it returns "
+            "for a peer, which a proxy hands on as the peer's own (NIXL's "
+            "transfer_mode). MultiConnector takes what any child takes; the offload "
+            "connector adds what its spec and tiers act on; a connector that "
+            "declares none takes none -- an out-of-tree one, and LMCache's and "
+            "FlexKV's delegated adapters, whose packages read what nothing here "
+            "establishes. Admission refuses any other key, and a non-object, with a "
+            "400 naming the key, the connector and what it takes; only a connector "
+            "that takes do_remote_prefill is told of a refused request's "
+            "remote-prefill blocks."
+        ),
+        removal_condition=(
+            "Remove when pinned upstream has each KV connector declare the request "
+            "kv_transfer_params keys it takes and refuses a key no configured "
+            "connector takes."
+        ),
+        validate_before=_validate_kv_transfer_params_keys_before,
+        validate_after=_validate_kv_transfer_params_keys_after,
     ),
 }

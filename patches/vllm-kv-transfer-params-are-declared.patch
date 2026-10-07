@@ -1,0 +1,1252 @@
+diff --git a/tests/entrypoints/openai/chat_completion/test_chat_completion.py b/tests/entrypoints/openai/chat_completion/test_chat_completion.py
+index a91e2de7cdde62412b78ba580def011d0201dcfa..ab479337a413194c869ecfdac2399389d8f01771 100644
+--- a/tests/entrypoints/openai/chat_completion/test_chat_completion.py
++++ b/tests/entrypoints/openai/chat_completion/test_chat_completion.py
+@@ -160,32 +160,27 @@ async def test_empty_grammar(client: openai.AsyncOpenAI, model_name: str) -> Non
+         )
+ 
+ 
+-# A chat request's prompt is its messages, rendered by the template. What the
+-# request carries for the KV connector never takes its place.
++# A chat request's prompt is its messages, rendered by the template. Ids a
++# request carries in kv_transfer_params are a parameter no KV connector takes,
++# and this server configures none: the request is refused, naming the key,
++# instead of served with the ids unread.
+ 
+ 
+ @pytest.mark.asyncio
+-async def test_kv_transfer_params_never_replace_the_rendered_prompt(
++async def test_kv_transfer_params_no_connector_takes_are_refused(
+     client: openai.AsyncOpenAI,
+ ):
+-    messages = [{"role": "user", "content": "Hello, how are you today?"}]
+-    rendered = await client.chat.completions.create(
+-        model=MODEL_NAME,
+-        messages=messages,
+-        max_completion_tokens=1,
+-        temperature=0,
+-        extra_body={"kv_scope": "rendered", "return_token_ids": True},
+-    )
+-    carried = await client.chat.completions.create(
+-        model=MODEL_NAME,
+-        messages=messages,
+-        max_completion_tokens=1,
+-        temperature=0,
+-        extra_body={
+-            "kv_scope": "carried",
+-            "kv_transfer_params": {"prompt_token_ids": [10, 20, 30]},
+-            "return_token_ids": True,
+-        },
++    with pytest.raises(openai.BadRequestError) as excinfo:
++        await client.chat.completions.create(
++            model=MODEL_NAME,
++            messages=[{"role": "user", "content": "Hello, how are you today?"}],
++            max_completion_tokens=1,
++            extra_body={
++                "kv_scope": "carried",
++                "kv_transfer_params": {"prompt_token_ids": [10, 20, 30]},
++            },
++        )
++    assert excinfo.value.status_code == 400
++    assert "kv_transfer_params key 'prompt_token_ids' reaches no KV connector" in (
++        str(excinfo.value)
+     )
+-    assert rendered.prompt_token_ids
+-    assert carried.prompt_token_ids == rendered.prompt_token_ids
+diff --git a/tests/v1/engine/test_engine_request_identity.py b/tests/v1/engine/test_engine_request_identity.py
+index f2cd9a3fffee84c111f862e72feed3839edb456f..903bceffaa3144de94e04d6a3a5b0bcda8a20ceb 100644
+--- a/tests/v1/engine/test_engine_request_identity.py
++++ b/tests/v1/engine/test_engine_request_identity.py
+@@ -79,7 +79,7 @@ def test_a_rejected_remote_prefill_notifies_under_the_requests_own_scope():
+     """The notice stands for the rejected request and carries its identity."""
+     notify = AsyncMock()
+     serving = SimpleNamespace(
+-        has_kv_connector=True,
++        notifies_remote_prefill_rejection=True,
+         engine_client=SimpleNamespace(notify_kv_transfer_request_rejected=notify),
+         _get_data_parallel_rank=lambda raw_request: None,
+     )
+diff --git a/tests/v1/engine/test_kv_transfer_params_admission.py b/tests/v1/engine/test_kv_transfer_params_admission.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..e4a5243edc68f971283693ef6ff6644692534cca
+--- /dev/null
++++ b/tests/v1/engine/test_kv_transfer_params_admission.py
+@@ -0,0 +1,173 @@
++# SPDX-License-Identifier: Apache-2.0
++# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
++"""Admission refuses kv_transfer_params that no configured KV connector
++takes, naming the key and the connector, before the request reaches the
++engine; and only a connector that takes do_remote_prefill is told of a
++refused request's remote-prefill blocks."""
++
++import asyncio
++from types import SimpleNamespace
++from unittest.mock import AsyncMock, patch
++
++import pytest
++
++import vllm.v1.engine.input_processor as input_processor_module
++from vllm.config.kv_transfer import KVTransferConfig
++from vllm.entrypoints.generate.base.serving import GenerateBaseServing
++from vllm.entrypoints.openai.chat_completion.protocol import (
++    ChatCompletionGenerationRequest,
++)
++from vllm.entrypoints.openai.engine.protocol import ErrorInfo, ErrorResponse
++from vllm.exceptions import VLLMValidationError
++from vllm.sampling_params import SamplingParams
++from vllm.v1.engine.input_processor import InputProcessor
++
++# The connector config/runtime-v1.sh launches: the CPU tier alone.
++DEPLOYED = KVTransferConfig(
++    kv_connector="OffloadingConnector",
++    kv_role="kv_both",
++    kv_connector_extra_config={"cpu_kv_cache_users": 1},
++)
++NIXL = KVTransferConfig(kv_connector="NixlConnector", kv_role="kv_both")
++
++
++def _admission(kv_transfer_config: KVTransferConfig | None) -> InputProcessor:
++    vllm_config = SimpleNamespace(
++        model_config=SimpleNamespace(
++            try_get_generation_config=lambda: {}, return_sampling_mask=False
++        ),
++        cache_config=None,
++        lora_config=None,
++        scheduler_config=None,
++        speculative_config=None,
++        structured_outputs_config=None,
++        observability_config=None,
++        use_v2_model_runner=False,
++        reasoning_config=None,
++        kv_transfer_config=kv_transfer_config,
++    )
++    with patch.object(input_processor_module, "InputPreprocessor"):
++        return InputProcessor(
++            vllm_config,
++            SimpleNamespace(_executor=None, tokenizer=None),
++            mm_registry=SimpleNamespace(supports_multimodal_inputs=lambda _: False),
++        )
++
++
++def _request(**fields) -> ChatCompletionGenerationRequest:
++    return ChatCompletionGenerationRequest(
++        model="m", messages=[{"role": "user", "content": "hi"}], kv_scope="a", **fields
++    )
++
++
++def _admit(processor: InputProcessor, **fields) -> None:
++    params = _request(**fields).to_sampling_params(8, {})
++    with patch.object(SamplingParams, "verify"):
++        processor._validate_params(params, ("generate",))
++
++
++def _refusal(processor: InputProcessor, **fields) -> VLLMValidationError:
++    with pytest.raises(VLLMValidationError) as excinfo:
++        _admit(processor, **fields)
++    assert excinfo.value.parameter == "kv_transfer_params"
++    return excinfo.value
++
++
++def test_the_cpu_offload_tier_admits_its_store_cap():
++    _admit(_admission(DEPLOYED), kv_transfer_params={"max_offload_tokens": 64})
++
++
++@pytest.mark.parametrize(
++    "key", ["do_remote_prefill", "kv_load_tiers", "prompt_token_ids"]
++)
++def test_a_key_the_configured_connector_does_not_take_is_refused_naming_both(key):
++    message = str(_refusal(_admission(DEPLOYED), kv_transfer_params={key: True}))
++    assert f"key {key!r} is not a parameter of OffloadingConnector" in message
++    assert "(it takes max_offload_tokens)" in message
++    assert "Remove it, or send the request to a server whose --kv-transfer-config" in (
++        message
++    )
++
++
++def test_every_refused_key_is_named():
++    message = str(
++        _refusal(
++            _admission(DEPLOYED),
++            kv_transfer_params={"max_offload_tokens": 1, "a": 1, "b": 2},
++        )
++    )
++    assert "keys 'a', 'b' are not parameters of OffloadingConnector" in message
++    assert "max_offload_tokens'" not in message
++
++
++def test_without_a_connector_every_key_is_refused():
++    message = str(
++        _refusal(_admission(None), kv_transfer_params={"max_offload_tokens": 1})
++    )
++    assert "reaches no KV connector: this server configures none" in message
++
++
++def test_a_connector_that_declares_nothing_is_named_as_declaring_nothing():
++    config = KVTransferConfig(
++        kv_connector="SimpleCPUOffloadConnector", kv_role="kv_both"
++    )
++    message = str(_refusal(_admission(config), kv_transfer_params={"x": 1}))
++    assert "SimpleCPUOffloadConnector" in message
++    assert "it declares none: KVConnectorBase_V1.get_kv_transfer_params_keys" in message
++
++
++def test_a_connector_that_takes_the_key_admits_it():
++    _admit(_admission(NIXL), kv_transfer_params={"do_remote_prefill": True})
++
++
++@pytest.mark.parametrize("smuggled", ["x", ["a"], 3])
++def test_kv_transfer_params_through_vllm_xargs_must_be_an_object(smuggled):
++    """vllm_xargs reaches the same engine parameter; a non-object would reach
++    the connector, whose first read of it raises in the engine core."""
++    message = str(
++        _refusal(_admission(DEPLOYED), vllm_xargs={"kv_transfer_params": smuggled})
++    )
++    assert "kv_transfer_params must be an object of KV connector parameters" in message
++
++
++def _serving(kv_transfer_config: KVTransferConfig | None):
++    notify = AsyncMock()
++    processor = _admission(kv_transfer_config)
++    engine_client = SimpleNamespace(
++        model_config=None,
++        renderer=None,
++        input_processor=processor,
++        vllm_config=processor.vllm_config,
++        notify_kv_transfer_request_rejected=notify,
++    )
++    serving = GenerateBaseServing(engine_client, None, request_logger=None)
++    serving._get_data_parallel_rank = lambda raw_request: None
++    return serving, notify
++
++
++def _rejected(serving, request):
++    refusal = ErrorResponse(error=ErrorInfo(message="no", type="BadRequest", code=400))
++
++    async def refused():
++        return refusal
++
++    result = asyncio.run(
++        serving._with_kv_transfer_rejection_cleanup(refused(), request, None)
++    )
++    assert result is refusal
++
++
++@pytest.mark.parametrize("kv_transfer_config", [DEPLOYED, None])
++def test_no_notice_without_a_connector_that_takes_remote_prefill(kv_transfer_config):
++    serving, notify = _serving(kv_transfer_config)
++    _rejected(serving, _request(kv_transfer_params={"do_remote_prefill": True}))
++    notify.assert_not_awaited()
++
++
++def test_a_connector_that_takes_remote_prefill_is_told_of_the_refusal():
++    serving, notify = _serving(NIXL)
++    request = _request(kv_transfer_params={"do_remote_prefill": True})
++    _rejected(serving, request)
++    notify.assert_awaited_once_with(
++        request.request_id, {"do_remote_prefill": True}, "a", data_parallel_rank=None
++    )
+diff --git a/tests/v1/kv_connector/unit/test_kv_transfer_params_keys.py b/tests/v1/kv_connector/unit/test_kv_transfer_params_keys.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..6873f5551a6eaecca3f6b03ca35967d34d06068c
+--- /dev/null
++++ b/tests/v1/kv_connector/unit/test_kv_transfer_params_keys.py
+@@ -0,0 +1,286 @@
++# SPDX-License-Identifier: Apache-2.0
++# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
++"""Each KV connector declares the request ``kv_transfer_params`` keys its
++protocol defines, as it is configured."""
++
++import ast
++import importlib.util
++import sys
++from pathlib import Path
++from types import ModuleType, SimpleNamespace
++
++import pytest
++
++import vllm
++from vllm.config.kv_transfer import KVTransferConfig
++from vllm.distributed.kv_transfer.kv_connector.factory import KVConnectorFactory
++from vllm.distributed.kv_transfer.kv_connector.v1.base import (
++    KVConnectorBase_V1,
++    KVTransferParamsKeys,
++)
++
++VLLM = Path(vllm.__file__).parent
++CONNECTORS = VLLM / "distributed/kv_transfer/kv_connector/v1"
++
++
++def _config(kv_connector: str | None, **extra) -> SimpleNamespace:
++    if kv_connector is None:
++        return SimpleNamespace(kv_transfer_config=None)
++    return SimpleNamespace(
++        kv_transfer_config=KVTransferConfig(
++            kv_connector=kv_connector, kv_role="kv_both", **extra
++        )
++    )
++
++
++def _keys(kv_connector: str | None, **extra) -> KVTransferParamsKeys:
++    config = _config(kv_connector, **extra)
++    return KVConnectorFactory.get_kv_transfer_params_keys(config)
++
++
++CPU_OFFLOAD = {"kv_connector_extra_config": {"cpu_kv_cache_users": 1}}
++
++
++def _tiering(*tiers: dict) -> dict:
++    extra = {"spec_name": "TieringOffloadingSpec", "cpu_kv_cache_users": 1}
++    if tiers:
++        extra["secondary_tiers"] = list(tiers)
++    return {"kv_connector_extra_config": extra}
++
++
++def test_a_vocabulary_defines_its_keys_and_everything_under_its_namespaces():
++    keys = KVTransferParamsKeys(keys=frozenset({"a"}), namespaces=frozenset({"ns."}))
++    assert keys.defines("a") and keys.defines("ns.anything")
++    assert not keys.defines("b") and not keys.defines("ns")
++    union = keys | KVTransferParamsKeys(keys=frozenset({"b"}))
++    assert union.defines("b") and union.defines("ns.x") and union.defines("a")
++    assert str(union) == "a, b, ns.*"
++    assert str(KVTransferParamsKeys()) == ""
++
++
++def test_no_connector_takes_no_key():
++    assert _keys(None) == KVTransferParamsKeys()
++
++
++def test_a_connector_that_declares_nothing_takes_nothing(monkeypatch):
++    """An out-of-tree connector inherits the empty declaration: every key a
++    request names for it is refused at admission until it declares one."""
++
++    class OutOfTreeConnector(KVConnectorBase_V1):
++        def __init__(self, vllm_config, role, kv_cache_config):
++            super().__init__(vllm_config, role, kv_cache_config)
++
++    module = ModuleType("out_of_tree_connector")
++    module.OutOfTreeConnector = OutOfTreeConnector
++    monkeypatch.setitem(sys.modules, "out_of_tree_connector", module)
++    keys = _keys(
++        "OutOfTreeConnector", kv_connector_module_path="out_of_tree_connector"
++    )
++    assert keys == KVTransferParamsKeys()
++
++
++def test_the_cpu_offload_tier_takes_only_its_store_cap():
++    """The CPU tier has no secondary tier for kv_load_tiers to select, so
++    only max_offload_tokens acts."""
++    keys = _keys("OffloadingConnector", **CPU_OFFLOAD)
++    assert keys == KVTransferParamsKeys(keys=frozenset({"max_offload_tokens"}))
++    assert not keys.defines("kv_load_tiers")
++    assert not keys.defines("do_remote_prefill")
++
++
++def test_the_tier_filter_is_taken_only_beside_a_secondary_tier():
++    assert _keys("OffloadingConnector", **_tiering()).keys == {"max_offload_tokens"}
++    assert _keys("OffloadingConnector", **_tiering({"type": "fs"})).keys == {
++        "max_offload_tokens",
++        "kv_load_tiers",
++    }
++    assert _keys("OffloadingConnector", **_tiering({"type": "p2p"})).keys == {
++        "max_offload_tokens",
++        "kv_load_tiers",
++        "remote_prefiller",
++        "remote_decoder",
++        "remote_kv_source",
++    }
++
++
++def test_multi_connector_takes_what_any_child_takes():
++    children = [
++        {"kv_connector": "NixlConnector", "kv_role": "kv_both"},
++        {"kv_connector": "OffloadingConnector", "kv_role": "kv_both", **CPU_OFFLOAD},
++    ]
++    keys = _keys("MultiConnector", kv_connector_extra_config={"connectors": children})
++    assert keys == _keys("NixlConnector") | _keys("OffloadingConnector", **CPU_OFFLOAD)
++    assert keys.defines("do_remote_prefill") and keys.defines("max_offload_tokens")
++
++
++def test_lmcache_takes_its_namespace_only_through_its_native_adapter():
++    native = _keys("LMCacheConnectorV1", kv_connector_extra_config={"use_native": True})
++    assert native.defines("lmcache.skip_save") and native.defines("disagg_spec")
++    assert _keys("LMCacheConnectorV1") == KVTransferParamsKeys()
++
++
++# The source cross-check: every key a connector's modules read from a
++# request's kv_transfer_params, or return from request_finished for the peer
++# node, is one it declares. Keys starting with "_" are the connector's own
++# markers, written into the request's parameters after admission.
++_RECEIVERS = {
++    "params",
++    "kv_params",
++    "kv_transfer_params",
++    "_kvp",
++    "request.kv_transfer_params",
++    "req.kv_transfer_params",
++    "self.req.kv_transfer_params",
++}
++
++
++def _string_constants(files: list[Path]) -> dict[str, str]:
++    constants = {}
++    for path in [*files, VLLM / "v1/kv_offload/base.py"]:
++        for node in ast.parse(path.read_text()).body:
++            if (
++                isinstance(node, ast.Assign)
++                and len(node.targets) == 1
++                and isinstance(node.targets[0], ast.Name)
++                and isinstance(node.value, ast.Constant)
++                and isinstance(node.value.value, str)
++            ):
++                constants[node.targets[0].id] = node.value.value
++    return constants
++
++
++def _used_keys(files: list[Path]) -> set[str]:
++    constants = _string_constants(files)
++
++    def key_of(node: ast.AST) -> str | None:
++        if isinstance(node, ast.Constant) and isinstance(node.value, str):
++            return node.value
++        if isinstance(node, ast.Name):
++            return constants.get(node.id)
++        return None
++
++    used: set[str] = set()
++    for path in files:
++        tree = ast.parse(path.read_text())
++        for node in ast.walk(tree):
++            receiver = key = None
++            if (
++                isinstance(node, ast.Call)
++                and isinstance(node.func, ast.Attribute)
++                and node.func.attr == "get"
++                and node.args
++            ):
++                receiver, key = ast.unparse(node.func.value), key_of(node.args[0])
++            elif isinstance(node, ast.Subscript):
++                receiver, key = ast.unparse(node.value), key_of(node.slice)
++            elif (
++                isinstance(node, ast.Compare)
++                and len(node.ops) == 1
++                and isinstance(node.ops[0], (ast.In, ast.NotIn))
++            ):
++                receiver, key = ast.unparse(node.comparators[0]), key_of(node.left)
++            elif isinstance(node, ast.FunctionDef) and node.name.startswith(
++                "request_finished"
++            ):
++                for ret in ast.walk(node):
++                    if isinstance(ret, ast.Return) and isinstance(ret.value, ast.Tuple):
++                        returned = ret.value.elts[-1]
++                        if isinstance(returned, ast.Call) and ast.unparse(
++                            returned.func
++                        ) == "dict":
++                            used.update(k.arg for k in returned.keywords if k.arg)
++                        elif isinstance(returned, ast.Dict):
++                            used.update(filter(None, map(key_of, returned.keys)))
++            if receiver in _RECEIVERS and key is not None:
++                used.add(key)
++    return {key for key in used if not key.startswith("_")}
++
++
++def _files(*patterns: str) -> list[Path]:
++    files = sorted({path for pattern in patterns for path in VLLM.glob(pattern)})
++    assert files, patterns
++    return files
++
++
++_NIXL = ("distributed/kv_transfer/kv_connector/v1/nixl/*.py",)
++_P2P_TIERING = _tiering({"type": "p2p"})
++
++CROSS_CHECKED = [
++    ("NixlConnector", {}, _NIXL, None),
++    ("NixlPushConnector", {}, _NIXL, None),
++    (
++        "MooncakeConnector",
++        {},
++        ("distributed/kv_transfer/kv_connector/v1/mooncake/mooncake_connector.py",),
++        None,
++    ),
++    (
++        "MoRIIOConnector",
++        {},
++        ("distributed/kv_transfer/kv_connector/v1/moriio/*.py",),
++        "msgpack",
++    ),
++    (
++        "LMCacheConnectorV1",
++        {"kv_connector_extra_config": {"use_native": True}},
++        (
++            "distributed/kv_transfer/kv_connector/v1/lmcache_connector.py",
++            "distributed/kv_transfer/kv_connector/v1/lmcache_integration/*.py",
++        ),
++        None,
++    ),
++    (
++        "LMCacheMPConnector",
++        {},
++        ("distributed/kv_transfer/kv_connector/v1/lmcache_mp_connector.py",),
++        "lmcache",
++    ),
++    (
++        "ExampleHiddenStatesConnector",
++        {},
++        ("distributed/kv_transfer/kv_connector/v1/example_hidden_states_connector.py",),
++        None,
++    ),
++    (
++        "OffloadingConnector",
++        _P2P_TIERING,
++        (
++            "distributed/kv_transfer/kv_connector/v1/offloading_connector.py",
++            "distributed/kv_transfer/kv_connector/v1/offloading/*.py",
++            "v1/kv_offload/**/*.py",
++        ),
++        None,
++    ),
++]
++
++
++@pytest.mark.parametrize(
++    "kv_connector,extra,patterns,needs",
++    CROSS_CHECKED,
++    ids=[c[0] for c in CROSS_CHECKED],
++)
++def test_every_key_a_connector_reads_or_returns_is_declared(
++    kv_connector, extra, patterns, needs
++):
++    if needs is not None and importlib.util.find_spec(needs) is None:
++        pytest.skip(f"{kv_connector} imports {needs}, which is not installed")
++    used = _used_keys(_files(*patterns))
++    assert used, f"the scan of {kv_connector} found no key at all"
++    declared = _keys(kv_connector, **extra)
++    assert {key for key in used if not declared.defines(key)} == set()
++
++
++@pytest.mark.parametrize(
++    "module",
++    [
++        "example_connector.py",
++        "decode_bench_connector.py",
++        "simple_cpu_offload_connector.py",
++        "flexkv_connector.py",
++        "hf3fs/*.py",
++        "mooncake/store/*.py",
++    ],
++)
++def test_a_connector_that_declares_nothing_reads_nothing(module):
++    files = _files(f"distributed/kv_transfer/kv_connector/v1/{module}")
++    assert _used_keys(files) == set()
+diff --git a/vllm/distributed/kv_transfer/kv_connector/factory.py b/vllm/distributed/kv_transfer/kv_connector/factory.py
+index aad7999d08a2a76392d1419f2cf1df6fc1a23127..99d3fbd51e9e5b67959b4ee95bb0aa195220bdcb 100644
+--- a/vllm/distributed/kv_transfer/kv_connector/factory.py
++++ b/vllm/distributed/kv_transfer/kv_connector/factory.py
+@@ -14,6 +14,7 @@ from vllm.distributed.kv_transfer.kv_connector.v1 import (
+     KVConnectorRole,
+     supports_hma,
+ )
++from vllm.distributed.kv_transfer.kv_connector.v1.base import KVTransferParamsKeys
+ from vllm.logger import init_logger
+ from vllm.utils.func_utils import supports_kw
+ 
+@@ -127,6 +128,17 @@ class KVConnectorFactory:
+             raise ValueError(f"Unsupported connector type: {connector_name}")
+         return connector_cls
+ 
++    @classmethod
++    def get_kv_transfer_params_keys(
++        cls, vllm_config: "VllmConfig"
++    ) -> KVTransferParamsKeys:
++        """The request ``kv_transfer_params`` keys the configured connector
++        defines: none when the server configures no connector."""
++        if vllm_config.kv_transfer_config is None:
++            return KVTransferParamsKeys()
++        connector_cls = cls.get_connector_class(vllm_config.kv_transfer_config)
++        return connector_cls.get_kv_transfer_params_keys(vllm_config)
++
+     @classmethod
+     def supports_hma_config(cls, kv_transfer_config: "KVTransferConfig") -> bool:
+         """Return whether this KV transfer config supports HMA.
+diff --git a/vllm/distributed/kv_transfer/kv_connector/v1/base.py b/vllm/distributed/kv_transfer/kv_connector/v1/base.py
+index e49dbebb1234de82221d9274d889376af8825e99..75ffef255680e04ac61eb4ccb502e7d760e4d020 100644
+--- a/vllm/distributed/kv_transfer/kv_connector/v1/base.py
++++ b/vllm/distributed/kv_transfer/kv_connector/v1/base.py
+@@ -43,6 +43,7 @@ The class provides the following primitives:
+ import enum
+ from abc import ABC, abstractmethod
+ from collections.abc import Callable, Iterable
++from dataclasses import dataclass
+ from typing import TYPE_CHECKING, Any, Literal
+ 
+ import torch
+@@ -168,6 +169,36 @@ class KVConnectorWorkerMetadata(ABC):
+         pass
+ 
+ 
++@dataclass(frozen=True)
++class KVTransferParamsKeys:
++    """The request ``kv_transfer_params`` keys a connector's protocol defines.
++
++    These are the keys the connector reads from a request and the keys it
++    returns for a peer, since a proxy hands one node's returned parameters to
++    the next node as that request's own. Every key under one of
++    ``namespaces`` (prefixes) is defined too, for a connector whose request
++    vocabulary is open-ended. Admission refuses a request that names a key no
++    configured connector defines, so no parameter is ignored unseen.
++    """
++
++    keys: frozenset[str] = frozenset()
++    namespaces: frozenset[str] = frozenset()
++
++    def defines(self, key: str) -> bool:
++        return key in self.keys or key.startswith(tuple(self.namespaces))
++
++    def __or__(self, other: "KVTransferParamsKeys") -> "KVTransferParamsKeys":
++        return KVTransferParamsKeys(
++            keys=self.keys | other.keys,
++            namespaces=self.namespaces | other.namespaces,
++        )
++
++    def __str__(self) -> str:
++        return ", ".join(
++            sorted(self.keys) + sorted(f"{prefix}*" for prefix in self.namespaces)
++        )
++
++
+ class KVConnectorBase_V1(ABC):
+     """
+     Base class for KV connectors.
+@@ -607,6 +638,19 @@ class KVConnectorBase_V1(ABC):
+         # scheduler alive (e.g. extend has_unfinished_requests).
+         return False
+ 
++    @classmethod
++    def get_kv_transfer_params_keys(
++        cls, vllm_config: "VllmConfig"
++    ) -> KVTransferParamsKeys:
++        """The request ``kv_transfer_params`` keys this connector defines, as
++        ``vllm_config`` configures it.
++
++        A connector that declares none defines none: a request naming any key
++        is refused at admission, naming this connector, instead of reaching a
++        connector that would not read it.
++        """
++        return KVTransferParamsKeys()
++
+     @classmethod
+     def get_required_kvcache_layout(cls, vllm_config: "VllmConfig") -> str | None:
+         """
+diff --git a/vllm/distributed/kv_transfer/kv_connector/v1/example_hidden_states_connector.py b/vllm/distributed/kv_transfer/kv_connector/v1/example_hidden_states_connector.py
+index 299ff037ad2cbf3c6d811aaf031b2072153d874d..b198c94feff34d67e1ca8b24050f63bbfb24d12f 100644
+--- a/vllm/distributed/kv_transfer/kv_connector/v1/example_hidden_states_connector.py
++++ b/vllm/distributed/kv_transfer/kv_connector/v1/example_hidden_states_connector.py
+@@ -17,6 +17,7 @@ from vllm.distributed.kv_transfer.kv_connector.v1.base import (
+     KVConnectorBase_V1,
+     KVConnectorMetadata,
+     KVConnectorRole,
++    KVTransferParamsKeys,
+     SupportsHMA,
+ )
+ from vllm.distributed.parallel_state import get_tensor_model_parallel_rank
+@@ -109,6 +110,16 @@ class ExampleHiddenStatesConnector(KVConnectorBase_V1, SupportsHMA):
+         # Must be False so that drafter kv cache isn't merged with verifier's
+         return False
+ 
++    @classmethod
++    def get_kv_transfer_params_keys(
++        cls, vllm_config: VllmConfig
++    ) -> KVTransferParamsKeys:
++        # A request may name its own output file and ask for the generated
++        # tokens' hidden states too; the file is returned under the same key.
++        return KVTransferParamsKeys(
++            keys=frozenset({"hidden_states_path", "include_output_tokens"})
++        )
++
+     @classmethod
+     def _find_cache_kv_group_id(cls, kv_cache_config: "KVCacheConfig | None") -> int:
+         """Index of the KV cache group holding the extracted hidden states.
+diff --git a/vllm/distributed/kv_transfer/kv_connector/v1/lmcache_connector.py b/vllm/distributed/kv_transfer/kv_connector/v1/lmcache_connector.py
+index 64aee2bd9c4991d36248a678a4d0e2e5b33ae1df..bb320aebdfbcfbc2b1a939dc2366139680a27e7c 100644
+--- a/vllm/distributed/kv_transfer/kv_connector/v1/lmcache_connector.py
++++ b/vllm/distributed/kv_transfer/kv_connector/v1/lmcache_connector.py
+@@ -16,6 +16,7 @@ from vllm.distributed.kv_transfer.kv_connector.v1.base import (
+     KVConnectorBase_V1,
+     KVConnectorMetadata,
+     KVConnectorRole,
++    KVTransferParamsKeys,
+ )
+ from vllm.logger import init_logger
+ from vllm.v1.attention.backend import AttentionMetadata
+@@ -80,6 +81,26 @@ class LMCacheConnectorV1(KVConnectorBase_V1):
+         """
+         return extra_config.get("use_layerwise", False)
+ 
++    @staticmethod
++    def _uses_native_adapter(vllm_config: "VllmConfig") -> bool:
++        assert vllm_config.kv_transfer_config is not None
++        return vllm_config.kv_transfer_config.get_from_extra_config("use_native", False)
++
++    @classmethod
++    def get_kv_transfer_params_keys(
++        cls, vllm_config: "VllmConfig"
++    ) -> KVTransferParamsKeys:
++        # The native adapter (lmcache_integration/vllm_v1_adapter.py) reads the
++        # disaggregation spec, the first-token request and every lmcache.*
++        # request configuration. The latest-dev adapter is the lmcache
++        # package's; nothing here establishes what it reads, so it defines none.
++        if not cls._uses_native_adapter(vllm_config):
++            return KVTransferParamsKeys()
++        return KVTransferParamsKeys(
++            keys=frozenset({"disagg_spec", "ret_first_tok"}),
++            namespaces=frozenset({"lmcache."}),
++        )
++
+     def __init__(
+         self,
+         vllm_config: "VllmConfig",
+@@ -89,11 +110,7 @@ class LMCacheConnectorV1(KVConnectorBase_V1):
+         super().__init__(
+             vllm_config=vllm_config, role=role, kv_cache_config=kv_cache_config
+         )
+-        assert vllm_config.kv_transfer_config is not None
+-        use_native = vllm_config.kv_transfer_config.get_from_extra_config(
+-            "use_native", False
+-        )
+-        if use_native:
++        if self._uses_native_adapter(vllm_config):
+             logger.info("Initializing native LMCache connector")
+             # lazy import
+             from vllm.distributed.kv_transfer.kv_connector.v1 import lmcache_integration
+diff --git a/vllm/distributed/kv_transfer/kv_connector/v1/lmcache_mp_connector.py b/vllm/distributed/kv_transfer/kv_connector/v1/lmcache_mp_connector.py
+index 8786e91a5a14b4a204305d8891d2dbcaed6e2e16..80a1b4dd6f7eeabf67b5f61640294a12389f9ff8 100644
+--- a/vllm/distributed/kv_transfer/kv_connector/v1/lmcache_mp_connector.py
++++ b/vllm/distributed/kv_transfer/kv_connector/v1/lmcache_mp_connector.py
+@@ -16,6 +16,7 @@ from vllm.distributed.kv_transfer.kv_connector.v1.base import (
+     KVConnectorBase_V1,
+     KVConnectorMetadata,
+     KVConnectorRole,
++    KVTransferParamsKeys,
+ )
+ from vllm.v1.attention.backend import AttentionMetadata
+ from vllm.v1.core.sched.output import SchedulerOutput
+@@ -966,6 +967,14 @@ class LMCacheMPConnectorUpstream(KVConnectorBase_V1):
+         """
+         return ()
+ 
++    @classmethod
++    def get_kv_transfer_params_keys(
++        cls, vllm_config: "VllmConfig"
++    ) -> KVTransferParamsKeys:
++        # Asks request_finished to return the request's extra cached tokens,
++        # under the same key.
++        return KVTransferParamsKeys(keys=frozenset({"num_lmcache_extra_cached_tokens"}))
++
+     @classmethod
+     def get_required_kvcache_layout(cls, vllm_config: "VllmConfig") -> str | None:
+         """
+diff --git a/vllm/distributed/kv_transfer/kv_connector/v1/mooncake/mooncake_connector.py b/vllm/distributed/kv_transfer/kv_connector/v1/mooncake/mooncake_connector.py
+index dd94ffb2f9ed824505748f9742ed27ce5cfbaf00..8a8d43849d8c58daa5a34bc6eff46a85377f5d09 100644
+--- a/vllm/distributed/kv_transfer/kv_connector/v1/mooncake/mooncake_connector.py
++++ b/vllm/distributed/kv_transfer/kv_connector/v1/mooncake/mooncake_connector.py
+@@ -28,6 +28,7 @@ from vllm.distributed.kv_transfer.kv_connector.v1.base import (
+     KVConnectorBase_V1,
+     KVConnectorMetadata,
+     KVConnectorRole,
++    KVTransferParamsKeys,
+     SupportsHMA,
+ )
+ from vllm.distributed.kv_transfer.kv_connector.v1.metrics import KVConnectorStats
+@@ -467,6 +468,23 @@ class MooncakeConnectorMetadata(KVConnectorMetadata):
+ 
+ 
+ class MooncakeConnector(KVConnectorBase_V1, SupportsHMA):
++    @classmethod
++    def get_kv_transfer_params_keys(
++        cls, vllm_config: VllmConfig
++    ) -> KVTransferParamsKeys:
++        # Set by the router; request_finished returns none for the peer.
++        return KVTransferParamsKeys(
++            keys=frozenset(
++                {
++                    "do_remote_prefill",
++                    "do_remote_decode",
++                    "transfer_id",
++                    "remote_engine_id",
++                    "remote_bootstrap_addr",
++                }
++            )
++        )
++
+     def __init__(
+         self,
+         vllm_config: VllmConfig,
+diff --git a/vllm/distributed/kv_transfer/kv_connector/v1/moriio/moriio_connector.py b/vllm/distributed/kv_transfer/kv_connector/v1/moriio/moriio_connector.py
+index c53c0eb99eb37fa4e6bdc18470b423bf5ee48dc0..b624a55524aa35249740cc0f904c3526ea9d07da 100644
+--- a/vllm/distributed/kv_transfer/kv_connector/v1/moriio/moriio_connector.py
++++ b/vllm/distributed/kv_transfer/kv_connector/v1/moriio/moriio_connector.py
+@@ -22,6 +22,7 @@ from vllm.distributed.kv_transfer.kv_connector.v1.base import (
+     KVConnectorBase_V1,
+     KVConnectorMetadata,
+     KVConnectorRole,
++    KVTransferParamsKeys,
+ )
+ from vllm.distributed.kv_transfer.kv_connector.v1.moriio.moriio_common import (
+     ROLE,
+@@ -190,6 +191,35 @@ def resolve_moriio_transfer_ack(
+ 
+ 
+ class MoRIIOConnector(KVConnectorBase_V1):
++    @classmethod
++    def get_kv_transfer_params_keys(
++        cls, vllm_config: VllmConfig
++    ) -> KVTransferParamsKeys:
++        # The router (or llm-d sidecar) contract the scheduler and
++        # moriio_common read; request_finished returns a subset for the peer.
++        return KVTransferParamsKeys(
++            keys=frozenset(
++                {
++                    "do_remote_prefill",
++                    "do_remote_decode",
++                    "transfer_id",
++                    "remote_block_ids",
++                    "remote_engine_id",
++                    "remote_host",
++                    "remote_hosts",
++                    "remote_handshake_port",
++                    "remote_notify_port",
++                    "remote_dp_rank",
++                    "remote_dp_rank_override",
++                    "remote_dp_size",
++                    "remote_dp_size_local",
++                    "remote_tp_size",
++                    "tp_size",
++                    "is_request_leader",
++                }
++            )
++        )
++
+     def __init__(
+         self,
+         vllm_config: VllmConfig,
+diff --git a/vllm/distributed/kv_transfer/kv_connector/v1/multi_connector.py b/vllm/distributed/kv_transfer/kv_connector/v1/multi_connector.py
+index 957b15ea40c15a4158c19dc6dbc626fcb7edb33e..6887f7737dc160726fac4e873257ace785e6f5c0 100644
+--- a/vllm/distributed/kv_transfer/kv_connector/v1/multi_connector.py
++++ b/vllm/distributed/kv_transfer/kv_connector/v1/multi_connector.py
+@@ -18,6 +18,7 @@ from vllm.distributed.kv_transfer.kv_connector.v1.base import (
+     KVConnectorMetadata,
+     KVConnectorRole,
+     KVConnectorWorkerMetadata,
++    KVTransferParamsKeys,
+     SupportsHMA,
+ )
+ from vllm.distributed.kv_transfer.kv_connector.v1.metrics import (
+@@ -553,6 +554,19 @@ class MultiConnector(KVConnectorBase_V1, SupportsHMA):
+     def has_pending_push_work(self) -> bool:
+         return any(c.has_pending_push_work() for c in self._connectors)
+ 
++    @classmethod
++    def get_kv_transfer_params_keys(
++        cls, vllm_config: "VllmConfig"
++    ) -> KVTransferParamsKeys:
++        """Every child reads the same request, so a key any child defines is
++        defined."""
++        keys = KVTransferParamsKeys()
++        for connector_cls, child_config in cls._get_connector_classes_and_configs(
++            vllm_config
++        ):
++            keys |= connector_cls.get_kv_transfer_params_keys(child_config)
++        return keys
++
+     @classmethod
+     def get_required_kvcache_layout(cls, vllm_config: "VllmConfig") -> str | None:
+         """
+diff --git a/vllm/distributed/kv_transfer/kv_connector/v1/nixl/connector.py b/vllm/distributed/kv_transfer/kv_connector/v1/nixl/connector.py
+index 0b7a5d572869efa70cb05214a15b66988c3bb995..a70d5979be55bc9db70724d2be0f0dab58c180c0 100644
+--- a/vllm/distributed/kv_transfer/kv_connector/v1/nixl/connector.py
++++ b/vllm/distributed/kv_transfer/kv_connector/v1/nixl/connector.py
+@@ -27,6 +27,7 @@ from vllm.distributed.kv_transfer.kv_connector.v1.base import (
+     KVConnectorHandshakeMetadata,
+     KVConnectorMetadata,
+     KVConnectorRole,
++    KVTransferParamsKeys,
+     SupportsHMA,
+ )
+ from vllm.distributed.kv_transfer.kv_connector.v1.metrics import (
+@@ -79,6 +80,33 @@ logger = init_logger(__name__)
+ class NixlBaseConnector(KVConnectorBase_V1, SupportsHMA):
+     """Base connector with common logic shared by pull and push modes."""
+ 
++    @classmethod
++    def get_kv_transfer_params_keys(
++        cls, vllm_config: VllmConfig
++    ) -> KVTransferParamsKeys:
++        # Read by the pull and push schedulers and the request metadata, and
++        # returned by request_finished for the peer node; transfer_mode is
++        # returned for the router and read by neither side.
++        return KVTransferParamsKeys(
++            keys=frozenset(
++                {
++                    "do_remote_prefill",
++                    "do_remote_decode",
++                    "remote_block_ids",
++                    "remote_engine_id",
++                    "remote_request_id",
++                    "remote_host",
++                    "remote_port",
++                    "remote_block_size",
++                    "remote_blocks_expiry_time",
++                    "remote_num_tokens",
++                    "tp_size",
++                    "pp_size",
++                    "transfer_mode",
++                }
++            )
++        )
++
+     @property
+     def supports_divergent_local_hybrid_hits(self) -> bool:
+         return True
+diff --git a/vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py b/vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py
+index f727163b9e4c82d5176abf5e8f09acf829b3dce9..4cc5770e1dfc99d621c63db3a86d90e9ccbc5416 100644
+--- a/vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py
++++ b/vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py
+@@ -34,6 +34,7 @@ from vllm.v1.kv_cache_interface import (
+     KVCacheConfig,
+ )
+ from vllm.v1.kv_offload.base import (
++    KV_LOAD_TIERS_KEY,
+     GPULoadStoreSpec,
+     Locality,
+     LookupResult,
+@@ -54,7 +55,7 @@ from vllm.v1.request import Request, RequestStatus
+ 
+ logger = init_logger(__name__)
+ 
+-KV_LOAD_TIERS_KEY = "kv_load_tiers"
++MAX_OFFLOAD_TOKENS_KEY = "max_offload_tokens"
+ MATCHER_MEDIUM_KEY = "medium"
+ MATCHER_LOCALITY_KEY = "locality"
+ 
+@@ -309,7 +310,7 @@ class RequestOffloadState:
+         params = self.req.kv_transfer_params
+ 
+         # NOTE: This field is experimental and subject to change in the future.
+-        raw = params.get("max_offload_tokens") if params else None
++        raw = params.get(MAX_OFFLOAD_TOKENS_KEY) if params else None
+         if type(raw) is int and raw >= 0:
+             self.max_offload_tokens = raw
+             logger.debug(
+diff --git a/vllm/distributed/kv_transfer/kv_connector/v1/offloading_connector.py b/vllm/distributed/kv_transfer/kv_connector/v1/offloading_connector.py
+index f003d0d6f88d7bdd141d6c0153524ef544c4510c..7c50a05d9a4eb27912e47aa406da785003934d6b 100644
+--- a/vllm/distributed/kv_transfer/kv_connector/v1/offloading_connector.py
++++ b/vllm/distributed/kv_transfer/kv_connector/v1/offloading_connector.py
+@@ -12,7 +12,10 @@ from vllm.distributed.kv_transfer.kv_connector.v1 import (
+     KVConnectorRole,
+     SupportsHMA,
+ )
+-from vllm.distributed.kv_transfer.kv_connector.v1.base import KVConnectorMetadata
++from vllm.distributed.kv_transfer.kv_connector.v1.base import (
++    KVConnectorMetadata,
++    KVTransferParamsKeys,
++)
+ from vllm.distributed.kv_transfer.kv_connector.v1.metrics import (
+     KVConnectorPromMetrics,
+     KVConnectorStats,
+@@ -31,6 +34,7 @@ from vllm.distributed.kv_transfer.kv_connector.v1.offloading.metrics import (
+     OffloadPromMetrics,
+ )
+ from vllm.distributed.kv_transfer.kv_connector.v1.offloading.scheduler import (
++    MAX_OFFLOAD_TOKENS_KEY,
+     OffloadingConnectorScheduler,
+ )
+ from vllm.distributed.kv_transfer.kv_connector.v1.offloading.worker import (
+@@ -198,6 +202,19 @@ class OffloadingConnector(KVConnectorBase_V1, SupportsHMA):
+     def get_required_kvcache_layout(cls, vllm_config: VllmConfig) -> str | None:
+         return "HND"
+ 
++    @classmethod
++    def get_kv_transfer_params_keys(
++        cls, vllm_config: VllmConfig
++    ) -> KVTransferParamsKeys:
++        """The store cap, and whatever the configured spec's manager acts on."""
++        assert vllm_config.kv_transfer_config is not None
++        extra_config = vllm_config.kv_transfer_config.kv_connector_extra_config
++        spec_cls = OffloadingSpecFactory.get_spec_cls(extra_config)
++        return KVTransferParamsKeys(
++            keys=frozenset({MAX_OFFLOAD_TOKENS_KEY})
++            | spec_cls.get_kv_transfer_params_keys(extra_config)
++        )
++
+     def reset_cache(self) -> bool | None:
+         assert self.connector_scheduler is not None
+         self.connector_scheduler.reset_cache()
+diff --git a/vllm/entrypoints/generate/base/serving.py b/vllm/entrypoints/generate/base/serving.py
+index d47535c226fe1a48b9956f9940ab0e8ae8d2da86..a8222389a3b8ab09b842949cf6d1cabb65fdae67 100644
+--- a/vllm/entrypoints/generate/base/serving.py
++++ b/vllm/entrypoints/generate/base/serving.py
+@@ -141,9 +141,11 @@ class GenerateBaseServing(BaseServing, BeamSearchOnlineMixin):
+         self.return_tokens_as_token_ids = return_tokens_as_token_ids
+         self.renderer = engine_client.renderer
+         self.input_processor = engine_client.input_processor
+-        vllm_config = getattr(engine_client, "vllm_config", None)
+-        kv_transfer_config = getattr(vllm_config, "kv_transfer_config", None)
+-        self.has_kv_connector = kv_transfer_config is not None
++        # Only a connector that takes do_remote_prefill holds remote-prefill
++        # blocks for a request it has not yet admitted.
++        self.notifies_remote_prefill_rejection = (
++            self.input_processor.kv_transfer_params_keys.defines("do_remote_prefill")
++        )
+ 
+         # Computed once at startup (cached by ``vllm_config`` identity) and
+         # stamped on non-streaming responses. Streaming chunks deliberately
+@@ -271,10 +273,13 @@ class GenerateBaseServing(BaseServing, BeamSearchOnlineMixin):
+         raw_request: Request | None,
+     ) -> _T:
+         """Wrap a `create_*` coroutine so that, if it raises or returns an
+-        ErrorResponse (i.e. the request never reached the engine), the KV
+-        connector is notified to free any pinned remote-prefill blocks. The
+-        notice names the rejected request's kv_scope."""
+-        kv_transfer_params = self.has_kv_connector and request.kv_transfer_params
++        ErrorResponse (i.e. the request never reached the engine), the
++        configured KV connector that takes do_remote_prefill is notified to
++        free the remote-prefill blocks the request named. The notice names the
++        rejected request's kv_scope."""
++        kv_transfer_params = (
++            self.notifies_remote_prefill_rejection and request.kv_transfer_params
++        )
+         if not kv_transfer_params or not kv_transfer_params.get("do_remote_prefill"):
+             return await awaitable
+ 
+diff --git a/vllm/v1/engine/input_processor.py b/vllm/v1/engine/input_processor.py
+index 0fa36770c5333eb51ed6c96683a45846ae5eacd3..478c5d22508178f4d5501f90a6e423d57edc84cb 100644
+--- a/vllm/v1/engine/input_processor.py
++++ b/vllm/v1/engine/input_processor.py
+@@ -7,6 +7,7 @@ from typing import Any, Literal
+ 
+ import vllm.envs as envs
+ from vllm.config import VllmConfig
++from vllm.distributed.kv_transfer.kv_connector.factory import KVConnectorFactory
+ from vllm.exceptions import VLLMValidationError
+ from vllm.inputs import (
+     EngineInput,
+@@ -55,6 +56,17 @@ class InputProcessor:
+ 
+         self.generation_config_fields = model_config.try_get_generation_config()
+ 
++        # The connector a request's kv_transfer_params are for, and the keys
++        # it takes. Admission refuses any other key: no connector would read
++        # it.
++        kv_transfer_config = vllm_config.kv_transfer_config
++        self.kv_connector_name = (
++            None if kv_transfer_config is None else kv_transfer_config.kv_connector
++        )
++        self.kv_transfer_params_keys = KVConnectorFactory.get_kv_transfer_params_keys(
++            vllm_config
++        )
++
+         self.renderer = renderer or renderer_from_config(vllm_config)
+ 
+         self.supports_mm_inputs = mm_registry.supports_multimodal_inputs(model_config)
+@@ -107,6 +119,7 @@ class InputProcessor:
+                 self.structured_outputs_config,
+                 self.tokenizer,
+             )
++            self._validate_kv_transfer_params(params)
+ 
+             if self.model_config.return_sampling_mask:
+                 if params.temperature <= 0:
+@@ -160,6 +173,50 @@ class InputProcessor:
+                 f"but got {type(params).__name__}"
+             )
+ 
++    def _validate_kv_transfer_params(self, params: SamplingParams) -> None:
++        """Refuse kv_transfer_params that no configured connector takes."""
++        kv_transfer_params = (params.extra_args or {}).get("kv_transfer_params")
++        if kv_transfer_params is None:
++            return
++        if not isinstance(kv_transfer_params, dict):
++            raise VLLMValidationError(
++                "kv_transfer_params must be an object of KV connector parameters, "
++                f"not {type(kv_transfer_params).__name__}.",
++                parameter="kv_transfer_params",
++            )
++        refused = [
++            key
++            for key in kv_transfer_params
++            if not (isinstance(key, str) and self.kv_transfer_params_keys.defines(key))
++        ]
++        if not refused:
++            return
++        one = len(refused) == 1
++        named = ("key " if one else "keys ") + ", ".join(map(repr, refused))
++        them = "it" if one else "them"
++        if self.kv_connector_name is None:
++            cause = (
++                f"kv_transfer_params {named} {'reaches' if one else 'reach'} no "
++                "KV connector: this server configures none (--kv-transfer-config)"
++            )
++        else:
++            takes = (
++                f"it takes {self.kv_transfer_params_keys}"
++                if str(self.kv_transfer_params_keys)
++                else "it declares none: KVConnectorBase_V1.get_kv_transfer_params_keys"
++            )
++            not_taken = "is not a parameter" if one else "are not parameters"
++            cause = (
++                f"kv_transfer_params {named} {not_taken} of "
++                f"{self.kv_connector_name}, the KV connector this server "
++                f"configures ({takes})"
++            )
++        raise VLLMValidationError(
++            f"{cause}. Remove {them}, or send the request to a server whose "
++            f"--kv-transfer-config configures a connector that takes {them}.",
++            parameter="kv_transfer_params",
++        )
++
+     def _validate_lora(self, lora_request: LoRARequest | None) -> None:
+         if lora_request is None:
+             return
+diff --git a/vllm/v1/kv_offload/base.py b/vllm/v1/kv_offload/base.py
+index bd7db7c0685c5791ff4e533610b9326c6dff36d8..c190da4d0deefdab7491553f47dd49ab08b4a19c 100644
+--- a/vllm/v1/kv_offload/base.py
++++ b/vllm/v1/kv_offload/base.py
+@@ -86,6 +86,10 @@ class TierFilter:
+ 
+ TierFilter.ALL = TierFilter(matchers=(TierMatcher(),))
+ 
++# The request kv_transfer_params key whose matchers become the request's
++# load_tier_filter.
++KV_LOAD_TIERS_KEY = "kv_load_tiers"
++
+ 
+ @dataclass
+ class ReqContext:
+@@ -583,6 +587,13 @@ class OffloadingSpec(ABC):
+         """Return Prometheus metric definitions emitted by this spec."""
+         return {}
+ 
++    @classmethod
++    def get_kv_transfer_params_keys(
++        cls, extra_config: dict[str, Any]
++    ) -> frozenset[str]:
++        """The request kv_transfer_params keys this spec's manager acts on."""
++        return frozenset()
++
+     def __init__(self, config: OffloadingConfig):
+         self.config = config
+         self.extra_config = config.extra_config
+diff --git a/vllm/v1/kv_offload/tiering/base.py b/vllm/v1/kv_offload/tiering/base.py
+index 768d7e328ad7ba4b59b9d3bcc2752a1ad1ba52fe..a086e1e24f1ef0f2daad151cf1c6199c738fbe8a 100644
+--- a/vllm/v1/kv_offload/tiering/base.py
++++ b/vllm/v1/kv_offload/tiering/base.py
+@@ -331,6 +331,13 @@ class SecondaryTierManager(ABC):
+         """Return Prometheus metric definitions emitted by this tier."""
+         return {}
+ 
++    @classmethod
++    def get_kv_transfer_params_keys(
++        cls, tier_config: dict[str, Any]
++    ) -> frozenset[str]:
++        """The request kv_transfer_params keys this tier acts on."""
++        return frozenset()
++
+     def get_stats(self) -> "OffloadingConnectorStats | None":
+         """Return and reset metric observations collected by this tier."""
+         return None
+diff --git a/vllm/v1/kv_offload/tiering/p2p/manager.py b/vllm/v1/kv_offload/tiering/p2p/manager.py
+index f76ed59b5c7823ace2505b2fb4936c7adfa10952..b53c90e8f2b4dc57452e77d0e74b455286f4d9f0 100644
+--- a/vllm/v1/kv_offload/tiering/p2p/manager.py
++++ b/vllm/v1/kv_offload/tiering/p2p/manager.py
+@@ -60,6 +60,11 @@ _SHUTDOWN_DRAIN_TIMEOUT_S = 3.0
+ # enough to avoid busy-spinning the scheduler thread.
+ _DRAIN_SLEEP_S = 0.001
+ 
++# The request kv_transfer_params keys naming this request's P2P peers.
++REMOTE_PREFILLER_KEY = "remote_prefiller"
++REMOTE_DECODER_KEY = "remote_decoder"
++REMOTE_KV_SOURCE_KEY = "remote_kv_source"
++
+ 
+ def _remote_prefiller_params(kv_params: dict | None) -> dict | None:
+     """Return the ``remote_prefiller`` sub-dict, or None if absent.
+@@ -69,7 +74,7 @@ def _remote_prefiller_params(kv_params: dict | None) -> dict | None:
+     """
+     if not kv_params:
+         return None
+-    return kv_params.get("remote_prefiller")
++    return kv_params.get(REMOTE_PREFILLER_KEY)
+ 
+ 
+ def _remote_decoder_params(kv_params: dict | None) -> dict | None:
+@@ -80,7 +85,7 @@ def _remote_decoder_params(kv_params: dict | None) -> dict | None:
+     """
+     if not kv_params:
+         return None
+-    return kv_params.get("remote_decoder")
++    return kv_params.get(REMOTE_DECODER_KEY)
+ 
+ 
+ def _remote_kv_source_params(kv_params: dict | None) -> dict | None:
+@@ -91,7 +96,7 @@ def _remote_kv_source_params(kv_params: dict | None) -> dict | None:
+     """
+     if not kv_params:
+         return None
+-    return kv_params.get("remote_kv_source")
++    return kv_params.get(REMOTE_KV_SOURCE_KEY)
+ 
+ 
+ def _peer_id_from_params(role_params: dict) -> str | None:
+@@ -198,6 +203,15 @@ class P2PSecondaryTierManager(SecondaryTierManager):
+     and existing sessions are polled even when no requests are scheduled.
+     """
+ 
++    @classmethod
++    @override
++    def get_kv_transfer_params_keys(
++        cls, tier_config: dict[str, Any]
++    ) -> frozenset[str]:
++        return frozenset(
++            {REMOTE_PREFILLER_KEY, REMOTE_DECODER_KEY, REMOTE_KV_SOURCE_KEY}
++        )
++
+     def __init__(
+         self,
+         offloading_spec: OffloadingSpec,
+diff --git a/vllm/v1/kv_offload/tiering/spec.py b/vllm/v1/kv_offload/tiering/spec.py
+index 4eb1caa132803b891c6e1d27ca74f51caadfe0f3..8a99ab464ff8900fcae9c7bc4379cca9224d2022 100644
+--- a/vllm/v1/kv_offload/tiering/spec.py
++++ b/vllm/v1/kv_offload/tiering/spec.py
+@@ -55,6 +55,7 @@ from typing_extensions import override
+ 
+ from vllm.logger import init_logger
+ from vllm.v1.kv_offload.base import (
++    KV_LOAD_TIERS_KEY,
+     CanonicalKVCaches,
+     OffloadingCounterMetadata,
+     OffloadingGaugeMetadata,
+@@ -246,6 +247,25 @@ class TieringOffloadingSpec(CPUOffloadingSpec):
+             metrics.update(tier_cls.build_metric_definitions(tier_config))
+         return metrics
+ 
++    @classmethod
++    @override
++    def get_kv_transfer_params_keys(
++        cls, extra_config: dict[str, Any]
++    ) -> frozenset[str]:
++        # A request's tier filter selects among the secondary tiers; the
++        # primary tier is always consulted, so with none the filter acts on
++        # nothing.
++        secondary_tier_configs = extra_config.get("secondary_tiers", [])
++        if not isinstance(secondary_tier_configs, list):
++            raise ValueError("secondary_tiers must be a list of tier configurations")
++
++        keys = frozenset({KV_LOAD_TIERS_KEY} if secondary_tier_configs else ())
++        for tier_config in secondary_tier_configs:
++            assert isinstance(tier_config, dict)
++            tier_cls = SecondaryTierFactory.get_tier_class(tier_config)
++            keys |= tier_cls.get_kv_transfer_params_keys(tier_config)
++        return keys
++
+     EXTRA_CONFIG_KEYS: frozenset[str] = CPUOffloadingSpec.EXTRA_CONFIG_KEYS | {
+         "secondary_tiers",
+         # Host byte-layout request, certified at worker registration.

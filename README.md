@@ -352,6 +352,7 @@ It is intentionally reconstructed by the ordered, reviewed semantic transformati
 | patches/vllm-batch-invariance-substitutes-no-nvfp4-kernel.patch | c79baaee0a51275f5f522d266fe6b315c200e6951920c2454d5c80cadbb92f44 |
 | patches/vllm-render-carries-every-image-chat-renders.patch | c5bf4cb2948b9eb7866d083671af3badcc9cf529a7756bde3b0647c236fe932f |
 | patches/vllm-rendered-prompts-are-never-truncated.patch | 07cd24fbf29bc66fb9615d63a8e30d947ee13cf6367e23bcb1a870e4f3a49334 |
+| patches/vllm-kv-transfer-params-are-declared.patch | 9742698af30ad79158f5430fb22987cafe4667f457771dd66b29b38a7376ce0e |
 
 The reconstructed tree's runtime-source and test changes, new files and
 deletions are counted by ./scripts/build-vllm.sh check, which derives and prints
@@ -402,9 +403,9 @@ Pinned build inputs and products:
 |---|---|
 | Immutable base tag | qwen38-vllm:main-9df9b0b |
 | Immutable base ID | sha256:fa4a002a88b7043a1a89966dea8a500fe9696f84e75730d9da916f916048d401 |
-| Runtime Dockerfile SHA-256 | e04514689e3175f6fc16be4a16e9400e35ad5ccdb8c0bb20a5624e6a6ce2129d |
-| Build verifier SHA-256 | 58602e08cfb7989c9ac76660aa7280719bfc060c7c510b461b2859d11d12dd76 |
-| Runtime validator SHA-256 | 82fd8389be9f7b3b3322289c82acb2353bc03f5bbd0893c2ae053cdc0a6a960e |
+| Runtime Dockerfile SHA-256 | da1ae30aa043b9ac46407f59e50581d1bc8f7e72122aab1776b4546df8475dc2 |
+| Build verifier SHA-256 | e16c29a960d4891146e9c5ee6074c198629f58c91b524e03370a0f1111828df9 |
+| Runtime validator SHA-256 | d843e0d641182ce85eca20f37a98f651569bcbd4888b1bc91dc86dfff90e6f6b |
 
 The runtime image's profile, tag and archive name, which every release advances
 together, are declared in `config/runtime-v1.sh`, and the archive lives under
@@ -533,6 +534,20 @@ Consequences:
   user context (bytes derived in-engine from max_model_len and the KV cache spec).
   Agent IDs decide what this tier retains, not what a lookup matches; see
   [Shared prefixes and agent IDs](#shared-prefixes-and-agent-ids).
+- A request's `kv_transfer_params` are parameters of the configured KV connector,
+  and each connector declares the keys it takes. This launch's CPU tier takes
+  `max_offload_tokens` alone: `kv_load_tiers` selects among secondary tiers it has
+  none of, and `do_remote_prefill` belongs to the NIXL, Mooncake and MoRIIO
+  connectors. Any other key, and a `kv_transfer_params` that is not an object
+  (including one sent through `vllm_xargs`), is refused with a 400 naming the key,
+  the connector and what it takes, before the request reaches the engine. A
+  connector that declares nothing takes nothing: an out-of-tree connector, and
+  LMCache's (without `use_native`) and FlexKV's adapters, which hand requests to
+  their own packages. Their callers remove the key; their operators declare it by
+  overriding `KVConnectorBase_V1.get_kv_transfer_params_keys`, or for LMCache set
+  `use_native`, whose adapter declares its keys. A taken key's value is not
+  checked here: a malformed `max_offload_tokens` is still logged and ignored by
+  the connector.
 - Multimodal profiling is mandatory and cannot be skipped to obtain a deceptively
   optimistic allocation.
 - All unquantized model computation, including the entire vision tower, uses BF16.
