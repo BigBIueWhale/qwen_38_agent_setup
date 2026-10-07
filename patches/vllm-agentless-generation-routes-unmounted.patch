@@ -1,5 +1,5 @@
 diff --git a/tests/entrypoints/test_kv_scope_protocol.py b/tests/entrypoints/test_kv_scope_protocol.py
-index 872a720829adcd6e47721d9b7cf494860ec44e93..27b7a4b46352f6b69094e3121f5f97e9569d0602 100644
+index e688fb27e36acaadc95aa3f86a9e8689e0c4c364..21c6755c0beaacb918777a4e7df18eab9229f5de 100644
 --- a/tests/entrypoints/test_kv_scope_protocol.py
 +++ b/tests/entrypoints/test_kv_scope_protocol.py
 @@ -330,6 +330,26 @@ def _app():
@@ -26,9 +26,9 @@ index 872a720829adcd6e47721d9b7cf494860ec44e93..27b7a4b46352f6b69094e3121f5f97e9
 +        assert required in paths, (required, sorted(paths))
 +
 +
- def _body_schema(schema: dict, path: str) -> dict:
-     content = schema["paths"][path]["post"]["requestBody"]["content"]
-     ref = content["application/json"]["schema"]
+ def test_invocations_dispatch_by_the_generation_request_types():
+     # /invocations is mounted on every server and dispatches to the chat and
+     # completion endpoints by the request types those endpoints take: a body
 diff --git a/vllm/entrypoints/generate/api_router.py b/vllm/entrypoints/generate/api_router.py
 index 92c564ac31dabcf7c5790d04d0f4d4f114d8357a..70486a8011217aea515cb58be7a8ef23039421ae 100644
 --- a/vllm/entrypoints/generate/api_router.py

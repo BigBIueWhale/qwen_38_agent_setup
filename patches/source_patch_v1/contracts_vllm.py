@@ -1198,6 +1198,11 @@ def _validate_agent_id_after(state: State) -> None:
          "return ChatCompletionGenerationRequest("),
         ("vllm/entrypoints/openai/run_batch.py",
          "return ChatCompletionGenerationRequest.model_validate(value)"),
+        # /invocations dispatches by the generation endpoints' own types.
+        ("vllm/entrypoints/generate/factories.py",
+         "(ChatCompletionGenerationRequest, (chat, create_chat_completion)),"),
+        ("vllm/entrypoints/generate/factories.py",
+         "(CompletionGenerationRequest, (completion, create_completion)),"),
     ):
         require_text(state, path, text, label=label)
     # The same rule holds for every caller at the one boundary every
@@ -1248,6 +1253,9 @@ def _validate_agent_id_after(state: State) -> None:
          "request.kv_scope,"),
         label=label,
     )
+    require_python_symbols(state, "tests/entrypoints/test_kv_scope_protocol.py", {
+        "test_invocations_dispatch_by_the_generation_request_types": None,
+    }, label=label)
     require_python_symbols(state, "tests/v1/engine/test_engine_request_identity.py", {
         "test_a_generation_without_an_identity_cannot_be_built": None,
         "test_a_generation_of_several_sequences_cannot_be_built": None,
@@ -4644,7 +4652,9 @@ CONTRACTS: Mapping[str, SemanticContract] = {
             "with allocate no KV and have no ID; a batch names one ID per "
             "conversation. One line of work generates one sequence per request, so "
             "n > 1, a batch best_of > 1, or several prompts under one ID are "
-            "refused by name. The engine request type holds the same rule: no "
+            "refused by name; /invocations dispatches by the same generation "
+            "types, so a body that names its ID reaches the engine with it. The "
+            "engine request type holds the same rule: no "
             "generation can be built, or decoded by the engine, without the ID, so "
             "it binds every producer -- the input processor, a caller that builds "
             "an engine request itself, and the engine's own notice that a "

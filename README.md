@@ -301,11 +301,11 @@ It is intentionally reconstructed by the ordered, reviewed semantic transformati
 | patches/vllm-qwen38-numerical-audits.patch | dc0b947db3727b522427a204edd1a930d637476a0f66d7d30e2da65c144ac944 |
 | patches/vllm-turboquant-fail-closed-guards.patch | b140445625c63a85d4cae5d878b1de472a9645b63e78c34249848082120b9ba3 |
 | patches/vllm-kv-offload-pinning-fail-closed.patch | 3a72f88d679a493d6ae0db6c05e171f9f0be6d44dca958ee351e6099df61a8ec |
-| patches/vllm-generation-requires-agent-id.patch | 4976d538eb98b6c424927a041e5885a7fd4004564a910cdb1c9faa56f4537f0d |
+| patches/vllm-generation-requires-agent-id.patch | 9428f66319f726b564ffb364f0375ba2d7660e3a8e297a5f57f60520b9939661 |
 | patches/vllm-attention-growth-keeps-prefix-hash.patch | a6c38a841c05bcd4f5bfc573c99f1c4a849e7399af05b1e53096e15a43a97632 |
 | patches/vllm-grouped-kv-specs-use-layer-geometry.patch | 6bb249bc143a179ca317c72d2bf70ec118baa6f12dca19c0a59da2e3c935b814 |
-| patches/vllm-agent-grouped-offload-retention.patch | cd1df4ae8de44aa92a3130ec2ad6a4fa087520d13fc884826100f95dd9782afc |
-| patches/vllm-agentless-generation-routes-unmounted.patch | c321d15313839c28542a6fb4d754080443a86aeeecdcdfbc8ea7459a52364b0b |
+| patches/vllm-agent-grouped-offload-retention.patch | 4a941d3037e7dae2e369f41512557e5eb443ef3a98b338686a45b7d5cb1a4a86 |
+| patches/vllm-agentless-generation-routes-unmounted.patch | c485cf9d7d862c0f4214cd625d598fd8903c43c0e42947e9f847ce4052b156ff |
 | patches/vllm-kv-capacity-in-declared-users.patch | 7a3d2c0ce43e468ed2177f567ac1eb31a70a95e525496a2d8b27f3330f214441 |
 | patches/vllm-kv-declaration-within-physical-bound.patch | 75526072aec94f8fd8e8e9ad9324408ce393b24c5cf50a8f801d87de62b24980 |
 | patches/vllm-exact-reasoning-usage.patch | 88453c8565e7dcffd975af1c92eb3d6a4ce0084913b23bb3b2998967c2abb449 |
@@ -401,9 +401,9 @@ Pinned build inputs and products:
 |---|---|
 | Immutable base tag | qwen38-vllm:main-9df9b0b |
 | Immutable base ID | sha256:fa4a002a88b7043a1a89966dea8a500fe9696f84e75730d9da916f916048d401 |
-| Runtime Dockerfile SHA-256 | 393497d3d72151b6caa7a0b405dd4d983cd8a08e0d26bc43cb08d9f60d31fa41 |
-| Build verifier SHA-256 | 261a605fe8ad0f514f5ddfd1d69722e8e5db773408049c67385b11af5451fe15 |
-| Runtime validator SHA-256 | 452adbe0e72c7ac71fffd36f1198209318639cdab7e17fb9aeb07bd34971cf83 |
+| Runtime Dockerfile SHA-256 | dac227dd8664e1fcf9123fa051efd824bb32a106c13e867c97752e7a207805c3 |
+| Build verifier SHA-256 | af14942249f9ff45747efa2f53d09838d38bf615346202cfa6efe7542299f07f |
+| Runtime validator SHA-256 | 2db1ae372fef308823ccd0e56b21207d8ae84c1d7d91efce9209f15e27313f23 |
 
 The runtime image's profile, tag and archive name, which every release advances
 together, are declared in `config/runtime-v1.sh`, and the archive lives under

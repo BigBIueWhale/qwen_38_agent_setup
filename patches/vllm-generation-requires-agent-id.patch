@@ -517,10 +517,10 @@ index 8936b19093b976e8db09406173632bc10a50da2e..cc6efb73b8e1fba5d9d65c068fb6000d
          stream=True,
 diff --git a/tests/entrypoints/test_kv_scope_protocol.py b/tests/entrypoints/test_kv_scope_protocol.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..e31c0e909a6f5c231be8dba1f70989e9e2f5ab64
+index 0000000000000000000000000000000000000000..9fa3840eab229cf76d9da664cc50d08403c40b03
 --- /dev/null
 +++ b/tests/entrypoints/test_kv_scope_protocol.py
-@@ -0,0 +1,376 @@
+@@ -0,0 +1,405 @@
 +# SPDX-License-Identifier: Apache-2.0
 +# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
 +"""Every generation surface names one line of work with an opaque kv_scope.
@@ -851,6 +851,35 @@ index 0000000000000000000000000000000000000000..e31c0e909a6f5c231be8dba1f70989e9
 +    register_generate_api_routers(app)
 +    register_scale_out_api_routers(app, ("generate",))
 +    return app
++
++
++def test_invocations_dispatch_by_the_generation_request_types():
++    # /invocations is mounted on every server and dispatches to the chat and
++    # completion endpoints by the request types those endpoints take: a body
++    # that names its line of work reaches them with it, and one that names
++    # none is refused naming kv_scope -- a client error the dispatcher, which
++    # skips only pydantic's own mismatches, passes to the error handler.
++    import pydantic
++
++    from vllm.entrypoints.generate.factories import get_generate_invocation_types
++
++    types = [request_type for request_type, _ in
++             get_generate_invocation_types(("generate",))]
++    assert types == [ChatCompletionGenerationRequest, CompletionGenerationRequest]
++    chat, completion = (pydantic.TypeAdapter(t) for t in types)
++    messages = [{"role": "user", "content": "hi"}]
++    named = chat.validate_python({"model": "m", "messages": messages,
++                                  "kv_scope": _SCOPE})
++    assert require_kv_scope(named.to_sampling_params(8, {})) == _SCOPE
++    prompt = {"model": "m", "prompt": "hi", "kv_scope": _SCOPE}
++    with pytest.raises(pydantic.ValidationError):
++        chat.validate_python(prompt)
++    assert completion.validate_python(prompt).kv_scope == _SCOPE
++    for body in ({"model": "m", "messages": messages}, {"model": "m", "prompt": "hi"}):
++        with pytest.raises(VLLMValidationError) as refused:
++            chat.validate_python(body)
++        assert refused.value.parameter == "kv_scope"
++        assert not isinstance(refused.value, pydantic.ValidationError)
 +
 +
 +def _body_schema(schema: dict, path: str) -> dict:
@@ -2158,3 +2187,35 @@ index 540ad236068ef52b500f126a11d2cb12056cb25a..ca80f01e34a8cbeeb918e4b243378753
              ),
              pooling_params=None,
              arrival_time=time.time(),
+diff --git a/vllm/entrypoints/generate/factories.py b/vllm/entrypoints/generate/factories.py
+index 8c963edc61839c661c9a1fdd0cf0781836ee2b7e..43c8e2c972fa4eca8244997606467fca5e3b3027 100644
+--- a/vllm/entrypoints/generate/factories.py
++++ b/vllm/entrypoints/generate/factories.py
+@@ -26,17 +26,23 @@ def get_generate_invocation_types(
+             create_chat_completion,
+         )
+         from vllm.entrypoints.openai.chat_completion.protocol import (
+-            ChatCompletionRequest,
++            ChatCompletionGenerationRequest,
+         )
+         from vllm.entrypoints.openai.completion.api_router import (
+             completion,
+             create_completion,
+         )
+-        from vllm.entrypoints.openai.completion.protocol import CompletionRequest
++        from vllm.entrypoints.openai.completion.protocol import (
++            CompletionGenerationRequest,
++        )
+ 
++        # The generation request types the generation endpoints take: the
++        # line of work a generation names is part of the request, so a body
++        # that names it reaches the engine with it and one that does not is
++        # refused naming kv_scope, as on the endpoints themselves.
+         invocation_types += [
+-            (ChatCompletionRequest, (chat, create_chat_completion)),
+-            (CompletionRequest, (completion, create_completion)),
++            (ChatCompletionGenerationRequest, (chat, create_chat_completion)),
++            (CompletionGenerationRequest, (completion, create_completion)),
+         ]
+ 
+     return invocation_types

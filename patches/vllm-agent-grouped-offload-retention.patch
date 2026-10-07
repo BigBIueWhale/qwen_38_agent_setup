@@ -1,5 +1,5 @@
 diff --git a/tests/entrypoints/test_kv_scope_protocol.py b/tests/entrypoints/test_kv_scope_protocol.py
-index e31c0e909a6f5c231be8dba1f70989e9e2f5ab64..872a720829adcd6e47721d9b7cf494860ec44e93 100644
+index 9fa3840eab229cf76d9da664cc50d08403c40b03..e688fb27e36acaadc95aa3f86a9e8689e0c4c364 100644
 --- a/tests/entrypoints/test_kv_scope_protocol.py
 +++ b/tests/entrypoints/test_kv_scope_protocol.py
 @@ -2,12 +2,12 @@

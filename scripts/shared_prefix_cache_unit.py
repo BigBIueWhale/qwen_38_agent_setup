@@ -164,6 +164,30 @@ def main():
         "/v1/chat/completions", "/v1/chat/completions/batch", "/v1/completions",
         "/v1/responses", "/v1/messages", "/inference/v1/generate",
     } <= paths, paths
+    # /invocations, mounted beside them, dispatches by the request types the
+    # generation endpoints take: a body naming its line of work reaches them
+    # with it; one naming none is refused naming kv_scope, an error the
+    # dispatcher -- which skips only pydantic mismatches -- does not swallow.
+    import pydantic
+
+    from vllm.entrypoints.generate.factories import get_generate_invocation_types
+
+    for request_type, _ in get_generate_invocation_types(("generate",)):
+        adapter = pydantic.TypeAdapter(request_type)
+        body = {"model": "unit", "kv_scope": "agent"}
+        body.update({"messages": [{"role": "user", "content": "hi"}]}
+                    if "messages" in request_type.model_fields else {"prompt": "hi"})
+        named = adapter.validate_python(body)
+        extra_args = named.to_sampling_params(8, {}).extra_args or {}
+        assert extra_args.get("kv_scope") == "agent", (
+            f"/invocations dropped the kv_scope sent to {request_type.__name__}")
+        del body["kv_scope"]
+        try:
+            adapter.validate_python(body)
+        except VLLMValidationError as error:
+            assert error.parameter == "kv_scope", request_type
+        else:
+            raise AssertionError(f"{request_type.__name__} generates for no agent")
     asyncio.run(check_stream_identity())
     asyncio.run(check_rejection_notice_identity())
 

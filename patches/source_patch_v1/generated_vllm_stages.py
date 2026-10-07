@@ -11921,7 +11921,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'def _new_descriptor_buffers(\n'},)},
  {'name': 'generation-requires-agent-id',
   'review_patch': 'patches/vllm-generation-requires-agent-id.patch',
-  'review_sha256': '4976d538eb98b6c424927a041e5885a7fd4004564a910cdb1c9faa56f4537f0d',
+  'review_sha256': '9428f66319f726b564ffb364f0375ba2d7660e3a8e297a5f57f60520b9939661',
   'files': ({'path': 'tests/entrypoints/anthropic/test_anthropic_messages_conversion.py',
              'before_sha256': 'e6fa915c7f58e252d0da33bb5de31215cd1dacab1292e9ad5c8d116a7551f942',
              'after_sha256': '55dbe9c3e8d541835a8b1864165762d7fad109a9ae2fe7268081043cfa8e533b'},
@@ -11951,7 +11951,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'after_sha256': '6471c9d9abd133865860d15c71f98f3a41cbdc365ae6aad5ded2597a5a2aa6ab'},
             {'path': 'tests/entrypoints/test_kv_scope_protocol.py',
              'before_sha256': None,
-             'after_sha256': 'a72bed55bd6be62608ab12db1d5d47f0ab8ebc1ffab2ff4a25fb003e40045d13'},
+             'after_sha256': 'd740a895321098dec98b4bf58d75817342f88886b16c5dd5b551cb88b75d4c11'},
             {'path': 'tests/test_request_input_bounds.py',
              'before_sha256': '0090315ba1e59d9460155b5b94a25c74be8823e735b2c748cd4315b1546af2a9',
              'after_sha256': '8f8073c8b27152ad898bc0a7d1d4963a26500fe4547b6365b51c6bc278797a71'},
@@ -12044,7 +12044,10 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'after_sha256': '1f52819297cc78bbe01450af3a1069c86513066a54eb4ac2b530565a96b55c46'},
             {'path': 'vllm/v1/engine/async_llm.py',
              'before_sha256': 'bceed0b3f5f0c834fef79525f2462a092f082390f0070526280abc95945837dd',
-             'after_sha256': '7f948316cd152c1d49bb064e6c40c4cd3cf3a148cc3416573dc6eb0c1e83d772'}),
+             'after_sha256': '7f948316cd152c1d49bb064e6c40c4cd3cf3a148cc3416573dc6eb0c1e83d772'},
+            {'path': 'vllm/entrypoints/generate/factories.py',
+             'before_sha256': '5689c967b4d707666e8c609152900cbd2caab01f5e50f71b91db38c227895eb3',
+             'after_sha256': 'd40aa14aad43cbb67b51568c56d5de76e43a3f9d8dc12a813b85d0e079323298'}),
   'edits': ({'name': 'tests/entrypoints/anthropic/test_anthropic_messages_conversion.py:landmark-1',
              'path': 'tests/entrypoints/anthropic/test_anthropic_messages_conversion.py',
              'before': '        model="test-model",\n'
@@ -14560,6 +14563,50 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '    return app\n'
                       '\n'
                       '\n'
+                      'def '
+                      'test_invocations_dispatch_by_the_generation_request_types():\n'
+                      '    # /invocations is mounted on every server and dispatches to '
+                      'the chat and\n'
+                      '    # completion endpoints by the request types those endpoints '
+                      'take: a body\n'
+                      '    # that names its line of work reaches them with it, and one '
+                      'that names\n'
+                      '    # none is refused naming kv_scope -- a client error the '
+                      'dispatcher, which\n'
+                      "    # skips only pydantic's own mismatches, passes to the error "
+                      'handler.\n'
+                      '    import pydantic\n'
+                      '\n'
+                      '    from vllm.entrypoints.generate.factories import '
+                      'get_generate_invocation_types\n'
+                      '\n'
+                      '    types = [request_type for request_type, _ in\n'
+                      '             get_generate_invocation_types(("generate",))]\n'
+                      '    assert types == [ChatCompletionGenerationRequest, '
+                      'CompletionGenerationRequest]\n'
+                      '    chat, completion = (pydantic.TypeAdapter(t) for t in '
+                      'types)\n'
+                      '    messages = [{"role": "user", "content": "hi"}]\n'
+                      '    named = chat.validate_python({"model": "m", "messages": '
+                      'messages,\n'
+                      '                                  "kv_scope": _SCOPE})\n'
+                      '    assert require_kv_scope(named.to_sampling_params(8, {})) == '
+                      '_SCOPE\n'
+                      '    prompt = {"model": "m", "prompt": "hi", "kv_scope": '
+                      '_SCOPE}\n'
+                      '    with pytest.raises(pydantic.ValidationError):\n'
+                      '        chat.validate_python(prompt)\n'
+                      '    assert completion.validate_python(prompt).kv_scope == '
+                      '_SCOPE\n'
+                      '    for body in ({"model": "m", "messages": messages}, '
+                      '{"model": "m", "prompt": "hi"}):\n'
+                      '        with pytest.raises(VLLMValidationError) as refused:\n'
+                      '            chat.validate_python(body)\n'
+                      '        assert refused.value.parameter == "kv_scope"\n'
+                      '        assert not isinstance(refused.value, '
+                      'pydantic.ValidationError)\n'
+                      '\n'
+                      '\n'
                       'def _body_schema(schema: dict, path: str) -> dict:\n'
                       '    content = '
                       'schema["paths"][path]["post"]["requestBody"]["content"]\n'
@@ -15061,6 +15108,52 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    register_generate_api_routers(app)\n'
                              '    register_scale_out_api_routers(app, ("generate",))\n'
                              '    return app\n'
+                             '\n'
+                             '\n'
+                             'def '
+                             'test_invocations_dispatch_by_the_generation_request_types():\n'
+                             '    # /invocations is mounted on every server and '
+                             'dispatches to the chat and\n'
+                             '    # completion endpoints by the request types those '
+                             'endpoints take: a body\n'
+                             '    # that names its line of work reaches them with it, '
+                             'and one that names\n'
+                             '    # none is refused naming kv_scope -- a client error '
+                             'the dispatcher, which\n'
+                             "    # skips only pydantic's own mismatches, passes to "
+                             'the error handler.\n'
+                             '    import pydantic\n'
+                             '\n'
+                             '    from vllm.entrypoints.generate.factories import '
+                             'get_generate_invocation_types\n'
+                             '\n'
+                             '    types = [request_type for request_type, _ in\n'
+                             '             '
+                             'get_generate_invocation_types(("generate",))]\n'
+                             '    assert types == [ChatCompletionGenerationRequest, '
+                             'CompletionGenerationRequest]\n'
+                             '    chat, completion = (pydantic.TypeAdapter(t) for t in '
+                             'types)\n'
+                             '    messages = [{"role": "user", "content": "hi"}]\n'
+                             '    named = chat.validate_python({"model": "m", '
+                             '"messages": messages,\n'
+                             '                                  "kv_scope": _SCOPE})\n'
+                             '    assert require_kv_scope(named.to_sampling_params(8, '
+                             '{})) == _SCOPE\n'
+                             '    prompt = {"model": "m", "prompt": "hi", "kv_scope": '
+                             '_SCOPE}\n'
+                             '    with pytest.raises(pydantic.ValidationError):\n'
+                             '        chat.validate_python(prompt)\n'
+                             '    assert completion.validate_python(prompt).kv_scope '
+                             '== _SCOPE\n'
+                             '    for body in ({"model": "m", "messages": messages}, '
+                             '{"model": "m", "prompt": "hi"}):\n'
+                             '        with pytest.raises(VLLMValidationError) as '
+                             'refused:\n'
+                             '            chat.validate_python(body)\n'
+                             '        assert refused.value.parameter == "kv_scope"\n'
+                             '        assert not isinstance(refused.value, '
+                             'pydantic.ValidationError)\n'
                              '\n'
                              '\n'
                              'def _body_schema(schema: dict, path: str) -> dict:\n'
@@ -18949,7 +19042,120 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '                },\n'
                              '            ),\n'
                              '            pooling_params=None,\n'
-                             '            arrival_time=time.time(),\n'})},
+                             '            arrival_time=time.time(),\n'},
+            {'name': 'vllm/entrypoints/generate/factories.py:landmark-1',
+             'path': 'vllm/entrypoints/generate/factories.py',
+             'before': '            create_chat_completion,\n'
+                       '        )\n'
+                       '        from vllm.entrypoints.openai.chat_completion.protocol '
+                       'import (\n'
+                       '            ChatCompletionRequest,\n'
+                       '        )\n'
+                       '        from vllm.entrypoints.openai.completion.api_router '
+                       'import (\n'
+                       '            completion,\n'
+                       '            create_completion,\n'
+                       '        )\n'
+                       '        from vllm.entrypoints.openai.completion.protocol '
+                       'import CompletionRequest\n'
+                       '\n'
+                       '        invocation_types += [\n'
+                       '            (ChatCompletionRequest, (chat, '
+                       'create_chat_completion)),\n'
+                       '            (CompletionRequest, (completion, '
+                       'create_completion)),\n'
+                       '        ]\n'
+                       '\n'
+                       '    return invocation_types\n',
+             'after': '            create_chat_completion,\n'
+                      '        )\n'
+                      '        from vllm.entrypoints.openai.chat_completion.protocol '
+                      'import (\n'
+                      '            ChatCompletionGenerationRequest,\n'
+                      '        )\n'
+                      '        from vllm.entrypoints.openai.completion.api_router '
+                      'import (\n'
+                      '            completion,\n'
+                      '            create_completion,\n'
+                      '        )\n'
+                      '        from vllm.entrypoints.openai.completion.protocol import '
+                      '(\n'
+                      '            CompletionGenerationRequest,\n'
+                      '        )\n'
+                      '\n'
+                      '        # The generation request types the generation endpoints '
+                      'take: the\n'
+                      '        # line of work a generation names is part of the '
+                      'request, so a body\n'
+                      '        # that names it reaches the engine with it and one that '
+                      'does not is\n'
+                      '        # refused naming kv_scope, as on the endpoints '
+                      'themselves.\n'
+                      '        invocation_types += [\n'
+                      '            (ChatCompletionGenerationRequest, (chat, '
+                      'create_chat_completion)),\n'
+                      '            (CompletionGenerationRequest, (completion, '
+                      'create_completion)),\n'
+                      '        ]\n'
+                      '\n'
+                      '    return invocation_types\n',
+             'review_before': '            create_chat_completion,\n'
+                              '        )\n'
+                              '        from '
+                              'vllm.entrypoints.openai.chat_completion.protocol import '
+                              '(\n'
+                              '            ChatCompletionRequest,\n'
+                              '        )\n'
+                              '        from '
+                              'vllm.entrypoints.openai.completion.api_router import (\n'
+                              '            completion,\n'
+                              '            create_completion,\n'
+                              '        )\n'
+                              '        from '
+                              'vllm.entrypoints.openai.completion.protocol import '
+                              'CompletionRequest\n'
+                              '\n'
+                              '        invocation_types += [\n'
+                              '            (ChatCompletionRequest, (chat, '
+                              'create_chat_completion)),\n'
+                              '            (CompletionRequest, (completion, '
+                              'create_completion)),\n'
+                              '        ]\n'
+                              '\n'
+                              '    return invocation_types\n',
+             'review_after': '            create_chat_completion,\n'
+                             '        )\n'
+                             '        from '
+                             'vllm.entrypoints.openai.chat_completion.protocol import '
+                             '(\n'
+                             '            ChatCompletionGenerationRequest,\n'
+                             '        )\n'
+                             '        from '
+                             'vllm.entrypoints.openai.completion.api_router import (\n'
+                             '            completion,\n'
+                             '            create_completion,\n'
+                             '        )\n'
+                             '        from vllm.entrypoints.openai.completion.protocol '
+                             'import (\n'
+                             '            CompletionGenerationRequest,\n'
+                             '        )\n'
+                             '\n'
+                             '        # The generation request types the generation '
+                             'endpoints take: the\n'
+                             '        # line of work a generation names is part of the '
+                             'request, so a body\n'
+                             '        # that names it reaches the engine with it and '
+                             'one that does not is\n'
+                             '        # refused naming kv_scope, as on the endpoints '
+                             'themselves.\n'
+                             '        invocation_types += [\n'
+                             '            (ChatCompletionGenerationRequest, (chat, '
+                             'create_chat_completion)),\n'
+                             '            (CompletionGenerationRequest, (completion, '
+                             'create_completion)),\n'
+                             '        ]\n'
+                             '\n'
+                             '    return invocation_types\n'})},
  {'name': 'attention-growth-keeps-prefix-hash',
   'review_patch': 'patches/vllm-attention-growth-keeps-prefix-hash.patch',
   'review_sha256': 'a6c38a841c05bcd4f5bfc573c99f1c4a849e7399af05b1e53096e15a43a97632',
@@ -20315,10 +20521,10 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '@dataclass(frozen=True)\n'})},
  {'name': 'agent-grouped-offload-retention',
   'review_patch': 'patches/vllm-agent-grouped-offload-retention.patch',
-  'review_sha256': 'cd1df4ae8de44aa92a3130ec2ad6a4fa087520d13fc884826100f95dd9782afc',
+  'review_sha256': '4a941d3037e7dae2e369f41512557e5eb443ef3a98b338686a45b7d5cb1a4a86',
   'files': ({'path': 'tests/entrypoints/test_kv_scope_protocol.py',
-             'before_sha256': 'a72bed55bd6be62608ab12db1d5d47f0ab8ebc1ffab2ff4a25fb003e40045d13',
-             'after_sha256': 'ababc51b4d4ba3eb770d32b2660d22f935d546a0c3be14e0939d6e0f4af32e13'},
+             'before_sha256': 'd740a895321098dec98b4bf58d75817342f88886b16c5dd5b551cb88b75d4c11',
+             'after_sha256': '56f8d49e5f368b79a6da517950a8ad52bfc3b9ef1d359d976e799bad3741fafe'},
             {'path': 'tests/evals/gsm8k/test_gsm8k_offloading.py',
              'before_sha256': '3e61db44e67ef27bb0c8351900a9f65db42ba86b543e0b569df9dc2f181d7612',
              'after_sha256': '9da02758f0acd74c7c8a25045269f732e17152ac173d08feee66b6bf04cbe605'},
@@ -36012,10 +36218,10 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    assert set(manager._contexts) == {"earlier"}\n'})},
  {'name': 'agentless-generation-routes-unmounted',
   'review_patch': 'patches/vllm-agentless-generation-routes-unmounted.patch',
-  'review_sha256': 'c321d15313839c28542a6fb4d754080443a86aeeecdcdfbc8ea7459a52364b0b',
+  'review_sha256': 'c485cf9d7d862c0f4214cd625d598fd8903c43c0e42947e9f847ce4052b156ff',
   'files': ({'path': 'tests/entrypoints/test_kv_scope_protocol.py',
-             'before_sha256': 'ababc51b4d4ba3eb770d32b2660d22f935d546a0c3be14e0939d6e0f4af32e13',
-             'after_sha256': 'b7b8a5edd2a045a6b7ace1d1aab87605681d3a1b96191f45cf2e39f8bb157925'},
+             'before_sha256': '56f8d49e5f368b79a6da517950a8ad52bfc3b9ef1d359d976e799bad3741fafe',
+             'after_sha256': 'afd93756d5796ef8a9fdc48381ebc5b061db9742d59e8571ccd64a9a700a7553'},
             {'path': 'vllm/entrypoints/generate/api_router.py',
              'before_sha256': 'e428a6de4c01659de90e3cd88aed179595f4e48ffdf02ece0a6649750ebc71ab',
              'after_sha256': 'dffeda2c3ccc6cfe3d4945720a7378bab34e7c7c9959d020a9643675895a3ffd'},
@@ -36027,10 +36233,12 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before': '    return app\n'
                        '\n'
                        '\n'
-                       'def _body_schema(schema: dict, path: str) -> dict:\n'
-                       '    content = '
-                       'schema["paths"][path]["post"]["requestBody"]["content"]\n'
-                       '    ref = content["application/json"]["schema"]\n',
+                       'def '
+                       'test_invocations_dispatch_by_the_generation_request_types():\n'
+                       '    # /invocations is mounted on every server and dispatches '
+                       'to the chat and\n'
+                       '    # completion endpoints by the request types those '
+                       'endpoints take: a body\n',
              'after': '    return app\n'
                       '\n'
                       '\n'
@@ -36061,17 +36269,21 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '        assert required in paths, (required, sorted(paths))\n'
                       '\n'
                       '\n'
-                      'def _body_schema(schema: dict, path: str) -> dict:\n'
-                      '    content = '
-                      'schema["paths"][path]["post"]["requestBody"]["content"]\n'
-                      '    ref = content["application/json"]["schema"]\n',
+                      'def '
+                      'test_invocations_dispatch_by_the_generation_request_types():\n'
+                      '    # /invocations is mounted on every server and dispatches to '
+                      'the chat and\n'
+                      '    # completion endpoints by the request types those endpoints '
+                      'take: a body\n',
              'review_before': '    return app\n'
                               '\n'
                               '\n'
-                              'def _body_schema(schema: dict, path: str) -> dict:\n'
-                              '    content = '
-                              'schema["paths"][path]["post"]["requestBody"]["content"]\n'
-                              '    ref = content["application/json"]["schema"]\n',
+                              'def '
+                              'test_invocations_dispatch_by_the_generation_request_types():\n'
+                              '    # /invocations is mounted on every server and '
+                              'dispatches to the chat and\n'
+                              '    # completion endpoints by the request types those '
+                              'endpoints take: a body\n',
              'review_after': '    return app\n'
                              '\n'
                              '\n'
@@ -36104,10 +36316,12 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'sorted(paths))\n'
                              '\n'
                              '\n'
-                             'def _body_schema(schema: dict, path: str) -> dict:\n'
-                             '    content = '
-                             'schema["paths"][path]["post"]["requestBody"]["content"]\n'
-                             '    ref = content["application/json"]["schema"]\n'},
+                             'def '
+                             'test_invocations_dispatch_by_the_generation_request_types():\n'
+                             '    # /invocations is mounted on every server and '
+                             'dispatches to the chat and\n'
+                             '    # completion endpoints by the request types those '
+                             'endpoints take: a body\n'},
             {'name': 'vllm/entrypoints/generate/api_router.py:landmark-1',
              'path': 'vllm/entrypoints/generate/api_router.py',
              'before': '\n'
@@ -63962,8 +64176,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': 'fb2ff88c15028af53b5693036b2ad077306010d6220a7c60140fa6cd8d4c3ef1',
              'after_sha256': '018f35bf3570c8407a50694d4750a6ada1c6b9c8e00603e2e8669f69ebb577e4'},
             {'path': 'tests/entrypoints/test_kv_scope_protocol.py',
-             'before_sha256': 'b7b8a5edd2a045a6b7ace1d1aab87605681d3a1b96191f45cf2e39f8bb157925',
-             'after_sha256': '8421a84b21ddf78ec8a80fc0f3e46ac0ce07a3eaffdd12df240bbd75ba332c78'},
+             'before_sha256': 'afd93756d5796ef8a9fdc48381ebc5b061db9742d59e8571ccd64a9a700a7553',
+             'after_sha256': '30dfe8005dcb5431f094f7344dd44d5ed928bbd4a55f08a7433738abfd6502cf'},
             {'path': 'vllm/entrypoints/openai/chat_completion/protocol.py',
              'before_sha256': '92a5a81276ffcc41fd0f0dbb87a82ed0c7d66797fae260f8ec315efd2eaaf3ac',
              'after_sha256': 'ab2d01bdf68f7fafc07d17924f39e9dde88d00b07a43ea8cef55270014b2f9ba'},
@@ -136043,7 +136257,7 @@ FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5d
  'tests/entrypoints/serve/lora/test_lora_adapters.py': '57dd9087c0c6f5d27ce93b217ca3e9edb74801c7249d298ce1e8cd03425b3b7e',
  'tests/entrypoints/serve/utils/test_api_utils.py': 'ef96041b54c496109f8eaa0dbb62d3465dbaf595a5a446bd588dd44ab304085d',
  'tests/entrypoints/test_generation_admission.py': '21f70cf0354f6aef59480eb0cc1b2a6407ed94ca68887af65f95218200e8e409',
- 'tests/entrypoints/test_kv_scope_protocol.py': '8421a84b21ddf78ec8a80fc0f3e46ac0ce07a3eaffdd12df240bbd75ba332c78',
+ 'tests/entrypoints/test_kv_scope_protocol.py': '30dfe8005dcb5431f094f7344dd44d5ed928bbd4a55f08a7433738abfd6502cf',
  'tests/entrypoints/unit_tests/test_chat_utils.py': '23ecf6b73c1af45b9440f57b175660bfed485a5e2d4fe1b029cf012cd54f777b',
  'tests/evals/gsm8k/test_gsm8k_offloading.py': 'a7ced3b714c418120c2e4d5cfb55690d3b11baa96083256c2bb640dc80eec3f6',
  'tests/model_executor/kernels/test_nvfp4_native_selection.py': '734053c7d0594ac215a3305105aaf122315b5ae2f2ca8d91ed35d73a18c20f90',
@@ -136134,6 +136348,7 @@ FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5d
  'vllm/entrypoints/chat_utils.py': '885a4093bdcdcfbf2449628a395edd838744d8b36c431cd35687c9c313690dab',
  'vllm/entrypoints/generate/api_router.py': 'dffeda2c3ccc6cfe3d4945720a7378bab34e7c7c9959d020a9643675895a3ffd',
  'vllm/entrypoints/generate/base/serving.py': '8857456bc7a0157497d03a95b90f7d60a6435615c8e06406437d90e016030c96',
+ 'vllm/entrypoints/generate/factories.py': 'd40aa14aad43cbb67b51568c56d5de76e43a3f9d8dc12a813b85d0e079323298',
  'vllm/entrypoints/llm.py': '79f9bb1212884746964a347f7e4b39087b5ac084b1d72821a12efd2fb85bcb03',
  'vllm/entrypoints/openai/chat_completion/api_router.py': '9cb8a56328bcfea734cc252e1291b17aee6c42e7208c9c8f883ad5a434bace17',
  'vllm/entrypoints/openai/chat_completion/batch_serving.py': 'e48a1aaf594d7fcbb0979a1e48785ed37d2b109e6343beb318cb9145486efebe',
