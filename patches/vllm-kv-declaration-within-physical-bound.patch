@@ -1,24 +1,38 @@
 diff --git a/tests/v1/core/test_kv_cache_users_sizing.py b/tests/v1/core/test_kv_cache_users_sizing.py
-index 88a57dd44c275528350460b8e8cafbe75d07596c..339d214947dab9cbcdc95e86bb15a0adfdd3367e 100644
+index 88a57dd44c275528350460b8e8cafbe75d07596c..927551a0b977dad9adac6d294c6c10578132c47f 100644
 --- a/tests/v1/core/test_kv_cache_users_sizing.py
 +++ b/tests/v1/core/test_kv_cache_users_sizing.py
-@@ -7,6 +7,14 @@ block) on any machine: the same declaration has to produce the same block
+@@ -7,6 +7,13 @@ block) on any machine: the same declaration has to produce the same block
  count on a laptop GPU and on a B200, with surplus VRAM left unclaimed and a
  shortfall failing closed at startup. Byte- and block-denominated sizing
  inputs are refused, not reconciled.
 +
 +The per-worker number these tests pass is the worker's PHYSICAL KV bound
-+(the whole card minus every measured resident: weights, non-torch
-+allocations, the activation peak, frontend reservations) — not profiling's
-+conservative availability estimate, which additionally withholds the
-+(1 - utilization) reserve, is informational, and can neither shrink nor
-+veto the declaration. Only a declaration exceeding the physical bound is
-+refused.
++(the device memory free at startup profiling, minus every resident profiling
++measured and the frontend reservations) — not profiling's conservative
++availability estimate, which additionally withholds the (1 - utilization)
++reserve, is informational, and can neither shrink nor veto the declaration.
++Only a declaration exceeding the physical bound is refused.
  """
  
  import pytest
-@@ -61,7 +69,7 @@ def test_pool_holds_declared_users_plus_null_block(users, max_model_len):
+@@ -14,7 +21,7 @@ import torch
+ 
+ from vllm.config import ModelConfig, VllmConfig
+ from vllm.utils.math_utils import cdiv
+-from vllm.v1.core.kv_cache_utils import get_kv_cache_configs
++from vllm.v1.core.kv_cache_utils import _pool_bytes_per_block, get_kv_cache_configs
+ from vllm.v1.kv_cache_interface import FullAttentionSpec
+ 
+ pytestmark = pytest.mark.cpu_test
+@@ -59,19 +66,29 @@ def test_pool_holds_declared_users_plus_null_block(users, max_model_len):
+     assert kv_cache_config.kv_cache_tensors[0].size == (
+         spec.page_size_bytes * expected_blocks
      )
++    # The startup log reports the pool by the divisor admission sized it with.
++    assert kv_cache_config.num_blocks * _pool_bytes_per_block(
++        vllm_config, kv_cache_config.kv_cache_groups
++    ) == spec.page_size_bytes * expected_blocks
  
  
 -def test_declared_users_beyond_available_memory_fail_closed():
@@ -26,8 +40,25 @@ index 88a57dd44c275528350460b8e8cafbe75d07596c..339d214947dab9cbcdc95e86bb15a0ad
      spec = _spec()
      vllm_config = _vllm_config(64, 4)
      expected_blocks = 4 * _blocks_per_user(64) + 1
+ 
+-    with pytest.raises(ValueError, match="--kv-cache-users 4 requires"):
++    with pytest.raises(ValueError, match="--kv-cache-users 4 requires") as refusal:
+         get_kv_cache_configs(
+             vllm_config,
+             [{"layer1": spec}],
+             [spec.page_size_bytes * (expected_blocks - 1)],
+         )
++    # The bound is what was free at startup, not the card: memory another
++    # process holds is a cause, and freeing it is a next action.
++    message = str(refusal.value)
++    assert "the device memory free at startup profiling" in message
++    assert "Free the device memory other processes hold" in message
++    assert "declare fewer users, or reduce max_model_len" in message
+ 
+ 
+ def test_missing_kv_cache_users_fails_closed():
 diff --git a/vllm/v1/core/kv_cache_utils.py b/vllm/v1/core/kv_cache_utils.py
-index 128e76ac624e87dbbd0582b4d5acabf72bf6ff89..a8cd5f847a8f9a944076ee119c6d40f5c9d3cf55 100644
+index 128e76ac624e87dbbd0582b4d5acabf72bf6ff89..07122caa6ba1546ae4be637da45766b5e16b601b 100644
 --- a/vllm/v1/core/kv_cache_utils.py
 +++ b/vllm/v1/core/kv_cache_utils.py
 @@ -742,10 +742,11 @@ def _check_enough_kv_cache_memory(
@@ -38,15 +69,15 @@ index 128e76ac624e87dbbd0582b4d5acabf72bf6ff89..a8cd5f847a8f9a944076ee119c6d40f5
 -            "Try increasing `gpu_memory_utilization` when initializing the engine "
 -            "(this flag also controls CPU memory reservation on the CPU "
 -            "backend, despite its name). "
-+            "No memory left for the cache blocks: the measured residents "
-+            "(weights, activations, non-torch allocations) already exhaust "
-+            "the device. Free device memory held by other processes or use "
-+            "a larger device. (On the CPU backend the bound follows "
-+            "`gpu_memory_utilization`.) "
++            "No memory left for the cache blocks: the residents this engine "
++            "measured (weights, activations, non-torch allocations) already use "
++            "all the device memory that was free at startup profiling. Free "
++            "device memory held by other processes or use a larger device. "
++            "(On the CPU backend the bound follows `gpu_memory_utilization`.) "
              "See https://docs.vllm.ai/en/latest/configuration/conserving_memory/ "
              "for more details."
          )
-@@ -764,11 +765,12 @@ def _check_enough_kv_cache_memory(
+@@ -764,11 +765,13 @@ def _check_enough_kv_cache_memory(
          raise ValueError(
              f"To serve at least one request with the model's max seq len "
              f"({max_model_len}), ({format_gib(needed_memory)} GiB KV "
@@ -55,16 +86,17 @@ index 128e76ac624e87dbbd0582b4d5acabf72bf6ff89..a8cd5f847a8f9a944076ee119c6d40f5
 -            f"Try increasing `gpu_memory_utilization` (which also controls "
 -            f"CPU memory on the CPU backend) or decreasing `max_model_len` "
 -            f"when initializing the engine. "
-+            f"cache is needed, which is larger than the device's physical "
-+            f"KV bound ({format_gib(available_memory)} GiB — total memory "
-+            f"minus every measured resident). {estimated_msg}"
++            f"cache is needed, which is larger than the KV bound "
++            f"({format_gib(available_memory)} GiB — the device memory free at "
++            f"startup profiling, minus the residents it measured). "
++            f"{estimated_msg}"
 +            f"Decrease `max_model_len`, free device memory held by other "
 +            f"processes, or use a larger device. (On the CPU backend the "
 +            f"bound follows `gpu_memory_utilization`.) "
              f"See https://docs.vllm.ai/en/latest/configuration/conserving_memory/ "
              f"for more details."
          )
-@@ -2039,7 +2041,8 @@ def _auto_fit_max_model_len(
+@@ -2039,7 +2042,8 @@ def _auto_fit_max_model_len(
      if auto_fit_max <= 0:
          raise ValueError(
              "Cannot auto-fit max_model_len: not enough GPU memory available "
@@ -74,26 +106,26 @@ index 128e76ac624e87dbbd0582b4d5acabf72bf6ff89..a8cd5f847a8f9a944076ee119c6d40f5
          )
  
      if auto_fit_max >= original_max:
-@@ -2251,6 +2254,18 @@ def get_kv_cache_configs(
+@@ -2251,6 +2255,18 @@ def get_kv_cache_configs(
          # so handing it needed_bytes reproduces needed_blocks exactly.
          # Surplus VRAM stays unclaimed — a pool sized to "whatever fits"
          # would revive the machine-specific capacity this flag removes.
 +        #
 +        # The declaration is AUTHORITATIVE against the bound the workers
-+        # report, and that bound is physical capacity: the whole card minus
-+        # every measured resident (weights, non-torch allocations, the
-+        # transient activation peak, frontend reservations) — NOT the
-+        # conservative profiling estimate, whose additional
-+        # (1 - gpu_memory_utilization) holdback is a discretionary paper
-+        # reserve. The distinction is the crux: a declaration a heuristic
-+        # may overrule is not a declaration, and the superseded byte flag
-+        # sat ~1.3 GiB beyond that estimate through months of production on
-+        # the pinned card. "The estimate would prefer less" proceeds; "the
-+        # card physically cannot hold N contexts" refuses below.
++        # report. On a GPU that bound is the device memory free at startup
++        # profiling, minus every resident profiling measured (weights,
++        # non-torch allocations, the transient activation peak, the CUDA-graph
++        # estimate when VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS charges it)
++        # and the frontend multimodal reservations — NOT the conservative
++        # profiling estimate, whose additional (1 - gpu_memory_utilization)
++        # holdback is a discretionary reserve. The distinction is the crux: a
++        # declaration a heuristic may overrule is not a declaration. "The
++        # estimate would prefer less" proceeds; "the memory that was free
++        # cannot hold N contexts" refuses below.
          users = vllm_config.cache_config.kv_cache_users
          assert users is not None
          per_user_bytes = _max_memory_usage_bytes_from_groups(
-@@ -2266,10 +2281,12 @@ def get_kv_cache_configs(
+@@ -2266,10 +2282,15 @@ def get_kv_cache_configs(
                  f"{format_gib(needed_bytes)} GiB of KV cache "
                  f"({format_gib(per_user_bytes)} GiB per "
                  f"{vllm_config.model_config.max_model_len}-token context), "
@@ -101,20 +133,31 @@ index 128e76ac624e87dbbd0582b4d5acabf72bf6ff89..a8cd5f847a8f9a944076ee119c6d40f5
 -                f"KV cache memory is available within the "
 -                f"gpu_memory_utilization budget: declare fewer users, reduce "
 -                f"max_model_len, or raise gpu_memory_utilization."
-+                f"but the card's physical KV bound is only "
-+                f"{format_gib(available_memory_one_worker)} GiB — total "
-+                f"device memory minus every measured resident (weights, "
-+                f"non-torch allocations, the activation peak, frontend "
-+                f"reservations). This card cannot hold the declared "
-+                f"contexts: declare fewer users or reduce max_model_len."
++                f"but the KV bound is only "
++                f"{format_gib(available_memory_one_worker)} GiB: the device "
++                f"memory free at startup profiling, minus the residents it "
++                f"measured (weights, non-torch allocations, the activation "
++                f"peak, any charged CUDA-graph estimate) and frontend "
++                f"reservations; the startup log gives each term. "
++                f"Free the device memory other processes hold, serve on a "
++                f"device with more memory, declare fewer users, or reduce "
++                f"max_model_len."
              )
          kv_cache_configs.append(
              get_kv_cache_config_from_groups(
 diff --git a/vllm/v1/worker/gpu_worker.py b/vllm/v1/worker/gpu_worker.py
-index a17cd65ccff6a928bb18b185c7eb5da2ad3b4cb8..1b952e439584beb282441cf91d39f15b57f06f47 100644
+index a17cd65ccff6a928bb18b185c7eb5da2ad3b4cb8..f4aa145b1812b3cbf98e46dcc7e09cb6e6691523 100644
 --- a/vllm/v1/worker/gpu_worker.py
 +++ b/vllm/v1/worker/gpu_worker.py
-@@ -538,11 +538,47 @@ class Worker(WorkerBase):
+@@ -68,6 +68,7 @@ from vllm.utils.gpu_sync_debug import enable_gpu_sync_check, with_gpu_sync_check
+ from vllm.utils.mem_constants import GiB_bytes
+ from vllm.utils.mem_utils import MemorySnapshot, format_gib, memory_profiling
+ from vllm.utils.torch_utils import set_random_seed, set_torch_threads_for_runtime
++from vllm.v1.core.kv_cache_utils import _pool_bytes_per_block
+ from vllm.v1.core.sched.output import GrammarOutput, SchedulerOutput
+ from vllm.v1.kv_cache_interface import KVCacheConfig, KVCacheSpec
+ from vllm.v1.outputs import (
+@@ -538,11 +539,47 @@ class Worker(WorkerBase):
              "To fix this, ensure consistent GPU memory allocation or "
              "isolate vLLM in its own container."
          )
@@ -162,7 +205,7 @@ index a17cd65ccff6a928bb18b185c7eb5da2ad3b4cb8..1b952e439584beb282441cf91d39f15b
  
          unrequested_memory = self.init_snapshot.free_memory - self.requested_memory
          logger.debug(
-@@ -558,8 +594,19 @@ class Worker(WorkerBase):
+@@ -558,8 +595,19 @@ class Worker(WorkerBase):
          )
          logger.debug(profile_result)
          logger.info_once(
@@ -183,7 +226,7 @@ index a17cd65ccff6a928bb18b185c7eb5da2ad3b4cb8..1b952e439584beb282441cf91d39f15b
          )
  
          if cudagraph_memory_estimate > 0:
-@@ -602,7 +649,7 @@ class Worker(WorkerBase):
+@@ -602,7 +650,7 @@ class Worker(WorkerBase):
                  )
  
          return reserve_mm_ipc_gpu_memory(
@@ -192,7 +235,75 @@ index a17cd65ccff6a928bb18b185c7eb5da2ad3b4cb8..1b952e439584beb282441cf91d39f15b
              self.model_config.multimodal_config,
              getattr(self.parallel_config, "_api_process_count", 1),
          )
-@@ -784,7 +831,17 @@ class Worker(WorkerBase):
+@@ -650,6 +698,13 @@ class Worker(WorkerBase):
+         # Update local config with adjusted num blocks after profiling,
+         # so that it's available to the warmup stage.
+         self.cache_config.num_gpu_blocks = kv_cache_config.num_blocks
++        # The pool's bytes, by the divisor admission sized it with.
++        self.kv_cache_pool_bytes = (
++            kv_cache_config.num_blocks
++            * _pool_bytes_per_block(self.vllm_config, kv_cache_config.kv_cache_groups)
++            if kv_cache_config.kv_cache_groups
++            else 0
++        )
+ 
+         # Init kv cache connector here, because it requires
+         # `kv_cache_config`.
+@@ -732,35 +787,8 @@ class Worker(WorkerBase):
+         if self.cache_config.kv_cache_memory_bytes is None and hasattr(
+             self, "peak_activation_memory"
+         ):
+-            # Suggests optimal kv cache memory size if we rely on
+-            # memory_profiling to guess the kv cache memory size which
+-            # provides peak_activation_memory and a few other memory
+-            # consumption. `memory_profiling` does not consider
+-            # CUDAGraph memory size and may not utilize all gpu memory.
+-            # Users may want fine-grained control to specify kv cache
+-            # memory size.
+-
+-            # empirically observed that the memory profiling may
+-            # slightly underestimate the memory consumption.
+-            # So leave a small buffer (=150MiB) to avoid OOM.
+-            redundancy_buffer_memory = 150 * (1 << 20)
+-
+-            non_kv_cache_memory = (
+-                self.total_consumed
+-                + self.peak_activation_memory
+-                + cuda_graph_memory_bytes
+-            )
+-            kv_cache_memory_bytes_to_gpu_limit = (
+-                self.init_snapshot.free_memory
+-                - non_kv_cache_memory
+-                - redundancy_buffer_memory
+-            )
+-            kv_cache_memory_bytes_to_requested_limit = (
+-                int(self.requested_memory)
+-                - non_kv_cache_memory
+-                - redundancy_buffer_memory
+-            )
+-
++            # What profiling measured, and the pool --kv-cache-users sized
++            # against the physical bound determine_available_memory derived.
+             msg = (
+                 f"Free memory on device "
+                 f"({format_gib(self.init_snapshot.free_memory)}/"
+@@ -772,19 +800,25 @@ class Worker(WorkerBase):
+                 f"GiB for consumed memory (weights + non-torch), "
+                 f"{format_gib(self.peak_activation_memory)} GiB "
+                 f"for peak activation, and {format_gib(cuda_graph_memory_bytes)} "
+-                f"GiB for CUDAGraph memory. Available KV cache memory within "
+-                f"the requested budget is "
+-                f"{format_gib(kv_cache_memory_bytes_to_requested_limit)} GiB "
+-                f"({format_gib(kv_cache_memory_bytes_to_gpu_limit)} GiB to the "
+-                f"GPU limit); the pool actually allocated is derived from "
+-                f"--kv-cache-users, not from this headroom. Current kv cache "
+-                f"memory in use is "
+-                f"{format_gib(self.available_kv_cache_memory_bytes)} GiB."
++                f"GiB for CUDAGraph memory. The KV pool --kv-cache-users "
++                f"declares is {format_gib(self.kv_cache_pool_bytes)} GiB, "
++                f"admitted against the "
++                f"{format_gib(self.kv_physical_bound)} GiB physical KV bound."
+             )
  
              logger.info(msg)
  

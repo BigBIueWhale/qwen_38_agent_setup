@@ -84,7 +84,7 @@ diff --git a/tests/v1/worker/test_gpu_worker.py b/tests/v1/worker/test_gpu_worke
 diff --git a/vllm/v1/worker/gpu_worker.py b/vllm/v1/worker/gpu_worker.py
 --- a/vllm/v1/worker/gpu_worker.py
 +++ b/vllm/v1/worker/gpu_worker.py
-@@ -547,12 +547,13 @@
+@@ -548,35 +548,33 @@
          #    allocator reservations, the transient activation peak).
          #    Informational only. It may prefer a smaller pool than the
          #    declaration; that preference must not shrink or veto the
@@ -97,13 +97,39 @@ diff --git a/vllm/v1/worker/gpu_worker.py b/vllm/v1/worker/gpu_worker.py
          #
 -        # 2) The AUTHORITATIVE physical bound (returned): the whole card
 -        #    minus every measured resident — weights, non-torch consumers,
+-        #    the transient activation peak that recurs on every forward
+-        #    pass, and the opted-in CUDA-graph charge. A declaration beyond
+-        #    THIS bound is memory the card genuinely cannot provide and is
+-        #    refused loudly at engine initialization; one that merely
+-        #    exceeds the estimate proceeds.
 +        # 2) The AUTHORITATIVE physical bound (returned): initially free
 +        #    memory minus the additional measured residents — weights,
-+        #    non-torch consumers,
-         #    the transient activation peak that recurs on every forward
-         #    pass, and the opted-in CUDA-graph charge. A declaration beyond
-         #    THIS bound is memory the card genuinely cannot provide and is
-@@ -575,7 +576,7 @@
++        #    non-torch consumers, the transient activation peak that recurs
++        #    on every forward pass, and the opted-in CUDA-graph charge. A
++        #    declaration beyond THIS bound is refused loudly at engine
++        #    initialization; one that merely exceeds the estimate proceeds.
++        #    Residents allocated after profiling are in neither term: the
++        #    TurboQuant continuation workspace, reserved when the profiling
++        #    KV cache for CUDA-graph estimation is built, is one.
+         #
+         # The utilization factor is deliberately NOT charged against the
+-        # declared pool. The superseded --kv-cache-memory byte flag ignored
+-        # it outright, and the pinned production profile depended on that:
+-        # on the 31.8 GiB card, weights 21.3 GiB + activation peak 1.9 GiB
+-        # + the 6.4 GiB one-context pool total 29.6 GiB — comfortably
+-        # inside the card, yet beyond the 28.9 GiB 0.9-utilization budget
+-        # that served it for months. Charging the holdback would veto a
+-        # configuration the card demonstrably holds; utilization keeps its
+-        # real jobs (the startup free-memory requirement and the estimate's
+-        # budget) and loses only the power to overrule the declaration.
++        # declared pool: a declaration the (1 - gpu_memory_utilization)
++        # holdback could veto would not be a declaration. Utilization keeps
++        # its real jobs (the startup free-memory requirement and the
++        # estimate's budget) and loses only the power to overrule the
++        # declaration.
+         self.available_kv_cache_memory_bytes = (
+             self.requested_memory
+             - profile_result.non_kv_cache_memory
              - cudagraph_memory_estimate_applied
          )
          kv_physical_bound = (
@@ -112,7 +138,7 @@ diff --git a/vllm/v1/worker/gpu_worker.py b/vllm/v1/worker/gpu_worker.py
              - profile_result.non_kv_cache_memory
              - cudagraph_memory_estimate_applied
          )
-@@ -596,14 +597,14 @@
+@@ -597,14 +595,14 @@
          logger.info_once(
              "Available KV cache memory: %s GiB (conservative estimate under "
              "the %s GiB utilization budget); physical KV bound: %s GiB "

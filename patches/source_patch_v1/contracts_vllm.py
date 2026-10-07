@@ -1554,7 +1554,14 @@ def _validate_physical_bound_after(state: State) -> None:
         state, kv_utils,
         "The declaration is AUTHORITATIVE against the bound the workers", label=label,
     )
-    require_text(state, kv_utils, "but the card's physical KV bound is only", label=label)
+    # The bound is the memory free at startup profiling, not the card's, and
+    # the refusal names the next actions that exist.
+    require_text(state, kv_utils, 'f"but the KV bound is only "', label=label)
+    require_text(state, kv_utils, 'f"memory free at startup profiling, minus the residents it "',
+                 label=label)
+    require_text(state, kv_utils, 'f"Free the device memory other processes hold, serve on a "',
+                 label=label)
+    forbid_text(state, kv_utils, "total device memory minus", label=label)
     forbid_text(state, kv_utils, "Try increasing `gpu_memory_utilization`", label=label)
 
 

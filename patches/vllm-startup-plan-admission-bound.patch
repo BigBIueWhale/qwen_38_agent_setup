@@ -79,7 +79,7 @@ diff --git a/tests/v1/worker/test_gpu_worker.py b/tests/v1/worker/test_gpu_worke
 diff --git a/vllm/v1/worker/gpu_worker.py b/vllm/v1/worker/gpu_worker.py
 --- a/vllm/v1/worker/gpu_worker.py
 +++ b/vllm/v1/worker/gpu_worker.py
-@@ -575,7 +575,7 @@
+@@ -573,7 +573,7 @@
              - profile_result.non_kv_cache_memory
              - cudagraph_memory_estimate_applied
          )
@@ -88,7 +88,7 @@ diff --git a/vllm/v1/worker/gpu_worker.py b/vllm/v1/worker/gpu_worker.py
              self.init_snapshot.free_memory
              - profile_result.non_kv_cache_memory
              - cudagraph_memory_estimate_applied
-@@ -603,7 +603,7 @@
+@@ -601,7 +601,7 @@
              "estimate.",
              format_gib(self.available_kv_cache_memory_bytes),
              format_gib(self.requested_memory),
@@ -97,7 +97,7 @@ diff --git a/vllm/v1/worker/gpu_worker.py b/vllm/v1/worker/gpu_worker.py
              format_gib(self.init_snapshot.free_memory),
              format_gib(profile_result.non_kv_cache_memory),
              format_gib(profile_result.weights_memory),
-@@ -650,7 +650,7 @@
+@@ -648,7 +648,7 @@
                  )
  
          return reserve_mm_ipc_gpu_memory(
@@ -106,7 +106,7 @@ diff --git a/vllm/v1/worker/gpu_worker.py b/vllm/v1/worker/gpu_worker.py
              self.model_config.multimodal_config,
              getattr(self.parallel_config, "_api_process_count", 1),
          )
-@@ -832,17 +832,12 @@
+@@ -806,17 +806,12 @@
  
              logger.info(msg)
  

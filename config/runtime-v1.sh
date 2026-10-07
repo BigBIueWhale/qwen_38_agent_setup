@@ -94,7 +94,7 @@ readonly GROUPED_SPEC_GEOMETRY_PATCH_DIFF_SHA256="6bb249bc143a179ca317c72d2bf70e
 readonly AGENT_OFFLOAD_RETENTION_PATCH_DIFF_SHA256="cd1df4ae8de44aa92a3130ec2ad6a4fa087520d13fc884826100f95dd9782afc"
 readonly AGENTLESS_ROUTES_PATCH_DIFF_SHA256="c321d15313839c28542a6fb4d754080443a86aeeecdcdfbc8ea7459a52364b0b"
 readonly KV_DECLARED_USERS_PATCH_DIFF_SHA256="7a3d2c0ce43e468ed2177f567ac1eb31a70a95e525496a2d8b27f3330f214441"
-readonly KV_PHYSICAL_BOUND_PATCH_DIFF_SHA256="c80ae7afa8392c600f6c6f74d6748a2bc14f3aebc4dd0fa2e5a63f79dfaef3d5"
+readonly KV_PHYSICAL_BOUND_PATCH_DIFF_SHA256="75526072aec94f8fd8e8e9ad9324408ce393b24c5cf50a8f801d87de62b24980"
 readonly EXACT_REASONING_USAGE_PATCH_DIFF_SHA256="88453c8565e7dcffd975af1c92eb3d6a4ce0084913b23bb3b2998967c2abb449"
 readonly CANONICAL_FRAMING_PATCH_DIFF_SHA256="d438f9106c4a989d64837c21f5491d946065e6721570ad47664513347f150064"
 readonly QWEN_OWNED_GRAMMAR_PATCH_DIFF_SHA256="8eca87e7046eb5b01f37ebc93cafaec01479558ef102201dd74ef3ae8ad8a665"
@@ -104,7 +104,7 @@ readonly KV_SCOPE_SINGLE_FLIGHT_PATCH_DIFF_SHA256="b84b915c38e2c1d32b278bf88dcd5
 readonly TEMPLATE_AUTHORED_CONTROL_TOKENS_PATCH_DIFF_SHA256="1f6b9e898c3b7d3620d2ad3ee8dce70aa7d320e211788ff4fe030468870bc37b"
 readonly NVFP4_NATIVE_KERNEL_PATCH_DIFF_SHA256="9d9ce188b6670d687a725c4cdca37478f9dc78ef9f19685ddbcf5e9edd53b8b7"
 readonly QWEN_ARGUMENTS_READ_BY_GRAMMAR_PATCH_DIFF_SHA256="c8d40913648479bfaf0ee90d8274be5914bd15f7ef235d2c6017f351fb499c97"
-readonly STARTUP_PLAN_BOUND_PATCH_DIFF_SHA256="994f9aabc61b3d7473e83593a5279b2759ce4413ceb1ea212ae33be342df0019"
+readonly STARTUP_PLAN_BOUND_PATCH_DIFF_SHA256="596e311a54f888e8589a0bdc9fba62b6bf779b11eabab8ca1d2b60b8cf9f9930"
 readonly TEMPLATE_REFUSAL_PARAMETER_PATCH_DIFF_SHA256="bf1b666d2f3ac901acebb614ea37c18113d7296fe0fe25348b63b4b72107dedd"
 readonly QWEN_REPEATED_PARAMETER_REFUSAL_PATCH_DIFF_SHA256="11e1a32696d6c17352a94ad815f878728011304592c1efb09eaf98f73f59f147"
 readonly GENERATED_TOKENS_SURVIVE_PARSING_PATCH_DIFF_SHA256="5a3649dc50d8f75a24474ce2a0776fd96cc51edf03f011d0887d84b4cb628e7a"
@@ -118,7 +118,7 @@ readonly OUTPUT_CONSTRAINT_BESIDE_TOOLS_PATCH_DIFF_SHA256="788431f67e89c1e363b59
 readonly BATCH_INVARIANT_NATIVE_FP4_PATCH_DIFF_SHA256="c79baaee0a51275f5f522d266fe6b315c200e6951920c2454d5c80cadbb92f44"
 readonly RENDER_EVERY_IMAGE_PATCH_DIFF_SHA256="5e406e569b5777b572aeeb875a4afdcf5a0a18d07901aa9d9309977a57758124"
 readonly RENDERED_PROMPT_NOT_TRUNCATED_PATCH_DIFF_SHA256="e797fd19e869da9c4271934d297b5bb37fa4f5716835d5f50fb3d5cbc6a0c3fc"
-readonly SOURCE_PATCH_MANIFEST_SHA256="48522f673a342c9c96f7e924efbd369e7bcb2bfe3ddec45b6ebd521de30f19aa"
+readonly SOURCE_PATCH_MANIFEST_SHA256="ffb0adf77079a13156612e7fbcac9a0d5e97ad8378f528fdf67741249f62b82c"
 # Cardinality of config/deployment-inputs.sha256. The hash manifest alone
 # proves the listed bytes but cannot see a quietly grown or shrunk allowlist,
 # so the reviewed file count is pinned as well. It is declared exactly once,
@@ -164,8 +164,8 @@ readonly CACHE_CONFIG_PATCHED_FILE_SHA256="82ab839cacb2e30f62f485c9e3ea32440fbf2
 readonly VLLM_CONFIG_PATCHED_FILE_SHA256="30f612691ee2a5a1511484fbcece4bd89ade72c4309e786771826cf12fad38df"
 readonly ARG_UTILS_PATCHED_FILE_SHA256="88582e97c98ffcd16416e48eeea3db415cab1f33673c7ff8c1613fa83aad1eac"
 readonly LLM_ENTRYPOINT_PATCHED_FILE_SHA256="79f9bb1212884746964a347f7e4b39087b5ac084b1d72821a12efd2fb85bcb03"
-readonly KV_CACHE_UTILS_PATCHED_FILE_SHA256="83cfaccc6607e8b850484aab0373bbfb326c072d606952dd42f21e41192dc8e7"
-readonly GPU_WORKER_PATCHED_FILE_SHA256="fab29d47bdd160a1a5d9b6277ce482af86f42eb2e95b6dc53b46abc2b636d5bc"
+readonly KV_CACHE_UTILS_PATCHED_FILE_SHA256="f0a146b3f311d2ae983e3d05f1267d35492298cf45d5f171d1bfd3e8da019c40"
+readonly GPU_WORKER_PATCHED_FILE_SHA256="f3de6be99518adb82d091a1bd3ae954bd7b9859429545b290588d35dee4bc8e0"
 readonly STARTUP_PLAN_PATCHED_FILE_SHA256="2f4f50c34201390e50e10b578bc4cd964a4f5729334225fc30d815bb704aa81f"
 readonly KV_OFFLOAD_CONFIG_PATCHED_FILE_SHA256="50daea7891442fa779743796c343fe0a09bdcd0266910bf83b35509e533c3b89"
 readonly KV_OFFLOAD_BASE_PATCHED_FILE_SHA256="d3f86b26330e057a7b030c7b4e32417acf18822e443ebf224d9393e67b86acc1"
@@ -346,15 +346,15 @@ VLLM_ARGS=(
   # The declaration is authoritative over the pool size, exactly as the byte
   # flag it replaced was: profiling's conservative availability estimate
   # (utilization budget minus every observed resident) may prefer a smaller
-  # pool — it preferred ~1.3 GiB less than this pool through months of
-  # production — but cannot shrink or veto it. What CAN refuse the
-  # declaration is physical capacity: the whole card minus every measured
-  # resident. Here weights 21.3 GiB + activation peak 1.9 GiB + this
-  # 6.4 GiB one-context pool total ~29.6 GiB on the 31.8 GiB card — inside
-  # the card, beyond the 0.9-utilization paper budget, exactly as the
-  # proven byte-flag profile ran. Utilization stays at the vLLM default;
-  # it governs the startup free-memory requirement and the informational
-  # estimate, not the declared pool.
+  # pool but cannot shrink or veto it. What CAN refuse the declaration is the
+  # bound the engine derives: the device memory free at startup profiling,
+  # minus every resident profiling measured and the frontend reservations.
+  # The startup log states each term ("physical KV bound") and, after
+  # warm-up, the pool admitted against it. Residents allocated after profiling
+  # -- the TurboQuant continuation workspace -- are not in that bound.
+  # Utilization stays at the vLLM default; it governs the startup
+  # free-memory requirement and the informational estimate, not the
+  # declared pool.
   --cpu-offload-gb 0
   # Host-RAM KV offload. A foreground subagent's context competes for the
   # one-context GPU pool of the session that launched it, so at long main
@@ -453,7 +453,7 @@ readonly TOOL_OUTPUT_PARSER_UNIT_SHA256="2bb75136a450e35bb3ac07af1af4bd2dbf33108
 
 readonly PNG_SOURCE_PATCH_DIFF_SHA256="b1b684a96d7243ae647d4d8ce2fe69b7330b3ab243ea77903c4cfb346bc80549"
 
-readonly KV_PHYSICAL_PATCH_DIFF_SHA256="21f8993033c78971d4f7a660fe9906e054ec658139e83fc37b7121f1d8d91289"
+readonly KV_PHYSICAL_PATCH_DIFF_SHA256="d9c1b5a9d2c20266246e856f2264ad9da0d624b797ca682671772b808febca82"
 
 readonly TOOL_PARSER_ABSTRACT_UPSTREAM_FILE_SHA256="5826dee6676d2ffc88856ab498c6271296b17c6f743a96646a2fc49a9008d1d7"
 
