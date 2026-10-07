@@ -81,6 +81,29 @@ def test_workspace_lifetime() -> None:
         torch.accelerator.empty_cache = original_empty_cache
 
 
+def test_graph_capture_refuses_reclaimable_views() -> None:
+    # A graph would keep the address the workspace is restored away from, so
+    # the views are refused while a capture is under way, and only then.
+    original_capturing = torch.cuda.is_current_stream_capturing
+    torch.cuda.is_current_stream_capturing = lambda: True
+    try:
+        manager = workspace.WorkspaceManager(torch.device("cuda"))
+        try:
+            manager.get_reclaimable_simultaneous("phase-local", ((64,), torch.uint8))
+        except AssertionError as error:
+            assert "being captured" in str(error), error
+            assert "--enforce-eager" in str(error), error
+        else:
+            raise AssertionError("A capture was given reclaimable workspace views")
+        assert manager._reclaimable_workspaces == {}
+        # The capture state of a CUDA stream says nothing about a CPU workspace.
+        cpu = workspace.WorkspaceManager(torch.device("cpu"))
+        (view,) = cpu.get_reclaimable_simultaneous("phase-local", ((64,), torch.uint8))
+        assert view.numel() == 64
+    finally:
+        torch.cuda.is_current_stream_capturing = original_capturing
+
+
 def test_turboquant_reservation_routing() -> None:
     calls = []
 
@@ -186,6 +209,7 @@ def test_model_runner_phase_boundary() -> None:
 
 if __name__ == "__main__":
     test_workspace_lifetime()
+    test_graph_capture_refuses_reclaimable_views()
     test_turboquant_reservation_routing()
     test_model_runner_phase_boundary()
     print("vision workspace unit: passed")

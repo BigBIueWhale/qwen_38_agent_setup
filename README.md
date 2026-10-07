@@ -117,8 +117,9 @@ verifies the pinned local archive before loading it.
 units offline, the Qwen grammar unit among them; it does not execute the
 Dockerfile. No build assertion is written only inside it any more: what the build
 alone still proves is the image's own assembly -- the copied modes, the removed
-modules and the upstream-verifier hashes -- together with the vision workspace and
-MLP units, which run only against the installed tree. The parser unit parses as
+modules and the upstream-verifier hashes -- together with the vision MLP unit,
+which runs only against the installed tree; the vision workspace unit runs in
+check as well. The parser unit parses as
 serving does: the reasoning and tool-call parsers the launch names, composed into
 the two-pass parser serving builds, with the launch's default template
 arguments, on the served model's tokenizer and generation files, each checked
@@ -297,7 +298,7 @@ It is intentionally reconstructed by the ordered, reviewed semantic transformati
 | patches/vllm-qwen-implicit-tool-grammar-boundary.patch | d231c6e2e7040c4cd4b38432cb8c794805afddbf2c6e4f7ff6febb78e3fd9f48 |
 | patches/vllm-anthropic-validation-http400.patch | b4c3327ca4e513b9a58edc3e9aca978d324a27032511f9868d5f941411941bcf |
 | patches/vllm-tool-truncation-finish-reason.patch | eb8406c77d3a57c6e4acc957aa0a331c2e9cb51262b8b08c78901aba51d3f52c |
-| patches/vllm-qwen38-vision-runtime.patch | 55d646c690a11b1254e3df10dcb55b4b287fb8b4c7b14cc84164b827065d7c13 |
+| patches/vllm-qwen38-vision-runtime.patch | 872211d0ee3d5099e88780c784c1384ab2fb2d75206a2d019b02acc5c0bb3225 |
 | patches/vllm-qwen38-numerical-audits.patch | dc0b947db3727b522427a204edd1a930d637476a0f66d7d30e2da65c144ac944 |
 | patches/vllm-turboquant-fail-closed-guards.patch | b140445625c63a85d4cae5d878b1de472a9645b63e78c34249848082120b9ba3 |
 | patches/vllm-kv-offload-pinning-fail-closed.patch | 3a72f88d679a493d6ae0db6c05e171f9f0be6d44dca958ee351e6099df61a8ec |
@@ -402,7 +403,7 @@ Pinned build inputs and products:
 | Immutable base tag | qwen38-vllm:main-9df9b0b |
 | Immutable base ID | sha256:fa4a002a88b7043a1a89966dea8a500fe9696f84e75730d9da916f916048d401 |
 | Runtime Dockerfile SHA-256 | dac227dd8664e1fcf9123fa051efd824bb32a106c13e867c97752e7a207805c3 |
-| Build verifier SHA-256 | af14942249f9ff45747efa2f53d09838d38bf615346202cfa6efe7542299f07f |
+| Build verifier SHA-256 | 968884742243d5a67c4fb9df67a314930572385c2250d2af336056cd1e763f5d |
 | Runtime validator SHA-256 | 2db1ae372fef308823ccd0e56b21207d8ae84c1d7d91efce9209f15e27313f23 |
 
 The runtime image's profile, tag and archive name, which every release advances

@@ -913,6 +913,14 @@ def _validate_vision_after(state: State) -> None:
         },
         label=label,
     )
+    # A reclaimable view is refused while a graph is captured: its allocation
+    # is released and restored at a new address, which a graph would keep.
+    _require_in_symbol(state, workspace, "WorkspaceManager.get_reclaimable_simultaneous", (
+        'if self._device.type == "cuda" and torch.cuda.is_current_stream_capturing():',
+    ), label=label)
+    require_python_symbols(state, "tests/v1/worker/test_workspace.py", {
+        "test_reclaimable_workspace_is_refused_during_graph_capture": None,
+    }, label=label)
     context = _symbol_source(state, workspace, "release_reclaimable_workspaces", label=label)
     _require_ordered(
         context,

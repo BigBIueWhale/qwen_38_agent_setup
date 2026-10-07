@@ -779,10 +779,10 @@ index a86e77c8f52fb2843b20c912fbaa5e7d3af11a83..9f549b6070922137b5e77d7073875026
 +    assert events == ["release", "encode", "restore"]
 diff --git a/tests/v1/worker/test_workspace.py b/tests/v1/worker/test_workspace.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..5b7941b47063f79e5ae0f6143be86e9b733ad627
+index 0000000000000000000000000000000000000000..85a92e427d29cd87ad1f29df842c2f3e952105d3
 --- /dev/null
 +++ b/tests/v1/worker/test_workspace.py
-@@ -0,0 +1,93 @@
+@@ -0,0 +1,107 @@
 +# SPDX-License-Identifier: Apache-2.0
 +# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
 +
@@ -876,6 +876,20 @@ index 0000000000000000000000000000000000000000..5b7941b47063f79e5ae0f6143be86e9b
 +        "phase-local", ((64,), torch.float32)
 +    )
 +    assert restored.shape == (64,)
++
++
++def test_reclaimable_workspace_is_refused_during_graph_capture(monkeypatch):
++    # A graph would keep the address the workspace is later restored away from.
++    monkeypatch.setattr(torch.cuda, "is_current_stream_capturing", lambda: True)
++    manager = workspace.WorkspaceManager(torch.device("cuda"))
++    with pytest.raises(AssertionError, match="being captured"):
++        manager.get_reclaimable_simultaneous("phase-local", ((64,), torch.uint8))
++    assert manager._reclaimable_workspaces == {}
++
++    # A CPU workspace is not on a capturing CUDA stream.
++    cpu = workspace.WorkspaceManager(torch.device("cpu"))
++    (view,) = cpu.get_reclaimable_simultaneous("phase-local", ((64,), torch.uint8))
++    assert view.numel() == 64
 diff --git a/vllm/entrypoints/anthropic/serving.py b/vllm/entrypoints/anthropic/serving.py
 index 7e8e4441efee914aca39aef7e739acc8b303686e..f04a1e2b5961096757432fa2dba5a5ab81151c3c 100644
 --- a/vllm/entrypoints/anthropic/serving.py
@@ -1367,7 +1381,7 @@ index cd1679bdd96b8fb3c81b48cfe7f7a436d3a7a656..58f3c8902538c846c06e99985f92bfbe
          mm_hashes, mm_kwargs, mm_lora_refs = self._batch_mm_inputs_from_scheduler(
              scheduler_output
 diff --git a/vllm/v1/worker/workspace.py b/vllm/v1/worker/workspace.py
-index 1c502bfd8ff11b4ceadedac20c6ae00023ee2b4c..52dac59666fd61d24fce9cb302987b4ea99cce6d 100644
+index 1c502bfd8ff11b4ceadedac20c6ae00023ee2b4c..934c556218407bc1a29cd19c219728368188b90c 100644
 --- a/vllm/v1/worker/workspace.py
 +++ b/vllm/v1/worker/workspace.py
 @@ -3,8 +3,10 @@
@@ -1391,7 +1405,7 @@ index 1c502bfd8ff11b4ceadedac20c6ae00023ee2b4c..52dac59666fd61d24fce9cb302987b4e
          self._locked: bool = False
  
      @staticmethod
-@@ -116,6 +121,165 @@ class WorkspaceManager:
+@@ -116,6 +121,175 @@ class WorkspaceManager:
              for i in range(len(shapes_and_dtypes))
          ]
  
@@ -1402,9 +1416,10 @@ index 1c502bfd8ff11b4ceadedac20c6ae00023ee2b4c..52dac59666fd61d24fce9cb302987b4e
 +    ) -> list[torch.Tensor]:
 +        """Get views into a named workspace that can be released between phases.
 +
-+        Reclaimable workspaces must not be referenced by CUDA graphs. Their backing
-+        allocations can be temporarily released while a mutually exclusive model
-+        phase needs the memory, then restored at their exact profiled sizes.
++        A reclaimable workspace's backing allocation can be temporarily released
++        while a mutually exclusive model phase needs the memory, then restored at
++        its exact profiled size at a new address. A CUDA graph would keep the old
++        address, so the views are refused while a graph is being captured.
 +
 +        Args:
 +            name: Stable name shared by all users of this workspace.
@@ -1413,9 +1428,18 @@ index 1c502bfd8ff11b4ceadedac20c6ae00023ee2b4c..52dac59666fd61d24fce9cb302987b4e
 +            Tensor views into the named workspace allocation.
 +
 +        Raises:
-+            AssertionError: If the workspace is released, or would grow while the
-+                manager is locked.
++            AssertionError: If a CUDA graph is being captured, the workspace is
++                released, or it would grow while the manager is locked.
 +        """
++        if self._device.type == "cuda" and torch.cuda.is_current_stream_capturing():
++            raise AssertionError(
++                f"Reclaimable workspace '{name}' was requested while a CUDA graph "
++                "is being captured. Its allocation is released around encoder "
++                "phases and restored at a new address, so the graph would replay "
++                "into freed memory. The layer that requests it must run outside "
++                "graph capture: serve with a cudagraph_mode that leaves attention "
++                "eager (PIECEWISE), or with --enforce-eager."
++            )
 +        if self._reclaimable_workspaces_released:
 +            raise AssertionError(
 +                f"Reclaimable workspace '{name}' was requested while reclaimable "
@@ -1557,7 +1581,7 @@ index 1c502bfd8ff11b4ceadedac20c6ae00023ee2b4c..52dac59666fd61d24fce9cb302987b4e
      def _ensure_workspace_size(self, required_bytes: int) -> torch.Tensor:
          """Ensure workspace is allocated and large enough, return current workspace.
  
-@@ -258,6 +422,17 @@ def lock_workspace() -> None:
+@@ -258,6 +432,17 @@ def lock_workspace() -> None:
      current_workspace_manager().lock()
  
  

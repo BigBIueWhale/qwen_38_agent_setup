@@ -869,7 +869,7 @@ while IFS= read -r status_line; do
       ;;
   esac
 done <<<"${REVIEWED_STATUS}"
-for unit in chat_template_retention_unit tool_output_parser_unit vision_contract_unit reasoning_usage_unit shared_prefix_cache_unit phase_budget_unit generate_result_unit raw_media_unit qwen_grammar_unit template_authorship_unit native_fp4_selection_unit qwen38_context_unit; do
+for unit in chat_template_retention_unit tool_output_parser_unit vision_contract_unit vision_workspace_unit reasoning_usage_unit shared_prefix_cache_unit phase_budget_unit generate_result_unit raw_media_unit qwen_grammar_unit template_authorship_unit native_fp4_selection_unit qwen38_context_unit; do
   docker run --rm --network none --read-only --user "$(id -u):$(id -g)" \
     --tmpfs /tmp:rw,nodev,nosuid,size=256m \
     --env PYTHONDONTWRITEBYTECODE=1 --env CUDA_VISIBLE_DEVICES= "${served_parser_env[@]}" \

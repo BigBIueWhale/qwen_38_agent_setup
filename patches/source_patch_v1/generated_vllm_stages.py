@@ -3660,7 +3660,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '\n'})},
  {'name': 'qwen38-vision-runtime',
   'review_patch': 'patches/vllm-qwen38-vision-runtime.patch',
-  'review_sha256': '55d646c690a11b1254e3df10dcb55b4b287fb8b4c7b14cc84164b827065d7c13',
+  'review_sha256': '872211d0ee3d5099e88780c784c1384ab2fb2d75206a2d019b02acc5c0bb3225',
   'files': ({'path': 'tests/entrypoints/anthropic/test_anthropic_messages_conversion.py',
              'before_sha256': '51c0ff68800ca0323740628a523ca8a4a3ab813480cc6bca4859ef021c9e03ed',
              'after_sha256': 'e6fa915c7f58e252d0da33bb5de31215cd1dacab1292e9ad5c8d116a7551f942'},
@@ -3684,7 +3684,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'after_sha256': '7076e2415a3a1246d6f1e22e978a4c32e7b87713d6d7ae5743960c3d31592759'},
             {'path': 'tests/v1/worker/test_workspace.py',
              'before_sha256': None,
-             'after_sha256': 'b5aec4cedc880276f8dec0fa68b146e4802eb30c641839e3fc788126029b091f'},
+             'after_sha256': 'ee6d86cbb1af9b0a363d1cb280fbee3b29e02fcd02f9b3320645968cc635b39f'},
             {'path': 'vllm/entrypoints/anthropic/serving.py',
              'before_sha256': 'b283dc7f47fe1cbb57f5a9cc4000a27ff5106e94d5caf152e5f7142e8a056e19',
              'after_sha256': '0e67a46639b5369fad8de21a31799b4fe2bfbbd93c5d1df02911f0f98a08a43c'},
@@ -3714,7 +3714,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'after_sha256': 'a7bed200b304fdc17320a30178ded7669d4677e787947470b872ef0ec14b6c8b'},
             {'path': 'vllm/v1/worker/workspace.py',
              'before_sha256': 'd0650393bc657064acc97fe2b227ebff8f85799a8f727a8c136098f1f79964df',
-             'after_sha256': '168ceb92560698ad90016bf6a29a15776fe2a01ac7c27d67bfecc9cb5fc538c1'},
+             'after_sha256': '14952bc14884394a74dcb937bcb1eecebffbf7579ca860601d9d02b6d5f8c611'},
             {'path': 'tests/benchmarks/test_custom_image_dataset.py',
              'before_sha256': 'c7e44e30549ca4a3c3095d988874dbd9a2cfee6afe086a65ce2a0b0f4559e3a8',
              'after_sha256': 'fe1335948a03c5dd4c4673b5925cebd27d46a5956832092bebbbd53d47993bac'},
@@ -6098,7 +6098,27 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '    (restored,) = manager.get_reclaimable_simultaneous(\n'
                       '        "phase-local", ((64,), torch.float32)\n'
                       '    )\n'
-                      '    assert restored.shape == (64,)\n',
+                      '    assert restored.shape == (64,)\n'
+                      '\n'
+                      '\n'
+                      'def '
+                      'test_reclaimable_workspace_is_refused_during_graph_capture(monkeypatch):\n'
+                      '    # A graph would keep the address the workspace is later '
+                      'restored away from.\n'
+                      '    monkeypatch.setattr(torch.cuda, '
+                      '"is_current_stream_capturing", lambda: True)\n'
+                      '    manager = workspace.WorkspaceManager(torch.device("cuda"))\n'
+                      '    with pytest.raises(AssertionError, match="being '
+                      'captured"):\n'
+                      '        manager.get_reclaimable_simultaneous("phase-local", '
+                      '((64,), torch.uint8))\n'
+                      '    assert manager._reclaimable_workspaces == {}\n'
+                      '\n'
+                      '    # A CPU workspace is not on a capturing CUDA stream.\n'
+                      '    cpu = workspace.WorkspaceManager(torch.device("cpu"))\n'
+                      '    (view,) = cpu.get_reclaimable_simultaneous("phase-local", '
+                      '((64,), torch.uint8))\n'
+                      '    assert view.numel() == 64\n',
              'review_before': '',
              'review_after': '# SPDX-License-Identifier: Apache-2.0\n'
                              '# SPDX-FileCopyrightText: Copyright contributors to the '
@@ -6211,7 +6231,32 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    (restored,) = manager.get_reclaimable_simultaneous(\n'
                              '        "phase-local", ((64,), torch.float32)\n'
                              '    )\n'
-                             '    assert restored.shape == (64,)\n'},
+                             '    assert restored.shape == (64,)\n'
+                             '\n'
+                             '\n'
+                             'def '
+                             'test_reclaimable_workspace_is_refused_during_graph_capture(monkeypatch):\n'
+                             '    # A graph would keep the address the workspace is '
+                             'later restored away from.\n'
+                             '    monkeypatch.setattr(torch.cuda, '
+                             '"is_current_stream_capturing", lambda: True)\n'
+                             '    manager = '
+                             'workspace.WorkspaceManager(torch.device("cuda"))\n'
+                             '    with pytest.raises(AssertionError, match="being '
+                             'captured"):\n'
+                             '        '
+                             'manager.get_reclaimable_simultaneous("phase-local", '
+                             '((64,), torch.uint8))\n'
+                             '    assert manager._reclaimable_workspaces == {}\n'
+                             '\n'
+                             '    # A CPU workspace is not on a capturing CUDA '
+                             'stream.\n'
+                             '    cpu = '
+                             'workspace.WorkspaceManager(torch.device("cpu"))\n'
+                             '    (view,) = '
+                             'cpu.get_reclaimable_simultaneous("phase-local", ((64,), '
+                             'torch.uint8))\n'
+                             '    assert view.numel() == 64\n'},
             {'name': 'vllm/entrypoints/anthropic/serving.py:landmark-1',
              'path': 'vllm/entrypoints/anthropic/serving.py',
              'before': '    def _convert_user_tool_result(\n'
@@ -7857,12 +7902,14 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '        """Get views into a named workspace that can be '
                       'released between phases.\n'
                       '\n'
-                      '        Reclaimable workspaces must not be referenced by CUDA '
-                      'graphs. Their backing\n'
-                      '        allocations can be temporarily released while a '
-                      'mutually exclusive model\n'
-                      '        phase needs the memory, then restored at their exact '
-                      'profiled sizes.\n'
+                      "        A reclaimable workspace's backing allocation can be "
+                      'temporarily released\n'
+                      '        while a mutually exclusive model phase needs the '
+                      'memory, then restored at\n'
+                      '        its exact profiled size at a new address. A CUDA graph '
+                      'would keep the old\n'
+                      '        address, so the views are refused while a graph is '
+                      'being captured.\n'
                       '\n'
                       '        Args:\n'
                       '            name: Stable name shared by all users of this '
@@ -7873,10 +7920,26 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '            Tensor views into the named workspace allocation.\n'
                       '\n'
                       '        Raises:\n'
-                      '            AssertionError: If the workspace is released, or '
-                      'would grow while the\n'
-                      '                manager is locked.\n'
+                      '            AssertionError: If a CUDA graph is being captured, '
+                      'the workspace is\n'
+                      '                released, or it would grow while the manager is '
+                      'locked.\n'
                       '        """\n'
+                      '        if self._device.type == "cuda" and '
+                      'torch.cuda.is_current_stream_capturing():\n'
+                      '            raise AssertionError(\n'
+                      '                f"Reclaimable workspace \'{name}\' was '
+                      'requested while a CUDA graph "\n'
+                      '                "is being captured. Its allocation is released '
+                      'around encoder "\n'
+                      '                "phases and restored at a new address, so the '
+                      'graph would replay "\n'
+                      '                "into freed memory. The layer that requests it '
+                      'must run outside "\n'
+                      '                "graph capture: serve with a cudagraph_mode '
+                      'that leaves attention "\n'
+                      '                "eager (PIECEWISE), or with --enforce-eager."\n'
+                      '            )\n'
                       '        if self._reclaimable_workspaces_released:\n'
                       '            raise AssertionError(\n'
                       '                f"Reclaimable workspace \'{name}\' was '
@@ -8067,12 +8130,14 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '        """Get views into a named workspace that can be '
                              'released between phases.\n'
                              '\n'
-                             '        Reclaimable workspaces must not be referenced by '
-                             'CUDA graphs. Their backing\n'
-                             '        allocations can be temporarily released while a '
-                             'mutually exclusive model\n'
-                             '        phase needs the memory, then restored at their '
-                             'exact profiled sizes.\n'
+                             "        A reclaimable workspace's backing allocation can "
+                             'be temporarily released\n'
+                             '        while a mutually exclusive model phase needs the '
+                             'memory, then restored at\n'
+                             '        its exact profiled size at a new address. A CUDA '
+                             'graph would keep the old\n'
+                             '        address, so the views are refused while a graph '
+                             'is being captured.\n'
                              '\n'
                              '        Args:\n'
                              '            name: Stable name shared by all users of '
@@ -8084,10 +8149,27 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'allocation.\n'
                              '\n'
                              '        Raises:\n'
-                             '            AssertionError: If the workspace is '
-                             'released, or would grow while the\n'
-                             '                manager is locked.\n'
+                             '            AssertionError: If a CUDA graph is being '
+                             'captured, the workspace is\n'
+                             '                released, or it would grow while the '
+                             'manager is locked.\n'
                              '        """\n'
+                             '        if self._device.type == "cuda" and '
+                             'torch.cuda.is_current_stream_capturing():\n'
+                             '            raise AssertionError(\n'
+                             '                f"Reclaimable workspace \'{name}\' was '
+                             'requested while a CUDA graph "\n'
+                             '                "is being captured. Its allocation is '
+                             'released around encoder "\n'
+                             '                "phases and restored at a new address, '
+                             'so the graph would replay "\n'
+                             '                "into freed memory. The layer that '
+                             'requests it must run outside "\n'
+                             '                "graph capture: serve with a '
+                             'cudagraph_mode that leaves attention "\n'
+                             '                "eager (PIECEWISE), or with '
+                             '--enforce-eager."\n'
+                             '            )\n'
                              '        if self._reclaimable_workspaces_released:\n'
                              '            raise AssertionError(\n'
                              '                f"Reclaimable workspace \'{name}\' was '
@@ -136333,7 +136415,7 @@ FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5d
  'tests/v1/test_request.py': '6fa5d12659ebb955c0fec37b09074f75b5011e0ac6e7b7551b9175c99f5655d0',
  'tests/v1/worker/test_gpu_model_runner_mm_gather.py': '7076e2415a3a1246d6f1e22e978a4c32e7b87713d6d7ae5743960c3d31592759',
  'tests/v1/worker/test_gpu_worker.py': '5a385d1aa588bb46b3b4356e08d9c45a115d6c616c66e804021e5458f388cbb3',
- 'tests/v1/worker/test_workspace.py': 'b5aec4cedc880276f8dec0fa68b146e4802eb30c641839e3fc788126029b091f',
+ 'tests/v1/worker/test_workspace.py': 'ee6d86cbb1af9b0a363d1cb280fbee3b29e02fcd02f9b3320645968cc635b39f',
  'vllm/config/cache.py': '82ab839cacb2e30f62f485c9e3ea32440fbf27beef00d1c60220f9776eb1ef43',
  'vllm/config/model.py': '6a0b5fdcb292fef440ee59321b7db437dae2cd5fd80eb2372fa3647fb163a3cf',
  'vllm/config/reasoning.py': '29a3bb76af99f67a7706f365fbcd3362205ef8af9db46b7f167374e68f8146ae',
@@ -136445,4 +136527,4 @@ FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5d
  'vllm/v1/worker/gpu_model_runner.py': 'a7bed200b304fdc17320a30178ded7669d4677e787947470b872ef0ec14b6c8b',
  'vllm/v1/worker/gpu_worker.py': 'f3de6be99518adb82d091a1bd3ae954bd7b9859429545b290588d35dee4bc8e0',
  'vllm/v1/worker/startup_plan.py': '2f4f50c34201390e50e10b578bc4cd964a4f5729334225fc30d815bb704aa81f',
- 'vllm/v1/worker/workspace.py': '168ceb92560698ad90016bf6a29a15776fe2a01ac7c27d67bfecc9cb5fc538c1'}
+ 'vllm/v1/worker/workspace.py': '14952bc14884394a74dcb937bcb1eecebffbf7579ca860601d9d02b6d5f8c611'}
