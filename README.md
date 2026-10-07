@@ -347,7 +347,7 @@ It is intentionally reconstructed by the ordered, reviewed semantic transformati
 | patches/vllm-call-only-answer-keeps-the-blank-line.patch | ad1e558f8ba02c6889d9b4a79c6ec355e9bfa763bc007e5cae7e609be96ec084 |
 | patches/vllm-responses-tools-are-one-function-list.patch | cae549ea87a8c1b6020f76163cfe1eca0c3104eac317ab2d84b3db75092d20cd |
 | patches/vllm-batch-parse-starts-where-the-prompt-leaves.patch | ef6c1694b9477ca802744485a3b0057b034392b1bf7cdcc0645b8baf3d723913 |
-| patches/vllm-derender-text-is-the-detokenizers.patch | f62ce9c3f0a4f83f5d6ed58d7e36b015cade5f6cb7cd2538df8c0bd1cb0050c4 |
+| patches/vllm-derender-text-is-the-detokenizers.patch | 9d8f6d45beba5c79671444be4e9604c4352c7fe5346d78573bfc4fbc91bfb4b6 |
 | patches/vllm-output-constraints-refused-beside-tool-calls.patch | c6ac620c8cd962a77868789d72875e0df456a9b0918ef8cb58ec2e15c3600343 |
 | patches/vllm-batch-invariance-substitutes-no-nvfp4-kernel.patch | c79baaee0a51275f5f522d266fe6b315c200e6951920c2454d5c80cadbb92f44 |
 | patches/vllm-render-carries-every-image-chat-renders.patch | c5bf4cb2948b9eb7866d083671af3badcc9cf529a7756bde3b0647c236fe932f |
@@ -848,7 +848,14 @@ An empty token list can carry a valid terminal. Parallel choices retain their
 own token sequences and contribute to the same total usage. Missing, repeated or
 contradictory engine terminals are server errors. A streaming error ends with its
 error event and no `[DONE]` marker. Derender preserves the supplied terminal cause
-and accepts a completed empty answer on both Chat and Completions.
+and accepts a completed empty answer -- the model's end of turn alone -- on both
+Chat and Completions. A choice that reports a stop on a stop token ends on it, as
+every generation the engine stops does: `stop_reason` null on one of the model's
+EOS ids, which derender reads as the engine does, and a stop token ID on that ID.
+Any other is refused as HTTP 400 whose parameter names the choice, and no token
+loses its text. Derender does not cut the text at a matched stop string: the
+string and whatever the ids decode to after it stay in its text, where Chat cuts
+the text at the string.
 
 Beam search is unsupported. Chat, Completions, batch Chat and their render requests
 refuse `use_beam_search: true` as HTTP 400 with parameter `use_beam_search`, before

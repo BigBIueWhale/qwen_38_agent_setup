@@ -43,7 +43,8 @@ def _served(name):
 SERVED_MODEL = _served("SERVED_MODEL")
 TOKENIZER = get_tokenizer(SERVED_MODEL)
 with open(os.path.join(SERVED_MODEL, "generation_config.json")) as config:
-    MODEL_EOS = tuple(json.load(config)["eos_token_id"])
+    GENERATION_CONFIG = json.load(config)
+MODEL_EOS = tuple(GENERATION_CONFIG["eos_token_id"])
 PARSER = ParserManager.get_parser(
     tool_parser_name=_served("SERVED_TOOL_CALL_PARSER"),
     reasoning_parser_name=_served("SERVED_REASONING_PARSER"),
@@ -772,7 +773,10 @@ class ToolOutputParserTest(unittest.TestCase):
         token id -- has no text unless the caller asked to see stop text, and a
         length cut inside a character shows nothing of it; derender decides
         both where the detokenizer does, so the same ids parse to the same
-        message on the chat route and on derender, batch and stream.
+        message on the chat route and on derender, batch and stream. Derender
+        reads a stop from its caller, not from the engine, so it accepts one
+        exactly where the engine, on the served generation config, would have
+        stopped with that stop_reason, and refuses any other, naming the choice.
         """
         import types
 
@@ -781,16 +785,23 @@ class ToolOutputParserTest(unittest.TestCase):
             GenerateResponse,
             GenerateStreamResponse,
         )
+        from vllm.exceptions import VLLMValidationError
         from vllm.renderers.online_derenderer import OnlineDerenderer
         from vllm.sampling_params import SamplingParams
+        from vllm.v1.core.sched.utils import check_stop
         from vllm.v1.engine import EngineCoreRequest
         from vllm.v1.engine.detokenizer import IncrementalDetokenizer
+        from vllm.v1.request import Request
 
         derenderer = OnlineDerenderer(
             types.SimpleNamespace(
-                hf_config=types.SimpleNamespace(model_type="qwen3_5"), model="unit"
+                hf_config=types.SimpleNamespace(model_type="qwen3_5"), model="unit",
+                try_get_generation_config=lambda: GENERATION_CONFIG,
             ),
-            types.SimpleNamespace(get_tokenizer=lambda: TOKENIZER, _executor=None),
+            types.SimpleNamespace(
+                get_tokenizer=lambda: TOKENIZER,
+                get_eos_token_id=lambda: TOKENIZER.eos_token_id, _executor=None,
+            ),
             request_logger=None, chat_template=None,
             chat_template_content_format="openai", enable_auto_tools=True,
             tool_parser=_served("SERVED_TOOL_CALL_PARSER"),
@@ -869,6 +880,41 @@ class ToolOutputParserTest(unittest.TestCase):
                         "unit", chunk, state, completion_request=completion))
                     streamed += delta.choices[0].text
                 self.assertEqual(streamed, served)
+
+        request = request_for()
+        completion = CompletionRequest(model="unit", prompt="prompt")
+        body = encode("plan</think>\n\nThe answer is 4.")
+        for last in (*MODEL_EOS, stop_id, None):
+            ids = body + [last] if last is not None else body
+            params = SamplingParams(stop_token_ids=[stop_id], extra_args={"kv_scope": "unit"})
+            params.update_from_generation_config(GENERATION_CONFIG, TOKENIZER.eos_token_id)
+            self.assertEqual(derenderer.eos_token_ids, params.eos_token_ids)
+            engine = Request("unit", [1], params, None)
+            engine.append_output_token_ids(ids[-1])
+            stopped = check_stop(engine, 1024)
+            for case_ids, stop in ((ids, None), (ids, stop_id), ([], None), ([], stop_id)):
+                accepted = bool(case_ids) and stopped and engine.stop_reason == stop
+                choice = {"index": 0, "finish_reason": "stop", "stop_reason": stop,
+                          "token_ids": list(case_ids)}
+                response = GenerateResponse(request_id="unit", choices=[choice])
+                chunk = GenerateStreamResponse(request_id="unit", choices=[choice])
+                for field, derender in (
+                    ("generate_response.choices[0]",
+                     lambda: derenderer._derender_chat(response, request)),
+                    ("generate_responses[0].choices[0]",
+                     lambda: derenderer._derender_completion([response], None, completion)),
+                    ("generate_chunk.choices[0]",
+                     lambda: asyncio_run(derenderer.derender_completion_stream(
+                         "unit", chunk, None, completion_request=completion))),
+                ):
+                    with self.subTest(last=last, ids=len(case_ids), stop=stop, field=field):
+                        if accepted:
+                            derender()
+                            continue
+                        with self.assertRaises(VLLMValidationError) as refused:
+                            derender()
+                        self.assertEqual(refused.exception.parameter, field)
+                        self.assertEqual(response.choices[0].token_ids, list(case_ids))
 
     def test_every_generated_token_survives_parsing(self):
         """The parser deletes nothing the model generated.

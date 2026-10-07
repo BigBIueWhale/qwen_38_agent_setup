@@ -3806,6 +3806,7 @@ def _validate_batch_parse_from_prompt_after(state: State) -> None:
 def _validate_derender_stop_text_before(state: State) -> None:
     label = "Derender stop-token text precondition"
     forbid_text(state, "vllm/v1/engine/detokenizer.py", "def split_stop_token(", label=label)
+    forbid_text(state, "vllm/sampling_params.py", "def model_eos_token_ids(", label=label)
     require_text(state, "vllm/renderers/online_derenderer.py",
                  "choice.token_ids, skip_special_tokens=False", label=label)
 
@@ -3823,16 +3824,35 @@ def _validate_derender_stop_text_after(state: State) -> None:
         "split_stop_token(",
     ), label=label)
     _require_in_symbol(state, derender, "_text_token_ids", (
-        "split_stop_token(",
-        "stop_terminated=ended_on_stop_token(finish_reason, stop_reason)",
+        "stop_terminated = ended_on_stop_token(finish_reason, stop_reason)",
+        "split_stop_token(", "stop_terminated=stop_terminated",
+        # The caller's stop is held to its ids, never repaired by them.
+        "ends_on_it = last in eos_token_ids", "ends_on_it = last == stop_reason",
+        "raise VLLMValidationError(", "parameter=field",
     ), label=label)
     # Chat with and without a parser, completion, and both streams.
     require_text(state, derender, "_text_token_ids(", count=5, label=label)
+    require_text(state, derender, "eos_token_ids=self.eos_token_ids", count=4, label=label)
     forbid_text(state, derender, "choice.token_ids, skip_special_tokens=False", label=label)
+    # One definition of the model's EOS ids, read from the engine's inputs.
+    sampling = "vllm/sampling_params.py"
+    require_python_symbols(state, sampling, {
+        "model_eos_token_ids": ("generation_config", "eos_token_id"),
+    }, label=label)
+    _require_in_symbol(state, sampling, "SamplingParams.update_from_generation_config", (
+        "model_eos_token_ids(generation_config, eos_token_id)",
+    ), label=label)
+    _require_in_symbol(state, derender, "OnlineDerenderer.__init__", (
+        "model_eos_token_ids(",
+        "model_config.try_get_generation_config(), renderer.get_eos_token_id()",
+    ), label=label)
     require_python_symbols(
         state, "tests/entrypoints/scale_out/derender/test_terminal_metadata.py", {
             "test_derender_keeps_empty_output_and_observed_terminal": None,
             "test_derender_only_commits_closed_calls_at_eos": None,
+            "test_derender_reads_the_model_eos_ids_the_engine_reads": None,
+            "test_derender_refuses_a_stop_its_ids_do_not_end_on": None,
+            "test_a_contradicted_stop_is_a_400_naming_the_choice": None,
         }, label=label)
 
 def _validate_output_constraint_beside_tools_before(state: State) -> None:
@@ -5201,11 +5221,20 @@ CONTRACTS: Mapping[str, SemanticContract] = {
             "and every derender path call it; the parser still receives every "
             "id. Derender's batch decode is its stream's incremental decode, so "
             "a length cut inside a character holds the partial bytes back, as "
-            "serving does, instead of failing the scanner with a 500."
+            "serving does, instead of failing the scanner with a 500. The "
+            "detokenizer is told by the engine that stopped that the last id is "
+            "a stop token; derender is told by its caller, and holds the caller "
+            "to it: a stop with no stop_reason ends on one of the model's EOS "
+            "ids, which one function reads from the generation config and the "
+            "tokenizer for the engine and derender alike, and a stop on a stop "
+            "token id ends on that id. Any other is a 400 naming the choice, "
+            "and no id loses its text. Derender does not cut the text at a "
+            "matched stop string, as upstream does not."
         ),
         removal_condition=(
             "Remove when pinned upstream's derender gives a generation's stop "
-            "token no text unless stop text is requested, as its detokenizer does."
+            "token no text unless stop text is requested, as its detokenizer does, "
+            "and refuses a stop the choice's ids do not end on."
         ),
         validate_before=_validate_derender_stop_text_before,
         validate_after=_validate_derender_stop_text_after,

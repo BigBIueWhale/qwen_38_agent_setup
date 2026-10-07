@@ -1,8 +1,56 @@
 diff --git a/tests/entrypoints/scale_out/derender/test_derender.py b/tests/entrypoints/scale_out/derender/test_derender.py
-index c0e5210dc0bedb6297851b28cd2b31bc0f477b0d..db8f02de2aa18b4517570909afd0ba2d432be289 100644
+index c0e5210dc0bedb6297851b28cd2b31bc0f477b0d..61e2614a81287f1ffbbe1f9d085e8233c4394611 100644
 --- a/tests/entrypoints/scale_out/derender/test_derender.py
 +++ b/tests/entrypoints/scale_out/derender/test_derender.py
-@@ -787,14 +787,17 @@ async def _e2e_render_chat(
+@@ -48,11 +48,13 @@ async def _render_chat(client: httpx.AsyncClient) -> dict:
+ def _make_generate_response(
+     token_ids: list[int] | None,
+     request_id: str = "chatcmpl-test-id",
+-    finish_reason: str = "stop",
++    finish_reason: str = "length",
+     logprobs: dict | None = None,
+     prompt_logprobs: list | None = None,
+     kv_transfer_params: dict | None = None,
+ ) -> dict:
++    """A generate response for *token_ids*: by default a generation cut at a
++    length limit, which ends on ordinary text rather than on a stop token."""
+     choice: dict = {
+         "index": 0,
+         "token_ids": token_ids,
+@@ -268,12 +270,14 @@ async def test_derender_chat_kv_transfer_params_passthrough(client):
+ 
+ @pytest.mark.asyncio
+ async def test_derender_chat_empty_token_ids(client):
+-    """A completed empty generation remains an empty answer."""
++    """A completed empty generation remains an empty answer: the model ended
++    its turn at once, and its end of turn carries no text."""
++    eos = get_tokenizer(MODEL_NAME).eos_token_id
+     response = await client.post(
+         "/v1/chat/completions/derender",
+         json={
+             "model": MODEL_NAME,
+-            "generate_response": _make_generate_response([]),
++            "generate_response": _make_generate_response([eos], finish_reason="stop"),
+         },
+     )
+     assert response.status_code == 200
+@@ -353,13 +357,14 @@ def _make_completion_generate_response(
+     kv_transfer_params: dict | None = None,
+     logprobs: dict | None = None,
+ ) -> dict:
++    """As _make_generate_response: a generation cut at a length limit."""
+     return {
+         "request_id": request_id,
+         "choices": [
+             {
+                 "index": 0,
+                 "token_ids": token_ids,
+-                "finish_reason": "stop",
++                "finish_reason": "length",
+                 "logprobs": logprobs,
+             }
+         ],
+@@ -787,14 +792,17 @@ async def _e2e_render_chat(
  
  def _e2e_generate_response(
      token_ids: list[int],
@@ -21,7 +69,7 @@ index c0e5210dc0bedb6297851b28cd2b31bc0f477b0d..db8f02de2aa18b4517570909afd0ba2d
                  "finish_reason": "stop",
              }
          ],
-@@ -815,7 +818,9 @@ async def test_e2e_plain_roundtrip(parser_client, parser_tokenizer):
+@@ -815,7 +823,9 @@ async def test_e2e_plain_roundtrip(parser_client, parser_tokenizer):
          "/v1/chat/completions/derender",
          json={
              "model": PARSER_MODEL,
@@ -32,7 +80,7 @@ index c0e5210dc0bedb6297851b28cd2b31bc0f477b0d..db8f02de2aa18b4517570909afd0ba2d
              "prompt_tokens": len(gen_req["token_ids"]),
          },
      )
-@@ -837,7 +842,9 @@ async def test_e2e_token_identity(parser_client, parser_tokenizer):
+@@ -837,7 +847,9 @@ async def test_e2e_token_identity(parser_client, parser_tokenizer):
          "/v1/chat/completions/derender",
          json={
              "model": PARSER_MODEL,
@@ -43,7 +91,7 @@ index c0e5210dc0bedb6297851b28cd2b31bc0f477b0d..db8f02de2aa18b4517570909afd0ba2d
              "prompt_tokens": len(gen_req["token_ids"]),
          },
      )
-@@ -860,7 +867,9 @@ async def test_e2e_non_ascii_roundtrip(parser_client, parser_tokenizer):
+@@ -860,7 +872,9 @@ async def test_e2e_non_ascii_roundtrip(parser_client, parser_tokenizer):
          "/v1/chat/completions/derender",
          json={
              "model": PARSER_MODEL,
@@ -54,7 +102,7 @@ index c0e5210dc0bedb6297851b28cd2b31bc0f477b0d..db8f02de2aa18b4517570909afd0ba2d
              "prompt_tokens": len(gen_req["token_ids"]),
          },
      )
-@@ -884,7 +893,9 @@ async def test_e2e_parsed_reasoning(parser_client, parser_tokenizer):
+@@ -884,7 +898,9 @@ async def test_e2e_parsed_reasoning(parser_client, parser_tokenizer):
          "/v1/chat/completions/derender",
          json={
              "model": PARSER_MODEL,
@@ -65,7 +113,7 @@ index c0e5210dc0bedb6297851b28cd2b31bc0f477b0d..db8f02de2aa18b4517570909afd0ba2d
              "prompt_tokens": len(gen_req["token_ids"]),
              "chat_request": {
                  "model": PARSER_MODEL,
-@@ -924,7 +935,9 @@ async def test_e2e_parsed_tool_call(parser_client, parser_tokenizer):
+@@ -924,7 +940,9 @@ async def test_e2e_parsed_tool_call(parser_client, parser_tokenizer):
          "/v1/chat/completions/derender",
          json={
              "model": PARSER_MODEL,
@@ -76,7 +124,7 @@ index c0e5210dc0bedb6297851b28cd2b31bc0f477b0d..db8f02de2aa18b4517570909afd0ba2d
              "prompt_tokens": len(gen_req["token_ids"]),
              "chat_request": {
                  "model": PARSER_MODEL,
-@@ -960,7 +973,9 @@ async def test_e2e_parsed_reasoning_and_tool_call(parser_client, parser_tokenize
+@@ -960,7 +978,9 @@ async def test_e2e_parsed_reasoning_and_tool_call(parser_client, parser_tokenize
          "/v1/chat/completions/derender",
          json={
              "model": PARSER_MODEL,
@@ -87,7 +135,7 @@ index c0e5210dc0bedb6297851b28cd2b31bc0f477b0d..db8f02de2aa18b4517570909afd0ba2d
              "prompt_tokens": len(gen_req["token_ids"]),
              "chat_request": {
                  "model": PARSER_MODEL,
-@@ -991,7 +1006,9 @@ async def test_e2e_no_chat_request_fallback(parser_client, parser_tokenizer):
+@@ -991,7 +1011,9 @@ async def test_e2e_no_chat_request_fallback(parser_client, parser_tokenizer):
          "/v1/chat/completions/derender",
          json={
              "model": PARSER_MODEL,
@@ -98,7 +146,7 @@ index c0e5210dc0bedb6297851b28cd2b31bc0f477b0d..db8f02de2aa18b4517570909afd0ba2d
              "prompt_tokens": len(gen_req["token_ids"]),
          },
      )
-@@ -1089,7 +1106,9 @@ async def test_e2e_harmony_plain_roundtrip(harmony_client, harmony_tokenizer):
+@@ -1089,7 +1111,9 @@ async def test_e2e_harmony_plain_roundtrip(harmony_client, harmony_tokenizer):
          "/v1/chat/completions/derender",
          json={
              "model": HARMONY_MODEL,
@@ -109,7 +157,7 @@ index c0e5210dc0bedb6297851b28cd2b31bc0f477b0d..db8f02de2aa18b4517570909afd0ba2d
              "prompt_tokens": len(gen_req["token_ids"]),
              "chat_request": {
                  "model": HARMONY_MODEL,
-@@ -1126,7 +1145,9 @@ async def test_e2e_harmony_reasoning(harmony_client, harmony_tokenizer):
+@@ -1126,7 +1150,9 @@ async def test_e2e_harmony_reasoning(harmony_client, harmony_tokenizer):
          "/v1/chat/completions/derender",
          json={
              "model": HARMONY_MODEL,
@@ -157,10 +205,23 @@ index 8e51ff5d42b358abbfaf943e80dd0986fb7aa78c..7f7406cc0acc66a70ece8aa7da03e114
          logprobs=ch["logprobs"],
      )
 diff --git a/tests/entrypoints/scale_out/derender/test_derender_stream.py b/tests/entrypoints/scale_out/derender/test_derender_stream.py
-index 014a8d7bc6b616f8716973d3397e7835a0da9a42..bd630343f6118f7a586029288202985c4ec03c66 100644
+index 014a8d7bc6b616f8716973d3397e7835a0da9a42..2772b787ef9ef6d4c0cd37fab4496d3c1c6b5470 100644
 --- a/tests/entrypoints/scale_out/derender/test_derender_stream.py
 +++ b/tests/entrypoints/scale_out/derender/test_derender_stream.py
-@@ -245,9 +245,12 @@ class TestDerenderCompletionStream:
+@@ -96,10 +96,12 @@ def derenderer(tokenizer):
+ 
+     renderer = MagicMock()
+     renderer.get_tokenizer.return_value = tokenizer
++    renderer.get_eos_token_id.return_value = tokenizer.eos_token_id
+ 
+     model_config = MagicMock()
+     model_config.hf_config.model_type = "llama"
+     model_config.model = MODEL_NAME
++    model_config.try_get_generation_config.return_value = {}
+ 
+     return OnlineDerenderer(
+         model_config=model_config,
+@@ -245,9 +247,12 @@ class TestDerenderCompletionStream:
              generate_chunk=_make_stream_chunk(token_ids[:mid]),
              state=state,
          )
@@ -174,11 +235,95 @@ index 014a8d7bc6b616f8716973d3397e7835a0da9a42..bd630343f6118f7a586029288202985c
              state=state,
          )
  
+@@ -347,9 +352,12 @@ class TestDerenderChatStream:
+             generate_chunk=_make_stream_chunk(token_ids[:mid]),
+             state=state,
+         )
++        # A natural stop ends with the end of turn, which carries no text.
+         chunk2, _ = await derenderer.derender_chat_stream(
+             model=MODEL_NAME,
+-            generate_chunk=_make_stream_chunk(token_ids[mid:], finish_reason="stop"),
++            generate_chunk=_make_stream_chunk(
++                token_ids[mid:] + [tokenizer.eos_token_id], finish_reason="stop"
++            ),
+             state=state,
+         )
+ 
+@@ -550,6 +558,8 @@ async def _render_chat(client) -> dict:
+ async def test_streaming_completion_derender_roundtrip(client):
+     """Streaming completions derender: chunked text == non streaming text."""
+     gen_req = await _render_chat(client)
++    # Rendered ids stand in for a generation cut at a length limit, which
++    # ends on ordinary text rather than on a stop token.
+     token_ids: list[int] = gen_req["token_ids"][:8]
+     mid = len(token_ids) // 2
+     chunk1_ids, chunk2_ids = token_ids[:mid], token_ids[mid:]
+@@ -566,7 +576,7 @@ async def test_streaming_completion_derender_roundtrip(client):
+                         {
+                             "index": 0,
+                             "token_ids": token_ids,
+-                            "finish_reason": "stop",
++                            "finish_reason": "length",
+                         }
+                     ],
+                 }
+@@ -605,7 +615,7 @@ async def test_streaming_completion_derender_roundtrip(client):
+             "generate_chunk": {
+                 "request_id": "test-s",
+                 "choices": [
+-                    {"index": 0, "token_ids": chunk2_ids, "finish_reason": "stop"}
++                    {"index": 0, "token_ids": chunk2_ids, "finish_reason": "length"}
+                 ],
+             },
+             "stream_state": state1,
+@@ -621,6 +631,7 @@ async def test_streaming_completion_derender_roundtrip(client):
+ async def test_streaming_chat_derender_roundtrip(client):
+     """Streaming chat derender (plain detok): chunked text == non streaming text."""
+     gen_req = await _render_chat(client)
++    # As above: a generation cut at a length limit.
+     token_ids: list[int] = gen_req["token_ids"][:8]
+     mid = len(token_ids) // 2
+     chunk1_ids, chunk2_ids = token_ids[:mid], token_ids[mid:]
+@@ -636,7 +647,7 @@ async def test_streaming_chat_derender_roundtrip(client):
+                     {
+                         "index": 0,
+                         "token_ids": token_ids,
+-                        "finish_reason": "stop",
++                        "finish_reason": "length",
+                     }
+                 ],
+             },
+@@ -676,7 +687,7 @@ async def test_streaming_chat_derender_roundtrip(client):
+             "generate_chunk": {
+                 "request_id": "test-s",
+                 "choices": [
+-                    {"index": 0, "token_ids": chunk2_ids, "finish_reason": "stop"}
++                    {"index": 0, "token_ids": chunk2_ids, "finish_reason": "length"}
+                 ],
+             },
+             "stream_state": state1,
+@@ -718,6 +729,7 @@ async def test_streaming_derender_non_object_body_returns_400(client):
+ async def test_streaming_usage_chunk(client):
+     """Usage only final chunk is forwarded with correct token counts."""
+     gen_req = await _render_chat(client)
++    # As above: a generation cut at a length limit.
+     token_ids: list[int] = gen_req["token_ids"][:6]
+     state: dict = {}
+ 
+@@ -730,7 +742,7 @@ async def test_streaming_usage_chunk(client):
+             "generate_chunk": {
+                 "request_id": "usage-test",
+                 "choices": [
+-                    {"index": 0, "token_ids": token_ids, "finish_reason": "stop"}
++                    {"index": 0, "token_ids": token_ids, "finish_reason": "length"}
+                 ],
+             },
+             "stream_state": None,
 diff --git a/tests/entrypoints/scale_out/derender/test_terminal_metadata.py b/tests/entrypoints/scale_out/derender/test_terminal_metadata.py
-index fcb0f378714335ece573ba62bab5cd3cc70ac88a..d0fbb8812c65cac3911f2aad13b0e3c7437516e0 100644
+index fcb0f378714335ece573ba62bab5cd3cc70ac88a..1846326155a68999a890cbf177051b06a32dc6fe 100644
 --- a/tests/entrypoints/scale_out/derender/test_terminal_metadata.py
 +++ b/tests/entrypoints/scale_out/derender/test_terminal_metadata.py
-@@ -20,6 +20,16 @@ from vllm.renderers.online_derenderer import OnlineDerenderer
+@@ -20,8 +20,19 @@ from vllm.renderers.online_derenderer import OnlineDerenderer
      ('length', None), ('length', 'final_response_token_budget'), ('abort', None),
  ])
  async def test_derender_keeps_empty_output_and_observed_terminal(surface, stream, tokens, finish, stop):
@@ -194,8 +339,11 @@ index fcb0f378714335ece573ba62bab5cd3cc70ac88a..d0fbb8812c65cac3911f2aad13b0e3c7
 +        ids.append(1 if stop is None else stop)
      renderer = object.__new__(OnlineDerenderer)
      renderer.parser = None
++    renderer.eos_token_ids = {1}
      renderer.renderer = SimpleNamespace(get_tokenizer=lambda: SimpleNamespace(
-@@ -29,7 +39,7 @@ async def test_derender_keeps_empty_output_and_observed_terminal(surface, stream
+         decode=lambda ids, **kwargs: ''.join(map(chr, ids))))
+     # This test isolates the token-transport boundary from the independent
+@@ -29,7 +40,7 @@ async def test_derender_keeps_empty_output_and_observed_terminal(surface, stream
      renderer._detokenize_delta = lambda tokenizer, ids, state, **kwargs: (
          ''.join(map(chr, ids)), state)
      payload = dict(request_id='request', choices=[dict(
@@ -204,7 +352,7 @@ index fcb0f378714335ece573ba62bab5cd3cc70ac88a..d0fbb8812c65cac3911f2aad13b0e3c7
      if stream:
          incoming = GenerateStreamResponse.model_validate_json(
              GenerateStreamResponse.model_validate(payload).model_dump_json())
-@@ -60,7 +70,8 @@ def test_derender_only_commits_closed_calls_at_eos(finish, stop, closed):
+@@ -60,7 +71,8 @@ def test_derender_only_commits_closed_calls_at_eos(finish, stop, closed):
      from vllm.entrypoints.openai.chat_completion.protocol import ChatCompletionRequest
      from vllm.parser import ParserManager
  
@@ -214,7 +362,7 @@ index fcb0f378714335ece573ba62bab5cd3cc70ac88a..d0fbb8812c65cac3911f2aad13b0e3c7
      token_text = {value: key for key, value in markers.items()}
      tokenizer = MagicMock()
      tokenizer.get_vocab.return_value = markers
-@@ -75,12 +86,18 @@ def test_derender_only_commits_closed_calls_at_eos(finish, stop, closed):
+@@ -75,12 +87,19 @@ def test_derender_only_commits_closed_calls_at_eos(finish, stop, closed):
      ids = [20000, 20001] + list(map(ord, body[len('<tool_call>'):]))
      if closed:
          ids = ids[:-len('</tool_call>')] + [20002]
@@ -222,6 +370,7 @@ index fcb0f378714335ece573ba62bab5cd3cc70ac88a..d0fbb8812c65cac3911f2aad13b0e3c7
 +        # A natural stop ends with the model's end of turn, which has no text.
 +        ids.append(20003)
      renderer = object.__new__(OnlineDerenderer)
++    renderer.eos_token_ids = {markers['<|im_end|>']}
      renderer.parser = ParserManager.get_parser(
          tool_parser_name='qwen3_coder', reasoning_parser_name='qwen3',
          enable_auto_tools=True,
@@ -233,11 +382,161 @@ index fcb0f378714335ece573ba62bab5cd3cc70ac88a..d0fbb8812c65cac3911f2aad13b0e3c7
      renderer.enable_auto_tools = True
      renderer.use_harmony = True
      incoming = GenerateResponse.model_validate(dict(request_id='request', choices=[dict(
+@@ -101,3 +120,140 @@ def test_derender_only_commits_closed_calls_at_eos(finish, stop, closed):
+     else:
+         assert not choice.message.tool_calls
+         assert choice.message.content == body
++
++
++def _plain_derenderer(eos_token_ids=(1, 2)):
++    """A derenderer without a parser over a one-character-per-id tokenizer,
++    given the model's EOS ids through the inputs the engine reads them from."""
++    tokenizer = SimpleNamespace(decode=lambda ids, **kwargs: ''.join(map(chr, ids)))
++    first, *rest = eos_token_ids
++    derenderer = OnlineDerenderer(
++        SimpleNamespace(
++            hf_config=SimpleNamespace(model_type='unit'), model='unit',
++            try_get_generation_config=lambda: {'eos_token_id': rest},
++        ),
++        SimpleNamespace(get_tokenizer=lambda: tokenizer,
++                        get_eos_token_id=lambda: first, _executor=None),
++        request_logger=None, chat_template=None,
++        chat_template_content_format='openai',
++    )
++    # The token-transport boundary, not the incremental decoder.
++    derenderer._detokenize_delta = lambda tokenizer, ids, state, **kwargs: (
++        ''.join(map(chr, ids)), state)
++    return derenderer
++
++
++def test_derender_reads_the_model_eos_ids_the_engine_reads():
++    """Both EOS sources count -- the generation config's list and the
++    tokenizer's EOS -- exactly as the engine's sampling parameters read them."""
++    from vllm.sampling_params import SamplingParams
++
++    derenderer = _plain_derenderer((1, 2, 3))
++    params = SamplingParams()
++    params.update_from_generation_config({'eos_token_id': [2, 3]}, 1)
++    assert derenderer.eos_token_ids == params.eos_token_ids == {1, 2, 3}
++
++
++@pytest.mark.asyncio
++@pytest.mark.parametrize('surface', ['chat', 'completion'])
++@pytest.mark.parametrize('stream', [False, True])
++@pytest.mark.parametrize('include_stop', [False, True])
++@pytest.mark.parametrize('ids,stop,ends', [
++    # A stop with no stop_reason is an end on a model EOS id.
++    ([65, 66], None, 'end with 66'),
++    ([], None, 'are empty'),
++    ([65, 99], None, 'end with 99'),  # a caller's stop id reports that id
++    # A stop on a caller's stop token id ends on that id.
++    ([65, 66], 99, 'end with 66'),
++    ([65, 1], 99, 'end with 1'),
++    ([], 99, 'are empty'),
++])
++async def test_derender_refuses_a_stop_its_ids_do_not_end_on(
++        surface, stream, include_stop, ids, stop, ends):
++    """A choice that reports a stop on a stop token ends on that token, as
++    every choice the generate route returns does. One that does not is the
++    caller's to correct: derender names it, and takes no id's text away."""
++    from vllm.entrypoints.openai.chat_completion.protocol import (
++        ChatCompletionRequest,
++    )
++    from vllm.entrypoints.openai.completion.protocol import CompletionRequest
++    from vllm.exceptions import VLLMValidationError
++
++    derenderer = _plain_derenderer()
++    payload = dict(request_id='request', choices=[dict(
++        index=0, token_ids=ids, finish_reason='stop', stop_reason=stop)])
++    chat = ChatCompletionRequest(
++        model='unit', messages=[], include_stop_str_in_output=include_stop)
++    completion = CompletionRequest(
++        model='unit', prompt='p', include_stop_str_in_output=include_stop)
++    with pytest.raises(VLLMValidationError) as refused:
++        if stream:
++            chunk = GenerateStreamResponse.model_validate(payload)
++            if surface == 'chat':
++                await derenderer.derender_chat_stream('unit', chunk, chat_request=chat)
++            else:
++                await derenderer.derender_completion_stream(
++                    'unit', chunk, completion_request=completion)
++        else:
++            response = GenerateResponse.model_validate(payload)
++            if surface == 'chat':
++                derenderer._derender_chat(response, chat)
++            else:
++                derenderer._derender_completion([response], None, completion)
++    field = ('generate_chunk.choices[0]' if stream
++             else 'generate_response.choices[0]' if surface == 'chat'
++             else 'generate_responses[0].choices[0]')
++    assert refused.value.parameter == field
++    claim = ('stop_reason null, an end on one of the model\'s EOS ids [1, 2]'
++             if stop is None else f'stop_reason {stop}, an end on that stop token id')
++    assert f"{field} reports finish_reason 'stop' with {claim}" in str(refused.value)
++    assert f'but its token_ids {ends}.' in str(refused.value)
++    assert payload['choices'][0]['token_ids'] == ids
++
++
++@pytest.mark.parametrize('route,body', [
++    ('/v1/chat/completions/derender',
++     {'generate_response': {'choices': [
++         {'index': 0, 'token_ids': [65, 66], 'finish_reason': 'stop'}]}}),
++    ('/v1/chat/completions/derender',
++     {'stream': True, 'generate_chunk': {'choices': [
++         {'index': 0, 'token_ids': [66], 'finish_reason': 'stop'}]}}),
++    ('/v1/completions/derender',
++     {'generate_responses': [
++         {'choices': [{'index': 0, 'token_ids': [65, 1], 'finish_reason': 'stop'}]},
++         {'choices': [{'index': 0, 'token_ids': [65, 66], 'finish_reason': 'stop',
++                       'stop_reason': 99}]}]}),
++    ('/v1/completions/derender',
++     {'stream': True, 'generate_chunk': {'choices': [
++         {'index': 0, 'token_ids': [], 'finish_reason': 'stop'}]}}),
++])
++def test_a_contradicted_stop_is_a_400_naming_the_choice(route, body):
++    """On every derender route the refusal reaches the caller as a 400 whose
++    parameter is the choice, not as a server error."""
++    from fastapi import FastAPI
++    from fastapi.testclient import TestClient
++
++    from vllm.entrypoints.scale_out.derender.api_router import router
++    from vllm.entrypoints.scale_out.derender.serving import ServingDerender
++    from vllm.entrypoints.serve.exception_handling.register import (
++        init_exception_handler,
++    )
++
++    app = FastAPI()
++    init_exception_handler(app)
++    app.include_router(router)
++    app.state.args = SimpleNamespace(log_error_stack=False)
++    app.state.serving_derender = ServingDerender(
++        SimpleNamespace(model_config=SimpleNamespace(max_model_len=64, max_logprobs=0),
++                        model_name=lambda: 'unit'),
++        _plain_derenderer(),
++    )
++    response = TestClient(app).post(route, json=body)
++    assert response.status_code == 400
++    error = response.json()['error']
++    choice = {
++        '/v1/chat/completions/derender': 'generate_response.choices[0]',
++        '/v1/completions/derender': 'generate_responses[1].choices[0]',
++    }[route] if not body.get('stream') else 'generate_chunk.choices[0]'
++    assert error['param'] == choice
++    assert error['message'].startswith(f"{choice} reports finish_reason 'stop'")
 diff --git a/vllm/renderers/online_derenderer.py b/vllm/renderers/online_derenderer.py
-index 6296e8c9abe4d9b0fb5fb4f5ab3bd71f5a78ad5d..70d8a2e01313c139c4c935d3763fd96896b06106 100644
+index 6296e8c9abe4d9b0fb5fb4f5ab3bd71f5a78ad5d..d6202317966125feb12be2e4478e053d9889bdce 100644
 --- a/vllm/renderers/online_derenderer.py
 +++ b/vllm/renderers/online_derenderer.py
-@@ -35,6 +35,7 @@ from vllm.tokenizers import TokenizerLike
+@@ -28,13 +28,16 @@ from vllm.entrypoints.scale_out.token_in_token_out.protocol import (
+     GenerateStreamResponse,
+ )
+ from vllm.entrypoints.serve.utils.request_logger import RequestLogger
++from vllm.exceptions import VLLMValidationError
+ from vllm.logger import init_logger
+ from vllm.parser import Parser, ParserManager
+ from vllm.renderers import BaseRenderer
++from vllm.sampling_params import model_eos_token_ids
+ from vllm.tokenizers import TokenizerLike
  from vllm.tokenizers.detokenizer_utils import detokenize_incrementally
  from vllm.utils import random_uuid
  from vllm.utils.async_utils import make_async
@@ -245,7 +544,27 @@ index 6296e8c9abe4d9b0fb5fb4f5ab3bd71f5a78ad5d..70d8a2e01313c139c4c935d3763fd968
  
  logger = init_logger(__name__)
  
-@@ -115,12 +116,20 @@ class OnlineDerenderer:
+@@ -59,6 +62,11 @@ class OnlineDerenderer:
+         self.model_config = model_config
+         self.renderer = renderer
+         self.request_logger = request_logger
++        # What the engine ends a generation on with no stop_reason, from the
++        # inputs the engine reads it from.
++        self.eos_token_ids = model_eos_token_ids(
++            model_config.try_get_generation_config(), renderer.get_eos_token_id()
++        )
+ 
+         self.enable_auto_tools = enable_auto_tools
+         self.exclude_tools_when_tool_choice_none = exclude_tools_when_tool_choice_none
+@@ -108,19 +116,29 @@ class OnlineDerenderer:
+         tokenizer = self.renderer.get_tokenizer()
+         choices: list[ChatCompletionResponseChoice] = []
+ 
+-        for choice in generate_response.choices:
++        for position, choice in enumerate(generate_response.choices):
+             resolved_logprobs = (
+                 _resolve_logprobs(choice.logprobs, tokenizer)
+                 if choice.logprobs is not None
                  else None
              )
  
@@ -254,6 +573,8 @@ index 6296e8c9abe4d9b0fb5fb4f5ab3bd71f5a78ad5d..70d8a2e01313c139c4c935d3763fd968
 +                choice.finish_reason,
 +                choice.stop_reason,
 +                chat_request is not None and chat_request.include_stop_str_in_output,
++                eos_token_ids=self.eos_token_ids,
++                field=f"generate_response.choices[{position}]",
 +            )
              if self.parser is not None and chat_request is not None:
                  # Parser path: decode with special tokens preserved
@@ -269,7 +590,7 @@ index 6296e8c9abe4d9b0fb5fb4f5ab3bd71f5a78ad5d..70d8a2e01313c139c4c935d3763fd968
                  )
  
                  chat_template_kwargs: dict[str, Any] = {}
-@@ -190,8 +199,8 @@ class OnlineDerenderer:
+@@ -190,8 +208,8 @@ class OnlineDerenderer:
                      if chat_request is not None
                      else True
                  )
@@ -280,7 +601,7 @@ index 6296e8c9abe4d9b0fb5fb4f5ab3bd71f5a78ad5d..70d8a2e01313c139c4c935d3763fd968
                  )
                  message = ChatMessage(role="assistant", content=decoded_text)
  
-@@ -213,6 +222,27 @@ class OnlineDerenderer:
+@@ -213,6 +231,27 @@ class OnlineDerenderer:
  
          return choices
  
@@ -308,26 +629,35 @@ index 6296e8c9abe4d9b0fb5fb4f5ab3bd71f5a78ad5d..70d8a2e01313c139c4c935d3763fd968
      def _detokenize_delta(
          self,
          tokenizer: TokenizerLike,
-@@ -341,7 +371,12 @@ class OnlineDerenderer:
+@@ -340,8 +379,15 @@ class OnlineDerenderer:
+         stream_choices: list[ChatCompletionResponseStreamChoice] = []
          updated_state = state
  
-         for choice in generate_chunk.choices:
+-        for choice in generate_chunk.choices:
 -            delta_tids = choice.token_ids or []
++        for position, choice in enumerate(generate_chunk.choices):
 +            delta_tids = _text_token_ids(
 +                choice.token_ids or [],
 +                choice.finish_reason,
 +                choice.stop_reason,
 +                chat_request is not None and chat_request.include_stop_str_in_output,
++                eos_token_ids=self.eos_token_ids,
++                field=f"generate_chunk.choices[{position}]",
 +            )
              new_text, updated_state = self._detokenize_delta(
                  tokenizer, delta_tids, updated_state, skip_special_tokens=skip_special
              )
-@@ -416,8 +451,16 @@ class OnlineDerenderer:
+@@ -414,10 +460,21 @@ class OnlineDerenderer:
+         total_completion_tokens = 0
+         index = 0
  
-         for gen, pt in zip(generate_responses, prompt_tokens_list):
-             for choice in gen.choices:
+-        for gen, pt in zip(generate_responses, prompt_tokens_list):
+-            for choice in gen.choices:
 -                decoded_text = tokenizer.decode(
 -                    choice.token_ids, skip_special_tokens=skip_special
++        responses = zip(generate_responses, prompt_tokens_list)
++        for response, (gen, pt) in enumerate(responses):
++            for position, choice in enumerate(gen.choices):
 +                decoded_text = self._decode(
 +                    tokenizer,
 +                    _text_token_ids(
@@ -336,27 +666,33 @@ index 6296e8c9abe4d9b0fb5fb4f5ab3bd71f5a78ad5d..70d8a2e01313c139c4c935d3763fd968
 +                        choice.stop_reason,
 +                        completion_request is not None
 +                        and completion_request.include_stop_str_in_output,
++                        eos_token_ids=self.eos_token_ids,
++                        field=f"generate_responses[{response}].choices[{position}]",
 +                    ),
 +                    skip_special_tokens=skip_special,
                  )
                  completion_logprobs = None
                  if choice.logprobs is not None:
-@@ -491,7 +534,13 @@ class OnlineDerenderer:
+@@ -490,8 +547,16 @@ class OnlineDerenderer:
+         stream_choices: list[CompletionResponseStreamChoice] = []
          updated_state = state
  
-         for choice in generate_chunk.choices:
+-        for choice in generate_chunk.choices:
 -            delta_tids = choice.token_ids or []
++        for position, choice in enumerate(generate_chunk.choices):
 +            delta_tids = _text_token_ids(
 +                choice.token_ids or [],
 +                choice.finish_reason,
 +                choice.stop_reason,
 +                completion_request is not None
 +                and completion_request.include_stop_str_in_output,
++                eos_token_ids=self.eos_token_ids,
++                field=f"generate_chunk.choices[{position}]",
 +            )
              new_text, updated_state = self._detokenize_delta(
                  tokenizer, delta_tids, updated_state, skip_special_tokens=skip_special
              )
-@@ -524,6 +573,21 @@ class OnlineDerenderer:
+@@ -524,6 +589,57 @@ class OnlineDerenderer:
          return chunk, updated_state
  
  
@@ -365,11 +701,47 @@ index 6296e8c9abe4d9b0fb5fb4f5ab3bd71f5a78ad5d..70d8a2e01313c139c4c935d3763fd968
 +    finish_reason: str | None,
 +    stop_reason: int | str | None,
 +    include_stop_str_in_output: bool,
++    *,
++    eos_token_ids: set[int],
++    field: str,
 +) -> list[int]:
-+    """The ids of a generated choice that carry text, as on the chat route."""
++    """The ids of a generated choice that carry text, as on the chat route.
++
++    The finish metadata says whether the last id is the stop token the
++    generation ended on, which shows no text. The detokenizer is told so by
++    the engine that stopped; derender is told so by its caller, and holds the
++    caller to it: a stop with no stop_reason ends on one of the model's EOS
++    ids, a stop on a stop token id ends on that id. A choice whose ids say
++    otherwise is refused, naming it, and no id loses its text.
++
++    A stop string ends on ordinary text, and derender does not cut the text
++    at it: the string, and whatever the ids decode to after it, stay in the
++    text, which the chat route's detokenizer, having matched the string,
++    ends before it (after it when stop text is asked for).
++    """
++    stop_terminated = ended_on_stop_token(finish_reason, stop_reason)
++    if stop_terminated:
++        last = token_ids[-1] if token_ids else None
++        if stop_reason is None:
++            ends_on_it = last in eos_token_ids
++            claim = (
++                "stop_reason null, an end on one of the model's EOS ids "
++                f"{sorted(eos_token_ids)}"
++            )
++        else:
++            ends_on_it = last == stop_reason
++            claim = f"stop_reason {stop_reason}, an end on that stop token id"
++        if not ends_on_it:
++            ids = "are empty" if last is None else f"end with {last}"
++            raise VLLMValidationError(
++                f"{field} reports finish_reason 'stop' with {claim}, but its "
++                f"token_ids {ids}. Send the choice's token_ids, finish_reason "
++                "and stop_reason as /inference/v1/generate returned them.",
++                parameter=field,
++            )
 +    text_ids, _ = split_stop_token(
 +        list(token_ids),
-+        stop_terminated=ended_on_stop_token(finish_reason, stop_reason),
++        stop_terminated=stop_terminated,
 +        include_stop_str_in_output=include_stop_str_in_output,
 +    )
 +    return text_ids
@@ -436,3 +808,44 @@ index 05760769575c1b51e6baa91365bdc984f3c0d273..e678eec75f9bf2dfb7773fbd44f4968c
  
          stop_string = None
          for new_token_id in new_token_ids:
+diff --git a/vllm/sampling_params.py b/vllm/sampling_params.py
+index 3db86455d59d4a2981fda7e03908c420a890d87a..ce6d6d5cf50cc8f9ad01b6cdaeb48a7a0a7ef33e 100644
+--- a/vllm/sampling_params.py
++++ b/vllm/sampling_params.py
+@@ -316,6 +316,22 @@ def resolve_final_response_token_budget(
+     return server_budget if requested is None else min(requested, server_budget)
+ 
+ 
++def model_eos_token_ids(
++    generation_config: dict[str, Any], eos_token_id: int | None
++) -> set[int]:
++    """The ids on which the model itself ends a generation.
++
++    The generation config's ``eos_token_id`` (one id or a list) and the
++    tokenizer's EOS. Unless a request sets ``ignore_eos``, the engine ends a
++    generation on one of these and reports no ``stop_reason``.
++    """
++    eos_ids = generation_config.get("eos_token_id")
++    ids = {eos_ids} if isinstance(eos_ids, int) else set(eos_ids or ())
++    if eos_token_id is not None:
++        ids.add(eos_token_id)
++    return ids
++
++
+ class SamplingParams(
+     PydanticMsgspecMixin,
+     msgspec.Struct,
+@@ -774,12 +790,7 @@ class SamplingParams(
+         eos_token_id: int | None = None,
+     ) -> None:
+         """Keep model EOS distinct from caller stop-token controls."""
+-        eos_ids = generation_config.get("eos_token_id")
+-        self._eos_token_ids = (
+-            {eos_ids} if isinstance(eos_ids, int) else set(eos_ids or ())
+-        )
+-        if eos_token_id is not None:
+-            self._eos_token_ids.add(eos_token_id)
++        self._eos_token_ids = model_eos_token_ids(generation_config, eos_token_id)
+         # min_tokens masks both kinds, including EOS under ignore_eos.
+         self._all_stop_token_ids = (
+             self._eos_token_ids | set(self.stop_token_ids or ())

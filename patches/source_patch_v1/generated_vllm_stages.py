@@ -131113,26 +131113,203 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'finish_reason=choice.finish_reason,\n'})},
  {'name': 'derender-text-is-the-detokenizers',
   'review_patch': 'patches/vllm-derender-text-is-the-detokenizers.patch',
-  'review_sha256': 'f62ce9c3f0a4f83f5d6ed58d7e36b015cade5f6cb7cd2538df8c0bd1cb0050c4',
+  'review_sha256': '9d8f6d45beba5c79671444be4e9604c4352c7fe5346d78573bfc4fbc91bfb4b6',
   'files': ({'path': 'tests/entrypoints/scale_out/derender/test_derender.py',
              'before_sha256': '3416a07fdc8241799d3ea888295eaaafe4cf01d569195e2f0351af793c63928b',
-             'after_sha256': '3278d088a2f804b6c01d8d1e77947a24d63dedc92a140202f2537245de88d0c8'},
+             'after_sha256': '210db8e1b18615c08fd072c37ca80357148c14ed205b55fb3b68e0a01d592055'},
             {'path': 'tests/entrypoints/scale_out/derender/test_derender_parity.py',
              'before_sha256': '024f6ad050104c1ca6e10b48dafa5a216afa2c0bf9eedc70b7320d2b492d50cc',
              'after_sha256': 'a0a88cd6a9b67b3d29d107053f22d623f4df07f9460b07ebfb0e2c417922441c'},
             {'path': 'tests/entrypoints/scale_out/derender/test_derender_stream.py',
              'before_sha256': 'ba472381827558b28b8a859ff1da7a67383fc071b4615038260e70d91e94700a',
-             'after_sha256': '56eabba03b7cf10a69eb16121afd53c670edfb797009100c3f1ba86344d565f8'},
+             'after_sha256': 'd1456066a8e1a3ef9d66571a14eb31bd5e05d56d571018920615138f8b10bf41'},
             {'path': 'tests/entrypoints/scale_out/derender/test_terminal_metadata.py',
              'before_sha256': 'e3edf885a33aaecf5dd8d6fdeadad7f3eed60510eb4f43354f1273e52b974cfc',
-             'after_sha256': 'b1042e95e61ff955062c999dc470873533a0b6034842fca4d2aa2e497914b493'},
+             'after_sha256': 'a1105a96507b731060a9d9290abefe355dbd1dd5d63954472297901af364b426'},
             {'path': 'vllm/renderers/online_derenderer.py',
              'before_sha256': 'aa7e50be91195b3781f184a37f6c6f24e0b830cedaced3229dc18436f3ebf407',
-             'after_sha256': 'ef7d3d1b4a3ce4d8ebd42c64b03c0f1736d586e549564b9ee19d48763dd0ffbf'},
+             'after_sha256': 'cdc9d9943329ae0d3dbfc69ad67f091b5df4ac8d3f2984ef0e4ae442be69b1b6'},
             {'path': 'vllm/v1/engine/detokenizer.py',
              'before_sha256': '3af97dd30fa95fb8e294b2de407012d365b124006ee324c576cba3d3a9d58c21',
-             'after_sha256': '49c4f4c012b9fc6b1a6363b56a7aa04b14a7791575db5ecac3d9fa669405c704'}),
+             'after_sha256': '49c4f4c012b9fc6b1a6363b56a7aa04b14a7791575db5ecac3d9fa669405c704'},
+            {'path': 'vllm/sampling_params.py',
+             'before_sha256': '29eb018fc1e5a3cec8b0b34901fd617b27ab893319f0df136314dda12843f073',
+             'after_sha256': 'c5e027fa409b8daf77bbbbd6fee97f13db52236ad14e7e4e3b546da35b182316'}),
   'edits': ({'name': 'tests/entrypoints/scale_out/derender/test_derender.py:landmark-1',
+             'path': 'tests/entrypoints/scale_out/derender/test_derender.py',
+             'before': 'def _make_generate_response(\n'
+                       '    token_ids: list[int] | None,\n'
+                       '    request_id: str = "chatcmpl-test-id",\n'
+                       '    finish_reason: str = "stop",\n'
+                       '    logprobs: dict | None = None,\n'
+                       '    prompt_logprobs: list | None = None,\n'
+                       '    kv_transfer_params: dict | None = None,\n'
+                       ') -> dict:\n'
+                       '    choice: dict = {\n'
+                       '        "index": 0,\n'
+                       '        "token_ids": token_ids,\n',
+             'after': 'def _make_generate_response(\n'
+                      '    token_ids: list[int] | None,\n'
+                      '    request_id: str = "chatcmpl-test-id",\n'
+                      '    finish_reason: str = "length",\n'
+                      '    logprobs: dict | None = None,\n'
+                      '    prompt_logprobs: list | None = None,\n'
+                      '    kv_transfer_params: dict | None = None,\n'
+                      ') -> dict:\n'
+                      '    """A generate response for *token_ids*: by default a '
+                      'generation cut at a\n'
+                      '    length limit, which ends on ordinary text rather than on a '
+                      'stop token."""\n'
+                      '    choice: dict = {\n'
+                      '        "index": 0,\n'
+                      '        "token_ids": token_ids,\n',
+             'review_before': 'def _make_generate_response(\n'
+                              '    token_ids: list[int] | None,\n'
+                              '    request_id: str = "chatcmpl-test-id",\n'
+                              '    finish_reason: str = "stop",\n'
+                              '    logprobs: dict | None = None,\n'
+                              '    prompt_logprobs: list | None = None,\n'
+                              '    kv_transfer_params: dict | None = None,\n'
+                              ') -> dict:\n'
+                              '    choice: dict = {\n'
+                              '        "index": 0,\n'
+                              '        "token_ids": token_ids,\n',
+             'review_after': 'def _make_generate_response(\n'
+                             '    token_ids: list[int] | None,\n'
+                             '    request_id: str = "chatcmpl-test-id",\n'
+                             '    finish_reason: str = "length",\n'
+                             '    logprobs: dict | None = None,\n'
+                             '    prompt_logprobs: list | None = None,\n'
+                             '    kv_transfer_params: dict | None = None,\n'
+                             ') -> dict:\n'
+                             '    """A generate response for *token_ids*: by default a '
+                             'generation cut at a\n'
+                             '    length limit, which ends on ordinary text rather '
+                             'than on a stop token."""\n'
+                             '    choice: dict = {\n'
+                             '        "index": 0,\n'
+                             '        "token_ids": token_ids,\n'},
+            {'name': 'tests/entrypoints/scale_out/derender/test_derender.py:landmark-2',
+             'path': 'tests/entrypoints/scale_out/derender/test_derender.py',
+             'before': '\n'
+                       '@pytest.mark.asyncio\n'
+                       'async def test_derender_chat_empty_token_ids(client):\n'
+                       '    """A completed empty generation remains an empty '
+                       'answer."""\n'
+                       '    response = await client.post(\n'
+                       '        "/v1/chat/completions/derender",\n'
+                       '        json={\n'
+                       '            "model": MODEL_NAME,\n'
+                       '            "generate_response": _make_generate_response([]),\n'
+                       '        },\n'
+                       '    )\n'
+                       '    assert response.status_code == 200\n',
+             'after': '\n'
+                      '@pytest.mark.asyncio\n'
+                      'async def test_derender_chat_empty_token_ids(client):\n'
+                      '    """A completed empty generation remains an empty answer: '
+                      'the model ended\n'
+                      '    its turn at once, and its end of turn carries no text."""\n'
+                      '    eos = get_tokenizer(MODEL_NAME).eos_token_id\n'
+                      '    response = await client.post(\n'
+                      '        "/v1/chat/completions/derender",\n'
+                      '        json={\n'
+                      '            "model": MODEL_NAME,\n'
+                      '            "generate_response": _make_generate_response([eos], '
+                      'finish_reason="stop"),\n'
+                      '        },\n'
+                      '    )\n'
+                      '    assert response.status_code == 200\n',
+             'review_before': '\n'
+                              '@pytest.mark.asyncio\n'
+                              'async def test_derender_chat_empty_token_ids(client):\n'
+                              '    """A completed empty generation remains an empty '
+                              'answer."""\n'
+                              '    response = await client.post(\n'
+                              '        "/v1/chat/completions/derender",\n'
+                              '        json={\n'
+                              '            "model": MODEL_NAME,\n'
+                              '            "generate_response": '
+                              '_make_generate_response([]),\n'
+                              '        },\n'
+                              '    )\n'
+                              '    assert response.status_code == 200\n',
+             'review_after': '\n'
+                             '@pytest.mark.asyncio\n'
+                             'async def test_derender_chat_empty_token_ids(client):\n'
+                             '    """A completed empty generation remains an empty '
+                             'answer: the model ended\n'
+                             '    its turn at once, and its end of turn carries no '
+                             'text."""\n'
+                             '    eos = get_tokenizer(MODEL_NAME).eos_token_id\n'
+                             '    response = await client.post(\n'
+                             '        "/v1/chat/completions/derender",\n'
+                             '        json={\n'
+                             '            "model": MODEL_NAME,\n'
+                             '            "generate_response": '
+                             '_make_generate_response([eos], finish_reason="stop"),\n'
+                             '        },\n'
+                             '    )\n'
+                             '    assert response.status_code == 200\n'},
+            {'name': 'tests/entrypoints/scale_out/derender/test_derender.py:landmark-3',
+             'path': 'tests/entrypoints/scale_out/derender/test_derender.py',
+             'before': '    kv_transfer_params: dict | None = None,\n'
+                       '    logprobs: dict | None = None,\n'
+                       ') -> dict:\n'
+                       '    return {\n'
+                       '        "request_id": request_id,\n'
+                       '        "choices": [\n'
+                       '            {\n'
+                       '                "index": 0,\n'
+                       '                "token_ids": token_ids,\n'
+                       '                "finish_reason": "stop",\n'
+                       '                "logprobs": logprobs,\n'
+                       '            }\n'
+                       '        ],\n',
+             'after': '    kv_transfer_params: dict | None = None,\n'
+                      '    logprobs: dict | None = None,\n'
+                      ') -> dict:\n'
+                      '    """As _make_generate_response: a generation cut at a length '
+                      'limit."""\n'
+                      '    return {\n'
+                      '        "request_id": request_id,\n'
+                      '        "choices": [\n'
+                      '            {\n'
+                      '                "index": 0,\n'
+                      '                "token_ids": token_ids,\n'
+                      '                "finish_reason": "length",\n'
+                      '                "logprobs": logprobs,\n'
+                      '            }\n'
+                      '        ],\n',
+             'review_before': '    kv_transfer_params: dict | None = None,\n'
+                              '    logprobs: dict | None = None,\n'
+                              ') -> dict:\n'
+                              '    return {\n'
+                              '        "request_id": request_id,\n'
+                              '        "choices": [\n'
+                              '            {\n'
+                              '                "index": 0,\n'
+                              '                "token_ids": token_ids,\n'
+                              '                "finish_reason": "stop",\n'
+                              '                "logprobs": logprobs,\n'
+                              '            }\n'
+                              '        ],\n',
+             'review_after': '    kv_transfer_params: dict | None = None,\n'
+                             '    logprobs: dict | None = None,\n'
+                             ') -> dict:\n'
+                             '    """As _make_generate_response: a generation cut at a '
+                             'length limit."""\n'
+                             '    return {\n'
+                             '        "request_id": request_id,\n'
+                             '        "choices": [\n'
+                             '            {\n'
+                             '                "index": 0,\n'
+                             '                "token_ids": token_ids,\n'
+                             '                "finish_reason": "length",\n'
+                             '                "logprobs": logprobs,\n'
+                             '            }\n'
+                             '        ],\n'},
+            {'name': 'tests/entrypoints/scale_out/derender/test_derender.py:landmark-4',
              'path': 'tests/entrypoints/scale_out/derender/test_derender.py',
              'before': '\n'
                        'def _e2e_generate_response(\n'
@@ -131199,7 +131376,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '                "finish_reason": "stop",\n'
                              '            }\n'
                              '        ],\n'},
-            {'name': 'tests/entrypoints/scale_out/derender/test_derender.py:landmark-2',
+            {'name': 'tests/entrypoints/scale_out/derender/test_derender.py:landmark-5',
              'path': 'tests/entrypoints/scale_out/derender/test_derender.py',
              'before': '    resp = await parser_client.post(\n'
                        '        "/v1/chat/completions/derender",\n'
@@ -131242,7 +131419,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '            "prompt_tokens": len(gen_req["token_ids"]),\n'
                              '        },\n'
                              '    )\n'},
-            {'name': 'tests/entrypoints/scale_out/derender/test_derender.py:landmark-3',
+            {'name': 'tests/entrypoints/scale_out/derender/test_derender.py:landmark-6',
              'path': 'tests/entrypoints/scale_out/derender/test_derender.py',
              'before': '    output_ids = _encode(parser_tokenizer, answer)\n'
                        '\n'
@@ -131293,7 +131470,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '            "prompt_tokens": len(gen_req["token_ids"]),\n'
                              '        },\n'
                              '    )\n'},
-            {'name': 'tests/entrypoints/scale_out/derender/test_derender.py:landmark-4',
+            {'name': 'tests/entrypoints/scale_out/derender/test_derender.py:landmark-7',
              'path': 'tests/entrypoints/scale_out/derender/test_derender.py',
              'before': '    output_ids = _encode(parser_tokenizer, answer)\n'
                        '\n'
@@ -131344,7 +131521,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '            "prompt_tokens": len(gen_req["token_ids"]),\n'
                              '        },\n'
                              '    )\n'},
-            {'name': 'tests/entrypoints/scale_out/derender/test_derender.py:landmark-5',
+            {'name': 'tests/entrypoints/scale_out/derender/test_derender.py:landmark-8',
              'path': 'tests/entrypoints/scale_out/derender/test_derender.py',
              'before': '\n'
                        '    resp = await parser_client.post(\n'
@@ -131391,7 +131568,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '            "prompt_tokens": len(gen_req["token_ids"]),\n'
                              '            "chat_request": {\n'
                              '                "model": PARSER_MODEL,\n'},
-            {'name': 'tests/entrypoints/scale_out/derender/test_derender.py:landmark-6',
+            {'name': 'tests/entrypoints/scale_out/derender/test_derender.py:landmark-9',
              'path': 'tests/entrypoints/scale_out/derender/test_derender.py',
              'before': '        "</tool_call>",\n'
                        '    )\n'
@@ -131446,7 +131623,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '            "prompt_tokens": len(gen_req["token_ids"]),\n'
                              '            "chat_request": {\n'
                              '                "model": PARSER_MODEL,\n'},
-            {'name': 'tests/entrypoints/scale_out/derender/test_derender.py:landmark-7',
+            {'name': 'tests/entrypoints/scale_out/derender/test_derender.py:landmark-10',
              'path': 'tests/entrypoints/scale_out/derender/test_derender.py',
              'before': '        parser_tokenizer, output_text, "</think>", '
                        '"<tool_call>"\n'
@@ -131503,7 +131680,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '            "prompt_tokens": len(gen_req["token_ids"]),\n'
                              '            "chat_request": {\n'
                              '                "model": PARSER_MODEL,\n'},
-            {'name': 'tests/entrypoints/scale_out/derender/test_derender.py:landmark-8',
+            {'name': 'tests/entrypoints/scale_out/derender/test_derender.py:landmark-11',
              'path': 'tests/entrypoints/scale_out/derender/test_derender.py',
              'before': '    output_ids = _encode(parser_tokenizer, answer)\n'
                        '\n'
@@ -131554,7 +131731,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '            "prompt_tokens": len(gen_req["token_ids"]),\n'
                              '        },\n'
                              '    )\n'},
-            {'name': 'tests/entrypoints/scale_out/derender/test_derender.py:landmark-9',
+            {'name': 'tests/entrypoints/scale_out/derender/test_derender.py:landmark-12',
              'path': 'tests/entrypoints/scale_out/derender/test_derender.py',
              'before': '\n'
                        '    resp = await harmony_client.post(\n'
@@ -131601,7 +131778,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '            "prompt_tokens": len(gen_req["token_ids"]),\n'
                              '            "chat_request": {\n'
                              '                "model": HARMONY_MODEL,\n'},
-            {'name': 'tests/entrypoints/scale_out/derender/test_derender.py:landmark-10',
+            {'name': 'tests/entrypoints/scale_out/derender/test_derender.py:landmark-13',
              'path': 'tests/entrypoints/scale_out/derender/test_derender.py',
              'before': '\n'
                        '    resp = await harmony_client.post(\n'
@@ -131763,6 +131940,55 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    )\n'},
             {'name': 'tests/entrypoints/scale_out/derender/test_derender_stream.py:landmark-1',
              'path': 'tests/entrypoints/scale_out/derender/test_derender_stream.py',
+             'before': '\n'
+                       '    renderer = MagicMock()\n'
+                       '    renderer.get_tokenizer.return_value = tokenizer\n'
+                       '\n'
+                       '    model_config = MagicMock()\n'
+                       '    model_config.hf_config.model_type = "llama"\n'
+                       '    model_config.model = MODEL_NAME\n'
+                       '\n'
+                       '    return OnlineDerenderer(\n'
+                       '        model_config=model_config,\n',
+             'after': '\n'
+                      '    renderer = MagicMock()\n'
+                      '    renderer.get_tokenizer.return_value = tokenizer\n'
+                      '    renderer.get_eos_token_id.return_value = '
+                      'tokenizer.eos_token_id\n'
+                      '\n'
+                      '    model_config = MagicMock()\n'
+                      '    model_config.hf_config.model_type = "llama"\n'
+                      '    model_config.model = MODEL_NAME\n'
+                      '    model_config.try_get_generation_config.return_value = {}\n'
+                      '\n'
+                      '    return OnlineDerenderer(\n'
+                      '        model_config=model_config,\n',
+             'review_before': '\n'
+                              '    renderer = MagicMock()\n'
+                              '    renderer.get_tokenizer.return_value = tokenizer\n'
+                              '\n'
+                              '    model_config = MagicMock()\n'
+                              '    model_config.hf_config.model_type = "llama"\n'
+                              '    model_config.model = MODEL_NAME\n'
+                              '\n'
+                              '    return OnlineDerenderer(\n'
+                              '        model_config=model_config,\n',
+             'review_after': '\n'
+                             '    renderer = MagicMock()\n'
+                             '    renderer.get_tokenizer.return_value = tokenizer\n'
+                             '    renderer.get_eos_token_id.return_value = '
+                             'tokenizer.eos_token_id\n'
+                             '\n'
+                             '    model_config = MagicMock()\n'
+                             '    model_config.hf_config.model_type = "llama"\n'
+                             '    model_config.model = MODEL_NAME\n'
+                             '    model_config.try_get_generation_config.return_value '
+                             '= {}\n'
+                             '\n'
+                             '    return OnlineDerenderer(\n'
+                             '        model_config=model_config,\n'},
+            {'name': 'tests/entrypoints/scale_out/derender/test_derender_stream.py:landmark-2',
+             'path': 'tests/entrypoints/scale_out/derender/test_derender_stream.py',
              'before': '            '
                        'generate_chunk=_make_stream_chunk(token_ids[:mid]),\n'
                        '            state=state,\n'
@@ -131820,6 +132046,370 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '            state=state,\n'
                              '        )\n'
                              '\n'},
+            {'name': 'tests/entrypoints/scale_out/derender/test_derender_stream.py:landmark-3',
+             'path': 'tests/entrypoints/scale_out/derender/test_derender_stream.py',
+             'before': '            '
+                       'generate_chunk=_make_stream_chunk(token_ids[:mid]),\n'
+                       '            state=state,\n'
+                       '        )\n'
+                       '        chunk2, _ = await derenderer.derender_chat_stream(\n'
+                       '            model=MODEL_NAME,\n'
+                       '            generate_chunk=_make_stream_chunk(token_ids[mid:], '
+                       'finish_reason="stop"),\n'
+                       '            state=state,\n'
+                       '        )\n'
+                       '\n',
+             'after': '            '
+                      'generate_chunk=_make_stream_chunk(token_ids[:mid]),\n'
+                      '            state=state,\n'
+                      '        )\n'
+                      '        # A natural stop ends with the end of turn, which '
+                      'carries no text.\n'
+                      '        chunk2, _ = await derenderer.derender_chat_stream(\n'
+                      '            model=MODEL_NAME,\n'
+                      '            generate_chunk=_make_stream_chunk(\n'
+                      '                token_ids[mid:] + [tokenizer.eos_token_id], '
+                      'finish_reason="stop"\n'
+                      '            ),\n'
+                      '            state=state,\n'
+                      '        )\n'
+                      '\n',
+             'review_before': '            '
+                              'generate_chunk=_make_stream_chunk(token_ids[:mid]),\n'
+                              '            state=state,\n'
+                              '        )\n'
+                              '        chunk2, _ = await '
+                              'derenderer.derender_chat_stream(\n'
+                              '            model=MODEL_NAME,\n'
+                              '            '
+                              'generate_chunk=_make_stream_chunk(token_ids[mid:], '
+                              'finish_reason="stop"),\n'
+                              '            state=state,\n'
+                              '        )\n'
+                              '\n',
+             'review_after': '            '
+                             'generate_chunk=_make_stream_chunk(token_ids[:mid]),\n'
+                             '            state=state,\n'
+                             '        )\n'
+                             '        # A natural stop ends with the end of turn, '
+                             'which carries no text.\n'
+                             '        chunk2, _ = await '
+                             'derenderer.derender_chat_stream(\n'
+                             '            model=MODEL_NAME,\n'
+                             '            generate_chunk=_make_stream_chunk(\n'
+                             '                token_ids[mid:] + '
+                             '[tokenizer.eos_token_id], finish_reason="stop"\n'
+                             '            ),\n'
+                             '            state=state,\n'
+                             '        )\n'
+                             '\n'},
+            {'name': 'tests/entrypoints/scale_out/derender/test_derender_stream.py:landmark-4',
+             'path': 'tests/entrypoints/scale_out/derender/test_derender_stream.py',
+             'before': 'async def '
+                       'test_streaming_completion_derender_roundtrip(client):\n'
+                       '    """Streaming completions derender: chunked text == non '
+                       'streaming text."""\n'
+                       '    gen_req = await _render_chat(client)\n'
+                       '    token_ids: list[int] = gen_req["token_ids"][:8]\n'
+                       '    mid = len(token_ids) // 2\n'
+                       '    chunk1_ids, chunk2_ids = token_ids[:mid], '
+                       'token_ids[mid:]\n',
+             'after': 'async def '
+                      'test_streaming_completion_derender_roundtrip(client):\n'
+                      '    """Streaming completions derender: chunked text == non '
+                      'streaming text."""\n'
+                      '    gen_req = await _render_chat(client)\n'
+                      '    # Rendered ids stand in for a generation cut at a length '
+                      'limit, which\n'
+                      '    # ends on ordinary text rather than on a stop token.\n'
+                      '    token_ids: list[int] = gen_req["token_ids"][:8]\n'
+                      '    mid = len(token_ids) // 2\n'
+                      '    chunk1_ids, chunk2_ids = token_ids[:mid], token_ids[mid:]\n',
+             'review_before': 'async def '
+                              'test_streaming_completion_derender_roundtrip(client):\n'
+                              '    """Streaming completions derender: chunked text == '
+                              'non streaming text."""\n'
+                              '    gen_req = await _render_chat(client)\n'
+                              '    token_ids: list[int] = gen_req["token_ids"][:8]\n'
+                              '    mid = len(token_ids) // 2\n'
+                              '    chunk1_ids, chunk2_ids = token_ids[:mid], '
+                              'token_ids[mid:]\n',
+             'review_after': 'async def '
+                             'test_streaming_completion_derender_roundtrip(client):\n'
+                             '    """Streaming completions derender: chunked text == '
+                             'non streaming text."""\n'
+                             '    gen_req = await _render_chat(client)\n'
+                             '    # Rendered ids stand in for a generation cut at a '
+                             'length limit, which\n'
+                             '    # ends on ordinary text rather than on a stop '
+                             'token.\n'
+                             '    token_ids: list[int] = gen_req["token_ids"][:8]\n'
+                             '    mid = len(token_ids) // 2\n'
+                             '    chunk1_ids, chunk2_ids = token_ids[:mid], '
+                             'token_ids[mid:]\n'},
+            {'name': 'tests/entrypoints/scale_out/derender/test_derender_stream.py:landmark-5',
+             'path': 'tests/entrypoints/scale_out/derender/test_derender_stream.py',
+             'before': '                        {\n'
+                       '                            "index": 0,\n'
+                       '                            "token_ids": token_ids,\n'
+                       '                            "finish_reason": "stop",\n'
+                       '                        }\n'
+                       '                    ],\n'
+                       '                }\n',
+             'after': '                        {\n'
+                      '                            "index": 0,\n'
+                      '                            "token_ids": token_ids,\n'
+                      '                            "finish_reason": "length",\n'
+                      '                        }\n'
+                      '                    ],\n'
+                      '                }\n',
+             'review_before': '                        {\n'
+                              '                            "index": 0,\n'
+                              '                            "token_ids": token_ids,\n'
+                              '                            "finish_reason": "stop",\n'
+                              '                        }\n'
+                              '                    ],\n'
+                              '                }\n',
+             'review_after': '                        {\n'
+                             '                            "index": 0,\n'
+                             '                            "token_ids": token_ids,\n'
+                             '                            "finish_reason": "length",\n'
+                             '                        }\n'
+                             '                    ],\n'
+                             '                }\n'},
+            {'name': 'tests/entrypoints/scale_out/derender/test_derender_stream.py:landmark-6',
+             'path': 'tests/entrypoints/scale_out/derender/test_derender_stream.py',
+             'before': '        "/v1/completions/derender",\n'
+                       '        json={\n'
+                       '            "stream": True,\n'
+                       '            "model": MODEL_NAME,\n'
+                       '            "generate_chunk": {\n'
+                       '                "request_id": "test-s",\n'
+                       '                "choices": [\n'
+                       '                    {"index": 0, "token_ids": chunk2_ids, '
+                       '"finish_reason": "stop"}\n'
+                       '                ],\n'
+                       '            },\n'
+                       '            "stream_state": state1,\n'
+                       '        },\n'
+                       '    )\n'
+                       '    assert r2.status_code == 200\n'
+                       '    text2 = r2.json()["chunk"]["choices"][0]["text"]\n',
+             'after': '        "/v1/completions/derender",\n'
+                      '        json={\n'
+                      '            "stream": True,\n'
+                      '            "model": MODEL_NAME,\n'
+                      '            "generate_chunk": {\n'
+                      '                "request_id": "test-s",\n'
+                      '                "choices": [\n'
+                      '                    {"index": 0, "token_ids": chunk2_ids, '
+                      '"finish_reason": "length"}\n'
+                      '                ],\n'
+                      '            },\n'
+                      '            "stream_state": state1,\n'
+                      '        },\n'
+                      '    )\n'
+                      '    assert r2.status_code == 200\n'
+                      '    text2 = r2.json()["chunk"]["choices"][0]["text"]\n',
+             'review_before': '            "generate_chunk": {\n'
+                              '                "request_id": "test-s",\n'
+                              '                "choices": [\n'
+                              '                    {"index": 0, "token_ids": '
+                              'chunk2_ids, "finish_reason": "stop"}\n'
+                              '                ],\n'
+                              '            },\n'
+                              '            "stream_state": state1,\n',
+             'review_after': '            "generate_chunk": {\n'
+                             '                "request_id": "test-s",\n'
+                             '                "choices": [\n'
+                             '                    {"index": 0, "token_ids": '
+                             'chunk2_ids, "finish_reason": "length"}\n'
+                             '                ],\n'
+                             '            },\n'
+                             '            "stream_state": state1,\n'},
+            {'name': 'tests/entrypoints/scale_out/derender/test_derender_stream.py:landmark-7',
+             'path': 'tests/entrypoints/scale_out/derender/test_derender_stream.py',
+             'before': 'async def test_streaming_chat_derender_roundtrip(client):\n'
+                       '    """Streaming chat derender (plain detok): chunked text == '
+                       'non streaming text."""\n'
+                       '    gen_req = await _render_chat(client)\n'
+                       '    token_ids: list[int] = gen_req["token_ids"][:8]\n'
+                       '    mid = len(token_ids) // 2\n'
+                       '    chunk1_ids, chunk2_ids = token_ids[:mid], '
+                       'token_ids[mid:]\n',
+             'after': 'async def test_streaming_chat_derender_roundtrip(client):\n'
+                      '    """Streaming chat derender (plain detok): chunked text == '
+                      'non streaming text."""\n'
+                      '    gen_req = await _render_chat(client)\n'
+                      '    # As above: a generation cut at a length limit.\n'
+                      '    token_ids: list[int] = gen_req["token_ids"][:8]\n'
+                      '    mid = len(token_ids) // 2\n'
+                      '    chunk1_ids, chunk2_ids = token_ids[:mid], token_ids[mid:]\n',
+             'review_before': 'async def '
+                              'test_streaming_chat_derender_roundtrip(client):\n'
+                              '    """Streaming chat derender (plain detok): chunked '
+                              'text == non streaming text."""\n'
+                              '    gen_req = await _render_chat(client)\n'
+                              '    token_ids: list[int] = gen_req["token_ids"][:8]\n'
+                              '    mid = len(token_ids) // 2\n'
+                              '    chunk1_ids, chunk2_ids = token_ids[:mid], '
+                              'token_ids[mid:]\n',
+             'review_after': 'async def '
+                             'test_streaming_chat_derender_roundtrip(client):\n'
+                             '    """Streaming chat derender (plain detok): chunked '
+                             'text == non streaming text."""\n'
+                             '    gen_req = await _render_chat(client)\n'
+                             '    # As above: a generation cut at a length limit.\n'
+                             '    token_ids: list[int] = gen_req["token_ids"][:8]\n'
+                             '    mid = len(token_ids) // 2\n'
+                             '    chunk1_ids, chunk2_ids = token_ids[:mid], '
+                             'token_ids[mid:]\n'},
+            {'name': 'tests/entrypoints/scale_out/derender/test_derender_stream.py:landmark-8',
+             'path': 'tests/entrypoints/scale_out/derender/test_derender_stream.py',
+             'before': '                    {\n'
+                       '                        "index": 0,\n'
+                       '                        "token_ids": token_ids,\n'
+                       '                        "finish_reason": "stop",\n'
+                       '                    }\n'
+                       '                ],\n'
+                       '            },\n',
+             'after': '                    {\n'
+                      '                        "index": 0,\n'
+                      '                        "token_ids": token_ids,\n'
+                      '                        "finish_reason": "length",\n'
+                      '                    }\n'
+                      '                ],\n'
+                      '            },\n',
+             'review_before': '                    {\n'
+                              '                        "index": 0,\n'
+                              '                        "token_ids": token_ids,\n'
+                              '                        "finish_reason": "stop",\n'
+                              '                    }\n'
+                              '                ],\n'
+                              '            },\n',
+             'review_after': '                    {\n'
+                             '                        "index": 0,\n'
+                             '                        "token_ids": token_ids,\n'
+                             '                        "finish_reason": "length",\n'
+                             '                    }\n'
+                             '                ],\n'
+                             '            },\n'},
+            {'name': 'tests/entrypoints/scale_out/derender/test_derender_stream.py:landmark-9',
+             'path': 'tests/entrypoints/scale_out/derender/test_derender_stream.py',
+             'before': '        "/v1/chat/completions/derender",\n'
+                       '        json={\n'
+                       '            "stream": True,\n'
+                       '            "model": MODEL_NAME,\n'
+                       '            "generate_chunk": {\n'
+                       '                "request_id": "test-s",\n'
+                       '                "choices": [\n'
+                       '                    {"index": 0, "token_ids": chunk2_ids, '
+                       '"finish_reason": "stop"}\n'
+                       '                ],\n'
+                       '            },\n'
+                       '            "stream_state": state1,\n'
+                       '        },\n'
+                       '    )\n'
+                       '    assert r2.status_code == 200\n'
+                       '    d2 = r2.json()\n',
+             'after': '        "/v1/chat/completions/derender",\n'
+                      '        json={\n'
+                      '            "stream": True,\n'
+                      '            "model": MODEL_NAME,\n'
+                      '            "generate_chunk": {\n'
+                      '                "request_id": "test-s",\n'
+                      '                "choices": [\n'
+                      '                    {"index": 0, "token_ids": chunk2_ids, '
+                      '"finish_reason": "length"}\n'
+                      '                ],\n'
+                      '            },\n'
+                      '            "stream_state": state1,\n'
+                      '        },\n'
+                      '    )\n'
+                      '    assert r2.status_code == 200\n'
+                      '    d2 = r2.json()\n',
+             'review_before': '            "generate_chunk": {\n'
+                              '                "request_id": "test-s",\n'
+                              '                "choices": [\n'
+                              '                    {"index": 0, "token_ids": '
+                              'chunk2_ids, "finish_reason": "stop"}\n'
+                              '                ],\n'
+                              '            },\n'
+                              '            "stream_state": state1,\n',
+             'review_after': '            "generate_chunk": {\n'
+                             '                "request_id": "test-s",\n'
+                             '                "choices": [\n'
+                             '                    {"index": 0, "token_ids": '
+                             'chunk2_ids, "finish_reason": "length"}\n'
+                             '                ],\n'
+                             '            },\n'
+                             '            "stream_state": state1,\n'},
+            {'name': 'tests/entrypoints/scale_out/derender/test_derender_stream.py:landmark-10',
+             'path': 'tests/entrypoints/scale_out/derender/test_derender_stream.py',
+             'before': 'async def test_streaming_usage_chunk(client):\n'
+                       '    """Usage only final chunk is forwarded with correct token '
+                       'counts."""\n'
+                       '    gen_req = await _render_chat(client)\n'
+                       '    token_ids: list[int] = gen_req["token_ids"][:6]\n'
+                       '    state: dict = {}\n'
+                       '\n',
+             'after': 'async def test_streaming_usage_chunk(client):\n'
+                      '    """Usage only final chunk is forwarded with correct token '
+                      'counts."""\n'
+                      '    gen_req = await _render_chat(client)\n'
+                      '    # As above: a generation cut at a length limit.\n'
+                      '    token_ids: list[int] = gen_req["token_ids"][:6]\n'
+                      '    state: dict = {}\n'
+                      '\n',
+             'review_before': 'async def test_streaming_usage_chunk(client):\n'
+                              '    """Usage only final chunk is forwarded with correct '
+                              'token counts."""\n'
+                              '    gen_req = await _render_chat(client)\n'
+                              '    token_ids: list[int] = gen_req["token_ids"][:6]\n'
+                              '    state: dict = {}\n'
+                              '\n',
+             'review_after': 'async def test_streaming_usage_chunk(client):\n'
+                             '    """Usage only final chunk is forwarded with correct '
+                             'token counts."""\n'
+                             '    gen_req = await _render_chat(client)\n'
+                             '    # As above: a generation cut at a length limit.\n'
+                             '    token_ids: list[int] = gen_req["token_ids"][:6]\n'
+                             '    state: dict = {}\n'
+                             '\n'},
+            {'name': 'tests/entrypoints/scale_out/derender/test_derender_stream.py:landmark-11',
+             'path': 'tests/entrypoints/scale_out/derender/test_derender_stream.py',
+             'before': '            "generate_chunk": {\n'
+                       '                "request_id": "usage-test",\n'
+                       '                "choices": [\n'
+                       '                    {"index": 0, "token_ids": token_ids, '
+                       '"finish_reason": "stop"}\n'
+                       '                ],\n'
+                       '            },\n'
+                       '            "stream_state": None,\n',
+             'after': '            "generate_chunk": {\n'
+                      '                "request_id": "usage-test",\n'
+                      '                "choices": [\n'
+                      '                    {"index": 0, "token_ids": token_ids, '
+                      '"finish_reason": "length"}\n'
+                      '                ],\n'
+                      '            },\n'
+                      '            "stream_state": None,\n',
+             'review_before': '            "generate_chunk": {\n'
+                              '                "request_id": "usage-test",\n'
+                              '                "choices": [\n'
+                              '                    {"index": 0, "token_ids": '
+                              'token_ids, "finish_reason": "stop"}\n'
+                              '                ],\n'
+                              '            },\n'
+                              '            "stream_state": None,\n',
+             'review_after': '            "generate_chunk": {\n'
+                             '                "request_id": "usage-test",\n'
+                             '                "choices": [\n'
+                             '                    {"index": 0, "token_ids": token_ids, '
+                             '"finish_reason": "length"}\n'
+                             '                ],\n'
+                             '            },\n'
+                             '            "stream_state": None,\n'},
             {'name': 'tests/entrypoints/scale_out/derender/test_terminal_metadata.py:landmark-1',
              'path': 'tests/entrypoints/scale_out/derender/test_terminal_metadata.py',
              'before': "    ('length', None), ('length', "
@@ -131831,7 +132421,10 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                        '    renderer = object.__new__(OnlineDerenderer)\n'
                        '    renderer.parser = None\n'
                        '    renderer.renderer = SimpleNamespace(get_tokenizer=lambda: '
-                       'SimpleNamespace(\n',
+                       'SimpleNamespace(\n'
+                       "        decode=lambda ids, **kwargs: ''.join(map(chr, ids))))\n"
+                       '    # This test isolates the token-transport boundary from the '
+                       'independent\n',
              'after': "    ('length', None), ('length', "
                       "'final_response_token_budget'), ('abort', None),\n"
                       '])\n'
@@ -131855,8 +132448,12 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '        ids.append(1 if stop is None else stop)\n'
                       '    renderer = object.__new__(OnlineDerenderer)\n'
                       '    renderer.parser = None\n'
+                      '    renderer.eos_token_ids = {1}\n'
                       '    renderer.renderer = SimpleNamespace(get_tokenizer=lambda: '
-                      'SimpleNamespace(\n',
+                      'SimpleNamespace(\n'
+                      "        decode=lambda ids, **kwargs: ''.join(map(chr, ids))))\n"
+                      '    # This test isolates the token-transport boundary from the '
+                      'independent\n',
              'review_before': "    ('length', None), ('length', "
                               "'final_response_token_budget'), ('abort', None),\n"
                               '])\n'
@@ -131866,8 +132463,11 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                               '    renderer = object.__new__(OnlineDerenderer)\n'
                               '    renderer.parser = None\n'
                               '    renderer.renderer = '
-                              'SimpleNamespace(get_tokenizer=lambda: '
-                              'SimpleNamespace(\n',
+                              'SimpleNamespace(get_tokenizer=lambda: SimpleNamespace(\n'
+                              "        decode=lambda ids, **kwargs: ''.join(map(chr, "
+                              'ids))))\n'
+                              '    # This test isolates the token-transport boundary '
+                              'from the independent\n',
              'review_after': "    ('length', None), ('length', "
                              "'final_response_token_budget'), ('abort', None),\n"
                              '])\n'
@@ -131891,9 +132491,13 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '        ids.append(1 if stop is None else stop)\n'
                              '    renderer = object.__new__(OnlineDerenderer)\n'
                              '    renderer.parser = None\n'
+                             '    renderer.eos_token_ids = {1}\n'
                              '    renderer.renderer = '
-                             'SimpleNamespace(get_tokenizer=lambda: '
-                             'SimpleNamespace(\n'},
+                             'SimpleNamespace(get_tokenizer=lambda: SimpleNamespace(\n'
+                             "        decode=lambda ids, **kwargs: ''.join(map(chr, "
+                             'ids))))\n'
+                             '    # This test isolates the token-transport boundary '
+                             'from the independent\n'},
             {'name': 'tests/entrypoints/scale_out/derender/test_terminal_metadata.py:landmark-2',
              'path': 'tests/entrypoints/scale_out/derender/test_terminal_metadata.py',
              'before': '    renderer._detokenize_delta = lambda tokenizer, ids, state, '
@@ -132014,6 +132618,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       'which has no text.\n'
                       '        ids.append(20003)\n'
                       '    renderer = object.__new__(OnlineDerenderer)\n'
+                      "    renderer.eos_token_ids = {markers['<|im_end|>']}\n"
                       '    renderer.parser = ParserManager.get_parser(\n'
                       "        tool_parser_name='qwen3_coder', "
                       "reasoning_parser_name='qwen3',\n"
@@ -132057,6 +132662,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'turn, which has no text.\n'
                              '        ids.append(20003)\n'
                              '    renderer = object.__new__(OnlineDerenderer)\n'
+                             "    renderer.eos_token_ids = {markers['<|im_end|>']}\n"
                              '    renderer.parser = ParserManager.get_parser(\n'
                              "        tool_parser_name='qwen3_coder', "
                              "reasoning_parser_name='qwen3',\n"
@@ -132074,16 +132680,432 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    incoming = '
                              "GenerateResponse.model_validate(dict(request_id='request', "
                              'choices=[dict(\n'},
+            {'name': 'tests/entrypoints/scale_out/derender/test_terminal_metadata.py:landmark-5',
+             'path': 'tests/entrypoints/scale_out/derender/test_terminal_metadata.py',
+             'before': '    else:\n'
+                       '        assert not choice.message.tool_calls\n'
+                       '        assert choice.message.content == body\n',
+             'after': '    else:\n'
+                      '        assert not choice.message.tool_calls\n'
+                      '        assert choice.message.content == body\n'
+                      '\n'
+                      '\n'
+                      'def _plain_derenderer(eos_token_ids=(1, 2)):\n'
+                      '    """A derenderer without a parser over a '
+                      'one-character-per-id tokenizer,\n'
+                      "    given the model's EOS ids through the inputs the engine "
+                      'reads them from."""\n'
+                      '    tokenizer = SimpleNamespace(decode=lambda ids, **kwargs: '
+                      "''.join(map(chr, ids)))\n"
+                      '    first, *rest = eos_token_ids\n'
+                      '    derenderer = OnlineDerenderer(\n'
+                      '        SimpleNamespace(\n'
+                      "            hf_config=SimpleNamespace(model_type='unit'), "
+                      "model='unit',\n"
+                      "            try_get_generation_config=lambda: {'eos_token_id': "
+                      'rest},\n'
+                      '        ),\n'
+                      '        SimpleNamespace(get_tokenizer=lambda: tokenizer,\n'
+                      '                        get_eos_token_id=lambda: first, '
+                      '_executor=None),\n'
+                      '        request_logger=None, chat_template=None,\n'
+                      "        chat_template_content_format='openai',\n"
+                      '    )\n'
+                      '    # The token-transport boundary, not the incremental '
+                      'decoder.\n'
+                      '    derenderer._detokenize_delta = lambda tokenizer, ids, '
+                      'state, **kwargs: (\n'
+                      "        ''.join(map(chr, ids)), state)\n"
+                      '    return derenderer\n'
+                      '\n'
+                      '\n'
+                      'def test_derender_reads_the_model_eos_ids_the_engine_reads():\n'
+                      '    """Both EOS sources count -- the generation config\'s list '
+                      'and the\n'
+                      "    tokenizer's EOS -- exactly as the engine's sampling "
+                      'parameters read them."""\n'
+                      '    from vllm.sampling_params import SamplingParams\n'
+                      '\n'
+                      '    derenderer = _plain_derenderer((1, 2, 3))\n'
+                      '    params = SamplingParams()\n'
+                      "    params.update_from_generation_config({'eos_token_id': [2, "
+                      '3]}, 1)\n'
+                      '    assert derenderer.eos_token_ids == params.eos_token_ids == '
+                      '{1, 2, 3}\n'
+                      '\n'
+                      '\n'
+                      '@pytest.mark.asyncio\n'
+                      "@pytest.mark.parametrize('surface', ['chat', 'completion'])\n"
+                      "@pytest.mark.parametrize('stream', [False, True])\n"
+                      "@pytest.mark.parametrize('include_stop', [False, True])\n"
+                      "@pytest.mark.parametrize('ids,stop,ends', [\n"
+                      '    # A stop with no stop_reason is an end on a model EOS id.\n'
+                      "    ([65, 66], None, 'end with 66'),\n"
+                      "    ([], None, 'are empty'),\n"
+                      "    ([65, 99], None, 'end with 99'),  # a caller's stop id "
+                      'reports that id\n'
+                      "    # A stop on a caller's stop token id ends on that id.\n"
+                      "    ([65, 66], 99, 'end with 66'),\n"
+                      "    ([65, 1], 99, 'end with 1'),\n"
+                      "    ([], 99, 'are empty'),\n"
+                      '])\n'
+                      'async def test_derender_refuses_a_stop_its_ids_do_not_end_on(\n'
+                      '        surface, stream, include_stop, ids, stop, ends):\n'
+                      '    """A choice that reports a stop on a stop token ends on '
+                      'that token, as\n'
+                      '    every choice the generate route returns does. One that does '
+                      'not is the\n'
+                      "    caller's to correct: derender names it, and takes no id's "
+                      'text away."""\n'
+                      '    from vllm.entrypoints.openai.chat_completion.protocol '
+                      'import (\n'
+                      '        ChatCompletionRequest,\n'
+                      '    )\n'
+                      '    from vllm.entrypoints.openai.completion.protocol import '
+                      'CompletionRequest\n'
+                      '    from vllm.exceptions import VLLMValidationError\n'
+                      '\n'
+                      '    derenderer = _plain_derenderer()\n'
+                      "    payload = dict(request_id='request', choices=[dict(\n"
+                      "        index=0, token_ids=ids, finish_reason='stop', "
+                      'stop_reason=stop)])\n'
+                      '    chat = ChatCompletionRequest(\n'
+                      "        model='unit', messages=[], "
+                      'include_stop_str_in_output=include_stop)\n'
+                      '    completion = CompletionRequest(\n'
+                      "        model='unit', prompt='p', "
+                      'include_stop_str_in_output=include_stop)\n'
+                      '    with pytest.raises(VLLMValidationError) as refused:\n'
+                      '        if stream:\n'
+                      '            chunk = '
+                      'GenerateStreamResponse.model_validate(payload)\n'
+                      "            if surface == 'chat':\n"
+                      "                await derenderer.derender_chat_stream('unit', "
+                      'chunk, chat_request=chat)\n'
+                      '            else:\n'
+                      '                await derenderer.derender_completion_stream(\n'
+                      "                    'unit', chunk, "
+                      'completion_request=completion)\n'
+                      '        else:\n'
+                      '            response = '
+                      'GenerateResponse.model_validate(payload)\n'
+                      "            if surface == 'chat':\n"
+                      '                derenderer._derender_chat(response, chat)\n'
+                      '            else:\n'
+                      '                derenderer._derender_completion([response], '
+                      'None, completion)\n'
+                      "    field = ('generate_chunk.choices[0]' if stream\n"
+                      "             else 'generate_response.choices[0]' if surface == "
+                      "'chat'\n"
+                      "             else 'generate_responses[0].choices[0]')\n"
+                      '    assert refused.value.parameter == field\n'
+                      "    claim = ('stop_reason null, an end on one of the model\\'s "
+                      "EOS ids [1, 2]'\n"
+                      "             if stop is None else f'stop_reason {stop}, an end "
+                      "on that stop token id')\n"
+                      '    assert f"{field} reports finish_reason \'stop\' with '
+                      '{claim}" in str(refused.value)\n'
+                      "    assert f'but its token_ids {ends}.' in str(refused.value)\n"
+                      "    assert payload['choices'][0]['token_ids'] == ids\n"
+                      '\n'
+                      '\n'
+                      "@pytest.mark.parametrize('route,body', [\n"
+                      "    ('/v1/chat/completions/derender',\n"
+                      "     {'generate_response': {'choices': [\n"
+                      "         {'index': 0, 'token_ids': [65, 66], 'finish_reason': "
+                      "'stop'}]}}),\n"
+                      "    ('/v1/chat/completions/derender',\n"
+                      "     {'stream': True, 'generate_chunk': {'choices': [\n"
+                      "         {'index': 0, 'token_ids': [66], 'finish_reason': "
+                      "'stop'}]}}),\n"
+                      "    ('/v1/completions/derender',\n"
+                      "     {'generate_responses': [\n"
+                      "         {'choices': [{'index': 0, 'token_ids': [65, 1], "
+                      "'finish_reason': 'stop'}]},\n"
+                      "         {'choices': [{'index': 0, 'token_ids': [65, 66], "
+                      "'finish_reason': 'stop',\n"
+                      "                       'stop_reason': 99}]}]}),\n"
+                      "    ('/v1/completions/derender',\n"
+                      "     {'stream': True, 'generate_chunk': {'choices': [\n"
+                      "         {'index': 0, 'token_ids': [], 'finish_reason': "
+                      "'stop'}]}}),\n"
+                      '])\n'
+                      'def test_a_contradicted_stop_is_a_400_naming_the_choice(route, '
+                      'body):\n'
+                      '    """On every derender route the refusal reaches the caller '
+                      'as a 400 whose\n'
+                      '    parameter is the choice, not as a server error."""\n'
+                      '    from fastapi import FastAPI\n'
+                      '    from fastapi.testclient import TestClient\n'
+                      '\n'
+                      '    from vllm.entrypoints.scale_out.derender.api_router import '
+                      'router\n'
+                      '    from vllm.entrypoints.scale_out.derender.serving import '
+                      'ServingDerender\n'
+                      '    from vllm.entrypoints.serve.exception_handling.register '
+                      'import (\n'
+                      '        init_exception_handler,\n'
+                      '    )\n'
+                      '\n'
+                      '    app = FastAPI()\n'
+                      '    init_exception_handler(app)\n'
+                      '    app.include_router(router)\n'
+                      '    app.state.args = SimpleNamespace(log_error_stack=False)\n'
+                      '    app.state.serving_derender = ServingDerender(\n'
+                      '        '
+                      'SimpleNamespace(model_config=SimpleNamespace(max_model_len=64, '
+                      'max_logprobs=0),\n'
+                      "                        model_name=lambda: 'unit'),\n"
+                      '        _plain_derenderer(),\n'
+                      '    )\n'
+                      '    response = TestClient(app).post(route, json=body)\n'
+                      '    assert response.status_code == 400\n'
+                      "    error = response.json()['error']\n"
+                      '    choice = {\n'
+                      "        '/v1/chat/completions/derender': "
+                      "'generate_response.choices[0]',\n"
+                      "        '/v1/completions/derender': "
+                      "'generate_responses[1].choices[0]',\n"
+                      "    }[route] if not body.get('stream') else "
+                      "'generate_chunk.choices[0]'\n"
+                      "    assert error['param'] == choice\n"
+                      '    assert error[\'message\'].startswith(f"{choice} reports '
+                      'finish_reason \'stop\'")\n',
+             'review_before': '    else:\n'
+                              '        assert not choice.message.tool_calls\n'
+                              '        assert choice.message.content == body\n',
+             'review_after': '    else:\n'
+                             '        assert not choice.message.tool_calls\n'
+                             '        assert choice.message.content == body\n'
+                             '\n'
+                             '\n'
+                             'def _plain_derenderer(eos_token_ids=(1, 2)):\n'
+                             '    """A derenderer without a parser over a '
+                             'one-character-per-id tokenizer,\n'
+                             "    given the model's EOS ids through the inputs the "
+                             'engine reads them from."""\n'
+                             '    tokenizer = SimpleNamespace(decode=lambda ids, '
+                             "**kwargs: ''.join(map(chr, ids)))\n"
+                             '    first, *rest = eos_token_ids\n'
+                             '    derenderer = OnlineDerenderer(\n'
+                             '        SimpleNamespace(\n'
+                             '            '
+                             "hf_config=SimpleNamespace(model_type='unit'), "
+                             "model='unit',\n"
+                             '            try_get_generation_config=lambda: '
+                             "{'eos_token_id': rest},\n"
+                             '        ),\n'
+                             '        SimpleNamespace(get_tokenizer=lambda: '
+                             'tokenizer,\n'
+                             '                        get_eos_token_id=lambda: first, '
+                             '_executor=None),\n'
+                             '        request_logger=None, chat_template=None,\n'
+                             "        chat_template_content_format='openai',\n"
+                             '    )\n'
+                             '    # The token-transport boundary, not the incremental '
+                             'decoder.\n'
+                             '    derenderer._detokenize_delta = lambda tokenizer, '
+                             'ids, state, **kwargs: (\n'
+                             "        ''.join(map(chr, ids)), state)\n"
+                             '    return derenderer\n'
+                             '\n'
+                             '\n'
+                             'def '
+                             'test_derender_reads_the_model_eos_ids_the_engine_reads():\n'
+                             '    """Both EOS sources count -- the generation '
+                             "config's list and the\n"
+                             "    tokenizer's EOS -- exactly as the engine's sampling "
+                             'parameters read them."""\n'
+                             '    from vllm.sampling_params import SamplingParams\n'
+                             '\n'
+                             '    derenderer = _plain_derenderer((1, 2, 3))\n'
+                             '    params = SamplingParams()\n'
+                             '    '
+                             "params.update_from_generation_config({'eos_token_id': "
+                             '[2, 3]}, 1)\n'
+                             '    assert derenderer.eos_token_ids == '
+                             'params.eos_token_ids == {1, 2, 3}\n'
+                             '\n'
+                             '\n'
+                             '@pytest.mark.asyncio\n'
+                             "@pytest.mark.parametrize('surface', ['chat', "
+                             "'completion'])\n"
+                             "@pytest.mark.parametrize('stream', [False, True])\n"
+                             "@pytest.mark.parametrize('include_stop', [False, True])\n"
+                             "@pytest.mark.parametrize('ids,stop,ends', [\n"
+                             '    # A stop with no stop_reason is an end on a model '
+                             'EOS id.\n'
+                             "    ([65, 66], None, 'end with 66'),\n"
+                             "    ([], None, 'are empty'),\n"
+                             "    ([65, 99], None, 'end with 99'),  # a caller's stop "
+                             'id reports that id\n'
+                             "    # A stop on a caller's stop token id ends on that "
+                             'id.\n'
+                             "    ([65, 66], 99, 'end with 66'),\n"
+                             "    ([65, 1], 99, 'end with 1'),\n"
+                             "    ([], 99, 'are empty'),\n"
+                             '])\n'
+                             'async def '
+                             'test_derender_refuses_a_stop_its_ids_do_not_end_on(\n'
+                             '        surface, stream, include_stop, ids, stop, '
+                             'ends):\n'
+                             '    """A choice that reports a stop on a stop token ends '
+                             'on that token, as\n'
+                             '    every choice the generate route returns does. One '
+                             'that does not is the\n'
+                             "    caller's to correct: derender names it, and takes no "
+                             'id\'s text away."""\n'
+                             '    from '
+                             'vllm.entrypoints.openai.chat_completion.protocol import '
+                             '(\n'
+                             '        ChatCompletionRequest,\n'
+                             '    )\n'
+                             '    from vllm.entrypoints.openai.completion.protocol '
+                             'import CompletionRequest\n'
+                             '    from vllm.exceptions import VLLMValidationError\n'
+                             '\n'
+                             '    derenderer = _plain_derenderer()\n'
+                             "    payload = dict(request_id='request', choices=[dict(\n"
+                             "        index=0, token_ids=ids, finish_reason='stop', "
+                             'stop_reason=stop)])\n'
+                             '    chat = ChatCompletionRequest(\n'
+                             "        model='unit', messages=[], "
+                             'include_stop_str_in_output=include_stop)\n'
+                             '    completion = CompletionRequest(\n'
+                             "        model='unit', prompt='p', "
+                             'include_stop_str_in_output=include_stop)\n'
+                             '    with pytest.raises(VLLMValidationError) as refused:\n'
+                             '        if stream:\n'
+                             '            chunk = '
+                             'GenerateStreamResponse.model_validate(payload)\n'
+                             "            if surface == 'chat':\n"
+                             '                await '
+                             "derenderer.derender_chat_stream('unit', chunk, "
+                             'chat_request=chat)\n'
+                             '            else:\n'
+                             '                await '
+                             'derenderer.derender_completion_stream(\n'
+                             "                    'unit', chunk, "
+                             'completion_request=completion)\n'
+                             '        else:\n'
+                             '            response = '
+                             'GenerateResponse.model_validate(payload)\n'
+                             "            if surface == 'chat':\n"
+                             '                derenderer._derender_chat(response, '
+                             'chat)\n'
+                             '            else:\n'
+                             '                '
+                             'derenderer._derender_completion([response], None, '
+                             'completion)\n'
+                             "    field = ('generate_chunk.choices[0]' if stream\n"
+                             "             else 'generate_response.choices[0]' if "
+                             "surface == 'chat'\n"
+                             "             else 'generate_responses[0].choices[0]')\n"
+                             '    assert refused.value.parameter == field\n'
+                             "    claim = ('stop_reason null, an end on one of the "
+                             "model\\'s EOS ids [1, 2]'\n"
+                             "             if stop is None else f'stop_reason {stop}, "
+                             "an end on that stop token id')\n"
+                             '    assert f"{field} reports finish_reason \'stop\' with '
+                             '{claim}" in str(refused.value)\n'
+                             "    assert f'but its token_ids {ends}.' in "
+                             'str(refused.value)\n'
+                             "    assert payload['choices'][0]['token_ids'] == ids\n"
+                             '\n'
+                             '\n'
+                             "@pytest.mark.parametrize('route,body', [\n"
+                             "    ('/v1/chat/completions/derender',\n"
+                             "     {'generate_response': {'choices': [\n"
+                             "         {'index': 0, 'token_ids': [65, 66], "
+                             "'finish_reason': 'stop'}]}}),\n"
+                             "    ('/v1/chat/completions/derender',\n"
+                             "     {'stream': True, 'generate_chunk': {'choices': [\n"
+                             "         {'index': 0, 'token_ids': [66], "
+                             "'finish_reason': 'stop'}]}}),\n"
+                             "    ('/v1/completions/derender',\n"
+                             "     {'generate_responses': [\n"
+                             "         {'choices': [{'index': 0, 'token_ids': [65, 1], "
+                             "'finish_reason': 'stop'}]},\n"
+                             "         {'choices': [{'index': 0, 'token_ids': [65, "
+                             "66], 'finish_reason': 'stop',\n"
+                             "                       'stop_reason': 99}]}]}),\n"
+                             "    ('/v1/completions/derender',\n"
+                             "     {'stream': True, 'generate_chunk': {'choices': [\n"
+                             "         {'index': 0, 'token_ids': [], 'finish_reason': "
+                             "'stop'}]}}),\n"
+                             '])\n'
+                             'def '
+                             'test_a_contradicted_stop_is_a_400_naming_the_choice(route, '
+                             'body):\n'
+                             '    """On every derender route the refusal reaches the '
+                             'caller as a 400 whose\n'
+                             '    parameter is the choice, not as a server error."""\n'
+                             '    from fastapi import FastAPI\n'
+                             '    from fastapi.testclient import TestClient\n'
+                             '\n'
+                             '    from vllm.entrypoints.scale_out.derender.api_router '
+                             'import router\n'
+                             '    from vllm.entrypoints.scale_out.derender.serving '
+                             'import ServingDerender\n'
+                             '    from '
+                             'vllm.entrypoints.serve.exception_handling.register '
+                             'import (\n'
+                             '        init_exception_handler,\n'
+                             '    )\n'
+                             '\n'
+                             '    app = FastAPI()\n'
+                             '    init_exception_handler(app)\n'
+                             '    app.include_router(router)\n'
+                             '    app.state.args = '
+                             'SimpleNamespace(log_error_stack=False)\n'
+                             '    app.state.serving_derender = ServingDerender(\n'
+                             '        '
+                             'SimpleNamespace(model_config=SimpleNamespace(max_model_len=64, '
+                             'max_logprobs=0),\n'
+                             "                        model_name=lambda: 'unit'),\n"
+                             '        _plain_derenderer(),\n'
+                             '    )\n'
+                             '    response = TestClient(app).post(route, json=body)\n'
+                             '    assert response.status_code == 400\n'
+                             "    error = response.json()['error']\n"
+                             '    choice = {\n'
+                             "        '/v1/chat/completions/derender': "
+                             "'generate_response.choices[0]',\n"
+                             "        '/v1/completions/derender': "
+                             "'generate_responses[1].choices[0]',\n"
+                             "    }[route] if not body.get('stream') else "
+                             "'generate_chunk.choices[0]'\n"
+                             "    assert error['param'] == choice\n"
+                             '    assert error[\'message\'].startswith(f"{choice} '
+                             'reports finish_reason \'stop\'")\n'},
             {'name': 'vllm/renderers/online_derenderer.py:landmark-1',
              'path': 'vllm/renderers/online_derenderer.py',
-             'before': 'from vllm.tokenizers.detokenizer_utils import '
+             'before': '    GenerateStreamResponse,\n'
+                       ')\n'
+                       'from vllm.entrypoints.serve.utils.request_logger import '
+                       'RequestLogger\n'
+                       'from vllm.logger import init_logger\n'
+                       'from vllm.parser import Parser, ParserManager\n'
+                       'from vllm.renderers import BaseRenderer\n'
+                       'from vllm.tokenizers import TokenizerLike\n'
+                       'from vllm.tokenizers.detokenizer_utils import '
                        'detokenize_incrementally\n'
                        'from vllm.utils import random_uuid\n'
                        'from vllm.utils.async_utils import make_async\n'
                        '\n'
                        'logger = init_logger(__name__)\n'
                        '\n',
-             'after': 'from vllm.tokenizers.detokenizer_utils import '
+             'after': '    GenerateStreamResponse,\n'
+                      ')\n'
+                      'from vllm.entrypoints.serve.utils.request_logger import '
+                      'RequestLogger\n'
+                      'from vllm.exceptions import VLLMValidationError\n'
+                      'from vllm.logger import init_logger\n'
+                      'from vllm.parser import Parser, ParserManager\n'
+                      'from vllm.renderers import BaseRenderer\n'
+                      'from vllm.sampling_params import model_eos_token_ids\n'
+                      'from vllm.tokenizers import TokenizerLike\n'
+                      'from vllm.tokenizers.detokenizer_utils import '
                       'detokenize_incrementally\n'
                       'from vllm.utils import random_uuid\n'
                       'from vllm.utils.async_utils import make_async\n'
@@ -132092,14 +133114,32 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '\n'
                       'logger = init_logger(__name__)\n'
                       '\n',
-             'review_before': 'from vllm.tokenizers.detokenizer_utils import '
+             'review_before': '    GenerateStreamResponse,\n'
+                              ')\n'
+                              'from vllm.entrypoints.serve.utils.request_logger import '
+                              'RequestLogger\n'
+                              'from vllm.logger import init_logger\n'
+                              'from vllm.parser import Parser, ParserManager\n'
+                              'from vllm.renderers import BaseRenderer\n'
+                              'from vllm.tokenizers import TokenizerLike\n'
+                              'from vllm.tokenizers.detokenizer_utils import '
                               'detokenize_incrementally\n'
                               'from vllm.utils import random_uuid\n'
                               'from vllm.utils.async_utils import make_async\n'
                               '\n'
                               'logger = init_logger(__name__)\n'
                               '\n',
-             'review_after': 'from vllm.tokenizers.detokenizer_utils import '
+             'review_after': '    GenerateStreamResponse,\n'
+                             ')\n'
+                             'from vllm.entrypoints.serve.utils.request_logger import '
+                             'RequestLogger\n'
+                             'from vllm.exceptions import VLLMValidationError\n'
+                             'from vllm.logger import init_logger\n'
+                             'from vllm.parser import Parser, ParserManager\n'
+                             'from vllm.renderers import BaseRenderer\n'
+                             'from vllm.sampling_params import model_eos_token_ids\n'
+                             'from vllm.tokenizers import TokenizerLike\n'
+                             'from vllm.tokenizers.detokenizer_utils import '
                              'detokenize_incrementally\n'
                              'from vllm.utils import random_uuid\n'
                              'from vllm.utils.async_utils import make_async\n'
@@ -132110,7 +133150,58 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '\n'},
             {'name': 'vllm/renderers/online_derenderer.py:landmark-2',
              'path': 'vllm/renderers/online_derenderer.py',
-             'before': '                else None\n'
+             'before': '        self.model_config = model_config\n'
+                       '        self.renderer = renderer\n'
+                       '        self.request_logger = request_logger\n'
+                       '\n'
+                       '        self.enable_auto_tools = enable_auto_tools\n'
+                       '        self.exclude_tools_when_tool_choice_none = '
+                       'exclude_tools_when_tool_choice_none\n',
+             'after': '        self.model_config = model_config\n'
+                      '        self.renderer = renderer\n'
+                      '        self.request_logger = request_logger\n'
+                      '        # What the engine ends a generation on with no '
+                      'stop_reason, from the\n'
+                      '        # inputs the engine reads it from.\n'
+                      '        self.eos_token_ids = model_eos_token_ids(\n'
+                      '            model_config.try_get_generation_config(), '
+                      'renderer.get_eos_token_id()\n'
+                      '        )\n'
+                      '\n'
+                      '        self.enable_auto_tools = enable_auto_tools\n'
+                      '        self.exclude_tools_when_tool_choice_none = '
+                      'exclude_tools_when_tool_choice_none\n',
+             'review_before': '        self.model_config = model_config\n'
+                              '        self.renderer = renderer\n'
+                              '        self.request_logger = request_logger\n'
+                              '\n'
+                              '        self.enable_auto_tools = enable_auto_tools\n'
+                              '        self.exclude_tools_when_tool_choice_none = '
+                              'exclude_tools_when_tool_choice_none\n',
+             'review_after': '        self.model_config = model_config\n'
+                             '        self.renderer = renderer\n'
+                             '        self.request_logger = request_logger\n'
+                             '        # What the engine ends a generation on with no '
+                             'stop_reason, from the\n'
+                             '        # inputs the engine reads it from.\n'
+                             '        self.eos_token_ids = model_eos_token_ids(\n'
+                             '            model_config.try_get_generation_config(), '
+                             'renderer.get_eos_token_id()\n'
+                             '        )\n'
+                             '\n'
+                             '        self.enable_auto_tools = enable_auto_tools\n'
+                             '        self.exclude_tools_when_tool_choice_none = '
+                             'exclude_tools_when_tool_choice_none\n'},
+            {'name': 'vllm/renderers/online_derenderer.py:landmark-3',
+             'path': 'vllm/renderers/online_derenderer.py',
+             'before': '        tokenizer = self.renderer.get_tokenizer()\n'
+                       '        choices: list[ChatCompletionResponseChoice] = []\n'
+                       '\n'
+                       '        for choice in generate_response.choices:\n'
+                       '            resolved_logprobs = (\n'
+                       '                _resolve_logprobs(choice.logprobs, tokenizer)\n'
+                       '                if choice.logprobs is not None\n'
+                       '                else None\n'
                        '            )\n'
                        '\n'
                        '            if self.parser is not None and chat_request is not '
@@ -132126,7 +133217,15 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                        '                )\n'
                        '\n'
                        '                chat_template_kwargs: dict[str, Any] = {}\n',
-             'after': '                else None\n'
+             'after': '        tokenizer = self.renderer.get_tokenizer()\n'
+                      '        choices: list[ChatCompletionResponseChoice] = []\n'
+                      '\n'
+                      '        for position, choice in '
+                      'enumerate(generate_response.choices):\n'
+                      '            resolved_logprobs = (\n'
+                      '                _resolve_logprobs(choice.logprobs, tokenizer)\n'
+                      '                if choice.logprobs is not None\n'
+                      '                else None\n'
                       '            )\n'
                       '\n'
                       '            text_ids = _text_token_ids(\n'
@@ -132135,6 +133234,9 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '                choice.stop_reason,\n'
                       '                chat_request is not None and '
                       'chat_request.include_stop_str_in_output,\n'
+                      '                eos_token_ids=self.eos_token_ids,\n'
+                      '                '
+                      'field=f"generate_response.choices[{position}]",\n'
                       '            )\n'
                       '            if self.parser is not None and chat_request is not '
                       'None:\n'
@@ -132152,7 +133254,16 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '                )\n'
                       '\n'
                       '                chat_template_kwargs: dict[str, Any] = {}\n',
-             'review_before': '                else None\n'
+             'review_before': '        tokenizer = self.renderer.get_tokenizer()\n'
+                              '        choices: list[ChatCompletionResponseChoice] = '
+                              '[]\n'
+                              '\n'
+                              '        for choice in generate_response.choices:\n'
+                              '            resolved_logprobs = (\n'
+                              '                _resolve_logprobs(choice.logprobs, '
+                              'tokenizer)\n'
+                              '                if choice.logprobs is not None\n'
+                              '                else None\n'
                               '            )\n'
                               '\n'
                               '            if self.parser is not None and chat_request '
@@ -132170,7 +133281,17 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                               '\n'
                               '                chat_template_kwargs: dict[str, Any] = '
                               '{}\n',
-             'review_after': '                else None\n'
+             'review_after': '        tokenizer = self.renderer.get_tokenizer()\n'
+                             '        choices: list[ChatCompletionResponseChoice] = '
+                             '[]\n'
+                             '\n'
+                             '        for position, choice in '
+                             'enumerate(generate_response.choices):\n'
+                             '            resolved_logprobs = (\n'
+                             '                _resolve_logprobs(choice.logprobs, '
+                             'tokenizer)\n'
+                             '                if choice.logprobs is not None\n'
+                             '                else None\n'
                              '            )\n'
                              '\n'
                              '            text_ids = _text_token_ids(\n'
@@ -132179,6 +133300,9 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '                choice.stop_reason,\n'
                              '                chat_request is not None and '
                              'chat_request.include_stop_str_in_output,\n'
+                             '                eos_token_ids=self.eos_token_ids,\n'
+                             '                '
+                             'field=f"generate_response.choices[{position}]",\n'
                              '            )\n'
                              '            if self.parser is not None and chat_request '
                              'is not None:\n'
@@ -132198,7 +133322,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '\n'
                              '                chat_template_kwargs: dict[str, Any] = '
                              '{}\n'},
-            {'name': 'vllm/renderers/online_derenderer.py:landmark-3',
+            {'name': 'vllm/renderers/online_derenderer.py:landmark-4',
              'path': 'vllm/renderers/online_derenderer.py',
              'before': '                    if chat_request is not None\n'
                        '                    else True\n'
@@ -132240,7 +133364,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '                message = ChatMessage(role="assistant", '
                              'content=decoded_text)\n'
                              '\n'},
-            {'name': 'vllm/renderers/online_derenderer.py:landmark-4',
+            {'name': 'vllm/renderers/online_derenderer.py:landmark-5',
              'path': 'vllm/renderers/online_derenderer.py',
              'before': '\n'
                        '        return choices\n'
@@ -132316,7 +133440,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    def _detokenize_delta(\n'
                              '        self,\n'
                              '        tokenizer: TokenizerLike,\n'},
-            {'name': 'vllm/renderers/online_derenderer.py:landmark-5',
+            {'name': 'vllm/renderers/online_derenderer.py:landmark-6',
              'path': 'vllm/renderers/online_derenderer.py',
              'before': '        stream_choices: '
                        'list[ChatCompletionResponseStreamChoice] = []\n'
@@ -132327,26 +133451,29 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                        '            new_text, updated_state = self._detokenize_delta(\n'
                        '                tokenizer, delta_tids, updated_state, '
                        'skip_special_tokens=skip_special\n'
-                       '            )\n'
-                       '\n',
+                       '            )\n',
              'after': '        stream_choices: '
                       'list[ChatCompletionResponseStreamChoice] = []\n'
                       '        updated_state = state\n'
                       '\n'
-                      '        for choice in generate_chunk.choices:\n'
+                      '        for position, choice in '
+                      'enumerate(generate_chunk.choices):\n'
                       '            delta_tids = _text_token_ids(\n'
                       '                choice.token_ids or [],\n'
                       '                choice.finish_reason,\n'
                       '                choice.stop_reason,\n'
                       '                chat_request is not None and '
                       'chat_request.include_stop_str_in_output,\n'
+                      '                eos_token_ids=self.eos_token_ids,\n'
+                      '                field=f"generate_chunk.choices[{position}]",\n'
                       '            )\n'
                       '            new_text, updated_state = self._detokenize_delta(\n'
                       '                tokenizer, delta_tids, updated_state, '
                       'skip_special_tokens=skip_special\n'
-                      '            )\n'
-                      '\n',
-             'review_before': '        updated_state = state\n'
+                      '            )\n',
+             'review_before': '        stream_choices: '
+                              'list[ChatCompletionResponseStreamChoice] = []\n'
+                              '        updated_state = state\n'
                               '\n'
                               '        for choice in generate_chunk.choices:\n'
                               '            delta_tids = choice.token_ids or []\n'
@@ -132355,24 +133482,32 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                               '                tokenizer, delta_tids, updated_state, '
                               'skip_special_tokens=skip_special\n'
                               '            )\n',
-             'review_after': '        updated_state = state\n'
+             'review_after': '        stream_choices: '
+                             'list[ChatCompletionResponseStreamChoice] = []\n'
+                             '        updated_state = state\n'
                              '\n'
-                             '        for choice in generate_chunk.choices:\n'
+                             '        for position, choice in '
+                             'enumerate(generate_chunk.choices):\n'
                              '            delta_tids = _text_token_ids(\n'
                              '                choice.token_ids or [],\n'
                              '                choice.finish_reason,\n'
                              '                choice.stop_reason,\n'
                              '                chat_request is not None and '
                              'chat_request.include_stop_str_in_output,\n'
+                             '                eos_token_ids=self.eos_token_ids,\n'
+                             '                '
+                             'field=f"generate_chunk.choices[{position}]",\n'
                              '            )\n'
                              '            new_text, updated_state = '
                              'self._detokenize_delta(\n'
                              '                tokenizer, delta_tids, updated_state, '
                              'skip_special_tokens=skip_special\n'
                              '            )\n'},
-            {'name': 'vllm/renderers/online_derenderer.py:landmark-6',
+            {'name': 'vllm/renderers/online_derenderer.py:landmark-7',
              'path': 'vllm/renderers/online_derenderer.py',
-             'before': '\n'
+             'before': '        total_completion_tokens = 0\n'
+                       '        index = 0\n'
+                       '\n'
                        '        for gen, pt in zip(generate_responses, '
                        'prompt_tokens_list):\n'
                        '            for choice in gen.choices:\n'
@@ -132382,10 +133517,13 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                        '                )\n'
                        '                completion_logprobs = None\n'
                        '                if choice.logprobs is not None:\n',
-             'after': '\n'
-                      '        for gen, pt in zip(generate_responses, '
-                      'prompt_tokens_list):\n'
-                      '            for choice in gen.choices:\n'
+             'after': '        total_completion_tokens = 0\n'
+                      '        index = 0\n'
+                      '\n'
+                      '        responses = zip(generate_responses, '
+                      'prompt_tokens_list)\n'
+                      '        for response, (gen, pt) in enumerate(responses):\n'
+                      '            for position, choice in enumerate(gen.choices):\n'
                       '                decoded_text = self._decode(\n'
                       '                    tokenizer,\n'
                       '                    _text_token_ids(\n'
@@ -132395,12 +133533,17 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '                        completion_request is not None\n'
                       '                        and '
                       'completion_request.include_stop_str_in_output,\n'
+                      '                        eos_token_ids=self.eos_token_ids,\n'
+                      '                        '
+                      'field=f"generate_responses[{response}].choices[{position}]",\n'
                       '                    ),\n'
                       '                    skip_special_tokens=skip_special,\n'
                       '                )\n'
                       '                completion_logprobs = None\n'
                       '                if choice.logprobs is not None:\n',
-             'review_before': '\n'
+             'review_before': '        total_completion_tokens = 0\n'
+                              '        index = 0\n'
+                              '\n'
                               '        for gen, pt in zip(generate_responses, '
                               'prompt_tokens_list):\n'
                               '            for choice in gen.choices:\n'
@@ -132410,10 +133553,15 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                               '                )\n'
                               '                completion_logprobs = None\n'
                               '                if choice.logprobs is not None:\n',
-             'review_after': '\n'
-                             '        for gen, pt in zip(generate_responses, '
-                             'prompt_tokens_list):\n'
-                             '            for choice in gen.choices:\n'
+             'review_after': '        total_completion_tokens = 0\n'
+                             '        index = 0\n'
+                             '\n'
+                             '        responses = zip(generate_responses, '
+                             'prompt_tokens_list)\n'
+                             '        for response, (gen, pt) in '
+                             'enumerate(responses):\n'
+                             '            for position, choice in '
+                             'enumerate(gen.choices):\n'
                              '                decoded_text = self._decode(\n'
                              '                    tokenizer,\n'
                              '                    _text_token_ids(\n'
@@ -132423,14 +133571,20 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '                        completion_request is not None\n'
                              '                        and '
                              'completion_request.include_stop_str_in_output,\n'
+                             '                        '
+                             'eos_token_ids=self.eos_token_ids,\n'
+                             '                        '
+                             'field=f"generate_responses[{response}].choices[{position}]",\n'
                              '                    ),\n'
                              '                    skip_special_tokens=skip_special,\n'
                              '                )\n'
                              '                completion_logprobs = None\n'
                              '                if choice.logprobs is not None:\n'},
-            {'name': 'vllm/renderers/online_derenderer.py:landmark-7',
+            {'name': 'vllm/renderers/online_derenderer.py:landmark-8',
              'path': 'vllm/renderers/online_derenderer.py',
-             'before': '        updated_state = state\n'
+             'before': '        stream_choices: list[CompletionResponseStreamChoice] = '
+                       '[]\n'
+                       '        updated_state = state\n'
                        '\n'
                        '        for choice in generate_chunk.choices:\n'
                        '            delta_tids = choice.token_ids or []\n'
@@ -132438,9 +133592,12 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                        '                tokenizer, delta_tids, updated_state, '
                        'skip_special_tokens=skip_special\n'
                        '            )\n',
-             'after': '        updated_state = state\n'
+             'after': '        stream_choices: list[CompletionResponseStreamChoice] = '
+                      '[]\n'
+                      '        updated_state = state\n'
                       '\n'
-                      '        for choice in generate_chunk.choices:\n'
+                      '        for position, choice in '
+                      'enumerate(generate_chunk.choices):\n'
                       '            delta_tids = _text_token_ids(\n'
                       '                choice.token_ids or [],\n'
                       '                choice.finish_reason,\n'
@@ -132448,12 +133605,16 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '                completion_request is not None\n'
                       '                and '
                       'completion_request.include_stop_str_in_output,\n'
+                      '                eos_token_ids=self.eos_token_ids,\n'
+                      '                field=f"generate_chunk.choices[{position}]",\n'
                       '            )\n'
                       '            new_text, updated_state = self._detokenize_delta(\n'
                       '                tokenizer, delta_tids, updated_state, '
                       'skip_special_tokens=skip_special\n'
                       '            )\n',
-             'review_before': '        updated_state = state\n'
+             'review_before': '        stream_choices: '
+                              'list[CompletionResponseStreamChoice] = []\n'
+                              '        updated_state = state\n'
                               '\n'
                               '        for choice in generate_chunk.choices:\n'
                               '            delta_tids = choice.token_ids or []\n'
@@ -132462,9 +133623,12 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                               '                tokenizer, delta_tids, updated_state, '
                               'skip_special_tokens=skip_special\n'
                               '            )\n',
-             'review_after': '        updated_state = state\n'
+             'review_after': '        stream_choices: '
+                             'list[CompletionResponseStreamChoice] = []\n'
+                             '        updated_state = state\n'
                              '\n'
-                             '        for choice in generate_chunk.choices:\n'
+                             '        for position, choice in '
+                             'enumerate(generate_chunk.choices):\n'
                              '            delta_tids = _text_token_ids(\n'
                              '                choice.token_ids or [],\n'
                              '                choice.finish_reason,\n'
@@ -132472,13 +133636,16 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '                completion_request is not None\n'
                              '                and '
                              'completion_request.include_stop_str_in_output,\n'
+                             '                eos_token_ids=self.eos_token_ids,\n'
+                             '                '
+                             'field=f"generate_chunk.choices[{position}]",\n'
                              '            )\n'
                              '            new_text, updated_state = '
                              'self._detokenize_delta(\n'
                              '                tokenizer, delta_tids, updated_state, '
                              'skip_special_tokens=skip_special\n'
                              '            )\n'},
-            {'name': 'vllm/renderers/online_derenderer.py:landmark-8',
+            {'name': 'vllm/renderers/online_derenderer.py:landmark-9',
              'path': 'vllm/renderers/online_derenderer.py',
              'before': '        return chunk, updated_state\n'
                        '\n'
@@ -132495,13 +133662,63 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '    finish_reason: str | None,\n'
                       '    stop_reason: int | str | None,\n'
                       '    include_stop_str_in_output: bool,\n'
+                      '    *,\n'
+                      '    eos_token_ids: set[int],\n'
+                      '    field: str,\n'
                       ') -> list[int]:\n'
                       '    """The ids of a generated choice that carry text, as on the '
-                      'chat route."""\n'
+                      'chat route.\n'
+                      '\n'
+                      '    The finish metadata says whether the last id is the stop '
+                      'token the\n'
+                      '    generation ended on, which shows no text. The detokenizer '
+                      'is told so by\n'
+                      '    the engine that stopped; derender is told so by its caller, '
+                      'and holds the\n'
+                      '    caller to it: a stop with no stop_reason ends on one of the '
+                      "model's EOS\n"
+                      '    ids, a stop on a stop token id ends on that id. A choice '
+                      'whose ids say\n'
+                      '    otherwise is refused, naming it, and no id loses its text.\n'
+                      '\n'
+                      '    A stop string ends on ordinary text, and derender does not '
+                      'cut the text\n'
+                      '    at it: the string, and whatever the ids decode to after it, '
+                      'stay in the\n'
+                      "    text, which the chat route's detokenizer, having matched "
+                      'the string,\n'
+                      '    ends before it (after it when stop text is asked for).\n'
+                      '    """\n'
+                      '    stop_terminated = ended_on_stop_token(finish_reason, '
+                      'stop_reason)\n'
+                      '    if stop_terminated:\n'
+                      '        last = token_ids[-1] if token_ids else None\n'
+                      '        if stop_reason is None:\n'
+                      '            ends_on_it = last in eos_token_ids\n'
+                      '            claim = (\n'
+                      '                "stop_reason null, an end on one of the '
+                      'model\'s EOS ids "\n'
+                      '                f"{sorted(eos_token_ids)}"\n'
+                      '            )\n'
+                      '        else:\n'
+                      '            ends_on_it = last == stop_reason\n'
+                      '            claim = f"stop_reason {stop_reason}, an end on that '
+                      'stop token id"\n'
+                      '        if not ends_on_it:\n'
+                      '            ids = "are empty" if last is None else f"end with '
+                      '{last}"\n'
+                      '            raise VLLMValidationError(\n'
+                      '                f"{field} reports finish_reason \'stop\' with '
+                      '{claim}, but its "\n'
+                      '                f"token_ids {ids}. Send the choice\'s '
+                      'token_ids, finish_reason "\n'
+                      '                "and stop_reason as /inference/v1/generate '
+                      'returned them.",\n'
+                      '                parameter=field,\n'
+                      '            )\n'
                       '    text_ids, _ = split_stop_token(\n'
                       '        list(token_ids),\n'
-                      '        stop_terminated=ended_on_stop_token(finish_reason, '
-                      'stop_reason),\n'
+                      '        stop_terminated=stop_terminated,\n'
                       '        include_stop_str_in_output=include_stop_str_in_output,\n'
                       '    )\n'
                       '    return text_ids\n'
@@ -132527,14 +133744,65 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    finish_reason: str | None,\n'
                              '    stop_reason: int | str | None,\n'
                              '    include_stop_str_in_output: bool,\n'
+                             '    *,\n'
+                             '    eos_token_ids: set[int],\n'
+                             '    field: str,\n'
                              ') -> list[int]:\n'
                              '    """The ids of a generated choice that carry text, as '
-                             'on the chat route."""\n'
+                             'on the chat route.\n'
+                             '\n'
+                             '    The finish metadata says whether the last id is the '
+                             'stop token the\n'
+                             '    generation ended on, which shows no text. The '
+                             'detokenizer is told so by\n'
+                             '    the engine that stopped; derender is told so by its '
+                             'caller, and holds the\n'
+                             '    caller to it: a stop with no stop_reason ends on one '
+                             "of the model's EOS\n"
+                             '    ids, a stop on a stop token id ends on that id. A '
+                             'choice whose ids say\n'
+                             '    otherwise is refused, naming it, and no id loses its '
+                             'text.\n'
+                             '\n'
+                             '    A stop string ends on ordinary text, and derender '
+                             'does not cut the text\n'
+                             '    at it: the string, and whatever the ids decode to '
+                             'after it, stay in the\n'
+                             "    text, which the chat route's detokenizer, having "
+                             'matched the string,\n'
+                             '    ends before it (after it when stop text is asked '
+                             'for).\n'
+                             '    """\n'
+                             '    stop_terminated = ended_on_stop_token(finish_reason, '
+                             'stop_reason)\n'
+                             '    if stop_terminated:\n'
+                             '        last = token_ids[-1] if token_ids else None\n'
+                             '        if stop_reason is None:\n'
+                             '            ends_on_it = last in eos_token_ids\n'
+                             '            claim = (\n'
+                             '                "stop_reason null, an end on one of the '
+                             'model\'s EOS ids "\n'
+                             '                f"{sorted(eos_token_ids)}"\n'
+                             '            )\n'
+                             '        else:\n'
+                             '            ends_on_it = last == stop_reason\n'
+                             '            claim = f"stop_reason {stop_reason}, an end '
+                             'on that stop token id"\n'
+                             '        if not ends_on_it:\n'
+                             '            ids = "are empty" if last is None else f"end '
+                             'with {last}"\n'
+                             '            raise VLLMValidationError(\n'
+                             '                f"{field} reports finish_reason \'stop\' '
+                             'with {claim}, but its "\n'
+                             '                f"token_ids {ids}. Send the choice\'s '
+                             'token_ids, finish_reason "\n'
+                             '                "and stop_reason as '
+                             '/inference/v1/generate returned them.",\n'
+                             '                parameter=field,\n'
+                             '            )\n'
                              '    text_ids, _ = split_stop_token(\n'
                              '        list(token_ids),\n'
-                             '        '
-                             'stop_terminated=ended_on_stop_token(finish_reason, '
-                             'stop_reason),\n'
+                             '        stop_terminated=stop_terminated,\n'
                              '        '
                              'include_stop_str_in_output=include_stop_str_in_output,\n'
                              '    )\n'
@@ -132722,7 +133990,136 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '        )\n'
                              '\n'
                              '        stop_string = None\n'
-                             '        for new_token_id in new_token_ids:\n'})},
+                             '        for new_token_id in new_token_ids:\n'},
+            {'name': 'vllm/sampling_params.py:landmark-1',
+             'path': 'vllm/sampling_params.py',
+             'before': '    return server_budget if requested is None else '
+                       'min(requested, server_budget)\n'
+                       '\n'
+                       '\n'
+                       'class SamplingParams(\n'
+                       '    PydanticMsgspecMixin,\n'
+                       '    msgspec.Struct,\n',
+             'after': '    return server_budget if requested is None else '
+                      'min(requested, server_budget)\n'
+                      '\n'
+                      '\n'
+                      'def model_eos_token_ids(\n'
+                      '    generation_config: dict[str, Any], eos_token_id: int | '
+                      'None\n'
+                      ') -> set[int]:\n'
+                      '    """The ids on which the model itself ends a generation.\n'
+                      '\n'
+                      "    The generation config's ``eos_token_id`` (one id or a list) "
+                      'and the\n'
+                      "    tokenizer's EOS. Unless a request sets ``ignore_eos``, the "
+                      'engine ends a\n'
+                      '    generation on one of these and reports no ``stop_reason``.\n'
+                      '    """\n'
+                      '    eos_ids = generation_config.get("eos_token_id")\n'
+                      '    ids = {eos_ids} if isinstance(eos_ids, int) else '
+                      'set(eos_ids or ())\n'
+                      '    if eos_token_id is not None:\n'
+                      '        ids.add(eos_token_id)\n'
+                      '    return ids\n'
+                      '\n'
+                      '\n'
+                      'class SamplingParams(\n'
+                      '    PydanticMsgspecMixin,\n'
+                      '    msgspec.Struct,\n',
+             'review_before': '    return server_budget if requested is None else '
+                              'min(requested, server_budget)\n'
+                              '\n'
+                              '\n'
+                              'class SamplingParams(\n'
+                              '    PydanticMsgspecMixin,\n'
+                              '    msgspec.Struct,\n',
+             'review_after': '    return server_budget if requested is None else '
+                             'min(requested, server_budget)\n'
+                             '\n'
+                             '\n'
+                             'def model_eos_token_ids(\n'
+                             '    generation_config: dict[str, Any], eos_token_id: int '
+                             '| None\n'
+                             ') -> set[int]:\n'
+                             '    """The ids on which the model itself ends a '
+                             'generation.\n'
+                             '\n'
+                             "    The generation config's ``eos_token_id`` (one id or "
+                             'a list) and the\n'
+                             "    tokenizer's EOS. Unless a request sets "
+                             '``ignore_eos``, the engine ends a\n'
+                             '    generation on one of these and reports no '
+                             '``stop_reason``.\n'
+                             '    """\n'
+                             '    eos_ids = generation_config.get("eos_token_id")\n'
+                             '    ids = {eos_ids} if isinstance(eos_ids, int) else '
+                             'set(eos_ids or ())\n'
+                             '    if eos_token_id is not None:\n'
+                             '        ids.add(eos_token_id)\n'
+                             '    return ids\n'
+                             '\n'
+                             '\n'
+                             'class SamplingParams(\n'
+                             '    PydanticMsgspecMixin,\n'
+                             '    msgspec.Struct,\n'},
+            {'name': 'vllm/sampling_params.py:landmark-2',
+             'path': 'vllm/sampling_params.py',
+             'before': '        eos_token_id: int | None = None,\n'
+                       '    ) -> None:\n'
+                       '        """Keep model EOS distinct from caller stop-token '
+                       'controls."""\n'
+                       '        eos_ids = generation_config.get("eos_token_id")\n'
+                       '        self._eos_token_ids = (\n'
+                       '            {eos_ids} if isinstance(eos_ids, int) else '
+                       'set(eos_ids or ())\n'
+                       '        )\n'
+                       '        if eos_token_id is not None:\n'
+                       '            self._eos_token_ids.add(eos_token_id)\n'
+                       '        # min_tokens masks both kinds, including EOS under '
+                       'ignore_eos.\n'
+                       '        self._all_stop_token_ids = (\n'
+                       '            self._eos_token_ids | set(self.stop_token_ids or '
+                       '())\n',
+             'after': '        eos_token_id: int | None = None,\n'
+                      '    ) -> None:\n'
+                      '        """Keep model EOS distinct from caller stop-token '
+                      'controls."""\n'
+                      '        self._eos_token_ids = '
+                      'model_eos_token_ids(generation_config, eos_token_id)\n'
+                      '        # min_tokens masks both kinds, including EOS under '
+                      'ignore_eos.\n'
+                      '        self._all_stop_token_ids = (\n'
+                      '            self._eos_token_ids | set(self.stop_token_ids or '
+                      '())\n',
+             'review_before': '        eos_token_id: int | None = None,\n'
+                              '    ) -> None:\n'
+                              '        """Keep model EOS distinct from caller '
+                              'stop-token controls."""\n'
+                              '        eos_ids = '
+                              'generation_config.get("eos_token_id")\n'
+                              '        self._eos_token_ids = (\n'
+                              '            {eos_ids} if isinstance(eos_ids, int) else '
+                              'set(eos_ids or ())\n'
+                              '        )\n'
+                              '        if eos_token_id is not None:\n'
+                              '            self._eos_token_ids.add(eos_token_id)\n'
+                              '        # min_tokens masks both kinds, including EOS '
+                              'under ignore_eos.\n'
+                              '        self._all_stop_token_ids = (\n'
+                              '            self._eos_token_ids | '
+                              'set(self.stop_token_ids or ())\n',
+             'review_after': '        eos_token_id: int | None = None,\n'
+                             '    ) -> None:\n'
+                             '        """Keep model EOS distinct from caller '
+                             'stop-token controls."""\n'
+                             '        self._eos_token_ids = '
+                             'model_eos_token_ids(generation_config, eos_token_id)\n'
+                             '        # min_tokens masks both kinds, including EOS '
+                             'under ignore_eos.\n'
+                             '        self._all_stop_token_ids = (\n'
+                             '            self._eos_token_ids | '
+                             'set(self.stop_token_ids or ())\n'})},
  {'name': 'output-constraints-refused-beside-tool-calls',
   'review_patch': 'patches/vllm-output-constraints-refused-beside-tool-calls.patch',
   'review_sha256': 'c6ac620c8cd962a77868789d72875e0df456a9b0918ef8cb58ec2e15c3600343',
@@ -141399,10 +142796,10 @@ FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5d
  'tests/entrypoints/openai/test_render_parity.py': '59ce2042beebb9354280aa484afa47eff9588e7a345fd8b1b7dc4dd812df106e',
  'tests/entrypoints/openai/test_render_token_offsets.py': '405e6e5592d4178fde073482558bb491fe201e3a3b706c25df104b136b8197a1',
  'tests/entrypoints/openai/test_session_id.py': '7d7df0cc79804e8275eacffdae1ea7f10717fcd981bd08155b296ab7d5f7c4f3',
- 'tests/entrypoints/scale_out/derender/test_derender.py': '3278d088a2f804b6c01d8d1e77947a24d63dedc92a140202f2537245de88d0c8',
+ 'tests/entrypoints/scale_out/derender/test_derender.py': '210db8e1b18615c08fd072c37ca80357148c14ed205b55fb3b68e0a01d592055',
  'tests/entrypoints/scale_out/derender/test_derender_parity.py': 'a0a88cd6a9b67b3d29d107053f22d623f4df07f9460b07ebfb0e2c417922441c',
- 'tests/entrypoints/scale_out/derender/test_derender_stream.py': '56eabba03b7cf10a69eb16121afd53c670edfb797009100c3f1ba86344d565f8',
- 'tests/entrypoints/scale_out/derender/test_terminal_metadata.py': 'b1042e95e61ff955062c999dc470873533a0b6034842fca4d2aa2e497914b493',
+ 'tests/entrypoints/scale_out/derender/test_derender_stream.py': 'd1456066a8e1a3ef9d66571a14eb31bd5e05d56d571018920615138f8b10bf41',
+ 'tests/entrypoints/scale_out/derender/test_terminal_metadata.py': 'a1105a96507b731060a9d9290abefe355dbd1dd5d63954472297901af364b426',
  'tests/entrypoints/scale_out/render/test_render_multimodal.py': '369b8b8c33d901e4864c34bed123af4cbf8e7c69d5ec82730788b30298018fa8',
  'tests/entrypoints/scale_out/token_in_token_out/test_generate_stream.py': '13b1be9e04274bb00e881b08e5eeb3927429567f0392e8db65b469f26aa2b464',
  'tests/entrypoints/scale_out/token_in_token_out/test_protocol.py': 'fc3d4cb03caedf41942409f0e93ec59e3a07ce511af798c10e87eaca104115c5',
@@ -141576,11 +142973,11 @@ FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5d
  'vllm/reasoning/abs_reasoning_parsers.py': 'ba4b1145048e5faa217e1ef4d849167ebd1fe7bcb9296fe2e9d2f17ce96607f7',
  'vllm/renderers/base.py': '09b769d4cd5cbb84572a084e054f5bef3b51873a9222dba11a154f98477aeed8',
  'vllm/renderers/hf.py': 'b06cb298f586607a036c8d976e0a08ac64eb317bfb8af1d4dc5329e690fb5e88',
- 'vllm/renderers/online_derenderer.py': 'ef7d3d1b4a3ce4d8ebd42c64b03c0f1736d586e549564b9ee19d48763dd0ffbf',
+ 'vllm/renderers/online_derenderer.py': 'cdc9d9943329ae0d3dbfc69ad67f091b5df4ac8d3f2984ef0e4ae442be69b1b6',
  'vllm/renderers/online_renderer.py': '1f12e251def8f81f3cf68e0030ddaaa8c988ac00a9f694c0718dd2d1d5c8f36f',
  'vllm/renderers/params.py': '31572224d8ea355fb77d80e3725779436533108c78f779b94760c6e55e6f3bfd',
  'vllm/renderers/template_authorship.py': '3110bd0d138e29ef01a51f5c357a2e6dd000c0b8c26b7fea94a4161471e43cba',
- 'vllm/sampling_params.py': '29eb018fc1e5a3cec8b0b34901fd617b27ab893319f0df136314dda12843f073',
+ 'vllm/sampling_params.py': 'c5e027fa409b8daf77bbbbd6fee97f13db52236ad14e7e4e3b546da35b182316',
  'vllm/tokenizers/detokenizer_utils.py': '7718979d813ed00d41116d92a5abf81524e393693a6b28fa1c2a6d8ff66c880d',
  'vllm/tool_parsers/abstract_tool_parser.py': '91f4f3184e7f0eb6bc9e76d9ce4d3063cff58e0de8afc409038139e48314d0c8',
  'vllm/tool_parsers/structural_tag_registry.py': '34a5d36d9afa30bee6b79a6e8c95ff1fa56580c461fc55adf5cf0c28f3e6c0fc',
