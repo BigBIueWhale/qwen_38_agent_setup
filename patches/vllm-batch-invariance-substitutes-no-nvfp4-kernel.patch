@@ -1,0 +1,183 @@
+diff --git a/tests/model_executor/kernels/test_nvfp4_native_selection.py b/tests/model_executor/kernels/test_nvfp4_native_selection.py
+index e17f21a2858907c9c3c3b71745b01af3ff540711..c692eb70d2c6dd8996f9c3ca7bc62905180ac132 100644
+--- a/tests/model_executor/kernels/test_nvfp4_native_selection.py
++++ b/tests/model_executor/kernels/test_nvfp4_native_selection.py
+@@ -92,3 +92,40 @@ def test_weight_only_checkpoints_keep_marlin(monkeypatch):
+     device(monkeypatch, (9, 0), {MarlinNvFp4LinearKernel})
+     kernel = init_nvfp4_linear_kernel(use_a16=True)
+     assert isinstance(kernel, MarlinNvFp4LinearKernel)
++
++
++def test_batch_invariance_does_not_substitute_emulation(monkeypatch):
++    # VLLM_BATCH_INVARIANT's deterministic path is the native CUTLASS kernel; on
++    # a GPU without it, emulation is a substitute like any other.
++    monkeypatch.setenv("VLLM_BATCH_INVARIANT", "1")
++    device(monkeypatch, (9, 0), {MarlinNvFp4LinearKernel, EmulationNvFp4LinearKernel})
++    with pytest.raises(ValueError, match="VLLM_BATCH_INVARIANT needs") as refusal:
++        init_nvfp4_linear_kernel()
++    message = str(refusal.value)
++    assert "compute capability 9.0" in message
++    assert "CutlassNvFp4LinearKernel: not here" in message
++    assert "EmulationNvFp4LinearKernel, does not compute in FP4" in message
++    assert "unset VLLM_BATCH_INVARIANT" in message
++
++
++def test_batch_invariance_serves_named_emulation(monkeypatch):
++    monkeypatch.setenv("VLLM_BATCH_INVARIANT", "1")
++    device(monkeypatch, (9, 0), {EmulationNvFp4LinearKernel}, backend="emulation")
++    assert isinstance(init_nvfp4_linear_kernel(), EmulationNvFp4LinearKernel)
++
++
++def test_batch_invariance_uses_cutlass_where_it_runs(monkeypatch):
++    monkeypatch.setenv("VLLM_BATCH_INVARIANT", "1")
++    device(monkeypatch, (12, 0), {CutlassNvFp4LinearKernel, EmulationNvFp4LinearKernel})
++    assert isinstance(init_nvfp4_linear_kernel(), CutlassNvFp4LinearKernel)
++
++
++def test_a_disabled_native_kernel_is_named_as_the_next_action(monkeypatch):
++    monkeypatch.setenv("VLLM_DISABLED_KERNELS", "CutlassNvFp4LinearKernel")
++    device(monkeypatch, (12, 0), {CutlassNvFp4LinearKernel, MarlinNvFp4LinearKernel})
++    with pytest.raises(ValueError, match="native FP4 kernel") as refusal:
++        init_nvfp4_linear_kernel()
++    assert (
++        "remove CutlassNvFp4LinearKernel from VLLM_DISABLED_KERNELS"
++        in str(refusal.value)
++    )
+diff --git a/vllm/model_executor/kernels/linear/__init__.py b/vllm/model_executor/kernels/linear/__init__.py
+index 9fd4d74ce91b817303103ce3852791b0b6eca5e7..3044b665a579331ed3104abb74febe6aa193f454 100644
+--- a/vllm/model_executor/kernels/linear/__init__.py
++++ b/vllm/model_executor/kernels/linear/__init__.py
+@@ -13,7 +13,7 @@ or kernel implementation, add it to this __init__.py to maintain
+ import stability.
+ """
+ 
+-from typing import TypeVar
++from typing import NoReturn, TypeVar
+ 
+ import torch
+ 
+@@ -1009,12 +1009,36 @@ def init_nvfp4_linear_kernel(use_a16: bool = False) -> NvFp4LinearKernel:
+     current platform."""
+     config = NvFp4LinearLayerConfig()
+     a16_kernels = (MarlinNvFp4LinearKernel, HummingNvFp4LinearKernel)
++    linear_backend = _get_linear_backend()
++
++    # A W4A4 layer is computed in FP4 by a native kernel. Marlin and Humming
++    # keep 16-bit activations and emulation dequantizes, so each computes
++    # different arithmetic than the checkpoint declares: no path below
++    # substitutes one, VLLM_BATCH_INVARIANT's included; only naming it with
++    # --linear-backend serves it.
++    substitutes = () if use_a16 else (*a16_kernels, EmulationNvFp4LinearKernel)
++    requested = _LINEAR_BACKEND_KERNEL_MAP.get(linear_backend, set())
++
++    def refuse_substitute(
++        substitute: type[NvFp4LinearKernel],
++        needed: str,
++        failure_reasons: list[str],
++        next_actions: str,
++    ) -> NoReturn:
++        capability = current_platform.get_device_capability()
++        device = "unknown" if capability is None else capability.as_version_str()
++        raise ValueError(
++            f"{needed}, and none is available on this device (compute "
++            f"capability {device}): {'; '.join(failure_reasons)}. The next "
++            f"candidate, {substitute.__name__}, does not compute in FP4, so it "
++            f"is not substituted. {next_actions}, or name the substitute with "
++            "--linear-backend to serve its arithmetic knowingly."
++        )
+ 
+-    # VLLM_BATCH_INVARIANT forces deterministic execution. Prefer the
+-    # batch-invariant CUTLASS implementation when available, otherwise fall
+-    # back to emulation. It overrides --linear-backend.
++    # VLLM_BATCH_INVARIANT forces deterministic execution: the batch-invariant
++    # CUTLASS kernel, or emulation when the operator names it. It overrides
++    # --linear-backend otherwise.
+     force_kernel: type[NvFp4LinearKernel] | None = None
+-    linear_backend = _get_linear_backend()
+     if envs.VLLM_BATCH_INVARIANT:
+         bi_supported, reason = CutlassNvFp4LinearKernel.is_supported()
+         if bi_supported:
+@@ -1031,16 +1055,24 @@ def init_nvfp4_linear_kernel(use_a16: bool = False) -> NvFp4LinearKernel:
+                 )
+             force_kernel = CutlassNvFp4LinearKernel
+         else:
+-            if linear_backend not in ("auto", "emulation"):
+-                logger.warning_once(
+-                    "VLLM_BATCH_INVARIANT overrides --linear-backend=%s; "
+-                    "using the emulation backend for deterministic execution.",
+-                    linear_backend,
++            if (
++                EmulationNvFp4LinearKernel in substitutes
++                and EmulationNvFp4LinearKernel not in requested
++            ):
++                refuse_substitute(
++                    EmulationNvFp4LinearKernel,
++                    "VLLM_BATCH_INVARIANT needs the batch-invariant native FP4 "
++                    "kernel for NVFP4 W4A4 layers",
++                    [f"CutlassNvFp4LinearKernel: {reason}"],
++                    "Serve this checkpoint on a GPU where CutlassNvFp4LinearKernel "
++                    "runs (compute capability 10.x or 12.x), unset "
++                    "VLLM_BATCH_INVARIANT to select among the native kernels",
+                 )
+             logger.info_once(
+-                "VLLM_BATCH_INVARIANT is set but the batch-invariant NVFP4 "
+-                "kernel is not supported on this platform; falling back to "
+-                "emulation for deterministic execution. Reason: %s",
++                "VLLM_BATCH_INVARIANT is set and the batch-invariant NVFP4 "
++                "kernel is not supported on this platform; serving %s for "
++                "deterministic execution. Reason: %s",
++                EmulationNvFp4LinearKernel.__name__,
+                 reason,
+             )
+             force_kernel = EmulationNvFp4LinearKernel
+@@ -1069,19 +1101,15 @@ def init_nvfp4_linear_kernel(use_a16: bool = False) -> NvFp4LinearKernel:
+     # Apply --linear-backend filtering when set.
+     possible = _resolve_backend_kernels(possible, "NVFP4")
+ 
+-    # A W4A4 layer is computed in FP4 by a native kernel. Marlin and Humming
+-    # keep 16-bit activations and emulation dequantizes, so each computes
+-    # different arithmetic than the checkpoint declares: selection never
+-    # substitutes one; only naming it with --linear-backend serves it.
+-    substitutes = () if use_a16 else (*a16_kernels, EmulationNvFp4LinearKernel)
+-    requested = _LINEAR_BACKEND_KERNEL_MAP.get(linear_backend, set())
+-
+     failure_reasons = []
++    disabled = []
+     for kernel_cls in possible:
+         if kernel_cls.__name__ in envs.VLLM_DISABLED_KERNELS:
+             failure_reasons.append(
+                 f" {kernel_cls.__name__} disabled by environment variable"
+             )
++            if kernel_cls not in substitutes:
++                disabled.append(kernel_cls.__name__)
+             continue
+ 
+         is_supported, reason = kernel_cls.is_supported()
+@@ -1095,16 +1123,17 @@ def init_nvfp4_linear_kernel(use_a16: bool = False) -> NvFp4LinearKernel:
+             continue
+ 
+         if kernel_cls in substitutes and kernel_cls not in requested:
+-            capability = current_platform.get_device_capability()
+-            device = "unknown" if capability is None else capability.as_version_str()
+-            raise ValueError(
+-                "NVFP4 W4A4 layers need a native FP4 kernel, and this device "
+-                f"(compute capability {device}) has none: "
+-                f"{'; '.join(failure_reasons)}. The next candidate, "
+-                f"{kernel_cls.__name__}, does not compute in FP4, so it is not "
+-                "substituted. Serve this checkpoint on a GPU with native FP4 "
+-                "(compute capability 10.x or 12.x), or name the substitute "
+-                "with --linear-backend to serve its arithmetic knowingly."
++            enable = (
++                f", remove {', '.join(disabled)} from VLLM_DISABLED_KERNELS"
++                if disabled
++                else ""
++            )
++            refuse_substitute(
++                kernel_cls,
++                "NVFP4 W4A4 layers need a native FP4 kernel",
++                failure_reasons,
++                "Serve this checkpoint on a GPU with native FP4 (compute "
++                f"capability 10.x or 12.x){enable}",
+             )
+ 
+         logger.info_once("Using %s for NVFP4 GEMM", kernel_cls.__name__)

@@ -3793,6 +3793,39 @@ def _validate_output_constraint_beside_tools_after(state: State) -> None:
         "test_anthropic_refuses_an_output_format_without_a_schema": None,
     }, label=label)
 
+
+def _validate_batch_invariant_native_fp4_before(state: State) -> None:
+    label = "Batch-invariant NVFP4 substitute precondition"
+    kernels = "vllm/model_executor/kernels/linear/__init__.py"
+    _require_in_symbol(state, kernels, "init_nvfp4_linear_kernel", (
+        '"kernel is not supported on this platform; falling back to "',
+    ), label=label)
+    forbid_text(state, kernels, "def refuse_substitute(", label=label)
+
+
+def _validate_batch_invariant_native_fp4_after(state: State) -> None:
+    label = "Batch-invariant NVFP4 substitute refused"
+    kernels = "vllm/model_executor/kernels/linear/__init__.py"
+    # VLLM_BATCH_INVARIANT's emulation kernel is a substitute like any other:
+    # served only when --linear-backend names it.
+    _require_in_symbol(state, kernels, "init_nvfp4_linear_kernel", (
+        "def refuse_substitute(",
+        "EmulationNvFp4LinearKernel in substitutes",
+        "and EmulationNvFp4LinearKernel not in requested",
+        "VLLM_BATCH_INVARIANT needs the batch-invariant native FP4",
+        "if kernel_cls in substitutes and kernel_cls not in requested:",
+    ), label=label)
+    forbid_text(state, kernels,
+                '"kernel is not supported on this platform; falling back to "',
+                label=label)
+    require_python_symbols(state,
+        "tests/model_executor/kernels/test_nvfp4_native_selection.py", {
+            "test_batch_invariance_does_not_substitute_emulation": None,
+            "test_batch_invariance_serves_named_emulation": None,
+            "test_batch_invariance_uses_cutlass_where_it_runs": None,
+            "test_a_disabled_native_kernel_is_named_as_the_next_action": None,
+        }, label=label)
+
 def validate_final(state: State) -> None:
     """Reassert every durable semantic invariant on the complete tree.
 
@@ -4875,5 +4908,26 @@ CONTRACTS: Mapping[str, SemanticContract] = {
         ),
         validate_before=_validate_output_constraint_beside_tools_before,
         validate_after=_validate_output_constraint_beside_tools_after,
+    ),
+    "batch-invariance-substitutes-no-nvfp4-kernel": SemanticContract(
+        rationale=(
+            "With VLLM_BATCH_INVARIANT set and the batch-invariant CUTLASS "
+            "kernel unsupported -- any GPU without native FP4 -- selection "
+            "forced the emulation kernel, logged it at INFO and returned before "
+            "the refusal that keeps a substitute from serving W4A4 layers. The "
+            "refusal held for this deployment only because its launch does not "
+            "set the variable. Emulation under batch invariance is now a "
+            "substitute like any other: served only when --linear-backend names "
+            "it, and otherwise refused with the CUTLASS reason and the next "
+            "actions that exist. The refusal's headline no longer says the "
+            "device has no native kernel when one was only disabled by "
+            "VLLM_DISABLED_KERNELS; it names that variable as the next action."
+        ),
+        removal_condition=(
+            "Remove when pinned upstream refuses to substitute a non-FP4 kernel "
+            "for NVFP4 W4A4 layers under VLLM_BATCH_INVARIANT unless it is named."
+        ),
+        validate_before=_validate_batch_invariant_native_fp4_before,
+        validate_after=_validate_batch_invariant_native_fp4_after,
     ),
 }

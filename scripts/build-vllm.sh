@@ -170,6 +170,7 @@ RESPONSES_ONE_FUNCTION_LIST_PATCH_FILE="${PROJECT_DIR}/patches/vllm-responses-to
 BATCH_PARSE_FROM_PROMPT_PATCH_FILE="${PROJECT_DIR}/patches/vllm-batch-parse-starts-where-the-prompt-leaves.patch"
 DERENDER_STOP_TOKEN_TEXT_PATCH_FILE="${PROJECT_DIR}/patches/vllm-derender-text-is-the-detokenizers.patch"
 OUTPUT_CONSTRAINT_BESIDE_TOOLS_PATCH_FILE="${PROJECT_DIR}/patches/vllm-output-constraints-refused-beside-tool-calls.patch"
+BATCH_INVARIANT_NATIVE_FP4_PATCH_FILE="${PROJECT_DIR}/patches/vllm-batch-invariance-substitutes-no-nvfp4-kernel.patch"
 
 if [[ ! -f "${DEPLOYMENT_INPUT_MANIFEST}" || -L "${DEPLOYMENT_INPUT_MANIFEST}" ]]; then
   echo "Deployment-input manifest is missing or is not a regular non-symlink file." >&2
@@ -315,7 +316,8 @@ printf '%s  %s\n' \
   "${RESPONSES_ONE_FUNCTION_LIST_PATCH_DIFF_SHA256}" "${RESPONSES_ONE_FUNCTION_LIST_PATCH_FILE}" \
   "${BATCH_PARSE_FROM_PROMPT_PATCH_DIFF_SHA256}" "${BATCH_PARSE_FROM_PROMPT_PATCH_FILE}" \
   "${DERENDER_STOP_TOKEN_TEXT_PATCH_DIFF_SHA256}" "${DERENDER_STOP_TOKEN_TEXT_PATCH_FILE}" \
-  "${OUTPUT_CONSTRAINT_BESIDE_TOOLS_PATCH_DIFF_SHA256}" "${OUTPUT_CONSTRAINT_BESIDE_TOOLS_PATCH_FILE}" | \
+  "${OUTPUT_CONSTRAINT_BESIDE_TOOLS_PATCH_DIFF_SHA256}" "${OUTPUT_CONSTRAINT_BESIDE_TOOLS_PATCH_FILE}" \
+  "${BATCH_INVARIANT_NATIVE_FP4_PATCH_DIFF_SHA256}" "${BATCH_INVARIANT_NATIVE_FP4_PATCH_FILE}" | \
   sha256sum --check --strict
 
 printf '%s  %s\n' \
