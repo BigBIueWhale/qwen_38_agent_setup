@@ -260,6 +260,23 @@ require_published_release() {
   require_equal "published GitHub master release" "${published}" "${repository_head}"
 }
 
+# The lock pins the runtime image together with the digest of the image
+# inputs it was built from; the build that produced the image writes both. A
+# commit whose image inputs have another digest is served by no image yet: the
+# pinned image lacks the source this commit reviews, and the byte check after
+# readiness would find that only once the whole model had loaded.
+require_image_built_from_inputs() {
+  # Distinct names: the build verifier holds its own values readonly.
+  local commit_inputs_sha256="$1" commit_context_files="$2"
+  [[ "${commit_inputs_sha256}" == "${IMAGE_BUILD_INPUTS_SHA256}" ]] && return 0
+  die "The pinned runtime image was not built from this commit's image inputs." \
+    "Pinned image: ${EXPECTED_IMAGE_ID}" \
+    "  built from: ${IMAGE_BUILD_INPUTS_SHA256}" \
+    "This commit:  ${commit_inputs_sha256} (${commit_context_files} context files)" \
+    "The image does not carry the source this commit reviews." \
+    "Next: cut a runtime image release from this commit -- advance IMAGE_PROFILE_VERSION, IMAGE_TAG and IMAGE_ARCHIVE_NAME in config/runtime-v1.sh, run ./scripts/build-vllm.sh build and then ./scripts/save-images.sh, and commit the pins they write."
+}
+
 check_pinned_build_inputs() {
   require_clean_committed_repository
   if [[ ! -f "${DEPLOYMENT_INPUT_MANIFEST}" || -L "${DEPLOYMENT_INPUT_MANIFEST}" ]]; then
@@ -270,7 +287,7 @@ check_pinned_build_inputs() {
     die "The deployment-input manifest does not contain the exact ${DEPLOYMENT_INPUT_FILE_COUNT}-file allowlist." \
       "Manifest: ${DEPLOYMENT_INPUT_MANIFEST}"
   fi
-  "${COMMON_SCRIPT_DIR}/build-vllm.sh" check
+  "${COMMON_SCRIPT_DIR}/build-vllm.sh" serve-check
 
   local image_id
   image_id="$(docker image inspect --format '{{.Id}}' "${IMAGE_TAG}" 2>/dev/null || true)"

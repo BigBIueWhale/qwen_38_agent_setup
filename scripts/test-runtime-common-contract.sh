@@ -22,6 +22,7 @@ required_functions=(
   require_published_release
   check_host_prerequisites
   check_pinned_build_inputs
+  require_image_built_from_inputs
   assert_running_profile
   host_isolation_refusal
   host_isolation_refusals
@@ -306,5 +307,37 @@ for pair in EXPECTED_IMAGE_ID:IMAGE_BUILD_INPUTS_SHA256:sha256: \
 done
 rm -rf -- "${pin_scratch}"
 
-printf 'RUNTIME_COMMON_CONTRACT_OK functions=%s host-isolation=%s-accepted-%s-refused capability-refusals=3 produced-identities=%s\n' \
+# Serving refuses, before anything loads, a commit whose image inputs are not
+# the ones the pinned image was built from, naming both digests and the release
+# that would serve it; the pinned inputs pass silently.
+# The build verifier calls it with its own values readonly, as here.
+readonly image_inputs_sha256="${IMAGE_BUILD_INPUTS_SHA256}" context_file_count=128
+pinned_output="$(require_image_built_from_inputs "${IMAGE_BUILD_INPUTS_SHA256}" 128 2>&1)" && \
+  [[ -z "${pinned_output}" ]] || {
+  printf 'ERROR: the inputs the pinned image was built from were refused:\n%s\n' \
+    "${pinned_output}" >&2
+  exit 1
+}
+stale_inputs="$(digest_of 'image inputs of a later commit')"
+if stale_output="$( (require_image_built_from_inputs "${stale_inputs}" 128) 2>&1 )"; then
+  printf 'ERROR: the pinned image was accepted for inputs it was not built from.\n' >&2
+  exit 1
+fi
+[[ "${stale_output}" == *"ERROR: The pinned runtime image was not built from this commit's image inputs."* && \
+   "${stale_output}" == *"Pinned image: ${EXPECTED_IMAGE_ID}"* && \
+   "${stale_output}" == *"  built from: ${IMAGE_BUILD_INPUTS_SHA256}"* && \
+   "${stale_output}" == *"This commit:  ${stale_inputs} (128 context files)"* && \
+   "${stale_output}" == *"Next: cut a runtime image release from this commit"* ]] || {
+  printf 'ERROR: stale image inputs were not refused by their own statement:\n%s\n' \
+    "${stale_output}" >&2
+  exit 1
+}
+# start.sh, status.sh and the release audit reach the refusal through the
+# serving verification, which runs before any container is created.
+[[ "$(declare -f check_pinned_build_inputs)" == *'/build-vllm.sh" serve-check'* ]] || {
+  printf 'ERROR: check_pinned_build_inputs does not run build-vllm.sh serve-check.\n' >&2
+  exit 1
+}
+
+printf 'RUNTIME_COMMON_CONTRACT_OK functions=%s host-isolation=%s-accepted-%s-refused capability-refusals=3 produced-identities=%s stale-image-refusal=1\n' \
   "${#required_functions[@]}" "${host_isolation_accepted}" "${host_isolation_refused}" "${settled_pairs}"

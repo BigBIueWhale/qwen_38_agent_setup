@@ -185,9 +185,22 @@ class BuildScriptTest(unittest.TestCase):
 
     def test_usage_names_every_mode(self):
         usage = self.script.split("<<'USAGE'", 1)[1].split("USAGE", 1)[0]
-        for mode in ("build", "check", "materialise"):
+        for mode in ("build", "check", "serve-check", "materialise"):
             with self.subTest(mode=mode):
                 self.assertIn(f"\n  {mode}", usage)
+
+    def test_serving_refuses_an_image_not_built_from_these_inputs(self):
+        # The refusal comes from the run that just derived the inputs, after
+        # every check and before anything is served.
+        summary = self.script.split('if [[ "${MODE}" == "check" || "${MODE}" == "serve-check" ]]; then', 1)[1]
+        summary = summary.split("\n  exit 0\n", 1)[0]
+        self.assertIn(
+            'require_image_built_from_inputs "${image_inputs_sha256}" "${context_file_count}"',
+            summary,
+        )
+        runtime = (ROOT / "scripts/runtime-common.sh").read_text()
+        self.assertIn('"${COMMON_SCRIPT_DIR}/build-vllm.sh" serve-check\n', runtime)
+        self.assertNotIn('"${COMMON_SCRIPT_DIR}/build-vllm.sh" check\n', runtime)
 
     def test_the_vllm_checkout_is_reached_only_through_git(self):
         # The submodule directory is used only as the repository that holds the

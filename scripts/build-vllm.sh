@@ -3,10 +3,12 @@ set -euo pipefail
 
 usage() {
   cat >&2 <<'USAGE'
-Usage: build-vllm.sh {build|check|materialise DIRECTORY}
+Usage: build-vllm.sh {build|check|serve-check|materialise DIRECTORY}
   build        verify every pinned input, then build the runtime image from the
                verified reconstruction and export it
   check        verify every pinned input and stop; nothing is written
+  serve-check  check, then refuse unless the pinned image was built from exactly
+               these inputs; start.sh and status.sh run it before serving
   materialise  write the verified reconstruction to DIRECTORY, a new tree in
                which to author a stage; nothing reads it
 USAGE
@@ -19,7 +21,7 @@ USAGE
 (($# >= 1)) || usage
 MODE="$1"
 case "${MODE}" in
-  build|check)
+  build|check|serve-check)
     (($# == 1)) || usage
     ;;
   materialise)
@@ -873,7 +875,7 @@ for unit in chat_template_retention_unit tool_output_parser_unit vision_contract
     --entrypoint python3 "${BASE_IMAGE_TAG}" "/context/scripts/${unit}.py"
 done
 
-if [[ "${MODE}" == "check" ]]; then
+if [[ "${MODE}" == "check" || "${MODE}" == "serve-check" ]]; then
   # Every count below is derived from the objects this run just verified —
   # REVIEWED_STATUS and the deployment-input manifest — never restated by
   # hand: a hand count here is one more copy that can drift from the thing
@@ -898,6 +900,9 @@ if [[ "${MODE}" == "check" ]]; then
     "${modified_doc_count} reviewed modified documentation files," \
     "${review_diff_count} review diffs, agent template, numerical audit" \
     "units, and all build units are exact."
+  if [[ "${MODE}" == "serve-check" ]]; then
+    require_image_built_from_inputs "${image_inputs_sha256}" "${context_file_count}"
+  fi
   if [[ "${image_inputs_sha256}" == "${IMAGE_BUILD_INPUTS_SHA256}" ]]; then
     echo "Image inputs ${image_inputs_sha256} (${context_file_count} context files):" \
       "the pinned image ${EXPECTED_IMAGE_ID} was built from exactly these, and a build" \

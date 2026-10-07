@@ -16,7 +16,8 @@ workstation.
 ### Bottom line
 
 The runtime image `config/runtime-v1.sh` pins awaits release validation;
-`./scripts/build-vllm.sh check` states whether it was built from this source revision.
+`./scripts/build-vllm.sh check` states whether it was built from this source revision,
+and `start.sh` and `status.sh` refuse before serving when it was not.
 Prior live results below describe the versions that earned them.
 The audit resolution record in `docs/model-output-and-audit-fixes.md` lists the
 source fixes and their container validation. Anthropic tool results now refuse
@@ -104,7 +105,11 @@ on that context and pins what it made: a build of the inputs the pinned image wa
 built from must reproduce its ID and fails otherwise, and a build of any other inputs
 writes its own ID into `config/runtime-v1.sh`. Materialise writes the verified
 reconstruction to a new directory, as a tree in which to author a stage; nothing
-reads it. The mode argument is required, so none of these happens by default. Save
+reads it. `serve-check` is the check `start.sh` and `status.sh` run first: it
+also refuses, before any container is created, a revision whose image inputs
+are not the ones the pinned image was built from, since that image does not
+carry the source the revision reviews. The mode argument is required, so none of
+these happens by default. Save
 archives the pinned images and pins the archive by the same rule, and restore
 verifies the pinned local archive before loading it.
 
@@ -397,8 +402,8 @@ Pinned build inputs and products:
 | Immutable base tag | qwen38-vllm:main-9df9b0b |
 | Immutable base ID | sha256:fa4a002a88b7043a1a89966dea8a500fe9696f84e75730d9da916f916048d401 |
 | Runtime Dockerfile SHA-256 | 393497d3d72151b6caa7a0b405dd4d983cd8a08e0d26bc43cb08d9f60d31fa41 |
-| Build verifier SHA-256 | eac6d09c6e8ca6aae2ac16129876d7bc9caf246b475c2534a4cd0bb704d98e85 |
-| Runtime validator SHA-256 | 357fdaed8d5a8ad0d901eaf07e5357722b74400c99d96b6f30572a557426b4fc |
+| Build verifier SHA-256 | 261a605fe8ad0f514f5ddfd1d69722e8e5db773408049c67385b11af5451fe15 |
+| Runtime validator SHA-256 | 452adbe0e72c7ac71fffd36f1198209318639cdab7e17fb9aeb07bd34971cf83 |
 
 The runtime image's profile, tag and archive name, which every release advances
 together, are declared in `config/runtime-v1.sh`, and the archive lives under
