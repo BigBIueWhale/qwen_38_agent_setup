@@ -151,7 +151,7 @@ index 20ed74d824aa314799ff70a43b9e51567f8559dc..882de5c20bdd5032b5623c8b813cd70a
 +    else:
 +        BaseRenderer.require_no_rendered_media(text_route, tokens)
 diff --git a/vllm/entrypoints/chat_utils.py b/vllm/entrypoints/chat_utils.py
-index 89873b4a72e910eb7cb0efec3f9015962f81d948..ac546ce1e3413d11ab86f794e9e154ea0e76605d 100644
+index 18458d9b2c3b451e73683775fa1cb3e1eb9731fe..5a131a68010c58434a964d4a3da5e6115fe9284c 100644
 --- a/vllm/entrypoints/chat_utils.py
 +++ b/vllm/entrypoints/chat_utils.py
 @@ -1605,17 +1605,44 @@ def _enforce_qwen38_strict_content_part(part: dict[str, Any]) -> None:

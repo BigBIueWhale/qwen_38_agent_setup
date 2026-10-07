@@ -492,10 +492,10 @@ index 3c840e5b92a1806fedadc43786c29da290158ee6..43ce83e3910de0e3137acb1ed54e62a5
                  context = HarmonyContext(
                      messages,
 diff --git a/vllm/entrypoints/openai/responses/utils.py b/vllm/entrypoints/openai/responses/utils.py
-index b79a9c49877a5238f6e210719035236ae9658cd6..09f68d9df4860ca025027ade09faa53509f3f14e 100644
+index f37dcc81d83dd9d87b7d125ddf8d20d0d174c872..c9d7c5dac034f97492903e82f04559371cbe1cd7 100644
 --- a/vllm/entrypoints/openai/responses/utils.py
 +++ b/vllm/entrypoints/openai/responses/utils.py
-@@ -363,20 +363,6 @@ def _construct_message_from_response_item(
+@@ -417,20 +417,6 @@ def _construct_message_from_response_item(
      return deepcopy(item)  # type: ignore[arg-type]
  
  

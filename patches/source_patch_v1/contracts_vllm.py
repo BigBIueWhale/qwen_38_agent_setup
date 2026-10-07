@@ -337,7 +337,7 @@ def _validate_defaults_after(state: State) -> None:
     correlation = _symbol_source(
         state, chat, "ChatCompletionRequest._validate_tool_result_correlation", label=label
     )
-    if "validate_tool_result_correlation(self.messages)" in correlation:
+    if "ToolHistoryOrigin.chat(self.messages)" in correlation:
         correlation = _symbol_source(
             state, "vllm/entrypoints/chat_utils.py",
             "validate_tool_result_correlation", label=label,
@@ -2107,9 +2107,15 @@ def _validate_responses_history_before(state: State) -> None:
 def _validate_responses_history_after(state: State) -> None:
     label = "Responses history result"
     utils = "vllm/entrypoints/openai/responses/utils.py"
+    # One boundary for every surface; each surface says where each message
+    # and call came from, so a refusal names the field the caller sent.
     _require_in_symbol(state, utils, "construct_input_messages", (
-        "list(prev_response_output or [])", "validate_tool_result_correlation(messages)",
-        "construct_chat_messages_with_tool_call(new_items)",
+        "list(prev_response_output or [])",
+        "_convert_response_items(",
+        'ToolHistoryOrigin(messages=origins, calls=call_origins, result_id="call_id")',
+    ), label=label)
+    _require_in_symbol(state, utils, "construct_chat_messages_with_tool_call", (
+        "_convert_response_items(",
     ), label=label)
     _require_in_symbol(state, utils, "_construct_message_from_response_item", (
         '"".join(block.text for block in item.content)',
@@ -2120,17 +2126,25 @@ def _validate_responses_history_after(state: State) -> None:
     forbid_text(state, utils, "item.summary[0]", label=label)
     _require_in_symbol(state, "vllm/entrypoints/openai/chat_completion/protocol.py",
                        "ChatCompletionRequest._validate_tool_result_correlation", (
-        "validate_tool_result_correlation(self.messages)",
+        "ToolHistoryOrigin.chat(self.messages)",
     ), label=label)
+    require_python_symbols(state, "vllm/entrypoints/chat_utils.py", {
+        "ToolHistoryOrigin.chat": ("cls", "messages"),
+        "validate_tool_result_correlation": ("messages", "origin"),
+    }, label=label)
     _require_in_symbol(state, "vllm/entrypoints/chat_utils.py",
                        "validate_tool_result_correlation", (
         "raise VLLMValidationError(", "result_id != expected_id", "pending_ids.pop(0)",
+        "parameter=parameter", "parameter=call_parameter",
     ), label=label)
+    forbid_text(state, "vllm/entrypoints/chat_utils.py", "messages[{message_index}]",
+                label=label)
     require_python_symbols(state,
         "tests/entrypoints/openai/responses/test_responses_utils.py", {
             "test_replayed_blocks_preserve_every_byte_and_reasoning": None,
             "test_tool_history_correlation_is_shared_across_surfaces": None,
             "test_responses_history_is_validated_before_rendering": None,
+            "test_a_responses_history_refusal_names_the_input_item_sent": None,
         }, label=label)
 
 
@@ -4348,7 +4362,11 @@ CONTRACTS: Mapping[str, SemanticContract] = {
         rationale=(
             "Responses replay dropped all but the first text/reasoning block and "
             "bypassed Chat's tool ID correlation. Preserve the supplied content and "
-            "validate every positional tool history through one shared boundary."
+            "validate every positional tool history through one shared boundary, "
+            "whose refusal names the field the caller sent -- input[k] or "
+            "previous_response_id on Responses, messages[i] on chat -- and the id "
+            "field each protocol uses (call_id or tool_call_id), never a position "
+            "in the converted chat list the caller never saw."
         ),
         removal_condition=(
             "Remove when upstream preserves all Responses history blocks and "

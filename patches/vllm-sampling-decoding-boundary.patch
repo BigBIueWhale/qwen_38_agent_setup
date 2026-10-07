@@ -452,7 +452,7 @@ diff --git a/tests/test_request_input_bounds.py b/tests/test_request_input_bound
 diff --git a/vllm/entrypoints/openai/chat_completion/protocol.py b/vllm/entrypoints/openai/chat_completion/protocol.py
 --- a/vllm/entrypoints/openai/chat_completion/protocol.py
 +++ b/vllm/entrypoints/openai/chat_completion/protocol.py
-@@ -26,6 +26,7 @@
+@@ -27,6 +27,7 @@
  )
  from vllm.entrypoints.openai.engine.protocol import (
      AnyResponseFormat,
@@ -460,7 +460,7 @@ diff --git a/vllm/entrypoints/openai/chat_completion/protocol.py b/vllm/entrypoi
      DeltaMessage,
      FunctionCall,
      FunctionDefinition,
-@@ -45,7 +46,6 @@
+@@ -46,7 +47,6 @@
  from vllm.logprobs import Logprob
  from vllm.renderers import ChatParams, TokenizeParams, merge_kwargs
  from vllm.sampling_params import (
@@ -468,7 +468,7 @@ diff --git a/vllm/entrypoints/openai/chat_completion/protocol.py b/vllm/entrypoi
      FinalResponseTokenBudget,
      resolve_final_response_token_budget,
      RepetitionDetectionParams,
-@@ -270,7 +270,7 @@
+@@ -271,7 +271,7 @@
      user: str | None = None
  
      # --8<-- [start:chat-completion-sampling-params]
@@ -477,7 +477,7 @@ diff --git a/vllm/entrypoints/openai/chat_completion/protocol.py b/vllm/entrypoi
      top_k: int | None = None
      min_p: float | None = None
      repetition_penalty: float | None = None
-@@ -645,24 +645,6 @@
+@@ -648,24 +648,6 @@
          "min_p": 0.0,
      }
  
@@ -502,7 +502,7 @@ diff --git a/vllm/entrypoints/openai/chat_completion/protocol.py b/vllm/entrypoi
      def extract_structured_outputs(self) -> StructuredOutputsParams | None:
          """Normalize request constraints into ``StructuredOutputsParams``."""
          return structured_outputs_from_response_format(
-@@ -827,12 +809,6 @@
+@@ -830,12 +812,6 @@
      def check_logprobs(cls, data):
          if not isinstance(data, dict):
              return data
@@ -515,7 +515,7 @@ diff --git a/vllm/entrypoints/openai/chat_completion/protocol.py b/vllm/entrypoi
          if data.get("logprob_token_ids") and not data.get("logprobs"):
              raise VLLMValidationError(
                  "when using `logprob_token_ids`, `logprobs` must be set to true.",
-@@ -1155,7 +1131,7 @@
+@@ -1158,7 +1134,7 @@
  
      # vLLM extensions
      best_of: int | None = None
@@ -524,7 +524,7 @@ diff --git a/vllm/entrypoints/openai/chat_completion/protocol.py b/vllm/entrypoi
      top_k: int | None = None
      min_p: float | None = None
      repetition_penalty: float | None = None
-@@ -1193,12 +1169,6 @@
+@@ -1196,12 +1172,6 @@
              data = data.model_dump(exclude_unset=True)
          if not isinstance(data, dict):
              return data

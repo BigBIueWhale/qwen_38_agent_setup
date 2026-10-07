@@ -84,7 +84,7 @@ diff --git a/tests/renderers/test_hf.py b/tests/renderers/test_hf.py
 diff --git a/vllm/entrypoints/openai/chat_completion/protocol.py b/vllm/entrypoints/openai/chat_completion/protocol.py
 --- a/vllm/entrypoints/openai/chat_completion/protocol.py
 +++ b/vllm/entrypoints/openai/chat_completion/protocol.py
-@@ -44,7 +44,8 @@
+@@ -45,7 +45,8 @@
  from vllm.exceptions import VLLMValidationError
  from vllm.logger import init_logger
  from vllm.logprobs import Logprob
@@ -94,7 +94,7 @@ diff --git a/vllm/entrypoints/openai/chat_completion/protocol.py b/vllm/entrypoi
  from vllm.sampling_params import (
      FinalResponseTokenBudget,
      resolve_final_response_token_budget,
-@@ -584,11 +585,13 @@
+@@ -587,11 +588,13 @@
          default_template: str | None,
          default_template_content_format: ChatTemplateContentFormatOption,
      ) -> ChatParams:
@@ -113,7 +113,7 @@ diff --git a/vllm/entrypoints/openai/chat_completion/protocol.py b/vllm/entrypoi
          )
  
          # When reasoning is requested, activate thinking for models whose
-@@ -597,15 +600,19 @@
+@@ -600,15 +603,19 @@
          # variable, resolve_chat_template_kwargs filters it out harmlessly.
          user_kwargs = self.chat_template_kwargs or {}
          if self.reasoning_effort is not None and "enable_thinking" not in user_kwargs:

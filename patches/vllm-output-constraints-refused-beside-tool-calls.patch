@@ -347,10 +347,10 @@ index 699c199b07296388ecd540590f863c4219142ffe..b88550dd7c534a0fb9ce676c1f3bc6e4
                  type=output_config.format.type,
                  json_schema=JsonSchemaResponseFormat(
 diff --git a/vllm/entrypoints/openai/chat_completion/protocol.py b/vllm/entrypoints/openai/chat_completion/protocol.py
-index 4cbf4f9c692fd1a4f0571e8843f5969df0b50c4f..0564f6f3e7ab87a2c966ac9636b5f608d6302ac6 100644
+index ae1cd615d876a4615861f42e17a1af25bd4d484c..a4b9935ccd2020b6734ce8696a8feb37d44586d8 100644
 --- a/vllm/entrypoints/openai/chat_completion/protocol.py
 +++ b/vllm/entrypoints/openai/chat_completion/protocol.py
-@@ -37,6 +37,7 @@ from vllm.entrypoints.openai.engine.protocol import (
+@@ -38,6 +38,7 @@ from vllm.entrypoints.openai.engine.protocol import (
      StreamOptions,
      ToolCall,
      UsageInfo,
@@ -358,7 +358,7 @@ index 4cbf4f9c692fd1a4f0571e8843f5969df0b50c4f..0564f6f3e7ab87a2c966ac9636b5f608
      structured_outputs_from_response_format,
      validate_structural_tag_response_format,
      validate_structured_outputs_structural_tag,
-@@ -892,16 +893,6 @@ class ChatCompletionRequest(OpenAIBaseModel):
+@@ -895,16 +896,6 @@ class ChatCompletionRequest(OpenAIBaseModel):
                  "You can only use one kind of constraints for structured "
                  "outputs ('json', 'regex' or 'choice').",
              )
@@ -375,7 +375,7 @@ index 4cbf4f9c692fd1a4f0571e8843f5969df0b50c4f..0564f6f3e7ab87a2c966ac9636b5f608
          validate_structured_outputs_structural_tag(structured_outputs_kwargs)
          return data
  
-@@ -988,6 +979,28 @@ class ChatCompletionRequest(OpenAIBaseModel):
+@@ -991,6 +982,28 @@ class ChatCompletionRequest(OpenAIBaseModel):
                      " of the specified `tools`",
                      parameter="tool_choice",
                  )

@@ -80,7 +80,7 @@ diff --git a/tests/entrypoints/openai/responses/test_responses_utils.py b/tests/
          mock_logger.warning.assert_called_once()
          assert (
              "summary text as reasoning content" in mock_logger.warning.call_args[0][0]
-@@ -900,3 +909,153 @@
+@@ -900,3 +909,181 @@
          assert len(msgs) == 2
          assert msgs[0] == {"role": "system", "content": "be helpful"}
          assert msgs[1] == {"role": "user", "content": "hello"}
@@ -155,12 +155,13 @@ diff --git a/tests/entrypoints/openai/responses/test_responses_utils.py b/tests/
 +    (_history(["a", "b"], ["b", "a"]), "expected 'a'"),
 +    (_history(["a", "a"], ["a", "a"]), "repeats transport id"),
 +    (_history([""], [""]), "missing its transport id"),
-+    (_history(["a"], [""]), "missing tool_call_id"),
++    (_history(["a"], [""]), "missing {result_id}"),
 +])
 +def test_tool_history_correlation_is_shared_across_surfaces(
 +    stream, surface, items, match,
 +):
-+    with pytest.raises(VLLMValidationError, match=match):
++    result_id = "tool_call_id" if surface == "chat" else "call_id"
++    with pytest.raises(VLLMValidationError, match=match.format(result_id=result_id)):
 +        if surface == "chat":
 +            ChatCompletionRequest(
 +                messages=construct_chat_messages_with_tool_call(items), stream=stream,
@@ -168,6 +169,33 @@ diff --git a/tests/entrypoints/openai/responses/test_responses_utils.py b/tests/
 +        else:
 +            request = ResponsesRequest(input=items, stream=stream, kv_scope="agent")
 +            construct_input_messages(request_input=request.input)
++
++
++def test_a_responses_history_refusal_names_the_input_item_sent():
++    """The history is validated after conversion to chat messages, whose
++    positions the caller never sent; the refusal names the input item."""
++    items = [{"role": "user", "content": "hi"},
++             make_reasoning_item(content_text="think"),
++             make_output_message("Calling."),
++             *_history(["A", "B"], ["B", "A"])]
++    request = ResponsesRequest(input=items, instructions="Be terse.", kv_scope="agent")
++    with pytest.raises(VLLMValidationError) as refused:
++        construct_input_messages(
++            request_instructions=request.instructions, request_input=request.input,
++        )
++    assert refused.value.parameter == "input"
++    assert "Tool result at input[5] has call_id 'B'; expected 'A'" in str(refused.value)
++
++    previous = [{"role": "user", "content": "q"},
++                {"role": "assistant", "content": "c", "tool_calls": [
++                    {"id": "s", "type": "function",
++                     "function": {"name": "f", "arguments": "{}"}}]}]
++    with pytest.raises(VLLMValidationError) as refused:
++        construct_input_messages(
++            request_input=[{"role": "user", "content": "go on"}], prev_msg=previous,
++        )
++    assert refused.value.parameter == "input"
++    assert "tool calls at previous_response_id" in str(refused.value)
 +
 +
 +def test_previous_response_preserves_thinking_calls_and_all_text_blocks():
@@ -237,17 +265,57 @@ diff --git a/tests/entrypoints/openai/responses/test_responses_utils.py b/tests/
 diff --git a/vllm/entrypoints/chat_utils.py b/vllm/entrypoints/chat_utils.py
 --- a/vllm/entrypoints/chat_utils.py
 +++ b/vllm/entrypoints/chat_utils.py
-@@ -2126,6 +2126,89 @@
+@@ -6,7 +6,7 @@
+ import types
+ from abc import ABC, abstractmethod
+ from collections import Counter, defaultdict
+-from collections.abc import Awaitable, Callable, Iterable
++from collections.abc import Awaitable, Callable, Iterable, Mapping, Sequence
+ from dataclasses import dataclass
+ from functools import cached_property, lru_cache, partial
+ from itertools import accumulate
+@@ -2126,6 +2126,131 @@
      return "random"
  
  
++@dataclass(frozen=True)
++class ToolHistoryOrigin:
++    """Where each message of a tool history, and each call in it, came from
++    in the request, so a refusal names the field the caller sent rather than
++    a position in a list the server built from it.
++
++    Each origin is a ``(parameter, location)`` pair: the top-level request
++    field and the place within it.
++    """
++
++    messages: Sequence[tuple[str, str]]
++    calls: Mapping[tuple[int, int], tuple[str, str]]
++    # The field a tool result names its call by.
++    result_id: str
++
++    @classmethod
++    def chat(cls, messages: Sequence[Any]) -> "ToolHistoryOrigin":
++        return cls(
++            messages=[("messages", f"messages[{i}]") for i in range(len(messages))],
++            calls={
++                (i, j): ("messages", f"messages[{i}].tool_calls[{j}]")
++                for i, message in enumerate(messages)
++                if isinstance(message, dict)
++                for j in range(len(message.get("tool_calls") or []))
++            },
++            result_id="tool_call_id",
++        )
++
++
 +def validate_tool_result_correlation(
 +    messages: list[ChatCompletionMessageParam],
++    origin: ToolHistoryOrigin,
 +) -> None:
 +    """Validate transport IDs before rendering positional Qwen tool history.
 +
 +    Chat and converted Responses messages share this boundary. Every call must
 +    have exactly one result in the declared order; never guess or reorder it.
++    A refusal names where the caller sent the offending message or call.
 +    """
 +    pending_ids: list[str] = []
 +    pending_message_index: int | None = None
@@ -257,25 +325,29 @@ diff --git a/vllm/entrypoints/chat_utils.py b/vllm/entrypoints/chat_utils.py
 +            continue
 +        role = message.get("role")
 +        tool_calls = message.get("tool_calls") or []
++        parameter, location = origin.messages[message_index]
 +
 +        if role == "tool":
 +            result_id = message.get("tool_call_id")
 +            if not pending_ids:
 +                raise VLLMValidationError(
-+                    f"Tool result at messages[{message_index}] is orphaned; "
-+                    "no preceding assistant tool call is awaiting a result."
++                    f"Tool result at {location} is orphaned; "
++                    "no preceding assistant tool call is awaiting a result.",
++                    parameter=parameter,
 +                )
 +            expected_id = pending_ids[0]
 +            if not result_id:
 +                raise VLLMValidationError(
-+                    f"Tool result at messages[{message_index}] is missing "
-+                    f"tool_call_id; expected {expected_id!r}."
++                    f"Tool result at {location} is missing "
++                    f"{origin.result_id}; expected {expected_id!r}.",
++                    parameter=parameter,
 +                )
 +            if result_id != expected_id:
 +                raise VLLMValidationError(
-+                    f"Tool result at messages[{message_index}] has "
-+                    f"tool_call_id {result_id!r}; expected {expected_id!r} "
-+                    "to preserve declared parallel-call order."
++                    f"Tool result at {location} has {origin.result_id} "
++                    f"{result_id!r}; expected {expected_id!r} "
++                    "to preserve declared parallel-call order.",
++                    parameter=parameter,
 +                )
 +            pending_ids.pop(0)
 +            if not pending_ids:
@@ -283,44 +355,51 @@ diff --git a/vllm/entrypoints/chat_utils.py b/vllm/entrypoints/chat_utils.py
 +            continue
 +
 +        if pending_ids:
++            assert pending_message_index is not None
 +            raise VLLMValidationError(
-+                f"Message at messages[{message_index}] has role {role!r} "
-+                f"before all results for assistant message "
-+                f"messages[{pending_message_index}] were supplied; still "
-+                f"awaiting {pending_ids!r}."
++                f"Message at {location} has role {role!r} "
++                f"before all results for the tool calls at "
++                f"{origin.messages[pending_message_index][1]} were supplied; "
++                f"still awaiting {pending_ids!r}.",
++                parameter=parameter,
 +            )
 +
 +        if not tool_calls:
 +            continue
 +        if role != "assistant":
 +            raise VLLMValidationError(
-+                f"Message at messages[{message_index}] declares tool_calls "
-+                f"with non-assistant role {role!r}."
++                f"Message at {location} declares tool_calls "
++                f"with non-assistant role {role!r}.",
++                parameter=parameter,
 +            )
 +
 +        call_ids: list[str] = []
 +        for call_index, tool_call in enumerate(tool_calls):
++            call_parameter, call_location = origin.calls[(message_index, call_index)]
 +            call_id = (
 +                tool_call.get("id") if isinstance(tool_call, dict) else None
 +            )
 +            if not call_id:
 +                raise VLLMValidationError(
-+                    f"Tool call messages[{message_index}].tool_calls"
-+                    f"[{call_index}] is missing its transport id."
++                    f"Tool call {call_location} is missing its transport id.",
++                    parameter=call_parameter,
 +                )
 +            if call_id in call_ids:
 +                raise VLLMValidationError(
-+                    f"Tool call messages[{message_index}].tool_calls"
-+                    f"[{call_index}] repeats transport id {call_id!r}."
++                    f"Tool call {call_location} repeats transport id {call_id!r}.",
++                    parameter=call_parameter,
 +                )
 +            call_ids.append(call_id)
 +        pending_ids = call_ids
 +        pending_message_index = message_index
 +
 +    if pending_ids:
++        assert pending_message_index is not None
++        parameter, location = origin.messages[pending_message_index]
 +        raise VLLMValidationError(
-+            f"Assistant tool-call message messages[{pending_message_index}] "
-+            f"has no complete result sequence; still awaiting {pending_ids!r}."
++            f"The tool calls at {location} have no complete result sequence; "
++            f"still awaiting {pending_ids!r}.",
++            parameter=parameter,
 +        )
 +
 +
@@ -330,15 +409,16 @@ diff --git a/vllm/entrypoints/chat_utils.py b/vllm/entrypoints/chat_utils.py
 diff --git a/vllm/entrypoints/openai/chat_completion/protocol.py b/vllm/entrypoints/openai/chat_completion/protocol.py
 --- a/vllm/entrypoints/openai/chat_completion/protocol.py
 +++ b/vllm/entrypoints/openai/chat_completion/protocol.py
-@@ -22,6 +22,7 @@
+@@ -22,6 +22,8 @@
  from vllm.entrypoints.chat_utils import (
      ChatCompletionMessageParam,
      ChatTemplateContentFormatOption,
++    ToolHistoryOrigin,
 +    validate_tool_result_correlation,
  )
  from vllm.entrypoints.openai.engine.protocol import (
      AnyResponseFormat,
-@@ -571,88 +572,7 @@
+@@ -571,88 +573,9 @@
  
      @model_validator(mode="after")
      def _validate_tool_result_correlation(self) -> "ChatCompletionRequest":
@@ -424,7 +504,9 @@ diff --git a/vllm/entrypoints/openai/chat_completion/protocol.py b/vllm/entrypoi
 -                f"Assistant tool-call message messages[{pending_message_index}] "
 -                f"has no complete result sequence; still awaiting {pending_ids!r}."
 -            )
-+        validate_tool_result_correlation(self.messages)
++        validate_tool_result_correlation(
++            self.messages, ToolHistoryOrigin.chat(self.messages)
++        )
          return self
  
      _grammar_from_parser: bool = PrivateAttr(default=False)
@@ -439,12 +521,13 @@ diff --git a/vllm/entrypoints/openai/responses/utils.py b/vllm/entrypoints/opena
  from typing import Any, Literal
  
  from openai.types.chat import (
-@@ -30,13 +31,17 @@
+@@ -30,13 +31,18 @@
  from openai.types.responses.tool import Tool
  
  from vllm import envs
 -from vllm.entrypoints.chat_utils import make_tool_call_id
 +from vllm.entrypoints.chat_utils import (
++    ToolHistoryOrigin,
 +    make_tool_call_id,
 +    validate_tool_result_correlation,
 +)
@@ -458,7 +541,27 @@ diff --git a/vllm/entrypoints/openai/responses/utils.py b/vllm/entrypoints/opena
  from vllm.logger import init_logger
  from vllm.tool_parsers.utils import (
      build_responses_tool_call_name_map,
-@@ -198,27 +203,17 @@
+@@ -184,7 +190,12 @@
+     prev_msg: list[ChatCompletionMessageParam] | None = None,
+     prev_response_output: list[ResponseOutputItem] | None = None,
+ ):
++    # Where each message and call came from in this request, so a refusal of
++    # the history names what the caller sent (see ToolHistoryOrigin).
++    history = ("previous_response_id", "previous_response_id")
+     messages: list[ChatCompletionMessageParam] = []
++    origins: list[tuple[str, str]] = []
++    call_origins: dict[tuple[int, int], tuple[str, str]] = {}
+     if request_instructions:
+         messages.append(
+             {
+@@ -192,33 +203,43 @@
+                 "content": request_instructions,
+             }
+         )
++        origins.append(("instructions", "instructions"))
+ 
+     # Prepend the conversation history.
+     if prev_msg is not None:
          # Filter out system messages from previous conversation -- per the
          # OpenAI spec, instructions should NOT carry over across responses.
          # The current request's instructions (if any) were already added above.
@@ -475,27 +578,89 @@ diff --git a/vllm/entrypoints/openai/responses/utils.py b/vllm/entrypoints/opena
 -                            "content": content.text,
 -                        }
 -                    )
-+        messages.extend(deepcopy(m) for m in prev_msg if m.get("role") != "system")
++        for message in prev_msg:
++            if message.get("role") == "system":
++                continue
++            for call_index in range(len(message.get("tool_calls") or [])):
++                call_origins[(len(messages), call_index)] = history
++            messages.append(deepcopy(message))
++            origins.append(history)
  
      # Append the new input.
      # Responses API supports simple text inputs without chat format.
 +    new_items: list[ResponseInputOutputItem] = list(prev_response_output or [])
++    item_origins = [history] * len(new_items)
      if isinstance(request_input, str):
 -        messages.append({"role": "user", "content": request_input})
 +        new_items.append({"role": "user", "content": request_input})
++        item_origins.append(("input", "input"))
      else:
 -        input_messages = construct_chat_messages_with_tool_call(request_input)
 -        messages.extend(input_messages)
 +        new_items.extend(request_input)
-+    messages.extend(construct_chat_messages_with_tool_call(new_items))
-+    validate_tool_result_correlation(messages)
++        item_origins.extend(("input", f"input[{k}]") for k in range(len(request_input)))
++    converted, converted_origins, converted_calls = _convert_response_items(
++        new_items, item_origins
++    )
++    offset = len(messages)
++    messages.extend(converted)
++    origins.extend(converted_origins)
++    for (message_index, call_index), origin in converted_calls.items():
++        call_origins[(offset + message_index, call_index)] = origin
++    validate_tool_result_correlation(
++        messages,
++        ToolHistoryOrigin(messages=origins, calls=call_origins, result_id="call_id"),
++    )
      return messages
  
  
-@@ -240,6 +235,23 @@
-     return messages
+@@ -229,15 +250,60 @@
  
+     Some chat messages span multiple response items (e.g., reasoning + tool calls).
+     """
++    messages, _, _ = _convert_response_items(
++        input_messages,
++        [("input", f"input[{k}]") for k in range(len(input_messages))],
++    )
++    return messages
++
++
++def _convert_response_items(
++    items: list[ResponseInputOutputItem],
++    item_origins: list[tuple[str, str]],
++) -> tuple[
++    list[ChatCompletionMessageParam],
++    list[tuple[str, str]],
++    dict[tuple[int, int], tuple[str, str]],
++]:
++    """Build chat messages from response items, recording for each message
++    the item that began it and for each call the item that carried it."""
+     messages: list[ChatCompletionMessageParam] = []
+-    for item in input_messages:
+-        message = _construct_message_from_response_item(
+-            item, prev_msg=messages[-1] if messages else None
++    origins: list[tuple[str, str]] = []
++    call_origins: dict[tuple[int, int], tuple[str, str]] = {}
++    for item, origin in zip(items, item_origins, strict=True):
++        prev_msg = messages[-1] if messages else None
++        calls_before = (
++            len(prev_msg.get("tool_calls") or []) if isinstance(prev_msg, dict) else 0
+         )
++        message = _construct_message_from_response_item(item, prev_msg=prev_msg)
+         if message is not None:
+             messages.append(message)
++            origins.append(origin)
++            calls_before = 0
++        if not messages or not isinstance(messages[-1], dict):
++            continue
++        for call_index in range(
++            calls_before, len(messages[-1].get("tool_calls") or [])
++        ):
++            call_origins[(len(messages) - 1, call_index)] = origin
++    return messages, origins, call_origins
  
+-    return messages
++
 +def _assistant_content(content):
 +    """Concatenate text blocks exactly; retain mixed parts for shared parsing."""
 +    if not isinstance(content, list):
@@ -511,12 +676,10 @@ diff --git a/vllm/entrypoints/openai/responses/utils.py b/vllm/entrypoints/opena
 +    ):
 +        return "".join(part["text"] for part in parts)
 +    return parts
-+
-+
+ 
+ 
  def _construct_message_from_response_item(
-     item: ResponseInputOutputItem,
-     prev_msg: ChatCompletionMessageParam | None = None,
-@@ -292,11 +304,13 @@
+@@ -292,11 +358,13 @@
      elif isinstance(item, ResponseReasoningItem):
          reasoning = ""
          if item.encrypted_content:
@@ -533,7 +696,7 @@ diff --git a/vllm/entrypoints/openai/responses/utils.py b/vllm/entrypoints/opena
              logger.warning(
                  "Using summary text as reasoning content for item %s. "
                  "Please use content instead of summary for "
-@@ -314,7 +328,7 @@
+@@ -314,7 +382,7 @@
              "reasoning": reasoning,
          }
      elif isinstance(item, ResponseOutputMessage):
@@ -542,7 +705,7 @@ diff --git a/vllm/entrypoints/openai/responses/utils.py b/vllm/entrypoints/opena
          if prev_assistant_msg:
              previous_content = prev_assistant_msg.get("content")
              if previous_content is None:
-@@ -338,20 +352,15 @@
+@@ -338,20 +406,15 @@
              tool_call_id=item.get("call_id"),
          )
      elif isinstance(item, dict) and item.get("role") == "assistant":

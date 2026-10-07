@@ -58626,19 +58626,19 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'def _dump_tool_for_xgrammar(\n'})},
  {'name': 'responses-history-integrity',
   'review_patch': 'patches/vllm-responses-history-integrity.patch',
-  'review_sha256': '0a0a8f1e7606e82a2fa338443c67946dbd8dfc0fb71078a62407d4c879075cf3',
+  'review_sha256': '226a84ccd920e8eb531f0006e1ebd7d51456fdecd4603d57d0cbd38e99ecb4fa',
   'files': ({'path': 'tests/entrypoints/openai/responses/test_responses_utils.py',
              'before_sha256': 'e858ea25eb9e0fac456b34975f7149858b1c61a001d86f63afd06e801ff6a19b',
-             'after_sha256': 'abf41a337cbc2e1e05d2e931c356368dcdf6cf7e75136a3ee8cf2ade9397a109'},
+             'after_sha256': '0f543a7d296a8028ffd0cc6a51971417e861f4e74596fc38c3ea96b8e4e6f2ff'},
             {'path': 'vllm/entrypoints/chat_utils.py',
              'before_sha256': 'e8675eb06fb554c84ad5e627e99e5b0ec7beefae64c4227f92eac96170eb4ec5',
-             'after_sha256': '1ce1f63ca3483a6cd1fc12b10408392f852621d769e2e08f6082c608e47dd5ed'},
+             'after_sha256': 'b8c8bd61c11e8cd93b0110ad2e9ef42e398b068f096be6c9901253a2fb084a1e'},
             {'path': 'vllm/entrypoints/openai/chat_completion/protocol.py',
              'before_sha256': 'afd4ebccd6bb8069604bedd408b60db5ea656dbf50af6ba3ba4d381595bdc5e7',
-             'after_sha256': 'a57b5a8cab8358a715cec3d79c2671bd66c8cfefc0c62cdab169159205b5006f'},
+             'after_sha256': '92a5a81276ffcc41fd0f0dbb87a82ed0c7d66797fae260f8ec315efd2eaaf3ac'},
             {'path': 'vllm/entrypoints/openai/responses/utils.py',
              'before_sha256': '90c48a7f52346b50d0929accbabeffbc88025f430cd595d066f470393e237b52',
-             'after_sha256': '522f71bc93aa354500f3f374fc58474202dcb4e997fe12a7d337d1ee006a6b10'}),
+             'after_sha256': '8820d8e03e3740ab9ce43e53c62b87f828eee4f7e25f20dadc54a2b450e17948'}),
   'edits': ({'name': 'tests/entrypoints/openai/responses/test_responses_utils.py:landmark-1',
              'path': 'tests/entrypoints/openai/responses/test_responses_utils.py',
              'before': '# SPDX-License-Identifier: Apache-2.0\n'
@@ -59048,12 +59048,15 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '    (_history(["a", "a"], ["a", "a"]), "repeats transport '
                       'id"),\n'
                       '    (_history([""], [""]), "missing its transport id"),\n'
-                      '    (_history(["a"], [""]), "missing tool_call_id"),\n'
+                      '    (_history(["a"], [""]), "missing {result_id}"),\n'
                       '])\n'
                       'def test_tool_history_correlation_is_shared_across_surfaces(\n'
                       '    stream, surface, items, match,\n'
                       '):\n'
-                      '    with pytest.raises(VLLMValidationError, match=match):\n'
+                      '    result_id = "tool_call_id" if surface == "chat" else '
+                      '"call_id"\n'
+                      '    with pytest.raises(VLLMValidationError, '
+                      'match=match.format(result_id=result_id)):\n'
                       '        if surface == "chat":\n'
                       '            ChatCompletionRequest(\n'
                       '                '
@@ -59065,6 +59068,43 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       'stream=stream, kv_scope="agent")\n'
                       '            '
                       'construct_input_messages(request_input=request.input)\n'
+                      '\n'
+                      '\n'
+                      'def '
+                      'test_a_responses_history_refusal_names_the_input_item_sent():\n'
+                      '    """The history is validated after conversion to chat '
+                      'messages, whose\n'
+                      '    positions the caller never sent; the refusal names the '
+                      'input item."""\n'
+                      '    items = [{"role": "user", "content": "hi"},\n'
+                      '             make_reasoning_item(content_text="think"),\n'
+                      '             make_output_message("Calling."),\n'
+                      '             *_history(["A", "B"], ["B", "A"])]\n'
+                      '    request = ResponsesRequest(input=items, instructions="Be '
+                      'terse.", kv_scope="agent")\n'
+                      '    with pytest.raises(VLLMValidationError) as refused:\n'
+                      '        construct_input_messages(\n'
+                      '            request_instructions=request.instructions, '
+                      'request_input=request.input,\n'
+                      '        )\n'
+                      '    assert refused.value.parameter == "input"\n'
+                      '    assert "Tool result at input[5] has call_id \'B\'; expected '
+                      '\'A\'" in str(refused.value)\n'
+                      '\n'
+                      '    previous = [{"role": "user", "content": "q"},\n'
+                      '                {"role": "assistant", "content": "c", '
+                      '"tool_calls": [\n'
+                      '                    {"id": "s", "type": "function",\n'
+                      '                     "function": {"name": "f", "arguments": '
+                      '"{}"}}]}]\n'
+                      '    with pytest.raises(VLLMValidationError) as refused:\n'
+                      '        construct_input_messages(\n'
+                      '            request_input=[{"role": "user", "content": "go '
+                      'on"}], prev_msg=previous,\n'
+                      '        )\n'
+                      '    assert refused.value.parameter == "input"\n'
+                      '    assert "tool calls at previous_response_id" in '
+                      'str(refused.value)\n'
                       '\n'
                       '\n'
                       'def '
@@ -59256,14 +59296,16 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    (_history(["a", "a"], ["a", "a"]), "repeats '
                              'transport id"),\n'
                              '    (_history([""], [""]), "missing its transport id"),\n'
-                             '    (_history(["a"], [""]), "missing tool_call_id"),\n'
+                             '    (_history(["a"], [""]), "missing {result_id}"),\n'
                              '])\n'
                              'def '
                              'test_tool_history_correlation_is_shared_across_surfaces(\n'
                              '    stream, surface, items, match,\n'
                              '):\n'
+                             '    result_id = "tool_call_id" if surface == "chat" else '
+                             '"call_id"\n'
                              '    with pytest.raises(VLLMValidationError, '
-                             'match=match):\n'
+                             'match=match.format(result_id=result_id)):\n'
                              '        if surface == "chat":\n'
                              '            ChatCompletionRequest(\n'
                              '                '
@@ -59275,6 +59317,43 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'stream=stream, kv_scope="agent")\n'
                              '            '
                              'construct_input_messages(request_input=request.input)\n'
+                             '\n'
+                             '\n'
+                             'def '
+                             'test_a_responses_history_refusal_names_the_input_item_sent():\n'
+                             '    """The history is validated after conversion to chat '
+                             'messages, whose\n'
+                             '    positions the caller never sent; the refusal names '
+                             'the input item."""\n'
+                             '    items = [{"role": "user", "content": "hi"},\n'
+                             '             make_reasoning_item(content_text="think"),\n'
+                             '             make_output_message("Calling."),\n'
+                             '             *_history(["A", "B"], ["B", "A"])]\n'
+                             '    request = ResponsesRequest(input=items, '
+                             'instructions="Be terse.", kv_scope="agent")\n'
+                             '    with pytest.raises(VLLMValidationError) as refused:\n'
+                             '        construct_input_messages(\n'
+                             '            request_instructions=request.instructions, '
+                             'request_input=request.input,\n'
+                             '        )\n'
+                             '    assert refused.value.parameter == "input"\n'
+                             '    assert "Tool result at input[5] has call_id \'B\'; '
+                             'expected \'A\'" in str(refused.value)\n'
+                             '\n'
+                             '    previous = [{"role": "user", "content": "q"},\n'
+                             '                {"role": "assistant", "content": "c", '
+                             '"tool_calls": [\n'
+                             '                    {"id": "s", "type": "function",\n'
+                             '                     "function": {"name": "f", '
+                             '"arguments": "{}"}}]}]\n'
+                             '    with pytest.raises(VLLMValidationError) as refused:\n'
+                             '        construct_input_messages(\n'
+                             '            request_input=[{"role": "user", "content": '
+                             '"go on"}], prev_msg=previous,\n'
+                             '        )\n'
+                             '    assert refused.value.parameter == "input"\n'
+                             '    assert "tool calls at previous_response_id" in '
+                             'str(refused.value)\n'
                              '\n'
                              '\n'
                              'def '
@@ -59372,6 +59451,41 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '{"completed"}\n'},
             {'name': 'vllm/entrypoints/chat_utils.py:landmark-1',
              'path': 'vllm/entrypoints/chat_utils.py',
+             'before': 'import types\n'
+                       'from abc import ABC, abstractmethod\n'
+                       'from collections import Counter, defaultdict\n'
+                       'from collections.abc import Awaitable, Callable, Iterable\n'
+                       'from dataclasses import dataclass\n'
+                       'from functools import cached_property, lru_cache, partial\n'
+                       'from itertools import accumulate\n',
+             'after': 'import types\n'
+                      'from abc import ABC, abstractmethod\n'
+                      'from collections import Counter, defaultdict\n'
+                      'from collections.abc import Awaitable, Callable, Iterable, '
+                      'Mapping, Sequence\n'
+                      'from dataclasses import dataclass\n'
+                      'from functools import cached_property, lru_cache, partial\n'
+                      'from itertools import accumulate\n',
+             'review_before': 'import types\n'
+                              'from abc import ABC, abstractmethod\n'
+                              'from collections import Counter, defaultdict\n'
+                              'from collections.abc import Awaitable, Callable, '
+                              'Iterable\n'
+                              'from dataclasses import dataclass\n'
+                              'from functools import cached_property, lru_cache, '
+                              'partial\n'
+                              'from itertools import accumulate\n',
+             'review_after': 'import types\n'
+                             'from abc import ABC, abstractmethod\n'
+                             'from collections import Counter, defaultdict\n'
+                             'from collections.abc import Awaitable, Callable, '
+                             'Iterable, Mapping, Sequence\n'
+                             'from dataclasses import dataclass\n'
+                             'from functools import cached_property, lru_cache, '
+                             'partial\n'
+                             'from itertools import accumulate\n'},
+            {'name': 'vllm/entrypoints/chat_utils.py:landmark-2',
+             'path': 'vllm/entrypoints/chat_utils.py',
              'before': '    return "random"\n'
                        '\n'
                        '\n'
@@ -59382,8 +59496,45 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'after': '    return "random"\n'
                       '\n'
                       '\n'
+                      '@dataclass(frozen=True)\n'
+                      'class ToolHistoryOrigin:\n'
+                      '    """Where each message of a tool history, and each call in '
+                      'it, came from\n'
+                      '    in the request, so a refusal names the field the caller '
+                      'sent rather than\n'
+                      '    a position in a list the server built from it.\n'
+                      '\n'
+                      '    Each origin is a ``(parameter, location)`` pair: the '
+                      'top-level request\n'
+                      '    field and the place within it.\n'
+                      '    """\n'
+                      '\n'
+                      '    messages: Sequence[tuple[str, str]]\n'
+                      '    calls: Mapping[tuple[int, int], tuple[str, str]]\n'
+                      '    # The field a tool result names its call by.\n'
+                      '    result_id: str\n'
+                      '\n'
+                      '    @classmethod\n'
+                      '    def chat(cls, messages: Sequence[Any]) -> '
+                      '"ToolHistoryOrigin":\n'
+                      '        return cls(\n'
+                      '            messages=[("messages", f"messages[{i}]") for i in '
+                      'range(len(messages))],\n'
+                      '            calls={\n'
+                      '                (i, j): ("messages", '
+                      'f"messages[{i}].tool_calls[{j}]")\n'
+                      '                for i, message in enumerate(messages)\n'
+                      '                if isinstance(message, dict)\n'
+                      '                for j in range(len(message.get("tool_calls") or '
+                      '[]))\n'
+                      '            },\n'
+                      '            result_id="tool_call_id",\n'
+                      '        )\n'
+                      '\n'
+                      '\n'
                       'def validate_tool_result_correlation(\n'
                       '    messages: list[ChatCompletionMessageParam],\n'
+                      '    origin: ToolHistoryOrigin,\n'
                       ') -> None:\n'
                       '    """Validate transport IDs before rendering positional Qwen '
                       'tool history.\n'
@@ -59392,6 +59543,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       'Every call must\n'
                       '    have exactly one result in the declared order; never guess '
                       'or reorder it.\n'
+                      '    A refusal names where the caller sent the offending message '
+                      'or call.\n'
                       '    """\n'
                       '    pending_ids: list[str] = []\n'
                       '    pending_message_index: int | None = None\n'
@@ -59401,31 +59554,34 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '            continue\n'
                       '        role = message.get("role")\n'
                       '        tool_calls = message.get("tool_calls") or []\n'
+                      '        parameter, location = origin.messages[message_index]\n'
                       '\n'
                       '        if role == "tool":\n'
                       '            result_id = message.get("tool_call_id")\n'
                       '            if not pending_ids:\n'
                       '                raise VLLMValidationError(\n'
-                      '                    f"Tool result at messages[{message_index}] '
-                      'is orphaned; "\n'
+                      '                    f"Tool result at {location} is orphaned; "\n'
                       '                    "no preceding assistant tool call is '
-                      'awaiting a result."\n'
+                      'awaiting a result.",\n'
+                      '                    parameter=parameter,\n'
                       '                )\n'
                       '            expected_id = pending_ids[0]\n'
                       '            if not result_id:\n'
                       '                raise VLLMValidationError(\n'
-                      '                    f"Tool result at messages[{message_index}] '
-                      'is missing "\n'
-                      '                    f"tool_call_id; expected {expected_id!r}."\n'
+                      '                    f"Tool result at {location} is missing "\n'
+                      '                    f"{origin.result_id}; expected '
+                      '{expected_id!r}.",\n'
+                      '                    parameter=parameter,\n'
                       '                )\n'
                       '            if result_id != expected_id:\n'
                       '                raise VLLMValidationError(\n'
-                      '                    f"Tool result at messages[{message_index}] '
-                      'has "\n'
-                      '                    f"tool_call_id {result_id!r}; expected '
-                      '{expected_id!r} "\n'
+                      '                    f"Tool result at {location} has '
+                      '{origin.result_id} "\n'
+                      '                    f"{result_id!r}; expected {expected_id!r} '
+                      '"\n'
                       '                    "to preserve declared parallel-call '
-                      'order."\n'
+                      'order.",\n'
+                      '                    parameter=parameter,\n'
                       '                )\n'
                       '            pending_ids.pop(0)\n'
                       '            if not pending_ids:\n'
@@ -59433,54 +59589,58 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '            continue\n'
                       '\n'
                       '        if pending_ids:\n'
+                      '            assert pending_message_index is not None\n'
                       '            raise VLLMValidationError(\n'
-                      '                f"Message at messages[{message_index}] has role '
-                      '{role!r} "\n'
-                      '                f"before all results for assistant message "\n'
-                      '                f"messages[{pending_message_index}] were '
-                      'supplied; still "\n'
-                      '                f"awaiting {pending_ids!r}."\n'
+                      '                f"Message at {location} has role {role!r} "\n'
+                      '                f"before all results for the tool calls at "\n'
+                      '                f"{origin.messages[pending_message_index][1]} '
+                      'were supplied; "\n'
+                      '                f"still awaiting {pending_ids!r}.",\n'
+                      '                parameter=parameter,\n'
                       '            )\n'
                       '\n'
                       '        if not tool_calls:\n'
                       '            continue\n'
                       '        if role != "assistant":\n'
                       '            raise VLLMValidationError(\n'
-                      '                f"Message at messages[{message_index}] declares '
-                      'tool_calls "\n'
-                      '                f"with non-assistant role {role!r}."\n'
+                      '                f"Message at {location} declares tool_calls "\n'
+                      '                f"with non-assistant role {role!r}.",\n'
+                      '                parameter=parameter,\n'
                       '            )\n'
                       '\n'
                       '        call_ids: list[str] = []\n'
                       '        for call_index, tool_call in enumerate(tool_calls):\n'
+                      '            call_parameter, call_location = '
+                      'origin.calls[(message_index, call_index)]\n'
                       '            call_id = (\n'
                       '                tool_call.get("id") if isinstance(tool_call, '
                       'dict) else None\n'
                       '            )\n'
                       '            if not call_id:\n'
                       '                raise VLLMValidationError(\n'
-                      '                    f"Tool call '
-                      'messages[{message_index}].tool_calls"\n'
-                      '                    f"[{call_index}] is missing its transport '
-                      'id."\n'
+                      '                    f"Tool call {call_location} is missing its '
+                      'transport id.",\n'
+                      '                    parameter=call_parameter,\n'
                       '                )\n'
                       '            if call_id in call_ids:\n'
                       '                raise VLLMValidationError(\n'
-                      '                    f"Tool call '
-                      'messages[{message_index}].tool_calls"\n'
-                      '                    f"[{call_index}] repeats transport id '
-                      '{call_id!r}."\n'
+                      '                    f"Tool call {call_location} repeats '
+                      'transport id {call_id!r}.",\n'
+                      '                    parameter=call_parameter,\n'
                       '                )\n'
                       '            call_ids.append(call_id)\n'
                       '        pending_ids = call_ids\n'
                       '        pending_message_index = message_index\n'
                       '\n'
                       '    if pending_ids:\n'
+                      '        assert pending_message_index is not None\n'
+                      '        parameter, location = '
+                      'origin.messages[pending_message_index]\n'
                       '        raise VLLMValidationError(\n'
-                      '            f"Assistant tool-call message '
-                      'messages[{pending_message_index}] "\n'
-                      '            f"has no complete result sequence; still awaiting '
-                      '{pending_ids!r}."\n'
+                      '            f"The tool calls at {location} have no complete '
+                      'result sequence; "\n'
+                      '            f"still awaiting {pending_ids!r}.",\n'
+                      '            parameter=parameter,\n'
                       '        )\n'
                       '\n'
                       '\n'
@@ -59498,8 +59658,45 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'review_after': '    return "random"\n'
                              '\n'
                              '\n'
+                             '@dataclass(frozen=True)\n'
+                             'class ToolHistoryOrigin:\n'
+                             '    """Where each message of a tool history, and each '
+                             'call in it, came from\n'
+                             '    in the request, so a refusal names the field the '
+                             'caller sent rather than\n'
+                             '    a position in a list the server built from it.\n'
+                             '\n'
+                             '    Each origin is a ``(parameter, location)`` pair: the '
+                             'top-level request\n'
+                             '    field and the place within it.\n'
+                             '    """\n'
+                             '\n'
+                             '    messages: Sequence[tuple[str, str]]\n'
+                             '    calls: Mapping[tuple[int, int], tuple[str, str]]\n'
+                             '    # The field a tool result names its call by.\n'
+                             '    result_id: str\n'
+                             '\n'
+                             '    @classmethod\n'
+                             '    def chat(cls, messages: Sequence[Any]) -> '
+                             '"ToolHistoryOrigin":\n'
+                             '        return cls(\n'
+                             '            messages=[("messages", f"messages[{i}]") for '
+                             'i in range(len(messages))],\n'
+                             '            calls={\n'
+                             '                (i, j): ("messages", '
+                             'f"messages[{i}].tool_calls[{j}]")\n'
+                             '                for i, message in enumerate(messages)\n'
+                             '                if isinstance(message, dict)\n'
+                             '                for j in '
+                             'range(len(message.get("tool_calls") or []))\n'
+                             '            },\n'
+                             '            result_id="tool_call_id",\n'
+                             '        )\n'
+                             '\n'
+                             '\n'
                              'def validate_tool_result_correlation(\n'
                              '    messages: list[ChatCompletionMessageParam],\n'
+                             '    origin: ToolHistoryOrigin,\n'
                              ') -> None:\n'
                              '    """Validate transport IDs before rendering '
                              'positional Qwen tool history.\n'
@@ -59508,6 +59705,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'boundary. Every call must\n'
                              '    have exactly one result in the declared order; never '
                              'guess or reorder it.\n'
+                             '    A refusal names where the caller sent the offending '
+                             'message or call.\n'
                              '    """\n'
                              '    pending_ids: list[str] = []\n'
                              '    pending_message_index: int | None = None\n'
@@ -59517,32 +59716,37 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '            continue\n'
                              '        role = message.get("role")\n'
                              '        tool_calls = message.get("tool_calls") or []\n'
+                             '        parameter, location = '
+                             'origin.messages[message_index]\n'
                              '\n'
                              '        if role == "tool":\n'
                              '            result_id = message.get("tool_call_id")\n'
                              '            if not pending_ids:\n'
                              '                raise VLLMValidationError(\n'
-                             '                    f"Tool result at '
-                             'messages[{message_index}] is orphaned; "\n'
+                             '                    f"Tool result at {location} is '
+                             'orphaned; "\n'
                              '                    "no preceding assistant tool call is '
-                             'awaiting a result."\n'
+                             'awaiting a result.",\n'
+                             '                    parameter=parameter,\n'
                              '                )\n'
                              '            expected_id = pending_ids[0]\n'
                              '            if not result_id:\n'
                              '                raise VLLMValidationError(\n'
-                             '                    f"Tool result at '
-                             'messages[{message_index}] is missing "\n'
-                             '                    f"tool_call_id; expected '
-                             '{expected_id!r}."\n'
+                             '                    f"Tool result at {location} is '
+                             'missing "\n'
+                             '                    f"{origin.result_id}; expected '
+                             '{expected_id!r}.",\n'
+                             '                    parameter=parameter,\n'
                              '                )\n'
                              '            if result_id != expected_id:\n'
                              '                raise VLLMValidationError(\n'
-                             '                    f"Tool result at '
-                             'messages[{message_index}] has "\n'
-                             '                    f"tool_call_id {result_id!r}; '
-                             'expected {expected_id!r} "\n'
+                             '                    f"Tool result at {location} has '
+                             '{origin.result_id} "\n'
+                             '                    f"{result_id!r}; expected '
+                             '{expected_id!r} "\n'
                              '                    "to preserve declared parallel-call '
-                             'order."\n'
+                             'order.",\n'
+                             '                    parameter=parameter,\n'
                              '                )\n'
                              '            pending_ids.pop(0)\n'
                              '            if not pending_ids:\n'
@@ -59550,56 +59754,63 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '            continue\n'
                              '\n'
                              '        if pending_ids:\n'
+                             '            assert pending_message_index is not None\n'
                              '            raise VLLMValidationError(\n'
-                             '                f"Message at messages[{message_index}] '
-                             'has role {role!r} "\n'
-                             '                f"before all results for assistant '
-                             'message "\n'
-                             '                f"messages[{pending_message_index}] were '
-                             'supplied; still "\n'
-                             '                f"awaiting {pending_ids!r}."\n'
+                             '                f"Message at {location} has role '
+                             '{role!r} "\n'
+                             '                f"before all results for the tool calls '
+                             'at "\n'
+                             '                '
+                             'f"{origin.messages[pending_message_index][1]} were '
+                             'supplied; "\n'
+                             '                f"still awaiting {pending_ids!r}.",\n'
+                             '                parameter=parameter,\n'
                              '            )\n'
                              '\n'
                              '        if not tool_calls:\n'
                              '            continue\n'
                              '        if role != "assistant":\n'
                              '            raise VLLMValidationError(\n'
-                             '                f"Message at messages[{message_index}] '
-                             'declares tool_calls "\n'
-                             '                f"with non-assistant role {role!r}."\n'
+                             '                f"Message at {location} declares '
+                             'tool_calls "\n'
+                             '                f"with non-assistant role {role!r}.",\n'
+                             '                parameter=parameter,\n'
                              '            )\n'
                              '\n'
                              '        call_ids: list[str] = []\n'
                              '        for call_index, tool_call in '
                              'enumerate(tool_calls):\n'
+                             '            call_parameter, call_location = '
+                             'origin.calls[(message_index, call_index)]\n'
                              '            call_id = (\n'
                              '                tool_call.get("id") if '
                              'isinstance(tool_call, dict) else None\n'
                              '            )\n'
                              '            if not call_id:\n'
                              '                raise VLLMValidationError(\n'
-                             '                    f"Tool call '
-                             'messages[{message_index}].tool_calls"\n'
-                             '                    f"[{call_index}] is missing its '
-                             'transport id."\n'
+                             '                    f"Tool call {call_location} is '
+                             'missing its transport id.",\n'
+                             '                    parameter=call_parameter,\n'
                              '                )\n'
                              '            if call_id in call_ids:\n'
                              '                raise VLLMValidationError(\n'
-                             '                    f"Tool call '
-                             'messages[{message_index}].tool_calls"\n'
-                             '                    f"[{call_index}] repeats transport '
-                             'id {call_id!r}."\n'
+                             '                    f"Tool call {call_location} repeats '
+                             'transport id {call_id!r}.",\n'
+                             '                    parameter=call_parameter,\n'
                              '                )\n'
                              '            call_ids.append(call_id)\n'
                              '        pending_ids = call_ids\n'
                              '        pending_message_index = message_index\n'
                              '\n'
                              '    if pending_ids:\n'
+                             '        assert pending_message_index is not None\n'
+                             '        parameter, location = '
+                             'origin.messages[pending_message_index]\n'
                              '        raise VLLMValidationError(\n'
-                             '            f"Assistant tool-call message '
-                             'messages[{pending_message_index}] "\n'
-                             '            f"has no complete result sequence; still '
-                             'awaiting {pending_ids!r}."\n'
+                             '            f"The tool calls at {location} have no '
+                             'complete result sequence; "\n'
+                             '            f"still awaiting {pending_ids!r}.",\n'
+                             '            parameter=parameter,\n'
                              '        )\n'
                              '\n'
                              '\n'
@@ -59618,6 +59829,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'after': 'from vllm.entrypoints.chat_utils import (\n'
                       '    ChatCompletionMessageParam,\n'
                       '    ChatTemplateContentFormatOption,\n'
+                      '    ToolHistoryOrigin,\n'
                       '    validate_tool_result_correlation,\n'
                       ')\n'
                       'from vllm.entrypoints.openai.engine.protocol import (\n'
@@ -59631,6 +59843,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'review_after': 'from vllm.entrypoints.chat_utils import (\n'
                              '    ChatCompletionMessageParam,\n'
                              '    ChatTemplateContentFormatOption,\n'
+                             '    ToolHistoryOrigin,\n'
                              '    validate_tool_result_correlation,\n'
                              ')\n'
                              'from vllm.entrypoints.openai.engine.protocol import (\n'
@@ -59757,7 +59970,10 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '    @model_validator(mode="after")\n'
                       '    def _validate_tool_result_correlation(self) -> '
                       '"ChatCompletionRequest":\n'
-                      '        validate_tool_result_correlation(self.messages)\n'
+                      '        validate_tool_result_correlation(\n'
+                      '            self.messages, '
+                      'ToolHistoryOrigin.chat(self.messages)\n'
+                      '        )\n'
                       '        return self\n'
                       '\n'
                       '    _grammar_from_parser: bool = PrivateAttr(default=False)\n',
@@ -59885,7 +60101,10 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    @model_validator(mode="after")\n'
                              '    def _validate_tool_result_correlation(self) -> '
                              '"ChatCompletionRequest":\n'
-                             '        validate_tool_result_correlation(self.messages)\n'
+                             '        validate_tool_result_correlation(\n'
+                             '            self.messages, '
+                             'ToolHistoryOrigin.chat(self.messages)\n'
+                             '        )\n'
                              '        return self\n'
                              '\n'
                              '    _grammar_from_parser: bool = '
@@ -59944,6 +60163,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '\n'
                       'from vllm import envs\n'
                       'from vllm.entrypoints.chat_utils import (\n'
+                      '    ToolHistoryOrigin,\n'
                       '    make_tool_call_id,\n'
                       '    validate_tool_result_correlation,\n'
                       ')\n'
@@ -59980,6 +60200,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '\n'
                              'from vllm import envs\n'
                              'from vllm.entrypoints.chat_utils import (\n'
+                             '    ToolHistoryOrigin,\n'
                              '    make_tool_call_id,\n'
                              '    validate_tool_result_correlation,\n'
                              ')\n'
@@ -59998,7 +60219,65 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    build_responses_tool_call_name_map,\n'},
             {'name': 'vllm/entrypoints/openai/responses/utils.py:landmark-3',
              'path': 'vllm/entrypoints/openai/responses/utils.py',
-             'before': '        # Filter out system messages from previous '
+             'before': '    prev_msg: list[ChatCompletionMessageParam] | None = None,\n'
+                       '    prev_response_output: list[ResponseOutputItem] | None = '
+                       'None,\n'
+                       '):\n'
+                       '    messages: list[ChatCompletionMessageParam] = []\n'
+                       '    if request_instructions:\n'
+                       '        messages.append(\n'
+                       '            {\n',
+             'after': '    prev_msg: list[ChatCompletionMessageParam] | None = None,\n'
+                      '    prev_response_output: list[ResponseOutputItem] | None = '
+                      'None,\n'
+                      '):\n'
+                      '    # Where each message and call came from in this request, so '
+                      'a refusal of\n'
+                      '    # the history names what the caller sent (see '
+                      'ToolHistoryOrigin).\n'
+                      '    history = ("previous_response_id", "previous_response_id")\n'
+                      '    messages: list[ChatCompletionMessageParam] = []\n'
+                      '    origins: list[tuple[str, str]] = []\n'
+                      '    call_origins: dict[tuple[int, int], tuple[str, str]] = {}\n'
+                      '    if request_instructions:\n'
+                      '        messages.append(\n'
+                      '            {\n',
+             'review_before': '    prev_msg: list[ChatCompletionMessageParam] | None = '
+                              'None,\n'
+                              '    prev_response_output: list[ResponseOutputItem] | '
+                              'None = None,\n'
+                              '):\n'
+                              '    messages: list[ChatCompletionMessageParam] = []\n'
+                              '    if request_instructions:\n'
+                              '        messages.append(\n'
+                              '            {\n',
+             'review_after': '    prev_msg: list[ChatCompletionMessageParam] | None = '
+                             'None,\n'
+                             '    prev_response_output: list[ResponseOutputItem] | '
+                             'None = None,\n'
+                             '):\n'
+                             '    # Where each message and call came from in this '
+                             'request, so a refusal of\n'
+                             '    # the history names what the caller sent (see '
+                             'ToolHistoryOrigin).\n'
+                             '    history = ("previous_response_id", '
+                             '"previous_response_id")\n'
+                             '    messages: list[ChatCompletionMessageParam] = []\n'
+                             '    origins: list[tuple[str, str]] = []\n'
+                             '    call_origins: dict[tuple[int, int], tuple[str, str]] '
+                             '= {}\n'
+                             '    if request_instructions:\n'
+                             '        messages.append(\n'
+                             '            {\n'},
+            {'name': 'vllm/entrypoints/openai/responses/utils.py:landmark-4',
+             'path': 'vllm/entrypoints/openai/responses/utils.py',
+             'before': '                "content": request_instructions,\n'
+                       '            }\n'
+                       '        )\n'
+                       '\n'
+                       '    # Prepend the conversation history.\n'
+                       '    if prev_msg is not None:\n'
+                       '        # Filter out system messages from previous '
                        'conversation -- per the\n'
                        '        # OpenAI spec, instructions should NOT carry over '
                        'across responses.\n'
@@ -60033,32 +60312,69 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                        '    return messages\n'
                        '\n'
                        '\n',
-             'after': '        # Filter out system messages from previous conversation '
+             'after': '                "content": request_instructions,\n'
+                      '            }\n'
+                      '        )\n'
+                      '        origins.append(("instructions", "instructions"))\n'
+                      '\n'
+                      '    # Prepend the conversation history.\n'
+                      '    if prev_msg is not None:\n'
+                      '        # Filter out system messages from previous conversation '
                       '-- per the\n'
                       '        # OpenAI spec, instructions should NOT carry over '
                       'across responses.\n'
                       "        # The current request's instructions (if any) were "
                       'already added above.\n'
-                      '        messages.extend(deepcopy(m) for m in prev_msg if '
-                      'm.get("role") != "system")\n'
+                      '        for message in prev_msg:\n'
+                      '            if message.get("role") == "system":\n'
+                      '                continue\n'
+                      '            for call_index in '
+                      'range(len(message.get("tool_calls") or [])):\n'
+                      '                call_origins[(len(messages), call_index)] = '
+                      'history\n'
+                      '            messages.append(deepcopy(message))\n'
+                      '            origins.append(history)\n'
                       '\n'
                       '    # Append the new input.\n'
                       '    # Responses API supports simple text inputs without chat '
                       'format.\n'
                       '    new_items: list[ResponseInputOutputItem] = '
                       'list(prev_response_output or [])\n'
+                      '    item_origins = [history] * len(new_items)\n'
                       '    if isinstance(request_input, str):\n'
                       '        new_items.append({"role": "user", "content": '
                       'request_input})\n'
+                      '        item_origins.append(("input", "input"))\n'
                       '    else:\n'
                       '        new_items.extend(request_input)\n'
-                      '    '
-                      'messages.extend(construct_chat_messages_with_tool_call(new_items))\n'
-                      '    validate_tool_result_correlation(messages)\n'
+                      '        item_origins.extend(("input", f"input[{k}]") for k in '
+                      'range(len(request_input)))\n'
+                      '    converted, converted_origins, converted_calls = '
+                      '_convert_response_items(\n'
+                      '        new_items, item_origins\n'
+                      '    )\n'
+                      '    offset = len(messages)\n'
+                      '    messages.extend(converted)\n'
+                      '    origins.extend(converted_origins)\n'
+                      '    for (message_index, call_index), origin in '
+                      'converted_calls.items():\n'
+                      '        call_origins[(offset + message_index, call_index)] = '
+                      'origin\n'
+                      '    validate_tool_result_correlation(\n'
+                      '        messages,\n'
+                      '        ToolHistoryOrigin(messages=origins, calls=call_origins, '
+                      'result_id="call_id"),\n'
+                      '    )\n'
                       '    return messages\n'
                       '\n'
                       '\n',
-             'review_before': '        # Filter out system messages from previous '
+             'review_before': '                "content": request_instructions,\n'
+                              '            }\n'
+                              '        )\n'
+                              '\n'
+                              '    # Prepend the conversation history.\n'
+                              '    if prev_msg is not None:\n'
+                              '        # Filter out system messages from previous '
                               'conversation -- per the\n'
                               '        # OpenAI spec, instructions should NOT carry '
                               'over across responses.\n'
@@ -60093,40 +60409,129 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                               '    return messages\n'
                               '\n'
                               '\n',
-             'review_after': '        # Filter out system messages from previous '
+             'review_after': '                "content": request_instructions,\n'
+                             '            }\n'
+                             '        )\n'
+                             '        origins.append(("instructions", '
+                             '"instructions"))\n'
+                             '\n'
+                             '    # Prepend the conversation history.\n'
+                             '    if prev_msg is not None:\n'
+                             '        # Filter out system messages from previous '
                              'conversation -- per the\n'
                              '        # OpenAI spec, instructions should NOT carry '
                              'over across responses.\n'
                              "        # The current request's instructions (if any) "
                              'were already added above.\n'
-                             '        messages.extend(deepcopy(m) for m in prev_msg if '
-                             'm.get("role") != "system")\n'
+                             '        for message in prev_msg:\n'
+                             '            if message.get("role") == "system":\n'
+                             '                continue\n'
+                             '            for call_index in '
+                             'range(len(message.get("tool_calls") or [])):\n'
+                             '                call_origins[(len(messages), '
+                             'call_index)] = history\n'
+                             '            messages.append(deepcopy(message))\n'
+                             '            origins.append(history)\n'
                              '\n'
                              '    # Append the new input.\n'
                              '    # Responses API supports simple text inputs without '
                              'chat format.\n'
                              '    new_items: list[ResponseInputOutputItem] = '
                              'list(prev_response_output or [])\n'
+                             '    item_origins = [history] * len(new_items)\n'
                              '    if isinstance(request_input, str):\n'
                              '        new_items.append({"role": "user", "content": '
                              'request_input})\n'
+                             '        item_origins.append(("input", "input"))\n'
                              '    else:\n'
                              '        new_items.extend(request_input)\n'
-                             '    '
-                             'messages.extend(construct_chat_messages_with_tool_call(new_items))\n'
-                             '    validate_tool_result_correlation(messages)\n'
+                             '        item_origins.extend(("input", f"input[{k}]") for '
+                             'k in range(len(request_input)))\n'
+                             '    converted, converted_origins, converted_calls = '
+                             '_convert_response_items(\n'
+                             '        new_items, item_origins\n'
+                             '    )\n'
+                             '    offset = len(messages)\n'
+                             '    messages.extend(converted)\n'
+                             '    origins.extend(converted_origins)\n'
+                             '    for (message_index, call_index), origin in '
+                             'converted_calls.items():\n'
+                             '        call_origins[(offset + message_index, '
+                             'call_index)] = origin\n'
+                             '    validate_tool_result_correlation(\n'
+                             '        messages,\n'
+                             '        ToolHistoryOrigin(messages=origins, '
+                             'calls=call_origins, result_id="call_id"),\n'
+                             '    )\n'
                              '    return messages\n'
                              '\n'
                              '\n'},
-            {'name': 'vllm/entrypoints/openai/responses/utils.py:landmark-4',
+            {'name': 'vllm/entrypoints/openai/responses/utils.py:landmark-5',
              'path': 'vllm/entrypoints/openai/responses/utils.py',
-             'before': '    return messages\n'
+             'before': '\n'
+                       '    Some chat messages span multiple response items (e.g., '
+                       'reasoning + tool calls).\n'
+                       '    """\n'
+                       '    messages: list[ChatCompletionMessageParam] = []\n'
+                       '    for item in input_messages:\n'
+                       '        message = _construct_message_from_response_item(\n'
+                       '            item, prev_msg=messages[-1] if messages else None\n'
+                       '        )\n'
+                       '        if message is not None:\n'
+                       '            messages.append(message)\n'
+                       '\n'
+                       '    return messages\n'
                        '\n'
                        '\n'
-                       'def _construct_message_from_response_item(\n'
-                       '    item: ResponseInputOutputItem,\n'
-                       '    prev_msg: ChatCompletionMessageParam | None = None,\n',
-             'after': '    return messages\n'
+                       'def _construct_message_from_response_item(\n',
+             'after': '\n'
+                      '    Some chat messages span multiple response items (e.g., '
+                      'reasoning + tool calls).\n'
+                      '    """\n'
+                      '    messages, _, _ = _convert_response_items(\n'
+                      '        input_messages,\n'
+                      '        [("input", f"input[{k}]") for k in '
+                      'range(len(input_messages))],\n'
+                      '    )\n'
+                      '    return messages\n'
+                      '\n'
+                      '\n'
+                      'def _convert_response_items(\n'
+                      '    items: list[ResponseInputOutputItem],\n'
+                      '    item_origins: list[tuple[str, str]],\n'
+                      ') -> tuple[\n'
+                      '    list[ChatCompletionMessageParam],\n'
+                      '    list[tuple[str, str]],\n'
+                      '    dict[tuple[int, int], tuple[str, str]],\n'
+                      ']:\n'
+                      '    """Build chat messages from response items, recording for '
+                      'each message\n'
+                      '    the item that began it and for each call the item that '
+                      'carried it."""\n'
+                      '    messages: list[ChatCompletionMessageParam] = []\n'
+                      '    origins: list[tuple[str, str]] = []\n'
+                      '    call_origins: dict[tuple[int, int], tuple[str, str]] = {}\n'
+                      '    for item, origin in zip(items, item_origins, strict=True):\n'
+                      '        prev_msg = messages[-1] if messages else None\n'
+                      '        calls_before = (\n'
+                      '            len(prev_msg.get("tool_calls") or []) if '
+                      'isinstance(prev_msg, dict) else 0\n'
+                      '        )\n'
+                      '        message = _construct_message_from_response_item(item, '
+                      'prev_msg=prev_msg)\n'
+                      '        if message is not None:\n'
+                      '            messages.append(message)\n'
+                      '            origins.append(origin)\n'
+                      '            calls_before = 0\n'
+                      '        if not messages or not isinstance(messages[-1], dict):\n'
+                      '            continue\n'
+                      '        for call_index in range(\n'
+                      '            calls_before, len(messages[-1].get("tool_calls") or '
+                      '[])\n'
+                      '        ):\n'
+                      '            call_origins[(len(messages) - 1, call_index)] = '
+                      'origin\n'
+                      '    return messages, origins, call_origins\n'
                       '\n'
                       '\n'
                       'def _assistant_content(content):\n'
@@ -60149,17 +60554,77 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '    return parts\n'
                       '\n'
                       '\n'
-                      'def _construct_message_from_response_item(\n'
-                      '    item: ResponseInputOutputItem,\n'
-                      '    prev_msg: ChatCompletionMessageParam | None = None,\n',
-             'review_before': '    return messages\n'
+                      'def _construct_message_from_response_item(\n',
+             'review_before': '\n'
+                              '    Some chat messages span multiple response items '
+                              '(e.g., reasoning + tool calls).\n'
+                              '    """\n'
+                              '    messages: list[ChatCompletionMessageParam] = []\n'
+                              '    for item in input_messages:\n'
+                              '        message = '
+                              '_construct_message_from_response_item(\n'
+                              '            item, prev_msg=messages[-1] if messages '
+                              'else None\n'
+                              '        )\n'
+                              '        if message is not None:\n'
+                              '            messages.append(message)\n'
+                              '\n'
+                              '    return messages\n'
                               '\n'
                               '\n'
-                              'def _construct_message_from_response_item(\n'
-                              '    item: ResponseInputOutputItem,\n'
-                              '    prev_msg: ChatCompletionMessageParam | None = '
-                              'None,\n',
-             'review_after': '    return messages\n'
+                              'def _construct_message_from_response_item(\n',
+             'review_after': '\n'
+                             '    Some chat messages span multiple response items '
+                             '(e.g., reasoning + tool calls).\n'
+                             '    """\n'
+                             '    messages, _, _ = _convert_response_items(\n'
+                             '        input_messages,\n'
+                             '        [("input", f"input[{k}]") for k in '
+                             'range(len(input_messages))],\n'
+                             '    )\n'
+                             '    return messages\n'
+                             '\n'
+                             '\n'
+                             'def _convert_response_items(\n'
+                             '    items: list[ResponseInputOutputItem],\n'
+                             '    item_origins: list[tuple[str, str]],\n'
+                             ') -> tuple[\n'
+                             '    list[ChatCompletionMessageParam],\n'
+                             '    list[tuple[str, str]],\n'
+                             '    dict[tuple[int, int], tuple[str, str]],\n'
+                             ']:\n'
+                             '    """Build chat messages from response items, '
+                             'recording for each message\n'
+                             '    the item that began it and for each call the item '
+                             'that carried it."""\n'
+                             '    messages: list[ChatCompletionMessageParam] = []\n'
+                             '    origins: list[tuple[str, str]] = []\n'
+                             '    call_origins: dict[tuple[int, int], tuple[str, str]] '
+                             '= {}\n'
+                             '    for item, origin in zip(items, item_origins, '
+                             'strict=True):\n'
+                             '        prev_msg = messages[-1] if messages else None\n'
+                             '        calls_before = (\n'
+                             '            len(prev_msg.get("tool_calls") or []) if '
+                             'isinstance(prev_msg, dict) else 0\n'
+                             '        )\n'
+                             '        message = '
+                             '_construct_message_from_response_item(item, '
+                             'prev_msg=prev_msg)\n'
+                             '        if message is not None:\n'
+                             '            messages.append(message)\n'
+                             '            origins.append(origin)\n'
+                             '            calls_before = 0\n'
+                             '        if not messages or not isinstance(messages[-1], '
+                             'dict):\n'
+                             '            continue\n'
+                             '        for call_index in range(\n'
+                             '            calls_before, '
+                             'len(messages[-1].get("tool_calls") or [])\n'
+                             '        ):\n'
+                             '            call_origins[(len(messages) - 1, '
+                             'call_index)] = origin\n'
+                             '    return messages, origins, call_origins\n'
                              '\n'
                              '\n'
                              'def _assistant_content(content):\n'
@@ -60182,11 +60647,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    return parts\n'
                              '\n'
                              '\n'
-                             'def _construct_message_from_response_item(\n'
-                             '    item: ResponseInputOutputItem,\n'
-                             '    prev_msg: ChatCompletionMessageParam | None = '
-                             'None,\n'},
-            {'name': 'vllm/entrypoints/openai/responses/utils.py:landmark-5',
+                             'def _construct_message_from_response_item(\n'},
+            {'name': 'vllm/entrypoints/openai/responses/utils.py:landmark-6',
              'path': 'vllm/entrypoints/openai/responses/utils.py',
              'before': '    elif isinstance(item, ResponseReasoningItem):\n'
                        '        reasoning = ""\n'
@@ -60250,7 +60712,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'for item %s. "\n'
                              '                "Please use content instead of summary '
                              'for "\n'},
-            {'name': 'vllm/entrypoints/openai/responses/utils.py:landmark-6',
+            {'name': 'vllm/entrypoints/openai/responses/utils.py:landmark-7',
              'path': 'vllm/entrypoints/openai/responses/utils.py',
              'before': '            "reasoning": reasoning,\n'
                        '        }\n'
@@ -60284,7 +60746,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '            previous_content = '
                              'prev_assistant_msg.get("content")\n'
                              '            if previous_content is None:\n'},
-            {'name': 'vllm/entrypoints/openai/responses/utils.py:landmark-7',
+            {'name': 'vllm/entrypoints/openai/responses/utils.py:landmark-8',
              'path': 'vllm/entrypoints/openai/responses/utils.py',
              'before': '            tool_call_id=item.get("call_id"),\n'
                        '        )\n'
@@ -63489,7 +63951,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'converter.")\n'})},
  {'name': 'generation-sampling-resolution',
   'review_patch': 'patches/vllm-generation-sampling-resolution.patch',
-  'review_sha256': '4ac5c3d5f1b91d8873dbedac89e6a9a8c65b57c9432c3e0ed2435966dbe880be',
+  'review_sha256': 'af5970eab6a3e9fd39bb9fc95f9f64ca1ee9588a40fac2c12110ff4cfa4ea343',
   'files': ({'path': 'tests/entrypoints/openai/test_render_token_offsets.py',
              'before_sha256': '223426750879932311a2f26377300df68ac13b2de1332c667c56b3bffb245b75',
              'after_sha256': '405e6e5592d4178fde073482558bb491fe201e3a3b706c25df104b136b8197a1'},
@@ -63503,8 +63965,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': 'b7b8a5edd2a045a6b7ace1d1aab87605681d3a1b96191f45cf2e39f8bb157925',
              'after_sha256': '8421a84b21ddf78ec8a80fc0f3e46ac0ce07a3eaffdd12df240bbd75ba332c78'},
             {'path': 'vllm/entrypoints/openai/chat_completion/protocol.py',
-             'before_sha256': 'a57b5a8cab8358a715cec3d79c2671bd66c8cfefc0c62cdab169159205b5006f',
-             'after_sha256': '4a3285f5f8947dea200a303fa8021362915ade9e8d22fc3109b54cb70e86002c'},
+             'before_sha256': '92a5a81276ffcc41fd0f0dbb87a82ed0c7d66797fae260f8ec315efd2eaaf3ac',
+             'after_sha256': 'ab2d01bdf68f7fafc07d17924f39e9dde88d00b07a43ea8cef55270014b2f9ba'},
             {'path': 'vllm/entrypoints/openai/completion/protocol.py',
              'before_sha256': '4aaad83ba272bcdea4d2b6e69fa0989cf40b48d47512486b6a1a2816f04d74f6',
              'after_sha256': 'af51ee290f1a98d8284bb678ad082927056b1a9e03389509e923ea632d8b8ed0'},
@@ -66512,7 +66974,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    msgspec.Struct,\n'})},
  {'name': 'sampling-decoding-boundary',
   'review_patch': 'patches/vllm-sampling-decoding-boundary.patch',
-  'review_sha256': 'f7e0c0569bf70642f53ada3104389058851efd50f265ded882df27f1b518cbc3',
+  'review_sha256': 'e5909686b9aa4e591a35e66bcd78fb0fbc7b0ea56bf2210779d934d86c7b28c8',
   'files': ({'path': 'tests/entrypoints/multimodal/openai/chat_completion/test_video.py',
              'before_sha256': 'e48e3ac6176becf5489c61c6cc050cc48f330483f45972fd5f65a8f7482bb9b1',
              'after_sha256': '219e50f6556699d257807b5481ba6664169cd0dd716a59f7fd5969442da475ae'},
@@ -66535,8 +66997,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': '8f8073c8b27152ad898bc0a7d1d4963a26500fe4547b6365b51c6bc278797a71',
              'after_sha256': '6d5796773be3daa15c1dc369bed3bb36fec877b4735389a6893d7236aa25cd38'},
             {'path': 'vllm/entrypoints/openai/chat_completion/protocol.py',
-             'before_sha256': '4a3285f5f8947dea200a303fa8021362915ade9e8d22fc3109b54cb70e86002c',
-             'after_sha256': '3019ad9ea067fc1b17f436507e21aa87d0d4816882b5ea9a3218a5dba7672fba'},
+             'before_sha256': 'ab2d01bdf68f7fafc07d17924f39e9dde88d00b07a43ea8cef55270014b2f9ba',
+             'after_sha256': 'ffc23035c247182c3533ee09347f59fe1384af4c30cb7766c504fd28536d095e'},
             {'path': 'vllm/entrypoints/openai/chat_completion/serving.py',
              'before_sha256': '21f1818607d712fb0abfcb78e67fd7ccb8c97eaded0717559970d9843d6d0dbf',
              'after_sha256': '2493c991aa308b9ded55fa705b0d67cefa5db569a3e56a0fa6e4a85fa1e88b42'},
@@ -108442,8 +108904,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': None,
              'after_sha256': 'b2b34a541fa8d5e1155ab87d6d4e781c40bb01762042d44dd6da48668a32691d'},
             {'path': 'vllm/entrypoints/chat_utils.py',
-             'before_sha256': '1ce1f63ca3483a6cd1fc12b10408392f852621d769e2e08f6082c608e47dd5ed',
-             'after_sha256': 'f178be190e94c5298661f8bc3a53b2c6882ec9c6fb302d59accc83b0dbe9fca1'},
+             'before_sha256': 'b8c8bd61c11e8cd93b0110ad2e9ef42e398b068f096be6c9901253a2fb084a1e',
+             'after_sha256': 'ddb54fb57feb0963958769aca568d495c2f543c8a2f54d29ce894d6394c00829'},
             {'path': 'vllm/entrypoints/pooling/scoring/io_processor.py',
              'before_sha256': 'd10e7153cb345d8a34d8c4d6e1c53e7b6adcf29d494368f03e3a0f07ebe290f2',
              'after_sha256': 'aaa0d78c9432298095134f2fc5f07ca18f613b139912aef01a43ade162bdb5d4'},
@@ -118738,13 +119200,13 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'to JIT compile triton kernels.\n'})},
  {'name': 'template-refusals-name-their-parameter',
   'review_patch': 'patches/vllm-template-refusals-name-their-parameter.patch',
-  'review_sha256': 'bf1b666d2f3ac901acebb614ea37c18113d7296fe0fe25348b63b4b72107dedd',
+  'review_sha256': '1f428332be39e4fb7f3c7f7eb5d6e3297f5dc70638fcd7f81d69b32f69d1fa26',
   'files': ({'path': 'tests/renderers/test_hf.py',
              'before_sha256': 'fa24987689db198add630723f7697ab2fc61edb7d133990890fcd19fe9943b90',
              'after_sha256': 'd6a2cc3febe2fc86138f019345a263018b63aea131541f9d82753c8d15260425'},
             {'path': 'vllm/entrypoints/openai/chat_completion/protocol.py',
-             'before_sha256': '3019ad9ea067fc1b17f436507e21aa87d0d4816882b5ea9a3218a5dba7672fba',
-             'after_sha256': '1a11f9bc960903d6bbaddca8f339b4517378ef54b5ce0f35543ed34a757519ae'},
+             'before_sha256': 'ffc23035c247182c3533ee09347f59fe1384af4c30cb7766c504fd28536d095e',
+             'after_sha256': 'cea0e7a83613a21da92fcd729a1caf3b83bdb97c611918e381c73d257a23dd1d'},
             {'path': 'vllm/entrypoints/openai/responses/protocol.py',
              'before_sha256': '878c4aea468b9d3436e934fc060035963a78acc88050126ccc1caf26ec18161d',
              'after_sha256': '7b7175cd40efdb5d165443f8147a17dcd82b8eaf0d897df14720a7f06f375124'},
@@ -123903,7 +124365,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '                # non-reasoning outputs.\n'})},
  {'name': 'unspecified-tool-choice-is-the-default',
   'review_patch': 'patches/vllm-unspecified-tool-choice-is-the-default.patch',
-  'review_sha256': '35be0035ab7ae64466a324bba0fd2a2004ba41fb254afbfd902319dcfa9ea6a7',
+  'review_sha256': '367fedad65383375e377d7bc1e20cc3fdab4554d511b9437918004b25321d530',
   'files': ({'path': 'tests/entrypoints/anthropic/test_anthropic_messages_conversion.py',
              'before_sha256': '8a0ab16f6a4cb53608192ffffc56998ce8eb7e51507b69883e5ee44dd1226265',
              'after_sha256': '6bc3ec877070bd71bd337199de61e7afa6c017a18332d7c5ac4f745491d49cf8'},
@@ -123917,8 +124379,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': '5868d595cd9560ec9d5da864771a862e02d33c95f7de7d49c61c0ae6df10678f',
              'after_sha256': '027c485896a24b533c4b5edcd0f4e2be96c5e29de9695ab88e70e60831ed8fd4'},
             {'path': 'vllm/entrypoints/openai/chat_completion/protocol.py',
-             'before_sha256': '1a11f9bc960903d6bbaddca8f339b4517378ef54b5ce0f35543ed34a757519ae',
-             'after_sha256': '6a3dcd5fa0bf1aca94cd2e9d3d463d002c986e2281732e1186b85ccc8fdea6f1'},
+             'before_sha256': 'cea0e7a83613a21da92fcd729a1caf3b83bdb97c611918e381c73d257a23dd1d',
+             'after_sha256': '0d200a798bb9fa7911ff2c2c84bae744b23f815b39b52ce0f69f533b1def60d4'},
             {'path': 'vllm/entrypoints/openai/chat_completion/serving.py',
              'before_sha256': 'e22196b991b48a775cb030e567cfa44574b7f96f83519b5bac1de0c30a99e878',
              'after_sha256': '36d480a3b533aaa5cf556349cad04afc0e37770c4bbbb51788836a512f1de518'},
@@ -125734,7 +126196,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    ]))\n'})},
  {'name': 'responses-tools-are-one-function-list',
   'review_patch': 'patches/vllm-responses-tools-are-one-function-list.patch',
-  'review_sha256': 'c443c7a1235e5ffc2ddc1ddb001ce72c75468c246ab2d6ca6ebefa87d2ac0f59',
+  'review_sha256': 'cae549ea87a8c1b6020f76163cfe1eca0c3104eac317ab2d84b3db75092d20cd',
   'files': ({'path': 'tests/tool_parsers/test_structural_tag_registry.py',
              'before_sha256': '3fbc42eef3b13462d86990e287c15e35ae3d1faa8e5a0d9eb75b338787074540',
              'after_sha256': '7d1fd82dfcf43352ff4b6953418cf762128bea9b78207a2313d9df9cb19b5f4b'},
@@ -125748,8 +126210,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': '14ad1e85aa2cd455de3c9f6231220a4fa9d41806a054c0e8f7d2da64e596493e',
              'after_sha256': 'fdcb2a0602a1ec83db357a34c9b70b8c045bf255eac6acfda83f8cc6dc106604'},
             {'path': 'vllm/entrypoints/openai/responses/utils.py',
-             'before_sha256': '522f71bc93aa354500f3f374fc58474202dcb4e997fe12a7d337d1ee006a6b10',
-             'after_sha256': 'b51b018482eb19482df18f84c6ae72b633f0de7b6f7c2d77842f7bc6608b91d6'},
+             'before_sha256': '8820d8e03e3740ab9ce43e53c62b87f828eee4f7e25f20dadc54a2b450e17948',
+             'after_sha256': 'd4197fd957d326f71f9b7c6fc04ca4534eca91fd3822670ec99ffd2c0d74ca3b'},
             {'path': 'vllm/parser/abstract_parser.py',
              'before_sha256': 'eaffc8cd7340c05b76e5c3bc3541e65e327aa00927b7119d29b92a33d7c845ec',
              'after_sha256': 'a52399b65316163be152a4c3fa9fd832e80d293814ec421832438c00bb7e1816'},
@@ -131486,7 +131948,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '        for new_token_id in new_token_ids:\n'})},
  {'name': 'output-constraints-refused-beside-tool-calls',
   'review_patch': 'patches/vllm-output-constraints-refused-beside-tool-calls.patch',
-  'review_sha256': '788431f67e89c1e363b59e22373cc62e6a9b972061f76566d77709d367379a2a',
+  'review_sha256': 'c6ac620c8cd962a77868789d72875e0df456a9b0918ef8cb58ec2e15c3600343',
   'files': ({'path': 'tests/entrypoints/openai/test_output_constraint_beside_tools.py',
              'before_sha256': None,
              'after_sha256': '836be0512b50a3c2877a99ef7166b59bc50c7aa535a7cf653edebf57028f9b39'},
@@ -131503,8 +131965,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': '027c485896a24b533c4b5edcd0f4e2be96c5e29de9695ab88e70e60831ed8fd4',
              'after_sha256': '089e60ed67e60717853e132f9d710c5542e9fa1f3b92d5a26033c8dadfc34eb4'},
             {'path': 'vllm/entrypoints/openai/chat_completion/protocol.py',
-             'before_sha256': '6a3dcd5fa0bf1aca94cd2e9d3d463d002c986e2281732e1186b85ccc8fdea6f1',
-             'after_sha256': '9381da57140b1e844346d2d452c7e6786e04bd6097b69a9313380a48c39c5ace'},
+             'before_sha256': '0d200a798bb9fa7911ff2c2c84bae744b23f815b39b52ce0f69f533b1def60d4',
+             'after_sha256': '327b4ee4a029ece964413b15c687cf7790f8aa3a4f87f0c06ab8e37b70581750'},
             {'path': 'vllm/entrypoints/openai/engine/protocol.py',
              'before_sha256': 'aac2094cff867c78ddf2e19829d17c24c330719d6e2f478ec3ff94c436ca0237',
              'after_sha256': '0d373e6820efe4bcbd625db972ba381a5070818669af0d06eda849a26efe78bc'},
@@ -133436,7 +133898,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'kernel_cls.__name__)\n'})},
  {'name': 'render-carries-every-image-chat-renders',
   'review_patch': 'patches/vllm-render-carries-every-image-chat-renders.patch',
-  'review_sha256': '5e406e569b5777b572aeeb875a4afdcf5a0a18d07901aa9d9309977a57758124',
+  'review_sha256': 'c5bf4cb2948b9eb7866d083671af3badcc9cf529a7756bde3b0647c236fe932f',
   'files': ({'path': 'tests/entrypoints/scale_out/token_in_token_out/test_protocol.py',
              'before_sha256': '64ae671e5da6f15c64b2d243b4a1bc3bdb0dd7b0b45f9288304a73e2ce9c7a1f',
              'after_sha256': 'fc3d4cb03caedf41942409f0e93ec59e3a07ce511af798c10e87eaca104115c5'},
@@ -133444,8 +133906,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': 'e8359e55d9919cb95d358854521be90c3d8f7367ddc8eaedf12b7ca46cce2aa9',
              'after_sha256': '119155ca00f4cb890976e438157fe0e437c491340d05233dc3483f38fd158785'},
             {'path': 'vllm/entrypoints/chat_utils.py',
-             'before_sha256': 'f178be190e94c5298661f8bc3a53b2c6882ec9c6fb302d59accc83b0dbe9fca1',
-             'after_sha256': 'fb57ba6e099342ae339639eb14f2a1ded460519b7f7747ee2552e1ad34f738f5'},
+             'before_sha256': 'ddb54fb57feb0963958769aca568d495c2f543c8a2f54d29ce894d6394c00829',
+             'after_sha256': '885a4093bdcdcfbf2449628a395edd838744d8b36c431cd35687c9c313690dab'},
             {'path': 'vllm/entrypoints/scale_out/render/serving.py',
              'before_sha256': '170d9ee1f5023075e128f9158b09ef33e4d653f3fb07ca73fd474cc5168b4f68',
              'after_sha256': '5c610ac0bdca6dcb4071a7b7952ffd3711fc600b89a9eca6a3e56e44fd00a674'},
@@ -134485,7 +134947,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'available for text-only models")\n'})},
  {'name': 'rendered-prompts-are-never-truncated',
   'review_patch': 'patches/vllm-rendered-prompts-are-never-truncated.patch',
-  'review_sha256': 'e797fd19e869da9c4271934d297b5bb37fa4f5716835d5f50fb3d5cbc6a0c3fc',
+  'review_sha256': '07cd24fbf29bc66fb9615d63a8e30d947ee13cf6367e23bcb1a870e4f3a49334',
   'files': ({'path': 'tests/entrypoints/openai/chat_completion/test_serving_chat.py',
              'before_sha256': '82a3f7dad3c315ce9fa205613f8ab817a879d1a3ddb9a8c3fa72d43af51412c9',
              'after_sha256': '3a452a168070dbbbd75c879507ab7f0126290db385c44fd94776b144922d4795'},
@@ -134493,8 +134955,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': None,
              'after_sha256': 'db436cb68152f60985f802cb63ecaaaca47e6e857a82056751ed730566e3aa86'},
             {'path': 'vllm/entrypoints/openai/chat_completion/protocol.py',
-             'before_sha256': '9381da57140b1e844346d2d452c7e6786e04bd6097b69a9313380a48c39c5ace',
-             'after_sha256': '3f255fe10ee6857c1e19e3ee604e6fb8de8098f00f41d68b8ef9e8995a53cb3e'},
+             'before_sha256': '327b4ee4a029ece964413b15c687cf7790f8aa3a4f87f0c06ab8e37b70581750',
+             'after_sha256': '4c2bb4939c7d7d17d006373d0c0b2cfc2c4f9bbc7e4afc268f50ed5fb0db1b3a'},
             {'path': 'vllm/entrypoints/openai/chat_completion/serving.py',
              'before_sha256': 'c630163a3ee8048653a750d73177a41cafd2271cebc449ea2b441c0e0641eb7c',
              'after_sha256': '09ec976686c9091c56ff71e5edfc8907d92eb8610d69d351a4a0af67b5e0f3a3'},
@@ -135556,7 +136018,7 @@ FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5d
  'tests/entrypoints/openai/responses/test_function_call_parsing.py': '98877f2029119b7b7b753c4a9cbc315d3c0124885bba29a45004dc9fd1cfb267',
  'tests/entrypoints/openai/responses/test_parsable_context_unit.py': '95f50d93d97370d426319b5dc94fce55b9cbca4ce9b3b95a930e42990dcbf4a2',
  'tests/entrypoints/openai/responses/test_reasoning_usage_context.py': '46074423f3316b6380ecb50f17c6d26aa2fe49c5fa211cb08179ee5fb4347666',
- 'tests/entrypoints/openai/responses/test_responses_utils.py': 'abf41a337cbc2e1e05d2e931c356368dcdf6cf7e75136a3ee8cf2ade9397a109',
+ 'tests/entrypoints/openai/responses/test_responses_utils.py': '0f543a7d296a8028ffd0cc6a51971417e861f4e74596fc38c3ea96b8e4e6f2ff',
  'tests/entrypoints/openai/responses/test_sampling_params.py': 'd4c56d82ae742e0c5075c189f91ac069f2ad0a61e336ee4f7fc178f46bf5f5b5',
  'tests/entrypoints/openai/responses/test_serving_responses.py': '170cdad0dba045b64560bf7dc78434786ce21de2cce032cd18ed0ffa358c75bc',
  'tests/entrypoints/openai/test_beam_search_boundary.py': '34bb27d9fc4952429dd4f31199a57ecef0ca049ac76c4040e548e9773fbd4cb1',
@@ -135669,13 +136131,13 @@ FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5d
  'vllm/entrypoints/anthropic/api_router.py': '8d7d742f6e7d9f2fa9bbe1e57d6adbd4f2753075a083c7a7f93d39fc5ab474b6',
  'vllm/entrypoints/anthropic/protocol.py': 'a6b36585ab26bf55c15205b03f6bad9da3534a9ddd5918ea358f2945ff303fdc',
  'vllm/entrypoints/anthropic/serving.py': '089e60ed67e60717853e132f9d710c5542e9fa1f3b92d5a26033c8dadfc34eb4',
- 'vllm/entrypoints/chat_utils.py': 'fb57ba6e099342ae339639eb14f2a1ded460519b7f7747ee2552e1ad34f738f5',
+ 'vllm/entrypoints/chat_utils.py': '885a4093bdcdcfbf2449628a395edd838744d8b36c431cd35687c9c313690dab',
  'vllm/entrypoints/generate/api_router.py': 'dffeda2c3ccc6cfe3d4945720a7378bab34e7c7c9959d020a9643675895a3ffd',
  'vllm/entrypoints/generate/base/serving.py': '8857456bc7a0157497d03a95b90f7d60a6435615c8e06406437d90e016030c96',
  'vllm/entrypoints/llm.py': '79f9bb1212884746964a347f7e4b39087b5ac084b1d72821a12efd2fb85bcb03',
  'vllm/entrypoints/openai/chat_completion/api_router.py': '9cb8a56328bcfea734cc252e1291b17aee6c42e7208c9c8f883ad5a434bace17',
  'vllm/entrypoints/openai/chat_completion/batch_serving.py': 'e48a1aaf594d7fcbb0979a1e48785ed37d2b109e6343beb318cb9145486efebe',
- 'vllm/entrypoints/openai/chat_completion/protocol.py': '3f255fe10ee6857c1e19e3ee604e6fb8de8098f00f41d68b8ef9e8995a53cb3e',
+ 'vllm/entrypoints/openai/chat_completion/protocol.py': '4c2bb4939c7d7d17d006373d0c0b2cfc2c4f9bbc7e4afc268f50ed5fb0db1b3a',
  'vllm/entrypoints/openai/chat_completion/serving.py': '09ec976686c9091c56ff71e5edfc8907d92eb8610d69d351a4a0af67b5e0f3a3',
  'vllm/entrypoints/openai/cli_args.py': '2c74b481652e1b7154df7836a98eb3ef1377092dc8ac4ae02095160907b5e36e',
  'vllm/entrypoints/openai/completion/api_router.py': '95f7e88069d896bb2a616a50ca3c3c9d1fd1b2314b785b87696ad936fd205363',
@@ -135686,7 +136148,7 @@ FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5d
  'vllm/entrypoints/openai/responses/protocol.py': '71108c0a82c83383a3e105f177f41190eb690c69f92c12cb43e1f4e4cd2c3262',
  'vllm/entrypoints/openai/responses/serving.py': '0a235c4b4681365d0c7c3fda940a5b4d57caee881a46d48fcfcfcc6f25c3a1dc',
  'vllm/entrypoints/openai/responses/streaming_events.py': 'd42b73604e9729d35fcc944c68b21e5a68f110be11327f65308dc8ee46daeffe',
- 'vllm/entrypoints/openai/responses/utils.py': 'b51b018482eb19482df18f84c6ae72b633f0de7b6f7c2d77842f7bc6608b91d6',
+ 'vllm/entrypoints/openai/responses/utils.py': 'd4197fd957d326f71f9b7c6fc04ca4534eca91fd3822670ec99ffd2c0d74ca3b',
  'vllm/entrypoints/openai/run_batch.py': 'b33bb5bb911b300914c10ac7068610330706a4c3371211ea7a165c219139f89e',
  'vllm/entrypoints/pooling/scoring/io_processor.py': 'aaa0d78c9432298095134f2fc5f07ca18f613b139912aef01a43ade162bdb5d4',
  'vllm/entrypoints/scale_out/derender/serving.py': '3beb23995dddcfac4b98bf38f5948bd992ff06bf99290157317ba7018f57a6d7',

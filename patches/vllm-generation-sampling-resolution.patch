@@ -488,7 +488,7 @@ diff --git a/tests/entrypoints/test_kv_scope_protocol.py b/tests/entrypoints/tes
 diff --git a/vllm/entrypoints/openai/chat_completion/protocol.py b/vllm/entrypoints/openai/chat_completion/protocol.py
 --- a/vllm/entrypoints/openai/chat_completion/protocol.py
 +++ b/vllm/entrypoints/openai/chat_completion/protocol.py
-@@ -47,6 +47,7 @@
+@@ -48,6 +48,7 @@
  from vllm.sampling_params import (
      BeamSearchParams,
      FinalResponseTokenBudget,
@@ -496,7 +496,7 @@ diff --git a/vllm/entrypoints/openai/chat_completion/protocol.py b/vllm/entrypoi
      RepetitionDetectionParams,
      RequestOutputKind,
      SamplingParams,
-@@ -231,7 +232,7 @@
+@@ -232,7 +233,7 @@
      )
      max_completion_tokens: int | None = None
      n: int | None = 1
@@ -505,7 +505,7 @@ diff --git a/vllm/entrypoints/openai/chat_completion/protocol.py b/vllm/entrypoi
      response_format: AnyResponseFormat | None = None
      seed: int | None = Field(None, ge=_INT64_MIN, le=_INT64_MAX)
      stop: StopParam = []
-@@ -706,17 +707,10 @@
+@@ -709,17 +710,10 @@
              thinking_token_budget = default_sampling_params.get(
                  "thinking_token_budget"
              )

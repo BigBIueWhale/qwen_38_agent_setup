@@ -269,10 +269,10 @@ index 7bbe49d0309d8e8230878a4852acb2eaa3a849df..699c199b07296388ecd540590f863c42
  
      async def create_messages(
 diff --git a/vllm/entrypoints/openai/chat_completion/protocol.py b/vllm/entrypoints/openai/chat_completion/protocol.py
-index 2c1f8db439cc213fc3e5042924a61f8e11c8b283..4cbf4f9c692fd1a4f0571e8843f5969df0b50c4f 100644
+index 6bc90e0aada242c1e29390b6a8cd9c7e77df9e1c..ae1cd615d876a4615861f42e17a1af25bd4d484c 100644
 --- a/vllm/entrypoints/openai/chat_completion/protocol.py
 +++ b/vllm/entrypoints/openai/chat_completion/protocol.py
-@@ -247,7 +247,6 @@ class ChatCompletionRequest(OpenAIBaseModel):
+@@ -248,7 +248,6 @@ class ChatCompletionRequest(OpenAIBaseModel):
          | Literal["auto"]
          | Literal["required"]
          | ChatCompletionNamedToolChoiceParam
@@ -280,7 +280,7 @@ index 2c1f8db439cc213fc3e5042924a61f8e11c8b283..4cbf4f9c692fd1a4f0571e8843f5969d
      ) = "none"
      reasoning_effort: (
          Literal["none", "minimal", "low", "medium", "high", "xhigh", "max"] | None
-@@ -922,74 +921,73 @@ class ChatCompletionRequest(OpenAIBaseModel):
+@@ -925,74 +924,73 @@ class ChatCompletionRequest(OpenAIBaseModel):
                  parameter="tools",
              )
  

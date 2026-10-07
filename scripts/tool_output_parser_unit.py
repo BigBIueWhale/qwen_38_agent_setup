@@ -1231,5 +1231,26 @@ class ToolOutputParserTest(unittest.TestCase):
                         [done[index].model_dump() for index in sorted(done)],
                     )
 
+    def test_a_responses_history_refusal_names_the_input_item(self):
+        """Responses validates its tool history after converting it to chat
+        messages, whose positions the caller never sent: a refusal names the
+        input item and the field the caller set."""
+        from vllm.entrypoints.openai.responses.protocol import ResponsesRequest
+        from vllm.entrypoints.openai.responses.utils import construct_input_messages
+        from vllm.exceptions import VLLMValidationError
+
+        history = [{"role": "user", "content": "hi"}] + [
+            {"type": "function_call", "id": "fc" + cid, "call_id": cid,
+             "name": "write", "arguments": "{}"} for cid in ("A", "B")
+        ] + [{"type": "function_call_output", "call_id": cid, "output": "x"}
+             for cid in ("B", "A")]
+        request = ResponsesRequest.model_validate(
+            {"model": "unit", "input": history, "kv_scope": "unit"})
+        with self.assertRaises(VLLMValidationError) as refused:
+            construct_input_messages(request_input=request.input)
+        self.assertEqual(refused.exception.parameter, "input")
+        self.assertIn("input[3] has call_id 'B'; expected 'A'", str(refused.exception))
+
+
 if __name__ == "__main__":
     unittest.main()
