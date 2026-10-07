@@ -291,7 +291,7 @@ diff --git a/vllm/entrypoints/openai/engine/protocol.py b/vllm/entrypoints/opena
 diff --git a/vllm/entrypoints/openai/responses/serving.py b/vllm/entrypoints/openai/responses/serving.py
 --- a/vllm/entrypoints/openai/responses/serving.py
 +++ b/vllm/entrypoints/openai/responses/serving.py
-@@ -38,6 +38,7 @@
+@@ -37,6 +37,7 @@
  from vllm.entrypoints.openai.engine.protocol import (
      DeltaMessage,
      ErrorResponse,
@@ -299,7 +299,7 @@ diff --git a/vllm/entrypoints/openai/responses/serving.py b/vllm/entrypoints/ope
      RequestResponseMetadata,
  )
  from vllm.entrypoints.openai.models.serving import OpenAIServingModels
-@@ -1600,6 +1601,9 @@
+@@ -1498,6 +1499,9 @@
                      )
          except GenerationError as e:
              yield _increment_sequence_number_and_return(self._stream_error_event(e))

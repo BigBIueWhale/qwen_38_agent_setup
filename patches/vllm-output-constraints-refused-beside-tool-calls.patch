@@ -439,7 +439,7 @@ index 3167509faf5c6979db7186b2f820ccfc2559d195..31d1dd14dcb935e0a86ae3350e68868a
      structured_outputs: StructuredOutputsParams | None,
      response_format: AnyResponseFormat | None,
 diff --git a/vllm/entrypoints/openai/responses/protocol.py b/vllm/entrypoints/openai/responses/protocol.py
-index 4012d68ad5c42a5579a726f29eb248fb3e414e07..ea184136e60c045292ae7bfe12809be47aa420c4 100644
+index 0ca3dcabb09ff4a98305e89417c1112be7071d62..8d2b82fb91119ddc6116fe154ab16e60f29bbe41 100644
 --- a/vllm/entrypoints/openai/responses/protocol.py
 +++ b/vllm/entrypoints/openai/responses/protocol.py
 @@ -70,6 +70,7 @@ from vllm.entrypoints.openai.engine.protocol import (
@@ -450,7 +450,7 @@ index 4012d68ad5c42a5579a726f29eb248fb3e414e07..ea184136e60c045292ae7bfe12809be4
  )
  from vllm.exceptions import VLLMValidationError
  from vllm.logger import init_logger
-@@ -678,6 +679,29 @@ class ResponsesRequest(OpenAIBaseModel):
+@@ -701,6 +702,29 @@ class ResponsesRequest(OpenAIBaseModel):
                  parameter="tool_choice",
              )
  

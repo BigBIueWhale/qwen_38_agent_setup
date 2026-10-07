@@ -16,7 +16,7 @@ import asyncio
 import json
 import os
 import unittest
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 from tokenizers import Tokenizer
 
@@ -241,14 +241,11 @@ def _served_model_config():
     return ServedModelConfig()
 
 
-def _chat_route_admits(*, include_reasoning, tools):
-    """Everything the chat route hands the engine for one request: the
-    prompt, the sampling parameters and the admission arguments."""
+def _served_chat():
+    """The chat route as the launch serves it -- template, parsers, renderer
+    -- over a mocked engine, which is returned with it."""
     from types import SimpleNamespace
 
-    from vllm.entrypoints.openai.chat_completion.protocol import (
-        ChatCompletionGenerationRequest,
-    )
     from vllm.entrypoints.openai.chat_completion.serving import OpenAIServingChat
     from vllm.entrypoints.openai.models.protocol import BaseModelPath
     from vllm.entrypoints.openai.models.serving import OpenAIServingModels
@@ -291,6 +288,17 @@ def _chat_route_admits(*, include_reasoning, tools):
         request_logger=None,
         **launch,
     )
+    return serving, engine
+
+
+def _chat_route_admits(*, include_reasoning, tools):
+    """Everything the chat route hands the engine for one request: the
+    prompt, the sampling parameters and the admission arguments."""
+    from vllm.entrypoints.openai.chat_completion.protocol import (
+        ChatCompletionGenerationRequest,
+    )
+
+    serving, engine = _served_chat()
     request = ChatCompletionGenerationRequest(
         model="unit", messages=[{"role": "user", "content": "what is 1+1?"}],
         kv_scope="unit", include_reasoning=include_reasoning, max_tokens=8,
@@ -309,6 +317,60 @@ def _chat_route_admits(*, include_reasoning, tools):
                           if k != "arrival_time"}
     admitted["params"] = repr(params)
     return admitted
+
+
+def _chat_logprobs(served, text, chunk_size, finish="stop", tools=None):
+    """The log probabilities the *served* chat route (``_served_chat()``)
+    reports for one generation in which the k-th generated id has log
+    probability -(k + 1)/100: the full response's, or every streamed chunk's
+    in order, as (token, logprob)."""
+    from vllm.entrypoints.openai.chat_completion.protocol import (
+        ChatCompletionGenerationRequest,
+    )
+    from vllm.logprobs import Logprob
+    from vllm.outputs import CompletionOutput, RequestOutput
+
+    serving, engine = served
+    ids, texts = generation(text, None, finish, None)
+    logprobs = [{token: Logprob(logprob=-(k + 1) / 100, rank=1)}
+                for k, token in enumerate(ids)]
+    step = chunk_size or len(ids)
+
+    async def outputs():
+        for start in range(0, len(ids), step):
+            last = start + step >= len(ids)
+            yield RequestOutput(
+                request_id="unit", prompt="p", prompt_token_ids=OPEN_PROMPT,
+                prompt_logprobs=None, finished=last, outputs=[CompletionOutput(
+                    index=0, text="".join(texts[start:start + step]),
+                    token_ids=ids[start:start + step], cumulative_logprob=None,
+                    logprobs=logprobs[start:start + step],
+                    finish_reason=finish if last else None, stop_reason=None,
+                )],
+            )
+
+    engine.admit = AsyncMock(return_value=outputs())
+    request = ChatCompletionGenerationRequest(
+        model="unit", messages=[{"role": "user", "content": "test"}],
+        kv_scope="unit", logprobs=True, top_logprobs=0, max_tokens=1000,
+        stream=chunk_size is not None, **({"tools": tools} if tools else {}),
+    )
+
+    async def collect():
+        response = await serving.create_chat_completion(request)
+        if chunk_size is None:
+            return [(entry.token, entry.logprob)
+                    for entry in response.choices[0].logprobs.content]
+        reported = []
+        async for line in response:
+            if not line.startswith("data: {"):
+                continue
+            for choice in json.loads(line[len("data: "):])["choices"]:
+                for entry in (choice.get("logprobs") or {}).get("content") or []:
+                    reported.append((entry["token"], entry["logprob"]))
+        return reported
+
+    return ids, asyncio_run(collect())
 
 
 def _responses_events(text, chunk_size, finish="stop"):
@@ -1431,6 +1493,61 @@ class ToolOutputParserTest(unittest.TestCase):
             construct_input_messages(request_input=request.input)
         self.assertEqual(refused.exception.parameter, "input")
         self.assertIn("input[3] has call_id 'B'; expected 'A'", str(refused.exception))
+
+    def test_a_responses_message_carries_no_log_probabilities(self):
+        """A message's log probabilities would be those of the tokens its text
+        came from, and the served parser divides one generated token between
+        the message and a call: after "See:" the grammar admits the ordinary
+        " <" token, whose space ends the message and whose "<" opens the call.
+        No list of whole tokens is the message's, so the route refuses each
+        field that asks for one, naming it."""
+        from vllm.entrypoints.openai.responses.protocol import ResponsesRequest
+        from vllm.exceptions import VLLMValidationError
+
+        message, body = "\n\nSee: ", call("v")
+        answer = ordinary(message + body)
+        shared = [TOKENIZER.decode([token]) for token in answer].index(" <")
+        self.assertEqual(TOKENIZER.decode(answer[:shared]) + " ", message)
+        matcher = grammar_matcher(request_for())
+        for token in [*answer, MODEL_EOS[0]]:
+            self.assertTrue(matcher.accept_token(token))
+        self.assertTrue(matcher.is_terminated())
+        for chunk in (None, 1, shared + 1):
+            with self.subTest(chunk=chunk):
+                self.assertEqual(
+                    parse("plan</think>" + message + body, chunk,
+                          ids=encode("plan</think>") + answer)[:3],
+                    ("plan", message, [("write", '{"text": "v"}')]),
+                )
+        for field, value in (("include", ["message.output_text.logprobs"]),
+                             ("top_logprobs", 5)):
+            with self.subTest(field=field):
+                with self.assertRaises(VLLMValidationError) as refused:
+                    ResponsesRequest.model_validate(
+                        {"model": "unit", "input": "test", "kv_scope": "unit",
+                         field: value})
+                self.assertEqual(refused.exception.parameter, field)
+
+    def test_chat_reports_every_generated_tokens_log_probability(self):
+        """Chat's log probabilities are the choice's: one per generated id, in
+        order, the end of reasoning, the calls and the end of turn included --
+        in the full response and across the streamed chunks alike, for every
+        engine chunking, including steps the parser releases no text for."""
+        generations = (
+            ("plan</think>\n\nThe answer.", "stop", None),
+            ("plan</think>\n\nLet me look.\n\n" + call("a b"), "stop", [TOOL]),
+            ("plan</think>\n\n" + call("a") + "\n<tool_call>\n<function=write>\n"
+             "<parameter=text>\nb", "length", [TOOL]),
+        )
+        served = _served_chat()
+        for text, finish, tools in generations:
+            for chunk in (None, 1, 2, 3, 5, 64):
+                with self.subTest(text=text, chunk=chunk):
+                    ids, reported = _chat_logprobs(served, text, chunk, finish, tools)
+                    self.assertEqual(
+                        [logprob for _, logprob in reported],
+                        [-(k + 1) / 100 for k in range(len(ids))],
+                    )
 
 
 if __name__ == "__main__":

@@ -1,0 +1,136 @@
+diff --git a/tests/entrypoints/openai/chat_completion/test_serving_chat.py b/tests/entrypoints/openai/chat_completion/test_serving_chat.py
+index 6c7ba0779c03f88d014fce0f196920641cca877d..a2a3ca052c6d9b6773ee799e836bf0f71721061b 100644
+--- a/tests/entrypoints/openai/chat_completion/test_serving_chat.py
++++ b/tests/entrypoints/openai/chat_completion/test_serving_chat.py
+@@ -31,6 +31,7 @@ from vllm.entrypoints.openai.chat_completion.serving import (
+     _make_prompt_tokens_details,
+ )
+ from vllm.entrypoints.openai.engine.protocol import (
++    DeltaMessage,
+     ErrorResponse,
+     RequestResponseMetadata,
+ )
+@@ -781,6 +782,69 @@ async def test_chat_streaming_metrics_ride_on_usage_chunk():
+     assert usage_chunks[-1]["metrics"]["time_to_first_token_ms"] == pytest.approx(500.0)
+ 
+ 
++@pytest.mark.asyncio
++@pytest.mark.parametrize("return_token_ids", [False, True])
++async def test_a_stream_reports_the_log_probability_of_a_step_with_no_text(
++    return_token_ids,
++):
++    """The parser may release no text for a step -- a reasoning end, a held
++    marker -- but the step generated its tokens, and the full response reports
++    a log probability for each. Its chunk carries them, so the stream reports
++    the same list, in order, with or without token ids."""
++    from vllm.logprobs import Logprob
++
++    class WithholdsTheFirstStep:
++        reasoning_token_count = None
++
++        def __init__(self, *args, **kwargs):
++            self.generated_token_count = 0
++
++        def parse_output_delta(self, delta_text, delta_token_ids, request,
++                               prompt_token_ids=None, *, finish_reason,
++                               stop_reason):
++            first = self.generated_token_count == 0
++            self.generated_token_count += len(delta_token_ids)
++            return None if first else DeltaMessage(content=delta_text)
++
++    serving = _build_minimal_metrics_serving_chat(enable_per_request_metrics=False)
++    serving.parser_cls = WithholdsTheFirstStep
++    serving.model_config = MockModelConfig()
++    steps = [("", [7], -0.5), ("Hi", [8], -0.25), ("!", [9], -0.125)]
++
++    async def outputs():
++        for index, (text, ids, logprob) in enumerate(steps):
++            last = index == len(steps) - 1
++            yield RequestOutput(
++                request_id="test-id", prompt="Test prompt",
++                prompt_token_ids=[1, 2, 3], prompt_logprobs=None, finished=last,
++                outputs=[CompletionOutput(
++                    index=0, text=text, token_ids=ids, cumulative_logprob=None,
++                    logprobs=[{ids[0]: Logprob(logprob=logprob, rank=1)}],
++                    finish_reason="stop" if last else None,
++                )],
++            )
++
++    request = ChatCompletionRequest(
++        model="test-model", messages=[{"role": "user", "content": "Test"}],
++        stream=True, logprobs=True, top_logprobs=0,
++        return_tokens_as_token_ids=True, return_token_ids=return_token_ids,
++    )
++    reported = []
++    async for line in serving.chat_completion_stream_generator(
++        request, outputs(), "chatcmpl-test-id", "test-model",
++        conversation=[{"role": "user", "content": "Test"}], tokenizer=MagicMock(),
++        request_metadata=RequestResponseMetadata(request_id="chatcmpl-test-id"),
++    ):
++        if not line.startswith("data: {"):
++            continue
++        for choice in json.loads(line[len("data: "):])["choices"]:
++            for entry in (choice.get("logprobs") or {}).get("content") or []:
++                reported.append((entry["token"], entry["logprob"]))
++    assert reported == [
++        ("token_id:7", -0.5), ("token_id:8", -0.25), ("token_id:9", -0.125)
++    ]
++
++
+ @dataclass
+ class MockEngine:
+     model_config: MockModelConfig = field(default_factory=MockModelConfig)
+diff --git a/vllm/entrypoints/openai/chat_completion/serving.py b/vllm/entrypoints/openai/chat_completion/serving.py
+index f85ba5c67f2dd44d894d5d5a40e316beabd66732..58ac785ba6dd16285e97e485448489c95b427e3c 100644
+--- a/vllm/entrypoints/openai/chat_completion/serving.py
++++ b/vllm/entrypoints/openai/chat_completion/serving.py
+@@ -654,13 +654,19 @@ class OpenAIServingChat(GenerateBaseServing):
+                     )
+                     if hide_stream_metadata:
+                         logprobs = None
++                    include_token_ids = (
++                        request.return_token_ids and not hide_stream_metadata
++                    )
+ 
+                     if delta_message is None:
+-                        # NOTE: If return_token_ids is enabled, we still need to
+-                        # send a chunk with token_ids even if delta_message is None
+-                        # to ensure all tokens are included in the response
+-                        if output.finish_reason is None and (
+-                            not request.return_token_ids or hide_stream_metadata
++                        # A step the parser released no text for still
++                        # generated tokens: its chunk carries their ids and log
++                        # probabilities, so the stream reports every generated
++                        # token, as the full response does.
++                        if (
++                            output.finish_reason is None
++                            and not include_token_ids
++                            and logprobs is None
+                         ):
+                             continue
+                         delta_message = DeltaMessage()
+@@ -693,10 +699,6 @@ class OpenAIServingChat(GenerateBaseServing):
+                                 delta=True,
+                             )
+ 
+-                    include_token_ids = (
+-                        request.return_token_ids and not hide_stream_metadata
+-                    )
+-
+                     if output.finish_reason is None:
+                         # Send token-by-token response for each request.n
+                         choice_data = ChatCompletionResponseStreamChoice(
+diff --git a/vllm/tool_parsers/poolside_v1_tool_parser.py b/vllm/tool_parsers/poolside_v1_tool_parser.py
+index 69ca9157a60c14997fe9cff345783ba9e35a8daa..890a44723338f7f412bf0f402c0fef0a13b6e007 100644
+--- a/vllm/tool_parsers/poolside_v1_tool_parser.py
++++ b/vllm/tool_parsers/poolside_v1_tool_parser.py
+@@ -443,9 +443,6 @@ class PoolsideV1ToolParser(ToolParser):
+ 
+         tool_calls = list(pending_deltas.values())
+         if content is None and len(tool_calls) == 0:
+-            wants_logprobs = getattr(request, "logprobs", None)
+-            if wants_logprobs:
+-                return DeltaMessage(content="")
+             return None
+         return DeltaMessage(content=content, tool_calls=tool_calls)
+ 

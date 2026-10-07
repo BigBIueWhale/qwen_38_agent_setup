@@ -201,7 +201,7 @@ diff --git a/tests/entrypoints/openai/chat_completion/test_parallel_tool_call_in
 diff --git a/tests/entrypoints/openai/responses/test_serving_responses.py b/tests/entrypoints/openai/responses/test_serving_responses.py
 --- a/tests/entrypoints/openai/responses/test_serving_responses.py
 +++ b/tests/entrypoints/openai/responses/test_serving_responses.py
-@@ -756,7 +756,7 @@
+@@ -757,7 +757,7 @@
      with a reasoning parser that returns the given delta_sequence.
  
      The mock has reasoning_parser set (truthy) but tool_parser as None,
@@ -210,7 +210,7 @@ diff --git a/tests/entrypoints/openai/responses/test_serving_responses.py b/test
      """
      call_count = 0
  
-@@ -771,7 +771,7 @@
+@@ -772,7 +772,7 @@
      mock_parser_instance = MagicMock()
      mock_parser_instance.reasoning_parser = MagicMock()  # truthy
      mock_parser_instance.tool_parser = None
@@ -219,7 +219,7 @@ diff --git a/tests/entrypoints/openai/responses/test_serving_responses.py b/test
      mock_parser_instance.is_reasoning_end = MagicMock(return_value=False)
      serving.parser = MagicMock(return_value=mock_parser_instance)
      return mock_parser_instance
-@@ -1256,7 +1256,7 @@
+@@ -1257,7 +1257,7 @@
      parser = MagicMock()
      # The scripted parser splits no reasoning on an exact id boundary.
      parser.reasoning_token_count = None
@@ -228,7 +228,7 @@ diff --git a/tests/entrypoints/openai/responses/test_serving_responses.py b/test
      deltas = []
      if shape == "mixed":
          deltas.append(DeltaMessage(reasoning="preserved thinking"))
-@@ -1272,7 +1272,7 @@
+@@ -1273,7 +1273,7 @@
                      index=index, function=DeltaFunctionCall(arguments='"x":1}'),
                  )]),
              ])
@@ -237,7 +237,7 @@ diff --git a/tests/entrypoints/openai/responses/test_serving_responses.py b/test
      context = SimpleContext(response_parser=parser)
  
      async def outputs():
-@@ -1308,7 +1308,7 @@
+@@ -1309,7 +1309,7 @@
      assert final.usage.output_tokens_details.reasoning_tokens is None
      assert [event.sequence_number for event in events] == list(range(len(events)))
      serving._initialize_tool_sessions.assert_not_awaited()
@@ -246,10 +246,10 @@ diff --git a/tests/entrypoints/openai/responses/test_serving_responses.py b/test
      if finish == "length":
          assert done[-1].status == "incomplete"
      else:
-@@ -1359,3 +1359,95 @@
-     assert response.status == ("incomplete" if finish == "length" else "completed")
-     assert response.output[0].status == response.status
-     assert response.output[0].content[0].logprobs == [logprob]
+@@ -1377,3 +1377,95 @@
+ def test_a_request_asking_for_no_log_probabilities_is_served(fields):
+     request = ResponsesRequest.model_validate({"input": "q", "kv_scope": "agent", **fields})
+     assert request.to_sampling_params(8, {}).logprobs is None
 +
 +
 +@pytest.mark.asyncio
@@ -839,9 +839,8 @@ diff --git a/vllm/entrypoints/openai/responses/context.py b/vllm/entrypoints/ope
 diff --git a/vllm/entrypoints/openai/responses/serving.py b/vllm/entrypoints/openai/responses/serving.py
 --- a/vllm/entrypoints/openai/responses/serving.py
 +++ b/vllm/entrypoints/openai/responses/serving.py
-@@ -1030,13 +1030,15 @@
-             )
- 
+@@ -948,11 +948,13 @@
+     ) -> list[ResponseOutputItem]:
          # Use parser to extract reasoning, content, and tool calls
          if parser:
 -            reasoning, content, tool_calls = parser.parse(
@@ -855,9 +854,7 @@ diff --git a/vllm/entrypoints/openai/responses/serving.py b/vllm/entrypoints/ope
              )
              if not request.include_reasoning:
                  reasoning = None
-                 logprobs = None
-@@ -1346,14 +1348,15 @@
-             delta_text = output.text
+@@ -1245,12 +1247,13 @@
              delta_token_ids = as_list(output.token_ids)
  
              if ctx.response_parser:
@@ -873,7 +870,6 @@ diff --git a/vllm/entrypoints/openai/responses/serving.py b/vllm/entrypoints/ope
                  )
              else:
                  delta_message = DeltaMessage(content=output.text)
- 
 diff --git a/vllm/parser/abstract_parser.py b/vllm/parser/abstract_parser.py
 --- a/vllm/parser/abstract_parser.py
 +++ b/vllm/parser/abstract_parser.py

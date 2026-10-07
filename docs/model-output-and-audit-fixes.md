@@ -626,17 +626,17 @@ batch generation with an empty iterator or reinitializes tool sessions at the
 end. A completed stream cannot acquire fresh item or function-call IDs by being
 parsed a second time.
 
-Text log probabilities retain their token bytes and alternatives in the completed
-item and terminal response. A truncated final text item is incomplete on both
-transports. The EOS tool-output stage subsequently completes the call-promotion
+A message carries no log probabilities on either transport: the route refuses
+the fields that ask for them, because no list of whole tokens is a message's when
+one token can end it and begin a call. A truncated final text item is incomplete
+on both transports. The EOS tool-output stage subsequently completes the call-promotion
 rule, retaining interrupted raw text instead of executable calls.
 
 Validation: 39 tests pass in an offline CPU container. Eight terminal-identity
 cases cover text, one/two calls, mixed reasoning/text/calls and length/normal ends;
 they verify added/done/terminal IDs, exact item payloads, usage, event sequence,
 absence of reparsing, and successful history replay using the original stream
-call IDs. Four additional cases check log probabilities and text status on both
-transports. The existing reasoning-usage fixture now has a coherent decoder and
+call IDs. Four additional cases check text status on both transports. The existing reasoning-usage fixture now has a coherent decoder and
 the full Qwen marker vocabulary; its expected count includes every generated ID
 before the reasoning boundary. One preexisting strict xfail remains for upstream
 Harmony zero-delta item lifecycle; the deployed Qwen path does not use Harmony.

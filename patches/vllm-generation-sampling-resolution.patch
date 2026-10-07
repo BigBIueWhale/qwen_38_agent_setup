@@ -645,8 +645,8 @@ diff --git a/vllm/entrypoints/openai/responses/protocol.py b/vllm/entrypoints/op
              top_k=top_k,
 +            min_p=default_sampling_params.get("min_p", 0.0),
              max_tokens=max_tokens,
-             logprobs=self.top_logprobs if self.is_include_output_logprobs() else None,
              stop=stop,
+             frequency_penalty=frequency_penalty,
 diff --git a/vllm/entrypoints/scale_out/token_in_token_out/protocol.py b/vllm/entrypoints/scale_out/token_in_token_out/protocol.py
 --- a/vllm/entrypoints/scale_out/token_in_token_out/protocol.py
 +++ b/vllm/entrypoints/scale_out/token_in_token_out/protocol.py

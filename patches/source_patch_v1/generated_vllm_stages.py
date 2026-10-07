@@ -62201,16 +62201,40 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'frozenset[str]:\n'})},
  {'name': 'responses-stream-identity',
   'review_patch': 'patches/vllm-responses-stream-identity.patch',
-  'review_sha256': 'd4629bd0b979eb1978721d12733caae4acca2736d6ec870eb295f87316e67345',
+  'review_sha256': '9a3f1fb54f3e22f3df621ab681e675f7a916849bdceb6e555242df29d6028095',
   'files': ({'path': 'tests/entrypoints/openai/responses/test_serving_responses.py',
              'before_sha256': '3b6763193980cefe67b693cf7b84428ffd2b58b49b0e59f18e81482d91fdd805',
-             'after_sha256': '63eab4c4177c58df2d538dc2a94049a7e8a6526fa0af0c10873ad77248daae72'},
+             'after_sha256': '288f2536ca39977c8408daca5a8f5300ffdf614528d87a6dce1e5e9744ff6e07'},
             {'path': 'vllm/entrypoints/openai/responses/serving.py',
              'before_sha256': '8b38cb52f9cf61085377c0a93f1393e93f09f00475057a1368b00703c10c2cd9',
-             'after_sha256': '7b8197f6e922a9eba9c57d7d811f0749b1dbda41faab2555adc4c3377dcd7728'},
+             'after_sha256': 'f093b4d7bd957e30cb4b6f025aab92d852f5161a75ad0ce9859c6772ffaa18ae'},
             {'path': 'vllm/entrypoints/openai/responses/streaming_events.py',
              'before_sha256': '795c2bf69485a46a53ab1c3a86e63828d9249739a0c07b0c34be7299b951b5a4',
-             'after_sha256': 'd42b73604e9729d35fcc944c68b21e5a68f110be11327f65308dc8ee46daeffe'}),
+             'after_sha256': '86a2600626f9100b6dcecca1876a5c4b9b9ac671297e025cd95e3bcb93fa7aba'},
+            {'path': 'tests/entrypoints/openai/responses/test_basic.py',
+             'before_sha256': 'b181fde79a03e9abcbbea251a6266e954fe45c38484d64fabc9449b4cfc2c00c',
+             'after_sha256': 'b0de70fa02b7c2ad59fc1a35b0c5e0139e64e2e4fd63a87a814f8a5626c159aa'},
+            {'path': 'tests/entrypoints/openai/responses/test_simple.py',
+             'before_sha256': '368ab432abfaf5073bc158e55f7b045a5a19ed14aa9b007ccc8ccee7b3bdf967',
+             'after_sha256': '9d02a3fcdcb2747afcf78095b883a91168fa47abb7e497ca5e2cea8fcb20be18'},
+            {'path': 'tests/entrypoints/openai/responses/test_streaming_events.py',
+             'before_sha256': '3cb01e561192eaca1cf0dbc03db72a91dacb8c13e462a023a2db2c4d34695323',
+             'after_sha256': 'adc8778744b27e9e1ea5a4d680f211fce8b068e492c27549f234224030af70bd'},
+            {'path': 'tests/entrypoints/openai/test_return_tokens_as_ids.py',
+             'before_sha256': '42e8f57614d3a35868993254fe37cb0004d045c1708abdfe259fcf88f3315d9e',
+             'after_sha256': '9d7986c1809c366eca7abf45609d61ae60f8f96110f768b3b2266a6f0dd6f865'},
+            {'path': 'tests/tool_parsers/test_poolside_v1_tool_parser.py',
+             'before_sha256': '662d77a06519ce25598292366fa1dfa74ffa8c6559be9796e6dfb24a878e7539',
+             'after_sha256': 'c8ae44174b76860378a29c2d123d95377cec3eaa41b8062717fd05d294a063d7'},
+            {'path': 'vllm/entrypoints/openai/responses/protocol.py',
+             'before_sha256': 'bbadaab457115890fd9d808f2b28a8f64c2be362f9058a848ca5277dcd463769',
+             'after_sha256': 'f1629201a0ebc5948aa2c673dec3206cda62ec49691627423bd61ef757e67852'},
+            {'path': 'vllm/entrypoints/openai/responses/utils.py',
+             'before_sha256': '8820d8e03e3740ab9ce43e53c62b87f828eee4f7e25f20dadc54a2b450e17948',
+             'after_sha256': 'be5f27d4d169c32717203d4cd02a624d33b0604a016dbb1e61cb7b6f0614fd8f'},
+            {'path': 'vllm/tool_parsers/poolside_v1_tool_parser.py',
+             'before_sha256': '4a690d9c0b3398fff5ba4fdc778eac29c1eb6a3ddf1311b16c3a164f7c56772e',
+             'after_sha256': 'e2e63d97005abeb880476b06aac7ed44c55dbd056ac54aa8202c4eeb814f0a35'}),
   'edits': ({'name': 'tests/entrypoints/openai/responses/test_serving_responses.py:landmark-1',
              'path': 'tests/entrypoints/openai/responses/test_serving_responses.py',
              'before': '# SPDX-FileCopyrightText: Copyright contributors to the vLLM '
@@ -62247,13 +62271,24 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'import pytest_asyncio\n'},
             {'name': 'tests/entrypoints/openai/responses/test_serving_responses.py:landmark-2',
              'path': 'tests/entrypoints/openai/responses/test_serving_responses.py',
-             'before': 'from vllm.outputs import CompletionOutput, RequestOutput\n'
+             'before': 'from vllm.entrypoints.openai.responses.streaming_events import '
+                       '(\n'
+                       '    StreamingState,\n'
+                       ')\n'
+                       'from vllm.inputs import tokens_input\n'
+                       'from vllm.outputs import CompletionOutput, RequestOutput\n'
                        'from vllm.parser.harmony import Segment\n'
                        'from vllm.sampling_params import SamplingParams\n'
                        '\n'
                        '\n'
                        'class MockConversationContext(ConversationContext):\n',
-             'after': 'from vllm.outputs import CompletionOutput, RequestOutput\n'
+             'after': 'from vllm.entrypoints.openai.responses.streaming_events import '
+                      '(\n'
+                      '    StreamingState,\n'
+                      ')\n'
+                      'from vllm.exceptions import VLLMValidationError\n'
+                      'from vllm.inputs import tokens_input\n'
+                      'from vllm.outputs import CompletionOutput, RequestOutput\n'
                       'from vllm.parser.harmony import Segment\n'
                       'from vllm.sampling_params import SamplingParams\n'
                       'from vllm.entrypoints.openai.responses.utils import '
@@ -62261,14 +62296,25 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '\n'
                       '\n'
                       'class MockConversationContext(ConversationContext):\n',
-             'review_before': 'from vllm.outputs import CompletionOutput, '
+             'review_before': 'from vllm.entrypoints.openai.responses.streaming_events '
+                              'import (\n'
+                              '    StreamingState,\n'
+                              ')\n'
+                              'from vllm.inputs import tokens_input\n'
+                              'from vllm.outputs import CompletionOutput, '
                               'RequestOutput\n'
                               'from vllm.parser.harmony import Segment\n'
                               'from vllm.sampling_params import SamplingParams\n'
                               '\n'
                               '\n'
                               'class MockConversationContext(ConversationContext):\n',
-             'review_after': 'from vllm.outputs import CompletionOutput, '
+             'review_after': 'from vllm.entrypoints.openai.responses.streaming_events '
+                             'import (\n'
+                             '    StreamingState,\n'
+                             ')\n'
+                             'from vllm.exceptions import VLLMValidationError\n'
+                             'from vllm.inputs import tokens_input\n'
+                             'from vllm.outputs import CompletionOutput, '
                              'RequestOutput\n'
                              'from vllm.parser.harmony import Segment\n'
                              'from vllm.sampling_params import SamplingParams\n'
@@ -62548,18 +62594,11 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '@pytest.mark.parametrize("stream", [False, True])\n'
                       '@pytest.mark.parametrize("finish", ["stop", "length"])\n'
                       'async def '
-                      'test_text_output_retains_logprobs_and_status_on_both_transports(stream, '
+                      'test_text_output_keeps_its_status_on_both_transports(stream, '
                       'finish):\n'
-                      '    from openai.types.responses.response_output_text import '
-                      'Logprob\n'
-                      '\n'
                       '    serving = _make_serving_instance_with_reasoning()\n'
                       '    serving.parser = None\n'
                       '    serving._initialize_tool_sessions = AsyncMock()\n'
-                      '    logprob = Logprob(token="A", bytes=[65], logprob=-0.25, '
-                      'top_logprobs=[])\n'
-                      '    serving._create_response_logprobs = '
-                      'MagicMock(return_value=[logprob])\n'
                       '    context = SimpleContext()\n'
                       '\n'
                       '    async def outputs():\n'
@@ -62569,17 +62608,14 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '            prompt_logprobs=None, outputs=[CompletionOutput(\n'
                       '                index=0, text="A", token_ids=[65], '
                       'cumulative_logprob=-0.25,\n'
-                      '                logprobs=[{}], finish_reason=finish, '
+                      '                logprobs=None, finish_reason=finish, '
                       'stop_reason=None,\n'
                       '            )], finished=True,\n'
                       '        ))\n'
                       '        yield context\n'
                       '\n'
-                      '    request = ResponsesRequest(\n'
-                      '        input="q", stream=stream, '
-                      'include=["message.output_text.logprobs"],\n'
-                      '        kv_scope="agent",\n'
-                      '    )\n'
+                      '    request = ResponsesRequest(input="q", stream=stream, '
+                      'kv_scope="agent")\n'
                       '    args = (request, SamplingParams(max_tokens=20), outputs(), '
                       'context, "model",\n'
                       '            MagicMock(), '
@@ -62598,8 +62634,38 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '    assert response.status == ("incomplete" if finish == '
                       '"length" else "completed")\n'
                       '    assert response.output[0].status == response.status\n'
-                      '    assert response.output[0].content[0].logprobs == '
-                      '[logprob]\n',
+                      '    assert response.output[0].content[0].text == "A"\n'
+                      '    assert response.output[0].content[0].logprobs is None\n'
+                      '\n'
+                      '\n'
+                      '@pytest.mark.parametrize("field,value", [\n'
+                      '    ("include", ["message.output_text.logprobs"]),\n'
+                      '    ("include", ["reasoning.encrypted_content", '
+                      '"message.output_text.logprobs"]),\n'
+                      '    ("top_logprobs", 1),\n'
+                      '    ("top_logprobs", 20),\n'
+                      '])\n'
+                      'def test_log_probabilities_are_refused_naming_the_field(field, '
+                      'value):\n'
+                      "    # A message's log probabilities would be those of the "
+                      'tokens its text came\n'
+                      '    # from; the parser does not divide the generated ids into '
+                      'items, and one\n'
+                      '    # token can end the message and begin a call.\n'
+                      '    with pytest.raises(VLLMValidationError) as refused:\n'
+                      '        ResponsesRequest.model_validate(\n'
+                      '            {"input": "q", "kv_scope": "agent", field: value})\n'
+                      '    assert refused.value.parameter == field\n'
+                      '    assert "/v1/chat/completions" in str(refused.value)\n'
+                      '\n'
+                      '\n'
+                      '@pytest.mark.parametrize("fields", [{}, {"top_logprobs": 0}, '
+                      '{"top_logprobs": None}])\n'
+                      'def '
+                      'test_a_request_asking_for_no_log_probabilities_is_served(fields):\n'
+                      '    request = ResponsesRequest.model_validate({"input": "q", '
+                      '"kv_scope": "agent", **fields})\n'
+                      '    assert request.to_sampling_params(8, {}).logprobs is None\n',
              'review_before': '        assert len(function_done) == 1\n'
                               '        assert function_done[0].item.name == '
                               '"get_weather"\n'
@@ -62729,18 +62795,11 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '@pytest.mark.parametrize("stream", [False, True])\n'
                              '@pytest.mark.parametrize("finish", ["stop", "length"])\n'
                              'async def '
-                             'test_text_output_retains_logprobs_and_status_on_both_transports(stream, '
+                             'test_text_output_keeps_its_status_on_both_transports(stream, '
                              'finish):\n'
-                             '    from openai.types.responses.response_output_text '
-                             'import Logprob\n'
-                             '\n'
                              '    serving = _make_serving_instance_with_reasoning()\n'
                              '    serving.parser = None\n'
                              '    serving._initialize_tool_sessions = AsyncMock()\n'
-                             '    logprob = Logprob(token="A", bytes=[65], '
-                             'logprob=-0.25, top_logprobs=[])\n'
-                             '    serving._create_response_logprobs = '
-                             'MagicMock(return_value=[logprob])\n'
                              '    context = SimpleContext()\n'
                              '\n'
                              '    async def outputs():\n'
@@ -62751,17 +62810,14 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'outputs=[CompletionOutput(\n'
                              '                index=0, text="A", token_ids=[65], '
                              'cumulative_logprob=-0.25,\n'
-                             '                logprobs=[{}], finish_reason=finish, '
+                             '                logprobs=None, finish_reason=finish, '
                              'stop_reason=None,\n'
                              '            )], finished=True,\n'
                              '        ))\n'
                              '        yield context\n'
                              '\n'
-                             '    request = ResponsesRequest(\n'
-                             '        input="q", stream=stream, '
-                             'include=["message.output_text.logprobs"],\n'
-                             '        kv_scope="agent",\n'
-                             '    )\n'
+                             '    request = ResponsesRequest(input="q", stream=stream, '
+                             'kv_scope="agent")\n'
                              '    args = (request, SamplingParams(max_tokens=20), '
                              'outputs(), context, "model",\n'
                              '            MagicMock(), '
@@ -62780,8 +62836,42 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    assert response.status == ("incomplete" if finish == '
                              '"length" else "completed")\n'
                              '    assert response.output[0].status == response.status\n'
-                             '    assert response.output[0].content[0].logprobs == '
-                             '[logprob]\n'},
+                             '    assert response.output[0].content[0].text == "A"\n'
+                             '    assert response.output[0].content[0].logprobs is '
+                             'None\n'
+                             '\n'
+                             '\n'
+                             '@pytest.mark.parametrize("field,value", [\n'
+                             '    ("include", ["message.output_text.logprobs"]),\n'
+                             '    ("include", ["reasoning.encrypted_content", '
+                             '"message.output_text.logprobs"]),\n'
+                             '    ("top_logprobs", 1),\n'
+                             '    ("top_logprobs", 20),\n'
+                             '])\n'
+                             'def '
+                             'test_log_probabilities_are_refused_naming_the_field(field, '
+                             'value):\n'
+                             "    # A message's log probabilities would be those of "
+                             'the tokens its text came\n'
+                             '    # from; the parser does not divide the generated ids '
+                             'into items, and one\n'
+                             '    # token can end the message and begin a call.\n'
+                             '    with pytest.raises(VLLMValidationError) as refused:\n'
+                             '        ResponsesRequest.model_validate(\n'
+                             '            {"input": "q", "kv_scope": "agent", field: '
+                             'value})\n'
+                             '    assert refused.value.parameter == field\n'
+                             '    assert "/v1/chat/completions" in str(refused.value)\n'
+                             '\n'
+                             '\n'
+                             '@pytest.mark.parametrize("fields", [{}, {"top_logprobs": '
+                             '0}, {"top_logprobs": None}])\n'
+                             'def '
+                             'test_a_request_asking_for_no_log_probabilities_is_served(fields):\n'
+                             '    request = ResponsesRequest.model_validate({"input": '
+                             '"q", "kv_scope": "agent", **fields})\n'
+                             '    assert request.to_sampling_params(8, {}).logprobs is '
+                             'None\n'},
             {'name': 'vllm/entrypoints/openai/responses/serving.py:landmark-1',
              'path': 'vllm/entrypoints/openai/responses/serving.py',
              'before': 'from openai.types.responses import (\n'
@@ -62794,7 +62884,9 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                        ')\n'
                        'from openai.types.responses.response_output_text import '
                        'Logprob, LogprobTopLogprob\n'
-                       'from openai.types.responses.tool import Mcp, Tool\n',
+                       'from openai.types.responses.tool import Mcp, Tool\n'
+                       'from openai_harmony import Message as OpenAIHarmonyMessage\n'
+                       'from pydantic import TypeAdapter\n',
              'after': 'from openai.types.responses import (\n'
                       '    ResponseFunctionToolCall,\n'
                       '    ResponseOutputItem,\n'
@@ -62803,9 +62895,9 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '    ResponseOutputText,\n'
                       '    ResponseStatus,\n'
                       ')\n'
-                      'from openai.types.responses.response_output_text import '
-                      'Logprob, LogprobTopLogprob\n'
-                      'from openai.types.responses.tool import Mcp, Tool\n',
+                      'from openai.types.responses.tool import Mcp, Tool\n'
+                      'from openai_harmony import Message as OpenAIHarmonyMessage\n'
+                      'from pydantic import TypeAdapter\n',
              'review_before': 'from openai.types.responses import (\n'
                               '    ResponseFunctionToolCall,\n'
                               '    ResponseOutputItem,\n'
@@ -62816,7 +62908,10 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                               ')\n'
                               'from openai.types.responses.response_output_text import '
                               'Logprob, LogprobTopLogprob\n'
-                              'from openai.types.responses.tool import Mcp, Tool\n',
+                              'from openai.types.responses.tool import Mcp, Tool\n'
+                              'from openai_harmony import Message as '
+                              'OpenAIHarmonyMessage\n'
+                              'from pydantic import TypeAdapter\n',
              'review_after': 'from openai.types.responses import (\n'
                              '    ResponseFunctionToolCall,\n'
                              '    ResponseOutputItem,\n'
@@ -62825,10 +62920,89 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    ResponseOutputText,\n'
                              '    ResponseStatus,\n'
                              ')\n'
-                             'from openai.types.responses.response_output_text import '
-                             'Logprob, LogprobTopLogprob\n'
-                             'from openai.types.responses.tool import Mcp, Tool\n'},
+                             'from openai.types.responses.tool import Mcp, Tool\n'
+                             'from openai_harmony import Message as '
+                             'OpenAIHarmonyMessage\n'
+                             'from pydantic import TypeAdapter\n'},
             {'name': 'vllm/entrypoints/openai/responses/serving.py:landmark-2',
+             'path': 'vllm/entrypoints/openai/responses/serving.py',
+             'before': 'from vllm.exceptions import VLLMValidationError\n'
+                       'from vllm.inputs import EngineInput, tokens_input\n'
+                       'from vllm.logger import init_logger\n'
+                       'from vllm.logprobs import Logprob as SampleLogprob\n'
+                       'from vllm.logprobs import SampleLogprobs\n'
+                       'from vllm.lora.request import LoRARequest\n'
+                       'from vllm.outputs import CompletionOutput\n'
+                       'from vllm.parser import Parser, ParserManager\n',
+             'after': 'from vllm.exceptions import VLLMValidationError\n'
+                      'from vllm.inputs import EngineInput, tokens_input\n'
+                      'from vllm.logger import init_logger\n'
+                      'from vllm.lora.request import LoRARequest\n'
+                      'from vllm.outputs import CompletionOutput\n'
+                      'from vllm.parser import Parser, ParserManager\n',
+             'review_before': 'from vllm.exceptions import VLLMValidationError\n'
+                              'from vllm.inputs import EngineInput, tokens_input\n'
+                              'from vllm.logger import init_logger\n'
+                              'from vllm.logprobs import Logprob as SampleLogprob\n'
+                              'from vllm.logprobs import SampleLogprobs\n'
+                              'from vllm.lora.request import LoRARequest\n'
+                              'from vllm.outputs import CompletionOutput\n'
+                              'from vllm.parser import Parser, ParserManager\n',
+             'review_after': 'from vllm.exceptions import VLLMValidationError\n'
+                             'from vllm.inputs import EngineInput, tokens_input\n'
+                             'from vllm.logger import init_logger\n'
+                             'from vllm.lora.request import LoRARequest\n'
+                             'from vllm.outputs import CompletionOutput\n'
+                             'from vllm.parser import Parser, ParserManager\n'},
+            {'name': 'vllm/entrypoints/openai/responses/serving.py:landmark-3',
+             'path': 'vllm/entrypoints/openai/responses/serving.py',
+             'before': '    def _validate_create_responses_input(\n'
+                       '        self, request: ResponsesRequest\n'
+                       '    ) -> ErrorResponse | None:\n'
+                       '        if self.use_harmony and '
+                       'request.is_include_output_logprobs():\n'
+                       '            return self.create_error_response(\n'
+                       '                err_type="invalid_request_error",\n'
+                       '                message="logprobs are not supported with '
+                       'gpt-oss models",\n'
+                       '                status_code=HTTPStatus.BAD_REQUEST,\n'
+                       '                param="logprobs",\n'
+                       '            )\n'
+                       '        if request.store and not self.enable_store and '
+                       'request.background:\n'
+                       '            return self.create_error_response(\n'
+                       '                err_type="invalid_request_error",\n',
+             'after': '    def _validate_create_responses_input(\n'
+                      '        self, request: ResponsesRequest\n'
+                      '    ) -> ErrorResponse | None:\n'
+                      '        if request.store and not self.enable_store and '
+                      'request.background:\n'
+                      '            return self.create_error_response(\n'
+                      '                err_type="invalid_request_error",\n',
+             'review_before': '    def _validate_create_responses_input(\n'
+                              '        self, request: ResponsesRequest\n'
+                              '    ) -> ErrorResponse | None:\n'
+                              '        if self.use_harmony and '
+                              'request.is_include_output_logprobs():\n'
+                              '            return self.create_error_response(\n'
+                              '                err_type="invalid_request_error",\n'
+                              '                message="logprobs are not supported '
+                              'with gpt-oss models",\n'
+                              '                status_code=HTTPStatus.BAD_REQUEST,\n'
+                              '                param="logprobs",\n'
+                              '            )\n'
+                              '        if request.store and not self.enable_store and '
+                              'request.background:\n'
+                              '            return self.create_error_response(\n'
+                              '                err_type="invalid_request_error",\n',
+             'review_after': '    def _validate_create_responses_input(\n'
+                             '        self, request: ResponsesRequest\n'
+                             '    ) -> ErrorResponse | None:\n'
+                             '        if request.store and not self.enable_store and '
+                             'request.background:\n'
+                             '            return self.create_error_response(\n'
+                             '                err_type="invalid_request_error",\n'},
+            {'name': 'vllm/entrypoints/openai/responses/serving.py:landmark-4',
              'path': 'vllm/entrypoints/openai/responses/serving.py',
              'before': '            except asyncio.CancelledError:\n'
                        '                return self.create_error_response("Client '
@@ -63279,9 +63453,83 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '        assert isinstance(context, (SimpleContext, '
                              'HarmonyContext, ParsableContext))\n'
                              '        num_prompt_tokens = context.num_prompt_tokens\n'},
-            {'name': 'vllm/entrypoints/openai/responses/serving.py:landmark-3',
+            {'name': 'vllm/entrypoints/openai/responses/serving.py:landmark-5',
              'path': 'vllm/entrypoints/openai/responses/serving.py',
-             'before': '            )\n'
+             'before': '                    self.response_store[response.id] = '
+                       'response\n'
+                       '        return response\n'
+                       '\n'
+                       '    def _topk_logprobs(\n'
+                       '        self,\n'
+                       '        logprobs: dict[int, SampleLogprob],\n'
+                       '        top_logprobs: int,\n'
+                       '        tokenizer: TokenizerLike,\n'
+                       '    ) -> list[LogprobTopLogprob]:\n'
+                       '        """Returns the top-k logprobs from the logprobs '
+                       'dictionary."""\n'
+                       '        out = []\n'
+                       '        for i, (token_id, _logprob) in '
+                       'enumerate(logprobs.items()):\n'
+                       '            if i >= top_logprobs:\n'
+                       '                break\n'
+                       '            text = self._get_decoded_token(\n'
+                       '                logprob=_logprob,\n'
+                       '                token_id=token_id,\n'
+                       '                tokenizer=tokenizer,\n'
+                       '                '
+                       'return_as_token_id=self.return_tokens_as_token_ids,\n'
+                       '            )\n'
+                       '            out.append(\n'
+                       '                LogprobTopLogprob(\n'
+                       '                    token=text,\n'
+                       '                    logprob=max(_logprob.logprob, -9999.0),\n'
+                       '                    bytes=list(text.encode("utf-8", '
+                       'errors="replace")),\n'
+                       '                )\n'
+                       '            )\n'
+                       '        return out\n'
+                       '\n'
+                       '    def _create_response_logprobs(\n'
+                       '        self,\n'
+                       '        token_ids: Sequence[int],\n'
+                       '        logprobs: SampleLogprobs | None,\n'
+                       '        tokenizer: TokenizerLike,\n'
+                       '        top_logprobs: int | None = None,\n'
+                       '    ) -> list[Logprob]:\n'
+                       '        assert logprobs is not None, "logprobs must be '
+                       'provided"\n'
+                       '        assert len(token_ids) == len(logprobs), (\n'
+                       '            "token_ids and logprobs.token_ids must have the '
+                       'same length"\n'
+                       '        )\n'
+                       '        out = []\n'
+                       '        for i, token_id in enumerate(token_ids):\n'
+                       '            logprob = logprobs[i]\n'
+                       '            token_logprob = logprob[token_id]\n'
+                       '            text = self._get_decoded_token(\n'
+                       '                logprob=token_logprob,\n'
+                       '                token_id=token_id,\n'
+                       '                tokenizer=tokenizer,\n'
+                       '                '
+                       'return_as_token_id=self.return_tokens_as_token_ids,\n'
+                       '            )\n'
+                       '            out.append(\n'
+                       '                Logprob(\n'
+                       '                    token=text,\n'
+                       '                    logprob=max(token_logprob.logprob, '
+                       '-9999.0),\n'
+                       '                    bytes=list(text.encode("utf-8", '
+                       'errors="replace")),\n'
+                       '                    top_logprobs=(\n'
+                       '                        self._topk_logprobs(\n'
+                       '                            logprob, '
+                       'top_logprobs=top_logprobs, tokenizer=tokenizer\n'
+                       '                        )\n'
+                       '                        if top_logprobs\n'
+                       '                        else []\n'
+                       '                    ),\n'
+                       '                )\n'
+                       '            )\n'
                        '        return out\n'
                        '\n'
                        '    def _create_stream_response_logprobs(\n'
@@ -63315,13 +63563,89 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                        '    def _make_response_output_items(\n'
                        '        self,\n'
                        '        request: ResponsesRequest,\n',
-             'after': '            )\n'
-                      '        return out\n'
+             'after': '                    self.response_store[response.id] = '
+                      'response\n'
+                      '        return response\n'
                       '\n'
                       '    def _make_response_output_items(\n'
                       '        self,\n'
                       '        request: ResponsesRequest,\n',
-             'review_before': '            )\n'
+             'review_before': '                    self.response_store[response.id] = '
+                              'response\n'
+                              '        return response\n'
+                              '\n'
+                              '    def _topk_logprobs(\n'
+                              '        self,\n'
+                              '        logprobs: dict[int, SampleLogprob],\n'
+                              '        top_logprobs: int,\n'
+                              '        tokenizer: TokenizerLike,\n'
+                              '    ) -> list[LogprobTopLogprob]:\n'
+                              '        """Returns the top-k logprobs from the logprobs '
+                              'dictionary."""\n'
+                              '        out = []\n'
+                              '        for i, (token_id, _logprob) in '
+                              'enumerate(logprobs.items()):\n'
+                              '            if i >= top_logprobs:\n'
+                              '                break\n'
+                              '            text = self._get_decoded_token(\n'
+                              '                logprob=_logprob,\n'
+                              '                token_id=token_id,\n'
+                              '                tokenizer=tokenizer,\n'
+                              '                '
+                              'return_as_token_id=self.return_tokens_as_token_ids,\n'
+                              '            )\n'
+                              '            out.append(\n'
+                              '                LogprobTopLogprob(\n'
+                              '                    token=text,\n'
+                              '                    logprob=max(_logprob.logprob, '
+                              '-9999.0),\n'
+                              '                    bytes=list(text.encode("utf-8", '
+                              'errors="replace")),\n'
+                              '                )\n'
+                              '            )\n'
+                              '        return out\n'
+                              '\n'
+                              '    def _create_response_logprobs(\n'
+                              '        self,\n'
+                              '        token_ids: Sequence[int],\n'
+                              '        logprobs: SampleLogprobs | None,\n'
+                              '        tokenizer: TokenizerLike,\n'
+                              '        top_logprobs: int | None = None,\n'
+                              '    ) -> list[Logprob]:\n'
+                              '        assert logprobs is not None, "logprobs must be '
+                              'provided"\n'
+                              '        assert len(token_ids) == len(logprobs), (\n'
+                              '            "token_ids and logprobs.token_ids must have '
+                              'the same length"\n'
+                              '        )\n'
+                              '        out = []\n'
+                              '        for i, token_id in enumerate(token_ids):\n'
+                              '            logprob = logprobs[i]\n'
+                              '            token_logprob = logprob[token_id]\n'
+                              '            text = self._get_decoded_token(\n'
+                              '                logprob=token_logprob,\n'
+                              '                token_id=token_id,\n'
+                              '                tokenizer=tokenizer,\n'
+                              '                '
+                              'return_as_token_id=self.return_tokens_as_token_ids,\n'
+                              '            )\n'
+                              '            out.append(\n'
+                              '                Logprob(\n'
+                              '                    token=text,\n'
+                              '                    logprob=max(token_logprob.logprob, '
+                              '-9999.0),\n'
+                              '                    bytes=list(text.encode("utf-8", '
+                              'errors="replace")),\n'
+                              '                    top_logprobs=(\n'
+                              '                        self._topk_logprobs(\n'
+                              '                            logprob, '
+                              'top_logprobs=top_logprobs, tokenizer=tokenizer\n'
+                              '                        )\n'
+                              '                        if top_logprobs\n'
+                              '                        else []\n'
+                              '                    ),\n'
+                              '                )\n'
+                              '            )\n'
                               '        return out\n'
                               '\n'
                               '    def _create_stream_response_logprobs(\n'
@@ -63356,13 +63680,14 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                               '    def _make_response_output_items(\n'
                               '        self,\n'
                               '        request: ResponsesRequest,\n',
-             'review_after': '            )\n'
-                             '        return out\n'
+             'review_after': '                    self.response_store[response.id] = '
+                             'response\n'
+                             '        return response\n'
                              '\n'
                              '    def _make_response_output_items(\n'
                              '        self,\n'
                              '        request: ResponsesRequest,\n'},
-            {'name': 'vllm/entrypoints/openai/responses/serving.py:landmark-4',
+            {'name': 'vllm/entrypoints/openai/responses/serving.py:landmark-6',
              'path': 'vllm/entrypoints/openai/responses/serving.py',
              'before': '        tokenizer: TokenizerLike,\n'
                        '        parser: Parser | None = None,\n'
@@ -63381,14 +63706,25 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                        '        # Compute logprobs if requested\n'
                        '        logprobs = None\n'
                        '        if request.is_include_output_logprobs() and '
-                       'final_output.logprobs:\n',
+                       'final_output.logprobs:\n'
+                       '            logprobs = self._create_response_logprobs(\n'
+                       '                token_ids=final_output.token_ids,\n'
+                       '                logprobs=final_output.logprobs,\n'
+                       '                tokenizer=tokenizer,\n'
+                       '                top_logprobs=request.top_logprobs,\n'
+                       '            )\n'
+                       '\n'
+                       '        # Use parser to extract reasoning, content, and tool '
+                       'calls\n'
+                       '        if parser:\n'
+                       '            reasoning, content, tool_calls = parser.parse(\n',
              'after': '        tokenizer: TokenizerLike,\n'
                       '        parser: Parser | None = None,\n'
                       '    ) -> list[ResponseOutputItem]:\n'
-                      '        # Compute logprobs if requested\n'
-                      '        logprobs = None\n'
-                      '        if request.is_include_output_logprobs() and '
-                      'final_output.logprobs:\n',
+                      '        # Use parser to extract reasoning, content, and tool '
+                      'calls\n'
+                      '        if parser:\n'
+                      '            reasoning, content, tool_calls = parser.parse(\n',
              'review_before': '        tokenizer: TokenizerLike,\n'
                               '        parser: Parser | None = None,\n'
                               '    ) -> list[ResponseOutputItem]:\n'
@@ -63410,24 +63746,98 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                               '        # Compute logprobs if requested\n'
                               '        logprobs = None\n'
                               '        if request.is_include_output_logprobs() and '
-                              'final_output.logprobs:\n',
+                              'final_output.logprobs:\n'
+                              '            logprobs = self._create_response_logprobs(\n'
+                              '                token_ids=final_output.token_ids,\n'
+                              '                logprobs=final_output.logprobs,\n'
+                              '                tokenizer=tokenizer,\n'
+                              '                top_logprobs=request.top_logprobs,\n'
+                              '            )\n'
+                              '\n'
+                              '        # Use parser to extract reasoning, content, and '
+                              'tool calls\n'
+                              '        if parser:\n'
+                              '            reasoning, content, tool_calls = '
+                              'parser.parse(\n',
              'review_after': '        tokenizer: TokenizerLike,\n'
                              '        parser: Parser | None = None,\n'
                              '    ) -> list[ResponseOutputItem]:\n'
-                             '        # Compute logprobs if requested\n'
-                             '        logprobs = None\n'
-                             '        if request.is_include_output_logprobs() and '
-                             'final_output.logprobs:\n'},
-            {'name': 'vllm/entrypoints/openai/responses/serving.py:landmark-5',
+                             '        # Use parser to extract reasoning, content, and '
+                             'tool calls\n'
+                             '        if parser:\n'
+                             '            reasoning, content, tool_calls = '
+                             'parser.parse(\n'},
+            {'name': 'vllm/entrypoints/openai/responses/serving.py:landmark-7',
              'path': 'vllm/entrypoints/openai/responses/serving.py',
-             'before': '                if final_output.text\n'
+             'before': '            )\n'
+                       '            if not request.include_reasoning:\n'
+                       '                reasoning = None\n'
+                       '                logprobs = None\n'
+                       '            return build_response_output_items(\n'
+                       '                reasoning=reasoning,\n'
+                       '                content=content,\n'
+                       '                tool_calls=tool_calls,\n'
+                       '                logprobs=logprobs,\n'
+                       '                tools=request.tools,\n'
+                       '                incomplete=final_output.finish_reason == '
+                       '"length",\n'
+                       '            )\n',
+             'after': '            )\n'
+                      '            if not request.include_reasoning:\n'
+                      '                reasoning = None\n'
+                      '            return build_response_output_items(\n'
+                      '                reasoning=reasoning,\n'
+                      '                content=content,\n'
+                      '                tool_calls=tool_calls,\n'
+                      '                tools=request.tools,\n'
+                      '                incomplete=final_output.finish_reason == '
+                      '"length",\n'
+                      '            )\n',
+             'review_before': '            )\n'
+                              '            if not request.include_reasoning:\n'
+                              '                reasoning = None\n'
+                              '                logprobs = None\n'
+                              '            return build_response_output_items(\n'
+                              '                reasoning=reasoning,\n'
+                              '                content=content,\n'
+                              '                tool_calls=tool_calls,\n'
+                              '                logprobs=logprobs,\n'
+                              '                tools=request.tools,\n'
+                              '                incomplete=final_output.finish_reason '
+                              '== "length",\n'
+                              '            )\n',
+             'review_after': '            )\n'
+                             '            if not request.include_reasoning:\n'
+                             '                reasoning = None\n'
+                             '            return build_response_output_items(\n'
+                             '                reasoning=reasoning,\n'
+                             '                content=content,\n'
+                             '                tool_calls=tool_calls,\n'
+                             '                tools=request.tools,\n'
+                             '                incomplete=final_output.finish_reason == '
+                             '"length",\n'
+                             '            )\n'},
+            {'name': 'vllm/entrypoints/openai/responses/serving.py:landmark-8',
+             'path': 'vllm/entrypoints/openai/responses/serving.py',
+             'before': '                        text=final_output.text,\n'
+                       '                        annotations=[],\n'
+                       '                        type="output_text",\n'
+                       '                        logprobs=logprobs,\n'
+                       '                    )\n'
+                       '                ]\n'
+                       '                if final_output.text\n'
                        '                else [],\n'
                        '                role="assistant",\n'
                        '                status="completed",\n'
                        '                type="message",\n'
                        '            )\n'
                        '        ]\n',
-             'after': '                if final_output.text\n'
+             'after': '                        text=final_output.text,\n'
+                      '                        annotations=[],\n'
+                      '                        type="output_text",\n'
+                      '                    )\n'
+                      '                ]\n'
+                      '                if final_output.text\n'
                       '                else [],\n'
                       '                role="assistant",\n'
                       '                status=(\n'
@@ -63437,14 +63847,25 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '                type="message",\n'
                       '            )\n'
                       '        ]\n',
-             'review_before': '                if final_output.text\n'
+             'review_before': '                        text=final_output.text,\n'
+                              '                        annotations=[],\n'
+                              '                        type="output_text",\n'
+                              '                        logprobs=logprobs,\n'
+                              '                    )\n'
+                              '                ]\n'
+                              '                if final_output.text\n'
                               '                else [],\n'
                               '                role="assistant",\n'
                               '                status="completed",\n'
                               '                type="message",\n'
                               '            )\n'
                               '        ]\n',
-             'review_after': '                if final_output.text\n'
+             'review_after': '                        text=final_output.text,\n'
+                             '                        annotations=[],\n'
+                             '                        type="output_text",\n'
+                             '                    )\n'
+                             '                ]\n'
+                             '                if final_output.text\n'
                              '                else [],\n'
                              '                role="assistant",\n'
                              '                status=(\n'
@@ -63454,9 +63875,15 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '                type="message",\n'
                              '            )\n'
                              '        ]\n'},
-            {'name': 'vllm/entrypoints/openai/responses/serving.py:landmark-6',
+            {'name': 'vllm/entrypoints/openai/responses/serving.py:landmark-9',
              'path': 'vllm/entrypoints/openai/responses/serving.py',
-             'before': '\n'
+             'before': '        processor = '
+                       'SimpleStreamingEventProcessor(tools=request.tools)\n'
+                       '        final_finish_reason: str | None = None\n'
+                       '\n'
+                       '        hide_stream_metadata = not request.include_reasoning '
+                       'and self.parser is not None\n'
+                       '\n'
                        '        def _get_logprobs(\n'
                        '            output: CompletionOutput,\n'
                        '        ) -> list[response_text_delta_event.Logprob]:\n'
@@ -63467,20 +63894,29 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                        '            return self._create_stream_response_logprobs(\n'
                        '                token_ids=output.token_ids,\n'
                        '                logprobs=output.logprobs,\n'
-                       '                tokenizer=tokenizer,\n',
-             'after': '\n'
-                      '        def _get_logprobs(\n'
-                      '            output: CompletionOutput,\n'
-                      '        ) -> list[Logprob]:\n'
-                      '            if not request.is_include_output_logprobs():\n'
-                      '                return []\n'
-                      '            if hide_stream_metadata:\n'
-                      '                return []\n'
-                      '            return self._create_response_logprobs(\n'
-                      '                token_ids=output.token_ids,\n'
-                      '                logprobs=output.logprobs,\n'
-                      '                tokenizer=tokenizer,\n',
-             'review_before': '\n'
+                       '                tokenizer=tokenizer,\n'
+                       '                top_logprobs=request.top_logprobs,\n'
+                       '            )\n'
+                       '\n'
+                       '        async for ctx in result_generator:\n'
+                       '            assert isinstance(ctx, SimpleContext)\n'
+                       '            if ctx.last_output is None or not '
+                       'ctx.last_output.outputs:\n',
+             'after': '        processor = '
+                      'SimpleStreamingEventProcessor(tools=request.tools)\n'
+                      '        final_finish_reason: str | None = None\n'
+                      '\n'
+                      '        async for ctx in result_generator:\n'
+                      '            assert isinstance(ctx, SimpleContext)\n'
+                      '            if ctx.last_output is None or not '
+                      'ctx.last_output.outputs:\n',
+             'review_before': '        processor = '
+                              'SimpleStreamingEventProcessor(tools=request.tools)\n'
+                              '        final_finish_reason: str | None = None\n'
+                              '\n'
+                              '        hide_stream_metadata = not '
+                              'request.include_reasoning and self.parser is not None\n'
+                              '\n'
                               '        def _get_logprobs(\n'
                               '            output: CompletionOutput,\n'
                               '        ) -> list[response_text_delta_event.Logprob]:\n'
@@ -63493,21 +63929,67 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                               'self._create_stream_response_logprobs(\n'
                               '                token_ids=output.token_ids,\n'
                               '                logprobs=output.logprobs,\n'
-                              '                tokenizer=tokenizer,\n',
-             'review_after': '\n'
-                             '        def _get_logprobs(\n'
-                             '            output: CompletionOutput,\n'
-                             '        ) -> list[Logprob]:\n'
-                             '            if not '
-                             'request.is_include_output_logprobs():\n'
-                             '                return []\n'
-                             '            if hide_stream_metadata:\n'
-                             '                return []\n'
-                             '            return self._create_response_logprobs(\n'
-                             '                token_ids=output.token_ids,\n'
-                             '                logprobs=output.logprobs,\n'
-                             '                tokenizer=tokenizer,\n'},
-            {'name': 'vllm/entrypoints/openai/responses/serving.py:landmark-7',
+                              '                tokenizer=tokenizer,\n'
+                              '                top_logprobs=request.top_logprobs,\n'
+                              '            )\n'
+                              '\n'
+                              '        async for ctx in result_generator:\n'
+                              '            assert isinstance(ctx, SimpleContext)\n'
+                              '            if ctx.last_output is None or not '
+                              'ctx.last_output.outputs:\n',
+             'review_after': '        processor = '
+                             'SimpleStreamingEventProcessor(tools=request.tools)\n'
+                             '        final_finish_reason: str | None = None\n'
+                             '\n'
+                             '        async for ctx in result_generator:\n'
+                             '            assert isinstance(ctx, SimpleContext)\n'
+                             '            if ctx.last_output is None or not '
+                             'ctx.last_output.outputs:\n'},
+            {'name': 'vllm/entrypoints/openai/responses/serving.py:landmark-10',
+             'path': 'vllm/entrypoints/openai/responses/serving.py',
+             'before': '                    for event in processor.open(target_state, '
+                       'tool_call):\n'
+                       '                        yield '
+                       '_increment_sequence_number_and_return(event)\n'
+                       '\n'
+                       '                for event in processor.emit_delta(dm, output, '
+                       '_get_logprobs):\n'
+                       '                    yield '
+                       '_increment_sequence_number_and_return(event)\n'
+                       '\n'
+                       '        for event in processor.close_current(\n',
+             'after': '                    for event in processor.open(target_state, '
+                      'tool_call):\n'
+                      '                        yield '
+                      '_increment_sequence_number_and_return(event)\n'
+                      '\n'
+                      '                for event in processor.emit_delta(dm):\n'
+                      '                    yield '
+                      '_increment_sequence_number_and_return(event)\n'
+                      '\n'
+                      '        for event in processor.close_current(\n',
+             'review_before': '                    for event in '
+                              'processor.open(target_state, tool_call):\n'
+                              '                        yield '
+                              '_increment_sequence_number_and_return(event)\n'
+                              '\n'
+                              '                for event in processor.emit_delta(dm, '
+                              'output, _get_logprobs):\n'
+                              '                    yield '
+                              '_increment_sequence_number_and_return(event)\n'
+                              '\n'
+                              '        for event in processor.close_current(\n',
+             'review_after': '                    for event in '
+                             'processor.open(target_state, tool_call):\n'
+                             '                        yield '
+                             '_increment_sequence_number_and_return(event)\n'
+                             '\n'
+                             '                for event in processor.emit_delta(dm):\n'
+                             '                    yield '
+                             '_increment_sequence_number_and_return(event)\n'
+                             '\n'
+                             '        for event in processor.close_current(\n'},
+            {'name': 'vllm/entrypoints/openai/responses/serving.py:landmark-11',
              'path': 'vllm/entrypoints/openai/responses/serving.py',
              'before': '                )\n'
                        '            )\n'
@@ -63535,7 +64017,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '            try:\n'
                              '                async for event_data in processor(\n'
                              '                    request,\n'},
-            {'name': 'vllm/entrypoints/openai/responses/serving.py:landmark-8',
+            {'name': 'vllm/entrypoints/openai/responses/serving.py:landmark-12',
              'path': 'vllm/entrypoints/openai/responses/serving.py',
              'before': '                    created_time,\n'
                        '                    _increment_sequence_number_and_return,\n'
@@ -63597,7 +64079,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'self._convert_generation_error_to_streaming_response(e)\n'
                              '                yield '
                              '_increment_sequence_number_and_return(\n'},
-            {'name': 'vllm/entrypoints/openai/responses/serving.py:landmark-9',
+            {'name': 'vllm/entrypoints/openai/responses/serving.py:landmark-13',
              'path': 'vllm/entrypoints/openai/responses/serving.py',
              'before': '                )\n'
                        '                return\n'
@@ -63663,103 +64145,67 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '                    ResponseIncompleteEvent(\n'},
             {'name': 'vllm/entrypoints/openai/responses/streaming_events.py:landmark-1',
              'path': 'vllm/entrypoints/openai/responses/streaming_events.py',
-             'before': '    response_text_delta_event,\n'
+             'before': '    ResponseWebSearchCallInProgressEvent,\n'
+                       '    ResponseWebSearchCallSearchingEvent,\n'
+                       '    response_function_web_search,\n'
+                       '    response_text_delta_event,\n'
                        ')\n'
                        'from openai.types.responses.response_output_item import '
                        'McpCall\n'
-                       'from openai.types.responses.response_reasoning_item import (\n'
-                       '    Content as ResponseReasoningTextContent,\n'
-                       ')\n',
-             'after': '    response_text_delta_event,\n'
+                       'from openai.types.responses.response_reasoning_item import (\n',
+             'after': '    ResponseWebSearchCallInProgressEvent,\n'
+                      '    ResponseWebSearchCallSearchingEvent,\n'
+                      '    response_function_web_search,\n'
                       ')\n'
                       'from openai.types.responses.response_output_item import '
                       'McpCall\n'
-                      'from openai.types.responses.response_output_text import '
-                      'Logprob\n'
-                      'from openai.types.responses.response_reasoning_item import (\n'
-                      '    Content as ResponseReasoningTextContent,\n'
-                      ')\n',
-             'review_before': '    response_text_delta_event,\n'
+                      'from openai.types.responses.response_reasoning_item import (\n',
+             'review_before': '    ResponseWebSearchCallInProgressEvent,\n'
+                              '    ResponseWebSearchCallSearchingEvent,\n'
+                              '    response_function_web_search,\n'
+                              '    response_text_delta_event,\n'
                               ')\n'
                               'from openai.types.responses.response_output_item import '
                               'McpCall\n'
                               'from openai.types.responses.response_reasoning_item '
-                              'import (\n'
-                              '    Content as ResponseReasoningTextContent,\n'
-                              ')\n',
-             'review_after': '    response_text_delta_event,\n'
+                              'import (\n',
+             'review_after': '    ResponseWebSearchCallInProgressEvent,\n'
+                             '    ResponseWebSearchCallSearchingEvent,\n'
+                             '    response_function_web_search,\n'
                              ')\n'
                              'from openai.types.responses.response_output_item import '
                              'McpCall\n'
-                             'from openai.types.responses.response_output_text import '
-                             'Logprob\n'
                              'from openai.types.responses.response_reasoning_item '
-                             'import (\n'
-                             '    Content as ResponseReasoningTextContent,\n'
-                             ')\n'},
+                             'import (\n'},
             {'name': 'vllm/entrypoints/openai/responses/streaming_events.py:landmark-2',
              'path': 'vllm/entrypoints/openai/responses/streaming_events.py',
-             'before': '    current_item_id: str = ""\n'
-                       '    content_index: int = 0\n'
-                       '    accumulated_text: str = ""\n'
-                       '    tool_call_id: str = ""\n'
-                       '    tool_call_name: str = ""\n'
-                       '    tool_call_namespace: str | None = None\n',
-             'after': '    current_item_id: str = ""\n'
-                      '    content_index: int = 0\n'
-                      '    accumulated_text: str = ""\n'
-                      '    accumulated_logprobs: list[Logprob] = '
-                      'field(default_factory=list)\n'
-                      '    tool_call_id: str = ""\n'
-                      '    tool_call_name: str = ""\n'
-                      '    tool_call_namespace: str | None = None\n',
-             'review_before': '    current_item_id: str = ""\n'
-                              '    content_index: int = 0\n'
-                              '    accumulated_text: str = ""\n'
-                              '    tool_call_id: str = ""\n'
-                              '    tool_call_name: str = ""\n'
-                              '    tool_call_namespace: str | None = None\n',
-             'review_after': '    current_item_id: str = ""\n'
-                             '    content_index: int = 0\n'
-                             '    accumulated_text: str = ""\n'
-                             '    accumulated_logprobs: list[Logprob] = '
-                             'field(default_factory=list)\n'
-                             '    tool_call_id: str = ""\n'
-                             '    tool_call_name: str = ""\n'
-                             '    tool_call_namespace: str | None = None\n'},
+             'before': '    build_responses_tool_call_name_map,\n'
+                       '    resolve_responses_tool_call_name,\n'
+                       ')\n'
+                       'from vllm.outputs import CompletionOutput\n'
+                       'from vllm.parser.harmony import Segment\n'
+                       'from vllm.utils import random_uuid\n'
+                       '\n',
+             'after': '    build_responses_tool_call_name_map,\n'
+                      '    resolve_responses_tool_call_name,\n'
+                      ')\n'
+                      'from vllm.parser.harmony import Segment\n'
+                      'from vllm.utils import random_uuid\n'
+                      '\n',
+             'review_before': '    build_responses_tool_call_name_map,\n'
+                              '    resolve_responses_tool_call_name,\n'
+                              ')\n'
+                              'from vllm.outputs import CompletionOutput\n'
+                              'from vllm.parser.harmony import Segment\n'
+                              'from vllm.utils import random_uuid\n'
+                              '\n',
+             'review_after': '    build_responses_tool_call_name_map,\n'
+                             '    resolve_responses_tool_call_name,\n'
+                             ')\n'
+                             'from vllm.parser.harmony import Segment\n'
+                             'from vllm.utils import random_uuid\n'
+                             '\n'},
             {'name': 'vllm/entrypoints/openai/responses/streaming_events.py:landmark-3',
-             'path': 'vllm/entrypoints/openai/responses/streaming_events.py',
-             'before': '    state.current_state = _StateType.CONTENT\n'
-                       '    state.current_item_id = random_uuid()\n'
-                       '    state.content_index = 0\n'
-                       '    state.accumulated_text = ""\n'
-                       '    return [\n'
-                       '        ResponseOutputItemAddedEvent(\n'
-                       '            type="response.output_item.added",\n'
-                       '            sequence_number=-1,\n',
-             'after': '    state.current_state = _StateType.CONTENT\n'
-                      '    state.current_item_id = random_uuid()\n'
-                      '    state.content_index = 0\n'
-                      '    state.accumulated_text = ""\n'
-                      '    state.accumulated_logprobs = []\n'
-                      '    return [\n'
-                      '        ResponseOutputItemAddedEvent(\n'
-                      '            type="response.output_item.added",\n'
-                      '            sequence_number=-1,\n',
-             'review_before': '    state.current_item_id = random_uuid()\n'
-                              '    state.content_index = 0\n'
-                              '    state.accumulated_text = ""\n'
-                              '    return [\n'
-                              '        ResponseOutputItemAddedEvent(\n'
-                              '            type="response.output_item.added",\n',
-             'review_after': '    state.current_item_id = random_uuid()\n'
-                             '    state.content_index = 0\n'
-                             '    state.accumulated_text = ""\n'
-                             '    state.accumulated_logprobs = []\n'
-                             '    return [\n'
-                             '        ResponseOutputItemAddedEvent(\n'
-                             '            type="response.output_item.added",\n'},
-            {'name': 'vllm/entrypoints/openai/responses/streaming_events.py:landmark-4',
              'path': 'vllm/entrypoints/openai/responses/streaming_events.py',
              'before': 'def emit_simple_content_delta(\n'
                        '    state: SimpleStreamingState,\n'
@@ -63768,19 +64214,13 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                        'None,\n'
                        ') -> list[StreamingResponsesResponse]:\n'
                        '    state.accumulated_text += delta\n'
-                       '    return [\n'
-                       '        ResponseTextDeltaEvent(\n'
-                       '            type="response.output_text.delta",\n',
+                       '    return [\n',
              'after': 'def emit_simple_content_delta(\n'
                       '    state: SimpleStreamingState,\n'
                       '    delta: str,\n'
-                      '    logprobs: list[Logprob] | None = None,\n'
                       ') -> list[StreamingResponsesResponse]:\n'
                       '    state.accumulated_text += delta\n'
-                      '    state.accumulated_logprobs.extend(logprobs or [])\n'
-                      '    return [\n'
-                      '        ResponseTextDeltaEvent(\n'
-                      '            type="response.output_text.delta",\n',
+                      '    return [\n',
              'review_before': 'def emit_simple_content_delta(\n'
                               '    state: SimpleStreamingState,\n'
                               '    delta: str,\n'
@@ -63788,20 +64228,14 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                               'None = None,\n'
                               ') -> list[StreamingResponsesResponse]:\n'
                               '    state.accumulated_text += delta\n'
-                              '    return [\n'
-                              '        ResponseTextDeltaEvent(\n'
-                              '            type="response.output_text.delta",\n',
+                              '    return [\n',
              'review_after': 'def emit_simple_content_delta(\n'
                              '    state: SimpleStreamingState,\n'
                              '    delta: str,\n'
-                             '    logprobs: list[Logprob] | None = None,\n'
                              ') -> list[StreamingResponsesResponse]:\n'
                              '    state.accumulated_text += delta\n'
-                             '    state.accumulated_logprobs.extend(logprobs or [])\n'
-                             '    return [\n'
-                             '        ResponseTextDeltaEvent(\n'
-                             '            type="response.output_text.delta",\n'},
-            {'name': 'vllm/entrypoints/openai/responses/streaming_events.py:landmark-5',
+                             '    return [\n'},
+            {'name': 'vllm/entrypoints/openai/responses/streaming_events.py:landmark-4',
              'path': 'vllm/entrypoints/openai/responses/streaming_events.py',
              'before': '            output_index=state.output_index,\n'
                        '            item_id=state.current_item_id,\n'
@@ -63815,30 +64249,11 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                        '    state: SimpleStreamingState,\n'
                        ') -> list[StreamingResponsesResponse]:\n'
                        '    part = ResponseOutputText(\n'
-                       '        type="output_text",\n'
-                       '        text=state.accumulated_text,\n'
-                       '        annotations=[],\n'
-                       '    )\n'
-                       '    events: list[StreamingResponsesResponse] = [\n'
-                       '        ResponseTextDoneEvent(\n',
+                       '        type="output_text",\n',
              'after': '            output_index=state.output_index,\n'
                       '            item_id=state.current_item_id,\n'
                       '            delta=delta,\n'
-                      '            logprobs=[\n'
-                      '                response_text_delta_event.Logprob(\n'
-                      '                    token=entry.token,\n'
-                      '                    logprob=entry.logprob,\n'
-                      '                    top_logprobs=[\n'
-                      '                        '
-                      'response_text_delta_event.LogprobTopLogprob(\n'
-                      '                            token=top.token, '
-                      'logprob=top.logprob,\n'
-                      '                        )\n'
-                      '                        for top in entry.top_logprobs\n'
-                      '                    ],\n'
-                      '                )\n'
-                      '                for entry in logprobs or []\n'
-                      '            ],\n'
+                      '            logprobs=[],\n'
                       '        )\n'
                       '    ]\n'
                       '\n'
@@ -63849,13 +64264,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '    incomplete: bool = False,\n'
                       ') -> list[StreamingResponsesResponse]:\n'
                       '    part = ResponseOutputText(\n'
-                      '        type="output_text",\n'
-                      '        text=state.accumulated_text,\n'
-                      '        annotations=[],\n'
-                      '        logprobs=state.accumulated_logprobs or None,\n'
-                      '    )\n'
-                      '    events: list[StreamingResponsesResponse] = [\n'
-                      '        ResponseTextDoneEvent(\n',
+                      '        type="output_text",\n',
              'review_before': '            output_index=state.output_index,\n'
                               '            item_id=state.current_item_id,\n'
                               '            delta=delta,\n'
@@ -63868,30 +64277,11 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                               '    state: SimpleStreamingState,\n'
                               ') -> list[StreamingResponsesResponse]:\n'
                               '    part = ResponseOutputText(\n'
-                              '        type="output_text",\n'
-                              '        text=state.accumulated_text,\n'
-                              '        annotations=[],\n'
-                              '    )\n'
-                              '    events: list[StreamingResponsesResponse] = [\n'
-                              '        ResponseTextDoneEvent(\n',
+                              '        type="output_text",\n',
              'review_after': '            output_index=state.output_index,\n'
                              '            item_id=state.current_item_id,\n'
                              '            delta=delta,\n'
-                             '            logprobs=[\n'
-                             '                response_text_delta_event.Logprob(\n'
-                             '                    token=entry.token,\n'
-                             '                    logprob=entry.logprob,\n'
-                             '                    top_logprobs=[\n'
-                             '                        '
-                             'response_text_delta_event.LogprobTopLogprob(\n'
-                             '                            token=top.token, '
-                             'logprob=top.logprob,\n'
-                             '                        )\n'
-                             '                        for top in entry.top_logprobs\n'
-                             '                    ],\n'
-                             '                )\n'
-                             '                for entry in logprobs or []\n'
-                             '            ],\n'
+                             '            logprobs=[],\n'
                              '        )\n'
                              '    ]\n'
                              '\n'
@@ -63902,46 +64292,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    incomplete: bool = False,\n'
                              ') -> list[StreamingResponsesResponse]:\n'
                              '    part = ResponseOutputText(\n'
-                             '        type="output_text",\n'
-                             '        text=state.accumulated_text,\n'
-                             '        annotations=[],\n'
-                             '        logprobs=state.accumulated_logprobs or None,\n'
-                             '    )\n'
-                             '    events: list[StreamingResponsesResponse] = [\n'
-                             '        ResponseTextDoneEvent(\n'},
-            {'name': 'vllm/entrypoints/openai/responses/streaming_events.py:landmark-6',
-             'path': 'vllm/entrypoints/openai/responses/streaming_events.py',
-             'before': '            output_index=state.output_index,\n'
-                       '            content_index=state.content_index,\n'
-                       '            text=state.accumulated_text,\n'
-                       '            logprobs=[],\n'
-                       '            item_id=state.current_item_id,\n'
-                       '        ),\n'
-                       '        ResponseContentPartDoneEvent(\n',
-             'after': '            output_index=state.output_index,\n'
-                      '            content_index=state.content_index,\n'
-                      '            text=state.accumulated_text,\n'
-                      '            logprobs=[entry.model_dump() for entry in '
-                      'state.accumulated_logprobs],\n'
-                      '            item_id=state.current_item_id,\n'
-                      '        ),\n'
-                      '        ResponseContentPartDoneEvent(\n',
-             'review_before': '            output_index=state.output_index,\n'
-                              '            content_index=state.content_index,\n'
-                              '            text=state.accumulated_text,\n'
-                              '            logprobs=[],\n'
-                              '            item_id=state.current_item_id,\n'
-                              '        ),\n'
-                              '        ResponseContentPartDoneEvent(\n',
-             'review_after': '            output_index=state.output_index,\n'
-                             '            content_index=state.content_index,\n'
-                             '            text=state.accumulated_text,\n'
-                             '            logprobs=[entry.model_dump() for entry in '
-                             'state.accumulated_logprobs],\n'
-                             '            item_id=state.current_item_id,\n'
-                             '        ),\n'
-                             '        ResponseContentPartDoneEvent(\n'},
-            {'name': 'vllm/entrypoints/openai/responses/streaming_events.py:landmark-7',
+                             '        type="output_text",\n'},
+            {'name': 'vllm/entrypoints/openai/responses/streaming_events.py:landmark-5',
              'path': 'vllm/entrypoints/openai/responses/streaming_events.py',
              'before': '                type="message",\n'
                        '                role="assistant",\n'
@@ -63977,7 +64329,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '                summary=[],\n'
                              '            ),\n'
                              '        ),\n'},
-            {'name': 'vllm/entrypoints/openai/responses/streaming_events.py:landmark-8',
+            {'name': 'vllm/entrypoints/openai/responses/streaming_events.py:landmark-6',
              'path': 'vllm/entrypoints/openai/responses/streaming_events.py',
              'before': '    def close_current(\n'
                        '        self, *, incomplete: bool = False\n'
@@ -64061,9 +64413,10 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    def open(\n'
                              '        self, target_state: _StateType, tool_call: Any = '
                              'None\n'},
-            {'name': 'vllm/entrypoints/openai/responses/streaming_events.py:landmark-9',
+            {'name': 'vllm/entrypoints/openai/responses/streaming_events.py:landmark-7',
              'path': 'vllm/entrypoints/openai/responses/streaming_events.py',
-             'before': '        self,\n'
+             'before': '    def emit_delta(\n'
+                       '        self,\n'
                        '        delta_message: DeltaMessage,\n'
                        '        output: CompletionOutput,\n'
                        '        get_logprobs: Callable[\n'
@@ -64073,17 +64426,19 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                        '        | None = None,\n'
                        '    ) -> list[StreamingResponsesResponse]:\n'
                        '        """Emit incremental events for the current state from '
-                       'the delta."""\n',
-             'after': '        self,\n'
+                       'the delta."""\n'
+                       '        handlers = '
+                       'self._STATE_HANDLERS[self.state.current_state]\n',
+             'after': '    def emit_delta(\n'
+                      '        self,\n'
                       '        delta_message: DeltaMessage,\n'
-                      '        output: CompletionOutput,\n'
-                      '        get_logprobs: Callable[[CompletionOutput], '
-                      'list[Logprob]]\n'
-                      '        | None = None,\n'
                       '    ) -> list[StreamingResponsesResponse]:\n'
                       '        """Emit incremental events for the current state from '
-                      'the delta."""\n',
-             'review_before': '        self,\n'
+                      'the delta."""\n'
+                      '        handlers = '
+                      'self._STATE_HANDLERS[self.state.current_state]\n',
+             'review_before': '    def emit_delta(\n'
+                              '        self,\n'
                               '        delta_message: DeltaMessage,\n'
                               '        output: CompletionOutput,\n'
                               '        get_logprobs: Callable[\n'
@@ -64093,16 +64448,821 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                               '        | None = None,\n'
                               '    ) -> list[StreamingResponsesResponse]:\n'
                               '        """Emit incremental events for the current '
-                              'state from the delta."""\n',
-             'review_after': '        self,\n'
+                              'state from the delta."""\n'
+                              '        handlers = '
+                              'self._STATE_HANDLERS[self.state.current_state]\n',
+             'review_after': '    def emit_delta(\n'
+                             '        self,\n'
                              '        delta_message: DeltaMessage,\n'
-                             '        output: CompletionOutput,\n'
-                             '        get_logprobs: Callable[[CompletionOutput], '
-                             'list[Logprob]]\n'
-                             '        | None = None,\n'
                              '    ) -> list[StreamingResponsesResponse]:\n'
                              '        """Emit incremental events for the current state '
-                             'from the delta."""\n'})},
+                             'from the delta."""\n'
+                             '        handlers = '
+                             'self._STATE_HANDLERS[self.state.current_state]\n'},
+            {'name': 'vllm/entrypoints/openai/responses/streaming_events.py:landmark-8',
+             'path': 'vllm/entrypoints/openai/responses/streaming_events.py',
+             'before': '            return handlers.delta_fn(self.state, '
+                       'delta_message.reasoning)\n'
+                       '        elif self.state.current_state == _StateType.CONTENT:\n'
+                       '            assert delta_message.content is not None\n'
+                       '            logprobs = get_logprobs(output) if get_logprobs '
+                       'else []\n'
+                       '            return handlers.delta_fn(self.state, '
+                       'delta_message.content, logprobs)\n'
+                       '        return []\n',
+             'after': '            return handlers.delta_fn(self.state, '
+                      'delta_message.reasoning)\n'
+                      '        elif self.state.current_state == _StateType.CONTENT:\n'
+                      '            assert delta_message.content is not None\n'
+                      '            return handlers.delta_fn(self.state, '
+                      'delta_message.content)\n'
+                      '        return []\n',
+             'review_before': '            return handlers.delta_fn(self.state, '
+                              'delta_message.reasoning)\n'
+                              '        elif self.state.current_state == '
+                              '_StateType.CONTENT:\n'
+                              '            assert delta_message.content is not None\n'
+                              '            logprobs = get_logprobs(output) if '
+                              'get_logprobs else []\n'
+                              '            return handlers.delta_fn(self.state, '
+                              'delta_message.content, logprobs)\n'
+                              '        return []\n',
+             'review_after': '            return handlers.delta_fn(self.state, '
+                             'delta_message.reasoning)\n'
+                             '        elif self.state.current_state == '
+                             '_StateType.CONTENT:\n'
+                             '            assert delta_message.content is not None\n'
+                             '            return handlers.delta_fn(self.state, '
+                             'delta_message.content)\n'
+                             '        return []\n'},
+            {'name': 'tests/entrypoints/openai/responses/test_basic.py:landmark-1',
+             'path': 'tests/entrypoints/openai/responses/test_basic.py',
+             'before': '\n'
+                       '\n'
+                       '@pytest.mark.asyncio\n'
+                       'async def test_logprobs(client: openai.AsyncOpenAI):\n'
+                       '    response = await client.responses.create(\n'
+                       '        include=["message.output_text.logprobs"],\n'
+                       '        input="What is 13 * 24?",\n'
+                       '        top_logprobs=5,\n'
+                       '    )\n'
+                       '    print(response)\n'
+                       '    outputs = response.output\n'
+                       '    assert outputs[-1].content[-1].logprobs\n'
+                       '    assert '
+                       'len(outputs[-1].content[-1].logprobs[0].top_logprobs) == 5\n'
+                       '\n'
+                       '\n'
+                       '@pytest.mark.asyncio\n',
+             'after': '\n'
+                      '\n'
+                      '@pytest.mark.asyncio\n'
+                      '@pytest.mark.parametrize("stream", [False, True])\n'
+                      'async def test_logprobs_are_refused(client: openai.AsyncOpenAI, '
+                      'stream: bool):\n'
+                      '    # A message cannot name the tokens its text came from: '
+                      'reasoning, message\n'
+                      '    # and calls are one generated sequence, and a token can end '
+                      'the message\n'
+                      '    # and begin a call.\n'
+                      '    with pytest.raises(openai.BadRequestError) as refused:\n'
+                      '        await client.responses.create(\n'
+                      '            include=["message.output_text.logprobs"],\n'
+                      '            input="What is 13 * 24?",\n'
+                      '            stream=stream,\n'
+                      '        )\n'
+                      '    assert refused.value.status_code == 400\n'
+                      '    assert "message.output_text.logprobs" in '
+                      'str(refused.value)\n'
+                      '\n'
+                      '\n'
+                      '@pytest.mark.asyncio\n',
+             'review_before': '\n'
+                              '\n'
+                              '@pytest.mark.asyncio\n'
+                              'async def test_logprobs(client: openai.AsyncOpenAI):\n'
+                              '    response = await client.responses.create(\n'
+                              '        include=["message.output_text.logprobs"],\n'
+                              '        input="What is 13 * 24?",\n'
+                              '        top_logprobs=5,\n'
+                              '    )\n'
+                              '    print(response)\n'
+                              '    outputs = response.output\n'
+                              '    assert outputs[-1].content[-1].logprobs\n'
+                              '    assert '
+                              'len(outputs[-1].content[-1].logprobs[0].top_logprobs) '
+                              '== 5\n'
+                              '\n'
+                              '\n'
+                              '@pytest.mark.asyncio\n',
+             'review_after': '\n'
+                             '\n'
+                             '@pytest.mark.asyncio\n'
+                             '@pytest.mark.parametrize("stream", [False, True])\n'
+                             'async def test_logprobs_are_refused(client: '
+                             'openai.AsyncOpenAI, stream: bool):\n'
+                             '    # A message cannot name the tokens its text came '
+                             'from: reasoning, message\n'
+                             '    # and calls are one generated sequence, and a token '
+                             'can end the message\n'
+                             '    # and begin a call.\n'
+                             '    with pytest.raises(openai.BadRequestError) as '
+                             'refused:\n'
+                             '        await client.responses.create(\n'
+                             '            include=["message.output_text.logprobs"],\n'
+                             '            input="What is 13 * 24?",\n'
+                             '            stream=stream,\n'
+                             '        )\n'
+                             '    assert refused.value.status_code == 400\n'
+                             '    assert "message.output_text.logprobs" in '
+                             'str(refused.value)\n'
+                             '\n'
+                             '\n'
+                             '@pytest.mark.asyncio\n'},
+            {'name': 'tests/entrypoints/openai/responses/test_simple.py:landmark-1',
+             'path': 'tests/entrypoints/openai/responses/test_simple.py',
+             'before': '    )\n'
+                       '\n'
+                       '\n'
+                       '@pytest.mark.asyncio\n'
+                       '@pytest.mark.parametrize("model_name", [MODEL_NAME])\n'
+                       'async def test_streaming_logprobs(client: OpenAI, model_name: '
+                       'str):\n'
+                       '    """Test that streaming with logprobs returns valid logprob '
+                       'data on\n'
+                       '    output_text.delta events and that top_logprobs has the '
+                       'requested count."""\n'
+                       '    response = await client.responses.create(\n'
+                       '        model=model_name,\n'
+                       '        input="Say hello.",\n'
+                       '        stream=True,\n'
+                       '        top_logprobs=3,\n'
+                       '        include=["message.output_text.logprobs"],\n'
+                       '    )\n'
+                       '\n'
+                       '    events = []\n'
+                       '    async for event in response:\n'
+                       '        events.append(event)\n'
+                       '\n'
+                       '    assert len(events) > 0\n'
+                       '\n'
+                       '    # Collect all output_text.delta events that carry '
+                       'logprobs\n'
+                       '    text_delta_events = [e for e in events if e.type == '
+                       '"response.output_text.delta"]\n'
+                       '    assert len(text_delta_events) > 0, "Expected at least one '
+                       'text delta event"\n'
+                       '\n'
+                       '    for delta_event in text_delta_events:\n'
+                       '        logprobs = delta_event.logprobs\n'
+                       '        assert logprobs is not None, "logprobs should be '
+                       'present on text delta events"\n'
+                       '        assert len(logprobs) > 0, "logprobs list should not be '
+                       'empty"\n'
+                       '        for lp in logprobs:\n'
+                       '            # Each logprob entry must have a token and a '
+                       'logprob value\n'
+                       '            assert lp.token is not None\n'
+                       '            assert isinstance(lp.logprob, float)\n'
+                       '            assert lp.logprob <= 0.0, f"logprob should be <= '
+                       '0, got {lp.logprob}"\n'
+                       '            # top_logprobs should have up to 3 entries\n'
+                       '            assert lp.top_logprobs is not None\n'
+                       '            assert len(lp.top_logprobs) <= 3\n'
+                       '            for tl in lp.top_logprobs:\n'
+                       '                assert tl.token is not None\n'
+                       '                assert isinstance(tl.logprob, float)\n'
+                       '\n'
+                       '    # Verify that top_logprobs are actually populated, not '
+                       'always empty\n'
+                       '    all_top_logprobs = [\n'
+                       '        tl for e in text_delta_events for lp in e.logprobs for '
+                       'tl in lp.top_logprobs\n'
+                       '    ]\n'
+                       '    assert len(all_top_logprobs) > 0, (\n'
+                       '        "Expected at least one top_logprobs entry across all '
+                       'delta events"\n'
+                       '    )\n'
+                       '\n'
+                       '    # Verify the completed event still has valid output\n'
+                       '    completed = events[-1]\n'
+                       '    assert completed.type == "response.completed"\n'
+                       '    assert completed.response.status == "completed"\n'
+                       '\n'
+                       '\n'
+                       '@pytest.mark.asyncio\n'
+                       '@pytest.mark.parametrize("model_name", [MODEL_NAME])\n'
+                       'async def test_streaming_reasoning_tokens_e2e(client: OpenAI, '
+                       'model_name: str):\n',
+             'after': '    )\n'
+                      '\n'
+                      '\n'
+                      '@pytest.mark.asyncio\n'
+                      '@pytest.mark.parametrize("model_name", [MODEL_NAME])\n'
+                      'async def test_streaming_reasoning_tokens_e2e(client: OpenAI, '
+                      'model_name: str):\n',
+             'review_before': '    )\n'
+                              '\n'
+                              '\n'
+                              '@pytest.mark.asyncio\n'
+                              '@pytest.mark.parametrize("model_name", [MODEL_NAME])\n'
+                              'async def test_streaming_logprobs(client: OpenAI, '
+                              'model_name: str):\n'
+                              '    """Test that streaming with logprobs returns valid '
+                              'logprob data on\n'
+                              '    output_text.delta events and that top_logprobs has '
+                              'the requested count."""\n'
+                              '    response = await client.responses.create(\n'
+                              '        model=model_name,\n'
+                              '        input="Say hello.",\n'
+                              '        stream=True,\n'
+                              '        top_logprobs=3,\n'
+                              '        include=["message.output_text.logprobs"],\n'
+                              '    )\n'
+                              '\n'
+                              '    events = []\n'
+                              '    async for event in response:\n'
+                              '        events.append(event)\n'
+                              '\n'
+                              '    assert len(events) > 0\n'
+                              '\n'
+                              '    # Collect all output_text.delta events that carry '
+                              'logprobs\n'
+                              '    text_delta_events = [e for e in events if e.type == '
+                              '"response.output_text.delta"]\n'
+                              '    assert len(text_delta_events) > 0, "Expected at '
+                              'least one text delta event"\n'
+                              '\n'
+                              '    for delta_event in text_delta_events:\n'
+                              '        logprobs = delta_event.logprobs\n'
+                              '        assert logprobs is not None, "logprobs should '
+                              'be present on text delta events"\n'
+                              '        assert len(logprobs) > 0, "logprobs list should '
+                              'not be empty"\n'
+                              '        for lp in logprobs:\n'
+                              '            # Each logprob entry must have a token and '
+                              'a logprob value\n'
+                              '            assert lp.token is not None\n'
+                              '            assert isinstance(lp.logprob, float)\n'
+                              '            assert lp.logprob <= 0.0, f"logprob should '
+                              'be <= 0, got {lp.logprob}"\n'
+                              '            # top_logprobs should have up to 3 entries\n'
+                              '            assert lp.top_logprobs is not None\n'
+                              '            assert len(lp.top_logprobs) <= 3\n'
+                              '            for tl in lp.top_logprobs:\n'
+                              '                assert tl.token is not None\n'
+                              '                assert isinstance(tl.logprob, float)\n'
+                              '\n'
+                              '    # Verify that top_logprobs are actually populated, '
+                              'not always empty\n'
+                              '    all_top_logprobs = [\n'
+                              '        tl for e in text_delta_events for lp in '
+                              'e.logprobs for tl in lp.top_logprobs\n'
+                              '    ]\n'
+                              '    assert len(all_top_logprobs) > 0, (\n'
+                              '        "Expected at least one top_logprobs entry '
+                              'across all delta events"\n'
+                              '    )\n'
+                              '\n'
+                              '    # Verify the completed event still has valid '
+                              'output\n'
+                              '    completed = events[-1]\n'
+                              '    assert completed.type == "response.completed"\n'
+                              '    assert completed.response.status == "completed"\n'
+                              '\n'
+                              '\n'
+                              '@pytest.mark.asyncio\n'
+                              '@pytest.mark.parametrize("model_name", [MODEL_NAME])\n'
+                              'async def test_streaming_reasoning_tokens_e2e(client: '
+                              'OpenAI, model_name: str):\n',
+             'review_after': '    )\n'
+                             '\n'
+                             '\n'
+                             '@pytest.mark.asyncio\n'
+                             '@pytest.mark.parametrize("model_name", [MODEL_NAME])\n'
+                             'async def test_streaming_reasoning_tokens_e2e(client: '
+                             'OpenAI, model_name: str):\n'},
+            {'name': 'tests/entrypoints/openai/responses/test_streaming_events.py:landmark-1',
+             'path': 'tests/entrypoints/openai/responses/test_streaming_events.py',
+             'before': '        if processor.needs_transition(target_state, '
+                       'tool_call):\n'
+                       '            events.extend(processor.close_current())\n'
+                       '            events.extend(processor.open(target_state, '
+                       'tool_call))\n'
+                       '        events.extend(processor.emit_delta(dm, None))\n'
+                       '    return events\n'
+                       '\n'
+                       '\n',
+             'after': '        if processor.needs_transition(target_state, '
+                      'tool_call):\n'
+                      '            events.extend(processor.close_current())\n'
+                      '            events.extend(processor.open(target_state, '
+                      'tool_call))\n'
+                      '        events.extend(processor.emit_delta(dm))\n'
+                      '    return events\n'
+                      '\n'
+                      '\n',
+             'review_before': '        if processor.needs_transition(target_state, '
+                              'tool_call):\n'
+                              '            events.extend(processor.close_current())\n'
+                              '            events.extend(processor.open(target_state, '
+                              'tool_call))\n'
+                              '        events.extend(processor.emit_delta(dm, None))\n'
+                              '    return events\n'
+                              '\n'
+                              '\n',
+             'review_after': '        if processor.needs_transition(target_state, '
+                             'tool_call):\n'
+                             '            events.extend(processor.close_current())\n'
+                             '            events.extend(processor.open(target_state, '
+                             'tool_call))\n'
+                             '        events.extend(processor.emit_delta(dm))\n'
+                             '    return events\n'
+                             '\n'
+                             '\n'},
+            {'name': 'tests/entrypoints/openai/test_return_tokens_as_ids.py:landmark-1',
+             'path': 'tests/entrypoints/openai/test_return_tokens_as_ids.py',
+             'before': '        for logprob_content in '
+                       'response.choices[0].logprobs.content:\n'
+                       '            '
+                       'token_ids.append(int(logprob_content.token.removeprefix("token_id:")))\n'
+                       '        assert tokenizer.decode(token_ids, '
+                       'skip_special_tokens=True) == text\n'
+                       '\n'
+                       '\n'
+                       'def '
+                       'test_responses_api_logprobs_with_return_tokens_as_token_ids():\n'
+                       '    """Test that return_tokens_as_token_ids works in Responses '
+                       'API logprobs."""\n'
+                       '    from unittest.mock import MagicMock\n'
+                       '\n'
+                       '    from vllm.entrypoints.generate.base.serving import '
+                       'GenerateBaseServing\n'
+                       '    from vllm.entrypoints.openai.responses.serving import '
+                       'OpenAIServingResponses\n'
+                       '    from vllm.logprobs import Logprob as SampleLogprob\n'
+                       '\n'
+                       '    serving = MagicMock(spec=OpenAIServingResponses)\n'
+                       '    serving.return_tokens_as_token_ids = True\n'
+                       '    serving._get_decoded_token = '
+                       'GenerateBaseServing._get_decoded_token\n'
+                       '\n'
+                       '    tokenizer = MagicMock()\n'
+                       '    tokenizer.decode = lambda token_id: "decoded"\n'
+                       '\n'
+                       '    token_ids = [100, 200, 300]\n'
+                       '    sample_logprobs = [\n'
+                       '        {100: SampleLogprob(logprob=-0.5, '
+                       'decoded_token="hello")},\n'
+                       '        {200: SampleLogprob(logprob=-1.2, '
+                       'decoded_token="world")},\n'
+                       '        {300: SampleLogprob(logprob=-0.8, '
+                       'decoded_token="!")},\n'
+                       '    ]\n'
+                       '\n'
+                       '    result = '
+                       'OpenAIServingResponses._create_response_logprobs(\n'
+                       '        serving,\n'
+                       '        token_ids=token_ids,\n'
+                       '        logprobs=sample_logprobs,\n'
+                       '        tokenizer=tokenizer,\n'
+                       '        top_logprobs=1,\n'
+                       '    )\n'
+                       '\n'
+                       '    assert len(result) == 3\n'
+                       '    assert result[0].token == "token_id:100"\n'
+                       '    assert result[1].token == "token_id:200"\n'
+                       '    assert result[2].token == "token_id:300"\n'
+                       '    assert result[0].logprob == -0.5\n'
+                       '    assert result[1].logprob == -1.2\n'
+                       '    assert result[2].logprob == -0.8\n',
+             'after': '        for logprob_content in '
+                      'response.choices[0].logprobs.content:\n'
+                      '            '
+                      'token_ids.append(int(logprob_content.token.removeprefix("token_id:")))\n'
+                      '        assert tokenizer.decode(token_ids, '
+                      'skip_special_tokens=True) == text\n',
+             'review_before': '        for logprob_content in '
+                              'response.choices[0].logprobs.content:\n'
+                              '            '
+                              'token_ids.append(int(logprob_content.token.removeprefix("token_id:")))\n'
+                              '        assert tokenizer.decode(token_ids, '
+                              'skip_special_tokens=True) == text\n'
+                              '\n'
+                              '\n'
+                              'def '
+                              'test_responses_api_logprobs_with_return_tokens_as_token_ids():\n'
+                              '    """Test that return_tokens_as_token_ids works in '
+                              'Responses API logprobs."""\n'
+                              '    from unittest.mock import MagicMock\n'
+                              '\n'
+                              '    from vllm.entrypoints.generate.base.serving import '
+                              'GenerateBaseServing\n'
+                              '    from vllm.entrypoints.openai.responses.serving '
+                              'import OpenAIServingResponses\n'
+                              '    from vllm.logprobs import Logprob as SampleLogprob\n'
+                              '\n'
+                              '    serving = MagicMock(spec=OpenAIServingResponses)\n'
+                              '    serving.return_tokens_as_token_ids = True\n'
+                              '    serving._get_decoded_token = '
+                              'GenerateBaseServing._get_decoded_token\n'
+                              '\n'
+                              '    tokenizer = MagicMock()\n'
+                              '    tokenizer.decode = lambda token_id: "decoded"\n'
+                              '\n'
+                              '    token_ids = [100, 200, 300]\n'
+                              '    sample_logprobs = [\n'
+                              '        {100: SampleLogprob(logprob=-0.5, '
+                              'decoded_token="hello")},\n'
+                              '        {200: SampleLogprob(logprob=-1.2, '
+                              'decoded_token="world")},\n'
+                              '        {300: SampleLogprob(logprob=-0.8, '
+                              'decoded_token="!")},\n'
+                              '    ]\n'
+                              '\n'
+                              '    result = '
+                              'OpenAIServingResponses._create_response_logprobs(\n'
+                              '        serving,\n'
+                              '        token_ids=token_ids,\n'
+                              '        logprobs=sample_logprobs,\n'
+                              '        tokenizer=tokenizer,\n'
+                              '        top_logprobs=1,\n'
+                              '    )\n'
+                              '\n'
+                              '    assert len(result) == 3\n'
+                              '    assert result[0].token == "token_id:100"\n'
+                              '    assert result[1].token == "token_id:200"\n'
+                              '    assert result[2].token == "token_id:300"\n'
+                              '    assert result[0].logprob == -0.5\n'
+                              '    assert result[1].logprob == -1.2\n'
+                              '    assert result[2].logprob == -0.8\n',
+             'review_after': '        for logprob_content in '
+                             'response.choices[0].logprobs.content:\n'
+                             '            '
+                             'token_ids.append(int(logprob_content.token.removeprefix("token_id:")))\n'
+                             '        assert tokenizer.decode(token_ids, '
+                             'skip_special_tokens=True) == text\n'},
+            {'name': 'tests/tool_parsers/test_poolside_v1_tool_parser.py:landmark-1',
+             'path': 'tests/tool_parsers/test_poolside_v1_tool_parser.py',
+             'before': 'def test_streaming_responses_request_without_logprobs() -> '
+                       'None:\n'
+                       '    request = _build_responses_request(tool_choice="auto")\n'
+                       '    assert _stream_partial_start_token(request) is None\n'
+                       '\n'
+                       '\n'
+                       'def '
+                       'test_streaming_responses_request_with_logprobs_emits_empty_delta() '
+                       '-> None:\n'
+                       '    request = _build_responses_request(\n'
+                       '        tool_choice="auto", '
+                       'include=["message.output_text.logprobs"]\n'
+                       '    )\n'
+                       '    result = _stream_partial_start_token(request)\n'
+                       '    assert result is not None\n'
+                       '    assert result.content == ""\n',
+             'after': 'def test_streaming_responses_request_without_logprobs() -> '
+                      'None:\n'
+                      '    request = _build_responses_request(tool_choice="auto")\n'
+                      '    assert _stream_partial_start_token(request) is None\n',
+             'review_before': 'def test_streaming_responses_request_without_logprobs() '
+                              '-> None:\n'
+                              '    request = '
+                              '_build_responses_request(tool_choice="auto")\n'
+                              '    assert _stream_partial_start_token(request) is '
+                              'None\n'
+                              '\n'
+                              '\n'
+                              'def '
+                              'test_streaming_responses_request_with_logprobs_emits_empty_delta() '
+                              '-> None:\n'
+                              '    request = _build_responses_request(\n'
+                              '        tool_choice="auto", '
+                              'include=["message.output_text.logprobs"]\n'
+                              '    )\n'
+                              '    result = _stream_partial_start_token(request)\n'
+                              '    assert result is not None\n'
+                              '    assert result.content == ""\n',
+             'review_after': 'def test_streaming_responses_request_without_logprobs() '
+                             '-> None:\n'
+                             '    request = '
+                             '_build_responses_request(tool_choice="auto")\n'
+                             '    assert _stream_partial_start_token(request) is '
+                             'None\n'},
+            {'name': 'vllm/entrypoints/openai/responses/protocol.py:landmark-1',
+             'path': 'vllm/entrypoints/openai/responses/protocol.py',
+             'before': '            top_p=top_p,\n'
+                       '            top_k=top_k,\n'
+                       '            max_tokens=max_tokens,\n'
+                       '            logprobs=self.top_logprobs if '
+                       'self.is_include_output_logprobs() else None,\n'
+                       '            stop=stop,\n'
+                       '            frequency_penalty=frequency_penalty,\n'
+                       '            presence_penalty=presence_penalty,\n',
+             'after': '            top_p=top_p,\n'
+                      '            top_k=top_k,\n'
+                      '            max_tokens=max_tokens,\n'
+                      '            stop=stop,\n'
+                      '            frequency_penalty=frequency_penalty,\n'
+                      '            presence_penalty=presence_penalty,\n',
+             'review_before': '            top_p=top_p,\n'
+                              '            top_k=top_k,\n'
+                              '            max_tokens=max_tokens,\n'
+                              '            logprobs=self.top_logprobs if '
+                              'self.is_include_output_logprobs() else None,\n'
+                              '            stop=stop,\n'
+                              '            frequency_penalty=frequency_penalty,\n'
+                              '            presence_penalty=presence_penalty,\n',
+             'review_after': '            top_p=top_p,\n'
+                             '            top_k=top_k,\n'
+                             '            max_tokens=max_tokens,\n'
+                             '            stop=stop,\n'
+                             '            frequency_penalty=frequency_penalty,\n'
+                             '            presence_penalty=presence_penalty,\n'},
+            {'name': 'vllm/entrypoints/openai/responses/protocol.py:landmark-2',
+             'path': 'vllm/entrypoints/openai/responses/protocol.py',
+             'before': '            '
+                       'final_response_token_budget=final_response_token_budget,\n'
+                       '        )\n'
+                       '\n'
+                       '    def is_include_output_logprobs(self) -> bool:\n'
+                       '        """Check if the request includes output logprobs."""\n'
+                       '        if self.include is None:\n'
+                       '            return False\n'
+                       '        return (\n'
+                       '            isinstance(self.include, list)\n'
+                       '            and "message.output_text.logprobs" in '
+                       'self.include\n'
+                       '        )\n'
+                       '\n'
+                       '    @model_validator(mode="before")\n'
+                       '    @classmethod\n',
+             'after': '            '
+                      'final_response_token_budget=final_response_token_budget,\n'
+                      '        )\n'
+                      '\n'
+                      '    @model_validator(mode="after")\n'
+                      '    def refuse_log_probabilities(self) -> "ResponsesRequest":\n'
+                      '        """A message\'s log probabilities would be those of the '
+                      'tokens its text\n'
+                      '        came from. The model writes its reasoning, the message '
+                      'and its calls\n'
+                      "        as one token sequence, the parser reports each item's "
+                      'text and not its\n'
+                      '        tokens, and a single token can end the message and '
+                      'begin a call, so\n'
+                      "        no list of whole tokens is a message's. Both fields "
+                      'that ask for one\n'
+                      '        are refused."""\n'
+                      '        if self.include and "message.output_text.logprobs" in '
+                      'self.include:\n'
+                      '            raise VLLMValidationError(\n'
+                      '                \'include "message.output_text.logprobs" asks '
+                      "for the log '\n"
+                      '                "probabilities of the tokens a message\'s text '
+                      'came from, and "\n'
+                      '                "this server cannot name those tokens: the '
+                      'model writes its "\n'
+                      '                "reasoning, the message and its calls as one '
+                      'token sequence, "\n'
+                      '                "and a single token can end the message and '
+                      'begin a call. "\n'
+                      '                "Remove it from include. /v1/chat/completions '
+                      'with logprobs "\n'
+                      '                "returns the log probability of every token the '
+                      'choice "\n'
+                      '                "generated, in order.",\n'
+                      '                parameter="include",\n'
+                      '                value="message.output_text.logprobs",\n'
+                      '            )\n'
+                      '        if self.top_logprobs:\n'
+                      '            raise VLLMValidationError(\n'
+                      '                "top_logprobs asks for log probabilities, which '
+                      'a Responses "\n'
+                      "                'message does not carry (see include "
+                      '"message.output_text.\'\n'
+                      '                \'logprobs"). Send 0 or omit it. '
+                      "/v1/chat/completions with '\n"
+                      '                "logprobs and top_logprobs returns them for '
+                      'every token the "\n'
+                      '                "choice generated.",\n'
+                      '                parameter="top_logprobs",\n'
+                      '                value=self.top_logprobs,\n'
+                      '            )\n'
+                      '        return self\n'
+                      '\n'
+                      '    @model_validator(mode="before")\n'
+                      '    @classmethod\n',
+             'review_before': '            '
+                              'final_response_token_budget=final_response_token_budget,\n'
+                              '        )\n'
+                              '\n'
+                              '    def is_include_output_logprobs(self) -> bool:\n'
+                              '        """Check if the request includes output '
+                              'logprobs."""\n'
+                              '        if self.include is None:\n'
+                              '            return False\n'
+                              '        return (\n'
+                              '            isinstance(self.include, list)\n'
+                              '            and "message.output_text.logprobs" in '
+                              'self.include\n'
+                              '        )\n'
+                              '\n'
+                              '    @model_validator(mode="before")\n'
+                              '    @classmethod\n',
+             'review_after': '            '
+                             'final_response_token_budget=final_response_token_budget,\n'
+                             '        )\n'
+                             '\n'
+                             '    @model_validator(mode="after")\n'
+                             '    def refuse_log_probabilities(self) -> '
+                             '"ResponsesRequest":\n'
+                             '        """A message\'s log probabilities would be those '
+                             'of the tokens its text\n'
+                             '        came from. The model writes its reasoning, the '
+                             'message and its calls\n'
+                             '        as one token sequence, the parser reports each '
+                             "item's text and not its\n"
+                             '        tokens, and a single token can end the message '
+                             'and begin a call, so\n'
+                             "        no list of whole tokens is a message's. Both "
+                             'fields that ask for one\n'
+                             '        are refused."""\n'
+                             '        if self.include and '
+                             '"message.output_text.logprobs" in self.include:\n'
+                             '            raise VLLMValidationError(\n'
+                             '                \'include "message.output_text.logprobs" '
+                             "asks for the log '\n"
+                             '                "probabilities of the tokens a '
+                             'message\'s text came from, and "\n'
+                             '                "this server cannot name those tokens: '
+                             'the model writes its "\n'
+                             '                "reasoning, the message and its calls as '
+                             'one token sequence, "\n'
+                             '                "and a single token can end the message '
+                             'and begin a call. "\n'
+                             '                "Remove it from include. '
+                             '/v1/chat/completions with logprobs "\n'
+                             '                "returns the log probability of every '
+                             'token the choice "\n'
+                             '                "generated, in order.",\n'
+                             '                parameter="include",\n'
+                             '                value="message.output_text.logprobs",\n'
+                             '            )\n'
+                             '        if self.top_logprobs:\n'
+                             '            raise VLLMValidationError(\n'
+                             '                "top_logprobs asks for log '
+                             'probabilities, which a Responses "\n'
+                             "                'message does not carry (see include "
+                             '"message.output_text.\'\n'
+                             '                \'logprobs"). Send 0 or omit it. '
+                             "/v1/chat/completions with '\n"
+                             '                "logprobs and top_logprobs returns them '
+                             'for every token the "\n'
+                             '                "choice generated.",\n'
+                             '                parameter="top_logprobs",\n'
+                             '                value=self.top_logprobs,\n'
+                             '            )\n'
+                             '        return self\n'
+                             '\n'
+                             '    @model_validator(mode="before")\n'
+                             '    @classmethod\n'},
+            {'name': 'vllm/entrypoints/openai/responses/utils.py:landmark-1',
+             'path': 'vllm/entrypoints/openai/responses/utils.py',
+             'before': 'from '
+                       'openai.types.responses.response_function_tool_call_output_item '
+                       'import (\n'
+                       '    ResponseFunctionToolCallOutputItem,\n'
+                       ')\n'
+                       'from openai.types.responses.response_output_text import '
+                       'Logprob\n'
+                       'from openai.types.responses.response_reasoning_item import (\n'
+                       '    Content as ResponseReasoningTextContent,\n'
+                       ')\n',
+             'after': 'from '
+                      'openai.types.responses.response_function_tool_call_output_item '
+                      'import (\n'
+                      '    ResponseFunctionToolCallOutputItem,\n'
+                      ')\n'
+                      'from openai.types.responses.response_reasoning_item import (\n'
+                      '    Content as ResponseReasoningTextContent,\n'
+                      ')\n',
+             'review_before': 'from '
+                              'openai.types.responses.response_function_tool_call_output_item '
+                              'import (\n'
+                              '    ResponseFunctionToolCallOutputItem,\n'
+                              ')\n'
+                              'from openai.types.responses.response_output_text import '
+                              'Logprob\n'
+                              'from openai.types.responses.response_reasoning_item '
+                              'import (\n'
+                              '    Content as ResponseReasoningTextContent,\n'
+                              ')\n',
+             'review_after': 'from '
+                             'openai.types.responses.response_function_tool_call_output_item '
+                             'import (\n'
+                             '    ResponseFunctionToolCallOutputItem,\n'
+                             ')\n'
+                             'from openai.types.responses.response_reasoning_item '
+                             'import (\n'
+                             '    Content as ResponseReasoningTextContent,\n'
+                             ')\n'},
+            {'name': 'vllm/entrypoints/openai/responses/utils.py:landmark-2',
+             'path': 'vllm/entrypoints/openai/responses/utils.py',
+             'before': '    reasoning: str | None,\n'
+                       '    content: str | None,\n'
+                       '    tool_calls: list[FunctionCall] | None,\n'
+                       '    logprobs: list[Logprob] | None = None,\n'
+                       '    tools: list[Tool] | None = None,\n'
+                       '    *,\n'
+                       '    incomplete: bool = False,\n',
+             'after': '    reasoning: str | None,\n'
+                      '    content: str | None,\n'
+                      '    tool_calls: list[FunctionCall] | None,\n'
+                      '    tools: list[Tool] | None = None,\n'
+                      '    *,\n'
+                      '    incomplete: bool = False,\n',
+             'review_before': '    reasoning: str | None,\n'
+                              '    content: str | None,\n'
+                              '    tool_calls: list[FunctionCall] | None,\n'
+                              '    logprobs: list[Logprob] | None = None,\n'
+                              '    tools: list[Tool] | None = None,\n'
+                              '    *,\n'
+                              '    incomplete: bool = False,\n',
+             'review_after': '    reasoning: str | None,\n'
+                             '    content: str | None,\n'
+                             '    tool_calls: list[FunctionCall] | None,\n'
+                             '    tools: list[Tool] | None = None,\n'
+                             '    *,\n'
+                             '    incomplete: bool = False,\n'},
+            {'name': 'vllm/entrypoints/openai/responses/utils.py:landmark-3',
+             'path': 'vllm/entrypoints/openai/responses/utils.py',
+             'before': '                        text=content,\n'
+                       '                        annotations=[],\n'
+                       '                        type="output_text",\n'
+                       '                        logprobs=logprobs,\n'
+                       '                    )\n'
+                       '                ],\n'
+                       '                role="assistant",\n',
+             'after': '                        text=content,\n'
+                      '                        annotations=[],\n'
+                      '                        type="output_text",\n'
+                      '                    )\n'
+                      '                ],\n'
+                      '                role="assistant",\n',
+             'review_before': '                        text=content,\n'
+                              '                        annotations=[],\n'
+                              '                        type="output_text",\n'
+                              '                        logprobs=logprobs,\n'
+                              '                    )\n'
+                              '                ],\n'
+                              '                role="assistant",\n',
+             'review_after': '                        text=content,\n'
+                             '                        annotations=[],\n'
+                             '                        type="output_text",\n'
+                             '                    )\n'
+                             '                ],\n'
+                             '                role="assistant",\n'},
+            {'name': 'vllm/tool_parsers/poolside_v1_tool_parser.py:landmark-1',
+             'path': 'vllm/tool_parsers/poolside_v1_tool_parser.py',
+             'before': '\n'
+                       '        tool_calls = list(pending_deltas.values())\n'
+                       '        if content is None and len(tool_calls) == 0:\n'
+                       '            wants_logprobs = getattr(request, "logprobs", '
+                       'None) or (\n'
+                       '                isinstance(request, ResponsesRequest)\n'
+                       '                and request.is_include_output_logprobs()\n'
+                       '            )\n'
+                       '            if wants_logprobs:\n'
+                       '                return DeltaMessage(content="")\n'
+                       '            return None\n',
+             'after': '\n'
+                      '        tool_calls = list(pending_deltas.values())\n'
+                      '        if content is None and len(tool_calls) == 0:\n'
+                      '            wants_logprobs = getattr(request, "logprobs", '
+                      'None)\n'
+                      '            if wants_logprobs:\n'
+                      '                return DeltaMessage(content="")\n'
+                      '            return None\n',
+             'review_before': '\n'
+                              '        tool_calls = list(pending_deltas.values())\n'
+                              '        if content is None and len(tool_calls) == 0:\n'
+                              '            wants_logprobs = getattr(request, '
+                              '"logprobs", None) or (\n'
+                              '                isinstance(request, ResponsesRequest)\n'
+                              '                and '
+                              'request.is_include_output_logprobs()\n'
+                              '            )\n'
+                              '            if wants_logprobs:\n'
+                              '                return DeltaMessage(content="")\n'
+                              '            return None\n',
+             'review_after': '\n'
+                             '        tool_calls = list(pending_deltas.values())\n'
+                             '        if content is None and len(tool_calls) == 0:\n'
+                             '            wants_logprobs = getattr(request, '
+                             '"logprobs", None)\n'
+                             '            if wants_logprobs:\n'
+                             '                return DeltaMessage(content="")\n'
+                             '            return None\n'})},
  {'name': 'anthropic-terminal-metadata',
   'review_patch': 'patches/vllm-anthropic-terminal-metadata.patch',
   'review_sha256': 'd09c3b0ba5658b864131c46202f53a4b611ca0395bd068feb1a054fcc70f2364',
@@ -65315,7 +66475,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'converter.")\n'})},
  {'name': 'generation-sampling-resolution',
   'review_patch': 'patches/vllm-generation-sampling-resolution.patch',
-  'review_sha256': 'af5970eab6a3e9fd39bb9fc95f9f64ca1ee9588a40fac2c12110ff4cfa4ea343',
+  'review_sha256': '7f2e59a647b89c5aa7e37b72a7979e57d88e1089e0cc4d7e9b2d1567a0db0c1b',
   'files': ({'path': 'tests/entrypoints/openai/test_render_token_offsets.py',
              'before_sha256': '223426750879932311a2f26377300df68ac13b2de1332c667c56b3bffb245b75',
              'after_sha256': '405e6e5592d4178fde073482558bb491fe201e3a3b706c25df104b136b8197a1'},
@@ -65335,8 +66495,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': '4aaad83ba272bcdea4d2b6e69fa0989cf40b48d47512486b6a1a2816f04d74f6',
              'after_sha256': 'af51ee290f1a98d8284bb678ad082927056b1a9e03389509e923ea632d8b8ed0'},
             {'path': 'vllm/entrypoints/openai/responses/protocol.py',
-             'before_sha256': 'bbadaab457115890fd9d808f2b28a8f64c2be362f9058a848ca5277dcd463769',
-             'after_sha256': 'ddf399abb5c9a8b6962b93bdc6290537e474af50b2a5a9b6e81b3c89f28cab5c'},
+             'before_sha256': 'f1629201a0ebc5948aa2c673dec3206cda62ec49691627423bd61ef757e67852',
+             'after_sha256': '7c75cab3318aae562788f06d6565779a4a87557966e7166ee8a35fe8de2b1efd'},
             {'path': 'vllm/entrypoints/scale_out/token_in_token_out/protocol.py',
              'before_sha256': '6e931fd74275453133d81626d901e7a74ebca28fc5db6a8e5bd3f86a705c6274',
              'after_sha256': 'ba343601ac6265ccff7b71b94a63c1f18ddfe3deab66f7d26935b1669499bc78'},
@@ -67273,33 +68433,29 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                        '            top_p=top_p,\n'
                        '            top_k=top_k,\n'
                        '            max_tokens=max_tokens,\n'
-                       '            logprobs=self.top_logprobs if '
-                       'self.is_include_output_logprobs() else None,\n'
-                       '            stop=stop,\n',
+                       '            stop=stop,\n'
+                       '            frequency_penalty=frequency_penalty,\n',
              'after': '            temperature=temperature,\n'
                       '            top_p=top_p,\n'
                       '            top_k=top_k,\n'
                       '            min_p=default_sampling_params.get("min_p", 0.0),\n'
                       '            max_tokens=max_tokens,\n'
-                      '            logprobs=self.top_logprobs if '
-                      'self.is_include_output_logprobs() else None,\n'
-                      '            stop=stop,\n',
+                      '            stop=stop,\n'
+                      '            frequency_penalty=frequency_penalty,\n',
              'review_before': '            temperature=temperature,\n'
                               '            top_p=top_p,\n'
                               '            top_k=top_k,\n'
                               '            max_tokens=max_tokens,\n'
-                              '            logprobs=self.top_logprobs if '
-                              'self.is_include_output_logprobs() else None,\n'
-                              '            stop=stop,\n',
+                              '            stop=stop,\n'
+                              '            frequency_penalty=frequency_penalty,\n',
              'review_after': '            temperature=temperature,\n'
                              '            top_p=top_p,\n'
                              '            top_k=top_k,\n'
                              '            min_p=default_sampling_params.get("min_p", '
                              '0.0),\n'
                              '            max_tokens=max_tokens,\n'
-                             '            logprobs=self.top_logprobs if '
-                             'self.is_include_output_logprobs() else None,\n'
-                             '            stop=stop,\n'},
+                             '            stop=stop,\n'
+                             '            frequency_penalty=frequency_penalty,\n'},
             {'name': 'vllm/entrypoints/scale_out/token_in_token_out/protocol.py:landmark-1',
              'path': 'vllm/entrypoints/scale_out/token_in_token_out/protocol.py',
              'before': '# SPDX-License-Identifier: Apache-2.0\n'
@@ -83978,13 +85134,13 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '                        request_id=internal_req_id,\n'})},
  {'name': 'tool-output-completion',
   'review_patch': 'patches/vllm-tool-output-completion.patch',
-  'review_sha256': '28525a4fe94915d387d36d6173493908dfba291a3d10b517353ba5fa8f3f4fa4',
+  'review_sha256': '51ec1e129e3467b6569e3557bebd57b2cd2c0ab809c81fb13d9e9a84300e4ce4',
   'files': ({'path': 'tests/entrypoints/openai/chat_completion/test_parallel_tool_call_integrity.py',
              'before_sha256': 'a4a6547338dbf625e3041e2578f2a8e314aa14d1520468c69ee17ff22998d9a2',
              'after_sha256': 'e290f2c4df7bd842594db1fb4e66bf713bc6ff653cbadc8877958a955c0fa4c4'},
             {'path': 'tests/entrypoints/openai/responses/test_serving_responses.py',
-             'before_sha256': '63eab4c4177c58df2d538dc2a94049a7e8a6526fa0af0c10873ad77248daae72',
-             'after_sha256': 'b2ef219d6fc9fe1fee04a641389451f263add461be2ce974bbb3dcc86d97e866'},
+             'before_sha256': '288f2536ca39977c8408daca5a8f5300ffdf614528d87a6dce1e5e9744ff6e07',
+             'after_sha256': 'ee5773dca660e76f27326c85fd475e3bfd54a9955c37d49a8859770a3e6e28a2'},
             {'path': 'tests/entrypoints/scale_out/derender/test_terminal_metadata.py',
              'before_sha256': '0451966ee298b08e799ef300029a144e66deb6debe5c1af43311aa1af622a277',
              'after_sha256': 'e3edf885a33aaecf5dd8d6fdeadad7f3eed60510eb4f43354f1273e52b974cfc'},
@@ -84007,8 +85163,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': 'c06ffd3ae1b634e8b42f043d0f7978fd86a54194dda428612aed0ba6429f1f46',
              'after_sha256': '366cfb15ac59ce6e27790d4c176d87bc1cd623599d20299c68ff672f327e9376'},
             {'path': 'vllm/entrypoints/openai/responses/serving.py',
-             'before_sha256': '7b8197f6e922a9eba9c57d7d811f0749b1dbda41faab2555adc4c3377dcd7728',
-             'after_sha256': '61a6cc056756ae386105704dd95f0d90822743619012488b1f083ca74ad79aaa'},
+             'before_sha256': 'f093b4d7bd957e30cb4b6f025aab92d852f5161a75ad0ce9859c6772ffaa18ae',
+             'after_sha256': '49998cc2e115d7510cca113b516c3ce57f8d9ad851ac43a2e22b7ae32f228404'},
             {'path': 'vllm/parser/abstract_parser.py',
              'before_sha256': '84891751517483beb28eb9956d6a39af65ee16fc8085c5500ac982e7bd0bae8a',
              'after_sha256': '5cfff0a45f292313ff633a1b71d1cf3f32369ae62b41d972ce80a238bc6005c0'},
@@ -84841,15 +85997,17 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    else:\n'},
             {'name': 'tests/entrypoints/openai/responses/test_serving_responses.py:landmark-6',
              'path': 'tests/entrypoints/openai/responses/test_serving_responses.py',
-             'before': '    assert response.status == ("incomplete" if finish == '
-                       '"length" else "completed")\n'
-                       '    assert response.output[0].status == response.status\n'
-                       '    assert response.output[0].content[0].logprobs == '
-                       '[logprob]\n',
-             'after': '    assert response.status == ("incomplete" if finish == '
-                      '"length" else "completed")\n'
-                      '    assert response.output[0].status == response.status\n'
-                      '    assert response.output[0].content[0].logprobs == [logprob]\n'
+             'before': 'def '
+                       'test_a_request_asking_for_no_log_probabilities_is_served(fields):\n'
+                       '    request = ResponsesRequest.model_validate({"input": "q", '
+                       '"kv_scope": "agent", **fields})\n'
+                       '    assert request.to_sampling_params(8, {}).logprobs is '
+                       'None\n',
+             'after': 'def '
+                      'test_a_request_asking_for_no_log_probabilities_is_served(fields):\n'
+                      '    request = ResponsesRequest.model_validate({"input": "q", '
+                      '"kv_scope": "agent", **fields})\n'
+                      '    assert request.to_sampling_params(8, {}).logprobs is None\n'
                       '\n'
                       '\n'
                       '@pytest.mark.asyncio\n'
@@ -84964,17 +86122,18 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '        assert content == (cut if shape == "mixed" else "")\n'
                       '    assert parser.generated_token_count == len(ids)\n'
                       '    assert parser.reasoning_token_count == 4\n',
-             'review_before': '    assert response.status == ("incomplete" if finish '
-                              '== "length" else "completed")\n'
-                              '    assert response.output[0].status == '
-                              'response.status\n'
-                              '    assert response.output[0].content[0].logprobs == '
-                              '[logprob]\n',
-             'review_after': '    assert response.status == ("incomplete" if finish == '
-                             '"length" else "completed")\n'
-                             '    assert response.output[0].status == response.status\n'
-                             '    assert response.output[0].content[0].logprobs == '
-                             '[logprob]\n'
+             'review_before': 'def '
+                              'test_a_request_asking_for_no_log_probabilities_is_served(fields):\n'
+                              '    request = ResponsesRequest.model_validate({"input": '
+                              '"q", "kv_scope": "agent", **fields})\n'
+                              '    assert request.to_sampling_params(8, {}).logprobs '
+                              'is None\n',
+             'review_after': 'def '
+                             'test_a_request_asking_for_no_log_probabilities_is_served(fields):\n'
+                             '    request = ResponsesRequest.model_validate({"input": '
+                             '"q", "kv_scope": "agent", **fields})\n'
+                             '    assert request.to_sampling_params(8, {}).logprobs is '
+                             'None\n'
                              '\n'
                              '\n'
                              '@pytest.mark.asyncio\n'
@@ -86552,8 +87711,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'len(completion.token_ids))\n'},
             {'name': 'vllm/entrypoints/openai/responses/serving.py:landmark-1',
              'path': 'vllm/entrypoints/openai/responses/serving.py',
-             'before': '            )\n'
-                       '\n'
+             'before': '    ) -> list[ResponseOutputItem]:\n'
                        '        # Use parser to extract reasoning, content, and tool '
                        'calls\n'
                        '        if parser:\n'
@@ -86565,10 +87723,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                        'model_output_token_ids=final_output.token_ids,\n'
                        '            )\n'
                        '            if not request.include_reasoning:\n'
-                       '                reasoning = None\n'
-                       '                logprobs = None\n',
-             'after': '            )\n'
-                      '\n'
+                       '                reasoning = None\n',
+             'after': '    ) -> list[ResponseOutputItem]:\n'
                       '        # Use parser to extract reasoning, content, and tool '
                       'calls\n'
                       '        if parser:\n'
@@ -86582,10 +87738,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '                stop_reason=final_output.stop_reason,\n'
                       '            )\n'
                       '            if not request.include_reasoning:\n'
-                      '                reasoning = None\n'
-                      '                logprobs = None\n',
-             'review_before': '            )\n'
-                              '\n'
+                      '                reasoning = None\n',
+             'review_before': '    ) -> list[ResponseOutputItem]:\n'
                               '        # Use parser to extract reasoning, content, and '
                               'tool calls\n'
                               '        if parser:\n'
@@ -86599,10 +87753,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                               'model_output_token_ids=final_output.token_ids,\n'
                               '            )\n'
                               '            if not request.include_reasoning:\n'
-                              '                reasoning = None\n'
-                              '                logprobs = None\n',
-             'review_after': '            )\n'
-                             '\n'
+                              '                reasoning = None\n',
+             'review_after': '    ) -> list[ResponseOutputItem]:\n'
                              '        # Use parser to extract reasoning, content, and '
                              'tool calls\n'
                              '        if parser:\n'
@@ -86619,12 +87771,10 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '                stop_reason=final_output.stop_reason,\n'
                              '            )\n'
                              '            if not request.include_reasoning:\n'
-                             '                reasoning = None\n'
-                             '                logprobs = None\n'},
+                             '                reasoning = None\n'},
             {'name': 'vllm/entrypoints/openai/responses/serving.py:landmark-2',
              'path': 'vllm/entrypoints/openai/responses/serving.py',
-             'before': '            delta_text = output.text\n'
-                       '            delta_token_ids = as_list(output.token_ids)\n'
+             'before': '            delta_token_ids = as_list(output.token_ids)\n'
                        '\n'
                        '            if ctx.response_parser:\n'
                        '                delta_message = '
@@ -86639,10 +87789,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                        '                )\n'
                        '            else:\n'
                        '                delta_message = '
-                       'DeltaMessage(content=output.text)\n'
-                       '\n',
-             'after': '            delta_text = output.text\n'
-                      '            delta_token_ids = as_list(output.token_ids)\n'
+                       'DeltaMessage(content=output.text)\n',
+             'after': '            delta_token_ids = as_list(output.token_ids)\n'
                       '\n'
                       '            if ctx.response_parser:\n'
                       '                delta_message = '
@@ -86657,10 +87805,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '                )\n'
                       '            else:\n'
                       '                delta_message = '
-                      'DeltaMessage(content=output.text)\n'
-                      '\n',
-             'review_before': '            delta_text = output.text\n'
-                              '            delta_token_ids = '
+                      'DeltaMessage(content=output.text)\n',
+             'review_before': '            delta_token_ids = '
                               'as_list(output.token_ids)\n'
                               '\n'
                               '            if ctx.response_parser:\n'
@@ -86676,10 +87822,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                               '                )\n'
                               '            else:\n'
                               '                delta_message = '
-                              'DeltaMessage(content=output.text)\n'
-                              '\n',
-             'review_after': '            delta_text = output.text\n'
-                             '            delta_token_ids = as_list(output.token_ids)\n'
+                              'DeltaMessage(content=output.text)\n',
+             'review_after': '            delta_token_ids = as_list(output.token_ids)\n'
                              '\n'
                              '            if ctx.response_parser:\n'
                              '                delta_message = '
@@ -86694,8 +87838,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '                )\n'
                              '            else:\n'
                              '                delta_message = '
-                             'DeltaMessage(content=output.text)\n'
-                             '\n'},
+                             'DeltaMessage(content=output.text)\n'},
             {'name': 'vllm/parser/abstract_parser.py:landmark-1',
              'path': 'vllm/parser/abstract_parser.py',
              'before': '    ChatCompletionNamedToolChoiceParam,\n'
@@ -103305,7 +104448,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'chunk_size):\n'})},
  {'name': 'generation-admission-before-response',
   'review_patch': 'patches/vllm-generation-admission-before-response.patch',
-  'review_sha256': '9e20b1a5b9a37784df6e0f7f034ed0ebf3022fd7ef61cb2353a889e6bfdb7a62',
+  'review_sha256': '6418c42eb3fca2492473e5411f9463d21d1473a0cc55187a2a9a530ddfc44b86',
   'files': ({'path': 'tests/entrypoints/openai/chat_completion/test_chat_error.py',
              'before_sha256': '51bface90cf08e565fc599f9b44f135db1ec337aa40cd7897dbd9820c4cc0c84',
              'after_sha256': '5b457424bc6887292dd00bc3620e7881ebe8ef1e04b2fe1d34dcefd8b29a23d8'},
@@ -103349,11 +104492,11 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': '6b4747502ecb32467626e54041e7e0cd276e064dd714554c58b8ebe4cdc3736b',
              'after_sha256': '47877f22727b674109b923e182471aa9948c75e22502b184b02a9882df4a54c5'},
             {'path': 'vllm/entrypoints/openai/responses/protocol.py',
-             'before_sha256': 'ddf399abb5c9a8b6962b93bdc6290537e474af50b2a5a9b6e81b3c89f28cab5c',
-             'after_sha256': '878c4aea468b9d3436e934fc060035963a78acc88050126ccc1caf26ec18161d'},
+             'before_sha256': '7c75cab3318aae562788f06d6565779a4a87557966e7166ee8a35fe8de2b1efd',
+             'after_sha256': '031b0873611fe4cfdf7aadd37511cc6689787cdaa72d6bee76087d6102601b43'},
             {'path': 'vllm/entrypoints/openai/responses/serving.py',
-             'before_sha256': '61a6cc056756ae386105704dd95f0d90822743619012488b1f083ca74ad79aaa',
-             'after_sha256': 'e9454a323a57d58ed7f2c518108d06ad53b76be0e81c96721fbea94d4e083bab'},
+             'before_sha256': '49998cc2e115d7510cca113b516c3ce57f8d9ad851ac43a2e22b7ae32f228404',
+             'after_sha256': 'b232973d9c369f47983efa2449b0cbcd432e983173b4a908693a259136886a26'},
             {'path': 'vllm/entrypoints/scale_out/token_in_token_out/serving.py',
              'before_sha256': '33fc93bdbf368ac1e7ddbb0a2c914db40ce0449b2dcd43291b5fe3868bf93198',
              'after_sha256': '4e76582db55dd262de822a59d61b954a7170a3af4f16ba9dcbf7ee9e400980ab'},
@@ -107412,23 +108555,20 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              ')\n'},
             {'name': 'vllm/entrypoints/openai/responses/serving.py:landmark-1',
              'path': 'vllm/entrypoints/openai/responses/serving.py',
-             'before': 'from openai.types.responses.response_output_text import '
-                       'Logprob, LogprobTopLogprob\n'
+             'before': ')\n'
                        'from openai.types.responses.tool import Mcp, Tool\n'
                        'from openai_harmony import Message as OpenAIHarmonyMessage\n'
                        'from pydantic import TypeAdapter\n'
                        '\n'
                        'from vllm import envs\n'
                        'from vllm.config.utils import replace\n',
-             'after': 'from openai.types.responses.response_output_text import '
-                      'Logprob, LogprobTopLogprob\n'
+             'after': ')\n'
                       'from openai.types.responses.tool import Mcp, Tool\n'
                       'from openai_harmony import Message as OpenAIHarmonyMessage\n'
                       '\n'
                       'from vllm import envs\n'
                       'from vllm.config.utils import replace\n',
-             'review_before': 'from openai.types.responses.response_output_text import '
-                              'Logprob, LogprobTopLogprob\n'
+             'review_before': ')\n'
                               'from openai.types.responses.tool import Mcp, Tool\n'
                               'from openai_harmony import Message as '
                               'OpenAIHarmonyMessage\n'
@@ -107436,8 +108576,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                               '\n'
                               'from vllm import envs\n'
                               'from vllm.config.utils import replace\n',
-             'review_after': 'from openai.types.responses.response_output_text import '
-                             'Logprob, LogprobTopLogprob\n'
+             'review_after': ')\n'
                              'from openai.types.responses.tool import Mcp, Tool\n'
                              'from openai_harmony import Message as '
                              'OpenAIHarmonyMessage\n'
@@ -107474,24 +108613,24 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    ResponseInputOutputMessage,\n'},
             {'name': 'vllm/entrypoints/openai/responses/serving.py:landmark-3',
              'path': 'vllm/entrypoints/openai/responses/serving.py',
-             'before': 'from vllm.logprobs import Logprob as SampleLogprob\n'
-                       'from vllm.logprobs import SampleLogprobs\n'
+             'before': 'from vllm.inputs import EngineInput, tokens_input\n'
+                       'from vllm.logger import init_logger\n'
                        'from vllm.lora.request import LoRARequest\n'
                        'from vllm.outputs import CompletionOutput\n'
                        'from vllm.parser import Parser, ParserManager\n'
                        'from vllm.renderers.online_renderer import OnlineRenderer\n'
                        'from vllm.sampling_params import SamplingParams, '
                        'StructuredOutputsParams\n',
-             'after': 'from vllm.logprobs import Logprob as SampleLogprob\n'
-                      'from vllm.logprobs import SampleLogprobs\n'
+             'after': 'from vllm.inputs import EngineInput, tokens_input\n'
+                      'from vllm.logger import init_logger\n'
                       'from vllm.lora.request import LoRARequest\n'
                       'from vllm.outputs import CompletionOutput, RequestOutput\n'
                       'from vllm.parser import Parser, ParserManager\n'
                       'from vllm.renderers.online_renderer import OnlineRenderer\n'
                       'from vllm.sampling_params import SamplingParams, '
                       'StructuredOutputsParams\n',
-             'review_before': 'from vllm.logprobs import Logprob as SampleLogprob\n'
-                              'from vllm.logprobs import SampleLogprobs\n'
+             'review_before': 'from vllm.inputs import EngineInput, tokens_input\n'
+                              'from vllm.logger import init_logger\n'
                               'from vllm.lora.request import LoRARequest\n'
                               'from vllm.outputs import CompletionOutput\n'
                               'from vllm.parser import Parser, ParserManager\n'
@@ -107499,8 +108638,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                               'OnlineRenderer\n'
                               'from vllm.sampling_params import SamplingParams, '
                               'StructuredOutputsParams\n',
-             'review_after': 'from vllm.logprobs import Logprob as SampleLogprob\n'
-                             'from vllm.logprobs import SampleLogprobs\n'
+             'review_after': 'from vllm.inputs import EngineInput, tokens_input\n'
+                             'from vllm.logger import init_logger\n'
                              'from vllm.lora.request import LoRARequest\n'
                              'from vllm.outputs import CompletionOutput, '
                              'RequestOutput\n'
@@ -120532,8 +121671,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': 'ffc23035c247182c3533ee09347f59fe1384af4c30cb7766c504fd28536d095e',
              'after_sha256': 'cea0e7a83613a21da92fcd729a1caf3b83bdb97c611918e381c73d257a23dd1d'},
             {'path': 'vllm/entrypoints/openai/responses/protocol.py',
-             'before_sha256': '878c4aea468b9d3436e934fc060035963a78acc88050126ccc1caf26ec18161d',
-             'after_sha256': '7b7175cd40efdb5d165443f8147a17dcd82b8eaf0d897df14720a7f06f375124'},
+             'before_sha256': '031b0873611fe4cfdf7aadd37511cc6689787cdaa72d6bee76087d6102601b43',
+             'after_sha256': '689c1ec5ce05dc82f97b9354caa506674021b9aab0e89486e9bce4bc1837dc81'},
             {'path': 'vllm/entrypoints/serve/tokenize/protocol.py',
              'before_sha256': '5cc5cb021b827ae34e5e3ce8fdd72ee0e07b6e6b95de74d3f075f3b3edb8ac21',
              'after_sha256': 'df1c91d3627f2fefa92404f67e1a27b134aa887bffdfc75298d6f26cfdf87ac5'},
@@ -121763,7 +122902,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '\n'})},
  {'name': 'qwen-repeated-parameter-refusal',
   'review_patch': 'patches/vllm-qwen-repeated-parameter-refusal.patch',
-  'review_sha256': '11e1a32696d6c17352a94ad815f878728011304592c1efb09eaf98f73f59f147',
+  'review_sha256': 'af405e3be4a649264786bf7bc924c3e4053579eddde47030d9776eb1bc1c73c0',
   'files': ({'path': 'tests/entrypoints/openai/chat_completion/test_repeated_tool_parameter_refusal.py',
              'before_sha256': None,
              'after_sha256': 'b8a7eed51747dddf980145be2609cf1a8136465bf0068a0f3c7b85424ab9a9d9'},
@@ -121780,8 +122919,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': 'e38f310d54fcb0d1529af2fe9e404aaff4f2a593c6b3390d69a93a1b9a5f7f62',
              'after_sha256': 'aac2094cff867c78ddf2e19829d17c24c330719d6e2f478ec3ff94c436ca0237'},
             {'path': 'vllm/entrypoints/openai/responses/serving.py',
-             'before_sha256': 'e9454a323a57d58ed7f2c518108d06ad53b76be0e81c96721fbea94d4e083bab',
-             'after_sha256': '14ad1e85aa2cd455de3c9f6231220a4fa9d41806a054c0e8f7d2da64e596493e'},
+             'before_sha256': 'b232973d9c369f47983efa2449b0cbcd432e983173b4a908693a259136886a26',
+             'after_sha256': 'c1558c04476c0eba8e346155a00f39b897a45d12382cd1fd14366eef44669cdf'},
             {'path': 'vllm/entrypoints/serve/exception_handling/error_response.py',
              'before_sha256': 'fbd9ba671dccceef0eabf62b5fe19218ed38dda991b3519a3b92e02ad4b24b39',
              'after_sha256': '67389b072fab088e8d29e30536dd80b7be1e8aded133976f3043b760a9ac73f9'},
@@ -127964,7 +129103,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    ]))\n'})},
  {'name': 'responses-tools-are-one-function-list',
   'review_patch': 'patches/vllm-responses-tools-are-one-function-list.patch',
-  'review_sha256': 'cae549ea87a8c1b6020f76163cfe1eca0c3104eac317ab2d84b3db75092d20cd',
+  'review_sha256': '6e1776efc90fb8f87f9c7886b3788850475b4ea500f5cafa7ca8ea348a6d79fc',
   'files': ({'path': 'tests/tool_parsers/test_structural_tag_registry.py',
              'before_sha256': '3fbc42eef3b13462d86990e287c15e35ae3d1faa8e5a0d9eb75b338787074540',
              'after_sha256': '7d1fd82dfcf43352ff4b6953418cf762128bea9b78207a2313d9df9cb19b5f4b'},
@@ -127972,14 +129111,14 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': 'ac94348ad68957e11374ac5e9545dd62aba45dcd343206ad39481ef6dedd1a4d',
              'after_sha256': '90f95b34cf4ed5b5b871798866787d76273e29f252c6128cfafeb139668f8e7f'},
             {'path': 'vllm/entrypoints/openai/responses/protocol.py',
-             'before_sha256': '7b7175cd40efdb5d165443f8147a17dcd82b8eaf0d897df14720a7f06f375124',
-             'after_sha256': '0aae2692b0fcea2274c0df5592c0d1fa6e54062a057e073c58e7380a84b1ae68'},
+             'before_sha256': '689c1ec5ce05dc82f97b9354caa506674021b9aab0e89486e9bce4bc1837dc81',
+             'after_sha256': '4e8950495f70120615206646053b3c4ad6db4475ac53dfd0dfa9b9b526d91405'},
             {'path': 'vllm/entrypoints/openai/responses/serving.py',
-             'before_sha256': '14ad1e85aa2cd455de3c9f6231220a4fa9d41806a054c0e8f7d2da64e596493e',
-             'after_sha256': 'fdcb2a0602a1ec83db357a34c9b70b8c045bf255eac6acfda83f8cc6dc106604'},
+             'before_sha256': 'c1558c04476c0eba8e346155a00f39b897a45d12382cd1fd14366eef44669cdf',
+             'after_sha256': 'f58ed7ac2646486f8f9032846558a09d94ae8b5577d36d29c8c06f774b83ebf8'},
             {'path': 'vllm/entrypoints/openai/responses/utils.py',
-             'before_sha256': '8820d8e03e3740ab9ce43e53c62b87f828eee4f7e25f20dadc54a2b450e17948',
-             'after_sha256': 'd4197fd957d326f71f9b7c6fc04ca4534eca91fd3822670ec99ffd2c0d74ca3b'},
+             'before_sha256': 'be5f27d4d169c32717203d4cd02a624d33b0604a016dbb1e61cb7b6f0614fd8f',
+             'after_sha256': 'f9be4f4ad445c92ad456e4cfe5ef220f001da85d68ff0c49560810f9753d81b2'},
             {'path': 'vllm/parser/abstract_parser.py',
              'before_sha256': 'eaffc8cd7340c05b76e5c3bc3541e65e327aa00927b7119d29b92a33d7c845ec',
              'after_sha256': 'a52399b65316163be152a4c3fa9fd832e80d293814ec421832438c00bb7e1816'},
@@ -130268,13 +131407,13 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              ') -> dict[str, ResponsesToolCallName]:\n'})},
  {'name': 'batch-parse-starts-where-the-prompt-leaves',
   'review_patch': 'patches/vllm-batch-parse-starts-where-the-prompt-leaves.patch',
-  'review_sha256': '73ae004604378573de88e10a357072ed3ff74f4e483f852f185032286d37a802',
+  'review_sha256': '352b37904e51dab650f4fb84b7ecd8f284f468d2602bcd1b021001a8d865ccc0',
   'files': ({'path': 'tests/entrypoints/openai/responses/test_parsable_context_unit.py',
              'before_sha256': '8fd0bd655d13abdc9fe03e1c0bb0625225431624db8257e1db07c00ac3da2779',
              'after_sha256': '95f50d93d97370d426319b5dc94fce55b9cbca4ce9b3b95a930e42990dcbf4a2'},
             {'path': 'tests/entrypoints/openai/responses/test_serving_responses.py',
-             'before_sha256': 'b2ef219d6fc9fe1fee04a641389451f263add461be2ce974bbb3dcc86d97e866',
-             'after_sha256': '170cdad0dba045b64560bf7dc78434786ce21de2cce032cd18ed0ffa358c75bc'},
+             'before_sha256': 'ee5773dca660e76f27326c85fd475e3bfd54a9955c37d49a8859770a3e6e28a2',
+             'after_sha256': '760b1ac6f86229afd12f439afbe9722c5c59d8c3f0eaf2f5c20c5497defb5d99'},
             {'path': 'tests/parser/engine/test_gemma4_streaming_reasoning.py',
              'before_sha256': '572f6a6e5f448861276bf272ec8b4be14434a9fd31312d087230f682a18f5e3e',
              'after_sha256': 'e491dbb881f33dfddbb07cb8fbebc6e5f6196c58a4b027cf04ba8095ea52f82e'},
@@ -130297,8 +131436,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': '366cfb15ac59ce6e27790d4c176d87bc1cd623599d20299c68ff672f327e9376',
              'after_sha256': '2b84c0d0e733057b80e93075bbeae0a16a9a6a6274ad0b15d1506d1c77ce7a24'},
             {'path': 'vllm/entrypoints/openai/responses/serving.py',
-             'before_sha256': 'fdcb2a0602a1ec83db357a34c9b70b8c045bf255eac6acfda83f8cc6dc106604',
-             'after_sha256': '4cd98f5142e5a07080e008d26d3ad07cb78ecc2d160855783484142c829d7568'},
+             'before_sha256': 'f58ed7ac2646486f8f9032846558a09d94ae8b5577d36d29c8c06f774b83ebf8',
+             'after_sha256': '148b0118ce43b302b33d88c86f4d9135e22e801a2decdd50a9561618269d71de'},
             {'path': 'vllm/parser/abstract_parser.py',
              'before_sha256': 'a52399b65316163be152a4c3fa9fd832e80d293814ec421832438c00bb7e1816',
              'after_sha256': 'b2f627c28667ec2a064898e627232a5ebb7f59826ad9b961359d56226ff2c2ec'},
@@ -131232,33 +132371,10 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                        '        tokenizer: TokenizerLike,\n'
                        '        parser: Parser | None = None,\n'
                        '    ) -> list[ResponseOutputItem]:\n'
-                       '        # Compute logprobs if requested\n'
-                       '        logprobs = None\n',
-             'after': '        final_output: CompletionOutput,\n'
-                      '        tokenizer: TokenizerLike,\n'
-                      '        parser: Parser | None = None,\n'
-                      '        *,\n'
-                      '        prompt_token_ids: Sequence[int] | None,\n'
-                      '    ) -> list[ResponseOutputItem]:\n'
-                      '        # Compute logprobs if requested\n'
-                      '        logprobs = None\n',
-             'review_before': '        final_output: CompletionOutput,\n'
-                              '        tokenizer: TokenizerLike,\n'
-                              '        parser: Parser | None = None,\n'
-                              '    ) -> list[ResponseOutputItem]:\n'
-                              '        # Compute logprobs if requested\n'
-                              '        logprobs = None\n',
-             'review_after': '        final_output: CompletionOutput,\n'
-                             '        tokenizer: TokenizerLike,\n'
-                             '        parser: Parser | None = None,\n'
-                             '        *,\n'
-                             '        prompt_token_ids: Sequence[int] | None,\n'
-                             '    ) -> list[ResponseOutputItem]:\n'
-                             '        # Compute logprobs if requested\n'
-                             '        logprobs = None\n'},
-            {'name': 'vllm/entrypoints/openai/responses/serving.py:landmark-3',
-             'path': 'vllm/entrypoints/openai/responses/serving.py',
-             'before': '            reasoning, content, tool_calls = '
+                       '        # Use parser to extract reasoning, content, and tool '
+                       'calls\n'
+                       '        if parser:\n'
+                       '            reasoning, content, tool_calls = '
                        'parser.parse_output(\n'
                        '                final_output.text,\n'
                        '                request,\n'
@@ -131266,7 +132382,16 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                        '                '
                        'model_output_token_ids=final_output.token_ids,\n'
                        '                finish_reason=final_output.finish_reason,\n',
-             'after': '            reasoning, content, tool_calls = '
+             'after': '        final_output: CompletionOutput,\n'
+                      '        tokenizer: TokenizerLike,\n'
+                      '        parser: Parser | None = None,\n'
+                      '        *,\n'
+                      '        prompt_token_ids: Sequence[int] | None,\n'
+                      '    ) -> list[ResponseOutputItem]:\n'
+                      '        # Use parser to extract reasoning, content, and tool '
+                      'calls\n'
+                      '        if parser:\n'
+                      '            reasoning, content, tool_calls = '
                       'parser.parse_output(\n'
                       '                final_output.text,\n'
                       '                request,\n'
@@ -131274,7 +132399,14 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '                enable_auto_tools=self.enable_auto_tools,\n'
                       '                model_output_token_ids=final_output.token_ids,\n'
                       '                finish_reason=final_output.finish_reason,\n',
-             'review_before': '            reasoning, content, tool_calls = '
+             'review_before': '        final_output: CompletionOutput,\n'
+                              '        tokenizer: TokenizerLike,\n'
+                              '        parser: Parser | None = None,\n'
+                              '    ) -> list[ResponseOutputItem]:\n'
+                              '        # Use parser to extract reasoning, content, and '
+                              'tool calls\n'
+                              '        if parser:\n'
+                              '            reasoning, content, tool_calls = '
                               'parser.parse_output(\n'
                               '                final_output.text,\n'
                               '                request,\n'
@@ -131284,7 +132416,16 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                               'model_output_token_ids=final_output.token_ids,\n'
                               '                '
                               'finish_reason=final_output.finish_reason,\n',
-             'review_after': '            reasoning, content, tool_calls = '
+             'review_after': '        final_output: CompletionOutput,\n'
+                             '        tokenizer: TokenizerLike,\n'
+                             '        parser: Parser | None = None,\n'
+                             '        *,\n'
+                             '        prompt_token_ids: Sequence[int] | None,\n'
+                             '    ) -> list[ResponseOutputItem]:\n'
+                             '        # Use parser to extract reasoning, content, and '
+                             'tool calls\n'
+                             '        if parser:\n'
+                             '            reasoning, content, tool_calls = '
                              'parser.parse_output(\n'
                              '                final_output.text,\n'
                              '                request,\n'
@@ -135368,7 +136509,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'set(self.stop_token_ids or ())\n'})},
  {'name': 'output-constraints-refused-beside-tool-calls',
   'review_patch': 'patches/vllm-output-constraints-refused-beside-tool-calls.patch',
-  'review_sha256': 'c6ac620c8cd962a77868789d72875e0df456a9b0918ef8cb58ec2e15c3600343',
+  'review_sha256': '01bfdf064fa8a83c68feb4f5477181bc3df2f6776e41ec91ac672e84ca562adb',
   'files': ({'path': 'tests/entrypoints/openai/test_output_constraint_beside_tools.py',
              'before_sha256': None,
              'after_sha256': '836be0512b50a3c2877a99ef7166b59bc50c7aa535a7cf653edebf57028f9b39'},
@@ -135391,8 +136532,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': 'aac2094cff867c78ddf2e19829d17c24c330719d6e2f478ec3ff94c436ca0237',
              'after_sha256': '0d373e6820efe4bcbd625db972ba381a5070818669af0d06eda849a26efe78bc'},
             {'path': 'vllm/entrypoints/openai/responses/protocol.py',
-             'before_sha256': '0aae2692b0fcea2274c0df5592c0d1fa6e54062a057e073c58e7380a84b1ae68',
-             'after_sha256': '0dfe48d36a93bb68989624569638aeebfb35157414afcac8dea2d960a48cda4b'}),
+             'before_sha256': '4e8950495f70120615206646053b3c4ad6db4475ac53dfd0dfa9b9b526d91405',
+             'after_sha256': '8087737a2138cfb8783363382a399435e14fdb5036a9f34dbab10f5b84a70791'}),
   'edits': ({'name': 'tests/entrypoints/openai/test_output_constraint_beside_tools.py:landmark-1',
              'path': 'tests/entrypoints/openai/test_output_constraint_beside_tools.py',
              'before': '',
@@ -138367,7 +139508,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'available for text-only models")\n'})},
  {'name': 'rendered-prompts-are-never-truncated',
   'review_patch': 'patches/vllm-rendered-prompts-are-never-truncated.patch',
-  'review_sha256': '07cd24fbf29bc66fb9615d63a8e30d947ee13cf6367e23bcb1a870e4f3a49334',
+  'review_sha256': '72e74c44c7c8b8ff3db8c7f73124fa82e196244f2b0f2f666a2315f3cef4cdc9',
   'files': ({'path': 'tests/entrypoints/openai/chat_completion/test_serving_chat.py',
              'before_sha256': '82a3f7dad3c315ce9fa205613f8ab817a879d1a3ddb9a8c3fa72d43af51412c9',
              'after_sha256': '3a452a168070dbbbd75c879507ab7f0126290db385c44fd94776b144922d4795'},
@@ -138381,11 +139522,11 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': 'c630163a3ee8048653a750d73177a41cafd2271cebc449ea2b441c0e0641eb7c',
              'after_sha256': '09ec976686c9091c56ff71e5edfc8907d92eb8610d69d351a4a0af67b5e0f3a3'},
             {'path': 'vllm/entrypoints/openai/responses/protocol.py',
-             'before_sha256': '0dfe48d36a93bb68989624569638aeebfb35157414afcac8dea2d960a48cda4b',
-             'after_sha256': '71108c0a82c83383a3e105f177f41190eb690c69f92c12cb43e1f4e4cd2c3262'},
+             'before_sha256': '8087737a2138cfb8783363382a399435e14fdb5036a9f34dbab10f5b84a70791',
+             'after_sha256': 'ed6c4f9e352b17ea73f7fba1adf54e03ababf7f752658aafcf6d444d1d96a2f9'},
             {'path': 'vllm/entrypoints/openai/responses/serving.py',
-             'before_sha256': '4cd98f5142e5a07080e008d26d3ad07cb78ecc2d160855783484142c829d7568',
-             'after_sha256': '0a235c4b4681365d0c7c3fda940a5b4d57caee881a46d48fcfcfcc6f25c3a1dc'},
+             'before_sha256': '148b0118ce43b302b33d88c86f4d9135e22e801a2decdd50a9561618269d71de',
+             'after_sha256': 'c0f404cdb953d6916b3515dc7719783bb8425978f6eac5f3f2511c41fd11576e'},
             {'path': 'vllm/entrypoints/scale_out/render/serving.py',
              'before_sha256': '5c610ac0bdca6dcb4071a7b7952ffd3711fc600b89a9eca6a3e56e44fd00a674',
              'after_sha256': '5e144dd7d773e3af7f462dfe58c780b65c45cb5bd759234bb76f7a8b0725b0df'}),
@@ -143051,7 +144192,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'registration.\n'})},
  {'name': 'responses-refuses-tools-the-template-is-never-given',
   'review_patch': 'patches/vllm-responses-refuses-tools-the-template-is-never-given.patch',
-  'review_sha256': 'e739235f61cf09867025db10b87b1aa4840aec9dca0bd857bfe735b5612d86ed',
+  'review_sha256': '84bfd906df0b4f47192d039106a3b6f6af154f4005d5036878b6af62c8c16cac',
   'files': ({'path': 'tests/entrypoints/openai/responses/test_parsable_context.py',
              'before_sha256': '1c1e227fda34d81b9493198f1202979295253fc337d141357d02b4a6923dbe38',
              'after_sha256': '689ff6d49b466e36ab73bbff52cd9733d288c8d98aeee47edb6e9bfbf03b8615'},
@@ -143062,8 +144203,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': '90f95b34cf4ed5b5b871798866787d76273e29f252c6128cfafeb139668f8e7f',
              'after_sha256': '0b898db5685b5c838c33804030c4b83987d7aea80f93b2eda5a5a65aba4f9b91'},
             {'path': 'vllm/entrypoints/openai/responses/utils.py',
-             'before_sha256': 'd4197fd957d326f71f9b7c6fc04ca4534eca91fd3822670ec99ffd2c0d74ca3b',
-             'after_sha256': 'cef740b1aeb407e7a36119949b74fa8d8e61a7b22b6ace496d86ff006a9bd567'}),
+             'before_sha256': 'f9be4f4ad445c92ad456e4cfe5ef220f001da85d68ff0c49560810f9753d81b2',
+             'after_sha256': '27228c0eb46d68278d35a8d5558e86935b47b04378d6d62df9cd6500b8c3fa0a'}),
   'edits': ({'name': 'tests/entrypoints/openai/responses/test_parsable_context.py:landmark-1',
              'path': 'tests/entrypoints/openai/responses/test_parsable_context.py',
              'before': '\n'
@@ -144007,7 +145148,429 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '        return None\n'
                              '    return [\n'
                              '        '
-                             'convert_tool_responses_to_completions_format(tool).model_dump()\n'})})
+                             'convert_tool_responses_to_completions_format(tool).model_dump()\n'})},
+ {'name': 'chat-stream-carries-every-token-logprob',
+  'review_patch': 'patches/vllm-chat-stream-carries-every-token-logprob.patch',
+  'review_sha256': 'ca15dadd152454fe5b3fbcb710b8c7b5ce3221c038617b9e0d0985953aecbf47',
+  'files': ({'path': 'tests/entrypoints/openai/chat_completion/test_serving_chat.py',
+             'before_sha256': '3a452a168070dbbbd75c879507ab7f0126290db385c44fd94776b144922d4795',
+             'after_sha256': 'a0cbc29d88eca544f8f5d29ed10c0ffc7bb379d40d2b0b93bdee12d086deda78'},
+            {'path': 'vllm/entrypoints/openai/chat_completion/serving.py',
+             'before_sha256': '09ec976686c9091c56ff71e5edfc8907d92eb8610d69d351a4a0af67b5e0f3a3',
+             'after_sha256': 'a4f6dec625b9b9f405b7cfe31968489720fbeee68e632029960eb01fc95afd64'},
+            {'path': 'vllm/tool_parsers/poolside_v1_tool_parser.py',
+             'before_sha256': 'e2e63d97005abeb880476b06aac7ed44c55dbd056ac54aa8202c4eeb814f0a35',
+             'after_sha256': '5c99ae314256ef4e5ca076a96c9863413dc57bf074f3ac070b527be2d3fe0d8c'}),
+  'edits': ({'name': 'tests/entrypoints/openai/chat_completion/test_serving_chat.py:landmark-1',
+             'path': 'tests/entrypoints/openai/chat_completion/test_serving_chat.py',
+             'before': '    _make_prompt_tokens_details,\n'
+                       ')\n'
+                       'from vllm.entrypoints.openai.engine.protocol import (\n'
+                       '    ErrorResponse,\n'
+                       '    RequestResponseMetadata,\n'
+                       ')\n',
+             'after': '    _make_prompt_tokens_details,\n'
+                      ')\n'
+                      'from vllm.entrypoints.openai.engine.protocol import (\n'
+                      '    DeltaMessage,\n'
+                      '    ErrorResponse,\n'
+                      '    RequestResponseMetadata,\n'
+                      ')\n',
+             'review_before': '    _make_prompt_tokens_details,\n'
+                              ')\n'
+                              'from vllm.entrypoints.openai.engine.protocol import (\n'
+                              '    ErrorResponse,\n'
+                              '    RequestResponseMetadata,\n'
+                              ')\n',
+             'review_after': '    _make_prompt_tokens_details,\n'
+                             ')\n'
+                             'from vllm.entrypoints.openai.engine.protocol import (\n'
+                             '    DeltaMessage,\n'
+                             '    ErrorResponse,\n'
+                             '    RequestResponseMetadata,\n'
+                             ')\n'},
+            {'name': 'tests/entrypoints/openai/chat_completion/test_serving_chat.py:landmark-2',
+             'path': 'tests/entrypoints/openai/chat_completion/test_serving_chat.py',
+             'before': '    assert '
+                       'usage_chunks[-1]["metrics"]["time_to_first_token_ms"] == '
+                       'pytest.approx(500.0)\n'
+                       '\n'
+                       '\n'
+                       '@dataclass\n'
+                       'class MockEngine:\n'
+                       '    model_config: MockModelConfig = '
+                       'field(default_factory=MockModelConfig)\n',
+             'after': '    assert '
+                      'usage_chunks[-1]["metrics"]["time_to_first_token_ms"] == '
+                      'pytest.approx(500.0)\n'
+                      '\n'
+                      '\n'
+                      '@pytest.mark.asyncio\n'
+                      '@pytest.mark.parametrize("return_token_ids", [False, True])\n'
+                      'async def '
+                      'test_a_stream_reports_the_log_probability_of_a_step_with_no_text(\n'
+                      '    return_token_ids,\n'
+                      '):\n'
+                      '    """The parser may release no text for a step -- a reasoning '
+                      'end, a held\n'
+                      '    marker -- but the step generated its tokens, and the full '
+                      'response reports\n'
+                      '    a log probability for each. Its chunk carries them, so the '
+                      'stream reports\n'
+                      '    the same list, in order, with or without token ids."""\n'
+                      '    from vllm.logprobs import Logprob\n'
+                      '\n'
+                      '    class WithholdsTheFirstStep:\n'
+                      '        reasoning_token_count = None\n'
+                      '\n'
+                      '        def __init__(self, *args, **kwargs):\n'
+                      '            self.generated_token_count = 0\n'
+                      '\n'
+                      '        def parse_output_delta(self, delta_text, '
+                      'delta_token_ids, request,\n'
+                      '                               prompt_token_ids=None, *, '
+                      'finish_reason,\n'
+                      '                               stop_reason):\n'
+                      '            first = self.generated_token_count == 0\n'
+                      '            self.generated_token_count += len(delta_token_ids)\n'
+                      '            return None if first else '
+                      'DeltaMessage(content=delta_text)\n'
+                      '\n'
+                      '    serving = '
+                      '_build_minimal_metrics_serving_chat(enable_per_request_metrics=False)\n'
+                      '    serving.parser_cls = WithholdsTheFirstStep\n'
+                      '    serving.model_config = MockModelConfig()\n'
+                      '    steps = [("", [7], -0.5), ("Hi", [8], -0.25), ("!", [9], '
+                      '-0.125)]\n'
+                      '\n'
+                      '    async def outputs():\n'
+                      '        for index, (text, ids, logprob) in enumerate(steps):\n'
+                      '            last = index == len(steps) - 1\n'
+                      '            yield RequestOutput(\n'
+                      '                request_id="test-id", prompt="Test prompt",\n'
+                      '                prompt_token_ids=[1, 2, 3], '
+                      'prompt_logprobs=None, finished=last,\n'
+                      '                outputs=[CompletionOutput(\n'
+                      '                    index=0, text=text, token_ids=ids, '
+                      'cumulative_logprob=None,\n'
+                      '                    logprobs=[{ids[0]: Logprob(logprob=logprob, '
+                      'rank=1)}],\n'
+                      '                    finish_reason="stop" if last else None,\n'
+                      '                )],\n'
+                      '            )\n'
+                      '\n'
+                      '    request = ChatCompletionRequest(\n'
+                      '        model="test-model", messages=[{"role": "user", '
+                      '"content": "Test"}],\n'
+                      '        stream=True, logprobs=True, top_logprobs=0,\n'
+                      '        return_tokens_as_token_ids=True, '
+                      'return_token_ids=return_token_ids,\n'
+                      '    )\n'
+                      '    reported = []\n'
+                      '    async for line in '
+                      'serving.chat_completion_stream_generator(\n'
+                      '        request, outputs(), "chatcmpl-test-id", "test-model",\n'
+                      '        conversation=[{"role": "user", "content": "Test"}], '
+                      'tokenizer=MagicMock(),\n'
+                      '        '
+                      'request_metadata=RequestResponseMetadata(request_id="chatcmpl-test-id"),\n'
+                      '    ):\n'
+                      '        if not line.startswith("data: {"):\n'
+                      '            continue\n'
+                      '        for choice in json.loads(line[len("data: '
+                      '"):])["choices"]:\n'
+                      '            for entry in (choice.get("logprobs") or '
+                      '{}).get("content") or []:\n'
+                      '                reported.append((entry["token"], '
+                      'entry["logprob"]))\n'
+                      '    assert reported == [\n'
+                      '        ("token_id:7", -0.5), ("token_id:8", -0.25), '
+                      '("token_id:9", -0.125)\n'
+                      '    ]\n'
+                      '\n'
+                      '\n'
+                      '@dataclass\n'
+                      'class MockEngine:\n'
+                      '    model_config: MockModelConfig = '
+                      'field(default_factory=MockModelConfig)\n',
+             'review_before': '    assert '
+                              'usage_chunks[-1]["metrics"]["time_to_first_token_ms"] '
+                              '== pytest.approx(500.0)\n'
+                              '\n'
+                              '\n'
+                              '@dataclass\n'
+                              'class MockEngine:\n'
+                              '    model_config: MockModelConfig = '
+                              'field(default_factory=MockModelConfig)\n',
+             'review_after': '    assert '
+                             'usage_chunks[-1]["metrics"]["time_to_first_token_ms"] == '
+                             'pytest.approx(500.0)\n'
+                             '\n'
+                             '\n'
+                             '@pytest.mark.asyncio\n'
+                             '@pytest.mark.parametrize("return_token_ids", [False, '
+                             'True])\n'
+                             'async def '
+                             'test_a_stream_reports_the_log_probability_of_a_step_with_no_text(\n'
+                             '    return_token_ids,\n'
+                             '):\n'
+                             '    """The parser may release no text for a step -- a '
+                             'reasoning end, a held\n'
+                             '    marker -- but the step generated its tokens, and the '
+                             'full response reports\n'
+                             '    a log probability for each. Its chunk carries them, '
+                             'so the stream reports\n'
+                             '    the same list, in order, with or without token '
+                             'ids."""\n'
+                             '    from vllm.logprobs import Logprob\n'
+                             '\n'
+                             '    class WithholdsTheFirstStep:\n'
+                             '        reasoning_token_count = None\n'
+                             '\n'
+                             '        def __init__(self, *args, **kwargs):\n'
+                             '            self.generated_token_count = 0\n'
+                             '\n'
+                             '        def parse_output_delta(self, delta_text, '
+                             'delta_token_ids, request,\n'
+                             '                               prompt_token_ids=None, *, '
+                             'finish_reason,\n'
+                             '                               stop_reason):\n'
+                             '            first = self.generated_token_count == 0\n'
+                             '            self.generated_token_count += '
+                             'len(delta_token_ids)\n'
+                             '            return None if first else '
+                             'DeltaMessage(content=delta_text)\n'
+                             '\n'
+                             '    serving = '
+                             '_build_minimal_metrics_serving_chat(enable_per_request_metrics=False)\n'
+                             '    serving.parser_cls = WithholdsTheFirstStep\n'
+                             '    serving.model_config = MockModelConfig()\n'
+                             '    steps = [("", [7], -0.5), ("Hi", [8], -0.25), ("!", '
+                             '[9], -0.125)]\n'
+                             '\n'
+                             '    async def outputs():\n'
+                             '        for index, (text, ids, logprob) in '
+                             'enumerate(steps):\n'
+                             '            last = index == len(steps) - 1\n'
+                             '            yield RequestOutput(\n'
+                             '                request_id="test-id", prompt="Test '
+                             'prompt",\n'
+                             '                prompt_token_ids=[1, 2, 3], '
+                             'prompt_logprobs=None, finished=last,\n'
+                             '                outputs=[CompletionOutput(\n'
+                             '                    index=0, text=text, token_ids=ids, '
+                             'cumulative_logprob=None,\n'
+                             '                    logprobs=[{ids[0]: '
+                             'Logprob(logprob=logprob, rank=1)}],\n'
+                             '                    finish_reason="stop" if last else '
+                             'None,\n'
+                             '                )],\n'
+                             '            )\n'
+                             '\n'
+                             '    request = ChatCompletionRequest(\n'
+                             '        model="test-model", messages=[{"role": "user", '
+                             '"content": "Test"}],\n'
+                             '        stream=True, logprobs=True, top_logprobs=0,\n'
+                             '        return_tokens_as_token_ids=True, '
+                             'return_token_ids=return_token_ids,\n'
+                             '    )\n'
+                             '    reported = []\n'
+                             '    async for line in '
+                             'serving.chat_completion_stream_generator(\n'
+                             '        request, outputs(), "chatcmpl-test-id", '
+                             '"test-model",\n'
+                             '        conversation=[{"role": "user", "content": '
+                             '"Test"}], tokenizer=MagicMock(),\n'
+                             '        '
+                             'request_metadata=RequestResponseMetadata(request_id="chatcmpl-test-id"),\n'
+                             '    ):\n'
+                             '        if not line.startswith("data: {"):\n'
+                             '            continue\n'
+                             '        for choice in json.loads(line[len("data: '
+                             '"):])["choices"]:\n'
+                             '            for entry in (choice.get("logprobs") or '
+                             '{}).get("content") or []:\n'
+                             '                reported.append((entry["token"], '
+                             'entry["logprob"]))\n'
+                             '    assert reported == [\n'
+                             '        ("token_id:7", -0.5), ("token_id:8", -0.25), '
+                             '("token_id:9", -0.125)\n'
+                             '    ]\n'
+                             '\n'
+                             '\n'
+                             '@dataclass\n'
+                             'class MockEngine:\n'
+                             '    model_config: MockModelConfig = '
+                             'field(default_factory=MockModelConfig)\n'},
+            {'name': 'vllm/entrypoints/openai/chat_completion/serving.py:landmark-1',
+             'path': 'vllm/entrypoints/openai/chat_completion/serving.py',
+             'before': '                    )\n'
+                       '                    if hide_stream_metadata:\n'
+                       '                        logprobs = None\n'
+                       '\n'
+                       '                    if delta_message is None:\n'
+                       '                        # NOTE: If return_token_ids is '
+                       'enabled, we still need to\n'
+                       '                        # send a chunk with token_ids even if '
+                       'delta_message is None\n'
+                       '                        # to ensure all tokens are included in '
+                       'the response\n'
+                       '                        if output.finish_reason is None and (\n'
+                       '                            not request.return_token_ids or '
+                       'hide_stream_metadata\n'
+                       '                        ):\n'
+                       '                            continue\n'
+                       '                        delta_message = DeltaMessage()\n',
+             'after': '                    )\n'
+                      '                    if hide_stream_metadata:\n'
+                      '                        logprobs = None\n'
+                      '                    include_token_ids = (\n'
+                      '                        request.return_token_ids and not '
+                      'hide_stream_metadata\n'
+                      '                    )\n'
+                      '\n'
+                      '                    if delta_message is None:\n'
+                      '                        # A step the parser released no text '
+                      'for still\n'
+                      '                        # generated tokens: its chunk carries '
+                      'their ids and log\n'
+                      '                        # probabilities, so the stream reports '
+                      'every generated\n'
+                      '                        # token, as the full response does.\n'
+                      '                        if (\n'
+                      '                            output.finish_reason is None\n'
+                      '                            and not include_token_ids\n'
+                      '                            and logprobs is None\n'
+                      '                        ):\n'
+                      '                            continue\n'
+                      '                        delta_message = DeltaMessage()\n',
+             'review_before': '                    )\n'
+                              '                    if hide_stream_metadata:\n'
+                              '                        logprobs = None\n'
+                              '\n'
+                              '                    if delta_message is None:\n'
+                              '                        # NOTE: If return_token_ids is '
+                              'enabled, we still need to\n'
+                              '                        # send a chunk with token_ids '
+                              'even if delta_message is None\n'
+                              '                        # to ensure all tokens are '
+                              'included in the response\n'
+                              '                        if output.finish_reason is None '
+                              'and (\n'
+                              '                            not '
+                              'request.return_token_ids or hide_stream_metadata\n'
+                              '                        ):\n'
+                              '                            continue\n'
+                              '                        delta_message = '
+                              'DeltaMessage()\n',
+             'review_after': '                    )\n'
+                             '                    if hide_stream_metadata:\n'
+                             '                        logprobs = None\n'
+                             '                    include_token_ids = (\n'
+                             '                        request.return_token_ids and not '
+                             'hide_stream_metadata\n'
+                             '                    )\n'
+                             '\n'
+                             '                    if delta_message is None:\n'
+                             '                        # A step the parser released no '
+                             'text for still\n'
+                             '                        # generated tokens: its chunk '
+                             'carries their ids and log\n'
+                             '                        # probabilities, so the stream '
+                             'reports every generated\n'
+                             '                        # token, as the full response '
+                             'does.\n'
+                             '                        if (\n'
+                             '                            output.finish_reason is '
+                             'None\n'
+                             '                            and not include_token_ids\n'
+                             '                            and logprobs is None\n'
+                             '                        ):\n'
+                             '                            continue\n'
+                             '                        delta_message = '
+                             'DeltaMessage()\n'},
+            {'name': 'vllm/entrypoints/openai/chat_completion/serving.py:landmark-2',
+             'path': 'vllm/entrypoints/openai/chat_completion/serving.py',
+             'before': '                                delta=True,\n'
+                       '                            )\n'
+                       '\n'
+                       '                    include_token_ids = (\n'
+                       '                        request.return_token_ids and not '
+                       'hide_stream_metadata\n'
+                       '                    )\n'
+                       '\n'
+                       '                    if output.finish_reason is None:\n'
+                       '                        # Send token-by-token response for '
+                       'each request.n\n'
+                       '                        choice_data = '
+                       'ChatCompletionResponseStreamChoice(\n',
+             'after': '                                delta=True,\n'
+                      '                            )\n'
+                      '\n'
+                      '                    if output.finish_reason is None:\n'
+                      '                        # Send token-by-token response for each '
+                      'request.n\n'
+                      '                        choice_data = '
+                      'ChatCompletionResponseStreamChoice(\n',
+             'review_before': '                                delta=True,\n'
+                              '                            )\n'
+                              '\n'
+                              '                    include_token_ids = (\n'
+                              '                        request.return_token_ids and '
+                              'not hide_stream_metadata\n'
+                              '                    )\n'
+                              '\n'
+                              '                    if output.finish_reason is None:\n'
+                              '                        # Send token-by-token response '
+                              'for each request.n\n'
+                              '                        choice_data = '
+                              'ChatCompletionResponseStreamChoice(\n',
+             'review_after': '                                delta=True,\n'
+                             '                            )\n'
+                             '\n'
+                             '                    if output.finish_reason is None:\n'
+                             '                        # Send token-by-token response '
+                             'for each request.n\n'
+                             '                        choice_data = '
+                             'ChatCompletionResponseStreamChoice(\n'},
+            {'name': 'vllm/tool_parsers/poolside_v1_tool_parser.py:landmark-1',
+             'path': 'vllm/tool_parsers/poolside_v1_tool_parser.py',
+             'before': '\n'
+                       '        tool_calls = list(pending_deltas.values())\n'
+                       '        if content is None and len(tool_calls) == 0:\n'
+                       '            wants_logprobs = getattr(request, "logprobs", '
+                       'None)\n'
+                       '            if wants_logprobs:\n'
+                       '                return DeltaMessage(content="")\n'
+                       '            return None\n'
+                       '        return DeltaMessage(content=content, '
+                       'tool_calls=tool_calls)\n'
+                       '\n',
+             'after': '\n'
+                      '        tool_calls = list(pending_deltas.values())\n'
+                      '        if content is None and len(tool_calls) == 0:\n'
+                      '            return None\n'
+                      '        return DeltaMessage(content=content, '
+                      'tool_calls=tool_calls)\n'
+                      '\n',
+             'review_before': '\n'
+                              '        tool_calls = list(pending_deltas.values())\n'
+                              '        if content is None and len(tool_calls) == 0:\n'
+                              '            wants_logprobs = getattr(request, '
+                              '"logprobs", None)\n'
+                              '            if wants_logprobs:\n'
+                              '                return DeltaMessage(content="")\n'
+                              '            return None\n'
+                              '        return DeltaMessage(content=content, '
+                              'tool_calls=tool_calls)\n'
+                              '\n',
+             'review_after': '\n'
+                             '        tool_calls = list(pending_deltas.values())\n'
+                             '        if content is None and len(tool_calls) == 0:\n'
+                             '            return None\n'
+                             '        return DeltaMessage(content=content, '
+                             'tool_calls=tool_calls)\n'
+                             '\n'})})
 
 FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5dd4c4673b5925cebd27d46a5956832092bebbbd53d47993bac',
  'tests/config/test_config_utils.py': '4f5ea0399cc3b4f9603df07e2cc26d32e1eddf6b98a36c0f30d580321879c038',
@@ -144023,24 +145586,28 @@ FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5d
  'tests/entrypoints/openai/chat_completion/test_logprob_token_ids.py': '3a208425a3acec91a63a0d66fd29a0edc6ddbeadb42c92b3b86afbfbf2e1363a',
  'tests/entrypoints/openai/chat_completion/test_parallel_tool_call_integrity.py': 'e290f2c4df7bd842594db1fb4e66bf713bc6ff653cbadc8877958a955c0fa4c4',
  'tests/entrypoints/openai/chat_completion/test_repeated_tool_parameter_refusal.py': 'b8a7eed51747dddf980145be2609cf1a8136465bf0068a0f3c7b85424ab9a9d9',
- 'tests/entrypoints/openai/chat_completion/test_serving_chat.py': '3a452a168070dbbbd75c879507ab7f0126290db385c44fd94776b144922d4795',
+ 'tests/entrypoints/openai/chat_completion/test_serving_chat.py': 'a0cbc29d88eca544f8f5d29ed10c0ffc7bb379d40d2b0b93bdee12d086deda78',
  'tests/entrypoints/openai/chat_completion/test_unspecified_tool_choice.py': 'd8e14d07b3c11672fd6aa08beb861e780b4296ca114a0cc3e1a6fb80489711a7',
  'tests/entrypoints/openai/completion/test_completion.py': 'd9a783cc90cb99dc9c280cbe0e6fe043d116189b5ba61c05de13856ea7808c3f',
  'tests/entrypoints/openai/completion/test_completion_error.py': 'a0f5377bbf39bf9d411452353aa7aa8afb3eb6c6d583c9bcaf95df0e469a9749',
  'tests/entrypoints/openai/completion/test_lora_resolvers.py': '8dd3116102f4e1287364b9bd967a1e5aa3bc93eea2dfb4b7277cb16733781f4c',
+ 'tests/entrypoints/openai/responses/test_basic.py': 'b0de70fa02b7c2ad59fc1a35b0c5e0139e64e2e4fd63a87a814f8a5626c159aa',
  'tests/entrypoints/openai/responses/test_function_call_parsing.py': '98877f2029119b7b7b753c4a9cbc315d3c0124885bba29a45004dc9fd1cfb267',
  'tests/entrypoints/openai/responses/test_parsable_context.py': '689ff6d49b466e36ab73bbff52cd9733d288c8d98aeee47edb6e9bfbf03b8615',
  'tests/entrypoints/openai/responses/test_parsable_context_unit.py': '95f50d93d97370d426319b5dc94fce55b9cbca4ce9b3b95a930e42990dcbf4a2',
  'tests/entrypoints/openai/responses/test_reasoning_usage_context.py': '46074423f3316b6380ecb50f17c6d26aa2fe49c5fa211cb08179ee5fb4347666',
  'tests/entrypoints/openai/responses/test_responses_utils.py': '2d638d7d0594fe95959c94a8486494e483fb367fbdb7d09a8d9156f8f450d651',
  'tests/entrypoints/openai/responses/test_sampling_params.py': 'd4c56d82ae742e0c5075c189f91ac069f2ad0a61e336ee4f7fc178f46bf5f5b5',
- 'tests/entrypoints/openai/responses/test_serving_responses.py': '170cdad0dba045b64560bf7dc78434786ce21de2cce032cd18ed0ffa358c75bc',
+ 'tests/entrypoints/openai/responses/test_serving_responses.py': '760b1ac6f86229afd12f439afbe9722c5c59d8c3f0eaf2f5c20c5497defb5d99',
+ 'tests/entrypoints/openai/responses/test_simple.py': '9d02a3fcdcb2747afcf78095b883a91168fa47abb7e497ca5e2cea8fcb20be18',
+ 'tests/entrypoints/openai/responses/test_streaming_events.py': 'adc8778744b27e9e1ea5a4d680f211fce8b068e492c27549f234224030af70bd',
  'tests/entrypoints/openai/test_beam_search_boundary.py': '34bb27d9fc4952429dd4f31199a57ecef0ca049ac76c4040e548e9773fbd4cb1',
  'tests/entrypoints/openai/test_output_constraint_beside_tools.py': '836be0512b50a3c2877a99ef7166b59bc50c7aa535a7cf653edebf57028f9b39',
  'tests/entrypoints/openai/test_prompt_truncation_refused.py': 'db436cb68152f60985f802cb63ecaaaca47e6e857a82056751ed730566e3aa86',
  'tests/entrypoints/openai/test_reasoning_enable_thinking.py': 'f196f90544a39ee15f045b6684a13197d5fce22432c5d3509e37f11fdd22314e',
  'tests/entrypoints/openai/test_render_parity.py': '59ce2042beebb9354280aa484afa47eff9588e7a345fd8b1b7dc4dd812df106e',
  'tests/entrypoints/openai/test_render_token_offsets.py': '405e6e5592d4178fde073482558bb491fe201e3a3b706c25df104b136b8197a1',
+ 'tests/entrypoints/openai/test_return_tokens_as_ids.py': '9d7986c1809c366eca7abf45609d61ae60f8f96110f768b3b2266a6f0dd6f865',
  'tests/entrypoints/openai/test_session_id.py': '7d7df0cc79804e8275eacffdae1ea7f10717fcd981bd08155b296ab7d5f7c4f3',
  'tests/entrypoints/scale_out/derender/test_derender.py': '210db8e1b18615c08fd072c37ca80357148c14ed205b55fb3b68e0a01d592055',
  'tests/entrypoints/scale_out/derender/test_derender_parity.py': 'a0a88cd6a9b67b3d29d107053f22d623f4df07f9460b07ebfb0e2c417922441c',
@@ -144093,7 +145660,7 @@ FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5d
  'tests/test_request_input_bounds.py': '6d5796773be3daa15c1dc369bed3bb36fec877b4735389a6893d7236aa25cd38',
  'tests/test_sampling_params.py': '9ce8ed07080994d48511465e8050a52ee1db8fdf5d0b2188bd6324b9276b3f97',
  'tests/tokenizers_/test_detokenize.py': 'd84dff3048856b762c2993a3aa130c4f508bbce9c59c9a815dabbf3ce5a3f234',
- 'tests/tool_parsers/test_poolside_v1_tool_parser.py': '662d77a06519ce25598292366fa1dfa74ffa8c6559be9796e6dfb24a878e7539',
+ 'tests/tool_parsers/test_poolside_v1_tool_parser.py': 'c8ae44174b76860378a29c2d123d95377cec3eaa41b8062717fd05d294a063d7',
  'tests/tool_parsers/test_structural_tag_registry.py': '7d1fd82dfcf43352ff4b6953418cf762128bea9b78207a2313d9df9cb19b5f4b',
  'tests/tool_use/test_chat_completion_request_validations.py': '8717564eac279b5b5b25d2bf03f42e4922f455bd0360ff23cd073d59f857759f',
  'tests/tool_use/test_chat_completions.py': 'cdf5ea1140e43f57cf4d576e9982235e2b599ab497946462509e02dbdc2ab190',
@@ -144167,17 +145734,17 @@ FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5d
  'vllm/entrypoints/openai/chat_completion/api_router.py': '9cb8a56328bcfea734cc252e1291b17aee6c42e7208c9c8f883ad5a434bace17',
  'vllm/entrypoints/openai/chat_completion/batch_serving.py': 'e48a1aaf594d7fcbb0979a1e48785ed37d2b109e6343beb318cb9145486efebe',
  'vllm/entrypoints/openai/chat_completion/protocol.py': '4c2bb4939c7d7d17d006373d0c0b2cfc2c4f9bbc7e4afc268f50ed5fb0db1b3a',
- 'vllm/entrypoints/openai/chat_completion/serving.py': '09ec976686c9091c56ff71e5edfc8907d92eb8610d69d351a4a0af67b5e0f3a3',
+ 'vllm/entrypoints/openai/chat_completion/serving.py': 'a4f6dec625b9b9f405b7cfe31968489720fbeee68e632029960eb01fc95afd64',
  'vllm/entrypoints/openai/cli_args.py': '2c74b481652e1b7154df7836a98eb3ef1377092dc8ac4ae02095160907b5e36e',
  'vllm/entrypoints/openai/completion/api_router.py': '95f7e88069d896bb2a616a50ca3c3c9d1fd1b2314b785b87696ad936fd205363',
  'vllm/entrypoints/openai/completion/protocol.py': 'a92405770e6d4f3b3732b0a42ebdc335441a448be9fc2ce4f92b02d16e6e0ca2',
  'vllm/entrypoints/openai/completion/serving.py': '47877f22727b674109b923e182471aa9948c75e22502b184b02a9882df4a54c5',
  'vllm/entrypoints/openai/engine/protocol.py': '0d373e6820efe4bcbd625db972ba381a5070818669af0d06eda849a26efe78bc',
  'vllm/entrypoints/openai/responses/context.py': '2b84c0d0e733057b80e93075bbeae0a16a9a6a6274ad0b15d1506d1c77ce7a24',
- 'vllm/entrypoints/openai/responses/protocol.py': '71108c0a82c83383a3e105f177f41190eb690c69f92c12cb43e1f4e4cd2c3262',
- 'vllm/entrypoints/openai/responses/serving.py': '0a235c4b4681365d0c7c3fda940a5b4d57caee881a46d48fcfcfcc6f25c3a1dc',
- 'vllm/entrypoints/openai/responses/streaming_events.py': 'd42b73604e9729d35fcc944c68b21e5a68f110be11327f65308dc8ee46daeffe',
- 'vllm/entrypoints/openai/responses/utils.py': 'cef740b1aeb407e7a36119949b74fa8d8e61a7b22b6ace496d86ff006a9bd567',
+ 'vllm/entrypoints/openai/responses/protocol.py': 'ed6c4f9e352b17ea73f7fba1adf54e03ababf7f752658aafcf6d444d1d96a2f9',
+ 'vllm/entrypoints/openai/responses/serving.py': 'c0f404cdb953d6916b3515dc7719783bb8425978f6eac5f3f2511c41fd11576e',
+ 'vllm/entrypoints/openai/responses/streaming_events.py': '86a2600626f9100b6dcecca1876a5c4b9b9ac671297e025cd95e3bcb93fa7aba',
+ 'vllm/entrypoints/openai/responses/utils.py': '27228c0eb46d68278d35a8d5558e86935b47b04378d6d62df9cd6500b8c3fa0a',
  'vllm/entrypoints/openai/run_batch.py': 'b33bb5bb911b300914c10ac7068610330706a4c3371211ea7a165c219139f89e',
  'vllm/entrypoints/pooling/scoring/io_processor.py': 'aaa0d78c9432298095134f2fc5f07ca18f613b139912aef01a43ade162bdb5d4',
  'vllm/entrypoints/scale_out/derender/serving.py': '3beb23995dddcfac4b98bf38f5948bd992ff06bf99290157317ba7018f57a6d7',
@@ -144230,6 +145797,7 @@ FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5d
  'vllm/sampling_params.py': 'c5e027fa409b8daf77bbbbd6fee97f13db52236ad14e7e4e3b546da35b182316',
  'vllm/tokenizers/detokenizer_utils.py': '7718979d813ed00d41116d92a5abf81524e393693a6b28fa1c2a6d8ff66c880d',
  'vllm/tool_parsers/abstract_tool_parser.py': '91f4f3184e7f0eb6bc9e76d9ce4d3063cff58e0de8afc409038139e48314d0c8',
+ 'vllm/tool_parsers/poolside_v1_tool_parser.py': '5c99ae314256ef4e5ca076a96c9863413dc57bf074f3ac070b527be2d3fe0d8c',
  'vllm/tool_parsers/structural_tag_registry.py': '34a5d36d9afa30bee6b79a6e8c95ff1fa56580c461fc55adf5cf0c28f3e6c0fc',
  'vllm/tool_parsers/utils.py': 'e2e93609470191c021cc9b67a781257b0bdb64954ca5a737faf972d27434f4a6',
  'vllm/v1/attention/backends/turboquant_attn.py': 'c3fef60cfa031a139bed6f413b2c40d0ea3bc6b48992455404a09459abbfa282',

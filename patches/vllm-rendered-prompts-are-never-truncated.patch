@@ -280,7 +280,7 @@ index 96ae50c0ab6e5bebd9b71ca69e5d07ec5f4a8582..f85ba5c67f2dd44d894d5d5a40e316be
  
              sampling_params = request.to_sampling_params(
 diff --git a/vllm/entrypoints/openai/responses/protocol.py b/vllm/entrypoints/openai/responses/protocol.py
-index ea184136e60c045292ae7bfe12809be47aa420c4..4c63338b30a80fbc57ed78ef9636f587a295bd3c 100644
+index 8d2b82fb91119ddc6116fe154ab16e60f29bbe41..6212e109250089bc54eb58892e6e8a13a2c8fa6d 100644
 --- a/vllm/entrypoints/openai/responses/protocol.py
 +++ b/vllm/entrypoints/openai/responses/protocol.py
 @@ -58,6 +58,7 @@ from pydantic import (
@@ -308,7 +308,7 @@ index ea184136e60c045292ae7bfe12809be47aa420c4..4c63338b30a80fbc57ed78ef9636f587
              max_total_tokens_param="max_model_len",
              max_output_tokens_param="max_output_tokens",
          )
-@@ -527,6 +527,24 @@ class ResponsesRequest(OpenAIBaseModel):
+@@ -550,6 +550,24 @@ class ResponsesRequest(OpenAIBaseModel):
              require_kv_scope_value(data.get("kv_scope"))
          return data
  
@@ -334,10 +334,10 @@ index ea184136e60c045292ae7bfe12809be47aa420c4..4c63338b30a80fbc57ed78ef9636f587
      @classmethod
      def validate_background(cls, data):
 diff --git a/vllm/entrypoints/openai/responses/serving.py b/vllm/entrypoints/openai/responses/serving.py
-index 8b4db1810e5fb728f9a81c12293aa6bb94747cd5..b709dccf52eb082251f319720b1ddf72900bb73a 100644
+index 7bdac98925369bc7b39b71889482751b6d273540..7376f97d06f2971651e8ac27743dc60b7f16d0ab 100644
 --- a/vllm/entrypoints/openai/responses/serving.py
 +++ b/vllm/entrypoints/openai/responses/serving.py
-@@ -445,9 +445,6 @@ class OpenAIServingResponses(GenerateBaseServing):
+@@ -435,9 +435,6 @@ class OpenAIServingResponses(GenerateBaseServing):
                  self._extract_prompt_len(engine_input),
                  self.default_sampling_params,
                  self.override_max_tokens,
@@ -347,7 +347,7 @@ index 8b4db1810e5fb728f9a81c12293aa6bb94747cd5..b709dccf52eb082251f319720b1ddf72
              )
  
              sampling_params = request.to_sampling_params(
-@@ -797,9 +794,6 @@ class OpenAIServingResponses(GenerateBaseServing):
+@@ -787,9 +784,6 @@ class OpenAIServingResponses(GenerateBaseServing):
                          self._extract_prompt_len(engine_input),
                          self.default_sampling_params,  # type: ignore
                          self.override_max_tokens,  # type: ignore

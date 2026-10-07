@@ -270,7 +270,7 @@ index f4c7cf36c5723219424caf89575589ad1ca7274a..6c48e7b6d194e929d83d6ea0f459e87b
 +    )
 +    assert request.tools[1].type == hosted["type"]
 diff --git a/vllm/entrypoints/openai/responses/utils.py b/vllm/entrypoints/openai/responses/utils.py
-index c9d7c5dac034f97492903e82f04559371cbe1cd7..3232ea9eab2d4f3975dd43b9c429f9316cfbbb9d 100644
+index af20e57f2b680e3736c7931ce50dfff0bd6b287e..7324af88553d4d16487698e311fdf927586d7783 100644
 --- a/vllm/entrypoints/openai/responses/utils.py
 +++ b/vllm/entrypoints/openai/responses/utils.py
 @@ -14,6 +14,8 @@ from openai.types.chat.chat_completion_message_tool_call_param import (
@@ -282,7 +282,7 @@ index c9d7c5dac034f97492903e82f04559371cbe1cd7..3232ea9eab2d4f3975dd43b9c429f931
      ResponseFunctionToolCall,
      ResponseOutputItem,
      ResponseOutputMessage,
-@@ -450,12 +452,57 @@ def convert_tool_responses_to_completions_format(
+@@ -447,12 +449,57 @@ def convert_tool_responses_to_completions_format(
      )
  
  

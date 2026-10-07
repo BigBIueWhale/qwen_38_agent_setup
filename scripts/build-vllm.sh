@@ -177,6 +177,7 @@ RENDER_EVERY_IMAGE_PATCH_FILE="${PROJECT_DIR}/patches/vllm-render-carries-every-
 RENDERED_PROMPT_NOT_TRUNCATED_PATCH_FILE="${PROJECT_DIR}/patches/vllm-rendered-prompts-are-never-truncated.patch"
 KV_TRANSFER_PARAMS_DECLARED_PATCH_FILE="${PROJECT_DIR}/patches/vllm-kv-transfer-params-are-declared.patch"
 RESPONSES_TOOLS_NEVER_GIVEN_PATCH_FILE="${PROJECT_DIR}/patches/vllm-responses-refuses-tools-the-template-is-never-given.patch"
+CHAT_STREAM_LOGPROBS_PATCH_FILE="${PROJECT_DIR}/patches/vllm-chat-stream-carries-every-token-logprob.patch"
 
 if [[ ! -f "${DEPLOYMENT_INPUT_MANIFEST}" || -L "${DEPLOYMENT_INPUT_MANIFEST}" ]]; then
   echo "Deployment-input manifest is missing or is not a regular non-symlink file." >&2
@@ -327,7 +328,8 @@ printf '%s  %s\n' \
   "${RENDER_EVERY_IMAGE_PATCH_DIFF_SHA256}" "${RENDER_EVERY_IMAGE_PATCH_FILE}" \
   "${RENDERED_PROMPT_NOT_TRUNCATED_PATCH_DIFF_SHA256}" "${RENDERED_PROMPT_NOT_TRUNCATED_PATCH_FILE}" \
   "${KV_TRANSFER_PARAMS_DECLARED_PATCH_DIFF_SHA256}" "${KV_TRANSFER_PARAMS_DECLARED_PATCH_FILE}" \
-  "${RESPONSES_TOOLS_NEVER_GIVEN_PATCH_DIFF_SHA256}" "${RESPONSES_TOOLS_NEVER_GIVEN_PATCH_FILE}" | \
+  "${RESPONSES_TOOLS_NEVER_GIVEN_PATCH_DIFF_SHA256}" "${RESPONSES_TOOLS_NEVER_GIVEN_PATCH_FILE}" \
+  "${CHAT_STREAM_LOGPROBS_PATCH_DIFF_SHA256}" "${CHAT_STREAM_LOGPROBS_PATCH_FILE}" | \
   sha256sum --check --strict
 
 printf '%s  %s\n' \
@@ -772,6 +774,8 @@ image_build_options=(
   --build-arg "STREAMING_PARSER_ENGINE_PATCHED_FILE_SHA256=${STREAMING_PARSER_ENGINE_PATCHED_FILE_SHA256}"
   --build-arg "TOKEN_ID_SCANNER_PATCHED_FILE_SHA256=${TOKEN_ID_SCANNER_PATCHED_FILE_SHA256}"
   --build-arg "ENGINE_PROTOCOL_PATCHED_FILE_SHA256=${ENGINE_PROTOCOL_PATCHED_FILE_SHA256}"
+  --build-arg "POOLSIDE_V1_TOOL_PARSER_PATCHED_FILE_SHA256=${POOLSIDE_V1_TOOL_PARSER_PATCHED_FILE_SHA256}"
+  --build-arg "POOLSIDE_V1_TOOL_PARSER_UPSTREAM_FILE_SHA256=${POOLSIDE_V1_TOOL_PARSER_UPSTREAM_FILE_SHA256}"
   --build-arg "MINIMAX_M3_REASONING_PARSER_PATCHED_FILE_SHA256=${MINIMAX_M3_REASONING_PARSER_PATCHED_FILE_SHA256}"
   --build-arg "MINIMAX_M3_REASONING_PARSER_UPSTREAM_FILE_SHA256=${MINIMAX_M3_REASONING_PARSER_UPSTREAM_FILE_SHA256}"
   --build-arg "BASIC_REASONING_PARSERS_PATCHED_FILE_SHA256=${BASIC_REASONING_PARSERS_PATCHED_FILE_SHA256}"
@@ -1017,6 +1021,7 @@ actual_installed_report="$(
     /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/detokenizer.py \
     /usr/local/lib/python3.12/dist-packages/vllm/v1/core/sched/scheduler.py \
     /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/async_llm.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/tool_parsers/poolside_v1_tool_parser.py \
     /usr/local/lib/python3.12/dist-packages/vllm/reasoning/minimax_m3_reasoning_parser.py \
     /usr/local/lib/python3.12/dist-packages/vllm/reasoning/basic_parsers.py \
     /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/tiering/p2p/manager.py \
@@ -1109,6 +1114,7 @@ expected_installed_report="$(printf '%s  %s\n' \
   "${V1_DETOKENIZER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/detokenizer.py \
   "${V1_SCHEDULER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/core/sched/scheduler.py \
   "${ASYNC_LLM_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/async_llm.py \
+  "${POOLSIDE_V1_TOOL_PARSER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/tool_parsers/poolside_v1_tool_parser.py \
   "${MINIMAX_M3_REASONING_PARSER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/reasoning/minimax_m3_reasoning_parser.py \
   "${BASIC_REASONING_PARSERS_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/reasoning/basic_parsers.py \
   "${KV_TIERING_P2P_MANAGER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/tiering/p2p/manager.py \

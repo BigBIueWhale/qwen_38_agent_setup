@@ -361,7 +361,7 @@ index b50482960c820208d81fcd9aaae2fcdb1e5ce440..f4c7cf36c5723219424caf89575589ad
 +    )
 +    assert error.parameter == "tool_choice"
 diff --git a/vllm/entrypoints/openai/responses/protocol.py b/vllm/entrypoints/openai/responses/protocol.py
-index 8c51f1e5100b8cb237d257689bd37cbae1724114..4012d68ad5c42a5579a726f29eb248fb3e414e07 100644
+index cc52a8d550a8fee56c205b4af38fa274f634f0ef..0ca3dcabb09ff4a98305e89417c1112be7071d62 100644
 --- a/vllm/entrypoints/openai/responses/protocol.py
 +++ b/vllm/entrypoints/openai/responses/protocol.py
 @@ -50,6 +50,8 @@ from openai.types.responses.response_reasoning_item import (
@@ -373,7 +373,7 @@ index 8c51f1e5100b8cb237d257689bd37cbae1724114..4012d68ad5c42a5579a726f29eb248fb
  from openai.types.shared import Metadata, Reasoning
  from openai_harmony import Message as OpenAIHarmonyMessage
  from pydantic import (
-@@ -669,28 +671,69 @@ class ResponsesRequest(OpenAIBaseModel):
+@@ -692,28 +694,69 @@ class ResponsesRequest(OpenAIBaseModel):
                      "Tool choice 'function' not found in 'tools' parameter.",
                      parameter="tool_choice",
                  )
@@ -463,10 +463,10 @@ index 8c51f1e5100b8cb237d257689bd37cbae1724114..4012d68ad5c42a5579a726f29eb248fb
  
  class ResponsesResponse(OpenAIBaseModel):
 diff --git a/vllm/entrypoints/openai/responses/serving.py b/vllm/entrypoints/openai/responses/serving.py
-index 3c840e5b92a1806fedadc43786c29da290158ee6..43ce83e3910de0e3137acb1ed54e62a5d56118b7 100644
+index 79be425d750269817fc25e445d9e53a85c4aed96..88d26bd7aedacc2ab918bd6f5a4a736ae9e58960 100644
 --- a/vllm/entrypoints/openai/responses/serving.py
 +++ b/vllm/entrypoints/openai/responses/serving.py
-@@ -88,7 +88,6 @@ from vllm.entrypoints.openai.responses.utils import (
+@@ -87,7 +87,6 @@ from vllm.entrypoints.openai.responses.utils import (
      build_response_output_items,
      construct_input_messages,
      construct_tool_dicts,
@@ -474,7 +474,7 @@ index 3c840e5b92a1806fedadc43786c29da290158ee6..43ce83e3910de0e3137acb1ed54e62a5
      extract_tool_types,
  )
  from vllm.entrypoints.serve.utils.api_utils import get_max_tokens
-@@ -104,6 +103,7 @@ from vllm.parser import Parser, ParserManager
+@@ -101,6 +100,7 @@ from vllm.parser import Parser, ParserManager
  from vllm.renderers.online_renderer import OnlineRenderer
  from vllm.sampling_params import SamplingParams, StructuredOutputsParams
  from vllm.tokenizers import TokenizerLike
@@ -482,7 +482,7 @@ index 3c840e5b92a1806fedadc43786c29da290158ee6..43ce83e3910de0e3137acb1ed54e62a5
  from vllm.utils import random_uuid
  from vllm.utils.collection_utils import as_list
  
-@@ -467,7 +467,7 @@ class OpenAIServingResponses(GenerateBaseServing):
+@@ -457,7 +457,7 @@ class OpenAIServingResponses(GenerateBaseServing):
              )
  
              context: ConversationContext
@@ -492,10 +492,10 @@ index 3c840e5b92a1806fedadc43786c29da290158ee6..43ce83e3910de0e3137acb1ed54e62a5
                  context = HarmonyContext(
                      messages,
 diff --git a/vllm/entrypoints/openai/responses/utils.py b/vllm/entrypoints/openai/responses/utils.py
-index f37dcc81d83dd9d87b7d125ddf8d20d0d174c872..c9d7c5dac034f97492903e82f04559371cbe1cd7 100644
+index 6c2253bbf314024691da4e58ce28a93d08e3b073..af20e57f2b680e3736c7931ce50dfff0bd6b287e 100644
 --- a/vllm/entrypoints/openai/responses/utils.py
 +++ b/vllm/entrypoints/openai/responses/utils.py
-@@ -417,20 +417,6 @@ def _construct_message_from_response_item(
+@@ -414,20 +414,6 @@ def _construct_message_from_response_item(
      return deepcopy(item)  # type: ignore[arg-type]
  
  

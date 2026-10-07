@@ -10,7 +10,12 @@ diff --git a/tests/entrypoints/openai/responses/test_serving_responses.py b/test
  
  import pytest
  import pytest_asyncio
-@@ -53,6 +53,7 @@
+@@ -49,10 +49,12 @@
+ from vllm.entrypoints.openai.responses.streaming_events import (
+     StreamingState,
+ )
++from vllm.exceptions import VLLMValidationError
+ from vllm.inputs import tokens_input
  from vllm.outputs import CompletionOutput, RequestOutput
  from vllm.parser.harmony import Segment
  from vllm.sampling_params import SamplingParams
@@ -18,7 +23,7 @@ diff --git a/tests/entrypoints/openai/responses/test_serving_responses.py b/test
  
  
  class MockConversationContext(ConversationContext):
-@@ -357,11 +358,18 @@
+@@ -357,11 +359,18 @@
  
      class FakeTokenizer:
          def __init__(self):
@@ -38,7 +43,7 @@ diff --git a/tests/entrypoints/openai/responses/test_serving_responses.py b/test
      # Force non-harmony, SimpleContext path
      monkeypatch.setattr(envs, "VLLM_USE_EXPERIMENTAL_PARSER_CONTEXT", False)
  
-@@ -398,7 +406,7 @@
+@@ -398,7 +407,7 @@
  
      # Build a SimpleContext with thinking tokens in the output.
      context = SimpleContext(response_parser=response_parser)
@@ -47,7 +52,7 @@ diff --git a/tests/entrypoints/openai/responses/test_serving_responses.py b/test
      completion = CompletionOutput(
          index=0,
          text="<think>reason</think>final",
-@@ -435,7 +443,8 @@
+@@ -435,7 +444,8 @@
          request_metadata=metadata,
      )
  
@@ -57,7 +62,7 @@ diff --git a/tests/entrypoints/openai/responses/test_serving_responses.py b/test
  
  
  class TestExtractAllowedToolsFromMcpRequests:
-@@ -1235,3 +1244,118 @@
+@@ -1235,3 +1245,135 @@
          assert len(function_done) == 1
          assert function_done[0].item.name == "get_weather"
          assert function_done[0].item.arguments == tool_args
@@ -140,14 +145,10 @@ diff --git a/tests/entrypoints/openai/responses/test_serving_responses.py b/test
 +@pytest.mark.asyncio
 +@pytest.mark.parametrize("stream", [False, True])
 +@pytest.mark.parametrize("finish", ["stop", "length"])
-+async def test_text_output_retains_logprobs_and_status_on_both_transports(stream, finish):
-+    from openai.types.responses.response_output_text import Logprob
-+
++async def test_text_output_keeps_its_status_on_both_transports(stream, finish):
 +    serving = _make_serving_instance_with_reasoning()
 +    serving.parser = None
 +    serving._initialize_tool_sessions = AsyncMock()
-+    logprob = Logprob(token="A", bytes=[65], logprob=-0.25, top_logprobs=[])
-+    serving._create_response_logprobs = MagicMock(return_value=[logprob])
 +    context = SimpleContext()
 +
 +    async def outputs():
@@ -155,15 +156,12 @@ diff --git a/tests/entrypoints/openai/responses/test_serving_responses.py b/test
 +            request_id="req", prompt="q", prompt_token_ids=[1, 2],
 +            prompt_logprobs=None, outputs=[CompletionOutput(
 +                index=0, text="A", token_ids=[65], cumulative_logprob=-0.25,
-+                logprobs=[{}], finish_reason=finish, stop_reason=None,
++                logprobs=None, finish_reason=finish, stop_reason=None,
 +            )], finished=True,
 +        ))
 +        yield context
 +
-+    request = ResponsesRequest(
-+        input="q", stream=stream, include=["message.output_text.logprobs"],
-+        kv_scope="agent",
-+    )
++    request = ResponsesRequest(input="q", stream=stream, kv_scope="agent")
 +    args = (request, SamplingParams(max_tokens=20), outputs(), context, "model",
 +            MagicMock(), RequestResponseMetadata(request_id="req"))
 +    if stream:
@@ -175,11 +173,35 @@ diff --git a/tests/entrypoints/openai/responses/test_serving_responses.py b/test
 +        response = await serving.responses_full_generator(*args)
 +    assert response.status == ("incomplete" if finish == "length" else "completed")
 +    assert response.output[0].status == response.status
-+    assert response.output[0].content[0].logprobs == [logprob]
++    assert response.output[0].content[0].text == "A"
++    assert response.output[0].content[0].logprobs is None
++
++
++@pytest.mark.parametrize("field,value", [
++    ("include", ["message.output_text.logprobs"]),
++    ("include", ["reasoning.encrypted_content", "message.output_text.logprobs"]),
++    ("top_logprobs", 1),
++    ("top_logprobs", 20),
++])
++def test_log_probabilities_are_refused_naming_the_field(field, value):
++    # A message's log probabilities would be those of the tokens its text came
++    # from; the parser does not divide the generated ids into items, and one
++    # token can end the message and begin a call.
++    with pytest.raises(VLLMValidationError) as refused:
++        ResponsesRequest.model_validate(
++            {"input": "q", "kv_scope": "agent", field: value})
++    assert refused.value.parameter == field
++    assert "/v1/chat/completions" in str(refused.value)
++
++
++@pytest.mark.parametrize("fields", [{}, {"top_logprobs": 0}, {"top_logprobs": None}])
++def test_a_request_asking_for_no_log_probabilities_is_served(fields):
++    request = ResponsesRequest.model_validate({"input": "q", "kv_scope": "agent", **fields})
++    assert request.to_sampling_params(8, {}).logprobs is None
 diff --git a/vllm/entrypoints/openai/responses/serving.py b/vllm/entrypoints/openai/responses/serving.py
 --- a/vllm/entrypoints/openai/responses/serving.py
 +++ b/vllm/entrypoints/openai/responses/serving.py
-@@ -14,10 +14,10 @@
+@@ -14,12 +14,11 @@
  from openai.types.responses import (
      ResponseFunctionToolCall,
      ResponseOutputItem,
@@ -189,9 +211,34 @@ diff --git a/vllm/entrypoints/openai/responses/serving.py b/vllm/entrypoints/ope
      ResponseStatus,
 -    response_text_delta_event,
  )
- from openai.types.responses.response_output_text import Logprob, LogprobTopLogprob
+-from openai.types.responses.response_output_text import Logprob, LogprobTopLogprob
  from openai.types.responses.tool import Mcp, Tool
-@@ -809,85 +809,93 @@
+ from openai_harmony import Message as OpenAIHarmonyMessage
+ from pydantic import TypeAdapter
+@@ -95,8 +94,6 @@
+ from vllm.exceptions import VLLMValidationError
+ from vllm.inputs import EngineInput, tokens_input
+ from vllm.logger import init_logger
+-from vllm.logprobs import Logprob as SampleLogprob
+-from vllm.logprobs import SampleLogprobs
+ from vllm.lora.request import LoRARequest
+ from vllm.outputs import CompletionOutput
+ from vllm.parser import Parser, ParserManager
+@@ -296,13 +293,6 @@
+     def _validate_create_responses_input(
+         self, request: ResponsesRequest
+     ) -> ErrorResponse | None:
+-        if self.use_harmony and request.is_include_output_logprobs():
+-            return self.create_error_response(
+-                err_type="invalid_request_error",
+-                message="logprobs are not supported with gpt-oss models",
+-                status_code=HTTPStatus.BAD_REQUEST,
+-                param="logprobs",
+-            )
+         if request.store and not self.enable_store and request.background:
+             return self.create_error_response(
+                 err_type="invalid_request_error",
+@@ -809,85 +799,93 @@
              except asyncio.CancelledError:
                  return self.create_error_response("Client disconnected")
  
@@ -354,10 +401,73 @@ diff --git a/vllm/entrypoints/openai/responses/serving.py b/vllm/entrypoints/ope
  
          assert isinstance(context, (SimpleContext, HarmonyContext, ParsableContext))
          num_prompt_tokens = context.num_prompt_tokens
-@@ -1004,33 +1012,6 @@
-             )
-         return out
+@@ -941,96 +939,6 @@
+                     self.response_store[response.id] = response
+         return response
  
+-    def _topk_logprobs(
+-        self,
+-        logprobs: dict[int, SampleLogprob],
+-        top_logprobs: int,
+-        tokenizer: TokenizerLike,
+-    ) -> list[LogprobTopLogprob]:
+-        """Returns the top-k logprobs from the logprobs dictionary."""
+-        out = []
+-        for i, (token_id, _logprob) in enumerate(logprobs.items()):
+-            if i >= top_logprobs:
+-                break
+-            text = self._get_decoded_token(
+-                logprob=_logprob,
+-                token_id=token_id,
+-                tokenizer=tokenizer,
+-                return_as_token_id=self.return_tokens_as_token_ids,
+-            )
+-            out.append(
+-                LogprobTopLogprob(
+-                    token=text,
+-                    logprob=max(_logprob.logprob, -9999.0),
+-                    bytes=list(text.encode("utf-8", errors="replace")),
+-                )
+-            )
+-        return out
+-
+-    def _create_response_logprobs(
+-        self,
+-        token_ids: Sequence[int],
+-        logprobs: SampleLogprobs | None,
+-        tokenizer: TokenizerLike,
+-        top_logprobs: int | None = None,
+-    ) -> list[Logprob]:
+-        assert logprobs is not None, "logprobs must be provided"
+-        assert len(token_ids) == len(logprobs), (
+-            "token_ids and logprobs.token_ids must have the same length"
+-        )
+-        out = []
+-        for i, token_id in enumerate(token_ids):
+-            logprob = logprobs[i]
+-            token_logprob = logprob[token_id]
+-            text = self._get_decoded_token(
+-                logprob=token_logprob,
+-                token_id=token_id,
+-                tokenizer=tokenizer,
+-                return_as_token_id=self.return_tokens_as_token_ids,
+-            )
+-            out.append(
+-                Logprob(
+-                    token=text,
+-                    logprob=max(token_logprob.logprob, -9999.0),
+-                    bytes=list(text.encode("utf-8", errors="replace")),
+-                    top_logprobs=(
+-                        self._topk_logprobs(
+-                            logprob, top_logprobs=top_logprobs, tokenizer=tokenizer
+-                        )
+-                        if top_logprobs
+-                        else []
+-                    ),
+-                )
+-            )
+-        return out
+-
 -    def _create_stream_response_logprobs(
 -        self,
 -        token_ids: Sequence[int],
@@ -388,7 +498,7 @@ diff --git a/vllm/entrypoints/openai/responses/serving.py b/vllm/entrypoints/ope
      def _make_response_output_items(
          self,
          request: ResponsesRequest,
-@@ -1038,17 +1019,6 @@
+@@ -1038,27 +946,6 @@
          tokenizer: TokenizerLike,
          parser: Parser | None = None,
      ) -> list[ResponseOutputItem]:
@@ -403,10 +513,39 @@ diff --git a/vllm/entrypoints/openai/responses/serving.py b/vllm/entrypoints/ope
 -                delta=False,
 -            )
 -
-         # Compute logprobs if requested
-         logprobs = None
-         if request.is_include_output_logprobs() and final_output.logprobs:
-@@ -1094,7 +1064,9 @@
+-        # Compute logprobs if requested
+-        logprobs = None
+-        if request.is_include_output_logprobs() and final_output.logprobs:
+-            logprobs = self._create_response_logprobs(
+-                token_ids=final_output.token_ids,
+-                logprobs=final_output.logprobs,
+-                tokenizer=tokenizer,
+-                top_logprobs=request.top_logprobs,
+-            )
+-
+         # Use parser to extract reasoning, content, and tool calls
+         if parser:
+             reasoning, content, tool_calls = parser.parse(
+@@ -1069,12 +956,10 @@
+             )
+             if not request.include_reasoning:
+                 reasoning = None
+-                logprobs = None
+             return build_response_output_items(
+                 reasoning=reasoning,
+                 content=content,
+                 tool_calls=tool_calls,
+-                logprobs=logprobs,
+                 tools=request.tools,
+                 incomplete=final_output.finish_reason == "length",
+             )
+@@ -1088,13 +973,14 @@
+                         text=final_output.text,
+                         annotations=[],
+                         type="output_text",
+-                        logprobs=logprobs,
+                     )
+                 ]
                  if final_output.text
                  else [],
                  role="assistant",
@@ -417,22 +556,39 @@ diff --git a/vllm/entrypoints/openai/responses/serving.py b/vllm/entrypoints/ope
                  type="message",
              )
          ]
-@@ -1350,12 +1322,12 @@
+@@ -1346,22 +1232,6 @@
+         processor = SimpleStreamingEventProcessor(tools=request.tools)
+         final_finish_reason: str | None = None
  
-         def _get_logprobs(
-             output: CompletionOutput,
+-        hide_stream_metadata = not request.include_reasoning and self.parser is not None
+-
+-        def _get_logprobs(
+-            output: CompletionOutput,
 -        ) -> list[response_text_delta_event.Logprob]:
-+        ) -> list[Logprob]:
-             if not request.is_include_output_logprobs():
-                 return []
-             if hide_stream_metadata:
-                 return []
+-            if not request.is_include_output_logprobs():
+-                return []
+-            if hide_stream_metadata:
+-                return []
 -            return self._create_stream_response_logprobs(
-+            return self._create_response_logprobs(
-                 token_ids=output.token_ids,
-                 logprobs=output.logprobs,
-                 tokenizer=tokenizer,
-@@ -1511,6 +1483,7 @@
+-                token_ids=output.token_ids,
+-                logprobs=output.logprobs,
+-                tokenizer=tokenizer,
+-                top_logprobs=request.top_logprobs,
+-            )
+-
+         async for ctx in result_generator:
+             assert isinstance(ctx, SimpleContext)
+             if ctx.last_output is None or not ctx.last_output.outputs:
+@@ -1399,7 +1269,7 @@
+                     for event in processor.open(target_state, tool_call):
+                         yield _increment_sequence_number_and_return(event)
+ 
+-                for event in processor.emit_delta(dm, output, _get_logprobs):
++                for event in processor.emit_delta(dm):
+                     yield _increment_sequence_number_and_return(event)
+ 
+         for event in processor.close_current(
+@@ -1511,6 +1381,7 @@
                  )
              )
  
@@ -440,7 +596,7 @@ diff --git a/vllm/entrypoints/openai/responses/serving.py b/vllm/entrypoints/ope
              try:
                  async for event_data in processor(
                      request,
-@@ -1523,7 +1496,14 @@
+@@ -1523,7 +1394,14 @@
                      created_time,
                      _increment_sequence_number_and_return,
                  ):
@@ -455,7 +611,7 @@ diff --git a/vllm/entrypoints/openai/responses/serving.py b/vllm/entrypoints/ope
              except GenerationError as e:
                  error_json = self._convert_generation_error_to_streaming_response(e)
                  yield _increment_sequence_number_and_return(
-@@ -1531,22 +1511,6 @@
+@@ -1531,22 +1409,6 @@
                  )
                  return
  
@@ -481,60 +637,36 @@ diff --git a/vllm/entrypoints/openai/responses/serving.py b/vllm/entrypoints/ope
 diff --git a/vllm/entrypoints/openai/responses/streaming_events.py b/vllm/entrypoints/openai/responses/streaming_events.py
 --- a/vllm/entrypoints/openai/responses/streaming_events.py
 +++ b/vllm/entrypoints/openai/responses/streaming_events.py
-@@ -55,6 +55,7 @@
-     response_text_delta_event,
+@@ -52,7 +52,6 @@
+     ResponseWebSearchCallInProgressEvent,
+     ResponseWebSearchCallSearchingEvent,
+     response_function_web_search,
+-    response_text_delta_event,
  )
  from openai.types.responses.response_output_item import McpCall
-+from openai.types.responses.response_output_text import Logprob
  from openai.types.responses.response_reasoning_item import (
-     Content as ResponseReasoningTextContent,
+@@ -76,7 +75,6 @@
+     build_responses_tool_call_name_map,
+     resolve_responses_tool_call_name,
  )
-@@ -818,6 +819,7 @@
-     current_item_id: str = ""
-     content_index: int = 0
-     accumulated_text: str = ""
-+    accumulated_logprobs: list[Logprob] = field(default_factory=list)
-     tool_call_id: str = ""
-     tool_call_name: str = ""
-     tool_call_namespace: str | None = None
-@@ -833,6 +835,7 @@
-     state.current_item_id = random_uuid()
-     state.content_index = 0
-     state.accumulated_text = ""
-+    state.accumulated_logprobs = []
-     return [
-         ResponseOutputItemAddedEvent(
-             type="response.output_item.added",
-@@ -865,9 +868,10 @@
+-from vllm.outputs import CompletionOutput
+ from vllm.parser.harmony import Segment
+ from vllm.utils import random_uuid
+ 
+@@ -865,7 +863,6 @@
  def emit_simple_content_delta(
      state: SimpleStreamingState,
      delta: str,
 -    logprobs: list[response_text_delta_event.Logprob] | None = None,
-+    logprobs: list[Logprob] | None = None,
  ) -> list[StreamingResponsesResponse]:
      state.accumulated_text += delta
-+    state.accumulated_logprobs.extend(logprobs or [])
      return [
-         ResponseTextDeltaEvent(
-             type="response.output_text.delta",
-@@ -876,18 +880,33 @@
+@@ -876,13 +873,15 @@
              output_index=state.output_index,
              item_id=state.current_item_id,
              delta=delta,
 -            logprobs=logprobs or [],
-+            logprobs=[
-+                response_text_delta_event.Logprob(
-+                    token=entry.token,
-+                    logprob=entry.logprob,
-+                    top_logprobs=[
-+                        response_text_delta_event.LogprobTopLogprob(
-+                            token=top.token, logprob=top.logprob,
-+                        )
-+                        for top in entry.top_logprobs
-+                    ],
-+                )
-+                for entry in logprobs or []
-+            ],
++            logprobs=[],
          )
      ]
  
@@ -546,22 +678,7 @@ diff --git a/vllm/entrypoints/openai/responses/streaming_events.py b/vllm/entryp
  ) -> list[StreamingResponsesResponse]:
      part = ResponseOutputText(
          type="output_text",
-         text=state.accumulated_text,
-         annotations=[],
-+        logprobs=state.accumulated_logprobs or None,
-     )
-     events: list[StreamingResponsesResponse] = [
-         ResponseTextDoneEvent(
-@@ -896,7 +915,7 @@
-             output_index=state.output_index,
-             content_index=state.content_index,
-             text=state.accumulated_text,
--            logprobs=[],
-+            logprobs=[entry.model_dump() for entry in state.accumulated_logprobs],
-             item_id=state.current_item_id,
-         ),
-         ResponseContentPartDoneEvent(
-@@ -916,7 +935,7 @@
+@@ -916,7 +915,7 @@
                  type="message",
                  role="assistant",
                  content=[part] if state.accumulated_text else [],
@@ -570,7 +687,7 @@ diff --git a/vllm/entrypoints/openai/responses/streaming_events.py b/vllm/entryp
                  summary=[],
              ),
          ),
-@@ -1236,16 +1255,16 @@
+@@ -1236,16 +1235,16 @@
      def close_current(
          self, *, incomplete: bool = False
      ) -> list[StreamingResponsesResponse]:
@@ -594,14 +711,293 @@ diff --git a/vllm/entrypoints/openai/responses/streaming_events.py b/vllm/entryp
  
      def open(
          self, target_state: _StateType, tool_call: Any = None
-@@ -1270,9 +1289,7 @@
+@@ -1269,11 +1268,6 @@
+     def emit_delta(
          self,
          delta_message: DeltaMessage,
-         output: CompletionOutput,
+-        output: CompletionOutput,
 -        get_logprobs: Callable[
 -            [CompletionOutput], list[response_text_delta_event.Logprob]
 -        ]
-+        get_logprobs: Callable[[CompletionOutput], list[Logprob]]
-         | None = None,
+-        | None = None,
      ) -> list[StreamingResponsesResponse]:
          """Emit incremental events for the current state from the delta."""
+         handlers = self._STATE_HANDLERS[self.state.current_state]
+@@ -1292,6 +1286,5 @@
+             return handlers.delta_fn(self.state, delta_message.reasoning)
+         elif self.state.current_state == _StateType.CONTENT:
+             assert delta_message.content is not None
+-            logprobs = get_logprobs(output) if get_logprobs else []
+-            return handlers.delta_fn(self.state, delta_message.content, logprobs)
++            return handlers.delta_fn(self.state, delta_message.content)
+         return []
+diff --git a/tests/entrypoints/openai/responses/test_basic.py b/tests/entrypoints/openai/responses/test_basic.py
+--- a/tests/entrypoints/openai/responses/test_basic.py
++++ b/tests/entrypoints/openai/responses/test_basic.py
+@@ -66,16 +66,19 @@
+ 
+ 
+ @pytest.mark.asyncio
+-async def test_logprobs(client: openai.AsyncOpenAI):
+-    response = await client.responses.create(
+-        include=["message.output_text.logprobs"],
+-        input="What is 13 * 24?",
+-        top_logprobs=5,
+-    )
+-    print(response)
+-    outputs = response.output
+-    assert outputs[-1].content[-1].logprobs
+-    assert len(outputs[-1].content[-1].logprobs[0].top_logprobs) == 5
++@pytest.mark.parametrize("stream", [False, True])
++async def test_logprobs_are_refused(client: openai.AsyncOpenAI, stream: bool):
++    # A message cannot name the tokens its text came from: reasoning, message
++    # and calls are one generated sequence, and a token can end the message
++    # and begin a call.
++    with pytest.raises(openai.BadRequestError) as refused:
++        await client.responses.create(
++            include=["message.output_text.logprobs"],
++            input="What is 13 * 24?",
++            stream=stream,
++        )
++    assert refused.value.status_code == 400
++    assert "message.output_text.logprobs" in str(refused.value)
+ 
+ 
+ @pytest.mark.asyncio
+diff --git a/tests/entrypoints/openai/responses/test_simple.py b/tests/entrypoints/openai/responses/test_simple.py
+--- a/tests/entrypoints/openai/responses/test_simple.py
++++ b/tests/entrypoints/openai/responses/test_simple.py
+@@ -139,59 +139,6 @@
+     )
+ 
+ 
+-@pytest.mark.asyncio
+-@pytest.mark.parametrize("model_name", [MODEL_NAME])
+-async def test_streaming_logprobs(client: OpenAI, model_name: str):
+-    """Test that streaming with logprobs returns valid logprob data on
+-    output_text.delta events and that top_logprobs has the requested count."""
+-    response = await client.responses.create(
+-        model=model_name,
+-        input="Say hello.",
+-        stream=True,
+-        top_logprobs=3,
+-        include=["message.output_text.logprobs"],
+-    )
+-
+-    events = []
+-    async for event in response:
+-        events.append(event)
+-
+-    assert len(events) > 0
+-
+-    # Collect all output_text.delta events that carry logprobs
+-    text_delta_events = [e for e in events if e.type == "response.output_text.delta"]
+-    assert len(text_delta_events) > 0, "Expected at least one text delta event"
+-
+-    for delta_event in text_delta_events:
+-        logprobs = delta_event.logprobs
+-        assert logprobs is not None, "logprobs should be present on text delta events"
+-        assert len(logprobs) > 0, "logprobs list should not be empty"
+-        for lp in logprobs:
+-            # Each logprob entry must have a token and a logprob value
+-            assert lp.token is not None
+-            assert isinstance(lp.logprob, float)
+-            assert lp.logprob <= 0.0, f"logprob should be <= 0, got {lp.logprob}"
+-            # top_logprobs should have up to 3 entries
+-            assert lp.top_logprobs is not None
+-            assert len(lp.top_logprobs) <= 3
+-            for tl in lp.top_logprobs:
+-                assert tl.token is not None
+-                assert isinstance(tl.logprob, float)
+-
+-    # Verify that top_logprobs are actually populated, not always empty
+-    all_top_logprobs = [
+-        tl for e in text_delta_events for lp in e.logprobs for tl in lp.top_logprobs
+-    ]
+-    assert len(all_top_logprobs) > 0, (
+-        "Expected at least one top_logprobs entry across all delta events"
+-    )
+-
+-    # Verify the completed event still has valid output
+-    completed = events[-1]
+-    assert completed.type == "response.completed"
+-    assert completed.response.status == "completed"
+-
+-
+ @pytest.mark.asyncio
+ @pytest.mark.parametrize("model_name", [MODEL_NAME])
+ async def test_streaming_reasoning_tokens_e2e(client: OpenAI, model_name: str):
+diff --git a/tests/entrypoints/openai/responses/test_streaming_events.py b/tests/entrypoints/openai/responses/test_streaming_events.py
+--- a/tests/entrypoints/openai/responses/test_streaming_events.py
++++ b/tests/entrypoints/openai/responses/test_streaming_events.py
+@@ -62,7 +62,7 @@
+         if processor.needs_transition(target_state, tool_call):
+             events.extend(processor.close_current())
+             events.extend(processor.open(target_state, tool_call))
+-        events.extend(processor.emit_delta(dm, None))
++        events.extend(processor.emit_delta(dm))
+     return events
+ 
+ 
+diff --git a/tests/entrypoints/openai/test_return_tokens_as_ids.py b/tests/entrypoints/openai/test_return_tokens_as_ids.py
+--- a/tests/entrypoints/openai/test_return_tokens_as_ids.py
++++ b/tests/entrypoints/openai/test_return_tokens_as_ids.py
+@@ -121,42 +121,3 @@
+         for logprob_content in response.choices[0].logprobs.content:
+             token_ids.append(int(logprob_content.token.removeprefix("token_id:")))
+         assert tokenizer.decode(token_ids, skip_special_tokens=True) == text
+-
+-
+-def test_responses_api_logprobs_with_return_tokens_as_token_ids():
+-    """Test that return_tokens_as_token_ids works in Responses API logprobs."""
+-    from unittest.mock import MagicMock
+-
+-    from vllm.entrypoints.generate.base.serving import GenerateBaseServing
+-    from vllm.entrypoints.openai.responses.serving import OpenAIServingResponses
+-    from vllm.logprobs import Logprob as SampleLogprob
+-
+-    serving = MagicMock(spec=OpenAIServingResponses)
+-    serving.return_tokens_as_token_ids = True
+-    serving._get_decoded_token = GenerateBaseServing._get_decoded_token
+-
+-    tokenizer = MagicMock()
+-    tokenizer.decode = lambda token_id: "decoded"
+-
+-    token_ids = [100, 200, 300]
+-    sample_logprobs = [
+-        {100: SampleLogprob(logprob=-0.5, decoded_token="hello")},
+-        {200: SampleLogprob(logprob=-1.2, decoded_token="world")},
+-        {300: SampleLogprob(logprob=-0.8, decoded_token="!")},
+-    ]
+-
+-    result = OpenAIServingResponses._create_response_logprobs(
+-        serving,
+-        token_ids=token_ids,
+-        logprobs=sample_logprobs,
+-        tokenizer=tokenizer,
+-        top_logprobs=1,
+-    )
+-
+-    assert len(result) == 3
+-    assert result[0].token == "token_id:100"
+-    assert result[1].token == "token_id:200"
+-    assert result[2].token == "token_id:300"
+-    assert result[0].logprob == -0.5
+-    assert result[1].logprob == -1.2
+-    assert result[2].logprob == -0.8
+diff --git a/tests/tool_parsers/test_poolside_v1_tool_parser.py b/tests/tool_parsers/test_poolside_v1_tool_parser.py
+--- a/tests/tool_parsers/test_poolside_v1_tool_parser.py
++++ b/tests/tool_parsers/test_poolside_v1_tool_parser.py
+@@ -340,12 +340,3 @@
+ def test_streaming_responses_request_without_logprobs() -> None:
+     request = _build_responses_request(tool_choice="auto")
+     assert _stream_partial_start_token(request) is None
+-
+-
+-def test_streaming_responses_request_with_logprobs_emits_empty_delta() -> None:
+-    request = _build_responses_request(
+-        tool_choice="auto", include=["message.output_text.logprobs"]
+-    )
+-    result = _stream_partial_start_token(request)
+-    assert result is not None
+-    assert result.content == ""
+diff --git a/vllm/entrypoints/openai/responses/protocol.py b/vllm/entrypoints/openai/responses/protocol.py
+--- a/vllm/entrypoints/openai/responses/protocol.py
++++ b/vllm/entrypoints/openai/responses/protocol.py
+@@ -489,7 +489,6 @@
+             top_p=top_p,
+             top_k=top_k,
+             max_tokens=max_tokens,
+-            logprobs=self.top_logprobs if self.is_include_output_logprobs() else None,
+             stop=stop,
+             frequency_penalty=frequency_penalty,
+             presence_penalty=presence_penalty,
+@@ -509,14 +508,38 @@
+             final_response_token_budget=final_response_token_budget,
+         )
+ 
+-    def is_include_output_logprobs(self) -> bool:
+-        """Check if the request includes output logprobs."""
+-        if self.include is None:
+-            return False
+-        return (
+-            isinstance(self.include, list)
+-            and "message.output_text.logprobs" in self.include
+-        )
++    @model_validator(mode="after")
++    def refuse_log_probabilities(self) -> "ResponsesRequest":
++        """A message's log probabilities would be those of the tokens its text
++        came from. The model writes its reasoning, the message and its calls
++        as one token sequence, the parser reports each item's text and not its
++        tokens, and a single token can end the message and begin a call, so
++        no list of whole tokens is a message's. Both fields that ask for one
++        are refused."""
++        if self.include and "message.output_text.logprobs" in self.include:
++            raise VLLMValidationError(
++                'include "message.output_text.logprobs" asks for the log '
++                "probabilities of the tokens a message's text came from, and "
++                "this server cannot name those tokens: the model writes its "
++                "reasoning, the message and its calls as one token sequence, "
++                "and a single token can end the message and begin a call. "
++                "Remove it from include. /v1/chat/completions with logprobs "
++                "returns the log probability of every token the choice "
++                "generated, in order.",
++                parameter="include",
++                value="message.output_text.logprobs",
++            )
++        if self.top_logprobs:
++            raise VLLMValidationError(
++                "top_logprobs asks for log probabilities, which a Responses "
++                'message does not carry (see include "message.output_text.'
++                'logprobs"). Send 0 or omit it. /v1/chat/completions with '
++                "logprobs and top_logprobs returns them for every token the "
++                "choice generated.",
++                parameter="top_logprobs",
++                value=self.top_logprobs,
++            )
++        return self
+ 
+     @model_validator(mode="before")
+     @classmethod
+diff --git a/vllm/entrypoints/openai/responses/utils.py b/vllm/entrypoints/openai/responses/utils.py
+--- a/vllm/entrypoints/openai/responses/utils.py
++++ b/vllm/entrypoints/openai/responses/utils.py
+@@ -24,7 +24,6 @@
+ from openai.types.responses.response_function_tool_call_output_item import (
+     ResponseFunctionToolCallOutputItem,
+ )
+-from openai.types.responses.response_output_text import Logprob
+ from openai.types.responses.response_reasoning_item import (
+     Content as ResponseReasoningTextContent,
+ )
+@@ -59,7 +58,6 @@
+     reasoning: str | None,
+     content: str | None,
+     tool_calls: list[FunctionCall] | None,
+-    logprobs: list[Logprob] | None = None,
+     tools: list[Tool] | None = None,
+     *,
+     incomplete: bool = False,
+@@ -106,7 +104,6 @@
+                         text=content,
+                         annotations=[],
+                         type="output_text",
+-                        logprobs=logprobs,
+                     )
+                 ],
+                 role="assistant",
+diff --git a/vllm/tool_parsers/poolside_v1_tool_parser.py b/vllm/tool_parsers/poolside_v1_tool_parser.py
+--- a/vllm/tool_parsers/poolside_v1_tool_parser.py
++++ b/vllm/tool_parsers/poolside_v1_tool_parser.py
+@@ -443,10 +443,7 @@
+ 
+         tool_calls = list(pending_deltas.values())
+         if content is None and len(tool_calls) == 0:
+-            wants_logprobs = getattr(request, "logprobs", None) or (
+-                isinstance(request, ResponsesRequest)
+-                and request.is_include_output_logprobs()
+-            )
++            wants_logprobs = getattr(request, "logprobs", None)
+             if wants_logprobs:
+                 return DeltaMessage(content="")
+             return None

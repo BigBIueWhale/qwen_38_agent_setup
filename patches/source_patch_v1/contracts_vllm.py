@@ -631,18 +631,13 @@ def _validate_truncation_after(state: State) -> None:
         ("incomplete=incomplete",),
         label=label,
     )
-    require_python_symbols(
-        state,
-        utils,
-        {"build_response_output_items": (
-            "reasoning",
-            "content",
-            "tool_calls",
-            "logprobs",
-            "tools",
-            "incomplete",
-        )},
-        label=label,
+    # The generation's cut is the one keyword-only parameter of the batch
+    # item builder.
+    builder = _find_symbol(state, utils, "build_response_output_items", label=label)
+    _require(
+        [argument.arg for argument in builder.args.kwonlyargs] == ["incomplete"],
+        f"{label}: {utils}:build_response_output_items must take incomplete as "
+        "its one keyword-only parameter",
     )
     event_source = _symbol_source(state, events, "emit_simple_tool_call_done", label=label)
     _require_ordered(
@@ -2253,9 +2248,12 @@ def _validate_responses_history_after(state: State) -> None:
 
 
 def _validate_responses_identity_before(state: State) -> None:
-    require_text(state, "vllm/entrypoints/openai/responses/serving.py",
-                 "async def empty_async_generator():",
-                 label="Responses stream identity precondition")
+    label = "Responses stream identity precondition"
+    serving = "vllm/entrypoints/openai/responses/serving.py"
+    require_text(state, serving, "async def empty_async_generator():", label=label)
+    require_text(state, serving, "def _create_response_logprobs(", label=label)
+    require_text(state, "vllm/entrypoints/openai/responses/protocol.py",
+                 "def is_include_output_logprobs(self) -> bool:", label=label)
 
 
 def _validate_responses_identity_after(state: State) -> None:
@@ -2277,16 +2275,49 @@ def _validate_responses_identity_after(state: State) -> None:
         "output=output", "usage=usage", "is_streaming=request.stream",
         'if finish_reason == "length"',
     ), label=label)
-    _require_in_symbol(state, "vllm/entrypoints/openai/responses/streaming_events.py",
-        "emit_simple_content_done", (
-            "logprobs=state.accumulated_logprobs or None",
-            'status="incomplete" if incomplete else "completed"',
-        ), label=label)
+    events = "vllm/entrypoints/openai/responses/streaming_events.py"
+    _require_in_symbol(state, events, "emit_simple_content_done", (
+        'status="incomplete" if incomplete else "completed"',
+    ), label=label)
+    # A message carries no log probabilities: the parser reports each item's
+    # text, never its tokens, and one token can end the message and begin a
+    # call. The request refuses both fields that ask for them, and nothing
+    # on either transport builds them.
+    protocol = "vllm/entrypoints/openai/responses/protocol.py"
+    _require_in_symbol(state, protocol, "ResponsesRequest.refuse_log_probabilities", (
+        'if self.include and "message.output_text.logprobs" in self.include:',
+        'parameter="include"', "if self.top_logprobs:", 'parameter="top_logprobs"',
+        "/v1/chat/completions",
+    ), label=label)
+    for path, needles in (
+        (protocol, ("is_include_output_logprobs", "logprobs=self.top_logprobs")),
+        (serving, ("is_include_output_logprobs", "_create_response_logprobs",
+                   "_create_stream_response_logprobs", "_topk_logprobs")),
+        (events, ("accumulated_logprobs",)),
+        ("vllm/tool_parsers/poolside_v1_tool_parser.py", ("is_include_output_logprobs",)),
+    ):
+        for needle in needles:
+            forbid_text(state, path, needle, label=label)
+    _require_in_symbol(state, serving,
+        "OpenAIServingResponses._process_simple_streaming_events",
+        ("processor.emit_delta(dm)",), label=label)
+    require_python_symbols(state, events, {
+        "emit_simple_content_delta": ("state", "delta"),
+        "SimpleStreamingEventProcessor.emit_delta": ("self", "delta_message"),
+    }, label=label)
+    require_python_symbols(state, "vllm/entrypoints/openai/responses/utils.py", {
+        "build_response_output_items": (
+            "reasoning", "content", "tool_calls", "tools", "incomplete"),
+    }, label=label)
     require_python_symbols(state,
         "tests/entrypoints/openai/responses/test_serving_responses.py", {
             "test_terminal_response_uses_streamed_items_and_ids": None,
-            "test_text_output_retains_logprobs_and_status_on_both_transports": None,
+            "test_text_output_keeps_its_status_on_both_transports": None,
+            "test_log_probabilities_are_refused_naming_the_field": None,
+            "test_a_request_asking_for_no_log_probabilities_is_served": None,
         }, label=label)
+    require_python_symbols(state, "tests/entrypoints/openai/responses/test_basic.py",
+        {"test_logprobs_are_refused": None}, label=label)
 
 
 def _validate_anthropic_terminal_before(state: State) -> None:
@@ -4252,6 +4283,45 @@ def _validate_responses_tools_never_given_after(state: State) -> None:
                 "async def test_mcp_tool_call(", label=label)
 
 
+def _validate_chat_stream_logprobs_before(state: State) -> None:
+    label = "chat stream log probabilities precondition"
+    require_text(state, "vllm/entrypoints/openai/chat_completion/serving.py",
+                 "not request.return_token_ids or hide_stream_metadata", label=label)
+    require_text(state, "vllm/tool_parsers/poolside_v1_tool_parser.py",
+                 'wants_logprobs = getattr(request, "logprobs", None)', label=label)
+
+
+def _validate_chat_stream_logprobs_after(state: State) -> None:
+    label = "chat stream log probabilities result"
+    serving = "vllm/entrypoints/openai/chat_completion/serving.py"
+    # A chat choice's log probabilities are those of every token it generated.
+    # A step the parser releases no text for still sends its chunk when the
+    # chunk carries the step's token ids or log probabilities, so the stream
+    # reports the list the full response reports.
+    source = _require_in_symbol(state, serving,
+        "OpenAIServingChat.chat_completion_stream_generator", (
+            "include_token_ids = (",
+            "request.return_token_ids and not hide_stream_metadata",
+            "and not include_token_ids",
+            "and logprobs is None",
+        ), label=label)
+    _require_ordered(source, (
+        "if hide_stream_metadata:", "logprobs = None", "include_token_ids = (",
+        "if delta_message is None:", "and not include_token_ids",
+        "and logprobs is None", "continue", "delta_message = DeltaMessage()",
+    ), label=label, location=f"{serving}:chat_completion_stream_generator")
+    forbid_text(state, serving, "not request.return_token_ids or hide_stream_metadata",
+                label=label)
+    # No parser emits a placeholder delta to keep a step's log probabilities.
+    poolside = "vllm/tool_parsers/poolside_v1_tool_parser.py"
+    forbid_text(state, poolside, "wants_logprobs", label=label)
+    forbid_text(state, poolside, 'return DeltaMessage(content="")', label=label)
+    require_python_symbols(state,
+        "tests/entrypoints/openai/chat_completion/test_serving_chat.py", {
+            "test_a_stream_reports_the_log_probability_of_a_step_with_no_text": None,
+        }, label=label)
+
+
 def validate_final(state: State) -> None:
     """Reassert every durable semantic invariant on the complete tree.
 
@@ -4672,11 +4742,20 @@ CONTRACTS: Mapping[str, SemanticContract] = {
         rationale=(
             "Reparsing streamed output minted replacement item and call IDs in "
             "the terminal response, breaking replay correlation. Finalization "
-            "must use the actual streamed items, preserving status and logprobs."
+            "uses the actual streamed items, so both transports report the same "
+            "items, IDs and statuses. A message carries no log probabilities: "
+            "they would be those of the tokens its text came from, the parser "
+            "reports each item's text and has no token spans, and one generated "
+            "token can end the message and begin a call, so no list of whole "
+            "tokens is a message's. The request refuses include "
+            "message.output_text.logprobs and a non-zero top_logprobs by name, "
+            "and nothing on either transport builds Responses log probabilities."
         ),
         removal_condition=(
             "Remove when upstream uses one item identity from stream creation "
-            "through terminal output, with equivalent metadata on both transports."
+            "through terminal output, and either attributes every generated "
+            "token to the one item that wrote it or refuses message log "
+            "probabilities."
         ),
         validate_before=_validate_responses_identity_before,
         validate_after=_validate_responses_identity_after,
@@ -5482,5 +5561,25 @@ CONTRACTS: Mapping[str, SemanticContract] = {
         ),
         validate_before=_validate_responses_tools_never_given_before,
         validate_after=_validate_responses_tools_never_given_after,
+    ),
+    "chat-stream-carries-every-token-logprob": SemanticContract(
+        rationale=(
+            "A chat choice's log probabilities are those of every token it "
+            "generated -- the end of reasoning, the calls and the end of turn "
+            "included -- and the full response reports one per generated id. "
+            "The stream skipped a step whose delta the parser left empty (a "
+            "reasoning end, a held marker) unless token ids were requested, so "
+            "that step's log probabilities never reached the caller and the "
+            "streamed list depended on how the engine grouped tokens. The step "
+            "is now sent whenever it carries log probabilities or token ids, "
+            "and the Poolside parser no longer emits an empty content delta to "
+            "keep them."
+        ),
+        removal_condition=(
+            "Remove when pinned upstream sends every generated token's log "
+            "probability on the chat stream whatever the parser releases."
+        ),
+        validate_before=_validate_chat_stream_logprobs_before,
+        validate_after=_validate_chat_stream_logprobs_after,
     ),
 }

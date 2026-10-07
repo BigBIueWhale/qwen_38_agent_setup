@@ -64,10 +64,10 @@ index a7d8c8a6c3437fe63157db75f47548db3d53e59c..a16e62a9916f9cfbb3fd903e1e8424fd
          return None
  
 diff --git a/tests/entrypoints/openai/responses/test_serving_responses.py b/tests/entrypoints/openai/responses/test_serving_responses.py
-index d130d198c3cfa73e66410420a70684009e8ae33d..9d5bce263c0010f3e815f075e5d23fe859618fb0 100644
+index 838118c0d79a279e90f7079e00742c549b21d092..0fe655a9ca22559a96f8a5a316badf2191170d0e 100644
 --- a/tests/entrypoints/openai/responses/test_serving_responses.py
 +++ b/tests/entrypoints/openai/responses/test_serving_responses.py
-@@ -1408,6 +1408,7 @@ async def test_wrapped_call_output_uses_its_terminal_on_both_responses_paths(
+@@ -1426,6 +1426,7 @@ async def test_wrapped_call_output_uses_its_terminal_on_both_responses_paths(
      if chunk_size is None:
          items = serving._make_response_output_items(
              request, completion(ids, True), tokenizer, parser,
@@ -75,7 +75,7 @@ index d130d198c3cfa73e66410420a70684009e8ae33d..9d5bce263c0010f3e815f075e5d23fe8
          )
      else:
          context = SimpleContext(response_parser=parser)
-@@ -1451,3 +1452,64 @@ async def test_wrapped_call_output_uses_its_terminal_on_both_responses_paths(
+@@ -1469,3 +1470,64 @@ async def test_wrapped_call_output_uses_its_terminal_on_both_responses_paths(
          assert content == (cut if shape == "mixed" else "")
      assert parser.generated_token_count == len(ids)
      assert parser.reasoning_token_count == 4
@@ -274,10 +274,10 @@ index 068bdfa2fb23f2a7d0aacbe38f75cafd163d567f..09d55e0ac16d541f9d510c57bc70c6fe
                  model_output_token_ids=completion.token_ids,
                  finish_reason=completion.finish_reason,
 diff --git a/vllm/entrypoints/openai/responses/serving.py b/vllm/entrypoints/openai/responses/serving.py
-index 43ce83e3910de0e3137acb1ed54e62a5d56118b7..8b4db1810e5fb728f9a81c12293aa6bb94747cd5 100644
+index 88d26bd7aedacc2ab918bd6f5a4a736ae9e58960..7bdac98925369bc7b39b71889482751b6d273540 100644
 --- a/vllm/entrypoints/openai/responses/serving.py
 +++ b/vllm/entrypoints/openai/responses/serving.py
-@@ -915,6 +915,7 @@ class OpenAIServingResponses(GenerateBaseServing):
+@@ -905,6 +905,7 @@ class OpenAIServingResponses(GenerateBaseServing):
          self._raise_if_error(final_res.outputs[0].finish_reason, request.request_id)
          return self._make_response_output_items(
              request, final_res.outputs[0], tokenizer, parser=context.response_parser,
@@ -285,16 +285,15 @@ index 43ce83e3910de0e3137acb1ed54e62a5d56118b7..8b4db1810e5fb728f9a81c12293aa6bb
          )
  
      async def _finalize_response(
-@@ -1089,6 +1090,8 @@ class OpenAIServingResponses(GenerateBaseServing):
+@@ -1016,12 +1017,15 @@ class OpenAIServingResponses(GenerateBaseServing):
          final_output: CompletionOutput,
          tokenizer: TokenizerLike,
          parser: Parser | None = None,
 +        *,
 +        prompt_token_ids: Sequence[int] | None,
      ) -> list[ResponseOutputItem]:
-         # Compute logprobs if requested
-         logprobs = None
-@@ -1105,6 +1108,7 @@ class OpenAIServingResponses(GenerateBaseServing):
+         # Use parser to extract reasoning, content, and tool calls
+         if parser:
              reasoning, content, tool_calls = parser.parse_output(
                  final_output.text,
                  request,

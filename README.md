@@ -316,16 +316,16 @@ It is intentionally reconstructed by the ordered, reviewed semantic transformati
 | patches/vllm-kv-physical-free-memory.patch | d9c1b5a9d2c20266246e856f2264ad9da0d624b797ca682671772b808febca82 |
 | patches/vllm-qwen-single-call-grammar.patch | 878ba3d98284a326784ffced00a64b38dd827cbc80f136cf1e582df469c3eced |
 | patches/vllm-responses-history-integrity.patch | 226a84ccd920e8eb531f0006e1ebd7d51456fdecd4603d57d0cbd38e99ecb4fa |
-| patches/vllm-responses-stream-identity.patch | d4629bd0b979eb1978721d12733caae4acca2736d6ec870eb295f87316e67345 |
+| patches/vllm-responses-stream-identity.patch | 9a3f1fb54f3e22f3df621ab681e675f7a916849bdceb6e555242df29d6028095 |
 | patches/vllm-anthropic-terminal-metadata.patch | d09c3b0ba5658b864131c46202f53a4b611ca0395bd068feb1a054fcc70f2364 |
-| patches/vllm-generation-sampling-resolution.patch | af5970eab6a3e9fd39bb9fc95f9f64ca1ee9588a40fac2c12110ff4cfa4ea343 |
+| patches/vllm-generation-sampling-resolution.patch | 7f2e59a647b89c5aa7e37b72a7979e57d88e1089e0cc4d7e9b2d1567a0db0c1b |
 | patches/vllm-sampling-decoding-boundary.patch | e5909686b9aa4e591a35e66bcd78fb0fbc7b0ea56bf2210779d934d86c7b28c8 |
 | patches/vllm-token-generation-result-integrity.patch | bcb8e56c7f9f53563c16bc3adb8fc10796d0463ac5b85e52ecb367948efbb93e |
 | patches/vllm-raw-image-token-transport.patch | 7ff7f7fdc9d72fec7948de4cd8968e157756345ab8487281a36689ed3aa82a63 |
 | patches/vllm-xml-text-fidelity.patch | fea2ea6b6837aa30c59a5758837eb039649af16bffd49ffcad603058d59742d3 |
 | patches/vllm-phase-aware-parser-terminals.patch | 8310845e39bed950883182690894f3ed94d0e55c8ef16d89c750d925fef65b21 |
 | patches/vllm-input-stream-agent-identity.patch | caee1588ff260cb866404a91889b3962f8f94b468fa5f5eb81720f1e8c88d67a |
-| patches/vllm-tool-output-completion.patch | 28525a4fe94915d387d36d6173493908dfba291a3d10b517353ba5fa8f3f4fa4 |
+| patches/vllm-tool-output-completion.patch | 51ec1e129e3467b6569e3557bebd57b2cd2c0ab809c81fb13d9e9a84300e4ce4 |
 | patches/vllm-one-way-thinking-boundary.patch | 63a69aea8a184a3875f50673a55058fb9e14dc3178abd8c5510de2770022f346 |
 | patches/vllm-schema-faithful-xml.patch | 97e73d566da1bbde490e78da1143d6052e93309b3bb67c90c56fda582af207c2 |
 | patches/vllm-token-text-provenance.patch | 954b36cb444f7e644e29d13f7a9d3c000512a0d616bbf2b6cd3cb8f4e880dd44 |
@@ -333,27 +333,28 @@ It is intentionally reconstructed by the ordered, reviewed semantic transformati
 | patches/vllm-qwen-canonical-parameter-framing.patch | d438f9106c4a989d64837c21f5491d946065e6721570ad47664513347f150064 |
 | patches/vllm-qwen-owned-tool-grammar.patch | 8eca87e7046eb5b01f37ebc93cafaec01479558ef102201dd74ef3ae8ad8a665 |
 | patches/vllm-qwen-unique-tool-parameters.patch | 6a76a61c743807215555cbd6b3bbdd8fcaba4abcaca69ef000d301df6c792d3b |
-| patches/vllm-generation-admission-before-response.patch | 9e20b1a5b9a37784df6e0f7f034ed0ebf3022fd7ef61cb2353a889e6bfdb7a62 |
+| patches/vllm-generation-admission-before-response.patch | 6418c42eb3fca2492473e5411f9463d21d1473a0cc55187a2a9a530ddfc44b86 |
 | patches/vllm-kv-scope-single-flight.patch | b84b915c38e2c1d32b278bf88dcd5ac7228b9a680b746e2842783dbe1942540a |
 | patches/vllm-template-authored-control-tokens.patch | 1f6b9e898c3b7d3620d2ad3ee8dce70aa7d320e211788ff4fe030468870bc37b |
 | patches/vllm-nvfp4-native-kernel-required.patch | 9d9ce188b6670d687a725c4cdca37478f9dc78ef9f19685ddbcf5e9edd53b8b7 |
 | patches/vllm-qwen-arguments-read-by-grammar.patch | 9bf29aed999f1cfe12a58cc98b91fccafe615dfb7c22f13e9c681d1b54034837 |
 | patches/vllm-startup-plan-admission-bound.patch | 596e311a54f888e8589a0bdc9fba62b6bf779b11eabab8ca1d2b60b8cf9f9930 |
 | patches/vllm-template-refusals-name-their-parameter.patch | 1f428332be39e4fb7f3c7f7eb5d6e3297f5dc70638fcd7f81d69b32f69d1fa26 |
-| patches/vllm-qwen-repeated-parameter-refusal.patch | 11e1a32696d6c17352a94ad815f878728011304592c1efb09eaf98f73f59f147 |
+| patches/vllm-qwen-repeated-parameter-refusal.patch | af405e3be4a649264786bf7bc924c3e4053579eddde47030d9776eb1bc1c73c0 |
 | patches/vllm-generated-tokens-survive-parsing.patch | 3709ac24d4f098a27ffa57fedf9d3dec81a1e08392da07d225bb8b62d2e8ee2e |
 | patches/vllm-include-reasoning-shapes-the-response.patch | d3b41899464142ffffb04efd0b19647153e322b10c7f9fc1e14af0f290af98d1 |
 | patches/vllm-unspecified-tool-choice-is-the-default.patch | 367fedad65383375e377d7bc1e20cc3fdab4554d511b9437918004b25321d530 |
 | patches/vllm-call-only-answer-keeps-the-blank-line.patch | ad1e558f8ba02c6889d9b4a79c6ec355e9bfa763bc007e5cae7e609be96ec084 |
-| patches/vllm-responses-tools-are-one-function-list.patch | cae549ea87a8c1b6020f76163cfe1eca0c3104eac317ab2d84b3db75092d20cd |
-| patches/vllm-batch-parse-starts-where-the-prompt-leaves.patch | 73ae004604378573de88e10a357072ed3ff74f4e483f852f185032286d37a802 |
+| patches/vllm-responses-tools-are-one-function-list.patch | 6e1776efc90fb8f87f9c7886b3788850475b4ea500f5cafa7ca8ea348a6d79fc |
+| patches/vllm-batch-parse-starts-where-the-prompt-leaves.patch | 352b37904e51dab650f4fb84b7ecd8f284f468d2602bcd1b021001a8d865ccc0 |
 | patches/vllm-derender-text-is-the-detokenizers.patch | 9d8f6d45beba5c79671444be4e9604c4352c7fe5346d78573bfc4fbc91bfb4b6 |
-| patches/vllm-output-constraints-refused-beside-tool-calls.patch | c6ac620c8cd962a77868789d72875e0df456a9b0918ef8cb58ec2e15c3600343 |
+| patches/vllm-output-constraints-refused-beside-tool-calls.patch | 01bfdf064fa8a83c68feb4f5477181bc3df2f6776e41ec91ac672e84ca562adb |
 | patches/vllm-batch-invariance-substitutes-no-nvfp4-kernel.patch | c79baaee0a51275f5f522d266fe6b315c200e6951920c2454d5c80cadbb92f44 |
 | patches/vllm-render-carries-every-image-chat-renders.patch | c5bf4cb2948b9eb7866d083671af3badcc9cf529a7756bde3b0647c236fe932f |
-| patches/vllm-rendered-prompts-are-never-truncated.patch | 07cd24fbf29bc66fb9615d63a8e30d947ee13cf6367e23bcb1a870e4f3a49334 |
+| patches/vllm-rendered-prompts-are-never-truncated.patch | 72e74c44c7c8b8ff3db8c7f73124fa82e196244f2b0f2f666a2315f3cef4cdc9 |
 | patches/vllm-kv-transfer-params-are-declared.patch | 9742698af30ad79158f5430fb22987cafe4667f457771dd66b29b38a7376ce0e |
-| patches/vllm-responses-refuses-tools-the-template-is-never-given.patch | e739235f61cf09867025db10b87b1aa4840aec9dca0bd857bfe735b5612d86ed |
+| patches/vllm-responses-refuses-tools-the-template-is-never-given.patch | 84bfd906df0b4f47192d039106a3b6f6af154f4005d5036878b6af62c8c16cac |
+| patches/vllm-chat-stream-carries-every-token-logprob.patch | ca15dadd152454fe5b3fbcb710b8c7b5ce3221c038617b9e0d0985953aecbf47 |
 
 The reconstructed tree's runtime-source and test changes, new files and
 deletions are counted by ./scripts/build-vllm.sh check, which derives and prints
@@ -404,9 +405,9 @@ Pinned build inputs and products:
 |---|---|
 | Immutable base tag | qwen38-vllm:main-9df9b0b |
 | Immutable base ID | sha256:fa4a002a88b7043a1a89966dea8a500fe9696f84e75730d9da916f916048d401 |
-| Runtime Dockerfile SHA-256 | c72161cf3d7d8b6dca178189d45d8c118b15964475cb9e46554618202db1bf8e |
-| Build verifier SHA-256 | 1041102e2dd8da5ac349b84cd1fa6fb36dac6e9bc91c6ae2205848f3bcc8204d |
-| Runtime validator SHA-256 | 2d52ddb8b576a6a4298bba641797588625350217d059490d6bcd6c63fd7dc45d |
+| Runtime Dockerfile SHA-256 | 319a602d81d5f30696609ad36c9e3ea421c08ef5d97623222eeec6ba1866f4fe |
+| Build verifier SHA-256 | d8a8d38eda3e4ae90eb7d3747610770cce2ee774b68ba8d4747af356bfd941f3 |
+| Runtime validator SHA-256 | a7d6486f1f5b98fba351d1164759adf29277f51849963e71ba01b34b70695692 |
 
 The runtime image's profile, tag and archive name, which every release advances
 together, are declared in `config/runtime-v1.sh`, and the archive lives under
@@ -1152,9 +1153,14 @@ exactly the concatenation of its deltas, which the parser unit asserts for every
 engine chunking. Usage, the response's own status and every item's status are
 the same on both paths: in a truncated response the item the limit cut -- the
 last -- is incomplete, and the items it finished before the cut are completed.
-Log probabilities are not: a batch message carries those of every generated token,
-reasoning and calls included, and a streamed message those of each engine step
-that emitted its text, so their number depends on how the engine grouped tokens.
+A message carries no log probabilities. They would be those of the tokens its
+text came from, and the model writes reasoning, message and calls as one token
+sequence in which a single token can end the message and begin a call, so no list
+of whole tokens is the message's: `include: ["message.output_text.logprobs"]` and
+a non-zero `top_logprobs` are refused, each by name. Chat Completions reports the
+log probability of every token a choice generated, in order -- the end of
+reasoning, the calls and the end of turn included -- the same in the full
+response and across the streamed chunks, for every engine chunking.
 
 OpenAI and Anthropic representations of the same history produced exactly identical
 16,562 prompt-token IDs. Marker ordering proved:
