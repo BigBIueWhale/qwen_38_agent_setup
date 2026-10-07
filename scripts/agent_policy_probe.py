@@ -207,14 +207,27 @@ def main() -> None:
     if not any(block.get("type") == "thinking" for block in adaptive["content"]):
         raise RuntimeError(f"Anthropic adaptive/max omitted thinking: {adaptive}")
 
+    # The budget must end thinking. The task needs far more than the budget's
+    # worth of reasoning, and max_tokens leaves room for an answer after it: a
+    # server that ignored the budget would think past it, or think until
+    # max_tokens and leave no answer.
+    thinking_budget = 32
     status, capped = post(
         "/v1/messages",
         {
             "model": MODEL,
-            "messages": simple,
+            "messages": [
+                {
+                    "role": "user",
+                    "content": (
+                        "Work out 17*23 + 19*29 step by step, then reply with "
+                        "POLICY_OK and the number."
+                    ),
+                }
+            ],
             "max_tokens": 256,
             "kv_scope": new_conversation("anthropic-thinking-budget"),
-            "thinking": {"type": "enabled", "budget_tokens": 32},
+            "thinking": {"type": "enabled", "budget_tokens": thinking_budget},
             "output_config": {"effort": "xhigh"},
         },
         {"anthropic-version": "2023-06-01"},
@@ -226,8 +239,27 @@ def main() -> None:
         for block in capped["content"]
         if block.get("type") == "thinking"
     )
+    answer_text = "".join(
+        block.get("text", "")
+        for block in capped["content"]
+        if block.get("type") == "text"
+    )
     if not thinking_text:
         raise RuntimeError(f"explicit thinking budget produced no thinking block: {capped}")
+    if capped.get("stop_reason") != "end_turn" or not answer_text.strip():
+        raise RuntimeError(
+            "explicit thinking budget did not end thinking before max_tokens: "
+            f"{capped}"
+        )
+    status, thinking_tokenization = post(
+        "/tokenize",
+        {"model": MODEL, "prompt": thinking_text, "add_special_tokens": False},
+    )
+    if status != 200 or not 0 < thinking_tokenization.get("count", 0) <= thinking_budget:
+        raise RuntimeError(
+            f"thinking ran past its {thinking_budget}-token budget: status={status}, "
+            f"tokenization={thinking_tokenization}, thinking={thinking_text!r}"
+        )
 
     status, phase_capped = post(
         "/v1/chat/completions",
@@ -291,8 +323,9 @@ def main() -> None:
                 "anthropic_low_rejected_http": anthropic_low_status,
                 "anthropic_thinking_disabled_rejected_http": anthropic_disabled_status,
                 "anthropic_adaptive_max_thinking_present": True,
-                "anthropic_explicit_budget": 32,
-                "anthropic_explicit_budget_thinking_characters": len(thinking_text),
+                "anthropic_thinking_budget": thinking_budget,
+                "anthropic_thinking_tokens": thinking_tokenization["count"],
+                "anthropic_answer_after_budget": True,
                 "separate_final_response_budget_tokens": 5,
                 "separate_final_response_stop_reason": phase_choice["stop_reason"],
             },

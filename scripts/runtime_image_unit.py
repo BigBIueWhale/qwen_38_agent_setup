@@ -133,6 +133,34 @@ class RuntimeImageTest(unittest.TestCase):
             recipe,
         )
 
+    def test_every_shipped_unit_is_executed_or_needs_the_card(self):
+        # A unit the image ships and nothing runs reports as coverage it never
+        # gives: qwen38_context_unit, which needs only the served config, was
+        # shipped and hashed for weeks and run by nothing. A unit runs in the
+        # image's own layers or in the build's unit loop. Only a unit that
+        # needs the GPU may do neither, and those are named here, with the
+        # reason, so no other unit can quietly join them.
+        needs_the_card = {
+            # Triton store and fused decode on CUDA, against PyTorch references.
+            "turboquant_k8v4_unit",
+            # The checkpoint's worst-error NVFP4 layer on an SM 12.0 card.
+            "nvfp4_kernel_unit",
+        }
+        recipe = (ROOT / "containers/Dockerfile.runtime").read_text()
+        script = (ROOT / "scripts/build-vllm.sh").read_text()
+        shipped = set(re.findall(
+            r"^COPY --chmod=0644 scripts/(\w+_unit)\.py /opt/qwen38/", recipe, re.M,
+        ))
+        in_image = set(re.findall(
+            r"^RUN [^\n]*python3 /opt/qwen38/(\w+_unit)\.py", recipe, re.M,
+        ))
+        loop = next(
+            line for line in script.splitlines() if line.startswith("for unit in ")
+        )
+        in_check = set(loop.split(" in ", 1)[1].split(";", 1)[0].split())
+        in_check |= set(re.findall(r"/context/scripts/(\w+_unit)\.py", script))
+        self.assertEqual(sorted(shipped - in_image - in_check), sorted(needs_the_card))
+
     def test_grammar_unit_is_executed_during_build(self):
         # The image must run the shipped file, not a copy of its assertions:
         # `build-vllm.sh check` runs the same path, so a recipe that stopped

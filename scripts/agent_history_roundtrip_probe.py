@@ -31,7 +31,7 @@ from vllm.entrypoints.openai.chat_completion.protocol import (
     ChatCompletionRequest,
     ChatCompletionToolsParam,
 )
-from vllm.tokenizers.detokenizer_utils import detokenize_incrementally
+from vllm.tokenizers.detokenizer_utils import NativeDecodeStream
 
 from probe_parser import served_parser
 from probe_scope import new_conversation
@@ -228,6 +228,37 @@ def render_request(messages: list[dict[str, Any]]) -> dict[str, Any]:
     return post_json("/v1/chat/completions/render", payload)
 
 
+def generated_turn(
+    tokenizer: Any,
+    prompt: dict[str, Any],
+    rendered: dict[str, Any],
+) -> tuple[list[int], list[int], list[str]]:
+    """The assistant turn as serving hands it to the parser.
+
+    *prompt* renders the history the turn answers, with the generation prompt;
+    the full history must begin with exactly those ids. The turn is the ids
+    after them through the end-of-turn token, which the model generates and
+    the detokenizer gives no text; the rest is decoded incrementally from the
+    prompt, as the served detokenizer does.
+    """
+    prompt_ids, history_ids = prompt["token_ids"], rendered["token_ids"]
+    if history_ids[: len(prompt_ids)] != prompt_ids:
+        raise AssertionError(
+            "The rendered history does not begin with the prompt its assistant "
+            "turn was generated after"
+        )
+    end = tokenizer.convert_tokens_to_ids("<|im_end|>")
+    turn = history_ids[len(prompt_ids) :]
+    if end not in turn:
+        raise AssertionError("Rendered assistant turn has no end-of-turn token")
+    turn = turn[: turn.index(end) + 1]
+    decoder = NativeDecodeStream(
+        tokenizer.backend_tokenizer, ids=list(prompt_ids), skip_special_tokens=False
+    )
+    texts = [decoder.step(token) or "" for token in turn[:-1]] + [""]
+    return list(prompt_ids), turn, texts
+
+
 def decode_render(tokenizer: Any, rendered: dict[str, Any]) -> str:
     token_ids = rendered.get("token_ids")
     if not isinstance(token_ids, list) or not token_ids:
@@ -237,18 +268,6 @@ def decode_render(tokenizer: Any, rendered: dict[str, Any]) -> str:
         skip_special_tokens=False,
         clean_up_tokenization_spaces=False,
     )
-
-
-def assistant_turn(rendered_text: str) -> str:
-    start_marker = "<|im_start|>assistant\n"
-    start = rendered_text.find(start_marker)
-    if start < 0:
-        raise AssertionError("Rendered history has no assistant turn")
-    start += len(start_marker)
-    end = rendered_text.find("<|im_end|>", start)
-    if end < 0:
-        raise AssertionError("Rendered assistant turn has no end marker")
-    return rendered_text[start:end]
 
 
 def normalize_calls(calls: Sequence[Any] | None) -> list[tuple[str, dict[str, Any]]]:
@@ -267,79 +286,59 @@ def normalize_calls(calls: Sequence[Any] | None) -> list[tuple[str, dict[str, An
 
 def parse_nonstream(
     tokenizer: Any,
-    raw_turn: str,
+    prompt_ids: list[int],
+    turn_ids: list[int],
+    texts: list[str],
     request: ChatCompletionRequest,
 ) -> tuple[str, str, list[tuple[str, dict[str, Any]]], list[Any]]:
+    """The served batch path: parse_output on the generated text and ids,
+    starting where the prompt leaves reasoning."""
     parser = served_parser(tokenizer, request.tools)
-    token_ids = tokenizer.encode(raw_turn, add_special_tokens=False)
-    reasoning, content, calls = parser.parse(
-        raw_turn,
+    reasoning, content, calls = parser.parse_output(
+        "".join(texts),
         request,
+        prompt_token_ids=prompt_ids,
+        finish_reason="stop",
+        stop_reason=None,
         enable_auto_tools=True,
-        model_output_token_ids=token_ids,
+        model_output_token_ids=turn_ids,
     )
     return reasoning or "", content or "", normalize_calls(calls), list(calls or [])
 
 
 def parse_streaming(
     tokenizer: Any,
-    raw_turn: str,
+    prompt_ids: list[int],
+    turn_ids: list[int],
+    texts: list[str],
     request: ChatCompletionRequest,
+    chunk_size: int,
 ) -> tuple[str, str, list[tuple[str, dict[str, Any]]]]:
+    """The served stream path: parse_output_delta per engine output, given the
+    prompt, with the finish reason on the last delta."""
     parser = served_parser(tokenizer, request.tools)
-    all_token_ids = tokenizer.encode(raw_turn, add_special_tokens=False)
-    previous_text = ""
-    previous_tokens = None
-    prefix_offset = 0
-    read_offset = 0
     reasoning_parts: list[str] = []
     content_parts: list[str] = []
     states: dict[int, dict[str, str]] = {}
-
-    def collect(delta: Any) -> None:
+    for start in range(0, len(turn_ids), chunk_size):
+        last = start + chunk_size >= len(turn_ids)
+        delta = parser.parse_output_delta(
+            delta_text="".join(texts[start : start + chunk_size]),
+            delta_token_ids=turn_ids[start : start + chunk_size],
+            request=request,
+            prompt_token_ids=prompt_ids,
+            finish_reason="stop" if last else None,
+            stop_reason=None,
+        )
         if delta is None:
-            return
+            continue
         reasoning_parts.append(delta.reasoning or "")
         content_parts.append(delta.content or "")
         for tool_delta in delta.tool_calls or []:
-            slot = states.setdefault(
-                tool_delta.index,
-                {"name": "", "arguments": ""},
-            )
-            function = tool_delta.function
-            if function is not None:
-                slot["name"] += function.name or ""
-                slot["arguments"] += function.arguments or ""
-
-    for index, delta_token in enumerate(all_token_ids):
-        current_token_ids = all_token_ids[: index + 1]
-        new_tokens, delta_text, prefix_offset, read_offset = detokenize_incrementally(
-            tokenizer=tokenizer,
-            all_input_ids=current_token_ids,
-            prev_tokens=previous_tokens,
-            prefix_offset=prefix_offset,
-            read_offset=read_offset,
-            skip_special_tokens=False,
-            spaces_between_special_tokens=True,
-        )
-        current_text = previous_text + delta_text
-        collect(
-            parser.extract_tool_calls_streaming(
-                previous_text=previous_text,
-                current_text=current_text,
-                delta_text=delta_text,
-                previous_token_ids=all_token_ids[:index],
-                current_token_ids=current_token_ids,
-                delta_token_ids=[delta_token],
-                request=request,
-            )
-        )
-        previous_text = current_text
-        previous_tokens = (
-            previous_tokens + new_tokens if previous_tokens is not None else new_tokens
-        )
-    collect(parser.finish_streaming())
-
+            slot = states.setdefault(tool_delta.index, {"name": "", "arguments": ""})
+            if tool_delta.function is not None:
+                slot["name"] += tool_delta.function.name or ""
+                slot["arguments"] += tool_delta.function.arguments or ""
     calls = [
         (states[index]["name"], json.loads(states[index]["arguments"]))
         for index in sorted(states)
@@ -365,24 +364,27 @@ def synthetic_roundtrip(tokenizer: Any) -> dict[str, Any]:
     if any(call_id in rendered_text for call_id in original_ids):
         raise AssertionError("Transport tool-call IDs leaked into Qwen prompt XML")
 
-    raw_turn = assistant_turn(rendered_text)
+    # The turn is parsed as the model generated it: after the prompt that
+    # renders the history before it, which ends with the template's opener.
+    prompt_ids, turn_ids, texts = generated_turn(
+        tokenizer, render_request(original_history[:2]), rendered
+    )
     batch_reasoning, batch_content, batch_calls, parsed_calls = parse_nonstream(
-        tokenizer, raw_turn, request
+        tokenizer, prompt_ids, turn_ids, texts, request
     )
-    stream_reasoning, stream_content, stream_calls = parse_streaming(
-        tokenizer, raw_turn, request
-    )
-    if batch_calls != EXPECTED_CALLS or stream_calls != EXPECTED_CALLS:
-        raise AssertionError(
-            "Stream/non-stream parser mismatch: "
-            f"batch={batch_calls!r}, stream={stream_calls!r}"
+    if batch_calls != EXPECTED_CALLS:
+        raise AssertionError(f"Batch parse changed the calls: {batch_calls!r}")
+    # Every engine chunking must give the batch answer, byte for byte.
+    for chunk_size in (1, 2, 3, 7, len(turn_ids)):
+        streamed = parse_streaming(
+            tokenizer, prompt_ids, turn_ids, texts, request, chunk_size
         )
-    if batch_reasoning != stream_reasoning or batch_content != stream_content:
-        raise AssertionError(
-            "Stream/non-stream text mismatch: "
-            f"batch={(batch_reasoning, batch_content)!r}, "
-            f"stream={(stream_reasoning, stream_content)!r}"
-        )
+        if streamed != (batch_reasoning, batch_content, batch_calls):
+            raise AssertionError(
+                f"Stream (chunks of {chunk_size}) and batch parses differ: "
+                f"batch={(batch_reasoning, batch_content, batch_calls)!r}, "
+                f"stream={streamed!r}"
+            )
     if batch_reasoning.strip() != REASONING or batch_content.strip():
         raise AssertionError(
             f"Rendered reasoning/content changed: {(batch_reasoning, batch_content)!r}"
@@ -447,6 +449,9 @@ def synthetic_roundtrip(tokenizer: Any) -> dict[str, Any]:
             ],
             "tool_choice": {"type": "any", "disable_parallel_tool_use": False},
             "max_tokens": 1,
+            # A Messages request is a generation request and names its line of
+            # work; the render below allocates no KV and names none.
+            "kv_scope": new_conversation("anthropic-history-render"),
         }
     )
     converted = AnthropicServingMessages._convert_anthropic_to_openai_request(
@@ -457,6 +462,7 @@ def synthetic_roundtrip(tokenizer: Any) -> dict[str, Any]:
         mode="json",
         by_alias=True,
         exclude_none=True,
+        exclude={"kv_scope"},
     )
     # The Anthropic request carries no template kwargs of its own, so without
     # this the converted side would inherit the deployment default while the

@@ -9,6 +9,7 @@ It also freezes the native text/RoPE/layer geometry used in the VRAM proof.
 from __future__ import annotations
 
 import math
+import os
 from dataclasses import dataclass
 
 import numpy as np
@@ -24,7 +25,13 @@ from vllm.multimodal.inputs import (
     PlaceholderRange,
 )
 
-MODEL_PATH = "/model"
+try:
+    MODEL_PATH = os.environ["SERVED_MODEL"]
+except KeyError:
+    raise SystemExit(
+        "SERVED_MODEL is not set. This unit reads the served model's config, "
+        "which ./scripts/build-vllm.sh check mounts; run it through the check."
+    ) from None
 
 
 def require(condition: bool, message: str) -> None:

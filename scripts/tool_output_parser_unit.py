@@ -198,6 +198,182 @@ def grammar_matcher(request):
     return xgr.GrammarMatcher(compiled)
 
 
+def _served_model_config():
+    """The model config the chat route reads, from the served files."""
+    from dataclasses import dataclass, field
+
+    from transformers import AutoConfig
+
+    from vllm.config.multimodal import MultiModalConfig
+
+    @dataclass
+    class ServedModelConfig:
+        task = "generate"
+        runner_type = "generate"
+        model = SERVED_MODEL
+        tokenizer = SERVED_MODEL
+        trust_remote_code = False
+        tokenizer_mode = "auto"
+        max_model_len = 4096
+        tokenizer_revision = None
+        multimodal_config = MultiModalConfig()
+        hf_config = hf_text_config = AutoConfig.from_pretrained(
+            SERVED_MODEL, local_files_only=True
+        )
+        logits_processors = None
+        diff_sampling_param = None
+        allowed_local_media_path = ""
+        allowed_media_domains = None
+        encoder_config = None
+        generation_config = "auto"
+        override_generation_config: dict = field(default_factory=dict)
+        media_io_kwargs: dict = field(default_factory=dict)
+        skip_tokenizer_init = False
+        is_encoder_decoder = False
+        is_multimodal_model = False
+        renderer_num_workers = 1
+        enable_prompt_embeds = False
+
+        def get_diff_sampling_param(self):
+            return {}
+
+    return ServedModelConfig()
+
+
+def _chat_route_admits(*, include_reasoning, tools):
+    """Everything the chat route hands the engine for one request: the
+    prompt, the sampling parameters and the admission arguments."""
+    from types import SimpleNamespace
+
+    from vllm.entrypoints.openai.chat_completion.protocol import (
+        ChatCompletionGenerationRequest,
+    )
+    from vllm.entrypoints.openai.chat_completion.serving import OpenAIServingChat
+    from vllm.entrypoints.openai.models.protocol import BaseModelPath
+    from vllm.entrypoints.openai.models.serving import OpenAIServingModels
+    from vllm.renderers.hf import HfRenderer
+    from vllm.renderers.online_renderer import OnlineRenderer
+    from vllm.tokenizers import cached_tokenizer_from_config
+    from vllm.v1.engine.async_llm import AsyncLLM
+
+    from chat_template_retention_unit import TEMPLATE_PATH
+
+    with open(TEMPLATE_PATH) as handle:
+        template = handle.read()
+    config = _served_model_config()
+    engine = MagicMock(spec=AsyncLLM)
+    engine.errored = False
+    engine.model_config = config
+    engine.input_processor = MagicMock()
+    engine.renderer = HfRenderer(
+        SimpleNamespace(model_config=config,
+                        parallel_config=SimpleNamespace(_api_process_rank=0)),
+        cached_tokenizer_from_config(config),
+    )
+    launch = dict(
+        enable_auto_tools=True,
+        tool_parser=_served("SERVED_TOOL_CALL_PARSER"),
+        reasoning_parser=_served("SERVED_REASONING_PARSER"),
+        default_chat_template_kwargs=CHAT_TEMPLATE_KWARGS,
+    )
+    serving = OpenAIServingChat(
+        engine,
+        OpenAIServingModels(engine_client=engine, base_model_paths=[
+            BaseModelPath(name="unit", model_path=SERVED_MODEL)]),
+        response_role="assistant",
+        online_renderer=OnlineRenderer(
+            model_config=config, renderer=engine.renderer, request_logger=None,
+            chat_template=template, chat_template_content_format="auto", **launch,
+        ),
+        chat_template=template,
+        chat_template_content_format="auto",
+        request_logger=None,
+        **launch,
+    )
+    request = ChatCompletionGenerationRequest(
+        model="unit", messages=[{"role": "user", "content": "what is 1+1?"}],
+        kv_scope="unit", include_reasoning=include_reasoning, max_tokens=8,
+        **({"tools": tools} if tools else {}),
+    )
+    try:
+        asyncio_run(serving.create_chat_completion(request))
+    except Exception:
+        pass  # the mocked engine generates nothing; admission has happened
+    if engine.admit.call_args is None:
+        raise AssertionError("the chat route admitted nothing")
+    engine_input, params = engine.admit.call_args.args[:2]
+    admitted = dict(engine.admit.call_args.kwargs)
+    admitted.pop("trace_headers", None)
+    admitted["prompt"] = {k: v for k, v in dict(engine_input).items()
+                          if k != "arrival_time"}
+    admitted["params"] = repr(params)
+    return admitted
+
+
+def _responses_events(text, chunk_size, finish="stop"):
+    """The served Responses stream for one generation: the launch's parsers,
+    the request adjusted as rendering adjusts it, engine outputs of
+    *chunk_size* ids decoded as the detokenizer decodes them, after the
+    generation prompt of a fresh turn."""
+    from vllm.entrypoints.openai.engine.protocol import RequestResponseMetadata
+    from vllm.entrypoints.openai.responses.context import SimpleContext
+    from vllm.entrypoints.openai.responses.protocol import ResponsesRequest
+    from vllm.entrypoints.openai.responses.serving import OpenAIServingResponses
+    from vllm.outputs import CompletionOutput, RequestOutput
+
+    engine = MagicMock()
+    engine.model_config.max_model_len = 10_000
+    engine.model_config.hf_config.model_type = "qwen3"
+    engine.model_config.get_diff_sampling_param.return_value = {}
+    serving = OpenAIServingResponses(
+        engine_client=engine, models=MagicMock(), online_renderer=MagicMock(),
+        request_logger=None, chat_template=None, chat_template_content_format="auto",
+        reasoning_parser=_served("SERVED_REASONING_PARSER"),
+        tool_parser=_served("SERVED_TOOL_CALL_PARSER"), enable_auto_tools=True,
+    )
+    request = ResponsesRequest.model_validate({
+        "model": "unit", "input": "test", "kv_scope": "unit", "stream": True,
+        "tools": [{"type": "function", "name": "write",
+                   "parameters": TOOL["function"]["parameters"]}],
+    })
+    serving.parser(
+        TOKENIZER, request.tools, chat_template_kwargs=CHAT_TEMPLATE_KWARGS
+    ).adjust_request(request)
+    ids, texts = generation(text, None, finish, None)
+    context = SimpleContext(response_parser=serving.parser(
+        TOKENIZER, request.tools, chat_template_kwargs=CHAT_TEMPLATE_KWARGS))
+
+    async def outputs():
+        for start in range(0, len(ids), chunk_size):
+            last = start + chunk_size >= len(ids)
+            context.append_output(RequestOutput(
+                request_id="unit", prompt=None, prompt_token_ids=OPEN_PROMPT,
+                prompt_logprobs=None, finished=last,
+                outputs=[CompletionOutput(
+                    index=0, text="".join(texts[start:start + chunk_size]),
+                    token_ids=ids[start:start + chunk_size], cumulative_logprob=None,
+                    logprobs=None, finish_reason=finish if last else None,
+                    stop_reason=None,
+                )],
+            ))
+            yield context
+
+    async def collect():
+        return [event async for event in serving.responses_stream_generator(
+            request, request.to_sampling_params(1000, {}), outputs(), context,
+            "unit", TOKENIZER, RequestResponseMetadata(request_id="unit"),
+            created_time=1,
+        )]
+
+    return asyncio_run(collect())
+
+
+def _item_text(item):
+    if item.type == "function_call":
+        return item.arguments
+    return "".join(part.text for part in (item.content or []))
+
+
 class ToolOutputParserTest(unittest.TestCase):
     def test_content_survives_tools_without_whitespace_normalization(self):
         for choice in ('auto', 'required', {
@@ -904,6 +1080,58 @@ class ToolOutputParserTest(unittest.TestCase):
                 self.assertEqual(parse("plan</think>\n\nok", chunk)[:3],
                                  ("plan", "\n\nok", []))
 
+    def test_include_reasoning_changes_nothing_the_route_admits(self):
+        """include_reasoning shapes the response, never what the model may
+        generate: the chat route admits the same prompt, sampling parameters
+        and reasoning state with it on or off, and that state is the prompt's
+        (reasoning is open at the end of the served generation prompt)."""
+        for tools in (None, [TOOL]):
+            with self.subTest(tools=bool(tools)):
+                shown, hidden = (
+                    _chat_route_admits(include_reasoning=flag, tools=tools)
+                    for flag in (True, False)
+                )
+                self.assertIs(shown["reasoning_ended"], False)
+                self.assertEqual(shown, hidden)
+
+    def test_a_responses_stream_is_its_own_snapshot(self):
+        """Each streamed item is the concatenation of its deltas; its done event
+        carries exactly that; the terminal response is the done items, in
+        order. For every engine chunking, on the served parsers."""
+        deltas = {
+            "response.output_text.delta", "response.reasoning_text.delta",
+            "response.function_call_arguments.delta",
+        }
+        generations = (
+            ("plan</think>\n\nThe answer \u03a9.", "stop"),
+            ("plan</think>\n\nLet me look.\n\n" + call("a b"), "stop"),
+            ("plan</think>\n\n" + call("a") + "\n" + call("b"), "stop"),
+            ("plan</think>\n\n" + call("a") + "\n<tool_call>\n<function=write>\n"
+             "<parameter=text>\nb", "length"),
+            ("plan and more pla", "length"),
+        )
+        for text, finish in generations:
+            for chunk in (1, 2, 3, 5, 64):
+                with self.subTest(text=text, chunk=chunk):
+                    events = _responses_events(text, chunk, finish)
+                    built, done = {}, {}
+                    for event in events:
+                        if event.type in deltas:
+                            built[event.output_index] = (
+                                built.get(event.output_index, "") + event.delta
+                            )
+                        elif event.type == "response.output_item.done":
+                            done[event.output_index] = event.item
+                    self.assertEqual(
+                        {index: _item_text(item) for index, item in done.items()
+                         if index in built},
+                        built,
+                    )
+                    terminal = events[-1].response
+                    self.assertEqual(
+                        [item.model_dump() for item in terminal.output],
+                        [done[index].model_dump() for index in sorted(done)],
+                    )
 
 if __name__ == "__main__":
     unittest.main()

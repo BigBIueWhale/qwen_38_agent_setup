@@ -397,7 +397,7 @@ Pinned build inputs and products:
 | Immutable base tag | qwen38-vllm:main-9df9b0b |
 | Immutable base ID | sha256:fa4a002a88b7043a1a89966dea8a500fe9696f84e75730d9da916f916048d401 |
 | Runtime Dockerfile SHA-256 | 393497d3d72151b6caa7a0b405dd4d983cd8a08e0d26bc43cb08d9f60d31fa41 |
-| Build verifier SHA-256 | 1a4f25c3dff1a0870f7e1d71508630f3f316ce8fbf0f12f9d772cbb97bafda17 |
+| Build verifier SHA-256 | eac6d09c6e8ca6aae2ac16129876d7bc9caf246b475c2534a4cd0bb704d98e85 |
 | Runtime validator SHA-256 | 357fdaed8d5a8ad0d901eaf07e5357722b74400c99d96b6f30572a557426b4fc |
 
 The runtime image's profile, tag and archive name, which every release advances
@@ -1118,8 +1118,14 @@ encrypted reasoning is unsupported and refused explicitly.
 Responses streaming keeps each output item's ID and each function call's
 `call_id` through its added/done events and the terminal response. Terminal
 output uses the completed stream items, so callers can replay it with results
-correlated using the IDs first received in the stream. Finalization preserves
-usage, log probabilities and truncation status on both streaming and batch paths.
+correlated using the IDs first received in the stream; each streamed item is
+exactly the concatenation of its deltas, which the parser unit asserts for every
+engine chunking. Usage and the response's own status are the same on both
+paths. Item statuses are not: a truncated batch response marks every item
+incomplete, while the stream completes each item it closed before the cut. Nor
+are log probabilities: a batch message carries those of every generated token,
+reasoning and calls included, and a streamed message those of each engine step
+that emitted its text, so their number depends on how the engine grouped tokens.
 
 OpenAI and Anthropic representations of the same history produced exactly identical
 16,562 prompt-token IDs. Marker ordering proved:

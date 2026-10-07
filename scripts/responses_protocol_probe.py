@@ -131,6 +131,48 @@ def read_sse(response) -> tuple[list[dict], dict]:
     return events, completed
 
 
+_DELTAS = {
+    "response.output_text.delta": "text",
+    "response.reasoning_text.delta": "text",
+    "response.function_call_arguments.delta": "arguments",
+}
+
+
+def item_text(item: dict) -> str:
+    if item.get("type") == "function_call":
+        return item.get("arguments") or ""
+    return "".join(part.get("text", "") for part in item.get("content") or [])
+
+
+def assert_stream_is_its_snapshot(events: list[dict], completed: dict) -> None:
+    """One generation, one record: every streamed item is the concatenation of
+    its deltas, its done event carries exactly that, and the completed
+    response is the done items in order, with contiguous sequence numbers."""
+    numbers = [event["sequence_number"] for event in events]
+    if numbers != list(range(numbers[0], numbers[0] + len(numbers))):
+        raise RuntimeError(f"Responses stream sequence numbers are not contiguous: {numbers}")
+    built: dict[int, str] = {}
+    done: dict[int, dict] = {}
+    for event in events:
+        kind = event.get("type")
+        if kind in _DELTAS:
+            index = event["output_index"]
+            built[index] = built.get(index, "") + event["delta"]
+        elif kind == "response.output_item.done":
+            done[event["output_index"]] = event["item"]
+    for index, text in built.items():
+        if index not in done or item_text(done[index]) != text:
+            raise RuntimeError(
+                f"Responses item {index} deltas {text!r} differ from its done item "
+                f"{done.get(index)!r}"
+            )
+    if [done[index] for index in sorted(done)] != completed["output"]:
+        raise RuntimeError(
+            "Responses completed output differs from the streamed done items: "
+            f"{completed['output']!r} != {[done[i] for i in sorted(done)]!r}"
+        )
+
+
 def semantic_summary(response: dict) -> dict:
     calls = function_calls(response["output"])
     return {
@@ -173,6 +215,7 @@ def main() -> None:
     stream_events, stream_first = read_sse(
         request(base_payload(stream=True, kv_scope=scope), stream=True)
     )
+    assert_stream_is_its_snapshot(stream_events, stream_first)
     stream_calls = function_calls(stream_first["output"])
     if len(stream_calls) != 1:
         raise RuntimeError(f"Expected one streamed function call: {stream_first}")
@@ -189,12 +232,13 @@ def main() -> None:
     nonstream_final = request(
         continuation_payload(nonstream_first, stream=False, kv_scope=scope)
     )
-    _, stream_final = read_sse(
+    final_events, stream_final = read_sse(
         request(
             continuation_payload(nonstream_first, stream=True, kv_scope=scope),
             stream=True,
         )
     )
+    assert_stream_is_its_snapshot(final_events, stream_final)
     final_nonstream_semantics = semantic_summary(nonstream_final)
     final_stream_semantics = semantic_summary(stream_final)
     assert_equivalent_final_responses(nonstream_final, stream_final)
@@ -210,6 +254,7 @@ def main() -> None:
                     {event.get("type", "") for event in stream_events}
                 ),
                 "stream_nonstream_tool_semantics_equal": True,
+                "streamed_items_equal_their_deltas_and_snapshot": True,
                 "final_transport_contracts_passed": True,
                 "explicit_reasoning_effort": "xhigh",
             },

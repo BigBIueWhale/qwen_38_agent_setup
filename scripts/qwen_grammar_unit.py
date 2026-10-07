@@ -49,14 +49,13 @@ from unittest.mock import MagicMock
 import json
 from pathlib import Path
 
-# The numerical audit units ship in the image but run later, on the GPU host.
-# A syntax error in one of them would otherwise surface only there. They sit
-# beside this file in both callers -- ``/opt/qwen38`` in the image, ``scripts/``
-# in the check -- so one expression covers both.
+# The GPU acceptance units ship in the image but need the card, so nothing here
+# runs them. A syntax error in one of them would otherwise surface only there.
+# They sit beside this file in both callers -- ``/opt/qwen38`` in the image,
+# ``scripts/`` in the check -- so one expression covers both.
 _UNIT_DIR = Path(__file__).resolve().parent
 for audit_path in (
     _UNIT_DIR / "turboquant_k8v4_unit.py",
-    _UNIT_DIR / "qwen38_context_unit.py",
     _UNIT_DIR / "nvfp4_kernel_unit.py",
 ):
     compile(audit_path.read_text(encoding="utf-8"), str(audit_path), "exec")
