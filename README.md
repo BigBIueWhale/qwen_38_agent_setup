@@ -340,6 +340,7 @@ It is intentionally reconstructed by the ordered, reviewed semantic transformati
 | patches/vllm-unspecified-tool-choice-is-the-default.patch | 4d8aa3e0eca27197da16ee57db26ac89ae8811bb175c9a6126863d2967821ab5 |
 | patches/vllm-call-only-answer-keeps-the-blank-line.patch | ad1e558f8ba02c6889d9b4a79c6ec355e9bfa763bc007e5cae7e609be96ec084 |
 | patches/vllm-responses-tools-are-one-function-list.patch | 4d742197b35f95efedb42452b3d30623dbba0655e8b4b00bd8174e972d6c7cd8 |
+| patches/vllm-batch-parse-starts-where-the-prompt-leaves.patch | 676d962e781b977933f2f0bd941b3f5413a82a96852fe588ed1a971882a933fe |
 
 The reconstructed tree's runtime-source and test changes, new files and
 deletions are counted by ./scripts/build-vllm.sh check, which derives and prints
@@ -391,7 +392,7 @@ Pinned build inputs and products:
 | Immutable base tag | qwen38-vllm:main-9df9b0b |
 | Immutable base ID | sha256:fa4a002a88b7043a1a89966dea8a500fe9696f84e75730d9da916f916048d401 |
 | Runtime Dockerfile SHA-256 | 393497d3d72151b6caa7a0b405dd4d983cd8a08e0d26bc43cb08d9f60d31fa41 |
-| Build verifier SHA-256 | e7219a1b936f0c0a3338aecaf2bb2e5658eb62144f39973d87d4321fad6739b9 |
+| Build verifier SHA-256 | 88148c6648adb9bf632cab21c0ce37e640026207fcc6fa07a9b389768348af85 |
 | Runtime validator SHA-256 | 357fdaed8d5a8ad0d901eaf07e5357722b74400c99d96b6f30572a557426b4fc |
 
 The runtime image's profile, tag and archive name, which every release advances
@@ -1177,7 +1178,11 @@ acts on a terminal in content outside its tool language.
 
 `include_reasoning` decides only what a response shows: whether reasoning has
 ended, and so when a grammar starts constraining, is read from the prompt the
-model continues, on Chat Completions as on Responses.
+model continues, on Chat Completions as on Responses. The complete-output parse
+reads that one decision as the stream does, so a continued final message -- whose
+prompt already closed reasoning -- is the answer on both transports, never
+reasoning in one and content in the other. Derender is given no prompt and parses
+as if reasoning were open.
 
 A tool choice that is not specified -- omitted or `null` -- is `auto` when tools
 are declared and `none` otherwise. The chat request and the Anthropic conversion

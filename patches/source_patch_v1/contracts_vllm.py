@@ -3596,6 +3596,83 @@ def _validate_responses_function_list_after(state: State) -> None:
         "test_qwen3_required_refuses_tools_that_offer_no_function": None,
     }, label=label)
 
+def _validate_batch_parse_from_prompt_before(state: State) -> None:
+    label = "Batch parse from the prompt state precondition"
+    abstract = "vllm/parser/abstract_parser.py"
+    forbid_text(state, abstract, "_reasoning_ended_in_prompt", label=label)
+    _require_in_symbol(state, abstract, "DelegatingParser.parse_delta", (
+        "if not state.prompt_reasoning_checked and prompt_token_ids is not None:",
+    ), label=label)
+
+
+def _validate_batch_parse_from_prompt_after(state: State) -> None:
+    label = "Batch parse from the prompt state"
+    abstract = "vllm/parser/abstract_parser.py"
+    engine = "vllm/parser/engine/parser_engine.py"
+    signature = ("self", "model_output", "request", "prompt_token_ids", "finish_reason",
+                 "stop_reason", "enable_auto_tools", "model_output_token_ids")
+    require_python_symbols(state, abstract, {
+        "Parser.parse_output": signature,
+        "DelegatingParser.parse_output": signature,
+        "DelegatingParser._reasoning_ended_in_prompt": ("self", "prompt_token_ids"),
+    }, label=label)
+    # One decision where the prompt leaves reasoning, read by both paths.
+    require_text(state, abstract, "adjust_initial_state_from_prompt(", label=label)
+    _require_in_symbol(state, abstract, "DelegatingParser._reasoning_ended_in_prompt", (
+        "self._reasoning_parser.adjust_initial_state_from_prompt(prompt_token_ids)",
+    ), label=label)
+    _require_in_symbol(state, abstract, "DelegatingParser.parse_delta", (
+        "state.reasoning_ended = self._reasoning_ended_in_prompt(prompt_token_ids)",
+    ), label=label)
+    _require_in_symbol(state, abstract, "DelegatingParser.parse_output", (
+        "if self._reasoning_ended_in_prompt(prompt_token_ids):",
+    ), label=label)
+    _require_in_symbol(state, abstract, "Parser.parse_output_delta", (
+        "prompt_token_ids=prompt_token_ids",
+    ), label=label)
+    # A grammar's prompt state survives the batch parse's reset.
+    require_python_symbols(state, engine, {
+        "ParserEngine._start_in": ("self", "state"),
+        "ParserEngine.parse_output": signature,
+    }, label=label)
+    _require_in_symbol(state, engine, "ParserEngine._reset", (
+        "initial_state = self._prompt_initial_state",), label=label)
+    _require_in_symbol(state, engine, "ParserEngine.parse_output", (
+        "self.adjust_initial_state_from_prompt(prompt_token_ids)",), label=label)
+    for path, starts in (("vllm/parser/gemma4.py", 1), ("vllm/parser/inkling.py", 3)):
+        forbid_text(state, path, "self._engine.reset(initial_state=", label=label)
+        require_text(state, path, "self._start_in(ParserState.", count=starts, label=label)
+    # Every complete-output parse is handed the prompt it continues.
+    for path, symbol, needle in (
+        ("vllm/entrypoints/openai/chat_completion/serving.py",
+         "OpenAIServingChat.chat_completion_full_generator",
+         "prompt_token_ids=final_res.prompt_token_ids"),
+        ("vllm/entrypoints/openai/chat_completion/batch_serving.py",
+         "OpenAIServingChatBatch.chat_completion_full_generator_batch",
+         "prompt_token_ids=final_res.prompt_token_ids"),
+        ("vllm/entrypoints/openai/responses/serving.py",
+         "OpenAIServingResponses._collect_response_output",
+         "prompt_token_ids=final_res.prompt_token_ids"),
+        ("vllm/entrypoints/openai/responses/serving.py",
+         "OpenAIServingResponses._make_response_output_items",
+         "prompt_token_ids=prompt_token_ids"),
+        ("vllm/entrypoints/openai/responses/context.py",
+         "ParsableContext.append_output", "prompt_token_ids=output.prompt_token_ids"),
+        ("vllm/renderers/online_derenderer.py", "OnlineDerenderer._derender_chat",
+         "prompt_token_ids=None"),
+    ):
+        _require_in_symbol(state, path, symbol, (needle,), label=label)
+    forbid_text(state, "vllm/entrypoints/openai/chat_completion/batch_serving.py",
+                "parser.parse(", label=label)
+    for path, tests in (
+        ("tests/entrypoints/openai/responses/test_serving_responses.py",
+         {"test_a_continued_final_message_is_the_answer_on_both_responses_paths": None}),
+        ("tests/parser/engine/test_gemma4_streaming_reasoning.py",
+         {"TestGemma4PromptOpenReasoning."
+          "test_batch_parse_starts_where_the_prompt_leaves_reasoning": None}),
+    ):
+        require_python_symbols(state, path, tests, label=label)
+
 def validate_final(state: State) -> None:
     """Reassert every durable semantic invariant on the complete tree.
 
@@ -4603,5 +4680,28 @@ CONTRACTS: Mapping[str, SemanticContract] = {
         ),
         validate_before=_validate_responses_function_list_before,
         validate_after=_validate_responses_function_list_after,
+    ),
+    "batch-parse-starts-where-the-prompt-leaves": SemanticContract(
+        rationale=(
+            "The stream decided from the prompt whether reasoning had already "
+            "ended; the complete-output parse never saw the prompt and always "
+            "began in reasoning. A final message the caller asks to continue -- "
+            "Responses turns this on by itself for an in_progress or incomplete "
+            "last item, chat with continue_final_message -- ends its prompt after "
+            "</think>, so the batch answer was filed as reasoning (and hidden with "
+            "include_reasoning off) and counted as reasoning tokens, while every "
+            "chunking of the stream read it as content. Upstream has the same "
+            "asymmetry. One decision now reads the prompt for both paths; "
+            "parse_output takes the prompt ids, every complete-output caller "
+            "passes them, and a grammar's prompt state survives the batch reset "
+            "(gemma4 and inkling seeded only the stream). Derender receives no "
+            "prompt ids and passes none."
+        ),
+        removal_condition=(
+            "Remove when pinned upstream's complete-output parse starts from the "
+            "state the prompt leaves, as its streaming parse does."
+        ),
+        validate_before=_validate_batch_parse_from_prompt_before,
+        validate_after=_validate_batch_parse_from_prompt_after,
     ),
 }

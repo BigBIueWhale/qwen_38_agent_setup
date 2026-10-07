@@ -349,7 +349,7 @@ def real_tokenizer_and_grammar_probe() -> dict[str, Any]:
     )
     # The served route reads a whole output with its generated ids.
     _, _, parsed = parser.parse_output(
-        raw, request, finish_reason="stop", stop_reason=None,
+        raw, request, prompt_token_ids=[], finish_reason="stop", stop_reason=None,
         enable_auto_tools=True,
         model_output_token_ids=tokenizer.encode(raw, add_special_tokens=False),
     )

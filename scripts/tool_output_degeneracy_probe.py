@@ -162,6 +162,8 @@ def parse_nonstream(
     reasoning, content, calls = parser.parse_output(
         raw,
         request,
+        # The same prompt parse_stream hands its first delta.
+        prompt_token_ids=[],
         finish_reason="stop",
         stop_reason=None,
         enable_auto_tools=True,

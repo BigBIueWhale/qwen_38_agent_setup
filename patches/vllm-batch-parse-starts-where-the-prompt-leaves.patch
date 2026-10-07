@@ -1,0 +1,541 @@
+diff --git a/tests/entrypoints/openai/responses/test_parsable_context_unit.py b/tests/entrypoints/openai/responses/test_parsable_context_unit.py
+index a7d8c8a6c3437fe63157db75f47548db3d53e59c..a16e62a9916f9cfbb3fd903e1e8424fd24a139e5 100644
+--- a/tests/entrypoints/openai/responses/test_parsable_context_unit.py
++++ b/tests/entrypoints/openai/responses/test_parsable_context_unit.py
+@@ -39,9 +39,6 @@ class _NoOpParser(DelegatingParser):
+     def extract_content_ids(self, input_ids: list[int]) -> list[int]:
+         return input_ids
+ 
+-    def extract_reasoning(self, model_output, request):
+-        return None, model_output
+-
+     def extract_reasoning_streaming(self, *args, **kwargs):
+         return None
+ 
+@@ -57,14 +54,13 @@ class _NoOpParser(DelegatingParser):
+         return None
+ 
+ 
+-class _ReasoningOnlyParser(DelegatingParser):
+-    """Parser that extracts reasoning but no tool calls."""
++class _StubReasoningParser:
++    """Minimal text reasoning parser: the span inside ``<think>...</think>``."""
+ 
+-    def is_reasoning_end(self, input_ids: list[int]) -> bool:
+-        return False
++    engine_based_streaming = False
+ 
+-    def extract_content_ids(self, input_ids: list[int]) -> list[int]:
+-        return input_ids
++    def adjust_initial_state_from_prompt(self, prompt_token_ids):
++        return None
+ 
+     def extract_reasoning(self, model_output, request):
+         if "<think>" in model_output and "</think>" in model_output:
+@@ -75,6 +71,20 @@ class _ReasoningOnlyParser(DelegatingParser):
+             return reasoning, content.strip() or None
+         return None, model_output
+ 
++
++class _ReasoningOnlyParser(DelegatingParser):
++    """Parser that extracts reasoning but no tool calls."""
++
++    def __init__(self, tokenizer, *args, **kwargs):
++        super().__init__(tokenizer)
++        self._reasoning_parser = _StubReasoningParser()
++
++    def is_reasoning_end(self, input_ids: list[int]) -> bool:
++        return False
++
++    def extract_content_ids(self, input_ids: list[int]) -> list[int]:
++        return input_ids
++
+     def extract_reasoning_streaming(self, *args, **kwargs):
+         return None
+ 
+@@ -134,9 +144,6 @@ class _ToolCallingParser(DelegatingParser):
+     def extract_content_ids(self, input_ids: list[int]) -> list[int]:
+         return input_ids
+ 
+-    def extract_reasoning(self, model_output, request):
+-        return None, model_output
+-
+     def extract_reasoning_streaming(self, *args, **kwargs):
+         return None
+ 
+diff --git a/tests/entrypoints/openai/responses/test_serving_responses.py b/tests/entrypoints/openai/responses/test_serving_responses.py
+index 7f01c4e17acfb016b914f6941902b6e7a70bfce6..cd8c7f338366c46a44437afb809e11a778892baa 100644
+--- a/tests/entrypoints/openai/responses/test_serving_responses.py
++++ b/tests/entrypoints/openai/responses/test_serving_responses.py
+@@ -1406,6 +1406,7 @@ async def test_wrapped_call_output_uses_its_terminal_on_both_responses_paths(
+     if chunk_size is None:
+         items = serving._make_response_output_items(
+             request, completion(ids, True), tokenizer, parser,
++            prompt_token_ids=[1, 2, 3],
+         )
+     else:
+         context = SimpleContext(response_parser=parser)
+@@ -1441,3 +1442,64 @@ async def test_wrapped_call_output_uses_its_terminal_on_both_responses_paths(
+         assert content == (cut if shape == "mixed" else "")
+     assert parser.generated_token_count == len(ids)
+     assert parser.reasoning_token_count == 4
++
++
++@pytest.mark.asyncio
++@pytest.mark.parametrize("chunk_size", [None, 1, 3, 1000])
++async def test_a_continued_final_message_is_the_answer_on_both_responses_paths(
++    chunk_size,
++):
++    """A prompt that already closed reasoning -- the continued final message
++    Responses selects for an in-progress last item -- leaves the generation
++    outside reasoning on the batch path exactly as on the stream."""
++    from tests.parser.engine.test_qwen_xml_fidelity import (
++        MARKERS, PARSER, decode, encode,
++    )
++
++    prompt = encode("hi<think>\n\n</think>\n\nThe ans")
++    ids = encode("wer is 4.")
++    request = ResponsesRequest(
++        input="hi", stream=chunk_size is not None, kv_scope="unit",
++    )
++    tokenizer = MagicMock()
++    tokenizer.get_vocab.return_value = MARKERS
++    tokenizer.all_special_tokens = list(MARKERS)
++    tokenizer.all_special_ids = list(MARKERS.values())
++    tokenizer.decode.side_effect = decode
++    parser = PARSER(tokenizer, None)
++    serving = OpenAIServingResponses.__new__(OpenAIServingResponses)
++    serving.parser = PARSER
++    serving.enable_auto_tools = True
++
++    def completion(group, last):
++        return CompletionOutput(
++            index=0, text=decode(group), token_ids=group, cumulative_logprob=None,
++            logprobs=None, finish_reason="stop" if last else None, stop_reason=None,
++        )
++
++    if chunk_size is None:
++        items = serving._make_response_output_items(
++            request, completion(ids, True), tokenizer, parser, prompt_token_ids=prompt,
++        )
++    else:
++        context = SimpleContext(response_parser=parser)
++
++        async def outputs():
++            for start in range(0, len(ids), chunk_size):
++                group = ids[start:start + chunk_size]
++                last = start + chunk_size >= len(ids)
++                context.append_output(RequestOutput(
++                    request_id="unit", prompt="prompt", prompt_token_ids=prompt,
++                    prompt_logprobs=None, outputs=[completion(group, last)], finished=last,
++                ))
++                yield context
++
++        events = [event async for event in serving._process_simple_streaming_events(
++            request, SamplingParams(max_tokens=1000), outputs(), context, "unit",
++            tokenizer, RequestResponseMetadata(request_id="unit"), 123, lambda event: event,
++        )]
++        items = [event.item for event in events if event.type == "response.output_item.done"]
++    assert [(item.type, item.content[0].text) for item in items] == [
++        ("message", "wer is 4.")
++    ]
++    assert parser.reasoning_token_count == 0
+diff --git a/tests/parser/engine/test_gemma4_streaming_reasoning.py b/tests/parser/engine/test_gemma4_streaming_reasoning.py
+index 6bfd2af568c1c83e68912d33823b0202b1cbbd48..1563be02cdc1ca033cd5dd16a181fb33799ea9f1 100644
+--- a/tests/parser/engine/test_gemma4_streaming_reasoning.py
++++ b/tests/parser/engine/test_gemma4_streaming_reasoning.py
+@@ -337,6 +337,25 @@ class TestGemma4PromptOpenReasoning:
+             f"Post-<channel|> text missing from content: {content!r}"
+         )
+ 
++    def test_batch_parse_starts_where_the_prompt_leaves_reasoning(
++        self, open_reasoning_tokenizer, request_obj
++    ):
++        """The complete-output parse reads the same prompt state as the
++        stream, so the same generation splits the same way on both."""
++        prompt = self._prompt_ids_open_channel()
++        streamed = _collect_fields(_stream_tokens_batched(
++            Gemma4Parser(open_reasoning_tokenizer), open_reasoning_tokenizer,
++            request_obj, batch_size=1, prompt_token_ids=prompt,
++        ))
++        ids = open_reasoning_tokenizer.encode("", add_special_tokens=False)
++        reasoning, content, _ = Gemma4Parser(open_reasoning_tokenizer).parse_output(
++            open_reasoning_tokenizer.decode(ids), request_obj,
++            prompt_token_ids=prompt, model_output_token_ids=ids,
++            finish_reason="stop", stop_reason=None,
++        )
++        assert "Sure, the answer is 42" in reasoning
++        assert (reasoning, content) == streamed[:2]
++
+     def test_new_turn_prompt_unchanged(self, parser, mock_tokenizer, request_obj):
+         """When the prompt does NOT end in an open reasoning channel (e.g. a
+         new turn that ends with ``<|turn>model\\n``), behaviour must match
+diff --git a/tests/parser/engine/test_qwen3.py b/tests/parser/engine/test_qwen3.py
+index 7525d2d1ecb5516454c890611dd677b6759e8eee..26f2d7cf1e1aea70b02f48f40e35a3119cd6179b 100644
+--- a/tests/parser/engine/test_qwen3.py
++++ b/tests/parser/engine/test_qwen3.py
+@@ -252,7 +252,8 @@ class TestNonStreaming:
+             "</tool_call>"
+         )
+         _, content, calls = parser.parse_output(
+-            text, mock_request, finish_reason="stop", stop_reason=None,
++            text, mock_request, prompt_token_ids=None,
++            finish_reason="stop", stop_reason=None,
+         )
+         assert not calls
+         assert content == text
+diff --git a/tests/parser/engine/test_qwen_xml_fidelity.py b/tests/parser/engine/test_qwen_xml_fidelity.py
+index 5008bc93091b0bd73b97c2fd1c821d7f6ab169a6..25a0db2f86680ebae3c21485582f777341614f74 100644
+--- a/tests/parser/engine/test_qwen_xml_fidelity.py
++++ b/tests/parser/engine/test_qwen_xml_fidelity.py
+@@ -17,6 +17,9 @@ TOOL = {'type': 'function', 'function': {'name': 'write', 'parameters': {
+     'required': ['text'], 'additionalProperties': False}}}
+ PARSER = ParserManager.get_parser(tool_parser_name='qwen3_coder',
+                                   reasoning_parser_name='qwen3', enable_auto_tools=True)
++# A prompt that leaves reasoning open, as the template's generation prompt
++# does; both paths start from it.
++PROMPT = [1, 2, 3]
+ 
+ 
+ def encode(text):
+@@ -49,14 +52,14 @@ def parse(text, chunk_size, ids=None, schema=None, finish='stop', choice='auto')
+     ids = encode(text) if ids is None else ids
+     if chunk_size is None:
+         reasoning, content, calls = parser.parse_output(text, request,
+-            enable_auto_tools=True, model_output_token_ids=ids,
++            prompt_token_ids=PROMPT, enable_auto_tools=True, model_output_token_ids=ids,
+             finish_reason=finish, stop_reason=None)
+         return reasoning or '', content or '', [c.arguments for c in calls or []]
+     reasoning, content, calls = '', '', {}
+     for start in range(0, len(ids), chunk_size):
+         group = ids[start:start+chunk_size]
+         delta = parser.parse_output_delta(decode(group), group, request,
+-            prompt_token_ids=[1, 2, 3],
++            prompt_token_ids=PROMPT,
+             finish_reason=finish if start+chunk_size >= len(ids) else None,
+             stop_reason=None)
+         if delta is None:
+diff --git a/tests/v1/structured_output/test_backend_xgrammar_stop_tokens.py b/tests/v1/structured_output/test_backend_xgrammar_stop_tokens.py
+index 226850cdf8bff5726c1502846118a4074c128345..8095ca758217b01f72e9d98bb516b570b7c538ab 100644
+--- a/tests/v1/structured_output/test_backend_xgrammar_stop_tokens.py
++++ b/tests/v1/structured_output/test_backend_xgrammar_stop_tokens.py
+@@ -381,7 +381,8 @@ def test_qwen_stop_stripped_boundary_never_rebinds_to_prose(
+                     calls.extend(delta.tool_calls or [])
+             else:
+                 reasoning, content, calls = parser.parse_output(
+-                    completion.text, api_request, enable_auto_tools=True,
++                    completion.text, api_request,
++                    prompt_token_ids=request.prompt_token_ids, enable_auto_tools=True,
+                     model_output_token_ids=completion.token_ids,
+                     finish_reason=completion.finish_reason,
+                     stop_reason=completion.stop_reason,
+diff --git a/vllm/entrypoints/openai/chat_completion/batch_serving.py b/vllm/entrypoints/openai/chat_completion/batch_serving.py
+index 7b3ab8e0b68bea9d71937a8d598a2f0e06966f85..242d8b95cfd4f0a52467b737e862009804618dfd 100644
+--- a/vllm/entrypoints/openai/chat_completion/batch_serving.py
++++ b/vllm/entrypoints/openai/chat_completion/batch_serving.py
+@@ -272,10 +272,13 @@ class OpenAIServingChatBatch(OpenAIServingChat):
+                     logprobs = None
+ 
+                 if parser is not None:
+-                    reasoning, content, _ = parser.parse(
++                    reasoning, content, _ = parser.parse_output(
+                         output.text,
+-                        request=request,  # type: ignore[arg-type]
++                        request,  # type: ignore[arg-type]
++                        prompt_token_ids=final_res.prompt_token_ids,
+                         model_output_token_ids=output.token_ids,
++                        finish_reason=output.finish_reason,
++                        stop_reason=output.stop_reason,
+                     )
+                     if not request.include_reasoning:
+                         reasoning = None
+diff --git a/vllm/entrypoints/openai/chat_completion/serving.py b/vllm/entrypoints/openai/chat_completion/serving.py
+index 41682e8504d064164d1680d378de043cd9701bfa..0a555501401ddbd53c83ed409d6057cec4967d1f 100644
+--- a/vllm/entrypoints/openai/chat_completion/serving.py
++++ b/vllm/entrypoints/openai/chat_completion/serving.py
+@@ -972,6 +972,7 @@ class OpenAIServingChat(GenerateBaseServing):
+                 reasoning, content, tool_calls = parser.parse_output(
+                     output.text,
+                     request,
++                    prompt_token_ids=final_res.prompt_token_ids,
+                     enable_auto_tools=self.enable_auto_tools,
+                     model_output_token_ids=token_ids,
+                     finish_reason=output.finish_reason,
+diff --git a/vllm/entrypoints/openai/responses/context.py b/vllm/entrypoints/openai/responses/context.py
+index ee30f0c4eba85177abd62e04aa9a47b0bdd0a6cc..31b3e76c964869964d20d5d8a6cf8121718017f6 100644
+--- a/vllm/entrypoints/openai/responses/context.py
++++ b/vllm/entrypoints/openai/responses/context.py
+@@ -350,6 +350,7 @@ class ParsableContext(ConversationContext):
+             reasoning, content, tool_calls = self.response_parser.parse_output(
+                 completion.text,
+                 self.request,
++                prompt_token_ids=output.prompt_token_ids,
+                 enable_auto_tools=self.enable_auto_tools,
+                 model_output_token_ids=completion.token_ids,
+                 finish_reason=completion.finish_reason,
+diff --git a/vllm/entrypoints/openai/responses/serving.py b/vllm/entrypoints/openai/responses/serving.py
+index 3d6d0a907d6f600f3537cedb22d72a95cc76968a..5ba4d096eef07b12f3c8f6171acb161fce4ab54a 100644
+--- a/vllm/entrypoints/openai/responses/serving.py
++++ b/vllm/entrypoints/openai/responses/serving.py
+@@ -915,6 +915,7 @@ class OpenAIServingResponses(GenerateBaseServing):
+         self._raise_if_error(final_res.outputs[0].finish_reason, request.request_id)
+         return self._make_response_output_items(
+             request, final_res.outputs[0], tokenizer, parser=context.response_parser,
++            prompt_token_ids=final_res.prompt_token_ids,
+         )
+ 
+     async def _finalize_response(
+@@ -1105,6 +1106,8 @@ class OpenAIServingResponses(GenerateBaseServing):
+         final_output: CompletionOutput,
+         tokenizer: TokenizerLike,
+         parser: Parser | None = None,
++        *,
++        prompt_token_ids: Sequence[int] | None,
+     ) -> list[ResponseOutputItem]:
+         # Compute logprobs if requested
+         logprobs = None
+@@ -1121,6 +1124,7 @@ class OpenAIServingResponses(GenerateBaseServing):
+             reasoning, content, tool_calls = parser.parse_output(
+                 final_output.text,
+                 request,
++                prompt_token_ids=prompt_token_ids,
+                 enable_auto_tools=self.enable_auto_tools,
+                 model_output_token_ids=final_output.token_ids,
+                 finish_reason=final_output.finish_reason,
+diff --git a/vllm/parser/abstract_parser.py b/vllm/parser/abstract_parser.py
+index 78cb078bf5a4c3d48143540b65c7bbbaf86ff889..860361bfeaa05666d05d10f9972560d1d6334e2f 100644
+--- a/vllm/parser/abstract_parser.py
++++ b/vllm/parser/abstract_parser.py
+@@ -230,11 +230,19 @@ class Parser:
+         model_output: str,
+         request: ChatCompletionRequest | ResponsesRequest,
+         *,
++        prompt_token_ids: Sequence[int] | None,
+         finish_reason: str | None,
+         stop_reason: str | int | None,
+         enable_auto_tools: bool = False,
+         model_output_token_ids: Sequence[int] = (),
+     ) -> tuple[str | None, str | None, list[FunctionCall] | None]:
++        """Parse a complete generation from the state its prompt leaves.
++
++        ``prompt_token_ids`` are the ids the generation continues, as
++        ``parse_delta`` receives them; ``None`` only when the prompt has no
++        ids (it was given as embeddings). A format whose ``parse_delta``
++        reads nothing from the prompt reads nothing from it here either.
++        """
+         return self.parse(
+             model_output, request, enable_auto_tools=enable_auto_tools,
+             model_output_token_ids=model_output_token_ids,
+@@ -288,9 +296,9 @@ class Parser:
+             return DeltaMessage(reasoning=reasoning)
+ 
+         _, content, calls = self.parse_output(
+-            "".join(state.text), request, finish_reason=finish_reason,
+-            stop_reason=stop_reason, enable_auto_tools=True,
+-            model_output_token_ids=state.token_ids,
++            "".join(state.text), request, prompt_token_ids=prompt_token_ids,
++            finish_reason=finish_reason, stop_reason=stop_reason,
++            enable_auto_tools=True, model_output_token_ids=state.token_ids,
+         )
+         prefix = "".join(state.emitted_content)
+         content = content or ""
+@@ -1012,11 +1020,33 @@ class DelegatingParser(Parser):
+         )
+         return reasoning, content, tool_calls
+ 
++    def _reasoning_ended_in_prompt(
++        self, prompt_token_ids: Sequence[int] | None
++    ) -> bool:
++        """Where the prompt leaves reasoning, decided the same way for the
++        streaming and the batch parse.
++
++        A prompt that already closed reasoning -- a continued final message,
++        or a template that writes the closer itself -- leaves every generated
++        token outside it. Otherwise the reasoning parser starts where the
++        prompt left it. A prompt without ids (given as embeddings) has no
++        state to read, and both paths start in the configured state.
++        """
++        if prompt_token_ids is None:
++            return False
++        if self._reasoning_parser is None or self.is_reasoning_end(
++            list(prompt_token_ids)
++        ):
++            return True
++        self._reasoning_parser.adjust_initial_state_from_prompt(prompt_token_ids)
++        return False
++
+     def parse_output(
+         self,
+         model_output: str,
+         request: ChatCompletionRequest | ResponsesRequest,
+         *,
++        prompt_token_ids: Sequence[int] | None,
+         finish_reason: str | None,
+         stop_reason: str | int | None,
+         enable_auto_tools: bool = False,
+@@ -1024,12 +1054,19 @@ class DelegatingParser(Parser):
+     ) -> tuple[str | None, str | None, list[FunctionCall] | None]:
+         self._initialize_history_tool_call_cnt(request)
+         self._stream_state.generated_token_count = len(model_output_token_ids)
+-        reasoning, content = self.extract_reasoning(
+-            model_output, request, model_output_token_ids,
+-        )
++        if self._reasoning_ended_in_prompt(prompt_token_ids):
++            # Nothing generated is reasoning, exactly as when no reasoning
++            # parser is configured: the content is every generated byte.
++            reasoning, content = None, model_output
++            content_token_ids: Sequence[int] = model_output_token_ids
++        else:
++            reasoning, content = self.extract_reasoning(
++                model_output, request, model_output_token_ids,
++            )
++            content_token_ids = self._content_token_ids(model_output_token_ids)
+         tool_calls, content = self._extract_tool_calls(
+             content=content, request=request, enable_auto_tools=enable_auto_tools,
+-            content_token_ids=self._content_token_ids(model_output_token_ids),
++            content_token_ids=content_token_ids,
+             output_terminal=(finish_reason, stop_reason),
+         )
+         return reasoning, content, tool_calls
+@@ -1049,17 +1086,7 @@ class DelegatingParser(Parser):
+ 
+         if not state.prompt_reasoning_checked and prompt_token_ids is not None:
+             state.prompt_reasoning_checked = True
+-            if self._reasoning_parser is None or self.is_reasoning_end(
+-                prompt_token_ids
+-            ):
+-                state.reasoning_ended = True
+-            else:
+-                # Reasoning is still open at the end of the prompt; let the
+-                # reasoning parser adjust its initial parsing state so the
+-                # first generated tokens are classified correctly.
+-                self._reasoning_parser.adjust_initial_state_from_prompt(
+-                    prompt_token_ids
+-                )
++            state.reasoning_ended = self._reasoning_ended_in_prompt(prompt_token_ids)
+ 
+         current_text, current_token_ids = state.advance(delta_text, delta_token_ids)
+         delta_message: DeltaMessage | None = None
+diff --git a/vllm/parser/engine/parser_engine.py b/vllm/parser/engine/parser_engine.py
+index b43755b16afb56a9ac2f646dd37c056dfc4041b6..b3691681f2a982a6ec9c585edbc206b178ddc0f5 100644
+--- a/vllm/parser/engine/parser_engine.py
++++ b/vllm/parser/engine/parser_engine.py
+@@ -166,6 +166,10 @@ class ParserEngine(Parser):
+         self._reasoning_ended: bool = not self._has_reasoning
+         self._streaming_initialized: bool = False
+         self._prompt_streaming_prepared: bool = False
++        # The state the prompt leaves this grammar in, when that is not the
++        # configured initial state (see ``_start_in``); every reset begins
++        # there, so the streaming and the batch parse start alike.
++        self._prompt_initial_state: ParserState | None = None
+ 
+         self._tool_slots: list[ToolCallSlot] = []
+         self._deferred_content: str = ""
+@@ -249,9 +253,23 @@ class ParserEngine(Parser):
+             self._reset(initial_state=initial_state)
+ 
+     def adjust_initial_state_from_prompt(self, prompt_token_ids: Sequence[int]) -> None:
+-        """See :meth:`ReasoningParser.adjust_initial_state_from_prompt`."""
++        """See :meth:`ReasoningParser.adjust_initial_state_from_prompt`.
++
++        A grammar whose prompt can leave it outside its configured initial
++        state overrides this and calls :meth:`_start_in`.
++        """
+         return
+ 
++    def _start_in(self, state: ParserState) -> None:
++        """Begin this generation in *state*, the one its prompt leaves it in.
++
++        Recorded rather than applied once, so the batch parse, which resets
++        before it feeds, starts where the streaming parse starts.
++        """
++        self._prompt_initial_state = state
++        self._reset()
++        self._streaming_initialized = True
++
+     def finish_streaming(self) -> DeltaMessage | None:
+         events = self._engine.finish()
+         if events or self._deferred_content:
+@@ -259,6 +277,8 @@ class ParserEngine(Parser):
+         return None
+ 
+     def _reset(self, initial_state: ParserState | None = None) -> None:
++        if initial_state is None:
++            initial_state = self._prompt_initial_state
+         self._engine.reset(initial_state=initial_state)
+         self._reasoning_ended = not self._has_reasoning
+         self._tool_slots.clear()
+@@ -924,11 +944,15 @@ class ParserEngine(Parser):
+         model_output: str,
+         request: ChatCompletionRequest | ResponsesRequest,
+         *,
++        prompt_token_ids: Sequence[int] | None,
+         finish_reason: str | None,
+         stop_reason: str | int | None,
+         enable_auto_tools: bool = False,
+         model_output_token_ids: Sequence[int] = (),
+     ) -> tuple[str | None, str | None, list[FunctionCall] | None]:
++        if prompt_token_ids is not None:
++            # The same hook ``parse_delta`` runs before its first feed.
++            self.adjust_initial_state_from_prompt(prompt_token_ids)
+         if not self._engine.requires_tool_closer:
+             return self.parse(
+                 model_output, request, enable_auto_tools=enable_auto_tools,
+diff --git a/vllm/parser/gemma4.py b/vllm/parser/gemma4.py
+index 545354b772f58a3e83fbbed62411442c86111602..92811d5c45bc5bd8eae44e81df98e55787261ba1 100644
+--- a/vllm/parser/gemma4.py
++++ b/vllm/parser/gemma4.py
+@@ -521,11 +521,9 @@ class Gemma4Parser(ParserEngine):
+         """
+         if not self._prompt_ends_in_open_reasoning(prompt_token_ids):
+             return
+-        self._engine.reset(initial_state=ParserState.REASONING)
+-        # Prevent a later default ``initialize_streaming()`` (e.g. from
+-        # ``ParserEngineReasoningAdapter.extract_reasoning_streaming``) from
+-        # clobbering this with ``CONTENT``.
+-        self._streaming_initialized = True
++        # Recorded, so neither a later default ``initialize_streaming()`` nor
++        # the batch parse's reset starts this generation in ``CONTENT``.
++        self._start_in(ParserState.REASONING)
+ 
+     def _events_to_delta(
+         self,
+diff --git a/vllm/parser/inkling.py b/vllm/parser/inkling.py
+index 666af5f89c6b0d71d4cc092fd1239999c4a9adda..572ed2bb6bda2f6c751c1e162fea072805869c00 100644
+--- a/vllm/parser/inkling.py
++++ b/vllm/parser/inkling.py
+@@ -327,16 +327,13 @@ class InklingParser(ParserEngine):
+         special_ids = {vocab[text] for text in INKLING_SPECIAL_TOKENS if text in vocab}
+         for token_id in reversed(prompt_token_ids):
+             if token_id == thinking_id:
+-                self._engine.reset(initial_state=ParserState.REASONING)
+-                self._streaming_initialized = True
++                self._start_in(ParserState.REASONING)
+                 return
+             if token_id == text_id:
+-                self._engine.reset(initial_state=ParserState.CONTENT)
+-                self._streaming_initialized = True
++                self._start_in(ParserState.CONTENT)
+                 return
+             if token_id == model_id:
+-                self._engine.reset(initial_state=ParserState.MESSAGE_HEADER)
+-                self._streaming_initialized = True
++                self._start_in(ParserState.MESSAGE_HEADER)
+                 return
+             if token_id in special_ids:
+                 break
+diff --git a/vllm/renderers/online_derenderer.py b/vllm/renderers/online_derenderer.py
+index 3a0be5eeec6c5586b58023568ef12f97edacbe10..4ff47caa852820b95c5776a90b1a8ca3c66092b6 100644
+--- a/vllm/renderers/online_derenderer.py
++++ b/vllm/renderers/online_derenderer.py
+@@ -142,6 +142,10 @@ class OnlineDerenderer:
+                 reasoning, content, tool_calls = parser.parse_output(
+                     decoded_text,
+                     chat_request,
++                    # This route is given the generated ids and the request,
++                    # never the prompt ids /render wrote, so it cannot read
++                    # where that prompt left reasoning.
++                    prompt_token_ids=None,
+                     enable_auto_tools=self.enable_auto_tools,
+                     model_output_token_ids=choice.token_ids,
+                     finish_reason=choice.finish_reason,

@@ -97,6 +97,29 @@ def call(value):
     )
 
 
+def rendered_prompt(messages, *, continue_final=False):
+    """The ids of the prompt the served template renders for *messages*.
+
+    ``continue_final`` leaves the final assistant message open, as
+    ``continue_final_message`` does: the render ends right after that
+    message's text rather than at the end of turn the template writes.
+    """
+    from chat_template_retention_unit import load_template
+
+    text = load_template().render(
+        messages=messages, add_generation_prompt=not continue_final,
+        **CHAT_TEMPLATE_KWARGS,
+    )
+    if continue_final:
+        final = messages[-1]["content"]
+        text = text[:text.rindex(final) + len(final)]
+    return encode(text)
+
+
+# The generation prompt of a fresh turn: reasoning is open where it ends.
+OPEN_PROMPT = rendered_prompt([{"role": "user", "content": "test"}])
+
+
 def request_for(*, tools=None, choice="auto"):
     fields = {} if tools == [] else {"tool_choice": choice}
     return ChatCompletionRequest(
@@ -119,14 +142,14 @@ def generation(text, ids, finish, stop):
 
 
 def parse(text, chunk_size, *, tools=None, choice="auto", ids=None,
-          finish="stop", stop=None, request=None):
+          finish="stop", stop=None, request=None, prompt=OPEN_PROMPT):
     if request is None:
         request = request_for(tools=tools, choice=choice)
     parser = PARSER(TOKENIZER, request.tools, chat_template_kwargs=CHAT_TEMPLATE_KWARGS)
     ids, texts = generation(text, ids, finish, stop)
     if chunk_size is None:
         reasoning, content, calls = parser.parse_output(
-            "".join(texts), request, enable_auto_tools=True,
+            "".join(texts), request, prompt_token_ids=prompt, enable_auto_tools=True,
             model_output_token_ids=ids, finish_reason=finish, stop_reason=stop,
         )
         return (
@@ -139,7 +162,7 @@ def parse(text, chunk_size, *, tools=None, choice="auto", ids=None,
         last = start + chunk_size >= len(ids)
         delta = parser.parse_output_delta(
             "".join(texts[start:start + chunk_size]), group, request,
-            prompt_token_ids=[1, 2, 3],
+            prompt_token_ids=prompt,
             finish_reason=finish if last else None, stop_reason=stop if last else None,
         )
         if not delta:
@@ -730,6 +753,46 @@ class ToolOutputParserTest(unittest.TestCase):
                 with self.assertRaises(VLLMValidationError) as refusal:
                     grammar_matcher(request(choice, tools))
                 self.assertEqual(refusal.exception.parameter, parameter)
+
+    def test_a_continued_final_message_parses_alike_on_every_path(self):
+        """A prompt that already closed reasoning -- a continued final
+        message, which Responses selects by itself for an in-progress or
+        incomplete last item -- leaves every generated token outside
+        reasoning: on the batch parse exactly as on every chunking of the
+        stream, with no reasoning counted."""
+        prompt = rendered_prompt(
+            [{"role": "user", "content": "test"},
+             {"role": "assistant", "content": "The ans"}],
+            continue_final=True,
+        )
+        self.assertTrue(TOKENIZER.decode(prompt).endswith("</think>\n\nThe ans"))
+        ids, texts = generation("wer is 4.", None, "stop", None)
+        for chunk in (None, 1, 3, 1000):
+            with self.subTest(chunk=chunk):
+                self.assertEqual(
+                    parse("wer is 4.", chunk, prompt=prompt)[:3],
+                    ("", "wer is 4.", []),
+                )
+                parser = PARSER(TOKENIZER, None, chat_template_kwargs=CHAT_TEMPLATE_KWARGS)
+                request = request_for(tools=[])
+                if chunk is None:
+                    parser.parse_output("".join(texts), request, prompt_token_ids=prompt,
+                                        model_output_token_ids=ids,
+                                        finish_reason="stop", stop_reason=None)
+                else:
+                    for start in range(0, len(ids), chunk):
+                        last = start + chunk >= len(ids)
+                        parser.parse_output_delta(
+                            "".join(texts[start:start + chunk]), ids[start:start + chunk],
+                            request, prompt_token_ids=prompt,
+                            finish_reason="stop" if last else None, stop_reason=None,
+                        )
+                self.assertEqual(parser.reasoning_token_count, 0)
+        # The open prompt still starts in reasoning, on every path alike.
+        for chunk in (None, 1, 1000):
+            with self.subTest(open=chunk):
+                self.assertEqual(parse("plan</think>\n\nok", chunk)[:3],
+                                 ("plan", "\n\nok", []))
 
 
 if __name__ == "__main__":
