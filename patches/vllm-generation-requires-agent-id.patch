@@ -972,7 +972,7 @@ index 937be9d016a4b7f333bd4eb53236db26f8fd2ca2..c3e253a874cc6e5cd776774f92284142
          tool_choice=tool_choice,
          stream=True,
 diff --git a/vllm/entrypoints/anthropic/protocol.py b/vllm/entrypoints/anthropic/protocol.py
-index ede9869ee3fb540507ae4ed51f05d0d85f88282a..47e47652fe7dc57599beea1ba0e73e799ac7aea3 100644
+index 7c3d56a145ed15d704c56dc6a1c1d65bbac95ca6..8f4ee6afa341476c3ec6b216dbd78208021092ba 100644
 --- a/vllm/entrypoints/anthropic/protocol.py
 +++ b/vllm/entrypoints/anthropic/protocol.py
 @@ -8,6 +8,8 @@ from typing import Annotated, Any, Literal
@@ -983,8 +983,8 @@ index ede9869ee3fb540507ae4ed51f05d0d85f88282a..47e47652fe7dc57599beea1ba0e73e79
 +from vllm.sampling_params import require_kv_scope_value
  
  
- class AnthropicError(BaseModel):
-@@ -187,6 +189,8 @@ class AnthropicMessagesRequest(BaseModel):
+ # The Messages API's documented error types, by the HTTP status each one
+@@ -220,6 +222,8 @@ class AnthropicMessagesRequest(BaseModel):
          default=None,
          description="KVTransfer parameters used for disaggregated serving.",
      )
@@ -993,7 +993,7 @@ index ede9869ee3fb540507ae4ed51f05d0d85f88282a..47e47652fe7dc57599beea1ba0e73e79
      ec_transfer_params: dict[str, Any] | None = Field(
          default=None,
          description=(
-@@ -208,6 +212,13 @@ class AnthropicMessagesRequest(BaseModel):
+@@ -241,6 +245,13 @@ class AnthropicMessagesRequest(BaseModel):
              raise ValueError("Model is required")
          return v
  
@@ -1098,10 +1098,10 @@ index 275ad13f06eea0701ac2bdce217987bacb26b94a..c0e22bb6b709b2a9613e0db3cffee9ee
          parser: Parser | None = None
          if self.parser_cls is not None:
 diff --git a/vllm/entrypoints/openai/chat_completion/protocol.py b/vllm/entrypoints/openai/chat_completion/protocol.py
-index f8a4ca299e5cdde4a7887278c66a843786acda4c..a3356a8a0f67f3bb3e6fdcd2c7241d85be43c648 100644
+index f532e983a97f1e9cb761a0f9da5a58e395a66d88..a7ab6c74949dbb3055584c7496dce24827b6aa84 100644
 --- a/vllm/entrypoints/openai/chat_completion/protocol.py
 +++ b/vllm/entrypoints/openai/chat_completion/protocol.py
-@@ -28,6 +28,7 @@ from vllm.entrypoints.openai.engine.protocol import (
+@@ -30,6 +30,7 @@ from vllm.entrypoints.openai.engine.protocol import (
      DeltaMessage,
      FunctionCall,
      FunctionDefinition,
@@ -1109,7 +1109,7 @@ index f8a4ca299e5cdde4a7887278c66a843786acda4c..a3356a8a0f67f3bb3e6fdcd2c7241d85
      OpenAIBaseModel,
      PerRequestTimingMetrics,
      StopParam,
-@@ -50,6 +51,8 @@ from vllm.sampling_params import (
+@@ -53,6 +54,8 @@ from vllm.sampling_params import (
      SamplingParams,
      StructuredOutputsParams,
      ThinkingTokenBudget,
@@ -1118,7 +1118,7 @@ index f8a4ca299e5cdde4a7887278c66a843786acda4c..a3356a8a0f67f3bb3e6fdcd2c7241d85
  )
  from vllm.utils import random_uuid
  
-@@ -1154,6 +1157,38 @@ class ChatCompletionRequest(OpenAIBaseModel):
+@@ -1071,6 +1074,38 @@ class ChatCompletionRequest(OpenAIBaseModel):
          return data
  
  
@@ -1157,7 +1157,7 @@ index f8a4ca299e5cdde4a7887278c66a843786acda4c..a3356a8a0f67f3bb3e6fdcd2c7241d85
  class BatchChatCompletionRequest(OpenAIBaseModel):
      """Request model for the /v1/chat/completions/batch endpoint.
  
-@@ -1163,6 +1198,9 @@ class BatchChatCompletionRequest(OpenAIBaseModel):
+@@ -1080,6 +1115,9 @@ class BatchChatCompletionRequest(OpenAIBaseModel):
      independently and the response contains one choice per conversation,
      indexed 0, 1, ..., N-1.
  
@@ -1167,7 +1167,7 @@ index f8a4ca299e5cdde4a7887278c66a843786acda4c..a3356a8a0f67f3bb3e6fdcd2c7241d85
      Current limitations compared to the single-conversation endpoint:
      - Streaming is not supported (``stream`` must be False or omitted).
      - Tool use is not supported (``tools`` must be omitted).
-@@ -1219,6 +1257,13 @@ class BatchChatCompletionRequest(OpenAIBaseModel):
+@@ -1136,6 +1174,13 @@ class BatchChatCompletionRequest(OpenAIBaseModel):
      mm_processor_kwargs: dict[str, Any] | None = None
      priority: int = Field(default=0, ge=_INT64_MIN, le=_INT64_MAX)
      cache_salt: str | None = None
@@ -1181,7 +1181,7 @@ index f8a4ca299e5cdde4a7887278c66a843786acda4c..a3356a8a0f67f3bb3e6fdcd2c7241d85
      include_stop_str_in_output: bool = False
      guided_decoding_backend: str | None = None
      echo: bool = False
-@@ -1256,19 +1301,39 @@ class BatchChatCompletionRequest(OpenAIBaseModel):
+@@ -1173,19 +1218,39 @@ class BatchChatCompletionRequest(OpenAIBaseModel):
                  validate_structural_tag_response_format(response_format)
          if (structured_outputs := data.get("structured_outputs")) is not None:
              validate_structured_outputs_structural_tag(structured_outputs)
@@ -1604,7 +1604,7 @@ index 9e9ace877a7c86f6a207547e715c3cab22d4521d..64d6846012a6493d1c8a4f15adac2b31
          request_id: str,
          model_name: str,
 diff --git a/vllm/sampling_params.py b/vllm/sampling_params.py
-index 1b30cf3924412f69f2129d1fffe1cc0b13c411bc..dd07fe560c394159993701403271d642664654bd 100644
+index 06b4ec776b485fae44f01d1b1bc50de02f481b98..87113f7a89205b6263427c561465643bae1e7956 100644
 --- a/vllm/sampling_params.py
 +++ b/vllm/sampling_params.py
 @@ -32,6 +32,68 @@ MAX_LOGPROB_TOKEN_IDS = 128

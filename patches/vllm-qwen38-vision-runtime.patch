@@ -957,7 +957,7 @@ index 7e8e4441efee914aca39aef7e739acc8b303686e..f04a1e2b5961096757432fa2dba5a5ab
              openai_messages.append(
                  {
 diff --git a/vllm/entrypoints/chat_utils.py b/vllm/entrypoints/chat_utils.py
-index 30b6ecc76be1bf4e2f1e5e1741b40fc8fddb41b7..3f83370b247181458c5f31334593dbf935fc935f 100644
+index f6381ec815abac4e48947870c1e516cc11cdc5e8..95c0b3a38c457a004782e9736a0038f3e601cdfb 100644
 --- a/vllm/entrypoints/chat_utils.py
 +++ b/vllm/entrypoints/chat_utils.py
 @@ -1532,6 +1532,89 @@ def _collect_extra_fields(part: dict[str, Any]) -> dict[str, Any]:

@@ -1,5 +1,5 @@
 diff --git a/vllm/sampling_params.py b/vllm/sampling_params.py
-index 46c4046082..1b30cf3924 100644
+index 63432b1759..06b4ec776b 100644
 --- a/vllm/sampling_params.py
 +++ b/vllm/sampling_params.py
 @@ -77,6 +77,37 @@ ThinkingTokenBudget = Annotated[
@@ -40,7 +40,7 @@ index 46c4046082..1b30cf3924 100644
  class SamplingType(IntEnum):
      GREEDY = 0
      RANDOM = 1
-@@ -364,6 +395,12 @@ class SamplingParams(
+@@ -375,6 +406,12 @@ class SamplingParams(
      skip_reading_prefix_cache: bool | None = None
      thinking_token_budget: int | None = None
      """Maximum number of tokens allowed for thinking operations."""
@@ -53,7 +53,7 @@ index 46c4046082..1b30cf3924 100644
  
      repetition_detection: RepetitionDetectionParams | None = None
      """Parameters for detecting repetitive N-gram patterns in output tokens.
-@@ -388,6 +425,7 @@ class SamplingParams(
+@@ -399,6 +436,7 @@ class SamplingParams(
          stop_token_ids: list[int] | None = None,
          bad_words: list[str] | None = None,
          thinking_token_budget: int | None = None,
@@ -61,7 +61,7 @@ index 46c4046082..1b30cf3924 100644
          include_stop_str_in_output: bool = False,
          ignore_eos: bool = False,
          max_tokens: int | None = 16,
-@@ -451,6 +489,7 @@ class SamplingParams(
+@@ -462,6 +500,7 @@ class SamplingParams(
              stop_token_ids=stop_token_ids,
              bad_words=bad_words,
              thinking_token_budget=thinking_token_budget,
@@ -69,7 +69,7 @@ index 46c4046082..1b30cf3924 100644
              include_stop_str_in_output=include_stop_str_in_output,
              ignore_eos=ignore_eos,
              max_tokens=max_tokens,
-@@ -489,6 +528,9 @@ class SamplingParams(
+@@ -500,6 +539,9 @@ class SamplingParams(
          self.thinking_token_budget = validate_thinking_token_budget(
              self.thinking_token_budget
          )
@@ -79,7 +79,7 @@ index 46c4046082..1b30cf3924 100644
  
          if self.stop is None:
              self.stop = []
-@@ -1142,6 +1184,7 @@ class SamplingParams(
+@@ -1153,6 +1195,7 @@ class SamplingParams(
              f"stop_token_ids={self.stop_token_ids}, "
              f"bad_words={self.bad_words}, "
              f"thinking_token_budget={self.thinking_token_budget}, "

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import os
 import sys
 import tempfile
@@ -904,3 +905,53 @@ class WorktreeStatusTests(unittest.TestCase):
         self.assertEqual(
             {line[3:] for line in patchset.worktree_status()}, observed
         )
+
+
+def _reads_code_text(test: ast.expr) -> bool:
+    """Whether a condition asks if some text occurs in the code under check."""
+    return any(
+        isinstance(node, ast.Compare)
+        and isinstance(node.left, ast.Constant)
+        and isinstance(node.left.value, str)
+        and any(isinstance(op, (ast.In, ast.NotIn)) for op in node.ops)
+        for node in ast.walk(test)
+    )
+
+
+class ContractShapeTests(unittest.TestCase):
+    """Every semantic contract validator pins one shape of the code it checks.
+
+    validate_final runs every stage's validate_after again on the final tree,
+    so a validator that decides by the code's text which shape to check -- or
+    hands its check to another stage's validator -- accepts a shape the code
+    has left beside the one it has, and a regression to the left shape passes
+    it. A stage that rewrites a construct an earlier contract pins is written
+    where the construct is first written instead.
+    """
+
+    def test_no_validator_branches_on_the_shape_of_the_code(self) -> None:
+        path = Path(__file__).with_name("contracts_vllm.py")
+        module = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        branches = []
+        for function in module.body:
+            if not (
+                isinstance(function, ast.FunctionDef)
+                and function.name.startswith("_validate_")
+            ):
+                continue
+            for node in ast.walk(function):
+                if isinstance(node, (ast.If, ast.IfExp, ast.While)):
+                    conditions = [node.test]
+                elif isinstance(node, ast.BoolOp) and isinstance(node.op, ast.Or):
+                    conditions = node.values
+                else:
+                    conditions = []
+                if any(_reads_code_text(condition) for condition in conditions):
+                    branches.append(f"{function.name}:{node.lineno} branches on the code")
+                if (
+                    isinstance(node, ast.Call)
+                    and isinstance(node.func, ast.Name)
+                    and node.func.id.startswith("_validate_")
+                ):
+                    branches.append(f"{function.name}:{node.lineno} runs {node.func.id}")
+        self.assertEqual(branches, [])

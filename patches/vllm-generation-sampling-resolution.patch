@@ -488,15 +488,7 @@ diff --git a/tests/entrypoints/test_kv_scope_protocol.py b/tests/entrypoints/tes
 diff --git a/vllm/entrypoints/openai/chat_completion/protocol.py b/vllm/entrypoints/openai/chat_completion/protocol.py
 --- a/vllm/entrypoints/openai/chat_completion/protocol.py
 +++ b/vllm/entrypoints/openai/chat_completion/protocol.py
-@@ -48,6 +48,7 @@
- from vllm.sampling_params import (
-     BeamSearchParams,
-     FinalResponseTokenBudget,
-+    resolve_final_response_token_budget,
-     RepetitionDetectionParams,
-     RequestOutputKind,
-     SamplingParams,
-@@ -232,7 +233,7 @@
+@@ -233,7 +233,7 @@
      )
      max_completion_tokens: int | None = None
      n: int | None = 1
@@ -505,27 +497,6 @@ diff --git a/vllm/entrypoints/openai/chat_completion/protocol.py b/vllm/entrypoi
      response_format: AnyResponseFormat | None = None
      seed: int | None = Field(None, ge=_INT64_MIN, le=_INT64_MAX)
      stop: StopParam = []
-@@ -709,17 +710,10 @@
-             thinking_token_budget = default_sampling_params.get(
-                 "thinking_token_budget"
-             )
--        final_response_token_budget = self.final_response_token_budget
--        server_final_response_budget = default_sampling_params.get(
--            "final_response_token_budget"
-+        final_response_token_budget = resolve_final_response_token_budget(
-+            self.final_response_token_budget,
-+            default_sampling_params.get("final_response_token_budget"),
-         )
--        if server_final_response_budget is not None:
--            if final_response_token_budget is None:
--                final_response_token_budget = server_final_response_budget
--            else:
--                final_response_token_budget = min(
--                    final_response_token_budget, server_final_response_budget
--                )
- 
-         # Merge server-default stop_token_ids (e.g., model-specific tokens
-         # like </call> for gpt-oss) with any request-specified ones
 diff --git a/vllm/entrypoints/openai/completion/protocol.py b/vllm/entrypoints/openai/completion/protocol.py
 --- a/vllm/entrypoints/openai/completion/protocol.py
 +++ b/vllm/entrypoints/openai/completion/protocol.py
@@ -945,24 +916,3 @@ diff --git a/vllm/entrypoints/scale_out/token_in_token_out/serving.py b/vllm/ent
  
          include_usage, include_continuous_usage = should_include_usage(
              request.stream_options, False
-diff --git a/vllm/sampling_params.py b/vllm/sampling_params.py
---- a/vllm/sampling_params.py
-+++ b/vllm/sampling_params.py
-@@ -305,6 +305,17 @@
-     return tokenizer.llg_tokenizer if is_mistral_tokenizer(tokenizer) else None
- 
- 
-+def resolve_final_response_token_budget(
-+    requested: int | None, server_budget: int | None,
-+) -> int | None:
-+    """Resolve the final-answer ceiling shared by generation protocols."""
-+    requested = validate_final_response_token_budget(requested)
-+    server_budget = validate_final_response_token_budget(server_budget)
-+    if server_budget is None:
-+        return requested
-+    return server_budget if requested is None else min(requested, server_budget)
-+
-+
- class SamplingParams(
-     PydanticMsgspecMixin,
-     msgspec.Struct,

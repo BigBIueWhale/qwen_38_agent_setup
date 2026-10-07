@@ -198,12 +198,23 @@ def _validate_turbo_after(state: State) -> None:
         contains="full_shape = (full_alloc_len, Hk, D)",
     )
     direct_source = _branch_source(direct.body)
+    # Both final-layout buffers come from one acquisition from the shared
+    # workspace manager. Which acquisition is the vision runtime's to pin: it
+    # makes the continuation workspace reclaimable around encoding.
+    acquisitions = [
+        candidate
+        for candidate in ast.walk(direct)
+        if isinstance(candidate, ast.Assign)
+        and ast.unparse(candidate.targets) == "(k_full_buf, v_full_buf)"
+        and isinstance(candidate.value, ast.Call)
+        and isinstance(candidate.value.func, ast.Attribute)
+        and ast.unparse(candidate.value.func.value) == "current_workspace_manager()"
+        and [ast.unparse(arg) for arg in candidate.value.args[-2:]]
+        == ["(full_shape, qdtype)", "(full_shape, qdtype)"]
+    ]
     _require(
         "full_shape = (full_alloc_len, Hk, D)" in direct_source
-        and (
-            "get_simultaneous" in direct_source
-            or "get_reclaimable_simultaneous" in direct_source
-        ),
+        and len(acquisitions) == 1,
         f"{label}: K8V4 branch does not acquire the final-layout workspace",
     )
     _require(
@@ -298,6 +309,8 @@ def _validate_defaults_before(state: State) -> None:
         label=label,
     )
     forbid_text(state, chat, "_validate_tool_result_correlation", label=label)
+    forbid_text(state, "vllm/entrypoints/chat_utils.py",
+                "def validate_tool_result_correlation(", label=label)
     forbid_text(state, anthropic, "class AnthropicThinkingConfig", label=label)
 
 
@@ -307,6 +320,7 @@ def _validate_defaults_after(state: State) -> None:
     anthropic_protocol = "vllm/entrypoints/anthropic/protocol.py"
     anthropic_serving = "vllm/entrypoints/anthropic/serving.py"
     chat = "vllm/entrypoints/openai/chat_completion/protocol.py"
+    chat_utils = "vllm/entrypoints/chat_utils.py"
     require_python_symbols(
         state,
         anthropic_protocol,
@@ -335,14 +349,25 @@ def _validate_defaults_after(state: State) -> None:
         '"final_response_token_budget"',
     ):
         require_text(state, model, needle, label=label)
-    correlation = _symbol_source(
-        state, chat, "ChatCompletionRequest._validate_tool_result_correlation", label=label
+    # One boundary validates a positional tool history before it is rendered;
+    # a refusal names where the caller sent the offending message or call.
+    _require_in_symbol(
+        state, chat, "ChatCompletionRequest._validate_tool_result_correlation", (
+            "validate_tool_result_correlation(",
+            "ToolHistoryOrigin.chat(self.messages)",
+        ), label=label,
     )
-    if "ToolHistoryOrigin.chat(self.messages)" in correlation:
-        correlation = _symbol_source(
-            state, "vllm/entrypoints/chat_utils.py",
-            "validate_tool_result_correlation", label=label,
-        )
+    require_python_symbols(state, chat_utils, {
+        "ToolHistoryOrigin.chat": ("cls", "messages"),
+        "validate_tool_result_correlation": ("messages", "origin"),
+    }, label=label)
+    correlation = _require_in_symbol(
+        state, chat_utils, "validate_tool_result_correlation", (
+            "raise VLLMValidationError(", "result_id != expected_id",
+            "pending_ids.pop(0)", "parameter=parameter", "parameter=call_parameter",
+        ), label=label,
+    )
+    forbid_text(state, chat_utils, "messages[{message_index}]", label=label)
     for invariant in (
         "is orphaned",
         "is missing its transport id",
@@ -358,21 +383,17 @@ def _validate_defaults_after(state: State) -> None:
         'default_sampling_params.get("presence_penalty", 0.0)',
         "thinking_token_budget = default_sampling_params.get(",
         '"thinking_token_budget"',
+        "final_response_token_budget = resolve_final_response_token_budget(",
         "final_response_token_budget=final_response_token_budget",
     ):
         _require(needle in sampling, f"{label}: sampling default/clamp missing {needle!r}")
-    if "resolve_final_response_token_budget(" in sampling:
-        _require_in_symbol(state, "vllm/sampling_params.py",
-            "resolve_final_response_token_budget", (
-                "validate_final_response_token_budget(requested)",
-                "validate_final_response_token_budget(server_budget)",
-                "server_budget if requested is None else min(requested, server_budget)",
-            ), label=label)
-    else:
-        _require(
-            "min(\n                    final_response_token_budget, server_final_response_budget" in sampling,
-            f"{label}: missing final-response ceiling",
-        )
+    # A client may lower the server's final-response ceiling, never raise it.
+    _require_in_symbol(state, "vllm/sampling_params.py",
+        "resolve_final_response_token_budget", (
+            "validate_final_response_token_budget(requested)",
+            "validate_final_response_token_budget(server_budget)",
+            "server_budget if requested is None else min(requested, server_budget)",
+        ), label=label)
     _require(
         "max(\n                    final_response_token_budget" not in sampling,
         f"{label}: client can raise the server final-response ceiling",
@@ -394,7 +415,7 @@ def _validate_phase_before(state: State) -> None:
     forbid_text(
         state,
         "vllm/sampling_params.py",
-        "validate_final_response_token_budget",
+        "def validate_final_response_token_budget(",
         label=label,
     )
     forbid_text(
@@ -536,52 +557,49 @@ def _validate_anthropic_400_before(state: State) -> None:
     source = _source(state, path, label=label)
     _require("except ValidationError as e:" not in source, f"{label}: fix already present")
     _require("VLLMValidationError" not in source, f"{label}: fix already present")
-    _require(source.count("except Exception as e:") >= 2, f"{label}: generic handlers drifted")
+    _require("def refuse(" not in source, f"{label}: fix already present")
+    _require(source.count("except Exception as e:") == 2, f"{label}: generic handlers drifted")
 
 
 def _validate_anthropic_400_after(state: State) -> None:
     label = "Anthropic validation status result"
     path = "vllm/entrypoints/anthropic/api_router.py"
+    protocol = "vllm/entrypoints/anthropic/protocol.py"
     require_python_symbols(
         state,
         path,
         {
             "create_messages": ("request", "raw_request"),
             "count_tokens": ("request", "raw_request"),
+            "refuse": ("exc", "route"),
+            "translate_error_response": ("response",),
         },
         label=label,
     )
-    # The later fidelity stage routes these same validation failures through
-    # the shared exception classifier. Reassert that stronger contract when
-    # validating the final tree; the initial stage still has its local catches.
-    if "def refuse(" in _source(state, path, label=label):
-        _validate_anthropic_inputs_after(state)
-        return
-    # The engine's own request validation -- a generation that names no agent,
-    # for one -- is a client error exactly as typed request validation is, and
-    # it reaches this router as VLLMValidationError rather than pydantic's.
-    require_text(
-        state,
-        path,
-        "from vllm.exceptions import VLLMValidationError",
-        count=1,
-        label=label,
-    )
-    for qualname in ("create_messages", "count_tokens"):
-        source = _symbol_source(state, path, qualname, label=label)
-        _require_ordered(
-            source,
-            (
-                "except (ValidationError, VLLMValidationError) as e:",
-                "status_code=HTTPStatus.BAD_REQUEST.value",
-                'type="invalid_request_error"',
-                "message=sanitize_message(str(e))",
-                "except Exception as e:",
-                "status_code=HTTPStatus.INTERNAL_SERVER_ERROR.value",
-            ),
-            label=label,
-            location=f"{path}:{qualname}",
-        )
+    # A route classifies a failure as the OpenAI surfaces do: typed request
+    # validation and the engine's own request validation -- a generation that
+    # names no agent, for one -- are client errors, and only a failure the
+    # classifier cannot lay at the client's door is a logged server error.
+    for name in ("create_messages", "count_tokens"):
+        _require_in_symbol(state, path, name, (
+            "except Exception as e:", f'return refuse(e, route="{name}")',
+        ), label=label)
+    _require_in_symbol(state, path, "refuse", (
+        "error = create_error_response(exc)",
+        "if error.error.code >= HTTPStatus.INTERNAL_SERVER_ERROR.value:",
+        "logger.exception(",
+        "return translate_error_response(error)",
+    ), label=label)
+    _require_in_symbol(state, path, "translate_error_response", (
+        "status_code=response.error.code", "AnthropicErrorResponse.for_status(",
+    ), label=label)
+    forbid_text(state, path, "except (ValidationError, VLLMValidationError)", label=label)
+    forbid_text(state, path, 'type="internal_error"', label=label)
+    for needle in (
+        '400: "invalid_request_error"', '500: "api_error"',
+        '529: "overloaded_error"', "def for_status(",
+    ):
+        require_text(state, protocol, needle, label=label)
 
 
 def _validate_truncation_before(state: State) -> None:
@@ -686,20 +704,19 @@ def _validate_truncation_after(state: State) -> None:
             label=label,
         )
     )
-    if "earlier_deferred" in parser_terminal:
-        _require(
-            "if finished or not seen_tool_event or (not tool_call_deltas):"
-            in parser_terminal
-            and "content_parts.insert(0, earlier_deferred)" in parser_terminal
-            and "content_parts.append(deferred_after_call)" in parser_terminal,
-            f"{label}: terminal parse must release all text in generation order",
-        )
-    else:
-        _require(
-            "self._deferred_content and (finished or not seen_tool_event or "
-            "(not tool_call_deltas))" in parser_terminal,
-            f"{label}: batch terminal parse can strand deferred content",
-        )
+    # A finished parse has no later delta to wait for: it releases every
+    # held-back text, in the order the model produced it.
+    _require(
+        "if finished or not seen_tool_event or (not tool_call_deltas):"
+        in parser_terminal
+        and "content_parts.insert(0, earlier_deferred)" in parser_terminal
+        and "content_parts.append(deferred_after_call)" in parser_terminal,
+        f"{label}: terminal parse must release all text in generation order",
+    )
+    require_python_symbols(state, "tests/parser/engine/test_parser_engine.py", {
+        "TestPostToolContentDeferral.test_text_after_tool_released_in_order_when_finished": None,
+        "TestPostToolContentDeferral.test_text_held_back_by_an_earlier_delta_comes_first": None,
+    }, label=label)
 
 
 def _validate_vision_before(state: State) -> None:
@@ -2005,26 +2022,14 @@ def _validate_reasoning_usage_after(state: State) -> None:
 def _validate_anthropic_inputs_before(state: State) -> None:
     forbid_text(
         state, "vllm/entrypoints/anthropic/protocol.py",
-        "def for_status(", label="Anthropic input fidelity precondition",
+        "def is_anthropic_api_path(", label="Anthropic input fidelity precondition",
     )
 
 
 def _validate_anthropic_inputs_after(state: State) -> None:
     label = "Anthropic input fidelity result"
-    router = "vllm/entrypoints/anthropic/api_router.py"
     serving = "vllm/entrypoints/anthropic/serving.py"
-    protocol = "vllm/entrypoints/anthropic/protocol.py"
     errors = "vllm/entrypoints/serve/exception_handling/error_response.py"
-    for name in ("create_messages", "count_tokens"):
-        _require_in_symbol(state, router, name, (
-            "except Exception as e:", f'return refuse(e, route="{name}")',
-        ), label=label)
-    _require_in_symbol(state, router, "refuse", (
-        "error = create_error_response(exc)", "return translate_error_response(error)",
-    ), label=label)
-    _require_in_symbol(state, router, "translate_error_response", (
-        "status_code=response.error.code", "AnthropicErrorResponse.for_status(",
-    ), label=label)
     _require_in_symbol(state, errors, "error_json_response", (
         "is_anthropic_api_path(get_route_path(request.scope))",
         "AnthropicErrorResponse.for_status(", "content = error.model_dump()",
@@ -2035,11 +2040,6 @@ def _validate_anthropic_inputs_after(state: State) -> None:
         require_text(state, path, "return error_json_response(req, err)",
                      count=2 if name == "vllm_error" else 1, label=label)
         forbid_text(state, path, "return JSONResponse(", label=label)
-    for needle in (
-        '400: "invalid_request_error"', '500: "api_error"',
-        '529: "overloaded_error"', "def for_status(",
-    ):
-        require_text(state, protocol, needle, label=label)
     _require_in_symbol(state, serving, "AnthropicServingMessages._convert_user_tool_result", (
         "raise VLLMValidationError(", "if block.is_error:", "TOOL_RESULT_ERROR_LINE",
         "tool_content_parts.insert(", "item_where",
@@ -2097,8 +2097,6 @@ def _validate_qwen_language_after(state: State) -> None:
         'events.extend(self._abandon_call_header(""))',
     ), label=label)
     _require_in_symbol(state, parser, "ParserEngine._events_to_delta", (
-        'content_parts.append(deferred_after_call)',
-        'content_parts.insert(0, earlier_deferred)',
         'case EventType.TOOL_CALL_CLOSED:', 'case EventType.TOOL_CALL_ABANDONED:',
     ), label=label)
     _require_in_symbol(state, abstract, "DelegatingParser.parse", (
@@ -2199,8 +2197,8 @@ def _validate_responses_history_before(state: State) -> None:
     label = "Responses history precondition"
     require_text(state, "vllm/entrypoints/openai/responses/utils.py",
                  "output_text = item.content[0].text", label=label)
-    forbid_text(state, "vllm/entrypoints/chat_utils.py",
-                "def validate_tool_result_correlation(", label=label)
+    forbid_text(state, "vllm/entrypoints/openai/responses/utils.py",
+                "validate_tool_result_correlation", label=label)
 
 
 def _validate_responses_history_after(state: State) -> None:
@@ -2223,21 +2221,6 @@ def _validate_responses_history_after(state: State) -> None:
     ), label=label)
     forbid_text(state, utils, "item.content[0]", label=label)
     forbid_text(state, utils, "item.summary[0]", label=label)
-    _require_in_symbol(state, "vllm/entrypoints/openai/chat_completion/protocol.py",
-                       "ChatCompletionRequest._validate_tool_result_correlation", (
-        "ToolHistoryOrigin.chat(self.messages)",
-    ), label=label)
-    require_python_symbols(state, "vllm/entrypoints/chat_utils.py", {
-        "ToolHistoryOrigin.chat": ("cls", "messages"),
-        "validate_tool_result_correlation": ("messages", "origin"),
-    }, label=label)
-    _require_in_symbol(state, "vllm/entrypoints/chat_utils.py",
-                       "validate_tool_result_correlation", (
-        "raise VLLMValidationError(", "result_id != expected_id", "pending_ids.pop(0)",
-        "parameter=parameter", "parameter=call_parameter",
-    ), label=label)
-    forbid_text(state, "vllm/entrypoints/chat_utils.py", "messages[{message_index}]",
-                label=label)
     require_python_symbols(state,
         "tests/entrypoints/openai/responses/test_responses_utils.py", {
             "test_replayed_blocks_preserve_every_byte_and_reasoning": None,
@@ -4825,8 +4808,7 @@ CONTRACTS: Mapping[str, SemanticContract] = {
             "is forwarded as the text it was. The batch tool pass splits on the "
             "generated ids after the reasoning boundary, as streaming does, so a "
             "text lookalike of a marker is content on both transports; a finished "
-            "parse releases content in the order generated and reports a call "
-            "cut before its wrapper as open."
+            "parse reports a call cut before its wrapper as open."
         ),
         removal_condition=(
             "Remove when upstream matches the Qwen grammar's trigger and parameter "
@@ -4839,9 +4821,11 @@ CONTRACTS: Mapping[str, SemanticContract] = {
     "anthropic-input-fidelity": SemanticContract(
         rationale=(
             "Anthropic tool results silently lost unsupported content and is_error; "
-            "renderer ValueErrors became 500s and framework errors used OpenAI "
-            "envelopes. Refuse unrenderable input, render the caller's failure flag, "
-            "and preserve the shared HTTP classification in Anthropic errors."
+            "a refusal raised before a route ran -- typed body validation, an HTTP or "
+            "framework error -- used the OpenAI envelope, and a stream replaced a "
+            "classified failure with an internal_error. Refuse unrenderable input, "
+            "render the caller's failure flag, and answer every refusal on a Messages "
+            "path, in a stream too, in the Anthropic envelope for its status."
         ),
         removal_condition=(
             "Remove when pinned upstream preserves all supported tool-result input "
@@ -4887,7 +4871,9 @@ CONTRACTS: Mapping[str, SemanticContract] = {
             "Server defaults must reach every protocol, only correctness-first thinking "
             "controls are accepted, a client may lower but never raise the final ceiling, "
             "and Qwen's ID-less prompt representation makes malformed tool-result "
-            "correlation unsafe to guess."
+            "correlation unsafe to guess. One function resolves the final ceiling, and "
+            "one boundary validates a tool history, its refusal naming where the "
+            "caller sent the offending message or call."
         ),
         removal_condition=(
             "Remove only after upstream propagates the same defaults and phase ceilings "
@@ -4928,16 +4914,20 @@ CONTRACTS: Mapping[str, SemanticContract] = {
     ),
     "anthropic-validation-http400": SemanticContract(
         rationale=(
-            "Typed Pydantic request/translation validation and the engine's own request "
-            "validation (VLLMValidationError on the path into the engine -- a generation "
-            "naming no kv_scope, for one) are client errors and must be returned as "
-            "sanitized Anthropic invalid_request_error HTTP 400. Unexpected server "
-            "failures remain logged HTTP 500; the categories must not be merged."
+            "The Messages routes answered every failure as HTTP 500 internal_error, "
+            "typed Pydantic request/translation validation and the engine's own "
+            "request validation (VLLMValidationError on the path into the engine -- a "
+            "generation naming no kv_scope, for one) included. Both routes classify a "
+            "failure with the classifier the OpenAI surfaces use and answer it, "
+            "sanitized, at that status with the Anthropic error type the status "
+            "stands for: request validation is an invalid_request_error HTTP 400, "
+            "and only a failure the classifier cannot lay at the client's door is a "
+            "logged server error; the categories must not be merged."
         ),
         removal_condition=(
-            "Remove when upstream maps Pydantic and VLLMValidationError failures in both "
-            "messages and count_tokens to Anthropic HTTP 400 while preserving generic "
-            "exception 500s."
+            "Remove when upstream classifies messages and count_tokens failures as its "
+            "OpenAI surfaces do and answers them with the Anthropic error type for "
+            "their status."
         ),
         validate_before=_validate_anthropic_400_before,
         validate_after=_validate_anthropic_400_after,
@@ -4950,7 +4940,8 @@ CONTRACTS: Mapping[str, SemanticContract] = {
             "arguments.done for the call the limit cut nor response.completed. Both "
             "Responses transports mark items as the stream closes them: the item the "
             "limit cut, the last, is incomplete; items the model finished before it "
-            "are completed."
+            "are completed. A finished parse releases every held-back text, in the "
+            "order the model produced it."
         ),
         removal_condition=(
             "Remove when upstream preserves engine truncation across Chat and Responses "
