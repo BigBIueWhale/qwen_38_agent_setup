@@ -346,8 +346,8 @@ It is intentionally reconstructed by the ordered, reviewed semantic transformati
 | patches/vllm-unspecified-tool-choice-is-the-default.patch | 367fedad65383375e377d7bc1e20cc3fdab4554d511b9437918004b25321d530 |
 | patches/vllm-call-only-answer-keeps-the-blank-line.patch | ad1e558f8ba02c6889d9b4a79c6ec355e9bfa763bc007e5cae7e609be96ec084 |
 | patches/vllm-responses-tools-are-one-function-list.patch | cae549ea87a8c1b6020f76163cfe1eca0c3104eac317ab2d84b3db75092d20cd |
-| patches/vllm-batch-parse-starts-where-the-prompt-leaves.patch | 4e7f284ab8f7a35bd1bf0405c8bca1e775fb4208326b6aa2e6438522509f3d61 |
-| patches/vllm-derender-text-is-the-detokenizers.patch | 1f733012c4c208a1f0a252518540bcddf5924152957cc96dce7783042f0df3c7 |
+| patches/vllm-batch-parse-starts-where-the-prompt-leaves.patch | ef6c1694b9477ca802744485a3b0057b034392b1bf7cdcc0645b8baf3d723913 |
+| patches/vllm-derender-text-is-the-detokenizers.patch | f62ce9c3f0a4f83f5d6ed58d7e36b015cade5f6cb7cd2538df8c0bd1cb0050c4 |
 | patches/vllm-output-constraints-refused-beside-tool-calls.patch | c6ac620c8cd962a77868789d72875e0df456a9b0918ef8cb58ec2e15c3600343 |
 | patches/vllm-batch-invariance-substitutes-no-nvfp4-kernel.patch | c79baaee0a51275f5f522d266fe6b315c200e6951920c2454d5c80cadbb92f44 |
 | patches/vllm-render-carries-every-image-chat-renders.patch | c5bf4cb2948b9eb7866d083671af3badcc9cf529a7756bde3b0647c236fe932f |
@@ -1218,7 +1218,12 @@ model continues, on Chat Completions as on Responses. The complete-output parse
 reads that one decision as the stream does, so a continued final message -- whose
 prompt already closed reasoning -- is the answer on both transports, never
 reasoning in one and content in the other. Derender is given no prompt and parses
-as if reasoning were open.
+as if reasoning were open, as upstream's derender does: a continued final
+message's answer is reasoning there, and empty with `include_reasoning` off. The
+"parser parity" that upstream's derender guide
+(`vllm/docs/serving/online_serving/derenderer.md`) states -- the same content,
+reasoning and tool-call split as a served Chat request -- does not hold here for
+a continued final message.
 
 A tool choice that is not specified -- omitted or `null` -- is `auto` when tools
 are declared and `none` otherwise. The chat request and the Anthropic conversion

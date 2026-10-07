@@ -525,16 +525,18 @@ index 666af5f89c6b0d71d4cc092fd1239999c4a9adda..572ed2bb6bda2f6c751c1e162fea0728
              if token_id in special_ids:
                  break
 diff --git a/vllm/renderers/online_derenderer.py b/vllm/renderers/online_derenderer.py
-index 3a0be5eeec6c5586b58023568ef12f97edacbe10..4ff47caa852820b95c5776a90b1a8ca3c66092b6 100644
+index 3a0be5eeec6c5586b58023568ef12f97edacbe10..6296e8c9abe4d9b0fb5fb4f5ab3bd71f5a78ad5d 100644
 --- a/vllm/renderers/online_derenderer.py
 +++ b/vllm/renderers/online_derenderer.py
-@@ -142,6 +142,10 @@ class OnlineDerenderer:
+@@ -142,6 +142,12 @@ class OnlineDerenderer:
                  reasoning, content, tool_calls = parser.parse_output(
                      decoded_text,
                      chat_request,
 +                    # This route is given the generated ids and the request,
 +                    # never the prompt ids /render wrote, so it cannot read
-+                    # where that prompt left reasoning.
++                    # where that prompt left reasoning: a continued final
++                    # message, whose prompt already closed it, is parsed as
++                    # reasoning here, as upstream parses it.
 +                    prompt_token_ids=None,
                      enable_auto_tools=self.enable_auto_tools,
                      model_output_token_ids=choice.token_ids,

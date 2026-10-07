@@ -234,7 +234,7 @@ index fcb0f378714335ece573ba62bab5cd3cc70ac88a..d0fbb8812c65cac3911f2aad13b0e3c7
      renderer.use_harmony = True
      incoming = GenerateResponse.model_validate(dict(request_id='request', choices=[dict(
 diff --git a/vllm/renderers/online_derenderer.py b/vllm/renderers/online_derenderer.py
-index 4ff47caa852820b95c5776a90b1a8ca3c66092b6..f41aba415433824819fe8276f02f35e8239d1daa 100644
+index 6296e8c9abe4d9b0fb5fb4f5ab3bd71f5a78ad5d..70d8a2e01313c139c4c935d3763fd96896b06106 100644
 --- a/vllm/renderers/online_derenderer.py
 +++ b/vllm/renderers/online_derenderer.py
 @@ -35,6 +35,7 @@ from vllm.tokenizers import TokenizerLike
@@ -269,7 +269,7 @@ index 4ff47caa852820b95c5776a90b1a8ca3c66092b6..f41aba415433824819fe8276f02f35e8
                  )
  
                  chat_template_kwargs: dict[str, Any] = {}
-@@ -188,8 +197,8 @@ class OnlineDerenderer:
+@@ -190,8 +199,8 @@ class OnlineDerenderer:
                      if chat_request is not None
                      else True
                  )
@@ -280,7 +280,7 @@ index 4ff47caa852820b95c5776a90b1a8ca3c66092b6..f41aba415433824819fe8276f02f35e8
                  )
                  message = ChatMessage(role="assistant", content=decoded_text)
  
-@@ -211,6 +220,27 @@ class OnlineDerenderer:
+@@ -213,6 +222,27 @@ class OnlineDerenderer:
  
          return choices
  
@@ -308,7 +308,7 @@ index 4ff47caa852820b95c5776a90b1a8ca3c66092b6..f41aba415433824819fe8276f02f35e8
      def _detokenize_delta(
          self,
          tokenizer: TokenizerLike,
-@@ -339,7 +369,12 @@ class OnlineDerenderer:
+@@ -341,7 +371,12 @@ class OnlineDerenderer:
          updated_state = state
  
          for choice in generate_chunk.choices:
@@ -322,7 +322,7 @@ index 4ff47caa852820b95c5776a90b1a8ca3c66092b6..f41aba415433824819fe8276f02f35e8
              new_text, updated_state = self._detokenize_delta(
                  tokenizer, delta_tids, updated_state, skip_special_tokens=skip_special
              )
-@@ -414,8 +449,16 @@ class OnlineDerenderer:
+@@ -416,8 +451,16 @@ class OnlineDerenderer:
  
          for gen, pt in zip(generate_responses, prompt_tokens_list):
              for choice in gen.choices:
@@ -341,7 +341,7 @@ index 4ff47caa852820b95c5776a90b1a8ca3c66092b6..f41aba415433824819fe8276f02f35e8
                  )
                  completion_logprobs = None
                  if choice.logprobs is not None:
-@@ -489,7 +532,13 @@ class OnlineDerenderer:
+@@ -491,7 +534,13 @@ class OnlineDerenderer:
          updated_state = state
  
          for choice in generate_chunk.choices:
@@ -356,7 +356,7 @@ index 4ff47caa852820b95c5776a90b1a8ca3c66092b6..f41aba415433824819fe8276f02f35e8
              new_text, updated_state = self._detokenize_delta(
                  tokenizer, delta_tids, updated_state, skip_special_tokens=skip_special
              )
-@@ -522,6 +571,21 @@ class OnlineDerenderer:
+@@ -524,6 +573,21 @@ class OnlineDerenderer:
          return chunk, updated_state
  
  

@@ -129268,7 +129268,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              ') -> dict[str, ResponsesToolCallName]:\n'})},
  {'name': 'batch-parse-starts-where-the-prompt-leaves',
   'review_patch': 'patches/vllm-batch-parse-starts-where-the-prompt-leaves.patch',
-  'review_sha256': '4e7f284ab8f7a35bd1bf0405c8bca1e775fb4208326b6aa2e6438522509f3d61',
+  'review_sha256': 'ef6c1694b9477ca802744485a3b0057b034392b1bf7cdcc0645b8baf3d723913',
   'files': ({'path': 'tests/entrypoints/openai/responses/test_parsable_context_unit.py',
              'before_sha256': '8fd0bd655d13abdc9fe03e1c0bb0625225431624db8257e1db07c00ac3da2779',
              'after_sha256': '95f50d93d97370d426319b5dc94fce55b9cbca4ce9b3b95a930e42990dcbf4a2'},
@@ -129313,7 +129313,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'after_sha256': 'fcc9e29316f6c9f75623d214798414c1513d51eae1c859a43565c577fe59cb83'},
             {'path': 'vllm/renderers/online_derenderer.py',
              'before_sha256': 'c93551f5e63e1b7e5d5bf105ca2e642a288644078feee561e8eef63267f7841d',
-             'after_sha256': '0ccb923be3e8110092d342c60db308a250bc7f1d79d2f2a12c202b49d1e509a7'}),
+             'after_sha256': 'aa7e50be91195b3781f184a37f6c6f24e0b830cedaced3229dc18436f3ebf407'}),
   'edits': ({'name': 'tests/entrypoints/openai/responses/test_parsable_context_unit.py:landmark-1',
              'path': 'tests/entrypoints/openai/responses/test_parsable_context_unit.py',
              'before': '\n'
@@ -131071,7 +131071,11 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       'the request,\n'
                       '                    # never the prompt ids /render wrote, so it '
                       'cannot read\n'
-                      '                    # where that prompt left reasoning.\n'
+                      '                    # where that prompt left reasoning: a '
+                      'continued final\n'
+                      '                    # message, whose prompt already closed it, '
+                      'is parsed as\n'
+                      '                    # reasoning here, as upstream parses it.\n'
                       '                    prompt_token_ids=None,\n'
                       '                    enable_auto_tools=self.enable_auto_tools,\n'
                       '                    model_output_token_ids=choice.token_ids,\n'
@@ -131094,7 +131098,12 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'ids and the request,\n'
                              '                    # never the prompt ids /render '
                              'wrote, so it cannot read\n'
-                             '                    # where that prompt left reasoning.\n'
+                             '                    # where that prompt left reasoning: '
+                             'a continued final\n'
+                             '                    # message, whose prompt already '
+                             'closed it, is parsed as\n'
+                             '                    # reasoning here, as upstream parses '
+                             'it.\n'
                              '                    prompt_token_ids=None,\n'
                              '                    '
                              'enable_auto_tools=self.enable_auto_tools,\n'
@@ -131104,7 +131113,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'finish_reason=choice.finish_reason,\n'})},
  {'name': 'derender-text-is-the-detokenizers',
   'review_patch': 'patches/vllm-derender-text-is-the-detokenizers.patch',
-  'review_sha256': '1f733012c4c208a1f0a252518540bcddf5924152957cc96dce7783042f0df3c7',
+  'review_sha256': 'f62ce9c3f0a4f83f5d6ed58d7e36b015cade5f6cb7cd2538df8c0bd1cb0050c4',
   'files': ({'path': 'tests/entrypoints/scale_out/derender/test_derender.py',
              'before_sha256': '3416a07fdc8241799d3ea888295eaaafe4cf01d569195e2f0351af793c63928b',
              'after_sha256': '3278d088a2f804b6c01d8d1e77947a24d63dedc92a140202f2537245de88d0c8'},
@@ -131118,8 +131127,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': 'e3edf885a33aaecf5dd8d6fdeadad7f3eed60510eb4f43354f1273e52b974cfc',
              'after_sha256': 'b1042e95e61ff955062c999dc470873533a0b6034842fca4d2aa2e497914b493'},
             {'path': 'vllm/renderers/online_derenderer.py',
-             'before_sha256': '0ccb923be3e8110092d342c60db308a250bc7f1d79d2f2a12c202b49d1e509a7',
-             'after_sha256': 'dfb99f2ca4ed2f1c99ffd7ac6a150851af06f1f4ef53d6af6c9e2c6a9e810b29'},
+             'before_sha256': 'aa7e50be91195b3781f184a37f6c6f24e0b830cedaced3229dc18436f3ebf407',
+             'after_sha256': 'ef7d3d1b4a3ce4d8ebd42c64b03c0f1736d586e549564b9ee19d48763dd0ffbf'},
             {'path': 'vllm/v1/engine/detokenizer.py',
              'before_sha256': '3af97dd30fa95fb8e294b2de407012d365b124006ee324c576cba3d3a9d58c21',
              'after_sha256': '49c4f4c012b9fc6b1a6363b56a7aa04b14a7791575db5ecac3d9fa669405c704'}),
@@ -141567,7 +141576,7 @@ FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5d
  'vllm/reasoning/abs_reasoning_parsers.py': 'ba4b1145048e5faa217e1ef4d849167ebd1fe7bcb9296fe2e9d2f17ce96607f7',
  'vllm/renderers/base.py': '09b769d4cd5cbb84572a084e054f5bef3b51873a9222dba11a154f98477aeed8',
  'vllm/renderers/hf.py': 'b06cb298f586607a036c8d976e0a08ac64eb317bfb8af1d4dc5329e690fb5e88',
- 'vllm/renderers/online_derenderer.py': 'dfb99f2ca4ed2f1c99ffd7ac6a150851af06f1f4ef53d6af6c9e2c6a9e810b29',
+ 'vllm/renderers/online_derenderer.py': 'ef7d3d1b4a3ce4d8ebd42c64b03c0f1736d586e549564b9ee19d48763dd0ffbf',
  'vllm/renderers/online_renderer.py': '1f12e251def8f81f3cf68e0030ddaaa8c988ac00a9f694c0718dd2d1d5c8f36f',
  'vllm/renderers/params.py': '31572224d8ea355fb77d80e3725779436533108c78f779b94760c6e55e6f3bfd',
  'vllm/renderers/template_authorship.py': '3110bd0d138e29ef01a51f5c357a2e6dd000c0b8c26b7fea94a4161471e43cba',

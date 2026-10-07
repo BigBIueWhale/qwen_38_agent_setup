@@ -5178,7 +5178,8 @@ CONTRACTS: Mapping[str, SemanticContract] = {
             "parse_output takes the prompt ids, every complete-output caller "
             "passes them, and a grammar's prompt state survives the batch reset "
             "(gemma4 and inkling seeded only the stream). Derender receives no "
-            "prompt ids and passes none."
+            "prompt ids and passes none, so a continued final message is "
+            "reasoning there, as on upstream's derender."
         ),
         removal_condition=(
             "Remove when pinned upstream's complete-output parse starts from the "
