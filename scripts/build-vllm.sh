@@ -176,6 +176,7 @@ BATCH_INVARIANT_NATIVE_FP4_PATCH_FILE="${PROJECT_DIR}/patches/vllm-batch-invaria
 RENDER_EVERY_IMAGE_PATCH_FILE="${PROJECT_DIR}/patches/vllm-render-carries-every-image-chat-renders.patch"
 RENDERED_PROMPT_NOT_TRUNCATED_PATCH_FILE="${PROJECT_DIR}/patches/vllm-rendered-prompts-are-never-truncated.patch"
 KV_TRANSFER_PARAMS_DECLARED_PATCH_FILE="${PROJECT_DIR}/patches/vllm-kv-transfer-params-are-declared.patch"
+RESPONSES_TOOLS_NEVER_GIVEN_PATCH_FILE="${PROJECT_DIR}/patches/vllm-responses-refuses-tools-the-template-is-never-given.patch"
 
 if [[ ! -f "${DEPLOYMENT_INPUT_MANIFEST}" || -L "${DEPLOYMENT_INPUT_MANIFEST}" ]]; then
   echo "Deployment-input manifest is missing or is not a regular non-symlink file." >&2
@@ -325,7 +326,8 @@ printf '%s  %s\n' \
   "${BATCH_INVARIANT_NATIVE_FP4_PATCH_DIFF_SHA256}" "${BATCH_INVARIANT_NATIVE_FP4_PATCH_FILE}" \
   "${RENDER_EVERY_IMAGE_PATCH_DIFF_SHA256}" "${RENDER_EVERY_IMAGE_PATCH_FILE}" \
   "${RENDERED_PROMPT_NOT_TRUNCATED_PATCH_DIFF_SHA256}" "${RENDERED_PROMPT_NOT_TRUNCATED_PATCH_FILE}" \
-  "${KV_TRANSFER_PARAMS_DECLARED_PATCH_DIFF_SHA256}" "${KV_TRANSFER_PARAMS_DECLARED_PATCH_FILE}" | \
+  "${KV_TRANSFER_PARAMS_DECLARED_PATCH_DIFF_SHA256}" "${KV_TRANSFER_PARAMS_DECLARED_PATCH_FILE}" \
+  "${RESPONSES_TOOLS_NEVER_GIVEN_PATCH_DIFF_SHA256}" "${RESPONSES_TOOLS_NEVER_GIVEN_PATCH_FILE}" | \
   sha256sum --check --strict
 
 printf '%s  %s\n' \

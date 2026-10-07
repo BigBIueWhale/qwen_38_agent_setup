@@ -4093,6 +4093,55 @@ def _validate_kv_transfer_params_keys_after(state: State) -> None:
     }, label=label)
 
 
+def _validate_responses_tools_never_given_before(state: State) -> None:
+    label = "Responses tools the template is never given precondition"
+    utils = "vllm/entrypoints/openai/responses/utils.py"
+    require_text(state, utils, 'if not tools or (tool_choice == "none" and '
+                 "exclude_tools_when_tool_choice_none):", label=label)
+    forbid_text(state, utils, "_tool_the_template_is_never_given", label=label)
+    require_text(state, "tests/entrypoints/openai/responses/test_parsable_context.py",
+                 "async def test_mcp_tool_call(", label=label)
+
+
+def _validate_responses_tools_never_given_after(state: State) -> None:
+    label = "Responses tools the template is never given"
+    utils = "vllm/entrypoints/openai/responses/utils.py"
+    # The template's tool list refuses, before any return and so under every
+    # choice, each declared tool it would not be given.
+    forbid_text(state, utils, 'if not tools or (tool_choice == "none" and '
+                "exclude_tools_when_tool_choice_none):", label=label)
+    require_python_symbols(state, utils, {
+        "_tool_the_template_is_never_given": ("parameter", "kind", "namespace"),
+    }, label=label)
+    _require_in_symbol(state, utils, "_tool_the_template_is_never_given", (
+        "with or without a tool ",
+        "Declare what it does as a function tool your client executes.",
+    ), label=label)
+    _require_in_symbol(state, utils, "construct_tool_dicts", (
+        'raise _tool_the_template_is_never_given(f"tools[{index}]", tool.type)',
+        'parameter=f"tools[{index}]"',
+        'f"tools[{index}].tools[{member_index}]"',
+        'if tool_choice == "none" and exclude_tools_when_tool_choice_none:',
+    ), label=label)
+    for path, tests in (
+        ("tests/entrypoints/openai/responses/test_responses_utils.py", {
+            "test_a_tool_the_chat_template_is_never_given_is_refused": None,
+            "test_the_chat_template_is_given_every_declared_function": None,
+            "test_a_tool_the_chat_template_is_never_given_is_refused_before_rendering":
+                None,
+        }),
+        ("tests/tool_use/test_responses_request_validations.py", {
+            "test_responses_request_leaves_hosted_tools_to_the_route": None,
+        }),
+        ("tests/entrypoints/openai/responses/test_parsable_context.py", {
+            "test_a_hosted_tool_is_refused_beside_a_tool_server": None,
+        }),
+    ):
+        require_python_symbols(state, path, tests, label=label)
+    forbid_text(state, "tests/entrypoints/openai/responses/test_parsable_context.py",
+                "async def test_mcp_tool_call(", label=label)
+
+
 def validate_final(state: State) -> None:
     """Reassert every durable semantic invariant on the complete tree.
 
@@ -5282,5 +5331,30 @@ CONTRACTS: Mapping[str, SemanticContract] = {
         ),
         validate_before=_validate_kv_transfer_params_keys_before,
         validate_after=_validate_kv_transfer_params_keys_after,
+    ),
+    "responses-refuses-tools-the-template-is-never-given": SemanticContract(
+        rationale=(
+            "On the chat-template path a Responses request's tools reach the "
+            "model only as the functions construct_tool_dicts gives the "
+            "template, on both contexts. A hosted, MCP or custom tool, a custom "
+            "tool inside a namespace, and an empty namespace were left out of "
+            "the prompt silently; with only such tools under auto the Qwen "
+            "grammar admitted any text, and an empty namespace under required "
+            "reached XGrammar's normalize_tool_choice, whose bare ValueError was "
+            "a 500. A tool server does not change that: ParsableContext only "
+            "runs a call the model was never told it could make, which upstream's "
+            "own test marks xfail. The template's tool list now refuses each "
+            "such tool with a 400 naming tools[i] or tools[i].tools[j] and its "
+            "kind, under every tool choice and before anything is rendered. "
+            "Harmony, which describes a tool server's browser and python to the "
+            "model, never builds this list, and the request model still accepts "
+            "a hosted tool for it."
+        ),
+        removal_condition=(
+            "Remove when pinned upstream gives the chat template every declared "
+            "Responses tool, or refuses a tool it does not give it."
+        ),
+        validate_before=_validate_responses_tools_never_given_before,
+        validate_after=_validate_responses_tools_never_given_after,
     ),
 }

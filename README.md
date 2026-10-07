@@ -353,6 +353,7 @@ It is intentionally reconstructed by the ordered, reviewed semantic transformati
 | patches/vllm-render-carries-every-image-chat-renders.patch | c5bf4cb2948b9eb7866d083671af3badcc9cf529a7756bde3b0647c236fe932f |
 | patches/vllm-rendered-prompts-are-never-truncated.patch | 07cd24fbf29bc66fb9615d63a8e30d947ee13cf6367e23bcb1a870e4f3a49334 |
 | patches/vllm-kv-transfer-params-are-declared.patch | 9742698af30ad79158f5430fb22987cafe4667f457771dd66b29b38a7376ce0e |
+| patches/vllm-responses-refuses-tools-the-template-is-never-given.patch | e739235f61cf09867025db10b87b1aa4840aec9dca0bd857bfe735b5612d86ed |
 
 The reconstructed tree's runtime-source and test changes, new files and
 deletions are counted by ./scripts/build-vllm.sh check, which derives and prints
@@ -404,7 +405,7 @@ Pinned build inputs and products:
 | Immutable base tag | qwen38-vllm:main-9df9b0b |
 | Immutable base ID | sha256:fa4a002a88b7043a1a89966dea8a500fe9696f84e75730d9da916f916048d401 |
 | Runtime Dockerfile SHA-256 | da1ae30aa043b9ac46407f59e50581d1bc8f7e72122aab1776b4546df8475dc2 |
-| Build verifier SHA-256 | e16c29a960d4891146e9c5ee6074c198629f58c91b524e03370a0f1111828df9 |
+| Build verifier SHA-256 | 2d75995836cf5b5254e85334e51fd0639bc9be2613f9192655c060db627e705b |
 | Runtime validator SHA-256 | d843e0d641182ce85eca20f37a98f651569bcbd4888b1bc91dc86dfff90e6f6b |
 
 The runtime image's profile, tag and archive name, which every release advances
@@ -1236,7 +1237,11 @@ one list, so a call to one of them is admitted and parsed by that name. A named
 choice must use a name the model is offered; `allowed_tools` arms the grammar to
 exactly the listed functions in its mode; `required` needs a function to call; and
 a choice no grammar can enforce -- a hosted, MCP or custom tool -- is refused
-naming `tool_choice` rather than left to publish the call as text.
+naming `tool_choice` rather than left to publish the call as text. Every declared
+tool is in that list or refused: the template is given functions and nothing else,
+so a hosted, MCP or custom tool, a namespace member that is not a function, or a
+namespace with no tools is a 400 naming `tools[i]`, under every choice and with or
+without a tool server, rather than a tool dropped from the prompt.
 
 A prompt the template renders is never cut. Responses `truncation: "auto"` and chat
 `truncate_prompt_tokens` or `truncation_side` would cut tokens from the head of the

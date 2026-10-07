@@ -1018,7 +1018,7 @@ class ToolOutputParserTest(unittest.TestCase):
                                 "parameters": schema}]}
         hosted = {"type": "web_search_preview"}
 
-        def request(choice, tools=(function, namespace, hosted)):
+        def request(choice, tools=(function, namespace)):
             return ResponsesRequest.model_validate(
                 {"model": "unit", "input": "test", "tools": list(tools),
                  "tool_choice": choice, "kv_scope": "unit"})
@@ -1069,6 +1069,111 @@ class ToolOutputParserTest(unittest.TestCase):
                 with self.assertRaises(VLLMValidationError) as refusal:
                     grammar_matcher(request(choice, tools))
                 self.assertEqual(refusal.exception.parameter, parameter)
+
+    def test_a_responses_tool_the_template_is_never_given_is_refused(self):
+        """The chat template is given function tools and the functions of a
+        namespace, and nothing else, so a declared tool of any other kind, a
+        namespace member that is not a function, or a namespace with no tools
+        would never reach the model -- with a tool server that serves every
+        kind, on either context. The route refuses the request with a 400
+        naming that tool and its kind, under every tool choice, before
+        anything is rendered or admitted."""
+        import typing
+        from unittest.mock import AsyncMock, patch
+
+        from openai.types.responses.tool import Tool
+
+        from vllm.entrypoints.mcp.tool_server import ToolServer
+        from vllm.entrypoints.openai.responses.protocol import ResponsesRequest
+        from vllm.entrypoints.openai.responses.serving import OpenAIServingResponses
+        from vllm.entrypoints.serve.exception_handling.error_response import (
+            create_error_response,
+        )
+        from vllm.exceptions import VLLMValidationError
+
+        schema = TOOL["function"]["parameters"]
+        function = {"type": "function", "name": "write", "parameters": schema}
+        never_given = {
+            "file_search": {"vector_store_ids": ["unit"]},
+            "computer": {},
+            "computer_use_preview": {"display_height": 1, "display_width": 1,
+                                     "environment": "linux"},
+            "web_search": {},
+            "web_search_2025_08_26": {},
+            "mcp": {"server_label": "code_interpreter", "server_url": "http://unit"},
+            "code_interpreter": {"container": {"type": "auto"}},
+            "programmatic_tool_calling": {},
+            "image_generation": {},
+            "local_shell": {},
+            "shell": {},
+            "custom": {"name": "patch"},
+            "tool_search": {},
+            "web_search_preview": {},
+            "web_search_preview_2025_03_11": {},
+            "apply_patch": {},
+        }
+        declarable = {
+            kind for member in typing.get_args(typing.get_args(Tool)[0])
+            for kind in typing.get_args(member.model_fields["type"].annotation)
+        }
+        self.assertEqual(declarable, {"function", "namespace", *never_given})
+        namespace = {"type": "namespace", "name": "fs", "description": "files",
+                     "tools": [{"type": "function", "name": "save",
+                                "parameters": schema},
+                               {"type": "custom", "name": "patch"}]}
+        empty = dict(namespace, tools=[])
+        declared = [
+            *((tools, parameter, f"is a {kind!r} tool")
+              for kind, fields in never_given.items()
+              for tools, parameter in (([{"type": kind, **fields}], "tools[0]"),
+                                       ([function, {"type": kind, **fields}],
+                                        "tools[1]"))),
+            ([function, namespace], "tools[1].tools[1]",
+             "is a 'custom' tool in namespace 'fs'"),
+            ([empty], "tools[0]", "is namespace 'fs' with no tools"),
+            ([function, empty], "tools[1]", "is namespace 'fs' with no tools"),
+        ]
+
+        engine = MagicMock()
+        engine.errored = False
+        engine.model_config.max_model_len = 10_000
+        engine.model_config.hf_config.model_type = "qwen3"
+        engine.model_config.get_diff_sampling_param.return_value = {}
+        tool_server = MagicMock(spec=ToolServer)
+        tool_server.has_tool.return_value = True
+        renderer = MagicMock()
+        renderer.preprocess_chat = AsyncMock(
+            side_effect=AssertionError("the chat template was given the request"))
+        serving = OpenAIServingResponses(
+            engine_client=engine, models=MagicMock(), online_renderer=renderer,
+            request_logger=None, chat_template=None,
+            chat_template_content_format="auto",
+            reasoning_parser=_served("SERVED_REASONING_PARSER"),
+            tool_parser=_served("SERVED_TOOL_CALL_PARSER"), enable_auto_tools=True,
+            tool_server=tool_server,
+        )
+        offered = ResponsesRequest.model_validate(
+            {"model": "unit", "input": "test", "kv_scope": "unit",
+             "tools": [function, dict(namespace, tools=namespace["tools"][:1])]})
+        with self.assertRaisesRegex(AssertionError, "chat template was given"):
+            asyncio_run(serving.create_responses(offered))
+        renderer.preprocess_chat.reset_mock()
+        for parsable in ("0", "1"):
+            for tools, parameter, cause in declared:
+                for choice in ("auto", "required", "none"):
+                    with self.subTest(parsable=parsable, tools=tools, choice=choice), \
+                            patch.dict(os.environ, {
+                                "VLLM_USE_EXPERIMENTAL_PARSER_CONTEXT": parsable}):
+                        request = ResponsesRequest.model_validate(
+                            {"model": "unit", "input": "test", "tools": tools,
+                             "tool_choice": choice, "kv_scope": "unit"})
+                        with self.assertRaises(VLLMValidationError) as refused:
+                            asyncio_run(serving.create_responses(request))
+                        error = create_error_response(refused.exception).error
+                        self.assertEqual((error.code, error.param), (400, parameter))
+                        self.assertIn(f"{parameter} {cause}", error.message)
+        renderer.preprocess_chat.assert_not_called()
+        engine.admit.assert_not_called()
 
     def test_a_continued_final_message_parses_alike_on_every_path(self):
         """A prompt that already closed reasoning -- a continued final
