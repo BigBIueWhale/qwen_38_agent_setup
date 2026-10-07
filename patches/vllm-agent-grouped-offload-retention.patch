@@ -3514,7 +3514,7 @@ index 7875d81501b27fdf6be5920145b9e2afbca55d2f..32201b2bc7ffcd20499128a1713340c4
      CPU_ALLOCATION_SIZE = "vllm:kv_offload_cpu_allocation_size"
      CPU_CACHE_WRITE_USAGE_PERC = "vllm:kv_offload_cpu_cache_write_usage_perc"
 diff --git a/vllm/v1/kv_offload/cpu/manager.py b/vllm/v1/kv_offload/cpu/manager.py
-index 0eef5cf7e79fbd008c458067fa8551cbda14d54b..ce38aaf7af23b3cc399d39f49f7ecb52e9e6a3ef 100644
+index 0eef5cf7e79fbd008c458067fa8551cbda14d54b..ea463b7f236319e8431c971167cfd9774b7cf871 100644
 --- a/vllm/v1/kv_offload/cpu/manager.py
 +++ b/vllm/v1/kv_offload/cpu/manager.py
 @@ -1,10 +1,13 @@
@@ -3540,7 +3540,7 @@ index 0eef5cf7e79fbd008c458067fa8551cbda14d54b..ce38aaf7af23b3cc399d39f49f7ecb52
      PrepareStoreOutput,
      ReqContext,
      RequestOffloadingContext,
-@@ -23,54 +27,91 @@ from vllm.v1.kv_offload.cpu.common import (
+@@ -23,54 +27,90 @@ from vllm.v1.kv_offload.cpu.common import (
      CPULoadStoreSpec,
      CPUOffloadingMetrics,
  )
@@ -3590,7 +3590,6 @@ index 0eef5cf7e79fbd008c458067fa8551cbda14d54b..ce38aaf7af23b3cc399d39f49f7ecb52
 +    agent_id: str
 +    keys: set[OffloadKey] = field(default_factory=set)
 +    required: dict[OffloadKey, tuple[bytes, ...]] = field(default_factory=dict)
-+    active: bool = True
 +
 +
 +class CPUOffloadingManager(OffloadingManager):
@@ -3660,7 +3659,7 @@ index 0eef5cf7e79fbd008c458067fa8551cbda14d54b..ce38aaf7af23b3cc399d39f49f7ecb52
  
      # --- block pool ---
  
-@@ -103,64 +144,211 @@ class CPUOffloadingManager(OffloadingManager):
+@@ -103,64 +143,210 @@ class CPUOffloadingManager(OffloadingManager):
      ) -> CPULoadStoreSpec:
          return CPULoadStoreSpec([block.block_id for block in blocks])
  
@@ -3751,7 +3750,6 @@ index 0eef5cf7e79fbd008c458067fa8551cbda14d54b..ce38aaf7af23b3cc399d39f49f7ecb52
 +        context = self._contexts.get(req_context.req_id)
 +        if context is None:
 +            return  # Capacity pressure already released this context.
-+        context.active = False
 +        if not context.keys or any(
 +            not required or not self._has_content(key, required, req_context)
 +            for key, required in context.required.items()
@@ -3897,7 +3895,7 @@ index 0eef5cf7e79fbd008c458067fa8551cbda14d54b..ce38aaf7af23b3cc399d39f49f7ecb52
  
      @override
      def prepare_store(
-@@ -168,45 +356,86 @@ class CPUOffloadingManager(OffloadingManager):
+@@ -168,45 +354,86 @@ class CPUOffloadingManager(OffloadingManager):
          keys: Collection[OffloadKey],
          req_context: ReqContext,
      ) -> PrepareStoreOutput | None:
@@ -4020,7 +4018,7 @@ index 0eef5cf7e79fbd008c458067fa8551cbda14d54b..ce38aaf7af23b3cc399d39f49f7ecb52
  
          if to_evict and self.events is not None:
              self.events.append(
-@@ -217,17 +446,25 @@ class CPUOffloadingManager(OffloadingManager):
+@@ -217,17 +444,25 @@ class CPUOffloadingManager(OffloadingManager):
                  )
              )
  
@@ -4056,7 +4054,7 @@ index 0eef5cf7e79fbd008c458067fa8551cbda14d54b..ce38aaf7af23b3cc399d39f49f7ecb52
  
          return PrepareStoreOutput(
              keys_to_store=keys_to_store,
-@@ -246,20 +483,23 @@ class CPUOffloadingManager(OffloadingManager):
+@@ -246,20 +481,23 @@ class CPUOffloadingManager(OffloadingManager):
  
          if success:
              for key in keys:
@@ -4088,7 +4086,7 @@ index 0eef5cf7e79fbd008c458067fa8551cbda14d54b..ce38aaf7af23b3cc399d39f49f7ecb52
  
          if stored_keys and self.events is not None:
              self.events.append(
-@@ -277,8 +517,15 @@ class CPUOffloadingManager(OffloadingManager):
+@@ -277,8 +515,15 @@ class CPUOffloadingManager(OffloadingManager):
          # pre-reset jobs, so no lazy cleanup is needed. The scheduler also
          # flushes in-flight load job IDs to the workers before any new stores
          # can begin, preventing a cross-direction data race on reused offload block IDs.
@@ -4106,7 +4104,7 @@ index 0eef5cf7e79fbd008c458067fa8551cbda14d54b..ce38aaf7af23b3cc399d39f49f7ecb52
          self._num_write_pending_blocks = 0
  
          self._free_list.clear()
-@@ -297,7 +544,7 @@ class CPUOffloadingManager(OffloadingManager):
+@@ -297,7 +542,7 @@ class CPUOffloadingManager(OffloadingManager):
          num_used = (
              self._num_allocated_blocks
              - len(self._free_list)
@@ -4115,7 +4113,7 @@ index 0eef5cf7e79fbd008c458067fa8551cbda14d54b..ce38aaf7af23b3cc399d39f49f7ecb52
          )
          usage = num_used / self._num_blocks if self._num_blocks > 0 else 0.0
          stats.set_gauge(CPUOffloadingMetrics.CPU_CACHE_USAGE_PERC, usage)
-@@ -317,11 +564,4 @@ class CPUOffloadingManager(OffloadingManager):
+@@ -317,11 +562,4 @@ class CPUOffloadingManager(OffloadingManager):
          stats.set_gauge(CPUOffloadingMetrics.CPU_CACHE_WRITE_USAGE_PERC, write_usage)
          stats.set_gauge(CPUOffloadingMetrics.CPU_CACHE_READ_USAGE_PERC, read_usage)
  

@@ -20603,7 +20603,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '@dataclass(frozen=True)\n'})},
  {'name': 'agent-grouped-offload-retention',
   'review_patch': 'patches/vllm-agent-grouped-offload-retention.patch',
-  'review_sha256': '4a941d3037e7dae2e369f41512557e5eb443ef3a98b338686a45b7d5cb1a4a86',
+  'review_sha256': '36140417721a858ed623a605874cd7c094171e01acead53d76c851ea3929b551',
   'files': ({'path': 'tests/entrypoints/test_kv_scope_protocol.py',
              'before_sha256': 'd740a895321098dec98b4bf58d75817342f88886b16c5dd5b551cb88b75d4c11',
              'after_sha256': '56f8d49e5f368b79a6da517950a8ad52bfc3b9ef1d359d976e799bad3741fafe'},
@@ -20651,7 +20651,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'after_sha256': '9144fd869fa0c6df122081be01f2d81fa70f2e407f187564aad874e679b832c4'},
             {'path': 'vllm/v1/kv_offload/cpu/manager.py',
              'before_sha256': '64b7ade9508fc4d1af5d7e67f030c05b3fe4b5dca0bcb6e91469ca0a127906c2',
-             'after_sha256': '020810a735801dcd4f6740a43a76d8c654a1dc25de92e5e3e27df1aecb973455'},
+             'after_sha256': 'fba0d578c3322f39ec4d889d16dac1fdf6dbb7c705890050ff1fe63afde956cd'},
             {'path': 'vllm/v1/kv_offload/cpu/policies/arc.py',
              'before_sha256': 'ff12419f9cb4fb84c4029ff3346319d43d02365a8c74748c35fbbdb3066e91d6',
              'after_sha256': None},
@@ -31576,7 +31576,6 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '    keys: set[OffloadKey] = field(default_factory=set)\n'
                       '    required: dict[OffloadKey, tuple[bytes, ...]] = '
                       'field(default_factory=dict)\n'
-                      '    active: bool = True\n'
                       '\n'
                       '\n'
                       'class CPUOffloadingManager(OffloadingManager):\n'
@@ -31761,7 +31760,6 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    keys: set[OffloadKey] = field(default_factory=set)\n'
                              '    required: dict[OffloadKey, tuple[bytes, ...]] = '
                              'field(default_factory=dict)\n'
-                             '    active: bool = True\n'
                              '\n'
                              '\n'
                              'class CPUOffloadingManager(OffloadingManager):\n'
@@ -32020,7 +32018,6 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '        if context is None:\n'
                       '            return  # Capacity pressure already released this '
                       'context.\n'
-                      '        context.active = False\n'
                       '        if not context.keys or any(\n'
                       '            not required or not self._has_content(key, '
                       'required, req_context)\n'
@@ -32358,7 +32355,6 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '        if context is None:\n'
                              '            return  # Capacity pressure already released '
                              'this context.\n'
-                             '        context.active = False\n'
                              '        if not context.keys or any(\n'
                              '            not required or not self._has_content(key, '
                              'required, req_context)\n'
@@ -36813,7 +36809,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'models; default) or\n'})},
  {'name': 'kv-capacity-in-declared-users',
   'review_patch': 'patches/vllm-kv-capacity-in-declared-users.patch',
-  'review_sha256': '7a3d2c0ce43e468ed2177f567ac1eb31a70a95e525496a2d8b27f3330f214441',
+  'review_sha256': 'f06f1becfcc7c56bb3507d0cfb91e37991a9b89d75112fe69cea76f389a484f4',
   'files': ({'path': 'tests/config/test_config_utils.py',
              'before_sha256': 'ca93f4a4de7c00f353e1de0f73a81ff632c5731c15904aec4bcb165b751ddd87',
              'after_sha256': '4f5ea0399cc3b4f9603df07e2cc26d32e1eddf6b98a36c0f30d580321879c038'},
@@ -36864,7 +36860,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'after_sha256': '3192b3d8dff17cfcc57cc3920fe6061afd9bc6dde5aef70cfadbe7a258e2c63c'},
             {'path': 'tests/v1/kv_offload/test_factory.py',
              'before_sha256': '5ee2dde7f884c163f2639aa628599859d3440a7b6d182e516870314909fd9afd',
-             'after_sha256': '30697b1ef07da44f609a29c6638d634fd43f4cac81c753d16a4aca413e1416e2'},
+             'after_sha256': '0debbb44dca2a75026823a66463c247a1dcbcd6aa73e5d9982d45ad75f5ebf3f'},
             {'path': 'tests/v1/kv_offload/test_file_mapper.py',
              'before_sha256': 'a515c938e4df7e1e3e7eb4a6137fa8e8ac2c5d62b85ee1f938d3fcc8399720d5',
              'after_sha256': 'be0514f0a37a1c9932863bfc8638f57dd9de9d710c5ff63e71d69289d532a125'},
@@ -36912,10 +36908,10 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'after_sha256': '0cd50f3deea7c8e91de072dde5d55f96edb6c0b35525c2d144ade7ae4e1b8a91'},
             {'path': 'vllm/v1/kv_offload/cpu/spec.py',
              'before_sha256': 'c8945f813bd5767193df76a8ebd377e083105ef51854daf9f21c91497541e6b1',
-             'after_sha256': '02bb64e4052092229e372002acdedb5206d3709698e88ff4c5e33b26da836e93'},
+             'after_sha256': 'fe4373ebbaf3685050e29f9ad4b7ec56811058adac2d8139060986582188e068'},
             {'path': 'vllm/v1/kv_offload/tiering/spec.py',
              'before_sha256': 'c4f95100df0deba2295294577c6e3cbebfb8332631cedadd63f81ffb2fc28770',
-             'after_sha256': 'a78615eeb2befe97739461b1db84b4fa79ebd3690fc63a807e2bed1ef2dc12f8'},
+             'after_sha256': '3a6b5ed06a6231519fe129af52845a528d6804f76ef8bdc9416a4c79e6073041'},
             {'path': 'vllm/v1/worker/gpu_worker.py',
              'before_sha256': '7ed4d59ee05cfefcdf16ffc901767e3c8a51d0fb0da4309cbd7b389bca96b7d2',
              'after_sha256': '2867bd3bc8449b5805bdfe2f0d0e2c557b42a864ca3eb3c0dca548d577605806'},
@@ -40059,10 +40055,25 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '\n'
                       '\n'
                       'def test_cpu_spec_unknown_extra_config_key_fails_startup():\n'
-                      '    with pytest.raises(ValueError, match="Unknown '
+                      '    with pytest.raises(ValueError, match="does not act on '
                       'kv_connector_extra_config"):\n'
                       '        _create_spec(extra_config={"definitely_not_a_knob": '
                       '1})\n'
+                      '\n'
+                      '\n'
+                      'def '
+                      'test_only_the_spec_that_certifies_a_canonical_layout_accepts_it():\n'
+                      "    # The CPU spec's worker keeps the direct layout, so a "
+                      'canonical_layout\n'
+                      '    # request it accepted would be ignored; the tiering spec '
+                      'certifies and\n'
+                      '    # honours it.\n'
+                      '    assert "canonical_layout" not in '
+                      'CPUOffloadingSpec.EXTRA_CONFIG_KEYS\n'
+                      '    assert "canonical_layout" in '
+                      'TieringOffloadingSpec.EXTRA_CONFIG_KEYS\n'
+                      '    with pytest.raises(ValueError, match="canonical_layout"):\n'
+                      '        _create_spec(extra_config={"canonical_layout": True})\n'
                       '\n'
                       '\n'
                       'def test_cpu_spec_user_count_scales_capacity():\n'
@@ -40144,10 +40155,27 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '\n'
                              'def '
                              'test_cpu_spec_unknown_extra_config_key_fails_startup():\n'
-                             '    with pytest.raises(ValueError, match="Unknown '
-                             'kv_connector_extra_config"):\n'
+                             '    with pytest.raises(ValueError, match="does not act '
+                             'on kv_connector_extra_config"):\n'
                              '        '
                              '_create_spec(extra_config={"definitely_not_a_knob": 1})\n'
+                             '\n'
+                             '\n'
+                             'def '
+                             'test_only_the_spec_that_certifies_a_canonical_layout_accepts_it():\n'
+                             "    # The CPU spec's worker keeps the direct layout, so "
+                             'a canonical_layout\n'
+                             '    # request it accepted would be ignored; the tiering '
+                             'spec certifies and\n'
+                             '    # honours it.\n'
+                             '    assert "canonical_layout" not in '
+                             'CPUOffloadingSpec.EXTRA_CONFIG_KEYS\n'
+                             '    assert "canonical_layout" in '
+                             'TieringOffloadingSpec.EXTRA_CONFIG_KEYS\n'
+                             '    with pytest.raises(ValueError, '
+                             'match="canonical_layout"):\n'
+                             '        _create_spec(extra_config={"canonical_layout": '
+                             'True})\n'
                              '\n'
                              '\n'
                              'def test_cpu_spec_user_count_scales_capacity():\n'
@@ -43038,9 +43066,6 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '            # OffloadingSpec base behavior.\n'
                       '            "offload_prompt_only",\n'
                       '            "self_describing_kv_events",\n'
-                      '            # Host byte-layout request, certified at worker '
-                      'registration.\n'
-                      '            "canonical_layout",\n'
                       '        }\n'
                       '    )\n'
                       '\n'
@@ -43076,9 +43101,6 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '            # OffloadingSpec base behavior.\n'
                              '            "offload_prompt_only",\n'
                              '            "self_describing_kv_events",\n'
-                             '            # Host byte-layout request, certified at '
-                             'worker registration.\n'
-                             '            "canonical_layout",\n'
                              '        }\n'
                              '    )\n'
                              '\n'
@@ -43112,10 +43134,10 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       'cls.EXTRA_CONFIG_KEYS)\n'
                       '        if unknown:\n'
                       '            raise ValueError(\n'
-                      '                f"Unknown kv_connector_extra_config keys '
-                      '{unknown}. "\n'
-                      '                f"Accepted keys: '
-                      '{sorted(cls.EXTRA_CONFIG_KEYS)}."\n'
+                      '                f"{cls.__name__} does not act on '
+                      'kv_connector_extra_config keys "\n'
+                      '                f"{unknown}. Remove them; it accepts "\n'
+                      '                f"{sorted(cls.EXTRA_CONFIG_KEYS)}."\n'
                       '            )\n'
                       '\n'
                       '    def __init__(self, config: OffloadingConfig):\n'
@@ -43174,10 +43196,10 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'cls.EXTRA_CONFIG_KEYS)\n'
                              '        if unknown:\n'
                              '            raise ValueError(\n'
-                             '                f"Unknown kv_connector_extra_config keys '
-                             '{unknown}. "\n'
-                             '                f"Accepted keys: '
-                             '{sorted(cls.EXTRA_CONFIG_KEYS)}."\n'
+                             '                f"{cls.__name__} does not act on '
+                             'kv_connector_extra_config keys "\n'
+                             '                f"{unknown}. Remove them; it accepts "\n'
+                             '                f"{sorted(cls.EXTRA_CONFIG_KEYS)}."\n'
                              '            )\n'
                              '\n'
                              '    def __init__(self, config: OffloadingConfig):\n'
@@ -43516,6 +43538,9 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '    EXTRA_CONFIG_KEYS: frozenset[str] = '
                       'CPUOffloadingSpec.EXTRA_CONFIG_KEYS | {\n'
                       '        "secondary_tiers",\n'
+                      '        # Host byte-layout request, certified at worker '
+                      'registration.\n'
+                      '        "canonical_layout",\n'
                       '    }\n'
                       '\n'
                       '    def __init__(self, config: OffloadingConfig):\n'
@@ -43537,6 +43562,9 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    EXTRA_CONFIG_KEYS: frozenset[str] = '
                              'CPUOffloadingSpec.EXTRA_CONFIG_KEYS | {\n'
                              '        "secondary_tiers",\n'
+                             '        # Host byte-layout request, certified at worker '
+                             'registration.\n'
+                             '        "canonical_layout",\n'
                              '    }\n'
                              '\n'
                              '    def __init__(self, config: OffloadingConfig):\n'
@@ -136401,7 +136429,7 @@ FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5d
  'tests/v1/kv_connector/unit/test_hma_auto_config.py': '3b9bec3a98b2ee5dca12a315a58307389f517c850c7ce30eb26ce9f8ec305588',
  'tests/v1/kv_connector/unit/test_offloading_connector.py': '3192b3d8dff17cfcc57cc3920fe6061afd9bc6dde5aef70cfadbe7a258e2c63c',
  'tests/v1/kv_offload/cpu/test_manager.py': '1dea9c01dc15292db00ad856b0c4eade9ed4bd65bbf01620e72234b80ba991ab',
- 'tests/v1/kv_offload/test_factory.py': '30697b1ef07da44f609a29c6638d634fd43f4cac81c753d16a4aca413e1416e2',
+ 'tests/v1/kv_offload/test_factory.py': '0debbb44dca2a75026823a66463c247a1dcbcd6aa73e5d9982d45ad75f5ebf3f',
  'tests/v1/kv_offload/test_file_mapper.py': 'be0514f0a37a1c9932863bfc8638f57dd9de9d710c5ff63e71d69289d532a125',
  'tests/v1/kv_offload/tiering/p2p/run_accuracy_test.sh': 'a8189fb7a0f618fe0a4ffe2d24acca45cfc8fe785c0aae2c22a1105fe05e96f9',
  'tests/v1/kv_offload/tiering/test_fs_tier.py': 'c170b6f37add5189a9e0d240a36835f69879d86afd9c81ebfec4e14acabec64a',
@@ -136514,10 +136542,10 @@ FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5d
  'vllm/v1/kv_offload/config.py': '50daea7891442fa779743796c343fe0a09bdcd0266910bf83b35509e533c3b89',
  'vllm/v1/kv_offload/cpu/common.py': '9144fd869fa0c6df122081be01f2d81fa70f2e407f187564aad874e679b832c4',
  'vllm/v1/kv_offload/cpu/gpu_worker.py': '0cd50f3deea7c8e91de072dde5d55f96edb6c0b35525c2d144ade7ae4e1b8a91',
- 'vllm/v1/kv_offload/cpu/manager.py': '020810a735801dcd4f6740a43a76d8c654a1dc25de92e5e3e27df1aecb973455',
- 'vllm/v1/kv_offload/cpu/spec.py': '02bb64e4052092229e372002acdedb5206d3709698e88ff4c5e33b26da836e93',
+ 'vllm/v1/kv_offload/cpu/manager.py': 'fba0d578c3322f39ec4d889d16dac1fdf6dbb7c705890050ff1fe63afde956cd',
+ 'vllm/v1/kv_offload/cpu/spec.py': 'fe4373ebbaf3685050e29f9ad4b7ec56811058adac2d8139060986582188e068',
  'vllm/v1/kv_offload/tiering/manager.py': 'b63a0d85d3cff32a27f82ebc9df6749cf2e64e6fe439dcae7adad00000817a13',
- 'vllm/v1/kv_offload/tiering/spec.py': 'a78615eeb2befe97739461b1db84b4fa79ebd3690fc63a807e2bed1ef2dc12f8',
+ 'vllm/v1/kv_offload/tiering/spec.py': '3a6b5ed06a6231519fe129af52845a528d6804f76ef8bdc9416a4c79e6073041',
  'vllm/v1/request.py': '80eb55815d50c131c6d40ea1ceb7f00453f898ec58441675234593c7e81b807d',
  'vllm/v1/sample/thinking_budget_state.py': '2de2bd4623f27a3f610c9f84b37cab0a9fb17d4da7574748994d4e209d89cb07',
  'vllm/v1/structured_output/__init__.py': '3ac80fb92f5ff57a44fcb800d96b46ad37987df55830568ea49ac303c4b472c8',

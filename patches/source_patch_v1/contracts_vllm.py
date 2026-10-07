@@ -1427,6 +1427,8 @@ def _validate_agent_retention_after(state: State) -> None:
     require_python_symbols(state, "tests/v1/engine/test_engine_request_identity.py", {
         "test_the_notice_reaches_the_offload_tier_as_a_request_of_that_agent": None,
     }, label=label)
+    # Whether a context is idle is the idle map's to say; no second flag.
+    forbid_text(state, manager, "context.active", label=label)
 
 
 def _validate_agentless_routes_before(state: State) -> None:
@@ -1497,7 +1499,16 @@ def _validate_declared_capacity_after(state: State) -> None:
     kv_utils = "vllm/v1/core/kv_cache_utils.py"
     scheduler = "vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py"
     require_text(state, spec, "cpu_kv_cache_users must be specified", label=label)
-    require_text(state, spec, "Unknown kv_connector_extra_config keys", label=label)
+    # A key the spec does not act on is refused, naming the spec; only the
+    # tiering spec, which certifies a canonical layout, accepts that request.
+    require_text(state, spec, "does not act on kv_connector_extra_config keys",
+                 label=label)
+    forbid_text(state, spec, '"canonical_layout",', label=label)
+    require_text(state, "vllm/v1/kv_offload/tiering/spec.py", '"canonical_layout",',
+                 label=label)
+    require_python_symbols(state, "tests/v1/kv_offload/test_factory.py", {
+        "test_only_the_spec_that_certifies_a_canonical_layout_accepts_it": None,
+    }, label=label)
     require_text(state, spec, "self.num_blocks = cpu_kv_cache_users * chunks_per_user", label=label)
 
     # GPU tier: the byte flag is gone, the count is required, and the pool

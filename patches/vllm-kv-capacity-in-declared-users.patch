@@ -743,7 +743,7 @@ index 5a6ea10a685ce25ce624dcc4020b1a7158bc5aa6..5e9c622868d23b599503c4956d0b389e
          tensor_parallel_size=tp_size,
          kv_transfer_config=kv_transfer_config,
 diff --git a/tests/v1/kv_offload/test_factory.py b/tests/v1/kv_offload/test_factory.py
-index 3064abed6b9a3ed3c8a4143f279f65c86576f817..924d97caaeb474ccfd3bbe7f368f6021f682f357 100644
+index 3064abed6b9a3ed3c8a4143f279f65c86576f817..a41dc3600be1389b5bf93ebaae9d7da6e9e8fa16 100644
 --- a/tests/v1/kv_offload/test_factory.py
 +++ b/tests/v1/kv_offload/test_factory.py
 @@ -37,7 +37,8 @@ def restore_registry():
@@ -870,7 +870,7 @@ index 3064abed6b9a3ed3c8a4143f279f65c86576f817..924d97caaeb474ccfd3bbe7f368f6021
          worker_kv_bytes_per_block=worker_kv_bytes_per_block,
          world_size=world_size,
          replicated_layout=replicated_layout,
-@@ -539,9 +541,57 @@ def test_unregistered_spec_without_module_path_raises():
+@@ -539,9 +541,67 @@ def test_unregistered_spec_without_module_path_raises():
          OffloadingSpecFactory.create_spec(config)
  
  
@@ -889,8 +889,18 @@ index 3064abed6b9a3ed3c8a4143f279f65c86576f817..924d97caaeb474ccfd3bbe7f368f6021
 +
 +
 +def test_cpu_spec_unknown_extra_config_key_fails_startup():
-+    with pytest.raises(ValueError, match="Unknown kv_connector_extra_config"):
++    with pytest.raises(ValueError, match="does not act on kv_connector_extra_config"):
 +        _create_spec(extra_config={"definitely_not_a_knob": 1})
++
++
++def test_only_the_spec_that_certifies_a_canonical_layout_accepts_it():
++    # The CPU spec's worker keeps the direct layout, so a canonical_layout
++    # request it accepted would be ignored; the tiering spec certifies and
++    # honours it.
++    assert "canonical_layout" not in CPUOffloadingSpec.EXTRA_CONFIG_KEYS
++    assert "canonical_layout" in TieringOffloadingSpec.EXTRA_CONFIG_KEYS
++    with pytest.raises(ValueError, match="canonical_layout"):
++        _create_spec(extra_config={"canonical_layout": True})
 +
 +
 +def test_cpu_spec_user_count_scales_capacity():
@@ -1743,7 +1753,7 @@ index 753fba6c4c6cbecfaa4327be59739a3553bfa680..b293b43109299253fadb220684eb1dc7
  
      logger.debug(
 diff --git a/vllm/v1/kv_offload/cpu/spec.py b/vllm/v1/kv_offload/cpu/spec.py
-index c25eb359f691c96c2af4692974746c2a271ea557..11bd1b292704f4ab6524d4f5d037ad0c17b70ed8 100644
+index c25eb359f691c96c2af4692974746c2a271ea557..330ced1e36e255a79b594f03a005b101a35f672c 100644
 --- a/vllm/v1/kv_offload/cpu/spec.py
 +++ b/vllm/v1/kv_offload/cpu/spec.py
 @@ -6,7 +6,7 @@ import torch
@@ -1755,7 +1765,7 @@ index c25eb359f691c96c2af4692974746c2a271ea557..11bd1b292704f4ab6524d4f5d037ad0c
  from vllm.v1.kv_offload.base import (
      CanonicalKVCaches,
      OffloadingCounterMetadata,
-@@ -27,6 +27,26 @@ from vllm.v1.kv_offload.cpu.shared_offload_region import SharedOffloadRegion
+@@ -27,6 +27,24 @@ from vllm.v1.kv_offload.cpu.shared_offload_region import SharedOffloadRegion
  class CPUOffloadingSpec(OffloadingSpec):
      BLOCK_SIZE_ALIGNMENT = SharedOffloadRegion.BLOCK_SIZE_ALIGNMENT
  
@@ -1774,15 +1784,13 @@ index c25eb359f691c96c2af4692974746c2a271ea557..11bd1b292704f4ab6524d4f5d037ad0c
 +            # OffloadingSpec base behavior.
 +            "offload_prompt_only",
 +            "self_describing_kv_events",
-+            # Host byte-layout request, certified at worker registration.
-+            "canonical_layout",
 +        }
 +    )
 +
      @classmethod
      def build_metric_definitions(
          cls, extra_config: dict[str, Any]
-@@ -64,13 +84,39 @@ class CPUOffloadingSpec(OffloadingSpec):
+@@ -64,13 +82,40 @@ class CPUOffloadingSpec(OffloadingSpec):
          }
          return definitions
  
@@ -1791,8 +1799,9 @@ index c25eb359f691c96c2af4692974746c2a271ea557..11bd1b292704f4ab6524d4f5d037ad0c
 +        unknown = sorted(set(extra_config) - cls.EXTRA_CONFIG_KEYS)
 +        if unknown:
 +            raise ValueError(
-+                f"Unknown kv_connector_extra_config keys {unknown}. "
-+                f"Accepted keys: {sorted(cls.EXTRA_CONFIG_KEYS)}."
++                f"{cls.__name__} does not act on kv_connector_extra_config keys "
++                f"{unknown}. Remove them; it accepts "
++                f"{sorted(cls.EXTRA_CONFIG_KEYS)}."
 +            )
 +
      def __init__(self, config: OffloadingConfig):
@@ -1826,7 +1835,7 @@ index c25eb359f691c96c2af4692974746c2a271ea557..11bd1b292704f4ab6524d4f5d037ad0c
              )
  
          world_size = config.parallel.world_size
-@@ -86,18 +132,37 @@ class CPUOffloadingSpec(OffloadingSpec):
+@@ -86,18 +131,37 @@ class CPUOffloadingSpec(OffloadingSpec):
              # calculate cpu_page_size_per_worker
              self.cpu_page_size_per_worker = kv_bytes_per_chunk // num_copies
  
@@ -1871,7 +1880,7 @@ index c25eb359f691c96c2af4692974746c2a271ea557..11bd1b292704f4ab6524d4f5d037ad0c
          # scheduler-side
          self._manager: OffloadingManager | None = None
 diff --git a/vllm/v1/kv_offload/tiering/spec.py b/vllm/v1/kv_offload/tiering/spec.py
-index c8f06fe2b2fd3bcecb8f11aa43c3fc9525949960..4b09aab4bb30a730378d1cdf1ae5c12cfbab3bab 100644
+index c8f06fe2b2fd3bcecb8f11aa43c3fc9525949960..4eb1caa132803b891c6e1d27ca74f51caadfe0f3 100644
 --- a/vllm/v1/kv_offload/tiering/spec.py
 +++ b/vllm/v1/kv_offload/tiering/spec.py
 @@ -7,7 +7,10 @@ This spec creates a TieringOffloadingManager with a CPU primary tier
@@ -1904,12 +1913,14 @@ index c8f06fe2b2fd3bcecb8f11aa43c3fc9525949960..4b09aab4bb30a730378d1cdf1ae5c12c
      "secondary_tiers": [
          {
              "type": "MyCustomTier",
-@@ -243,6 +246,10 @@ class TieringOffloadingSpec(CPUOffloadingSpec):
+@@ -243,6 +246,12 @@ class TieringOffloadingSpec(CPUOffloadingSpec):
              metrics.update(tier_cls.build_metric_definitions(tier_config))
          return metrics
  
 +    EXTRA_CONFIG_KEYS: frozenset[str] = CPUOffloadingSpec.EXTRA_CONFIG_KEYS | {
 +        "secondary_tiers",
++        # Host byte-layout request, certified at worker registration.
++        "canonical_layout",
 +    }
 +
      def __init__(self, config: OffloadingConfig):
