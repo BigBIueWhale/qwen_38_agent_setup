@@ -345,6 +345,7 @@ It is intentionally reconstructed by the ordered, reviewed semantic transformati
 | patches/vllm-output-constraints-refused-beside-tool-calls.patch | 788431f67e89c1e363b59e22373cc62e6a9b972061f76566d77709d367379a2a |
 | patches/vllm-batch-invariance-substitutes-no-nvfp4-kernel.patch | c79baaee0a51275f5f522d266fe6b315c200e6951920c2454d5c80cadbb92f44 |
 | patches/vllm-render-carries-every-image-chat-renders.patch | 5e406e569b5777b572aeeb875a4afdcf5a0a18d07901aa9d9309977a57758124 |
+| patches/vllm-rendered-prompts-are-never-truncated.patch | e797fd19e869da9c4271934d297b5bb37fa4f5716835d5f50fb3d5cbc6a0c3fc |
 
 The reconstructed tree's runtime-source and test changes, new files and
 deletions are counted by ./scripts/build-vllm.sh check, which derives and prints
@@ -396,7 +397,7 @@ Pinned build inputs and products:
 | Immutable base tag | qwen38-vllm:main-9df9b0b |
 | Immutable base ID | sha256:fa4a002a88b7043a1a89966dea8a500fe9696f84e75730d9da916f916048d401 |
 | Runtime Dockerfile SHA-256 | 393497d3d72151b6caa7a0b405dd4d983cd8a08e0d26bc43cb08d9f60d31fa41 |
-| Build verifier SHA-256 | b1f6be876c1f10e316088eaedb09d6a5910b87b7af090cd6f8b9a475d03a4908 |
+| Build verifier SHA-256 | 1a4f25c3dff1a0870f7e1d71508630f3f316ce8fbf0f12f9d772cbb97bafda17 |
 | Runtime validator SHA-256 | 357fdaed8d5a8ad0d901eaf07e5357722b74400c99d96b6f30572a557426b4fc |
 
 The runtime image's profile, tag and archive name, which every release advances
@@ -1208,6 +1209,13 @@ choice must use a name the model is offered; `allowed_tools` arms the grammar to
 exactly the listed functions in its mode; `required` needs a function to call; and
 a choice no grammar can enforce -- a hosted, MCP or custom tool -- is refused
 naming `tool_choice` rather than left to publish the call as text.
+
+A prompt the template renders is never cut. Responses `truncation: "auto"` and chat
+`truncate_prompt_tokens` or `truncation_side` would cut tokens from the head of the
+rendered prompt -- the template's markers, the system text, the task and the tool
+definitions -- so each is refused with a 400 naming the parameter; shorten the
+input, or let the client compact it. Completions keep `truncate_prompt_tokens`,
+whose prompt is the caller's own text.
 
 An output constraint cannot hold beside a callable tool, because the call grammar
 covers the whole output. A request that could call a tool and also constrains its

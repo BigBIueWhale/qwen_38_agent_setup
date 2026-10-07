@@ -1,0 +1,371 @@
+diff --git a/tests/entrypoints/openai/chat_completion/test_serving_chat.py b/tests/entrypoints/openai/chat_completion/test_serving_chat.py
+index 3b8155e47e6d1819084a67d94c708082d7fe32c4..6c7ba0779c03f88d014fce0f196920641cca877d 100644
+--- a/tests/entrypoints/openai/chat_completion/test_serving_chat.py
++++ b/tests/entrypoints/openai/chat_completion/test_serving_chat.py
+@@ -1059,101 +1059,6 @@ async def test_serving_chat_should_set_correct_max_tokens():
+     assert mock_engine.admit.call_args.args[1].max_tokens == 5
+ 
+ 
+-@pytest.mark.asyncio
+-async def test_serving_chat_truncate_prompt_tokens_max_token_accounting():
+-    """When truncate_prompt_tokens is set, max_tokens must be calculated using
+-    the truncated prompt length, not the original prompt length.
+-
+-    Regression: without the fix, get_max_tokens received the untruncated prompt
+-    length, causing the output budget to be underestimated.
+-    """
+-    mock_engine = MagicMock(spec=AsyncLLM)
+-    mock_engine.errored = False
+-    mock_engine.model_config = MockModelConfig()
+-    mock_engine.input_processor = MagicMock()
+-    mock_engine.renderer = _build_renderer(mock_engine.model_config)
+-
+-    serving_chat = _build_serving_chat(mock_engine)
+-
+-    # "what is 1+1?" tokenizes to 7 tokens with the test chat template
+-    # (max_model_len=100 -> max_tokens = 93 without truncation, confirmed by
+-    # test_serving_chat_should_set_correct_max_tokens above).
+-    messages = [{"role": "user", "content": "what is 1+1?"}]
+-
+-    # Baseline: no truncation -> max_tokens = 100 - 7 = 93.
+-    req = ChatCompletionRequest(model=MODEL_NAME, messages=messages)
+-    with suppress(Exception):
+-        await serving_chat.create_chat_completion(req)
+-    assert mock_engine.admit.call_args.args[1].max_tokens == 93
+-
+-    # With truncate_prompt_tokens=5 (less than 7): the effective prompt length
+-    # is 5, so max_tokens should be 100 - 5 = 95, not 93.
+-    req = ChatCompletionRequest(
+-        model=MODEL_NAME,
+-        messages=messages,
+-        truncate_prompt_tokens=5,
+-    )
+-    with suppress(Exception):
+-        await serving_chat.create_chat_completion(req)
+-    assert mock_engine.admit.call_args.args[1].max_tokens == 95
+-
+-    # With truncate_prompt_tokens=-1 (meaning use full max_model_len as the
+-    # truncation limit, i.e., no practical truncation vs the window): effective
+-    # length = min(7, 100) = 7 -> max_tokens = 93 again.
+-    req = ChatCompletionRequest(
+-        model=MODEL_NAME,
+-        messages=messages,
+-        truncate_prompt_tokens=-1,
+-    )
+-    with suppress(Exception):
+-        await serving_chat.create_chat_completion(req)
+-    assert mock_engine.admit.call_args.args[1].max_tokens == 93
+-
+-
+-@pytest.mark.asyncio
+-async def test_serving_chat_truncation_side_controls_prompt_truncation():
+-    model_config = MockModelConfig()
+-    model_config.model = MODEL_NAME_SHORT
+-    model_config.tokenizer = MODEL_NAME_SHORT
+-    mock_engine = MockEngine(
+-        model_config=model_config,
+-        renderer=_build_renderer(model_config),
+-    )
+-
+-    serving_chat = _build_serving_chat(mock_engine)
+-    messages = [
+-        {
+-            "role": "user",
+-            "content": "Summarize how prompt truncation works in one sentence.",
+-        }
+-    ]
+-
+-    full_token_ids = await _render_chat_prompt_token_ids(
+-        serving_chat,
+-        messages,
+-        model_name=MODEL_NAME_SHORT,
+-    )
+-    assert len(full_token_ids) > 4
+-
+-    right_token_ids = await _render_chat_prompt_token_ids(
+-        serving_chat,
+-        messages,
+-        model_name=MODEL_NAME_SHORT,
+-        truncate_prompt_tokens=4,
+-        truncation_side="right",
+-    )
+-    assert right_token_ids == full_token_ids[:4]
+-
+-    left_token_ids = await _render_chat_prompt_token_ids(
+-        serving_chat,
+-        messages,
+-        model_name=MODEL_NAME_SHORT,
+-        truncate_prompt_tokens=4,
+-        truncation_side="left",
+-    )
+-    assert left_token_ids == full_token_ids[-4:]
+-
+-
+ @pytest.mark.asyncio
+ async def test_serving_chat_mistral_token_ids_prompt_is_validated():
+     """Regression test: when the Mistral tokenizer path returns token IDs
+@@ -1410,37 +1315,6 @@ async def test_serving_chat_data_parallel_rank_extraction():
+     assert mock_engine.admit.call_args.kwargs["data_parallel_rank"] is None
+ 
+ 
+-async def _render_chat_prompt_token_ids(
+-    serving_chat: OpenAIServingChat,
+-    messages: list[dict[str, str]],
+-    *,
+-    model_name: str = MODEL_NAME,
+-    truncate_prompt_tokens: int | None = None,
+-    truncation_side: str | None = None,
+-) -> list[int]:
+-    request = ChatCompletionRequest(
+-        model=model_name,
+-        messages=messages,
+-        max_tokens=1,
+-        temperature=0.0,
+-        return_token_ids=True,
+-        truncate_prompt_tokens=truncate_prompt_tokens,
+-        truncation_side=truncation_side,
+-    )
+-
+-    result = await serving_chat.render_chat_request(request)
+-    assert not isinstance(result, ErrorResponse)
+-
+-    _, engine_inputs = result
+-    assert len(engine_inputs) == 1
+-
+-    prompt_token_ids = serving_chat._extract_prompt_components(
+-        engine_inputs[0]
+-    ).token_ids
+-    assert prompt_token_ids is not None
+-    return prompt_token_ids
+-
+-
+ class TestServingChatWithHarmony:
+     """
+     These tests ensure Chat Completion requests are being properly converted into
+diff --git a/tests/entrypoints/openai/test_prompt_truncation_refused.py b/tests/entrypoints/openai/test_prompt_truncation_refused.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..659087e6ebf26ae157c3ee099dd4e32fe4b2b0ce
+--- /dev/null
++++ b/tests/entrypoints/openai/test_prompt_truncation_refused.py
+@@ -0,0 +1,69 @@
++# SPDX-License-Identifier: Apache-2.0
++# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
++"""A prompt the chat template renders is never truncated.
++
++Truncation by token count cuts the rendered prompt from the tokenizer's
++default side, its head: the template's markers, the system text and the tool
++definitions go first, and the model reads a prompt that starts mid-message.
++Every surface that renders through the template refuses the parameter that
++would ask for it, naming it.
++"""
++
++from types import SimpleNamespace
++
++import pytest
++from pydantic import ValidationError
++
++from vllm.entrypoints.openai.chat_completion.protocol import ChatCompletionRequest
++from vllm.entrypoints.openai.responses.protocol import ResponsesRequest
++from vllm.exceptions import VLLMValidationError
++
++
++@pytest.mark.parametrize(
++    "parameter,value",
++    [("truncate_prompt_tokens", 5), ("truncate_prompt_tokens", -1),
++     ("truncation_side", "left"), ("truncation_side", "right")],
++)
++def test_chat_refuses_prompt_truncation(parameter, value):
++    with pytest.raises(VLLMValidationError) as refusal:
++        ChatCompletionRequest.model_validate(
++            {"model": "m", "messages": [{"role": "user", "content": "hi"}],
++             parameter: value}
++        )
++    assert refusal.value.parameter == parameter
++
++
++def test_chat_tokenizes_without_truncation():
++    request = ChatCompletionRequest.model_validate(
++        {"model": "m", "messages": [{"role": "user", "content": "hi"}], "max_tokens": 8}
++    )
++    params = request.build_tok_params(SimpleNamespace(max_model_len=64))
++    assert params.truncate_prompt_tokens is None
++    assert params.truncation_side is None
++
++
++def _responses(**fields):
++    return ResponsesRequest.model_validate(
++        {"model": "m", "input": "hi", "kv_scope": "agent", **fields}
++    )
++
++
++def test_responses_refuses_truncation_auto():
++    with pytest.raises(VLLMValidationError) as refusal:
++        _responses(truncation="auto", max_output_tokens=8)
++    assert refusal.value.parameter == "truncation"
++
++
++def test_responses_refuses_a_null_truncation():
++    # The response echoes truncation as "auto" or "disabled"; a null that the
++    # request admitted could not be echoed back.
++    with pytest.raises(ValidationError):
++        _responses(truncation=None)
++
++
++@pytest.mark.parametrize("fields", [{}, {"truncation": "disabled"}])
++def test_responses_tokenizes_without_truncation(fields):
++    request = _responses(max_output_tokens=8, **fields)
++    assert request.truncation == "disabled"
++    params = request.build_tok_params(SimpleNamespace(max_model_len=64))
++    assert params.truncate_prompt_tokens is None
+diff --git a/vllm/entrypoints/openai/chat_completion/protocol.py b/vllm/entrypoints/openai/chat_completion/protocol.py
+index 0564f6f3e7ab87a2c966ac9636b5f608d6302ac6..7c8f0c9ab4634709bfaf52da861ee28cd683e390 100644
+--- a/vllm/entrypoints/openai/chat_completion/protocol.py
++++ b/vllm/entrypoints/openai/chat_completion/protocol.py
+@@ -634,8 +634,6 @@ class ChatCompletionRequest(OpenAIBaseModel):
+         return TokenizeParams(
+             max_total_tokens=model_config.max_model_len,
+             max_output_tokens=max_output_tokens or 0,
+-            truncate_prompt_tokens=self.truncate_prompt_tokens,
+-            truncation_side=self.truncation_side,
+             add_special_tokens=self.add_special_tokens,
+             needs_detokenization=bool(self.echo and not self.return_token_ids),
+             max_total_tokens_param="max_model_len",
+@@ -1003,6 +1001,36 @@ class ChatCompletionRequest(OpenAIBaseModel):
+                 )
+         return data
+ 
++    @model_validator(mode="before")
++    @classmethod
++    def refuse_prompt_truncation(cls, data):
++        if not isinstance(data, dict):
++            return data
++        # The template renders the prompt and the tokenizer's default side
++        # cuts its head: the template's own markers, the system text and the
++        # tool definitions go first, and the model reads a prompt that starts
++        # mid-message.
++        if (value := data.get("truncate_prompt_tokens")) is not None:
++            raise VLLMValidationError(
++                "truncate_prompt_tokens would cut the rendered chat prompt by "
++                "token count, from its head by default -- the template's "
++                "markers, the system text and the tool definitions first -- "
++                "so the model would read a prompt that starts mid-message. "
++                "This server never truncates a chat prompt. Remove "
++                "truncate_prompt_tokens and shorten the messages yourself.",
++                parameter="truncate_prompt_tokens",
++                value=value,
++            )
++        if (value := data.get("truncation_side")) is not None:
++            raise VLLMValidationError(
++                "truncation_side chooses which end of the chat prompt "
++                "truncate_prompt_tokens cuts, and this server never truncates "
++                "a chat prompt. Remove truncation_side.",
++                parameter="truncation_side",
++                value=value,
++            )
++        return data
++
+     @model_validator(mode="before")
+     @classmethod
+     def check_generation_prompt(cls, data):
+diff --git a/vllm/entrypoints/openai/chat_completion/serving.py b/vllm/entrypoints/openai/chat_completion/serving.py
+index 96ae50c0ab6e5bebd9b71ca69e5d07ec5f4a8582..f85ba5c67f2dd44d894d5d5a40e316beabd66732 100644
+--- a/vllm/entrypoints/openai/chat_completion/serving.py
++++ b/vllm/entrypoints/openai/chat_completion/serving.py
+@@ -306,7 +306,6 @@ class OpenAIServingChat(GenerateBaseServing):
+                 self._extract_prompt_len(engine_input),
+                 self.default_sampling_params,
+                 self.override_max_tokens,
+-                truncate_prompt_tokens=request.truncate_prompt_tokens,
+             )
+ 
+             sampling_params = request.to_sampling_params(
+diff --git a/vllm/entrypoints/openai/responses/protocol.py b/vllm/entrypoints/openai/responses/protocol.py
+index ea184136e60c045292ae7bfe12809be47aa420c4..4c63338b30a80fbc57ed78ef9636f587a295bd3c 100644
+--- a/vllm/entrypoints/openai/responses/protocol.py
++++ b/vllm/entrypoints/openai/responses/protocol.py
+@@ -58,6 +58,7 @@ from pydantic import (
+     Field,
+     ValidationError,
+     field_serializer,
++    field_validator,
+     model_validator,
+ )
+ 
+@@ -215,7 +216,7 @@ class ResponsesRequest(OpenAIBaseModel):
+     top_logprobs: int | None = 0
+     top_p: float | None = None
+     top_k: int | None = None
+-    truncation: Literal["auto", "disabled"] | None = "disabled"
++    truncation: Literal["auto", "disabled"] = "disabled"
+     user: str | None = None
+     skip_special_tokens: bool = True
+     include_stop_str_in_output: bool = False
+@@ -392,7 +393,6 @@ class ResponsesRequest(OpenAIBaseModel):
+         return TokenizeParams(
+             max_total_tokens=model_config.max_model_len,
+             max_output_tokens=self.max_output_tokens or 0,
+-            truncate_prompt_tokens=-1 if self.truncation != "disabled" else None,
+             max_total_tokens_param="max_model_len",
+             max_output_tokens_param="max_output_tokens",
+         )
+@@ -527,6 +527,24 @@ class ResponsesRequest(OpenAIBaseModel):
+             require_kv_scope_value(data.get("kv_scope"))
+         return data
+ 
++    @field_validator("truncation")
++    @classmethod
++    def refuse_prompt_truncation(cls, truncation: str) -> str:
++        if truncation == "auto":
++            raise VLLMValidationError(
++                'truncation "auto" cuts tokens from the head of the rendered '
++                "prompt -- the instructions, system text and tool definitions "
++                "first -- whenever the input and max_output_tokens exceed the "
++                "context window, so the model would read a prompt that starts "
++                "mid-message. This server never truncates a prompt. Send "
++                'truncation "disabled" (the default) and shorten the input '
++                "yourself, for example by dropping or summarising earlier "
++                "input items.",
++                parameter="truncation",
++                value=truncation,
++            )
++        return truncation
++
+     @model_validator(mode="before")
+     @classmethod
+     def validate_background(cls, data):
+diff --git a/vllm/entrypoints/openai/responses/serving.py b/vllm/entrypoints/openai/responses/serving.py
+index 8b4db1810e5fb728f9a81c12293aa6bb94747cd5..b709dccf52eb082251f319720b1ddf72900bb73a 100644
+--- a/vllm/entrypoints/openai/responses/serving.py
++++ b/vllm/entrypoints/openai/responses/serving.py
+@@ -445,9 +445,6 @@ class OpenAIServingResponses(GenerateBaseServing):
+                 self._extract_prompt_len(engine_input),
+                 self.default_sampling_params,
+                 self.override_max_tokens,
+-                truncate_prompt_tokens=(
+-                    -1 if request.truncation != "disabled" else None
+-                ),
+             )
+ 
+             sampling_params = request.to_sampling_params(
+@@ -797,9 +794,6 @@ class OpenAIServingResponses(GenerateBaseServing):
+                         self._extract_prompt_len(engine_input),
+                         self.default_sampling_params,  # type: ignore
+                         self.override_max_tokens,  # type: ignore
+-                        truncate_prompt_tokens=(
+-                            -1 if context.request.truncation != "disabled" else None
+-                        ),
+                     )
+ 
+                 # OPTIMIZATION
+diff --git a/vllm/entrypoints/scale_out/render/serving.py b/vllm/entrypoints/scale_out/render/serving.py
+index a7e0ae55313849576596451d80aa2fdc353e3f8e..9e1d6dfdf102ab6bc42caf5483b0daf38a11ecca 100644
+--- a/vllm/entrypoints/scale_out/render/serving.py
++++ b/vllm/entrypoints/scale_out/render/serving.py
+@@ -96,7 +96,6 @@ class ServingRender(BaseServing):
+             input_length,
+             self.default_sampling_params,
+             self.override_max_tokens,
+-            truncate_prompt_tokens=request.truncate_prompt_tokens,
+         )
+         params = request.to_sampling_params(max_tokens, self.default_sampling_params)
+ 

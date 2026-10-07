@@ -172,6 +172,7 @@ DERENDER_STOP_TOKEN_TEXT_PATCH_FILE="${PROJECT_DIR}/patches/vllm-derender-text-i
 OUTPUT_CONSTRAINT_BESIDE_TOOLS_PATCH_FILE="${PROJECT_DIR}/patches/vllm-output-constraints-refused-beside-tool-calls.patch"
 BATCH_INVARIANT_NATIVE_FP4_PATCH_FILE="${PROJECT_DIR}/patches/vllm-batch-invariance-substitutes-no-nvfp4-kernel.patch"
 RENDER_EVERY_IMAGE_PATCH_FILE="${PROJECT_DIR}/patches/vllm-render-carries-every-image-chat-renders.patch"
+RENDERED_PROMPT_NOT_TRUNCATED_PATCH_FILE="${PROJECT_DIR}/patches/vllm-rendered-prompts-are-never-truncated.patch"
 
 if [[ ! -f "${DEPLOYMENT_INPUT_MANIFEST}" || -L "${DEPLOYMENT_INPUT_MANIFEST}" ]]; then
   echo "Deployment-input manifest is missing or is not a regular non-symlink file." >&2
@@ -319,7 +320,8 @@ printf '%s  %s\n' \
   "${DERENDER_STOP_TOKEN_TEXT_PATCH_DIFF_SHA256}" "${DERENDER_STOP_TOKEN_TEXT_PATCH_FILE}" \
   "${OUTPUT_CONSTRAINT_BESIDE_TOOLS_PATCH_DIFF_SHA256}" "${OUTPUT_CONSTRAINT_BESIDE_TOOLS_PATCH_FILE}" \
   "${BATCH_INVARIANT_NATIVE_FP4_PATCH_DIFF_SHA256}" "${BATCH_INVARIANT_NATIVE_FP4_PATCH_FILE}" \
-  "${RENDER_EVERY_IMAGE_PATCH_DIFF_SHA256}" "${RENDER_EVERY_IMAGE_PATCH_FILE}" | \
+  "${RENDER_EVERY_IMAGE_PATCH_DIFF_SHA256}" "${RENDER_EVERY_IMAGE_PATCH_FILE}" \
+  "${RENDERED_PROMPT_NOT_TRUNCATED_PATCH_DIFF_SHA256}" "${RENDERED_PROMPT_NOT_TRUNCATED_PATCH_FILE}" | \
   sha256sum --check --strict
 
 printf '%s  %s\n' \

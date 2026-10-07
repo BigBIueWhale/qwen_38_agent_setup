@@ -4,6 +4,8 @@ from types import SimpleNamespace
 
 from pydantic import ValidationError
 from vllm.entrypoints.scale_out.token_in_token_out.protocol import GenerateRequest
+from vllm.entrypoints.openai.chat_completion.protocol import ChatCompletionRequest
+from vllm.entrypoints.openai.responses.protocol import ResponsesRequest
 from vllm.exceptions import VLLMValidationError
 from vllm.model_executor.models.qwen3_vl import Qwen3VLMultiModalProcessor
 from vllm.multimodal.processing.context import TimingContext
@@ -138,4 +140,34 @@ except VLLMValidationError as error:
 else:
     raise AssertionError("An input_image without detail was accepted")
 
+# A prompt the chat template renders is never truncated: a token-count cut
+# from the tokenizer's default side removes the template's markers, the system
+# text and the tool definitions first. Chat and Responses refuse the parameter
+# that would ask for it, and neither tokenizes with a truncation.
+model_config = SimpleNamespace(max_model_len=64)
+for build, parameter in (
+    (lambda: ChatCompletionRequest.model_validate(
+        {"model": "m", "messages": [{"role": "user", "content": "hi"}],
+         "truncate_prompt_tokens": -1}), "truncate_prompt_tokens"),
+    (lambda: ChatCompletionRequest.model_validate(
+        {"model": "m", "messages": [{"role": "user", "content": "hi"}],
+         "truncation_side": "left"}), "truncation_side"),
+    (lambda: ResponsesRequest.model_validate(
+        {"model": "m", "input": "hi", "kv_scope": "agent", "truncation": "auto",
+         "max_output_tokens": 8}), "truncation"),
+):
+    try:
+        build()
+    except VLLMValidationError as refusal:
+        assert refusal.parameter == parameter, (parameter, refusal.parameter)
+    else:
+        raise AssertionError(f"{parameter} truncation of a chat prompt was accepted")
+for request in (
+    ChatCompletionRequest.model_validate(
+        {"model": "m", "messages": [{"role": "user", "content": "hi"}],
+         "max_completion_tokens": 8}),
+    ResponsesRequest.model_validate(
+        {"model": "m", "input": "hi", "kv_scope": "agent", "max_output_tokens": 8}),
+):
+    assert request.build_tok_params(model_config).truncate_prompt_tokens is None
 print("Installed raw-media and rendered-prompt contract passed")

@@ -3861,6 +3861,41 @@ def _validate_render_every_image_after(state: State) -> None:
             "test_rendered_media_spans_require_their_images": None,
         }, label=label)
 
+def _validate_rendered_prompt_truncation_before(state: State) -> None:
+    label = "Rendered prompt truncation precondition"
+    require_text(state, "vllm/entrypoints/openai/responses/protocol.py",
+                 'truncate_prompt_tokens=-1 if self.truncation != "disabled" else None,',
+                 label=label)
+    forbid_text(state, "vllm/entrypoints/openai/chat_completion/protocol.py",
+                "def refuse_prompt_truncation(", label=label)
+
+
+def _validate_rendered_prompt_truncation_after(state: State) -> None:
+    label = "Rendered prompt truncation"
+    chat = "vllm/entrypoints/openai/chat_completion/protocol.py"
+    responses = "vllm/entrypoints/openai/responses/protocol.py"
+    # A prompt the template renders is never cut: the request that would ask
+    # for it is refused by name, and nothing tokenizes it with a truncation.
+    require_python_symbols(state, chat, {
+        "ChatCompletionRequest.refuse_prompt_truncation": ("cls", "data"),
+    }, label=label)
+    require_python_symbols(state, responses, {
+        "ResponsesRequest.refuse_prompt_truncation": ("cls", "truncation"),
+    }, label=label)
+    require_text(state, responses, 'truncation: Literal["auto", "disabled"] = "disabled"',
+                 label=label)
+    for path in (responses, "vllm/entrypoints/openai/responses/serving.py"):
+        forbid_text(state, path, 'truncation != "disabled"', label=label)
+    for path in (chat, "vllm/entrypoints/openai/chat_completion/serving.py"):
+        forbid_text(state, path, "truncate_prompt_tokens=", label=label)
+    require_python_symbols(state, "tests/entrypoints/openai/test_prompt_truncation_refused.py", {
+        "test_chat_refuses_prompt_truncation": None,
+        "test_chat_tokenizes_without_truncation": None,
+        "test_responses_refuses_truncation_auto": None,
+        "test_responses_refuses_a_null_truncation": None,
+        "test_responses_tokenizes_without_truncation": None,
+    }, label=label)
+
 def validate_final(state: State) -> None:
     """Reassert every durable semantic invariant on the complete tree.
 
@@ -4987,5 +5022,28 @@ CONTRACTS: Mapping[str, SemanticContract] = {
         ),
         validate_before=_validate_render_every_image_before,
         validate_after=_validate_render_every_image_after,
+    ),
+    "rendered-prompts-are-never-truncated": SemanticContract(
+        rationale=(
+            "Responses truncation \"auto\" set truncate_prompt_tokens to the "
+            "room max_output_tokens left, and the served tokenizer cuts from "
+            "the left, so an overflowing prompt lost its head: the template's "
+            "markers, the system text, the operator's task and the tool "
+            "definitions, with nothing said. An explicit null truncated as "
+            "well and then failed at response construction, and the mapping was "
+            "decided three times. Chat cut the same head through "
+            "truncate_prompt_tokens and truncation_side. A rendered prompt cut "
+            "from the left starts mid-message, a shape no template writes. Both "
+            "surfaces refuse the parameter by name and tokenize without a "
+            "truncation; Completions keeps truncate_prompt_tokens, whose prompt "
+            "is the caller's own text with no template around it."
+        ),
+        removal_condition=(
+            "Remove when pinned upstream truncates a rendered chat or Responses "
+            "prompt only by whole input items, never by a token cut from the "
+            "head, or refuses to."
+        ),
+        validate_before=_validate_rendered_prompt_truncation_before,
+        validate_after=_validate_rendered_prompt_truncation_after,
     ),
 }
