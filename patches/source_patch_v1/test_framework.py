@@ -372,6 +372,108 @@ class SourcePatchTransactionTests(unittest.TestCase):
         ):
             compiler.expand_to_unique_landmark(current, block, changed, 4)
 
+    def _landmark_patchset(
+        self, *, source: str, result: str, edit: LandmarkEdit, hunk: str
+    ) -> PatchSet:
+        """A one-hunk stage over module.py, its source written in place."""
+        review = (
+            "diff --git a/module.py b/module.py\n--- a/module.py\n+++ b/module.py\n"
+            + hunk
+        )
+        (self.source / "module.py").write_text(source, encoding="utf-8")
+        (self.artifact / "landmark.patch").write_text(
+            review, encoding="utf-8", newline="\n"
+        )
+        stage = PatchStage(
+            name="landmark",
+            rationale="Synthetic landmark used to prove the after-block rule.",
+            removal_condition="Remove when this framework test is removed.",
+            review_patch="landmark.patch",
+            review_sha256=sha256_bytes(review.encode("utf-8")),
+            files=(
+                FileIdentity("module.py", sha256_text(source), sha256_text(result)),
+            ),
+            edits=(edit,),
+            validate_before=_noop,
+            validate_after=_noop,
+        )
+        return _patchset((stage,), final_files={"module.py": sha256_text(result)})
+
+    def test_a_deletion_that_ends_a_file_compiles_and_applies(self) -> None:
+        sys.path.insert(0, str(Path(framework.__file__).parent))
+        try:
+            import compile_review_diff as compiler
+        finally:
+            sys.path.pop(0)
+        source = "def kept():\n    return 1\n\n\ndef dropped():\n    return 2\n"
+        result = "def kept():\n    return 1\n"
+        review_before = "    return 1\n\n\ndef dropped():\n    return 2\n"
+        review_after = "    return 1\n"
+        # What the deletion keeps is part of what it replaces: the block itself,
+        # not a sign that the source already holds the result.
+        before, after = compiler.expand_to_unique_landmark(
+            source, review_before, review_after, 2
+        )
+        self.assertEqual(source.replace(before, after, 1), result)
+        edit = LandmarkEdit(
+            name="module.py:landmark-1", path="module.py", before=before,
+            after=after, review_before=review_before, review_after=review_after,
+        )
+        hunk = "@@ -2,5 +2,1 @@\n     return 1\n-\n-\n-def dropped():\n-    return 2\n"
+        patchset = self._landmark_patchset(
+            source=source, result=result, edit=edit, hunk=hunk
+        )
+        self.assertEqual(
+            SourcePatchTransaction(self.source, self.artifact, patchset).apply().state,
+            "applied",
+        )
+        self.assertEqual((self.source / "module.py").read_text(), result)
+
+    def test_an_after_block_outside_its_landmark_is_refused(self) -> None:
+        # The same trailing deletion, over a source that already holds the text
+        # it keeps elsewhere: that copy is outside the landmark, so refused.
+        kept = "def other():\n    return 1\n\n\n"
+        source = kept + "def kept():\n    return 1\n\n\ndef dropped():\n    return 2\n"
+        review_before = "    return 1\n\n\ndef dropped():\n    return 2\n"
+        trailing = LandmarkEdit(
+            name="module.py:landmark-1", path="module.py", before=review_before,
+            after="    return 1\n", review_before=review_before,
+            review_after="    return 1\n",
+        )
+        # A partial application of an ordinary change: its result is already
+        # in the file.
+        partial = LandmarkEdit(
+            name="module.py:landmark-1", path="module.py", before="value = 1\n",
+            after="value = 2\n", review_before="value = 1\n",
+            review_after="value = 2\n",
+        )
+        # A result that straddles the landmark's edge is outside it too.
+        straddling = LandmarkEdit(
+            name="module.py:landmark-1", path="module.py", before="b\nc\n",
+            after="c\nd\n", review_before="b\nc\n", review_after="c\nd\n",
+        )
+        trailing_hunk = (
+            "@@ -6,5 +6,1 @@\n     return 1\n-\n-\n-def dropped():\n-    return 2\n"
+        )
+        cases = (
+            (source, trailing, trailing_hunk),
+            ("value = 2\nvalue = 1\n", partial, "@@ -2,1 +2,1 @@\n-value = 1\n+value = 2\n"),
+            ("a\nb\nc\nd\n", straddling, "@@ -2,2 +2,2 @@\n-b\n-c\n+c\n+d\n"),
+        )
+        for case_source, edit, hunk in cases:
+            with self.subTest(edit=edit.before):
+                result = case_source.replace(edit.before, edit.after, 1)
+                patchset = self._landmark_patchset(
+                    source=case_source, result=result, edit=edit, hunk=hunk
+                )
+                with self.assertRaisesRegex(
+                    PatchRefusedError,
+                    r"after block already appears 1 time\(s\) in module\.py "
+                    r"outside its before landmark",
+                ):
+                    SourcePatchTransaction(self.source, self.artifact, patchset).apply()
+                self.assertEqual((self.source / "module.py").read_text(), case_source)
+
     def test_unknown_source_drift_refuses_without_writes(self) -> None:
         before = "def value():\n    return 1\n"
         after = "def value():\n    return 2\n"

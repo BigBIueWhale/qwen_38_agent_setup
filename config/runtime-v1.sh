@@ -120,7 +120,7 @@ readonly RENDER_EVERY_IMAGE_PATCH_DIFF_SHA256="c5bf4cb2948b9eb7866d083671af3badc
 readonly RENDERED_PROMPT_NOT_TRUNCATED_PATCH_DIFF_SHA256="07cd24fbf29bc66fb9615d63a8e30d947ee13cf6367e23bcb1a870e4f3a49334"
 readonly KV_TRANSFER_PARAMS_DECLARED_PATCH_DIFF_SHA256="9742698af30ad79158f5430fb22987cafe4667f457771dd66b29b38a7376ce0e"
 readonly RESPONSES_TOOLS_NEVER_GIVEN_PATCH_DIFF_SHA256="e739235f61cf09867025db10b87b1aa4840aec9dca0bd857bfe735b5612d86ed"
-readonly SOURCE_PATCH_MANIFEST_SHA256="9d5eadb7009676f578704906acc9809fde45a007550dd90f28a6d587a82443c5"
+readonly SOURCE_PATCH_MANIFEST_SHA256="2e3c13913dcb11bf97544713952b249439c1442bd65316d1bca98d8b56e7a40f"
 # Cardinality of config/deployment-inputs.sha256. The hash manifest alone
 # proves the listed bytes but cannot see a quietly grown or shrunk allowlist,
 # so the reviewed file count is pinned as well. It is declared exactly once,

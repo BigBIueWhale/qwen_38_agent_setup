@@ -60,6 +60,28 @@ def _require(condition: object, message: str) -> None:
         raise PatchRefusedError(message)
 
 
+def after_outside_landmark(current: str, before: str, after: str) -> int:
+    """How often *after* occurs in *current* other than wholly inside the one
+    occurrence of *before* that an edit replaces.
+
+    Any such occurrence means the source already holds the edit's result, or
+    part of it, so the edit is refused.  An occurrence wholly inside that
+    block is the block itself: the text a deletion keeps is part of the text
+    it replaces, as it always is for a deletion that ends a file.  Every
+    occurrence is counted, overlapping ones included, so one that straddles
+    the block's edge counts as outside it.
+    """
+    start = current.index(before)
+    end = start + len(before)
+    outside = 0
+    position = current.find(after)
+    while position != -1:
+        if position < start or position + len(after) > end:
+            outside += 1
+        position = current.find(after, position + 1)
+    return outside
+
+
 def _safe_relative_path(raw: str) -> PurePosixPath:
     path = PurePosixPath(raw)
     _require(raw != "", "empty source path")
@@ -756,17 +778,18 @@ class SourcePatchTransaction:
                     changed.add(edit.path)
                     continue
                 before_count = current.count(edit.before)
-                after_count = current.count(edit.after)
                 _require(
                     before_count == 1,
                     f"{stage.name}:{edit.name}: expected one before landmark "
                     f"in {edit.path}, found {before_count}; no writes performed",
                 )
+                after_count = after_outside_landmark(current, edit.before, edit.after)
                 _require(
                     after_count == 0,
                     f"{stage.name}:{edit.name}: after block already appears "
-                    f"{after_count} time(s) in {edit.path}; source is partial or "
-                    "the landmarks overlap; no writes performed",
+                    f"{after_count} time(s) in {edit.path} outside its before "
+                    "landmark; source is partial or the landmarks overlap; no "
+                    "writes performed",
                 )
                 if edit.review_before:
                     # Where the edit lands is proven, not only what it says:

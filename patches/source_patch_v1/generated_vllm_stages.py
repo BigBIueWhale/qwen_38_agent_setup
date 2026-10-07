@@ -4340,9 +4340,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'from vllm.multimodal.media import MediaConnector\n'},
             {'name': 'tests/multimodal/media/test_connector.py:landmark-2',
              'path': 'tests/multimodal/media/test_connector.py',
-             'before': '        assert _image_equals(data_image_sync, '
-                       'data_image_async)\n'
-                       '\n'
+             'before': '\n'
                        '\n'
                        '@pytest.mark.asyncio\n'
                        'async def test_fetch_image_keep_original_mode():\n'
@@ -4381,17 +4379,13 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                        '@pytest.mark.asyncio\n'
                        '@pytest.mark.parametrize("image_url", TEST_IMAGE_ASSETS, '
                        'indirect=True)\n'
-                       'async def test_fetch_image_local_files(image_url: str):\n'
-                       '    connector = MediaConnector()\n',
-             'after': '        assert _image_equals(data_image_sync, '
-                      'data_image_async)\n'
-                      '\n'
+                       'async def test_fetch_image_local_files(image_url: str):\n',
+             'after': '\n'
                       '\n'
                       '@pytest.mark.asyncio\n'
                       '@pytest.mark.parametrize("image_url", TEST_IMAGE_ASSETS, '
                       'indirect=True)\n'
-                      'async def test_fetch_image_local_files(image_url: str):\n'
-                      '    connector = MediaConnector()\n',
+                      'async def test_fetch_image_local_files(image_url: str):\n',
              'review_before': '\n'
                               '\n'
                               '@pytest.mark.asyncio\n'
@@ -4448,9 +4442,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'str):\n'},
             {'name': 'tests/multimodal/media/test_connector.py:landmark-3',
              'path': 'tests/multimodal/media/test_connector.py',
-             'before': '            '
-                       'connector.fetch_image(f"file://{temp_dir}/../{os.path.basename(image_url)}")\n'
-                       '\n'
+             'before': '\n'
                        '\n'
                        '@pytest.mark.asyncio\n'
                        'async def '
@@ -4481,19 +4473,15 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                        'indirect=True)\n'
                        'async def '
                        'test_fetch_image_local_files_with_space_in_name(image_url: '
-                       'str):\n'
-                       '    connector = MediaConnector()\n',
-             'after': '            '
-                      'connector.fetch_image(f"file://{temp_dir}/../{os.path.basename(image_url)}")\n'
-                      '\n'
+                       'str):\n',
+             'after': '\n'
                       '\n'
                       '@pytest.mark.asyncio\n'
                       '@pytest.mark.parametrize("image_url", [TEST_IMAGE_ASSETS[0]], '
                       'indirect=True)\n'
                       'async def '
                       'test_fetch_image_local_files_with_space_in_name(image_url: '
-                      'str):\n'
-                      '    connector = MediaConnector()\n',
+                      'str):\n',
              'review_before': '\n'
                               '\n'
                               '@pytest.mark.asyncio\n'
@@ -4536,8 +4524,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'str):\n'},
             {'name': 'tests/multimodal/media/test_connector.py:landmark-4',
              'path': 'tests/multimodal/media/test_connector.py',
-             'before': '        # Check that the images are equal\n'
-                       '        assert not ImageChops.difference(image_sync, '
+             'before': '        assert not ImageChops.difference(image_sync, '
                        'image_async).getbbox()\n'
                        '\n'
                        '\n'
@@ -4587,15 +4574,12 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                        'base64,aGVsbG8=")\n'
                        '\n'
                        '\n'
-                       '@pytest.mark.asyncio\n'
-                       'async def test_fetch_image_error_conversion():\n',
-             'after': '        # Check that the images are equal\n'
-                      '        assert not ImageChops.difference(image_sync, '
+                       '@pytest.mark.asyncio\n',
+             'after': '        assert not ImageChops.difference(image_sync, '
                       'image_async).getbbox()\n'
                       '\n'
                       '\n'
-                      '@pytest.mark.asyncio\n'
-                      'async def test_fetch_image_error_conversion():\n',
+                      '@pytest.mark.asyncio\n',
              'review_before': '        assert not ImageChops.difference(image_sync, '
                               'image_async).getbbox()\n'
                               '\n'
@@ -9466,8 +9450,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    b64_frames = _make_jpeg_b64_frames(3)\n'},
             {'name': 'tests/multimodal/test_hasher.py:landmark-1',
              'path': 'tests/multimodal/test_hasher.py',
-             'before': '        "blake3", image=image2a\n'
-                       '    )\n'
+             'before': '    )\n'
                        '\n'
                        '\n'
                        'def _rgba_png_bytes() -> bytes:\n'
@@ -9504,16 +9487,13 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                        '\n'
                        'def test_hash_media_io_noop_config_preserves_hash():\n'
                        '    image = Image.new("RGB", (8, 8), (0, 128, 255))\n'
-                       '    buf = BytesIO()\n'
-                       '    image.save(buf, format="PNG")\n',
-             'after': '        "blake3", image=image2a\n'
-                      '    )\n'
+                       '    buf = BytesIO()\n',
+             'after': '    )\n'
                       '\n'
                       '\n'
                       'def test_hash_media_io_noop_config_preserves_hash():\n'
                       '    image = Image.new("RGB", (8, 8), (0, 128, 255))\n'
-                      '    buf = BytesIO()\n'
-                      '    image.save(buf, format="PNG")\n',
+                      '    buf = BytesIO()\n',
              'review_before': '    )\n'
                               '\n'
                               '\n'
@@ -67340,10 +67320,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'after_sha256': '7f460ca14ac85d5817cd8923938269df24fd49c84647d83308392ff6ee3c86c5'}),
   'edits': ({'name': 'tests/entrypoints/multimodal/openai/chat_completion/test_video.py:landmark-1',
              'path': 'tests/entrypoints/multimodal/openai/chat_completion/test_video.py',
-             'before': '        )\n'
-                       '\n'
-                       '\n'
-                       '@pytest.mark.asyncio\n'
+             'before': '@pytest.mark.asyncio\n'
                        '@pytest.mark.parametrize("model_name", [MODEL_NAME])\n'
                        '@pytest.mark.parametrize("video_url", TEST_VIDEO_URLS)\n'
                        'async def test_single_chat_session_video_beamsearch(\n'
@@ -67373,22 +67350,13 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                        '@pytest.mark.parametrize("video_url", TEST_VIDEO_URLS)\n'
                        'async def test_single_chat_session_video_base64encoded(\n'
                        '    client: openai.AsyncOpenAI,\n'
-                       '    model_name: str,\n'
-                       '    video_url: str,\n'
-                       '    url_encoded_video: dict[str, str],\n'
-                       '):\n',
-             'after': '        )\n'
-                      '\n'
-                      '\n'
-                      '@pytest.mark.asyncio\n'
+                       '    model_name: str,\n',
+             'after': '@pytest.mark.asyncio\n'
                       '@pytest.mark.parametrize("model_name", [MODEL_NAME])\n'
                       '@pytest.mark.parametrize("video_url", TEST_VIDEO_URLS)\n'
                       'async def test_single_chat_session_video_base64encoded(\n'
                       '    client: openai.AsyncOpenAI,\n'
-                      '    model_name: str,\n'
-                      '    video_url: str,\n'
-                      '    url_encoded_video: dict[str, str],\n'
-                      '):\n',
+                      '    model_name: str,\n',
              'review_before': '@pytest.mark.asyncio\n'
                               '@pytest.mark.parametrize("model_name", [MODEL_NAME])\n'
                               '@pytest.mark.parametrize("video_url", TEST_VIDEO_URLS)\n'
@@ -67431,9 +67399,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    model_name: str,\n'},
             {'name': 'tests/entrypoints/multimodal/openai/chat_completion/test_video.py:landmark-2',
              'path': 'tests/entrypoints/multimodal/openai/chat_completion/test_video.py',
-             'before': '        messages=messages,\n'
-                       '        max_completion_tokens=10,\n'
-                       '        temperature=0.0,\n'
+             'before': '        temperature=0.0,\n'
                        '    )\n'
                        '    message = chat_completion.choices[0].message\n'
                        '    assert message.content is not None and '
@@ -67468,12 +67434,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                        '\n'
                        '\n'
                        '@pytest.mark.asyncio\n'
-                       '@pytest.mark.parametrize("model_name", [MODEL_NAME])\n'
-                       '@pytest.mark.parametrize("video_url", TEST_VIDEO_URLS)\n'
-                       'async def test_chat_streaming_video(\n',
-             'after': '        messages=messages,\n'
-                      '        max_completion_tokens=10,\n'
-                      '        temperature=0.0,\n'
+                       '@pytest.mark.parametrize("model_name", [MODEL_NAME])\n',
+             'after': '        temperature=0.0,\n'
                       '    )\n'
                       '    message = chat_completion.choices[0].message\n'
                       '    assert message.content is not None and len(message.content) '
@@ -67481,9 +67443,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '\n'
                       '\n'
                       '@pytest.mark.asyncio\n'
-                      '@pytest.mark.parametrize("model_name", [MODEL_NAME])\n'
-                      '@pytest.mark.parametrize("video_url", TEST_VIDEO_URLS)\n'
-                      'async def test_chat_streaming_video(\n',
+                      '@pytest.mark.parametrize("model_name", [MODEL_NAME])\n',
              'review_before': '    )\n'
                               '    message = chat_completion.choices[0].message\n'
                               '    assert message.content is not None and '
@@ -67628,9 +67588,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'context: str = "") -> str:\n'},
             {'name': 'tests/entrypoints/multimodal/openai/chat_completion/test_vision.py:landmark-2',
              'path': 'tests/entrypoints/multimodal/openai/chat_completion/test_vision.py',
-             'before': '        )\n'
-                       '\n'
-                       '\n'
+             'before': '\n'
                        '@pytest.mark.asyncio\n'
                        '@pytest.mark.parametrize("model_name", [MODEL_NAME])\n'
                        '@pytest.mark.parametrize("image_url", TEST_IMAGE_ASSETS, '
@@ -67671,20 +67629,14 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                        '@pytest.mark.parametrize("raw_image_url", TEST_IMAGE_ASSETS)\n'
                        '@pytest.mark.parametrize("image_url", TEST_IMAGE_ASSETS, '
                        'indirect=True)\n'
-                       'async def test_single_chat_session_image_base64encoded(\n'
-                       '    client: openai.AsyncOpenAI,\n'
-                       '    model_name: str,\n',
-             'after': '        )\n'
-                      '\n'
-                      '\n'
+                       'async def test_single_chat_session_image_base64encoded(\n',
+             'after': '\n'
                       '@pytest.mark.asyncio\n'
                       '@pytest.mark.parametrize("model_name", [MODEL_NAME])\n'
                       '@pytest.mark.parametrize("raw_image_url", TEST_IMAGE_ASSETS)\n'
                       '@pytest.mark.parametrize("image_url", TEST_IMAGE_ASSETS, '
                       'indirect=True)\n'
-                      'async def test_single_chat_session_image_base64encoded(\n'
-                      '    client: openai.AsyncOpenAI,\n'
-                      '    model_name: str,\n',
+                      'async def test_single_chat_session_image_base64encoded(\n',
              'review_before': '\n'
                               '@pytest.mark.asyncio\n'
                               '@pytest.mark.parametrize("model_name", [MODEL_NAME])\n'
@@ -67743,10 +67695,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'test_single_chat_session_image_base64encoded(\n'},
             {'name': 'tests/entrypoints/multimodal/openai/chat_completion/test_vision.py:landmark-3',
              'path': 'tests/entrypoints/multimodal/openai/chat_completion/test_vision.py',
-             'before': '        messages,\n'
-                       '        context=f"multi-turn base64 follow-up for '
-                       '{raw_image_url}",\n'
-                       '        max_completion_tokens=10,\n'
+             'before': '        max_completion_tokens=10,\n'
                        '        temperature=0.0,\n'
                        '    )\n'
                        '\n'
@@ -67829,22 +67778,13 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                        '        )\n'
                        '\n'
                        '\n'
-                       '@pytest.mark.asyncio\n'
-                       '@pytest.mark.parametrize("model_name", [MODEL_NAME])\n'
-                       '@pytest.mark.parametrize("image_url", TEST_IMAGE_ASSETS, '
-                       'indirect=True)\n',
-             'after': '        messages,\n'
-                      '        context=f"multi-turn base64 follow-up for '
-                      '{raw_image_url}",\n'
-                      '        max_completion_tokens=10,\n'
+                       '@pytest.mark.asyncio\n',
+             'after': '        max_completion_tokens=10,\n'
                       '        temperature=0.0,\n'
                       '    )\n'
                       '\n'
                       '\n'
-                      '@pytest.mark.asyncio\n'
-                      '@pytest.mark.parametrize("model_name", [MODEL_NAME])\n'
-                      '@pytest.mark.parametrize("image_url", TEST_IMAGE_ASSETS, '
-                      'indirect=True)\n',
+                      '@pytest.mark.asyncio\n',
              'review_before': '        max_completion_tokens=10,\n'
                               '        temperature=0.0,\n'
                               '    )\n'

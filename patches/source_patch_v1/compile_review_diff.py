@@ -18,6 +18,7 @@ from framework import (
     EMPTY_FILE_SHA256,
     PatchRefusedError,
     _parse_review_diff,
+    after_outside_landmark,
     sha256_bytes,
     sha256_text,
 )
@@ -122,7 +123,10 @@ def expand_to_unique_landmark(
             f"the review hunk's block does not start at line {new_start}, "
             "where its header places it"
         )
-    if len(offsets) == 1 and current.count(review_after) == 0:
+    if (
+        len(offsets) == 1
+        and after_outside_landmark(current, review_before, review_after) == 0
+    ):
         return review_before, review_after
 
     line_starts = [0]
@@ -142,7 +146,10 @@ def expand_to_unique_landmark(
         suffix = current[suffix_start:suffix_end]
         expanded_before = prefix + review_before + suffix
         expanded_after = prefix + review_after + suffix
-        if current.count(expanded_before) == 1 and current.count(expanded_after) == 0:
+        if (
+            current.count(expanded_before) == 1
+            and after_outside_landmark(current, expanded_before, expanded_after) == 0
+        ):
             return expanded_before, expanded_after
     raise PatchRefusedError("could not expand an ambiguous hunk to unique landmarks")
 
@@ -220,8 +227,13 @@ def main() -> None:
                         "deleted-file hunk does not describe the whole file"
                     )
                 after_count = 0
+            elif before_count == 1:
+                after_count = after_outside_landmark(
+                    current, landmark_before, landmark_after
+                )
             else:
-                after_count = current.count(landmark_after)
+                # No single landmark for the after block to lie outside of.
+                after_count = None
             if before_count != 1 or after_count != 0:
                 raise PatchRefusedError(
                     f"{stage_arg.name}:{parsed_edit.path}:landmark-{index}: "
