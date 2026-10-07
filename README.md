@@ -341,6 +341,7 @@ It is intentionally reconstructed by the ordered, reviewed semantic transformati
 | patches/vllm-call-only-answer-keeps-the-blank-line.patch | ad1e558f8ba02c6889d9b4a79c6ec355e9bfa763bc007e5cae7e609be96ec084 |
 | patches/vllm-responses-tools-are-one-function-list.patch | 4d742197b35f95efedb42452b3d30623dbba0655e8b4b00bd8174e972d6c7cd8 |
 | patches/vllm-batch-parse-starts-where-the-prompt-leaves.patch | 676d962e781b977933f2f0bd941b3f5413a82a96852fe588ed1a971882a933fe |
+| patches/vllm-derender-text-is-the-detokenizers.patch | 1f733012c4c208a1f0a252518540bcddf5924152957cc96dce7783042f0df3c7 |
 
 The reconstructed tree's runtime-source and test changes, new files and
 deletions are counted by ./scripts/build-vllm.sh check, which derives and prints
@@ -392,7 +393,7 @@ Pinned build inputs and products:
 | Immutable base tag | qwen38-vllm:main-9df9b0b |
 | Immutable base ID | sha256:fa4a002a88b7043a1a89966dea8a500fe9696f84e75730d9da916f916048d401 |
 | Runtime Dockerfile SHA-256 | 393497d3d72151b6caa7a0b405dd4d983cd8a08e0d26bc43cb08d9f60d31fa41 |
-| Build verifier SHA-256 | 88148c6648adb9bf632cab21c0ce37e640026207fcc6fa07a9b389768348af85 |
+| Build verifier SHA-256 | 127e616e8e02826a6133d9ca6301df5d7a00da0181c59d2ba093a887003bd2ca |
 | Runtime validator SHA-256 | 357fdaed8d5a8ad0d901eaf07e5357722b74400c99d96b6f30572a557426b4fc |
 
 The runtime image's profile, tag and archive name, which every release advances
@@ -1167,8 +1168,10 @@ The parser deletes nothing the model generated. A special token its format does
 not act on -- the vision and audio markers among them, which the served template
 itself spells -- is the text it decodes to, in reasoning, in the answer and inside
 a call's arguments, and a second `</think>` after reasoning has ended is content,
-as a literal `<think>` there already was; a stop token contributes nothing only
-because the detokenizer gives it no text. Upstream's parser engine deletes every
+as a literal `<think>` there already was. The stop token a generation ended on
+carries no text unless the caller asked to see stop text, on every route: the
+detokenizer and the derender route decide it in one place, and the parser still
+receives the token. Upstream's parser engine deletes every
 such token by default. Here that deletion erased the model's output from the
 record and, beside the content ids the batch tool pass splits on, left an id
 whose text was gone, which the token-position scanner refuses: a whole response

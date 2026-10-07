@@ -3673,6 +3673,38 @@ def _validate_batch_parse_from_prompt_after(state: State) -> None:
     ):
         require_python_symbols(state, path, tests, label=label)
 
+def _validate_derender_stop_text_before(state: State) -> None:
+    label = "Derender stop-token text precondition"
+    forbid_text(state, "vllm/v1/engine/detokenizer.py", "def split_stop_token(", label=label)
+    require_text(state, "vllm/renderers/online_derenderer.py",
+                 "choice.token_ids, skip_special_tokens=False", label=label)
+
+
+def _validate_derender_stop_text_after(state: State) -> None:
+    label = "Derender stop-token text"
+    detokenizer = "vllm/v1/engine/detokenizer.py"
+    derender = "vllm/renderers/online_derenderer.py"
+    # One decision of which generated ids carry text, for every route.
+    require_python_symbols(state, detokenizer, {
+        "split_stop_token": ("token_ids", "stop_terminated", "include_stop_str_in_output"),
+        "ended_on_stop_token": ("finish_reason", "stop_reason"),
+    }, label=label)
+    _require_in_symbol(state, detokenizer, "BaseIncrementalDetokenizer.update", (
+        "split_stop_token(",
+    ), label=label)
+    _require_in_symbol(state, derender, "_text_token_ids", (
+        "split_stop_token(",
+        "stop_terminated=ended_on_stop_token(finish_reason, stop_reason)",
+    ), label=label)
+    # Chat with and without a parser, completion, and both streams.
+    require_text(state, derender, "_text_token_ids(", count=5, label=label)
+    forbid_text(state, derender, "choice.token_ids, skip_special_tokens=False", label=label)
+    require_python_symbols(
+        state, "tests/entrypoints/scale_out/derender/test_terminal_metadata.py", {
+            "test_derender_keeps_empty_output_and_observed_terminal": None,
+            "test_derender_only_commits_closed_calls_at_eos": None,
+        }, label=label)
+
 def validate_final(state: State) -> None:
     """Reassert every durable semantic invariant on the complete tree.
 
@@ -4703,5 +4735,27 @@ CONTRACTS: Mapping[str, SemanticContract] = {
         ),
         validate_before=_validate_batch_parse_from_prompt_before,
         validate_after=_validate_batch_parse_from_prompt_after,
+    ),
+    "derender-text-is-the-detokenizers": SemanticContract(
+        rationale=(
+            "The serving detokenizer gives the stop token a generation ended on "
+            "no text unless the caller asked to see stop text; derender decoded "
+            "every id itself, so the model's <|im_end|> (and a caller's stop "
+            "token id) reached content on the derender route, in batch and in "
+            "the stream, chat and completion alike. The parser engine's "
+            "special-token deletion had hidden the end-of-turn text there until "
+            "generated-tokens-survive-parsing removed it. One function now "
+            "decides which generated ids carry text, and both the detokenizer "
+            "and every derender path call it; the parser still receives every "
+            "id. Derender's batch decode is its stream's incremental decode, so "
+            "a length cut inside a character holds the partial bytes back, as "
+            "serving does, instead of failing the scanner with a 500."
+        ),
+        removal_condition=(
+            "Remove when pinned upstream's derender gives a generation's stop "
+            "token no text unless stop text is requested, as its detokenizer does."
+        ),
+        validate_before=_validate_derender_stop_text_before,
+        validate_after=_validate_derender_stop_text_after,
     ),
 }

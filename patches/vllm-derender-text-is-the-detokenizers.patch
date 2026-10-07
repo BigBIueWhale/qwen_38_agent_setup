@@ -1,0 +1,438 @@
+diff --git a/tests/entrypoints/scale_out/derender/test_derender.py b/tests/entrypoints/scale_out/derender/test_derender.py
+index c0e5210dc0bedb6297851b28cd2b31bc0f477b0d..db8f02de2aa18b4517570909afd0ba2d432be289 100644
+--- a/tests/entrypoints/scale_out/derender/test_derender.py
++++ b/tests/entrypoints/scale_out/derender/test_derender.py
+@@ -787,14 +787,17 @@ async def _e2e_render_chat(
+ 
+ def _e2e_generate_response(
+     token_ids: list[int],
++    end_of_turn: int,
+     request_id: str = "chatcmpl-e2e-test",
+ ) -> dict:
++    """A natural stop as the generate route returns it: the generated ids end
++    with the model's end of turn, which carries no text."""
+     return {
+         "request_id": request_id,
+         "choices": [
+             {
+                 "index": 0,
+-                "token_ids": token_ids,
++                "token_ids": [*token_ids, end_of_turn],
+                 "finish_reason": "stop",
+             }
+         ],
+@@ -815,7 +818,9 @@ async def test_e2e_plain_roundtrip(parser_client, parser_tokenizer):
+         "/v1/chat/completions/derender",
+         json={
+             "model": PARSER_MODEL,
+-            "generate_response": _e2e_generate_response(output_ids),
++            "generate_response": _e2e_generate_response(
++                output_ids, parser_tokenizer.eos_token_id
++            ),
+             "prompt_tokens": len(gen_req["token_ids"]),
+         },
+     )
+@@ -837,7 +842,9 @@ async def test_e2e_token_identity(parser_client, parser_tokenizer):
+         "/v1/chat/completions/derender",
+         json={
+             "model": PARSER_MODEL,
+-            "generate_response": _e2e_generate_response(output_ids),
++            "generate_response": _e2e_generate_response(
++                output_ids, parser_tokenizer.eos_token_id
++            ),
+             "prompt_tokens": len(gen_req["token_ids"]),
+         },
+     )
+@@ -860,7 +867,9 @@ async def test_e2e_non_ascii_roundtrip(parser_client, parser_tokenizer):
+         "/v1/chat/completions/derender",
+         json={
+             "model": PARSER_MODEL,
+-            "generate_response": _e2e_generate_response(output_ids),
++            "generate_response": _e2e_generate_response(
++                output_ids, parser_tokenizer.eos_token_id
++            ),
+             "prompt_tokens": len(gen_req["token_ids"]),
+         },
+     )
+@@ -884,7 +893,9 @@ async def test_e2e_parsed_reasoning(parser_client, parser_tokenizer):
+         "/v1/chat/completions/derender",
+         json={
+             "model": PARSER_MODEL,
+-            "generate_response": _e2e_generate_response(output_ids),
++            "generate_response": _e2e_generate_response(
++                output_ids, parser_tokenizer.eos_token_id
++            ),
+             "prompt_tokens": len(gen_req["token_ids"]),
+             "chat_request": {
+                 "model": PARSER_MODEL,
+@@ -924,7 +935,9 @@ async def test_e2e_parsed_tool_call(parser_client, parser_tokenizer):
+         "/v1/chat/completions/derender",
+         json={
+             "model": PARSER_MODEL,
+-            "generate_response": _e2e_generate_response(output_ids),
++            "generate_response": _e2e_generate_response(
++                output_ids, parser_tokenizer.eos_token_id
++            ),
+             "prompt_tokens": len(gen_req["token_ids"]),
+             "chat_request": {
+                 "model": PARSER_MODEL,
+@@ -960,7 +973,9 @@ async def test_e2e_parsed_reasoning_and_tool_call(parser_client, parser_tokenize
+         "/v1/chat/completions/derender",
+         json={
+             "model": PARSER_MODEL,
+-            "generate_response": _e2e_generate_response(output_ids),
++            "generate_response": _e2e_generate_response(
++                output_ids, parser_tokenizer.eos_token_id
++            ),
+             "prompt_tokens": len(gen_req["token_ids"]),
+             "chat_request": {
+                 "model": PARSER_MODEL,
+@@ -991,7 +1006,9 @@ async def test_e2e_no_chat_request_fallback(parser_client, parser_tokenizer):
+         "/v1/chat/completions/derender",
+         json={
+             "model": PARSER_MODEL,
+-            "generate_response": _e2e_generate_response(output_ids),
++            "generate_response": _e2e_generate_response(
++                output_ids, parser_tokenizer.eos_token_id
++            ),
+             "prompt_tokens": len(gen_req["token_ids"]),
+         },
+     )
+@@ -1089,7 +1106,9 @@ async def test_e2e_harmony_plain_roundtrip(harmony_client, harmony_tokenizer):
+         "/v1/chat/completions/derender",
+         json={
+             "model": HARMONY_MODEL,
+-            "generate_response": _e2e_generate_response(output_ids),
++            "generate_response": _e2e_generate_response(
++                output_ids, harmony_tokenizer.eos_token_id
++            ),
+             "prompt_tokens": len(gen_req["token_ids"]),
+             "chat_request": {
+                 "model": HARMONY_MODEL,
+@@ -1126,7 +1145,9 @@ async def test_e2e_harmony_reasoning(harmony_client, harmony_tokenizer):
+         "/v1/chat/completions/derender",
+         json={
+             "model": HARMONY_MODEL,
+-            "generate_response": _e2e_generate_response(output_ids),
++            "generate_response": _e2e_generate_response(
++                output_ids, harmony_tokenizer.eos_token_id
++            ),
+             "prompt_tokens": len(gen_req["token_ids"]),
+             "chat_request": {
+                 "model": HARMONY_MODEL,
+diff --git a/tests/entrypoints/scale_out/derender/test_derender_parity.py b/tests/entrypoints/scale_out/derender/test_derender_parity.py
+index 8e51ff5d42b358abbfaf943e80dd0986fb7aa78c..7f7406cc0acc66a70ece8aa7da03e1140548995c 100644
+--- a/tests/entrypoints/scale_out/derender/test_derender_parity.py
++++ b/tests/entrypoints/scale_out/derender/test_derender_parity.py
+@@ -92,6 +92,7 @@ async def _disagg(
+     output_ids: list[int],
+     prompt_tokens: int,
+     finish_reason: str,
++    stop_reason: int | str | None,
+     chat_request: dict,
+     logprobs: dict | None = None,
+ ) -> dict:
+@@ -106,6 +107,7 @@ async def _disagg(
+                         "index": 0,
+                         "token_ids": output_ids,
+                         "finish_reason": finish_reason,
++                        "stop_reason": stop_reason,
+                         "logprobs": logprobs,
+                     }
+                 ],
+@@ -151,6 +153,7 @@ async def _run_parity_case(
+         ch["token_ids"],
+         coupled["usage"]["prompt_tokens"],
+         ch["finish_reason"],
++        ch.get("stop_reason"),
+         chat_request,
+     )
+     return coupled, disagg
+@@ -247,6 +250,7 @@ async def test_parity_logprobs(client):
+         ch["token_ids"],
+         placeholder["usage"]["prompt_tokens"],
+         ch["finish_reason"],
++        ch.get("stop_reason"),
+         chat_request,
+         logprobs=ch["logprobs"],
+     )
+diff --git a/tests/entrypoints/scale_out/derender/test_derender_stream.py b/tests/entrypoints/scale_out/derender/test_derender_stream.py
+index 014a8d7bc6b616f8716973d3397e7835a0da9a42..bd630343f6118f7a586029288202985c4ec03c66 100644
+--- a/tests/entrypoints/scale_out/derender/test_derender_stream.py
++++ b/tests/entrypoints/scale_out/derender/test_derender_stream.py
+@@ -245,9 +245,12 @@ class TestDerenderCompletionStream:
+             generate_chunk=_make_stream_chunk(token_ids[:mid]),
+             state=state,
+         )
++        # A natural stop ends with the end of turn, which carries no text.
+         chunk2, _ = await derenderer.derender_completion_stream(
+             model=MODEL_NAME,
+-            generate_chunk=_make_stream_chunk(token_ids[mid:], finish_reason="stop"),
++            generate_chunk=_make_stream_chunk(
++                token_ids[mid:] + [tokenizer.eos_token_id], finish_reason="stop"
++            ),
+             state=state,
+         )
+ 
+diff --git a/tests/entrypoints/scale_out/derender/test_terminal_metadata.py b/tests/entrypoints/scale_out/derender/test_terminal_metadata.py
+index fcb0f378714335ece573ba62bab5cd3cc70ac88a..d0fbb8812c65cac3911f2aad13b0e3c7437516e0 100644
+--- a/tests/entrypoints/scale_out/derender/test_terminal_metadata.py
++++ b/tests/entrypoints/scale_out/derender/test_terminal_metadata.py
+@@ -20,6 +20,16 @@ from vllm.renderers.online_derenderer import OnlineDerenderer
+     ('length', None), ('length', 'final_response_token_budget'), ('abort', None),
+ ])
+ async def test_derender_keeps_empty_output_and_observed_terminal(surface, stream, tokens, finish, stop):
++    """Every generated token's text survives, and the stop token does not.
++
++    The generate route returns a natural stop's ids ending with the stop token
++    the engine ended on -- the model's end of turn, or the caller's stop token
++    id it reports as stop_reason -- and, as on the chat route, that token shows
++    no text; a stop string or any other terminal ends with ordinary text.
++    """
++    ids = list(tokens)
++    if finish == 'stop' and not isinstance(stop, str):
++        ids.append(1 if stop is None else stop)
+     renderer = object.__new__(OnlineDerenderer)
+     renderer.parser = None
+     renderer.renderer = SimpleNamespace(get_tokenizer=lambda: SimpleNamespace(
+@@ -29,7 +39,7 @@ async def test_derender_keeps_empty_output_and_observed_terminal(surface, stream
+     renderer._detokenize_delta = lambda tokenizer, ids, state, **kwargs: (
+         ''.join(map(chr, ids)), state)
+     payload = dict(request_id='request', choices=[dict(
+-        index=0, token_ids=tokens, finish_reason=finish, stop_reason=stop)])
++        index=0, token_ids=ids, finish_reason=finish, stop_reason=stop)])
+     if stream:
+         incoming = GenerateStreamResponse.model_validate_json(
+             GenerateStreamResponse.model_validate(payload).model_dump_json())
+@@ -60,7 +70,8 @@ def test_derender_only_commits_closed_calls_at_eos(finish, stop, closed):
+     from vllm.entrypoints.openai.chat_completion.protocol import ChatCompletionRequest
+     from vllm.parser import ParserManager
+ 
+-    markers = {'</think>': 20000, '<tool_call>': 20001, '</tool_call>': 20002}
++    markers = {'</think>': 20000, '<tool_call>': 20001, '</tool_call>': 20002,
++               '<|im_end|>': 20003}
+     token_text = {value: key for key, value in markers.items()}
+     tokenizer = MagicMock()
+     tokenizer.get_vocab.return_value = markers
+@@ -75,12 +86,18 @@ def test_derender_only_commits_closed_calls_at_eos(finish, stop, closed):
+     ids = [20000, 20001] + list(map(ord, body[len('<tool_call>'):]))
+     if closed:
+         ids = ids[:-len('</tool_call>')] + [20002]
++    if finish == 'stop' and stop is None:
++        # A natural stop ends with the model's end of turn, which has no text.
++        ids.append(20003)
+     renderer = object.__new__(OnlineDerenderer)
+     renderer.parser = ParserManager.get_parser(
+         tool_parser_name='qwen3_coder', reasoning_parser_name='qwen3',
+         enable_auto_tools=True,
+     )
+     renderer.renderer = SimpleNamespace(get_tokenizer=lambda: tokenizer)
++    # As above: the token-transport boundary, not the incremental decoder.
++    renderer._detokenize_delta = lambda tokenizer, ids, state, **kwargs: (
++        tokenizer.decode(ids), state)
+     renderer.enable_auto_tools = True
+     renderer.use_harmony = True
+     incoming = GenerateResponse.model_validate(dict(request_id='request', choices=[dict(
+diff --git a/vllm/renderers/online_derenderer.py b/vllm/renderers/online_derenderer.py
+index 4ff47caa852820b95c5776a90b1a8ca3c66092b6..f41aba415433824819fe8276f02f35e8239d1daa 100644
+--- a/vllm/renderers/online_derenderer.py
++++ b/vllm/renderers/online_derenderer.py
+@@ -35,6 +35,7 @@ from vllm.tokenizers import TokenizerLike
+ from vllm.tokenizers.detokenizer_utils import detokenize_incrementally
+ from vllm.utils import random_uuid
+ from vllm.utils.async_utils import make_async
++from vllm.v1.engine.detokenizer import ended_on_stop_token, split_stop_token
+ 
+ logger = init_logger(__name__)
+ 
+@@ -115,12 +116,20 @@ class OnlineDerenderer:
+                 else None
+             )
+ 
++            text_ids = _text_token_ids(
++                choice.token_ids,
++                choice.finish_reason,
++                choice.stop_reason,
++                chat_request is not None and chat_request.include_stop_str_in_output,
++            )
+             if self.parser is not None and chat_request is not None:
+                 # Parser path: decode with special tokens preserved
+                 # so the parser can see markers like </think>,
+-                # <tool_call>, or Harmony channel tokens.
+-                decoded_text = tokenizer.decode(
+-                    choice.token_ids, skip_special_tokens=False
++                # <tool_call>, or Harmony channel tokens. The parser gets
++                # the text the serving detokenizer gives these ids and every
++                # id, as on the chat route.
++                decoded_text = self._decode(
++                    tokenizer, text_ids, skip_special_tokens=False
+                 )
+ 
+                 chat_template_kwargs: dict[str, Any] = {}
+@@ -188,8 +197,8 @@ class OnlineDerenderer:
+                     if chat_request is not None
+                     else True
+                 )
+-                decoded_text = tokenizer.decode(
+-                    choice.token_ids, skip_special_tokens=skip_special
++                decoded_text = self._decode(
++                    tokenizer, text_ids, skip_special_tokens=skip_special
+                 )
+                 message = ChatMessage(role="assistant", content=decoded_text)
+ 
+@@ -211,6 +220,27 @@ class OnlineDerenderer:
+ 
+         return choices
+ 
++    def _decode(
++        self,
++        tokenizer: TokenizerLike,
++        token_ids: list[int],
++        *,
++        skip_special_tokens: bool,
++    ) -> str:
++        """Decode a complete choice as the serving detokenizer would.
++
++        Decoding runs incrementally, as on the chat route: an incomplete
++        trailing character shows no text rather than a replacement character
++        the parser's own decoding of the same ids does not have.
++        """
++        text, _ = self._detokenize_delta(
++            tokenizer,
++            token_ids,
++            DerenderStreamState(),
++            skip_special_tokens=skip_special_tokens,
++        )
++        return text
++
+     def _detokenize_delta(
+         self,
+         tokenizer: TokenizerLike,
+@@ -339,7 +369,12 @@ class OnlineDerenderer:
+         updated_state = state
+ 
+         for choice in generate_chunk.choices:
+-            delta_tids = choice.token_ids or []
++            delta_tids = _text_token_ids(
++                choice.token_ids or [],
++                choice.finish_reason,
++                choice.stop_reason,
++                chat_request is not None and chat_request.include_stop_str_in_output,
++            )
+             new_text, updated_state = self._detokenize_delta(
+                 tokenizer, delta_tids, updated_state, skip_special_tokens=skip_special
+             )
+@@ -414,8 +449,16 @@ class OnlineDerenderer:
+ 
+         for gen, pt in zip(generate_responses, prompt_tokens_list):
+             for choice in gen.choices:
+-                decoded_text = tokenizer.decode(
+-                    choice.token_ids, skip_special_tokens=skip_special
++                decoded_text = self._decode(
++                    tokenizer,
++                    _text_token_ids(
++                        choice.token_ids,
++                        choice.finish_reason,
++                        choice.stop_reason,
++                        completion_request is not None
++                        and completion_request.include_stop_str_in_output,
++                    ),
++                    skip_special_tokens=skip_special,
+                 )
+                 completion_logprobs = None
+                 if choice.logprobs is not None:
+@@ -489,7 +532,13 @@ class OnlineDerenderer:
+         updated_state = state
+ 
+         for choice in generate_chunk.choices:
+-            delta_tids = choice.token_ids or []
++            delta_tids = _text_token_ids(
++                choice.token_ids or [],
++                choice.finish_reason,
++                choice.stop_reason,
++                completion_request is not None
++                and completion_request.include_stop_str_in_output,
++            )
+             new_text, updated_state = self._detokenize_delta(
+                 tokenizer, delta_tids, updated_state, skip_special_tokens=skip_special
+             )
+@@ -522,6 +571,21 @@ class OnlineDerenderer:
+         return chunk, updated_state
+ 
+ 
++def _text_token_ids(
++    token_ids: list[int],
++    finish_reason: str | None,
++    stop_reason: int | str | None,
++    include_stop_str_in_output: bool,
++) -> list[int]:
++    """The ids of a generated choice that carry text, as on the chat route."""
++    text_ids, _ = split_stop_token(
++        list(token_ids),
++        stop_terminated=ended_on_stop_token(finish_reason, stop_reason),
++        include_stop_str_in_output=include_stop_str_in_output,
++    )
++    return text_ids
++
++
+ def _parse_token_id_placeholder(token: str) -> int | None:
+     """Extract token ID from a 'token_id:N' placeholder string."""
+     if not token.startswith("token_id:"):
+diff --git a/vllm/v1/engine/detokenizer.py b/vllm/v1/engine/detokenizer.py
+index 05760769575c1b51e6baa91365bdc984f3c0d273..e678eec75f9bf2dfb7773fbd44f4968ceb6e0570 100644
+--- a/vllm/v1/engine/detokenizer.py
++++ b/vllm/v1/engine/detokenizer.py
+@@ -23,6 +23,34 @@ from vllm.v1.engine import EngineCoreRequest
+ # (ids parameter) used for FastIncrementalDetokenizer.
+ USE_FAST_DETOKENIZER = version.parse(tokenizers.__version__) >= version.parse("0.22.0")
+ 
++
++def split_stop_token(
++    token_ids: list[int], *, stop_terminated: bool, include_stop_str_in_output: bool
++) -> tuple[list[int], int | None]:
++    """Separate the stop token a generation ended on from the ids that carry text.
++
++    A generation the engine ends on a stop token -- the model's end of turn or
++    a caller's stop token id -- shows no text for that token unless the caller
++    asked to see stop text (``include_stop_str_in_output``); the token itself
++    stays in the generation's ids. This is the one place that decides it: the
++    serving detokenizer and the derender routes both split here, so every
++    route hands a parser and a caller the same text for the same ids.
++    """
++    if stop_terminated and not include_stop_str_in_output and token_ids:
++        return token_ids[:-1], token_ids[-1]
++    return token_ids, None
++
++
++def ended_on_stop_token(finish_reason: str | None, stop_reason: int | str | None) -> bool:
++    """Whether a finished choice's last id is the stop token the engine ended on.
++
++    The engine ends a generation on the model's end of turn (stop_reason None)
++    or on a caller's stop token id (stop_reason that id). A stop string is
++    matched in the text after the engine and reports that string instead.
++    """
++    return finish_reason == "stop" and not isinstance(stop_reason, str)
++
++
+ class IncrementalDetokenizer:
+     def __init__(self):
+         self.token_ids: list[int] = []
+@@ -114,13 +142,11 @@ class BaseIncrementalDetokenizer(IncrementalDetokenizer, ABC):
+             # Skip detokenization if no new token ids.
+             return None
+ 
+-        if stop_terminated and not self.include_stop_str_in_output:
+-            # If stop-terminated, exclude last token from detokenization
+-            # based on include_stop_str_in_output parameter.
+-            skipped_stop_token_id = new_token_ids[-1]
+-            new_token_ids = new_token_ids[:-1]
+-        else:
+-            skipped_stop_token_id = None
++        new_token_ids, skipped_stop_token_id = split_stop_token(
++            new_token_ids,
++            stop_terminated=stop_terminated,
++            include_stop_str_in_output=self.include_stop_str_in_output,
++        )
+ 
+         stop_string = None
+         for new_token_id in new_token_ids:

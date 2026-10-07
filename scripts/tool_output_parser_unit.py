@@ -12,6 +12,7 @@ a second tokenizer or a second composition to fall back to: run any other way,
 the unit fails at import, naming what it lacks.
 """
 
+import asyncio
 import json
 import os
 import unittest
@@ -23,6 +24,10 @@ from vllm.entrypoints.openai.chat_completion.protocol import ChatCompletionReque
 from vllm.parser import ParserManager
 from vllm.tokenizers import get_tokenizer
 from vllm.tokenizers.detokenizer_utils import NativeDecodeStream
+
+
+def asyncio_run(awaitable):
+    return asyncio.run(awaitable)
 
 
 def _served(name):
@@ -583,6 +588,111 @@ class ToolOutputParserTest(unittest.TestCase):
             self.assertIsNone(request.stop_reason)
             self.assertEqual(params.stop_token_ids, [7])
 
+
+    def test_derender_reads_a_generation_as_the_chat_route_does(self):
+        """Derender hands the parser the text the serving detokenizer gives.
+
+        The stop token a generation ends on -- a model EOS or a caller's stop
+        token id -- has no text unless the caller asked to see stop text, and a
+        length cut inside a character shows nothing of it; derender decides
+        both where the detokenizer does, so the same ids parse to the same
+        message on the chat route and on derender, batch and stream.
+        """
+        import types
+
+        from vllm.entrypoints.openai.completion.protocol import CompletionRequest
+        from vllm.entrypoints.scale_out.token_in_token_out.protocol import (
+            GenerateResponse,
+            GenerateStreamResponse,
+        )
+        from vllm.renderers.online_derenderer import OnlineDerenderer
+        from vllm.sampling_params import SamplingParams
+        from vllm.v1.engine import EngineCoreRequest
+        from vllm.v1.engine.detokenizer import IncrementalDetokenizer
+
+        derenderer = OnlineDerenderer(
+            types.SimpleNamespace(
+                hf_config=types.SimpleNamespace(model_type="qwen3_5"), model="unit"
+            ),
+            types.SimpleNamespace(get_tokenizer=lambda: TOKENIZER, _executor=None),
+            request_logger=None, chat_template=None,
+            chat_template_content_format="openai", enable_auto_tools=True,
+            tool_parser=_served("SERVED_TOOL_CALL_PARSER"),
+            reasoning_parser=_served("SERVED_REASONING_PARSER"),
+            default_chat_template_kwargs=CHAT_TEMPLATE_KWARGS,
+        )
+        crab = encode("plan</think>\n\nCrab: \U0001F980")
+        stop_id = encode(" Done")[0]
+        cases = [
+            ("answer", encode("plan</think>\n\nThe answer is 4.") + [MODEL_EOS[0]],
+             "stop", None, False),
+            ("call", encode("plan</think>\n\n" + call("one")) + [MODEL_EOS[1]],
+             "stop", None, False),
+            ("caller stop id", encode("plan</think>\n\nAll") + [stop_id],
+             "stop", stop_id, False),
+            ("stop text asked for", encode("plan</think>\n\nYes") + [MODEL_EOS[0]],
+             "stop", None, True),
+            ("cut inside a character", crab[:-1], "length", None, False),
+        ]
+        for name, ids, finish, stop, include_stop in cases:
+            with self.subTest(case=name):
+                params = SamplingParams(
+                    skip_special_tokens=False,
+                    include_stop_str_in_output=include_stop,
+                    extra_args={"kv_scope": "unit"},
+                )
+                detokenizer = IncrementalDetokenizer.from_new_request(
+                    TOKENIZER,
+                    EngineCoreRequest(
+                        request_id="unit", prompt_token_ids=encode("prompt"),
+                        mm_features=None, sampling_params=params,
+                        pooling_params=None, arrival_time=0.0, lora_request=None,
+                        cache_salt=None, data_parallel_rank=None,
+                    ),
+                )
+                # The engine reports a stop on a stop token as STOP.
+                detokenizer.update(list(ids), finish == "stop")
+                served = detokenizer.get_next_output_text(finished=True, delta=False)
+                request = request_for().model_copy(
+                    update={"include_stop_str_in_output": include_stop})
+                parser = PARSER(
+                    TOKENIZER, request.tools, chat_template_kwargs=CHAT_TEMPLATE_KWARGS
+                )
+                chat = parser.parse_output(
+                    served, request, prompt_token_ids=OPEN_PROMPT,
+                    enable_auto_tools=True, model_output_token_ids=list(ids),
+                    finish_reason=finish, stop_reason=stop,
+                )
+                response = GenerateResponse(request_id="unit", choices=[{
+                    "index": 0, "finish_reason": finish, "stop_reason": stop,
+                    "token_ids": list(ids),
+                }])
+                message = derenderer._derender_chat(response, request)[0].message
+                self.assertEqual(
+                    (message.reasoning, message.content,
+                     [(c.function.name, c.function.arguments)
+                      for c in message.tool_calls]),
+                    (chat[0], chat[1], [(c.name, c.arguments) for c in chat[2] or []]),
+                )
+                completion = CompletionRequest(
+                    model="unit", prompt="prompt", skip_special_tokens=False,
+                    include_stop_str_in_output=include_stop,
+                )
+                (choice,), _, _ = derenderer._derender_completion(
+                    [response], None, completion)
+                self.assertEqual(choice.text, served)
+                streamed, state = "", None
+                for start in range(0, len(ids), 3):
+                    last = start + 3 >= len(ids)
+                    chunk = GenerateStreamResponse(request_id="unit", choices=[{
+                        "index": 0, "token_ids": list(ids[start:start + 3]),
+                        "finish_reason": finish if last else None,
+                        "stop_reason": stop if last else None,
+                    }])
+                    delta, state = asyncio_run(derenderer.derender_completion_stream(
+                        "unit", chunk, state, completion_request=completion))
+                    streamed += delta.choices[0].text
+                self.assertEqual(streamed, served)
 
     def test_every_generated_token_survives_parsing(self):
         """The parser deletes nothing the model generated.
