@@ -80,7 +80,7 @@ diff --git a/tests/entrypoints/openai/responses/test_responses_utils.py b/tests/
          mock_logger.warning.assert_called_once()
          assert (
              "summary text as reasoning content" in mock_logger.warning.call_args[0][0]
-@@ -900,3 +909,181 @@
+@@ -900,3 +909,191 @@
          assert len(msgs) == 2
          assert msgs[0] == {"role": "system", "content": "be helpful"}
          assert msgs[1] == {"role": "user", "content": "hello"}
@@ -169,6 +169,16 @@ diff --git a/tests/entrypoints/openai/responses/test_responses_utils.py b/tests/
 +        else:
 +            request = ResponsesRequest(input=items, stream=stream, kv_scope="agent")
 +            construct_input_messages(request_input=request.input)
++
++
++def test_a_call_outside_an_assistant_message_is_named_by_the_call():
++    messages = [{"role": "user", "content": "x", "tool_calls": [
++        {"id": "a", "type": "function", "function": {"name": "f", "arguments": "{}"}}]}]
++    with pytest.raises(VLLMValidationError) as refused:
++        ChatCompletionRequest(messages=messages)
++    assert refused.value.parameter == "messages"
++    assert "Tool call messages[0].tool_calls[0] is in a message with role 'user'; " \
++        "only an assistant message declares tool calls" in str(refused.value)
 +
 +
 +def test_a_responses_history_refusal_names_the_input_item_sent():

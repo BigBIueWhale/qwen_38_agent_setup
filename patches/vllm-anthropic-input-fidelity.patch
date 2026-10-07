@@ -1,13 +1,14 @@
 diff --git a/tests/entrypoints/anthropic/test_anthropic_messages_conversion.py b/tests/entrypoints/anthropic/test_anthropic_messages_conversion.py
 --- a/tests/entrypoints/anthropic/test_anthropic_messages_conversion.py
 +++ b/tests/entrypoints/anthropic/test_anthropic_messages_conversion.py
-@@ -22,12 +22,13 @@
+@@ -22,12 +22,14 @@
  from fastapi.exceptions import RequestValidationError
  from fastapi.testclient import TestClient
  
 -from vllm.entrypoints.anthropic.api_router import attach_router
 +from vllm.entrypoints.anthropic.api_router import attach_router, translate_error_response
  from vllm.entrypoints.anthropic.protocol import (
++    AnthropicCountTokensRequest,
      AnthropicMessagesRequest,
  )
  from vllm.entrypoints.anthropic.serving import (
@@ -16,7 +17,7 @@ diff --git a/tests/entrypoints/anthropic/test_anthropic_messages_conversion.py b
      _build_anthropic_usage,
  )
  from vllm.entrypoints.openai.chat_completion.protocol import (
-@@ -38,6 +39,8 @@
+@@ -38,6 +40,8 @@
      ChatMessage,
  )
  from vllm.entrypoints.openai.engine.protocol import (
@@ -25,7 +26,7 @@ diff --git a/tests/entrypoints/anthropic/test_anthropic_messages_conversion.py b
      DeltaFunctionCall,
      DeltaMessage,
      DeltaToolCall,
-@@ -48,6 +51,8 @@
+@@ -48,6 +52,8 @@
      validation_exception_handler,
  )
  
@@ -34,7 +35,7 @@ diff --git a/tests/entrypoints/anthropic/test_anthropic_messages_conversion.py b
  _convert = AnthropicServingMessages._convert_anthropic_to_openai_request
  _img_url = AnthropicServingMessages._convert_image_source_to_url
  
-@@ -94,25 +99,28 @@
+@@ -94,25 +100,28 @@
          }
          assert _img_url(source) == "https://example.com/image.jpg"
  
@@ -72,7 +73,138 @@ diff --git a/tests/entrypoints/anthropic/test_anthropic_messages_conversion.py b
  
  
  # ======================================================================
-@@ -1442,3 +1450,274 @@
+@@ -346,4 +355,130 @@
+         assert len(user_follow_ups) == 0
+ 
+ 
++def _use(call_id, name="read_file"):
++    block = {"type": "tool_use", "name": name, "input": {}}
++    return block if call_id is None else {**block, "id": call_id}
++
++
++def _result(call_id):
++    block = {"type": "tool_result", "content": "done"}
++    return block if call_id is None else {**block, "tool_use_id": call_id}
++
++
++def _text(text):
++    return {"type": "text", "text": text}
++
++
++class TestToolHistoryRefusal:
++    """The tool history is validated after conversion to chat messages, whose
++    positions and id field the caller never sent: one Anthropic message becomes
++    several chat messages and the system prompt shifts them. A refusal names
++    the message or content block the caller sent, and tool_use_id."""
++
++    @pytest.mark.parametrize("request_type", ["messages", "count_tokens"])
++    @pytest.mark.parametrize(
++        ("messages", "refusal"),
++        [
++            (
++                [{"role": "user", "content": "hi"},
++                 {"role": "user", "content": [_result("a")]}],
++                "Tool result at messages[1].content[0] is orphaned",
++            ),
++            (
++                [{"role": "user", "content": "hi"},
++                 {"role": "assistant", "content": [_use("a")]},
++                 {"role": "user", "content": [_result(None)]}],
++                "Tool result at messages[2].content[0] is missing tool_use_id; "
++                "expected 'a'",
++            ),
++            (
++                [{"role": "user", "content": "hi"},
++                 {"role": "assistant", "content": [_text("x"), _use("a"), _use("b")]},
++                 {"role": "user", "content": [_result("a"), _result("c")]}],
++                "Tool result at messages[2].content[1] has tool_use_id 'c'; "
++                "expected 'b'",
++            ),
++            (
++                [{"role": "user", "content": "hi"},
++                 {"role": "assistant", "content": [_text("x"), _use("a"), _use("b")]},
++                 {"role": "user", "content": [_result("a"), _text("and then")]}],
++                "Message at messages[2] has role 'user' before all results for "
++                "the tool calls at messages[1] were supplied; still awaiting ['b']",
++            ),
++            (
++                [{"role": "user", "content": [_text("x"), _use("a")]}],
++                "Tool call messages[0].content[1] is in a message with role 'user'",
++            ),
++            (
++                [{"role": "user", "content": "hi"},
++                 {"role": "assistant", "content": [_text("x"), _use(None)]},
++                 {"role": "user", "content": [_result("a")]}],
++                "Tool call messages[1].content[1] is missing its transport id",
++            ),
++            (
++                [{"role": "user", "content": "hi"},
++                 {"role": "assistant", "content": [
++                     _use("a"), {"type": "thinking", "thinking": "t"}, _use("a")]},
++                 {"role": "user", "content": [_result("a"), _result("a")]}],
++                "Tool call messages[1].content[2] repeats transport id 'a'",
++            ),
++            (
++                [{"role": "user", "content": "hi"},
++                 {"role": "assistant", "content": [_text("x"), _use("a")]}],
++                "The tool calls at messages[1] have no complete result sequence",
++            ),
++        ],
++        ids=["orphaned", "result-without-id", "out-of-order", "turn-before-results",
++             "call-in-user-message", "call-without-id", "repeated-id", "unanswered"],
++    )
++    def test_a_refusal_names_the_block_the_caller_sent(
++        self, request_type, messages, refusal
++    ):
++        if request_type == "messages":
++            request = _make_request(messages, system="Be terse.")
++        else:
++            request = AnthropicCountTokensRequest(
++                model="test-model", messages=messages, system="Be terse."
++            )
++
++        with pytest.raises(VLLMValidationError) as refused:
++            _convert(request, merge_inline_system=True)
++
++        assert refusal in str(refused.value)
++        assert refused.value.parameter == "messages"
++
++    def test_an_unmerged_inline_system_message_is_named_where_it_was_sent(self):
++        request = _make_request(
++            [{"role": "user", "content": "hi"},
++             {"role": "assistant", "content": [_use("a")]},
++             {"role": "system", "content": "note"},
++             {"role": "user", "content": [_result("a")]}],
++            system="Be terse.",
++        )
++
++        with pytest.raises(VLLMValidationError) as refused:
++            _convert(request, merge_inline_system=False)
++
++        assert "Message at messages[2] has role 'system' before all results for " \
++            "the tool calls at messages[1]" in str(refused.value)
++
++    def test_a_correlated_history_converts_whole(self):
++        request = _make_request(
++            [{"role": "system", "content": "inline"},
++             {"role": "user", "content": "hi"},
++             {"role": "assistant", "content": [
++                 {"type": "thinking", "thinking": "plan"}, _text("Calling."),
++                 _use("a"), _use("b")]},
++             {"role": "user", "content": [_result("a"), _result("b"), _text("go on")]}],
++            system="Be terse.",
++        )
++
++        result = _convert(request, merge_inline_system=True)
++
++        assert [m["role"] for m in result.messages] == [
++            "system", "user", "assistant", "tool", "tool", "user"]
++        assert [c["id"] for c in result.messages[2]["tool_calls"]] == ["a", "b"]
++        assert [m.get("tool_call_id") for m in result.messages[3:5]] == ["a", "b"]
++
++
+ # ======================================================================
+@@ -1442,3 +1577,274 @@
  
          assert response.status_code == HTTPStatus.BAD_REQUEST
          handler.create_messages.assert_not_awaited()
@@ -485,7 +617,7 @@ diff --git a/vllm/entrypoints/anthropic/protocol.py b/vllm/entrypoints/anthropic
 diff --git a/vllm/entrypoints/anthropic/serving.py b/vllm/entrypoints/anthropic/serving.py
 --- a/vllm/entrypoints/anthropic/serving.py
 +++ b/vllm/entrypoints/anthropic/serving.py
-@@ -23,6 +23,7 @@
+@@ -22,6 +22,7 @@
      AnthropicCountTokensResponse,
      AnthropicDelta,
      AnthropicError,
@@ -493,7 +625,7 @@ diff --git a/vllm/entrypoints/anthropic/serving.py b/vllm/entrypoints/anthropic/
      AnthropicMessagesRequest,
      AnthropicMessagesResponse,
      AnthropicOutputConfig,
-@@ -49,10 +50,14 @@
+@@ -52,10 +53,14 @@
  from vllm.entrypoints.openai.models.serving import OpenAIServingModels
  from vllm.entrypoints.serve.exception_handling.utils import sanitize_message
  from vllm.entrypoints.serve.utils.request_logger import RequestLogger
@@ -508,7 +640,7 @@ diff --git a/vllm/entrypoints/anthropic/serving.py b/vllm/entrypoints/anthropic/
  
  def _build_anthropic_usage(
      usage: UsageInfo | None,
-@@ -171,7 +176,7 @@
+@@ -174,7 +179,7 @@
              return True
  
      @staticmethod
@@ -517,7 +649,7 @@ diff --git a/vllm/entrypoints/anthropic/serving.py b/vllm/entrypoints/anthropic/
          """Convert an Anthropic image source to an OpenAI-compatible URL.
  
          Anthropic supports two image source types:
-@@ -181,15 +186,35 @@
+@@ -184,15 +189,35 @@
          For base64 sources, this constructs a proper data URI that
          downstream processors (e.g. vLLM's media connector) can handle.
          """
@@ -562,7 +694,7 @@ diff --git a/vllm/entrypoints/anthropic/serving.py b/vllm/entrypoints/anthropic/
  
      @classmethod
      def _convert_anthropic_to_openai_request(
-@@ -354,9 +379,10 @@
+@@ -396,9 +421,10 @@
          """Convert individual content block"""
          if block.type == "text" and block.text:
              content_parts.append({"type": "text", "text": block.text})
@@ -576,7 +708,7 @@ diff --git a/vllm/entrypoints/anthropic/serving.py b/vllm/entrypoints/anthropic/
          elif block.type == "thinking" and block.thinking is not None:
              reasoning_parts.append(block.thinking)
          elif block.type == "redacted_thinking":
-@@ -414,40 +440,63 @@
+@@ -458,40 +484,63 @@
          appears inside the originating ``<tool_response>``.  Moving images to a
          synthetic later user message changes the trained prompt structure,
          multimodal marker positions, and prefix-cache identity.
@@ -655,7 +787,7 @@ diff --git a/vllm/entrypoints/anthropic/serving.py b/vllm/entrypoints/anthropic/
          openai_messages.append(
              {
                  "role": "tool",
-@@ -804,9 +853,15 @@
+@@ -848,9 +897,15 @@
                          )
                          yield wrap_data_with_event(data, "message_stop")
                      else:
@@ -674,7 +806,7 @@ diff --git a/vllm/entrypoints/anthropic/serving.py b/vllm/entrypoints/anthropic/
  
                          if first_item:
                              chunk = AnthropicStreamEvent(
-@@ -992,7 +1047,7 @@
+@@ -1036,7 +1091,7 @@
                      error_response = AnthropicStreamEvent(
                          type="error",
                          error=AnthropicError(
@@ -683,7 +815,7 @@ diff --git a/vllm/entrypoints/anthropic/serving.py b/vllm/entrypoints/anthropic/
                              message="Invalid data format received",
                          ),
                      )
-@@ -1004,7 +1059,7 @@
+@@ -1048,7 +1103,7 @@
              error_response = AnthropicStreamEvent(
                  type="error",
                  error=AnthropicError(

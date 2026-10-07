@@ -1494,6 +1494,38 @@ class ToolOutputParserTest(unittest.TestCase):
         self.assertEqual(refused.exception.parameter, "input")
         self.assertIn("input[3] has call_id 'B'; expected 'A'", str(refused.exception))
 
+    def test_an_anthropic_history_refusal_names_the_block_sent(self):
+        """An Anthropic request is validated after conversion to chat
+        messages, whose positions and id field the caller never sent: a
+        refusal names the content block and its tool_use_id or id."""
+        from vllm.entrypoints.anthropic.protocol import AnthropicMessagesRequest
+        from vllm.entrypoints.anthropic.serving import AnthropicServingMessages
+        from vllm.exceptions import VLLMValidationError
+
+        def refusal(calls, results):
+            request = AnthropicMessagesRequest.model_validate({
+                "model": "unit", "max_tokens": 8, "kv_scope": "unit",
+                "system": "Be terse.",
+                "messages": [
+                    {"role": "user", "content": "hi"},
+                    {"role": "assistant", "content": [{"type": "text", "text": "Calling."}]
+                     + [{"type": "tool_use", "name": "write", "input": {},
+                         **({"id": cid} if cid else {})} for cid in calls]},
+                    {"role": "user", "content": [
+                        {"type": "tool_result", "tool_use_id": cid, "content": "x"}
+                        for cid in results]},
+                ]})
+            with self.assertRaises(VLLMValidationError) as refused:
+                AnthropicServingMessages._convert_anthropic_to_openai_request(
+                    request, merge_inline_system=True)
+            self.assertEqual(refused.exception.parameter, "messages")
+            return str(refused.exception)
+
+        self.assertIn("Tool result at messages[2].content[1] has tool_use_id 'A'; "
+                      "expected 'B'", refusal(["A", "B"], ["A", "A"]))
+        self.assertIn("Tool call messages[1].content[1] is missing its transport id",
+                      refusal([None], ["A"]))
+
     def test_a_responses_message_carries_no_log_probabilities(self):
         """A message's log probabilities would be those of the tokens its text
         came from, and the served parser divides one generated token between

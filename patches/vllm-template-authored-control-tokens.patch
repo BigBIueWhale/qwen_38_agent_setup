@@ -1,7 +1,7 @@
 diff --git a/tests/entrypoints/anthropic/test_anthropic_messages_conversion.py b/tests/entrypoints/anthropic/test_anthropic_messages_conversion.py
 --- a/tests/entrypoints/anthropic/test_anthropic_messages_conversion.py
 +++ b/tests/entrypoints/anthropic/test_anthropic_messages_conversion.py
-@@ -1714,7 +1714,6 @@
+@@ -1841,7 +1841,6 @@
                      MagicMock(), refusal_tokenizer,
                      [{"role": "user", "content": "hi"}],
                      chat_template="{{ raise_exception('history refused') }}",
@@ -9,7 +9,7 @@ diff --git a/tests/entrypoints/anthropic/test_anthropic_messages_conversion.py b
                  )
  
          app = self._make_api_app(reject)
-@@ -1734,15 +1733,20 @@
+@@ -1861,15 +1860,20 @@
  
  @pytest.mark.parametrize("error", [ValueError("decoder bug"), TypeError("internal type"),
                                    OverflowError("internal overflow")])
@@ -36,7 +36,7 @@ diff --git a/tests/entrypoints/anthropic/test_anthropic_messages_conversion.py b
      assert raised.value is error
      assert create_error_response(error).error.code == 500
  
-@@ -1753,7 +1757,7 @@
+@@ -1880,7 +1884,7 @@
      from vllm.entrypoints.serve.exception_handling.error_response import create_error_response
      with pytest.raises(Exception) as raised:
          safe_apply_chat_template(MagicMock(), refusal_tokenizer,

@@ -1,7 +1,7 @@
 diff --git a/tests/entrypoints/anthropic/test_anthropic_messages_conversion.py b/tests/entrypoints/anthropic/test_anthropic_messages_conversion.py
 --- a/tests/entrypoints/anthropic/test_anthropic_messages_conversion.py
 +++ b/tests/entrypoints/anthropic/test_anthropic_messages_conversion.py
-@@ -937,11 +937,6 @@
+@@ -1064,11 +1064,6 @@
  
  def _make_stream_converter():
      obj = MagicMock(spec=AnthropicServingMessages)
@@ -13,7 +13,7 @@ diff --git a/tests/entrypoints/anthropic/test_anthropic_messages_conversion.py b
      obj.message_stream_converter = (
          AnthropicServingMessages.message_stream_converter.__get__(obj)
      )
-@@ -963,6 +958,7 @@
+@@ -1090,6 +1085,7 @@
      *,
      delta: DeltaMessage | None = None,
      finish_reason: str | None = None,
@@ -21,7 +21,7 @@ diff --git a/tests/entrypoints/anthropic/test_anthropic_messages_conversion.py b
      choices: list[ChatCompletionResponseStreamChoice] | None = None,
      usage: UsageInfo | None = None,
  ) -> str:
-@@ -972,6 +968,7 @@
+@@ -1099,6 +1095,7 @@
                  index=0,
                  delta=delta or DeltaMessage(),
                  finish_reason=finish_reason,
@@ -29,7 +29,7 @@ diff --git a/tests/entrypoints/anthropic/test_anthropic_messages_conversion.py b
              )
          ]
      chunk = ChatCompletionStreamResponse(
-@@ -1084,7 +1081,8 @@
+@@ -1211,7 +1208,8 @@
      async def test_buffered_content_flushed_on_done_without_usage_chunk(self):
          """Content buffered during tool_use must be emitted even if the
          stream jumps straight from finish_reason to [DONE], skipping the
@@ -39,7 +39,7 @@ diff --git a/tests/entrypoints/anthropic/test_anthropic_messages_conversion.py b
  
          async def sse_input():
              yield _make_stream_chunk(
-@@ -1132,7 +1130,8 @@
+@@ -1259,7 +1257,8 @@
          assert "tool_use" in block_starts
          assert "text" in block_starts
  
@@ -49,7 +49,7 @@ diff --git a/tests/entrypoints/anthropic/test_anthropic_messages_conversion.py b
  
  
  class TestMessageStartIncludesTypeAndRole:
-@@ -1721,3 +1720,145 @@
+@@ -1848,3 +1847,145 @@
          assert response.status_code == 400
          assert response.json()["error"]["type"] == "invalid_request_error"
          assert response.headers["content-type"] == "application/json"
@@ -198,7 +198,7 @@ diff --git a/tests/entrypoints/anthropic/test_anthropic_messages_conversion.py b
 diff --git a/vllm/entrypoints/anthropic/serving.py b/vllm/entrypoints/anthropic/serving.py
 --- a/vllm/entrypoints/anthropic/serving.py
 +++ b/vllm/entrypoints/anthropic/serving.py
-@@ -42,6 +42,7 @@
+@@ -45,6 +45,7 @@
  from vllm.entrypoints.openai.chat_completion.serving import OpenAIServingChat
  from vllm.entrypoints.openai.engine.protocol import (
      ErrorResponse,
@@ -206,7 +206,7 @@ diff --git a/vllm/entrypoints/anthropic/serving.py b/vllm/entrypoints/anthropic/
      JsonSchemaResponseFormat,
      ResponseFormat,
      StreamOptions,
-@@ -59,6 +60,25 @@
+@@ -62,6 +63,25 @@
  TOOL_RESULT_ERROR_LINE = "Tool result flagged is_error: true."
  
  
@@ -232,7 +232,7 @@ diff --git a/vllm/entrypoints/anthropic/serving.py b/vllm/entrypoints/anthropic/
  def _build_anthropic_usage(
      usage: UsageInfo | None,
  ) -> AnthropicUsage:
-@@ -139,11 +159,6 @@
+@@ -142,11 +162,6 @@
              enable_force_include_usage=enable_force_include_usage,
              default_chat_template_kwargs=default_chat_template_kwargs,
          )
@@ -244,7 +244,7 @@ diff --git a/vllm/entrypoints/anthropic/serving.py b/vllm/entrypoints/anthropic/
          self._merge_inline_system = self._detect_merge_inline_system(chat_template)
  
      @staticmethod
-@@ -691,12 +706,11 @@
+@@ -735,12 +750,11 @@
              ec_transfer_params=generator.ec_transfer_params,
          )
          choice = generator.choices[0]
@@ -262,7 +262,7 @@ diff --git a/vllm/entrypoints/anthropic/serving.py b/vllm/entrypoints/anthropic/
  
          content: list[AnthropicContentBlock] = []
          if choice.message.reasoning:
-@@ -776,6 +790,9 @@
+@@ -820,6 +834,9 @@
  
              first_item = True
              finish_reason = None
@@ -272,7 +272,7 @@ diff --git a/vllm/entrypoints/anthropic/serving.py b/vllm/entrypoints/anthropic/
              state = _ActiveBlockState()
              # Map from tool call index to tool_use_id
              tool_index_to_id: dict[int, str] = {}
-@@ -845,6 +862,10 @@
+@@ -889,6 +906,10 @@
                      if data_str == "[DONE]":
                          for event in stop_and_flush():
                              yield event
@@ -283,7 +283,7 @@ diff --git a/vllm/entrypoints/anthropic/serving.py b/vllm/entrypoints/anthropic/
                          stop_message = AnthropicStreamEvent(
                              type="message_stop",
                          )
-@@ -852,6 +873,7 @@
+@@ -896,6 +917,7 @@
                              exclude_unset=True, exclude_none=True
                          )
                          yield wrap_data_with_event(data, "message_stop")
@@ -291,7 +291,7 @@ diff --git a/vllm/entrypoints/anthropic/serving.py b/vllm/entrypoints/anthropic/
                      else:
                          payload = json.loads(data_str)
                          if "error" in payload:
-@@ -885,27 +907,35 @@
+@@ -929,27 +951,35 @@
                              first_item = False
                              data = chunk.model_dump_json(exclude_unset=True)
                              yield wrap_data_with_event(data, "message_start")
@@ -332,7 +332,7 @@ diff --git a/vllm/entrypoints/anthropic/serving.py b/vllm/entrypoints/anthropic/
  
                          # thinking / text content
                          reasoning_delta = origin_chunk.choices[0].delta.reasoning
-@@ -994,6 +1024,7 @@
+@@ -1038,6 +1068,7 @@
                                                  input={},
                                              )
                                          )
@@ -340,7 +340,7 @@ diff --git a/vllm/entrypoints/anthropic/serving.py b/vllm/entrypoints/anthropic/
                                          yield start_event
                                      # Handle initial arguments if present
                                      if (
-@@ -1053,6 +1084,9 @@
+@@ -1097,6 +1128,9 @@
                      )
                      data = error_response.model_dump_json(exclude_unset=True)
                      yield wrap_data_with_event(data, "error")

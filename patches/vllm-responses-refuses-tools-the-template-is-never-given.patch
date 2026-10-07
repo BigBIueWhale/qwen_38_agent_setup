@@ -136,7 +136,7 @@ index 8a360fdd7105640b11a170991363bebe448c7974..4270f2fcf187ca434e58e3c6e1698fbf
  
  @pytest.mark.asyncio
 diff --git a/tests/entrypoints/openai/responses/test_responses_utils.py b/tests/entrypoints/openai/responses/test_responses_utils.py
-index 586f029b388bd5e95832ca2c51f3f0eb3b5eb82f..52ca5e2f772d8277f171831c40db62415ef14ec2 100644
+index ecb07446c0be893b4f6bf781843b546840d106a7..2ea910539436f51201277f4426f01e3ebb8dd851 100644
 --- a/tests/entrypoints/openai/responses/test_responses_utils.py
 +++ b/tests/entrypoints/openai/responses/test_responses_utils.py
 @@ -24,6 +24,7 @@ from vllm.entrypoints.openai.responses.utils import (
@@ -147,7 +147,7 @@ index 586f029b388bd5e95832ca2c51f3f0eb3b5eb82f..52ca5e2f772d8277f171831c40db6241
      should_continue_final_message,
  )
  from vllm.entrypoints.openai.chat_completion.protocol import ChatCompletionRequest
-@@ -1087,3 +1088,95 @@ def test_the_limit_leaves_only_the_item_it_cut_incomplete():
+@@ -1097,3 +1098,95 @@ def test_the_limit_leaves_only_the_item_it_cut_incomplete():
      assert [item.status for item in items] == ["incomplete"]
      items = build_response_output_items("plan", "text", calls)
      assert {item.status for item in items} == {"completed"}

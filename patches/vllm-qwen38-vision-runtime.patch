@@ -891,10 +891,10 @@ index 0000000000000000000000000000000000000000..85a92e427d29cd87ad1f29df842c2f3e
 +    (view,) = cpu.get_reclaimable_simultaneous("phase-local", ((64,), torch.uint8))
 +    assert view.numel() == 64
 diff --git a/vllm/entrypoints/anthropic/serving.py b/vllm/entrypoints/anthropic/serving.py
-index 7e8e4441efee914aca39aef7e739acc8b303686e..f04a1e2b5961096757432fa2dba5a5ab81151c3c 100644
+index 45b70196af0bff8ce41c8fae769f7e48695be618..96f2150d24d6c92a6a34889494d1a481a285d2c9 100644
 --- a/vllm/entrypoints/anthropic/serving.py
 +++ b/vllm/entrypoints/anthropic/serving.py
-@@ -407,9 +407,16 @@ class AnthropicServingMessages(OpenAIServingChat):
+@@ -451,9 +451,16 @@ class AnthropicServingMessages(OpenAIServingChat):
      def _convert_user_tool_result(
          cls, block, openai_messages: list[dict[str, Any]]
      ) -> None:
@@ -913,7 +913,7 @@ index 7e8e4441efee914aca39aef7e739acc8b303686e..f04a1e2b5961096757432fa2dba5a5ab
          tool_reference: list[dict[str, Any]] = []
  
          if isinstance(block.content, str):
-@@ -421,12 +428,17 @@ class AnthropicServingMessages(OpenAIServingChat):
+@@ -465,12 +472,17 @@ class AnthropicServingMessages(OpenAIServingChat):
                      continue
                  item_type = item.get("type")
                  if item_type == "text":
@@ -933,7 +933,7 @@ index 7e8e4441efee914aca39aef7e739acc8b303686e..f04a1e2b5961096757432fa2dba5a5ab
                  elif item_type == "tool_reference":
                      ref_name = item.get("tool_name") or item.get("name")
                      if ref_name:
-@@ -439,21 +451,10 @@ class AnthropicServingMessages(OpenAIServingChat):
+@@ -483,21 +495,10 @@ class AnthropicServingMessages(OpenAIServingChat):
              {
                  "role": "tool",
                  "tool_call_id": block.tool_use_id or "",
@@ -957,7 +957,7 @@ index 7e8e4441efee914aca39aef7e739acc8b303686e..f04a1e2b5961096757432fa2dba5a5ab
              openai_messages.append(
                  {
 diff --git a/vllm/entrypoints/chat_utils.py b/vllm/entrypoints/chat_utils.py
-index f6381ec815abac4e48947870c1e516cc11cdc5e8..95c0b3a38c457a004782e9736a0038f3e601cdfb 100644
+index 24982e706e2aa50eced3b83e56b01eb71dcc5ba0..773652aa03e969152f1dc484d9ea39b2778758df 100644
 --- a/vllm/entrypoints/chat_utils.py
 +++ b/vllm/entrypoints/chat_utils.py
 @@ -1532,6 +1532,89 @@ def _collect_extra_fields(part: dict[str, Any]) -> dict[str, Any]:

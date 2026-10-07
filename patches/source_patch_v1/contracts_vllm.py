@@ -312,6 +312,8 @@ def _validate_defaults_before(state: State) -> None:
     forbid_text(state, "vllm/entrypoints/chat_utils.py",
                 "def validate_tool_result_correlation(", label=label)
     forbid_text(state, anthropic, "class AnthropicThinkingConfig", label=label)
+    require_text(state, "vllm/entrypoints/anthropic/serving.py",
+                 '"id": block.id or f"call_{int(time.time())}",', label=label)
 
 
 def _validate_defaults_after(state: State) -> None:
@@ -365,9 +367,37 @@ def _validate_defaults_after(state: State) -> None:
         state, chat_utils, "validate_tool_result_correlation", (
             "raise VLLMValidationError(", "result_id != expected_id",
             "pending_ids.pop(0)", "parameter=parameter", "parameter=call_parameter",
+            "only an assistant message declares tool calls",
         ), label=label,
     )
     forbid_text(state, chat_utils, "messages[{message_index}]", label=label)
+    # Anthropic records, as it converts, the message or content block each
+    # chat message and call came from, and refuses its history in those terms
+    # before building the chat request; a call sent without an id is refused
+    # as such, never given one.
+    conversion = _require_in_symbol(
+        state, anthropic_serving,
+        "AnthropicServingMessages._convert_anthropic_to_openai_request", (
+            "validate_tool_result_correlation(",
+            'messages=origins, calls=call_origins, result_id="tool_use_id"',
+        ), label=label,
+    )
+    _require_ordered(conversion, (
+        "validate_tool_result_correlation(", "cls._build_base_request(",
+    ), label=label, location="_convert_anthropic_to_openai_request")
+    _require_in_symbol(
+        state, anthropic_serving, "AnthropicServingMessages._convert_message_content", (
+            'block_origin = ("messages", f"{where}.content[{position}]")',
+            "origins.extend([block_origin] * (len(openai_messages) - results_before))",
+            "call_blocks.extend([block_origin] * (len(tool_calls) - calls_before))",
+        ), label=label,
+    )
+    _require_in_symbol(
+        state, anthropic_serving, "AnthropicServingMessages._convert_tool_use_block", (
+            '"id": block.id or "",',
+        ), label=label,
+    )
+    forbid_text(state, anthropic_serving, "time.time()", label=label)
     for invariant in (
         "is orphaned",
         "is missing its transport id",
@@ -2056,6 +2086,10 @@ def _validate_anthropic_inputs_after(state: State) -> None:
     require_python_symbols(state,
         "tests/entrypoints/anthropic/test_anthropic_messages_conversion.py", {
             "TestToolResultFidelity.test_an_item_the_rendering_cannot_carry_is_refused": None,
+            "TestToolHistoryRefusal.test_a_refusal_names_the_block_the_caller_sent": None,
+            "TestToolHistoryRefusal."
+            "test_an_unmerged_inline_system_message_is_named_where_it_was_sent": None,
+            "TestToolHistoryRefusal.test_a_correlated_history_converts_whole": None,
             "TestToolResultFidelity.test_is_error_is_stated_before_media_parts": None,
             "TestErrorEnvelope.test_real_request_gates_return_400_before_streaming": None,
             "TestErrorEnvelope.test_stream_forwards_the_classified_error_and_never_reports_success": None,
@@ -2227,6 +2261,7 @@ def _validate_responses_history_after(state: State) -> None:
             "test_tool_history_correlation_is_shared_across_surfaces": None,
             "test_responses_history_is_validated_before_rendering": None,
             "test_a_responses_history_refusal_names_the_input_item_sent": None,
+            "test_a_call_outside_an_assistant_message_is_named_by_the_call": None,
         }, label=label)
 
 
@@ -4873,7 +4908,11 @@ CONTRACTS: Mapping[str, SemanticContract] = {
             "and Qwen's ID-less prompt representation makes malformed tool-result "
             "correlation unsafe to guess. One function resolves the final ceiling, and "
             "one boundary validates a tool history, its refusal naming where the "
-            "caller sent the offending message or call."
+            "caller sent the offending message or call: messages[i] on chat; on "
+            "Anthropic, which records each origin as it converts, the message or "
+            "content block and its tool_use_id, never a position in the converted "
+            "chat list. An Anthropic tool_use sent without an id is refused as one, "
+            "never given an id invented from the clock."
         ),
         removal_condition=(
             "Remove only after upstream propagates the same defaults and phase ceilings "

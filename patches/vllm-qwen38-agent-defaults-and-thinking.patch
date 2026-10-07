@@ -70,10 +70,196 @@ index 02b9356113..ede9869ee3 100644
      # vLLM-specific fields that are not in Anthropic spec
      cache_salt: str | None = Field(
 diff --git a/vllm/entrypoints/anthropic/serving.py b/vllm/entrypoints/anthropic/serving.py
-index 4ec5c14e01..7e8e4441ef 100644
+index 4ec5c14e01..45b70196af 100644
 --- a/vllm/entrypoints/anthropic/serving.py
 +++ b/vllm/entrypoints/anthropic/serving.py
-@@ -477,6 +477,14 @@ class AnthropicServingMessages(OpenAIServingChat):
+@@ -7,7 +7,6 @@
+ 
+ import json
+ import logging
+-import time
+ import uuid
+ from collections.abc import AsyncGenerator
+ from typing import Any
+@@ -29,7 +28,11 @@ from vllm.entrypoints.anthropic.protocol import (
+     AnthropicStreamEvent,
+     AnthropicUsage,
+ )
+-from vllm.entrypoints.chat_utils import ChatTemplateContentFormatOption
++from vllm.entrypoints.chat_utils import (
++    ChatTemplateContentFormatOption,
++    ToolHistoryOrigin,
++    validate_tool_result_correlation,
++)
+ from vllm.entrypoints.openai.chat_completion.protocol import (
+     ChatCompletionNamedToolChoiceParam,
+     ChatCompletionRequest,
+@@ -199,16 +202,29 @@ class AnthropicServingMessages(OpenAIServingChat):
+     ) -> ChatCompletionRequest:
+         """Convert Anthropic message format to OpenAI format"""
+         openai_messages: list[dict[str, Any]] = []
++        # Where each converted message and call came from in the request, so
++        # a refusal of the tool history names the block the caller sent.
++        origins: list[tuple[str, str]] = []
++        call_origins: dict[tuple[int, int], tuple[str, str]] = {}
+ 
+         cls._convert_system_message(
+             anthropic_request,
+             openai_messages,
++            origins,
+             merge_inline_system=merge_inline_system,
+         )
+         cls._convert_messages(
+             anthropic_request.messages,
+             openai_messages,
++            origins,
++            call_origins,
+             merge_inline_system=merge_inline_system,
+         )
++        validate_tool_result_correlation(
++            openai_messages,
++            ToolHistoryOrigin(
++                messages=origins, calls=call_origins, result_id="tool_use_id"
++            ),
++        )
+         req = cls._build_base_request(anthropic_request, openai_messages)
+         cls._handle_streaming_options(req, anthropic_request)
+@@ -222,11 +238,13 @@ class AnthropicServingMessages(OpenAIServingChat):
+         cls,
+         anthropic_request: AnthropicMessagesRequest | AnthropicCountTokensRequest,
+         openai_messages: list[dict[str, Any]],
++        origins: list[tuple[str, str]],
+         *,
+         merge_inline_system: bool = False,
+     ) -> None:
+         """Convert Anthropic system message to OpenAI format"""
+         system_parts: list[str] = []
++        origin = ("system", "system")
+ 
+         # Top-level system field
+         if anthropic_request.system:
+@@ -245,15 +263,18 @@ class AnthropicServingMessages(OpenAIServingChat):
+         # system messages from the messages array and merge them into the
+         # top-level block so the template doesn't reject them.
+         if merge_inline_system:
+-            for msg in anthropic_request.messages:
++            for index, msg in enumerate(anthropic_request.messages):
+                 if msg.role != "system":
+                     continue
+                 text = cls._extract_system_text(msg)
+                 if text:
++                    if not system_parts:
++                        origin = ("messages", f"messages[{index}]")
+                     system_parts.append(text)
+ 
+         if system_parts:
+             openai_messages.append({"role": "system", "content": "".join(system_parts)})
++            origins.append(origin)
+ 
+     @classmethod
+     def _extract_system_text(cls, msg) -> str | None:
+@@ -276,11 +297,15 @@ class AnthropicServingMessages(OpenAIServingChat):
+         cls,
+         messages: list,
+         openai_messages: list[dict[str, Any]],
++        origins: list[tuple[str, str]],
++        call_origins: dict[tuple[int, int], tuple[str, str]],
+         *,
+         merge_inline_system: bool = False,
+     ) -> None:
+-        """Convert Anthropic messages to OpenAI format"""
+-        for msg in messages:
++        """Convert Anthropic messages to OpenAI format, recording beside each
++        converted message, and each call in it, the field it came from."""
++        for index, msg in enumerate(messages):
++            where = f"messages[{index}]"
+             # Handle system messages in-place: extract text, strip billing
+             # headers, and only emit if there is real content.  This avoids
+             # going through _convert_block / _convert_message_content which
+@@ -292,17 +317,24 @@ class AnthropicServingMessages(OpenAIServingChat):
+                 text = cls._extract_system_text(msg)
+                 if text:
+                     openai_messages.append({"role": "system", "content": text})
++                    origins.append(("messages", where))
+                 continue
+ 
+             openai_msg: dict[str, Any] = {"role": msg.role}  # type: ignore
++            call_blocks: list[tuple[str, str]] = []
+ 
+             if isinstance(msg.content, str):
+                 openai_msg["content"] = msg.content
+             else:
+-                cls._convert_message_content(msg, openai_msg, openai_messages)
++                call_blocks = cls._convert_message_content(
++                    msg, openai_msg, openai_messages, origins, where
++                )
+ 
+             if not (msg.role == "user" and "content" not in openai_msg):
++                for call_index, origin in enumerate(call_blocks):
++                    call_origins[(len(openai_messages), call_index)] = origin
+                 openai_messages.append(openai_msg)
++                origins.append(("messages", where))
+ 
+     @classmethod
+     def _convert_message_content(
+@@ -310,13 +342,21 @@ class AnthropicServingMessages(OpenAIServingChat):
+         msg,
+         openai_msg: dict[str, Any],
+         openai_messages: list[dict[str, Any]],
+-    ) -> None:
+-        """Convert complex message content blocks"""
++        origins: list[tuple[str, str]],
++        where: str,
++    ) -> list[tuple[str, str]]:
++        """Convert complex message content blocks.
++
++        Every message a block adds (a tool result) is recorded as coming from
++        that block; the block of each call is returned, in call order.
++        """
+         content_parts: list[dict[str, Any]] = []
+         tool_calls: list[dict[str, Any]] = []
+         reasoning_parts: list[str] = []
++        call_blocks: list[tuple[str, str]] = []
+ 
+-        for block in msg.content:
++        for position, block in enumerate(msg.content):
++            results_before, calls_before = len(openai_messages), len(tool_calls)
+             cls._convert_block(
+                 block,
+                 msg.role,
+@@ -325,6 +365,9 @@ class AnthropicServingMessages(OpenAIServingChat):
+                 reasoning_parts,
+                 openai_messages,
+             )
++            block_origin = ("messages", f"{where}.content[{position}]")
++            origins.extend([block_origin] * (len(openai_messages) - results_before))
++            call_blocks.extend([block_origin] * (len(tool_calls) - calls_before))
+ 
+         if reasoning_parts:
+             openai_msg["reasoning"] = "".join(reasoning_parts)
+@@ -337,8 +380,7 @@ class AnthropicServingMessages(OpenAIServingChat):
+                 openai_msg["content"] = content_parts[0]["text"]
+             else:
+                 openai_msg["content"] = content_parts  # type: ignore
+-        elif not tool_calls and not reasoning_parts:
+-            return
++        return call_blocks
+ 
+     @classmethod
+     def _convert_block(
+@@ -376,8 +418,10 @@ class AnthropicServingMessages(OpenAIServingChat):
+     @classmethod
+     def _convert_tool_use_block(cls, block, tool_calls: list[dict[str, Any]]) -> None:
+         """Convert tool_use block to OpenAI function call format"""
++        # A call sent without an id keeps none; the tool-history check
++        # refuses it, naming the block.
+         tool_call = {
+-            "id": block.id or f"call_{int(time.time())}",
++            "id": block.id or "",
+             "type": "function",
+             "function": {
+                 "name": block.name or "",
+@@ -477,6 +521,14 @@ class AnthropicServingMessages(OpenAIServingChat):
                  chat_template_kwargs=anthropic_request.chat_template_kwargs,
              )
  
@@ -88,7 +274,7 @@ index 4ec5c14e01..7e8e4441ef 100644
          return ChatCompletionRequest(
              model=anthropic_request.model,
              messages=openai_messages,
-@@ -489,7 +497,8 @@ class AnthropicServingMessages(OpenAIServingChat):
+@@ -489,7 +541,8 @@ class AnthropicServingMessages(OpenAIServingChat):
              cache_salt=anthropic_request.cache_salt,
              kv_transfer_params=anthropic_request.kv_transfer_params,
              ec_transfer_params=anthropic_request.ec_transfer_params,
@@ -190,7 +376,7 @@ index e8bb4e5678..f532e983a9 100644
              extra_args=extra_args or None,
              skip_clone=True,  # Created fresh per request, safe to skip clone
 diff --git a/vllm/entrypoints/chat_utils.py b/vllm/entrypoints/chat_utils.py
-index 30b6ecc76b..f6381ec815 100644
+index 30b6ecc76b..24982e706e 100644
 --- a/vllm/entrypoints/chat_utils.py
 +++ b/vllm/entrypoints/chat_utils.py
 @@ -6,7 +6,7 @@ import json
@@ -202,7 +388,7 @@ index 30b6ecc76b..f6381ec815 100644
  from dataclasses import dataclass
  from functools import cached_property, lru_cache, partial
  from itertools import accumulate
-@@ -2049,6 +2049,131 @@ def get_tool_call_id_type(model_config: ModelConfig) -> str:
+@@ -2049,6 +2049,133 @@ def get_tool_call_id_type(model_config: ModelConfig) -> str:
      return "random"
  
  
@@ -241,9 +427,10 @@ index 30b6ecc76b..f6381ec815 100644
 +) -> None:
 +    """Validate transport IDs before rendering positional Qwen tool history.
 +
-+    Chat and converted Responses messages share this boundary. Every call must
-+    have exactly one result in the declared order; never guess or reorder it.
-+    A refusal names where the caller sent the offending message or call.
++    Chat messages, and those Responses and Anthropic requests convert to, share
++    this boundary. Every call must have exactly one result in the declared
++    order; never guess or reorder it. A refusal names where the caller sent the
++    offending message or call.
 +    """
 +    pending_ids: list[str] = []
 +    pending_message_index: int | None = None
@@ -295,10 +482,11 @@ index 30b6ecc76b..f6381ec815 100644
 +        if not tool_calls:
 +            continue
 +        if role != "assistant":
++            call_parameter, call_location = origin.calls[(message_index, 0)]
 +            raise VLLMValidationError(
-+                f"Message at {location} declares tool_calls "
-+                f"with non-assistant role {role!r}.",
-+                parameter=parameter,
++                f"Tool call {call_location} is in a message with role {role!r}; "
++                "only an assistant message declares tool calls.",
++                parameter=call_parameter,
 +            )
 +
 +        call_ids: list[str] = []

@@ -1,7 +1,7 @@
 diff --git a/tests/entrypoints/anthropic/test_anthropic_messages_conversion.py b/tests/entrypoints/anthropic/test_anthropic_messages_conversion.py
 --- a/tests/entrypoints/anthropic/test_anthropic_messages_conversion.py
 +++ b/tests/entrypoints/anthropic/test_anthropic_messages_conversion.py
-@@ -1608,8 +1608,8 @@
+@@ -1735,8 +1735,8 @@
      @pytest.mark.parametrize(
          ("exc", "status", "error_type"),
          [
@@ -12,7 +12,7 @@ diff --git a/tests/entrypoints/anthropic/test_anthropic_messages_conversion.py b
              (
                  VLLMValidationError("kv_scope is required", parameter="kv_scope"),
                  400,
-@@ -1625,9 +1625,7 @@
+@@ -1752,9 +1752,7 @@
      def test_a_refusal_is_classified_as_the_openai_surface_classifies_it(
          self, route, stream, exc, status, error_type
      ):
@@ -23,7 +23,7 @@ diff --git a/tests/entrypoints/anthropic/test_anthropic_messages_conversion.py b
          app = self._make_api_app(exc)
          with TestClient(app, raise_server_exceptions=False) as client:
              response = client.post(route, json=self._body | {"stream": stream})
-@@ -1694,24 +1692,29 @@
+@@ -1821,24 +1819,29 @@
      @pytest.mark.parametrize("route", ["/v1/messages", "/v1/messages/count_tokens"])
      @pytest.mark.parametrize("stream", [False, True])
      @pytest.mark.parametrize("gate", ["template", "image", "length"])
@@ -60,7 +60,7 @@ diff --git a/tests/entrypoints/anthropic/test_anthropic_messages_conversion.py b
                  )
  
          app = self._make_api_app(reject)
-@@ -1722,6 +1725,45 @@
+@@ -1849,6 +1852,45 @@
          assert response.headers["content-type"] == "application/json"
  
  

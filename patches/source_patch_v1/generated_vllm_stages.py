@@ -451,7 +451,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    if model in _VLLM_STRUCTURAL_TAG_REGISTRY:\n'},)},
  {'name': 'qwen38-agent-defaults-and-thinking',
   'review_patch': 'patches/vllm-qwen38-agent-defaults-and-thinking.patch',
-  'review_sha256': 'ca480ea417db9a8cdf9919aab8589dcf8bf03bcb45ffca0cce2c594df9765359',
+  'review_sha256': 'bdba0512ed3c997e259856a2909d61bd24b87cf262f4f3a62875a8354a380a0a',
   'files': ({'path': 'vllm/config/model.py',
              'before_sha256': '17c687232886184f0390f38fc1c2c8ae078eaf24ebd1960a6b0c6a0669a35a98',
              'after_sha256': '6a0b5fdcb292fef440ee59321b7db437dae2cd5fd80eb2372fa3647fb163a3cf'},
@@ -460,13 +460,13 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'after_sha256': 'b4841be67939294cfabbc5370452c3235f8c484fc9bcd2dea4821756db4df298'},
             {'path': 'vllm/entrypoints/anthropic/serving.py',
              'before_sha256': 'cc99303714b88b7138ff5411cc367a66f98bf851c55f63bff226f562f5b528ef',
-             'after_sha256': 'b283dc7f47fe1cbb57f5a9cc4000a27ff5106e94d5caf152e5f7142e8a056e19'},
+             'after_sha256': '17dc7dc8122927adca3d7459e9b02944b9bb2ccc2310eeb99e7ffc27bbb7802e'},
             {'path': 'vllm/entrypoints/openai/chat_completion/protocol.py',
              'before_sha256': 'cb756e3d18e9061a2b306f305e10bd71d43f01ad1b236d0e9cbbb8756cd504dc',
              'after_sha256': 'a0cbec47f1479fdd5ef1df0862761f270d17eb50896afd04c6b5dfb02d24f390'},
             {'path': 'vllm/entrypoints/chat_utils.py',
              'before_sha256': 'e77285d290ec7ad0fd8aaff8bcccfa9be3e77ff7fd355a1fb4b77bae0e8686e1',
-             'after_sha256': '87b24efcaddc21ca22b6863492822d2d794ec62f374a2fe720da94db06c799d6'},
+             'after_sha256': 'f5026963fbd765f97b16fc7b7725b6438df269c9b1326e9505d9d3e76fa2cc25'},
             {'path': 'vllm/sampling_params.py',
              'before_sha256': 'a29d80a2dc533c9a560f96acc3538fffcd00bf0412a6a7aa105d46553afb8359',
              'after_sha256': '82b5d4d8624bdf66086d8fab0d1a2fdab204a412a035f53871aca851e8ac02a0'}),
@@ -672,6 +672,714 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    cache_salt: str | None = Field(\n'},
             {'name': 'vllm/entrypoints/anthropic/serving.py:landmark-1',
              'path': 'vllm/entrypoints/anthropic/serving.py',
+             'before': '\n'
+                       'import json\n'
+                       'import logging\n'
+                       'import time\n'
+                       'import uuid\n'
+                       'from collections.abc import AsyncGenerator\n'
+                       'from typing import Any\n',
+             'after': '\n'
+                      'import json\n'
+                      'import logging\n'
+                      'import uuid\n'
+                      'from collections.abc import AsyncGenerator\n'
+                      'from typing import Any\n',
+             'review_before': '\n'
+                              'import json\n'
+                              'import logging\n'
+                              'import time\n'
+                              'import uuid\n'
+                              'from collections.abc import AsyncGenerator\n'
+                              'from typing import Any\n',
+             'review_after': '\n'
+                             'import json\n'
+                             'import logging\n'
+                             'import uuid\n'
+                             'from collections.abc import AsyncGenerator\n'
+                             'from typing import Any\n'},
+            {'name': 'vllm/entrypoints/anthropic/serving.py:landmark-2',
+             'path': 'vllm/entrypoints/anthropic/serving.py',
+             'before': '    AnthropicStreamEvent,\n'
+                       '    AnthropicUsage,\n'
+                       ')\n'
+                       'from vllm.entrypoints.chat_utils import '
+                       'ChatTemplateContentFormatOption\n'
+                       'from vllm.entrypoints.openai.chat_completion.protocol import '
+                       '(\n'
+                       '    ChatCompletionNamedToolChoiceParam,\n'
+                       '    ChatCompletionRequest,\n',
+             'after': '    AnthropicStreamEvent,\n'
+                      '    AnthropicUsage,\n'
+                      ')\n'
+                      'from vllm.entrypoints.chat_utils import (\n'
+                      '    ChatTemplateContentFormatOption,\n'
+                      '    ToolHistoryOrigin,\n'
+                      '    validate_tool_result_correlation,\n'
+                      ')\n'
+                      'from vllm.entrypoints.openai.chat_completion.protocol import (\n'
+                      '    ChatCompletionNamedToolChoiceParam,\n'
+                      '    ChatCompletionRequest,\n',
+             'review_before': '    AnthropicStreamEvent,\n'
+                              '    AnthropicUsage,\n'
+                              ')\n'
+                              'from vllm.entrypoints.chat_utils import '
+                              'ChatTemplateContentFormatOption\n'
+                              'from vllm.entrypoints.openai.chat_completion.protocol '
+                              'import (\n'
+                              '    ChatCompletionNamedToolChoiceParam,\n'
+                              '    ChatCompletionRequest,\n',
+             'review_after': '    AnthropicStreamEvent,\n'
+                             '    AnthropicUsage,\n'
+                             ')\n'
+                             'from vllm.entrypoints.chat_utils import (\n'
+                             '    ChatTemplateContentFormatOption,\n'
+                             '    ToolHistoryOrigin,\n'
+                             '    validate_tool_result_correlation,\n'
+                             ')\n'
+                             'from vllm.entrypoints.openai.chat_completion.protocol '
+                             'import (\n'
+                             '    ChatCompletionNamedToolChoiceParam,\n'
+                             '    ChatCompletionRequest,\n'},
+            {'name': 'vllm/entrypoints/anthropic/serving.py:landmark-3',
+             'path': 'vllm/entrypoints/anthropic/serving.py',
+             'before': '    ) -> ChatCompletionRequest:\n'
+                       '        """Convert Anthropic message format to OpenAI '
+                       'format"""\n'
+                       '        openai_messages: list[dict[str, Any]] = []\n'
+                       '\n'
+                       '        cls._convert_system_message(\n'
+                       '            anthropic_request,\n'
+                       '            openai_messages,\n'
+                       '            merge_inline_system=merge_inline_system,\n'
+                       '        )\n'
+                       '        cls._convert_messages(\n'
+                       '            anthropic_request.messages,\n'
+                       '            openai_messages,\n'
+                       '            merge_inline_system=merge_inline_system,\n'
+                       '        )\n'
+                       '        req = cls._build_base_request(anthropic_request, '
+                       'openai_messages)\n'
+                       '        cls._handle_streaming_options(req, '
+                       'anthropic_request)\n',
+             'after': '    ) -> ChatCompletionRequest:\n'
+                      '        """Convert Anthropic message format to OpenAI '
+                      'format"""\n'
+                      '        openai_messages: list[dict[str, Any]] = []\n'
+                      '        # Where each converted message and call came from in '
+                      'the request, so\n'
+                      '        # a refusal of the tool history names the block the '
+                      'caller sent.\n'
+                      '        origins: list[tuple[str, str]] = []\n'
+                      '        call_origins: dict[tuple[int, int], tuple[str, str]] = '
+                      '{}\n'
+                      '\n'
+                      '        cls._convert_system_message(\n'
+                      '            anthropic_request,\n'
+                      '            openai_messages,\n'
+                      '            origins,\n'
+                      '            merge_inline_system=merge_inline_system,\n'
+                      '        )\n'
+                      '        cls._convert_messages(\n'
+                      '            anthropic_request.messages,\n'
+                      '            openai_messages,\n'
+                      '            origins,\n'
+                      '            call_origins,\n'
+                      '            merge_inline_system=merge_inline_system,\n'
+                      '        )\n'
+                      '        validate_tool_result_correlation(\n'
+                      '            openai_messages,\n'
+                      '            ToolHistoryOrigin(\n'
+                      '                messages=origins, calls=call_origins, '
+                      'result_id="tool_use_id"\n'
+                      '            ),\n'
+                      '        )\n'
+                      '        req = cls._build_base_request(anthropic_request, '
+                      'openai_messages)\n'
+                      '        cls._handle_streaming_options(req, anthropic_request)\n',
+             'review_before': '    ) -> ChatCompletionRequest:\n'
+                              '        """Convert Anthropic message format to OpenAI '
+                              'format"""\n'
+                              '        openai_messages: list[dict[str, Any]] = []\n'
+                              '\n'
+                              '        cls._convert_system_message(\n'
+                              '            anthropic_request,\n'
+                              '            openai_messages,\n'
+                              '            merge_inline_system=merge_inline_system,\n'
+                              '        )\n'
+                              '        cls._convert_messages(\n'
+                              '            anthropic_request.messages,\n'
+                              '            openai_messages,\n'
+                              '            merge_inline_system=merge_inline_system,\n'
+                              '        )\n'
+                              '        req = '
+                              'cls._build_base_request(anthropic_request, '
+                              'openai_messages)\n'
+                              '        cls._handle_streaming_options(req, '
+                              'anthropic_request)\n',
+             'review_after': '    ) -> ChatCompletionRequest:\n'
+                             '        """Convert Anthropic message format to OpenAI '
+                             'format"""\n'
+                             '        openai_messages: list[dict[str, Any]] = []\n'
+                             '        # Where each converted message and call came '
+                             'from in the request, so\n'
+                             '        # a refusal of the tool history names the block '
+                             'the caller sent.\n'
+                             '        origins: list[tuple[str, str]] = []\n'
+                             '        call_origins: dict[tuple[int, int], tuple[str, '
+                             'str]] = {}\n'
+                             '\n'
+                             '        cls._convert_system_message(\n'
+                             '            anthropic_request,\n'
+                             '            openai_messages,\n'
+                             '            origins,\n'
+                             '            merge_inline_system=merge_inline_system,\n'
+                             '        )\n'
+                             '        cls._convert_messages(\n'
+                             '            anthropic_request.messages,\n'
+                             '            openai_messages,\n'
+                             '            origins,\n'
+                             '            call_origins,\n'
+                             '            merge_inline_system=merge_inline_system,\n'
+                             '        )\n'
+                             '        validate_tool_result_correlation(\n'
+                             '            openai_messages,\n'
+                             '            ToolHistoryOrigin(\n'
+                             '                messages=origins, calls=call_origins, '
+                             'result_id="tool_use_id"\n'
+                             '            ),\n'
+                             '        )\n'
+                             '        req = cls._build_base_request(anthropic_request, '
+                             'openai_messages)\n'
+                             '        cls._handle_streaming_options(req, '
+                             'anthropic_request)\n'},
+            {'name': 'vllm/entrypoints/anthropic/serving.py:landmark-4',
+             'path': 'vllm/entrypoints/anthropic/serving.py',
+             'before': '        cls,\n'
+                       '        anthropic_request: AnthropicMessagesRequest | '
+                       'AnthropicCountTokensRequest,\n'
+                       '        openai_messages: list[dict[str, Any]],\n'
+                       '        *,\n'
+                       '        merge_inline_system: bool = False,\n'
+                       '    ) -> None:\n'
+                       '        """Convert Anthropic system message to OpenAI '
+                       'format"""\n'
+                       '        system_parts: list[str] = []\n'
+                       '\n'
+                       '        # Top-level system field\n'
+                       '        if anthropic_request.system:\n',
+             'after': '        cls,\n'
+                      '        anthropic_request: AnthropicMessagesRequest | '
+                      'AnthropicCountTokensRequest,\n'
+                      '        openai_messages: list[dict[str, Any]],\n'
+                      '        origins: list[tuple[str, str]],\n'
+                      '        *,\n'
+                      '        merge_inline_system: bool = False,\n'
+                      '    ) -> None:\n'
+                      '        """Convert Anthropic system message to OpenAI '
+                      'format"""\n'
+                      '        system_parts: list[str] = []\n'
+                      '        origin = ("system", "system")\n'
+                      '\n'
+                      '        # Top-level system field\n'
+                      '        if anthropic_request.system:\n',
+             'review_before': '        cls,\n'
+                              '        anthropic_request: AnthropicMessagesRequest | '
+                              'AnthropicCountTokensRequest,\n'
+                              '        openai_messages: list[dict[str, Any]],\n'
+                              '        *,\n'
+                              '        merge_inline_system: bool = False,\n'
+                              '    ) -> None:\n'
+                              '        """Convert Anthropic system message to OpenAI '
+                              'format"""\n'
+                              '        system_parts: list[str] = []\n'
+                              '\n'
+                              '        # Top-level system field\n'
+                              '        if anthropic_request.system:\n',
+             'review_after': '        cls,\n'
+                             '        anthropic_request: AnthropicMessagesRequest | '
+                             'AnthropicCountTokensRequest,\n'
+                             '        openai_messages: list[dict[str, Any]],\n'
+                             '        origins: list[tuple[str, str]],\n'
+                             '        *,\n'
+                             '        merge_inline_system: bool = False,\n'
+                             '    ) -> None:\n'
+                             '        """Convert Anthropic system message to OpenAI '
+                             'format"""\n'
+                             '        system_parts: list[str] = []\n'
+                             '        origin = ("system", "system")\n'
+                             '\n'
+                             '        # Top-level system field\n'
+                             '        if anthropic_request.system:\n'},
+            {'name': 'vllm/entrypoints/anthropic/serving.py:landmark-5',
+             'path': 'vllm/entrypoints/anthropic/serving.py',
+             'before': '        # system messages from the messages array and merge '
+                       'them into the\n'
+                       "        # top-level block so the template doesn't reject "
+                       'them.\n'
+                       '        if merge_inline_system:\n'
+                       '            for msg in anthropic_request.messages:\n'
+                       '                if msg.role != "system":\n'
+                       '                    continue\n'
+                       '                text = cls._extract_system_text(msg)\n'
+                       '                if text:\n'
+                       '                    system_parts.append(text)\n'
+                       '\n'
+                       '        if system_parts:\n'
+                       '            openai_messages.append({"role": "system", '
+                       '"content": "".join(system_parts)})\n'
+                       '\n'
+                       '    @classmethod\n'
+                       '    def _extract_system_text(cls, msg) -> str | None:\n',
+             'after': '        # system messages from the messages array and merge '
+                      'them into the\n'
+                      "        # top-level block so the template doesn't reject them.\n"
+                      '        if merge_inline_system:\n'
+                      '            for index, msg in '
+                      'enumerate(anthropic_request.messages):\n'
+                      '                if msg.role != "system":\n'
+                      '                    continue\n'
+                      '                text = cls._extract_system_text(msg)\n'
+                      '                if text:\n'
+                      '                    if not system_parts:\n'
+                      '                        origin = ("messages", '
+                      'f"messages[{index}]")\n'
+                      '                    system_parts.append(text)\n'
+                      '\n'
+                      '        if system_parts:\n'
+                      '            openai_messages.append({"role": "system", '
+                      '"content": "".join(system_parts)})\n'
+                      '            origins.append(origin)\n'
+                      '\n'
+                      '    @classmethod\n'
+                      '    def _extract_system_text(cls, msg) -> str | None:\n',
+             'review_before': '        # system messages from the messages array and '
+                              'merge them into the\n'
+                              "        # top-level block so the template doesn't "
+                              'reject them.\n'
+                              '        if merge_inline_system:\n'
+                              '            for msg in anthropic_request.messages:\n'
+                              '                if msg.role != "system":\n'
+                              '                    continue\n'
+                              '                text = cls._extract_system_text(msg)\n'
+                              '                if text:\n'
+                              '                    system_parts.append(text)\n'
+                              '\n'
+                              '        if system_parts:\n'
+                              '            openai_messages.append({"role": "system", '
+                              '"content": "".join(system_parts)})\n'
+                              '\n'
+                              '    @classmethod\n'
+                              '    def _extract_system_text(cls, msg) -> str | None:\n',
+             'review_after': '        # system messages from the messages array and '
+                             'merge them into the\n'
+                             "        # top-level block so the template doesn't reject "
+                             'them.\n'
+                             '        if merge_inline_system:\n'
+                             '            for index, msg in '
+                             'enumerate(anthropic_request.messages):\n'
+                             '                if msg.role != "system":\n'
+                             '                    continue\n'
+                             '                text = cls._extract_system_text(msg)\n'
+                             '                if text:\n'
+                             '                    if not system_parts:\n'
+                             '                        origin = ("messages", '
+                             'f"messages[{index}]")\n'
+                             '                    system_parts.append(text)\n'
+                             '\n'
+                             '        if system_parts:\n'
+                             '            openai_messages.append({"role": "system", '
+                             '"content": "".join(system_parts)})\n'
+                             '            origins.append(origin)\n'
+                             '\n'
+                             '    @classmethod\n'
+                             '    def _extract_system_text(cls, msg) -> str | None:\n'},
+            {'name': 'vllm/entrypoints/anthropic/serving.py:landmark-6',
+             'path': 'vllm/entrypoints/anthropic/serving.py',
+             'before': '        cls,\n'
+                       '        messages: list,\n'
+                       '        openai_messages: list[dict[str, Any]],\n'
+                       '        *,\n'
+                       '        merge_inline_system: bool = False,\n'
+                       '    ) -> None:\n'
+                       '        """Convert Anthropic messages to OpenAI format"""\n'
+                       '        for msg in messages:\n'
+                       '            # Handle system messages in-place: extract text, '
+                       'strip billing\n'
+                       '            # headers, and only emit if there is real '
+                       'content.  This avoids\n'
+                       '            # going through _convert_block / '
+                       '_convert_message_content which\n',
+             'after': '        cls,\n'
+                      '        messages: list,\n'
+                      '        openai_messages: list[dict[str, Any]],\n'
+                      '        origins: list[tuple[str, str]],\n'
+                      '        call_origins: dict[tuple[int, int], tuple[str, str]],\n'
+                      '        *,\n'
+                      '        merge_inline_system: bool = False,\n'
+                      '    ) -> None:\n'
+                      '        """Convert Anthropic messages to OpenAI format, '
+                      'recording beside each\n'
+                      '        converted message, and each call in it, the field it '
+                      'came from."""\n'
+                      '        for index, msg in enumerate(messages):\n'
+                      '            where = f"messages[{index}]"\n'
+                      '            # Handle system messages in-place: extract text, '
+                      'strip billing\n'
+                      '            # headers, and only emit if there is real content.  '
+                      'This avoids\n'
+                      '            # going through _convert_block / '
+                      '_convert_message_content which\n',
+             'review_before': '        cls,\n'
+                              '        messages: list,\n'
+                              '        openai_messages: list[dict[str, Any]],\n'
+                              '        *,\n'
+                              '        merge_inline_system: bool = False,\n'
+                              '    ) -> None:\n'
+                              '        """Convert Anthropic messages to OpenAI '
+                              'format"""\n'
+                              '        for msg in messages:\n'
+                              '            # Handle system messages in-place: extract '
+                              'text, strip billing\n'
+                              '            # headers, and only emit if there is real '
+                              'content.  This avoids\n'
+                              '            # going through _convert_block / '
+                              '_convert_message_content which\n',
+             'review_after': '        cls,\n'
+                             '        messages: list,\n'
+                             '        openai_messages: list[dict[str, Any]],\n'
+                             '        origins: list[tuple[str, str]],\n'
+                             '        call_origins: dict[tuple[int, int], tuple[str, '
+                             'str]],\n'
+                             '        *,\n'
+                             '        merge_inline_system: bool = False,\n'
+                             '    ) -> None:\n'
+                             '        """Convert Anthropic messages to OpenAI format, '
+                             'recording beside each\n'
+                             '        converted message, and each call in it, the '
+                             'field it came from."""\n'
+                             '        for index, msg in enumerate(messages):\n'
+                             '            where = f"messages[{index}]"\n'
+                             '            # Handle system messages in-place: extract '
+                             'text, strip billing\n'
+                             '            # headers, and only emit if there is real '
+                             'content.  This avoids\n'
+                             '            # going through _convert_block / '
+                             '_convert_message_content which\n'},
+            {'name': 'vllm/entrypoints/anthropic/serving.py:landmark-7',
+             'path': 'vllm/entrypoints/anthropic/serving.py',
+             'before': '                text = cls._extract_system_text(msg)\n'
+                       '                if text:\n'
+                       '                    openai_messages.append({"role": "system", '
+                       '"content": text})\n'
+                       '                continue\n'
+                       '\n'
+                       '            openai_msg: dict[str, Any] = {"role": msg.role}  # '
+                       'type: ignore\n'
+                       '\n'
+                       '            if isinstance(msg.content, str):\n'
+                       '                openai_msg["content"] = msg.content\n'
+                       '            else:\n'
+                       '                cls._convert_message_content(msg, openai_msg, '
+                       'openai_messages)\n'
+                       '\n'
+                       '            if not (msg.role == "user" and "content" not in '
+                       'openai_msg):\n'
+                       '                openai_messages.append(openai_msg)\n'
+                       '\n'
+                       '    @classmethod\n'
+                       '    def _convert_message_content(\n',
+             'after': '                text = cls._extract_system_text(msg)\n'
+                      '                if text:\n'
+                      '                    openai_messages.append({"role": "system", '
+                      '"content": text})\n'
+                      '                    origins.append(("messages", where))\n'
+                      '                continue\n'
+                      '\n'
+                      '            openai_msg: dict[str, Any] = {"role": msg.role}  # '
+                      'type: ignore\n'
+                      '            call_blocks: list[tuple[str, str]] = []\n'
+                      '\n'
+                      '            if isinstance(msg.content, str):\n'
+                      '                openai_msg["content"] = msg.content\n'
+                      '            else:\n'
+                      '                call_blocks = cls._convert_message_content(\n'
+                      '                    msg, openai_msg, openai_messages, origins, '
+                      'where\n'
+                      '                )\n'
+                      '\n'
+                      '            if not (msg.role == "user" and "content" not in '
+                      'openai_msg):\n'
+                      '                for call_index, origin in '
+                      'enumerate(call_blocks):\n'
+                      '                    call_origins[(len(openai_messages), '
+                      'call_index)] = origin\n'
+                      '                openai_messages.append(openai_msg)\n'
+                      '                origins.append(("messages", where))\n'
+                      '\n'
+                      '    @classmethod\n'
+                      '    def _convert_message_content(\n',
+             'review_before': '                text = cls._extract_system_text(msg)\n'
+                              '                if text:\n'
+                              '                    openai_messages.append({"role": '
+                              '"system", "content": text})\n'
+                              '                continue\n'
+                              '\n'
+                              '            openai_msg: dict[str, Any] = {"role": '
+                              'msg.role}  # type: ignore\n'
+                              '\n'
+                              '            if isinstance(msg.content, str):\n'
+                              '                openai_msg["content"] = msg.content\n'
+                              '            else:\n'
+                              '                cls._convert_message_content(msg, '
+                              'openai_msg, openai_messages)\n'
+                              '\n'
+                              '            if not (msg.role == "user" and "content" '
+                              'not in openai_msg):\n'
+                              '                openai_messages.append(openai_msg)\n'
+                              '\n'
+                              '    @classmethod\n'
+                              '    def _convert_message_content(\n',
+             'review_after': '                text = cls._extract_system_text(msg)\n'
+                             '                if text:\n'
+                             '                    openai_messages.append({"role": '
+                             '"system", "content": text})\n'
+                             '                    origins.append(("messages", where))\n'
+                             '                continue\n'
+                             '\n'
+                             '            openai_msg: dict[str, Any] = {"role": '
+                             'msg.role}  # type: ignore\n'
+                             '            call_blocks: list[tuple[str, str]] = []\n'
+                             '\n'
+                             '            if isinstance(msg.content, str):\n'
+                             '                openai_msg["content"] = msg.content\n'
+                             '            else:\n'
+                             '                call_blocks = '
+                             'cls._convert_message_content(\n'
+                             '                    msg, openai_msg, openai_messages, '
+                             'origins, where\n'
+                             '                )\n'
+                             '\n'
+                             '            if not (msg.role == "user" and "content" not '
+                             'in openai_msg):\n'
+                             '                for call_index, origin in '
+                             'enumerate(call_blocks):\n'
+                             '                    call_origins[(len(openai_messages), '
+                             'call_index)] = origin\n'
+                             '                openai_messages.append(openai_msg)\n'
+                             '                origins.append(("messages", where))\n'
+                             '\n'
+                             '    @classmethod\n'
+                             '    def _convert_message_content(\n'},
+            {'name': 'vllm/entrypoints/anthropic/serving.py:landmark-8',
+             'path': 'vllm/entrypoints/anthropic/serving.py',
+             'before': '        msg,\n'
+                       '        openai_msg: dict[str, Any],\n'
+                       '        openai_messages: list[dict[str, Any]],\n'
+                       '    ) -> None:\n'
+                       '        """Convert complex message content blocks"""\n'
+                       '        content_parts: list[dict[str, Any]] = []\n'
+                       '        tool_calls: list[dict[str, Any]] = []\n'
+                       '        reasoning_parts: list[str] = []\n'
+                       '\n'
+                       '        for block in msg.content:\n'
+                       '            cls._convert_block(\n'
+                       '                block,\n'
+                       '                msg.role,\n',
+             'after': '        msg,\n'
+                      '        openai_msg: dict[str, Any],\n'
+                      '        openai_messages: list[dict[str, Any]],\n'
+                      '        origins: list[tuple[str, str]],\n'
+                      '        where: str,\n'
+                      '    ) -> list[tuple[str, str]]:\n'
+                      '        """Convert complex message content blocks.\n'
+                      '\n'
+                      '        Every message a block adds (a tool result) is recorded '
+                      'as coming from\n'
+                      '        that block; the block of each call is returned, in call '
+                      'order.\n'
+                      '        """\n'
+                      '        content_parts: list[dict[str, Any]] = []\n'
+                      '        tool_calls: list[dict[str, Any]] = []\n'
+                      '        reasoning_parts: list[str] = []\n'
+                      '        call_blocks: list[tuple[str, str]] = []\n'
+                      '\n'
+                      '        for position, block in enumerate(msg.content):\n'
+                      '            results_before, calls_before = '
+                      'len(openai_messages), len(tool_calls)\n'
+                      '            cls._convert_block(\n'
+                      '                block,\n'
+                      '                msg.role,\n',
+             'review_before': '        msg,\n'
+                              '        openai_msg: dict[str, Any],\n'
+                              '        openai_messages: list[dict[str, Any]],\n'
+                              '    ) -> None:\n'
+                              '        """Convert complex message content blocks"""\n'
+                              '        content_parts: list[dict[str, Any]] = []\n'
+                              '        tool_calls: list[dict[str, Any]] = []\n'
+                              '        reasoning_parts: list[str] = []\n'
+                              '\n'
+                              '        for block in msg.content:\n'
+                              '            cls._convert_block(\n'
+                              '                block,\n'
+                              '                msg.role,\n',
+             'review_after': '        msg,\n'
+                             '        openai_msg: dict[str, Any],\n'
+                             '        openai_messages: list[dict[str, Any]],\n'
+                             '        origins: list[tuple[str, str]],\n'
+                             '        where: str,\n'
+                             '    ) -> list[tuple[str, str]]:\n'
+                             '        """Convert complex message content blocks.\n'
+                             '\n'
+                             '        Every message a block adds (a tool result) is '
+                             'recorded as coming from\n'
+                             '        that block; the block of each call is returned, '
+                             'in call order.\n'
+                             '        """\n'
+                             '        content_parts: list[dict[str, Any]] = []\n'
+                             '        tool_calls: list[dict[str, Any]] = []\n'
+                             '        reasoning_parts: list[str] = []\n'
+                             '        call_blocks: list[tuple[str, str]] = []\n'
+                             '\n'
+                             '        for position, block in enumerate(msg.content):\n'
+                             '            results_before, calls_before = '
+                             'len(openai_messages), len(tool_calls)\n'
+                             '            cls._convert_block(\n'
+                             '                block,\n'
+                             '                msg.role,\n'},
+            {'name': 'vllm/entrypoints/anthropic/serving.py:landmark-9',
+             'path': 'vllm/entrypoints/anthropic/serving.py',
+             'before': '                reasoning_parts,\n'
+                       '                openai_messages,\n'
+                       '            )\n'
+                       '\n'
+                       '        if reasoning_parts:\n'
+                       '            openai_msg["reasoning"] = '
+                       '"".join(reasoning_parts)\n',
+             'after': '                reasoning_parts,\n'
+                      '                openai_messages,\n'
+                      '            )\n'
+                      '            block_origin = ("messages", '
+                      'f"{where}.content[{position}]")\n'
+                      '            origins.extend([block_origin] * '
+                      '(len(openai_messages) - results_before))\n'
+                      '            call_blocks.extend([block_origin] * '
+                      '(len(tool_calls) - calls_before))\n'
+                      '\n'
+                      '        if reasoning_parts:\n'
+                      '            openai_msg["reasoning"] = '
+                      '"".join(reasoning_parts)\n',
+             'review_before': '                reasoning_parts,\n'
+                              '                openai_messages,\n'
+                              '            )\n'
+                              '\n'
+                              '        if reasoning_parts:\n'
+                              '            openai_msg["reasoning"] = '
+                              '"".join(reasoning_parts)\n',
+             'review_after': '                reasoning_parts,\n'
+                             '                openai_messages,\n'
+                             '            )\n'
+                             '            block_origin = ("messages", '
+                             'f"{where}.content[{position}]")\n'
+                             '            origins.extend([block_origin] * '
+                             '(len(openai_messages) - results_before))\n'
+                             '            call_blocks.extend([block_origin] * '
+                             '(len(tool_calls) - calls_before))\n'
+                             '\n'
+                             '        if reasoning_parts:\n'
+                             '            openai_msg["reasoning"] = '
+                             '"".join(reasoning_parts)\n'},
+            {'name': 'vllm/entrypoints/anthropic/serving.py:landmark-10',
+             'path': 'vllm/entrypoints/anthropic/serving.py',
+             'before': '                openai_msg["content"] = '
+                       'content_parts[0]["text"]\n'
+                       '            else:\n'
+                       '                openai_msg["content"] = content_parts  # type: '
+                       'ignore\n'
+                       '        elif not tool_calls and not reasoning_parts:\n'
+                       '            return\n'
+                       '\n'
+                       '    @classmethod\n'
+                       '    def _convert_block(\n',
+             'after': '                openai_msg["content"] = '
+                      'content_parts[0]["text"]\n'
+                      '            else:\n'
+                      '                openai_msg["content"] = content_parts  # type: '
+                      'ignore\n'
+                      '        return call_blocks\n'
+                      '\n'
+                      '    @classmethod\n'
+                      '    def _convert_block(\n',
+             'review_before': '                openai_msg["content"] = '
+                              'content_parts[0]["text"]\n'
+                              '            else:\n'
+                              '                openai_msg["content"] = content_parts  '
+                              '# type: ignore\n'
+                              '        elif not tool_calls and not reasoning_parts:\n'
+                              '            return\n'
+                              '\n'
+                              '    @classmethod\n'
+                              '    def _convert_block(\n',
+             'review_after': '                openai_msg["content"] = '
+                             'content_parts[0]["text"]\n'
+                             '            else:\n'
+                             '                openai_msg["content"] = content_parts  # '
+                             'type: ignore\n'
+                             '        return call_blocks\n'
+                             '\n'
+                             '    @classmethod\n'
+                             '    def _convert_block(\n'},
+            {'name': 'vllm/entrypoints/anthropic/serving.py:landmark-11',
+             'path': 'vllm/entrypoints/anthropic/serving.py',
+             'before': '    @classmethod\n'
+                       '    def _convert_tool_use_block(cls, block, tool_calls: '
+                       'list[dict[str, Any]]) -> None:\n'
+                       '        """Convert tool_use block to OpenAI function call '
+                       'format"""\n'
+                       '        tool_call = {\n'
+                       '            "id": block.id or f"call_{int(time.time())}",\n'
+                       '            "type": "function",\n'
+                       '            "function": {\n'
+                       '                "name": block.name or "",\n',
+             'after': '    @classmethod\n'
+                      '    def _convert_tool_use_block(cls, block, tool_calls: '
+                      'list[dict[str, Any]]) -> None:\n'
+                      '        """Convert tool_use block to OpenAI function call '
+                      'format"""\n'
+                      '        # A call sent without an id keeps none; the '
+                      'tool-history check\n'
+                      '        # refuses it, naming the block.\n'
+                      '        tool_call = {\n'
+                      '            "id": block.id or "",\n'
+                      '            "type": "function",\n'
+                      '            "function": {\n'
+                      '                "name": block.name or "",\n',
+             'review_before': '    @classmethod\n'
+                              '    def _convert_tool_use_block(cls, block, tool_calls: '
+                              'list[dict[str, Any]]) -> None:\n'
+                              '        """Convert tool_use block to OpenAI function '
+                              'call format"""\n'
+                              '        tool_call = {\n'
+                              '            "id": block.id or '
+                              'f"call_{int(time.time())}",\n'
+                              '            "type": "function",\n'
+                              '            "function": {\n'
+                              '                "name": block.name or "",\n',
+             'review_after': '    @classmethod\n'
+                             '    def _convert_tool_use_block(cls, block, tool_calls: '
+                             'list[dict[str, Any]]) -> None:\n'
+                             '        """Convert tool_use block to OpenAI function '
+                             'call format"""\n'
+                             '        # A call sent without an id keeps none; the '
+                             'tool-history check\n'
+                             '        # refuses it, naming the block.\n'
+                             '        tool_call = {\n'
+                             '            "id": block.id or "",\n'
+                             '            "type": "function",\n'
+                             '            "function": {\n'
+                             '                "name": block.name or "",\n'},
+            {'name': 'vllm/entrypoints/anthropic/serving.py:landmark-12',
+             'path': 'vllm/entrypoints/anthropic/serving.py',
              'before': '                '
                        'chat_template_kwargs=anthropic_request.chat_template_kwargs,\n'
                        '            )\n'
@@ -721,7 +1429,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '        return ChatCompletionRequest(\n'
                              '            model=anthropic_request.model,\n'
                              '            messages=openai_messages,\n'},
-            {'name': 'vllm/entrypoints/anthropic/serving.py:landmark-2',
+            {'name': 'vllm/entrypoints/anthropic/serving.py:landmark-13',
              'path': 'vllm/entrypoints/anthropic/serving.py',
              'before': '            cache_salt=anthropic_request.cache_salt,\n'
                        '            '
@@ -1187,12 +1895,13 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '    """Validate transport IDs before rendering positional Qwen '
                       'tool history.\n'
                       '\n'
-                      '    Chat and converted Responses messages share this boundary. '
-                      'Every call must\n'
-                      '    have exactly one result in the declared order; never guess '
-                      'or reorder it.\n'
-                      '    A refusal names where the caller sent the offending message '
-                      'or call.\n'
+                      '    Chat messages, and those Responses and Anthropic requests '
+                      'convert to, share\n'
+                      '    this boundary. Every call must have exactly one result in '
+                      'the declared\n'
+                      '    order; never guess or reorder it. A refusal names where the '
+                      'caller sent the\n'
+                      '    offending message or call.\n'
                       '    """\n'
                       '    pending_ids: list[str] = []\n'
                       '    pending_message_index: int | None = None\n'
@@ -1250,10 +1959,14 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '        if not tool_calls:\n'
                       '            continue\n'
                       '        if role != "assistant":\n'
+                      '            call_parameter, call_location = '
+                      'origin.calls[(message_index, 0)]\n'
                       '            raise VLLMValidationError(\n'
-                      '                f"Message at {location} declares tool_calls "\n'
-                      '                f"with non-assistant role {role!r}.",\n'
-                      '                parameter=parameter,\n'
+                      '                f"Tool call {call_location} is in a message '
+                      'with role {role!r}; "\n'
+                      '                "only an assistant message declares tool '
+                      'calls.",\n'
+                      '                parameter=call_parameter,\n'
                       '            )\n'
                       '\n'
                       '        call_ids: list[str] = []\n'
@@ -1349,12 +2062,13 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    """Validate transport IDs before rendering '
                              'positional Qwen tool history.\n'
                              '\n'
-                             '    Chat and converted Responses messages share this '
-                             'boundary. Every call must\n'
-                             '    have exactly one result in the declared order; never '
-                             'guess or reorder it.\n'
-                             '    A refusal names where the caller sent the offending '
-                             'message or call.\n'
+                             '    Chat messages, and those Responses and Anthropic '
+                             'requests convert to, share\n'
+                             '    this boundary. Every call must have exactly one '
+                             'result in the declared\n'
+                             '    order; never guess or reorder it. A refusal names '
+                             'where the caller sent the\n'
+                             '    offending message or call.\n'
                              '    """\n'
                              '    pending_ids: list[str] = []\n'
                              '    pending_message_index: int | None = None\n'
@@ -1418,11 +2132,14 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '        if not tool_calls:\n'
                              '            continue\n'
                              '        if role != "assistant":\n'
+                             '            call_parameter, call_location = '
+                             'origin.calls[(message_index, 0)]\n'
                              '            raise VLLMValidationError(\n'
-                             '                f"Message at {location} declares '
-                             'tool_calls "\n'
-                             '                f"with non-assistant role {role!r}.",\n'
-                             '                parameter=parameter,\n'
+                             '                f"Tool call {call_location} is in a '
+                             'message with role {role!r}; "\n'
+                             '                "only an assistant message declares tool '
+                             'calls.",\n'
+                             '                parameter=call_parameter,\n'
                              '            )\n'
                              '\n'
                              '        call_ids: list[str] = []\n'
@@ -4428,7 +5145,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '        engine = _make_engine()\n'})},
  {'name': 'qwen38-vision-runtime',
   'review_patch': 'patches/vllm-qwen38-vision-runtime.patch',
-  'review_sha256': '49c23f8762375910a2e0afa2dd1bc3af1ae0c9525b2191c44e382d1faaa0326a',
+  'review_sha256': '03e091a252702011556eca614c0b41dee9b3643973431004415f3ee2ae987227',
   'files': ({'path': 'tests/entrypoints/anthropic/test_anthropic_messages_conversion.py',
              'before_sha256': '51c0ff68800ca0323740628a523ca8a4a3ab813480cc6bca4859ef021c9e03ed',
              'after_sha256': 'e6fa915c7f58e252d0da33bb5de31215cd1dacab1292e9ad5c8d116a7551f942'},
@@ -4454,11 +5171,11 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': None,
              'after_sha256': 'ee6d86cbb1af9b0a363d1cb280fbee3b29e02fcd02f9b3320645968cc635b39f'},
             {'path': 'vllm/entrypoints/anthropic/serving.py',
-             'before_sha256': 'b283dc7f47fe1cbb57f5a9cc4000a27ff5106e94d5caf152e5f7142e8a056e19',
-             'after_sha256': '0e67a46639b5369fad8de21a31799b4fe2bfbbd93c5d1df02911f0f98a08a43c'},
+             'before_sha256': '17dc7dc8122927adca3d7459e9b02944b9bb2ccc2310eeb99e7ffc27bbb7802e',
+             'after_sha256': '2e03ccab70501d9b22d6bf656bdbf65a0fa0771d280b8206aa91ee64eef55111'},
             {'path': 'vllm/entrypoints/chat_utils.py',
-             'before_sha256': '87b24efcaddc21ca22b6863492822d2d794ec62f374a2fe720da94db06c799d6',
-             'after_sha256': 'b8c8bd61c11e8cd93b0110ad2e9ef42e398b068f096be6c9901253a2fb084a1e'},
+             'before_sha256': 'f5026963fbd765f97b16fc7b7725b6438df269c9b1326e9505d9d3e76fa2cc25',
+             'after_sha256': 'd042526e6564182ed4049b98159af1d413ece7b4d561f4e5d38317d2f29d307e'},
             {'path': 'vllm/entrypoints/serve/utils/api_utils.py',
              'before_sha256': '14ca06f57d110b05f561812f84115bd7c380ad18e0fd0d0b2acaaab0e21fdd74',
              'after_sha256': '5c6fbd5ff02c042d6f96bfbe7f4d784f97dbfa8029bc09e059c66c16a807f74b'},
@@ -12751,7 +13468,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'def _new_descriptor_buffers(\n'},)},
  {'name': 'generation-requires-agent-id',
   'review_patch': 'patches/vllm-generation-requires-agent-id.patch',
-  'review_sha256': '8c6adcddb6de73b7c42fa38df7107bef905fbf3ada0157a9fef302d650f7f126',
+  'review_sha256': 'f9e387eb2a57a3c4177d10637faf2f44eb05436d09823cca83d55d4a1d6c20e7',
   'files': ({'path': 'tests/entrypoints/anthropic/test_anthropic_messages_conversion.py',
              'before_sha256': 'e6fa915c7f58e252d0da33bb5de31215cd1dacab1292e9ad5c8d116a7551f942',
              'after_sha256': '55dbe9c3e8d541835a8b1864165762d7fad109a9ae2fe7268081043cfa8e533b'},
@@ -12795,8 +13512,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': '6e217829f96a7e46b87247b2603e9c6cd616c91d97550f9d46ba3cbaad235f4d',
              'after_sha256': '9a1b44b3369ba3933ac35e78dc017d5fc57ae8f84a0785fc2a3bc0b729129fdc'},
             {'path': 'vllm/entrypoints/anthropic/serving.py',
-             'before_sha256': '0e67a46639b5369fad8de21a31799b4fe2bfbbd93c5d1df02911f0f98a08a43c',
-             'after_sha256': '635a9b732dacd22662966c469b43f7ea3d2958913c37943c172dc123459d5bed'},
+             'before_sha256': '2e03ccab70501d9b22d6bf656bdbf65a0fa0771d280b8206aa91ee64eef55111',
+             'after_sha256': '8bd98f7074d7ea28bf3ec2f79c30b034a707000cb4966f9ba03b950a5d19b657'},
             {'path': 'vllm/entrypoints/openai/chat_completion/api_router.py',
              'before_sha256': '118e4e7dfd74d09a296fe4aa8ad094ea829cee5e107c7ac78fed92249db12d1a',
              'after_sha256': '9cb8a56328bcfea734cc252e1291b17aee6c42e7208c9c8f883ad5a434bace17'},
@@ -16293,33 +17010,29 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    def validate_max_tokens(cls, v):\n'},
             {'name': 'vllm/entrypoints/anthropic/serving.py:landmark-1',
              'path': 'vllm/entrypoints/anthropic/serving.py',
-             'before': ')\n'
-                       'from vllm.entrypoints.chat_utils import '
-                       'ChatTemplateContentFormatOption\n'
+             'before': '    validate_tool_result_correlation,\n'
+                       ')\n'
                        'from vllm.entrypoints.openai.chat_completion.protocol import '
                        '(\n'
                        '    ChatCompletionNamedToolChoiceParam,\n'
                        '    ChatCompletionRequest,\n'
                        '    ChatCompletionResponse,\n',
-             'after': ')\n'
-                      'from vllm.entrypoints.chat_utils import '
-                      'ChatTemplateContentFormatOption\n'
+             'after': '    validate_tool_result_correlation,\n'
+                      ')\n'
                       'from vllm.entrypoints.openai.chat_completion.protocol import (\n'
                       '    ChatCompletionGenerationRequest,\n'
                       '    ChatCompletionNamedToolChoiceParam,\n'
                       '    ChatCompletionRequest,\n'
                       '    ChatCompletionResponse,\n',
-             'review_before': ')\n'
-                              'from vllm.entrypoints.chat_utils import '
-                              'ChatTemplateContentFormatOption\n'
+             'review_before': '    validate_tool_result_correlation,\n'
+                              ')\n'
                               'from vllm.entrypoints.openai.chat_completion.protocol '
                               'import (\n'
                               '    ChatCompletionNamedToolChoiceParam,\n'
                               '    ChatCompletionRequest,\n'
                               '    ChatCompletionResponse,\n',
-             'review_after': ')\n'
-                             'from vllm.entrypoints.chat_utils import '
-                             'ChatTemplateContentFormatOption\n'
+             'review_after': '    validate_tool_result_correlation,\n'
+                             ')\n'
                              'from vllm.entrypoints.openai.chat_completion.protocol '
                              'import (\n'
                              '    ChatCompletionGenerationRequest,\n'
@@ -50129,10 +50842,10 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'self._end_token_ids)\n'})},
  {'name': 'anthropic-input-fidelity',
   'review_patch': 'patches/vllm-anthropic-input-fidelity.patch',
-  'review_sha256': '668e8307870ae2b901a86318b03fc3490f4dd1e254d2b4489facfa8ca473da3f',
+  'review_sha256': '3252e25a6c2e9d8ee0eec4cb383fc292bff2afaac2e3becdc1006c68b3b02c3c',
   'files': ({'path': 'tests/entrypoints/anthropic/test_anthropic_messages_conversion.py',
              'before_sha256': '55dbe9c3e8d541835a8b1864165762d7fad109a9ae2fe7268081043cfa8e533b',
-             'after_sha256': '0e41da6d3b88917705ff9a2ad0f295e801fe9164488458fe528cef82984f041b'},
+             'after_sha256': 'df83725d94b42110724df31cd485676333eb442da57b6a389007f4988b1360a8'},
             {'path': 'tests/entrypoints/serve/exception_handling/test_validation_exception_handler.py',
              'before_sha256': '70ac47238a5b8d2f807ceee783daa8a7270599e9b8454c0e24164cb80179a57b',
              'after_sha256': '1a4574a22f9dd00afccbb99dd0b113bb613fa99945e66a9effd3c5014aa886af'},
@@ -50143,8 +50856,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': '9a1b44b3369ba3933ac35e78dc017d5fc57ae8f84a0785fc2a3bc0b729129fdc',
              'after_sha256': '9808d00e7ecb3873e82955172ed1acae80c64f9cf4b0ba647c5a296a06ff6676'},
             {'path': 'vllm/entrypoints/anthropic/serving.py',
-             'before_sha256': '635a9b732dacd22662966c469b43f7ea3d2958913c37943c172dc123459d5bed',
-             'after_sha256': '593c23a6114988f9a0ee442924cea8890c2204446b7821478e820936f0b12917'},
+             'before_sha256': '8bd98f7074d7ea28bf3ec2f79c30b034a707000cb4966f9ba03b950a5d19b657',
+             'after_sha256': '889f35b7e288c9efcafc9cce97aafa4e07a1124cba93eed6e82d3af3c31201da'},
             {'path': 'vllm/entrypoints/serve/exception_handling/error_response.py',
              'before_sha256': '91e23742a98c6ab629ec1fb41d63e3537b4a618c2f1310a32ee79e384b31d047',
              'after_sha256': '897ad7da6633bee28d379f70a84ac51f6889b63214fc33977ef67c929a69584a'},
@@ -50182,6 +50895,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       'from vllm.entrypoints.anthropic.api_router import '
                       'attach_router, translate_error_response\n'
                       'from vllm.entrypoints.anthropic.protocol import (\n'
+                      '    AnthropicCountTokensRequest,\n'
                       '    AnthropicMessagesRequest,\n'
                       ')\n'
                       'from vllm.entrypoints.anthropic.serving import (\n'
@@ -50211,6 +50925,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'from vllm.entrypoints.anthropic.api_router import '
                              'attach_router, translate_error_response\n'
                              'from vllm.entrypoints.anthropic.protocol import (\n'
+                             '    AnthropicCountTokensRequest,\n'
                              '    AnthropicMessagesRequest,\n'
                              ')\n'
                              'from vllm.entrypoints.anthropic.serving import (\n'
@@ -50414,6 +51129,368 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '# '
                              '======================================================================\n'},
             {'name': 'tests/entrypoints/anthropic/test_anthropic_messages_conversion.py:landmark-5',
+             'path': 'tests/entrypoints/anthropic/test_anthropic_messages_conversion.py',
+             'before': '        assert len(user_follow_ups) == 0\n'
+                       '\n'
+                       '\n'
+                       '# '
+                       '======================================================================\n',
+             'after': '        assert len(user_follow_ups) == 0\n'
+                      '\n'
+                      '\n'
+                      'def _use(call_id, name="read_file"):\n'
+                      '    block = {"type": "tool_use", "name": name, "input": {}}\n'
+                      '    return block if call_id is None else {**block, "id": '
+                      'call_id}\n'
+                      '\n'
+                      '\n'
+                      'def _result(call_id):\n'
+                      '    block = {"type": "tool_result", "content": "done"}\n'
+                      '    return block if call_id is None else {**block, '
+                      '"tool_use_id": call_id}\n'
+                      '\n'
+                      '\n'
+                      'def _text(text):\n'
+                      '    return {"type": "text", "text": text}\n'
+                      '\n'
+                      '\n'
+                      'class TestToolHistoryRefusal:\n'
+                      '    """The tool history is validated after conversion to chat '
+                      'messages, whose\n'
+                      '    positions and id field the caller never sent: one Anthropic '
+                      'message becomes\n'
+                      '    several chat messages and the system prompt shifts them. A '
+                      'refusal names\n'
+                      '    the message or content block the caller sent, and '
+                      'tool_use_id."""\n'
+                      '\n'
+                      '    @pytest.mark.parametrize("request_type", ["messages", '
+                      '"count_tokens"])\n'
+                      '    @pytest.mark.parametrize(\n'
+                      '        ("messages", "refusal"),\n'
+                      '        [\n'
+                      '            (\n'
+                      '                [{"role": "user", "content": "hi"},\n'
+                      '                 {"role": "user", "content": [_result("a")]}],\n'
+                      '                "Tool result at messages[1].content[0] is '
+                      'orphaned",\n'
+                      '            ),\n'
+                      '            (\n'
+                      '                [{"role": "user", "content": "hi"},\n'
+                      '                 {"role": "assistant", "content": '
+                      '[_use("a")]},\n'
+                      '                 {"role": "user", "content": '
+                      '[_result(None)]}],\n'
+                      '                "Tool result at messages[2].content[0] is '
+                      'missing tool_use_id; "\n'
+                      '                "expected \'a\'",\n'
+                      '            ),\n'
+                      '            (\n'
+                      '                [{"role": "user", "content": "hi"},\n'
+                      '                 {"role": "assistant", "content": [_text("x"), '
+                      '_use("a"), _use("b")]},\n'
+                      '                 {"role": "user", "content": [_result("a"), '
+                      '_result("c")]}],\n'
+                      '                "Tool result at messages[2].content[1] has '
+                      'tool_use_id \'c\'; "\n'
+                      '                "expected \'b\'",\n'
+                      '            ),\n'
+                      '            (\n'
+                      '                [{"role": "user", "content": "hi"},\n'
+                      '                 {"role": "assistant", "content": [_text("x"), '
+                      '_use("a"), _use("b")]},\n'
+                      '                 {"role": "user", "content": [_result("a"), '
+                      '_text("and then")]}],\n'
+                      '                "Message at messages[2] has role \'user\' '
+                      'before all results for "\n'
+                      '                "the tool calls at messages[1] were supplied; '
+                      'still awaiting [\'b\']",\n'
+                      '            ),\n'
+                      '            (\n'
+                      '                [{"role": "user", "content": [_text("x"), '
+                      '_use("a")]}],\n'
+                      '                "Tool call messages[0].content[1] is in a '
+                      'message with role \'user\'",\n'
+                      '            ),\n'
+                      '            (\n'
+                      '                [{"role": "user", "content": "hi"},\n'
+                      '                 {"role": "assistant", "content": [_text("x"), '
+                      '_use(None)]},\n'
+                      '                 {"role": "user", "content": [_result("a")]}],\n'
+                      '                "Tool call messages[1].content[1] is missing '
+                      'its transport id",\n'
+                      '            ),\n'
+                      '            (\n'
+                      '                [{"role": "user", "content": "hi"},\n'
+                      '                 {"role": "assistant", "content": [\n'
+                      '                     _use("a"), {"type": "thinking", '
+                      '"thinking": "t"}, _use("a")]},\n'
+                      '                 {"role": "user", "content": [_result("a"), '
+                      '_result("a")]}],\n'
+                      '                "Tool call messages[1].content[2] repeats '
+                      'transport id \'a\'",\n'
+                      '            ),\n'
+                      '            (\n'
+                      '                [{"role": "user", "content": "hi"},\n'
+                      '                 {"role": "assistant", "content": [_text("x"), '
+                      '_use("a")]}],\n'
+                      '                "The tool calls at messages[1] have no complete '
+                      'result sequence",\n'
+                      '            ),\n'
+                      '        ],\n'
+                      '        ids=["orphaned", "result-without-id", "out-of-order", '
+                      '"turn-before-results",\n'
+                      '             "call-in-user-message", "call-without-id", '
+                      '"repeated-id", "unanswered"],\n'
+                      '    )\n'
+                      '    def test_a_refusal_names_the_block_the_caller_sent(\n'
+                      '        self, request_type, messages, refusal\n'
+                      '    ):\n'
+                      '        if request_type == "messages":\n'
+                      '            request = _make_request(messages, system="Be '
+                      'terse.")\n'
+                      '        else:\n'
+                      '            request = AnthropicCountTokensRequest(\n'
+                      '                model="test-model", messages=messages, '
+                      'system="Be terse."\n'
+                      '            )\n'
+                      '\n'
+                      '        with pytest.raises(VLLMValidationError) as refused:\n'
+                      '            _convert(request, merge_inline_system=True)\n'
+                      '\n'
+                      '        assert refusal in str(refused.value)\n'
+                      '        assert refused.value.parameter == "messages"\n'
+                      '\n'
+                      '    def '
+                      'test_an_unmerged_inline_system_message_is_named_where_it_was_sent(self):\n'
+                      '        request = _make_request(\n'
+                      '            [{"role": "user", "content": "hi"},\n'
+                      '             {"role": "assistant", "content": [_use("a")]},\n'
+                      '             {"role": "system", "content": "note"},\n'
+                      '             {"role": "user", "content": [_result("a")]}],\n'
+                      '            system="Be terse.",\n'
+                      '        )\n'
+                      '\n'
+                      '        with pytest.raises(VLLMValidationError) as refused:\n'
+                      '            _convert(request, merge_inline_system=False)\n'
+                      '\n'
+                      '        assert "Message at messages[2] has role \'system\' '
+                      'before all results for " \\\n'
+                      '            "the tool calls at messages[1]" in '
+                      'str(refused.value)\n'
+                      '\n'
+                      '    def test_a_correlated_history_converts_whole(self):\n'
+                      '        request = _make_request(\n'
+                      '            [{"role": "system", "content": "inline"},\n'
+                      '             {"role": "user", "content": "hi"},\n'
+                      '             {"role": "assistant", "content": [\n'
+                      '                 {"type": "thinking", "thinking": "plan"}, '
+                      '_text("Calling."),\n'
+                      '                 _use("a"), _use("b")]},\n'
+                      '             {"role": "user", "content": [_result("a"), '
+                      '_result("b"), _text("go on")]}],\n'
+                      '            system="Be terse.",\n'
+                      '        )\n'
+                      '\n'
+                      '        result = _convert(request, merge_inline_system=True)\n'
+                      '\n'
+                      '        assert [m["role"] for m in result.messages] == [\n'
+                      '            "system", "user", "assistant", "tool", "tool", '
+                      '"user"]\n'
+                      '        assert [c["id"] for c in '
+                      'result.messages[2]["tool_calls"]] == ["a", "b"]\n'
+                      '        assert [m.get("tool_call_id") for m in '
+                      'result.messages[3:5]] == ["a", "b"]\n'
+                      '\n'
+                      '\n'
+                      '# '
+                      '======================================================================\n',
+             'review_before': '        assert len(user_follow_ups) == 0\n'
+                              '\n'
+                              '\n'
+                              '# '
+                              '======================================================================\n',
+             'review_after': '        assert len(user_follow_ups) == 0\n'
+                             '\n'
+                             '\n'
+                             'def _use(call_id, name="read_file"):\n'
+                             '    block = {"type": "tool_use", "name": name, "input": '
+                             '{}}\n'
+                             '    return block if call_id is None else {**block, "id": '
+                             'call_id}\n'
+                             '\n'
+                             '\n'
+                             'def _result(call_id):\n'
+                             '    block = {"type": "tool_result", "content": "done"}\n'
+                             '    return block if call_id is None else {**block, '
+                             '"tool_use_id": call_id}\n'
+                             '\n'
+                             '\n'
+                             'def _text(text):\n'
+                             '    return {"type": "text", "text": text}\n'
+                             '\n'
+                             '\n'
+                             'class TestToolHistoryRefusal:\n'
+                             '    """The tool history is validated after conversion to '
+                             'chat messages, whose\n'
+                             '    positions and id field the caller never sent: one '
+                             'Anthropic message becomes\n'
+                             '    several chat messages and the system prompt shifts '
+                             'them. A refusal names\n'
+                             '    the message or content block the caller sent, and '
+                             'tool_use_id."""\n'
+                             '\n'
+                             '    @pytest.mark.parametrize("request_type", '
+                             '["messages", "count_tokens"])\n'
+                             '    @pytest.mark.parametrize(\n'
+                             '        ("messages", "refusal"),\n'
+                             '        [\n'
+                             '            (\n'
+                             '                [{"role": "user", "content": "hi"},\n'
+                             '                 {"role": "user", "content": '
+                             '[_result("a")]}],\n'
+                             '                "Tool result at messages[1].content[0] '
+                             'is orphaned",\n'
+                             '            ),\n'
+                             '            (\n'
+                             '                [{"role": "user", "content": "hi"},\n'
+                             '                 {"role": "assistant", "content": '
+                             '[_use("a")]},\n'
+                             '                 {"role": "user", "content": '
+                             '[_result(None)]}],\n'
+                             '                "Tool result at messages[2].content[0] '
+                             'is missing tool_use_id; "\n'
+                             '                "expected \'a\'",\n'
+                             '            ),\n'
+                             '            (\n'
+                             '                [{"role": "user", "content": "hi"},\n'
+                             '                 {"role": "assistant", "content": '
+                             '[_text("x"), _use("a"), _use("b")]},\n'
+                             '                 {"role": "user", "content": '
+                             '[_result("a"), _result("c")]}],\n'
+                             '                "Tool result at messages[2].content[1] '
+                             'has tool_use_id \'c\'; "\n'
+                             '                "expected \'b\'",\n'
+                             '            ),\n'
+                             '            (\n'
+                             '                [{"role": "user", "content": "hi"},\n'
+                             '                 {"role": "assistant", "content": '
+                             '[_text("x"), _use("a"), _use("b")]},\n'
+                             '                 {"role": "user", "content": '
+                             '[_result("a"), _text("and then")]}],\n'
+                             '                "Message at messages[2] has role '
+                             '\'user\' before all results for "\n'
+                             '                "the tool calls at messages[1] were '
+                             'supplied; still awaiting [\'b\']",\n'
+                             '            ),\n'
+                             '            (\n'
+                             '                [{"role": "user", "content": '
+                             '[_text("x"), _use("a")]}],\n'
+                             '                "Tool call messages[0].content[1] is in '
+                             'a message with role \'user\'",\n'
+                             '            ),\n'
+                             '            (\n'
+                             '                [{"role": "user", "content": "hi"},\n'
+                             '                 {"role": "assistant", "content": '
+                             '[_text("x"), _use(None)]},\n'
+                             '                 {"role": "user", "content": '
+                             '[_result("a")]}],\n'
+                             '                "Tool call messages[1].content[1] is '
+                             'missing its transport id",\n'
+                             '            ),\n'
+                             '            (\n'
+                             '                [{"role": "user", "content": "hi"},\n'
+                             '                 {"role": "assistant", "content": [\n'
+                             '                     _use("a"), {"type": "thinking", '
+                             '"thinking": "t"}, _use("a")]},\n'
+                             '                 {"role": "user", "content": '
+                             '[_result("a"), _result("a")]}],\n'
+                             '                "Tool call messages[1].content[2] '
+                             'repeats transport id \'a\'",\n'
+                             '            ),\n'
+                             '            (\n'
+                             '                [{"role": "user", "content": "hi"},\n'
+                             '                 {"role": "assistant", "content": '
+                             '[_text("x"), _use("a")]}],\n'
+                             '                "The tool calls at messages[1] have no '
+                             'complete result sequence",\n'
+                             '            ),\n'
+                             '        ],\n'
+                             '        ids=["orphaned", "result-without-id", '
+                             '"out-of-order", "turn-before-results",\n'
+                             '             "call-in-user-message", "call-without-id", '
+                             '"repeated-id", "unanswered"],\n'
+                             '    )\n'
+                             '    def test_a_refusal_names_the_block_the_caller_sent(\n'
+                             '        self, request_type, messages, refusal\n'
+                             '    ):\n'
+                             '        if request_type == "messages":\n'
+                             '            request = _make_request(messages, system="Be '
+                             'terse.")\n'
+                             '        else:\n'
+                             '            request = AnthropicCountTokensRequest(\n'
+                             '                model="test-model", messages=messages, '
+                             'system="Be terse."\n'
+                             '            )\n'
+                             '\n'
+                             '        with pytest.raises(VLLMValidationError) as '
+                             'refused:\n'
+                             '            _convert(request, merge_inline_system=True)\n'
+                             '\n'
+                             '        assert refusal in str(refused.value)\n'
+                             '        assert refused.value.parameter == "messages"\n'
+                             '\n'
+                             '    def '
+                             'test_an_unmerged_inline_system_message_is_named_where_it_was_sent(self):\n'
+                             '        request = _make_request(\n'
+                             '            [{"role": "user", "content": "hi"},\n'
+                             '             {"role": "assistant", "content": '
+                             '[_use("a")]},\n'
+                             '             {"role": "system", "content": "note"},\n'
+                             '             {"role": "user", "content": '
+                             '[_result("a")]}],\n'
+                             '            system="Be terse.",\n'
+                             '        )\n'
+                             '\n'
+                             '        with pytest.raises(VLLMValidationError) as '
+                             'refused:\n'
+                             '            _convert(request, '
+                             'merge_inline_system=False)\n'
+                             '\n'
+                             '        assert "Message at messages[2] has role '
+                             '\'system\' before all results for " \\\n'
+                             '            "the tool calls at messages[1]" in '
+                             'str(refused.value)\n'
+                             '\n'
+                             '    def test_a_correlated_history_converts_whole(self):\n'
+                             '        request = _make_request(\n'
+                             '            [{"role": "system", "content": "inline"},\n'
+                             '             {"role": "user", "content": "hi"},\n'
+                             '             {"role": "assistant", "content": [\n'
+                             '                 {"type": "thinking", "thinking": '
+                             '"plan"}, _text("Calling."),\n'
+                             '                 _use("a"), _use("b")]},\n'
+                             '             {"role": "user", "content": [_result("a"), '
+                             '_result("b"), _text("go on")]}],\n'
+                             '            system="Be terse.",\n'
+                             '        )\n'
+                             '\n'
+                             '        result = _convert(request, '
+                             'merge_inline_system=True)\n'
+                             '\n'
+                             '        assert [m["role"] for m in result.messages] == '
+                             '[\n'
+                             '            "system", "user", "assistant", "tool", '
+                             '"tool", "user"]\n'
+                             '        assert [c["id"] for c in '
+                             'result.messages[2]["tool_calls"]] == ["a", "b"]\n'
+                             '        assert [m.get("tool_call_id") for m in '
+                             'result.messages[3:5]] == ["a", "b"]\n'
+                             '\n'
+                             '\n'
+                             '# '
+                             '======================================================================\n'},
+            {'name': 'tests/entrypoints/anthropic/test_anthropic_messages_conversion.py:landmark-6',
              'path': 'tests/entrypoints/anthropic/test_anthropic_messages_conversion.py',
              'before': '\n'
                        '        assert response.status_code == HTTPStatus.BAD_REQUEST\n'
@@ -59977,10 +61054,10 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'def _dump_tool_for_xgrammar(\n'})},
  {'name': 'responses-history-integrity',
   'review_patch': 'patches/vllm-responses-history-integrity.patch',
-  'review_sha256': '8d026e4fde0f40af9f58f6d8341aec8ce5af0316836e419467d2ebc3fc718964',
+  'review_sha256': 'd2c6343087fc287eb6afe315cdfb9caa2909de140c82b57ee9d0c3ed9473983c',
   'files': ({'path': 'tests/entrypoints/openai/responses/test_responses_utils.py',
              'before_sha256': 'e858ea25eb9e0fac456b34975f7149858b1c61a001d86f63afd06e801ff6a19b',
-             'after_sha256': '0f543a7d296a8028ffd0cc6a51971417e861f4e74596fc38c3ea96b8e4e6f2ff'},
+             'after_sha256': 'f8bbcaa1c34d6a5ce237ccf92181695075cf23ac2825644c20b1b134d8da1ef1'},
             {'path': 'vllm/entrypoints/openai/responses/utils.py',
              'before_sha256': '90c48a7f52346b50d0929accbabeffbc88025f430cd595d066f470393e237b52',
              'after_sha256': '8820d8e03e3740ab9ce43e53c62b87f828eee4f7e25f20dadc54a2b450e17948'}),
@@ -60416,6 +61493,21 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '\n'
                       '\n'
                       'def '
+                      'test_a_call_outside_an_assistant_message_is_named_by_the_call():\n'
+                      '    messages = [{"role": "user", "content": "x", "tool_calls": '
+                      '[\n'
+                      '        {"id": "a", "type": "function", "function": {"name": '
+                      '"f", "arguments": "{}"}}]}]\n'
+                      '    with pytest.raises(VLLMValidationError) as refused:\n'
+                      '        ChatCompletionRequest(messages=messages)\n'
+                      '    assert refused.value.parameter == "messages"\n'
+                      '    assert "Tool call messages[0].tool_calls[0] is in a message '
+                      'with role \'user\'; " \\\n'
+                      '        "only an assistant message declares tool calls" in '
+                      'str(refused.value)\n'
+                      '\n'
+                      '\n'
+                      'def '
                       'test_a_responses_history_refusal_names_the_input_item_sent():\n'
                       '    """The history is validated after conversion to chat '
                       'messages, whose\n'
@@ -60662,6 +61754,21 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'stream=stream, kv_scope="agent")\n'
                              '            '
                              'construct_input_messages(request_input=request.input)\n'
+                             '\n'
+                             '\n'
+                             'def '
+                             'test_a_call_outside_an_assistant_message_is_named_by_the_call():\n'
+                             '    messages = [{"role": "user", "content": "x", '
+                             '"tool_calls": [\n'
+                             '        {"id": "a", "type": "function", "function": '
+                             '{"name": "f", "arguments": "{}"}}]}]\n'
+                             '    with pytest.raises(VLLMValidationError) as refused:\n'
+                             '        ChatCompletionRequest(messages=messages)\n'
+                             '    assert refused.value.parameter == "messages"\n'
+                             '    assert "Tool call messages[0].tool_calls[0] is in a '
+                             'message with role \'user\'; " \\\n'
+                             '        "only an assistant message declares tool calls" '
+                             'in str(refused.value)\n'
                              '\n'
                              '\n'
                              'def '
@@ -64586,13 +65693,13 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '            return None\n'})},
  {'name': 'anthropic-terminal-metadata',
   'review_patch': 'patches/vllm-anthropic-terminal-metadata.patch',
-  'review_sha256': 'd09c3b0ba5658b864131c46202f53a4b611ca0395bd068feb1a054fcc70f2364',
+  'review_sha256': '532d0087c42445ffa19f0d1ce190fd72b9eb238fda4100f17aa071af598dee6c',
   'files': ({'path': 'tests/entrypoints/anthropic/test_anthropic_messages_conversion.py',
-             'before_sha256': '0e41da6d3b88917705ff9a2ad0f295e801fe9164488458fe528cef82984f041b',
-             'after_sha256': 'ecc69fcf88b64a295c238a7440f9e852c82417e7822eec81f7816a5569e9391a'},
+             'before_sha256': 'df83725d94b42110724df31cd485676333eb442da57b6a389007f4988b1360a8',
+             'after_sha256': '79b285e140af605bf6b04e704bb22a6d9ad4e7489b65534d90de0a11037a8836'},
             {'path': 'vllm/entrypoints/anthropic/serving.py',
-             'before_sha256': '593c23a6114988f9a0ee442924cea8890c2204446b7821478e820936f0b12917',
-             'after_sha256': '5868d595cd9560ec9d5da864771a862e02d33c95f7de7d49c61c0ae6df10678f'}),
+             'before_sha256': '889f35b7e288c9efcafc9cce97aafa4e07a1124cba93eed6e82d3af3c31201da',
+             'after_sha256': '146368b4867e5a538e216fbbe4bf17525703e89a6a04e6febde1df8a94fd0233'}),
   'edits': ({'name': 'tests/entrypoints/anthropic/test_anthropic_messages_conversion.py:landmark-1',
              'path': 'tests/entrypoints/anthropic/test_anthropic_messages_conversion.py',
              'before': '\n'
@@ -96778,10 +97885,10 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '        super().__init__(request)\n'})},
  {'name': 'precise-request-errors',
   'review_patch': 'patches/vllm-precise-request-errors.patch',
-  'review_sha256': '6ebbc277c2a6f523d520b75d3afe75dd13c745449eea63e037856e8351ac05ad',
+  'review_sha256': '5620e9394e9d636b6f875bb9a04c21d54b5a9629f6a6651cda3be79d98be43f2',
   'files': ({'path': 'tests/entrypoints/anthropic/test_anthropic_messages_conversion.py',
-             'before_sha256': 'ecc69fcf88b64a295c238a7440f9e852c82417e7822eec81f7816a5569e9391a',
-             'after_sha256': '3ff009c6f1bfecc12ce231bc8f5cff386f23e47257c54940ec3bac3e022c550b'},
+             'before_sha256': '79b285e140af605bf6b04e704bb22a6d9ad4e7489b65534d90de0a11037a8836',
+             'after_sha256': 'b56738b337efb00d37efc174a265d2e5681b58cf391ac5a4f4294842d708268b'},
             {'path': 'tests/entrypoints/serve/exception_handling/test_http_status_metrics.py',
              'before_sha256': '7584628ae7017fe7d5dcc79bbcb803fc19bd99d91177a27cf6ae98ca1ac7eeec',
              'after_sha256': '3a6f93e9c2ae479d81c8454dd94ab8a4bdf1fe62cf0e134496c7db98d77fcdd1'},
@@ -110506,10 +111613,10 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '\n'})},
  {'name': 'template-authored-control-tokens',
   'review_patch': 'patches/vllm-template-authored-control-tokens.patch',
-  'review_sha256': '1f6b9e898c3b7d3620d2ad3ee8dce70aa7d320e211788ff4fe030468870bc37b',
+  'review_sha256': '2a6e8b31826cf06d52acb3c87cae0c6c68a7acc2c8f01dd7848bc5e948977228',
   'files': ({'path': 'tests/entrypoints/anthropic/test_anthropic_messages_conversion.py',
-             'before_sha256': '3ff009c6f1bfecc12ce231bc8f5cff386f23e47257c54940ec3bac3e022c550b',
-             'after_sha256': '8a0ab16f6a4cb53608192ffffc56998ce8eb7e51507b69883e5ee44dd1226265'},
+             'before_sha256': 'b56738b337efb00d37efc174a265d2e5681b58cf391ac5a4f4294842d708268b',
+             'after_sha256': 'c9e0ceeaea3ef19464f1d0f16c86bfb40b96747a336a7c7ee6430b7c25d60243'},
             {'path': 'tests/renderers/test_hf.py',
              'before_sha256': 'a807a89a298f4542a149acb20471d55ac47a874639c134858996c8196387f8ee',
              'after_sha256': 'fa24987689db198add630723f7697ab2fc61edb7d133990890fcd19fe9943b90'},
@@ -110517,8 +111624,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': None,
              'after_sha256': 'b2b34a541fa8d5e1155ab87d6d4e781c40bb01762042d44dd6da48668a32691d'},
             {'path': 'vllm/entrypoints/chat_utils.py',
-             'before_sha256': 'b8c8bd61c11e8cd93b0110ad2e9ef42e398b068f096be6c9901253a2fb084a1e',
-             'after_sha256': 'ddb54fb57feb0963958769aca568d495c2f543c8a2f54d29ce894d6394c00829'},
+             'before_sha256': 'd042526e6564182ed4049b98159af1d413ece7b4d561f4e5d38317d2f29d307e',
+             'after_sha256': '136f738d1fa68009a176e23d07985574f5628ada3cd5e2a73793931cd8e7aa40'},
             {'path': 'vllm/entrypoints/pooling/scoring/io_processor.py',
              'before_sha256': 'd10e7153cb345d8a34d8c4d6e1c53e7b6adcf29d494368f03e3a0f07ebe290f2',
              'after_sha256': 'aaa0d78c9432298095134f2fc5f07ca18f613b139912aef01a43ade162bdb5d4'},
@@ -126422,10 +127529,10 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '                # non-reasoning outputs.\n'})},
  {'name': 'unspecified-tool-choice-is-the-default',
   'review_patch': 'patches/vllm-unspecified-tool-choice-is-the-default.patch',
-  'review_sha256': '367fedad65383375e377d7bc1e20cc3fdab4554d511b9437918004b25321d530',
+  'review_sha256': '8db1159ea73f23e20a7635b276f56abce085d9b0d83b3ea0d4599f275c5e8746',
   'files': ({'path': 'tests/entrypoints/anthropic/test_anthropic_messages_conversion.py',
-             'before_sha256': '8a0ab16f6a4cb53608192ffffc56998ce8eb7e51507b69883e5ee44dd1226265',
-             'after_sha256': '6bc3ec877070bd71bd337199de61e7afa6c017a18332d7c5ac4f745491d49cf8'},
+             'before_sha256': 'c9e0ceeaea3ef19464f1d0f16c86bfb40b96747a336a7c7ee6430b7c25d60243',
+             'after_sha256': '30e03a0608325ec676971d1a02a04512004a3d61cb07875cbb36458162a94007'},
             {'path': 'tests/entrypoints/openai/chat_completion/test_unspecified_tool_choice.py',
              'before_sha256': None,
              'after_sha256': 'd8e14d07b3c11672fd6aa08beb861e780b4296ca114a0cc3e1a6fb80489711a7'},
@@ -126433,8 +127540,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': '658ba086e5883517a477bd81eb2cf94b55dc1aeefe8a2a1b7e74353f7eeb1cb7',
              'after_sha256': 'ef7698e44d4c71dc803773a515d0c12e81c66751108bc5d304e9f3bc8bd9d907'},
             {'path': 'vllm/entrypoints/anthropic/serving.py',
-             'before_sha256': '5868d595cd9560ec9d5da864771a862e02d33c95f7de7d49c61c0ae6df10678f',
-             'after_sha256': '027c485896a24b533c4b5edcd0f4e2be96c5e29de9695ab88e70e60831ed8fd4'},
+             'before_sha256': '146368b4867e5a538e216fbbe4bf17525703e89a6a04e6febde1df8a94fd0233',
+             'after_sha256': 'e6f1e2257df53672a5d2bd434eb6b0f9025a10ad8bda80f08af8924f241679a8'},
             {'path': 'vllm/entrypoints/openai/chat_completion/protocol.py',
              'before_sha256': 'cea0e7a83613a21da92fcd729a1caf3b83bdb97c611918e381c73d257a23dd1d',
              'after_sha256': '0d200a798bb9fa7911ff2c2c84bae744b23f815b39b52ce0f69f533b1def60d4'},
@@ -135697,7 +136804,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'set(self.stop_token_ids or ())\n'})},
  {'name': 'output-constraints-refused-beside-tool-calls',
   'review_patch': 'patches/vllm-output-constraints-refused-beside-tool-calls.patch',
-  'review_sha256': '01bfdf064fa8a83c68feb4f5477181bc3df2f6776e41ec91ac672e84ca562adb',
+  'review_sha256': 'b82f6259428441aee55d157443bcedc1d98fb247ef9a521106408671a24ae533',
   'files': ({'path': 'tests/entrypoints/openai/test_output_constraint_beside_tools.py',
              'before_sha256': None,
              'after_sha256': '836be0512b50a3c2877a99ef7166b59bc50c7aa535a7cf653edebf57028f9b39'},
@@ -135711,8 +136818,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': '9808d00e7ecb3873e82955172ed1acae80c64f9cf4b0ba647c5a296a06ff6676',
              'after_sha256': 'a6b36585ab26bf55c15205b03f6bad9da3534a9ddd5918ea358f2945ff303fdc'},
             {'path': 'vllm/entrypoints/anthropic/serving.py',
-             'before_sha256': '027c485896a24b533c4b5edcd0f4e2be96c5e29de9695ab88e70e60831ed8fd4',
-             'after_sha256': '089e60ed67e60717853e132f9d710c5542e9fa1f3b92d5a26033c8dadfc34eb4'},
+             'before_sha256': 'e6f1e2257df53672a5d2bd434eb6b0f9025a10ad8bda80f08af8924f241679a8',
+             'after_sha256': 'e268ce5922cefa06377dc7b0abe70b96bd9c33f82c5f5c9a53ce91375ba5bbdf'},
             {'path': 'vllm/entrypoints/openai/chat_completion/protocol.py',
              'before_sha256': '0d200a798bb9fa7911ff2c2c84bae744b23f815b39b52ce0f69f533b1def60d4',
              'after_sha256': '327b4ee4a029ece964413b15c687cf7790f8aa3a4f87f0c06ab8e37b70581750'},
@@ -137647,7 +138754,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'kernel_cls.__name__)\n'})},
  {'name': 'render-carries-every-image-chat-renders',
   'review_patch': 'patches/vllm-render-carries-every-image-chat-renders.patch',
-  'review_sha256': 'c5bf4cb2948b9eb7866d083671af3badcc9cf529a7756bde3b0647c236fe932f',
+  'review_sha256': 'de53b6f2c86c53552a133d0ef93422c73570b53d1eace1d9e8f835accf9f5181',
   'files': ({'path': 'tests/entrypoints/scale_out/token_in_token_out/test_protocol.py',
              'before_sha256': '64ae671e5da6f15c64b2d243b4a1bc3bdb0dd7b0b45f9288304a73e2ce9c7a1f',
              'after_sha256': 'fc3d4cb03caedf41942409f0e93ec59e3a07ce511af798c10e87eaca104115c5'},
@@ -137655,8 +138762,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': 'e8359e55d9919cb95d358854521be90c3d8f7367ddc8eaedf12b7ca46cce2aa9',
              'after_sha256': '119155ca00f4cb890976e438157fe0e437c491340d05233dc3483f38fd158785'},
             {'path': 'vllm/entrypoints/chat_utils.py',
-             'before_sha256': 'ddb54fb57feb0963958769aca568d495c2f543c8a2f54d29ce894d6394c00829',
-             'after_sha256': '885a4093bdcdcfbf2449628a395edd838744d8b36c431cd35687c9c313690dab'},
+             'before_sha256': '136f738d1fa68009a176e23d07985574f5628ada3cd5e2a73793931cd8e7aa40',
+             'after_sha256': 'b6a8c6ef3d744dd0aeafa5532d00f72299c0b4bb6de3216ad26735ef7530ccac'},
             {'path': 'vllm/entrypoints/scale_out/render/serving.py',
              'before_sha256': '170d9ee1f5023075e128f9158b09ef33e4d653f3fb07ca73fd474cc5168b4f68',
              'after_sha256': '5c610ac0bdca6dcb4071a7b7952ffd3711fc600b89a9eca6a3e56e44fd00a674'},
@@ -143380,13 +144487,13 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'registration.\n'})},
  {'name': 'responses-refuses-tools-the-template-is-never-given',
   'review_patch': 'patches/vllm-responses-refuses-tools-the-template-is-never-given.patch',
-  'review_sha256': '84bfd906df0b4f47192d039106a3b6f6af154f4005d5036878b6af62c8c16cac',
+  'review_sha256': 'ee2c83118ee21815cfb582d432c61b9bebbde1845858f4c294bab0ce392abf85',
   'files': ({'path': 'tests/entrypoints/openai/responses/test_parsable_context.py',
              'before_sha256': '1c1e227fda34d81b9493198f1202979295253fc337d141357d02b4a6923dbe38',
              'after_sha256': '689ff6d49b466e36ab73bbff52cd9733d288c8d98aeee47edb6e9bfbf03b8615'},
             {'path': 'tests/entrypoints/openai/responses/test_responses_utils.py',
-             'before_sha256': '0f543a7d296a8028ffd0cc6a51971417e861f4e74596fc38c3ea96b8e4e6f2ff',
-             'after_sha256': '2d638d7d0594fe95959c94a8486494e483fb367fbdb7d09a8d9156f8f450d651'},
+             'before_sha256': 'f8bbcaa1c34d6a5ce237ccf92181695075cf23ac2825644c20b1b134d8da1ef1',
+             'after_sha256': 'dc39c484458fa0812c4aa662a64f33b36ac398fcb57f004dcabc86946f5d3c84'},
             {'path': 'tests/tool_use/test_responses_request_validations.py',
              'before_sha256': '90f95b34cf4ed5b5b871798866787d76273e29f252c6128cfafeb139668f8e7f',
              'after_sha256': '0b898db5685b5c838c33804030c4b83987d7aea80f93b2eda5a5a65aba4f9b91'},
@@ -144766,7 +145873,7 @@ FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5d
  'tests/detokenizer/test_stop_string_while_stop_model_terminates.py': 'a575db162d04feb30942438f02f89d7f69292ca66c4bd391e89b2755966c62f4',
  'tests/distributed/test_rocm_quick_reduce.py': 'bf6f8a5708568b1f4d96dcc59f42258f8680e5b03bb4abdddcb0c7ead9d414bd',
  'tests/engine/test_arg_utils.py': '858f15c077a1fa031228bcf8e2d92a7a479a07f2d7da32b106f8eab419b7901b',
- 'tests/entrypoints/anthropic/test_anthropic_messages_conversion.py': '6bc3ec877070bd71bd337199de61e7afa6c017a18332d7c5ac4f745491d49cf8',
+ 'tests/entrypoints/anthropic/test_anthropic_messages_conversion.py': '30e03a0608325ec676971d1a02a04512004a3d61cb07875cbb36458162a94007',
  'tests/entrypoints/multimodal/openai/chat_completion/test_video.py': '219e50f6556699d257807b5481ba6664169cd0dd716a59f7fd5969442da475ae',
  'tests/entrypoints/multimodal/openai/chat_completion/test_vision.py': '02bfb195fed75218c3c930867fc80a85f56737644e852f2072a1159ce41869a4',
  'tests/entrypoints/openai/chat_completion/test_chat_completion.py': '23ca459e429fa23fbee2e9e1fb8bda8e2c68303b2554a310b232423f667a40ab',
@@ -144784,7 +145891,7 @@ FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5d
  'tests/entrypoints/openai/responses/test_parsable_context.py': '689ff6d49b466e36ab73bbff52cd9733d288c8d98aeee47edb6e9bfbf03b8615',
  'tests/entrypoints/openai/responses/test_parsable_context_unit.py': '95f50d93d97370d426319b5dc94fce55b9cbca4ce9b3b95a930e42990dcbf4a2',
  'tests/entrypoints/openai/responses/test_reasoning_usage_context.py': '46074423f3316b6380ecb50f17c6d26aa2fe49c5fa211cb08179ee5fb4347666',
- 'tests/entrypoints/openai/responses/test_responses_utils.py': '2d638d7d0594fe95959c94a8486494e483fb367fbdb7d09a8d9156f8f450d651',
+ 'tests/entrypoints/openai/responses/test_responses_utils.py': 'dc39c484458fa0812c4aa662a64f33b36ac398fcb57f004dcabc86946f5d3c84',
  'tests/entrypoints/openai/responses/test_sampling_params.py': 'd4c56d82ae742e0c5075c189f91ac069f2ad0a61e336ee4f7fc178f46bf5f5b5',
  'tests/entrypoints/openai/responses/test_serving_responses.py': '760b1ac6f86229afd12f439afbe9722c5c59d8c3f0eaf2f5c20c5497defb5d99',
  'tests/entrypoints/openai/responses/test_simple.py': '9d02a3fcdcb2747afcf78095b883a91168fa47abb7e497ca5e2cea8fcb20be18',
@@ -144913,8 +146020,8 @@ FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5d
  'vllm/engine/protocol.py': '2b0e0da7e5fdd88b7edc4c7a2c9b9648dfb5d41c152bcf0825073cb3bfe31fd9',
  'vllm/entrypoints/anthropic/api_router.py': '8d7d742f6e7d9f2fa9bbe1e57d6adbd4f2753075a083c7a7f93d39fc5ab474b6',
  'vllm/entrypoints/anthropic/protocol.py': 'a6b36585ab26bf55c15205b03f6bad9da3534a9ddd5918ea358f2945ff303fdc',
- 'vllm/entrypoints/anthropic/serving.py': '089e60ed67e60717853e132f9d710c5542e9fa1f3b92d5a26033c8dadfc34eb4',
- 'vllm/entrypoints/chat_utils.py': '885a4093bdcdcfbf2449628a395edd838744d8b36c431cd35687c9c313690dab',
+ 'vllm/entrypoints/anthropic/serving.py': 'e268ce5922cefa06377dc7b0abe70b96bd9c33f82c5f5c9a53ce91375ba5bbdf',
+ 'vllm/entrypoints/chat_utils.py': 'b6a8c6ef3d744dd0aeafa5532d00f72299c0b4bb6de3216ad26735ef7530ccac',
  'vllm/entrypoints/generate/api_router.py': 'dffeda2c3ccc6cfe3d4945720a7378bab34e7c7c9959d020a9643675895a3ffd',
  'vllm/entrypoints/generate/base/serving.py': 'ee5aa5396600659860e54342eb5915fdac539187d97116b977b38b03e7add340',
  'vllm/entrypoints/generate/factories.py': 'd40aa14aad43cbb67b51568c56d5de76e43a3f9d8dc12a813b85d0e079323298',

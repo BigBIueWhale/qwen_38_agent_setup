@@ -1008,18 +1008,18 @@ index 7c3d56a145ed15d704c56dc6a1c1d65bbac95ca6..8f4ee6afa341476c3ec6b216dbd78208
      @classmethod
      def validate_max_tokens(cls, v):
 diff --git a/vllm/entrypoints/anthropic/serving.py b/vllm/entrypoints/anthropic/serving.py
-index f04a1e2b5961096757432fa2dba5a5ab81151c3c..73f70c9b81c40dadd70334a445ad72c8d9aea61d 100644
+index 96f2150d24d6c92a6a34889494d1a481a285d2c9..67ba24530a87f008417f6eda956e603164bd4c9a 100644
 --- a/vllm/entrypoints/anthropic/serving.py
 +++ b/vllm/entrypoints/anthropic/serving.py
-@@ -31,6 +31,7 @@ from vllm.entrypoints.anthropic.protocol import (
+@@ -34,6 +34,7 @@ from vllm.entrypoints.chat_utils import (
+     validate_tool_result_correlation,
  )
- from vllm.entrypoints.chat_utils import ChatTemplateContentFormatOption
  from vllm.entrypoints.openai.chat_completion.protocol import (
 +    ChatCompletionGenerationRequest,
      ChatCompletionNamedToolChoiceParam,
      ChatCompletionRequest,
      ChatCompletionResponse,
-@@ -470,7 +471,7 @@ class AnthropicServingMessages(OpenAIServingChat):
+@@ -514,7 +515,7 @@ class AnthropicServingMessages(OpenAIServingChat):
          anthropic_request: AnthropicMessagesRequest | AnthropicCountTokensRequest,
          openai_messages: list[dict[str, Any]],
      ) -> ChatCompletionRequest:
@@ -1028,7 +1028,7 @@ index f04a1e2b5961096757432fa2dba5a5ab81151c3c..73f70c9b81c40dadd70334a445ad72c8
          if isinstance(anthropic_request, AnthropicCountTokensRequest):
              return ChatCompletionRequest(
                  model=anthropic_request.model,
-@@ -486,7 +487,7 @@ class AnthropicServingMessages(OpenAIServingChat):
+@@ -530,7 +531,7 @@ class AnthropicServingMessages(OpenAIServingChat):
              if thinking.budget_tokens is not None:
                  thinking_kwargs["thinking_token_budget"] = thinking.budget_tokens
  
@@ -1037,7 +1037,7 @@ index f04a1e2b5961096757432fa2dba5a5ab81151c3c..73f70c9b81c40dadd70334a445ad72c8
              model=anthropic_request.model,
              messages=openai_messages,
              max_tokens=anthropic_request.max_tokens,
-@@ -497,6 +498,7 @@ class AnthropicServingMessages(OpenAIServingChat):
+@@ -541,6 +542,7 @@ class AnthropicServingMessages(OpenAIServingChat):
              top_k=anthropic_request.top_k,
              cache_salt=anthropic_request.cache_salt,
              kv_transfer_params=anthropic_request.kv_transfer_params,

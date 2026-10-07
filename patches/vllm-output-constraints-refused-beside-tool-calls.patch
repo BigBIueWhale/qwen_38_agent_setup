@@ -334,10 +334,10 @@ index 0f533af4db299d2dfdb5377eb3658678f23305d5..387c007daa382fe547d92697fe008b19
  class AnthropicDelta(BaseModel):
      """Delta for streaming responses"""
 diff --git a/vllm/entrypoints/anthropic/serving.py b/vllm/entrypoints/anthropic/serving.py
-index 699c199b07296388ecd540590f863c4219142ffe..b88550dd7c534a0fb9ce676c1f3bc6e476a92fa1 100644
+index 312cc0a464b87001a8e96de75c5eafeaef91cb3c..e94ce273bdec17ae892572817ba804d82370490d 100644
 --- a/vllm/entrypoints/anthropic/serving.py
 +++ b/vllm/entrypoints/anthropic/serving.py
-@@ -578,7 +578,7 @@ class AnthropicServingMessages(OpenAIServingChat):
+@@ -622,7 +622,7 @@ class AnthropicServingMessages(OpenAIServingChat):
          if isinstance(anthropic_request, AnthropicCountTokensRequest):
              return
          output_config: AnthropicOutputConfig | None = anthropic_request.output_config

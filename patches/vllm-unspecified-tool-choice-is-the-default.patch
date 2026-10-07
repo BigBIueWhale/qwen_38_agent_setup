@@ -1,8 +1,8 @@
 diff --git a/tests/entrypoints/anthropic/test_anthropic_messages_conversion.py b/tests/entrypoints/anthropic/test_anthropic_messages_conversion.py
-index a7bf432da5286afe92acb9c8f7eee6f8eb65d1c1..ae151c2484e4928a05f788cc957cc80ab20098b0 100644
+index e339f82c4135c7ba2a60d30807d1d6eb461087e9..11bc2fe9a0b85eca32b05a50065975bdbfd5747e 100644
 --- a/tests/entrypoints/anthropic/test_anthropic_messages_conversion.py
 +++ b/tests/entrypoints/anthropic/test_anthropic_messages_conversion.py
-@@ -1908,3 +1908,34 @@ class TestAnthropicTerminalMetadata:
+@@ -2035,3 +2035,34 @@ class TestAnthropicTerminalMetadata:
          assert not any(kind == 'message_stop' for kind, _ in events)
          assert any(data.get('delta', {}).get('text') == 'diagnostic' for _, data in events)
          assert not any(data.get('delta', {}).get('text') == 'too late' for _, data in events)
@@ -247,10 +247,10 @@ index 99f99008d11d736333d751b894554c8b89a1cb44..8de5facfb3a6b8fed2ac85678c7f5e17
              {
                  "tool_choice": {
 diff --git a/vllm/entrypoints/anthropic/serving.py b/vllm/entrypoints/anthropic/serving.py
-index 7bbe49d0309d8e8230878a4852acb2eaa3a849df..699c199b07296388ecd540590f863c4219142ffe 100644
+index 05c3f18ba16a65d1ae433942f9d8fb8de8676549..312cc0a464b87001a8e96de75c5eafeaef91cb3c 100644
 --- a/vllm/entrypoints/anthropic/serving.py
 +++ b/vllm/entrypoints/anthropic/serving.py
-@@ -612,7 +612,7 @@ class AnthropicServingMessages(OpenAIServingChat):
+@@ -656,7 +656,7 @@ class AnthropicServingMessages(OpenAIServingChat):
      ) -> None:
          """Convert Anthropic tool_choice to OpenAI format"""
          if anthropic_request.tool_choice is None:
@@ -259,7 +259,7 @@ index 7bbe49d0309d8e8230878a4852acb2eaa3a849df..699c199b07296388ecd540590f863c42
              return
  
          req.parallel_tool_calls = (
-@@ -660,8 +660,6 @@ class AnthropicServingMessages(OpenAIServingChat):
+@@ -704,8 +704,6 @@ class AnthropicServingMessages(OpenAIServingChat):
                  )
              )
  

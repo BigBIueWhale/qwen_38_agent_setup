@@ -295,16 +295,16 @@ It is intentionally reconstructed by the ordered, reviewed semantic transformati
 |---|---|
 | patches/vllm-turboquant-k8v4-direct-workspace.patch | a9721067f1a7ee9497a4bd51e47e3a474561189e881b4704bfc4beac8ea48380 |
 | patches/vllm-enforce-auto-tool-schema.patch | 4f75c793a9c2cdcfb2fd0768ba49a4e34748d3a37d8392b07d3592ca50939c07 |
-| patches/vllm-qwen38-agent-defaults-and-thinking.patch | ca480ea417db9a8cdf9919aab8589dcf8bf03bcb45ffca0cce2c594df9765359 |
+| patches/vllm-qwen38-agent-defaults-and-thinking.patch | bdba0512ed3c997e259856a2909d61bd24b87cf262f4f3a62875a8354a380a0a |
 | patches/vllm-qwen38-separate-final-response-budget.patch | f2d88c9ec42e62dcb079d77136d8cbb11443a12304d632924c2e0071098e2b00 |
 | patches/vllm-qwen-implicit-tool-grammar-boundary.patch | d231c6e2e7040c4cd4b38432cb8c794805afddbf2c6e4f7ff6febb78e3fd9f48 |
 | patches/vllm-anthropic-validation-http400.patch | 2950d1e6659bc961aeb55e8061fad84ee8f9b1295dfb6793f9efa365d28432e5 |
 | patches/vllm-tool-truncation-finish-reason.patch | 7ee55158f31b5243b14b9d25ac250511a2fec7f8fca2101d2990d105eaa6b5a0 |
-| patches/vllm-qwen38-vision-runtime.patch | 49c23f8762375910a2e0afa2dd1bc3af1ae0c9525b2191c44e382d1faaa0326a |
+| patches/vllm-qwen38-vision-runtime.patch | 03e091a252702011556eca614c0b41dee9b3643973431004415f3ee2ae987227 |
 | patches/vllm-qwen38-numerical-audits.patch | dc0b947db3727b522427a204edd1a930d637476a0f66d7d30e2da65c144ac944 |
 | patches/vllm-turboquant-fail-closed-guards.patch | b140445625c63a85d4cae5d878b1de472a9645b63e78c34249848082120b9ba3 |
 | patches/vllm-kv-offload-pinning-fail-closed.patch | 3a72f88d679a493d6ae0db6c05e171f9f0be6d44dca958ee351e6099df61a8ec |
-| patches/vllm-generation-requires-agent-id.patch | 8c6adcddb6de73b7c42fa38df7107bef905fbf3ada0157a9fef302d650f7f126 |
+| patches/vllm-generation-requires-agent-id.patch | f9e387eb2a57a3c4177d10637faf2f44eb05436d09823cca83d55d4a1d6c20e7 |
 | patches/vllm-attention-growth-keeps-prefix-hash.patch | a6c38a841c05bcd4f5bfc573c99f1c4a849e7399af05b1e53096e15a43a97632 |
 | patches/vllm-grouped-kv-specs-use-layer-geometry.patch | 6bb249bc143a179ca317c72d2bf70ec118baa6f12dca19c0a59da2e3c935b814 |
 | patches/vllm-agent-grouped-offload-retention.patch | 36140417721a858ed623a605874cd7c094171e01acead53d76c851ea3929b551 |
@@ -312,14 +312,14 @@ It is intentionally reconstructed by the ordered, reviewed semantic transformati
 | patches/vllm-kv-capacity-in-declared-users.patch | f06f1becfcc7c56bb3507d0cfb91e37991a9b89d75112fe69cea76f389a484f4 |
 | patches/vllm-kv-declaration-within-physical-bound.patch | 75526072aec94f8fd8e8e9ad9324408ce393b24c5cf50a8f801d87de62b24980 |
 | patches/vllm-exact-reasoning-usage.patch | 34a3291cda667e89ffa97f399b821a06adf9a0b14c7429b121e2b01492b7a8e6 |
-| patches/vllm-anthropic-input-fidelity.patch | 668e8307870ae2b901a86318b03fc3490f4dd1e254d2b4489facfa8ca473da3f |
+| patches/vllm-anthropic-input-fidelity.patch | 3252e25a6c2e9d8ee0eec4cb383fc292bff2afaac2e3becdc1006c68b3b02c3c |
 | patches/vllm-qwen-exact-tool-language.patch | e0bdd47262490c88bc600b858e3320efdd4dc4c80c218761fe01378b0e8c8134 |
 | patches/vllm-png-source-admission.patch | b1b684a96d7243ae647d4d8ce2fe69b7330b3ab243ea77903c4cfb346bc80549 |
 | patches/vllm-kv-physical-free-memory.patch | d9c1b5a9d2c20266246e856f2264ad9da0d624b797ca682671772b808febca82 |
 | patches/vllm-qwen-single-call-grammar.patch | 878ba3d98284a326784ffced00a64b38dd827cbc80f136cf1e582df469c3eced |
-| patches/vllm-responses-history-integrity.patch | 8d026e4fde0f40af9f58f6d8341aec8ce5af0316836e419467d2ebc3fc718964 |
+| patches/vllm-responses-history-integrity.patch | d2c6343087fc287eb6afe315cdfb9caa2909de140c82b57ee9d0c3ed9473983c |
 | patches/vllm-responses-stream-identity.patch | 9a3f1fb54f3e22f3df621ab681e675f7a916849bdceb6e555242df29d6028095 |
-| patches/vllm-anthropic-terminal-metadata.patch | d09c3b0ba5658b864131c46202f53a4b611ca0395bd068feb1a054fcc70f2364 |
+| patches/vllm-anthropic-terminal-metadata.patch | 532d0087c42445ffa19f0d1ce190fd72b9eb238fda4100f17aa071af598dee6c |
 | patches/vllm-generation-sampling-resolution.patch | 8fb1c0311f4e7faa03780914d609bbb109fb609e759eb07196bac2040adfea84 |
 | patches/vllm-sampling-decoding-boundary.patch | e5909686b9aa4e591a35e66bcd78fb0fbc7b0ea56bf2210779d934d86c7b28c8 |
 | patches/vllm-token-generation-result-integrity.patch | bcb8e56c7f9f53563c16bc3adb8fc10796d0463ac5b85e52ecb367948efbb93e |
@@ -331,13 +331,13 @@ It is intentionally reconstructed by the ordered, reviewed semantic transformati
 | patches/vllm-one-way-thinking-boundary.patch | 63a69aea8a184a3875f50673a55058fb9e14dc3178abd8c5510de2770022f346 |
 | patches/vllm-schema-faithful-xml.patch | 97e73d566da1bbde490e78da1143d6052e93309b3bb67c90c56fda582af207c2 |
 | patches/vllm-token-text-provenance.patch | 954b36cb444f7e644e29d13f7a9d3c000512a0d616bbf2b6cd3cb8f4e880dd44 |
-| patches/vllm-precise-request-errors.patch | 6ebbc277c2a6f523d520b75d3afe75dd13c745449eea63e037856e8351ac05ad |
+| patches/vllm-precise-request-errors.patch | 5620e9394e9d636b6f875bb9a04c21d54b5a9629f6a6651cda3be79d98be43f2 |
 | patches/vllm-qwen-canonical-parameter-framing.patch | d438f9106c4a989d64837c21f5491d946065e6721570ad47664513347f150064 |
 | patches/vllm-qwen-owned-tool-grammar.patch | 8eca87e7046eb5b01f37ebc93cafaec01479558ef102201dd74ef3ae8ad8a665 |
 | patches/vllm-qwen-unique-tool-parameters.patch | 6a76a61c743807215555cbd6b3bbdd8fcaba4abcaca69ef000d301df6c792d3b |
 | patches/vllm-generation-admission-before-response.patch | 6418c42eb3fca2492473e5411f9463d21d1473a0cc55187a2a9a530ddfc44b86 |
 | patches/vllm-kv-scope-single-flight.patch | b84b915c38e2c1d32b278bf88dcd5ac7228b9a680b746e2842783dbe1942540a |
-| patches/vllm-template-authored-control-tokens.patch | 1f6b9e898c3b7d3620d2ad3ee8dce70aa7d320e211788ff4fe030468870bc37b |
+| patches/vllm-template-authored-control-tokens.patch | 2a6e8b31826cf06d52acb3c87cae0c6c68a7acc2c8f01dd7848bc5e948977228 |
 | patches/vllm-nvfp4-native-kernel-required.patch | 9d9ce188b6670d687a725c4cdca37478f9dc78ef9f19685ddbcf5e9edd53b8b7 |
 | patches/vllm-qwen-arguments-read-by-grammar.patch | 9bf29aed999f1cfe12a58cc98b91fccafe615dfb7c22f13e9c681d1b54034837 |
 | patches/vllm-startup-plan-admission-bound.patch | 596e311a54f888e8589a0bdc9fba62b6bf779b11eabab8ca1d2b60b8cf9f9930 |
@@ -345,17 +345,17 @@ It is intentionally reconstructed by the ordered, reviewed semantic transformati
 | patches/vllm-qwen-repeated-parameter-refusal.patch | af405e3be4a649264786bf7bc924c3e4053579eddde47030d9776eb1bc1c73c0 |
 | patches/vllm-generated-tokens-survive-parsing.patch | 3709ac24d4f098a27ffa57fedf9d3dec81a1e08392da07d225bb8b62d2e8ee2e |
 | patches/vllm-include-reasoning-shapes-the-response.patch | d3b41899464142ffffb04efd0b19647153e322b10c7f9fc1e14af0f290af98d1 |
-| patches/vllm-unspecified-tool-choice-is-the-default.patch | 367fedad65383375e377d7bc1e20cc3fdab4554d511b9437918004b25321d530 |
+| patches/vllm-unspecified-tool-choice-is-the-default.patch | 8db1159ea73f23e20a7635b276f56abce085d9b0d83b3ea0d4599f275c5e8746 |
 | patches/vllm-call-only-answer-keeps-the-blank-line.patch | 57c69104cb5b569050098993f4abb4e7f88299a43b6ac41f22e267dd8ab177a2 |
 | patches/vllm-responses-tools-are-one-function-list.patch | aa54ae92344ca7c9bdfe014a9676b7b63716e3c677e64cee4a8a6ac3b0c104e5 |
 | patches/vllm-batch-parse-starts-where-the-prompt-leaves.patch | 352b37904e51dab650f4fb84b7ecd8f284f468d2602bcd1b021001a8d865ccc0 |
 | patches/vllm-derender-text-is-the-detokenizers.patch | 9d8f6d45beba5c79671444be4e9604c4352c7fe5346d78573bfc4fbc91bfb4b6 |
-| patches/vllm-output-constraints-refused-beside-tool-calls.patch | 01bfdf064fa8a83c68feb4f5477181bc3df2f6776e41ec91ac672e84ca562adb |
+| patches/vllm-output-constraints-refused-beside-tool-calls.patch | b82f6259428441aee55d157443bcedc1d98fb247ef9a521106408671a24ae533 |
 | patches/vllm-batch-invariance-substitutes-no-nvfp4-kernel.patch | c79baaee0a51275f5f522d266fe6b315c200e6951920c2454d5c80cadbb92f44 |
-| patches/vllm-render-carries-every-image-chat-renders.patch | c5bf4cb2948b9eb7866d083671af3badcc9cf529a7756bde3b0647c236fe932f |
+| patches/vllm-render-carries-every-image-chat-renders.patch | de53b6f2c86c53552a133d0ef93422c73570b53d1eace1d9e8f835accf9f5181 |
 | patches/vllm-rendered-prompts-are-never-truncated.patch | 72e74c44c7c8b8ff3db8c7f73124fa82e196244f2b0f2f666a2315f3cef4cdc9 |
 | patches/vllm-kv-transfer-params-are-declared.patch | 9742698af30ad79158f5430fb22987cafe4667f457771dd66b29b38a7376ce0e |
-| patches/vllm-responses-refuses-tools-the-template-is-never-given.patch | 84bfd906df0b4f47192d039106a3b6f6af154f4005d5036878b6af62c8c16cac |
+| patches/vllm-responses-refuses-tools-the-template-is-never-given.patch | ee2c83118ee21815cfb582d432c61b9bebbde1845858f4c294bab0ce392abf85 |
 | patches/vllm-chat-stream-carries-every-token-logprob.patch | ca15dadd152454fe5b3fbcb710b8c7b5ce3221c038617b9e0d0985953aecbf47 |
 
 The reconstructed tree's runtime-source and test changes, new files and
