@@ -66,9 +66,9 @@ before the agent runs.
 The original service's examples encourage subagents. Subagents can still be useful
 for genuinely independent work, but they create separate context and fragment a long
 thread. They must not be the default operating pattern for this deployment. The
-quality-first default is one continuous main thread, completed-thinking omission,
-prefix reuse, and compaction when the exactly-counted request reaches the share of
-the window the history is allowed.
+quality-first default is one continuous main thread, every past turn's thinking
+kept in its history, prefix reuse, and compaction when the exactly-counted request
+reaches the share of the window the history is allowed.
 
 ## Current client comparison
 
@@ -269,8 +269,9 @@ The accepted Qwen Code contract is:
 7. cancellation, timeout, process failure, malformed events, and model/protocol
    mismatches all produce explicit terminal records and preserve forensics;
 8. the default is one long main thread. Compaction is due when the measured
-   request reaches the history's share of the window, completed hidden thinking is
-   omitted to preserve useful context, and only sequential foreground
+   request reaches the history's share of the window, every past turn's thinking
+   stays in the history (the served template renders it and refuses
+   `preserve_thinking` other than true), and only sequential foreground
    `general-purpose`/`Explore` subagents are permitted;
 9. original static RGB/RGBA PNG bytes stay in their originating tool result, remain
    cacheable at that chronological position, and invalid media fails before egress;

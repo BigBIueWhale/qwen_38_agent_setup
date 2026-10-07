@@ -118,7 +118,7 @@ readonly OUTPUT_CONSTRAINT_BESIDE_TOOLS_PATCH_DIFF_SHA256="c6ac620c8cd962a778687
 readonly BATCH_INVARIANT_NATIVE_FP4_PATCH_DIFF_SHA256="c79baaee0a51275f5f522d266fe6b315c200e6951920c2454d5c80cadbb92f44"
 readonly RENDER_EVERY_IMAGE_PATCH_DIFF_SHA256="c5bf4cb2948b9eb7866d083671af3badcc9cf529a7756bde3b0647c236fe932f"
 readonly RENDERED_PROMPT_NOT_TRUNCATED_PATCH_DIFF_SHA256="07cd24fbf29bc66fb9615d63a8e30d947ee13cf6367e23bcb1a870e4f3a49334"
-readonly SOURCE_PATCH_MANIFEST_SHA256="8552e896fbf6ff0d081c59b0a58b25df10fd52ef36e8841d2e80ed6911b61be7"
+readonly SOURCE_PATCH_MANIFEST_SHA256="0888e7fb8adb4d81482dbc695a6ad10f19539f74a3143bff9b4290a90bd97b11"
 # Cardinality of config/deployment-inputs.sha256. The hash manifest alone
 # proves the listed bytes but cannot see a quietly grown or shrunk allowlist,
 # so the reviewed file count is pinned as well. It is declared exactly once,
@@ -307,6 +307,10 @@ RUNTIME_ENV=(
   "PYTHONDONTWRITEBYTECODE=1"
   "HF_HUB_OFFLINE=1"
   "TRANSFORMERS_OFFLINE=1"
+  # The startup log then records every workspace's size, and each release and
+  # restore around the vision encoder with the driver's free memory: the record
+  # the KV bound and the encoder's room are checked against. It changes no
+  # allocation; it logs, querying the driver's free memory to do so.
   "VLLM_DEBUG_WORKSPACE=1"
   "VLLM_ENFORCE_STRICT_TOOL_CALLING=1"
   "GLOO_SOCKET_IFNAME=lo"

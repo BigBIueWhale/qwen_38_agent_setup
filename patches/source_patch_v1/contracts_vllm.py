@@ -4,7 +4,8 @@ The generated landmark module proves byte identity with the reviewed diffs.
 This module independently states the defect, the intended behavioral invariant,
 and the condition under which each local change should disappear.  A maintainer
 cannot bless a new upstream hash without also satisfying these source-structure
-checks and the behavioral suites run by the immutable build.
+checks and the CPU units the check and the build execute.  The vLLM tests a
+contract names are review artifacts: they are hashed, and nothing runs them.
 """
 
 from __future__ import annotations
