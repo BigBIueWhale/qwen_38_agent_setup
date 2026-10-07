@@ -417,7 +417,7 @@ index 27a4f2773131719b7961222f50199221db967b72..8a2709431195e73bae9fe399b5bc82fa
          current_text, current_token_ids = state.advance(delta_text, delta_token_ids)
          delta_message: DeltaMessage | None = None
 diff --git a/vllm/parser/engine/parser_engine.py b/vllm/parser/engine/parser_engine.py
-index d2cef6232a463474d6393723dcc80f37e51d150b..ef288583a81654647de1af2b4e739fb04eb57493 100644
+index 799ff9f41dded3ef599498dca130b2303cf4dcb2..ff9a4dd2e0ddfeed2daa441ea2e2c350b3a6ece8 100644
 --- a/vllm/parser/engine/parser_engine.py
 +++ b/vllm/parser/engine/parser_engine.py
 @@ -186,6 +186,10 @@ class ParserEngine(Parser):
@@ -465,7 +465,30 @@ index d2cef6232a463474d6393723dcc80f37e51d150b..ef288583a81654647de1af2b4e739fb0
          self._engine.reset(initial_state=initial_state)
          self._reasoning_ended = not self._has_reasoning
          self._tool_slots.clear()
-@@ -944,11 +964,15 @@ class ParserEngine(Parser):
+@@ -858,15 +878,18 @@ class ParserEngine(Parser):
+         """Reasoning ids in a complete generation, by the rule the feed follows.
+ 
+         The value :attr:`reasoning_token_count` holds once *token_ids* have
+-        been fed from the grammar's initial state, where every reset begins,
+-        so a caller that accumulates a whole generation's ids reads the same
+-        number.  ``None``
++        been fed from where the generation starts -- the state its prompt
++        leaves the grammar in, where every reset begins -- so a caller that
++        accumulates a whole generation's ids reads the same number.  ``None``
+         when the grammar has no single id-marked boundary, exactly when
+         :attr:`reasoning_token_count` is: the count is absent, never an error.
+         """
+         if self._reasoning_boundary_refusal is not None:
+             return None
+-        if self.parser_engine_config.initial_state is not ParserState.REASONING:
++        initial_state = self._prompt_initial_state
++        if initial_state is None:
++            initial_state = self.parser_engine_config.initial_state
++        if initial_state is not ParserState.REASONING:
+             return 0
+         return self._ids_before_boundary(token_ids)
+ 
+@@ -947,11 +970,15 @@ class ParserEngine(Parser):
          model_output: str,
          request: ChatCompletionRequest | ResponsesRequest,
          *,
@@ -501,7 +524,7 @@ index 545354b772f58a3e83fbbed62411442c86111602..92811d5c45bc5bd8eae44e81df98e557
      def _events_to_delta(
          self,
 diff --git a/vllm/parser/inkling.py b/vllm/parser/inkling.py
-index 666af5f89c6b0d71d4cc092fd1239999c4a9adda..572ed2bb6bda2f6c751c1e162fea072805869c00 100644
+index 2995a9dac0d10a3ef0773ff99328e20973532166..f5f9155f29965bbe6ff2009febb292bf12950290 100644
 --- a/vllm/parser/inkling.py
 +++ b/vllm/parser/inkling.py
 @@ -327,16 +327,13 @@ class InklingParser(ParserEngine):
@@ -541,3 +564,54 @@ index 3a0be5eeec6c5586b58023568ef12f97edacbe10..6296e8c9abe4d9b0fb5fb4f5ab3bd71f
                      enable_auto_tools=self.enable_auto_tools,
                      model_output_token_ids=choice.token_ids,
                      finish_reason=choice.finish_reason,
+diff --git a/tests/parser/engine/test_reasoning_token_count.py b/tests/parser/engine/test_reasoning_token_count.py
+index b1553d47b1ea3e6f266f70a9c2094bf229abe632..a6c31222ff027f519281b8a80d84200b1ac7465c 100644
+--- a/tests/parser/engine/test_reasoning_token_count.py
++++ b/tests/parser/engine/test_reasoning_token_count.py
+@@ -151,6 +151,31 @@ def terminal_tokenizer(vocab):
+     return tokenizer
+ 
+ 
++class PromptOpenedGrammar(ParserEngine):
++    """Configured to start in content; a prompt ending in the opener starts
++    the generation inside reasoning, as a template that pre-fills it does."""
++
++    def __init__(self, tokenizer, tools=None, **kwargs):
++        super().__init__(tokenizer, tools, parser_engine_config=ParserEngineConfig(
++            name="prompt-opened",
++            initial_state=ParserState.CONTENT,
++            terminals={"THINK_START": THINK_START, "THINK_END": THINK_END},
++            token_id_terminals={
++                "THINK_START": TokenTerminal(THINK_START),
++                "THINK_END": TokenTerminal(THINK_END),
++            },
++            transitions={
++                (ParserState.REASONING, "THINK_END"): Transition(
++                    ParserState.CONTENT, (EventType.REASONING_END,)
++                ),
++            },
++        ))
++
++    def adjust_initial_state_from_prompt(self, prompt_token_ids):
++        if prompt_token_ids and prompt_token_ids[-1] == self.vocab[THINK_START]:
++            self._start_in(ParserState.REASONING)
++
++
+ class TestStreaming:
+     @pytest.mark.parametrize("implicit", [False, True])
+     def test_boundary_ids_wait_for_detokenized_text(
+@@ -391,3 +416,14 @@ class TestOneCount:
+         assert (reasoning, content) == ("AB", "C")
+         assert parser.reasoning_token_count is None
+         assert parser.reasoning_parser.count_reasoning_tokens(ids) is None
++
++    def test_the_whole_generation_count_starts_where_the_prompt_leaves(
++        self, tokenizer, request_stub
++    ):
++        engine = PromptOpenedGrammar(tokenizer)
++        stream(engine, request_stub, [("A", "B"), (THINK_END, "C")],
++               prompt_token_ids=(1, VOCAB[THINK_START]))
++        _, ids = tokens("A", "B", THINK_END, "C")
++
++        assert engine.reasoning_token_count == 2
++        assert engine.count_reasoning_tokens(ids) == 2

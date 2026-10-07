@@ -394,7 +394,7 @@ diff --git a/tests/parser/engine/test_qwen_xml_fidelity.py b/tests/parser/engine
 diff --git a/vllm/parser/engine/parser_engine.py b/vllm/parser/engine/parser_engine.py
 --- a/vllm/parser/engine/parser_engine.py
 +++ b/vllm/parser/engine/parser_engine.py
-@@ -1204,18 +1204,15 @@
+@@ -1207,18 +1207,15 @@
              return None
  
          slot = self._tool_slots[idx]
@@ -414,7 +414,7 @@ diff --git a/vllm/parser/engine/parser_engine.py b/vllm/parser/engine/parser_eng
          prev = slot.streamed_json
          safe_json = self._safe_arg_prefix(current_json, slot.string_keys)
  
-@@ -1240,15 +1237,12 @@
+@@ -1243,15 +1240,12 @@
              return None
  
          slot = self._tool_slots[idx]
@@ -431,7 +431,7 @@ diff --git a/vllm/parser/engine/parser_engine.py b/vllm/parser/engine/parser_eng
          prev = slot.streamed_json
          if final_json and len(final_json) > len(prev):
              if prev and not final_json.startswith(prev):
-@@ -1285,16 +1279,18 @@
+@@ -1288,16 +1282,18 @@
                  continue
  
              name = slot.name
@@ -451,7 +451,7 @@ diff --git a/vllm/parser/engine/parser_engine.py b/vllm/parser/engine/parser_eng
                          logger.debug(
                              "arg converter failed (extract): %s", raw_body[:80]
                          )
-@@ -1305,9 +1301,10 @@
+@@ -1308,9 +1304,10 @@
                  args_json = "{}"
  
              if self._accept_tool_name(name):
@@ -463,7 +463,7 @@ diff --git a/vllm/parser/engine/parser_engine.py b/vllm/parser/engine/parser_eng
                      ToolCall(
                          id=slot.id,
                          function=FunctionCall(name=name, arguments=args_json),
-@@ -1353,8 +1350,16 @@
+@@ -1356,8 +1353,16 @@
  
          without_name = {k: v for k, v in parsed.items() if k != "name"}
          return name, json.dumps(without_name, ensure_ascii=False)

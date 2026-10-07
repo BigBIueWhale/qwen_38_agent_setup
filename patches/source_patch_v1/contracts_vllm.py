@@ -1611,6 +1611,25 @@ def _validate_reasoning_usage_before(state: State) -> None:
     )
     forbid_text(state, parser, "_resolve_reasoning_boundary", label=label)
     forbid_text(state, parser, "reasoning_token_count", label=label)
+    # Counts of their own beside it: a zero default for a parser that cannot
+    # count, depth counts on the text-split parsers, and two format overrides.
+    require_text(
+        state, "vllm/reasoning/abs_reasoning_parsers.py",
+        "# By default, assume the parser cannot detect reasoning spans.", label=label,
+    )
+    require_text(
+        state, "vllm/reasoning/basic_parsers.py",
+        "Uses a depth counter so nested spans are handled safely", label=label,
+    )
+    require_text(
+        state, "vllm/reasoning/minimax_m3_reasoning_parser.py",
+        "depth = 1 if self._initial_in_reasoning else 0", label=label,
+    )
+    require_text(
+        state, "vllm/parser/kimi_k2.py",
+        "return super().count_reasoning_tokens(token_ids)", label=label,
+    )
+    require_text(state, "vllm/parser/inkling.py", "def count_reasoning_tokens(", label=label)
     # The batch split drops the generated ids it is handed.
     require_text(
         state,
@@ -1652,6 +1671,7 @@ def _validate_reasoning_usage_after(state: State) -> None:
             "ParserEngine.batch_token_ids": ("self", "token_ids"),
             "ParserEngine.reasoning_token_count": ("self",),
             "ParserEngine.count_reasoning_tokens": ("self", "token_ids"),
+            "ParserEngine._ids_before_boundary": ("self", "token_ids"),
         },
         label=label,
     )
@@ -1686,10 +1706,52 @@ def _validate_reasoning_usage_after(state: State) -> None:
         "ParserEngine._account_reasoning_tokens",
         (
             "self._reasoning_fed_without_ids = True",
-            "if token_id in self._reasoning_boundary_ids:",
+            "counted = self._ids_before_boundary(delta_token_ids)",
         ),
         label=label,
     )
+    _require_in_symbol(
+        state,
+        parser,
+        "ParserEngine._ids_before_boundary",
+        ("if token_id in self._reasoning_boundary_ids:",),
+        label=label,
+    )
+    # The whole-generation count is that number, by that scan: absent with
+    # it, never an error, and no format or text-split parser keeps another.
+    _require_in_symbol(
+        state,
+        parser,
+        "ParserEngine.count_reasoning_tokens",
+        (
+            "if self._reasoning_boundary_refusal is not None:\n            return None",
+            "return self._ids_before_boundary(token_ids)",
+        ),
+        label=label,
+    )
+    _require(
+        "raise" not in _symbol_source(
+            state, parser, "ParserEngine.count_reasoning_tokens", label=label),
+        f"{label}: the whole-generation reasoning count raises",
+    )
+    counted = "    def count_reasoning_tokens(self, token_ids: Sequence[int]) -> int | None:\n"
+    basic = "vllm/reasoning/basic_parsers.py"
+    for path in (parser, adapters, "vllm/reasoning/abs_reasoning_parsers.py", basic):
+        require_text(state, path, counted, label=label)
+    for path, qualname in (
+        ("vllm/reasoning/abs_reasoning_parsers.py", "ReasoningParser.count_reasoning_tokens"),
+        (basic, "BaseThinkingReasoningParser.count_reasoning_tokens"),
+    ):
+        _require_in_symbol(
+            state, path, qualname, ('"""\n        return None',), label=label
+        )
+    forbid_text(state, basic, "Uses a depth counter", label=label)
+    for path in (
+        "vllm/reasoning/minimax_m3_reasoning_parser.py",
+        "vllm/parser/kimi_k2.py",
+        "vllm/parser/inkling.py",
+    ):
+        forbid_text(state, path, "def count_reasoning_tokens(", label=label)
     _require_in_symbol(
         state,
         parser,
@@ -1926,8 +1988,22 @@ def _validate_reasoning_usage_after(state: State) -> None:
             "TestBatch.test_batch_and_stream_agree_on_the_same_generation": None,
             "TestRefusals.test_text_fed_without_ids_refuses_the_count": None,
             "TestRefusals.test_a_grammar_without_one_id_boundary_serves_no_count": None,
+            "TestOneCount.test_every_engine_format_counts_a_generation_as_it_feeds_it": None,
+            "TestOneCount.test_a_parser_that_splits_on_text_reports_no_count": None,
         },
         label=label,
+    )
+    require_text(
+        state, test, "assert engine.count_reasoning_tokens([65, 99, 66]) is None",
+        label=label,
+    )
+    require_text(
+        state, "tests/reasoning/test_base_thinking_reasoning_parser.py",
+        "assert parser.count_reasoning_tokens(token_ids) is None", label=label,
+    )
+    require_text(
+        state, "tests/reasoning/test_minimax_m3_reasoning_parser.py",
+        "assert parser.count_reasoning_tokens(output_ids) is None", count=3, label=label,
     )
 
 
@@ -3733,6 +3809,13 @@ def _validate_batch_parse_from_prompt_before(state: State) -> None:
     _require_in_symbol(state, abstract, "DelegatingParser.parse_delta", (
         "if not state.prompt_reasoning_checked and prompt_token_ids is not None:",
     ), label=label)
+    # The whole-generation reasoning count starts from the configured state.
+    _require_in_symbol(
+        state, "vllm/parser/engine/parser_engine.py",
+        "ParserEngine.count_reasoning_tokens",
+        ("if self.parser_engine_config.initial_state is not ParserState.REASONING:",),
+        label=label,
+    )
 
 
 def _validate_batch_parse_from_prompt_after(state: State) -> None:
@@ -3767,6 +3850,10 @@ def _validate_batch_parse_from_prompt_after(state: State) -> None:
     }, label=label)
     _require_in_symbol(state, engine, "ParserEngine._reset", (
         "initial_state = self._prompt_initial_state",), label=label)
+    # The whole-generation reasoning count starts there too, so it is the
+    # count the feed takes from that state.
+    _require_in_symbol(state, engine, "ParserEngine.count_reasoning_tokens", (
+        "initial_state = self._prompt_initial_state",), label=label)
     _require_in_symbol(state, engine, "ParserEngine.parse_output", (
         "self.adjust_initial_state_from_prompt(prompt_token_ids)",), label=label)
     for path, starts in (("vllm/parser/gemma4.py", 1), ("vllm/parser/inkling.py", 3)):
@@ -3800,6 +3887,9 @@ def _validate_batch_parse_from_prompt_after(state: State) -> None:
         ("tests/parser/engine/test_gemma4_streaming_reasoning.py",
          {"TestGemma4PromptOpenReasoning."
           "test_batch_parse_starts_where_the_prompt_leaves_reasoning": None}),
+        ("tests/parser/engine/test_reasoning_token_count.py",
+         {"TestOneCount."
+          "test_the_whole_generation_count_starts_where_the_prompt_leaves": None}),
     ):
         require_python_symbols(state, path, tests, label=label)
 
@@ -5063,9 +5153,12 @@ CONTRACTS: Mapping[str, SemanticContract] = {
             "choices exactly as completion_tokens is, and served on both chat "
             "paths -- the batch split now receives the generated ids it used "
             "to drop -- and on Responses, which reads the same count through "
-            "the same function, per turn, instead of a second count of its own "
-            "(that one raised for every grammar without one id-marked "
-            "boundary, a 500 on every Responses request for those families). "
+            "the same function, per turn, instead of a second count of its own. "
+            "The whole-generation count the reasoning-parser interface exposes "
+            "is that same number, by the same scan: absent where usage is "
+            "absent, never an error, and kept by no format or text-split parser "
+            "beside it -- a parser that splits on text has no exact id count "
+            "and reports none rather than a depth count usage declines. "
             "A grammar without one id-marked boundary, a parser fed text "
             "without its ids, or a parser that missed generated ids yields no "
             "count or a refusal, never an estimate; the field is absent, not "
@@ -5075,7 +5168,8 @@ CONTRACTS: Mapping[str, SemanticContract] = {
             "Remove only when pinned upstream serves completion_tokens_details."
             "reasoning_tokens on Chat Completions from the parser's own token-id "
             "boundary, with the prompt-side opener and the implicit tool-call "
-            "end both counted correctly, on the streaming and batch paths."
+            "end both counted correctly, on the streaming and batch paths, and "
+            "its reasoning-parser count is that number or absent."
         ),
         validate_before=_validate_reasoning_usage_before,
         validate_after=_validate_reasoning_usage_after,
@@ -5197,7 +5291,9 @@ CONTRACTS: Mapping[str, SemanticContract] = {
             "asymmetry. One decision now reads the prompt for both paths; "
             "parse_output takes the prompt ids, every complete-output caller "
             "passes them, and a grammar's prompt state survives the batch reset "
-            "(gemma4 and inkling seeded only the stream). Derender receives no "
+            "(gemma4 and inkling seeded only the stream) and is where the "
+            "whole-generation reasoning count starts, so that count is the one "
+            "the feed takes. Derender receives no "
             "prompt ids and passes none, so a continued final message is "
             "reasoning there, as on upstream's derender."
         ),

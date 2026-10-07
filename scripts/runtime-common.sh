@@ -849,6 +849,8 @@ assert_running_profile() {
       /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/detokenizer.py \
       /usr/local/lib/python3.12/dist-packages/vllm/v1/core/sched/scheduler.py \
       /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/async_llm.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/reasoning/minimax_m3_reasoning_parser.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/reasoning/basic_parsers.py \
       /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/tiering/p2p/manager.py \
       /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/tiering/base.py \
       /usr/local/lib/python3.12/dist-packages/vllm/distributed/kv_transfer/kv_connector/v1/example_hidden_states_connector.py \
@@ -939,6 +941,8 @@ assert_running_profile() {
     "${V1_DETOKENIZER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/detokenizer.py \
     "${V1_SCHEDULER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/core/sched/scheduler.py \
     "${ASYNC_LLM_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/async_llm.py \
+    "${MINIMAX_M3_REASONING_PARSER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/reasoning/minimax_m3_reasoning_parser.py \
+    "${BASIC_REASONING_PARSERS_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/reasoning/basic_parsers.py \
     "${KV_TIERING_P2P_MANAGER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/tiering/p2p/manager.py \
     "${KV_TIERING_BASE_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/tiering/base.py \
     "${HIDDEN_STATES_CONNECTOR_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/distributed/kv_transfer/kv_connector/v1/example_hidden_states_connector.py \

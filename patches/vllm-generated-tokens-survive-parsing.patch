@@ -540,7 +540,7 @@ index c3e253a874cc6e5cd776774f92284142a771633c..2a9fc10e694ba5b1c045806967b9947e
      parser = Gemma4ToolParser(_StubTokenizer())
      request = _build_chat_request(
 diff --git a/vllm/parser/engine/parser_engine.py b/vllm/parser/engine/parser_engine.py
-index 84a8e10485a5e4dc29f163d120661bba213ac72b..d2cef6232a463474d6393723dcc80f37e51d150b 100644
+index 635896dc563e142a5f5f89ef8bdfe96dfc7a9ccc..799ff9f41dded3ef599498dca130b2303cf4dcb2 100644
 --- a/vllm/parser/engine/parser_engine.py
 +++ b/vllm/parser/engine/parser_engine.py
 @@ -96,8 +96,46 @@ class ParserEngine(Parser):
@@ -876,7 +876,7 @@ index 9d74bd3d050d738e8f11ea2ec5b43b67d1ef89a3..80c3768be5a29b20133412626d692563
          super().__init__(
              tokenizer,
 diff --git a/vllm/parser/engine/adapters.py b/vllm/parser/engine/adapters.py
-index ccf635807dd615015d519dbdd76f479c3a84000e..8c9e2af6e0904151e82a509e6790094fb17252a1 100644
+index c126c18174da6cc0e1e307fc3d72026f165494e7..bf514f70d1a727daae2ad9b06b2221a8249a84dd 100644
 --- a/vllm/parser/engine/adapters.py
 +++ b/vllm/parser/engine/adapters.py
 @@ -240,6 +240,7 @@ class ParserEngineToolAdapter(ToolParser):

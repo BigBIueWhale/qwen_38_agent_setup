@@ -309,9 +309,9 @@ It is intentionally reconstructed by the ordered, reviewed semantic transformati
 | patches/vllm-agentless-generation-routes-unmounted.patch | c485cf9d7d862c0f4214cd625d598fd8903c43c0e42947e9f847ce4052b156ff |
 | patches/vllm-kv-capacity-in-declared-users.patch | f06f1becfcc7c56bb3507d0cfb91e37991a9b89d75112fe69cea76f389a484f4 |
 | patches/vllm-kv-declaration-within-physical-bound.patch | 75526072aec94f8fd8e8e9ad9324408ce393b24c5cf50a8f801d87de62b24980 |
-| patches/vllm-exact-reasoning-usage.patch | 88453c8565e7dcffd975af1c92eb3d6a4ce0084913b23bb3b2998967c2abb449 |
+| patches/vllm-exact-reasoning-usage.patch | 34a3291cda667e89ffa97f399b821a06adf9a0b14c7429b121e2b01492b7a8e6 |
 | patches/vllm-anthropic-input-fidelity.patch | 126f002321100271897a93ddbe212cc37e5d014d0ab745bcd2ce6037f224c5b3 |
-| patches/vllm-qwen-exact-tool-language.patch | fe4e46cb7444c80646537da63ab1ac12c54e7eebb04c0735a4243d8b7e7943d2 |
+| patches/vllm-qwen-exact-tool-language.patch | 05dff889176a99929c1d29a998c8c80ea56ff1cbe82c1d541b8625fc6548474f |
 | patches/vllm-png-source-admission.patch | b1b684a96d7243ae647d4d8ce2fe69b7330b3ab243ea77903c4cfb346bc80549 |
 | patches/vllm-kv-physical-free-memory.patch | d9c1b5a9d2c20266246e856f2264ad9da0d624b797ca682671772b808febca82 |
 | patches/vllm-qwen-single-call-grammar.patch | 878ba3d98284a326784ffced00a64b38dd827cbc80f136cf1e582df469c3eced |
@@ -322,12 +322,12 @@ It is intentionally reconstructed by the ordered, reviewed semantic transformati
 | patches/vllm-sampling-decoding-boundary.patch | e5909686b9aa4e591a35e66bcd78fb0fbc7b0ea56bf2210779d934d86c7b28c8 |
 | patches/vllm-token-generation-result-integrity.patch | bcb8e56c7f9f53563c16bc3adb8fc10796d0463ac5b85e52ecb367948efbb93e |
 | patches/vllm-raw-image-token-transport.patch | 7ff7f7fdc9d72fec7948de4cd8968e157756345ab8487281a36689ed3aa82a63 |
-| patches/vllm-xml-text-fidelity.patch | 91ff1c8c46336fc00745d84f31d7edecabebec5ff9c0f501d86a801e39e86870 |
-| patches/vllm-phase-aware-parser-terminals.patch | 3b6f1075e206370ebed7572852ac9bc559e80264ea6ed9e4b3850e30887dda28 |
+| patches/vllm-xml-text-fidelity.patch | fea2ea6b6837aa30c59a5758837eb039649af16bffd49ffcad603058d59742d3 |
+| patches/vllm-phase-aware-parser-terminals.patch | 8310845e39bed950883182690894f3ed94d0e55c8ef16d89c750d925fef65b21 |
 | patches/vllm-input-stream-agent-identity.patch | caee1588ff260cb866404a91889b3962f8f94b468fa5f5eb81720f1e8c88d67a |
-| patches/vllm-tool-output-completion.patch | 9cbb734b571b1800634e5172e16796de5bcb70b8c5e70c3cbc2226a2e3a39aed |
+| patches/vllm-tool-output-completion.patch | 28525a4fe94915d387d36d6173493908dfba291a3d10b517353ba5fa8f3f4fa4 |
 | patches/vllm-one-way-thinking-boundary.patch | 63a69aea8a184a3875f50673a55058fb9e14dc3178abd8c5510de2770022f346 |
-| patches/vllm-schema-faithful-xml.patch | bd5475972df5b62dd4a0b2b67e68640987f018cf9b14870edf6569a6b0cd8dcc |
+| patches/vllm-schema-faithful-xml.patch | 97e73d566da1bbde490e78da1143d6052e93309b3bb67c90c56fda582af207c2 |
 | patches/vllm-token-text-provenance.patch | 954b36cb444f7e644e29d13f7a9d3c000512a0d616bbf2b6cd3cb8f4e880dd44 |
 | patches/vllm-precise-request-errors.patch | 6ebbc277c2a6f523d520b75d3afe75dd13c745449eea63e037856e8351ac05ad |
 | patches/vllm-qwen-canonical-parameter-framing.patch | d438f9106c4a989d64837c21f5491d946065e6721570ad47664513347f150064 |
@@ -337,16 +337,16 @@ It is intentionally reconstructed by the ordered, reviewed semantic transformati
 | patches/vllm-kv-scope-single-flight.patch | b84b915c38e2c1d32b278bf88dcd5ac7228b9a680b746e2842783dbe1942540a |
 | patches/vllm-template-authored-control-tokens.patch | 1f6b9e898c3b7d3620d2ad3ee8dce70aa7d320e211788ff4fe030468870bc37b |
 | patches/vllm-nvfp4-native-kernel-required.patch | 9d9ce188b6670d687a725c4cdca37478f9dc78ef9f19685ddbcf5e9edd53b8b7 |
-| patches/vllm-qwen-arguments-read-by-grammar.patch | c8d40913648479bfaf0ee90d8274be5914bd15f7ef235d2c6017f351fb499c97 |
+| patches/vllm-qwen-arguments-read-by-grammar.patch | 9bf29aed999f1cfe12a58cc98b91fccafe615dfb7c22f13e9c681d1b54034837 |
 | patches/vllm-startup-plan-admission-bound.patch | 596e311a54f888e8589a0bdc9fba62b6bf779b11eabab8ca1d2b60b8cf9f9930 |
 | patches/vllm-template-refusals-name-their-parameter.patch | 1f428332be39e4fb7f3c7f7eb5d6e3297f5dc70638fcd7f81d69b32f69d1fa26 |
 | patches/vllm-qwen-repeated-parameter-refusal.patch | 11e1a32696d6c17352a94ad815f878728011304592c1efb09eaf98f73f59f147 |
-| patches/vllm-generated-tokens-survive-parsing.patch | 2fb9c11827cad42f46702d213e6e5ea60329181c2f7ab157fcd298338fc06197 |
+| patches/vllm-generated-tokens-survive-parsing.patch | 3709ac24d4f098a27ffa57fedf9d3dec81a1e08392da07d225bb8b62d2e8ee2e |
 | patches/vllm-include-reasoning-shapes-the-response.patch | d3b41899464142ffffb04efd0b19647153e322b10c7f9fc1e14af0f290af98d1 |
 | patches/vllm-unspecified-tool-choice-is-the-default.patch | 367fedad65383375e377d7bc1e20cc3fdab4554d511b9437918004b25321d530 |
 | patches/vllm-call-only-answer-keeps-the-blank-line.patch | ad1e558f8ba02c6889d9b4a79c6ec355e9bfa763bc007e5cae7e609be96ec084 |
 | patches/vllm-responses-tools-are-one-function-list.patch | cae549ea87a8c1b6020f76163cfe1eca0c3104eac317ab2d84b3db75092d20cd |
-| patches/vllm-batch-parse-starts-where-the-prompt-leaves.patch | ef6c1694b9477ca802744485a3b0057b034392b1bf7cdcc0645b8baf3d723913 |
+| patches/vllm-batch-parse-starts-where-the-prompt-leaves.patch | 73ae004604378573de88e10a357072ed3ff74f4e483f852f185032286d37a802 |
 | patches/vllm-derender-text-is-the-detokenizers.patch | 9d8f6d45beba5c79671444be4e9604c4352c7fe5346d78573bfc4fbc91bfb4b6 |
 | patches/vllm-output-constraints-refused-beside-tool-calls.patch | c6ac620c8cd962a77868789d72875e0df456a9b0918ef8cb58ec2e15c3600343 |
 | patches/vllm-batch-invariance-substitutes-no-nvfp4-kernel.patch | c79baaee0a51275f5f522d266fe6b315c200e6951920c2454d5c80cadbb92f44 |
@@ -404,9 +404,9 @@ Pinned build inputs and products:
 |---|---|
 | Immutable base tag | qwen38-vllm:main-9df9b0b |
 | Immutable base ID | sha256:fa4a002a88b7043a1a89966dea8a500fe9696f84e75730d9da916f916048d401 |
-| Runtime Dockerfile SHA-256 | da1ae30aa043b9ac46407f59e50581d1bc8f7e72122aab1776b4546df8475dc2 |
-| Build verifier SHA-256 | 2d75995836cf5b5254e85334e51fd0639bc9be2613f9192655c060db627e705b |
-| Runtime validator SHA-256 | d843e0d641182ce85eca20f37a98f651569bcbd4888b1bc91dc86dfff90e6f6b |
+| Runtime Dockerfile SHA-256 | c72161cf3d7d8b6dca178189d45d8c118b15964475cb9e46554618202db1bf8e |
+| Build verifier SHA-256 | 1041102e2dd8da5ac349b84cd1fa6fb36dac6e9bc91c6ae2205848f3bcc8204d |
+| Runtime validator SHA-256 | 2d52ddb8b576a6a4298bba641797588625350217d059490d6bcd6c63fd7dc45d |
 
 The runtime image's profile, tag and archive name, which every release advances
 together, are declared in `config/runtime-v1.sh`, and the archive lives under
@@ -1461,8 +1461,12 @@ generation had no exact split. `--enable-prompt-tokens-details`
 serves `prompt_tokens_details.cached_tokens`, the prompt tokens the scheduler
 actually reused from the prefix cache, so a client never has to invent a zero for
 it. The exact-reasoning-usage build unit exercises the composed qwen3 parsers on
-CPU inside the immutable build, and the protocol probe holds both fields to the
-returned token ids on every trial, streamed and unstreamed.
+CPU inside the immutable build and holds every reasoning parser to one count: the
+whole-generation count a parser exposes is the count its feed took for every
+format built on the engine, and none for a parser that splits on text, so it is
+absent exactly where usage is absent and never an error. The protocol probe
+holds both fields to the returned token ids on every trial, streamed and
+unstreamed.
 
 ### Validation record for v13 and the paired production agent
 

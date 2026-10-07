@@ -256,7 +256,7 @@ diff --git a/vllm/parser/engine/parser_engine.py b/vllm/parser/engine/parser_eng
      # ── Streaming: parse_delta ────────────────────────────────────────
  
      def parse_delta(
-@@ -853,11 +833,6 @@
+@@ -856,11 +836,6 @@
              reasoning = reasoning.rstrip() or None
  
          content = delta.content if delta else None
@@ -268,7 +268,7 @@ diff --git a/vllm/parser/engine/parser_engine.py b/vllm/parser/engine/parser_eng
          return reasoning, content, tool_call_info
  
      # ── Non-streaming: parse ───────────────────────────────────────────
-@@ -971,19 +946,6 @@
+@@ -974,19 +949,6 @@
  
          content_str = "".join(content_parts)
  
@@ -288,7 +288,7 @@ diff --git a/vllm/parser/engine/parser_engine.py b/vllm/parser/engine/parser_eng
          content = content_str or None
          reasoning = "".join(reasoning_parts) or None
  
-@@ -1268,7 +1230,7 @@
+@@ -1271,7 +1233,7 @@
                  )
  
          content_str = "".join(content_parts)
@@ -325,7 +325,7 @@ diff --git a/vllm/parser/inkling.py b/vllm/parser/inkling.py
          validate_tool_names=False,
      )
  
-@@ -395,10 +393,7 @@
+@@ -371,10 +369,7 @@
          if self._deferred_content:
              trailing = self._deferred_content
              self._deferred_content = ""
@@ -340,7 +340,7 @@ diff --git a/vllm/parser/inkling.py b/vllm/parser/inkling.py
 diff --git a/vllm/parser/kimi_k2.py b/vllm/parser/kimi_k2.py
 --- a/vllm/parser/kimi_k2.py
 +++ b/vllm/parser/kimi_k2.py
-@@ -141,8 +141,6 @@
+@@ -140,8 +140,6 @@
          stream_arg_deltas=True,
          tool_args_json=True,
          strip_trailing_reasoning_whitespace=True,

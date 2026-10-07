@@ -45027,10 +45027,10 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'to JIT compile triton kernels.\n'})},
  {'name': 'exact-reasoning-usage',
   'review_patch': 'patches/vllm-exact-reasoning-usage.patch',
-  'review_sha256': '88453c8565e7dcffd975af1c92eb3d6a4ce0084913b23bb3b2998967c2abb449',
+  'review_sha256': '34a3291cda667e89ffa97f399b821a06adf9a0b14c7429b121e2b01492b7a8e6',
   'files': ({'path': 'tests/parser/engine/test_reasoning_token_count.py',
              'before_sha256': None,
-             'after_sha256': '6256e27e4b7a3f9507f425c16a1aae381b5ac81d60abe3b71bb7964f9f1f84b2'},
+             'after_sha256': 'c95894e30059c24244f2b39663a7cc39db6990e39698ce46dda1ccf48dcd8197'},
             {'path': 'vllm/entrypoints/openai/chat_completion/serving.py',
              'before_sha256': 'da0922ec020e0d4cf0111af1bf00b534348ce13e6e19ac7ce50b3d6cbf58653a',
              'after_sha256': '7e2cfea5a769d396ee7ed0879f91b0325aec21e0423f7b1c310c1291ae3ec3b8'},
@@ -45042,10 +45042,10 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'after_sha256': '7741f85e231cacef264a56f2c794d3a170f37abbd7de7d23f0516883de6487fe'},
             {'path': 'vllm/parser/engine/adapters.py',
              'before_sha256': 'dc1c1317dbfb298e54b8d94ca0e66d2b0cb1e481c35cdcc60a815284bd8a6ef7',
-             'after_sha256': '0d68474d291a7de76f795f6e2d64b15a15077860d1b9ba5711ffe0bfd0c3ca65'},
+             'after_sha256': 'a5e07b911aa1d15ac5691d32d0b9bed7408f964fd0845e7d8974d39ac7141dc5'},
             {'path': 'vllm/parser/engine/parser_engine.py',
              'before_sha256': '9ffce8a3aac1d885cbbd4de269201ef32bdd6089b5f92d61f94eebf1130a5faf',
-             'after_sha256': '006e92011b9ff73f5a99a578b9a836ce4ccc853f84aefa179c066fa4e386a4fd'},
+             'after_sha256': 'de70bf4d36b1c18b1a6d257436278427be30c2dc37855814be161784fca1a12a'},
             {'path': 'tests/entrypoints/openai/responses/test_reasoning_usage_context.py',
              'before_sha256': None,
              'after_sha256': '46074423f3316b6380ecb50f17c6d26aa2fe49c5fa211cb08179ee5fb4347666'},
@@ -45057,7 +45057,28 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'after_sha256': 'bbadaab457115890fd9d808f2b28a8f64c2be362f9058a848ca5277dcd463769'},
             {'path': 'vllm/entrypoints/openai/responses/serving.py',
              'before_sha256': 'ee5f461f39c7a03fb4147d6f045c127b311785def7689e607002676de50f2f83',
-             'after_sha256': '8b38cb52f9cf61085377c0a93f1393e93f09f00475057a1368b00703c10c2cd9'}),
+             'after_sha256': '8b38cb52f9cf61085377c0a93f1393e93f09f00475057a1368b00703c10c2cd9'},
+            {'path': 'tests/reasoning/test_base_thinking_reasoning_parser.py',
+             'before_sha256': '74f1ab3c4dd4c4e7666038d77d94c3a827afd0383ec9a648f3907582c2c314e6',
+             'after_sha256': 'e983590bfa89d22c2c6f6bb834061eb5117f405cd26e9a03c6904c992f6f1c5e'},
+            {'path': 'tests/reasoning/test_minimax_m3_reasoning_parser.py',
+             'before_sha256': '711d7106bb6cd7a4b567b192b2f416959441aeee4bda19a942562c39252f273d',
+             'after_sha256': 'c077f6abd750267b45867c461f50e472318d65d8870f066fdcd0b5daadc6b14c'},
+            {'path': 'vllm/parser/inkling.py',
+             'before_sha256': 'cb2f269ebd08698105ed895906b6d0d95e6539dea7959cbf138ff51cfd572ee7',
+             'after_sha256': 'b3402be0ebf4f3af6847f3fca890f4dfb1c29714312ea0611967b4e760bc8a84'},
+            {'path': 'vllm/parser/kimi_k2.py',
+             'before_sha256': 'e85c1598225aba9dbe0c0caedab94ae80cd3db5d4d6ae302e6681b42c593bbcf',
+             'after_sha256': 'a44e46e53af9c2dc527f431cad597419880982d070e09f513754eaba0baf273d'},
+            {'path': 'vllm/reasoning/abs_reasoning_parsers.py',
+             'before_sha256': 'f1b0977ebbf92cc1fed3b6d6c8040bcd2d418fee1ef013df3d24d915068cb021',
+             'after_sha256': 'd367196debd45d496653f66ac5b1a68a442db95dfe2d3e1a7a10df0144d53843'},
+            {'path': 'vllm/reasoning/basic_parsers.py',
+             'before_sha256': '2270653840ec1c7a82a60989938ea46c36ecb9d476d20e781a9212dd9cae2cc6',
+             'after_sha256': 'daf62cc0685705b5cac7c4c6e2c6d9a0182960b5d8ebafc2ca3c45f39653c598'},
+            {'path': 'vllm/reasoning/minimax_m3_reasoning_parser.py',
+             'before_sha256': '62b35a09e322787a5c9831bd8c12512e8594d8df16f92ccb80da40d63cde4769',
+             'after_sha256': 'd91a8f1c7c34bc4d32d374e68038c719e61a1cac456c0538025bcbba0daf3cab'}),
   'edits': ({'name': 'tests/parser/engine/test_reasoning_token_count.py:landmark-1',
              'path': 'tests/parser/engine/test_reasoning_token_count.py',
              'before': '',
@@ -45076,6 +45097,9 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       'uses, on both the delta-by-delta and the batch path.\n'
                       '"""\n'
                       '\n'
+                      'import importlib\n'
+                      'import inspect\n'
+                      'import pkgutil\n'
                       'from unittest.mock import MagicMock\n'
                       '\n'
                       'import pytest\n'
@@ -45084,6 +45108,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       'from vllm.entrypoints.openai.chat_completion.protocol import '
                       'ChatCompletionRequest\n'
                       'from vllm.parser import ParserManager\n'
+                      'from vllm.parser.abstract_parser import DelegatingParser\n'
                       'from vllm.parser.engine.events import EventType\n'
                       'from vllm.parser.engine.parser_engine import ParserEngine\n'
                       'from vllm.parser.engine.parser_engine_config import (\n'
@@ -45098,6 +45123,10 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '    TOOL_CALL_START,\n'
                       '    Qwen3Parser,\n'
                       ')\n'
+                      'from vllm.reasoning.deepseek_r1_reasoning_parser import '
+                      'DeepSeekR1ReasoningParser\n'
+                      'from vllm.reasoning.minimax_m3_reasoning_parser import '
+                      'MiniMaxM3ReasoningParser\n'
                       '\n'
                       'END_OF_TURN = "<|im_end|>"\n'
                       'VOCAB = {\n'
@@ -45171,6 +45200,55 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       'def joined(outputs, field):\n'
                       '    return "".join(getattr(delta, field) or "" for delta in '
                       'outputs if delta)\n'
+                      '\n'
+                      '\n'
+                      'def engine_formats():\n'
+                      '    """Every parser format this package builds on the '
+                      'engine."""\n'
+                      '    import vllm.parser as parser_package\n'
+                      '\n'
+                      '    found = {}\n'
+                      '    for module_info in '
+                      'pkgutil.iter_modules(parser_package.__path__):\n'
+                      '        module = importlib.import_module(\n'
+                      '            f"{parser_package.__name__}.{module_info.name}"\n'
+                      '        )\n'
+                      '        for obj in vars(module).values():\n'
+                      '            if (\n'
+                      '                inspect.isclass(obj)\n'
+                      '                and issubclass(obj, ParserEngine)\n'
+                      '                and obj is not ParserEngine\n'
+                      '                and obj.__module__ == module.__name__\n'
+                      '            ):\n'
+                      '                found[obj.__name__] = obj\n'
+                      '    return sorted(found.items())\n'
+                      '\n'
+                      '\n'
+                      'class TerminalVocab(dict):\n'
+                      '    """A vocabulary holding every terminal a format asks for as '
+                      'one id, so\n'
+                      '    only the shape of its grammar decides whether it has a '
+                      'boundary."""\n'
+                      '\n'
+                      '    def get(self, text, default=None):\n'
+                      '        if text not in self:\n'
+                      '            self[text] = 5000 + len(self)\n'
+                      '        return self[text]\n'
+                      '\n'
+                      '    def decode(self, ids):\n'
+                      '        by_id = {token_id: text for text, token_id in '
+                      'self.items()}\n'
+                      '        return "".join(by_id.get(token_id, chr(token_id)) for '
+                      'token_id in ids)\n'
+                      '\n'
+                      '\n'
+                      'def terminal_tokenizer(vocab):\n'
+                      '    tokenizer = MagicMock()\n'
+                      '    tokenizer.get_vocab.return_value = vocab\n'
+                      '    tokenizer.decode.side_effect = vocab.decode\n'
+                      '    tokenizer.all_special_tokens = []\n'
+                      '    tokenizer.all_special_ids = []\n'
+                      '    return tokenizer\n'
                       '\n'
                       '\n'
                       'class TestStreaming:\n'
@@ -45365,9 +45443,84 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '        engine = ParserEngine(tokenizer, '
                       'parser_engine_config=config)\n'
                       '\n'
+                      '        assert reason in engine._reasoning_boundary_refusal\n'
                       '        assert engine.reasoning_token_count is None\n'
-                      '        with pytest.raises(ValueError, match=reason):\n'
-                      '            engine.count_reasoning_tokens([65, 99, 66])\n',
+                      '        assert engine.count_reasoning_tokens([65, 99, 66]) is '
+                      'None\n'
+                      '\n'
+                      '\n'
+                      'class TestOneCount:\n'
+                      '    """The whole-generation count is the fed count, for every '
+                      'format."""\n'
+                      '\n'
+                      '    @pytest.mark.parametrize("enable_thinking", [True, False])\n'
+                      '    @pytest.mark.parametrize(\n'
+                      '        "parser_cls",\n'
+                      '        [cls for _, cls in engine_formats()],\n'
+                      '        ids=lambda cls: cls.__name__,\n'
+                      '    )\n'
+                      '    def '
+                      'test_every_engine_format_counts_a_generation_as_it_feeds_it(\n'
+                      '        self, parser_cls, enable_thinking\n'
+                      '    ):\n'
+                      '        vocab = TerminalVocab()\n'
+                      '        engine = parser_cls(\n'
+                      '            terminal_tokenizer(vocab),\n'
+                      '            [],\n'
+                      '            chat_template_kwargs={"enable_thinking": '
+                      'enable_thinking},\n'
+                      '        )\n'
+                      '        boundary = sorted(engine._reasoning_boundary_ids)\n'
+                      '        for ids in ([65, 66, 67], [65, 66, *boundary[:1], '
+                      '67]):\n'
+                      '            with engine.batch_token_ids(ids):\n'
+                      '                engine.extract_reasoning(vocab.decode(ids), '
+                      'MagicMock())\n'
+                      '\n'
+                      '            assert engine.count_reasoning_tokens(ids) == '
+                      'engine.reasoning_token_count\n'
+                      '\n'
+                      '    @pytest.mark.parametrize(\n'
+                      '        ("reasoning_parser_cls", "opener", "closer"),\n'
+                      '        [\n'
+                      '            (DeepSeekR1ReasoningParser, THINK_START, '
+                      'THINK_END),\n'
+                      '            (MiniMaxM3ReasoningParser, "<mm:think>", '
+                      '"</mm:think>"),\n'
+                      '        ],\n'
+                      '        ids=["deepseek_r1", "minimax_m3"],\n'
+                      '    )\n'
+                      '    def test_a_parser_that_splits_on_text_reports_no_count(\n'
+                      '        self, reasoning_parser_cls, opener, closer, '
+                      'request_stub\n'
+                      '    ):\n'
+                      '        # The split is made on text, so the served usage '
+                      'carries no count,\n'
+                      "        # and the parser's own count is that same absent one.\n"
+                      '        vocab = {**VOCAB, "<mm:think>": 1003, "</mm:think>": '
+                      '1004}\n'
+                      '        tokenizer = make_mock_tokenizer(vocab)\n'
+                      '        tokenizer.encode.side_effect = lambda text, **_: (\n'
+                      '            [vocab[text]] if text in vocab else [ord(c) for c '
+                      'in text]\n'
+                      '        )\n'
+                      '        parser = type(\n'
+                      '            "TextSplit",\n'
+                      '            (DelegatingParser,),\n'
+                      '            {"reasoning_parser_cls": reasoning_parser_cls, '
+                      '"tool_parser_cls": None},\n'
+                      '        )(tokenizer)\n'
+                      '        ids = [vocab[opener], ord("A"), ord("B"), '
+                      'vocab[closer], ord("C")]\n'
+                      '        reasoning, content, _ = parser.parse(\n'
+                      '            tokenizer.decode(ids), request_stub, '
+                      'model_output_token_ids=ids\n'
+                      '        )\n'
+                      '\n'
+                      '        assert (reasoning, content) == ("AB", "C")\n'
+                      '        assert parser.reasoning_token_count is None\n'
+                      '        assert '
+                      'parser.reasoning_parser.count_reasoning_tokens(ids) is None\n',
              'review_before': '',
              'review_after': '# SPDX-License-Identifier: Apache-2.0\n'
                              '# SPDX-FileCopyrightText: Copyright contributors to the '
@@ -45384,6 +45537,9 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'uses, on both the delta-by-delta and the batch path.\n'
                              '"""\n'
                              '\n'
+                             'import importlib\n'
+                             'import inspect\n'
+                             'import pkgutil\n'
                              'from unittest.mock import MagicMock\n'
                              '\n'
                              'import pytest\n'
@@ -45393,6 +45549,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'from vllm.entrypoints.openai.chat_completion.protocol '
                              'import ChatCompletionRequest\n'
                              'from vllm.parser import ParserManager\n'
+                             'from vllm.parser.abstract_parser import '
+                             'DelegatingParser\n'
                              'from vllm.parser.engine.events import EventType\n'
                              'from vllm.parser.engine.parser_engine import '
                              'ParserEngine\n'
@@ -45408,6 +45566,10 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    TOOL_CALL_START,\n'
                              '    Qwen3Parser,\n'
                              ')\n'
+                             'from vllm.reasoning.deepseek_r1_reasoning_parser import '
+                             'DeepSeekR1ReasoningParser\n'
+                             'from vllm.reasoning.minimax_m3_reasoning_parser import '
+                             'MiniMaxM3ReasoningParser\n'
                              '\n'
                              'END_OF_TURN = "<|im_end|>"\n'
                              'VOCAB = {\n'
@@ -45482,6 +45644,56 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'def joined(outputs, field):\n'
                              '    return "".join(getattr(delta, field) or "" for delta '
                              'in outputs if delta)\n'
+                             '\n'
+                             '\n'
+                             'def engine_formats():\n'
+                             '    """Every parser format this package builds on the '
+                             'engine."""\n'
+                             '    import vllm.parser as parser_package\n'
+                             '\n'
+                             '    found = {}\n'
+                             '    for module_info in '
+                             'pkgutil.iter_modules(parser_package.__path__):\n'
+                             '        module = importlib.import_module(\n'
+                             '            '
+                             'f"{parser_package.__name__}.{module_info.name}"\n'
+                             '        )\n'
+                             '        for obj in vars(module).values():\n'
+                             '            if (\n'
+                             '                inspect.isclass(obj)\n'
+                             '                and issubclass(obj, ParserEngine)\n'
+                             '                and obj is not ParserEngine\n'
+                             '                and obj.__module__ == module.__name__\n'
+                             '            ):\n'
+                             '                found[obj.__name__] = obj\n'
+                             '    return sorted(found.items())\n'
+                             '\n'
+                             '\n'
+                             'class TerminalVocab(dict):\n'
+                             '    """A vocabulary holding every terminal a format asks '
+                             'for as one id, so\n'
+                             '    only the shape of its grammar decides whether it has '
+                             'a boundary."""\n'
+                             '\n'
+                             '    def get(self, text, default=None):\n'
+                             '        if text not in self:\n'
+                             '            self[text] = 5000 + len(self)\n'
+                             '        return self[text]\n'
+                             '\n'
+                             '    def decode(self, ids):\n'
+                             '        by_id = {token_id: text for text, token_id in '
+                             'self.items()}\n'
+                             '        return "".join(by_id.get(token_id, '
+                             'chr(token_id)) for token_id in ids)\n'
+                             '\n'
+                             '\n'
+                             'def terminal_tokenizer(vocab):\n'
+                             '    tokenizer = MagicMock()\n'
+                             '    tokenizer.get_vocab.return_value = vocab\n'
+                             '    tokenizer.decode.side_effect = vocab.decode\n'
+                             '    tokenizer.all_special_tokens = []\n'
+                             '    tokenizer.all_special_ids = []\n'
+                             '    return tokenizer\n'
                              '\n'
                              '\n'
                              'class TestStreaming:\n'
@@ -45695,10 +45907,92 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '        engine = ParserEngine(tokenizer, '
                              'parser_engine_config=config)\n'
                              '\n'
+                             '        assert reason in '
+                             'engine._reasoning_boundary_refusal\n'
                              '        assert engine.reasoning_token_count is None\n'
-                             '        with pytest.raises(ValueError, match=reason):\n'
-                             '            engine.count_reasoning_tokens([65, 99, '
-                             '66])\n'},
+                             '        assert engine.count_reasoning_tokens([65, 99, '
+                             '66]) is None\n'
+                             '\n'
+                             '\n'
+                             'class TestOneCount:\n'
+                             '    """The whole-generation count is the fed count, for '
+                             'every format."""\n'
+                             '\n'
+                             '    @pytest.mark.parametrize("enable_thinking", [True, '
+                             'False])\n'
+                             '    @pytest.mark.parametrize(\n'
+                             '        "parser_cls",\n'
+                             '        [cls for _, cls in engine_formats()],\n'
+                             '        ids=lambda cls: cls.__name__,\n'
+                             '    )\n'
+                             '    def '
+                             'test_every_engine_format_counts_a_generation_as_it_feeds_it(\n'
+                             '        self, parser_cls, enable_thinking\n'
+                             '    ):\n'
+                             '        vocab = TerminalVocab()\n'
+                             '        engine = parser_cls(\n'
+                             '            terminal_tokenizer(vocab),\n'
+                             '            [],\n'
+                             '            chat_template_kwargs={"enable_thinking": '
+                             'enable_thinking},\n'
+                             '        )\n'
+                             '        boundary = '
+                             'sorted(engine._reasoning_boundary_ids)\n'
+                             '        for ids in ([65, 66, 67], [65, 66, '
+                             '*boundary[:1], 67]):\n'
+                             '            with engine.batch_token_ids(ids):\n'
+                             '                '
+                             'engine.extract_reasoning(vocab.decode(ids), '
+                             'MagicMock())\n'
+                             '\n'
+                             '            assert engine.count_reasoning_tokens(ids) == '
+                             'engine.reasoning_token_count\n'
+                             '\n'
+                             '    @pytest.mark.parametrize(\n'
+                             '        ("reasoning_parser_cls", "opener", "closer"),\n'
+                             '        [\n'
+                             '            (DeepSeekR1ReasoningParser, THINK_START, '
+                             'THINK_END),\n'
+                             '            (MiniMaxM3ReasoningParser, "<mm:think>", '
+                             '"</mm:think>"),\n'
+                             '        ],\n'
+                             '        ids=["deepseek_r1", "minimax_m3"],\n'
+                             '    )\n'
+                             '    def '
+                             'test_a_parser_that_splits_on_text_reports_no_count(\n'
+                             '        self, reasoning_parser_cls, opener, closer, '
+                             'request_stub\n'
+                             '    ):\n'
+                             '        # The split is made on text, so the served usage '
+                             'carries no count,\n'
+                             "        # and the parser's own count is that same absent "
+                             'one.\n'
+                             '        vocab = {**VOCAB, "<mm:think>": 1003, '
+                             '"</mm:think>": 1004}\n'
+                             '        tokenizer = make_mock_tokenizer(vocab)\n'
+                             '        tokenizer.encode.side_effect = lambda text, **_: '
+                             '(\n'
+                             '            [vocab[text]] if text in vocab else [ord(c) '
+                             'for c in text]\n'
+                             '        )\n'
+                             '        parser = type(\n'
+                             '            "TextSplit",\n'
+                             '            (DelegatingParser,),\n'
+                             '            {"reasoning_parser_cls": '
+                             'reasoning_parser_cls, "tool_parser_cls": None},\n'
+                             '        )(tokenizer)\n'
+                             '        ids = [vocab[opener], ord("A"), ord("B"), '
+                             'vocab[closer], ord("C")]\n'
+                             '        reasoning, content, _ = parser.parse(\n'
+                             '            tokenizer.decode(ids), request_stub, '
+                             'model_output_token_ids=ids\n'
+                             '        )\n'
+                             '\n'
+                             '        assert (reasoning, content) == ("AB", "C")\n'
+                             '        assert parser.reasoning_token_count is None\n'
+                             '        assert '
+                             'parser.reasoning_parser.count_reasoning_tokens(ids) is '
+                             'None\n'},
             {'name': 'vllm/entrypoints/openai/chat_completion/serving.py:landmark-1',
              'path': 'vllm/entrypoints/openai/chat_completion/serving.py',
              'before': '    ChatMessage,\n'
@@ -46841,7 +47135,11 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    def extract_reasoning_streaming(\n'},
             {'name': 'vllm/parser/engine/adapters.py:landmark-2',
              'path': 'vllm/parser/engine/adapters.py',
-             'before': '\n'
+             'before': '    ) -> str | None:\n'
+                       '        return '
+                       'self._parser_engine.get_streaming_fallback_content(text, '
+                       'request)\n'
+                       '\n'
                        '    def count_reasoning_tokens(self, token_ids: Sequence[int]) '
                        '-> int:\n'
                        '        return '
@@ -46849,9 +47147,13 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                        '\n'
                        '\n'
                        'class ParserEngineToolAdapter(ToolParser):\n',
-             'after': '\n'
+             'after': '    ) -> str | None:\n'
+                      '        return '
+                      'self._parser_engine.get_streaming_fallback_content(text, '
+                      'request)\n'
+                      '\n'
                       '    def count_reasoning_tokens(self, token_ids: Sequence[int]) '
-                      '-> int:\n'
+                      '-> int | None:\n'
                       '        return '
                       'self._parser_engine.count_reasoning_tokens(token_ids)\n'
                       '\n'
@@ -46861,7 +47163,11 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '\n'
                       '\n'
                       'class ParserEngineToolAdapter(ToolParser):\n',
-             'review_before': '\n'
+             'review_before': '    ) -> str | None:\n'
+                              '        return '
+                              'self._parser_engine.get_streaming_fallback_content(text, '
+                              'request)\n'
+                              '\n'
                               '    def count_reasoning_tokens(self, token_ids: '
                               'Sequence[int]) -> int:\n'
                               '        return '
@@ -46869,9 +47175,13 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                               '\n'
                               '\n'
                               'class ParserEngineToolAdapter(ToolParser):\n',
-             'review_after': '\n'
+             'review_after': '    ) -> str | None:\n'
+                             '        return '
+                             'self._parser_engine.get_streaming_fallback_content(text, '
+                             'request)\n'
+                             '\n'
                              '    def count_reasoning_tokens(self, token_ids: '
-                             'Sequence[int]) -> int:\n'
+                             'Sequence[int]) -> int | None:\n'
                              '        return '
                              'self._parser_engine.count_reasoning_tokens(token_ids)\n'
                              '\n'
@@ -47305,11 +47615,19 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '            self._reasoning_fed_without_ids = True\n'
                       '        if not self._reasoning_open:\n'
                       '            return\n'
-                      '        for token_id in delta_token_ids:\n'
+                      '        counted = self._ids_before_boundary(delta_token_ids)\n'
+                      '        self._reasoning_token_count += counted\n'
+                      '        self._reasoning_open = counted == len(delta_token_ids)\n'
+                      '\n'
+                      '    def _ids_before_boundary(self, token_ids: Sequence[int]) -> '
+                      'int:\n'
+                      '        """How many of *token_ids* precede the first id the '
+                      'grammar leaves\n'
+                      '        reasoning at: all of them when none of them is one."""\n'
+                      '        for index, token_id in enumerate(token_ids):\n'
                       '            if token_id in self._reasoning_boundary_ids:\n'
-                      '                self._reasoning_open = False\n'
-                      '                return\n'
-                      '            self._reasoning_token_count += 1\n'
+                      '                return index\n'
+                      '        return len(token_ids)\n'
                       '\n'
                       '    @contextmanager\n'
                       '    def batch_token_ids(self, token_ids: Sequence[int]) -> '
@@ -47364,30 +47682,28 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '        return self._reasoning_token_count\n'
                       '\n'
                       '    def count_reasoning_tokens(self, token_ids: Sequence[int]) '
-                      '-> int:\n'
-                      '        """Reasoning ids in a complete generation, by the same '
-                      'boundary.\n'
+                      '-> int | None:\n'
+                      '        """Reasoning ids in a complete generation, by the rule '
+                      'the feed follows.\n'
                       '\n'
-                      '        The count :attr:`reasoning_token_count` accumulates '
-                      'delta by delta,\n'
-                      "        taken in one pass from the grammar's initial state; it "
-                      'is what a\n'
-                      "        caller that accumulates a whole generation's ids reads "
-                      'afterwards.\n'
+                      '        The value :attr:`reasoning_token_count` holds once '
+                      '*token_ids* have\n'
+                      "        been fed from the grammar's initial state, where every "
+                      'reset begins,\n'
+                      "        so a caller that accumulates a whole generation's ids "
+                      'reads the same\n'
+                      '        number.  ``None``\n'
+                      '        when the grammar has no single id-marked boundary, '
+                      'exactly when\n'
+                      '        :attr:`reasoning_token_count` is: the count is absent, '
+                      'never an error.\n'
                       '        """\n'
                       '        if self._reasoning_boundary_refusal is not None:\n'
-                      '            raise ValueError(\n'
-                      '                "the exact reasoning token count is '
-                      'unavailable: "\n'
-                      '                f"{self._reasoning_boundary_refusal}"\n'
-                      '            )\n'
+                      '            return None\n'
                       '        if self.parser_engine_config.initial_state is not '
                       'ParserState.REASONING:\n'
                       '            return 0\n'
-                      '        for index, token_id in enumerate(token_ids):\n'
-                      '            if token_id in self._reasoning_boundary_ids:\n'
-                      '                return index\n'
-                      '        return len(token_ids)\n'
+                      '        return self._ids_before_boundary(token_ids)\n'
                       '\n'
                       '    # ── Single-pass parse helper '
                       '────────────────────────────────────────\n'
@@ -47538,12 +47854,23 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '            self._reasoning_fed_without_ids = True\n'
                              '        if not self._reasoning_open:\n'
                              '            return\n'
-                             '        for token_id in delta_token_ids:\n'
+                             '        counted = '
+                             'self._ids_before_boundary(delta_token_ids)\n'
+                             '        self._reasoning_token_count += counted\n'
+                             '        self._reasoning_open = counted == '
+                             'len(delta_token_ids)\n'
+                             '\n'
+                             '    def _ids_before_boundary(self, token_ids: '
+                             'Sequence[int]) -> int:\n'
+                             '        """How many of *token_ids* precede the first id '
+                             'the grammar leaves\n'
+                             '        reasoning at: all of them when none of them is '
+                             'one."""\n'
+                             '        for index, token_id in enumerate(token_ids):\n'
                              '            if token_id in '
                              'self._reasoning_boundary_ids:\n'
-                             '                self._reasoning_open = False\n'
-                             '                return\n'
-                             '            self._reasoning_token_count += 1\n'
+                             '                return index\n'
+                             '        return len(token_ids)\n'
                              '\n'
                              '    @contextmanager\n'
                              '    def batch_token_ids(self, token_ids: Sequence[int]) '
@@ -47600,32 +47927,29 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '        return self._reasoning_token_count\n'
                              '\n'
                              '    def count_reasoning_tokens(self, token_ids: '
-                             'Sequence[int]) -> int:\n'
+                             'Sequence[int]) -> int | None:\n'
                              '        """Reasoning ids in a complete generation, by '
-                             'the same boundary.\n'
+                             'the rule the feed follows.\n'
                              '\n'
-                             '        The count :attr:`reasoning_token_count` '
-                             'accumulates delta by delta,\n'
-                             "        taken in one pass from the grammar's initial "
-                             'state; it is what a\n'
-                             "        caller that accumulates a whole generation's ids "
-                             'reads afterwards.\n'
+                             '        The value :attr:`reasoning_token_count` holds '
+                             'once *token_ids* have\n'
+                             "        been fed from the grammar's initial state, where "
+                             'every reset begins,\n'
+                             '        so a caller that accumulates a whole '
+                             "generation's ids reads the same\n"
+                             '        number.  ``None``\n'
+                             '        when the grammar has no single id-marked '
+                             'boundary, exactly when\n'
+                             '        :attr:`reasoning_token_count` is: the count is '
+                             'absent, never an error.\n'
                              '        """\n'
                              '        if self._reasoning_boundary_refusal is not '
                              'None:\n'
-                             '            raise ValueError(\n'
-                             '                "the exact reasoning token count is '
-                             'unavailable: "\n'
-                             '                f"{self._reasoning_boundary_refusal}"\n'
-                             '            )\n'
+                             '            return None\n'
                              '        if self.parser_engine_config.initial_state is '
                              'not ParserState.REASONING:\n'
                              '            return 0\n'
-                             '        for index, token_id in enumerate(token_ids):\n'
-                             '            if token_id in '
-                             'self._reasoning_boundary_ids:\n'
-                             '                return index\n'
-                             '        return len(token_ids)\n'
+                             '        return self._ids_before_boundary(token_ids)\n'
                              '\n'
                              '    # ── Single-pass parse helper '
                              '────────────────────────────────────────\n'
@@ -48298,7 +48622,739 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'context.num_reasoning_tokens\n'
                              '\n'
                              '        usage = ResponseUsage(\n'
-                             '            input_tokens=num_prompt_tokens,\n'})},
+                             '            input_tokens=num_prompt_tokens,\n'},
+            {'name': 'tests/reasoning/test_base_thinking_reasoning_parser.py:landmark-1',
+             'path': 'tests/reasoning/test_base_thinking_reasoning_parser.py',
+             'before': '        )\n'
+                       '\n'
+                       '    def test_count_reasoning_tokens(self, test_tokenizer):\n'
+                       '        """Count tokens between start/end markers."""\n'
+                       '        parser = TestThinkingReasoningParser(test_tokenizer)\n'
+                       '        start = parser.start_token_id\n'
+                       '        end = parser.end_token_id\n'
+                       '        token_ids = [0, start, 11, 12, end, 99]\n'
+                       '        assert parser.count_reasoning_tokens(token_ids) == 2\n'
+                       '\n'
+                       '    def test_count_reasoning_tokens_nested(self, '
+                       'test_tokenizer):\n'
+                       '        """Ensure nested thinking spans count all inner tokens '
+                       'safely."""\n'
+                       '        parser = TestThinkingReasoningParser(test_tokenizer)\n'
+                       '        s = parser.start_token_id\n'
+                       '        e = parser.end_token_id\n'
+                       '        token_ids = [s, 1, s, 2, e, 3, e]\n'
+                       '        # Tokens 1,2,3 are inside reasoning (depth>0) => 3 '
+                       'tokens\n'
+                       '        assert parser.count_reasoning_tokens(token_ids) == 3\n'
+                       '\n'
+                       '    def test_extract_content_ids(self, test_tokenizer):\n'
+                       '        """Test the extract_content_ids method."""\n',
+             'after': '        )\n'
+                      '\n'
+                      '    def test_count_reasoning_tokens(self, test_tokenizer):\n'
+                      '        """The split is made on text, so no id count is exact: '
+                      'none is\n'
+                      '        reported, even with both markers generated."""\n'
+                      '        parser = TestThinkingReasoningParser(test_tokenizer)\n'
+                      '        start = parser.start_token_id\n'
+                      '        end = parser.end_token_id\n'
+                      '        token_ids = [0, start, 11, 12, end, 99]\n'
+                      '        assert parser.count_reasoning_tokens(token_ids) is '
+                      'None\n'
+                      '\n'
+                      '    def test_extract_content_ids(self, test_tokenizer):\n'
+                      '        """Test the extract_content_ids method."""\n',
+             'review_before': '        )\n'
+                              '\n'
+                              '    def test_count_reasoning_tokens(self, '
+                              'test_tokenizer):\n'
+                              '        """Count tokens between start/end markers."""\n'
+                              '        parser = '
+                              'TestThinkingReasoningParser(test_tokenizer)\n'
+                              '        start = parser.start_token_id\n'
+                              '        end = parser.end_token_id\n'
+                              '        token_ids = [0, start, 11, 12, end, 99]\n'
+                              '        assert parser.count_reasoning_tokens(token_ids) '
+                              '== 2\n'
+                              '\n'
+                              '    def test_count_reasoning_tokens_nested(self, '
+                              'test_tokenizer):\n'
+                              '        """Ensure nested thinking spans count all inner '
+                              'tokens safely."""\n'
+                              '        parser = '
+                              'TestThinkingReasoningParser(test_tokenizer)\n'
+                              '        s = parser.start_token_id\n'
+                              '        e = parser.end_token_id\n'
+                              '        token_ids = [s, 1, s, 2, e, 3, e]\n'
+                              '        # Tokens 1,2,3 are inside reasoning (depth>0) '
+                              '=> 3 tokens\n'
+                              '        assert parser.count_reasoning_tokens(token_ids) '
+                              '== 3\n'
+                              '\n'
+                              '    def test_extract_content_ids(self, '
+                              'test_tokenizer):\n'
+                              '        """Test the extract_content_ids method."""\n',
+             'review_after': '        )\n'
+                             '\n'
+                             '    def test_count_reasoning_tokens(self, '
+                             'test_tokenizer):\n'
+                             '        """The split is made on text, so no id count is '
+                             'exact: none is\n'
+                             '        reported, even with both markers generated."""\n'
+                             '        parser = '
+                             'TestThinkingReasoningParser(test_tokenizer)\n'
+                             '        start = parser.start_token_id\n'
+                             '        end = parser.end_token_id\n'
+                             '        token_ids = [0, start, 11, 12, end, 99]\n'
+                             '        assert parser.count_reasoning_tokens(token_ids) '
+                             'is None\n'
+                             '\n'
+                             '    def test_extract_content_ids(self, test_tokenizer):\n'
+                             '        """Test the extract_content_ids method."""\n'},
+            {'name': 'tests/reasoning/test_minimax_m3_reasoning_parser.py:landmark-1',
+             'path': 'tests/reasoning/test_minimax_m3_reasoning_parser.py',
+             'before': '    assert '
+                       'tokenizer.decode(parser.extract_content_ids(output_ids)) == '
+                       '"def"\n'
+                       '    assert parser.extract_content_ids(open_reasoning_ids) == '
+                       '[]\n'
+                       '    assert parser.extract_content_ids(content_ids) == '
+                       'content_ids\n'
+                       '    assert parser.count_reasoning_tokens(output_ids) == '
+                       'len(tokenizer.encode("abc"))\n'
+                       '\n'
+                       '\n'
+                       'def test_token_id_helpers():\n',
+             'after': '    assert '
+                      'tokenizer.decode(parser.extract_content_ids(output_ids)) == '
+                      '"def"\n'
+                      '    assert parser.extract_content_ids(open_reasoning_ids) == '
+                      '[]\n'
+                      '    assert parser.extract_content_ids(content_ids) == '
+                      'content_ids\n'
+                      '    assert parser.count_reasoning_tokens(output_ids) is None\n'
+                      '\n'
+                      '\n'
+                      'def test_token_id_helpers():\n',
+             'review_before': '    assert '
+                              'tokenizer.decode(parser.extract_content_ids(output_ids)) '
+                              '== "def"\n'
+                              '    assert '
+                              'parser.extract_content_ids(open_reasoning_ids) == []\n'
+                              '    assert parser.extract_content_ids(content_ids) == '
+                              'content_ids\n'
+                              '    assert parser.count_reasoning_tokens(output_ids) == '
+                              'len(tokenizer.encode("abc"))\n'
+                              '\n'
+                              '\n'
+                              'def test_token_id_helpers():\n',
+             'review_after': '    assert '
+                             'tokenizer.decode(parser.extract_content_ids(output_ids)) '
+                             '== "def"\n'
+                             '    assert '
+                             'parser.extract_content_ids(open_reasoning_ids) == []\n'
+                             '    assert parser.extract_content_ids(content_ids) == '
+                             'content_ids\n'
+                             '    assert parser.count_reasoning_tokens(output_ids) is '
+                             'None\n'
+                             '\n'
+                             '\n'
+                             'def test_token_id_helpers():\n'},
+            {'name': 'tests/reasoning/test_minimax_m3_reasoning_parser.py:landmark-2',
+             'path': 'tests/reasoning/test_minimax_m3_reasoning_parser.py',
+             'before': '    assert '
+                       'tokenizer.decode(parser.extract_content_ids(output_ids)) == '
+                       '"def"\n'
+                       '    assert parser.extract_content_ids(open_reasoning_ids) == '
+                       '[]\n'
+                       '    assert parser.extract_content_ids(content_ids) == '
+                       'content_ids\n'
+                       '    assert parser.count_reasoning_tokens(output_ids) == '
+                       'len(tokenizer.encode("abc"))\n'
+                       '\n'
+                       '\n'
+                       'def test_token_id_helpers_enabled_mode():\n',
+             'after': '    assert '
+                      'tokenizer.decode(parser.extract_content_ids(output_ids)) == '
+                      '"def"\n'
+                      '    assert parser.extract_content_ids(open_reasoning_ids) == '
+                      '[]\n'
+                      '    assert parser.extract_content_ids(content_ids) == '
+                      'content_ids\n'
+                      '    assert parser.count_reasoning_tokens(output_ids) is None\n'
+                      '\n'
+                      '\n'
+                      'def test_token_id_helpers_enabled_mode():\n',
+             'review_before': '    assert '
+                              'tokenizer.decode(parser.extract_content_ids(output_ids)) '
+                              '== "def"\n'
+                              '    assert '
+                              'parser.extract_content_ids(open_reasoning_ids) == []\n'
+                              '    assert parser.extract_content_ids(content_ids) == '
+                              'content_ids\n'
+                              '    assert parser.count_reasoning_tokens(output_ids) == '
+                              'len(tokenizer.encode("abc"))\n'
+                              '\n'
+                              '\n'
+                              'def test_token_id_helpers_enabled_mode():\n',
+             'review_after': '    assert '
+                             'tokenizer.decode(parser.extract_content_ids(output_ids)) '
+                             '== "def"\n'
+                             '    assert '
+                             'parser.extract_content_ids(open_reasoning_ids) == []\n'
+                             '    assert parser.extract_content_ids(content_ids) == '
+                             'content_ids\n'
+                             '    assert parser.count_reasoning_tokens(output_ids) is '
+                             'None\n'
+                             '\n'
+                             '\n'
+                             'def test_token_id_helpers_enabled_mode():\n'},
+            {'name': 'tests/reasoning/test_minimax_m3_reasoning_parser.py:landmark-3',
+             'path': 'tests/reasoning/test_minimax_m3_reasoning_parser.py',
+             'before': '    assert not parser.is_reasoning_end(open_reasoning_ids)\n'
+                       '    assert '
+                       'tokenizer.decode(parser.extract_content_ids(output_ids)) == '
+                       '"def"\n'
+                       '    assert parser.extract_content_ids(open_reasoning_ids) == '
+                       '[]\n'
+                       '    assert parser.count_reasoning_tokens(output_ids) == '
+                       'len(tokenizer.encode("abc"))\n'
+                       '    assert parser.count_reasoning_tokens(open_reasoning_ids) '
+                       '== len(\n'
+                       '        tokenizer.encode("abc")\n'
+                       '    )\n',
+             'after': '    assert not parser.is_reasoning_end(open_reasoning_ids)\n'
+                      '    assert '
+                      'tokenizer.decode(parser.extract_content_ids(output_ids)) == '
+                      '"def"\n'
+                      '    assert parser.extract_content_ids(open_reasoning_ids) == '
+                      '[]\n'
+                      '    assert parser.count_reasoning_tokens(output_ids) is None\n'
+                      '    assert parser.count_reasoning_tokens(open_reasoning_ids) is '
+                      'None\n',
+             'review_before': '    assert not '
+                              'parser.is_reasoning_end(open_reasoning_ids)\n'
+                              '    assert '
+                              'tokenizer.decode(parser.extract_content_ids(output_ids)) '
+                              '== "def"\n'
+                              '    assert '
+                              'parser.extract_content_ids(open_reasoning_ids) == []\n'
+                              '    assert parser.count_reasoning_tokens(output_ids) == '
+                              'len(tokenizer.encode("abc"))\n'
+                              '    assert '
+                              'parser.count_reasoning_tokens(open_reasoning_ids) == '
+                              'len(\n'
+                              '        tokenizer.encode("abc")\n'
+                              '    )\n',
+             'review_after': '    assert not '
+                             'parser.is_reasoning_end(open_reasoning_ids)\n'
+                             '    assert '
+                             'tokenizer.decode(parser.extract_content_ids(output_ids)) '
+                             '== "def"\n'
+                             '    assert '
+                             'parser.extract_content_ids(open_reasoning_ids) == []\n'
+                             '    assert parser.count_reasoning_tokens(output_ids) is '
+                             'None\n'
+                             '    assert '
+                             'parser.count_reasoning_tokens(open_reasoning_ids) is '
+                             'None\n'},
+            {'name': 'vllm/parser/inkling.py:landmark-1',
+             'path': 'vllm/parser/inkling.py',
+             'before': 'is carved out of the wrapper by '
+                       ':func:`_inkling_arg_converter`.\n'
+                       '\n'
+                       'Note the terminal *labels*: ``THINK_START``/``THINK_END`` are '
+                       'what the\n'
+                       'engine keys its reasoning plumbing on (``is_reasoning_end``,\n'
+                       '``count_reasoning_tokens``, initial-state seeding), so '
+                       '``<|end_message|>``\n'
+                       'is labelled ``THINK_END`` here even though it ends every block '
+                       'kind —\n'
+                       'the transition table, not the label, carries the semantics.\n'
+                       '"""\n',
+             'after': 'is carved out of the wrapper by '
+                      ':func:`_inkling_arg_converter`.\n'
+                      '\n'
+                      'Note the terminal *labels*: ``THINK_START``/``THINK_END`` are '
+                      'what the\n'
+                      'engine keys its reasoning plumbing on (``is_reasoning_end`` '
+                      'and\n'
+                      'initial-state seeding), so ``<|end_message|>``\n'
+                      'is labelled ``THINK_END`` here even though it ends every block '
+                      'kind —\n'
+                      'the transition table, not the label, carries the semantics.\n'
+                      '"""\n',
+             'review_before': 'is carved out of the wrapper by '
+                              ':func:`_inkling_arg_converter`.\n'
+                              '\n'
+                              'Note the terminal *labels*: '
+                              '``THINK_START``/``THINK_END`` are what the\n'
+                              'engine keys its reasoning plumbing on '
+                              '(``is_reasoning_end``,\n'
+                              '``count_reasoning_tokens``, initial-state seeding), so '
+                              '``<|end_message|>``\n'
+                              'is labelled ``THINK_END`` here even though it ends '
+                              'every block kind —\n'
+                              'the transition table, not the label, carries the '
+                              'semantics.\n'
+                              '"""\n',
+             'review_after': 'is carved out of the wrapper by '
+                             ':func:`_inkling_arg_converter`.\n'
+                             '\n'
+                             'Note the terminal *labels*: '
+                             '``THINK_START``/``THINK_END`` are what the\n'
+                             'engine keys its reasoning plumbing on '
+                             '(``is_reasoning_end`` and\n'
+                             'initial-state seeding), so ``<|end_message|>``\n'
+                             'is labelled ``THINK_END`` here even though it ends every '
+                             'block kind —\n'
+                             'the transition table, not the label, carries the '
+                             'semantics.\n'
+                             '"""\n'},
+            {'name': 'vllm/parser/inkling.py:landmark-2',
+             'path': 'vllm/parser/inkling.py',
+             'before': '                return True\n'
+                       '        return False\n'
+                       '\n'
+                       '    def count_reasoning_tokens(self, token_ids: Sequence[int]) '
+                       '-> int:\n'
+                       '        vocab = self.vocab\n'
+                       '        thinking_id = vocab.get(CONTENT_THINKING)\n'
+                       '        end_ids = {\n'
+                       '            token_id\n'
+                       '            for token_id in (\n'
+                       '                vocab.get(END_MESSAGE),\n'
+                       '                vocab.get(CONTENT_MODEL_END_SAMPLING),\n'
+                       '            )\n'
+                       '            if token_id is not None\n'
+                       '        }\n'
+                       '        in_reasoning = False\n'
+                       '        count = 0\n'
+                       '        for token_id in token_ids:\n'
+                       '            if token_id == thinking_id:\n'
+                       '                in_reasoning = True\n'
+                       '                continue\n'
+                       '            if token_id in end_ids:\n'
+                       '                in_reasoning = False\n'
+                       '                continue\n'
+                       '            if in_reasoning:\n'
+                       '                count += 1\n'
+                       '        return count\n'
+                       '\n'
+                       '    def _single_pass_parse(\n'
+                       '        self,\n'
+                       '        text: str,\n',
+             'after': '                return True\n'
+                      '        return False\n'
+                      '\n'
+                      '    def _single_pass_parse(\n'
+                      '        self,\n'
+                      '        text: str,\n',
+             'review_before': '                return True\n'
+                              '        return False\n'
+                              '\n'
+                              '    def count_reasoning_tokens(self, token_ids: '
+                              'Sequence[int]) -> int:\n'
+                              '        vocab = self.vocab\n'
+                              '        thinking_id = vocab.get(CONTENT_THINKING)\n'
+                              '        end_ids = {\n'
+                              '            token_id\n'
+                              '            for token_id in (\n'
+                              '                vocab.get(END_MESSAGE),\n'
+                              '                vocab.get(CONTENT_MODEL_END_SAMPLING),\n'
+                              '            )\n'
+                              '            if token_id is not None\n'
+                              '        }\n'
+                              '        in_reasoning = False\n'
+                              '        count = 0\n'
+                              '        for token_id in token_ids:\n'
+                              '            if token_id == thinking_id:\n'
+                              '                in_reasoning = True\n'
+                              '                continue\n'
+                              '            if token_id in end_ids:\n'
+                              '                in_reasoning = False\n'
+                              '                continue\n'
+                              '            if in_reasoning:\n'
+                              '                count += 1\n'
+                              '        return count\n'
+                              '\n'
+                              '    def _single_pass_parse(\n'
+                              '        self,\n'
+                              '        text: str,\n',
+             'review_after': '                return True\n'
+                             '        return False\n'
+                             '\n'
+                             '    def _single_pass_parse(\n'
+                             '        self,\n'
+                             '        text: str,\n'},
+            {'name': 'vllm/parser/kimi_k2.py:landmark-1',
+             'path': 'vllm/parser/kimi_k2.py',
+             'before': 'from __future__ import annotations\n'
+                       '\n'
+                       'import functools\n'
+                       'from collections.abc import Sequence\n'
+                       'from typing import TYPE_CHECKING\n'
+                       '\n'
+                       'import regex as re\n',
+             'after': 'from __future__ import annotations\n'
+                      '\n'
+                      'import functools\n'
+                      'from typing import TYPE_CHECKING\n'
+                      '\n'
+                      'import regex as re\n',
+             'review_before': 'from __future__ import annotations\n'
+                              '\n'
+                              'import functools\n'
+                              'from collections.abc import Sequence\n'
+                              'from typing import TYPE_CHECKING\n'
+                              '\n'
+                              'import regex as re\n',
+             'review_after': 'from __future__ import annotations\n'
+                             '\n'
+                             'import functools\n'
+                             'from typing import TYPE_CHECKING\n'
+                             '\n'
+                             'import regex as re\n'},
+            {'name': 'vllm/parser/kimi_k2.py:landmark-2',
+             'path': 'vllm/parser/kimi_k2.py',
+             'before': '        if not self.thinking_enabled:\n'
+                       '            return None, model_output\n'
+                       '        return super().extract_reasoning(model_output, '
+                       'request)\n'
+                       '\n'
+                       '    def count_reasoning_tokens(self, token_ids: Sequence[int]) '
+                       '-> int:\n'
+                       '        if not self.thinking_enabled:\n'
+                       '            return 0\n'
+                       '        return super().count_reasoning_tokens(token_ids)\n',
+             'after': '        if not self.thinking_enabled:\n'
+                      '            return None, model_output\n'
+                      '        return super().extract_reasoning(model_output, '
+                      'request)\n',
+             'review_before': '        if not self.thinking_enabled:\n'
+                              '            return None, model_output\n'
+                              '        return super().extract_reasoning(model_output, '
+                              'request)\n'
+                              '\n'
+                              '    def count_reasoning_tokens(self, token_ids: '
+                              'Sequence[int]) -> int:\n'
+                              '        if not self.thinking_enabled:\n'
+                              '            return 0\n'
+                              '        return '
+                              'super().count_reasoning_tokens(token_ids)\n',
+             'review_after': '        if not self.thinking_enabled:\n'
+                             '            return None, model_output\n'
+                             '        return super().extract_reasoning(model_output, '
+                             'request)\n'},
+            {'name': 'vllm/reasoning/abs_reasoning_parsers.py:landmark-1',
+             'path': 'vllm/reasoning/abs_reasoning_parsers.py',
+             'before': '            The extracted content from the input_ids.\n'
+                       '        """\n'
+                       '\n'
+                       '    def count_reasoning_tokens(self, token_ids: Sequence[int]) '
+                       '-> int:\n'
+                       '        """Count the number of reasoning tokens in a '
+                       'sequence.\n'
+                       '\n'
+                       '        Text-based reasoning models typically wrap their '
+                       'chain-of-thought\n'
+                       '        between special start/end tokens (e.g., ``<think> ... '
+                       '</think>``).\n'
+                       '        Implementations that support reasoning token counting '
+                       'should override\n'
+                       '        this method. The default implementation returns ``0`` '
+                       'so existing\n'
+                       '        parsers remain unchanged unless they explicitly opt '
+                       'in.\n'
+                       '\n'
+                       '        Args:\n'
+                       '            token_ids: Sequence of generated token ids '
+                       '(excluding prompt).\n'
+                       '\n'
+                       '        Returns:\n'
+                       '            int: Number of tokens that belong to reasoning '
+                       'content.\n'
+                       '        """\n'
+                       '\n'
+                       '        # By default, assume the parser cannot detect '
+                       'reasoning spans.\n'
+                       '        return 0\n'
+                       '\n'
+                       '    @abstractmethod\n'
+                       '    def extract_reasoning(\n',
+             'after': '            The extracted content from the input_ids.\n'
+                      '        """\n'
+                      '\n'
+                      '    def count_reasoning_tokens(self, token_ids: Sequence[int]) '
+                      '-> int | None:\n'
+                      '        """Count the number of reasoning tokens in a sequence.\n'
+                      '\n'
+                      '        Text-based reasoning models typically wrap their '
+                      'chain-of-thought\n'
+                      '        between special start/end tokens (e.g., ``<think> ... '
+                      '</think>``).\n'
+                      '        Implementations that support reasoning token counting '
+                      'should override\n'
+                      '        this method. The default implementation returns '
+                      '``None``: a parser\n'
+                      '        that cannot say which generated ids were reasoning has '
+                      'no count, and\n'
+                      '        a zero would claim that none were.\n'
+                      '\n'
+                      '        Args:\n'
+                      '            token_ids: Sequence of generated token ids '
+                      '(excluding prompt).\n'
+                      '\n'
+                      '        Returns:\n'
+                      '            int | None: Number of tokens that belong to '
+                      'reasoning content,\n'
+                      '            or ``None`` when the parser cannot count them.\n'
+                      '        """\n'
+                      '        return None\n'
+                      '\n'
+                      '    @abstractmethod\n'
+                      '    def extract_reasoning(\n',
+             'review_before': '            The extracted content from the input_ids.\n'
+                              '        """\n'
+                              '\n'
+                              '    def count_reasoning_tokens(self, token_ids: '
+                              'Sequence[int]) -> int:\n'
+                              '        """Count the number of reasoning tokens in a '
+                              'sequence.\n'
+                              '\n'
+                              '        Text-based reasoning models typically wrap '
+                              'their chain-of-thought\n'
+                              '        between special start/end tokens (e.g., '
+                              '``<think> ... </think>``).\n'
+                              '        Implementations that support reasoning token '
+                              'counting should override\n'
+                              '        this method. The default implementation returns '
+                              '``0`` so existing\n'
+                              '        parsers remain unchanged unless they explicitly '
+                              'opt in.\n'
+                              '\n'
+                              '        Args:\n'
+                              '            token_ids: Sequence of generated token ids '
+                              '(excluding prompt).\n'
+                              '\n'
+                              '        Returns:\n'
+                              '            int: Number of tokens that belong to '
+                              'reasoning content.\n'
+                              '        """\n'
+                              '\n'
+                              '        # By default, assume the parser cannot detect '
+                              'reasoning spans.\n'
+                              '        return 0\n'
+                              '\n'
+                              '    @abstractmethod\n'
+                              '    def extract_reasoning(\n',
+             'review_after': '            The extracted content from the input_ids.\n'
+                             '        """\n'
+                             '\n'
+                             '    def count_reasoning_tokens(self, token_ids: '
+                             'Sequence[int]) -> int | None:\n'
+                             '        """Count the number of reasoning tokens in a '
+                             'sequence.\n'
+                             '\n'
+                             '        Text-based reasoning models typically wrap their '
+                             'chain-of-thought\n'
+                             '        between special start/end tokens (e.g., '
+                             '``<think> ... </think>``).\n'
+                             '        Implementations that support reasoning token '
+                             'counting should override\n'
+                             '        this method. The default implementation returns '
+                             '``None``: a parser\n'
+                             '        that cannot say which generated ids were '
+                             'reasoning has no count, and\n'
+                             '        a zero would claim that none were.\n'
+                             '\n'
+                             '        Args:\n'
+                             '            token_ids: Sequence of generated token ids '
+                             '(excluding prompt).\n'
+                             '\n'
+                             '        Returns:\n'
+                             '            int | None: Number of tokens that belong to '
+                             'reasoning content,\n'
+                             '            or ``None`` when the parser cannot count '
+                             'them.\n'
+                             '        """\n'
+                             '        return None\n'
+                             '\n'
+                             '    @abstractmethod\n'
+                             '    def extract_reasoning(\n'},
+            {'name': 'vllm/reasoning/basic_parsers.py:landmark-1',
+             'path': 'vllm/reasoning/basic_parsers.py',
+             'before': '            final_content = content or None\n'
+                       '            return reasoning, final_content\n'
+                       '\n'
+                       '    def count_reasoning_tokens(self, token_ids: Sequence[int]) '
+                       '-> int:\n'
+                       '        """Count tokens that fall within start/end thinking '
+                       'markers.\n'
+                       '\n'
+                       '        Uses a depth counter so nested spans are handled '
+                       'safely and stray end\n'
+                       '        tokens do not drive the counter negative.\n'
+                       '        """\n'
+                       '        count = 0\n'
+                       '        depth = 0\n'
+                       '        for token_id in token_ids:\n'
+                       '            if token_id == self.start_token_id:\n'
+                       '                depth += 1\n'
+                       '                continue\n'
+                       '            if token_id == self.end_token_id:\n'
+                       '                if depth > 0:\n'
+                       '                    depth -= 1\n'
+                       '                continue\n'
+                       '            if depth > 0:\n'
+                       '                count += 1\n'
+                       '        return count\n',
+             'after': '            final_content = content or None\n'
+                      '            return reasoning, final_content\n'
+                      '\n'
+                      '    def count_reasoning_tokens(self, token_ids: Sequence[int]) '
+                      '-> int | None:\n'
+                      '        """``None``: these parsers split reasoning from content '
+                      'on the marker\n'
+                      '        text, which no generated id position marks, so no count '
+                      'of ids is the\n'
+                      '        split\'s and the served usage carries none either."""\n'
+                      '        return None\n',
+             'review_before': '            final_content = content or None\n'
+                              '            return reasoning, final_content\n'
+                              '\n'
+                              '    def count_reasoning_tokens(self, token_ids: '
+                              'Sequence[int]) -> int:\n'
+                              '        """Count tokens that fall within start/end '
+                              'thinking markers.\n'
+                              '\n'
+                              '        Uses a depth counter so nested spans are '
+                              'handled safely and stray end\n'
+                              '        tokens do not drive the counter negative.\n'
+                              '        """\n'
+                              '        count = 0\n'
+                              '        depth = 0\n'
+                              '        for token_id in token_ids:\n'
+                              '            if token_id == self.start_token_id:\n'
+                              '                depth += 1\n'
+                              '                continue\n'
+                              '            if token_id == self.end_token_id:\n'
+                              '                if depth > 0:\n'
+                              '                    depth -= 1\n'
+                              '                continue\n'
+                              '            if depth > 0:\n'
+                              '                count += 1\n'
+                              '        return count\n',
+             'review_after': '            final_content = content or None\n'
+                             '            return reasoning, final_content\n'
+                             '\n'
+                             '    def count_reasoning_tokens(self, token_ids: '
+                             'Sequence[int]) -> int | None:\n'
+                             '        """``None``: these parsers split reasoning from '
+                             'content on the marker\n'
+                             '        text, which no generated id position marks, so '
+                             'no count of ids is the\n'
+                             "        split's and the served usage carries none "
+                             'either."""\n'
+                             '        return None\n'},
+            {'name': 'vllm/reasoning/minimax_m3_reasoning_parser.py:landmark-1',
+             'path': 'vllm/reasoning/minimax_m3_reasoning_parser.py',
+             'before': '            return None\n'
+                       '        return DeltaMessage(reasoning=reasoning, '
+                       'content=content)\n'
+                       '\n'
+                       '    def count_reasoning_tokens(self, token_ids: Sequence[int]) '
+                       '-> int:\n'
+                       '        count = 0\n'
+                       '        depth = 1 if self._initial_in_reasoning else 0\n'
+                       '        i = 0\n'
+                       '        while i < len(token_ids):\n'
+                       '            if tuple(token_ids[i : i + '
+                       'len(self._start_token_ids)]) == (\n'
+                       '                self._start_token_ids\n'
+                       '            ):\n'
+                       '                depth += 1\n'
+                       '                i += len(self._start_token_ids)\n'
+                       '                continue\n'
+                       '            if tuple(token_ids[i : i + '
+                       'len(self._end_token_ids)]) == (\n'
+                       '                self._end_token_ids\n'
+                       '            ):\n'
+                       '                if depth > 0:\n'
+                       '                    depth -= 1\n'
+                       '                i += len(self._end_token_ids)\n'
+                       '                continue\n'
+                       '            if depth > 0:\n'
+                       '                count += 1\n'
+                       '            i += 1\n'
+                       '        return count\n'
+                       '\n'
+                       '    def is_reasoning_end(self, input_ids: Sequence[int]) -> '
+                       'bool:\n'
+                       '        start_index = self._rfind_token_sequence(input_ids, '
+                       'self._start_token_ids)\n'
+                       '        end_index = self._rfind_token_sequence(input_ids, '
+                       'self._end_token_ids)\n',
+             'after': '            return None\n'
+                      '        return DeltaMessage(reasoning=reasoning, '
+                      'content=content)\n'
+                      '\n'
+                      '    def is_reasoning_end(self, input_ids: Sequence[int]) -> '
+                      'bool:\n'
+                      '        start_index = self._rfind_token_sequence(input_ids, '
+                      'self._start_token_ids)\n'
+                      '        end_index = self._rfind_token_sequence(input_ids, '
+                      'self._end_token_ids)\n',
+             'review_before': '            return None\n'
+                              '        return DeltaMessage(reasoning=reasoning, '
+                              'content=content)\n'
+                              '\n'
+                              '    def count_reasoning_tokens(self, token_ids: '
+                              'Sequence[int]) -> int:\n'
+                              '        count = 0\n'
+                              '        depth = 1 if self._initial_in_reasoning else 0\n'
+                              '        i = 0\n'
+                              '        while i < len(token_ids):\n'
+                              '            if tuple(token_ids[i : i + '
+                              'len(self._start_token_ids)]) == (\n'
+                              '                self._start_token_ids\n'
+                              '            ):\n'
+                              '                depth += 1\n'
+                              '                i += len(self._start_token_ids)\n'
+                              '                continue\n'
+                              '            if tuple(token_ids[i : i + '
+                              'len(self._end_token_ids)]) == (\n'
+                              '                self._end_token_ids\n'
+                              '            ):\n'
+                              '                if depth > 0:\n'
+                              '                    depth -= 1\n'
+                              '                i += len(self._end_token_ids)\n'
+                              '                continue\n'
+                              '            if depth > 0:\n'
+                              '                count += 1\n'
+                              '            i += 1\n'
+                              '        return count\n'
+                              '\n'
+                              '    def is_reasoning_end(self, input_ids: '
+                              'Sequence[int]) -> bool:\n'
+                              '        start_index = '
+                              'self._rfind_token_sequence(input_ids, '
+                              'self._start_token_ids)\n'
+                              '        end_index = '
+                              'self._rfind_token_sequence(input_ids, '
+                              'self._end_token_ids)\n',
+             'review_after': '            return None\n'
+                             '        return DeltaMessage(reasoning=reasoning, '
+                             'content=content)\n'
+                             '\n'
+                             '    def is_reasoning_end(self, input_ids: Sequence[int]) '
+                             '-> bool:\n'
+                             '        start_index = '
+                             'self._rfind_token_sequence(input_ids, '
+                             'self._start_token_ids)\n'
+                             '        end_index = '
+                             'self._rfind_token_sequence(input_ids, '
+                             'self._end_token_ids)\n'})},
  {'name': 'anthropic-input-fidelity',
   'review_patch': 'patches/vllm-anthropic-input-fidelity.patch',
   'review_sha256': '126f002321100271897a93ddbe212cc37e5d014d0ab745bcd2ce6037f224c5b3',
@@ -51379,7 +52435,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    return error_json_response(req, err)\n'})},
  {'name': 'qwen-exact-tool-language',
   'review_patch': 'patches/vllm-qwen-exact-tool-language.patch',
-  'review_sha256': 'fe4e46cb7444c80646537da63ab1ac12c54e7eebb04c0735a4243d8b7e7943d2',
+  'review_sha256': '05dff889176a99929c1d29a998c8c80ea56ff1cbe82c1d541b8625fc6548474f',
   'files': ({'path': 'tests/parser/engine/replay_harness.py',
              'before_sha256': '08a10377bcfa12cd7c6dcd8759e8783d8a5f84f00d0dd1f6dc9886e2d35a49d7',
              'after_sha256': '6bacf71a93469ca49bbdbfed3b109f82861f9ae3b5298e0d548c5440b0df13fe'},
@@ -51399,8 +52455,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': '03298bb459bdb98166db9eca267e13d273bb884b26eb64e4dee8e78985283eb3',
              'after_sha256': '60a31db16f2b621403b9b2b5259407a44a5ce1e9e79b62e2c27f1cf505a4db21'},
             {'path': 'tests/parser/engine/test_reasoning_token_count.py',
-             'before_sha256': '6256e27e4b7a3f9507f425c16a1aae381b5ac81d60abe3b71bb7964f9f1f84b2',
-             'after_sha256': '37bb1cb80e628ceccc0bd042c9d2806183d2366015a64eac7244af6cc81d1e85'},
+             'before_sha256': 'c95894e30059c24244f2b39663a7cc39db6990e39698ce46dda1ccf48dcd8197',
+             'after_sha256': 'b375c5b45cb549cfc336bbeee9e143f3503a22b5f2d1514c9ec59f0bcd46243c'},
             {'path': 'tests/parser/engine/test_replay.py',
              'before_sha256': 'd77d0f04ee81ffb8973cc38737d0944eb471f639ce0e96a4791617ce95ccca3b',
              'after_sha256': '1299d37b89efcdb9dc4804c79488128117356daeca60a213d13d662628d17a6f'},
@@ -51417,14 +52473,14 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': '7741f85e231cacef264a56f2c794d3a170f37abbd7de7d23f0516883de6487fe',
              'after_sha256': '986719675d268550f09fb863af9c5bdbfb6971c1b7358a94d8cb0ad2c955593f'},
             {'path': 'vllm/parser/engine/adapters.py',
-             'before_sha256': '0d68474d291a7de76f795f6e2d64b15a15077860d1b9ba5711ffe0bfd0c3ca65',
-             'after_sha256': 'cda9c48f5b64c60224961bd75c8a5667caaa1494da581f5bb7ab10cec07ecd8b'},
+             'before_sha256': 'a5e07b911aa1d15ac5691d32d0b9bed7408f964fd0845e7d8974d39ac7141dc5',
+             'after_sha256': '615ac704490a6b6431ab88a1fa5d1c6887e2fb2d0b62b1e8c5c5bd46fa9aa3a5'},
             {'path': 'vllm/parser/engine/events.py',
              'before_sha256': '493543e5832b721c67640c09a6ad664823423a98afe0bb53ba78518608047f0a',
              'after_sha256': 'd0ed492bbe28c19b6ec0446770a21754bfa844a70888ef5706587b0bbea51405'},
             {'path': 'vllm/parser/engine/parser_engine.py',
-             'before_sha256': '006e92011b9ff73f5a99a578b9a836ce4ccc853f84aefa179c066fa4e386a4fd',
-             'after_sha256': '163224e7847cbd29bce9e291adfc4f307aace7109f52fbfd671a1b645cb9542a'},
+             'before_sha256': 'de70bf4d36b1c18b1a6d257436278427be30c2dc37855814be161784fca1a12a',
+             'after_sha256': 'cbc32cf452311707315eeef8e620091bd2c4163e39239c08b91b1bc0bb8a22fc'},
             {'path': 'vllm/parser/engine/parser_engine_config.py',
              'before_sha256': 'f7350e0ca9124001684f1f874ee72bf6a34932d3e4b84cc84567bbccf2f3e4b9',
              'after_sha256': 'f746ba34d2b7606037d4229529e97da019bed0abda83b5f62f98559db613a233'},
@@ -52813,7 +53869,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    def test_think_end_token(self, parser):\n'},
             {'name': 'tests/parser/engine/test_reasoning_token_count.py:landmark-1',
              'path': 'tests/parser/engine/test_reasoning_token_count.py',
-             'before': ')\n'
+             'before': 'from vllm.reasoning.minimax_m3_reasoning_parser import '
+                       'MiniMaxM3ReasoningParser\n'
                        '\n'
                        'END_OF_TURN = "<|im_end|>"\n'
                        'VOCAB = {\n'
@@ -52825,7 +53882,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                        '}\n'
                        '\n'
                        '\n',
-             'after': ')\n'
+             'after': 'from vllm.reasoning.minimax_m3_reasoning_parser import '
+                      'MiniMaxM3ReasoningParser\n'
                       '\n'
                       'END_OF_TURN = "<|im_end|>"\n'
                       '# Marker ids lie outside the ASCII range that single-character '
@@ -52840,7 +53898,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '}\n'
                       '\n'
                       '\n',
-             'review_before': ')\n'
+             'review_before': 'from vllm.reasoning.minimax_m3_reasoning_parser import '
+                              'MiniMaxM3ReasoningParser\n'
                               '\n'
                               'END_OF_TURN = "<|im_end|>"\n'
                               'VOCAB = {\n'
@@ -52852,7 +53911,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                               '}\n'
                               '\n'
                               '\n',
-             'review_after': ')\n'
+             'review_after': 'from vllm.reasoning.minimax_m3_reasoning_parser import '
+                             'MiniMaxM3ReasoningParser\n'
                              '\n'
                              'END_OF_TURN = "<|im_end|>"\n'
                              '# Marker ids lie outside the ASCII range that '
@@ -77995,7 +79055,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'review_after': ''})},
  {'name': 'xml-text-fidelity',
   'review_patch': 'patches/vllm-xml-text-fidelity.patch',
-  'review_sha256': '91ff1c8c46336fc00745d84f31d7edecabebec5ff9c0f501d86a801e39e86870',
+  'review_sha256': 'fea2ea6b6837aa30c59a5758837eb039649af16bffd49ffcad603058d59742d3',
   'files': ({'path': 'tests/parser/engine/test_qwen3.py',
              'before_sha256': 'ff2bab0e9fdafc5a9ac8b2cf3b74b760cc8668a387caf7dd749ca1f8edc730d6',
              'after_sha256': '0f01de04b2c7290acaf9e3fb509704589d853bb625bbe67d78dfb5b5d28e9452'},
@@ -78009,17 +79069,17 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': 'e03e05595209fe6a665839a3120e9c1153d9f9c54f6352976751926e3f6d8598',
              'after_sha256': '1f4b3ad07d6fbed70024db07125296121a454f6a0eb68e32118913a31e4c7899'},
             {'path': 'vllm/parser/engine/parser_engine.py',
-             'before_sha256': '163224e7847cbd29bce9e291adfc4f307aace7109f52fbfd671a1b645cb9542a',
-             'after_sha256': 'c53202173f916b09db41122e95055999e11d578401e1809b27f308f86f72bcc5'},
+             'before_sha256': 'cbc32cf452311707315eeef8e620091bd2c4163e39239c08b91b1bc0bb8a22fc',
+             'after_sha256': '740ae5cdf587d9c3f3f744d669d384b06829a9835c5f977a762c9fc89d71d84b'},
             {'path': 'vllm/parser/engine/parser_engine_config.py',
              'before_sha256': 'f746ba34d2b7606037d4229529e97da019bed0abda83b5f62f98559db613a233',
              'after_sha256': 'a5b3aec530efe97e210f3c75fd158f014203d837322ab7f4fceedbb80e07c7d5'},
             {'path': 'vllm/parser/inkling.py',
-             'before_sha256': 'cb2f269ebd08698105ed895906b6d0d95e6539dea7959cbf138ff51cfd572ee7',
-             'after_sha256': '183f1dd726bfe6169f0c72ef506f6a3edb13c8a19ccf1f515ed9f123aeeb3e6e'},
+             'before_sha256': 'b3402be0ebf4f3af6847f3fca890f4dfb1c29714312ea0611967b4e760bc8a84',
+             'after_sha256': '362c7b80bc3a850d86f5839a98bf86918a49d646b71e320733131c4884fe59c8'},
             {'path': 'vllm/parser/kimi_k2.py',
-             'before_sha256': 'e85c1598225aba9dbe0c0caedab94ae80cd3db5d4d6ae302e6681b42c593bbcf',
-             'after_sha256': '6fcb9c15d8168a034fc1f15d8f43467c2b4ad5457c9b8d8f8571ca6caaede85f'},
+             'before_sha256': 'a44e46e53af9c2dc527f431cad597419880982d070e09f513754eaba0baf273d',
+             'after_sha256': '9c55358d0d81abbd3c954e42b9388cfe9f608377d04f70f60d62c7440831bad4'},
             {'path': 'vllm/parser/qwen3.py',
              'before_sha256': '2c0d5e5bec9e3b504894d278eeaeded0f282e627260f1f35689869dd1fdf9bb0',
              'after_sha256': '7da16cd0e85b8ff6e6544c260cdde2521b881dc2605b64b666fca6fdf97bbdca'},
@@ -79828,7 +80888,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '\n'})},
  {'name': 'phase-aware-parser-terminals',
   'review_patch': 'patches/vllm-phase-aware-parser-terminals.patch',
-  'review_sha256': '3b6f1075e206370ebed7572852ac9bc559e80264ea6ed9e4b3850e30887dda28',
+  'review_sha256': '8310845e39bed950883182690894f3ed94d0e55c8ef16d89c750d925fef65b21',
   'files': ({'path': 'tests/parser/engine/streaming_helpers.py',
              'before_sha256': '969ab05da36e3200c99a1c3d7a2a6a68bfaea5ccc8f3ab158da020a05092177c',
              'after_sha256': '6dba19ea496809f185a2824ac812bbdd93d4f2d8ac36e2827f76d670eddd996a'},
@@ -79848,8 +80908,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': '2d41c84835a4ae718cf573e8a2f8f5ebe14df1282aab4b1491ed6abd70d5eb37',
              'after_sha256': '969ed3d6968db465472951207d70c3ed70128f4c69f766ea3c41d46b754c8a2e'},
             {'path': 'tests/parser/engine/test_reasoning_token_count.py',
-             'before_sha256': '37bb1cb80e628ceccc0bd042c9d2806183d2366015a64eac7244af6cc81d1e85',
-             'after_sha256': '4d823e0f71e5041c60d077a258f80250a4c11fbc642f5bbc6ceb7da515c04b94'},
+             'before_sha256': 'b375c5b45cb549cfc336bbeee9e143f3503a22b5f2d1514c9ec59f0bcd46243c',
+             'after_sha256': 'dab4d5943f8887c1c56e884b77d63898e24fbcce16393ed240aabe61f555d280'},
             {'path': 'tests/parser/engine/test_replay.py',
              'before_sha256': '1299d37b89efcdb9dc4804c79488128117356daeca60a213d13d662628d17a6f',
              'after_sha256': '1684c44d016e26a6ed4aec2c99e0b6f355c1fb1562603784d24f2e61496479a6'},
@@ -79860,8 +80920,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': '1f4b3ad07d6fbed70024db07125296121a454f6a0eb68e32118913a31e4c7899',
              'after_sha256': 'a95f86eb4146d3096a73f1076260bbc58630a74c377b9da1d7e66d65e898465f'},
             {'path': 'vllm/parser/engine/parser_engine.py',
-             'before_sha256': 'c53202173f916b09db41122e95055999e11d578401e1809b27f308f86f72bcc5',
-             'after_sha256': '3d75b24ff94895b9f1a5dff49e31c0b3d4d29ce886bcfb04679ad32b27b25904'},
+             'before_sha256': '740ae5cdf587d9c3f3f744d669d384b06829a9835c5f977a762c9fc89d71d84b',
+             'after_sha256': '491eaeec03903da66c6a86b1d4594950a67609664a2853b946fbfa816be673e2'},
             {'path': 'vllm/parser/engine/parser_engine_config.py',
              'before_sha256': 'a5b3aec530efe97e210f3c75fd158f014203d837322ab7f4fceedbb80e07c7d5',
              'after_sha256': 'cb14810b125705026ce8e558d0f53e7fb814b86371f8ee36908d30aa9d2e69f1'},
@@ -79875,8 +80935,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': 'ce3629319e56e882d25cb75d62e3e7088a4eec1518885fc69fc696eafb4a97b2',
              'after_sha256': 'b0c121dddf46e6c74ee6cae1d47eccddbdd0e1622e2f41b985e4e06bd017ed73'},
             {'path': 'vllm/parser/kimi_k2.py',
-             'before_sha256': '6fcb9c15d8168a034fc1f15d8f43467c2b4ad5457c9b8d8f8571ca6caaede85f',
-             'after_sha256': '7d1d9a64ae888e08c135e8b3859d6a3a66b53e4b8e685bd2f4090bd30204ab56'},
+             'before_sha256': '9c55358d0d81abbd3c954e42b9388cfe9f608377d04f70f60d62c7440831bad4',
+             'after_sha256': '45e79bcf8dfe770fd43a5943c0df1128b2254c3298777c25111e86812365fa0a'},
             {'path': 'vllm/parser/minimax_m2.py',
              'before_sha256': '31c0816e323fd957ff0a2a28222dca411e6811f914e2743a279d05413f839086',
              'after_sha256': '38577327262d3df29c052240f7bbb1369b82a6d3697d85bd4e5c29d130662fa1'},
@@ -82918,7 +83978,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '                        request_id=internal_req_id,\n'})},
  {'name': 'tool-output-completion',
   'review_patch': 'patches/vllm-tool-output-completion.patch',
-  'review_sha256': '9cbb734b571b1800634e5172e16796de5bcb70b8c5e70c3cbc2226a2e3a39aed',
+  'review_sha256': '28525a4fe94915d387d36d6173493908dfba291a3d10b517353ba5fa8f3f4fa4',
   'files': ({'path': 'tests/entrypoints/openai/chat_completion/test_parallel_tool_call_integrity.py',
              'before_sha256': 'a4a6547338dbf625e3041e2578f2a8e314aa14d1520468c69ee17ff22998d9a2',
              'after_sha256': 'e290f2c4df7bd842594db1fb4e66bf713bc6ff653cbadc8877958a955c0fa4c4'},
@@ -82953,11 +84013,11 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': '84891751517483beb28eb9956d6a39af65ee16fc8085c5500ac982e7bd0bae8a',
              'after_sha256': '5cfff0a45f292313ff633a1b71d1cf3f32369ae62b41d972ce80a238bc6005c0'},
             {'path': 'vllm/parser/engine/adapters.py',
-             'before_sha256': 'cda9c48f5b64c60224961bd75c8a5667caaa1494da581f5bb7ab10cec07ecd8b',
-             'after_sha256': 'f5d248040238b4fdcd89c97164c97e45941fad46d650614b4de5e8cd9e83118a'},
+             'before_sha256': '615ac704490a6b6431ab88a1fa5d1c6887e2fb2d0b62b1e8c5c5bd46fa9aa3a5',
+             'after_sha256': '111149dc91d9fc0de78eb719154521d1e41a1e1326013b5b7ce2c42bcf92f241'},
             {'path': 'vllm/parser/engine/parser_engine.py',
-             'before_sha256': '3d75b24ff94895b9f1a5dff49e31c0b3d4d29ce886bcfb04679ad32b27b25904',
-             'after_sha256': '3e7fa5e4d302ffc6c6fcbff8bb0933f897f1fd5c975254db75cffff9e0f884b2'},
+             'before_sha256': '491eaeec03903da66c6a86b1d4594950a67609664a2853b946fbfa816be673e2',
+             'after_sha256': 'faf4f8a9aad387ba63a9df44980da9857619c3d99d13360df3039a262dba1efa'},
             {'path': 'vllm/parser/engine/streaming_parser_engine.py',
              'before_sha256': '4dfe9ac9a6f742237f962fecae6b72f596fe93684b107a2647e79eb52494b392',
              'after_sha256': '971e1b338169349d03bf04ad4bbd9702b97f6086cf4890d23321a0a37a5b385b'},
@@ -89810,17 +90870,17 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': '2c4f7bdee48a9fb3d93787c4c32361c2411417cce452cfde86808d8759977861',
              'after_sha256': '29a3bb76af99f67a7706f365fbcd3362205ef8af9db46b7f167374e68f8146ae'},
             {'path': 'vllm/parser/engine/adapters.py',
-             'before_sha256': 'f5d248040238b4fdcd89c97164c97e45941fad46d650614b4de5e8cd9e83118a',
-             'after_sha256': 'b59c8b5911e0570fbe5778791e079a197c365beda8160ea901e3ff2dcf18fa48'},
+             'before_sha256': '111149dc91d9fc0de78eb719154521d1e41a1e1326013b5b7ce2c42bcf92f241',
+             'after_sha256': '2679bf5609812dcd988d4039db0203eb9361e21d5360ea1a363ad51f9c3d839d'},
             {'path': 'vllm/parser/engine/parser_engine.py',
-             'before_sha256': '3e7fa5e4d302ffc6c6fcbff8bb0933f897f1fd5c975254db75cffff9e0f884b2',
-             'after_sha256': '6a07e8c8733cefadd7fce345851a1f5e447709a7cf083b96b571fe03e6e1b307'},
+             'before_sha256': 'faf4f8a9aad387ba63a9df44980da9857619c3d99d13360df3039a262dba1efa',
+             'after_sha256': '43329c8aa073ce3844e605165f073541b6c103ed65a1d6e42fa7792a6a470578'},
             {'path': 'vllm/parser/qwen3.py',
              'before_sha256': '0f2fd79645b9c4ed2f2e87dafa8a67015ec775418b671b387dca4dbfa25f02ac',
              'after_sha256': '1661e17f66a979600a730bfb9369a97be3f1f1719a1c2d7331af3892d388cfbb'},
             {'path': 'vllm/reasoning/abs_reasoning_parsers.py',
-             'before_sha256': 'f1b0977ebbf92cc1fed3b6d6c8040bcd2d418fee1ef013df3d24d915068cb021',
-             'after_sha256': 'ba4b1145048e5faa217e1ef4d849167ebd1fe7bcb9296fe2e9d2f17ce96607f7'},
+             'before_sha256': 'd367196debd45d496653f66ac5b1a68a442db95dfe2d3e1a7a10df0144d53843',
+             'after_sha256': '95e86d5bc477f00f5ed043273f64b76dc939374b118687bbcf834cc5d332c6c2'},
             {'path': 'vllm/v1/sample/thinking_budget_state.py',
              'before_sha256': 'f73274268a72988a540e7e58ec5bdfb1515fcb689da4bf2e6b60017d8f28f99c',
              'after_sha256': '2de2bd4623f27a3f610c9f84b37cab0a9fb17d4da7574748994d4e209d89cb07'},
@@ -91275,7 +92335,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '                step_prefix_len = idx - start + 1\n'})},
  {'name': 'schema-faithful-xml',
   'review_patch': 'patches/vllm-schema-faithful-xml.patch',
-  'review_sha256': 'bd5475972df5b62dd4a0b2b67e68640987f018cf9b14870edf6569a6b0cd8dcc',
+  'review_sha256': '97e73d566da1bbde490e78da1143d6052e93309b3bb67c90c56fda582af207c2',
   'files': ({'path': 'tests/parser/engine/test_qwen3.py',
              'before_sha256': 'e08cb8b5ba3d19e80dca5da22730360c194fcfea7c899dcd84a0d1b7273099de',
              'after_sha256': 'ca773868114ed9eb184bdde02a12763b644e4b14456f847f19e853b39721b569'},
@@ -91283,8 +92343,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': '969ed3d6968db465472951207d70c3ed70128f4c69f766ea3c41d46b754c8a2e',
              'after_sha256': 'ecff0586292555a116ada3b7d7e644896c73ff09d076983fc0415d4bbae17ffc'},
             {'path': 'vllm/parser/engine/parser_engine.py',
-             'before_sha256': '6a07e8c8733cefadd7fce345851a1f5e447709a7cf083b96b571fe03e6e1b307',
-             'after_sha256': '3077737309b8064bc6906b24caf06ea94cdc89c205a6b6da8c1c0d05f7544d6e'},
+             'before_sha256': '43329c8aa073ce3844e605165f073541b6c103ed65a1d6e42fa7792a6a470578',
+             'after_sha256': 'a6a167574dbc69abc5c671af0138c8f7d68787722d4152eb04da4384c9c8c2a4'},
             {'path': 'vllm/parser/qwen3.py',
              'before_sha256': '1661e17f66a979600a730bfb9369a97be3f1f1719a1c2d7331af3892d388cfbb',
              'after_sha256': 'c84856f77e4c2d057bbc5e6bafecc23ef39d4f573b49f28c41b6cc420c381c68'},
@@ -115353,7 +116413,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'kernel_cls.__name__)\n'})},
  {'name': 'qwen-arguments-read-by-grammar',
   'review_patch': 'patches/vllm-qwen-arguments-read-by-grammar.patch',
-  'review_sha256': 'c8d40913648479bfaf0ee90d8274be5914bd15f7ef235d2c6017f351fb499c97',
+  'review_sha256': '9bf29aed999f1cfe12a58cc98b91fccafe615dfb7c22f13e9c681d1b54034837',
   'files': ({'path': 'tests/parser/engine/test_qwen_xml_fidelity.py',
              'before_sha256': '3222b5f59f5ac7111b95877635364abf9e977716a7ebd8b1f157dff207aa5d12',
              'after_sha256': '6b3cac443f0363ce3cd64535edcbfd699177b2dd2f3715d719e8c1d8b5823534'},
@@ -115361,8 +116421,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': 'e6885a848740d178422eff8381e66dbd31777cf2e57129be2d645e935317666f',
              'after_sha256': '069d0f390832418ac8089d0499f47f6ea2704515d2cf47a1bf05cd318032aeaa'},
             {'path': 'vllm/parser/engine/parser_engine.py',
-             'before_sha256': '3077737309b8064bc6906b24caf06ea94cdc89c205a6b6da8c1c0d05f7544d6e',
-             'after_sha256': '356bd0bb3e0ee9587185b6205dde95720e670fd1e8208752533c4d323b8a38bb'},
+             'before_sha256': 'a6a167574dbc69abc5c671af0138c8f7d68787722d4152eb04da4384c9c8c2a4',
+             'after_sha256': '09775cb1228448d958a2952530a34779b7f2118903fac561eb057043bb80cd18'},
             {'path': 'vllm/parser/engine/parser_engine_config.py',
              'before_sha256': 'cb14810b125705026ce8e558d0f53e7fb814b86371f8ee36908d30aa9d2e69f1',
              'after_sha256': '47d25d6674d304a1eb8c28764b6fde27c845be98a508a54f43a8a989eaf1fb01'},
@@ -121969,7 +123029,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '        if not token_ids:\n'})},
  {'name': 'generated-tokens-survive-parsing',
   'review_patch': 'patches/vllm-generated-tokens-survive-parsing.patch',
-  'review_sha256': '2fb9c11827cad42f46702d213e6e5ea60329181c2f7ab157fcd298338fc06197',
+  'review_sha256': '3709ac24d4f098a27ffa57fedf9d3dec81a1e08392da07d225bb8b62d2e8ee2e',
   'files': ({'path': 'tests/parser/engine/test_deepseek_v4.py',
              'before_sha256': '6de6f7aaa3e8ff7fb058ac933cbf9ab2467a78bbe63659763729cbaa0bb488b4',
              'after_sha256': 'c4b1aad15dbaef851b7c76cd4e6a97e90df3316629dcb3fbf89da7473ec2953c'},
@@ -121989,8 +123049,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': 'dc76b67ac0cc84ff117e81687d2017ffa20e5ef64db729588bf73425fe728d01',
              'after_sha256': 'ac6531c1601139d42c6eb05d967653656c6926e145bc21b21e6236e8c95d68b5'},
             {'path': 'vllm/parser/engine/parser_engine.py',
-             'before_sha256': '356bd0bb3e0ee9587185b6205dde95720e670fd1e8208752533c4d323b8a38bb',
-             'after_sha256': 'a6109505968ac86616b674dadd42ef320c75887dfdc2b2cca0dd916c41f6d82a'},
+             'before_sha256': '09775cb1228448d958a2952530a34779b7f2118903fac561eb057043bb80cd18',
+             'after_sha256': 'a868ba32cfea9c2e685b78a4fd505ba42f9616db0b3b15e828ac3a4b6eafcf8c'},
             {'path': 'vllm/parser/engine/parser_engine_config.py',
              'before_sha256': '47d25d6674d304a1eb8c28764b6fde27c845be98a508a54f43a8a989eaf1fb01',
              'after_sha256': '350cc2f76baa973252119fcbef2304f07d5b039dd439220d7b75a59d32ce46d9'},
@@ -122007,8 +123067,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': '6dd2a349ebcfedfe8aa6a9f318ab802bc83e663defca9d634c38cfefeda27b5a',
              'after_sha256': '316d5ce3e386ed18953b8ce1c78944c854a82e19b2b187de0d7f2c5419064249'},
             {'path': 'vllm/parser/engine/adapters.py',
-             'before_sha256': 'b59c8b5911e0570fbe5778791e079a197c365beda8160ea901e3ff2dcf18fa48',
-             'after_sha256': '5b11c6d93cbd290367323213ec52d8188e44a6f00bd0992ef1cbc0d0856272c2'},
+             'before_sha256': '2679bf5609812dcd988d4039db0203eb9361e21d5360ea1a363ad51f9c3d839d',
+             'after_sha256': '131fdf12c1ecb244f01b235eeda7bbf4facf65a80edc56256eba72745bb8e1d0'},
             {'path': 'vllm/parser/nemotron_v3.py',
              'before_sha256': '9d77b45debb4fb820cc448dfbeeccb53b384f8124b0ef6627ddba9777dcfa6df',
              'after_sha256': '544d2dcece372db535614d77ca6e4e276b8d1814df7ac47461192cd5737a0518'}),
@@ -129208,7 +130268,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              ') -> dict[str, ResponsesToolCallName]:\n'})},
  {'name': 'batch-parse-starts-where-the-prompt-leaves',
   'review_patch': 'patches/vllm-batch-parse-starts-where-the-prompt-leaves.patch',
-  'review_sha256': 'ef6c1694b9477ca802744485a3b0057b034392b1bf7cdcc0645b8baf3d723913',
+  'review_sha256': '73ae004604378573de88e10a357072ed3ff74f4e483f852f185032286d37a802',
   'files': ({'path': 'tests/entrypoints/openai/responses/test_parsable_context_unit.py',
              'before_sha256': '8fd0bd655d13abdc9fe03e1c0bb0625225431624db8257e1db07c00ac3da2779',
              'after_sha256': '95f50d93d97370d426319b5dc94fce55b9cbca4ce9b3b95a930e42990dcbf4a2'},
@@ -129243,17 +130303,20 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': 'a52399b65316163be152a4c3fa9fd832e80d293814ec421832438c00bb7e1816',
              'after_sha256': 'b2f627c28667ec2a064898e627232a5ebb7f59826ad9b961359d56226ff2c2ec'},
             {'path': 'vllm/parser/engine/parser_engine.py',
-             'before_sha256': 'a6109505968ac86616b674dadd42ef320c75887dfdc2b2cca0dd916c41f6d82a',
-             'after_sha256': 'e496c870ce534714ba80010c92ef9a9adca1f9f2f92a8c4f3555b1698aa3ebd6'},
+             'before_sha256': 'a868ba32cfea9c2e685b78a4fd505ba42f9616db0b3b15e828ac3a4b6eafcf8c',
+             'after_sha256': 'cdac491b61fe25c0c80cf56a1b8830541106c0dec27a2801aa2be8e9aeb38780'},
             {'path': 'vllm/parser/gemma4.py',
              'before_sha256': '44411dca605b8cfd849c42b7c246aee2f7c2da168ecfa7e876fd770e92a4aa23',
              'after_sha256': '8c9988dc7fd71ffb19c90b435d8b0b1d80b24cb9a383562a6ce5184cae571928'},
             {'path': 'vllm/parser/inkling.py',
-             'before_sha256': '183f1dd726bfe6169f0c72ef506f6a3edb13c8a19ccf1f515ed9f123aeeb3e6e',
-             'after_sha256': 'fcc9e29316f6c9f75623d214798414c1513d51eae1c859a43565c577fe59cb83'},
+             'before_sha256': '362c7b80bc3a850d86f5839a98bf86918a49d646b71e320733131c4884fe59c8',
+             'after_sha256': 'cf2cf56da08af417457b76cf9a335b5724d2d75855906e957c83069171ff2354'},
             {'path': 'vllm/renderers/online_derenderer.py',
              'before_sha256': 'c93551f5e63e1b7e5d5bf105ca2e642a288644078feee561e8eef63267f7841d',
-             'after_sha256': 'aa7e50be91195b3781f184a37f6c6f24e0b830cedaced3229dc18436f3ebf407'}),
+             'after_sha256': 'aa7e50be91195b3781f184a37f6c6f24e0b830cedaced3229dc18436f3ebf407'},
+            {'path': 'tests/parser/engine/test_reasoning_token_count.py',
+             'before_sha256': 'dab4d5943f8887c1c56e884b77d63898e24fbcce16393ed240aabe61f555d280',
+             'after_sha256': '8eadc5059845dacc54dd7b2fa725e6a4745daa2a94cb16d13238916df26cbd2c'}),
   'edits': ({'name': 'tests/entrypoints/openai/responses/test_parsable_context_unit.py:landmark-1',
              'path': 'tests/entrypoints/openai/responses/test_parsable_context_unit.py',
              'before': '\n'
@@ -130799,6 +131862,106 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '        self._tool_slots.clear()\n'},
             {'name': 'vllm/parser/engine/parser_engine.py:landmark-4',
              'path': 'vllm/parser/engine/parser_engine.py',
+             'before': '        """Reasoning ids in a complete generation, by the rule '
+                       'the feed follows.\n'
+                       '\n'
+                       '        The value :attr:`reasoning_token_count` holds once '
+                       '*token_ids* have\n'
+                       "        been fed from the grammar's initial state, where every "
+                       'reset begins,\n'
+                       "        so a caller that accumulates a whole generation's ids "
+                       'reads the same\n'
+                       '        number.  ``None``\n'
+                       '        when the grammar has no single id-marked boundary, '
+                       'exactly when\n'
+                       '        :attr:`reasoning_token_count` is: the count is absent, '
+                       'never an error.\n'
+                       '        """\n'
+                       '        if self._reasoning_boundary_refusal is not None:\n'
+                       '            return None\n'
+                       '        if self.parser_engine_config.initial_state is not '
+                       'ParserState.REASONING:\n'
+                       '            return 0\n'
+                       '        return self._ids_before_boundary(token_ids)\n'
+                       '\n',
+             'after': '        """Reasoning ids in a complete generation, by the rule '
+                      'the feed follows.\n'
+                      '\n'
+                      '        The value :attr:`reasoning_token_count` holds once '
+                      '*token_ids* have\n'
+                      '        been fed from where the generation starts -- the state '
+                      'its prompt\n'
+                      '        leaves the grammar in, where every reset begins -- so a '
+                      'caller that\n'
+                      "        accumulates a whole generation's ids reads the same "
+                      'number.  ``None``\n'
+                      '        when the grammar has no single id-marked boundary, '
+                      'exactly when\n'
+                      '        :attr:`reasoning_token_count` is: the count is absent, '
+                      'never an error.\n'
+                      '        """\n'
+                      '        if self._reasoning_boundary_refusal is not None:\n'
+                      '            return None\n'
+                      '        initial_state = self._prompt_initial_state\n'
+                      '        if initial_state is None:\n'
+                      '            initial_state = '
+                      'self.parser_engine_config.initial_state\n'
+                      '        if initial_state is not ParserState.REASONING:\n'
+                      '            return 0\n'
+                      '        return self._ids_before_boundary(token_ids)\n'
+                      '\n',
+             'review_before': '        """Reasoning ids in a complete generation, by '
+                              'the rule the feed follows.\n'
+                              '\n'
+                              '        The value :attr:`reasoning_token_count` holds '
+                              'once *token_ids* have\n'
+                              "        been fed from the grammar's initial state, "
+                              'where every reset begins,\n'
+                              '        so a caller that accumulates a whole '
+                              "generation's ids reads the same\n"
+                              '        number.  ``None``\n'
+                              '        when the grammar has no single id-marked '
+                              'boundary, exactly when\n'
+                              '        :attr:`reasoning_token_count` is: the count is '
+                              'absent, never an error.\n'
+                              '        """\n'
+                              '        if self._reasoning_boundary_refusal is not '
+                              'None:\n'
+                              '            return None\n'
+                              '        if self.parser_engine_config.initial_state is '
+                              'not ParserState.REASONING:\n'
+                              '            return 0\n'
+                              '        return self._ids_before_boundary(token_ids)\n'
+                              '\n',
+             'review_after': '        """Reasoning ids in a complete generation, by '
+                             'the rule the feed follows.\n'
+                             '\n'
+                             '        The value :attr:`reasoning_token_count` holds '
+                             'once *token_ids* have\n'
+                             '        been fed from where the generation starts -- the '
+                             'state its prompt\n'
+                             '        leaves the grammar in, where every reset begins '
+                             '-- so a caller that\n'
+                             "        accumulates a whole generation's ids reads the "
+                             'same number.  ``None``\n'
+                             '        when the grammar has no single id-marked '
+                             'boundary, exactly when\n'
+                             '        :attr:`reasoning_token_count` is: the count is '
+                             'absent, never an error.\n'
+                             '        """\n'
+                             '        if self._reasoning_boundary_refusal is not '
+                             'None:\n'
+                             '            return None\n'
+                             '        initial_state = self._prompt_initial_state\n'
+                             '        if initial_state is None:\n'
+                             '            initial_state = '
+                             'self.parser_engine_config.initial_state\n'
+                             '        if initial_state is not ParserState.REASONING:\n'
+                             '            return 0\n'
+                             '        return self._ids_before_boundary(token_ids)\n'
+                             '\n'},
+            {'name': 'vllm/parser/engine/parser_engine.py:landmark-5',
+             'path': 'vllm/parser/engine/parser_engine.py',
              'before': '        model_output: str,\n'
                        '        request: ChatCompletionRequest | ResponsesRequest,\n'
                        '        *,\n'
@@ -131050,7 +132213,150 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '                    '
                              'model_output_token_ids=choice.token_ids,\n'
                              '                    '
-                             'finish_reason=choice.finish_reason,\n'})},
+                             'finish_reason=choice.finish_reason,\n'},
+            {'name': 'tests/parser/engine/test_reasoning_token_count.py:landmark-1',
+             'path': 'tests/parser/engine/test_reasoning_token_count.py',
+             'before': '    return tokenizer\n'
+                       '\n'
+                       '\n'
+                       'class TestStreaming:\n'
+                       '    @pytest.mark.parametrize("implicit", [False, True])\n'
+                       '    def test_boundary_ids_wait_for_detokenized_text(\n',
+             'after': '    return tokenizer\n'
+                      '\n'
+                      '\n'
+                      'class PromptOpenedGrammar(ParserEngine):\n'
+                      '    """Configured to start in content; a prompt ending in the '
+                      'opener starts\n'
+                      '    the generation inside reasoning, as a template that '
+                      'pre-fills it does."""\n'
+                      '\n'
+                      '    def __init__(self, tokenizer, tools=None, **kwargs):\n'
+                      '        super().__init__(tokenizer, tools, '
+                      'parser_engine_config=ParserEngineConfig(\n'
+                      '            name="prompt-opened",\n'
+                      '            initial_state=ParserState.CONTENT,\n'
+                      '            terminals={"THINK_START": THINK_START, "THINK_END": '
+                      'THINK_END},\n'
+                      '            token_id_terminals={\n'
+                      '                "THINK_START": TokenTerminal(THINK_START),\n'
+                      '                "THINK_END": TokenTerminal(THINK_END),\n'
+                      '            },\n'
+                      '            transitions={\n'
+                      '                (ParserState.REASONING, "THINK_END"): '
+                      'Transition(\n'
+                      '                    ParserState.CONTENT, '
+                      '(EventType.REASONING_END,)\n'
+                      '                ),\n'
+                      '            },\n'
+                      '        ))\n'
+                      '\n'
+                      '    def adjust_initial_state_from_prompt(self, '
+                      'prompt_token_ids):\n'
+                      '        if prompt_token_ids and prompt_token_ids[-1] == '
+                      'self.vocab[THINK_START]:\n'
+                      '            self._start_in(ParserState.REASONING)\n'
+                      '\n'
+                      '\n'
+                      'class TestStreaming:\n'
+                      '    @pytest.mark.parametrize("implicit", [False, True])\n'
+                      '    def test_boundary_ids_wait_for_detokenized_text(\n',
+             'review_before': '    return tokenizer\n'
+                              '\n'
+                              '\n'
+                              'class TestStreaming:\n'
+                              '    @pytest.mark.parametrize("implicit", [False, '
+                              'True])\n'
+                              '    def test_boundary_ids_wait_for_detokenized_text(\n',
+             'review_after': '    return tokenizer\n'
+                             '\n'
+                             '\n'
+                             'class PromptOpenedGrammar(ParserEngine):\n'
+                             '    """Configured to start in content; a prompt ending '
+                             'in the opener starts\n'
+                             '    the generation inside reasoning, as a template that '
+                             'pre-fills it does."""\n'
+                             '\n'
+                             '    def __init__(self, tokenizer, tools=None, '
+                             '**kwargs):\n'
+                             '        super().__init__(tokenizer, tools, '
+                             'parser_engine_config=ParserEngineConfig(\n'
+                             '            name="prompt-opened",\n'
+                             '            initial_state=ParserState.CONTENT,\n'
+                             '            terminals={"THINK_START": THINK_START, '
+                             '"THINK_END": THINK_END},\n'
+                             '            token_id_terminals={\n'
+                             '                "THINK_START": '
+                             'TokenTerminal(THINK_START),\n'
+                             '                "THINK_END": TokenTerminal(THINK_END),\n'
+                             '            },\n'
+                             '            transitions={\n'
+                             '                (ParserState.REASONING, "THINK_END"): '
+                             'Transition(\n'
+                             '                    ParserState.CONTENT, '
+                             '(EventType.REASONING_END,)\n'
+                             '                ),\n'
+                             '            },\n'
+                             '        ))\n'
+                             '\n'
+                             '    def adjust_initial_state_from_prompt(self, '
+                             'prompt_token_ids):\n'
+                             '        if prompt_token_ids and prompt_token_ids[-1] == '
+                             'self.vocab[THINK_START]:\n'
+                             '            self._start_in(ParserState.REASONING)\n'
+                             '\n'
+                             '\n'
+                             'class TestStreaming:\n'
+                             '    @pytest.mark.parametrize("implicit", [False, True])\n'
+                             '    def test_boundary_ids_wait_for_detokenized_text(\n'},
+            {'name': 'tests/parser/engine/test_reasoning_token_count.py:landmark-2',
+             'path': 'tests/parser/engine/test_reasoning_token_count.py',
+             'before': '        assert (reasoning, content) == ("AB", "C")\n'
+                       '        assert parser.reasoning_token_count is None\n'
+                       '        assert '
+                       'parser.reasoning_parser.count_reasoning_tokens(ids) is None\n',
+             'after': '        assert (reasoning, content) == ("AB", "C")\n'
+                      '        assert parser.reasoning_token_count is None\n'
+                      '        assert '
+                      'parser.reasoning_parser.count_reasoning_tokens(ids) is None\n'
+                      '\n'
+                      '    def '
+                      'test_the_whole_generation_count_starts_where_the_prompt_leaves(\n'
+                      '        self, tokenizer, request_stub\n'
+                      '    ):\n'
+                      '        engine = PromptOpenedGrammar(tokenizer)\n'
+                      '        stream(engine, request_stub, [("A", "B"), (THINK_END, '
+                      '"C")],\n'
+                      '               prompt_token_ids=(1, VOCAB[THINK_START]))\n'
+                      '        _, ids = tokens("A", "B", THINK_END, "C")\n'
+                      '\n'
+                      '        assert engine.reasoning_token_count == 2\n'
+                      '        assert engine.count_reasoning_tokens(ids) == 2\n',
+             'review_before': '        assert (reasoning, content) == ("AB", "C")\n'
+                              '        assert parser.reasoning_token_count is None\n'
+                              '        assert '
+                              'parser.reasoning_parser.count_reasoning_tokens(ids) is '
+                              'None\n',
+             'review_after': '        assert (reasoning, content) == ("AB", "C")\n'
+                             '        assert parser.reasoning_token_count is None\n'
+                             '        assert '
+                             'parser.reasoning_parser.count_reasoning_tokens(ids) is '
+                             'None\n'
+                             '\n'
+                             '    def '
+                             'test_the_whole_generation_count_starts_where_the_prompt_leaves(\n'
+                             '        self, tokenizer, request_stub\n'
+                             '    ):\n'
+                             '        engine = PromptOpenedGrammar(tokenizer)\n'
+                             '        stream(engine, request_stub, [("A", "B"), '
+                             '(THINK_END, "C")],\n'
+                             '               prompt_token_ids=(1, '
+                             'VOCAB[THINK_START]))\n'
+                             '        _, ids = tokens("A", "B", THINK_END, "C")\n'
+                             '\n'
+                             '        assert engine.reasoning_token_count == 2\n'
+                             '        assert engine.count_reasoning_tokens(ids) == '
+                             '2\n'})},
  {'name': 'derender-text-is-the-detokenizers',
   'review_patch': 'patches/vllm-derender-text-is-the-detokenizers.patch',
   'review_sha256': '9d8f6d45beba5c79671444be4e9604c4352c7fe5346d78573bfc4fbc91bfb4b6',
@@ -142773,13 +144079,15 @@ FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5d
  'tests/parser/engine/test_qwen3_reasoning.py': '66b57e6eb6563bf5210ed864baf0658a5683dec42f30d0b9fb671cceeee1051f',
  'tests/parser/engine/test_qwen_terminal_authority.py': '15b1a503148a15e51bfc85798c7964342cc611e3dfb5451734020513259f8dad',
  'tests/parser/engine/test_qwen_xml_fidelity.py': 'cf8997243513e0424feb9ff646cb249662e4574cd2c46b47df0d73ceb5ca6690',
- 'tests/parser/engine/test_reasoning_token_count.py': '4d823e0f71e5041c60d077a258f80250a4c11fbc642f5bbc6ceb7da515c04b94',
+ 'tests/parser/engine/test_reasoning_token_count.py': '8eadc5059845dacc54dd7b2fa725e6a4745daa2a94cb16d13238916df26cbd2c',
  'tests/parser/engine/test_replay.py': '1b8286ef3218108f0f2cbe28bbe7f0315bc01af6e4282ce76b243255c5d97309',
  'tests/parser/engine/test_seed_oss.py': '9f2af2c75f71c6fb280f2a2a4a2bb8eaecf1c919c083e6c925f6d6f81cc2c236',
  'tests/parser/engine/test_token_id_scanner.py': '5e4524f0bc2096c0962246eac497ad014f7da4026d5265a39e3fea52d2a0a0e8',
  'tests/parser/engine/trace_builder.py': '12311dc9d1686394bc7b4499e32b353dabe02c650942c0c9d3d376da5e55fcb0',
  'tests/parser/mistral/test_tool_calls.py': 'ef7698e44d4c71dc803773a515d0c12e81c66751108bc5d304e9f3bc8bd9d907',
  'tests/quantization/test_turboquant.py': '3df754d759133bfbc1e0b7526f38eeec620a0e0405417ae1b352713bccb76963',
+ 'tests/reasoning/test_base_thinking_reasoning_parser.py': 'e983590bfa89d22c2c6f6bb834061eb5117f405cd26e9a03c6904c992f6f1c5e',
+ 'tests/reasoning/test_minimax_m3_reasoning_parser.py': 'c077f6abd750267b45867c461f50e472318d65d8870f066fdcd0b5daadc6b14c',
  'tests/renderers/test_hf.py': 'd6a2cc3febe2fc86138f019345a263018b63aea131541f9d82753c8d15260425',
  'tests/renderers/test_template_authorship.py': 'b2b34a541fa8d5e1155ab87d6d4e781c40bb01762042d44dd6da48668a32691d',
  'tests/test_request_input_bounds.py': '6d5796773be3daa15c1dc369bed3bb36fec877b4735389a6893d7236aa25cd38',
@@ -142895,22 +144203,24 @@ FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5d
  'vllm/parser/abstract_parser.py': 'b2f627c28667ec2a064898e627232a5ebb7f59826ad9b961359d56226ff2c2ec',
  'vllm/parser/deepseek_v32.py': '1fe0aec597caf6c10ff9905a3b1918c2a8608b5b1df32127ff8038c10f5d9b1c',
  'vllm/parser/deepseek_v4.py': 'a95f86eb4146d3096a73f1076260bbc58630a74c377b9da1d7e66d65e898465f',
- 'vllm/parser/engine/adapters.py': '5b11c6d93cbd290367323213ec52d8188e44a6f00bd0992ef1cbc0d0856272c2',
+ 'vllm/parser/engine/adapters.py': '131fdf12c1ecb244f01b235eeda7bbf4facf65a80edc56256eba72745bb8e1d0',
  'vllm/parser/engine/events.py': 'd0ed492bbe28c19b6ec0446770a21754bfa844a70888ef5706587b0bbea51405',
- 'vllm/parser/engine/parser_engine.py': 'e496c870ce534714ba80010c92ef9a9adca1f9f2f92a8c4f3555b1698aa3ebd6',
+ 'vllm/parser/engine/parser_engine.py': 'cdac491b61fe25c0c80cf56a1b8830541106c0dec27a2801aa2be8e9aeb38780',
  'vllm/parser/engine/parser_engine_config.py': '350cc2f76baa973252119fcbef2304f07d5b039dd439220d7b75a59d32ce46d9',
  'vllm/parser/engine/streaming_parser_engine.py': '90958bf8f39a7080573ee9c2c6223c6b473210c1715c678231df925f39788003',
  'vllm/parser/engine/token_id_scanner.py': '8e0f784b533cbc72801e4eef787cf96ec0e221e4c9d55098ee89b9bcb088059c',
  'vllm/parser/gemma4.py': '8c9988dc7fd71ffb19c90b435d8b0b1d80b24cb9a383562a6ce5184cae571928',
  'vllm/parser/glm47_moe.py': 'b0c121dddf46e6c74ee6cae1d47eccddbdd0e1622e2f41b985e4e06bd017ed73',
  'vllm/parser/harmony.py': '6111940bcc1a8d588650e926a4e4146d676836e66466aa3afbd2549f65061b6f',
- 'vllm/parser/inkling.py': 'fcc9e29316f6c9f75623d214798414c1513d51eae1c859a43565c577fe59cb83',
- 'vllm/parser/kimi_k2.py': '7d1d9a64ae888e08c135e8b3859d6a3a66b53e4b8e685bd2f4090bd30204ab56',
+ 'vllm/parser/inkling.py': 'cf2cf56da08af417457b76cf9a335b5724d2d75855906e957c83069171ff2354',
+ 'vllm/parser/kimi_k2.py': '45e79bcf8dfe770fd43a5943c0df1128b2254c3298777c25111e86812365fa0a',
  'vllm/parser/minimax_m2.py': '38577327262d3df29c052240f7bbb1369b82a6d3697d85bd4e5c29d130662fa1',
  'vllm/parser/mistral.py': '0b74821f7c68d5cf572760288d82bb40c19dfe0c88a6f9412befcaf1cfdcf6e8',
  'vllm/parser/nemotron_v3.py': '544d2dcece372db535614d77ca6e4e276b8d1814df7ac47461192cd5737a0518',
  'vllm/parser/qwen3.py': '316d5ce3e386ed18953b8ce1c78944c854a82e19b2b187de0d7f2c5419064249',
- 'vllm/reasoning/abs_reasoning_parsers.py': 'ba4b1145048e5faa217e1ef4d849167ebd1fe7bcb9296fe2e9d2f17ce96607f7',
+ 'vllm/reasoning/abs_reasoning_parsers.py': '95e86d5bc477f00f5ed043273f64b76dc939374b118687bbcf834cc5d332c6c2',
+ 'vllm/reasoning/basic_parsers.py': 'daf62cc0685705b5cac7c4c6e2c6d9a0182960b5d8ebafc2ca3c45f39653c598',
+ 'vllm/reasoning/minimax_m3_reasoning_parser.py': 'd91a8f1c7c34bc4d32d374e68038c719e61a1cac456c0538025bcbba0daf3cab',
  'vllm/renderers/base.py': '09b769d4cd5cbb84572a084e054f5bef3b51873a9222dba11a154f98477aeed8',
  'vllm/renderers/hf.py': 'b06cb298f586607a036c8d976e0a08ac64eb317bfb8af1d4dc5329e690fb5e88',
  'vllm/renderers/online_derenderer.py': 'cdc9d9943329ae0d3dbfc69ad67f091b5df4ac8d3f2984ef0e4ae442be69b1b6',

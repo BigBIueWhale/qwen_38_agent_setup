@@ -465,6 +465,16 @@ RUN printf '%s  %s\n' \
   "${KV_TIERING_P2P_MANAGER_UPSTREAM_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/tiering/p2p/manager.py \
   | sha256sum --check --strict
 
+ARG BASIC_REASONING_PARSERS_UPSTREAM_FILE_SHA256
+RUN printf '%s  %s\n' \
+  "${BASIC_REASONING_PARSERS_UPSTREAM_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/reasoning/basic_parsers.py \
+  | sha256sum --check --strict
+
+ARG MINIMAX_M3_REASONING_PARSER_UPSTREAM_FILE_SHA256
+RUN printf '%s  %s\n' \
+  "${MINIMAX_M3_REASONING_PARSER_UPSTREAM_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/reasoning/minimax_m3_reasoning_parser.py \
+  | sha256sum --check --strict
+
 FROM upstream-verifier AS runtime
 ARG HF_RENDERER_PATCHED_FILE_SHA256
 ARG TEMPLATE_AUTHORSHIP_PATCHED_FILE_SHA256
@@ -485,6 +495,8 @@ ARG V1_OUTPUT_PROCESSOR_PATCHED_FILE_SHA256
 ARG V1_DETOKENIZER_PATCHED_FILE_SHA256
 ARG V1_SCHEDULER_PATCHED_FILE_SHA256
 ARG ASYNC_LLM_PATCHED_FILE_SHA256
+ARG MINIMAX_M3_REASONING_PARSER_PATCHED_FILE_SHA256
+ARG BASIC_REASONING_PARSERS_PATCHED_FILE_SHA256
 ARG KV_TIERING_P2P_MANAGER_PATCHED_FILE_SHA256
 ARG KV_TIERING_BASE_PATCHED_FILE_SHA256
 ARG HIDDEN_STATES_CONNECTOR_PATCHED_FILE_SHA256
@@ -1058,6 +1070,14 @@ RUN printf '%s  %s\n' \
 COPY --chmod=0644 vllm/vllm/v1/kv_offload/tiering/p2p/manager.py /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/tiering/p2p/manager.py
 RUN printf '%s  %s\n' \
   "${KV_TIERING_P2P_MANAGER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/tiering/p2p/manager.py \
+  | sha256sum --check --strict
+COPY --chmod=0644 vllm/vllm/reasoning/basic_parsers.py /usr/local/lib/python3.12/dist-packages/vllm/reasoning/basic_parsers.py
+RUN printf '%s  %s\n' \
+  "${BASIC_REASONING_PARSERS_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/reasoning/basic_parsers.py \
+  | sha256sum --check --strict
+COPY --chmod=0644 vllm/vllm/reasoning/minimax_m3_reasoning_parser.py /usr/local/lib/python3.12/dist-packages/vllm/reasoning/minimax_m3_reasoning_parser.py
+RUN printf '%s  %s\n' \
+  "${MINIMAX_M3_REASONING_PARSER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/reasoning/minimax_m3_reasoning_parser.py \
   | sha256sum --check --strict
 COPY --chmod=0644 chat_template.jinja /opt/qwen38/chat_template.jinja
 COPY --chmod=0644 scripts/phase_budget_unit.py /opt/qwen38/phase_budget_unit.py

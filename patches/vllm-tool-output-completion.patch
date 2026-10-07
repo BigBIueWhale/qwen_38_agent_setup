@@ -1189,7 +1189,7 @@ diff --git a/vllm/parser/engine/parser_engine.py b/vllm/parser/engine/parser_eng
              tool_call_info = ExtractedToolCallInformation(
                  tools_called=tool_call_info.tools_called,
                  tool_calls=tool_call_info.tool_calls,
-@@ -815,16 +817,27 @@
+@@ -818,16 +820,27 @@
          text: str,
          token_ids: Sequence[int],
          initial_state: ParserState | None = None,
@@ -1217,7 +1217,7 @@ diff --git a/vllm/parser/engine/parser_engine.py b/vllm/parser/engine/parser_eng
          delta = self._events_to_delta(events, finished=True)
          tool_call_info = self._build_extracted_result()
  
-@@ -833,8 +846,69 @@
+@@ -836,8 +849,69 @@
              reasoning = reasoning.rstrip() or None
  
          content = delta.content if delta else None
@@ -1287,7 +1287,7 @@ diff --git a/vllm/parser/engine/parser_engine.py b/vllm/parser/engine/parser_eng
      # ── Non-streaming: parse ───────────────────────────────────────────
  
      def parse(
-@@ -924,9 +998,15 @@
+@@ -927,9 +1001,15 @@
                      if not suppress and event.tool_index == len(self._tool_slots) - 1:
                          # Nothing about this slot was reported; it never was
                          # a call.  The text it held follows as content.
@@ -1303,7 +1303,7 @@ diff --git a/vllm/parser/engine/parser_engine.py b/vllm/parser/engine/parser_eng
                      pass  # no delta-level effect
  
          if len(tool_call_deltas) > 1:
-@@ -1198,9 +1278,9 @@
+@@ -1201,9 +1281,9 @@
          for idx, slot in enumerate(self._tool_slots):
              if not slot.name and not slot.args:
                  continue

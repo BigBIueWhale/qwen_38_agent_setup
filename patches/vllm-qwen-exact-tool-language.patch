@@ -458,8 +458,8 @@ diff --git a/tests/parser/engine/test_qwen3_reasoning.py b/tests/parser/engine/t
 diff --git a/tests/parser/engine/test_reasoning_token_count.py b/tests/parser/engine/test_reasoning_token_count.py
 --- a/tests/parser/engine/test_reasoning_token_count.py
 +++ b/tests/parser/engine/test_reasoning_token_count.py
-@@ -31,12 +31,14 @@
- )
+@@ -37,12 +37,14 @@
+ from vllm.reasoning.minimax_m3_reasoning_parser import MiniMaxM3ReasoningParser
  
  END_OF_TURN = "<|im_end|>"
 +# Marker ids lie outside the ASCII range that single-character tokens use
@@ -478,7 +478,7 @@ diff --git a/tests/parser/engine/test_reasoning_token_count.py b/tests/parser/en
  }
  
  
-@@ -58,7 +60,10 @@
+@@ -64,7 +66,10 @@
  @pytest.fixture
  def request_stub():
      req = MagicMock(spec=ChatCompletionRequest)
@@ -490,7 +490,7 @@ diff --git a/tests/parser/engine/test_reasoning_token_count.py b/tests/parser/en
      req.tool_choice = "auto"
      req.include_reasoning = True
      return req
-@@ -97,6 +102,30 @@
+@@ -146,6 +151,30 @@
  
  
  class TestStreaming:
@@ -1175,7 +1175,7 @@ diff --git a/vllm/parser/engine/parser_engine.py b/vllm/parser/engine/parser_eng
              initial_state=ParserState.CONTENT,
          )
          if parsed_content is not None and tool_call_info.content is None:
-@@ -873,13 +904,20 @@
+@@ -876,13 +907,20 @@
          content_parts: list[str] = []
          reasoning_parts: list[str] = []
  
@@ -1197,7 +1197,7 @@ diff --git a/vllm/parser/engine/parser_engine.py b/vllm/parser/engine/parser_eng
                      else:
                          content_parts.append(event.value)
                  case EventType.REASONING_CHUNK:
-@@ -902,21 +940,34 @@
+@@ -905,21 +943,34 @@
                      if not suppress:
                          seen_tool_event = True
                          self._handle_tool_end(event, tool_call_deltas)

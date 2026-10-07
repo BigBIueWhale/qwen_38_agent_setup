@@ -244,7 +244,7 @@ diff --git a/vllm/parser/engine/parser_engine.py b/vllm/parser/engine/parser_eng
  
          self._has_reasoning = (
              "THINK_END" in parser_engine_config.token_id_terminals
-@@ -1359,6 +1373,13 @@
+@@ -1362,6 +1376,13 @@
          result = self._arg_converter(raw_args, partial)
          return self._fix_arg_types(result, func_name) if result else result
  

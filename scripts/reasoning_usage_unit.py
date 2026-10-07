@@ -3,8 +3,13 @@
 
 from __future__ import annotations
 
+import importlib
+import inspect
 import json
+import pkgutil
 from unittest.mock import MagicMock
+
+import vllm.parser as parser_package
 
 from vllm.entrypoints.openai.chat_completion.protocol import ChatCompletionRequest
 from vllm.entrypoints.openai.chat_completion.serving import (
@@ -25,6 +30,8 @@ from vllm.parser.engine.parser_engine_config import (
     TokenTerminal,
     Transition,
 )
+from vllm.parser.inkling import InklingParser
+from vllm.parser.kimi_k2 import KimiK2Parser
 from vllm.parser.qwen3 import (
     THINK_END,
     THINK_START,
@@ -32,6 +39,8 @@ from vllm.parser.qwen3 import (
     TOOL_CALL_START,
     Qwen3Parser,
 )
+from vllm.reasoning.deepseek_r1_reasoning_parser import DeepSeekR1ReasoningParser
+from vllm.reasoning.minimax_m3_reasoning_parser import MiniMaxM3ReasoningParser
 
 # The deployed grammar's markers under the ids the mock tokenizer resolves;
 # every other token is one ASCII character carrying its code point.
@@ -85,7 +94,7 @@ def make_parser(tokenizer):
     return parser_cls(tokenizer, [], chat_template_kwargs={"enable_thinking": True})
 
 
-def stream(parser, request, deltas):
+def stream(parser, request, deltas, prompt_token_ids=(1, 2, 3)):
     outputs = []
     for index, pieces in enumerate(deltas):
         text, ids = tokens(*pieces)
@@ -94,7 +103,7 @@ def stream(parser, request, deltas):
                 delta_text=text,
                 delta_token_ids=ids,
                 request=request,
-                prompt_token_ids=[1, 2, 3],
+                prompt_token_ids=list(prompt_token_ids),
                 finished=index == len(deltas) - 1,
             )
         )
@@ -225,13 +234,129 @@ for transitions, reason in (
             transitions=transitions,
         ),
     )
+    assert reason in engine._reasoning_boundary_refusal, reason
     assert engine.reasoning_token_count is None
-    try:
-        engine.count_reasoning_tokens([65, 99, 66])
-    except ValueError as exc:
-        assert reason in str(exc), str(exc)
-    else:
-        raise AssertionError(f"an unmodelled grammar was counted: {reason}")
+    assert engine.count_reasoning_tokens([65, 99, 66]) is None
+
+
+# One count: the whole-generation count a reasoning parser exposes is the
+# count its feed took on the same ids -- exact, or absent exactly where the
+# served usage is absent, never an error -- for every format built on the
+# engine, and taken from where the prompt leaves the grammar.
+class TerminalVocab(dict):
+    """Every terminal a format asks for is one id: only its grammar decides."""
+
+    def get(self, text, default=None):
+        if text not in self:
+            self[text] = 5000 + len(self)
+        return self[text]
+
+    def decode(self, ids):
+        by_id = {token_id: text for text, token_id in self.items()}
+        return "".join(by_id.get(token_id, chr(token_id)) for token_id in ids)
+
+
+formats = []
+for module_info in pkgutil.iter_modules(parser_package.__path__):
+    module = importlib.import_module(
+        f"{parser_package.__name__}.{module_info.name}"
+    )
+    formats += [
+        obj
+        for obj in vars(module).values()
+        if inspect.isclass(obj)
+        and issubclass(obj, ParserEngine)
+        and obj is not ParserEngine
+        and obj.__module__ == module.__name__
+    ]
+assert {Qwen3Parser, KimiK2Parser, InklingParser} <= set(formats), formats
+for parser_cls in formats:
+    for enable_thinking in (True, False):
+        vocab = TerminalVocab()
+        terminal_tokenizer = MagicMock()
+        terminal_tokenizer.get_vocab.return_value = vocab
+        terminal_tokenizer.decode.side_effect = vocab.decode
+        terminal_tokenizer.all_special_tokens = []
+        terminal_tokenizer.all_special_ids = []
+        engine = parser_cls(
+            terminal_tokenizer,
+            [],
+            chat_template_kwargs={"enable_thinking": enable_thinking},
+        )
+        boundary = sorted(engine._reasoning_boundary_ids)
+        for ids in ([65, 66, 67], [65, 66, *boundary[:1], 67]):
+            with engine.batch_token_ids(ids):
+                engine.extract_reasoning(vocab.decode(ids), request)
+            assert engine.count_reasoning_tokens(ids) == engine.reasoning_token_count, (
+                parser_cls.__name__,
+                enable_thinking,
+                ids,
+            )
+
+
+# A parser that splits on text serves no count, and its own count is that
+# same absent one rather than a depth count usage declines.
+text_vocab = {**VOCAB, "<mm:think>": 1003, "</mm:think>": 1004}
+text_ids = {token_id: text for text, token_id in text_vocab.items()}
+for reasoning_parser_cls, opener, closer in (
+    (DeepSeekR1ReasoningParser, THINK_START, THINK_END),
+    (MiniMaxM3ReasoningParser, "<mm:think>", "</mm:think>"),
+):
+    text_tokenizer = MagicMock()
+    text_tokenizer.get_vocab.return_value = dict(text_vocab)
+    text_tokenizer.decode.side_effect = lambda ids: "".join(
+        text_ids.get(i, chr(i)) for i in ids
+    )
+    text_tokenizer.encode.side_effect = lambda text, **_: (
+        [text_vocab[text]] if text in text_vocab else [ord(c) for c in text]
+    )
+    text_split = type(
+        "TextSplit",
+        (DelegatingParser,),
+        {"reasoning_parser_cls": reasoning_parser_cls, "tool_parser_cls": None},
+    )(text_tokenizer)
+    ids = [text_vocab[opener], ord("A"), ord("B"), text_vocab[closer], ord("C")]
+    split = text_split.parse(
+        text_tokenizer.decode(ids), request, model_output_token_ids=ids
+    )
+    assert split[:2] == ("AB", "C"), (reasoning_parser_cls.__name__, split)
+    assert text_split.reasoning_token_count is None
+    assert text_split.reasoning_parser.count_reasoning_tokens(ids) is None, (
+        reasoning_parser_cls.__name__
+    )
+
+
+class PromptOpenedGrammar(ParserEngine):
+    """Configured to start in content; a prompt ending in the opener starts
+    the generation inside reasoning, as a template that pre-fills it does."""
+
+    def __init__(self, tokenizer, tools=None, **kwargs):
+        super().__init__(tokenizer, tools, parser_engine_config=ParserEngineConfig(
+            name="unit-prompt-opened",
+            initial_state=ParserState.CONTENT,
+            terminals={"THINK_START": THINK_START, "THINK_END": THINK_END},
+            token_id_terminals={
+                "THINK_START": TokenTerminal(THINK_START),
+                "THINK_END": TokenTerminal(THINK_END),
+            },
+            transitions={
+                (ParserState.REASONING, "THINK_END"): Transition(
+                    ParserState.CONTENT, (EventType.REASONING_END,)
+                ),
+            },
+        ))
+
+    def adjust_initial_state_from_prompt(self, prompt_token_ids):
+        if prompt_token_ids and prompt_token_ids[-1] == self.vocab[THINK_START]:
+            self._start_in(ParserState.REASONING)
+
+
+prompt_opened = PromptOpenedGrammar(tokenizer)
+stream(prompt_opened, request, [("A", "B"), (THINK_END, "C")],
+       prompt_token_ids=(1, VOCAB[THINK_START]))
+_, ids = tokens("A", "B", THINK_END, "C")
+assert prompt_opened.reasoning_token_count == 2
+assert prompt_opened.count_reasoning_tokens(ids) == 2
 
 
 # Responses reports the same count chat does, read from the parser that split

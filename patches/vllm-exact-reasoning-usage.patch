@@ -2,7 +2,7 @@ diff --git a/tests/parser/engine/test_reasoning_token_count.py b/tests/parser/en
 new file mode 100644
 --- /dev/null
 +++ b/tests/parser/engine/test_reasoning_token_count.py
-@@ -0,0 +1,256 @@
+@@ -0,0 +1,363 @@
 +# SPDX-License-Identifier: Apache-2.0
 +# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
 +"""The exact reasoning token count is the parser's own split, on token ids.
@@ -13,6 +13,9 @@ new file mode 100644
 +uses, on both the delta-by-delta and the batch path.
 +"""
 +
++import importlib
++import inspect
++import pkgutil
 +from unittest.mock import MagicMock
 +
 +import pytest
@@ -20,6 +23,7 @@ new file mode 100644
 +from tests.parser.engine.conftest import make_mock_tokenizer
 +from vllm.entrypoints.openai.chat_completion.protocol import ChatCompletionRequest
 +from vllm.parser import ParserManager
++from vllm.parser.abstract_parser import DelegatingParser
 +from vllm.parser.engine.events import EventType
 +from vllm.parser.engine.parser_engine import ParserEngine
 +from vllm.parser.engine.parser_engine_config import (
@@ -34,6 +38,8 @@ new file mode 100644
 +    TOOL_CALL_START,
 +    Qwen3Parser,
 +)
++from vllm.reasoning.deepseek_r1_reasoning_parser import DeepSeekR1ReasoningParser
++from vllm.reasoning.minimax_m3_reasoning_parser import MiniMaxM3ReasoningParser
 +
 +END_OF_TURN = "<|im_end|>"
 +VOCAB = {
@@ -99,6 +105,49 @@ new file mode 100644
 +
 +def joined(outputs, field):
 +    return "".join(getattr(delta, field) or "" for delta in outputs if delta)
++
++
++def engine_formats():
++    """Every parser format this package builds on the engine."""
++    import vllm.parser as parser_package
++
++    found = {}
++    for module_info in pkgutil.iter_modules(parser_package.__path__):
++        module = importlib.import_module(
++            f"{parser_package.__name__}.{module_info.name}"
++        )
++        for obj in vars(module).values():
++            if (
++                inspect.isclass(obj)
++                and issubclass(obj, ParserEngine)
++                and obj is not ParserEngine
++                and obj.__module__ == module.__name__
++            ):
++                found[obj.__name__] = obj
++    return sorted(found.items())
++
++
++class TerminalVocab(dict):
++    """A vocabulary holding every terminal a format asks for as one id, so
++    only the shape of its grammar decides whether it has a boundary."""
++
++    def get(self, text, default=None):
++        if text not in self:
++            self[text] = 5000 + len(self)
++        return self[text]
++
++    def decode(self, ids):
++        by_id = {token_id: text for text, token_id in self.items()}
++        return "".join(by_id.get(token_id, chr(token_id)) for token_id in ids)
++
++
++def terminal_tokenizer(vocab):
++    tokenizer = MagicMock()
++    tokenizer.get_vocab.return_value = vocab
++    tokenizer.decode.side_effect = vocab.decode
++    tokenizer.all_special_tokens = []
++    tokenizer.all_special_ids = []
++    return tokenizer
 +
 +
 +class TestStreaming:
@@ -256,9 +305,67 @@ new file mode 100644
 +        )
 +        engine = ParserEngine(tokenizer, parser_engine_config=config)
 +
++        assert reason in engine._reasoning_boundary_refusal
 +        assert engine.reasoning_token_count is None
-+        with pytest.raises(ValueError, match=reason):
-+            engine.count_reasoning_tokens([65, 99, 66])
++        assert engine.count_reasoning_tokens([65, 99, 66]) is None
++
++
++class TestOneCount:
++    """The whole-generation count is the fed count, for every format."""
++
++    @pytest.mark.parametrize("enable_thinking", [True, False])
++    @pytest.mark.parametrize(
++        "parser_cls",
++        [cls for _, cls in engine_formats()],
++        ids=lambda cls: cls.__name__,
++    )
++    def test_every_engine_format_counts_a_generation_as_it_feeds_it(
++        self, parser_cls, enable_thinking
++    ):
++        vocab = TerminalVocab()
++        engine = parser_cls(
++            terminal_tokenizer(vocab),
++            [],
++            chat_template_kwargs={"enable_thinking": enable_thinking},
++        )
++        boundary = sorted(engine._reasoning_boundary_ids)
++        for ids in ([65, 66, 67], [65, 66, *boundary[:1], 67]):
++            with engine.batch_token_ids(ids):
++                engine.extract_reasoning(vocab.decode(ids), MagicMock())
++
++            assert engine.count_reasoning_tokens(ids) == engine.reasoning_token_count
++
++    @pytest.mark.parametrize(
++        ("reasoning_parser_cls", "opener", "closer"),
++        [
++            (DeepSeekR1ReasoningParser, THINK_START, THINK_END),
++            (MiniMaxM3ReasoningParser, "<mm:think>", "</mm:think>"),
++        ],
++        ids=["deepseek_r1", "minimax_m3"],
++    )
++    def test_a_parser_that_splits_on_text_reports_no_count(
++        self, reasoning_parser_cls, opener, closer, request_stub
++    ):
++        # The split is made on text, so the served usage carries no count,
++        # and the parser's own count is that same absent one.
++        vocab = {**VOCAB, "<mm:think>": 1003, "</mm:think>": 1004}
++        tokenizer = make_mock_tokenizer(vocab)
++        tokenizer.encode.side_effect = lambda text, **_: (
++            [vocab[text]] if text in vocab else [ord(c) for c in text]
++        )
++        parser = type(
++            "TextSplit",
++            (DelegatingParser,),
++            {"reasoning_parser_cls": reasoning_parser_cls, "tool_parser_cls": None},
++        )(tokenizer)
++        ids = [vocab[opener], ord("A"), ord("B"), vocab[closer], ord("C")]
++        reasoning, content, _ = parser.parse(
++            tokenizer.decode(ids), request_stub, model_output_token_ids=ids
++        )
++
++        assert (reasoning, content) == ("AB", "C")
++        assert parser.reasoning_token_count is None
++        assert parser.reasoning_parser.count_reasoning_tokens(ids) is None
 diff --git a/vllm/entrypoints/openai/chat_completion/serving.py b/vllm/entrypoints/openai/chat_completion/serving.py
 --- a/vllm/entrypoints/openai/chat_completion/serving.py
 +++ b/vllm/entrypoints/openai/chat_completion/serving.py
@@ -579,15 +686,18 @@ diff --git a/vllm/parser/engine/adapters.py b/vllm/parser/engine/adapters.py
              return self._parser_engine.extract_reasoning(model_output, request)
  
      def extract_reasoning_streaming(
-@@ -123,6 +127,10 @@
+@@ -121,8 +125,12 @@
+     ) -> str | None:
+         return self._parser_engine.get_streaming_fallback_content(text, request)
  
-     def count_reasoning_tokens(self, token_ids: Sequence[int]) -> int:
+-    def count_reasoning_tokens(self, token_ids: Sequence[int]) -> int:
++    def count_reasoning_tokens(self, token_ids: Sequence[int]) -> int | None:
          return self._parser_engine.count_reasoning_tokens(token_ids)
-+
+ 
 +    @property
 +    def reasoning_token_count(self) -> int | None:
 +        return self._parser_engine.reasoning_token_count
- 
++
  
  class ParserEngineToolAdapter(ToolParser):
 diff --git a/vllm/parser/engine/parser_engine.py b/vllm/parser/engine/parser_engine.py
@@ -669,10 +779,20 @@ diff --git a/vllm/parser/engine/parser_engine.py b/vllm/parser/engine/parser_eng
          events.extend(self._engine.finish())
  
          reasoning_parts: list[str] = []
-@@ -624,24 +654,148 @@
+@@ -624,24 +654,151 @@
      ) -> str | None:
          return None
  
+-    def count_reasoning_tokens(self, token_ids: Sequence[int]) -> int:
+-        start_id = self._reasoning_start_token_id
+-        end_id = self._reasoning_end_token_id
+-        if start_id is None or end_id is None:
+-            return 0
+-        count = 0
+-        depth = 0
+-        for token_id in token_ids:
+-            if token_id == start_id:
+-                depth += 1
 +    # ── Exact reasoning usage ────────────────────────────────────────
 +
 +    def _resolve_reasoning_boundary(self) -> tuple[frozenset[int], str | None]:
@@ -714,7 +834,10 @@ diff --git a/vllm/parser/engine/parser_engine.py b/vllm/parser/engine/parser_eng
 +        boundary: set[int] = set()
 +        for (state, terminal), transition in config.transitions.items():
 +            if state is not ParserState.REASONING or transition.skip_in_token_id_mode:
-+                continue
+                 continue
+-            if token_id == end_id:
+-                if depth > 0:
+-                    depth -= 1
 +            leaves = transition.next_state is not ParserState.REASONING
 +            announces = EventType.REASONING_END in transition.events
 +            if leaves != announces:
@@ -726,7 +849,10 @@ diff --git a/vllm/parser/engine/parser_engine.py b/vllm/parser/engine/parser_eng
 +                    "without leaving reasoning"
 +                )
 +            if not leaves:
-+                continue
+                 continue
+-            if depth > 0:
+-                count += 1
+-        return count
 +            token_text = config.token_id_terminals.get(terminal)
 +            token_id = self.vocab.get(token_text) if token_text is not None else None
 +            if token_id is None:
@@ -753,11 +879,17 @@ diff --git a/vllm/parser/engine/parser_engine.py b/vllm/parser/engine/parser_eng
 +            self._reasoning_fed_without_ids = True
 +        if not self._reasoning_open:
 +            return
-+        for token_id in delta_token_ids:
++        counted = self._ids_before_boundary(delta_token_ids)
++        self._reasoning_token_count += counted
++        self._reasoning_open = counted == len(delta_token_ids)
++
++    def _ids_before_boundary(self, token_ids: Sequence[int]) -> int:
++        """How many of *token_ids* precede the first id the grammar leaves
++        reasoning at: all of them when none of them is one."""
++        for index, token_id in enumerate(token_ids):
 +            if token_id in self._reasoning_boundary_ids:
-+                self._reasoning_open = False
-+                return
-+            self._reasoning_token_count += 1
++                return index
++        return len(token_ids)
 +
 +    @contextmanager
 +    def batch_token_ids(self, token_ids: Sequence[int]) -> Iterator[None]:
@@ -797,44 +929,25 @@ diff --git a/vllm/parser/engine/parser_engine.py b/vllm/parser/engine/parser_eng
 +            )
 +        return self._reasoning_token_count
 +
-     def count_reasoning_tokens(self, token_ids: Sequence[int]) -> int:
--        start_id = self._reasoning_start_token_id
--        end_id = self._reasoning_end_token_id
--        if start_id is None or end_id is None:
-+        """Reasoning ids in a complete generation, by the same boundary.
++    def count_reasoning_tokens(self, token_ids: Sequence[int]) -> int | None:
++        """Reasoning ids in a complete generation, by the rule the feed follows.
 +
-+        The count :attr:`reasoning_token_count` accumulates delta by delta,
-+        taken in one pass from the grammar's initial state; it is what a
-+        caller that accumulates a whole generation's ids reads afterwards.
++        The value :attr:`reasoning_token_count` holds once *token_ids* have
++        been fed from the grammar's initial state, where every reset begins,
++        so a caller that accumulates a whole generation's ids reads the same
++        number.  ``None``
++        when the grammar has no single id-marked boundary, exactly when
++        :attr:`reasoning_token_count` is: the count is absent, never an error.
 +        """
 +        if self._reasoning_boundary_refusal is not None:
-+            raise ValueError(
-+                "the exact reasoning token count is unavailable: "
-+                f"{self._reasoning_boundary_refusal}"
-+            )
++            return None
 +        if self.parser_engine_config.initial_state is not ParserState.REASONING:
-             return 0
--        count = 0
--        depth = 0
--        for token_id in token_ids:
--            if token_id == start_id:
--                depth += 1
--                continue
--            if token_id == end_id:
--                if depth > 0:
--                    depth -= 1
--                continue
--            if depth > 0:
--                count += 1
--        return count
-+        for index, token_id in enumerate(token_ids):
-+            if token_id in self._reasoning_boundary_ids:
-+                return index
-+        return len(token_ids)
++            return 0
++        return self._ids_before_boundary(token_ids)
  
      # ── Single-pass parse helper ────────────────────────────────────────
  
-@@ -686,6 +840,7 @@
+@@ -686,6 +843,7 @@
      ) -> tuple[str | None, str | None, list[FunctionCall] | None]:
          self._initialize_history_tool_call_cnt(request)
          self._check_skip_tool_parsing(request)
@@ -1053,3 +1166,226 @@ diff --git a/vllm/entrypoints/openai/responses/serving.py b/vllm/entrypoints/ope
  
          usage = ResponseUsage(
              input_tokens=num_prompt_tokens,
+diff --git a/tests/reasoning/test_base_thinking_reasoning_parser.py b/tests/reasoning/test_base_thinking_reasoning_parser.py
+--- a/tests/reasoning/test_base_thinking_reasoning_parser.py
++++ b/tests/reasoning/test_base_thinking_reasoning_parser.py
+@@ -168,21 +168,13 @@
+         )
+ 
+     def test_count_reasoning_tokens(self, test_tokenizer):
+-        """Count tokens between start/end markers."""
++        """The split is made on text, so no id count is exact: none is
++        reported, even with both markers generated."""
+         parser = TestThinkingReasoningParser(test_tokenizer)
+         start = parser.start_token_id
+         end = parser.end_token_id
+         token_ids = [0, start, 11, 12, end, 99]
+-        assert parser.count_reasoning_tokens(token_ids) == 2
+-
+-    def test_count_reasoning_tokens_nested(self, test_tokenizer):
+-        """Ensure nested thinking spans count all inner tokens safely."""
+-        parser = TestThinkingReasoningParser(test_tokenizer)
+-        s = parser.start_token_id
+-        e = parser.end_token_id
+-        token_ids = [s, 1, s, 2, e, 3, e]
+-        # Tokens 1,2,3 are inside reasoning (depth>0) => 3 tokens
+-        assert parser.count_reasoning_tokens(token_ids) == 3
++        assert parser.count_reasoning_tokens(token_ids) is None
+ 
+     def test_extract_content_ids(self, test_tokenizer):
+         """Test the extract_content_ids method."""
+diff --git a/tests/reasoning/test_minimax_m3_reasoning_parser.py b/tests/reasoning/test_minimax_m3_reasoning_parser.py
+--- a/tests/reasoning/test_minimax_m3_reasoning_parser.py
++++ b/tests/reasoning/test_minimax_m3_reasoning_parser.py
+@@ -426,7 +426,7 @@
+     assert tokenizer.decode(parser.extract_content_ids(output_ids)) == "def"
+     assert parser.extract_content_ids(open_reasoning_ids) == []
+     assert parser.extract_content_ids(content_ids) == content_ids
+-    assert parser.count_reasoning_tokens(output_ids) == len(tokenizer.encode("abc"))
++    assert parser.count_reasoning_tokens(output_ids) is None
+ 
+ 
+ def test_token_id_helpers():
+@@ -443,7 +443,7 @@
+     assert tokenizer.decode(parser.extract_content_ids(output_ids)) == "def"
+     assert parser.extract_content_ids(open_reasoning_ids) == []
+     assert parser.extract_content_ids(content_ids) == content_ids
+-    assert parser.count_reasoning_tokens(output_ids) == len(tokenizer.encode("abc"))
++    assert parser.count_reasoning_tokens(output_ids) is None
+ 
+ 
+ def test_token_id_helpers_enabled_mode():
+@@ -455,7 +455,5 @@
+     assert not parser.is_reasoning_end(open_reasoning_ids)
+     assert tokenizer.decode(parser.extract_content_ids(output_ids)) == "def"
+     assert parser.extract_content_ids(open_reasoning_ids) == []
+-    assert parser.count_reasoning_tokens(output_ids) == len(tokenizer.encode("abc"))
+-    assert parser.count_reasoning_tokens(open_reasoning_ids) == len(
+-        tokenizer.encode("abc")
+-    )
++    assert parser.count_reasoning_tokens(output_ids) is None
++    assert parser.count_reasoning_tokens(open_reasoning_ids) is None
+diff --git a/vllm/parser/inkling.py b/vllm/parser/inkling.py
+--- a/vllm/parser/inkling.py
++++ b/vllm/parser/inkling.py
+@@ -16,8 +16,8 @@
+ is carved out of the wrapper by :func:`_inkling_arg_converter`.
+ 
+ Note the terminal *labels*: ``THINK_START``/``THINK_END`` are what the
+-engine keys its reasoning plumbing on (``is_reasoning_end``,
+-``count_reasoning_tokens``, initial-state seeding), so ``<|end_message|>``
++engine keys its reasoning plumbing on (``is_reasoning_end`` and
++initial-state seeding), so ``<|end_message|>``
+ is labelled ``THINK_END`` here even though it ends every block kind —
+ the transition table, not the label, carries the semantics.
+ """
+@@ -356,30 +356,6 @@
+                 return True
+         return False
+ 
+-    def count_reasoning_tokens(self, token_ids: Sequence[int]) -> int:
+-        vocab = self.vocab
+-        thinking_id = vocab.get(CONTENT_THINKING)
+-        end_ids = {
+-            token_id
+-            for token_id in (
+-                vocab.get(END_MESSAGE),
+-                vocab.get(CONTENT_MODEL_END_SAMPLING),
+-            )
+-            if token_id is not None
+-        }
+-        in_reasoning = False
+-        count = 0
+-        for token_id in token_ids:
+-            if token_id == thinking_id:
+-                in_reasoning = True
+-                continue
+-            if token_id in end_ids:
+-                in_reasoning = False
+-                continue
+-            if in_reasoning:
+-                count += 1
+-        return count
+-
+     def _single_pass_parse(
+         self,
+         text: str,
+diff --git a/vllm/parser/kimi_k2.py b/vllm/parser/kimi_k2.py
+--- a/vllm/parser/kimi_k2.py
++++ b/vllm/parser/kimi_k2.py
+@@ -16,7 +16,6 @@
+ from __future__ import annotations
+ 
+ import functools
+-from collections.abc import Sequence
+ from typing import TYPE_CHECKING
+ 
+ import regex as re
+@@ -278,8 +277,3 @@
+         if not self.thinking_enabled:
+             return None, model_output
+         return super().extract_reasoning(model_output, request)
+-
+-    def count_reasoning_tokens(self, token_ids: Sequence[int]) -> int:
+-        if not self.thinking_enabled:
+-            return 0
+-        return super().count_reasoning_tokens(token_ids)
+diff --git a/vllm/reasoning/abs_reasoning_parsers.py b/vllm/reasoning/abs_reasoning_parsers.py
+--- a/vllm/reasoning/abs_reasoning_parsers.py
++++ b/vllm/reasoning/abs_reasoning_parsers.py
+@@ -124,24 +124,24 @@
+             The extracted content from the input_ids.
+         """
+ 
+-    def count_reasoning_tokens(self, token_ids: Sequence[int]) -> int:
++    def count_reasoning_tokens(self, token_ids: Sequence[int]) -> int | None:
+         """Count the number of reasoning tokens in a sequence.
+ 
+         Text-based reasoning models typically wrap their chain-of-thought
+         between special start/end tokens (e.g., ``<think> ... </think>``).
+         Implementations that support reasoning token counting should override
+-        this method. The default implementation returns ``0`` so existing
+-        parsers remain unchanged unless they explicitly opt in.
++        this method. The default implementation returns ``None``: a parser
++        that cannot say which generated ids were reasoning has no count, and
++        a zero would claim that none were.
+ 
+         Args:
+             token_ids: Sequence of generated token ids (excluding prompt).
+ 
+         Returns:
+-            int: Number of tokens that belong to reasoning content.
++            int | None: Number of tokens that belong to reasoning content,
++            or ``None`` when the parser cannot count them.
+         """
+-
+-        # By default, assume the parser cannot detect reasoning spans.
+-        return 0
++        return None
+ 
+     @abstractmethod
+     def extract_reasoning(
+diff --git a/vllm/reasoning/basic_parsers.py b/vllm/reasoning/basic_parsers.py
+--- a/vllm/reasoning/basic_parsers.py
++++ b/vllm/reasoning/basic_parsers.py
+@@ -180,22 +180,8 @@
+             final_content = content or None
+             return reasoning, final_content
+ 
+-    def count_reasoning_tokens(self, token_ids: Sequence[int]) -> int:
+-        """Count tokens that fall within start/end thinking markers.
+-
+-        Uses a depth counter so nested spans are handled safely and stray end
+-        tokens do not drive the counter negative.
+-        """
+-        count = 0
+-        depth = 0
+-        for token_id in token_ids:
+-            if token_id == self.start_token_id:
+-                depth += 1
+-                continue
+-            if token_id == self.end_token_id:
+-                if depth > 0:
+-                    depth -= 1
+-                continue
+-            if depth > 0:
+-                count += 1
+-        return count
++    def count_reasoning_tokens(self, token_ids: Sequence[int]) -> int | None:
++        """``None``: these parsers split reasoning from content on the marker
++        text, which no generated id position marks, so no count of ids is the
++        split's and the served usage carries none either."""
++        return None
+diff --git a/vllm/reasoning/minimax_m3_reasoning_parser.py b/vllm/reasoning/minimax_m3_reasoning_parser.py
+--- a/vllm/reasoning/minimax_m3_reasoning_parser.py
++++ b/vllm/reasoning/minimax_m3_reasoning_parser.py
+@@ -287,29 +287,6 @@
+             return None
+         return DeltaMessage(reasoning=reasoning, content=content)
+ 
+-    def count_reasoning_tokens(self, token_ids: Sequence[int]) -> int:
+-        count = 0
+-        depth = 1 if self._initial_in_reasoning else 0
+-        i = 0
+-        while i < len(token_ids):
+-            if tuple(token_ids[i : i + len(self._start_token_ids)]) == (
+-                self._start_token_ids
+-            ):
+-                depth += 1
+-                i += len(self._start_token_ids)
+-                continue
+-            if tuple(token_ids[i : i + len(self._end_token_ids)]) == (
+-                self._end_token_ids
+-            ):
+-                if depth > 0:
+-                    depth -= 1
+-                i += len(self._end_token_ids)
+-                continue
+-            if depth > 0:
+-                count += 1
+-            i += 1
+-        return count
+-
+     def is_reasoning_end(self, input_ids: Sequence[int]) -> bool:
+         start_index = self._rfind_token_sequence(input_ids, self._start_token_ids)
+         end_index = self._rfind_token_sequence(input_ids, self._end_token_ids)

@@ -397,7 +397,7 @@ diff --git a/tests/parser/engine/test_qwen_xml_fidelity.py b/tests/parser/engine
 diff --git a/tests/parser/engine/test_reasoning_token_count.py b/tests/parser/engine/test_reasoning_token_count.py
 --- a/tests/parser/engine/test_reasoning_token_count.py
 +++ b/tests/parser/engine/test_reasoning_token_count.py
-@@ -20,6 +20,7 @@
+@@ -24,6 +24,7 @@
  from vllm.parser.engine.parser_engine_config import (
      ParserEngineConfig,
      ParserState,
@@ -405,7 +405,7 @@ diff --git a/tests/parser/engine/test_reasoning_token_count.py b/tests/parser/en
      Transition,
  )
  from vllm.parser.qwen3 import (
-@@ -275,7 +276,7 @@
+@@ -324,7 +325,7 @@
              name="test-grammar",
              initial_state=ParserState.REASONING,
              terminals={"THINK_START": THINK_START, "THINK_END": THINK_END},
@@ -690,7 +690,7 @@ diff --git a/vllm/parser/glm47_moe.py b/vllm/parser/glm47_moe.py
 diff --git a/vllm/parser/kimi_k2.py b/vllm/parser/kimi_k2.py
 --- a/vllm/parser/kimi_k2.py
 +++ b/vllm/parser/kimi_k2.py
-@@ -27,6 +27,7 @@
+@@ -26,6 +26,7 @@
  from vllm.parser.engine.parser_engine_config import (
      ParserEngineConfig,
      ParserState,
@@ -698,7 +698,7 @@ diff --git a/vllm/parser/kimi_k2.py b/vllm/parser/kimi_k2.py
      Transition,
  )
  
-@@ -90,12 +91,12 @@
+@@ -89,12 +90,12 @@
              "ARG_START": TOOL_ARG_START,
          },
          token_id_terminals={
