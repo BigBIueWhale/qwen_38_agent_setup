@@ -417,10 +417,10 @@ index 27a4f2773131719b7961222f50199221db967b72..8a2709431195e73bae9fe399b5bc82fa
          current_text, current_token_ids = state.advance(delta_text, delta_token_ids)
          delta_message: DeltaMessage | None = None
 diff --git a/vllm/parser/engine/parser_engine.py b/vllm/parser/engine/parser_engine.py
-index b43755b16afb56a9ac2f646dd37c056dfc4041b6..b3691681f2a982a6ec9c585edbc206b178ddc0f5 100644
+index d2cef6232a463474d6393723dcc80f37e51d150b..ef288583a81654647de1af2b4e739fb04eb57493 100644
 --- a/vllm/parser/engine/parser_engine.py
 +++ b/vllm/parser/engine/parser_engine.py
-@@ -166,6 +166,10 @@ class ParserEngine(Parser):
+@@ -186,6 +186,10 @@ class ParserEngine(Parser):
          self._reasoning_ended: bool = not self._has_reasoning
          self._streaming_initialized: bool = False
          self._prompt_streaming_prepared: bool = False
@@ -431,7 +431,7 @@ index b43755b16afb56a9ac2f646dd37c056dfc4041b6..b3691681f2a982a6ec9c585edbc206b1
  
          self._tool_slots: list[ToolCallSlot] = []
          self._deferred_content: str = ""
-@@ -249,9 +253,23 @@ class ParserEngine(Parser):
+@@ -269,9 +273,23 @@ class ParserEngine(Parser):
              self._reset(initial_state=initial_state)
  
      def adjust_initial_state_from_prompt(self, prompt_token_ids: Sequence[int]) -> None:
@@ -456,7 +456,7 @@ index b43755b16afb56a9ac2f646dd37c056dfc4041b6..b3691681f2a982a6ec9c585edbc206b1
      def finish_streaming(self) -> DeltaMessage | None:
          events = self._engine.finish()
          if events or self._deferred_content:
-@@ -259,6 +277,8 @@ class ParserEngine(Parser):
+@@ -279,6 +297,8 @@ class ParserEngine(Parser):
          return None
  
      def _reset(self, initial_state: ParserState | None = None) -> None:
@@ -465,7 +465,7 @@ index b43755b16afb56a9ac2f646dd37c056dfc4041b6..b3691681f2a982a6ec9c585edbc206b1
          self._engine.reset(initial_state=initial_state)
          self._reasoning_ended = not self._has_reasoning
          self._tool_slots.clear()
-@@ -924,11 +944,15 @@ class ParserEngine(Parser):
+@@ -944,11 +964,15 @@ class ParserEngine(Parser):
          model_output: str,
          request: ChatCompletionRequest | ResponsesRequest,
          *,

@@ -3525,19 +3525,35 @@ def _validate_generated_tokens_after(state: State) -> None:
     forbid_text(state, "vllm/parser/qwen3.py", '(ParserState.CONTENT, "THINK_END")',
                 label=label)
     # A grammar whose batch tool pass splits on the forwarded content ids must
-    # forward every byte after the boundary; construction refuses one that
-    # acts on a terminal in content outside its tool language.
+    # forward every byte after the boundary; registering the format refuses
+    # one that acts on a terminal in content outside its tool language, in
+    # any configuration it builds, before any request.
     _require_in_symbol(state, "vllm/parser/engine/parser_engine.py",
-                       "ParserEngine.__init__", (
-        "if self.batch_tool_pass_uses_ids:",
-        "if state is ParserState.CONTENT",
-        "and terminal not in self._engine._tool_terminals",
+                       "ParserEngine.check_format", (
+        "if not cls.batch_tool_pass_uses_ids:",
+        "for config in cls.engine_configs():",
+        "if state is ParserState.CONTENT and terminal not in tool_terminals",
         "or keep the text-only batch tool pass.",
     ), label=label)
+    _require_in_symbol(state, "vllm/parser/engine/adapters.py", "make_adapters",
+                       ("parser_engine_cls.check_format()",), label=label)
+    _require_in_symbol(state, "vllm/parser/qwen3.py", "Qwen3Parser.engine_configs",
+                       ("(cls.engine_config(True), cls.engine_config(False))",),
+                       label=label)
+    # A format that builds its own configuration names it, so registration
+    # checks what is served; no request repeats the check.
+    _require_in_symbol(state, "vllm/parser/nemotron_v3.py", "NemotronV3Parser.engine_config",
+                       ("return nemotron_v3_config(thinking=thinking)",), label=label)
+    forbid_text(state, "vllm/parser/engine/parser_engine.py",
+                "and terminal not in self._engine._tool_terminals", label=label)
     require_python_symbols(state, "tests/parser/engine/test_parser_engine.py", {
         "TestSpecialTokensAreText.test_special_token_by_id_stays_in_content": None,
         "TestSpecialTokensAreText.test_special_token_stays_in_tool_args": None,
         "TestSpecialTokensAreText.test_special_tokens_stay_with_skip_tool_parsing": None,
+        "TestFormatRegistration."
+        "test_forwarding_ids_while_acting_in_content_is_refused_at_registration": None,
+        "TestFormatRegistration.test_forwarding_ids_requires_naming_every_configuration": None,
+        "TestFormatRegistration.test_every_format_that_forwards_ids_registers": None,
     }, label=label)
     require_python_symbols(state, "tests/parser/engine/test_replay.py", {
         "TestSpecialTokenReplay.test_special_tokens_survive_as_text": None,

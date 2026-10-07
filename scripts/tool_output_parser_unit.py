@@ -908,6 +908,36 @@ class ToolOutputParserTest(unittest.TestCase):
                     with self.subTest(token=token, text=text, chunk=chunk):
                         self.assertEqual(parse(text, chunk)[:3], expected)
 
+    def test_a_format_whose_ids_and_text_could_disagree_never_registers(self):
+        """The served format gives its batch tool pass the content ids, which is
+        sound only while it acts on no content terminal outside its tool
+        language. That is a property of the format alone, so registering the
+        format decides it, before any request: the served one registers, and
+        the same format acting on one more content terminal does not.
+        """
+        import dataclasses
+
+        from vllm.parser.engine.adapters import make_adapters
+        from vllm.parser.engine.parser_engine_config import ParserState, Transition
+
+        served = PARSER.reasoning_parser_cls._parser_engine_cls
+        self.assertTrue(served.batch_tool_pass_uses_ids)
+        served.check_format()
+
+        class ActsOnAnOpenerInContent(served):
+            @classmethod
+            def engine_config(cls, thinking):
+                config = super().engine_config(thinking)
+                transitions = {
+                    **config.transitions,
+                    (ParserState.CONTENT, "THINK_START"):
+                        Transition(next_state=ParserState.CONTENT),
+                }
+                return dataclasses.replace(config, transitions=transitions)
+
+        with self.assertRaisesRegex(ValueError, r"acts on \['THINK_START'\]"):
+            make_adapters(ActsOnAnOpenerInContent)
+
     def test_the_grammar_is_armed_exactly_where_calls_are_parsed(self):
         """One value decides both: an omitted or null choice is "auto" with
         tools, and "none" is the only choice under which nothing is a call."""

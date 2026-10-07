@@ -122029,7 +122029,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '        if not token_ids:\n'})},
  {'name': 'generated-tokens-survive-parsing',
   'review_patch': 'patches/vllm-generated-tokens-survive-parsing.patch',
-  'review_sha256': '5a3649dc50d8f75a24474ce2a0776fd96cc51edf03f011d0887d84b4cb628e7a',
+  'review_sha256': '2fb9c11827cad42f46702d213e6e5ea60329181c2f7ab157fcd298338fc06197',
   'files': ({'path': 'tests/parser/engine/test_deepseek_v4.py',
              'before_sha256': '6de6f7aaa3e8ff7fb058ac933cbf9ab2467a78bbe63659763729cbaa0bb488b4',
              'after_sha256': 'c4b1aad15dbaef851b7c76cd4e6a97e90df3316629dcb3fbf89da7473ec2953c'},
@@ -122038,7 +122038,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'after_sha256': '572f6a6e5f448861276bf272ec8b4be14434a9fd31312d087230f682a18f5e3e'},
             {'path': 'tests/parser/engine/test_parser_engine.py',
              'before_sha256': 'e78d3a02da16759ee0418fee58ff2c550ca29a9dc0035bd892ebd4fae7369066',
-             'after_sha256': '9472eacecc3f188643c0749a59c728b49daff8907574676931fac0755ce52d81'},
+             'after_sha256': '6546143c7cadd640eb6777d2cd326a07fac755f683299f1dfa3e1f61d5c049fa'},
             {'path': 'tests/parser/engine/test_qwen3_reasoning.py',
              'before_sha256': '60a31db16f2b621403b9b2b5259407a44a5ce1e9e79b62e2c27f1cf505a4db21',
              'after_sha256': '66b57e6eb6563bf5210ed864baf0658a5683dec42f30d0b9fb671cceeee1051f'},
@@ -122050,13 +122050,13 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'after_sha256': 'ac6531c1601139d42c6eb05d967653656c6926e145bc21b21e6236e8c95d68b5'},
             {'path': 'vllm/parser/engine/parser_engine.py',
              'before_sha256': '356bd0bb3e0ee9587185b6205dde95720e670fd1e8208752533c4d323b8a38bb',
-             'after_sha256': '2a48d1e6c87a29ce4efed73ff630a630ea739d572da350835334afce74240caf'},
+             'after_sha256': 'a6109505968ac86616b674dadd42ef320c75887dfdc2b2cca0dd916c41f6d82a'},
             {'path': 'vllm/parser/engine/parser_engine_config.py',
              'before_sha256': '47d25d6674d304a1eb8c28764b6fde27c845be98a508a54f43a8a989eaf1fb01',
              'after_sha256': '350cc2f76baa973252119fcbef2304f07d5b039dd439220d7b75a59d32ce46d9'},
             {'path': 'vllm/parser/engine/streaming_parser_engine.py',
              'before_sha256': '36a82097dbd242c34cde10914e9de757f1d1c6b619edbe92928c726479c3b068',
-             'after_sha256': '32aaa0f577aaf8d157c1d786cdbffe95d8c0b52e0b5bed0e80c10d497b1c0ba7'},
+             'after_sha256': '90958bf8f39a7080573ee9c2c6223c6b473210c1715c678231df925f39788003'},
             {'path': 'vllm/parser/engine/token_id_scanner.py',
              'before_sha256': 'dc6aec25112eef55f7ace3d5e519a0ded4a0012723318b1d2752df9e917907cd',
              'after_sha256': '8e0f784b533cbc72801e4eef787cf96ec0e221e4c9d55098ee89b9bcb088059c'},
@@ -122065,7 +122065,13 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'after_sha256': '44411dca605b8cfd849c42b7c246aee2f7c2da168ecfa7e876fd770e92a4aa23'},
             {'path': 'vllm/parser/qwen3.py',
              'before_sha256': '6dd2a349ebcfedfe8aa6a9f318ab802bc83e663defca9d634c38cfefeda27b5a',
-             'after_sha256': '676e5a88a159860084a9fe5903c639e091b3cec3e6650d00acf6a114b28e1333'}),
+             'after_sha256': '316d5ce3e386ed18953b8ce1c78944c854a82e19b2b187de0d7f2c5419064249'},
+            {'path': 'vllm/parser/engine/adapters.py',
+             'before_sha256': 'b59c8b5911e0570fbe5778791e079a197c365beda8160ea901e3ff2dcf18fa48',
+             'after_sha256': '5b11c6d93cbd290367323213ec52d8188e44a6f00bd0992ef1cbc0d0856272c2'},
+            {'path': 'vllm/parser/nemotron_v3.py',
+             'before_sha256': '9d77b45debb4fb820cc448dfbeeccb53b384f8124b0ef6627ddba9777dcfa6df',
+             'after_sha256': '544d2dcece372db535614d77ca6e4e276b8d1814df7ac47461192cd5737a0518'}),
   'edits': ({'name': 'tests/parser/engine/test_deepseek_v4.py:landmark-1',
              'path': 'tests/parser/engine/test_deepseek_v4.py',
              'before': '        ids=lambda c: f"chunk={c}",\n'
@@ -123097,34 +123103,70 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '204, 201, 73])\n'},
             {'name': 'tests/parser/engine/test_parser_engine.py:landmark-7',
              'path': 'tests/parser/engine/test_parser_engine.py',
-             'before': '        )\n'
-                       '        engine._engine.reset()\n'
-                       '        events = '
-                       'engine._engine.feed("thought<bos></think>answer", [72, 204, '
-                       '201, 73])\n'
-                       '        types = [e.type for e in events]\n'
-                       '        assert EventType.REASONING_CHUNK in types\n'
-                       '        assert EventType.REASONING_END in types\n'
-                       '        assert EventType.TEXT_CHUNK in types\n'
-                       '        reasoning_text = "".join(\n'
+             'before': '        reasoning_text = "".join(\n'
                        '            e.value for e in events if e.type == '
                        'EventType.REASONING_CHUNK\n'
                        '        )\n'
                        '        assert "<bos>" not in reasoning_text\n',
-             'after': '        )\n'
-                      '        engine._engine.reset()\n'
-                      '        events = '
-                      'engine._engine.feed("thought<bos></think>answer", [72, 204, '
-                      '201, 73])\n'
-                      '        types = [e.type for e in events]\n'
-                      '        assert EventType.REASONING_CHUNK in types\n'
-                      '        assert EventType.REASONING_END in types\n'
-                      '        assert EventType.TEXT_CHUNK in types\n'
-                      '        reasoning_text = "".join(\n'
+             'after': '        reasoning_text = "".join(\n'
                       '            e.value for e in events if e.type == '
                       'EventType.REASONING_CHUNK\n'
                       '        )\n'
-                      '        assert reasoning_text == "thought<bos>"\n',
+                      '        assert reasoning_text == "thought<bos>"\n'
+                      '\n'
+                      '\n'
+                      'class TestFormatRegistration:\n'
+                      '    """Whether a format\'s forwarded ids and text can disagree '
+                      'is a property of\n'
+                      '    the format alone, so registering it decides, before any '
+                      'request."""\n'
+                      '\n'
+                      '    def '
+                      'test_forwarding_ids_while_acting_in_content_is_refused_at_registration(self):\n'
+                      '        import dataclasses\n'
+                      '\n'
+                      '        from vllm.parser.qwen3 import Qwen3Parser\n'
+                      '\n'
+                      '        class ActsOnAnOpenerInContent(Qwen3Parser):\n'
+                      '            @classmethod\n'
+                      '            def engine_config(cls, thinking):\n'
+                      '                config = super().engine_config(thinking)\n'
+                      '                transitions = dict(config.transitions)\n'
+                      '                transitions[(ParserState.CONTENT, '
+                      '"THINK_START")] = Transition(\n'
+                      '                    next_state=ParserState.CONTENT\n'
+                      '                )\n'
+                      '                return dataclasses.replace(config, '
+                      'transitions=transitions)\n'
+                      '\n'
+                      '        with pytest.raises(ValueError, match=r"acts on '
+                      '\\[\'THINK_START\'\\] in content"):\n'
+                      '            make_adapters(ActsOnAnOpenerInContent)\n'
+                      '\n'
+                      '    def '
+                      'test_forwarding_ids_requires_naming_every_configuration(self):\n'
+                      '        class Unnamed(ParserEngine):\n'
+                      '            batch_tool_pass_uses_ids = True\n'
+                      '\n'
+                      '        with pytest.raises(NotImplementedError, '
+                      'match="engine_configs"):\n'
+                      '            make_adapters(Unnamed)\n'
+                      '\n'
+                      '    def test_every_format_that_forwards_ids_registers(self):\n'
+                      '        from vllm.parser.nemotron_v3 import NemotronV3Parser\n'
+                      '        from vllm.parser.qwen3 import Qwen3Parser\n'
+                      '        from vllm.parser.seed_oss import SeedOssParser\n'
+                      '\n'
+                      '        for parser_cls in (Qwen3Parser, SeedOssParser, '
+                      'NemotronV3Parser):\n'
+                      '            assert parser_cls.batch_tool_pass_uses_ids\n'
+                      '            configs = parser_cls.engine_configs()\n'
+                      '            assert {config.initial_state for config in configs} '
+                      '== {\n'
+                      '                ParserState.REASONING,\n'
+                      '                ParserState.CONTENT,\n'
+                      '            }\n'
+                      '            parser_cls.check_format()\n',
              'review_before': '        reasoning_text = "".join(\n'
                               '            e.value for e in events if e.type == '
                               'EventType.REASONING_CHUNK\n'
@@ -123134,7 +123176,64 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '            e.value for e in events if e.type == '
                              'EventType.REASONING_CHUNK\n'
                              '        )\n'
-                             '        assert reasoning_text == "thought<bos>"\n'},
+                             '        assert reasoning_text == "thought<bos>"\n'
+                             '\n'
+                             '\n'
+                             'class TestFormatRegistration:\n'
+                             '    """Whether a format\'s forwarded ids and text can '
+                             'disagree is a property of\n'
+                             '    the format alone, so registering it decides, before '
+                             'any request."""\n'
+                             '\n'
+                             '    def '
+                             'test_forwarding_ids_while_acting_in_content_is_refused_at_registration(self):\n'
+                             '        import dataclasses\n'
+                             '\n'
+                             '        from vllm.parser.qwen3 import Qwen3Parser\n'
+                             '\n'
+                             '        class ActsOnAnOpenerInContent(Qwen3Parser):\n'
+                             '            @classmethod\n'
+                             '            def engine_config(cls, thinking):\n'
+                             '                config = '
+                             'super().engine_config(thinking)\n'
+                             '                transitions = dict(config.transitions)\n'
+                             '                transitions[(ParserState.CONTENT, '
+                             '"THINK_START")] = Transition(\n'
+                             '                    next_state=ParserState.CONTENT\n'
+                             '                )\n'
+                             '                return dataclasses.replace(config, '
+                             'transitions=transitions)\n'
+                             '\n'
+                             '        with pytest.raises(ValueError, match=r"acts on '
+                             '\\[\'THINK_START\'\\] in content"):\n'
+                             '            make_adapters(ActsOnAnOpenerInContent)\n'
+                             '\n'
+                             '    def '
+                             'test_forwarding_ids_requires_naming_every_configuration(self):\n'
+                             '        class Unnamed(ParserEngine):\n'
+                             '            batch_tool_pass_uses_ids = True\n'
+                             '\n'
+                             '        with pytest.raises(NotImplementedError, '
+                             'match="engine_configs"):\n'
+                             '            make_adapters(Unnamed)\n'
+                             '\n'
+                             '    def '
+                             'test_every_format_that_forwards_ids_registers(self):\n'
+                             '        from vllm.parser.nemotron_v3 import '
+                             'NemotronV3Parser\n'
+                             '        from vllm.parser.qwen3 import Qwen3Parser\n'
+                             '        from vllm.parser.seed_oss import SeedOssParser\n'
+                             '\n'
+                             '        for parser_cls in (Qwen3Parser, SeedOssParser, '
+                             'NemotronV3Parser):\n'
+                             '            assert parser_cls.batch_tool_pass_uses_ids\n'
+                             '            configs = parser_cls.engine_configs()\n'
+                             '            assert {config.initial_state for config in '
+                             'configs} == {\n'
+                             '                ParserState.REASONING,\n'
+                             '                ParserState.CONTENT,\n'
+                             '            }\n'
+                             '            parser_cls.check_format()\n'},
             {'name': 'tests/parser/engine/test_qwen3_reasoning.py:landmark-1',
              'path': 'tests/parser/engine/test_qwen3_reasoning.py',
              'before': '        assert "</think>" not in (content or "")\n'
@@ -123735,14 +123834,16 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                        '    # text keeps the text-only batch tool pass.\n'
                        '    batch_tool_pass_uses_ids: bool = False\n'
                        '\n'
-                       '    def extract_batch_content_ids(\n',
+                       '    def extract_batch_content_ids(\n'
+                       '        self, token_ids: Sequence[int], *, token_offset: int = '
+                       '0\n',
              'after': '    # reasoning boundary byte for byte, so the batch tool pass '
                       'can be given\n'
                       '    # the generated ids after that boundary and split on them '
                       'exactly as\n'
                       '    # the streaming tool pass does.  A grammar that rewrites '
                       'the forwarded\n'
-                      '    # text keeps the text-only batch tool pass.  Construction '
+                      '    # text keeps the text-only batch tool pass.  Registration '
                       'refuses a grammar\n'
                       '    # that sets this and acts on a terminal in content outside '
                       'its tool\n'
@@ -123751,7 +123852,57 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '    # id stayed in the forwarded ids.\n'
                       '    batch_tool_pass_uses_ids: bool = False\n'
                       '\n'
-                      '    def extract_batch_content_ids(\n',
+                      '    @classmethod\n'
+                      '    def engine_configs(cls) -> tuple[ParserEngineConfig, ...]:\n'
+                      '        """Every configuration this format builds, whatever the '
+                      'request."""\n'
+                      '        raise NotImplementedError(\n'
+                      '            f"Parser format {cls.__name__} gives its batch tool '
+                      'pass the "\n'
+                      '            "generated ids, so it must name every configuration '
+                      'it builds "\n'
+                      '            "(engine_configs) for registration to check them."\n'
+                      '        )\n'
+                      '\n'
+                      '    @classmethod\n'
+                      '    def check_format(cls) -> None:\n'
+                      '        """Refuse a format whose forwarded ids and text could '
+                      'disagree.\n'
+                      '\n'
+                      '        A property of the format alone -- its transitions and '
+                      'whether it\n'
+                      '        forwards ids -- so it is decided when the format is '
+                      'registered, before\n'
+                      '        any request, rather than when a request first '
+                      'constructs one.\n'
+                      '        """\n'
+                      '        if not cls.batch_tool_pass_uses_ids:\n'
+                      '            return\n'
+                      '        for config in cls.engine_configs():\n'
+                      '            tool_terminals = '
+                      'StreamingParserEngine.tool_terminals(config)\n'
+                      '            consumed = sorted(\n'
+                      '                terminal\n'
+                      '                for state, terminal in config.transitions\n'
+                      '                if state is ParserState.CONTENT and terminal '
+                      'not in tool_terminals\n'
+                      '            )\n'
+                      '            if consumed:\n'
+                      '                raise ValueError(\n'
+                      '                    f"Parser format {config.name!r} gives its '
+                      'batch tool pass "\n'
+                      '                    "the generated ids after the reasoning '
+                      'boundary, so its "\n'
+                      '                    "reasoning pass must forward every byte '
+                      'after it, but it "\n'
+                      '                    f"acts on {consumed} in content. Treat them '
+                      'as text there, "\n'
+                      '                    "or keep the text-only batch tool pass."\n'
+                      '                )\n'
+                      '\n'
+                      '    def extract_batch_content_ids(\n'
+                      '        self, token_ids: Sequence[int], *, token_offset: int = '
+                      '0\n',
              'review_before': '    # reasoning boundary byte for byte, so the batch '
                               'tool pass can be given\n'
                               '    # the generated ids after that boundary and split '
@@ -123761,7 +123912,9 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                               '    # text keeps the text-only batch tool pass.\n'
                               '    batch_tool_pass_uses_ids: bool = False\n'
                               '\n'
-                              '    def extract_batch_content_ids(\n',
+                              '    def extract_batch_content_ids(\n'
+                              '        self, token_ids: Sequence[int], *, '
+                              'token_offset: int = 0\n',
              'review_after': '    # reasoning boundary byte for byte, so the batch '
                              'tool pass can be given\n'
                              '    # the generated ids after that boundary and split on '
@@ -123769,7 +123922,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    # the streaming tool pass does.  A grammar that '
                              'rewrites the forwarded\n'
                              '    # text keeps the text-only batch tool pass.  '
-                             'Construction refuses a grammar\n'
+                             'Registration refuses a grammar\n'
                              '    # that sets this and acts on a terminal in content '
                              'outside its tool\n'
                              "    # language: that terminal's text would leave the "
@@ -123777,88 +123930,61 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    # id stayed in the forwarded ids.\n'
                              '    batch_tool_pass_uses_ids: bool = False\n'
                              '\n'
-                             '    def extract_batch_content_ids(\n'},
-            {'name': 'vllm/parser/engine/parser_engine.py:landmark-2',
-             'path': 'vllm/parser/engine/parser_engine.py',
-             'before': '                "a wrapper but declares no arguments_reading, '
-                       'so no wrapper "\n'
-                       '                "could be told apart from text inside a '
-                       'value."\n'
-                       '            )\n'
-                       '\n'
-                       '        self._has_reasoning = (\n'
-                       '            "THINK_END" in '
-                       'parser_engine_config.token_id_terminals\n',
-             'after': '                "a wrapper but declares no arguments_reading, '
-                      'so no wrapper "\n'
-                      '                "could be told apart from text inside a '
-                      'value."\n'
-                      '            )\n'
-                      '        if self.batch_tool_pass_uses_ids:\n'
-                      '            consumed = sorted(\n'
-                      '                terminal\n'
-                      '                for state, terminal in '
-                      'parser_engine_config.transitions\n'
-                      '                if state is ParserState.CONTENT\n'
-                      '                and terminal not in '
-                      'self._engine._tool_terminals\n'
-                      '            )\n'
-                      '            if consumed:\n'
-                      '                raise ValueError(\n'
-                      '                    f"Parser format '
-                      '{parser_engine_config.name!r} gives its batch "\n'
-                      '                    "tool pass the generated ids after the '
-                      'reasoning boundary, so "\n'
-                      '                    "its reasoning pass must forward every byte '
-                      'after it, but it "\n'
-                      '                    f"acts on {consumed} in content. Treat them '
-                      'as text there, "\n'
-                      '                    "or keep the text-only batch tool pass."\n'
-                      '                )\n'
-                      '\n'
-                      '        self._has_reasoning = (\n'
-                      '            "THINK_END" in '
-                      'parser_engine_config.token_id_terminals\n',
-             'review_before': '                "a wrapper but declares no '
-                              'arguments_reading, so no wrapper "\n'
-                              '                "could be told apart from text inside a '
-                              'value."\n'
-                              '            )\n'
-                              '\n'
-                              '        self._has_reasoning = (\n'
-                              '            "THINK_END" in '
-                              'parser_engine_config.token_id_terminals\n',
-             'review_after': '                "a wrapper but declares no '
-                             'arguments_reading, so no wrapper "\n'
-                             '                "could be told apart from text inside a '
-                             'value."\n'
-                             '            )\n'
-                             '        if self.batch_tool_pass_uses_ids:\n'
+                             '    @classmethod\n'
+                             '    def engine_configs(cls) -> tuple[ParserEngineConfig, '
+                             '...]:\n'
+                             '        """Every configuration this format builds, '
+                             'whatever the request."""\n'
+                             '        raise NotImplementedError(\n'
+                             '            f"Parser format {cls.__name__} gives its '
+                             'batch tool pass the "\n'
+                             '            "generated ids, so it must name every '
+                             'configuration it builds "\n'
+                             '            "(engine_configs) for registration to check '
+                             'them."\n'
+                             '        )\n'
+                             '\n'
+                             '    @classmethod\n'
+                             '    def check_format(cls) -> None:\n'
+                             '        """Refuse a format whose forwarded ids and text '
+                             'could disagree.\n'
+                             '\n'
+                             '        A property of the format alone -- its '
+                             'transitions and whether it\n'
+                             '        forwards ids -- so it is decided when the format '
+                             'is registered, before\n'
+                             '        any request, rather than when a request first '
+                             'constructs one.\n'
+                             '        """\n'
+                             '        if not cls.batch_tool_pass_uses_ids:\n'
+                             '            return\n'
+                             '        for config in cls.engine_configs():\n'
+                             '            tool_terminals = '
+                             'StreamingParserEngine.tool_terminals(config)\n'
                              '            consumed = sorted(\n'
                              '                terminal\n'
                              '                for state, terminal in '
-                             'parser_engine_config.transitions\n'
-                             '                if state is ParserState.CONTENT\n'
-                             '                and terminal not in '
-                             'self._engine._tool_terminals\n'
+                             'config.transitions\n'
+                             '                if state is ParserState.CONTENT and '
+                             'terminal not in tool_terminals\n'
                              '            )\n'
                              '            if consumed:\n'
                              '                raise ValueError(\n'
-                             '                    f"Parser format '
-                             '{parser_engine_config.name!r} gives its batch "\n'
-                             '                    "tool pass the generated ids after '
-                             'the reasoning boundary, so "\n'
-                             '                    "its reasoning pass must forward '
-                             'every byte after it, but it "\n'
+                             '                    f"Parser format {config.name!r} '
+                             'gives its batch tool pass "\n'
+                             '                    "the generated ids after the '
+                             'reasoning boundary, so its "\n'
+                             '                    "reasoning pass must forward every '
+                             'byte after it, but it "\n'
                              '                    f"acts on {consumed} in content. '
                              'Treat them as text there, "\n'
                              '                    "or keep the text-only batch tool '
                              'pass."\n'
                              '                )\n'
                              '\n'
-                             '        self._has_reasoning = (\n'
-                             '            "THINK_END" in '
-                             'parser_engine_config.token_id_terminals\n'},
+                             '    def extract_batch_content_ids(\n'
+                             '        self, token_ids: Sequence[int], *, token_offset: '
+                             'int = 0\n'},
             {'name': 'vllm/parser/engine/parser_engine_config.py:landmark-1',
              'path': 'vllm/parser/engine/parser_engine_config.py',
              'before': '\n'
@@ -124213,7 +124339,18 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                        'content_terminal=CONTENT_TERMINAL)\n'
                        '\n'
                        '        self._tool_terminals: frozenset[str] = frozenset(\n'
-                       '            terminal\n',
+                       '            terminal\n'
+                       '            for (state, terminal), tr in '
+                       'config.transitions.items()\n'
+                       '            if tr.next_state in self._TOOL_STATES or state in '
+                       'self._TOOL_STATES\n'
+                       '        )\n'
+                       '        # TOOL_CALL_END may close an inner call rather than '
+                       'its lexical wrapper,\n'
+                       '        # as in MiniMax, so identify exits from state '
+                       'transitions instead.\n'
+                       '        self._tool_exit_terminals: frozenset[str] = '
+                       'frozenset(\n',
              'after': '            for name, spec in '
                       'config.token_id_terminals.items()\n'
                       '            if name in resolved_token_ids.values()\n'
@@ -124224,8 +124361,14 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       'content_terminal=CONTENT_TERMINAL\n'
                       '        )\n'
                       '\n'
-                      '        self._tool_terminals: frozenset[str] = frozenset(\n'
-                      '            terminal\n',
+                      '        self._tool_terminals: frozenset[str] = '
+                      'self.tool_terminals(config)\n'
+                      '        # TOOL_CALL_END may close an inner call rather than its '
+                      'lexical wrapper,\n'
+                      '        # as in MiniMax, so identify exits from state '
+                      'transitions instead.\n'
+                      '        self._tool_exit_terminals: frozenset[str] = '
+                      'frozenset(\n',
              'review_before': '            for name, spec in '
                               'config.token_id_terminals.items()\n'
                               '            if name in resolved_token_ids.values()\n'
@@ -124239,7 +124382,18 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                               '\n'
                               '        self._tool_terminals: frozenset[str] = '
                               'frozenset(\n'
-                              '            terminal\n',
+                              '            terminal\n'
+                              '            for (state, terminal), tr in '
+                              'config.transitions.items()\n'
+                              '            if tr.next_state in self._TOOL_STATES or '
+                              'state in self._TOOL_STATES\n'
+                              '        )\n'
+                              '        # TOOL_CALL_END may close an inner call rather '
+                              'than its lexical wrapper,\n'
+                              '        # as in MiniMax, so identify exits from state '
+                              'transitions instead.\n'
+                              '        self._tool_exit_terminals: frozenset[str] = '
+                              'frozenset(\n',
              'review_after': '            for name, spec in '
                              'config.token_id_terminals.items()\n'
                              '            if name in resolved_token_ids.values()\n'
@@ -124251,9 +124405,62 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '        )\n'
                              '\n'
                              '        self._tool_terminals: frozenset[str] = '
-                             'frozenset(\n'
-                             '            terminal\n'},
+                             'self.tool_terminals(config)\n'
+                             '        # TOOL_CALL_END may close an inner call rather '
+                             'than its lexical wrapper,\n'
+                             '        # as in MiniMax, so identify exits from state '
+                             'transitions instead.\n'
+                             '        self._tool_exit_terminals: frozenset[str] = '
+                             'frozenset(\n'},
             {'name': 'vllm/parser/engine/streaming_parser_engine.py:landmark-6',
+             'path': 'vllm/parser/engine/streaming_parser_engine.py',
+             'before': '        }\n'
+                       '    )\n'
+                       '\n'
+                       '    def _call_reading(self) -> ArgumentsReading:\n'
+                       '        assert self._arguments_reading is not None\n',
+             'after': '        }\n'
+                      '    )\n'
+                      '\n'
+                      '    @classmethod\n'
+                      '    def tool_terminals(cls, config: ParserEngineConfig) -> '
+                      'frozenset[str]:\n'
+                      '        """The terminals of a format\'s tool language: those '
+                      'entering or inside a call."""\n'
+                      '        return frozenset(\n'
+                      '            terminal\n'
+                      '            for (state, terminal), tr in '
+                      'config.transitions.items()\n'
+                      '            if tr.next_state in cls._TOOL_STATES or state in '
+                      'cls._TOOL_STATES\n'
+                      '        )\n'
+                      '\n'
+                      '    def _call_reading(self) -> ArgumentsReading:\n'
+                      '        assert self._arguments_reading is not None\n',
+             'review_before': '        }\n'
+                              '    )\n'
+                              '\n'
+                              '    def _call_reading(self) -> ArgumentsReading:\n'
+                              '        assert self._arguments_reading is not None\n',
+             'review_after': '        }\n'
+                             '    )\n'
+                             '\n'
+                             '    @classmethod\n'
+                             '    def tool_terminals(cls, config: ParserEngineConfig) '
+                             '-> frozenset[str]:\n'
+                             '        """The terminals of a format\'s tool language: '
+                             'those entering or inside a call."""\n'
+                             '        return frozenset(\n'
+                             '            terminal\n'
+                             '            for (state, terminal), tr in '
+                             'config.transitions.items()\n'
+                             '            if tr.next_state in cls._TOOL_STATES or '
+                             'state in cls._TOOL_STATES\n'
+                             '        )\n'
+                             '\n'
+                             '    def _call_reading(self) -> ArgumentsReading:\n'
+                             '        assert self._arguments_reading is not None\n'},
+            {'name': 'vllm/parser/engine/streaming_parser_engine.py:landmark-7',
              'path': 'vllm/parser/engine/streaming_parser_engine.py',
              'before': '                    self._in_skipped_parameter_value = False\n'
                        '                return self._emit_for_state(value)\n'
@@ -124519,7 +124726,244 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    # the streaming tool pass sees.\n'
                              '    batch_tool_pass_uses_ids = True\n'
                              '\n'
-                             '    def _tool_arguments_reading(\n'})},
+                             '    def _tool_arguments_reading(\n'},
+            {'name': 'vllm/parser/qwen3.py:landmark-3',
+             'path': 'vllm/parser/qwen3.py',
+             'before': '            offset += 1\n'
+                       '        return token_ids[offset:]\n'
+                       '\n'
+                       '    def __init__(\n'
+                       '        self,\n'
+                       '        tokenizer: TokenizerLike,\n',
+             'after': '            offset += 1\n'
+                      '        return token_ids[offset:]\n'
+                      '\n'
+                      '    @classmethod\n'
+                      '    def engine_config(cls, thinking: bool) -> '
+                      'ParserEngineConfig:\n'
+                      '        return qwen3_config(\n'
+                      '            thinking=thinking,\n'
+                      '            name=cls.CONFIG_NAME,\n'
+                      '            think_start=cls.THINK_START,\n'
+                      '            think_end=cls.THINK_END,\n'
+                      '            tool_start=cls.TOOL_START,\n'
+                      '            tool_end=cls.TOOL_END,\n'
+                      '        )\n'
+                      '\n'
+                      '    @classmethod\n'
+                      '    def engine_configs(cls) -> tuple[ParserEngineConfig, ...]:\n'
+                      '        # A request chooses only whether the model thinks.\n'
+                      '        return (cls.engine_config(True), '
+                      'cls.engine_config(False))\n'
+                      '\n'
+                      '    def __init__(\n'
+                      '        self,\n'
+                      '        tokenizer: TokenizerLike,\n',
+             'review_before': '            offset += 1\n'
+                              '        return token_ids[offset:]\n'
+                              '\n'
+                              '    def __init__(\n'
+                              '        self,\n'
+                              '        tokenizer: TokenizerLike,\n',
+             'review_after': '            offset += 1\n'
+                             '        return token_ids[offset:]\n'
+                             '\n'
+                             '    @classmethod\n'
+                             '    def engine_config(cls, thinking: bool) -> '
+                             'ParserEngineConfig:\n'
+                             '        return qwen3_config(\n'
+                             '            thinking=thinking,\n'
+                             '            name=cls.CONFIG_NAME,\n'
+                             '            think_start=cls.THINK_START,\n'
+                             '            think_end=cls.THINK_END,\n'
+                             '            tool_start=cls.TOOL_START,\n'
+                             '            tool_end=cls.TOOL_END,\n'
+                             '        )\n'
+                             '\n'
+                             '    @classmethod\n'
+                             '    def engine_configs(cls) -> tuple[ParserEngineConfig, '
+                             '...]:\n'
+                             '        # A request chooses only whether the model '
+                             'thinks.\n'
+                             '        return (cls.engine_config(True), '
+                             'cls.engine_config(False))\n'
+                             '\n'
+                             '    def __init__(\n'
+                             '        self,\n'
+                             '        tokenizer: TokenizerLike,\n'},
+            {'name': 'vllm/parser/qwen3.py:landmark-4',
+             'path': 'vllm/parser/qwen3.py',
+             'before': '        chat_kwargs = kwargs.get("chat_template_kwargs", {}) '
+                       'or {}\n'
+                       '        self.thinking_enabled = '
+                       'chat_kwargs.get("enable_thinking", True)\n'
+                       '        kwargs.setdefault(\n'
+                       '            "parser_engine_config",\n'
+                       '            qwen3_config(\n'
+                       '                thinking=self.thinking_enabled,\n'
+                       '                name=self.CONFIG_NAME,\n'
+                       '                think_start=self.THINK_START,\n'
+                       '                think_end=self.THINK_END,\n'
+                       '                tool_start=self.TOOL_START,\n'
+                       '                tool_end=self.TOOL_END,\n'
+                       '            ),\n'
+                       '        )\n'
+                       '        super().__init__(\n'
+                       '            tokenizer,\n',
+             'after': '        chat_kwargs = kwargs.get("chat_template_kwargs", {}) or '
+                      '{}\n'
+                      '        self.thinking_enabled = '
+                      'chat_kwargs.get("enable_thinking", True)\n'
+                      '        kwargs.setdefault(\n'
+                      '            "parser_engine_config", '
+                      'self.engine_config(self.thinking_enabled)\n'
+                      '        )\n'
+                      '        super().__init__(\n'
+                      '            tokenizer,\n',
+             'review_before': '        chat_kwargs = '
+                              'kwargs.get("chat_template_kwargs", {}) or {}\n'
+                              '        self.thinking_enabled = '
+                              'chat_kwargs.get("enable_thinking", True)\n'
+                              '        kwargs.setdefault(\n'
+                              '            "parser_engine_config",\n'
+                              '            qwen3_config(\n'
+                              '                thinking=self.thinking_enabled,\n'
+                              '                name=self.CONFIG_NAME,\n'
+                              '                think_start=self.THINK_START,\n'
+                              '                think_end=self.THINK_END,\n'
+                              '                tool_start=self.TOOL_START,\n'
+                              '                tool_end=self.TOOL_END,\n'
+                              '            ),\n'
+                              '        )\n'
+                              '        super().__init__(\n'
+                              '            tokenizer,\n',
+             'review_after': '        chat_kwargs = kwargs.get("chat_template_kwargs", '
+                             '{}) or {}\n'
+                             '        self.thinking_enabled = '
+                             'chat_kwargs.get("enable_thinking", True)\n'
+                             '        kwargs.setdefault(\n'
+                             '            "parser_engine_config", '
+                             'self.engine_config(self.thinking_enabled)\n'
+                             '        )\n'
+                             '        super().__init__(\n'
+                             '            tokenizer,\n'},
+            {'name': 'vllm/parser/engine/adapters.py:landmark-1',
+             'path': 'vllm/parser/engine/adapters.py',
+             'before': 'def make_adapters(\n'
+                       '    parser_engine_cls: type[ParserEngine],\n'
+                       ') -> tuple[type[ParserEngineReasoningAdapter], '
+                       'type[ParserEngineToolAdapter]]:\n'
+                       '    reasoning_adapter = type(\n'
+                       '        f"{parser_engine_cls.__name__}ReasoningAdapter",\n'
+                       '        (ParserEngineReasoningAdapter,),\n',
+             'after': 'def make_adapters(\n'
+                      '    parser_engine_cls: type[ParserEngine],\n'
+                      ') -> tuple[type[ParserEngineReasoningAdapter], '
+                      'type[ParserEngineToolAdapter]]:\n'
+                      '    parser_engine_cls.check_format()\n'
+                      '    reasoning_adapter = type(\n'
+                      '        f"{parser_engine_cls.__name__}ReasoningAdapter",\n'
+                      '        (ParserEngineReasoningAdapter,),\n',
+             'review_before': 'def make_adapters(\n'
+                              '    parser_engine_cls: type[ParserEngine],\n'
+                              ') -> tuple[type[ParserEngineReasoningAdapter], '
+                              'type[ParserEngineToolAdapter]]:\n'
+                              '    reasoning_adapter = type(\n'
+                              '        '
+                              'f"{parser_engine_cls.__name__}ReasoningAdapter",\n'
+                              '        (ParserEngineReasoningAdapter,),\n',
+             'review_after': 'def make_adapters(\n'
+                             '    parser_engine_cls: type[ParserEngine],\n'
+                             ') -> tuple[type[ParserEngineReasoningAdapter], '
+                             'type[ParserEngineToolAdapter]]:\n'
+                             '    parser_engine_cls.check_format()\n'
+                             '    reasoning_adapter = type(\n'
+                             '        '
+                             'f"{parser_engine_cls.__name__}ReasoningAdapter",\n'
+                             '        (ParserEngineReasoningAdapter,),\n'},
+            {'name': 'vllm/parser/nemotron_v3.py:landmark-1',
+             'path': 'vllm/parser/nemotron_v3.py',
+             'before': '    reasoning and content.\n'
+                       '    """\n'
+                       '\n'
+                       '    def __init__(\n'
+                       '        self,\n'
+                       '        tokenizer: TokenizerLike,\n'
+                       '        tools: list[Tool] | None = None,\n'
+                       '        **kwargs,\n'
+                       '    ) -> None:\n'
+                       '        chat_kwargs = kwargs.get("chat_template_kwargs", {}) '
+                       'or {}\n'
+                       '        thinking = chat_kwargs.get("enable_thinking", True)\n'
+                       '        super().__init__(\n'
+                       '            tokenizer,\n'
+                       '            tools,\n'
+                       '            '
+                       'parser_engine_config=nemotron_v3_config(thinking=thinking),\n'
+                       '            **kwargs,\n'
+                       '        )\n'
+                       '        self._streamed_reasoning: list[str] = []\n'
+                       '\n'
+                       '    def _reset(self, initial_state=None) -> None:\n',
+             'after': '    reasoning and content.\n'
+                      '    """\n'
+                      '\n'
+                      '    @classmethod\n'
+                      '    def engine_config(cls, thinking: bool) -> '
+                      'ParserEngineConfig:\n'
+                      '        return nemotron_v3_config(thinking=thinking)\n'
+                      '\n'
+                      '    def __init__(\n'
+                      '        self,\n'
+                      '        tokenizer: TokenizerLike,\n'
+                      '        tools: list[Tool] | None = None,\n'
+                      '        **kwargs,\n'
+                      '    ) -> None:\n'
+                      '        super().__init__(tokenizer, tools, **kwargs)\n'
+                      '        self._streamed_reasoning: list[str] = []\n'
+                      '\n'
+                      '    def _reset(self, initial_state=None) -> None:\n',
+             'review_before': '    reasoning and content.\n'
+                              '    """\n'
+                              '\n'
+                              '    def __init__(\n'
+                              '        self,\n'
+                              '        tokenizer: TokenizerLike,\n'
+                              '        tools: list[Tool] | None = None,\n'
+                              '        **kwargs,\n'
+                              '    ) -> None:\n'
+                              '        chat_kwargs = '
+                              'kwargs.get("chat_template_kwargs", {}) or {}\n'
+                              '        thinking = chat_kwargs.get("enable_thinking", '
+                              'True)\n'
+                              '        super().__init__(\n'
+                              '            tokenizer,\n'
+                              '            tools,\n'
+                              '            '
+                              'parser_engine_config=nemotron_v3_config(thinking=thinking),\n'
+                              '            **kwargs,\n'
+                              '        )\n'
+                              '        self._streamed_reasoning: list[str] = []\n'
+                              '\n'
+                              '    def _reset(self, initial_state=None) -> None:\n',
+             'review_after': '    reasoning and content.\n'
+                             '    """\n'
+                             '\n'
+                             '    @classmethod\n'
+                             '    def engine_config(cls, thinking: bool) -> '
+                             'ParserEngineConfig:\n'
+                             '        return nemotron_v3_config(thinking=thinking)\n'
+                             '\n'
+                             '    def __init__(\n'
+                             '        self,\n'
+                             '        tokenizer: TokenizerLike,\n'
+                             '        tools: list[Tool] | None = None,\n'
+                             '        **kwargs,\n'
+                             '    ) -> None:\n'
+                             '        super().__init__(tokenizer, tools, **kwargs)\n'
+                             '        self._streamed_reasoning: list[str] = []\n'
+                             '\n'
+                             '    def _reset(self, initial_state=None) -> None:\n'})},
  {'name': 'include-reasoning-shapes-the-response',
   'review_patch': 'patches/vllm-include-reasoning-shapes-the-response.patch',
   'review_sha256': 'd3b41899464142ffffb04efd0b19647153e322b10c7f9fc1e14af0f290af98d1',
@@ -128824,7 +129268,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              ') -> dict[str, ResponsesToolCallName]:\n'})},
  {'name': 'batch-parse-starts-where-the-prompt-leaves',
   'review_patch': 'patches/vllm-batch-parse-starts-where-the-prompt-leaves.patch',
-  'review_sha256': 'dfc0484af7234693e7df8ce8530e443fb6d58adef4d3145f74ad3a28ca9985a2',
+  'review_sha256': '4e7f284ab8f7a35bd1bf0405c8bca1e775fb4208326b6aa2e6438522509f3d61',
   'files': ({'path': 'tests/entrypoints/openai/responses/test_parsable_context_unit.py',
              'before_sha256': '8fd0bd655d13abdc9fe03e1c0bb0625225431624db8257e1db07c00ac3da2779',
              'after_sha256': '95f50d93d97370d426319b5dc94fce55b9cbca4ce9b3b95a930e42990dcbf4a2'},
@@ -128859,8 +129303,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': 'a52399b65316163be152a4c3fa9fd832e80d293814ec421832438c00bb7e1816',
              'after_sha256': 'b2f627c28667ec2a064898e627232a5ebb7f59826ad9b961359d56226ff2c2ec'},
             {'path': 'vllm/parser/engine/parser_engine.py',
-             'before_sha256': '2a48d1e6c87a29ce4efed73ff630a630ea739d572da350835334afce74240caf',
-             'after_sha256': '1e1300284ccb666714938075f5f53273673a5659ed6aa30d9515ae4ce54aa811'},
+             'before_sha256': 'a6109505968ac86616b674dadd42ef320c75887dfdc2b2cca0dd916c41f6d82a',
+             'after_sha256': 'e496c870ce534714ba80010c92ef9a9adca1f9f2f92a8c4f3555b1698aa3ebd6'},
             {'path': 'vllm/parser/gemma4.py',
              'before_sha256': '44411dca605b8cfd849c42b7c246aee2f7c2da168ecfa7e876fd770e92a4aa23',
              'after_sha256': '8c9988dc7fd71ffb19c90b435d8b0b1d80b24cb9a383562a6ce5184cae571928'},
@@ -136384,7 +136828,7 @@ FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5d
  'tests/parser/engine/test_engine.py': 'acf3128470532aa0f07ee5d3749824a48e11cc44df78e4550a9b622a8fb05c0b',
  'tests/parser/engine/test_gemma4_streaming_reasoning.py': 'e491dbb881f33dfddbb07cb8fbebc6e5f6196c58a4b027cf04ba8095ea52f82e',
  'tests/parser/engine/test_nemotron_v3.py': '65b1be9ad64bd16e08cea6d6886a33169aae31933c918587ea9e4ea8167975c5',
- 'tests/parser/engine/test_parser_engine.py': '9472eacecc3f188643c0749a59c728b49daff8907574676931fac0755ce52d81',
+ 'tests/parser/engine/test_parser_engine.py': '6546143c7cadd640eb6777d2cd326a07fac755f683299f1dfa3e1f61d5c049fa',
  'tests/parser/engine/test_qwen3.py': 'e8b43bf3b75f045f61386002e45f6341ef2069f269c84ce2cb5433fc8b3c1c94',
  'tests/parser/engine/test_qwen3_reasoning.py': '66b57e6eb6563bf5210ed864baf0658a5683dec42f30d0b9fb671cceeee1051f',
  'tests/parser/engine/test_qwen_terminal_authority.py': '15b1a503148a15e51bfc85798c7964342cc611e3dfb5451734020513259f8dad',
@@ -136499,11 +136943,11 @@ FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5d
  'vllm/parser/abstract_parser.py': 'b2f627c28667ec2a064898e627232a5ebb7f59826ad9b961359d56226ff2c2ec',
  'vllm/parser/deepseek_v32.py': '1fe0aec597caf6c10ff9905a3b1918c2a8608b5b1df32127ff8038c10f5d9b1c',
  'vllm/parser/deepseek_v4.py': 'a95f86eb4146d3096a73f1076260bbc58630a74c377b9da1d7e66d65e898465f',
- 'vllm/parser/engine/adapters.py': 'b59c8b5911e0570fbe5778791e079a197c365beda8160ea901e3ff2dcf18fa48',
+ 'vllm/parser/engine/adapters.py': '5b11c6d93cbd290367323213ec52d8188e44a6f00bd0992ef1cbc0d0856272c2',
  'vllm/parser/engine/events.py': 'd0ed492bbe28c19b6ec0446770a21754bfa844a70888ef5706587b0bbea51405',
- 'vllm/parser/engine/parser_engine.py': '1e1300284ccb666714938075f5f53273673a5659ed6aa30d9515ae4ce54aa811',
+ 'vllm/parser/engine/parser_engine.py': 'e496c870ce534714ba80010c92ef9a9adca1f9f2f92a8c4f3555b1698aa3ebd6',
  'vllm/parser/engine/parser_engine_config.py': '350cc2f76baa973252119fcbef2304f07d5b039dd439220d7b75a59d32ce46d9',
- 'vllm/parser/engine/streaming_parser_engine.py': '32aaa0f577aaf8d157c1d786cdbffe95d8c0b52e0b5bed0e80c10d497b1c0ba7',
+ 'vllm/parser/engine/streaming_parser_engine.py': '90958bf8f39a7080573ee9c2c6223c6b473210c1715c678231df925f39788003',
  'vllm/parser/engine/token_id_scanner.py': '8e0f784b533cbc72801e4eef787cf96ec0e221e4c9d55098ee89b9bcb088059c',
  'vllm/parser/gemma4.py': '8c9988dc7fd71ffb19c90b435d8b0b1d80b24cb9a383562a6ce5184cae571928',
  'vllm/parser/glm47_moe.py': 'b0c121dddf46e6c74ee6cae1d47eccddbdd0e1622e2f41b985e4e06bd017ed73',
@@ -136512,7 +136956,8 @@ FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5d
  'vllm/parser/kimi_k2.py': '7d1d9a64ae888e08c135e8b3859d6a3a66b53e4b8e685bd2f4090bd30204ab56',
  'vllm/parser/minimax_m2.py': '38577327262d3df29c052240f7bbb1369b82a6d3697d85bd4e5c29d130662fa1',
  'vllm/parser/mistral.py': '0b74821f7c68d5cf572760288d82bb40c19dfe0c88a6f9412befcaf1cfdcf6e8',
- 'vllm/parser/qwen3.py': '676e5a88a159860084a9fe5903c639e091b3cec3e6650d00acf6a114b28e1333',
+ 'vllm/parser/nemotron_v3.py': '544d2dcece372db535614d77ca6e4e276b8d1814df7ac47461192cd5737a0518',
+ 'vllm/parser/qwen3.py': '316d5ce3e386ed18953b8ce1c78944c854a82e19b2b187de0d7f2c5419064249',
  'vllm/reasoning/abs_reasoning_parsers.py': 'ba4b1145048e5faa217e1ef4d849167ebd1fe7bcb9296fe2e9d2f17ce96607f7',
  'vllm/renderers/base.py': '09b769d4cd5cbb84572a084e054f5bef3b51873a9222dba11a154f98477aeed8',
  'vllm/renderers/hf.py': 'b06cb298f586607a036c8d976e0a08ac64eb317bfb8af1d4dc5329e690fb5e88',

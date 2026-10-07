@@ -341,12 +341,12 @@ It is intentionally reconstructed by the ordered, reviewed semantic transformati
 | patches/vllm-startup-plan-admission-bound.patch | 596e311a54f888e8589a0bdc9fba62b6bf779b11eabab8ca1d2b60b8cf9f9930 |
 | patches/vllm-template-refusals-name-their-parameter.patch | 1f428332be39e4fb7f3c7f7eb5d6e3297f5dc70638fcd7f81d69b32f69d1fa26 |
 | patches/vllm-qwen-repeated-parameter-refusal.patch | 11e1a32696d6c17352a94ad815f878728011304592c1efb09eaf98f73f59f147 |
-| patches/vllm-generated-tokens-survive-parsing.patch | 5a3649dc50d8f75a24474ce2a0776fd96cc51edf03f011d0887d84b4cb628e7a |
+| patches/vllm-generated-tokens-survive-parsing.patch | 2fb9c11827cad42f46702d213e6e5ea60329181c2f7ab157fcd298338fc06197 |
 | patches/vllm-include-reasoning-shapes-the-response.patch | d3b41899464142ffffb04efd0b19647153e322b10c7f9fc1e14af0f290af98d1 |
 | patches/vllm-unspecified-tool-choice-is-the-default.patch | 367fedad65383375e377d7bc1e20cc3fdab4554d511b9437918004b25321d530 |
 | patches/vllm-call-only-answer-keeps-the-blank-line.patch | ad1e558f8ba02c6889d9b4a79c6ec355e9bfa763bc007e5cae7e609be96ec084 |
 | patches/vllm-responses-tools-are-one-function-list.patch | cae549ea87a8c1b6020f76163cfe1eca0c3104eac317ab2d84b3db75092d20cd |
-| patches/vllm-batch-parse-starts-where-the-prompt-leaves.patch | dfc0484af7234693e7df8ce8530e443fb6d58adef4d3145f74ad3a28ca9985a2 |
+| patches/vllm-batch-parse-starts-where-the-prompt-leaves.patch | 4e7f284ab8f7a35bd1bf0405c8bca1e775fb4208326b6aa2e6438522509f3d61 |
 | patches/vllm-derender-text-is-the-detokenizers.patch | 1f733012c4c208a1f0a252518540bcddf5924152957cc96dce7783042f0df3c7 |
 | patches/vllm-output-constraints-refused-beside-tool-calls.patch | c6ac620c8cd962a77868789d72875e0df456a9b0918ef8cb58ec2e15c3600343 |
 | patches/vllm-batch-invariance-substitutes-no-nvfp4-kernel.patch | c79baaee0a51275f5f522d266fe6b315c200e6951920c2454d5c80cadbb92f44 |
@@ -402,9 +402,9 @@ Pinned build inputs and products:
 |---|---|
 | Immutable base tag | qwen38-vllm:main-9df9b0b |
 | Immutable base ID | sha256:fa4a002a88b7043a1a89966dea8a500fe9696f84e75730d9da916f916048d401 |
-| Runtime Dockerfile SHA-256 | dac227dd8664e1fcf9123fa051efd824bb32a106c13e867c97752e7a207805c3 |
-| Build verifier SHA-256 | 968884742243d5a67c4fb9df67a314930572385c2250d2af336056cd1e763f5d |
-| Runtime validator SHA-256 | 2db1ae372fef308823ccd0e56b21207d8ae84c1d7d91efce9209f15e27313f23 |
+| Runtime Dockerfile SHA-256 | e04514689e3175f6fc16be4a16e9400e35ad5ccdb8c0bb20a5624e6a6ce2129d |
+| Build verifier SHA-256 | 58602e08cfb7989c9ac76660aa7280719bfc060c7c510b461b2859d11d12dd76 |
+| Runtime validator SHA-256 | 82fd8389be9f7b3b3322289c82acb2353bc03f5bbd0893c2ae053cdc0a6a960e |
 
 The runtime image's profile, tag and archive name, which every release advances
 together, are declared in `config/runtime-v1.sh`, and the archive lives under
@@ -1192,8 +1192,9 @@ such token by default. Here that deletion erased the model's output from the
 record and, beside the content ids the batch tool pass splits on, left an id
 whose text was gone, which the token-position scanner refuses: a whole response
 failed with 500 and a stream lost the token or failed, by how its deltas were
-grouped. A parser that forwards content ids is refused at construction if it
-acts on a terminal in content outside its tool language.
+grouped. A parser format that forwards content ids is refused when it is
+registered, at startup, if it acts on a terminal in content outside its tool
+language in any configuration it builds.
 
 `include_reasoning` decides only what a response shows: whether reasoning has
 ended, and so when a grammar starts constraining, is read from the prompt the

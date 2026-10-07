@@ -768,6 +768,8 @@ image_build_options=(
   --build-arg "STREAMING_PARSER_ENGINE_PATCHED_FILE_SHA256=${STREAMING_PARSER_ENGINE_PATCHED_FILE_SHA256}"
   --build-arg "TOKEN_ID_SCANNER_PATCHED_FILE_SHA256=${TOKEN_ID_SCANNER_PATCHED_FILE_SHA256}"
   --build-arg "ENGINE_PROTOCOL_PATCHED_FILE_SHA256=${ENGINE_PROTOCOL_PATCHED_FILE_SHA256}"
+  --build-arg "NEMOTRON_V3_PARSER_PATCHED_FILE_SHA256=${NEMOTRON_V3_PARSER_PATCHED_FILE_SHA256}"
+  --build-arg "NEMOTRON_V3_PARSER_UPSTREAM_FILE_SHA256=${NEMOTRON_V3_PARSER_UPSTREAM_FILE_SHA256}"
   --build-arg "GENERATE_INVOCATION_TYPES_PATCHED_FILE_SHA256=${GENERATE_INVOCATION_TYPES_PATCHED_FILE_SHA256}"
   --build-arg "GENERATE_INVOCATION_TYPES_UPSTREAM_FILE_SHA256=${GENERATE_INVOCATION_TYPES_UPSTREAM_FILE_SHA256}"
   --build-arg "GENERATE_BASE_SERVING_PATCHED_FILE_SHA256=${GENERATE_BASE_SERVING_PATCHED_FILE_SHA256}"
@@ -983,6 +985,7 @@ actual_installed_report="$(
     /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/detokenizer.py \
     /usr/local/lib/python3.12/dist-packages/vllm/v1/core/sched/scheduler.py \
     /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/async_llm.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/parser/nemotron_v3.py \
     /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/generate/factories.py \
     /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/generate/base/serving.py \
     /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/__init__.py \
@@ -1060,6 +1063,7 @@ expected_installed_report="$(printf '%s  %s\n' \
   "${V1_DETOKENIZER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/detokenizer.py \
   "${V1_SCHEDULER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/core/sched/scheduler.py \
   "${ASYNC_LLM_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/async_llm.py \
+  "${NEMOTRON_V3_PARSER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/nemotron_v3.py \
   "${GENERATE_INVOCATION_TYPES_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/generate/factories.py \
   "${GENERATE_BASE_SERVING_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/generate/base/serving.py \
   "${ENGINE_CORE_REQUEST_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/__init__.py \

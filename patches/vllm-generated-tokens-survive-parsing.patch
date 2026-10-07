@@ -68,7 +68,7 @@ index 5f6b0a414e144cf6f4a37459e8a712a9472e8177..6bfd2af568c1c83e68912d33823b0202
      separators.
      """
 diff --git a/tests/parser/engine/test_parser_engine.py b/tests/parser/engine/test_parser_engine.py
-index 23751d7ad0c2c8c3080ab10206439528ceaa148c..852e792d425a00117f2cf78369fb398fdf7ab810 100644
+index 23751d7ad0c2c8c3080ab10206439528ceaa148c..d4d20d52f6f4a4923550d3c20130de0ec87ed737 100644
 --- a/tests/parser/engine/test_parser_engine.py
 +++ b/tests/parser/engine/test_parser_engine.py
 @@ -1611,21 +1611,24 @@ class TestCoercionInstabilityRegression:
@@ -304,12 +304,56 @@ index 23751d7ad0c2c8c3080ab10206439528ceaa148c..852e792d425a00117f2cf78369fb398f
          )
          engine._engine.reset()
          events = engine._engine.feed("thought<bos></think>answer", [72, 204, 201, 73])
-@@ -1808,4 +1791,4 @@ class TestDropSpecialTokens:
+@@ -1808,4 +1791,48 @@ class TestDropSpecialTokens:
          reasoning_text = "".join(
              e.value for e in events if e.type == EventType.REASONING_CHUNK
          )
 -        assert "<bos>" not in reasoning_text
 +        assert reasoning_text == "thought<bos>"
++
++
++class TestFormatRegistration:
++    """Whether a format's forwarded ids and text can disagree is a property of
++    the format alone, so registering it decides, before any request."""
++
++    def test_forwarding_ids_while_acting_in_content_is_refused_at_registration(self):
++        import dataclasses
++
++        from vllm.parser.qwen3 import Qwen3Parser
++
++        class ActsOnAnOpenerInContent(Qwen3Parser):
++            @classmethod
++            def engine_config(cls, thinking):
++                config = super().engine_config(thinking)
++                transitions = dict(config.transitions)
++                transitions[(ParserState.CONTENT, "THINK_START")] = Transition(
++                    next_state=ParserState.CONTENT
++                )
++                return dataclasses.replace(config, transitions=transitions)
++
++        with pytest.raises(ValueError, match=r"acts on \['THINK_START'\] in content"):
++            make_adapters(ActsOnAnOpenerInContent)
++
++    def test_forwarding_ids_requires_naming_every_configuration(self):
++        class Unnamed(ParserEngine):
++            batch_tool_pass_uses_ids = True
++
++        with pytest.raises(NotImplementedError, match="engine_configs"):
++            make_adapters(Unnamed)
++
++    def test_every_format_that_forwards_ids_registers(self):
++        from vllm.parser.nemotron_v3 import NemotronV3Parser
++        from vllm.parser.qwen3 import Qwen3Parser
++        from vllm.parser.seed_oss import SeedOssParser
++
++        for parser_cls in (Qwen3Parser, SeedOssParser, NemotronV3Parser):
++            assert parser_cls.batch_tool_pass_uses_ids
++            configs = parser_cls.engine_configs()
++            assert {config.initial_state for config in configs} == {
++                ParserState.REASONING,
++                ParserState.CONTENT,
++            }
++            parser_cls.check_format()
 diff --git a/tests/parser/engine/test_qwen3_reasoning.py b/tests/parser/engine/test_qwen3_reasoning.py
 index 9e58fb9b2c116a6b6327ef708f255a272bde2357..9a6710b5a0ac89dab6ab1bb90bb428f8cc88bfa6 100644
 --- a/tests/parser/engine/test_qwen3_reasoning.py
@@ -496,43 +540,57 @@ index c3e253a874cc6e5cd776774f92284142a771633c..2a9fc10e694ba5b1c045806967b9947e
      parser = Gemma4ToolParser(_StubTokenizer())
      request = _build_chat_request(
 diff --git a/vllm/parser/engine/parser_engine.py b/vllm/parser/engine/parser_engine.py
-index 84a8e10485a5e4dc29f163d120661bba213ac72b..b43755b16afb56a9ac2f646dd37c056dfc4041b6 100644
+index 84a8e10485a5e4dc29f163d120661bba213ac72b..d2cef6232a463474d6393723dcc80f37e51d150b 100644
 --- a/vllm/parser/engine/parser_engine.py
 +++ b/vllm/parser/engine/parser_engine.py
-@@ -96,7 +96,10 @@ class ParserEngine(Parser):
+@@ -96,8 +96,46 @@ class ParserEngine(Parser):
      # reasoning boundary byte for byte, so the batch tool pass can be given
      # the generated ids after that boundary and split on them exactly as
      # the streaming tool pass does.  A grammar that rewrites the forwarded
 -    # text keeps the text-only batch tool pass.
-+    # text keeps the text-only batch tool pass.  Construction refuses a grammar
++    # text keeps the text-only batch tool pass.  Registration refuses a grammar
 +    # that sets this and acts on a terminal in content outside its tool
 +    # language: that terminal's text would leave the forwarded text while its
 +    # id stayed in the forwarded ids.
      batch_tool_pass_uses_ids: bool = False
  
-     def extract_batch_content_ids(
-@@ -138,6 +141,21 @@ class ParserEngine(Parser):
-                 "a wrapper but declares no arguments_reading, so no wrapper "
-                 "could be told apart from text inside a value."
-             )
-+        if self.batch_tool_pass_uses_ids:
++    @classmethod
++    def engine_configs(cls) -> tuple[ParserEngineConfig, ...]:
++        """Every configuration this format builds, whatever the request."""
++        raise NotImplementedError(
++            f"Parser format {cls.__name__} gives its batch tool pass the "
++            "generated ids, so it must name every configuration it builds "
++            "(engine_configs) for registration to check them."
++        )
++
++    @classmethod
++    def check_format(cls) -> None:
++        """Refuse a format whose forwarded ids and text could disagree.
++
++        A property of the format alone -- its transitions and whether it
++        forwards ids -- so it is decided when the format is registered, before
++        any request, rather than when a request first constructs one.
++        """
++        if not cls.batch_tool_pass_uses_ids:
++            return
++        for config in cls.engine_configs():
++            tool_terminals = StreamingParserEngine.tool_terminals(config)
 +            consumed = sorted(
 +                terminal
-+                for state, terminal in parser_engine_config.transitions
-+                if state is ParserState.CONTENT
-+                and terminal not in self._engine._tool_terminals
++                for state, terminal in config.transitions
++                if state is ParserState.CONTENT and terminal not in tool_terminals
 +            )
 +            if consumed:
 +                raise ValueError(
-+                    f"Parser format {parser_engine_config.name!r} gives its batch "
-+                    "tool pass the generated ids after the reasoning boundary, so "
-+                    "its reasoning pass must forward every byte after it, but it "
++                    f"Parser format {config.name!r} gives its batch tool pass "
++                    "the generated ids after the reasoning boundary, so its "
++                    "reasoning pass must forward every byte after it, but it "
 +                    f"acts on {consumed} in content. Treat them as text there, "
 +                    "or keep the text-only batch tool pass."
 +                )
- 
-         self._has_reasoning = (
-             "THINK_END" in parser_engine_config.token_id_terminals
++
+     def extract_batch_content_ids(
+         self, token_ids: Sequence[int], *, token_offset: int = 0
 diff --git a/vllm/parser/engine/parser_engine_config.py b/vllm/parser/engine/parser_engine_config.py
 index c68617df67df101a3ee2d1969eb7c9e136ee0a8a..8b1021b5f759ca08cec66c96ece9534a2705472e 100644
 --- a/vllm/parser/engine/parser_engine_config.py
@@ -548,7 +606,7 @@ index c68617df67df101a3ee2d1969eb7c9e136ee0a8a..8b1021b5f759ca08cec66c96ece9534a
      strip_trailing_reasoning_whitespace: bool = True
  
 diff --git a/vllm/parser/engine/streaming_parser_engine.py b/vllm/parser/engine/streaming_parser_engine.py
-index 1b6f92109cfe187f8fa931e22e2b124fd8cf0189..1db1096995ef79418c7cfac352be3130698f85ff 100644
+index 1b6f92109cfe187f8fa931e22e2b124fd8cf0189..7a302e74b22edd5d3598f8ab150f5cc404c11ece 100644
 --- a/vllm/parser/engine/streaming_parser_engine.py
 +++ b/vllm/parser/engine/streaming_parser_engine.py
 @@ -12,9 +12,7 @@ from vllm.parser.engine.events import EventType, SemanticEvent
@@ -658,7 +716,7 @@ index 1b6f92109cfe187f8fa931e22e2b124fd8cf0189..1db1096995ef79418c7cfac352be3130
  
          self._scanner = TokenIDScanner(
              resolved_token_ids,
-@@ -158,10 +91,10 @@ class StreamingParserEngine:
+@@ -158,16 +91,12 @@ class StreamingParserEngine:
              for name, spec in config.token_id_terminals.items()
              if name in resolved_token_ids.values()
          }
@@ -666,13 +724,35 @@ index 1b6f92109cfe187f8fa931e22e2b124fd8cf0189..1db1096995ef79418c7cfac352be3130
 -            self._token_required_states[DROP_TERMINAL] = frozenset(ParserState)
  
 -        self._lexer = IncrementalLexer(lexer_shape, content_terminal=CONTENT_TERMINAL)
+-
+-        self._tool_terminals: frozenset[str] = frozenset(
+-            terminal
+-            for (state, terminal), tr in config.transitions.items()
+-            if tr.next_state in self._TOOL_STATES or state in self._TOOL_STATES
 +        self._lexer = IncrementalLexer(
 +            config.lexer_shape, content_terminal=CONTENT_TERMINAL
-+        )
+         )
++
++        self._tool_terminals: frozenset[str] = self.tool_terminals(config)
+         # TOOL_CALL_END may close an inner call rather than its lexical wrapper,
+         # as in MiniMax, so identify exits from state transitions instead.
+         self._tool_exit_terminals: frozenset[str] = frozenset(
+@@ -393,5 +322,14 @@ class StreamingParserEngine:
+         }
+     )
  
-         self._tool_terminals: frozenset[str] = frozenset(
-             terminal
-@@ -460,9 +393,6 @@ class StreamingParserEngine:
++    @classmethod
++    def tool_terminals(cls, config: ParserEngineConfig) -> frozenset[str]:
++        """The terminals of a format's tool language: those entering or inside a call."""
++        return frozenset(
++            terminal
++            for (state, terminal), tr in config.transitions.items()
++            if tr.next_state in cls._TOOL_STATES or state in cls._TOOL_STATES
++        )
++
+     def _call_reading(self) -> ArgumentsReading:
+         assert self._arguments_reading is not None
+@@ -460,9 +398,6 @@ class StreamingParserEngine:
                      self._in_skipped_parameter_value = False
                  return self._emit_for_state(value)
  
@@ -726,7 +806,7 @@ index 31ce2f5907b3d80763f81f4c91e6538a25f836b8..545354b772f58a3e83fbbed62411442c
  
  
 diff --git a/vllm/parser/qwen3.py b/vllm/parser/qwen3.py
-index 9d74bd3d050d738e8f11ea2ec5b43b67d1ef89a3..03a52f051b2bd85d3135824b2700709b43a4a0b0 100644
+index 9d74bd3d050d738e8f11ea2ec5b43b67d1ef89a3..80c3768be5a29b20133412626d6925639e11fd0c 100644
 --- a/vllm/parser/qwen3.py
 +++ b/vllm/parser/qwen3.py
 @@ -377,12 +377,6 @@ def qwen3_config(
@@ -755,3 +835,85 @@ index 9d74bd3d050d738e8f11ea2ec5b43b67d1ef89a3..03a52f051b2bd85d3135824b2700709b
      batch_tool_pass_uses_ids = True
  
      def _tool_arguments_reading(
+@@ -498,6 +494,22 @@ class Qwen3Parser(ParserEngine):
+             offset += 1
+         return token_ids[offset:]
+ 
++    @classmethod
++    def engine_config(cls, thinking: bool) -> ParserEngineConfig:
++        return qwen3_config(
++            thinking=thinking,
++            name=cls.CONFIG_NAME,
++            think_start=cls.THINK_START,
++            think_end=cls.THINK_END,
++            tool_start=cls.TOOL_START,
++            tool_end=cls.TOOL_END,
++        )
++
++    @classmethod
++    def engine_configs(cls) -> tuple[ParserEngineConfig, ...]:
++        # A request chooses only whether the model thinks.
++        return (cls.engine_config(True), cls.engine_config(False))
++
+     def __init__(
+         self,
+         tokenizer: TokenizerLike,
+@@ -507,15 +519,7 @@ class Qwen3Parser(ParserEngine):
+         chat_kwargs = kwargs.get("chat_template_kwargs", {}) or {}
+         self.thinking_enabled = chat_kwargs.get("enable_thinking", True)
+         kwargs.setdefault(
+-            "parser_engine_config",
+-            qwen3_config(
+-                thinking=self.thinking_enabled,
+-                name=self.CONFIG_NAME,
+-                think_start=self.THINK_START,
+-                think_end=self.THINK_END,
+-                tool_start=self.TOOL_START,
+-                tool_end=self.TOOL_END,
+-            ),
++            "parser_engine_config", self.engine_config(self.thinking_enabled)
+         )
+         super().__init__(
+             tokenizer,
+diff --git a/vllm/parser/engine/adapters.py b/vllm/parser/engine/adapters.py
+index ccf635807dd615015d519dbdd76f479c3a84000e..8c9e2af6e0904151e82a509e6790094fb17252a1 100644
+--- a/vllm/parser/engine/adapters.py
++++ b/vllm/parser/engine/adapters.py
+@@ -240,6 +240,7 @@ class ParserEngineToolAdapter(ToolParser):
+ def make_adapters(
+     parser_engine_cls: type[ParserEngine],
+ ) -> tuple[type[ParserEngineReasoningAdapter], type[ParserEngineToolAdapter]]:
++    parser_engine_cls.check_format()
+     reasoning_adapter = type(
+         f"{parser_engine_cls.__name__}ReasoningAdapter",
+         (ParserEngineReasoningAdapter,),
+diff --git a/vllm/parser/nemotron_v3.py b/vllm/parser/nemotron_v3.py
+index 7884480feeeaeb6e374902da4c8527b6e6b2f430..eef2b2bb4e43b2005563f73447069eb4a1375e5f 100644
+--- a/vllm/parser/nemotron_v3.py
++++ b/vllm/parser/nemotron_v3.py
+@@ -46,20 +46,17 @@ class NemotronV3Parser(Qwen3Parser):
+     reasoning and content.
+     """
+ 
++    @classmethod
++    def engine_config(cls, thinking: bool) -> ParserEngineConfig:
++        return nemotron_v3_config(thinking=thinking)
++
+     def __init__(
+         self,
+         tokenizer: TokenizerLike,
+         tools: list[Tool] | None = None,
+         **kwargs,
+     ) -> None:
+-        chat_kwargs = kwargs.get("chat_template_kwargs", {}) or {}
+-        thinking = chat_kwargs.get("enable_thinking", True)
+-        super().__init__(
+-            tokenizer,
+-            tools,
+-            parser_engine_config=nemotron_v3_config(thinking=thinking),
+-            **kwargs,
+-        )
++        super().__init__(tokenizer, tools, **kwargs)
+         self._streamed_reasoning: list[str] = []
+ 
+     def _reset(self, initial_state=None) -> None:
