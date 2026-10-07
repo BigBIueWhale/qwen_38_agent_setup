@@ -1184,15 +1184,15 @@ The parser deletes nothing the model generated. A special token its format does
 not act on -- the vision and audio markers among them, which the served template
 itself spells -- is the text it decodes to, in reasoning, in the answer and inside
 a call's arguments, and a second `</think>` after reasoning has ended is content,
-as a literal `<think>` there already was. The stop token a generation ended on
-carries no text unless the caller asked to see stop text, on every route: the
-detokenizer and the derender route decide it in one place, and the parser still
-receives the token. Upstream's parser engine deletes every
-such token by default. Here that deletion erased the model's output from the
-record and, beside the content ids the batch tool pass splits on, left an id
-whose text was gone, which the token-position scanner refuses: a whole response
-failed with 500 and a stream lost the token or failed, by how its deltas were
-grouped. A parser format that forwards content ids is refused when it is
+as a literal `<think>` there already was. Upstream's parser engine deletes every
+special token its format does not act on by default. Here that deletion erased the
+model's output from the record and, beside the content ids the batch tool pass
+splits on, left an id whose text was gone, which the token-position scanner
+refuses: a whole response failed with 500 and a stream lost the token or failed,
+by how its deltas were grouped. The stop token a generation ended on carries no
+text unless the caller asked to see stop text, on every route: the detokenizer and
+the derender route decide it in one place, and the parser still receives the
+token. A parser format that forwards content ids is refused when it is
 registered, at startup, if it acts on a terminal in content outside its tool
 language in any configuration it builds.
 
