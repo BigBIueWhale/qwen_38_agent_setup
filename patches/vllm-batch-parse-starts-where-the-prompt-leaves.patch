@@ -64,10 +64,10 @@ index a7d8c8a6c3437fe63157db75f47548db3d53e59c..a16e62a9916f9cfbb3fd903e1e8424fd
          return None
  
 diff --git a/tests/entrypoints/openai/responses/test_serving_responses.py b/tests/entrypoints/openai/responses/test_serving_responses.py
-index 7f01c4e17acfb016b914f6941902b6e7a70bfce6..cd8c7f338366c46a44437afb809e11a778892baa 100644
+index 2b0465f925dd762be89f56c431ce0250cc5f9a34..1be8ebded8c94615128faad8721586fa712dcbc8 100644
 --- a/tests/entrypoints/openai/responses/test_serving_responses.py
 +++ b/tests/entrypoints/openai/responses/test_serving_responses.py
-@@ -1406,6 +1406,7 @@ async def test_wrapped_call_output_uses_its_terminal_on_both_responses_paths(
+@@ -1408,6 +1408,7 @@ async def test_wrapped_call_output_uses_its_terminal_on_both_responses_paths(
      if chunk_size is None:
          items = serving._make_response_output_items(
              request, completion(ids, True), tokenizer, parser,
@@ -75,7 +75,7 @@ index 7f01c4e17acfb016b914f6941902b6e7a70bfce6..cd8c7f338366c46a44437afb809e11a7
          )
      else:
          context = SimpleContext(response_parser=parser)
-@@ -1441,3 +1442,64 @@ async def test_wrapped_call_output_uses_its_terminal_on_both_responses_paths(
+@@ -1443,3 +1444,64 @@ async def test_wrapped_call_output_uses_its_terminal_on_both_responses_paths(
          assert content == (cut if shape == "mixed" else "")
      assert parser.generated_token_count == len(ids)
      assert parser.reasoning_token_count == 4
@@ -250,10 +250,10 @@ index 7b3ab8e0b68bea9d71937a8d598a2f0e06966f85..242d8b95cfd4f0a52467b737e8620098
                      if not request.include_reasoning:
                          reasoning = None
 diff --git a/vllm/entrypoints/openai/chat_completion/serving.py b/vllm/entrypoints/openai/chat_completion/serving.py
-index 41682e8504d064164d1680d378de043cd9701bfa..0a555501401ddbd53c83ed409d6057cec4967d1f 100644
+index 53737b27890770ed6ab51df466a8317b8f83c119..96ae50c0ab6e5bebd9b71ca69e5d07ec5f4a8582 100644
 --- a/vllm/entrypoints/openai/chat_completion/serving.py
 +++ b/vllm/entrypoints/openai/chat_completion/serving.py
-@@ -972,6 +972,7 @@ class OpenAIServingChat(GenerateBaseServing):
+@@ -945,6 +945,7 @@ class OpenAIServingChat(GenerateBaseServing):
                  reasoning, content, tool_calls = parser.parse_output(
                      output.text,
                      request,
@@ -262,10 +262,10 @@ index 41682e8504d064164d1680d378de043cd9701bfa..0a555501401ddbd53c83ed409d6057ce
                      model_output_token_ids=token_ids,
                      finish_reason=output.finish_reason,
 diff --git a/vllm/entrypoints/openai/responses/context.py b/vllm/entrypoints/openai/responses/context.py
-index ee30f0c4eba85177abd62e04aa9a47b0bdd0a6cc..31b3e76c964869964d20d5d8a6cf8121718017f6 100644
+index 068bdfa2fb23f2a7d0aacbe38f75cafd163d567f..09d55e0ac16d541f9d510c57bc70c6fe50e851f2 100644
 --- a/vllm/entrypoints/openai/responses/context.py
 +++ b/vllm/entrypoints/openai/responses/context.py
-@@ -350,6 +350,7 @@ class ParsableContext(ConversationContext):
+@@ -363,6 +363,7 @@ class ParsableContext(ConversationContext):
              reasoning, content, tool_calls = self.response_parser.parse_output(
                  completion.text,
                  self.request,
@@ -274,7 +274,7 @@ index ee30f0c4eba85177abd62e04aa9a47b0bdd0a6cc..31b3e76c964869964d20d5d8a6cf8121
                  model_output_token_ids=completion.token_ids,
                  finish_reason=completion.finish_reason,
 diff --git a/vllm/entrypoints/openai/responses/serving.py b/vllm/entrypoints/openai/responses/serving.py
-index 3d6d0a907d6f600f3537cedb22d72a95cc76968a..5ba4d096eef07b12f3c8f6171acb161fce4ab54a 100644
+index 43ce83e3910de0e3137acb1ed54e62a5d56118b7..8b4db1810e5fb728f9a81c12293aa6bb94747cd5 100644
 --- a/vllm/entrypoints/openai/responses/serving.py
 +++ b/vllm/entrypoints/openai/responses/serving.py
 @@ -915,6 +915,7 @@ class OpenAIServingResponses(GenerateBaseServing):
@@ -285,7 +285,7 @@ index 3d6d0a907d6f600f3537cedb22d72a95cc76968a..5ba4d096eef07b12f3c8f6171acb161f
          )
  
      async def _finalize_response(
-@@ -1105,6 +1106,8 @@ class OpenAIServingResponses(GenerateBaseServing):
+@@ -1089,6 +1090,8 @@ class OpenAIServingResponses(GenerateBaseServing):
          final_output: CompletionOutput,
          tokenizer: TokenizerLike,
          parser: Parser | None = None,
@@ -294,7 +294,7 @@ index 3d6d0a907d6f600f3537cedb22d72a95cc76968a..5ba4d096eef07b12f3c8f6171acb161f
      ) -> list[ResponseOutputItem]:
          # Compute logprobs if requested
          logprobs = None
-@@ -1121,6 +1124,7 @@ class OpenAIServingResponses(GenerateBaseServing):
+@@ -1105,6 +1108,7 @@ class OpenAIServingResponses(GenerateBaseServing):
              reasoning, content, tool_calls = parser.parse_output(
                  final_output.text,
                  request,
@@ -303,7 +303,7 @@ index 3d6d0a907d6f600f3537cedb22d72a95cc76968a..5ba4d096eef07b12f3c8f6171acb161f
                  model_output_token_ids=final_output.token_ids,
                  finish_reason=final_output.finish_reason,
 diff --git a/vllm/parser/abstract_parser.py b/vllm/parser/abstract_parser.py
-index 78cb078bf5a4c3d48143540b65c7bbbaf86ff889..860361bfeaa05666d05d10f9972560d1d6334e2f 100644
+index 27a4f2773131719b7961222f50199221db967b72..8a2709431195e73bae9fe399b5bc82fa032b4149 100644
 --- a/vllm/parser/abstract_parser.py
 +++ b/vllm/parser/abstract_parser.py
 @@ -230,11 +230,19 @@ class Parser:

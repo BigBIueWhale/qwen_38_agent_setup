@@ -57,7 +57,7 @@ diff --git a/tests/entrypoints/openai/responses/test_serving_responses.py b/test
  
  
  class TestExtractAllowedToolsFromMcpRequests:
-@@ -1235,3 +1244,116 @@
+@@ -1235,3 +1244,118 @@
          assert len(function_done) == 1
          assert function_done[0].item.name == "get_weather"
          assert function_done[0].item.arguments == tool_args
@@ -71,7 +71,8 @@ diff --git a/tests/entrypoints/openai/responses/test_serving_responses.py b/test
 +    serving = _make_serving_instance_with_reasoning()
 +    serving._initialize_tool_sessions = AsyncMock()
 +    parser = MagicMock()
-+    parser.reasoning_parser = None
++    # The scripted parser splits no reasoning on an exact id boundary.
++    parser.reasoning_token_count = None
 +    parser.parse.side_effect = AssertionError("Streaming output must not be reparsed")
 +    deltas = []
 +    if shape == "mixed":
@@ -121,6 +122,7 @@ diff --git a/tests/entrypoints/openai/responses/test_serving_responses.py b/test
 +    ]
 +    assert final.usage.input_tokens == 2
 +    assert final.usage.output_tokens == len(deltas)
++    assert final.usage.output_tokens_details.reasoning_tokens is None
 +    assert [event.sequence_number for event in events] == list(range(len(events)))
 +    serving._initialize_tool_sessions.assert_not_awaited()
 +    parser.parse.assert_not_called()
@@ -352,7 +354,7 @@ diff --git a/vllm/entrypoints/openai/responses/serving.py b/vllm/entrypoints/ope
  
          assert isinstance(context, (SimpleContext, HarmonyContext, ParsableContext))
          num_prompt_tokens = context.num_prompt_tokens
-@@ -1020,33 +1028,6 @@
+@@ -1004,33 +1012,6 @@
              )
          return out
  
@@ -386,7 +388,7 @@ diff --git a/vllm/entrypoints/openai/responses/serving.py b/vllm/entrypoints/ope
      def _make_response_output_items(
          self,
          request: ResponsesRequest,
-@@ -1054,17 +1035,6 @@
+@@ -1038,17 +1019,6 @@
          tokenizer: TokenizerLike,
          parser: Parser | None = None,
      ) -> list[ResponseOutputItem]:
@@ -404,7 +406,7 @@ diff --git a/vllm/entrypoints/openai/responses/serving.py b/vllm/entrypoints/ope
          # Compute logprobs if requested
          logprobs = None
          if request.is_include_output_logprobs() and final_output.logprobs:
-@@ -1110,7 +1080,9 @@
+@@ -1094,7 +1064,9 @@
                  if final_output.text
                  else [],
                  role="assistant",
@@ -415,7 +417,7 @@ diff --git a/vllm/entrypoints/openai/responses/serving.py b/vllm/entrypoints/ope
                  type="message",
              )
          ]
-@@ -1366,12 +1338,12 @@
+@@ -1350,12 +1322,12 @@
  
          def _get_logprobs(
              output: CompletionOutput,
@@ -430,7 +432,7 @@ diff --git a/vllm/entrypoints/openai/responses/serving.py b/vllm/entrypoints/ope
                  token_ids=output.token_ids,
                  logprobs=output.logprobs,
                  tokenizer=tokenizer,
-@@ -1527,6 +1499,7 @@
+@@ -1511,6 +1483,7 @@
                  )
              )
  
@@ -438,7 +440,7 @@ diff --git a/vllm/entrypoints/openai/responses/serving.py b/vllm/entrypoints/ope
              try:
                  async for event_data in processor(
                      request,
-@@ -1539,7 +1512,14 @@
+@@ -1523,7 +1496,14 @@
                      created_time,
                      _increment_sequence_number_and_return,
                  ):
@@ -453,7 +455,7 @@ diff --git a/vllm/entrypoints/openai/responses/serving.py b/vllm/entrypoints/ope
              except GenerationError as e:
                  error_json = self._convert_generation_error_to_streaming_response(e)
                  yield _increment_sequence_number_and_return(
-@@ -1547,22 +1527,6 @@
+@@ -1531,22 +1511,6 @@
                  )
                  return
  

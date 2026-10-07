@@ -151,7 +151,7 @@ diff --git a/vllm/entrypoints/openai/responses/protocol.py b/vllm/entrypoints/op
  from vllm.sampling_params import (
      FinalResponseTokenBudget,
      resolve_final_response_token_budget,
-@@ -353,10 +354,10 @@
+@@ -357,10 +358,10 @@
          reasoning = self.reasoning
          reasoning_effort = None if reasoning is None else reasoning.effort
  
@@ -166,7 +166,7 @@ diff --git a/vllm/entrypoints/openai/responses/protocol.py b/vllm/entrypoints/op
          )
  
          # When reasoning is requested, activate thinking for models whose
-@@ -365,15 +366,17 @@
+@@ -369,15 +370,17 @@
          # variable, resolve_chat_template_kwargs filters it out harmlessly.
          user_kwargs = self.chat_template_kwargs or {}
          if reasoning_effort is not None and "enable_thinking" not in user_kwargs:

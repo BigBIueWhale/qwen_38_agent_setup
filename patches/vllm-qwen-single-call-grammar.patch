@@ -295,7 +295,7 @@ diff --git a/vllm/entrypoints/openai/chat_completion/serving.py b/vllm/entrypoin
  from vllm.inputs import EngineInput, MultiModalPlaceholders
  from vllm.logger import init_logger
  from vllm.logprobs import Logprob
-@@ -790,7 +787,6 @@
+@@ -763,7 +760,6 @@
  
                          finish_reason_sent[i] = True
  
@@ -303,7 +303,7 @@ diff --git a/vllm/entrypoints/openai/chat_completion/serving.py b/vllm/entrypoin
                      chunk = ChatCompletionStreamResponse(
                          id=request_id,
                          object=chunk_object_type,
-@@ -1116,7 +1112,6 @@
+@@ -1089,7 +1085,6 @@
                  ),
                  routed_experts=routed_experts_b64,
              )

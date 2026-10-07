@@ -1138,7 +1138,7 @@ diff --git a/vllm/entrypoints/openai/chat_completion/serving.py b/vllm/entrypoin
      ChatCompletionLogProb,
      ChatCompletionLogProbs,
      ChatCompletionLogProbsContent,
-@@ -254,7 +255,7 @@
+@@ -227,7 +228,7 @@
  
      async def create_chat_completion(
          self,
@@ -1147,7 +1147,7 @@ diff --git a/vllm/entrypoints/openai/chat_completion/serving.py b/vllm/entrypoin
          raw_request: Request | None = None,
      ) -> AsyncGenerator[str, None] | ChatCompletionResponse | ErrorResponse:
          """
-@@ -270,7 +271,7 @@
+@@ -243,7 +244,7 @@
  
      async def _create_chat_completion(
          self,
@@ -1156,7 +1156,7 @@ diff --git a/vllm/entrypoints/openai/chat_completion/serving.py b/vllm/entrypoin
          raw_request: Request | None = None,
      ) -> AsyncGenerator[str, None] | ChatCompletionResponse | ErrorResponse:
          # Streaming response
-@@ -306,7 +307,10 @@
+@@ -279,7 +280,10 @@
          # Extract data_parallel_rank from header (router can inject it)
          data_parallel_rank = self._get_data_parallel_rank(raw_request)
  
@@ -1168,7 +1168,7 @@ diff --git a/vllm/entrypoints/openai/chat_completion/serving.py b/vllm/entrypoin
          max_model_len = self.model_config.max_model_len
          generators: list[AsyncGenerator[RequestOutput, None]] = []
          mm_token_counts: dict[str, int] | None = None
-@@ -362,7 +366,7 @@
+@@ -335,7 +339,7 @@
              else:
                  reasoning_ended = None
  
@@ -1177,7 +1177,7 @@ diff --git a/vllm/entrypoints/openai/chat_completion/serving.py b/vllm/entrypoin
                  engine_input,
                  sampling_params,
                  sub_request_id,
-@@ -381,7 +385,6 @@
+@@ -354,7 +358,6 @@
  
              generators.append(generator)
  
@@ -1246,7 +1246,7 @@ diff --git a/vllm/entrypoints/openai/responses/protocol.py b/vllm/entrypoints/op
      ResponseFunctionToolCall,
      ResponseInputItemParam,
      ResponseMcpCallArgumentsDeltaEvent,
-@@ -917,4 +918,5 @@
+@@ -921,4 +922,5 @@
      | ResponseMcpCallArgumentsDoneEvent
      | ResponseMcpCallInProgressEvent
      | ResponseMcpCallCompletedEvent
@@ -1514,7 +1514,7 @@ diff --git a/vllm/entrypoints/openai/responses/serving.py b/vllm/entrypoints/ope
  
      def _make_request_with_harmony(
          self,
-@@ -1253,7 +1323,7 @@
+@@ -1237,7 +1307,7 @@
              while current_index < len(event_deque):
                  event = event_deque[current_index]
                  yield event
@@ -1523,7 +1523,7 @@ diff --git a/vllm/entrypoints/openai/responses/serving.py b/vllm/entrypoints/ope
                      return
                  current_index += 1
  
-@@ -1468,42 +1538,46 @@
+@@ -1452,42 +1522,46 @@
              sequence_number += 1
              return event
  
@@ -1602,7 +1602,7 @@ diff --git a/vllm/entrypoints/openai/responses/serving.py b/vllm/entrypoints/ope
                  async for event_data in processor(
                      request,
                      sampling_params,
-@@ -1523,26 +1597,36 @@
+@@ -1507,26 +1581,36 @@
                  final_response = await self._finalize_response(
                      request, sampling_params, context, model_name, created_time, output,
                  )

@@ -415,10 +415,10 @@ index 2c1f8db439cc213fc3e5042924a61f8e11c8b283..4cbf4f9c692fd1a4f0571e8843f5969d
  
      @model_validator(mode="before")
 diff --git a/vllm/entrypoints/openai/chat_completion/serving.py b/vllm/entrypoints/openai/chat_completion/serving.py
-index f2df8c6f72eb8534cd03dd61aa5cc4e947789b93..41682e8504d064164d1680d378de043cd9701bfa 100644
+index c398169ccf9a32f96fd49959f982bf7af6f4dd6c..53737b27890770ed6ab51df466a8317b8f83c119 100644
 --- a/vllm/entrypoints/openai/chat_completion/serving.py
 +++ b/vllm/entrypoints/openai/chat_completion/serving.py
-@@ -994,8 +994,7 @@ class OpenAIServingChat(GenerateBaseServing):
+@@ -967,8 +967,7 @@ class OpenAIServingChat(GenerateBaseServing):
  
              auto_tools_called = False
              is_named_tool_choice = (
@@ -428,7 +428,7 @@ index f2df8c6f72eb8534cd03dd61aa5cc4e947789b93..41682e8504d064164d1680d378de043c
              )
              is_required_tool_choice = request.tool_choice == "required"
  
-@@ -1023,7 +1022,7 @@ class OpenAIServingChat(GenerateBaseServing):
+@@ -996,7 +995,7 @@ class OpenAIServingChat(GenerateBaseServing):
  
              # if the request doesn't use tool choice
              # OR specifies to not use a tool
@@ -437,7 +437,7 @@ index f2df8c6f72eb8534cd03dd61aa5cc4e947789b93..41682e8504d064164d1680d378de043c
                  message = self._create_chat_message(
                      role=role, reasoning=reasoning, content=content
                  )
-@@ -1031,7 +1030,7 @@ class OpenAIServingChat(GenerateBaseServing):
+@@ -1004,7 +1003,7 @@ class OpenAIServingChat(GenerateBaseServing):
              # handle when there are tools and tool choice is auto
              elif (
                  request.tools
@@ -447,7 +447,7 @@ index f2df8c6f72eb8534cd03dd61aa5cc4e947789b93..41682e8504d064164d1680d378de043c
                  and tool_parser_cls
              ):
 diff --git a/vllm/parser/abstract_parser.py b/vllm/parser/abstract_parser.py
-index 5664b0e504446e2b3e167af652f53e205fc7761f..ad0e5914682a5b4644c8b727f75257a9d58681cc 100644
+index 87416b6b5e1291555244383c47f65da5a2cbd2ed..c011a54b2bd565e27ce88a3b509eae4013a86162 100644
 --- a/vllm/parser/abstract_parser.py
 +++ b/vllm/parser/abstract_parser.py
 @@ -621,7 +621,6 @@ class DelegatingParser(Parser):

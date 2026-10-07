@@ -361,7 +361,7 @@ index b50482960c820208d81fcd9aaae2fcdb1e5ce440..f4c7cf36c5723219424caf89575589ad
 +    )
 +    assert error.parameter == "tool_choice"
 diff --git a/vllm/entrypoints/openai/responses/protocol.py b/vllm/entrypoints/openai/responses/protocol.py
-index 5494548ca762b840352d21caba206842b1c97ae0..bfd66d665465022230bbc0fcd774c4672a6c78c0 100644
+index 8c51f1e5100b8cb237d257689bd37cbae1724114..4012d68ad5c42a5579a726f29eb248fb3e414e07 100644
 --- a/vllm/entrypoints/openai/responses/protocol.py
 +++ b/vllm/entrypoints/openai/responses/protocol.py
 @@ -50,6 +50,8 @@ from openai.types.responses.response_reasoning_item import (
@@ -373,7 +373,7 @@ index 5494548ca762b840352d21caba206842b1c97ae0..bfd66d665465022230bbc0fcd774c467
  from openai.types.shared import Metadata, Reasoning
  from openai_harmony import Message as OpenAIHarmonyMessage
  from pydantic import (
-@@ -665,28 +667,69 @@ class ResponsesRequest(OpenAIBaseModel):
+@@ -669,28 +671,69 @@ class ResponsesRequest(OpenAIBaseModel):
                      "Tool choice 'function' not found in 'tools' parameter.",
                      parameter="tool_choice",
                  )
@@ -463,7 +463,7 @@ index 5494548ca762b840352d21caba206842b1c97ae0..bfd66d665465022230bbc0fcd774c467
  
  class ResponsesResponse(OpenAIBaseModel):
 diff --git a/vllm/entrypoints/openai/responses/serving.py b/vllm/entrypoints/openai/responses/serving.py
-index 4fbff109f0a780de709e68b1b977907fdd4ba777..3d6d0a907d6f600f3537cedb22d72a95cc76968a 100644
+index 3c840e5b92a1806fedadc43786c29da290158ee6..43ce83e3910de0e3137acb1ed54e62a5d56118b7 100644
 --- a/vllm/entrypoints/openai/responses/serving.py
 +++ b/vllm/entrypoints/openai/responses/serving.py
 @@ -88,7 +88,6 @@ from vllm.entrypoints.openai.responses.utils import (
@@ -517,7 +517,7 @@ index 59b0df7d697d670cc06fa1981ae06a74f6b6323a..4b1b67e85dc8b50303e28394f3cdcf17
      """
      Extracts the tool types from the given tools.
 diff --git a/vllm/parser/abstract_parser.py b/vllm/parser/abstract_parser.py
-index ad0e5914682a5b4644c8b727f75257a9d58681cc..78cb078bf5a4c3d48143540b65c7bbbaf86ff889 100644
+index c011a54b2bd565e27ce88a3b509eae4013a86162..27a4f2773131719b7961222f50199221db967b72 100644
 --- a/vllm/parser/abstract_parser.py
 +++ b/vllm/parser/abstract_parser.py
 @@ -8,7 +8,7 @@ from collections.abc import Sequence

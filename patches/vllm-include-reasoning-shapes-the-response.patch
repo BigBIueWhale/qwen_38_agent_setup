@@ -37,10 +37,10 @@ index 1cd3e669424d13041a59eef67b1e27505ec30abf..3b8155e47e6d1819084a67d94c708082
  async def test_serving_chat_should_set_correct_max_tokens():
      mock_engine = MagicMock(spec=AsyncLLM)
 diff --git a/vllm/entrypoints/openai/chat_completion/serving.py b/vllm/entrypoints/openai/chat_completion/serving.py
-index 522f19010324dd9d665a1d1219cf1527c3f57145..f2df8c6f72eb8534cd03dd61aa5cc4e947789b93 100644
+index 6b8cf6c39f2d87ac6a9f9a7056743530d159dcf7..c398169ccf9a32f96fd49959f982bf7af6f4dd6c 100644
 --- a/vllm/entrypoints/openai/chat_completion/serving.py
 +++ b/vllm/entrypoints/openai/chat_completion/serving.py
-@@ -355,9 +355,9 @@ class OpenAIServingChat(GenerateBaseServing):
+@@ -328,9 +328,9 @@ class OpenAIServingChat(GenerateBaseServing):
              )
              session_id = self._get_session_id(request, raw_request)
  

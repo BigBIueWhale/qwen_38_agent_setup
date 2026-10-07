@@ -44105,25 +44105,37 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'to JIT compile triton kernels.\n'})},
  {'name': 'exact-reasoning-usage',
   'review_patch': 'patches/vllm-exact-reasoning-usage.patch',
-  'review_sha256': '2179e27460e4239367ac7e2dd3828b9b3db463e79d87ad81433d00fbc6b12395',
+  'review_sha256': '88453c8565e7dcffd975af1c92eb3d6a4ce0084913b23bb3b2998967c2abb449',
   'files': ({'path': 'tests/parser/engine/test_reasoning_token_count.py',
              'before_sha256': None,
              'after_sha256': '6256e27e4b7a3f9507f425c16a1aae381b5ac81d60abe3b71bb7964f9f1f84b2'},
             {'path': 'vllm/entrypoints/openai/chat_completion/serving.py',
              'before_sha256': 'da0922ec020e0d4cf0111af1bf00b534348ce13e6e19ac7ce50b3d6cbf58653a',
-             'after_sha256': '57e7c8f804efd00f104c2780556194fb5567f5ac90e1915c7bf4a57491d126ed'},
+             'after_sha256': '7e2cfea5a769d396ee7ed0879f91b0325aec21e0423f7b1c310c1291ae3ec3b8'},
             {'path': 'vllm/entrypoints/openai/engine/protocol.py',
              'before_sha256': 'cdb012ff659079a242aeafcd78405e081df46d4f3dc4b5d4477e8195e050c286',
              'after_sha256': '716a4fb99d7ecdd59b9085390591f9380f3b00524ce2d08011443787aaf5dc75'},
             {'path': 'vllm/parser/abstract_parser.py',
              'before_sha256': 'e567186750002ed7d0f5c5efeaffc9b9cfbec18060bdc080420b24cade713e13',
-             'after_sha256': '87534a9739902c0e118819ac13c6593107bf2a5ae942af3269471557dd610577'},
+             'after_sha256': '7741f85e231cacef264a56f2c794d3a170f37abbd7de7d23f0516883de6487fe'},
             {'path': 'vllm/parser/engine/adapters.py',
              'before_sha256': 'dc1c1317dbfb298e54b8d94ca0e66d2b0cb1e481c35cdcc60a815284bd8a6ef7',
              'after_sha256': '0d68474d291a7de76f795f6e2d64b15a15077860d1b9ba5711ffe0bfd0c3ca65'},
             {'path': 'vllm/parser/engine/parser_engine.py',
              'before_sha256': '9ffce8a3aac1d885cbbd4de269201ef32bdd6089b5f92d61f94eebf1130a5faf',
-             'after_sha256': '006e92011b9ff73f5a99a578b9a836ce4ccc853f84aefa179c066fa4e386a4fd'}),
+             'after_sha256': '006e92011b9ff73f5a99a578b9a836ce4ccc853f84aefa179c066fa4e386a4fd'},
+            {'path': 'tests/entrypoints/openai/responses/test_reasoning_usage_context.py',
+             'before_sha256': None,
+             'after_sha256': '46074423f3316b6380ecb50f17c6d26aa2fe49c5fa211cb08179ee5fb4347666'},
+            {'path': 'vllm/entrypoints/openai/responses/context.py',
+             'before_sha256': '45aabb486f12047609dac95a8f05bd48ce653e9c139cb1195f44c2df3b114423',
+             'after_sha256': 'c06ffd3ae1b634e8b42f043d0f7978fd86a54194dda428612aed0ba6429f1f46'},
+            {'path': 'vllm/entrypoints/openai/responses/protocol.py',
+             'before_sha256': '6bf271ff977683003937e402680e4e5dfa375215505835a4ed58d0fa3a65cb59',
+             'after_sha256': 'bbadaab457115890fd9d808f2b28a8f64c2be362f9058a848ca5277dcd463769'},
+            {'path': 'vllm/entrypoints/openai/responses/serving.py',
+             'before_sha256': 'ee5f461f39c7a03fb4147d6f045c127b311785def7689e607002676de50f2f83',
+             'after_sha256': '8b38cb52f9cf61085377c0a93f1393e93f09f00475057a1368b00703c10c2cd9'}),
   'edits': ({'name': 'tests/parser/engine/test_reasoning_token_count.py:landmark-1',
              'path': 'tests/parser/engine/test_reasoning_token_count.py',
              'before': '',
@@ -44795,51 +44807,46 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    FunctionCall,\n'},
             {'name': 'vllm/entrypoints/openai/chat_completion/serving.py:landmark-2',
              'path': 'vllm/entrypoints/openai/chat_completion/serving.py',
-             'before': '        created_cache_tokens=num_cache_creation_tokens,\n'
-                       '        multimodal_tokens=mm_token_counts or None,\n'
-                       '    )\n'
-                       '\n'
-                       '\n'
-                       'class OpenAIServingChat(GenerateBaseServing):\n',
-             'after': '        created_cache_tokens=num_cache_creation_tokens,\n'
-                      '        multimodal_tokens=mm_token_counts or None,\n'
-                      '    )\n'
-                      '\n'
-                      '\n'
-                      'def _reasoning_token_count(\n'
-                      '    parser: Parser | None, generated_token_count: int\n'
-                      ') -> int | None:\n'
-                      '    """Reasoning ids of one choice, from the parser that split '
-                      'it.\n'
-                      '\n'
-                      "    The count is the parser's own, taken on the token-id stream "
-                      'it split\n'
-                      '    reasoning from content on, never a re-tokenisation of the '
-                      'reasoning\n'
-                      '    text.  ``None`` when there is no parser or the parser has '
-                      'no exact id\n'
-                      '    boundary: usage then omits the count rather than '
-                      'fabricating one.  A\n'
-                      '    parser that was handed fewer or more ids than the choice '
-                      'generated has\n'
-                      '    split a different stream, and the request is refused rather '
-                      'than\n'
-                      '    reported with a count that does not describe it.\n'
-                      '    """\n'
-                      '    if parser is None:\n'
-                      '        return None\n'
-                      '    count = parser.reasoning_token_count\n'
-                      '    if count is None:\n'
-                      '        return None\n'
-                      '    if parser.generated_token_count != generated_token_count:\n'
-                      '        raise ValueError(\n'
-                      '            "reasoning token accounting refused: the parser was '
-                      'handed "\n'
-                      '            f"{parser.generated_token_count} generated ids but '
-                      'the choice "\n'
-                      '            f"generated {generated_token_count}"\n'
-                      '        )\n'
-                      '    return count\n'
+             'before': 'from vllm.logprobs import Logprob\n'
+                       'from vllm.outputs import RequestOutput\n'
+                       'from vllm.parser import ParserManager\n'
+                       'from vllm.parser.abstract_parser import Parser\n'
+                       'from vllm.renderers.online_renderer import OnlineRenderer\n'
+                       'from vllm.sampling_params import BeamSearchParams, '
+                       'SamplingParams\n'
+                       'from vllm.tokenizers import TokenizerLike\n',
+             'after': 'from vllm.logprobs import Logprob\n'
+                      'from vllm.outputs import RequestOutput\n'
+                      'from vllm.parser import ParserManager\n'
+                      'from vllm.parser.abstract_parser import Parser, '
+                      'reasoning_token_usage\n'
+                      'from vllm.renderers.online_renderer import OnlineRenderer\n'
+                      'from vllm.sampling_params import BeamSearchParams, '
+                      'SamplingParams\n'
+                      'from vllm.tokenizers import TokenizerLike\n',
+             'review_before': 'from vllm.logprobs import Logprob\n'
+                              'from vllm.outputs import RequestOutput\n'
+                              'from vllm.parser import ParserManager\n'
+                              'from vllm.parser.abstract_parser import Parser\n'
+                              'from vllm.renderers.online_renderer import '
+                              'OnlineRenderer\n'
+                              'from vllm.sampling_params import BeamSearchParams, '
+                              'SamplingParams\n'
+                              'from vllm.tokenizers import TokenizerLike\n',
+             'review_after': 'from vllm.logprobs import Logprob\n'
+                             'from vllm.outputs import RequestOutput\n'
+                             'from vllm.parser import ParserManager\n'
+                             'from vllm.parser.abstract_parser import Parser, '
+                             'reasoning_token_usage\n'
+                             'from vllm.renderers.online_renderer import '
+                             'OnlineRenderer\n'
+                             'from vllm.sampling_params import BeamSearchParams, '
+                             'SamplingParams\n'
+                             'from vllm.tokenizers import TokenizerLike\n'},
+            {'name': 'vllm/entrypoints/openai/chat_completion/serving.py:landmark-3',
+             'path': 'vllm/entrypoints/openai/chat_completion/serving.py',
+             'before': '    )\n\n\nclass OpenAIServingChat(GenerateBaseServing):\n',
+             'after': '    )\n'
                       '\n'
                       '\n'
                       'def _make_completion_tokens_details(\n'
@@ -44858,53 +44865,11 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '\n'
                       '\n'
                       'class OpenAIServingChat(GenerateBaseServing):\n',
-             'review_before': '        '
-                              'created_cache_tokens=num_cache_creation_tokens,\n'
-                              '        multimodal_tokens=mm_token_counts or None,\n'
-                              '    )\n'
+             'review_before': '    )\n'
                               '\n'
                               '\n'
                               'class OpenAIServingChat(GenerateBaseServing):\n',
-             'review_after': '        created_cache_tokens=num_cache_creation_tokens,\n'
-                             '        multimodal_tokens=mm_token_counts or None,\n'
-                             '    )\n'
-                             '\n'
-                             '\n'
-                             'def _reasoning_token_count(\n'
-                             '    parser: Parser | None, generated_token_count: int\n'
-                             ') -> int | None:\n'
-                             '    """Reasoning ids of one choice, from the parser that '
-                             'split it.\n'
-                             '\n'
-                             "    The count is the parser's own, taken on the token-id "
-                             'stream it split\n'
-                             '    reasoning from content on, never a re-tokenisation '
-                             'of the reasoning\n'
-                             '    text.  ``None`` when there is no parser or the '
-                             'parser has no exact id\n'
-                             '    boundary: usage then omits the count rather than '
-                             'fabricating one.  A\n'
-                             '    parser that was handed fewer or more ids than the '
-                             'choice generated has\n'
-                             '    split a different stream, and the request is refused '
-                             'rather than\n'
-                             '    reported with a count that does not describe it.\n'
-                             '    """\n'
-                             '    if parser is None:\n'
-                             '        return None\n'
-                             '    count = parser.reasoning_token_count\n'
-                             '    if count is None:\n'
-                             '        return None\n'
-                             '    if parser.generated_token_count != '
-                             'generated_token_count:\n'
-                             '        raise ValueError(\n'
-                             '            "reasoning token accounting refused: the '
-                             'parser was handed "\n'
-                             '            f"{parser.generated_token_count} generated '
-                             'ids but the choice "\n'
-                             '            f"generated {generated_token_count}"\n'
-                             '        )\n'
-                             '    return count\n'
+             'review_after': '    )\n'
                              '\n'
                              '\n'
                              'def _make_completion_tokens_details(\n'
@@ -44925,7 +44890,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '\n'
                              '\n'
                              'class OpenAIServingChat(GenerateBaseServing):\n'},
-            {'name': 'vllm/entrypoints/openai/chat_completion/serving.py:landmark-3',
+            {'name': 'vllm/entrypoints/openai/chat_completion/serving.py:landmark-4',
              'path': 'vllm/entrypoints/openai/chat_completion/serving.py',
              'before': '                                '
                        'prompt_tokens=num_prompt_tokens,\n'
@@ -44945,7 +44910,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '                                    '
                       '_make_completion_tokens_details(\n'
                       '                                        '
-                      '[_reasoning_token_count(parsers[i], 0)]\n'
+                      '[reasoning_token_usage(parsers[i], 0)]\n'
                       '                                    )\n'
                       '                                ),\n'
                       '                            )\n'
@@ -44971,14 +44936,14 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '                                    '
                              '_make_completion_tokens_details(\n'
                              '                                        '
-                             '[_reasoning_token_count(parsers[i], 0)]\n'
+                             '[reasoning_token_usage(parsers[i], 0)]\n'
                              '                                    )\n'
                              '                                ),\n'
                              '                            )\n'
                              '\n'
                              '                        data = '
                              'chunk.model_dump_json(exclude_unset=True)\n'},
-            {'name': 'vllm/entrypoints/openai/chat_completion/serving.py:landmark-4',
+            {'name': 'vllm/entrypoints/openai/chat_completion/serving.py:landmark-5',
              'path': 'vllm/entrypoints/openai/chat_completion/serving.py',
              'before': '                                        '
                        'prompt_tokens=num_prompt_tokens,\n'
@@ -44999,7 +44964,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '                                            '
                       '_make_completion_tokens_details(\n'
                       '                                                '
-                      '[_reasoning_token_count(parsers[i], 0)]\n'
+                      '[reasoning_token_usage(parsers[i], 0)]\n'
                       '                                            )\n'
                       '                                        ),\n'
                       '                                    )\n'
@@ -45027,14 +44992,14 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '                                            '
                              '_make_completion_tokens_details(\n'
                              '                                                '
-                             '[_reasoning_token_count(parsers[i], 0)]\n'
+                             '[reasoning_token_usage(parsers[i], 0)]\n'
                              '                                            )\n'
                              '                                        ),\n'
                              '                                    )\n'
                              '\n'
                              '                                data = '
                              'chunk.model_dump_json(exclude_unset=True)\n'},
-            {'name': 'vllm/entrypoints/openai/chat_completion/serving.py:landmark-5',
+            {'name': 'vllm/entrypoints/openai/chat_completion/serving.py:landmark-6',
              'path': 'vllm/entrypoints/openai/chat_completion/serving.py',
              'before': '                            prompt_tokens=num_prompt_tokens,\n'
                        '                            '
@@ -45070,7 +45035,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '                                '
                       '_make_completion_tokens_details(\n'
                       '                                    '
-                      '[_reasoning_token_count(parser, completion_tokens)]\n'
+                      '[reasoning_token_usage(parser, completion_tokens)]\n'
                       '                                )\n'
                       '                            ),\n'
                       '                        )\n'
@@ -45091,7 +45056,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '            completion_tokens_details = '
                       '_make_completion_tokens_details(\n'
                       '                [\n'
-                      '                    _reasoning_token_count(parser, generated)\n'
+                      '                    reasoning_token_usage(parser, generated)\n'
                       '                    for parser, generated in zip(\n'
                       '                        parsers, previous_num_tokens, '
                       'strict=True\n'
@@ -45150,7 +45115,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '                                '
                              '_make_completion_tokens_details(\n'
                              '                                    '
-                             '[_reasoning_token_count(parser, completion_tokens)]\n'
+                             '[reasoning_token_usage(parser, completion_tokens)]\n'
                              '                                )\n'
                              '                            ),\n'
                              '                        )\n'
@@ -45171,7 +45136,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '            completion_tokens_details = '
                              '_make_completion_tokens_details(\n'
                              '                [\n'
-                             '                    _reasoning_token_count(parser, '
+                             '                    reasoning_token_usage(parser, '
                              'generated)\n'
                              '                    for parser, generated in zip(\n'
                              '                        parsers, previous_num_tokens, '
@@ -45195,7 +45160,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '_make_prompt_tokens_details(\n'
                              '                    '
                              'self.enable_prompt_tokens_details,\n'},
-            {'name': 'vllm/entrypoints/openai/chat_completion/serving.py:landmark-6',
+            {'name': 'vllm/entrypoints/openai/chat_completion/serving.py:landmark-7',
              'path': 'vllm/entrypoints/openai/chat_completion/serving.py',
              'before': '                prompt_tokens=num_prompt_tokens,\n'
                        '                completion_tokens=num_completion_tokens,\n'
@@ -45235,7 +45200,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '\n'
                              '            # Log complete streaming response if output '
                              'logging is enabled\n'},
-            {'name': 'vllm/entrypoints/openai/chat_completion/serving.py:landmark-7',
+            {'name': 'vllm/entrypoints/openai/chat_completion/serving.py:landmark-8',
              'path': 'vllm/entrypoints/openai/chat_completion/serving.py',
              'before': '            )\n'
                        '\n'
@@ -45273,7 +45238,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '\n'
                              '        role = self.get_chat_request_role(request)\n'
                              '        tool_parser_cls = (\n'},
-            {'name': 'vllm/entrypoints/openai/chat_completion/serving.py:landmark-8',
+            {'name': 'vllm/entrypoints/openai/chat_completion/serving.py:landmark-9',
              'path': 'vllm/entrypoints/openai/chat_completion/serving.py',
              'before': '                    enable_auto_tools=self.enable_auto_tools,\n'
                        '                    model_output_token_ids=token_ids,\n'
@@ -45286,7 +45251,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '                    model_output_token_ids=token_ids,\n'
                       '                )\n'
                       '                reasoning_token_counts.append(\n'
-                      '                    _reasoning_token_count(parser, '
+                      '                    reasoning_token_usage(parser, '
                       'len(token_ids))\n'
                       '                )\n'
                       '                suppress_metadata = not '
@@ -45306,14 +45271,14 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '                    model_output_token_ids=token_ids,\n'
                              '                )\n'
                              '                reasoning_token_counts.append(\n'
-                             '                    _reasoning_token_count(parser, '
+                             '                    reasoning_token_usage(parser, '
                              'len(token_ids))\n'
                              '                )\n'
                              '                suppress_metadata = not '
                              'request.include_reasoning and parser is not None\n'
                              '                if not request.include_reasoning:\n'
                              '                    reasoning = None\n'},
-            {'name': 'vllm/entrypoints/openai/chat_completion/serving.py:landmark-9',
+            {'name': 'vllm/entrypoints/openai/chat_completion/serving.py:landmark-10',
              'path': 'vllm/entrypoints/openai/chat_completion/serving.py',
              'before': '                content = output.text\n'
                        '                tool_calls = []\n'
@@ -45341,7 +45306,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '\n'
                              '            auto_tools_called = False\n'
                              '            is_named_tool_choice = (\n'},
-            {'name': 'vllm/entrypoints/openai/chat_completion/serving.py:landmark-10',
+            {'name': 'vllm/entrypoints/openai/chat_completion/serving.py:landmark-11',
              'path': 'vllm/entrypoints/openai/chat_completion/serving.py',
              'before': '            prompt_tokens=num_prompt_tokens,\n'
                        '            completion_tokens=num_generated_tokens,\n'
@@ -45611,7 +45576,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                        '\n'
                        '    def _get_function_name(\n'
                        '        self, request: ChatCompletionRequest | '
-                       'ResponsesRequest\n',
+                       'ResponsesRequest\n'
+                       '    ) -> str:\n',
              'after': '        self,\n'
                       '        model_output: str,\n'
                       '        request: ChatCompletionRequest | ResponsesRequest,\n'
@@ -45654,7 +45620,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '\n'
                       '    def _get_function_name(\n'
                       '        self, request: ChatCompletionRequest | '
-                      'ResponsesRequest\n',
+                      'ResponsesRequest\n'
+                      '    ) -> str:\n',
              'review_before': '        self,\n'
                               '        model_output: str,\n'
                               '        request: ChatCompletionRequest | '
@@ -45668,7 +45635,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                               '\n'
                               '    def _get_function_name(\n'
                               '        self, request: ChatCompletionRequest | '
-                              'ResponsesRequest\n',
+                              'ResponsesRequest\n'
+                              '    ) -> str:\n',
              'review_after': '        self,\n'
                              '        model_output: str,\n'
                              '        request: ChatCompletionRequest | '
@@ -45715,7 +45683,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '\n'
                              '    def _get_function_name(\n'
                              '        self, request: ChatCompletionRequest | '
-                             'ResponsesRequest\n'},
+                             'ResponsesRequest\n'
+                             '    ) -> str:\n'},
             {'name': 'vllm/parser/abstract_parser.py:landmark-4',
              'path': 'vllm/parser/abstract_parser.py',
              'before': '        model_output_token_ids: Sequence[int] = (),\n'
@@ -45797,6 +45766,105 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '        if not state.prompt_reasoning_checked and '
                              'prompt_token_ids is not None:\n'
                              '            state.prompt_reasoning_checked = True\n'},
+            {'name': 'vllm/parser/abstract_parser.py:landmark-6',
+             'path': 'vllm/parser/abstract_parser.py',
+             'before': '                        delta_message.tool_calls or []\n'
+                       '                    ) + flush_delta.tool_calls\n'
+                       '        return delta_message\n',
+             'after': '                        delta_message.tool_calls or []\n'
+                      '                    ) + flush_delta.tool_calls\n'
+                      '        return delta_message\n'
+                      '\n'
+                      '\n'
+                      'def reasoning_token_usage(\n'
+                      '    parser: Parser | None, generated_token_count: int\n'
+                      ') -> int | None:\n'
+                      '    """Reasoning ids of one generation, from the parser that '
+                      'split it.\n'
+                      '\n'
+                      '    The one count every usage report reads -- each chat choice, '
+                      'and each\n'
+                      '    Responses turn -- taken after the parse that produced the '
+                      'output it\n'
+                      '    describes.\n'
+                      '\n'
+                      "    The count is the parser's own, taken on the token-id stream "
+                      'it split\n'
+                      '    reasoning from content on, never a re-tokenisation of the '
+                      'reasoning\n'
+                      '    text.  ``None`` when there is no parser or the parser has '
+                      'no exact id\n'
+                      '    boundary: usage then omits the count rather than '
+                      'fabricating one.  A\n'
+                      '    parser that was handed fewer or more ids than the '
+                      'generation produced\n'
+                      '    has split a different stream, and the request is refused '
+                      'rather than\n'
+                      '    reported with a count that does not describe it.\n'
+                      '    """\n'
+                      '    if parser is None:\n'
+                      '        return None\n'
+                      '    count = parser.reasoning_token_count\n'
+                      '    if count is None:\n'
+                      '        return None\n'
+                      '    if parser.generated_token_count != generated_token_count:\n'
+                      '        raise ValueError(\n'
+                      '            "reasoning token accounting refused: the parser was '
+                      'handed "\n'
+                      '            f"{parser.generated_token_count} generated ids but '
+                      'the generation "\n'
+                      '            f"produced {generated_token_count}"\n'
+                      '        )\n'
+                      '    return count\n',
+             'review_before': '                        delta_message.tool_calls or []\n'
+                              '                    ) + flush_delta.tool_calls\n'
+                              '        return delta_message\n',
+             'review_after': '                        delta_message.tool_calls or []\n'
+                             '                    ) + flush_delta.tool_calls\n'
+                             '        return delta_message\n'
+                             '\n'
+                             '\n'
+                             'def reasoning_token_usage(\n'
+                             '    parser: Parser | None, generated_token_count: int\n'
+                             ') -> int | None:\n'
+                             '    """Reasoning ids of one generation, from the parser '
+                             'that split it.\n'
+                             '\n'
+                             '    The one count every usage report reads -- each chat '
+                             'choice, and each\n'
+                             '    Responses turn -- taken after the parse that '
+                             'produced the output it\n'
+                             '    describes.\n'
+                             '\n'
+                             "    The count is the parser's own, taken on the token-id "
+                             'stream it split\n'
+                             '    reasoning from content on, never a re-tokenisation '
+                             'of the reasoning\n'
+                             '    text.  ``None`` when there is no parser or the '
+                             'parser has no exact id\n'
+                             '    boundary: usage then omits the count rather than '
+                             'fabricating one.  A\n'
+                             '    parser that was handed fewer or more ids than the '
+                             'generation produced\n'
+                             '    has split a different stream, and the request is '
+                             'refused rather than\n'
+                             '    reported with a count that does not describe it.\n'
+                             '    """\n'
+                             '    if parser is None:\n'
+                             '        return None\n'
+                             '    count = parser.reasoning_token_count\n'
+                             '    if count is None:\n'
+                             '        return None\n'
+                             '    if parser.generated_token_count != '
+                             'generated_token_count:\n'
+                             '        raise ValueError(\n'
+                             '            "reasoning token accounting refused: the '
+                             'parser was handed "\n'
+                             '            f"{parser.generated_token_count} generated '
+                             'ids but the generation "\n'
+                             '            f"produced {generated_token_count}"\n'
+                             '        )\n'
+                             '    return count\n'},
             {'name': 'vllm/parser/engine/adapters.py:landmark-1',
              'path': 'vllm/parser/engine/adapters.py',
              'before': '        self,\n'
@@ -46678,7 +46746,637 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '        reasoning, content, tool_call_info = '
                              'self._single_pass_parse(\n'
                              '            model_output,\n'
-                             '            model_output_token_ids,\n'})},
+                             '            model_output_token_ids,\n'},
+            {'name': 'tests/entrypoints/openai/responses/test_reasoning_usage_context.py:landmark-1',
+             'path': 'tests/entrypoints/openai/responses/test_reasoning_usage_context.py',
+             'before': '',
+             'after': '# SPDX-License-Identifier: Apache-2.0\n'
+                      '# SPDX-FileCopyrightText: Copyright contributors to the vLLM '
+                      'project\n'
+                      '"""Responses reports the reasoning count the parser that split '
+                      'the output made.\n'
+                      '\n'
+                      'It is the count chat reports, read through the same function: '
+                      "the parser's own\n"
+                      'on the ids it split, absent when the parser has no exact '
+                      'boundary, and never a\n'
+                      'failed response for that reason.\n'
+                      '"""\n'
+                      '\n'
+                      'from unittest.mock import MagicMock\n'
+                      '\n'
+                      'import pytest\n'
+                      '\n'
+                      'from vllm.entrypoints.openai.responses.context import '
+                      'SimpleContext\n'
+                      'from vllm.outputs import CompletionOutput, RequestOutput\n'
+                      '\n'
+                      '\n'
+                      'def _generation(token_ids: list[int]) -> RequestOutput:\n'
+                      '    return RequestOutput(\n'
+                      '        request_id="req", prompt="q", prompt_token_ids=[1, 2], '
+                      'prompt_logprobs=None,\n'
+                      '        outputs=[CompletionOutput(\n'
+                      '            index=0, text="text", token_ids=token_ids, '
+                      'cumulative_logprob=None,\n'
+                      '            logprobs=None, finish_reason="stop", '
+                      'stop_reason=None,\n'
+                      '        )], finished=True,\n'
+                      '    )\n'
+                      '\n'
+                      '\n'
+                      'def _parser(count: int | None, generated: int) -> MagicMock:\n'
+                      '    parser = MagicMock()\n'
+                      '    parser.reasoning_token_count = count\n'
+                      '    parser.generated_token_count = generated\n'
+                      '    return parser\n'
+                      '\n'
+                      '\n'
+                      '@pytest.mark.parametrize("count", [None, 0, 3])\n'
+                      'def test_the_context_reads_the_parsers_count(count):\n'
+                      '    context = SimpleContext(response_parser=_parser(count, 4))\n'
+                      '    context.append_output(_generation([1, 2, 3, 4]))\n'
+                      '    assert context.num_reasoning_tokens == count\n'
+                      '\n'
+                      '\n'
+                      'def test_a_parser_that_split_other_ids_is_refused():\n'
+                      '    context = SimpleContext(response_parser=_parser(3, 2))\n'
+                      '    context.append_output(_generation([1, 2, 3, 4]))\n'
+                      '    with pytest.raises(ValueError, match="the parser was handed '
+                      '2 generated ids"):\n'
+                      '        context.num_reasoning_tokens\n',
+             'review_before': '',
+             'review_after': '# SPDX-License-Identifier: Apache-2.0\n'
+                             '# SPDX-FileCopyrightText: Copyright contributors to the '
+                             'vLLM project\n'
+                             '"""Responses reports the reasoning count the parser that '
+                             'split the output made.\n'
+                             '\n'
+                             'It is the count chat reports, read through the same '
+                             "function: the parser's own\n"
+                             'on the ids it split, absent when the parser has no exact '
+                             'boundary, and never a\n'
+                             'failed response for that reason.\n'
+                             '"""\n'
+                             '\n'
+                             'from unittest.mock import MagicMock\n'
+                             '\n'
+                             'import pytest\n'
+                             '\n'
+                             'from vllm.entrypoints.openai.responses.context import '
+                             'SimpleContext\n'
+                             'from vllm.outputs import CompletionOutput, '
+                             'RequestOutput\n'
+                             '\n'
+                             '\n'
+                             'def _generation(token_ids: list[int]) -> RequestOutput:\n'
+                             '    return RequestOutput(\n'
+                             '        request_id="req", prompt="q", '
+                             'prompt_token_ids=[1, 2], prompt_logprobs=None,\n'
+                             '        outputs=[CompletionOutput(\n'
+                             '            index=0, text="text", token_ids=token_ids, '
+                             'cumulative_logprob=None,\n'
+                             '            logprobs=None, finish_reason="stop", '
+                             'stop_reason=None,\n'
+                             '        )], finished=True,\n'
+                             '    )\n'
+                             '\n'
+                             '\n'
+                             'def _parser(count: int | None, generated: int) -> '
+                             'MagicMock:\n'
+                             '    parser = MagicMock()\n'
+                             '    parser.reasoning_token_count = count\n'
+                             '    parser.generated_token_count = generated\n'
+                             '    return parser\n'
+                             '\n'
+                             '\n'
+                             '@pytest.mark.parametrize("count", [None, 0, 3])\n'
+                             'def test_the_context_reads_the_parsers_count(count):\n'
+                             '    context = '
+                             'SimpleContext(response_parser=_parser(count, 4))\n'
+                             '    context.append_output(_generation([1, 2, 3, 4]))\n'
+                             '    assert context.num_reasoning_tokens == count\n'
+                             '\n'
+                             '\n'
+                             'def test_a_parser_that_split_other_ids_is_refused():\n'
+                             '    context = SimpleContext(response_parser=_parser(3, '
+                             '2))\n'
+                             '    context.append_output(_generation([1, 2, 3, 4]))\n'
+                             '    with pytest.raises(ValueError, match="the parser was '
+                             'handed 2 generated ids"):\n'
+                             '        context.num_reasoning_tokens\n'},
+            {'name': 'vllm/entrypoints/openai/responses/context.py:landmark-1',
+             'path': 'vllm/entrypoints/openai/responses/context.py',
+             'before': ')\n'
+                       'from vllm.entrypoints.serve.utils.constants import MCP_PREFIX\n'
+                       'from vllm.outputs import RequestOutput\n'
+                       'from vllm.parser.abstract_parser import Parser\n'
+                       'from vllm.tokenizers import TokenizerLike\n'
+                       'from vllm.utils import random_uuid\n'
+                       '\n',
+             'after': ')\n'
+                      'from vllm.entrypoints.serve.utils.constants import MCP_PREFIX\n'
+                      'from vllm.outputs import RequestOutput\n'
+                      'from vllm.parser.abstract_parser import Parser, '
+                      'reasoning_token_usage\n'
+                      'from vllm.tokenizers import TokenizerLike\n'
+                      'from vllm.utils import random_uuid\n'
+                      '\n',
+             'review_before': ')\n'
+                              'from vllm.entrypoints.serve.utils.constants import '
+                              'MCP_PREFIX\n'
+                              'from vllm.outputs import RequestOutput\n'
+                              'from vllm.parser.abstract_parser import Parser\n'
+                              'from vllm.tokenizers import TokenizerLike\n'
+                              'from vllm.utils import random_uuid\n'
+                              '\n',
+             'review_after': ')\n'
+                             'from vllm.entrypoints.serve.utils.constants import '
+                             'MCP_PREFIX\n'
+                             'from vllm.outputs import RequestOutput\n'
+                             'from vllm.parser.abstract_parser import Parser, '
+                             'reasoning_token_usage\n'
+                             'from vllm.tokenizers import TokenizerLike\n'
+                             'from vllm.utils import random_uuid\n'
+                             '\n'},
+            {'name': 'vllm/entrypoints/openai/responses/context.py:landmark-2',
+             'path': 'vllm/entrypoints/openai/responses/context.py',
+             'before': '        self.num_prompt_tokens = 0\n'
+                       '        self.num_output_tokens = 0\n'
+                       '        self.num_cached_tokens = 0\n'
+                       '        # todo num_reasoning_tokens is not implemented yet.\n'
+                       '        self.num_reasoning_tokens = 0\n'
+                       '        # not implemented yet for SimpleContext\n'
+                       '        self.all_turn_metrics: list[TurnMetrics] = []\n'
+                       '\n',
+             'after': '        self.num_prompt_tokens = 0\n'
+                      '        self.num_output_tokens = 0\n'
+                      '        self.num_cached_tokens = 0\n'
+                      '        # not implemented yet for SimpleContext\n'
+                      '        self.all_turn_metrics: list[TurnMetrics] = []\n'
+                      '\n',
+             'review_before': '        self.num_prompt_tokens = 0\n'
+                              '        self.num_output_tokens = 0\n'
+                              '        self.num_cached_tokens = 0\n'
+                              '        # todo num_reasoning_tokens is not implemented '
+                              'yet.\n'
+                              '        self.num_reasoning_tokens = 0\n'
+                              '        # not implemented yet for SimpleContext\n'
+                              '        self.all_turn_metrics: list[TurnMetrics] = []\n'
+                              '\n',
+             'review_after': '        self.num_prompt_tokens = 0\n'
+                             '        self.num_output_tokens = 0\n'
+                             '        self.num_cached_tokens = 0\n'
+                             '        # not implemented yet for SimpleContext\n'
+                             '        self.all_turn_metrics: list[TurnMetrics] = []\n'
+                             '\n'},
+            {'name': 'vllm/entrypoints/openai/responses/context.py:landmark-3',
+             'path': 'vllm/entrypoints/openai/responses/context.py',
+             'before': '        self.kv_transfer_params: dict[str, Any] | None = None\n'
+                       '        self.ec_transfer_params: dict[str, Any] | None = None\n'
+                       '\n'
+                       '    def append_output(self, output) -> None:\n'
+                       '        self.last_output = output\n'
+                       '        if not isinstance(output, RequestOutput):\n',
+             'after': '        self.kv_transfer_params: dict[str, Any] | None = None\n'
+                      '        self.ec_transfer_params: dict[str, Any] | None = None\n'
+                      '\n'
+                      '    @property\n'
+                      '    def num_reasoning_tokens(self) -> int | None:\n'
+                      '        """The reasoning ids of this one generation, read from '
+                      'the parser that\n'
+                      '        split it -- the batch parse or every streamed delta '
+                      'alike."""\n'
+                      '        return reasoning_token_usage(self.response_parser, '
+                      'self.num_output_tokens)\n'
+                      '\n'
+                      '    def append_output(self, output) -> None:\n'
+                      '        self.last_output = output\n'
+                      '        if not isinstance(output, RequestOutput):\n',
+             'review_before': '        self.kv_transfer_params: dict[str, Any] | None '
+                              '= None\n'
+                              '        self.ec_transfer_params: dict[str, Any] | None '
+                              '= None\n'
+                              '\n'
+                              '    def append_output(self, output) -> None:\n'
+                              '        self.last_output = output\n'
+                              '        if not isinstance(output, RequestOutput):\n',
+             'review_after': '        self.kv_transfer_params: dict[str, Any] | None = '
+                             'None\n'
+                             '        self.ec_transfer_params: dict[str, Any] | None = '
+                             'None\n'
+                             '\n'
+                             '    @property\n'
+                             '    def num_reasoning_tokens(self) -> int | None:\n'
+                             '        """The reasoning ids of this one generation, '
+                             'read from the parser that\n'
+                             '        split it -- the batch parse or every streamed '
+                             'delta alike."""\n'
+                             '        return '
+                             'reasoning_token_usage(self.response_parser, '
+                             'self.num_output_tokens)\n'
+                             '\n'
+                             '    def append_output(self, output) -> None:\n'
+                             '        self.last_output = output\n'
+                             '        if not isinstance(output, RequestOutput):\n'},
+            {'name': 'vllm/entrypoints/openai/responses/context.py:landmark-4',
+             'path': 'vllm/entrypoints/openai/responses/context.py',
+             'before': '        self.num_prompt_tokens = 0\n'
+                       '        self.num_output_tokens = 0\n'
+                       '        self.num_cached_tokens = 0\n'
+                       '        self.num_reasoning_tokens = 0\n'
+                       '        # not implemented yet for ParsableContext\n'
+                       '        self.all_turn_metrics: list[TurnMetrics] = []\n'
+                       '\n',
+             'after': '        self.num_prompt_tokens = 0\n'
+                      '        self.num_output_tokens = 0\n'
+                      '        self.num_cached_tokens = 0\n'
+                      "        # Each turn's reasoning ids, read from the parser right "
+                      'after the parse\n'
+                      "        # that split that turn, before the next turn's parse "
+                      'resets it.\n'
+                      '        self._turn_reasoning_tokens: list[int | None] = []\n'
+                      '        # not implemented yet for ParsableContext\n'
+                      '        self.all_turn_metrics: list[TurnMetrics] = []\n'
+                      '\n',
+             'review_before': '        self.num_prompt_tokens = 0\n'
+                              '        self.num_output_tokens = 0\n'
+                              '        self.num_cached_tokens = 0\n'
+                              '        self.num_reasoning_tokens = 0\n'
+                              '        # not implemented yet for ParsableContext\n'
+                              '        self.all_turn_metrics: list[TurnMetrics] = []\n'
+                              '\n',
+             'review_after': '        self.num_prompt_tokens = 0\n'
+                             '        self.num_output_tokens = 0\n'
+                             '        self.num_cached_tokens = 0\n'
+                             "        # Each turn's reasoning ids, read from the "
+                             'parser right after the parse\n'
+                             "        # that split that turn, before the next turn's "
+                             'parse resets it.\n'
+                             '        self._turn_reasoning_tokens: list[int | None] = '
+                             '[]\n'
+                             '        # not implemented yet for ParsableContext\n'
+                             '        self.all_turn_metrics: list[TurnMetrics] = []\n'
+                             '\n'},
+            {'name': 'vllm/entrypoints/openai/responses/context.py:landmark-5',
+             'path': 'vllm/entrypoints/openai/responses/context.py',
+             'before': '\n'
+                       '        self.input_messages: list[ResponseRawMessageAndToken] '
+                       '= []\n'
+                       '        self.output_messages: list[ResponseRawMessageAndToken] '
+                       '= []\n'
+                       '        self._accumulated_token_ids: list[int] = []\n'
+                       '        self.kv_transfer_params: dict[str, Any] | None = None\n'
+                       '        self.ec_transfer_params: dict[str, Any] | None = None\n'
+                       '\n'
+                       '    def append_output(self, output: RequestOutput) -> None:\n'
+                       '        self.num_prompt_tokens = len(output.prompt_token_ids '
+                       'or [])\n'
+                       '        self.num_cached_tokens = output.num_cached_tokens or '
+                       '0\n',
+             'after': '\n'
+                      '        self.input_messages: list[ResponseRawMessageAndToken] = '
+                      '[]\n'
+                      '        self.output_messages: list[ResponseRawMessageAndToken] '
+                      '= []\n'
+                      '        self.kv_transfer_params: dict[str, Any] | None = None\n'
+                      '        self.ec_transfer_params: dict[str, Any] | None = None\n'
+                      '\n'
+                      '    @property\n'
+                      '    def num_reasoning_tokens(self) -> int | None:\n'
+                      '        """Summed over turns as ``num_output_tokens`` is; '
+                      'absent as soon as one\n'
+                      '        turn has no exact count."""\n'
+                      '        if None in self._turn_reasoning_tokens:\n'
+                      '            return None\n'
+                      '        return sum(self._turn_reasoning_tokens)  # type: '
+                      'ignore[arg-type]\n'
+                      '\n'
+                      '    def append_output(self, output: RequestOutput) -> None:\n'
+                      '        self.num_prompt_tokens = len(output.prompt_token_ids or '
+                      '[])\n'
+                      '        self.num_cached_tokens = output.num_cached_tokens or '
+                      '0\n',
+             'review_before': '\n'
+                              '        self.input_messages: '
+                              'list[ResponseRawMessageAndToken] = []\n'
+                              '        self.output_messages: '
+                              'list[ResponseRawMessageAndToken] = []\n'
+                              '        self._accumulated_token_ids: list[int] = []\n'
+                              '        self.kv_transfer_params: dict[str, Any] | None '
+                              '= None\n'
+                              '        self.ec_transfer_params: dict[str, Any] | None '
+                              '= None\n'
+                              '\n'
+                              '    def append_output(self, output: RequestOutput) -> '
+                              'None:\n'
+                              '        self.num_prompt_tokens = '
+                              'len(output.prompt_token_ids or [])\n'
+                              '        self.num_cached_tokens = '
+                              'output.num_cached_tokens or 0\n',
+             'review_after': '\n'
+                             '        self.input_messages: '
+                             'list[ResponseRawMessageAndToken] = []\n'
+                             '        self.output_messages: '
+                             'list[ResponseRawMessageAndToken] = []\n'
+                             '        self.kv_transfer_params: dict[str, Any] | None = '
+                             'None\n'
+                             '        self.ec_transfer_params: dict[str, Any] | None = '
+                             'None\n'
+                             '\n'
+                             '    @property\n'
+                             '    def num_reasoning_tokens(self) -> int | None:\n'
+                             '        """Summed over turns as ``num_output_tokens`` '
+                             'is; absent as soon as one\n'
+                             '        turn has no exact count."""\n'
+                             '        if None in self._turn_reasoning_tokens:\n'
+                             '            return None\n'
+                             '        return sum(self._turn_reasoning_tokens)  # type: '
+                             'ignore[arg-type]\n'
+                             '\n'
+                             '    def append_output(self, output: RequestOutput) -> '
+                             'None:\n'
+                             '        self.num_prompt_tokens = '
+                             'len(output.prompt_token_ids or [])\n'
+                             '        self.num_cached_tokens = '
+                             'output.num_cached_tokens or 0\n'},
+            {'name': 'vllm/entrypoints/openai/responses/context.py:landmark-6',
+             'path': 'vllm/entrypoints/openai/responses/context.py',
+             'before': '                enable_auto_tools=self.enable_auto_tools,\n'
+                       '                model_output_token_ids=completion.token_ids,\n'
+                       '            )\n'
+                       '            if not self.request.include_reasoning:\n'
+                       '                reasoning = None\n'
+                       '            self.response_messages.extend(\n',
+             'after': '                enable_auto_tools=self.enable_auto_tools,\n'
+                      '                model_output_token_ids=completion.token_ids,\n'
+                      '            )\n'
+                      '            self._turn_reasoning_tokens.append(\n'
+                      '                reasoning_token_usage(self.response_parser, '
+                      'len(completion.token_ids))\n'
+                      '            )\n'
+                      '            if not self.request.include_reasoning:\n'
+                      '                reasoning = None\n'
+                      '            self.response_messages.extend(\n',
+             'review_before': '                '
+                              'enable_auto_tools=self.enable_auto_tools,\n'
+                              '                '
+                              'model_output_token_ids=completion.token_ids,\n'
+                              '            )\n'
+                              '            if not self.request.include_reasoning:\n'
+                              '                reasoning = None\n'
+                              '            self.response_messages.extend(\n',
+             'review_after': '                '
+                             'enable_auto_tools=self.enable_auto_tools,\n'
+                             '                '
+                             'model_output_token_ids=completion.token_ids,\n'
+                             '            )\n'
+                             '            self._turn_reasoning_tokens.append(\n'
+                             '                '
+                             'reasoning_token_usage(self.response_parser, '
+                             'len(completion.token_ids))\n'
+                             '            )\n'
+                             '            if not self.request.include_reasoning:\n'
+                             '                reasoning = None\n'
+                             '            self.response_messages.extend(\n'},
+            {'name': 'vllm/entrypoints/openai/responses/context.py:landmark-7',
+             'path': 'vllm/entrypoints/openai/responses/context.py',
+             'before': '                    incomplete=completion.finish_reason == '
+                       '"length",\n'
+                       '                )\n'
+                       '            )\n'
+                       '        elif completion.text:\n'
+                       '            self.response_messages.append(\n'
+                       '                ResponseOutputMessage(\n'
+                       '                    type="message",\n'
+                       '                    id=f"msg_{random_uuid()}",\n'
+                       '                    status="completed",\n'
+                       '                    role="assistant",\n'
+                       '                    content=[\n'
+                       '                        ResponseOutputText(\n'
+                       '                            annotations=[],\n'
+                       '                            type="output_text",\n'
+                       '                            text=completion.text,\n'
+                       '                            logprobs=None,\n'
+                       '                        )\n'
+                       '                    ],\n'
+                       '                )\n'
+                       '            )\n'
+                       '\n'
+                       '        '
+                       'self._accumulated_token_ids.extend(completion.token_ids or '
+                       '[])\n'
+                       '\n'
+                       '        if self.request.enable_response_messages:\n'
+                       '            output_prompt = output.prompt or ""\n',
+             'after': '                    incomplete=completion.finish_reason == '
+                      '"length",\n'
+                      '                )\n'
+                      '            )\n'
+                      '        else:\n'
+                      '            self._turn_reasoning_tokens.append(None)\n'
+                      '            if completion.text:\n'
+                      '                self.response_messages.append(\n'
+                      '                    ResponseOutputMessage(\n'
+                      '                        type="message",\n'
+                      '                        id=f"msg_{random_uuid()}",\n'
+                      '                        status="completed",\n'
+                      '                        role="assistant",\n'
+                      '                        content=[\n'
+                      '                            ResponseOutputText(\n'
+                      '                                annotations=[],\n'
+                      '                                type="output_text",\n'
+                      '                                text=completion.text,\n'
+                      '                                logprobs=None,\n'
+                      '                            )\n'
+                      '                        ],\n'
+                      '                    )\n'
+                      '                )\n'
+                      '\n'
+                      '        if self.request.enable_response_messages:\n'
+                      '            output_prompt = output.prompt or ""\n',
+             'review_before': '                    incomplete=completion.finish_reason '
+                              '== "length",\n'
+                              '                )\n'
+                              '            )\n'
+                              '        elif completion.text:\n'
+                              '            self.response_messages.append(\n'
+                              '                ResponseOutputMessage(\n'
+                              '                    type="message",\n'
+                              '                    id=f"msg_{random_uuid()}",\n'
+                              '                    status="completed",\n'
+                              '                    role="assistant",\n'
+                              '                    content=[\n'
+                              '                        ResponseOutputText(\n'
+                              '                            annotations=[],\n'
+                              '                            type="output_text",\n'
+                              '                            text=completion.text,\n'
+                              '                            logprobs=None,\n'
+                              '                        )\n'
+                              '                    ],\n'
+                              '                )\n'
+                              '            )\n'
+                              '\n'
+                              '        '
+                              'self._accumulated_token_ids.extend(completion.token_ids '
+                              'or [])\n'
+                              '\n'
+                              '        if self.request.enable_response_messages:\n'
+                              '            output_prompt = output.prompt or ""\n',
+             'review_after': '                    incomplete=completion.finish_reason '
+                             '== "length",\n'
+                             '                )\n'
+                             '            )\n'
+                             '        else:\n'
+                             '            self._turn_reasoning_tokens.append(None)\n'
+                             '            if completion.text:\n'
+                             '                self.response_messages.append(\n'
+                             '                    ResponseOutputMessage(\n'
+                             '                        type="message",\n'
+                             '                        id=f"msg_{random_uuid()}",\n'
+                             '                        status="completed",\n'
+                             '                        role="assistant",\n'
+                             '                        content=[\n'
+                             '                            ResponseOutputText(\n'
+                             '                                annotations=[],\n'
+                             '                                type="output_text",\n'
+                             '                                text=completion.text,\n'
+                             '                                logprobs=None,\n'
+                             '                            )\n'
+                             '                        ],\n'
+                             '                    )\n'
+                             '                )\n'
+                             '\n'
+                             '        if self.request.enable_response_messages:\n'
+                             '            output_prompt = output.prompt or ""\n'},
+            {'name': 'vllm/entrypoints/openai/responses/protocol.py:landmark-1',
+             'path': 'vllm/entrypoints/openai/responses/protocol.py',
+             'before': '\n'
+                       '\n'
+                       'class OutputTokensDetails(OpenAIBaseModel):\n'
+                       '    reasoning_tokens: int = 0\n'
+                       '    tool_output_tokens: int = 0\n'
+                       '    output_tokens_per_turn: list[int] = '
+                       'Field(default_factory=list)\n'
+                       '    tool_output_tokens_per_turn: list[int] = '
+                       'Field(default_factory=list)\n',
+             'after': '\n'
+                      '\n'
+                      'class OutputTokensDetails(OpenAIBaseModel):\n'
+                      '    reasoning_tokens: int | None = None\n'
+                      '    """Generated tokens the reasoning parser consumed inside '
+                      'reasoning, read\n'
+                      "    from the parser that split the output, as chat's\n"
+                      '    ``completion_tokens_details`` is; absent, never zero, when '
+                      'no exact split\n'
+                      '    was made."""\n'
+                      '    tool_output_tokens: int = 0\n'
+                      '    output_tokens_per_turn: list[int] = '
+                      'Field(default_factory=list)\n'
+                      '    tool_output_tokens_per_turn: list[int] = '
+                      'Field(default_factory=list)\n',
+             'review_before': '\n'
+                              '\n'
+                              'class OutputTokensDetails(OpenAIBaseModel):\n'
+                              '    reasoning_tokens: int = 0\n'
+                              '    tool_output_tokens: int = 0\n'
+                              '    output_tokens_per_turn: list[int] = '
+                              'Field(default_factory=list)\n'
+                              '    tool_output_tokens_per_turn: list[int] = '
+                              'Field(default_factory=list)\n',
+             'review_after': '\n'
+                             '\n'
+                             'class OutputTokensDetails(OpenAIBaseModel):\n'
+                             '    reasoning_tokens: int | None = None\n'
+                             '    """Generated tokens the reasoning parser consumed '
+                             'inside reasoning, read\n'
+                             "    from the parser that split the output, as chat's\n"
+                             '    ``completion_tokens_details`` is; absent, never '
+                             'zero, when no exact split\n'
+                             '    was made."""\n'
+                             '    tool_output_tokens: int = 0\n'
+                             '    output_tokens_per_turn: list[int] = '
+                             'Field(default_factory=list)\n'
+                             '    tool_output_tokens_per_turn: list[int] = '
+                             'Field(default_factory=list)\n'},
+            {'name': 'vllm/entrypoints/openai/responses/serving.py:landmark-1',
+             'path': 'vllm/entrypoints/openai/responses/serving.py',
+             'before': '        num_generated_tokens = context.num_output_tokens\n'
+                       '        num_cached_tokens = context.num_cached_tokens\n'
+                       '        num_reasoning_tokens = context.num_reasoning_tokens\n'
+                       '        # For text-based reasoning parsers (e.g., '
+                       '<think>...</think>),\n'
+                       '        # HarmonyContext already counts reasoning tokens via '
+                       'channels.\n'
+                       '        # For Simple/Parsable contexts, derive '
+                       'reasoning_tokens from\n'
+                       '        # accumulated output token IDs using the parser if not '
+                       'already set.\n'
+                       '        if (\n'
+                       '            num_reasoning_tokens == 0\n'
+                       '            and isinstance(context, (SimpleContext, '
+                       'ParsableContext))\n'
+                       '            and context.response_parser is not None\n'
+                       '            and context.response_parser.reasoning_parser is '
+                       'not None\n'
+                       '        ):\n'
+                       '            accumulated = getattr(context, '
+                       '"_accumulated_token_ids", []) or []\n'
+                       '            num_reasoning_tokens = (\n'
+                       '                '
+                       'context.response_parser.reasoning_parser.count_reasoning_tokens(\n'
+                       '                    accumulated\n'
+                       '                )\n'
+                       '            )\n'
+                       '\n'
+                       '        usage = ResponseUsage(\n'
+                       '            input_tokens=num_prompt_tokens,\n',
+             'after': '        num_generated_tokens = context.num_output_tokens\n'
+                      '        num_cached_tokens = context.num_cached_tokens\n'
+                      '        num_reasoning_tokens = context.num_reasoning_tokens\n'
+                      '\n'
+                      '        usage = ResponseUsage(\n'
+                      '            input_tokens=num_prompt_tokens,\n',
+             'review_before': '        num_generated_tokens = '
+                              'context.num_output_tokens\n'
+                              '        num_cached_tokens = context.num_cached_tokens\n'
+                              '        num_reasoning_tokens = '
+                              'context.num_reasoning_tokens\n'
+                              '        # For text-based reasoning parsers (e.g., '
+                              '<think>...</think>),\n'
+                              '        # HarmonyContext already counts reasoning '
+                              'tokens via channels.\n'
+                              '        # For Simple/Parsable contexts, derive '
+                              'reasoning_tokens from\n'
+                              '        # accumulated output token IDs using the parser '
+                              'if not already set.\n'
+                              '        if (\n'
+                              '            num_reasoning_tokens == 0\n'
+                              '            and isinstance(context, (SimpleContext, '
+                              'ParsableContext))\n'
+                              '            and context.response_parser is not None\n'
+                              '            and '
+                              'context.response_parser.reasoning_parser is not None\n'
+                              '        ):\n'
+                              '            accumulated = getattr(context, '
+                              '"_accumulated_token_ids", []) or []\n'
+                              '            num_reasoning_tokens = (\n'
+                              '                '
+                              'context.response_parser.reasoning_parser.count_reasoning_tokens(\n'
+                              '                    accumulated\n'
+                              '                )\n'
+                              '            )\n'
+                              '\n'
+                              '        usage = ResponseUsage(\n'
+                              '            input_tokens=num_prompt_tokens,\n',
+             'review_after': '        num_generated_tokens = '
+                             'context.num_output_tokens\n'
+                             '        num_cached_tokens = context.num_cached_tokens\n'
+                             '        num_reasoning_tokens = '
+                             'context.num_reasoning_tokens\n'
+                             '\n'
+                             '        usage = ResponseUsage(\n'
+                             '            input_tokens=num_prompt_tokens,\n'})},
  {'name': 'anthropic-input-fidelity',
   'review_patch': 'patches/vllm-anthropic-input-fidelity.patch',
   'review_sha256': '126f002321100271897a93ddbe212cc37e5d014d0ab745bcd2ce6037f224c5b3',
@@ -49794,8 +50492,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': '9c2f2f590ab83dcb7f6b7956588a1ea7b7917d7864f3f5183fd74d334526faa2',
              'after_sha256': '4ec7419f7ffaaef9e3f19ed345aa5ebb31d41b6686470d2768f01240c2efcdbc'},
             {'path': 'vllm/parser/abstract_parser.py',
-             'before_sha256': '87534a9739902c0e118819ac13c6593107bf2a5ae942af3269471557dd610577',
-             'after_sha256': 'c3ab24e70dcabf75cd8cb662e56bd369dfcb6a9e66814e1e35f2840bc3920c4d'},
+             'before_sha256': '7741f85e231cacef264a56f2c794d3a170f37abbd7de7d23f0516883de6487fe',
+             'after_sha256': '986719675d268550f09fb863af9c5bdbfb6971c1b7358a94d8cb0ad2c955593f'},
             {'path': 'vllm/parser/engine/adapters.py',
              'before_sha256': '0d68474d291a7de76f795f6e2d64b15a15077860d1b9ba5711ffe0bfd0c3ca65',
              'after_sha256': 'cda9c48f5b64c60224961bd75c8a5667caaa1494da581f5bb7ab10cec07ecd8b'},
@@ -56044,7 +56742,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'format_gib(profile_result.transient_peak_headroom),\n'})},
  {'name': 'qwen-single-call-grammar',
   'review_patch': 'patches/vllm-qwen-single-call-grammar.patch',
-  'review_sha256': '2ae587bdde25b974cd88c5c351162fe809ee92b11d22ac0037f38411c8467b8b',
+  'review_sha256': '878ba3d98284a326784ffced00a64b38dd827cbc80f136cf1e582df469c3eced',
   'files': ({'path': 'tests/entrypoints/openai/chat_completion/test_parallel_tool_call_integrity.py',
              'before_sha256': None,
              'after_sha256': 'a4a6547338dbf625e3041e2578f2a8e314aa14d1520468c69ee17ff22998d9a2'},
@@ -56052,8 +56750,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': '9c32ac426996b4d0a9129a59f06e6a8f1213b8c785081377b80637060afcc767',
              'after_sha256': 'd45f5ba680c75277c0ae46bd6d90e90edefb124416fb1a0f204122a2198fb08a'},
             {'path': 'vllm/entrypoints/openai/chat_completion/serving.py',
-             'before_sha256': '57e7c8f804efd00f104c2780556194fb5567f5ac90e1915c7bf4a57491d126ed',
-             'after_sha256': '6d7e623168292c83e8a2eebd97ee124dc2ea03a4de5a7c36dc21d461ec623337'},
+             'before_sha256': '7e2cfea5a769d396ee7ed0879f91b0325aec21e0423f7b1c310c1291ae3ec3b8',
+             'after_sha256': '21f1818607d712fb0abfcb78e67fd7ccb8c97eaded0717559970d9843d6d0dbf'},
             {'path': 'vllm/entrypoints/serve/utils/tool_calls_utils.py',
              'before_sha256': '8439c3798fefaecd689f499b48ed4e151fff104b4c92c992ce4455ded25cb186',
              'after_sha256': None},
@@ -58895,13 +59593,13 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'frozenset[str]:\n'})},
  {'name': 'responses-stream-identity',
   'review_patch': 'patches/vllm-responses-stream-identity.patch',
-  'review_sha256': '451ab26fda73a0d71861159c91ffa69aa6cd9456f303a3ff682f43398695a522',
+  'review_sha256': '13de2609c6f80dcf722b61e8e02444e9c73572c65e511883318d2fa231a82f9f',
   'files': ({'path': 'tests/entrypoints/openai/responses/test_serving_responses.py',
              'before_sha256': '3b6763193980cefe67b693cf7b84428ffd2b58b49b0e59f18e81482d91fdd805',
-             'after_sha256': '8acb475da4c5194d8c1c82391841f084aa3ed1b7b6aacb974dc85ea750ef8205'},
+             'after_sha256': '63eab4c4177c58df2d538dc2a94049a7e8a6526fa0af0c10873ad77248daae72'},
             {'path': 'vllm/entrypoints/openai/responses/serving.py',
-             'before_sha256': 'ee5f461f39c7a03fb4147d6f045c127b311785def7689e607002676de50f2f83',
-             'after_sha256': '2eb659b4b126d551ea60516d499e79de420162da90c9cc7dafd220b1f52646cd'},
+             'before_sha256': '8b38cb52f9cf61085377c0a93f1393e93f09f00475057a1368b00703c10c2cd9',
+             'after_sha256': '7b8197f6e922a9eba9c57d7d811f0749b1dbda41faab2555adc4c3377dcd7728'},
             {'path': 'vllm/entrypoints/openai/responses/streaming_events.py',
              'before_sha256': '5400a68d6219ca3944edb8a6d077da5e0ad0c767c34759dec7d35463dd1090b2',
              'after_sha256': '1d39608c0ddfb5466661fbe42d44f8c8b3584e9eeab36f3093c41734183efeba'}),
@@ -59144,7 +59842,9 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '    serving = _make_serving_instance_with_reasoning()\n'
                       '    serving._initialize_tool_sessions = AsyncMock()\n'
                       '    parser = MagicMock()\n'
-                      '    parser.reasoning_parser = None\n'
+                      '    # The scripted parser splits no reasoning on an exact id '
+                      'boundary.\n'
+                      '    parser.reasoning_token_count = None\n'
                       '    parser.parse.side_effect = AssertionError("Streaming output '
                       'must not be reparsed")\n'
                       '    deltas = []\n'
@@ -59214,6 +59914,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '    ]\n'
                       '    assert final.usage.input_tokens == 2\n'
                       '    assert final.usage.output_tokens == len(deltas)\n'
+                      '    assert final.usage.output_tokens_details.reasoning_tokens '
+                      'is None\n'
                       '    assert [event.sequence_number for event in events] == '
                       'list(range(len(events)))\n'
                       '    serving._initialize_tool_sessions.assert_not_awaited()\n'
@@ -59314,7 +60016,9 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    serving = _make_serving_instance_with_reasoning()\n'
                              '    serving._initialize_tool_sessions = AsyncMock()\n'
                              '    parser = MagicMock()\n'
-                             '    parser.reasoning_parser = None\n'
+                             '    # The scripted parser splits no reasoning on an '
+                             'exact id boundary.\n'
+                             '    parser.reasoning_token_count = None\n'
                              '    parser.parse.side_effect = AssertionError("Streaming '
                              'output must not be reparsed")\n'
                              '    deltas = []\n'
@@ -59389,6 +60093,9 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    ]\n'
                              '    assert final.usage.input_tokens == 2\n'
                              '    assert final.usage.output_tokens == len(deltas)\n'
+                             '    assert '
+                             'final.usage.output_tokens_details.reasoning_tokens is '
+                             'None\n'
                              '    assert [event.sequence_number for event in events] '
                              '== list(range(len(events)))\n'
                              '    '
@@ -61949,7 +62656,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'converter.")\n'})},
  {'name': 'generation-sampling-resolution',
   'review_patch': 'patches/vllm-generation-sampling-resolution.patch',
-  'review_sha256': 'ebb88fa080f82512ed547debc3e7d7de73fe2b64cad56beacec8140c23ab56c1',
+  'review_sha256': '4ac5c3d5f1b91d8873dbedac89e6a9a8c65b57c9432c3e0ed2435966dbe880be',
   'files': ({'path': 'tests/entrypoints/openai/test_render_token_offsets.py',
              'before_sha256': '223426750879932311a2f26377300df68ac13b2de1332c667c56b3bffb245b75',
              'after_sha256': '405e6e5592d4178fde073482558bb491fe201e3a3b706c25df104b136b8197a1'},
@@ -61969,8 +62676,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': '4aaad83ba272bcdea4d2b6e69fa0989cf40b48d47512486b6a1a2816f04d74f6',
              'after_sha256': 'af51ee290f1a98d8284bb678ad082927056b1a9e03389509e923ea632d8b8ed0'},
             {'path': 'vllm/entrypoints/openai/responses/protocol.py',
-             'before_sha256': '6bf271ff977683003937e402680e4e5dfa375215505835a4ed58d0fa3a65cb59',
-             'after_sha256': 'c3649d9b8d2ba1d8b96866dc7e02556178afc84943006e8ff1901411d45fee6a'},
+             'before_sha256': 'bbadaab457115890fd9d808f2b28a8f64c2be362f9058a848ca5277dcd463769',
+             'after_sha256': 'ddf399abb5c9a8b6962b93bdc6290537e474af50b2a5a9b6e81b3c89f28cab5c'},
             {'path': 'vllm/entrypoints/scale_out/token_in_token_out/protocol.py',
              'before_sha256': '6e931fd74275453133d81626d901e7a74ebca28fc5db6a8e5bd3f86a705c6274',
              'after_sha256': 'ba343601ac6265ccff7b71b94a63c1f18ddfe3deab66f7d26935b1669499bc78'},
@@ -64972,7 +65679,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    msgspec.Struct,\n'})},
  {'name': 'sampling-decoding-boundary',
   'review_patch': 'patches/vllm-sampling-decoding-boundary.patch',
-  'review_sha256': '85cfffb303c52128b7e3183e5b3d18c3d1f8a906b7b1b6f9d1ddc8010de4bc0f',
+  'review_sha256': 'f7e0c0569bf70642f53ada3104389058851efd50f265ded882df27f1b518cbc3',
   'files': ({'path': 'tests/entrypoints/multimodal/openai/chat_completion/test_video.py',
              'before_sha256': 'e48e3ac6176becf5489c61c6cc050cc48f330483f45972fd5f65a8f7482bb9b1',
              'after_sha256': '219e50f6556699d257807b5481ba6664169cd0dd716a59f7fd5969442da475ae'},
@@ -64998,8 +65705,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': '4a3285f5f8947dea200a303fa8021362915ade9e8d22fc3109b54cb70e86002c',
              'after_sha256': '3019ad9ea067fc1b17f436507e21aa87d0d4816882b5ea9a3218a5dba7672fba'},
             {'path': 'vllm/entrypoints/openai/chat_completion/serving.py',
-             'before_sha256': '6d7e623168292c83e8a2eebd97ee124dc2ea03a4de5a7c36dc21d461ec623337',
-             'after_sha256': 'fd06cc1eec25bc41efb4ac7bff1c33a17a65a6463715a731d24c8bed8cc887d1'},
+             'before_sha256': '21f1818607d712fb0abfcb78e67fd7ccb8c97eaded0717559970d9843d6d0dbf',
+             'after_sha256': '2493c991aa308b9ded55fa705b0d67cefa5db569a3e56a0fa6e4a85fa1e88b42'},
             {'path': 'vllm/entrypoints/openai/completion/protocol.py',
              'before_sha256': 'af51ee290f1a98d8284bb678ad082927056b1a9e03389509e923ea632d8b8ed0',
              'after_sha256': 'a92405770e6d4f3b3732b0a42ebdc335441a448be9fc2ce4f92b02d16e6e0ca2'},
@@ -66577,7 +67284,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
             {'name': 'vllm/entrypoints/openai/chat_completion/serving.py:landmark-1',
              'path': 'vllm/entrypoints/openai/chat_completion/serving.py',
              'before': 'from vllm.parser import ParserManager\n'
-                       'from vllm.parser.abstract_parser import Parser\n'
+                       'from vllm.parser.abstract_parser import Parser, '
+                       'reasoning_token_usage\n'
                        'from vllm.renderers.online_renderer import OnlineRenderer\n'
                        'from vllm.sampling_params import BeamSearchParams, '
                        'SamplingParams\n'
@@ -66585,14 +67293,16 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                        'from vllm.utils.collection_utils import as_list\n'
                        'from vllm.utils.serial_utils import numpy2base64\n',
              'after': 'from vllm.parser import ParserManager\n'
-                      'from vllm.parser.abstract_parser import Parser\n'
+                      'from vllm.parser.abstract_parser import Parser, '
+                      'reasoning_token_usage\n'
                       'from vllm.renderers.online_renderer import OnlineRenderer\n'
                       'from vllm.sampling_params import SamplingParams\n'
                       'from vllm.tokenizers import TokenizerLike\n'
                       'from vllm.utils.collection_utils import as_list\n'
                       'from vllm.utils.serial_utils import numpy2base64\n',
              'review_before': 'from vllm.parser import ParserManager\n'
-                              'from vllm.parser.abstract_parser import Parser\n'
+                              'from vllm.parser.abstract_parser import Parser, '
+                              'reasoning_token_usage\n'
                               'from vllm.renderers.online_renderer import '
                               'OnlineRenderer\n'
                               'from vllm.sampling_params import BeamSearchParams, '
@@ -66601,7 +67311,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                               'from vllm.utils.collection_utils import as_list\n'
                               'from vllm.utils.serial_utils import numpy2base64\n',
              'review_after': 'from vllm.parser import ParserManager\n'
-                             'from vllm.parser.abstract_parser import Parser\n'
+                             'from vllm.parser.abstract_parser import Parser, '
+                             'reasoning_token_usage\n'
                              'from vllm.renderers.online_renderer import '
                              'OnlineRenderer\n'
                              'from vllm.sampling_params import SamplingParams\n'
@@ -75760,8 +76471,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': '4ec7419f7ffaaef9e3f19ed345aa5ebb31d41b6686470d2768f01240c2efcdbc',
              'after_sha256': '12311dc9d1686394bc7b4499e32b353dabe02c650942c0c9d3d376da5e55fcb0'},
             {'path': 'vllm/parser/abstract_parser.py',
-             'before_sha256': 'c3ab24e70dcabf75cd8cb662e56bd369dfcb6a9e66814e1e35f2840bc3920c4d',
-             'after_sha256': '27d0c3fd3694c3aab00bfa59a644f680ff61f2fb76cea2fe4fcc7949ce97a172'},
+             'before_sha256': '986719675d268550f09fb863af9c5bdbfb6971c1b7358a94d8cb0ad2c955593f',
+             'after_sha256': '84891751517483beb28eb9956d6a39af65ee16fc8085c5500ac982e7bd0bae8a'},
             {'path': 'vllm/parser/mistral.py',
              'before_sha256': 'd361421339cfe4daa0c0e924bf255eabbb3bc34eb9a1be0aeb37f95e6c66295a',
              'after_sha256': 'af028e500d1eafae7a357a6b2814c7e08d7d4892057a83002081135420005103'}),
@@ -80648,13 +81359,13 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '                        request_id=internal_req_id,\n'})},
  {'name': 'tool-output-completion',
   'review_patch': 'patches/vllm-tool-output-completion.patch',
-  'review_sha256': '28f49b69af72f1caca3d716cdfe58b96626e1411c8599b49253946ee2cad6090',
+  'review_sha256': '41d49e00bd197fea0b449c2c0c0447d7afa2a55665221928e789c85aec9a957a',
   'files': ({'path': 'tests/entrypoints/openai/chat_completion/test_parallel_tool_call_integrity.py',
              'before_sha256': 'a4a6547338dbf625e3041e2578f2a8e314aa14d1520468c69ee17ff22998d9a2',
              'after_sha256': 'e290f2c4df7bd842594db1fb4e66bf713bc6ff653cbadc8877958a955c0fa4c4'},
             {'path': 'tests/entrypoints/openai/responses/test_serving_responses.py',
-             'before_sha256': '8acb475da4c5194d8c1c82391841f084aa3ed1b7b6aacb974dc85ea750ef8205',
-             'after_sha256': '5e9481ec6b4f3b8401fe1533dceeb233117ad0857093a34565d83594f850674d'},
+             'before_sha256': '63eab4c4177c58df2d538dc2a94049a7e8a6526fa0af0c10873ad77248daae72',
+             'after_sha256': 'ce5a325238d8c650968f59dc3d150ffc7574c224e60db2135e3fbce76d374fbd'},
             {'path': 'tests/entrypoints/scale_out/derender/test_terminal_metadata.py',
              'before_sha256': '0451966ee298b08e799ef300029a144e66deb6debe5c1af43311aa1af622a277',
              'after_sha256': 'e3edf885a33aaecf5dd8d6fdeadad7f3eed60510eb4f43354f1273e52b974cfc'},
@@ -80671,17 +81382,17 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': '8a74b37b0b33dc2db25ad685f975530ca32c825c4f8e1e9f4998cbacf1e2b586',
              'after_sha256': '2d3bc4f13b371265b659858c5441d04c7a6e3e9f2286e6e932c63f3e2d356651'},
             {'path': 'vllm/entrypoints/openai/chat_completion/serving.py',
-             'before_sha256': 'fd06cc1eec25bc41efb4ac7bff1c33a17a65a6463715a731d24c8bed8cc887d1',
-             'after_sha256': 'b698eb4843d0a06fffb7f7331c4250e09f2709ec7e119ee35f12e6c1c785c6f8'},
+             'before_sha256': '2493c991aa308b9ded55fa705b0d67cefa5db569a3e56a0fa6e4a85fa1e88b42',
+             'after_sha256': '687376f2b69595fc739dc1cce71810aefe53d8cb9a02aa2e8f9eec690f0cef66'},
             {'path': 'vllm/entrypoints/openai/responses/context.py',
-             'before_sha256': '45aabb486f12047609dac95a8f05bd48ce653e9c139cb1195f44c2df3b114423',
-             'after_sha256': 'a92273bc16cbdda51dafc4ba0f32615f4a4586f07acaef4256ce459f7b327b78'},
+             'before_sha256': 'c06ffd3ae1b634e8b42f043d0f7978fd86a54194dda428612aed0ba6429f1f46',
+             'after_sha256': '366cfb15ac59ce6e27790d4c176d87bc1cd623599d20299c68ff672f327e9376'},
             {'path': 'vllm/entrypoints/openai/responses/serving.py',
-             'before_sha256': '2eb659b4b126d551ea60516d499e79de420162da90c9cc7dafd220b1f52646cd',
-             'after_sha256': 'fd74b42a19e162f1326fbd7e27bf9fe615b572fe6537266ee8bdedb5393a3c30'},
+             'before_sha256': '7b8197f6e922a9eba9c57d7d811f0749b1dbda41faab2555adc4c3377dcd7728',
+             'after_sha256': '61a6cc056756ae386105704dd95f0d90822743619012488b1f083ca74ad79aaa'},
             {'path': 'vllm/parser/abstract_parser.py',
-             'before_sha256': '27d0c3fd3694c3aab00bfa59a644f680ff61f2fb76cea2fe4fcc7949ce97a172',
-             'after_sha256': 'c7c5d58071832c14431c43dc1babde8882b4690ea1c6c506d756f174a9c6c95e'},
+             'before_sha256': '84891751517483beb28eb9956d6a39af65ee16fc8085c5500ac982e7bd0bae8a',
+             'after_sha256': '5cfff0a45f292313ff633a1b71d1cf3f32369ae62b41d972ce80a238bc6005c0'},
             {'path': 'vllm/parser/engine/adapters.py',
              'before_sha256': 'cda9c48f5b64c60224961bd75c8a5667caaa1494da581f5bb7ab10cec07ecd8b',
              'after_sha256': 'f5d248040238b4fdcd89c97164c97e45941fad46d650614b4de5e8cd9e83118a'},
@@ -81392,27 +82103,30 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    return mock_parser_instance\n'},
             {'name': 'tests/entrypoints/openai/responses/test_serving_responses.py:landmark-3',
              'path': 'tests/entrypoints/openai/responses/test_serving_responses.py',
-             'before': '    serving._initialize_tool_sessions = AsyncMock()\n'
-                       '    parser = MagicMock()\n'
-                       '    parser.reasoning_parser = None\n'
+             'before': '    parser = MagicMock()\n'
+                       '    # The scripted parser splits no reasoning on an exact id '
+                       'boundary.\n'
+                       '    parser.reasoning_token_count = None\n'
                        '    parser.parse.side_effect = AssertionError("Streaming '
                        'output must not be reparsed")\n'
                        '    deltas = []\n'
                        '    if shape == "mixed":\n'
                        '        deltas.append(DeltaMessage(reasoning="preserved '
                        'thinking"))\n',
-             'after': '    serving._initialize_tool_sessions = AsyncMock()\n'
-                      '    parser = MagicMock()\n'
-                      '    parser.reasoning_parser = None\n'
+             'after': '    parser = MagicMock()\n'
+                      '    # The scripted parser splits no reasoning on an exact id '
+                      'boundary.\n'
+                      '    parser.reasoning_token_count = None\n'
                       '    parser.parse_output.side_effect = AssertionError("Streaming '
                       'output must not be reparsed")\n'
                       '    deltas = []\n'
                       '    if shape == "mixed":\n'
                       '        deltas.append(DeltaMessage(reasoning="preserved '
                       'thinking"))\n',
-             'review_before': '    serving._initialize_tool_sessions = AsyncMock()\n'
-                              '    parser = MagicMock()\n'
-                              '    parser.reasoning_parser = None\n'
+             'review_before': '    parser = MagicMock()\n'
+                              '    # The scripted parser splits no reasoning on an '
+                              'exact id boundary.\n'
+                              '    parser.reasoning_token_count = None\n'
                               '    parser.parse.side_effect = '
                               'AssertionError("Streaming output must not be '
                               'reparsed")\n'
@@ -81420,9 +82134,10 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                               '    if shape == "mixed":\n'
                               '        deltas.append(DeltaMessage(reasoning="preserved '
                               'thinking"))\n',
-             'review_after': '    serving._initialize_tool_sessions = AsyncMock()\n'
-                             '    parser = MagicMock()\n'
-                             '    parser.reasoning_parser = None\n'
+             'review_after': '    parser = MagicMock()\n'
+                             '    # The scripted parser splits no reasoning on an '
+                             'exact id boundary.\n'
+                             '    parser.reasoning_token_count = None\n'
                              '    parser.parse_output.side_effect = '
                              'AssertionError("Streaming output must not be reparsed")\n'
                              '    deltas = []\n'
@@ -81465,7 +82180,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    async def outputs():\n'},
             {'name': 'tests/entrypoints/openai/responses/test_serving_responses.py:landmark-5',
              'path': 'tests/entrypoints/openai/responses/test_serving_responses.py',
-             'before': '    assert final.usage.output_tokens == len(deltas)\n'
+             'before': '    assert final.usage.output_tokens_details.reasoning_tokens '
+                       'is None\n'
                        '    assert [event.sequence_number for event in events] == '
                        'list(range(len(events)))\n'
                        '    serving._initialize_tool_sessions.assert_not_awaited()\n'
@@ -81473,7 +82189,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                        '    if finish == "length":\n'
                        '        assert done[-1].status == "incomplete"\n'
                        '    else:\n',
-             'after': '    assert final.usage.output_tokens == len(deltas)\n'
+             'after': '    assert final.usage.output_tokens_details.reasoning_tokens '
+                      'is None\n'
                       '    assert [event.sequence_number for event in events] == '
                       'list(range(len(events)))\n'
                       '    serving._initialize_tool_sessions.assert_not_awaited()\n'
@@ -81481,7 +82198,9 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '    if finish == "length":\n'
                       '        assert done[-1].status == "incomplete"\n'
                       '    else:\n',
-             'review_before': '    assert final.usage.output_tokens == len(deltas)\n'
+             'review_before': '    assert '
+                              'final.usage.output_tokens_details.reasoning_tokens is '
+                              'None\n'
                               '    assert [event.sequence_number for event in events] '
                               '== list(range(len(events)))\n'
                               '    '
@@ -81490,7 +82209,9 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                               '    if finish == "length":\n'
                               '        assert done[-1].status == "incomplete"\n'
                               '    else:\n',
-             'review_after': '    assert final.usage.output_tokens == len(deltas)\n'
+             'review_after': '    assert '
+                             'final.usage.output_tokens_details.reasoning_tokens is '
+                             'None\n'
                              '    assert [event.sequence_number for event in events] '
                              '== list(range(len(events)))\n'
                              '    '
@@ -82897,8 +83618,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'skip_special_tokens=False)\n'},
             {'name': 'vllm/entrypoints/openai/chat_completion/serving.py:landmark-1',
              'path': 'vllm/entrypoints/openai/chat_completion/serving.py',
-             'before': '\n'
-                       '                    delta_message: DeltaMessage | None\n'
+             'before': '                    delta_message: DeltaMessage | None\n'
                        '\n'
                        '                    if parser is not None:\n'
                        '                        delta_message = parser.parse_delta(\n'
@@ -82913,10 +83633,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                        '                        )\n'
                        '                        if delta_message is not None and '
                        'delta_message.tool_calls:\n'
-                       '                            tools_streamed[i] = True\n'
-                       '\n',
-             'after': '\n'
-                      '                    delta_message: DeltaMessage | None\n'
+                       '                            tools_streamed[i] = True\n',
+             'after': '                    delta_message: DeltaMessage | None\n'
                       '\n'
                       '                    if parser is not None:\n'
                       '                        delta_message = '
@@ -82933,10 +83651,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '                        )\n'
                       '                        if delta_message is not None and '
                       'delta_message.tool_calls:\n'
-                      '                            tools_streamed[i] = True\n'
-                      '\n',
-             'review_before': '\n'
-                              '                    delta_message: DeltaMessage | None\n'
+                      '                            tools_streamed[i] = True\n',
+             'review_before': '                    delta_message: DeltaMessage | None\n'
                               '\n'
                               '                    if parser is not None:\n'
                               '                        delta_message = '
@@ -82952,10 +83668,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                               '                        )\n'
                               '                        if delta_message is not None '
                               'and delta_message.tool_calls:\n'
-                              '                            tools_streamed[i] = True\n'
-                              '\n',
-             'review_after': '\n'
-                             '                    delta_message: DeltaMessage | None\n'
+                              '                            tools_streamed[i] = True\n',
+             'review_after': '                    delta_message: DeltaMessage | None\n'
                              '\n'
                              '                    if parser is not None:\n'
                              '                        delta_message = '
@@ -82973,34 +83687,25 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '                        )\n'
                              '                        if delta_message is not None and '
                              'delta_message.tool_calls:\n'
-                             '                            tools_streamed[i] = True\n'
-                             '\n'},
+                             '                            tools_streamed[i] = True\n'},
             {'name': 'vllm/entrypoints/openai/chat_completion/serving.py:landmark-2',
              'path': 'vllm/entrypoints/openai/chat_completion/serving.py',
-             'before': '                        # clients must never mistake a '
-                       'truncated call for an\n'
-                       '                        # executable, normally-terminated tool '
+             'before': '                        # executable, normally-terminated tool '
                        'call.\n'
                        '                        if (\n'
                        '                            output.finish_reason == "stop"\n'
                        '                            and tools_streamed[i]\n'
                        '                            and not tool_choice_function_name\n'
-                       '                        ):\n'
-                       '                            finish_reason_ = "tool_calls"\n',
-             'after': '                        # clients must never mistake a '
-                      'truncated call for an\n'
-                      '                        # executable, normally-terminated tool '
+                       '                        ):\n',
+             'after': '                        # executable, normally-terminated tool '
                       'call.\n'
                       '                        if (\n'
                       '                            output.finish_reason == "stop"\n'
                       '                            and output.stop_reason is None\n'
                       '                            and tools_streamed[i]\n'
                       '                            and not tool_choice_function_name\n'
-                      '                        ):\n'
-                      '                            finish_reason_ = "tool_calls"\n',
-             'review_before': '                        # clients must never mistake a '
-                              'truncated call for an\n'
-                              '                        # executable, '
+                      '                        ):\n',
+             'review_before': '                        # executable, '
                               'normally-terminated tool call.\n'
                               '                        if (\n'
                               '                            output.finish_reason == '
@@ -83008,12 +83713,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                               '                            and tools_streamed[i]\n'
                               '                            and not '
                               'tool_choice_function_name\n'
-                              '                        ):\n'
-                              '                            finish_reason_ = '
-                              '"tool_calls"\n',
-             'review_after': '                        # clients must never mistake a '
-                             'truncated call for an\n'
-                             '                        # executable, '
+                              '                        ):\n',
+             'review_after': '                        # executable, '
                              'normally-terminated tool call.\n'
                              '                        if (\n'
                              '                            output.finish_reason == '
@@ -83023,13 +83724,10 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '                            and tools_streamed[i]\n'
                              '                            and not '
                              'tool_choice_function_name\n'
-                             '                        ):\n'
-                             '                            finish_reason_ = '
-                             '"tool_calls"\n'},
+                             '                        ):\n'},
             {'name': 'vllm/entrypoints/openai/chat_completion/serving.py:landmark-3',
              'path': 'vllm/entrypoints/openai/chat_completion/serving.py',
-             'before': '            else:\n'
-                       '                logprobs = None\n'
+             'before': '                logprobs = None\n'
                        '\n'
                        '            if parser is not None:\n'
                        '                reasoning, content, tool_calls = '
@@ -83040,11 +83738,9 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                        '                    model_output_token_ids=token_ids,\n'
                        '                )\n'
                        '                reasoning_token_counts.append(\n'
-                       '                    _reasoning_token_count(parser, '
-                       'len(token_ids))\n'
-                       '                )\n',
-             'after': '            else:\n'
-                      '                logprobs = None\n'
+                       '                    reasoning_token_usage(parser, '
+                       'len(token_ids))\n',
+             'after': '                logprobs = None\n'
                       '\n'
                       '            if parser is not None:\n'
                       '                reasoning, content, tool_calls = '
@@ -83057,11 +83753,9 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '                    stop_reason=output.stop_reason,\n'
                       '                )\n'
                       '                reasoning_token_counts.append(\n'
-                      '                    _reasoning_token_count(parser, '
-                      'len(token_ids))\n'
-                      '                )\n',
-             'review_before': '            else:\n'
-                              '                logprobs = None\n'
+                      '                    reasoning_token_usage(parser, '
+                      'len(token_ids))\n',
+             'review_before': '                logprobs = None\n'
                               '\n'
                               '            if parser is not None:\n'
                               '                reasoning, content, tool_calls = '
@@ -83073,11 +83767,9 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                               '                    model_output_token_ids=token_ids,\n'
                               '                )\n'
                               '                reasoning_token_counts.append(\n'
-                              '                    _reasoning_token_count(parser, '
-                              'len(token_ids))\n'
-                              '                )\n',
-             'review_after': '            else:\n'
-                             '                logprobs = None\n'
+                              '                    reasoning_token_usage(parser, '
+                              'len(token_ids))\n',
+             'review_after': '                logprobs = None\n'
                              '\n'
                              '            if parser is not None:\n'
                              '                reasoning, content, tool_calls = '
@@ -83091,14 +83783,11 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '                    stop_reason=output.stop_reason,\n'
                              '                )\n'
                              '                reasoning_token_counts.append(\n'
-                             '                    _reasoning_token_count(parser, '
-                             'len(token_ids))\n'
-                             '                )\n'},
+                             '                    reasoning_token_usage(parser, '
+                             'len(token_ids))\n'},
             {'name': 'vllm/entrypoints/openai/chat_completion/serving.py:landmark-4',
              'path': 'vllm/entrypoints/openai/chat_completion/serving.py',
-             'before': '            # Parsing a partial function prefix does not '
-                       "override the engine's\n"
-                       '            # terminal condition.  In particular, ``length`` '
+             'before': '            # terminal condition.  In particular, ``length`` '
                        'is a fail-closed\n'
                        '            # signal: the returned call prefix is incomplete '
                        'and must not be\n'
@@ -83110,11 +83799,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                        'request.tool_choice == "required")\n'
                        '            )\n'
                        '\n'
-                       '            routed_experts_b64 = (\n'
-                       '                numpy2base64(output.routed_experts)\n',
-             'after': '            # Parsing a partial function prefix does not '
-                      "override the engine's\n"
-                      '            # terminal condition.  In particular, ``length`` is '
+                       '            routed_experts_b64 = (\n',
+             'after': '            # terminal condition.  In particular, ``length`` is '
                       'a fail-closed\n'
                       '            # signal: the returned call prefix is incomplete '
                       'and must not be\n'
@@ -83127,11 +83813,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '== "required")\n'
                       '            )\n'
                       '\n'
-                      '            routed_experts_b64 = (\n'
-                      '                numpy2base64(output.routed_experts)\n',
-             'review_before': '            # Parsing a partial function prefix does '
-                              "not override the engine's\n"
-                              '            # terminal condition.  In particular, '
+                      '            routed_experts_b64 = (\n',
+             'review_before': '            # terminal condition.  In particular, '
                               '``length`` is a fail-closed\n'
                               '            # signal: the returned call prefix is '
                               'incomplete and must not be\n'
@@ -83143,11 +83826,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                               'request.tool_choice == "required")\n'
                               '            )\n'
                               '\n'
-                              '            routed_experts_b64 = (\n'
-                              '                numpy2base64(output.routed_experts)\n',
-             'review_after': '            # Parsing a partial function prefix does not '
-                             "override the engine's\n"
-                             '            # terminal condition.  In particular, '
+                              '            routed_experts_b64 = (\n',
+             'review_after': '            # terminal condition.  In particular, '
                              '``length`` is a fail-closed\n'
                              '            # signal: the returned call prefix is '
                              'incomplete and must not be\n'
@@ -83160,12 +83840,10 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'request.tool_choice == "required")\n'
                              '            )\n'
                              '\n'
-                             '            routed_experts_b64 = (\n'
-                             '                numpy2base64(output.routed_experts)\n'},
+                             '            routed_experts_b64 = (\n'},
             {'name': 'vllm/entrypoints/openai/responses/context.py:landmark-1',
              'path': 'vllm/entrypoints/openai/responses/context.py',
-             'before': '        completion = output.outputs[0]\n'
-                       '        self.finish_reason = completion.finish_reason\n'
+             'before': '        self.finish_reason = completion.finish_reason\n'
                        '\n'
                        '        if self.response_parser is not None:\n'
                        '            reasoning, content, tool_calls = '
@@ -83175,11 +83853,10 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                        '                enable_auto_tools=self.enable_auto_tools,\n'
                        '                model_output_token_ids=completion.token_ids,\n'
                        '            )\n'
-                       '            if not self.request.include_reasoning:\n'
-                       '                reasoning = None\n'
-                       '            self.response_messages.extend(\n',
-             'after': '        completion = output.outputs[0]\n'
-                      '        self.finish_reason = completion.finish_reason\n'
+                       '            self._turn_reasoning_tokens.append(\n'
+                       '                reasoning_token_usage(self.response_parser, '
+                       'len(completion.token_ids))\n',
+             'after': '        self.finish_reason = completion.finish_reason\n'
                       '\n'
                       '        if self.response_parser is not None:\n'
                       '            reasoning, content, tool_calls = '
@@ -83191,11 +83868,10 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '                finish_reason=completion.finish_reason,\n'
                       '                stop_reason=completion.stop_reason,\n'
                       '            )\n'
-                      '            if not self.request.include_reasoning:\n'
-                      '                reasoning = None\n'
-                      '            self.response_messages.extend(\n',
-             'review_before': '        completion = output.outputs[0]\n'
-                              '        self.finish_reason = completion.finish_reason\n'
+                      '            self._turn_reasoning_tokens.append(\n'
+                      '                reasoning_token_usage(self.response_parser, '
+                      'len(completion.token_ids))\n',
+             'review_before': '        self.finish_reason = completion.finish_reason\n'
                               '\n'
                               '        if self.response_parser is not None:\n'
                               '            reasoning, content, tool_calls = '
@@ -83207,11 +83883,11 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                               '                '
                               'model_output_token_ids=completion.token_ids,\n'
                               '            )\n'
-                              '            if not self.request.include_reasoning:\n'
-                              '                reasoning = None\n'
-                              '            self.response_messages.extend(\n',
-             'review_after': '        completion = output.outputs[0]\n'
-                             '        self.finish_reason = completion.finish_reason\n'
+                              '            self._turn_reasoning_tokens.append(\n'
+                              '                '
+                              'reasoning_token_usage(self.response_parser, '
+                              'len(completion.token_ids))\n',
+             'review_after': '        self.finish_reason = completion.finish_reason\n'
                              '\n'
                              '        if self.response_parser is not None:\n'
                              '            reasoning, content, tool_calls = '
@@ -83225,9 +83901,10 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '                finish_reason=completion.finish_reason,\n'
                              '                stop_reason=completion.stop_reason,\n'
                              '            )\n'
-                             '            if not self.request.include_reasoning:\n'
-                             '                reasoning = None\n'
-                             '            self.response_messages.extend(\n'},
+                             '            self._turn_reasoning_tokens.append(\n'
+                             '                '
+                             'reasoning_token_usage(self.response_parser, '
+                             'len(completion.token_ids))\n'},
             {'name': 'vllm/entrypoints/openai/responses/serving.py:landmark-1',
              'path': 'vllm/entrypoints/openai/responses/serving.py',
              'before': '            )\n'
@@ -99983,7 +100660,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'chunk_size):\n'})},
  {'name': 'generation-admission-before-response',
   'review_patch': 'patches/vllm-generation-admission-before-response.patch',
-  'review_sha256': '59678e08ffb6e4b5cc2d8d01b7876e4732e9b6e5fc7b128c544540aace8464b4',
+  'review_sha256': '9e20b1a5b9a37784df6e0f7f034ed0ebf3022fd7ef61cb2353a889e6bfdb7a62',
   'files': ({'path': 'tests/entrypoints/openai/chat_completion/test_chat_error.py',
              'before_sha256': '51bface90cf08e565fc599f9b44f135db1ec337aa40cd7897dbd9820c4cc0c84',
              'after_sha256': '5b457424bc6887292dd00bc3620e7881ebe8ef1e04b2fe1d34dcefd8b29a23d8'},
@@ -100021,17 +100698,17 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': '104ef1737efe6208223a0ca98b79dc5f46b2fe09b75132ef63f211dc91f747ea',
              'after_sha256': '90dee26650b749fec50ebc7bcf461ae5566c48e66bd0ccdb2b6d726c1ae2dd7a'},
             {'path': 'vllm/entrypoints/openai/chat_completion/serving.py',
-             'before_sha256': 'b698eb4843d0a06fffb7f7331c4250e09f2709ec7e119ee35f12e6c1c785c6f8',
-             'after_sha256': '8806686da34a308eefb5c44b725898745b4a282cc75670aab0e0b39b5addffa6'},
+             'before_sha256': '687376f2b69595fc739dc1cce71810aefe53d8cb9a02aa2e8f9eec690f0cef66',
+             'after_sha256': '5a75f7b5c7fdbdfc02116396ad45938a60350633fedeb06a40b01cbb65e76c96'},
             {'path': 'vllm/entrypoints/openai/completion/serving.py',
              'before_sha256': '6b4747502ecb32467626e54041e7e0cd276e064dd714554c58b8ebe4cdc3736b',
              'after_sha256': '47877f22727b674109b923e182471aa9948c75e22502b184b02a9882df4a54c5'},
             {'path': 'vllm/entrypoints/openai/responses/protocol.py',
-             'before_sha256': 'c3649d9b8d2ba1d8b96866dc7e02556178afc84943006e8ff1901411d45fee6a',
-             'after_sha256': '72fd1d2aa1070323c66bf733bcd62669cfb0fd2a74578f7f6064ad0bc00dc2d9'},
+             'before_sha256': 'ddf399abb5c9a8b6962b93bdc6290537e474af50b2a5a9b6e81b3c89f28cab5c',
+             'after_sha256': '878c4aea468b9d3436e934fc060035963a78acc88050126ccc1caf26ec18161d'},
             {'path': 'vllm/entrypoints/openai/responses/serving.py',
-             'before_sha256': 'fd74b42a19e162f1326fbd7e27bf9fe615b572fe6537266ee8bdedb5393a3c30',
-             'after_sha256': '7f8223b26af4fe2b718c96b070b3a2948aee318e85cb0a708654ab3522de3b51'},
+             'before_sha256': '61a6cc056756ae386105704dd95f0d90822743619012488b1f083ca74ad79aaa',
+             'after_sha256': 'e9454a323a57d58ed7f2c518108d06ad53b76be0e81c96721fbea94d4e083bab'},
             {'path': 'vllm/entrypoints/scale_out/token_in_token_out/serving.py',
              'before_sha256': '33fc93bdbf368ac1e7ddbb0a2c914db40ce0449b2dcd43291b5fe3868bf93198',
              'after_sha256': '4e76582db55dd262de822a59d61b954a7170a3af4f16ba9dcbf7ee9e400980ab'},
@@ -117202,7 +117879,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'to JIT compile triton kernels.\n'})},
  {'name': 'template-refusals-name-their-parameter',
   'review_patch': 'patches/vllm-template-refusals-name-their-parameter.patch',
-  'review_sha256': '587facad35a115822bb6af2baefc00604fa87e1e96d0e6d85919115821a1ccd5',
+  'review_sha256': 'bf1b666d2f3ac901acebb614ea37c18113d7296fe0fe25348b63b4b72107dedd',
   'files': ({'path': 'tests/renderers/test_hf.py',
              'before_sha256': 'fa24987689db198add630723f7697ab2fc61edb7d133990890fcd19fe9943b90',
              'after_sha256': 'd6a2cc3febe2fc86138f019345a263018b63aea131541f9d82753c8d15260425'},
@@ -117210,8 +117887,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': '3019ad9ea067fc1b17f436507e21aa87d0d4816882b5ea9a3218a5dba7672fba',
              'after_sha256': '1a11f9bc960903d6bbaddca8f339b4517378ef54b5ce0f35543ed34a757519ae'},
             {'path': 'vllm/entrypoints/openai/responses/protocol.py',
-             'before_sha256': '72fd1d2aa1070323c66bf733bcd62669cfb0fd2a74578f7f6064ad0bc00dc2d9',
-             'after_sha256': 'fe67b79c05832f02635c6eaef0e4c641cecf33db59fc8b7e49ec0908bc0deb30'},
+             'before_sha256': '878c4aea468b9d3436e934fc060035963a78acc88050126ccc1caf26ec18161d',
+             'after_sha256': '7b7175cd40efdb5d165443f8147a17dcd82b8eaf0d897df14720a7f06f375124'},
             {'path': 'vllm/entrypoints/serve/tokenize/protocol.py',
              'before_sha256': '5cc5cb021b827ae34e5e3ce8fdd72ee0e07b6e6b95de74d3f075f3b3edb8ac21',
              'after_sha256': 'df1c91d3627f2fefa92404f67e1a27b134aa887bffdfc75298d6f26cfdf87ac5'},
@@ -118441,7 +119118,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '\n'})},
  {'name': 'qwen-repeated-parameter-refusal',
   'review_patch': 'patches/vllm-qwen-repeated-parameter-refusal.patch',
-  'review_sha256': 'e6217bcd1fae538ef97dacd523c3b994f594826502961c24c3aa47402b668fa9',
+  'review_sha256': '11e1a32696d6c17352a94ad815f878728011304592c1efb09eaf98f73f59f147',
   'files': ({'path': 'tests/entrypoints/openai/chat_completion/test_repeated_tool_parameter_refusal.py',
              'before_sha256': None,
              'after_sha256': 'b8a7eed51747dddf980145be2609cf1a8136465bf0068a0f3c7b85424ab9a9d9'},
@@ -118452,14 +119129,14 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': '6b3cac443f0363ce3cd64535edcbfd699177b2dd2f3715d719e8c1d8b5823534',
              'after_sha256': '582dce451adaf23773987e81e57d82028697e570ba35360540a82e8287572a52'},
             {'path': 'vllm/entrypoints/openai/chat_completion/serving.py',
-             'before_sha256': '8806686da34a308eefb5c44b725898745b4a282cc75670aab0e0b39b5addffa6',
-             'after_sha256': '12c520ffa8cd4cf2c793e38a0756748fc48dae19b20fb9f94bceab94916e17a6'},
+             'before_sha256': '5a75f7b5c7fdbdfc02116396ad45938a60350633fedeb06a40b01cbb65e76c96',
+             'after_sha256': '9357f6c195b933b0805acd1e515ca192219e360ffbac0f4738721bee6cbd5508'},
             {'path': 'vllm/entrypoints/openai/engine/protocol.py',
              'before_sha256': 'e38f310d54fcb0d1529af2fe9e404aaff4f2a593c6b3390d69a93a1b9a5f7f62',
              'after_sha256': 'aac2094cff867c78ddf2e19829d17c24c330719d6e2f478ec3ff94c436ca0237'},
             {'path': 'vllm/entrypoints/openai/responses/serving.py',
-             'before_sha256': '7f8223b26af4fe2b718c96b070b3a2948aee318e85cb0a708654ab3522de3b51',
-             'after_sha256': '53bccaa74f173c4f8748874e6ee2cab232419a1052295a88b92e7aabcaab4e4d'},
+             'before_sha256': 'e9454a323a57d58ed7f2c518108d06ad53b76be0e81c96721fbea94d4e083bab',
+             'after_sha256': '14ad1e85aa2cd455de3c9f6231220a4fa9d41806a054c0e8f7d2da64e596493e'},
             {'path': 'vllm/entrypoints/serve/exception_handling/error_response.py',
              'before_sha256': 'fbd9ba671dccceef0eabf62b5fe19218ed38dda991b3519a3b92e02ad4b24b39',
              'after_sha256': '67389b072fab088e8d29e30536dd80b7be1e8aded133976f3043b760a9ac73f9'},
@@ -122200,13 +122877,13 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    def _tool_arguments_reading(\n'})},
  {'name': 'include-reasoning-shapes-the-response',
   'review_patch': 'patches/vllm-include-reasoning-shapes-the-response.patch',
-  'review_sha256': '866f50c8e1f3d7f5cfe19e1432378b18309bbd8c3c49a6d2dccf657af99fb58d',
+  'review_sha256': 'd3b41899464142ffffb04efd0b19647153e322b10c7f9fc1e14af0f290af98d1',
   'files': ({'path': 'tests/entrypoints/openai/chat_completion/test_serving_chat.py',
              'before_sha256': '80e601895d15af815ddc98233fc4aefdb656bdc682d24124d9047fad6d6057f6',
              'after_sha256': '82a3f7dad3c315ce9fa205613f8ab817a879d1a3ddb9a8c3fa72d43af51412c9'},
             {'path': 'vllm/entrypoints/openai/chat_completion/serving.py',
-             'before_sha256': '12c520ffa8cd4cf2c793e38a0756748fc48dae19b20fb9f94bceab94916e17a6',
-             'after_sha256': '9f6f58c30b0d995de4cb655ae201e6f2d556784fd18ae0e636294dfd49345f2a'}),
+             'before_sha256': '9357f6c195b933b0805acd1e515ca192219e360ffbac0f4738721bee6cbd5508',
+             'after_sha256': 'e22196b991b48a775cb030e567cfa44574b7f96f83519b5bac1de0c30a99e878'}),
   'edits': ({'name': 'tests/entrypoints/openai/chat_completion/test_serving_chat.py:landmark-1',
              'path': 'tests/entrypoints/openai/chat_completion/test_serving_chat.py',
              'before': '    assert await serving_chat.create_chat_completion(req) == '
@@ -122367,7 +123044,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '                # non-reasoning outputs.\n'})},
  {'name': 'unspecified-tool-choice-is-the-default',
   'review_patch': 'patches/vllm-unspecified-tool-choice-is-the-default.patch',
-  'review_sha256': '4d8aa3e0eca27197da16ee57db26ac89ae8811bb175c9a6126863d2967821ab5',
+  'review_sha256': '35be0035ab7ae64466a324bba0fd2a2004ba41fb254afbfd902319dcfa9ea6a7',
   'files': ({'path': 'tests/entrypoints/anthropic/test_anthropic_messages_conversion.py',
              'before_sha256': '8a0ab16f6a4cb53608192ffffc56998ce8eb7e51507b69883e5ee44dd1226265',
              'after_sha256': '6bc3ec877070bd71bd337199de61e7afa6c017a18332d7c5ac4f745491d49cf8'},
@@ -122384,11 +123061,11 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': '1a11f9bc960903d6bbaddca8f339b4517378ef54b5ce0f35543ed34a757519ae',
              'after_sha256': '6a3dcd5fa0bf1aca94cd2e9d3d463d002c986e2281732e1186b85ccc8fdea6f1'},
             {'path': 'vllm/entrypoints/openai/chat_completion/serving.py',
-             'before_sha256': '9f6f58c30b0d995de4cb655ae201e6f2d556784fd18ae0e636294dfd49345f2a',
-             'after_sha256': '505cf565af0ca47029254abdd3939c8f09893f7730ba90dfa7608e57782f56d3'},
+             'before_sha256': 'e22196b991b48a775cb030e567cfa44574b7f96f83519b5bac1de0c30a99e878',
+             'after_sha256': '36d480a3b533aaa5cf556349cad04afc0e37770c4bbbb51788836a512f1de518'},
             {'path': 'vllm/parser/abstract_parser.py',
-             'before_sha256': 'c7c5d58071832c14431c43dc1babde8882b4690ea1c6c506d756f174a9c6c95e',
-             'after_sha256': '86884905432481ad0f1369f1b3955e379298f558956964728d9be12cb4d6df34'},
+             'before_sha256': '5cfff0a45f292313ff633a1b71d1cf3f32369ae62b41d972ce80a238bc6005c0',
+             'after_sha256': 'eaffc8cd7340c05b76e5c3bc3541e65e327aa00927b7119d29b92a33d7c845ec'},
             {'path': 'vllm/parser/mistral.py',
              'before_sha256': '1ec656330956a89a6a5446e96282a2b049bb4504baad9f6779351e20958a7c25',
              'after_sha256': '0b74821f7c68d5cf572760288d82bb40c19dfe0c88a6f9412befcaf1cfdcf6e8'},
@@ -124198,7 +124875,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    ]))\n'})},
  {'name': 'responses-tools-are-one-function-list',
   'review_patch': 'patches/vllm-responses-tools-are-one-function-list.patch',
-  'review_sha256': '4d742197b35f95efedb42452b3d30623dbba0655e8b4b00bd8174e972d6c7cd8',
+  'review_sha256': 'c4f0cb9233fac4c8903c729434f7c7f85388084e7879d16bfbb852f1faf8700b',
   'files': ({'path': 'tests/tool_parsers/test_structural_tag_registry.py',
              'before_sha256': '3fbc42eef3b13462d86990e287c15e35ae3d1faa8e5a0d9eb75b338787074540',
              'after_sha256': '7d1fd82dfcf43352ff4b6953418cf762128bea9b78207a2313d9df9cb19b5f4b'},
@@ -124206,17 +124883,17 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': 'ac94348ad68957e11374ac5e9545dd62aba45dcd343206ad39481ef6dedd1a4d',
              'after_sha256': '90f95b34cf4ed5b5b871798866787d76273e29f252c6128cfafeb139668f8e7f'},
             {'path': 'vllm/entrypoints/openai/responses/protocol.py',
-             'before_sha256': 'fe67b79c05832f02635c6eaef0e4c641cecf33db59fc8b7e49ec0908bc0deb30',
-             'after_sha256': '94f64f7a6416ba4540fce67d86d58a84d50e3d8ccf71ee6f8c0b20146b81887e'},
+             'before_sha256': '7b7175cd40efdb5d165443f8147a17dcd82b8eaf0d897df14720a7f06f375124',
+             'after_sha256': '0aae2692b0fcea2274c0df5592c0d1fa6e54062a057e073c58e7380a84b1ae68'},
             {'path': 'vllm/entrypoints/openai/responses/serving.py',
-             'before_sha256': '53bccaa74f173c4f8748874e6ee2cab232419a1052295a88b92e7aabcaab4e4d',
-             'after_sha256': '5e58b9954e482deb875700d1364de54dad99ca4958c38878c48c37172b12881b'},
+             'before_sha256': '14ad1e85aa2cd455de3c9f6231220a4fa9d41806a054c0e8f7d2da64e596493e',
+             'after_sha256': 'fdcb2a0602a1ec83db357a34c9b70b8c045bf255eac6acfda83f8cc6dc106604'},
             {'path': 'vllm/entrypoints/openai/responses/utils.py',
              'before_sha256': '8d266a6a9a0f2d3c2d748e2bb4e8e69b2cdfb4a0488224e2a28d356cdf046b79',
              'after_sha256': '42a5c0d56e6f556ec9449803af46fe47d96dc0b009529fe8f785e9af605b5188'},
             {'path': 'vllm/parser/abstract_parser.py',
-             'before_sha256': '86884905432481ad0f1369f1b3955e379298f558956964728d9be12cb4d6df34',
-             'after_sha256': '83b1749ff131bfacdb0a15f973dc882e39cbc6e54b689ec0640f26317ae1debd'},
+             'before_sha256': 'eaffc8cd7340c05b76e5c3bc3541e65e327aa00927b7119d29b92a33d7c845ec',
+             'after_sha256': 'a52399b65316163be152a4c3fa9fd832e80d293814ec421832438c00bb7e1816'},
             {'path': 'vllm/tool_parsers/structural_tag_registry.py',
              'before_sha256': '9638ea980d7bf019ba3fe1fac1b12979df2ff7a51c94554a85500db2c3c40073',
              'after_sha256': '34a5d36d9afa30bee6b79a6e8c95ff1fa56580c461fc55adf5cf0c28f3e6c0fc'},
@@ -126502,13 +127179,13 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              ') -> dict[str, ResponsesToolCallName]:\n'})},
  {'name': 'batch-parse-starts-where-the-prompt-leaves',
   'review_patch': 'patches/vllm-batch-parse-starts-where-the-prompt-leaves.patch',
-  'review_sha256': '676d962e781b977933f2f0bd941b3f5413a82a96852fe588ed1a971882a933fe',
+  'review_sha256': 'd3b517a2b8b968273c480fd59650df5441755a9d31527277675502a5bbef4700',
   'files': ({'path': 'tests/entrypoints/openai/responses/test_parsable_context_unit.py',
              'before_sha256': '8fd0bd655d13abdc9fe03e1c0bb0625225431624db8257e1db07c00ac3da2779',
              'after_sha256': '95f50d93d97370d426319b5dc94fce55b9cbca4ce9b3b95a930e42990dcbf4a2'},
             {'path': 'tests/entrypoints/openai/responses/test_serving_responses.py',
-             'before_sha256': '5e9481ec6b4f3b8401fe1533dceeb233117ad0857093a34565d83594f850674d',
-             'after_sha256': '4328b8f026627f4ca59582da7376b6245175c761bbe2120614e35344a8eb806e'},
+             'before_sha256': 'ce5a325238d8c650968f59dc3d150ffc7574c224e60db2135e3fbce76d374fbd',
+             'after_sha256': '3bf75ab3385a9e43bfb6125c894c06770efa0aae92a054304826a3b02a3615cd'},
             {'path': 'tests/parser/engine/test_gemma4_streaming_reasoning.py',
              'before_sha256': '572f6a6e5f448861276bf272ec8b4be14434a9fd31312d087230f682a18f5e3e',
              'after_sha256': 'e491dbb881f33dfddbb07cb8fbebc6e5f6196c58a4b027cf04ba8095ea52f82e'},
@@ -126525,17 +127202,17 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': '90dee26650b749fec50ebc7bcf461ae5566c48e66bd0ccdb2b6d726c1ae2dd7a',
              'after_sha256': 'e48a1aaf594d7fcbb0979a1e48785ed37d2b109e6343beb318cb9145486efebe'},
             {'path': 'vllm/entrypoints/openai/chat_completion/serving.py',
-             'before_sha256': '505cf565af0ca47029254abdd3939c8f09893f7730ba90dfa7608e57782f56d3',
-             'after_sha256': '16dcdd6d8ef0939fd7316b0f8d1649efedc6848cf8df2b3db20f0b838e7c3e2e'},
+             'before_sha256': '36d480a3b533aaa5cf556349cad04afc0e37770c4bbbb51788836a512f1de518',
+             'after_sha256': 'c630163a3ee8048653a750d73177a41cafd2271cebc449ea2b441c0e0641eb7c'},
             {'path': 'vllm/entrypoints/openai/responses/context.py',
-             'before_sha256': 'a92273bc16cbdda51dafc4ba0f32615f4a4586f07acaef4256ce459f7b327b78',
-             'after_sha256': '0d2708348cb2e6266ec52cb8fd45ef8e2e90d411dc89ec1fca45b92833a1ac8f'},
+             'before_sha256': '366cfb15ac59ce6e27790d4c176d87bc1cd623599d20299c68ff672f327e9376',
+             'after_sha256': '2b84c0d0e733057b80e93075bbeae0a16a9a6a6274ad0b15d1506d1c77ce7a24'},
             {'path': 'vllm/entrypoints/openai/responses/serving.py',
-             'before_sha256': '5e58b9954e482deb875700d1364de54dad99ca4958c38878c48c37172b12881b',
-             'after_sha256': 'ff66ee97e83de3e90e4e9a072c409b1b372f94b3491d1f060591ab4640102bfd'},
+             'before_sha256': 'fdcb2a0602a1ec83db357a34c9b70b8c045bf255eac6acfda83f8cc6dc106604',
+             'after_sha256': '4cd98f5142e5a07080e008d26d3ad07cb78ecc2d160855783484142c829d7568'},
             {'path': 'vllm/parser/abstract_parser.py',
-             'before_sha256': '83b1749ff131bfacdb0a15f973dc882e39cbc6e54b689ec0640f26317ae1debd',
-             'after_sha256': '7c749ccb6f0419b6720f3b5df16f70bd19028deefd68298b54c815a738495024'},
+             'before_sha256': 'a52399b65316163be152a4c3fa9fd832e80d293814ec421832438c00bb7e1816',
+             'after_sha256': 'b2f627c28667ec2a064898e627232a5ebb7f59826ad9b961359d56226ff2c2ec'},
             {'path': 'vllm/parser/engine/parser_engine.py',
              'before_sha256': '2a48d1e6c87a29ce4efed73ff630a630ea739d572da350835334afce74240caf',
              'after_sha256': '1e1300284ccb666714938075f5f53273673a5659ed6aa30d9515ae4ce54aa811'},
@@ -129970,9 +130647,10 @@ FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5d
  'tests/entrypoints/openai/completion/test_lora_resolvers.py': '8dd3116102f4e1287364b9bd967a1e5aa3bc93eea2dfb4b7277cb16733781f4c',
  'tests/entrypoints/openai/responses/test_function_call_parsing.py': '98877f2029119b7b7b753c4a9cbc315d3c0124885bba29a45004dc9fd1cfb267',
  'tests/entrypoints/openai/responses/test_parsable_context_unit.py': '95f50d93d97370d426319b5dc94fce55b9cbca4ce9b3b95a930e42990dcbf4a2',
+ 'tests/entrypoints/openai/responses/test_reasoning_usage_context.py': '46074423f3316b6380ecb50f17c6d26aa2fe49c5fa211cb08179ee5fb4347666',
  'tests/entrypoints/openai/responses/test_responses_utils.py': '20841eeeaeacb6e3363b628e03a456e66acd71568bde9fe2727591146e3c904a',
  'tests/entrypoints/openai/responses/test_sampling_params.py': 'd4c56d82ae742e0c5075c189f91ac069f2ad0a61e336ee4f7fc178f46bf5f5b5',
- 'tests/entrypoints/openai/responses/test_serving_responses.py': '4328b8f026627f4ca59582da7376b6245175c761bbe2120614e35344a8eb806e',
+ 'tests/entrypoints/openai/responses/test_serving_responses.py': '3bf75ab3385a9e43bfb6125c894c06770efa0aae92a054304826a3b02a3615cd',
  'tests/entrypoints/openai/test_beam_search_boundary.py': '34bb27d9fc4952429dd4f31199a57ecef0ca049ac76c4040e548e9773fbd4cb1',
  'tests/entrypoints/openai/test_reasoning_enable_thinking.py': 'f196f90544a39ee15f045b6684a13197d5fce22432c5d3509e37f11fdd22314e',
  'tests/entrypoints/openai/test_render_parity.py': '59ce2042beebb9354280aa484afa47eff9588e7a345fd8b1b7dc4dd812df106e',
@@ -130086,15 +130764,15 @@ FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5d
  'vllm/entrypoints/openai/chat_completion/api_router.py': '9cb8a56328bcfea734cc252e1291b17aee6c42e7208c9c8f883ad5a434bace17',
  'vllm/entrypoints/openai/chat_completion/batch_serving.py': 'e48a1aaf594d7fcbb0979a1e48785ed37d2b109e6343beb318cb9145486efebe',
  'vllm/entrypoints/openai/chat_completion/protocol.py': '6a3dcd5fa0bf1aca94cd2e9d3d463d002c986e2281732e1186b85ccc8fdea6f1',
- 'vllm/entrypoints/openai/chat_completion/serving.py': '16dcdd6d8ef0939fd7316b0f8d1649efedc6848cf8df2b3db20f0b838e7c3e2e',
+ 'vllm/entrypoints/openai/chat_completion/serving.py': 'c630163a3ee8048653a750d73177a41cafd2271cebc449ea2b441c0e0641eb7c',
  'vllm/entrypoints/openai/cli_args.py': '2c74b481652e1b7154df7836a98eb3ef1377092dc8ac4ae02095160907b5e36e',
  'vllm/entrypoints/openai/completion/api_router.py': '95f7e88069d896bb2a616a50ca3c3c9d1fd1b2314b785b87696ad936fd205363',
  'vllm/entrypoints/openai/completion/protocol.py': 'a92405770e6d4f3b3732b0a42ebdc335441a448be9fc2ce4f92b02d16e6e0ca2',
  'vllm/entrypoints/openai/completion/serving.py': '47877f22727b674109b923e182471aa9948c75e22502b184b02a9882df4a54c5',
  'vllm/entrypoints/openai/engine/protocol.py': 'aac2094cff867c78ddf2e19829d17c24c330719d6e2f478ec3ff94c436ca0237',
- 'vllm/entrypoints/openai/responses/context.py': '0d2708348cb2e6266ec52cb8fd45ef8e2e90d411dc89ec1fca45b92833a1ac8f',
- 'vllm/entrypoints/openai/responses/protocol.py': '94f64f7a6416ba4540fce67d86d58a84d50e3d8ccf71ee6f8c0b20146b81887e',
- 'vllm/entrypoints/openai/responses/serving.py': 'ff66ee97e83de3e90e4e9a072c409b1b372f94b3491d1f060591ab4640102bfd',
+ 'vllm/entrypoints/openai/responses/context.py': '2b84c0d0e733057b80e93075bbeae0a16a9a6a6274ad0b15d1506d1c77ce7a24',
+ 'vllm/entrypoints/openai/responses/protocol.py': '0aae2692b0fcea2274c0df5592c0d1fa6e54062a057e073c58e7380a84b1ae68',
+ 'vllm/entrypoints/openai/responses/serving.py': '4cd98f5142e5a07080e008d26d3ad07cb78ecc2d160855783484142c829d7568',
  'vllm/entrypoints/openai/responses/streaming_events.py': '1d39608c0ddfb5466661fbe42d44f8c8b3584e9eeab36f3093c41734183efeba',
  'vllm/entrypoints/openai/responses/utils.py': '42a5c0d56e6f556ec9449803af46fe47d96dc0b009529fe8f785e9af605b5188',
  'vllm/entrypoints/openai/run_batch.py': 'b33bb5bb911b300914c10ac7068610330706a4c3371211ea7a165c219139f89e',
@@ -130119,7 +130797,7 @@ FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5d
  'vllm/multimodal/media/image.py': '2858f153037359fc0a089e2b4aa21bfe97f1c38860a2118f48b501c0259cd329',
  'vllm/multimodal/processing/inputs.py': '389b97d942469c5600c6c321676497a0197eccec231aeabe0836080daaddafce',
  'vllm/multimodal/processing/processor.py': '43aca2c9c8fbd6e8d825c7f6eeed460f19ee65504a8540ee6bc0f0f26b404ef7',
- 'vllm/parser/abstract_parser.py': '7c749ccb6f0419b6720f3b5df16f70bd19028deefd68298b54c815a738495024',
+ 'vllm/parser/abstract_parser.py': 'b2f627c28667ec2a064898e627232a5ebb7f59826ad9b961359d56226ff2c2ec',
  'vllm/parser/deepseek_v32.py': '1fe0aec597caf6c10ff9905a3b1918c2a8608b5b1df32127ff8038c10f5d9b1c',
  'vllm/parser/deepseek_v4.py': 'a95f86eb4146d3096a73f1076260bbc58630a74c377b9da1d7e66d65e898465f',
  'vllm/parser/engine/adapters.py': 'b59c8b5911e0570fbe5778791e079a197c365beda8160ea901e3ff2dcf18fa48',

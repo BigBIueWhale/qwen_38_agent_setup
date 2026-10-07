@@ -270,39 +270,19 @@ diff --git a/vllm/entrypoints/openai/chat_completion/serving.py b/vllm/entrypoin
      DeltaMessage,
      ErrorResponse,
      FunctionCall,
-@@ -103,6 +104,46 @@
-         created_cache_tokens=num_cache_creation_tokens,
-         multimodal_tokens=mm_token_counts or None,
+@@ -56,7 +57,7 @@
+ from vllm.logprobs import Logprob
+ from vllm.outputs import RequestOutput
+ from vllm.parser import ParserManager
+-from vllm.parser.abstract_parser import Parser
++from vllm.parser.abstract_parser import Parser, reasoning_token_usage
+ from vllm.renderers.online_renderer import OnlineRenderer
+ from vllm.sampling_params import BeamSearchParams, SamplingParams
+ from vllm.tokenizers import TokenizerLike
+@@ -105,4 +106,17 @@
      )
-+
-+
-+def _reasoning_token_count(
-+    parser: Parser | None, generated_token_count: int
-+) -> int | None:
-+    """Reasoning ids of one choice, from the parser that split it.
-+
-+    The count is the parser's own, taken on the token-id stream it split
-+    reasoning from content on, never a re-tokenisation of the reasoning
-+    text.  ``None`` when there is no parser or the parser has no exact id
-+    boundary: usage then omits the count rather than fabricating one.  A
-+    parser that was handed fewer or more ids than the choice generated has
-+    split a different stream, and the request is refused rather than
-+    reported with a count that does not describe it.
-+    """
-+    if parser is None:
-+        return None
-+    count = parser.reasoning_token_count
-+    if count is None:
-+        return None
-+    if parser.generated_token_count != generated_token_count:
-+        raise ValueError(
-+            "reasoning token accounting refused: the parser was handed "
-+            f"{parser.generated_token_count} generated ids but the choice "
-+            f"generated {generated_token_count}"
-+        )
-+    return count
-+
-+
+ 
+ 
 +def _make_completion_tokens_details(
 +    reasoning_token_counts: GenericSequence[int | None],
 +) -> CompletionTokenUsageInfo | None:
@@ -314,40 +294,40 @@ diff --git a/vllm/entrypoints/openai/chat_completion/serving.py b/vllm/entrypoin
 +            return None
 +        total += count
 +    return CompletionTokenUsageInfo(reasoning_tokens=total)
- 
- 
++
++
  class OpenAIServingChat(GenerateBaseServing):
-@@ -537,6 +578,11 @@
+@@ -537,6 +551,11 @@
                                  prompt_tokens=num_prompt_tokens,
                                  completion_tokens=0,
                                  total_tokens=num_prompt_tokens,
 +                                completion_tokens_details=(
 +                                    _make_completion_tokens_details(
-+                                        [_reasoning_token_count(parsers[i], 0)]
++                                        [reasoning_token_usage(parsers[i], 0)]
 +                                    )
 +                                ),
                              )
  
                          data = chunk.model_dump_json(exclude_unset=True)
-@@ -573,6 +619,11 @@
+@@ -573,6 +592,11 @@
                                          prompt_tokens=num_prompt_tokens,
                                          completion_tokens=0,
                                          total_tokens=num_prompt_tokens,
 +                                        completion_tokens_details=(
 +                                            _make_completion_tokens_details(
-+                                                [_reasoning_token_count(parsers[i], 0)]
++                                                [reasoning_token_usage(parsers[i], 0)]
 +                                            )
 +                                        ),
                                      )
  
                                  data = chunk.model_dump_json(exclude_unset=True)
-@@ -765,19 +816,36 @@
+@@ -765,19 +789,36 @@
                              prompt_tokens=num_prompt_tokens,
                              completion_tokens=completion_tokens,
                              total_tokens=num_prompt_tokens + completion_tokens,
 +                            completion_tokens_details=(
 +                                _make_completion_tokens_details(
-+                                    [_reasoning_token_count(parser, completion_tokens)]
++                                    [reasoning_token_usage(parser, completion_tokens)]
 +                                )
 +                            ),
                          )
@@ -363,7 +343,7 @@ diff --git a/vllm/entrypoints/openai/chat_completion/serving.py b/vllm/entrypoin
 +            # completion_tokens is.
 +            completion_tokens_details = _make_completion_tokens_details(
 +                [
-+                    _reasoning_token_count(parser, generated)
++                    reasoning_token_usage(parser, generated)
 +                    for parser, generated in zip(
 +                        parsers, previous_num_tokens, strict=True
 +                    )
@@ -379,7 +359,7 @@ diff --git a/vllm/entrypoints/openai/chat_completion/serving.py b/vllm/entrypoin
                  )
                  final_usage.prompt_tokens_details = _make_prompt_tokens_details(
                      self.enable_prompt_tokens_details,
-@@ -822,6 +890,7 @@
+@@ -822,6 +863,7 @@
                  prompt_tokens=num_prompt_tokens,
                  completion_tokens=num_completion_tokens,
                  total_tokens=num_prompt_tokens + num_completion_tokens,
@@ -387,7 +367,7 @@ diff --git a/vllm/entrypoints/openai/chat_completion/serving.py b/vllm/entrypoin
              )
  
              # Log complete streaming response if output logging is enabled
-@@ -880,6 +949,9 @@
+@@ -880,6 +922,9 @@
              )
  
          choices: list[ChatCompletionResponseChoice] = []
@@ -397,17 +377,17 @@ diff --git a/vllm/entrypoints/openai/chat_completion/serving.py b/vllm/entrypoin
  
          role = self.get_chat_request_role(request)
          tool_parser_cls = (
-@@ -914,6 +986,9 @@
+@@ -914,6 +959,9 @@
                      enable_auto_tools=self.enable_auto_tools,
                      model_output_token_ids=token_ids,
                  )
 +                reasoning_token_counts.append(
-+                    _reasoning_token_count(parser, len(token_ids))
++                    reasoning_token_usage(parser, len(token_ids))
 +                )
                  suppress_metadata = not request.include_reasoning and parser is not None
                  if not request.include_reasoning:
                      reasoning = None
-@@ -924,6 +999,7 @@
+@@ -924,6 +972,7 @@
                  content = output.text
                  tool_calls = []
                  suppress_metadata = False
@@ -415,7 +395,7 @@ diff --git a/vllm/entrypoints/openai/chat_completion/serving.py b/vllm/entrypoin
  
              auto_tools_called = False
              is_named_tool_choice = (
-@@ -1070,6 +1146,9 @@
+@@ -1070,6 +1119,9 @@
              prompt_tokens=num_prompt_tokens,
              completion_tokens=num_generated_tokens,
              total_tokens=num_prompt_tokens + num_generated_tokens,
@@ -493,7 +473,7 @@ diff --git a/vllm/parser/abstract_parser.py b/vllm/parser/abstract_parser.py
      # ========== Reasoning Parser Methods ==========
  
      @abstractmethod
-@@ -386,10 +410,32 @@
+@@ -386,11 +410,33 @@
          self,
          model_output: str,
          request: ChatCompletionRequest | ResponsesRequest,
@@ -512,7 +492,7 @@ diff --git a/vllm/parser/abstract_parser.py b/vllm/parser/abstract_parser.py
 +                model_output_token_ids=model_output_token_ids,
 +            )
          return self._reasoning_parser.extract_reasoning(model_output, request)
-+
+ 
 +    @property
 +    def reasoning_token_count(self) -> int | None:
 +        reasoning_parser = self._reasoning_parser
@@ -523,9 +503,10 @@ diff --git a/vllm/parser/abstract_parser.py b/vllm/parser/abstract_parser.py
 +        if not reasoning_parser.engine_based_streaming:
 +            return None
 +        return reasoning_parser.reasoning_token_count  # type: ignore[attr-defined]
- 
++
      def _get_function_name(
          self, request: ChatCompletionRequest | ResponsesRequest
+     ) -> str:
 @@ -790,7 +836,10 @@
          model_output_token_ids: Sequence[int] = (),
      ) -> tuple[str | None, str | None, list[FunctionCall] | None]:
@@ -546,6 +527,41 @@ diff --git a/vllm/parser/abstract_parser.py b/vllm/parser/abstract_parser.py
  
          if not state.prompt_reasoning_checked and prompt_token_ids is not None:
              state.prompt_reasoning_checked = True
+@@ -976,3 +1026,34 @@
+                         delta_message.tool_calls or []
+                     ) + flush_delta.tool_calls
+         return delta_message
++
++
++def reasoning_token_usage(
++    parser: Parser | None, generated_token_count: int
++) -> int | None:
++    """Reasoning ids of one generation, from the parser that split it.
++
++    The one count every usage report reads -- each chat choice, and each
++    Responses turn -- taken after the parse that produced the output it
++    describes.
++
++    The count is the parser's own, taken on the token-id stream it split
++    reasoning from content on, never a re-tokenisation of the reasoning
++    text.  ``None`` when there is no parser or the parser has no exact id
++    boundary: usage then omits the count rather than fabricating one.  A
++    parser that was handed fewer or more ids than the generation produced
++    has split a different stream, and the request is refused rather than
++    reported with a count that does not describe it.
++    """
++    if parser is None:
++        return None
++    count = parser.reasoning_token_count
++    if count is None:
++        return None
++    if parser.generated_token_count != generated_token_count:
++        raise ValueError(
++            "reasoning token accounting refused: the parser was handed "
++            f"{parser.generated_token_count} generated ids but the generation "
++            f"produced {generated_token_count}"
++        )
++    return count
 diff --git a/vllm/parser/engine/adapters.py b/vllm/parser/engine/adapters.py
 --- a/vllm/parser/engine/adapters.py
 +++ b/vllm/parser/engine/adapters.py
@@ -826,3 +842,214 @@ diff --git a/vllm/parser/engine/parser_engine.py b/vllm/parser/engine/parser_eng
          reasoning, content, tool_call_info = self._single_pass_parse(
              model_output,
              model_output_token_ids,
+diff --git a/tests/entrypoints/openai/responses/test_reasoning_usage_context.py b/tests/entrypoints/openai/responses/test_reasoning_usage_context.py
+new file mode 100644
+--- /dev/null
++++ b/tests/entrypoints/openai/responses/test_reasoning_usage_context.py
+@@ -0,0 +1,46 @@
++# SPDX-License-Identifier: Apache-2.0
++# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
++"""Responses reports the reasoning count the parser that split the output made.
++
++It is the count chat reports, read through the same function: the parser's own
++on the ids it split, absent when the parser has no exact boundary, and never a
++failed response for that reason.
++"""
++
++from unittest.mock import MagicMock
++
++import pytest
++
++from vllm.entrypoints.openai.responses.context import SimpleContext
++from vllm.outputs import CompletionOutput, RequestOutput
++
++
++def _generation(token_ids: list[int]) -> RequestOutput:
++    return RequestOutput(
++        request_id="req", prompt="q", prompt_token_ids=[1, 2], prompt_logprobs=None,
++        outputs=[CompletionOutput(
++            index=0, text="text", token_ids=token_ids, cumulative_logprob=None,
++            logprobs=None, finish_reason="stop", stop_reason=None,
++        )], finished=True,
++    )
++
++
++def _parser(count: int | None, generated: int) -> MagicMock:
++    parser = MagicMock()
++    parser.reasoning_token_count = count
++    parser.generated_token_count = generated
++    return parser
++
++
++@pytest.mark.parametrize("count", [None, 0, 3])
++def test_the_context_reads_the_parsers_count(count):
++    context = SimpleContext(response_parser=_parser(count, 4))
++    context.append_output(_generation([1, 2, 3, 4]))
++    assert context.num_reasoning_tokens == count
++
++
++def test_a_parser_that_split_other_ids_is_refused():
++    context = SimpleContext(response_parser=_parser(3, 2))
++    context.append_output(_generation([1, 2, 3, 4]))
++    with pytest.raises(ValueError, match="the parser was handed 2 generated ids"):
++        context.num_reasoning_tokens
+diff --git a/vllm/entrypoints/openai/responses/context.py b/vllm/entrypoints/openai/responses/context.py
+--- a/vllm/entrypoints/openai/responses/context.py
++++ b/vllm/entrypoints/openai/responses/context.py
+@@ -41,7 +41,7 @@
+ )
+ from vllm.entrypoints.serve.utils.constants import MCP_PREFIX
+ from vllm.outputs import RequestOutput
+-from vllm.parser.abstract_parser import Parser
++from vllm.parser.abstract_parser import Parser, reasoning_token_usage
+ from vllm.tokenizers import TokenizerLike
+ from vllm.utils import random_uuid
+ 
+@@ -193,8 +193,6 @@
+         self.num_prompt_tokens = 0
+         self.num_output_tokens = 0
+         self.num_cached_tokens = 0
+-        # todo num_reasoning_tokens is not implemented yet.
+-        self.num_reasoning_tokens = 0
+         # not implemented yet for SimpleContext
+         self.all_turn_metrics: list[TurnMetrics] = []
+ 
+@@ -202,6 +200,12 @@
+         self.kv_transfer_params: dict[str, Any] | None = None
+         self.ec_transfer_params: dict[str, Any] | None = None
+ 
++    @property
++    def num_reasoning_tokens(self) -> int | None:
++        """The reasoning ids of this one generation, read from the parser that
++        split it -- the batch parse or every streamed delta alike."""
++        return reasoning_token_usage(self.response_parser, self.num_output_tokens)
++
+     def append_output(self, output) -> None:
+         self.last_output = output
+         if not isinstance(output, RequestOutput):
+@@ -304,7 +308,9 @@
+         self.num_prompt_tokens = 0
+         self.num_output_tokens = 0
+         self.num_cached_tokens = 0
+-        self.num_reasoning_tokens = 0
++        # Each turn's reasoning ids, read from the parser right after the parse
++        # that split that turn, before the next turn's parse resets it.
++        self._turn_reasoning_tokens: list[int | None] = []
+         # not implemented yet for ParsableContext
+         self.all_turn_metrics: list[TurnMetrics] = []
+ 
+@@ -329,10 +335,17 @@
+ 
+         self.input_messages: list[ResponseRawMessageAndToken] = []
+         self.output_messages: list[ResponseRawMessageAndToken] = []
+-        self._accumulated_token_ids: list[int] = []
+         self.kv_transfer_params: dict[str, Any] | None = None
+         self.ec_transfer_params: dict[str, Any] | None = None
+ 
++    @property
++    def num_reasoning_tokens(self) -> int | None:
++        """Summed over turns as ``num_output_tokens`` is; absent as soon as one
++        turn has no exact count."""
++        if None in self._turn_reasoning_tokens:
++            return None
++        return sum(self._turn_reasoning_tokens)  # type: ignore[arg-type]
++
+     def append_output(self, output: RequestOutput) -> None:
+         self.num_prompt_tokens = len(output.prompt_token_ids or [])
+         self.num_cached_tokens = output.num_cached_tokens or 0
+@@ -353,6 +366,9 @@
+                 enable_auto_tools=self.enable_auto_tools,
+                 model_output_token_ids=completion.token_ids,
+             )
++            self._turn_reasoning_tokens.append(
++                reasoning_token_usage(self.response_parser, len(completion.token_ids))
++            )
+             if not self.request.include_reasoning:
+                 reasoning = None
+             self.response_messages.extend(
+@@ -364,25 +380,25 @@
+                     incomplete=completion.finish_reason == "length",
+                 )
+             )
+-        elif completion.text:
+-            self.response_messages.append(
+-                ResponseOutputMessage(
+-                    type="message",
+-                    id=f"msg_{random_uuid()}",
+-                    status="completed",
+-                    role="assistant",
+-                    content=[
+-                        ResponseOutputText(
+-                            annotations=[],
+-                            type="output_text",
+-                            text=completion.text,
+-                            logprobs=None,
+-                        )
+-                    ],
++        else:
++            self._turn_reasoning_tokens.append(None)
++            if completion.text:
++                self.response_messages.append(
++                    ResponseOutputMessage(
++                        type="message",
++                        id=f"msg_{random_uuid()}",
++                        status="completed",
++                        role="assistant",
++                        content=[
++                            ResponseOutputText(
++                                annotations=[],
++                                type="output_text",
++                                text=completion.text,
++                                logprobs=None,
++                            )
++                        ],
++                    )
+                 )
+-            )
+-
+-        self._accumulated_token_ids.extend(completion.token_ids or [])
+ 
+         if self.request.enable_response_messages:
+             output_prompt = output.prompt or ""
+diff --git a/vllm/entrypoints/openai/responses/protocol.py b/vllm/entrypoints/openai/responses/protocol.py
+--- a/vllm/entrypoints/openai/responses/protocol.py
++++ b/vllm/entrypoints/openai/responses/protocol.py
+@@ -94,7 +94,11 @@
+ 
+ 
+ class OutputTokensDetails(OpenAIBaseModel):
+-    reasoning_tokens: int = 0
++    reasoning_tokens: int | None = None
++    """Generated tokens the reasoning parser consumed inside reasoning, read
++    from the parser that split the output, as chat's
++    ``completion_tokens_details`` is; absent, never zero, when no exact split
++    was made."""
+     tool_output_tokens: int = 0
+     output_tokens_per_turn: list[int] = Field(default_factory=list)
+     tool_output_tokens_per_turn: list[int] = Field(default_factory=list)
+diff --git a/vllm/entrypoints/openai/responses/serving.py b/vllm/entrypoints/openai/responses/serving.py
+--- a/vllm/entrypoints/openai/responses/serving.py
++++ b/vllm/entrypoints/openai/responses/serving.py
+@@ -894,22 +894,6 @@
+         num_generated_tokens = context.num_output_tokens
+         num_cached_tokens = context.num_cached_tokens
+         num_reasoning_tokens = context.num_reasoning_tokens
+-        # For text-based reasoning parsers (e.g., <think>...</think>),
+-        # HarmonyContext already counts reasoning tokens via channels.
+-        # For Simple/Parsable contexts, derive reasoning_tokens from
+-        # accumulated output token IDs using the parser if not already set.
+-        if (
+-            num_reasoning_tokens == 0
+-            and isinstance(context, (SimpleContext, ParsableContext))
+-            and context.response_parser is not None
+-            and context.response_parser.reasoning_parser is not None
+-        ):
+-            accumulated = getattr(context, "_accumulated_token_ids", []) or []
+-            num_reasoning_tokens = (
+-                context.response_parser.reasoning_parser.count_reasoning_tokens(
+-                    accumulated
+-                )
+-            )
+ 
+         usage = ResponseUsage(
+             input_tokens=num_prompt_tokens,

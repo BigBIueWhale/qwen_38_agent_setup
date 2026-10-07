@@ -1766,21 +1766,19 @@ def _validate_reasoning_usage_after(state: State) -> None:
         label=label,
     )
 
-    # Both chat paths report it from the parsers that split the choices,
-    # refuse a parser that missed generated ids, and never estimate.
+    # One reader of the count, beside the parsers: every surface reports it
+    # from the parser that split the output, refuses a parser that missed
+    # generated ids, and never estimates.
     require_python_symbols(
         state,
-        chat,
-        {
-            "_reasoning_token_count": ("parser", "generated_token_count"),
-            "_make_completion_tokens_details": ("reasoning_token_counts",),
-        },
+        abstract,
+        {"reasoning_token_usage": ("parser", "generated_token_count")},
         label=label,
     )
     _require_in_symbol(
         state,
-        chat,
-        "_reasoning_token_count",
+        abstract,
+        "reasoning_token_usage",
         (
             "count = parser.reasoning_token_count",
             "if parser.generated_token_count != generated_token_count:",
@@ -1788,6 +1786,14 @@ def _validate_reasoning_usage_after(state: State) -> None:
         ),
         label=label,
     )
+    require_python_symbols(
+        state,
+        chat,
+        {"_make_completion_tokens_details": ("reasoning_token_counts",)},
+        label=label,
+    )
+    forbid_text(state, chat, "def _reasoning_token_count(", label=label)
+    require_text(state, chat, "reasoning_token_usage(", count=5, label=label)
     require_text(state, chat, "completion_tokens_details=", count=6, label=label)
     _require_in_symbol(
         state,
@@ -1806,7 +1812,7 @@ def _validate_reasoning_usage_after(state: State) -> None:
         "OpenAIServingChat.chat_completion_full_generator",
         (
             "reasoning_token_counts: list[int | None] = []",
-            "_reasoning_token_count(parser, len(token_ids))",
+            "reasoning_token_usage(parser, len(token_ids))",
             "reasoning_token_counts.append(None)",
             "completion_tokens_details=_make_completion_tokens_details(",
         ),
@@ -1814,6 +1820,53 @@ def _validate_reasoning_usage_after(state: State) -> None:
     )
     for absent in ("estimate", "len(reasoning)", "tokenizer.encode(reasoning"):
         forbid_text(state, chat, absent, label=label)
+
+    # Responses reads the same count from the same parser -- per generation,
+    # summed over a parsable context's turns -- and serves it absent, never
+    # zero and never a failed response, when no exact split was made.
+    responses_context = "vllm/entrypoints/openai/responses/context.py"
+    responses_serving = "vllm/entrypoints/openai/responses/serving.py"
+    _require_in_symbol(
+        state, responses_context, "SimpleContext.num_reasoning_tokens",
+        ("reasoning_token_usage(self.response_parser, self.num_output_tokens)",),
+        label=label,
+    )
+    _require_in_symbol(
+        state, responses_context, "ParsableContext.append_output",
+        ("reasoning_token_usage(self.response_parser, len(completion.token_ids))",
+         "self._turn_reasoning_tokens.append(None)"),
+        label=label,
+    )
+    _require_in_symbol(
+        state, responses_context, "ParsableContext.num_reasoning_tokens",
+        ("if None in self._turn_reasoning_tokens:",), label=label,
+    )
+    # Harmony counts its own reasoning channel; the parsed contexts read the
+    # parser and keep no counter beside it.
+    for context in ("SimpleContext.__init__", "ParsableContext.__init__"):
+        _require(
+            "self.num_reasoning_tokens" not in _symbol_source(
+                state, responses_context, context, label=label),
+            f"{label}: {context} keeps a reasoning counter beside the parser's",
+        )
+    forbid_text(state, responses_serving, "count_reasoning_tokens(", label=label)
+    require_text(
+        state, responses_serving,
+        "num_reasoning_tokens = context.num_reasoning_tokens", label=label,
+    )
+    require_text(
+        state, "vllm/entrypoints/openai/responses/protocol.py",
+        "    reasoning_tokens: int | None = None\n", label=label,
+    )
+    require_python_symbols(
+        state,
+        "tests/entrypoints/openai/responses/test_reasoning_usage_context.py",
+        {
+            "test_the_context_reads_the_parsers_count": None,
+            "test_a_parser_that_split_other_ids_is_refused": None,
+        },
+        label=label,
+    )
 
     require_python_symbols(
         state,
@@ -4595,10 +4648,14 @@ CONTRACTS: Mapping[str, SemanticContract] = {
             "from the transition table, advanced on every feed, summed across "
             "choices exactly as completion_tokens is, and served on both chat "
             "paths -- the batch split now receives the generated ids it used "
-            "to drop. A grammar without one id-marked boundary, a parser fed "
-            "text without its ids, or a parser that missed generated ids "
-            "yields no count or a refusal, never an estimate; the field is "
-            "absent, not zero, when no exact split was made."
+            "to drop -- and on Responses, which reads the same count through "
+            "the same function, per turn, instead of a second count of its own "
+            "(that one raised for every grammar without one id-marked "
+            "boundary, a 500 on every Responses request for those families). "
+            "A grammar without one id-marked boundary, a parser fed text "
+            "without its ids, or a parser that missed generated ids yields no "
+            "count or a refusal, never an estimate; the field is absent, not "
+            "zero, when no exact split was made."
         ),
         removal_condition=(
             "Remove only when pinned upstream serves completion_tokens_details."

@@ -618,7 +618,7 @@ diff --git a/vllm/entrypoints/openai/responses/protocol.py b/vllm/entrypoints/op
      RequestOutputKind,
      SamplingParams,
      StructuredOutputsParams,
-@@ -457,17 +458,10 @@
+@@ -461,17 +462,10 @@
              thinking_token_budget = default_sampling_params.get(
                  "thinking_token_budget"
              )
@@ -639,7 +639,7 @@ diff --git a/vllm/entrypoints/openai/responses/protocol.py b/vllm/entrypoints/op
  
          stop = self.stop if self.stop else []
          if isinstance(stop, str):
-@@ -484,6 +478,7 @@
+@@ -488,6 +482,7 @@
              temperature=temperature,
              top_p=top_p,
              top_k=top_k,

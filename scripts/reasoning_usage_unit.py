@@ -9,13 +9,14 @@ from unittest.mock import MagicMock
 from vllm.entrypoints.openai.chat_completion.protocol import ChatCompletionRequest
 from vllm.entrypoints.openai.chat_completion.serving import (
     _make_completion_tokens_details,
-    _reasoning_token_count,
 )
 from vllm.entrypoints.openai.engine.protocol import (
     CompletionTokenUsageInfo,
     UsageInfo,
 )
 from vllm.parser import ParserManager
+from vllm.parser.abstract_parser import DelegatingParser, reasoning_token_usage
+from vllm.parser.engine.adapters import make_adapters
 from vllm.parser.engine.events import EventType
 from vllm.parser.engine.parser_engine import ParserEngine
 from vllm.parser.engine.parser_engine_config import (
@@ -116,7 +117,7 @@ assert joined(outputs, "reasoning") == "ABC", outputs
 assert joined(outputs, "content") == "DE", outputs
 assert explicit.reasoning_token_count == 3
 assert explicit.generated_token_count == 6
-assert _reasoning_token_count(explicit, 6) == 3
+assert reasoning_token_usage(explicit, 6) == 3
 
 call = (
     TOOL_CALL_START,
@@ -159,9 +160,9 @@ assert _make_completion_tokens_details([3, 2]) == CompletionTokenUsageInfo(
     reasoning_tokens=5
 )
 assert _make_completion_tokens_details([3, None]) is None
-assert _reasoning_token_count(None, 6) is None
+assert reasoning_token_usage(None, 6) is None
 try:
-    _reasoning_token_count(explicit, 7)
+    reasoning_token_usage(explicit, 7)
 except ValueError as exc:
     assert "handed 6 generated ids" in str(exc), str(exc)
 else:
@@ -231,5 +232,75 @@ for transitions, reason in (
         assert reason in str(exc), str(exc)
     else:
         raise AssertionError(f"an unmodelled grammar was counted: {reason}")
+
+
+# Responses reports the same count chat does, read from the parser that split
+# the output: exact for the deployed grammar, and absent -- never a failed
+# response -- for a grammar that re-enters reasoning, as gemma4, deepseek_v4,
+# glm45/glm47 and ling3 do.
+def responses_usage(parser, text, ids):
+    import asyncio
+
+    from vllm.entrypoints.openai.responses.context import SimpleContext
+    from vllm.entrypoints.openai.responses.protocol import ResponsesRequest
+    from vllm.entrypoints.openai.responses.serving import OpenAIServingResponses
+    from vllm.outputs import CompletionOutput, RequestOutput
+    from vllm.sampling_params import SamplingParams
+
+    serving = OpenAIServingResponses.__new__(OpenAIServingResponses)
+    serving.enable_log_outputs = False
+    serving.request_logger = None
+    serving.enable_auto_tools = True
+    request = ResponsesRequest(input="q", kv_scope="unit", store=False)
+    context = SimpleContext(response_parser=parser)
+    completion = CompletionOutput(
+        index=0, text=text, token_ids=ids, cumulative_logprob=None, logprobs=None,
+        finish_reason="stop", stop_reason=None,
+    )
+    context.append_output(RequestOutput(
+        request_id="unit", prompt="q", prompt_token_ids=[1, 2, 3],
+        prompt_logprobs=None, outputs=[completion], finished=True,
+    ))
+    output = serving._collect_response_output(request, context, tokenizer)
+    response = asyncio.run(serving._finalize_response(
+        request, SamplingParams(max_tokens=16), context, "unit", 1, output,
+    ))
+    return response.usage.output_tokens_details.reasoning_tokens
+
+
+text, ids = tokens("A", "B", "C", THINK_END, "D", "E")
+assert responses_usage(make_parser(tokenizer), text, ids) == 3
+
+
+class ReenteringGrammar(ParserEngine):
+    def __init__(self, tokenizer, tools=None, **kwargs):
+        super().__init__(tokenizer, tools, parser_engine_config=ParserEngineConfig(
+            name="unit-reentering",
+            initial_state=ParserState.REASONING,
+            terminals={"THINK_START": THINK_START, "THINK_END": THINK_END},
+            token_id_terminals={
+                "THINK_START": TokenTerminal(THINK_START),
+                "THINK_END": TokenTerminal(THINK_END),
+            },
+            transitions={
+                (ParserState.REASONING, "THINK_END"): Transition(
+                    ParserState.CONTENT, (EventType.REASONING_END,)
+                ),
+                (ParserState.CONTENT, "THINK_START"): Transition(
+                    ParserState.REASONING, (EventType.REASONING_START,)
+                ),
+            },
+        ))
+
+
+reentering_reasoning, _ = make_adapters(ReenteringGrammar)
+
+
+class Reentering(DelegatingParser):
+    reasoning_parser_cls = reentering_reasoning
+    tool_parser_cls = None
+
+
+assert responses_usage(Reentering(tokenizer), text, ids) is None
 
 print("reasoning-usage-unit: PASS")

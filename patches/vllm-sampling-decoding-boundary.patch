@@ -542,14 +542,14 @@ diff --git a/vllm/entrypoints/openai/chat_completion/serving.py b/vllm/entrypoin
 +++ b/vllm/entrypoints/openai/chat_completion/serving.py
 @@ -56,7 +56,7 @@
  from vllm.parser import ParserManager
- from vllm.parser.abstract_parser import Parser
+ from vllm.parser.abstract_parser import Parser, reasoning_token_usage
  from vllm.renderers.online_renderer import OnlineRenderer
 -from vllm.sampling_params import BeamSearchParams, SamplingParams
 +from vllm.sampling_params import SamplingParams
  from vllm.tokenizers import TokenizerLike
  from vllm.utils.collection_utils import as_list
  from vllm.utils.serial_utils import numpy2base64
-@@ -331,16 +331,10 @@
+@@ -304,16 +304,10 @@
                  truncate_prompt_tokens=request.truncate_prompt_tokens,
              )
  
@@ -570,7 +570,7 @@ diff --git a/vllm/entrypoints/openai/chat_completion/serving.py b/vllm/entrypoin
  
              self._log_inputs(
                  sub_request_id,
-@@ -356,44 +350,34 @@
+@@ -329,44 +323,34 @@
              )
              session_id = self._get_session_id(request, raw_request)
  

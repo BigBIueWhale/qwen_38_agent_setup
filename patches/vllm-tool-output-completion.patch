@@ -219,16 +219,16 @@ diff --git a/tests/entrypoints/openai/responses/test_serving_responses.py b/test
      mock_parser_instance.is_reasoning_end = MagicMock(return_value=False)
      serving.parser = MagicMock(return_value=mock_parser_instance)
      return mock_parser_instance
-@@ -1255,7 +1255,7 @@
-     serving._initialize_tool_sessions = AsyncMock()
+@@ -1256,7 +1256,7 @@
      parser = MagicMock()
-     parser.reasoning_parser = None
+     # The scripted parser splits no reasoning on an exact id boundary.
+     parser.reasoning_token_count = None
 -    parser.parse.side_effect = AssertionError("Streaming output must not be reparsed")
 +    parser.parse_output.side_effect = AssertionError("Streaming output must not be reparsed")
      deltas = []
      if shape == "mixed":
          deltas.append(DeltaMessage(reasoning="preserved thinking"))
-@@ -1271,7 +1271,7 @@
+@@ -1272,7 +1272,7 @@
                      index=index, function=DeltaFunctionCall(arguments='"x":1}'),
                  )]),
              ])
@@ -237,8 +237,8 @@ diff --git a/tests/entrypoints/openai/responses/test_serving_responses.py b/test
      context = SimpleContext(response_parser=parser)
  
      async def outputs():
-@@ -1306,7 +1306,7 @@
-     assert final.usage.output_tokens == len(deltas)
+@@ -1308,7 +1308,7 @@
+     assert final.usage.output_tokens_details.reasoning_tokens is None
      assert [event.sequence_number for event in events] == list(range(len(events)))
      serving._initialize_tool_sessions.assert_not_awaited()
 -    parser.parse.assert_not_called()
@@ -246,7 +246,7 @@ diff --git a/tests/entrypoints/openai/responses/test_serving_responses.py b/test
      if finish == "length":
          assert done[-1].status == "incomplete"
      else:
-@@ -1357,3 +1357,87 @@
+@@ -1359,3 +1359,87 @@
      assert response.status == ("incomplete" if finish == "length" else "completed")
      assert response.output[0].status == response.status
      assert response.output[0].content[0].logprobs == [logprob]
@@ -756,8 +756,7 @@ diff --git a/tests/v1/structured_output/test_backend_xgrammar_stop_tokens.py b/t
 diff --git a/vllm/entrypoints/openai/chat_completion/serving.py b/vllm/entrypoints/openai/chat_completion/serving.py
 --- a/vllm/entrypoints/openai/chat_completion/serving.py
 +++ b/vllm/entrypoints/openai/chat_completion/serving.py
-@@ -644,14 +644,15 @@
- 
+@@ -618,12 +618,13 @@
                      delta_message: DeltaMessage | None
  
                      if parser is not None:
@@ -773,9 +772,7 @@ diff --git a/vllm/entrypoints/openai/chat_completion/serving.py b/vllm/entrypoin
                          )
                          if delta_message is not None and delta_message.tool_calls:
                              tools_streamed[i] = True
- 
-@@ -749,8 +750,9 @@
-                         # clients must never mistake a truncated call for an
+@@ -723,6 +724,7 @@
                          # executable, normally-terminated tool call.
                          if (
                              output.finish_reason == "stop"
@@ -783,9 +780,7 @@ diff --git a/vllm/entrypoints/openai/chat_completion/serving.py b/vllm/entrypoin
                              and tools_streamed[i]
                              and not tool_choice_function_name
                          ):
-                             finish_reason_ = "tool_calls"
-@@ -959,13 +961,15 @@
-             else:
+@@ -933,11 +935,13 @@
                  logprobs = None
  
              if parser is not None:
@@ -799,10 +794,8 @@ diff --git a/vllm/entrypoints/openai/chat_completion/serving.py b/vllm/entrypoin
 +                    stop_reason=output.stop_reason,
                  )
                  reasoning_token_counts.append(
-                     _reasoning_token_count(parser, len(token_ids))
-                 )
-@@ -1067,11 +1071,13 @@
-             # Parsing a partial function prefix does not override the engine's
+                     reasoning_token_usage(parser, len(token_ids))
+@@ -1041,9 +1045,11 @@
              # terminal condition.  In particular, ``length`` is a fail-closed
              # signal: the returned call prefix is incomplete and must not be
              # executed by an agent client.
@@ -817,12 +810,10 @@ diff --git a/vllm/entrypoints/openai/chat_completion/serving.py b/vllm/entrypoin
              )
  
              routed_experts_b64 = (
-                 numpy2base64(output.routed_experts)
 diff --git a/vllm/entrypoints/openai/responses/context.py b/vllm/entrypoints/openai/responses/context.py
 --- a/vllm/entrypoints/openai/responses/context.py
 +++ b/vllm/entrypoints/openai/responses/context.py
-@@ -346,13 +346,15 @@
-         completion = output.outputs[0]
+@@ -360,11 +360,13 @@
          self.finish_reason = completion.finish_reason
  
          if self.response_parser is not None:
@@ -835,13 +826,12 @@ diff --git a/vllm/entrypoints/openai/responses/context.py b/vllm/entrypoints/ope
 +                finish_reason=completion.finish_reason,
 +                stop_reason=completion.stop_reason,
              )
-             if not self.request.include_reasoning:
-                 reasoning = None
-             self.response_messages.extend(
+             self._turn_reasoning_tokens.append(
+                 reasoning_token_usage(self.response_parser, len(completion.token_ids))
 diff --git a/vllm/entrypoints/openai/responses/serving.py b/vllm/entrypoints/openai/responses/serving.py
 --- a/vllm/entrypoints/openai/responses/serving.py
 +++ b/vllm/entrypoints/openai/responses/serving.py
-@@ -1046,13 +1046,15 @@
+@@ -1030,13 +1030,15 @@
              )
  
          # Use parser to extract reasoning, content, and tool calls
@@ -858,7 +848,7 @@ diff --git a/vllm/entrypoints/openai/responses/serving.py b/vllm/entrypoints/ope
              if not request.include_reasoning:
                  reasoning = None
                  logprobs = None
-@@ -1362,14 +1364,15 @@
+@@ -1346,14 +1348,15 @@
              delta_text = output.text
              delta_token_ids = as_list(output.token_ids)
  
