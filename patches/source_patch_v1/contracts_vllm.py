@@ -2206,22 +2206,36 @@ def _validate_kv_physical_after(state: State) -> None:
         location=f"{worker}:Worker.determine_available_memory",
     )
     # Each phase runs in the residency serving runs it in: the encoder with
-    # the reclaimable workspace released, the text step attending at full
-    # context with it resident, then its sampler and its prompt log
-    # probabilities at the most a request is admitted with.
+    # the reclaimable workspace released, the text step with it resident,
+    # then its sampler and its prompt log probabilities at the most a request
+    # is admitted with. That the text step ran attention and every state
+    # update is witnessed by the step itself and refused at startup when it
+    # is missing, so no argument the step is called with is pinned here.
     _require_ordered(
         _symbol_source(state, runner, "GPUModelRunner.profile_served_phases",
                        label=label),
         (
             "with release_reclaimable_workspaces():",
             "self._run_dummy_encoder()",
+            "num_logprobs = self._largest_admitted_logprob_count()",
+            "with manager.witness_reclaimable_requests() as requested:",
             "self._run_dummy_text_step(",
-            "num_logprobs=self._largest_admitted_logprob_count(),",
-            "force_attention=True, profile_seq_lens=self.max_model_len",
+            "layer_reads=layer_reads,",
+            "self._require_text_step_ran(",
         ),
         label=label,
         location=f"{runner}:GPUModelRunner.profile_served_phases",
     )
+    # The witnesses are produced where the served code runs: the dummy step
+    # records which layers read the metadata it built, and the workspace
+    # manager which reclaimable workspaces were requested.
+    _require_in_symbol(state, runner, "GPUModelRunner._dummy_run", (
+        "attn_metadata = _record_layer_reads(attn_metadata, layer_reads)",
+    ), label=label)
+    _require_in_symbol(state, "vllm/v1/worker/workspace.py",
+                       "WorkspaceManager.get_reclaimable_simultaneous", (
+        "self._witnessed_requests.add(name)",
+    ), label=label)
     _require_ordered(
         _symbol_source(state, runner, "GPUModelRunner._run_dummy_text_step",
                        label=label),
@@ -2274,12 +2288,16 @@ def _validate_kv_physical_after(state: State) -> None:
     require_python_symbols(state, "tests/v1/worker/test_gpu_worker.py", {
         "test_physical_bound_charges_preexisting_residents_once": None,
         "test_served_profile_encodes_with_workspace_released_and_attends_in_text": None,
+        "test_served_profile_refuses_a_text_step_that_skipped_what_serving_runs": None,
         "test_largest_admitted_logprob_count": None,
         "test_served_text_step_samples_then_scores_the_prompt": None,
         "test_dummy_prompt_logprobs_scores_every_prompt_row_of_the_step": None,
         "test_prompt_logprobs_are_scored_by_the_profiled_function": None,
         "test_profiling_kv_cache_yields_stand_in_bytes_and_always_removes_it": None,
         "test_dummy_context_covers_its_own_query": None,
+    }, label=label)
+    require_python_symbols(state, "tests/v1/worker/test_workspace.py", {
+        "test_witness_names_the_reserved_workspaces_a_block_never_requested": None,
     }, label=label)
 
 
@@ -4942,7 +4960,10 @@ CONTRACTS: Mapping[str, SemanticContract] = {
             "sampler and its prompt log probabilities at the most a request is "
             "admitted with, computed as serving computes them -- the peak of "
             "those phases above that with the stand-in pool taken off, CUDA "
-            "graph and frontend reservations. The V2 runner, whose profile runs "
+            "graph and frontend reservations. The profile witnesses what its "
+            "text step ran -- every layer holding KV cache or state read its "
+            "metadata, every reserved reclaimable workspace was requested -- "
+            "and refuses startup otherwise. The V2 runner, whose profile runs "
             "no attention, holds no declared pool."
         ),
         removal_condition=(

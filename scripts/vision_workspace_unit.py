@@ -11,8 +11,12 @@ import torch
 from vllm.config import CUDAGraphMode
 from vllm.config import vllm as vllm_config
 from vllm.config.compilation import CompilationMode
+from vllm.forward_context import ForwardContext, override_forward_context
+from vllm.model_executor.layers.attention import attention as attention_layer
+from vllm.model_executor.layers.mamba.gdn import qwen_gdn_linear_attn
 from vllm.utils import mem_utils
 from vllm.v1.attention.backends import turboquant_attn
+from vllm.v1.attention.backends.gdn_attn import GDNAttentionMetadata
 from vllm.v1.core import kv_cache_utils
 from vllm.v1.kv_cache_interface import FullAttentionSpec
 from vllm.v1.worker import gpu_model_runner, gpu_worker, workspace
@@ -173,6 +177,168 @@ def test_turboquant_reservation_routing() -> None:
     )
 
 
+class _ReachedKernel(Exception):
+    """The served path went on past its witness to a GPU kernel."""
+
+
+def test_served_paths_witness_their_own_execution() -> None:
+    # The profile's witnesses are produced by the served code itself: an
+    # attention layer reads its metadata through the attention op, and a
+    # TurboQuant continuation requests the reclaimable workspace, only on
+    # the path that executes; GDN reads its metadata only on the path that
+    # updates its state. Without metadata both return having read nothing.
+    max_model_len, block, q_len = 4096, 32, 2048
+    vllm_config = SimpleNamespace(
+        attention_config=SimpleNamespace(tq_max_kv_splits_for_cuda_graph=4),
+        model_config=SimpleNamespace(
+            max_model_len=max_model_len,
+            dtype=torch.float16,
+            get_num_attention_heads=lambda parallel_config: 8,
+        ),
+        scheduler_config=SimpleNamespace(
+            max_num_seqs=1, enable_chunked_prefill=True, max_num_batched_tokens=q_len
+        ),
+        parallel_config=SimpleNamespace(
+            tensor_parallel_size=1, decode_context_parallel_size=1
+        ),
+    )
+
+    class Launcher:
+        def __getitem__(self, grid):
+            def launch(*args, **kwargs):
+                raise _ReachedKernel
+            return launch
+
+    saved_config = turboquant_attn.get_current_vllm_config
+    saved_dequant = turboquant_attn._tq_full_dequant_kv
+    saved_manager = workspace._manager
+    turboquant_attn.get_current_vllm_config = lambda: vllm_config
+    turboquant_attn._tq_full_dequant_kv = Launcher()
+    workspace._manager = manager = workspace.WorkspaceManager(torch.device("cpu"))
+    try:
+        spec = FullAttentionSpec(
+            block_size=block, num_kv_heads=4, head_size=128, head_size_v=128,
+            dtype=torch.uint8, state_content_bytes=102,
+        )
+        turboquant_attn.TurboQuantMetadataBuilder(
+            spec, ["layers.0.self_attn.attn"], vllm_config, torch.device("cpu")
+        )
+        impl = turboquant_attn.TurboQuantAttentionImpl(
+            num_heads=8, head_size=128, scale=1.0, num_kv_heads=4,
+            kv_cache_dtype="turboquant_k8v4",
+        )
+        attn = "layers.0.self_attn.attn"
+        attn_layer = SimpleNamespace(
+            impl=impl,
+            kv_cache=torch.zeros(
+                (max_model_len // block, block, 4, 256), dtype=torch.uint8
+            ),
+        )
+
+        def tq_metadata(seq_len):
+            return turboquant_attn.TurboQuantMetadata(
+                seq_lens=torch.tensor([seq_len], dtype=torch.int32),
+                slot_mapping=torch.full((q_len,), -1, dtype=torch.int64),
+                block_table=torch.zeros(
+                    (1, max_model_len // block), dtype=torch.int32
+                ),
+                query_start_loc=torch.tensor([0, q_len], dtype=torch.int32),
+                num_actual_tokens=q_len, max_query_len=q_len, max_seq_len=seq_len,
+                is_prefill=True, num_decodes=0, num_decode_tokens=0,
+                query_start_loc_cpu=torch.tensor([0, q_len], dtype=torch.int32),
+                seq_lens_cpu=torch.tensor([seq_len], dtype=torch.int32),
+            )
+
+        def attend(metadata):
+            reads: set[str] = set()
+            if metadata is not None:
+                metadata = gpu_model_runner._record_layer_reads(
+                    {attn: metadata}, reads
+                )
+            context = ForwardContext(
+                no_compile_layers={attn: attn_layer},
+                attn_metadata=metadata,
+                slot_mapping={},
+            )
+            query = torch.zeros(q_len, 8 * 128, dtype=torch.float16)
+            key = torch.zeros(q_len, 4 * 128, dtype=torch.float16)
+            with (
+                override_forward_context(context),
+                manager.witness_reclaimable_requests() as requested,
+            ):
+                try:
+                    attention_layer.unified_attention_with_output(
+                        query, key, key,
+                        torch.empty(q_len, 8 * 128, dtype=torch.float16), attn,
+                    )
+                    reached = False
+                except _ReachedKernel:
+                    reached = True
+            return reads, requested, reached
+
+        # No metadata: zeros, and nothing read or requested.
+        assert attend(None) == (set(), set(), False)
+        # A first prefill chunk attends within the step: read, no workspace.
+        assert attend(tq_metadata(q_len)) == ({attn}, set(), False)
+        # A continuation at full context requests the workspace and goes on
+        # to dequantise the cached K/V into it.
+        assert attend(tq_metadata(max_model_len)) == (
+            {attn}, {_CONTINUATION}, True
+        )
+    finally:
+        turboquant_attn.get_current_vllm_config = saved_config
+        turboquant_attn._tq_full_dequant_kv = saved_dequant
+        workspace._manager = saved_manager
+
+    class StateUpdate:
+        def __get__(self, layer, owner):
+            raise _ReachedKernel
+
+    warm_ups = []
+    Layer = type("Layer", (), {
+        "_forward_core": qwen_gdn_linear_attn.QwenGatedDeltaNetAttention._forward_core,
+        "conv1d": StateUpdate(),
+    })
+    gdn = Layer()
+    gdn.prefix = "layers.1.linear_attn"
+    gdn._warmup_prefill_kernels = lambda mixed_qkv, v_dim: warm_ups.append(v_dim)
+    gdn.enable_packed_recurrent_decode = False
+    gdn.kv_cache = (torch.zeros(2, 64, 3), torch.zeros(2, 4, 16, 16))
+    tokens = 64
+    gdn_metadata = GDNAttentionMetadata(
+        num_prefills=1, num_prefill_tokens=tokens, num_decodes=0,
+        num_decode_tokens=0, num_spec_decodes=0, num_spec_decode_tokens=0,
+        num_actual_tokens=tokens,
+        has_initial_state=torch.ones(1, dtype=torch.bool),
+        non_spec_query_start_loc=torch.tensor([0, tokens], dtype=torch.int32),
+        non_spec_state_indices_tensor=torch.zeros(1, dtype=torch.int32),
+    )
+    for metadata, expected in ((None, (set(), False)),
+                               (gdn_metadata, ({gdn.prefix}, True))):
+        reads: set[str] = set()
+        if metadata is not None:
+            metadata = gpu_model_runner._record_layer_reads(
+                {gdn.prefix: metadata}, reads
+            )
+        context = ForwardContext(
+            no_compile_layers={gdn.prefix: gdn},
+            attn_metadata=metadata,
+            slot_mapping={},
+        )
+        with override_forward_context(context):
+            try:
+                qwen_gdn_linear_attn.qwen_gdn_attention_core(
+                    torch.zeros(tokens, 64), torch.zeros(tokens, 4),
+                    torch.zeros(tokens, 4), torch.zeros(tokens, 4, 16),
+                    layer_name=gdn.prefix,
+                )
+                reached = False
+            except _ReachedKernel:
+                reached = True
+        assert (reads, reached) == expected, (metadata is None, reads, reached)
+    assert warm_ups == [0]
+
+
 def test_model_runner_phase_boundary() -> None:
     events = []
 
@@ -257,14 +423,29 @@ class _Device:
         self.peak = self.allocated()
 
 
-def _profiled_bound(sizes: dict[str, int]) -> tuple[int, int]:
+_CONTINUATION = "turboquant_continuation_prefill"
+
+
+def _profiled_bound(
+    sizes: dict[str, int], skipped: str | None = None
+) -> tuple[int, int]:
     """Run the worker's derivation over the runner's profile, both as built,
     on a device where each phase allocates `sizes`; return the bound and
-    what serving holds beside its pool at its worst moment."""
+    what serving holds beside its pool at its worst moment. The pool holds
+    two model layers and a drafter's; each model layer reads its metadata
+    when the step built it, and the continuation phase requests the
+    reclaimable workspace when one request holds the step -- except what
+    `skipped` names ("layer" or "workspace")."""
     total, others, weights, non_torch = 1 << 30, 3 << 20, 600 << 20, 40 << 20
     reclaimable, primary = sizes["reclaimable"], 1 << 20
     builders, input_batch, per_block, blocks = 3 << 20, 2 << 20, 5 << 20, 2
     max_model_len, max_num_tokens, max_logprobs, vocab = 4096, 2048, 20, 1000
+    model_layers = {
+        "layers.0.self_attn.attn": object(),
+        "layers.1.linear_attn": object(),
+    }
+    drafter_layer = "drafter.layers.0.self_attn.attn"
+    forward_context = {**model_layers, drafter_layer: object()}
 
     manager = workspace.WorkspaceManager(torch.device("cpu"))
     device = _Device(total, others, manager)
@@ -280,15 +461,20 @@ def _profiled_bound(sizes: dict[str, int]) -> tuple[int, int]:
         device.alloc("builders", builders)
         manager.get_simultaneous(((primary,), torch.uint8))
         manager.get_reclaimable_simultaneous(
-            "turboquant_continuation_prefill", ((reclaimable,), torch.uint8)
+            _CONTINUATION, ((reclaimable,), torch.uint8)
         )
         if "input_batch" not in device.named:
             device.alloc("input_batch", input_batch)
-        return SimpleNamespace(num_blocks=blocks, kv_cache_groups=["layer-group"])
+        runner.kv_cache_config = SimpleNamespace(
+            num_blocks=blocks,
+            kv_cache_groups=[SimpleNamespace(layer_names=list(forward_context))],
+        )
+        return runner.kv_cache_config
 
     def cleanup(runner) -> None:
         device.free("stand_in")
         device.free("builders")
+        del runner.kv_cache_config
 
     def embed_multimodal(**inputs):
         assert manager._reclaimable_workspaces_released or not any(
@@ -300,7 +486,7 @@ def _profiled_bound(sizes: dict[str, int]) -> tuple[int, int]:
         return [torch.zeros(4, 8)]
 
     def dummy_run(runner, num_tokens, is_profile=False, force_attention=False,
-                  profile_seq_lens=None):
+                  profile_seq_lens=None, max_num_reqs=None, layer_reads=None):
         assert is_profile
         text = sizes["text"]
         if force_attention:
@@ -308,6 +494,16 @@ def _profiled_bound(sizes: dict[str, int]) -> tuple[int, int]:
             # context a request holds; its first call autotunes once.
             assert "stand_in" in device.named
             assert profile_seq_lens == max_model_len
+            metadata = gpu_model_runner._record_layer_reads(
+                {name: object() for name in forward_context}, layer_reads
+            )
+            for name in model_layers:
+                if not (skipped == "layer" and name == "layers.1.linear_attn"):
+                    metadata[name]
+            if max_num_reqs == 1 and skipped != "workspace":
+                manager.get_reclaimable_simultaneous(
+                    _CONTINUATION, ((reclaimable,), torch.uint8)
+                )
             text += sizes["attention"]
             if not runner.autotuned:
                 runner.autotuned = True
@@ -350,6 +546,7 @@ def _profiled_bound(sizes: dict[str, int]) -> tuple[int, int]:
             "profiling_kv_cache",
             "_run_dummy_encoder",
             "_run_dummy_text_step",
+            "_require_text_step_ran",
             "_dummy_prompt_logprobs_run",
             "_largest_admitted_logprob_count",
         )
@@ -381,6 +578,13 @@ def _profiled_bound(sizes: dict[str, int]) -> tuple[int, int]:
     )
     runner.device = torch.device("cpu")
     runner.encoder_cache = EncoderCache()
+    runner.get_model = lambda: SimpleNamespace(
+        modules=lambda: iter(model_layers.values())
+    )
+    runner.compilation_config = SimpleNamespace(
+        static_forward_context=forward_context
+    )
+    runner.max_num_reqs = 4
     runner.max_num_tokens = max_num_tokens
     runner.max_model_len = max_model_len
     runner.is_pooling_model = False
@@ -459,6 +663,29 @@ def _profiled_bound(sizes: dict[str, int]) -> tuple[int, int]:
     )
     held = weights + non_torch + primary + input_batch + builders + phase
     return bound, total - others - held
+
+
+def test_kv_bound_refuses_a_text_step_that_skips_what_serving_runs() -> None:
+    # The text step's own execution is the witness: a model layer that never
+    # read its metadata, or a reserved reclaimable workspace never requested,
+    # refuses startup by name. A drafter's layer is not the model's step.
+    mib = 1 << 20
+    sizes = {
+        "reclaimable": 64 * mib, "encoder_outputs": 8 * mib, "text": 16 * mib,
+        "attention": 6 * mib, "sampler": 4 * mib, "prompt_logprobs": 12 * mib,
+        "autotune": 200 * mib, "encoder": 40 * mib,
+    }
+    for skipped, named in (
+        ("layer", "layers.1.linear_attn"),
+        ("workspace", repr(_CONTINUATION)),
+    ):
+        try:
+            _profiled_bound(sizes, skipped=skipped)
+        except RuntimeError as error:
+            assert named in str(error), error
+            assert "Next:" in str(error), error
+        else:
+            raise AssertionError(f"a text step that skipped the {skipped} was admitted")
 
 
 def test_kv_bound_counts_each_phase_with_the_workspaces_it_holds() -> None:
@@ -652,13 +879,119 @@ def test_profiled_context_covers_its_own_query() -> None:
         assert captured == expected, (tokens, seqs, context, captured)
 
 
+def test_dummy_step_records_the_layers_that_read_its_metadata() -> None:
+    # The dummy text step builds attention metadata only when attention is
+    # forced, and hands the layers a record of which of them read their own
+    # entry; it splits its tokens over at most the requests it is given.
+    from contextlib import nullcontext
+
+    import numpy as np
+
+    class Stop(Exception):
+        pass
+
+    layer = "layers.0.self_attn.attn"
+    built = []
+
+    def build_attention_metadata(**kwargs):
+        built.append(kwargs["num_reqs"])
+        return {layer: object()}, None
+
+    captured = []
+
+    def set_forward_context(attn_metadata, *args, **kwargs):
+        captured.append(attn_metadata)
+        raise Stop
+
+    saved_context = gpu_model_runner.set_forward_context
+    saved_pp = gpu_model_runner.get_pp_group
+    gpu_model_runner.set_forward_context = set_forward_context
+    gpu_model_runner.get_pp_group = lambda: SimpleNamespace(is_first_rank=True)
+    try:
+        for force_attention, max_num_reqs, seq_lens in (
+            (True, None, [4096, 4096, 4096, 4096]),
+            (True, 1, [4096]),
+            (False, None, None),
+        ):
+            built.clear()
+            captured.clear()
+            reads: set[str] = set()
+            copied = []
+            step = SimpleNamespace(num_tokens=2048, num_reqs=None)
+            runner = SimpleNamespace(
+                vllm_config=SimpleNamespace(
+                    model_config=SimpleNamespace(multimodal_config=None),
+                    parallel_config=SimpleNamespace(num_ubatches=1),
+                ),
+                uniform_decode_query_len=1,
+                max_num_tokens=2048,
+                scheduler_config=SimpleNamespace(max_num_seqs=4),
+                _determine_batch_execution_and_padding=lambda **kwargs: (
+                    CUDAGraphMode.NONE, step, False, None, None
+                ),
+                dcp_world_size=1,
+                parallel_config=SimpleNamespace(cp_kv_cache_interleave_size=1),
+                _get_slot_mappings=lambda **kwargs: (None, None),
+                synchronize_input_prep=nullcontext,
+                optimistic_seq_lens_cpu=torch.zeros(8, dtype=torch.int32),
+                seq_lens=SimpleNamespace(
+                    copy_=lambda source, non_blocking=False: copied.append(
+                        source.tolist()
+                    )
+                ),
+                _get_cumsum_and_arange=lambda tokens, out: np.cumsum(tokens),
+                query_pos=SimpleNamespace(np=np.zeros(4096, dtype=np.int64)),
+                query_start_loc=SimpleNamespace(
+                    np=np.zeros(9, dtype=np.int32), copy_to_gpu=lambda: None
+                ),
+                input_batch=SimpleNamespace(
+                    block_table=SimpleNamespace(commit_block_table=lambda n: None)
+                ),
+                positions=torch.zeros(2048, dtype=torch.int64),
+                _build_attention_metadata=build_attention_metadata,
+                speculative_config=None,
+                lora_config=None,
+                maybe_dummy_run_with_lora=lambda *args: nullcontext(),
+                _init_model_kwargs=lambda: {},
+                supports_mm_inputs=False,
+                enable_prompt_embeds=False,
+                input_ids=SimpleNamespace(gpu=torch.zeros(2048, dtype=torch.int64)),
+                uses_mrope=False,
+                uses_xdrope_dim=0,
+                maybe_randomize_inputs=lambda *args, **kwargs: nullcontext(),
+            )
+            try:
+                gpu_model_runner.GPUModelRunner._dummy_run(
+                    runner, 2048, is_profile=True, force_attention=force_attention,
+                    profile_seq_lens=4096 if force_attention else None,
+                    max_num_reqs=max_num_reqs, layer_reads=reads,
+                )
+            except Stop:
+                pass
+            (metadata,) = captured
+            if not force_attention:
+                assert metadata is None and not built and not copied
+                continue
+            assert built == [len(seq_lens)], built
+            assert copied[0][: len(seq_lens)] == seq_lens, copied
+            assert reads == set()
+            metadata[layer]
+            assert reads == {layer}
+    finally:
+        gpu_model_runner.set_forward_context = saved_context
+        gpu_model_runner.get_pp_group = saved_pp
+
+
 if __name__ == "__main__":
     test_workspace_lifetime()
     test_graph_capture_refuses_reclaimable_views()
     test_turboquant_reservation_routing()
+    test_served_paths_witness_their_own_execution()
     test_model_runner_phase_boundary()
     test_kv_bound_counts_each_phase_with_the_workspaces_it_holds()
+    test_kv_bound_refuses_a_text_step_that_skips_what_serving_runs()
     test_serving_scores_the_prompt_as_the_profile_measures()
     test_v2_runner_holds_no_declared_pool()
     test_profiled_context_covers_its_own_query()
+    test_dummy_step_records_the_layers_that_read_its_metadata()
     print("vision workspace unit: passed")

@@ -15,7 +15,7 @@ diff --git a/tests/v1/worker/test_gpu_worker.py b/tests/v1/worker/test_gpu_worke
  
  from vllm.utils.mem_constants import GiB_bytes
  from vllm.v1.worker import startup_plan
-@@ -77,3 +79,389 @@
+@@ -77,3 +79,447 @@
      explicit = _plan_worker(kv_bytes=7 * GiB_bytes)
      maybe_apply_startup_plan(explicit)
      assert explicit.cache_config.kv_cache_memory_bytes == 7 * GiB_bytes
@@ -143,7 +143,9 @@ diff --git a/tests/v1/worker/test_gpu_worker.py b/tests/v1/worker/test_gpu_worke
 +    encoder with the reclaimable workspace released, the text step with it
 +    resident, attending over the longest context a request holds, its
 +    sampler and prompt log probabilities at the most a request is admitted
-+    with."""
++    with -- over as many requests as a step holds and as one request, inside
++    a witness of what the step requested, the encoder outputs cached through
++    both."""
 +    from vllm.v1.worker import gpu_model_runner
 +
 +    events = []
@@ -156,25 +158,81 @@ diff --git a/tests/v1/worker/test_gpu_worker.py b/tests/v1/worker/test_gpu_worke
 +        finally:
 +            events.append("restored")
 +
++    @contextmanager
++    def witness():
++        events.append("witnessing")
++        yield {"turboquant_continuation_prefill"}
++        events.append("witnessed")
++
++    manager = SimpleNamespace(
++        witness_reclaimable_requests=witness,
++        unrequested_reclaimable_workspaces=lambda requested: {
++            "unrequested": sorted(requested)
++        },
++    )
++
++    def text_step(**kwargs):
++        kwargs.pop("layer_reads").add(f"read-{kwargs['max_num_reqs']}")
++        events.append(("text", kwargs))
++
 +    runner = SimpleNamespace(
 +        max_model_len=4096,
++        max_num_reqs=4,
++        encoder_cache=SimpleNamespace(clear=lambda: events.append("cleared")),
 +        _largest_admitted_logprob_count=lambda: 20,
 +        _run_dummy_encoder=lambda: events.append("encoder"),
-+        _run_dummy_text_step=lambda **kwargs: events.append(("text", kwargs)),
-+    )
-+    with patch.object(gpu_model_runner, "release_reclaimable_workspaces", release):
-+        gpu_model_runner.GPUModelRunner.profile_served_phases(runner)
-+    assert events == [
-+        "released", "encoder", "restored",
-+        (
-+            "text",
-+            {
-+                "num_logprobs": 20,
-+                "force_attention": True,
-+                "profile_seq_lens": 4096,
-+            },
++        _run_dummy_text_step=text_step,
++        _require_text_step_ran=lambda reads, unrequested: events.append(
++            ("required", sorted(reads), unrequested)
 +        ),
++    )
++    with (
++        patch.object(gpu_model_runner, "release_reclaimable_workspaces", release),
++        patch.object(gpu_model_runner, "current_workspace_manager", lambda: manager),
++    ):
++        gpu_model_runner.GPUModelRunner.profile_served_phases(runner)
++    text = {"num_logprobs": 20, "force_attention": True, "profile_seq_lens": 4096}
++    assert events == [
++        "released", "encoder", "restored", "witnessing",
++        ("text", {**text, "max_num_reqs": 4}),
++        ("text", {**text, "max_num_reqs": 1}),
++        "witnessed", "cleared",
++        ("required", ["read-1", "read-4"],
++         {"unrequested": ["turboquant_continuation_prefill"]}),
 +    ]
++
++
++@pytest.mark.parametrize(
++    ("reads", "unrequested", "named"),
++    [
++        ({"model.attn"}, {}, "model.linear_attn"),
++        ({"model.attn", "model.linear_attn"}, {"continuation": 64}, "'continuation'"),
++    ],
++)
++def test_served_profile_refuses_a_text_step_that_skipped_what_serving_runs(
++    reads, unrequested, named
++):
++    """A model layer of the pool that never read its metadata, or a reserved
++    reclaimable workspace never requested, refuses startup by name; a
++    drafter's layer, which the model's step does not run, does not."""
++    from vllm.v1.worker import gpu_model_runner
++
++    layers = {"model.attn": object(), "model.linear_attn": object()}
++    runner = SimpleNamespace(
++        get_model=lambda: SimpleNamespace(modules=lambda: iter(layers.values())),
++        compilation_config=SimpleNamespace(
++            static_forward_context={**layers, "drafter.attn": object()}
++        ),
++        kv_cache_config=SimpleNamespace(kv_cache_groups=[
++            SimpleNamespace(layer_names=["model.attn", "drafter.attn"]),
++            SimpleNamespace(layer_names=["model.linear_attn"]),
++        ]),
++    )
++    require = gpu_model_runner.GPUModelRunner._require_text_step_ran
++    with pytest.raises(RuntimeError, match="Next:") as refused:
++        require(runner, reads, unrequested)
++    assert named in str(refused.value)
++    require(runner, {"model.attn", "model.linear_attn"}, {})
 +
 +
 +@pytest.mark.parametrize(
@@ -571,7 +629,53 @@ diff --git a/vllm/v1/worker/gpu_model_runner.py b/vllm/v1/worker/gpu_model_runne
  from vllm.v1.worker.gpu_input_batch import CachedRequestState, InputBatch
  from vllm.v1.worker.gpu_ubatch_wrapper import UBatchWrapper
  from vllm.v1.worker.kv_connector_model_runner_mixin import KVConnectorModelRunnerMixin
-@@ -5798,28 +5801,31 @@
+@@ -235,7 +238,11 @@
+     is_residual_scattered_for_sp,
+     raise_if_nan_logits,
+ )
+-from vllm.v1.worker.workspace import lock_workspace, release_reclaimable_workspaces
++from vllm.v1.worker.workspace import (
++    current_workspace_manager,
++    lock_workspace,
++    release_reclaimable_workspaces,
++)
+ 
+ from .utils import (
+     AttentionGroup,
+@@ -269,4 +276,32 @@
+ PerLayerAttnMetadata: TypeAlias = list[AttnMetadataDict] | AttnMetadataDict
+ 
+ 
++class _LayerReadsMetadata(dict):
++    """A step's per-layer attention metadata that records which layers read
++    their own entry. A layer that holds KV cache or state reads its entry on
++    the path that executes against that cache or state and returns without
++    it otherwise, so the entries read are the layers the step ran."""
++
++    def __init__(self, metadata: AttnMetadataDict, reads: set[str]) -> None:
++        super().__init__(metadata)
++        self._reads = reads
++
++    def __getitem__(self, layer_name: str) -> AttentionMetadata:
++        self._reads.add(layer_name)
++        return super().__getitem__(layer_name)
++
++    def get(self, layer_name: str, default: Any = None) -> Any:
++        if layer_name in self:
++            self._reads.add(layer_name)
++        return super().get(layer_name, default)
++
++
++def _record_layer_reads(
++    attn_metadata: PerLayerAttnMetadata, reads: set[str]
++) -> PerLayerAttnMetadata:
++    if isinstance(attn_metadata, list):
++        return [_LayerReadsMetadata(ubatch, reads) for ubatch in attn_metadata]
++    return _LayerReadsMetadata(attn_metadata, reads)
++
++
+ def count_nans_per_row(logits: torch.Tensor) -> torch.Tensor:
+@@ -5798,28 +5833,31 @@
                  # step. There are no more prompt logprobs to produce.
                  continue
  
@@ -612,7 +716,16 @@ diff --git a/vllm/v1/worker/gpu_model_runner.py b/vllm/v1/worker/gpu_model_runne
              )
  
              # Transfer GPU->CPU async.
-@@ -5978,9 +5984,10 @@
+@@ -5954,6 +5992,8 @@
+         num_active_loras: int = 0,
+         profile_seq_lens: int | None = None,
+         randomize_inputs: bool = False,
++        max_num_reqs: int | None = None,
++        layer_reads: set[str] | None = None,
+     ) -> tuple[torch.Tensor, torch.Tensor]:
+         """
+         Run a dummy forward pass to warm up/profile run or capture the
+@@ -5978,9 +6018,14 @@
              remove_lora: If False, dummy LoRAs are not destroyed after the run
              num_active_loras: Number of distinct active LoRAs to capture for.
                  LoRA is activated when num_active_loras > 0.
@@ -623,10 +736,24 @@ diff --git a/vllm/v1/worker/gpu_model_runner.py b/vllm/v1/worker/gpu_model_runne
 +                (or its own query length, if that is longer) instead of
 +                max_query_len. Used to profile attention workspace that scales
 +                with context length.
++            max_num_reqs: The most requests the tokens are split over; the
++                scheduler's max_num_seqs when not given.
++            layer_reads: If provided, every layer that reads its own entry of
++                the attention metadata this step builds is added to it.
          """
          mm_config = self.vllm_config.model_config.multimodal_config
          if mm_config and mm_config.mm_encoder_only:
-@@ -6126,7 +6133,10 @@
+@@ -6012,7 +6057,8 @@
+         # for dummy run with LoRA so that the num_reqs collectively
+         # has num_tokens in total.
+         assert num_tokens <= self.max_num_tokens
+-        max_num_reqs = self.scheduler_config.max_num_seqs
++        if max_num_reqs is None:
++            max_num_reqs = self.scheduler_config.max_num_seqs
+         if create_mixed_batch:
+             assert not uniform_decode
+             # Create mixed batch:
+@@ -6126,7 +6172,10 @@
              # Otherwise, it only happens for cudagraph_runtime_mode=FULL.
              if force_attention or cudagraph_runtime_mode == CUDAGraphMode.FULL:
                  if profile_seq_lens is not None:
@@ -638,7 +765,16 @@ diff --git a/vllm/v1/worker/gpu_model_runner.py b/vllm/v1/worker/gpu_model_runne
                  elif create_mixed_batch:
                      # In the mixed batch mode (used for FI warmup), we use
                      # shorter sequence lengths to run faster.
-@@ -6354,6 +6364,7 @@
+@@ -6193,6 +6242,8 @@
+                     slot_mappings=slot_mappings_by_group,
+                     use_spec_decode=self.speculative_config is not None,
+                 )
++                if layer_reads is not None:
++                    attn_metadata = _record_layer_reads(attn_metadata, layer_reads)
+ 
+         with self.maybe_dummy_run_with_lora(
+             self.lora_config,
+@@ -6354,6 +6405,7 @@
      def _dummy_sampler_run(
          self,
          hidden_states: torch.Tensor,
@@ -646,7 +782,7 @@ diff --git a/vllm/v1/worker/gpu_model_runner.py b/vllm/v1/worker/gpu_model_runne
      ) -> torch.Tensor:
          # The dummy hidden states may contain special values,
          # like `inf` or `nan`.
-@@ -6378,7 +6389,7 @@
+@@ -6378,7 +6430,7 @@
              top_p=dummy_tensors(0.9),
              top_k=dummy_tensors(logits.size(1) - 1),
              generators={},
@@ -655,7 +791,7 @@ diff --git a/vllm/v1/worker/gpu_model_runner.py b/vllm/v1/worker/gpu_model_runne
              logprob_token_ids=None,
              no_penalties=True,
              prompt_token_ids=None,
-@@ -6470,5 +6481,34 @@
+@@ -6470,5 +6522,34 @@
              torch.accelerator.synchronize()
          return sampler_output
  
@@ -690,7 +826,7 @@ diff --git a/vllm/v1/worker/gpu_model_runner.py b/vllm/v1/worker/gpu_model_runne
 +
      def _dummy_pooler_run_task(
          self,
-@@ -6558,7 +6598,38 @@
+@@ -6558,7 +6639,102 @@
          return self._dummy_pooler_run_task(hidden_states, max_task)
  
      def profile_run(self) -> None:
@@ -700,6 +836,8 @@ diff --git a/vllm/v1/worker/gpu_model_runner.py b/vllm/v1/worker/gpu_model_runne
          # Profile with multimodal encoder & encoder cache.
 +        self._run_dummy_encoder()
 +        self._run_dummy_text_step()
++        self.encoder_cache.clear()
++        gc.collect()
 +
 +    def profile_served_phases(self) -> None:
 +        """Run each phase serving runs, at its largest, in the residency
@@ -714,22 +852,84 @@ diff --git a/vllm/v1/worker/gpu_model_runner.py b/vllm/v1/worker/gpu_model_runne
 +        context at max_model_len, then the sampler and the step's prompt log
 +        probabilities, each with the most log probabilities a request is
 +        admitted with; the reclaimable workspaces are resident through all
-+        three. A memory profile around this therefore sees the peak of each
-+        phase together with the workspaces resident in that phase, and only
-+        those.
++        three. The text step runs over as many requests as a step holds and,
++        when that splits it, once more as one request: the longest chunk a
++        request is scheduled, which a continuation path reaches only alone.
++        A memory profile around this therefore sees the peak of each phase
++        together with the workspaces resident in that phase, and only those.
++
++        The text step shows what it ran by running it: every layer that holds
++        KV cache or state reads its attention metadata only on the path that
++        executes against it, and a reclaimable workspace is requested only by
++        the phase that needs it. Startup is refused unless every such layer
++        of the model read its metadata and every reserved reclaimable
++        workspace was requested.
 +        """
 +        with release_reclaimable_workspaces():
 +            self._run_dummy_encoder()
-+        self._run_dummy_text_step(
-+            num_logprobs=self._largest_admitted_logprob_count(),
-+            force_attention=True, profile_seq_lens=self.max_model_len,
++        num_logprobs = self._largest_admitted_logprob_count()
++        layer_reads: set[str] = set()
++        manager = current_workspace_manager()
++        with manager.witness_reclaimable_requests() as requested:
++            for max_num_reqs in dict.fromkeys((self.max_num_reqs, 1)):
++                self._run_dummy_text_step(
++                    num_logprobs=num_logprobs,
++                    force_attention=True,
++                    profile_seq_lens=self.max_model_len,
++                    max_num_reqs=max_num_reqs,
++                    layer_reads=layer_reads,
++                )
++        self.encoder_cache.clear()
++        gc.collect()
++        self._require_text_step_ran(
++            layer_reads, manager.unrequested_reclaimable_workspaces(requested)
++        )
++
++    def _require_text_step_ran(
++        self,
++        layer_reads: set[str],
++        unrequested: dict[str, int],
++    ) -> None:
++        """Refuse a profile whose text step skipped what serving runs: a layer
++        of the model's KV cache that never read its attention metadata, or a
++        reserved reclaimable workspace it never requested. Runs inside
++        profiling_kv_cache(), whose groups name the layers."""
++        model_modules = {id(module) for module in self.get_model().modules()}
++        layers = self.compilation_config.static_forward_context
++        unread = sorted(
++            name
++            for group in self.kv_cache_config.kv_cache_groups
++            for name in group.layer_names
++            if id(layers[name]) in model_modules and name not in layer_reads
++        )
++        if not unread and not unrequested:
++            return
++        skipped = []
++        if unread:
++            skipped.append(
++                f"{len(unread)} layer(s) holding KV cache or state never read "
++                f"their attention metadata, so the attention or state update "
++                f"serving runs was skipped (first: {unread[0]})"
++            )
++        skipped.extend(
++            f"the reclaimable workspace {name!r} ({reserved} B reserved) was "
++            "never requested, so the phase that needs it never ran"
++            for name, reserved in unrequested.items()
++        )
++        raise RuntimeError(
++            "The startup memory profile's text step did not run what serving "
++            f"runs: {'; '.join(skipped)}. The KV bound would omit that "
++            "memory, so no declared pool is admitted against it. This is a "
++            "defect in this engine's startup profile, which no launch option "
++            "corrects. Next: report it, with this message, to whoever builds "
++            "this engine."
 +        )
 +
 +    def _run_dummy_encoder(self) -> None:
          if self.supports_mm_inputs:
              mm_config = self.model_config.multimodal_config
              if mm_config is not None and mm_config.skip_mm_profiling:
-@@ -6616,15 +6687,22 @@
+@@ -6616,23 +6792,28 @@
                          for i, output in enumerate(dummy_encoder_outputs):
                              self.encoder_cache[f"tmp_{i}"] = output
  
@@ -754,16 +954,16 @@ diff --git a/vllm/v1/worker/gpu_model_runner.py b/vllm/v1/worker/gpu_model_runne
          else:
              output = None
          self._sync_device()
-@@ -6632,7 +6710,7 @@
-         self.encoder_cache.clear()
-         gc.collect()
+         del hidden_states, output
+-        self.encoder_cache.clear()
+-        gc.collect()
  
 -    def _init_minimal_kv_cache_for_profiling(self) -> None:
 +    def _init_minimal_kv_cache_for_profiling(self) -> KVCacheConfig:
          from vllm.v1.core.kv_cache_utils import (
              get_kv_cache_config_from_groups,
              get_kv_cache_groups,
-@@ -6658,7 +6736,33 @@
+@@ -6658,7 +6839,33 @@
          self.initialize_kv_cache(minimal_config, is_profiling=True)
          self.cache_config.num_gpu_blocks = minimal_config.num_blocks
  
@@ -801,13 +1001,60 @@ diff --git a/vllm/v1/worker/gpu_model_runner.py b/vllm/v1/worker/gpu_model_runne
 diff --git a/vllm/v1/worker/workspace.py b/vllm/v1/worker/workspace.py
 --- a/vllm/v1/worker/workspace.py
 +++ b/vllm/v1/worker/workspace.py
-@@ -207,6 +207,10 @@
+@@ -47,6 +47,9 @@
+         self._reclaimable_workspaces: dict[str, list[torch.Tensor | None]] = {}
+         self._reclaimable_workspace_sizes: dict[str, list[int]] = {}
+         self._reclaimable_workspaces_released = False
++        # Inside witness_reclaimable_requests(): the names of the reclaimable
++        # workspaces requested.
++        self._witnessed_requests: set[str] | None = None
+         self._locked: bool = False
+ 
+     @staticmethod
+@@ -162,6 +165,8 @@
+         aligned_bytes = [round_up(actual, 256) for actual in actual_bytes]
+         total_bytes = sum(aligned_bytes)
+         offsets = list(accumulate([0] + aligned_bytes[:-1]))
++        if self._witnessed_requests is not None:
++            self._witnessed_requests.add(name)
+ 
+         workspaces = self._reclaimable_workspaces.setdefault(
+             name, [None] * self._num_ubatches
+@@ -207,6 +212,38 @@
              for i in range(len(shapes_and_dtypes))
          ]
  
 +    def reclaimable_workspace_bytes(self) -> int:
 +        """Bytes the reclaimable workspaces hold while they are restored."""
 +        return sum(sum(sizes) for sizes in self._reclaimable_workspace_sizes.values())
++
++    def unrequested_reclaimable_workspaces(
++        self, requested: set[str]
++    ) -> dict[str, int]:
++        """Each reserved reclaimable workspace that `requested` (a record from
++        witness_reclaimable_requests) never asked for, with its reserved
++        bytes. Only the phase that needs a reclaimable workspace requests it,
++        so a reserved workspace missing from the record is a phase the
++        witnessed block never ran.
++        """
++        return {
++            name: max(sizes)
++            for name, sizes in self._reclaimable_workspace_sizes.items()
++            if max(sizes) > 0 and name not in requested
++        }
++
++    @contextmanager
++    def witness_reclaimable_requests(self) -> Iterator[set[str]]:
++        """Record the name of each reclaimable workspace requested inside the
++        block; see unrequested_reclaimable_workspaces."""
++        if self._witnessed_requests is not None:
++            raise AssertionError("Reclaimable-workspace witnesses do not nest.")
++        requested: set[str] = set()
++        self._witnessed_requests = requested
++        try:
++            yield requested
++        finally:
++            self._witnessed_requests = None
 +
      def _driver_free_bytes(self) -> int | None:
          if self._device.type != "cuda":
@@ -919,3 +1166,28 @@ diff --git a/vllm/config/vllm.py b/vllm/config/vllm.py
              )
  
      def validate_block_size(self) -> None:
+diff --git a/tests/v1/worker/test_workspace.py b/tests/v1/worker/test_workspace.py
+--- a/tests/v1/worker/test_workspace.py
++++ b/tests/v1/worker/test_workspace.py
+@@ -105,3 +105,21 @@
+     cpu = workspace.WorkspaceManager(torch.device("cpu"))
+     (view,) = cpu.get_reclaimable_simultaneous("phase-local", ((64,), torch.uint8))
+     assert view.numel() == 64
++
++
++def test_witness_names_the_reserved_workspaces_a_block_never_requested():
++    # A reclaimable workspace is requested only by the phase that needs it:
++    # one the witnessed block reserved but never requested is a phase the
++    # block never ran. A request outside the block witnesses nothing.
++    manager = workspace.WorkspaceManager(torch.device("cpu"))
++    manager.get_reclaimable_simultaneous("continuation", ((64,), torch.uint8))
++    manager.get_reclaimable_simultaneous("other", ((32,), torch.uint8))
++    with manager.witness_reclaimable_requests() as requested:
++        manager.get_reclaimable_simultaneous("continuation", ((16,), torch.uint8))
++        with pytest.raises(AssertionError, match="do not nest"):
++            with manager.witness_reclaimable_requests():
++                pass
++    assert requested == {"continuation"}
++    assert manager.unrequested_reclaimable_workspaces(requested) == {"other": 256}
++    manager.get_reclaimable_simultaneous("other", ((32,), torch.uint8))
++    assert requested == {"continuation"}
