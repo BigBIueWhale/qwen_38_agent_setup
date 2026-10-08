@@ -781,6 +781,8 @@ image_build_options=(
   --build-arg "STREAMING_PARSER_ENGINE_PATCHED_FILE_SHA256=${STREAMING_PARSER_ENGINE_PATCHED_FILE_SHA256}"
   --build-arg "TOKEN_ID_SCANNER_PATCHED_FILE_SHA256=${TOKEN_ID_SCANNER_PATCHED_FILE_SHA256}"
   --build-arg "ENGINE_PROTOCOL_PATCHED_FILE_SHA256=${ENGINE_PROTOCOL_PATCHED_FILE_SHA256}"
+  --build-arg "ENGINE_CORE_PATCHED_FILE_SHA256=${ENGINE_CORE_PATCHED_FILE_SHA256}"
+  --build-arg "ENGINE_CORE_UPSTREAM_FILE_SHA256=${ENGINE_CORE_UPSTREAM_FILE_SHA256}"
   --build-arg "QWEN3_ENGINE_TOOL_PARSER_PATCHED_FILE_SHA256=${QWEN3_ENGINE_TOOL_PARSER_PATCHED_FILE_SHA256}"
   --build-arg "QWEN3_ENGINE_TOOL_PARSER_UPSTREAM_FILE_SHA256=${QWEN3_ENGINE_TOOL_PARSER_UPSTREAM_FILE_SHA256}"
   --build-arg "PARSER_MANAGER_PATCHED_FILE_SHA256=${PARSER_MANAGER_PATCHED_FILE_SHA256}"
@@ -1043,6 +1045,7 @@ actual_installed_report="$(
     /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/detokenizer.py \
     /usr/local/lib/python3.12/dist-packages/vllm/v1/core/sched/scheduler.py \
     /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/async_llm.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/core.py \
     /usr/local/lib/python3.12/dist-packages/vllm/tool_parsers/qwen3_engine_tool_parser.py \
     /usr/local/lib/python3.12/dist-packages/vllm/parser/parser_manager.py \
     /usr/local/lib/python3.12/dist-packages/vllm/tool_parsers/poolside_v1_tool_parser.py \
@@ -1138,6 +1141,7 @@ expected_installed_report="$(printf '%s  %s\n' \
   "${V1_DETOKENIZER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/detokenizer.py \
   "${V1_SCHEDULER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/core/sched/scheduler.py \
   "${ASYNC_LLM_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/async_llm.py \
+  "${ENGINE_CORE_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/core.py \
   "${QWEN3_ENGINE_TOOL_PARSER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/tool_parsers/qwen3_engine_tool_parser.py \
   "${PARSER_MANAGER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/parser_manager.py \
   "${POOLSIDE_V1_TOOL_PARSER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/tool_parsers/poolside_v1_tool_parser.py \

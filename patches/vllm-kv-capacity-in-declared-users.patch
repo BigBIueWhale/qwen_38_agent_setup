@@ -1753,7 +1753,7 @@ index 753fba6c4c6cbecfaa4327be59739a3553bfa680..b293b43109299253fadb220684eb1dc7
  
      logger.debug(
 diff --git a/vllm/v1/kv_offload/cpu/spec.py b/vllm/v1/kv_offload/cpu/spec.py
-index c25eb359f691c96c2af4692974746c2a271ea557..330ced1e36e255a79b594f03a005b101a35f672c 100644
+index e506ab2b0cf215b033b8523f357c471355a2e864..ac9589603a79ec359ab0584d0af2c08a982396fb 100644
 --- a/vllm/v1/kv_offload/cpu/spec.py
 +++ b/vllm/v1/kv_offload/cpu/spec.py
 @@ -6,7 +6,7 @@ import torch
@@ -1765,9 +1765,9 @@ index c25eb359f691c96c2af4692974746c2a271ea557..330ced1e36e255a79b594f03a005b101
  from vllm.v1.kv_offload.base import (
      CanonicalKVCaches,
      OffloadingCounterMetadata,
-@@ -27,6 +27,24 @@ from vllm.v1.kv_offload.cpu.shared_offload_region import SharedOffloadRegion
- class CPUOffloadingSpec(OffloadingSpec):
-     BLOCK_SIZE_ALIGNMENT = SharedOffloadRegion.BLOCK_SIZE_ALIGNMENT
+@@ -29,6 +29,24 @@ class CPUOffloadingSpec(OffloadingSpec):
+     # CPUOffloadingManager retains and gives up host KV by agent.
+     ACCOUNTS_KV_PER_AGENT = True
  
 +    # Unknown configuration keys refuse at startup. Subclasses and
 +    # out-of-tree specs declare their additional supported keys here.
@@ -1790,7 +1790,7 @@ index c25eb359f691c96c2af4692974746c2a271ea557..330ced1e36e255a79b594f03a005b101
      @classmethod
      def build_metric_definitions(
          cls, extra_config: dict[str, Any]
-@@ -64,13 +82,40 @@ class CPUOffloadingSpec(OffloadingSpec):
+@@ -66,13 +84,40 @@ class CPUOffloadingSpec(OffloadingSpec):
          }
          return definitions
  
@@ -1835,7 +1835,7 @@ index c25eb359f691c96c2af4692974746c2a271ea557..330ced1e36e255a79b594f03a005b101
              )
  
          world_size = config.parallel.world_size
-@@ -86,18 +131,37 @@ class CPUOffloadingSpec(OffloadingSpec):
+@@ -88,18 +133,37 @@ class CPUOffloadingSpec(OffloadingSpec):
              # calculate cpu_page_size_per_worker
              self.cpu_page_size_per_worker = kv_bytes_per_chunk // num_copies
  

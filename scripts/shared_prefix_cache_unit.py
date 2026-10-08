@@ -8,7 +8,16 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import vllm.v1.engine.input_processor as input_processor_module
 from vllm.config.kv_transfer import KVTransferConfig
-from vllm.distributed.kv_transfer.kv_connector.v1.base import KVTransferParamsKeys
+from vllm.distributed.kv_transfer.kv_connector.v1 import (
+    offloading_connector as offloading_connector_module,
+)
+from vllm.distributed.kv_transfer.kv_connector.v1.base import (
+    NON_NEGATIVE_INTEGER,
+    KVTransferParamsKeys,
+)
+from vllm.distributed.kv_transfer.kv_connector.v1.offloading_connector import (
+    OffloadingConnector,
+)
 from vllm.distributed.kv_transfer.kv_connector.v1.offloading.scheduler import (
     _create_req_context,
 )
@@ -20,10 +29,13 @@ from vllm.exceptions import VLLMValidationError
 from vllm.sampling_params import RequestOutputKind, SamplingParams, require_kv_scope
 from vllm.v1.engine import EngineCoreRequest
 from vllm.v1.engine.async_llm import AsyncLLM, InputStreamError
+from vllm.v1.engine.core import EngineCoreProc
 from vllm.v1.engine.input_processor import InputProcessor
 from vllm.v1.kv_offload.base import LookupResult, ReqContext
 from vllm.v1.kv_offload.cpu.manager import CPUOffloadingManager
+from vllm.v1.kv_offload.tiering.p2p.manager import _annotate_req_context
 from vllm.v1.request import Request
+from vllm.v1.serial_utils import MsgpackDecoder, MsgpackEncoder
 
 
 def request(agent, content, required=None, produced=None):
@@ -98,6 +110,12 @@ DEPLOYED_KV_TRANSFER = KVTransferConfig(
     kv_connector_extra_config={'cpu_kv_cache_users': 1},
 )
 NIXL_KV_TRANSFER = KVTransferConfig(kv_connector='NixlConnector', kv_role='kv_both')
+P2P_KV_TRANSFER = KVTransferConfig(
+    kv_connector='OffloadingConnector', kv_role='kv_both',
+    kv_connector_extra_config={'spec_name': 'TieringOffloadingSpec',
+                               'cpu_kv_cache_users': 1,
+                               'secondary_tiers': [{'type': 'p2p'}]},
+)
 
 
 def admission(kv_transfer_config):
@@ -167,17 +185,27 @@ async def check_kv_transfer_params_admission():
     raised in the engine core for every user."""
     deployed = admission(DEPLOYED_KV_TRANSFER)
     assert deployed.kv_transfer_params_keys == KVTransferParamsKeys(
-        keys=frozenset({'max_offload_tokens'})), deployed.kv_transfer_params_keys
+        keys={'max_offload_tokens': NON_NEGATIVE_INTEGER}), deployed.kv_transfer_params_keys
     admit(deployed, kv_transfer_params={'max_offload_tokens': 64})
-    for key in ('do_remote_prefill', 'kv_load_tiers', 'prompt_token_ids'):
+    for key in ('do_remote_prefill', 'kv_load_tiers'):
         message = refusal(deployed, kv_transfer_params={key: True})
         assert f'key {key!r} is not a parameter of OffloadingConnector' in message, message
-        assert '(it takes max_offload_tokens)' in message, message
+        assert '(it takes max_offload_tokens). Next: remove it.' in message, message
+    # No connector takes upstream's reused prompt ids: the refusal names what
+    # this server does instead of sending the request elsewhere.
+    for processor in (deployed, admission(None), admission(NIXL_KV_TRANSFER)):
+        message = refusal(processor, kv_transfer_params={'prompt_token_ids': [1]})
+        assert "takes no prompt ids from a request. Next: remove it." in message, message
+        assert 'send the request to a server' not in message, message
     for smuggled in ('x', ['a'], 3):
         message = refusal(deployed, vllm_xargs={'kv_transfer_params': smuggled})
         assert 'must be an object of KV connector parameters' in message, message
     message = refusal(admission(None), kv_transfer_params={'max_offload_tokens': 1})
     assert 'reaches no KV connector: this server configures none' in message, message
+    # A value of a key the connector takes is held to what it reads.
+    for value in (-1, '64', 1.5, True):
+        message = refusal(deployed, kv_transfer_params={'max_offload_tokens': value})
+        assert "'max_offload_tokens' must be a non-negative integer" in message, message
 
     # No connector here holds remote-prefill blocks, so a refused request
     # that names some sends no notice into the engine.
@@ -185,6 +213,105 @@ async def check_kv_transfer_params_admission():
         serving, notify = serving_over(processor)
         await refuse(serving, chat(kv_transfer_params={'do_remote_prefill': True}))
         notify.assert_not_awaited()
+
+
+def check_kv_transfer_values_are_what_their_connector_reads():
+    """The P2P tier reads its peer objects with .get in on_new_request, inside
+    EngineCore.add_request, where a value of another shape raised and ended the
+    engine core for every user. Admission takes exactly the values the tier's
+    own reader reads, and refuses the ones that raised there."""
+    p2p = admission(P2P_KV_TRANSFER)
+    peer = {'kv_request_id': 't', 'remote_host': '10.0.0.1', 'remote_port': 5710}
+    taken = [{'remote_prefiller': peer}, {'remote_kv_source': peer},
+             {'remote_decoder': {'kv_request_id': 't'}},
+             {'remote_decoder': {}, 'remote_kv_source': peer}]
+    refused = [{'remote_kv_source': 'x'}, {'remote_decoder': 'x'},
+               {'remote_prefiller': [1]}]
+    # Unhashable, it raises later, where the tier keys its sessions by it.
+    message = refusal(p2p, kv_transfer_params={
+        'remote_prefiller': {**peer, 'kv_request_id': ['t']}})
+    assert "'remote_prefiller' must be an object whose kv_request_id" in message, message
+    for params in taken:
+        admit(p2p, kv_transfer_params=params)
+        _annotate_req_context(ReqContext(req_id='r', kv_transfer_params=params,
+                                         kv_scope='agent'))
+    for params in refused:
+        ((key, _),) = params.items()
+        message = refusal(p2p, kv_transfer_params=params)
+        assert f'{key!r} must be an object whose kv_request_id' in message, message
+        assert 'Next: send it in that shape, or remove it.' in message, message
+        try:
+            _annotate_req_context(ReqContext(req_id='r', kv_transfer_params=params,
+                                             kv_scope='agent'))
+        except (AttributeError, TypeError):
+            pass
+        else:
+            raise AssertionError(f'the P2P tier reads {params!r}; admission refuses it')
+
+
+def check_pooling_offload_is_refused_at_startup():
+    """The CPU tier accounts the host KV cache per agent ID, which a pooling
+    request does not carry: its manager raises on the first one, in the engine
+    core. A pooling model is refused that tier when the connector is built."""
+    context = ReqContext(req_id='pooling', kv_transfer_params=None, kv_scope=None)
+    try:
+        CPUOffloadingManager(4).on_new_request(context)
+    except Exception as error:
+        assert 'agent ID' in str(error), error
+    else:
+        raise AssertionError('the CPU tier took a request without an agent ID')
+
+    class Built(Exception):
+        pass
+
+    with patch.object(offloading_connector_module, 'build_offloading_config',
+                      side_effect=Built):
+        for runner_type in ('pooling', 'generate'):
+            vllm_config = SimpleNamespace(
+                kv_transfer_config=DEPLOYED_KV_TRANSFER,
+                model_config=SimpleNamespace(runner_type=runner_type))
+            try:
+                OffloadingConnector(vllm_config, None, None)
+            except ValueError as error:
+                assert runner_type == 'pooling', error
+                assert 'accounts the offloaded KV cache per agent ID' in str(error)
+                assert 'Next: serve this pooling model without the OffloadingConnector' in str(error)
+            except Built:
+                assert runner_type == 'generate', runner_type
+            else:
+                raise AssertionError('the connector was built without its config')
+
+
+def check_a_refused_engine_request_is_its_own_error():
+    """The engine request type refuses on decode what it refuses when built,
+    so a request changed after it was built is refused as it is decoded. That
+    is the request's error, returned to its client; it used to end the input
+    thread, after which the engine received nothing, silently."""
+    built = EngineCoreRequest(
+        request_id='changed', prompt_token_ids=[0], mm_features=None,
+        sampling_params=SamplingParams(max_tokens=1, extra_args={'kv_scope': 'agent'}),
+        pooling_params=None, arrival_time=0.0, lora_request=None, cache_salt=None,
+        data_parallel_rank=None, client_index=3,
+    )
+    built.sampling_params = SamplingParams(max_tokens=1)
+    frames = MsgpackEncoder().encode(built)
+    errors, preprocessed = [], []
+    engine = SimpleNamespace(
+        _send_error_outputs_to_client=lambda ids, client: errors.append((ids, client)),
+        preprocess_add_request=lambda req: preprocessed.append(req) or (req, 0),
+    )
+    engine._handle_refused_add_request = (
+        lambda frames: EngineCoreProc._handle_refused_add_request(engine, frames))
+    decoder = MsgpackDecoder(EngineCoreRequest)
+    assert EngineCoreProc._receive_add_request(engine, decoder, frames) is None
+    assert errors == [(['changed'], 3)], errors
+    assert preprocessed == [], preprocessed
+
+    built.sampling_params = SamplingParams(max_tokens=1, extra_args={'kv_scope': 'agent'})
+    received = EngineCoreProc._receive_add_request(
+        engine, decoder, MsgpackEncoder().encode(built))
+    assert received is not None and received[0].request_id == 'changed', received
+    assert errors == [(['changed'], 3)], errors
 
 
 async def check_rejection_notice_identity():
@@ -208,6 +335,12 @@ async def check_rejection_notice_identity():
             raise AssertionError(f'an engine request generated with {extra_args!r}')
 
     serving, notify = serving_over(admission(NIXL_KV_TRANSFER))
+    # The notice reaches the connector without crossing admission: one whose
+    # parameters admission refuses names no blocks the connector can read,
+    # and is not sent.
+    await refuse(serving, chat(kv_transfer_params={'do_remote_prefill': True,
+                                                   'remote_engine_id': ['e']}))
+    notify.assert_not_awaited()
     refused = chat(kv_transfer_params={'do_remote_prefill': True})
     await refuse(serving, refused)
     (request_id, params, scope), _ = notify.await_args
@@ -276,6 +409,9 @@ def main():
             raise AssertionError(f"{request_type.__name__} generates for no agent")
     asyncio.run(check_stream_identity())
     asyncio.run(check_kv_transfer_params_admission())
+    check_kv_transfer_values_are_what_their_connector_reads()
+    check_pooling_offload_is_refused_at_startup()
+    check_a_refused_engine_request_is_its_own_error()
     asyncio.run(check_rejection_notice_identity())
 
     # Lookup matches content alone. The membership catalog that once let only

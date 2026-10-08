@@ -1739,10 +1739,10 @@ index 5a943e8d60445ce6f7e191851e40ae35facdbf88..473d668e235e0218f15858858d73e7d2
          external_req_id=f"{request_id}-{uuid.uuid4()}",
 diff --git a/tests/v1/engine/test_engine_request_identity.py b/tests/v1/engine/test_engine_request_identity.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..c9343c090535dcabfa7bf0918c92978ca99b3d6a
+index 0000000000000000000000000000000000000000..f094b170af823c4a1b507b955670dd1bae604dee
 --- /dev/null
 +++ b/tests/v1/engine/test_engine_request_identity.py
-@@ -0,0 +1,104 @@
+@@ -0,0 +1,143 @@
 +# SPDX-License-Identifier: Apache-2.0
 +# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
 +"""Every engine request for generation names its line of work, by construction.
@@ -1806,6 +1806,45 @@ index 0000000000000000000000000000000000000000..c9343c090535dcabfa7bf0918c92978c
 +def test_a_pooling_request_names_no_line_of_work():
 +    request = _engine_request(pooling_params=PoolingParams(task="embed"))
 +    assert Request.from_engine_core_request(request, None).kv_scope is None
++
++
++def test_a_request_refused_as_it_is_decoded_is_that_requests_error():
++    """A request changed after it was built is refused as the engine decodes
++    it; the refusal is returned to that request's client, and the input
++    thread, which it used to end, goes on."""
++    from vllm.v1.engine.core import EngineCoreProc
++
++    request = EngineCoreRequest(
++        request_id="changed",
++        prompt_token_ids=[0],
++        mm_features=None,
++        sampling_params=SamplingParams(max_tokens=1, extra_args={"kv_scope": "a"}),
++        pooling_params=None,
++        arrival_time=0.0,
++        lora_request=None,
++        cache_salt=None,
++        data_parallel_rank=None,
++        client_index=2,
++    )
++    request.sampling_params = SamplingParams(max_tokens=1)
++    errors, preprocessed = [], []
++    engine = SimpleNamespace(
++        _send_error_outputs_to_client=lambda ids, client: errors.append((ids, client)),
++        preprocess_add_request=lambda req: preprocessed.append(req) or (req, 0),
++    )
++    engine._handle_refused_add_request = lambda frames: (
++        EngineCoreProc._handle_refused_add_request(engine, frames)
++    )
++    decoder = MsgpackDecoder(EngineCoreRequest)
++    frames = MsgpackEncoder().encode(request)
++    assert EngineCoreProc._receive_add_request(engine, decoder, frames) is None
++    assert errors == [(["changed"], 2)] and preprocessed == []
++
++    request.sampling_params = SamplingParams(max_tokens=1, extra_args={"kv_scope": "a"})
++    received = EngineCoreProc._receive_add_request(
++        engine, decoder, MsgpackEncoder().encode(request)
++    )
++    assert received[0].request_id == "changed" and len(errors) == 1
 +
 +
 +def test_the_engine_decodes_the_identity_it_was_sent():
@@ -2219,3 +2258,86 @@ index 8c963edc61839c661c9a1fdd0cf0781836ee2b7e..43c8e2c972fa4eca8244997606467fca
          ]
  
      return invocation_types
+diff --git a/vllm/v1/engine/core.py b/vllm/v1/engine/core.py
+index 55fe5b90c587c77318e54bc0a849262fe90f25c1..c46104347dbc522cd06abd551b67ef379ef2e45c 100644
+--- a/vllm/v1/engine/core.py
++++ b/vllm/v1/engine/core.py
+@@ -28,6 +28,7 @@ from vllm.distributed import (
+     stateless_destroy_torch_distributed_process_group,
+ )
+ from vllm.envs import enable_envs_cache
++from vllm.exceptions import VLLMValidationError
+ from vllm.logger import init_logger
+ from vllm.logging_utils.dump_input import dump_engine_exception
+ from vllm.lora.request import LoRARequest
+@@ -1717,16 +1718,10 @@ class EngineCoreProc(EngineCore):
+                     # Deserialize the request data.
+                     request: Any
+                     if request_type == EngineCoreRequestType.ADD:
+-                        req: EngineCoreRequest = add_request_decoder.decode(data_frames)
+-                        try:
+-                            request = self.preprocess_add_request(req)
+-                        except MultiModalCacheMissError as e:
+-                            # P0/P1 shadow drift -- return a retryable signal (P0
+-                            # drops the stale entry, client resends with data).
+-                            self._handle_mm_cache_miss(req, e)
+-                            continue
+-                        except Exception:
+-                            self._handle_request_preproc_error(req)
++                        request = self._receive_add_request(
++                            add_request_decoder, data_frames
++                        )
++                        if request is None:
+                             continue
+                     elif request_type == EngineCoreRequestType.UTILITY:
+                         request = generic_decoder.decode(data_frames)
+@@ -1869,6 +1864,49 @@ class EngineCoreProc(EngineCore):
+             socket.send_multipart(buffers[1:], copy=False)
+         return tracker
+ 
++    def _receive_add_request(
++        self, add_request_decoder: MsgpackDecoder, data_frames: Sequence[Any]
++    ) -> tuple[Request, int] | None:
++        """Decode and preprocess one request the client added, or answer its
++        client with its error and return None: a request's failure is that
++        request's, and never this input thread's."""
++        try:
++            req: EngineCoreRequest = add_request_decoder.decode(data_frames)
++        except VLLMValidationError:
++            # The engine request type refuses on decode what it refuses when
++            # built: a request changed after it was built.
++            self._handle_refused_add_request(data_frames)
++            return None
++        try:
++            return self.preprocess_add_request(req)
++        except MultiModalCacheMissError as e:
++            # P0/P1 shadow drift -- return a retryable signal (P0
++            # drops the stale entry, client resends with data).
++            self._handle_mm_cache_miss(req, e)
++            return None
++        except Exception:
++            self._handle_request_preproc_error(req)
++            return None
++
++    def _handle_refused_add_request(self, data_frames: Sequence[Any]) -> None:
++        """Log a request the engine request type refused on decode and return
++        that request's error to its client. The refusal leaves no decoded
++        request, so its ID and client are read from the encoded fields."""
++        fields = msgspec.msgpack.decode(data_frames[0])
++        names = EngineCoreRequest.__struct_fields__
++        request_id = fields[names.index("request_id")]
++        client_index_at = names.index("client_index")
++        client_index = (
++            fields[client_index_at] if len(fields) > client_index_at else 0
++        )
++        logger.exception(
++            "Refused request %s as it was decoded: the engine request type "
++            "refuses it when built and when decoded alike, so it was changed "
++            "after it was built, or encoded without being built as one.",
++            request_id,
++        )
++        self._send_error_outputs_to_client([request_id], client_index)
++
+     def _handle_request_preproc_error(self, request: EngineCoreRequest) -> None:
+         """Log and return a request-scoped error response for exceptions raised
+         from the add request preprocessing in the input socket processing thread.

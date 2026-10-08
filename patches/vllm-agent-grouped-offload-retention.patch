@@ -3435,7 +3435,7 @@ index 0ae138f716f2fe31d7051e2fc7ab64c9b2cff5a3..26e3c4a0fbcd0bea66e2a0783de116a5
      ),
  ]
 diff --git a/vllm/v1/kv_offload/base.py b/vllm/v1/kv_offload/base.py
-index 6c81d15b39c94ab26969cd837659af21c34ce178..bd7db7c0685c5791ff4e533610b9326c6dff36d8 100644
+index 6c81d15b39c94ab26969cd837659af21c34ce178..4985ff5c3acef874a65fdab84bd73336042506ab 100644
 --- a/vllm/v1/kv_offload/base.py
 +++ b/vllm/v1/kv_offload/base.py
 @@ -92,6 +92,14 @@ class ReqContext:
@@ -3488,6 +3488,17 @@ index 6c81d15b39c94ab26969cd837659af21c34ce178..bd7db7c0685c5791ff4e533610b9326c
          """
          return
  
+@@ -572,6 +576,10 @@ class OffloadingWorker(ABC):
+ class OffloadingSpec(ABC):
+     """Spec for an offloading connector"""
+ 
++    # Whether this spec's manager accounts offloaded KV per agent ID
++    # (ReqContext.kv_scope), which only a generation request carries.
++    ACCOUNTS_KV_PER_AGENT: ClassVar[bool] = False
++
+     @classmethod
+     def build_metric_definitions(
+         cls, extra_config: dict[str, Any]
 diff --git a/vllm/v1/kv_offload/config.py b/vllm/v1/kv_offload/config.py
 index 39019de4cf9f0d94526200264f9782cd018e6c22..b8b0424a91255f5cf98878e9d8373b84dc429621 100644
 --- a/vllm/v1/kv_offload/config.py
@@ -4601,10 +4612,19 @@ index e8ccf0bdef5e972bd11d12bc166d8988ab0dfe0d..00000000000000000000000000000000
 -        # key must have been in the evictable list.
 -        del self.evictable_blocks[key]
 diff --git a/vllm/v1/kv_offload/cpu/spec.py b/vllm/v1/kv_offload/cpu/spec.py
-index 91d20c10b13406049b1d2041f0b3cb068e227dc9..c25eb359f691c96c2af4692974746c2a271ea557 100644
+index 91d20c10b13406049b1d2041f0b3cb068e227dc9..e506ab2b0cf215b033b8523f357c471355a2e864 100644
 --- a/vllm/v1/kv_offload/cpu/spec.py
 +++ b/vllm/v1/kv_offload/cpu/spec.py
-@@ -62,16 +62,6 @@ class CPUOffloadingSpec(OffloadingSpec):
+@@ -26,6 +26,8 @@ from vllm.v1.kv_offload.cpu.shared_offload_region import SharedOffloadRegion
+ 
+ class CPUOffloadingSpec(OffloadingSpec):
+     BLOCK_SIZE_ALIGNMENT = SharedOffloadRegion.BLOCK_SIZE_ALIGNMENT
++    # CPUOffloadingManager retains and gives up host KV by agent.
++    ACCOUNTS_KV_PER_AGENT = True
+ 
+     @classmethod
+     def build_metric_definitions(
+@@ -62,16 +64,6 @@ class CPUOffloadingSpec(OffloadingSpec):
                  buckets=(1, 4, 16, 64, 256, 1024, 4096, 16384, 65536, 262144),
              ),
          }
@@ -4621,7 +4641,7 @@ index 91d20c10b13406049b1d2041f0b3cb068e227dc9..c25eb359f691c96c2af4692974746c2a
          return definitions
  
      def __init__(self, config: OffloadingConfig):
-@@ -115,29 +105,12 @@ class CPUOffloadingSpec(OffloadingSpec):
+@@ -115,29 +107,12 @@ class CPUOffloadingSpec(OffloadingSpec):
          # worker-side
          self._worker: CPUOffloadingWorker | None = None
  
@@ -5097,7 +5117,7 @@ index 58bbd4091560f1d4d03010bf7d15970640c5be8c..31ee91c9aaaf52d5259ed07652125477
              Gauge: _FakeMetric,
              Counter: _FakeMetric,
 diff --git a/tests/v1/engine/test_engine_request_identity.py b/tests/v1/engine/test_engine_request_identity.py
-index c9343c090535dcabfa7bf0918c92978ca99b3d6a..f2cd9a3fffee84c111f862e72feed3839edb456f 100644
+index f094b170af823c4a1b507b955670dd1bae604dee..77f76c3c527712b9a49808a5b90817f637bfce8f 100644
 --- a/tests/v1/engine/test_engine_request_identity.py
 +++ b/tests/v1/engine/test_engine_request_identity.py
 @@ -15,6 +15,9 @@ from unittest.mock import AsyncMock
@@ -5119,7 +5139,7 @@ index c9343c090535dcabfa7bf0918c92978ca99b3d6a..f2cd9a3fffee84c111f862e72feed383
  from vllm.v1.request import Request
  from vllm.v1.serial_utils import MsgpackDecoder, MsgpackEncoder
  
-@@ -102,3 +107,34 @@ def test_a_rejected_remote_prefill_notifies_under_the_requests_own_scope():
+@@ -141,3 +146,74 @@ def test_a_rejected_remote_prefill_notifies_under_the_requests_own_scope():
          data_parallel_rank=None,
      )
  
@@ -5154,3 +5174,72 @@ index c9343c090535dcabfa7bf0918c92978ca99b3d6a..f2cd9a3fffee84c111f862e72feed383
 +    manager.on_request_finished(context)
 +    assert manager._idle_context == {"agent-a": "earlier"}
 +    assert set(manager._contexts) == {"earlier"}
++
++
++def test_a_pooling_model_is_refused_an_agent_scoped_offload_tier():
++    """The CPU tier accounts offloaded KV per agent ID, which no pooling
++    request carries: its manager raised on the first one, in the engine core.
++    The connector refuses the pairing when it is built."""
++    from unittest.mock import patch
++
++    from vllm.config.kv_transfer import KVTransferConfig
++    from vllm.distributed.kv_transfer.kv_connector.v1 import offloading_connector
++    from vllm.distributed.kv_transfer.kv_connector.v1.offloading_connector import (
++        OffloadingConnector,
++    )
++
++    with pytest.raises(Exception, match="agent ID"):
++        CPUOffloadingManager(4).on_new_request(
++            ReqContext(req_id="pooling", kv_transfer_params=None, kv_scope=None)
++        )
++
++    class Built(Exception):
++        pass
++
++    config = KVTransferConfig(
++        kv_connector="OffloadingConnector",
++        kv_role="kv_both",
++        kv_connector_extra_config={"cpu_kv_cache_users": 1},
++    )
++    with patch.object(offloading_connector, "build_offloading_config", side_effect=Built):
++        pooling = SimpleNamespace(
++            kv_transfer_config=config,
++            model_config=SimpleNamespace(runner_type="pooling"),
++        )
++        with pytest.raises(ValueError, match="per agent ID .* runner is pooling"):
++            OffloadingConnector(pooling, None, None)
++        generating = SimpleNamespace(
++            kv_transfer_config=config,
++            model_config=SimpleNamespace(runner_type="generate"),
++        )
++        with pytest.raises(Built):
++            OffloadingConnector(generating, None, None)
+diff --git a/vllm/distributed/kv_transfer/kv_connector/v1/offloading_connector.py b/vllm/distributed/kv_transfer/kv_connector/v1/offloading_connector.py
+index f003d0d6f88d7bdd141d6c0153524ef544c4510c..b4767b71075c0a5010322dbd073c7dc6b77690e0 100644
+--- a/vllm/distributed/kv_transfer/kv_connector/v1/offloading_connector.py
++++ b/vllm/distributed/kv_transfer/kv_connector/v1/offloading_connector.py
+@@ -66,6 +66,24 @@ class OffloadingConnector(KVConnectorBase_V1, SupportsHMA):
+     ):
+         super().__init__(vllm_config, role, kv_cache_config)
+ 
++        assert vllm_config.kv_transfer_config is not None
++        spec_cls = OffloadingSpecFactory.get_spec_cls(
++            vllm_config.kv_transfer_config.kv_connector_extra_config
++        )
++        if (
++            spec_cls.ACCOUNTS_KV_PER_AGENT
++            and vllm_config.model_config.runner_type == "pooling"
++        ):
++            # A pooling request carries no agent ID (only generation names
++            # one), and the manager would raise on the first one in the
++            # engine core, ending it for every request.
++            raise ValueError(
++                f"OffloadingConnector's {spec_cls.__name__} accounts the "
++                "offloaded KV cache per agent ID (kv_scope), which only a "
++                "generation request carries, and this model's runner is "
++                "pooling, whose requests carry none. Next: serve this pooling "
++                "model without the OffloadingConnector in --kv-transfer-config."
++            )
+         offloading_config = build_offloading_config(vllm_config, kv_cache_config)
+         self._canonical_layout = offloading_config.canonical_layout
+         spec = OffloadingSpecFactory.create_spec(offloading_config)

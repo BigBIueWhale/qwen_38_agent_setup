@@ -316,12 +316,12 @@ It is intentionally reconstructed by the ordered, reviewed semantic transformati
 | patches/vllm-qwen38-numerical-audits.patch | dc0b947db3727b522427a204edd1a930d637476a0f66d7d30e2da65c144ac944 |
 | patches/vllm-turboquant-fail-closed-guards.patch | df0a32bb40ca8495cf636e1dcc8da97c82654b99f4f54969bae420d3dcf81e28 |
 | patches/vllm-kv-offload-pinning-fail-closed.patch | 56ecf2d6f79c20fa7d6f17527ae4f86149e9a1a73f84c00c7b938b257b5e9927 |
-| patches/vllm-generation-requires-agent-id.patch | f9e387eb2a57a3c4177d10637faf2f44eb05436d09823cca83d55d4a1d6c20e7 |
+| patches/vllm-generation-requires-agent-id.patch | 564ba3f1ba0bae5368656a70d5403424f5563ed8cea6a5f29313ed9190d59b98 |
 | patches/vllm-attention-growth-keeps-prefix-hash.patch | a6c38a841c05bcd4f5bfc573c99f1c4a849e7399af05b1e53096e15a43a97632 |
 | patches/vllm-grouped-kv-specs-use-layer-geometry.patch | 6bb249bc143a179ca317c72d2bf70ec118baa6f12dca19c0a59da2e3c935b814 |
-| patches/vllm-agent-grouped-offload-retention.patch | 36140417721a858ed623a605874cd7c094171e01acead53d76c851ea3929b551 |
+| patches/vllm-agent-grouped-offload-retention.patch | 1141e2ad5e72e11c608c2ea73228cbce3939844b0d32155f140ee246e033744d |
 | patches/vllm-agentless-generation-routes-unmounted.patch | c485cf9d7d862c0f4214cd625d598fd8903c43c0e42947e9f847ce4052b156ff |
-| patches/vllm-kv-capacity-in-declared-users.patch | a1effdf2bc170d50a0e38dcabad61174122d764428e374d907fb6bd4d3b47003 |
+| patches/vllm-kv-capacity-in-declared-users.patch | 9c981d09677970327e3051eff8678c375d677470a160387eb1f04ab6efe8ddc4 |
 | patches/vllm-kv-declaration-within-physical-bound.patch | a8386795dc7792ed06f63d92159c22323b986bb93e25a0798417243e00a643e5 |
 | patches/vllm-exact-reasoning-usage.patch | 34a3291cda667e89ffa97f399b821a06adf9a0b14c7429b121e2b01492b7a8e6 |
 | patches/vllm-anthropic-input-fidelity.patch | 3252e25a6c2e9d8ee0eec4cb383fc292bff2afaac2e3becdc1006c68b3b02c3c |
@@ -366,7 +366,7 @@ It is intentionally reconstructed by the ordered, reviewed semantic transformati
 | patches/vllm-batch-invariance-substitutes-no-nvfp4-kernel.patch | c79baaee0a51275f5f522d266fe6b315c200e6951920c2454d5c80cadbb92f44 |
 | patches/vllm-render-carries-every-image-chat-renders.patch | 9c20792ac98dfabdc44691217947d18ad7eee940f236343f531a891cde9a72b1 |
 | patches/vllm-rendered-prompts-are-never-truncated.patch | 3128a77dde8f5b5118d2893bb858183e7fc0f20573124441bb69b2e82251fc6d |
-| patches/vllm-kv-transfer-params-are-declared.patch | 9742698af30ad79158f5430fb22987cafe4667f457771dd66b29b38a7376ce0e |
+| patches/vllm-kv-transfer-params-are-declared.patch | 18316e69260279327deed84b584ee87d6960fe757a298640edcd5400d24de2e2 |
 | patches/vllm-responses-refuses-tools-the-template-is-never-given.patch | eb497a85e0a2f3aa1907fcf22e34b62fe8dc91015a7f869293497d64ad5134b2 |
 | patches/vllm-chat-stream-carries-every-token-logprob.patch | ca15dadd152454fe5b3fbcb710b8c7b5ce3221c038617b9e0d0985953aecbf47 |
 
@@ -426,9 +426,9 @@ Pinned build inputs and products:
 |---|---|
 | Immutable base tag | qwen38-vllm:main-9df9b0b |
 | Immutable base ID | sha256:fa4a002a88b7043a1a89966dea8a500fe9696f84e75730d9da916f916048d401 |
-| Runtime Dockerfile SHA-256 | 6a6e53692fb47eaef1ee4765c7f9986db3fa61eafd462968763db6bc47173534 |
-| Build verifier SHA-256 | 084bef4954e5931444bc51eda1450a798e42dfbe6840a7fb14281e4ab2d31c8f |
-| Runtime validator SHA-256 | 41c037d340983edebfd5038615c18accfcaccb97314970f856b901c9e4151597 |
+| Runtime Dockerfile SHA-256 | b5c54c949c8718cf99c4b43c7b3b135c3ff20176b412712c31f4b26ddff982c6 |
+| Build verifier SHA-256 | b304eb5f08c605b9e3a32a28668d3eaf58db0167d072cabb3758e8574180ba68 |
+| Runtime validator SHA-256 | 79b5afa242bf9a8f6a751bbac16deb1b68a366c0a08fe198925a8f520885aff7 |
 
 The runtime image's profile, tag and archive name, which every release advances
 together, are declared in `config/runtime-v1.sh`, and the archive lives under
@@ -573,9 +573,19 @@ Consequences:
   LMCache's (without `use_native`) and FlexKV's adapters, which hand requests to
   their own packages. Their callers remove the key; their operators declare it by
   overriding `KVConnectorBase_V1.get_kv_transfer_params_keys`, or for LMCache set
-  `use_native`, whose adapter declares its keys. A taken key's value is not
-  checked here: a malformed `max_offload_tokens` is still logged and ignored by
-  the connector.
+  `use_native`, whose adapter declares its keys; the refusal says which. Each
+  declared key carries the shape of the value its connector reads, and a value
+  of another shape -- a negative or non-integer `max_offload_tokens`, a P2P peer
+  that is not an object, an ID that is not a string -- is refused with a 400
+  naming the key and the shape: the connector reads it inside the engine core,
+  where such a value raised for every request the engine served. Upstream's
+  `prompt_token_ids`, a prefill node's prompt ids for decode-side reuse, is
+  refused for what this server does instead: it renders every prompt from the
+  request through its template. A refused request's remote-prefill notice
+  reaches the connector only with parameters admission takes.
+- A pooling model is refused the OffloadingConnector's CPU tier when the
+  connector is built: the tier accounts the offloaded KV cache per agent ID,
+  which only a generation request carries.
 - Multimodal profiling is mandatory and cannot be skipped to obtain a deceptively
   optimistic allocation.
 - All unquantized model computation, including the entire vision tower, uses BF16.

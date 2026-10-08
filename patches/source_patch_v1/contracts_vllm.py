@@ -1313,7 +1313,29 @@ def _validate_agent_id_after(state: State) -> None:
         "test_a_pooling_request_names_no_line_of_work": None,
         "test_the_engine_decodes_the_identity_it_was_sent": None,
         "test_a_rejected_remote_prefill_notifies_under_the_requests_own_scope": None,
+        "test_a_request_refused_as_it_is_decoded_is_that_requests_error": None,
     }, label=label)
+    # A request the engine refuses as it decodes it is that request's error,
+    # returned to its client; the input thread it used to end goes on.
+    core = "vllm/v1/engine/core.py"
+    _require_ordered(
+        _symbol_source(state, core, "EngineCoreProc._receive_add_request", label=label),
+        (
+            "add_request_decoder.decode(data_frames)",
+            "except VLLMValidationError:",
+            "self._handle_refused_add_request(data_frames)",
+            "return None",
+            "return self.preprocess_add_request(req)",
+        ),
+        label=label,
+        location=f"{core}:EngineCoreProc._receive_add_request",
+    )
+    _require_in_symbol(state, core, "EngineCoreProc.process_input_sockets", (
+        "request = self._receive_add_request(",
+    ), label=label)
+    _require_in_symbol(state, core, "EngineCoreProc._handle_refused_add_request", (
+        "self._send_error_outputs_to_client([request_id], client_index)",
+    ), label=label)
 
 
 def _validate_attention_prefix_hash_before(state: State) -> None:
@@ -1462,7 +1484,27 @@ def _validate_agent_retention_after(state: State) -> None:
     )
     require_python_symbols(state, "tests/v1/engine/test_engine_request_identity.py", {
         "test_the_notice_reaches_the_offload_tier_as_a_request_of_that_agent": None,
+        "test_a_pooling_model_is_refused_an_agent_scoped_offload_tier": None,
     }, label=label)
+    # A pooling request carries no agent ID, so a spec whose manager accounts
+    # per agent is refused a pooling model where the connector is built.
+    require_text(state, "vllm/v1/kv_offload/base.py",
+                 "ACCOUNTS_KV_PER_AGENT: ClassVar[bool] = False", label=label)
+    require_text(state, "vllm/v1/kv_offload/cpu/spec.py",
+                 "ACCOUNTS_KV_PER_AGENT = True", label=label)
+    _require_ordered(
+        _symbol_source(state,
+                       "vllm/distributed/kv_transfer/kv_connector/v1/offloading_connector.py",
+                       "OffloadingConnector.__init__", label=label),
+        (
+            "spec_cls.ACCOUNTS_KV_PER_AGENT",
+            'vllm_config.model_config.runner_type == "pooling"',
+            "raise ValueError(",
+            "offloading_config = build_offloading_config(vllm_config, kv_cache_config)",
+        ),
+        label=label,
+        location="OffloadingConnector.__init__",
+    )
     # Whether a context is idle is the idle map's to say; no second flag.
     forbid_text(state, manager, "context.active", label=label)
 
@@ -4384,11 +4426,25 @@ def _validate_kv_transfer_params_keys_after(state: State) -> None:
     label = "declared kv_transfer_params keys result"
     v1 = "vllm/distributed/kv_transfer/kv_connector/v1/"
     # A connector that declares nothing takes nothing; namespaces are prefixes.
+    # It says what its operator does to declare what it reads.
     _require_in_symbol(state, v1 + "base.py",
-                       "KVConnectorBase_V1.get_kv_transfer_params_keys",
-                       ("return KVTransferParamsKeys()",), label=label)
+                       "KVConnectorBase_V1.get_kv_transfer_params_keys", (
+        "return KVTransferParamsKeys(",
+        "undeclared=(",
+        "overriding KVConnectorBase_V1.get_kv_transfer_params_keys",
+    ), label=label)
     _require_in_symbol(state, v1 + "base.py", "KVTransferParamsKeys.defines", (
         "key in self.keys or key.startswith(tuple(self.namespaces))",
+    ), label=label)
+    # Each declared key carries the shape of the value its connector reads;
+    # a key two declarations define holds its value to both.
+    require_python_symbols(state, v1 + "base.py", {
+        "KVTransferParamShape": None,
+        "KVTransferParamsKeys.shape_of": ("self", "key"),
+        "object_with": ("fields", "required"),
+    }, label=label)
+    _require_in_symbol(state, v1 + "base.py", "KVTransferParamsKeys.__or__", (
+        "_all_of(union[name], shape) if name in union else shape",
     ), label=label)
     _require_in_symbol(state, v1 + "multi_connector.py",
                        "MultiConnector.get_kv_transfer_params_keys", (
@@ -4404,11 +4460,13 @@ def _validate_kv_transfer_params_keys_after(state: State) -> None:
     # secondary tiers, so only a tiering spec that has one takes it.
     _require_in_symbol(state, v1 + "offloading_connector.py",
                        "OffloadingConnector.get_kv_transfer_params_keys", (
-        "keys=frozenset({MAX_OFFLOAD_TOKENS_KEY})",
+        "keys={MAX_OFFLOAD_TOKENS_KEY: NON_NEGATIVE_INTEGER}",
         "spec_cls.get_kv_transfer_params_keys(extra_config)",
     ), label=label)
     require_text(state, "vllm/v1/kv_offload/base.py",
                  'KV_LOAD_TIERS_KEY = "kv_load_tiers"', label=label)
+    require_text(state, "vllm/v1/kv_offload/base.py",
+                 "KV_LOAD_TIERS_SHAPE = list_of(", label=label)
     forbid_text(state, v1 + "offloading/scheduler.py",
                 'KV_LOAD_TIERS_KEY = "kv_load_tiers"', label=label)
     _require_in_symbol(state, v1 + "offloading/scheduler.py",
@@ -4416,7 +4474,7 @@ def _validate_kv_transfer_params_keys_after(state: State) -> None:
                        ("params.get(MAX_OFFLOAD_TOKENS_KEY)",), label=label)
     _require_in_symbol(state, "vllm/v1/kv_offload/tiering/spec.py",
                        "TieringOffloadingSpec.get_kv_transfer_params_keys", (
-        "frozenset({KV_LOAD_TIERS_KEY} if secondary_tier_configs else ())",
+        "keys={KV_LOAD_TIERS_KEY: KV_LOAD_TIERS_SHAPE}",
         "tier_cls.get_kv_transfer_params_keys(tier_config)",
     ), label=label)
     # Every in-tree connector that reads request keys declares them, including
@@ -4430,13 +4488,15 @@ def _validate_kv_transfer_params_keys_after(state: State) -> None:
          ('"is_request_leader"',)),
         (v1 + "lmcache_connector.py", "LMCacheConnectorV1",
          ("if not cls._uses_native_adapter(vllm_config):",
-          'namespaces=frozenset({"lmcache."})')),
+          "with use_native set in ",
+          'namespaces={"lmcache.": ANY_VALUE}')),
         (v1 + "lmcache_mp_connector.py", "LMCacheMPConnectorUpstream",
          ('"num_lmcache_extra_cached_tokens"',)),
         (v1 + "example_hidden_states_connector.py", "ExampleHiddenStatesConnector",
          ('"hidden_states_path"', '"include_output_tokens"')),
         ("vllm/v1/kv_offload/tiering/p2p/manager.py", "P2PSecondaryTierManager",
-         ("REMOTE_PREFILLER_KEY", "REMOTE_DECODER_KEY", "REMOTE_KV_SOURCE_KEY")),
+         ("REMOTE_PREFILLER_KEY: peer", "REMOTE_DECODER_KEY: object_with(",
+          "REMOTE_KV_SOURCE_KEY: peer")),
     ):
         _require_in_symbol(state, path, f"{qualname}.get_kv_transfer_params_keys",
                            needles, label=label)
@@ -4449,19 +4509,38 @@ def _validate_kv_transfer_params_keys_after(state: State) -> None:
         "self._validate_kv_transfer_params(params)",
     ), label=label)
     _require_in_symbol(state, processor, "InputProcessor._validate_kv_transfer_params", (
-        "if not isinstance(kv_transfer_params, dict):",
-        "self.kv_transfer_params_keys.defines(key)",
+        "refusal = self.kv_transfer_params_refusal(kv_transfer_params)",
         'parameter="kv_transfer_params"',
     ), label=label)
+    _require_ordered(
+        _symbol_source(state, processor, "InputProcessor.kv_transfer_params_refusal",
+                       label=label),
+        (
+            "if not isinstance(kv_transfer_params, dict):",
+            "declared.defines(key)",
+            "return self._undefined_keys_refusal(refused)",
+            "if not shape.conforms(value):",
+        ),
+        label=label,
+        location=f"{processor}:InputProcessor.kv_transfer_params_refusal",
+    )
+    # Every refusal's next action is one the caller can take, and the
+    # reused-prompt-ids key is refused for what this server does instead.
+    require_text(state, processor, 'REUSED_PROMPT_IDS_KEY = "prompt_token_ids"',
+                 label=label)
+    forbid_text(state, processor, "send the request to a server whose", label=label)
     # Only a connector that takes do_remote_prefill is told of a refusal.
     serving = "vllm/entrypoints/generate/base/serving.py"
     forbid_text(state, serving, "has_kv_connector", label=label)
     _require_in_symbol(state, serving, "GenerateBaseServing.__init__", (
         'self.input_processor.kv_transfer_params_keys.defines("do_remote_prefill")',
     ), label=label)
+    # The notice reaches the connector without crossing admission, so it
+    # carries only parameters admission takes.
     _require_in_symbol(state, serving,
                        "GenerateBaseServing._with_kv_transfer_rejection_cleanup", (
         "self.notifies_remote_prefill_rejection and request.kv_transfer_params",
+        "self.input_processor.kv_transfer_params_refusal(kv_transfer_params)",
     ), label=label)
     require_python_symbols(state, "tests/v1/kv_connector/unit/test_kv_transfer_params_keys.py", {
         "test_a_connector_that_declares_nothing_takes_nothing": None,
@@ -4471,6 +4550,8 @@ def _validate_kv_transfer_params_keys_after(state: State) -> None:
         "test_lmcache_takes_its_namespace_only_through_its_native_adapter": None,
         "test_every_key_a_connector_reads_or_returns_is_declared": None,
         "test_a_connector_that_declares_nothing_reads_nothing": None,
+        "test_a_key_two_connectors_define_holds_its_value_to_both": None,
+        "test_each_value_is_held_to_what_its_connector_reads": None,
     }, label=label)
     require_python_symbols(state, "tests/v1/engine/test_kv_transfer_params_admission.py", {
         "test_the_cpu_offload_tier_admits_its_store_cap": None,
@@ -4480,6 +4561,10 @@ def _validate_kv_transfer_params_keys_after(state: State) -> None:
         "test_kv_transfer_params_through_vllm_xargs_must_be_an_object": None,
         "test_no_notice_without_a_connector_that_takes_remote_prefill": None,
         "test_a_connector_that_takes_remote_prefill_is_told_of_the_refusal": None,
+        "test_reused_prompt_ids_are_refused_for_what_the_server_does_instead": None,
+        "test_lmcache_without_its_native_adapter_names_use_native": None,
+        "test_a_value_the_connector_cannot_read_is_refused_naming_its_shape": None,
+        "test_parameters_admission_refuses_reach_no_connector_as_a_notice": None,
     }, label=label)
     require_python_symbols(state, "tests/entrypoints/openai/chat_completion/test_chat_completion.py", {
         "test_kv_transfer_params_no_connector_takes_are_refused": None,
@@ -5338,7 +5423,10 @@ CONTRACTS: Mapping[str, SemanticContract] = {
             "it binds every producer -- the input processor, a caller that builds "
             "an engine request itself, and the engine's own notice that a "
             "KV-transfer request was refused before admission, which names the "
-            "refused request's ID. The ID is the key agent-grouped-offload-retention "
+            "refused request's ID. A request refused as the engine decodes it "
+            "(one changed after it was built) is that request's error, returned "
+            "to its client; it used to end the engine's input thread, after which "
+            "the engine received nothing. The ID is the key agent-grouped-offload-retention "
             "groups what the KV tiers retain by, and that tier refuses a request "
             "without one; a notice without one ended the engine core for every user."
         ),
@@ -5414,7 +5502,9 @@ CONTRACTS: Mapping[str, SemanticContract] = {
             "touched, never on insert, eviction or request finish, so it cannot "
             "release whole agents; eviction is the manager's own, no policy or "
             "policy-selection key exists, and stores are not filtered by reuse "
-            "count."
+            "count. A pooling request carries no ID, so a spec whose manager "
+            "accounts per agent is refused a pooling model where the connector is "
+            "built; its manager raised on the first one, in the engine core."
         ),
         removal_condition=(
             "Remove when pinned upstream retains complete per-agent contexts, "
@@ -5824,10 +5914,18 @@ CONTRACTS: Mapping[str, SemanticContract] = {
             "connector adds what its spec and tiers act on; a connector that "
             "declares none takes none -- an out-of-tree one, and LMCache's and "
             "FlexKV's delegated adapters, whose packages read what nothing here "
-            "establishes. Admission refuses any other key, and a non-object, with a "
-            "400 naming the key, the connector and what it takes; only a connector "
-            "that takes do_remote_prefill is told of a refused request's "
-            "remote-prefill blocks."
+            "establishes, each naming what its operator does to declare them. Each "
+            "declared key carries the shape of the value its connector reads -- "
+            "inside the engine core, where the P2P tier's .get on a string, or a "
+            "list hashed as an ID, raised for every request the engine served. "
+            "Admission refuses any other key, a value of another shape, and a "
+            "non-object, with a 400 naming the key, the connector and what it "
+            "takes or the shape, and a next action the caller can take; upstream's "
+            "reused prompt ids, which no layer here takes, are refused for what "
+            "this server does instead. Only a connector that takes "
+            "do_remote_prefill is told of a refused request's remote-prefill "
+            "blocks, and only by parameters admission takes, since the notice "
+            "reaches the connector without crossing admission."
         ),
         removal_condition=(
             "Remove when pinned upstream has each KV connector declare the request "
