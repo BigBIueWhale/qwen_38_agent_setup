@@ -269,14 +269,13 @@ readonly RUNTIME_DOCKERFILE_SHA256="319a602d81d5f30696609ad36c9e3ea421c08ef5d976
 # Functional host contract only. Exact host software versions, binary
 # hashes, and GPU/driver identity are deliberately not pinned: they tie the
 # deployment to one specific computer without making inference any more
-# correct. The AppArmor profile every container is verified to run under and
-# the GPU-memory calibration floor for the locked VRAM budget are the
-# properties the profile actually depends on; what the Docker daemon must
+# correct. The AppArmor profile every container is verified to run under is
+# the property the profile actually depends on; what the Docker daemon must
 # report about container isolation is the rule in scripts/host-isolation.sh,
-# asserted against the live daemon. Everything inside the pinned images
-# remains exact.
+# asserted against the live daemon. Whether a GPU's memory holds the declared
+# KV pool is the engine's measurement, not a number here. Everything inside the
+# pinned images remains exact.
 readonly EXPECTED_CONTAINER_APPARMOR_PROFILE="docker-default"
-readonly MINIMUM_GPU_MEMORY_MIB="32607"
 # The one GPU compute capability this image is built and validated for. The
 # pinned base image compiles vLLM's kernels with TORCH_CUDA_ARCH_LIST=12.0, and
 # every GPU gate -- the NVFP4 kernel unit, the numerical audits and the probes --

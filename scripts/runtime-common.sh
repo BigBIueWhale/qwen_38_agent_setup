@@ -163,15 +163,17 @@ check_host_prerequisites() {
   # must exist, Docker must respond with its NVIDIA runtime configured, the
   # daemon must report the container isolation the profile depends on, as
   # scripts/host-isolation.sh states it -- the one rule agent_service carries
-  # byte-identically -- and exactly one GPU with at least the memory the
-  # locked KV/VRAM budget was calibrated for, and of the compute capability the
-  # image is built and validated for, must be present. Exact host software
-  # versions, binary hashes, and GPU/driver identity are deliberately not
-  # asserted: they tie the deployment to one specific computer without making
-  # inference any more correct. Everything inside the pinned images remains
-  # exact.
+  # byte-identically -- and exactly one GPU, of the compute capability the
+  # image is built and validated for, must be present. Whether its memory
+  # holds the model and the declared KV pool is the engine's to decide: it
+  # admits --kv-cache-users against the memory free at startup minus what it
+  # measures serving to hold, and refuses the pool naming each term. Exact host
+  # software versions, binary hashes, and GPU/driver identity are deliberately
+  # not asserted: they tie the deployment to one specific computer without
+  # making inference any more correct. Everything inside the pinned images
+  # remains exact.
   local command_name docker_server security_options isolation_refusals runtimes
-  local gpu_report gpu_count gpu_memory gpu_capability
+  local gpu_report gpu_count gpu_capability
   for command_name in docker git nvidia-smi sha256sum ss; do
     require_command "${command_name}"
   done
@@ -194,18 +196,12 @@ check_host_prerequisites() {
 
   gpu_report="$(
     nvidia-smi \
-      --query-gpu=memory.total,compute_cap \
+      --query-gpu=compute_cap \
       --format=csv,noheader,nounits
   )"
   gpu_count="$(wc -l <<<"${gpu_report}")"
   require_equal "GPU count" "${gpu_count}" "1"
-  IFS=, read -r gpu_memory gpu_capability <<<"${gpu_report//[[:space:]]/}"
-  [[ "${gpu_memory}" =~ ^[0-9]+$ ]] || die "nvidia-smi reported a non-numeric GPU memory total: ${gpu_report}"
-  if (( gpu_memory < MINIMUM_GPU_MEMORY_MIB )); then
-    die "GPU memory is below the locked VRAM budget's calibration floor." \
-      "Required: at least ${MINIMUM_GPU_MEMORY_MIB} MiB" \
-      "Found:    ${gpu_memory} MiB"
-  fi
+  gpu_capability="${gpu_report//[[:space:]]/}"
   if [[ "${gpu_capability}" != "${VALIDATED_CUDA_CAPABILITY}" ]]; then
     die "GPU compute capability ${gpu_capability:-<none reported>} is outside the validated lock." \
       "Validated: ${VALIDATED_CUDA_CAPABILITY} -- the image's kernels are built for it and every GPU gate ran on it." \

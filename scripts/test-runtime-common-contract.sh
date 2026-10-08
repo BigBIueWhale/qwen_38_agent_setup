@@ -128,11 +128,11 @@ host_isolation_check_on() (
     esac
   }
   nvidia-smi() {
-    [[ "$*" == '--query-gpu=memory.total,compute_cap --format=csv,noheader,nounits' ]] || {
+    [[ "$*" == '--query-gpu=compute_cap --format=csv,noheader,nounits' ]] || {
       printf 'unexpected fake nvidia-smi invocation: %s\n' "$*" >&2
       return 97
     }
-    printf '%s, %s\n' "${MINIMUM_GPU_MEMORY_MIB}" "${fake_gpu_capability}"
+    printf '%s\n' "${fake_gpu_capability}"
   }
   # git and ss only have to exist; these bodies run only if the check misuses
   # them.
@@ -241,7 +241,7 @@ gpu_release_units_on() (
     esac
   }
   nvidia-smi() {
-    printf '%s, %s\n' "${MINIMUM_GPU_MEMORY_MIB}" "${fake_capability}"
+    printf '%s\n' "${fake_capability}"
   }
   # shellcheck disable=SC2317
   git() { return 97; }

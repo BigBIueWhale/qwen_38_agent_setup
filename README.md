@@ -421,7 +421,7 @@ Pinned build inputs and products:
 | Immutable base ID | sha256:fa4a002a88b7043a1a89966dea8a500fe9696f84e75730d9da916f916048d401 |
 | Runtime Dockerfile SHA-256 | 319a602d81d5f30696609ad36c9e3ea421c08ef5d97623222eeec6ba1866f4fe |
 | Build verifier SHA-256 | 1cfd9e55f63e92d586d5c19ae48ad235f235ceb884a9cc3919ca0f59fe99f908 |
-| Runtime validator SHA-256 | 65975561709b9876c31cd38a956971e7172ca7fc38cbdeac9733adec94a78d47 |
+| Runtime validator SHA-256 | e743d2bdca2bb34960f3b5bc8240d0361a7479539a2980a4aae552be29c74f7e |
 
 The runtime image's profile, tag and archive name, which every release advances
 together, are declared in `config/runtime-v1.sh`, and the archive lives under
@@ -1751,8 +1751,10 @@ container through the isolated service into this pinned vLLM backend.
 Host requirements are functional, not identity pins: the invoked tools must
 exist, Docker must respond with its NVIDIA runtime, the daemon must report the
 container isolation [`scripts/host-isolation.sh`](scripts/host-isolation.sh)
-requires, and exactly one GPU with at least 32,607 MiB — the calibration floor
-of the locked VRAM/KV budget — and compute capability 12.0 must be present.
+requires, and exactly one GPU of compute capability 12.0 must be present.
+Whether its memory holds the model and the declared KV pool is the engine's
+measurement at startup, which refuses the pool naming each term; the launcher
+keeps no second memory number beside it.
 Exact host software versions, binary hashes, and GPU/driver identity are
 deliberately not asserted; pinning them tied the deployment to one specific
 computer without making inference any more correct.
