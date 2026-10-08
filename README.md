@@ -348,7 +348,7 @@ It is intentionally reconstructed by the ordered, reviewed semantic transformati
 | patches/vllm-unspecified-tool-choice-is-the-default.patch | 8db1159ea73f23e20a7635b276f56abce085d9b0d83b3ea0d4599f275c5e8746 |
 | patches/vllm-call-only-answer-keeps-the-blank-line.patch | 57c69104cb5b569050098993f4abb4e7f88299a43b6ac41f22e267dd8ab177a2 |
 | patches/vllm-responses-tools-are-one-function-list.patch | aa54ae92344ca7c9bdfe014a9676b7b63716e3c677e64cee4a8a6ac3b0c104e5 |
-| patches/vllm-batch-parse-starts-where-the-prompt-leaves.patch | 352b37904e51dab650f4fb84b7ecd8f284f468d2602bcd1b021001a8d865ccc0 |
+| patches/vllm-batch-parse-starts-where-the-prompt-leaves.patch | bc8dc94b88990fbf99549ac8a9b8825bfa02a5225809071e73eab869e12de8db |
 | patches/vllm-derender-text-is-the-detokenizers.patch | 9d8f6d45beba5c79671444be4e9604c4352c7fe5346d78573bfc4fbc91bfb4b6 |
 | patches/vllm-output-constraints-refused-beside-tool-calls.patch | b82f6259428441aee55d157443bcedc1d98fb247ef9a521106408671a24ae533 |
 | patches/vllm-batch-invariance-substitutes-no-nvfp4-kernel.patch | c79baaee0a51275f5f522d266fe6b315c200e6951920c2454d5c80cadbb92f44 |
@@ -1276,7 +1276,13 @@ The parser deletes nothing the model generated. A special token its format does
 not act on -- the vision and audio markers among them, which the served template
 itself spells -- is the text it decodes to, in reasoning, in the answer and inside
 a call's arguments, and a second `</think>` after reasoning has ended is content,
-as a literal `<think>` there already was. Upstream's parser engine deletes every
+as a literal `<think>` there already was. A `<think>` the model writes inside its
+reasoning is part of it: every served generation prompt ends inside the `<think>`
+the template wrote, and the parser reads the prompt. Only a generation whose
+prompt left the opener to the model -- a template that writes none, or derender,
+which is given no prompt -- opens its reasoning with `<think>`, and only as its
+first token. Upstream's Qwen grammar deletes every `<think>` in reasoning, the
+model's own included. Upstream's parser engine deletes every
 special token its format does not act on by default. Here that deletion erased the
 model's output from the record and, beside the content ids the batch tool pass
 splits on, left an id whose text was gone, which the token-position scanner

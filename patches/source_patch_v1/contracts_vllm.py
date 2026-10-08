@@ -3956,6 +3956,9 @@ def _validate_batch_parse_from_prompt_before(state: State) -> None:
         ("if self.parser_engine_config.initial_state is not ParserState.REASONING:",),
         label=label,
     )
+    # Qwen's grammar absorbs every <think> in reasoning.
+    require_text(state, "vllm/parser/qwen3.py",
+                 '(ParserState.REASONING, "THINK_START"): Transition(', label=label)
 
 
 def _validate_batch_parse_from_prompt_after(state: State) -> None:
@@ -3983,13 +3986,42 @@ def _validate_batch_parse_from_prompt_after(state: State) -> None:
     _require_in_symbol(state, abstract, "Parser.parse_output_delta", (
         "prompt_token_ids=prompt_token_ids",
     ), label=label)
-    # A grammar's prompt state survives the batch parse's reset.
+    # A grammar's prompt state survives the batch parse's reset, and with it
+    # whether the prompt itself opened the reasoning it leaves.
     require_python_symbols(state, engine, {
-        "ParserEngine._start_in": ("self", "state"),
+        "ParserEngine._start_in": ("self", "state", "reasoning_opened"),
         "ParserEngine.parse_output": signature,
     }, label=label)
     _require_in_symbol(state, engine, "ParserEngine._reset", (
-        "initial_state = self._prompt_initial_state",), label=label)
+        "initial_state = self._prompt_initial_state",
+        "reasoning_opened = self._prompt_opened_reasoning",), label=label)
+    # A generation opens its reasoning only with its first token, and only
+    # where no prompt opened it; anywhere else the opener is text it wrote.
+    streaming = "vllm/parser/engine/streaming_parser_engine.py"
+    qwen = "vllm/parser/qwen3.py"
+    require_text(state, "vllm/parser/engine/parser_engine_config.py",
+                 "reasoning_opener: str | None = None", label=label)
+    _require_in_symbol(state, streaming, "StreamingParserEngine.reset", (
+        "self.config.reasoning_opener is not None",
+        "and self.state is ParserState.REASONING",
+        "and not reasoning_opened",), label=label)
+    _require_in_symbol(state, streaming, "StreamingParserEngine._on_terminal", (
+        "if terminal == self.config.reasoning_opener:",), label=label)
+    _require_in_symbol(state, streaming, "StreamingParserEngine._emit_for_state", (
+        "self._awaits_opener = False",), label=label)
+    forbid_text(state, qwen, '(ParserState.REASONING, "THINK_START")', label=label)
+    _require_in_symbol(state, qwen, "qwen3_config", (
+        'reasoning_opener="THINK_START" if thinking else None',), label=label)
+    _require_in_symbol(state, qwen, "Qwen3Parser.adjust_initial_state_from_prompt", (
+        "self._start_in(ParserState.REASONING, reasoning_opened=True)",), label=label)
+    require_python_symbols(state, "tests/parser/engine/test_qwen3_reasoning.py", {
+        "TestNonStreaming.test_opener_inside_reasoning_is_text": None,
+        "TestNonStreaming.test_opener_after_a_prompt_that_opened_reasoning_is_text": None,
+        "TestNonStreaming.test_prompt_without_an_opener_leaves_it_to_the_model": None,
+        "TestStreaming.test_streaming_opener_inside_reasoning_is_text": None,
+        "TestDelegatingGeneratedOpener."
+        "test_a_generated_opener_after_an_opened_prompt_is_reasoning_text": None,
+    }, label=label)
     # The whole-generation reasoning count starts there too, so it is the
     # count the feed takes from that state.
     _require_in_symbol(state, engine, "ParserEngine.count_reasoning_tokens", (
@@ -5503,9 +5535,16 @@ CONTRACTS: Mapping[str, SemanticContract] = {
             "passes them, and a grammar's prompt state survives the batch reset "
             "(gemma4 and inkling seeded only the stream) and is where the "
             "whole-generation reasoning count starts, so that count is the one "
-            "the feed takes. Derender receives no "
-            "prompt ids and passes none, so a continued final message is "
-            "reasoning there, as on upstream's derender."
+            "the feed takes. The same reading decides who writes Qwen's opener: "
+            "its grammar deleted every <think> in reasoning, the model's own "
+            "included, because it could not tell an opener from text. A prompt "
+            "ending inside <think>, as every served generation prompt does, "
+            "opened reasoning, so a <think> the model writes is reasoning text; "
+            "elsewhere only a generation's first token can be the opener, which "
+            "a template that leaves the opener to the model expects. Derender "
+            "receives no prompt ids and passes none, so a continued final "
+            "message is reasoning there, as on upstream's derender, and a "
+            "<think> as a generation's first token is read as its opener."
         ),
         removal_condition=(
             "Remove when pinned upstream's complete-output parse starts from the "

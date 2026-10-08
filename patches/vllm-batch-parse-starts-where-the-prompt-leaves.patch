@@ -416,10 +416,10 @@ index 27a4f2773131719b7961222f50199221db967b72..8a2709431195e73bae9fe399b5bc82fa
          current_text, current_token_ids = state.advance(delta_text, delta_token_ids)
          delta_message: DeltaMessage | None = None
 diff --git a/vllm/parser/engine/parser_engine.py b/vllm/parser/engine/parser_engine.py
-index 799ff9f41dded3ef599498dca130b2303cf4dcb2..ff9a4dd2e0ddfeed2daa441ea2e2c350b3a6ece8 100644
+index 799ff9f41dded3ef599498dca130b2303cf4dcb2..96871b30f620bd804e5936caede4378f9eb41c18 100644
 --- a/vllm/parser/engine/parser_engine.py
 +++ b/vllm/parser/engine/parser_engine.py
-@@ -186,6 +186,10 @@ class ParserEngine(Parser):
+@@ -186,6 +186,11 @@ class ParserEngine(Parser):
          self._reasoning_ended: bool = not self._has_reasoning
          self._streaming_initialized: bool = False
          self._prompt_streaming_prepared: bool = False
@@ -427,10 +427,11 @@ index 799ff9f41dded3ef599498dca130b2303cf4dcb2..ff9a4dd2e0ddfeed2daa441ea2e2c350
 +        # configured initial state (see ``_start_in``); every reset begins
 +        # there, so the streaming and the batch parse start alike.
 +        self._prompt_initial_state: ParserState | None = None
++        self._prompt_opened_reasoning: bool = False
  
          self._tool_slots: list[ToolCallSlot] = []
          self._deferred_content: str = ""
-@@ -269,9 +273,23 @@ class ParserEngine(Parser):
+@@ -269,9 +274,28 @@ class ParserEngine(Parser):
              self._reset(initial_state=initial_state)
  
      def adjust_initial_state_from_prompt(self, prompt_token_ids: Sequence[int]) -> None:
@@ -442,29 +443,40 @@ index 799ff9f41dded3ef599498dca130b2303cf4dcb2..ff9a4dd2e0ddfeed2daa441ea2e2c350
 +        """
          return
  
-+    def _start_in(self, state: ParserState) -> None:
++    def _start_in(
++        self, state: ParserState, *, reasoning_opened: bool = False
++    ) -> None:
 +        """Begin this generation in *state*, the one its prompt leaves it in.
 +
 +        Recorded rather than applied once, so the batch parse, which resets
 +        before it feeds, starts where the streaming parse starts.
++        ``reasoning_opened`` records that the prompt itself opened that
++        reasoning, so the generation writes no opener of it.
 +        """
 +        self._prompt_initial_state = state
++        self._prompt_opened_reasoning = reasoning_opened
 +        self._reset()
 +        self._streaming_initialized = True
 +
      def finish_streaming(self) -> DeltaMessage | None:
          events = self._engine.finish()
          if events or self._deferred_content:
-@@ -279,6 +297,8 @@ class ParserEngine(Parser):
+@@ -279,7 +303,13 @@ class ParserEngine(Parser):
          return None
  
      def _reset(self, initial_state: ParserState | None = None) -> None:
+-        self._engine.reset(initial_state=initial_state)
++        reasoning_opened = False
 +        if initial_state is None:
 +            initial_state = self._prompt_initial_state
-         self._engine.reset(initial_state=initial_state)
++            reasoning_opened = self._prompt_opened_reasoning
++        self._engine.reset(
++            initial_state=initial_state, reasoning_opened=reasoning_opened
++        )
          self._reasoning_ended = not self._has_reasoning
          self._tool_slots.clear()
-@@ -858,15 +878,18 @@ class ParserEngine(Parser):
+         self._deferred_content = ""
+@@ -858,15 +888,18 @@ class ParserEngine(Parser):
          """Reasoning ids in a complete generation, by the rule the feed follows.
  
          The value :attr:`reasoning_token_count` holds once *token_ids* have
@@ -487,7 +499,7 @@ index 799ff9f41dded3ef599498dca130b2303cf4dcb2..ff9a4dd2e0ddfeed2daa441ea2e2c350
              return 0
          return self._ids_before_boundary(token_ids)
  
-@@ -947,11 +970,15 @@ class ParserEngine(Parser):
+@@ -947,11 +980,15 @@ class ParserEngine(Parser):
          model_output: str,
          request: ChatCompletionRequest | ResponsesRequest,
          *,
@@ -614,3 +626,268 @@ index b1553d47b1ea3e6f266f70a9c2094bf229abe632..a6c31222ff027f519281b8a80d84200b
 +
 +        assert engine.reasoning_token_count == 2
 +        assert engine.count_reasoning_tokens(ids) == 2
+diff --git a/tests/parser/engine/test_qwen3_reasoning.py b/tests/parser/engine/test_qwen3_reasoning.py
+index 9a6710b5a0ac89dab6ab1bb90bb428f8cc88bfa6..bc6eca255ea16891a335658e1d6932932a241bf0 100644
+--- a/tests/parser/engine/test_qwen3_reasoning.py
++++ b/tests/parser/engine/test_qwen3_reasoning.py
+@@ -5,7 +5,9 @@
+ Validates that ``Qwen3Parser`` correctly handles
+ ``<think>``/``</think>`` reasoning with Qwen3-specific extensions:
+ - ``<tool_call>`` as implicit reasoning end (terminal + token ID)
+-- Stripping ``<think>`` from generated output (old template compat)
++- A leading ``<think>`` opens reasoning only where the prompt left the
++  opener to the model (old template compat); inside reasoning, and after a
++  prompt that opened reasoning, ``<think>`` is text the model wrote
+ - No terminal text (``</think>``, ``<tool_call>``) leaks into output
+ """
+ 
+@@ -150,6 +152,34 @@ class TestNonStreaming:
+         assert "</think>" not in (content or "")
+         assert "<think>" not in (content or "")
+ 
++    def test_opener_inside_reasoning_is_text(self, parser):
++        """Only a generation's first token can open its reasoning; a later
++        ``<think>`` is text the model wrote, kept byte for byte."""
++        text = "<think>Plan<think>more</think>Answer."
++        reasoning, content = parser.extract_reasoning(text, None)
++        assert reasoning == "Plan<think>more"
++        assert content == "Answer."
++
++    def test_opener_after_a_prompt_that_opened_reasoning_is_text(self, parser):
++        """A prompt ending inside an open ``<think>`` -- as a template that
++        writes the opener leaves it -- leaves the model no opener to write."""
++        parser.adjust_initial_state_from_prompt([_TEXT_ID, _THINK_START_ID, _TEXT_ID])
++        text = "<think>Plan</think>Answer."
++        reasoning, content = parser.extract_reasoning(text, None)
++        assert reasoning == "<think>Plan"
++        assert content == "Answer."
++
++    def test_prompt_without_an_opener_leaves_it_to_the_model(self, parser):
++        """A prompt whose last reasoning marker is no opener keeps the
++        configured start: the generation's first token opens reasoning."""
++        parser.adjust_initial_state_from_prompt(
++            [_THINK_START_ID, _THINK_END_ID, _TEXT_ID]
++        )
++        text = "<think>Plan</think>Answer."
++        reasoning, content = parser.extract_reasoning(text, None)
++        assert reasoning == "Plan"
++        assert content == "Answer."
++
+     def test_second_think_end_is_content(self, parser):
+         """Reasoning ends once; a later </think> is text the model wrote."""
+         text = "Reasoning here.</think>Content here.</think>More content."
+@@ -233,6 +263,33 @@ class TestDelegatingPromptDetection:
+         assert delta.content is None
+ 
+ 
++class TestDelegatingGeneratedOpener:
++    def test_a_generated_opener_after_an_opened_prompt_is_reasoning_text(
++        self, mock_tokenizer, mock_request
++    ):
++        """Batch and stream read the prompt alike: after one that opened
++        reasoning the model's ``<think>`` is part of its reasoning."""
++        prompt_ids = [_TEXT_ID, _THINK_START_ID]
++        ids = [_THINK_START_ID, _TEXT_ID, _THINK_END_ID, _TEXT_ID]
++        texts = ["<think>", "plan", "</think>", "done"]
++        batch = _Qwen3DelegatingParser(mock_tokenizer).parse_output(
++            "".join(texts), mock_request, prompt_token_ids=prompt_ids,
++            finish_reason="stop", stop_reason=None, model_output_token_ids=ids,
++        )
++        assert batch[:2] == ("<think>plan", "done")
++        stream = _Qwen3DelegatingParser(mock_tokenizer)
++        reasoning = content = ""
++        for index, (text, token) in enumerate(zip(texts, ids)):
++            delta = stream.parse_delta(
++                text, [token], mock_request, prompt_token_ids=prompt_ids,
++                finished=index == len(ids) - 1,
++            )
++            if delta is not None:
++                reasoning += delta.reasoning or ""
++                content += delta.content or ""
++        assert (reasoning, content) == ("<think>plan", "done")
++
++
+ class TestStreaming:
+     def test_basic_streaming(self, parser):
+         reasoning, content = simulate_reasoning_streaming(
+@@ -404,6 +461,40 @@ class TestStreaming:
+         assert "</think>" not in content
+         assert "<think>" not in reasoning
+ 
++    def test_streaming_opener_inside_reasoning_is_text(self, parser):
++        """A second ``<think>`` token is reasoning text, exactly as in batch."""
++        reasoning, content = simulate_reasoning_streaming(
++            parser,
++            ["<think>", "plan", "<think>", "more", "</think>", "done"],
++            [
++                (_THINK_START_ID,),
++                (1,),
++                (_THINK_START_ID,),
++                (2,),
++                (_THINK_END_ID,),
++                (3,),
++            ],
++        )
++        assert reasoning == "plan<think>more"
++        assert content == "done"
++
++    def test_streaming_opener_after_a_prompt_that_opened_reasoning_is_text(
++        self, parser
++    ):
++        parser.adjust_initial_state_from_prompt([_THINK_START_ID])
++        reasoning, content = simulate_reasoning_streaming(
++            parser,
++            ["<think>", "plan", "</think>", "done"],
++            [
++                (_THINK_START_ID,),
++                (1,),
++                (_THINK_END_ID,),
++                (2,),
++            ],
++        )
++        assert reasoning == "<think>plan"
++        assert content == "done"
++
+     def test_streaming_second_think_end_is_content(self, parser):
+         """A second </think> token is content, exactly as in batch."""
+         reasoning, content = simulate_reasoning_streaming(
+diff --git a/vllm/parser/engine/parser_engine_config.py b/vllm/parser/engine/parser_engine_config.py
+index 8b1021b5f759ca08cec66c96ece9534a2705472e..c92b66dec66761d5e3d12ae66c1689c172b0843c 100644
+--- a/vllm/parser/engine/parser_engine_config.py
++++ b/vllm/parser/engine/parser_engine_config.py
+@@ -99,6 +99,13 @@ class ParserEngineConfig:
+ 
+     initial_state: ParserState = ParserState.CONTENT
+ 
++    # The terminal a generation that starts in reasoning may open it with,
++    # as its first token: a template that leaves the opener to the model.
++    # Anywhere else the terminal is the text the model wrote, and a
++    # generation whose prompt opened reasoning writes no opener at all.
++    # ``None`` for a format with no such opener.
++    reasoning_opener: str | None = None
++
+     # The exact text the format puts between the tool-call opener and the
+     # function opener.  When set, an opener that this text and the function
+     # opener do not follow is not a call: the opener and whatever followed it
+diff --git a/vllm/parser/engine/streaming_parser_engine.py b/vllm/parser/engine/streaming_parser_engine.py
+index 7a302e74b22edd5d3598f8ab150f5cc404c11ece..5b62265d485b62f3688148fc15ae30bd8295bec4 100644
+--- a/vllm/parser/engine/streaming_parser_engine.py
++++ b/vllm/parser/engine/streaming_parser_engine.py
+@@ -148,16 +148,31 @@ class StreamingParserEngine:
+         self._call_arguments: list[str] = []
+         self._held_function_end: str = ""
+ 
+-    def reset(self, initial_state: ParserState | None = None) -> None:
++    def reset(
++        self,
++        initial_state: ParserState | None = None,
++        *,
++        reasoning_opened: bool = False,
++    ) -> None:
+         """Reset mutable state for reuse across requests.
+ 
+         Preserves cached immutable structures (compiled terminals,
+         resolved token IDs, lexer shape, token text cache) to avoid
+         redundant initialization work.
++
++        ``reasoning_opened`` says the prompt itself opened the reasoning
++        this generation starts in, so no token of it is the format's
++        ``reasoning_opener``.
+         """
+         self.state = (
+             initial_state if initial_state is not None else self.config.initial_state
+         )
++        # Only a generation's first token can open its reasoning.
++        self._awaits_opener = (
++            self.config.reasoning_opener is not None
++            and self.state is ParserState.REASONING
++            and not reasoning_opened
++        )
+         self.tool_index = -1
+         self.raw_tool_calls: dict[int, RawToolCall] = {}
+         self._raw_tool_parts: list[str] = []
+@@ -386,6 +401,11 @@ class StreamingParserEngine:
+         return events
+ 
+     def _on_terminal(self, terminal: str, value: str) -> list[SemanticEvent]:
++        if self._awaits_opener:
++            self._awaits_opener = False
++            if terminal == self.config.reasoning_opener:
++                # The generation opened the reasoning it starts in.
++                return []
+         if (
+             self.skip_tool_parsing
+             and self._in_skipped_tool_span
+@@ -540,6 +560,8 @@ class StreamingParserEngine:
+         return self._apply_transition(transition, value)
+ 
+     def _emit_for_state(self, text: str) -> list[SemanticEvent]:
++        if text:
++            self._awaits_opener = False
+         if self.requires_tool_closer and self.state in self._TOOL_STATES:
+             self._raw_tool_parts.append(text)
+         if self.state == ParserState.MESSAGE_HEADER:
+diff --git a/vllm/parser/qwen3.py b/vllm/parser/qwen3.py
+index 80c3768be5a29b20133412626d6925639e11fd0c..c2b558a70bd20afca509606aa26a7f3219677195 100644
+--- a/vllm/parser/qwen3.py
++++ b/vllm/parser/qwen3.py
+@@ -23,6 +23,7 @@ from __future__ import annotations
+ 
+ import functools
+ import json
++from collections.abc import Sequence
+ from itertools import product
+ from typing import TYPE_CHECKING
+ from urllib.parse import unquote
+@@ -339,6 +340,9 @@ def qwen3_config(
+     return ParserEngineConfig(
+         name=name,
+         initial_state=ParserState.REASONING if thinking else ParserState.CONTENT,
++        # A template may leave ``<think>`` to the model; inside reasoning it
++        # is text (``Qwen3Parser.adjust_initial_state_from_prompt``).
++        reasoning_opener="THINK_START" if thinking else None,
+         terminals={
+             # Reasoning terminals
+             "THINK_START": think_start,
+@@ -369,10 +373,6 @@ def qwen3_config(
+         # reaches a client that the grammar did not constrain.
+         transitions={
+             # -- Reasoning transitions --
+-            (ParserState.REASONING, "THINK_START"): Transition(
+-                ParserState.REASONING,
+-                (),
+-            ),
+             (ParserState.REASONING, "THINK_END"): Transition(
+                 ParserState.CONTENT,
+                 (EventType.REASONING_END,),
+@@ -558,6 +558,30 @@ class Qwen3Parser(ParserEngine):
+             if tool_choice == "none" or not tools:
+                 self.skip_tool_parsing = True
+ 
++    def adjust_initial_state_from_prompt(
++        self, prompt_token_ids: Sequence[int]
++    ) -> None:
++        """A prompt that opened reasoning leaves the model no opener to write.
++
++        When the prompt's last reasoning marker is ``<think>`` -- every
++        generation prompt the served template writes ends with it -- the
++        reasoning is open, and a ``<think>`` the model generates is part of
++        it. Otherwise the configured start holds: the generation's first
++        token may open reasoning, as a template that leaves the opener to the
++        model expects. A prompt that closed reasoning is parsed as content
++        before this is asked.
++        """
++        if not self.thinking_enabled:
++            return
++        start_id = self._reasoning_start_token_id
++        end_id = self._reasoning_end_token_id
++        for token_id in reversed(prompt_token_ids):
++            if token_id == start_id:
++                self._start_in(ParserState.REASONING, reasoning_opened=True)
++                return
++            if token_id == end_id:
++                return
++
+     def is_reasoning_end(self, input_ids: list[int]) -> bool:
+         if super().is_reasoning_end(input_ids):
+             return True

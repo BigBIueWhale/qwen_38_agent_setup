@@ -882,6 +882,9 @@ class ToolOutputParserTest(unittest.TestCase):
             ("stop text asked for", encode("plan</think>\n\nYes") + [MODEL_EOS[0]],
              "stop", None, True),
             ("cut inside a character", crab[:-1], "length", None, False),
+            ("an opener inside reasoning",
+             encode("pl<think>an</think>\n\nok") + [MODEL_EOS[0]],
+             "stop", None, False),
         ]
         for name, ids, finish, stop, include_stop in cases:
             with self.subTest(case=name):
@@ -984,9 +987,12 @@ class ToolOutputParserTest(unittest.TestCase):
         Every special token of the served tokenizer that the format does not
         act on -- the vision and audio markers among them -- is the text it
         decodes to, in reasoning, in the answer, beside a call and inside a
-        value; so is a second ``</think>``. Batch and every chunking read the
-        same ids the same way, so text and ids cannot disagree. A model EOS
-        ends a generation, so it is not one of them.
+        value; so are a ``<think>``, which the served prompt has already
+        opened reasoning with, and a second ``</think>``. Batch and every
+        chunking read the same ids the same way, so text and ids cannot
+        disagree. A model EOS ends a generation, so it is not one of them.
+        Only a prompt that wrote no reasoning marker leaves the opener to the
+        model: its first token then opens reasoning, and a later one is text.
         """
         specials = [
             token for token in TOKENIZER.all_special_tokens
@@ -994,7 +1000,8 @@ class ToolOutputParserTest(unittest.TestCase):
             and TOKENIZER.convert_tokens_to_ids(token) not in MODEL_EOS
         ]
         self.assertIn("<|image_pad|>", specials)
-        for token in [*specials, "</think>"]:
+        self.assertTrue(TOKENIZER.decode(OPEN_PROMPT).endswith("<think>\n"))
+        for token in [*specials, "<think>", "</think>"]:
             cases = [
                 ("pl" + token + "an</think>\n\nanswer",
                  ("pl" + token + "an", "\n\nanswer", [])),
@@ -1015,6 +1022,16 @@ class ToolOutputParserTest(unittest.TestCase):
                 for chunk in (None, 1, 3, 1000):
                     with self.subTest(token=token, text=text, chunk=chunk):
                         self.assertEqual(parse(text, chunk)[:3], expected)
+        unopened = OPEN_PROMPT[:-len(encode("<think>\n"))]
+        self.assertFalse({MARKERS["<think>"], MARKERS["</think>"]} & set(unopened))
+        text = "<think>\npl<think>an</think>\n\nanswer"
+        for prompt, expected in (
+            (OPEN_PROMPT, (text.removesuffix("</think>\n\nanswer"), "\n\nanswer", [])),
+            (unopened, ("\npl<think>an", "\n\nanswer", [])),
+        ):
+            for chunk in (None, 1, 3, 1000):
+                with self.subTest(opened=prompt is OPEN_PROMPT, chunk=chunk):
+                    self.assertEqual(parse(text, chunk, prompt=prompt)[:3], expected)
 
     def test_a_format_whose_ids_and_text_could_disagree_never_registers(self):
         """The served format gives its batch tool pass the content ids, which is
@@ -1411,6 +1428,12 @@ class ToolOutputParserTest(unittest.TestCase):
                 [("reasoning", "incomplete", "plan more pla")]), []),
             "a continued final message": ("wer is 4.", "stop", continued, (
                 "completed", 0, [("message", "completed", "wer is 4.")]), []),
+            "an opener inside reasoning": (
+                "pl<think>an</think>\n\nok", "stop", OPEN_PROMPT, (
+                    "completed", len(encode("pl<think>an")), [
+                        ("reasoning", "completed", "pl<think>an"),
+                        ("message", "completed", "\n\nok"),
+                    ]), []),
         }
         for name, (text, finish, prompt, expected, done) in cases.items():
             for chunk in (None, 1, 4):
