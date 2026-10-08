@@ -369,6 +369,8 @@ It is intentionally reconstructed by the ordered, reviewed semantic transformati
 | patches/vllm-kv-transfer-params-are-declared.patch | 18316e69260279327deed84b584ee87d6960fe757a298640edcd5400d24de2e2 |
 | patches/vllm-responses-refuses-tools-the-template-is-never-given.patch | eb497a85e0a2f3aa1907fcf22e34b62fe8dc91015a7f869293497d64ad5134b2 |
 | patches/vllm-chat-stream-carries-every-token-logprob.patch | ca15dadd152454fe5b3fbcb710b8c7b5ce3221c038617b9e0d0985953aecbf47 |
+| patches/vllm-chat-messages-read-by-one-rule.patch | 5bf8a2d69d7ab1c6b9ee423740d34616a69e857d64816f68b9b9b1d509455f7f |
+| patches/vllm-responses-refuses-what-it-cannot-honour.patch | 9848b7a06c5eb092889f9fc9f6025d67bea28a029b03da9f2d8378cebdac924f |
 
 The reconstructed tree's runtime-source and test changes, new files and
 deletions are counted by ./scripts/build-vllm.sh check, which derives and prints
@@ -426,9 +428,9 @@ Pinned build inputs and products:
 |---|---|
 | Immutable base tag | qwen38-vllm:main-9df9b0b |
 | Immutable base ID | sha256:fa4a002a88b7043a1a89966dea8a500fe9696f84e75730d9da916f916048d401 |
-| Runtime Dockerfile SHA-256 | b5c54c949c8718cf99c4b43c7b3b135c3ff20176b412712c31f4b26ddff982c6 |
-| Build verifier SHA-256 | b304eb5f08c605b9e3a32a28668d3eaf58db0167d072cabb3758e8574180ba68 |
-| Runtime validator SHA-256 | 79b5afa242bf9a8f6a751bbac16deb1b68a366c0a08fe198925a8f520885aff7 |
+| Runtime Dockerfile SHA-256 | fe87ba7c6dd20403cf4abc85ce902bd27128c235d562febe5954c57b5aa3fb2a |
+| Build verifier SHA-256 | c68af72ed44aa4d4aaf80cbc4739b5bf372bc803db540dd0dff6266bd35d1a53 |
+| Runtime validator SHA-256 | 4a9ebd2d86bc89891d4128a90cfb61a45792bd632d035cc6d529c7811004e0d7 |
 
 The runtime image's profile, tag and archive name, which every release advances
 together, are declared in `config/runtime-v1.sh`, and the archive lives under
@@ -1246,7 +1248,11 @@ IDs are validated and correlated, while Qwen's positional tool XML remains order
 Chat, Anthropic and Responses replay share the same ordered tool-history gate.
 Every declared call requires one result with its transport ID, in call order,
 before the next turn. Orphaned, missing, duplicate and mismatched results are
-request errors before rendering. Responses preserves every supplied reasoning,
+request errors before rendering. Every request that carries chat messages -- chat,
+`/tokenize`'s chat form and the pooling chat forms -- reads them by one rule, which
+takes a past turn's reasoning as `reasoning` or the legacy `reasoning_content`, so
+`/tokenize` counts the conversation chat renders. `/tokenize` does not apply the
+gate: a client counts a history whose last calls have no results yet. Responses preserves every supplied reasoning,
 summary and assistant text block in order; text blocks concatenate without
 trimming or invented separators. Mixed text/media/refusal parts remain available
 to the shared content parser. Summary-only reasoning retains all summary text;
@@ -1392,6 +1398,15 @@ rendered prompt -- the template's markers, the system text, the task and the too
 definitions -- so each is refused with a 400 naming the parameter; shorten the
 input, or let the client compact it. Completions keep `truncate_prompt_tokens`,
 whose prompt is the caller's own text.
+
+A Responses field the server cannot honour is refused with a 400 naming it, the
+cause and what to send instead. This deployment stores no responses (it runs
+without `VLLM_ENABLE_RESPONSES_API_STORE`), so `previous_response_id` is refused:
+send the conversation so far in `input`. `prompt` names a prompt template this
+server does not hold: send its text as `instructions` and `input`.
+`max_tool_calls` counts built-in tool calls, which the template path never runs, so
+it holds and is echoed; it does not count function calls, which return to the
+client. A server that runs a requested built-in tool itself refuses it.
 
 An output constraint cannot hold beside a callable tool, because the call grammar
 covers the whole output. A request that could call a tool and also constrains its

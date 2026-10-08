@@ -163,19 +163,19 @@ and the native Anthropic endpoint emits typed thinking blocks. Replacing the cur
 field globally would create another compatibility fork.
 
 Known boundary: clients that insist on `reasoning_content` *on output* need a client
-adapter. This server accepts the legacy alias on Chat Completions *input*.
+adapter. This server accepts the legacy alias on *input*, on every request that
+carries chat messages.
 
 ### 4. `monkey_patch_reasoning_field_ingest.py` — legacy input alias
 
 Historical idea: normalize assistant-history `reasoning_content` to `reasoning` so
 preserved reasoning is not silently dropped.
 
-Disposition: **fixed upstream**, by vLLM commit `346cf163a1`; no patch copied. A live
-Chat Completions request proved the alias is normalized.
-
-Narrow caveat: `/tokenize` uses its own `TokenizeChatRequest` model and bypasses the
-Chat Completions request normalizer. That diagnostic route is not inference ingress.
-Use `reasoning` there.
+Disposition: **fixed upstream for Chat Completions**, by vLLM commit `346cf163a1`; no
+patch copied. A live Chat Completions request proved the alias is normalized. The
+stage `chat-messages-read-by-one-rule` gives that normalizer to every request that
+carries chat messages -- `/tokenize`'s chat form and the pooling chat forms as well
+-- so `/tokenize` counts the reasoning chat renders.
 
 ### 5. `monkey_patch_tool_call_in_think_detector.py` — tool call before `</think>`
 

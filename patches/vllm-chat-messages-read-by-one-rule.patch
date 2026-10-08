@@ -1,0 +1,189 @@
+diff --git a/tests/tool_use/test_chat_completion_request_validations.py b/tests/tool_use/test_chat_completion_request_validations.py
+index 63ba2f29953da69ec996d1494519f7c17c2f49bc..5eb3bdc9650405cee7d1067030dbbb3fb81e7a11 100644
+--- a/tests/tool_use/test_chat_completion_request_validations.py
++++ b/tests/tool_use/test_chat_completion_request_validations.py
+@@ -4,8 +4,17 @@
+ import pytest
+ 
+ from vllm.entrypoints.openai.chat_completion.protocol import ChatCompletionRequest
++from vllm.entrypoints.pooling.embed.protocol import EmbeddingChatRequest
++from vllm.entrypoints.serve.tokenize.protocol import TokenizeChatRequest
+ from vllm.exceptions import VLLMValidationError
+ 
++# Every request type that carries a caller's chat messages reads them by one
++# rule, so /tokenize counts the conversation chat renders.
++MESSAGE_REQUESTS = pytest.mark.parametrize(
++    "request_type",
++    [ChatCompletionRequest, TokenizeChatRequest, EmbeddingChatRequest],
++)
++
+ 
+ def test_chat_completion_request_with_no_tools():
+     # tools key is not present
+@@ -64,8 +73,9 @@ def test_chat_completion_request_with_tool_choice_but_no_tools(tool_choice):
+         )
+ 
+ 
+-def test_reasoning_content_normalized_to_reasoning():
+-    request = ChatCompletionRequest.model_validate(
++@MESSAGE_REQUESTS
++def test_reasoning_content_normalized_to_reasoning(request_type):
++    request = request_type.model_validate(
+         {
+             "messages": [
+                 {"role": "user", "content": "What is 2+2?"},
+@@ -84,8 +94,9 @@ def test_reasoning_content_normalized_to_reasoning():
+     assert "reasoning_content" not in assistant_msg
+ 
+ 
+-def test_reasoning_takes_precedence_over_reasoning_content():
+-    request = ChatCompletionRequest.model_validate(
++@MESSAGE_REQUESTS
++def test_reasoning_takes_precedence_over_reasoning_content(request_type):
++    request = request_type.model_validate(
+         {
+             "messages": [
+                 {"role": "user", "content": "What is 2+2?"},
+@@ -104,8 +115,9 @@ def test_reasoning_takes_precedence_over_reasoning_content():
+     assert "reasoning_content" not in assistant_msg
+ 
+ 
+-def test_no_reasoning_fields_unchanged():
+-    request = ChatCompletionRequest.model_validate(
++@MESSAGE_REQUESTS
++def test_no_reasoning_fields_unchanged(request_type):
++    request = request_type.model_validate(
+         {
+             "messages": [
+                 {"role": "user", "content": "Hello"},
+diff --git a/vllm/entrypoints/chat_utils.py b/vllm/entrypoints/chat_utils.py
+index 2beceb22c9fb0dfd240fb664413465df24392ce8..fc6045fa5c1d35344f1cb94b94c26e6f1cb8ed24 100644
+--- a/vllm/entrypoints/chat_utils.py
++++ b/vllm/entrypoints/chat_utils.py
+@@ -2161,6 +2161,35 @@ def get_tool_call_id_type(model_config: ModelConfig) -> str:
+     return "random"
+ 
+ 
++def normalize_request_messages(data: Any) -> Any:
++    """Pre-process the message dicts of a request body before Pydantic field
++    validation: the one reading of a caller's chat messages, shared by every
++    request type that carries them, so a request that counts a conversation
++    (/tokenize) and one that generates from it render the same conversation.
++
++    Performs two normalizations in a single pass:
++    - Converts tool_calls generators/iterators to lists so one-shot
++      generators are not consumed during union type matching.
++    - Renames the deprecated ``reasoning_content`` field to
++      ``reasoning`` so downstream code only needs to check one field.
++    """
++    if not isinstance(data, dict):
++        return data
++    messages = data.get("messages")
++    if not isinstance(messages, list):
++        return data
++    for msg in messages:
++        if not isinstance(msg, dict):
++            continue
++        tool_calls = msg.get("tool_calls")
++        if tool_calls is not None and not isinstance(tool_calls, list):
++            msg["tool_calls"] = list(tool_calls)
++        reasoning_content = msg.pop("reasoning_content", None)
++        if reasoning_content is not None and msg.get("reasoning") is None:
++            msg["reasoning"] = reasoning_content
++    return data
++
++
+ @dataclass(frozen=True)
+ class ToolHistoryOrigin:
+     """Where each message of a tool history, and each call in it, came from
+diff --git a/vllm/entrypoints/openai/chat_completion/protocol.py b/vllm/entrypoints/openai/chat_completion/protocol.py
+index 7b5408d5cf9e2943b25ee1eb7e846ef5753a6cc0..fdad8fbe9281050ab8aaef0cb8b452dc37c93d1f 100644
+--- a/vllm/entrypoints/openai/chat_completion/protocol.py
++++ b/vllm/entrypoints/openai/chat_completion/protocol.py
+@@ -23,6 +23,7 @@ from vllm.entrypoints.chat_utils import (
+     ChatCompletionMessageParam,
+     ChatTemplateContentFormatOption,
+     ToolHistoryOrigin,
++    normalize_request_messages,
+     validate_tool_result_correlation,
+ )
+ from vllm.entrypoints.openai.engine.protocol import (
+@@ -531,29 +532,7 @@ class ChatCompletionRequest(OpenAIBaseModel):
+     @model_validator(mode="before")
+     @classmethod
+     def _normalize_messages_before(cls, data: Any) -> Any:
+-        """Pre-process message dicts before Pydantic field validation.
+-
+-        Performs two normalizations in a single pass:
+-        - Converts tool_calls generators/iterators to lists so one-shot
+-          generators are not consumed during union type matching.
+-        - Renames the deprecated ``reasoning_content`` field to
+-          ``reasoning`` so downstream code only needs to check one field.
+-        """
+-        if not isinstance(data, dict):
+-            return data
+-        messages = data.get("messages")
+-        if not isinstance(messages, list):
+-            return data
+-        for msg in messages:
+-            if not isinstance(msg, dict):
+-                continue
+-            tool_calls = msg.get("tool_calls")
+-            if tool_calls is not None and not isinstance(tool_calls, list):
+-                msg["tool_calls"] = list(tool_calls)
+-            reasoning_content = msg.pop("reasoning_content", None)
+-            if reasoning_content is not None and msg.get("reasoning") is None:
+-                msg["reasoning"] = reasoning_content
+-        return data
++        return normalize_request_messages(data)
+ 
+     @model_validator(mode="after")
+     def _materialize_tool_calls_after(self) -> "ChatCompletionRequest":
+diff --git a/vllm/entrypoints/pooling/base/protocol.py b/vllm/entrypoints/pooling/base/protocol.py
+index fcc7c24b28c5a224085b23db7d2a7b418817db3f..07b9ae63f6697629ee4b0bb67c701e40d58dd941 100644
+--- a/vllm/entrypoints/pooling/base/protocol.py
++++ b/vllm/entrypoints/pooling/base/protocol.py
+@@ -10,6 +10,7 @@ from vllm.config import ModelConfig
+ from vllm.entrypoints.chat_utils import (
+     ChatCompletionMessageParam,
+     ChatTemplateContentFormatOption,
++    normalize_request_messages,
+ )
+ from vllm.entrypoints.openai.engine.protocol import OpenAIBaseModel
+ from vllm.exceptions import VLLMValidationError
+@@ -270,6 +271,11 @@ class ChatRequestMixin(ChatRequestOptionsMixin):
+     messages: list[ChatCompletionMessageParam]
+     # --8<-- [end:chat-params]
+ 
++    @model_validator(mode="before")
++    @classmethod
++    def _normalize_messages_before(cls, data: Any) -> Any:
++        return normalize_request_messages(data)
++
+ 
+ class EncodingRequestMixin(OpenAIBaseModel):
+     # --8<-- [start:encoding-params]
+diff --git a/vllm/entrypoints/serve/tokenize/protocol.py b/vllm/entrypoints/serve/tokenize/protocol.py
+index 46ad81b308ba2c19bbe2ecf3caee49c003029de3..5ece11f38f3e8502fb5c5edf6a87428c574b6299 100644
+--- a/vllm/entrypoints/serve/tokenize/protocol.py
++++ b/vllm/entrypoints/serve/tokenize/protocol.py
+@@ -10,6 +10,7 @@ from vllm.config import ModelConfig
+ from vllm.entrypoints.chat_utils import (
+     ChatCompletionMessageParam,
+     ChatTemplateContentFormatOption,
++    normalize_request_messages,
+ )
+ from vllm.entrypoints.openai.chat_completion.protocol import (
+     ChatCompletionToolsParam,
+@@ -118,6 +119,11 @@ class TokenizeChatRequest(OpenAIBaseModel):
+         description="A list of tools the model may call.",
+     )
+ 
++    @model_validator(mode="before")
++    @classmethod
++    def _normalize_messages_before(cls, data: Any) -> Any:
++        return normalize_request_messages(data)
++
+     @model_validator(mode="before")
+     @classmethod
+     def check_generation_prompt(cls, data):

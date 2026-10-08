@@ -4659,6 +4659,112 @@ def _validate_chat_stream_logprobs_after(state: State) -> None:
         }, label=label)
 
 
+def _validate_messages_one_rule_before(state: State) -> None:
+    label = "chat messages read by one rule precondition"
+    require_text(state, "vllm/entrypoints/openai/chat_completion/protocol.py",
+                 'reasoning_content = msg.pop("reasoning_content", None)', label=label)
+    forbid_text(state, "vllm/entrypoints/chat_utils.py",
+                "def normalize_request_messages(", label=label)
+    forbid_text(state, "vllm/entrypoints/serve/tokenize/protocol.py",
+                "normalize_request_messages", label=label)
+
+
+def _validate_messages_one_rule_after(state: State) -> None:
+    label = "chat messages read by one rule result"
+    chat_utils = "vllm/entrypoints/chat_utils.py"
+    # One function reads a caller's chat messages: a past turn's reasoning
+    # under its legacy name is the turn's reasoning, on every request type
+    # that carries messages, so /tokenize counts what chat renders.
+    _require_in_symbol(state, chat_utils, "normalize_request_messages", (
+        'msg["tool_calls"] = list(tool_calls)',
+        'reasoning_content = msg.pop("reasoning_content", None)',
+        'if reasoning_content is not None and msg.get("reasoning") is None:',
+        'msg["reasoning"] = reasoning_content',
+    ), label=label)
+    for path, qualname in (
+        ("vllm/entrypoints/openai/chat_completion/protocol.py",
+         "ChatCompletionRequest._normalize_messages_before"),
+        ("vllm/entrypoints/serve/tokenize/protocol.py",
+         "TokenizeChatRequest._normalize_messages_before"),
+        ("vllm/entrypoints/pooling/base/protocol.py",
+         "ChatRequestMixin._normalize_messages_before"),
+    ):
+        _require_in_symbol(state, path, qualname, (
+            "return normalize_request_messages(data)",
+        ), label=label)
+        forbid_text(state, path, 'msg.pop("reasoning_content"', label=label)
+    require_python_symbols(state,
+        "tests/tool_use/test_chat_completion_request_validations.py", {
+            "test_reasoning_content_normalized_to_reasoning": ("request_type",),
+            "test_reasoning_takes_precedence_over_reasoning_content": ("request_type",),
+            "test_no_reasoning_fields_unchanged": ("request_type",),
+        }, label=label)
+
+
+def _validate_responses_unhonoured_fields_before(state: State) -> None:
+    label = "Responses unhonoured fields precondition"
+    serving = "vllm/entrypoints/openai/responses/serving.py"
+    require_text(state, serving,
+                 "def _make_not_found_error(self, response_id: str) -> ErrorResponse:",
+                 label=label)
+    forbid_text(state, serving, 'parameter="max_tool_calls"', label=label)
+    require_text(state, "vllm/entrypoints/openai/responses/protocol.py",
+                 '"prompt template is not supported", parameter="prompt"', label=label)
+
+
+def _validate_responses_unhonoured_fields_after(state: State) -> None:
+    label = "Responses unhonoured fields result"
+    serving = "vllm/entrypoints/openai/responses/serving.py"
+    protocol = "vllm/entrypoints/openai/responses/protocol.py"
+    # A server that stores no responses refuses previous_response_id at
+    # intake, naming the field, the cause and both next actions.
+    _require_in_symbol(state, serving,
+        "OpenAIServingResponses._validate_create_responses_input", (
+            "if request.previous_response_id is not None and not self.enable_store:",
+            "this server stores no responses",
+            "conversation so far in `input`",
+            "`VLLM_ENABLE_RESPONSES_API_STORE=1`",
+            "status_code=HTTPStatus.BAD_REQUEST,",
+            'param="previous_response_id",',
+        ), label=label)
+    # A stored-response lookup names the field the id came in, and a server
+    # that stores nothing says so.
+    _require_in_symbol(state, serving, "OpenAIServingResponses._make_not_found_error", (
+        'self, response_id: str, parameter: str = "response_id"',
+        "if not self.enable_store:",
+        "This server stores no responses",
+        "param=parameter,",
+    ), label=label)
+    # max_tool_calls counts built-in calls; where the server runs one itself
+    # it is refused before anything is admitted.
+    create = _require_in_symbol(state, serving, "OpenAIServingResponses._create_responses", (
+        'prev_response_id, parameter="previous_response_id"',
+        "if request.max_tool_calls is not None and available_tools:",
+        'parameter="max_tool_calls",',
+    ), label=label)
+    _require_ordered(create, (
+        "available_tools = builtin_tool_list",
+        "if request.max_tool_calls is not None and available_tools:",
+        "generator = await self._generate_with_builtin_tools(",
+    ), label=label, location=f"{serving}:_create_responses")
+    _require_in_symbol(state, protocol, "ResponsesRequest.validate_prompt", (
+        "holds no prompt templates",
+        "as instructions and input, and omit prompt.",
+        'parameter="prompt",',
+    ), label=label)
+    forbid_text(state, protocol, "prompt template is not supported", label=label)
+    require_python_symbols(state,
+        "tests/entrypoints/openai/responses/test_serving_responses.py", {
+            "test_previous_response_id_on_a_server_that_stores_nothing_is_refused": None,
+            "test_an_unknown_previous_response_id_is_named_by_its_field": None,
+            "test_max_tool_calls_is_refused_where_built_in_calls_are_not_counted": (
+                "runs_the_tool",),
+        }, label=label)
+    require_python_symbols(state, "tests/tool_use/test_responses_request_validations.py", {
+        "test_a_prompt_template_is_refused_naming_what_to_send_instead": None,
+    }, label=label)
+
+
 def validate_final(state: State) -> None:
     """Reassert every durable semantic invariant on the complete tree.
 
@@ -5979,5 +6085,46 @@ CONTRACTS: Mapping[str, SemanticContract] = {
         ),
         validate_before=_validate_chat_stream_logprobs_before,
         validate_after=_validate_chat_stream_logprobs_after,
+    ),
+    "chat-messages-read-by-one-rule": SemanticContract(
+        rationale=(
+            "Chat Completions renamed a message's legacy reasoning_content to "
+            "reasoning before validation, and the message parser reads only "
+            "reasoning, while /tokenize's chat form and the pooling chat forms "
+            "kept the legacy name: /tokenize rendered a history whose past "
+            "turns carry reasoning_content without that reasoning, so its count "
+            "omitted tokens chat renders. One function now reads a caller's "
+            "chat messages for every request type that carries them. The "
+            "tool-history gate stays chat's: a client counts a history whose "
+            "last calls have no results yet, and /tokenize counts it."
+        ),
+        removal_condition=(
+            "Remove when pinned upstream normalizes reasoning_content on every "
+            "request type that carries chat messages."
+        ),
+        validate_before=_validate_messages_one_rule_before,
+        validate_after=_validate_messages_one_rule_after,
+    ),
+    "responses-refuses-what-it-cannot-honour": SemanticContract(
+        rationale=(
+            "previous_response_id on a server that stores no responses was "
+            "looked up in an empty store and answered 404 'Response with id "
+            "not found' naming response_id: the wrong field, the wrong cause "
+            "and no next action. It is refused at intake with a 400 naming "
+            "previous_response_id, the store being off, and what to send "
+            "instead; a lookup that misses names the field the id came in, and "
+            "retrieving on a server that stores nothing says so. The prompt "
+            "template refusal names why and what to send instead. "
+            "max_tool_calls counts built-in tool calls: the template path runs "
+            "none, so it holds there; a server that runs a requested built-in "
+            "tool itself, uncounted, refuses it before admission."
+        ),
+        removal_condition=(
+            "Remove when pinned upstream refuses previous_response_id without "
+            "a store by its field and cause, and applies or refuses "
+            "max_tool_calls where it runs built-in tools."
+        ),
+        validate_before=_validate_responses_unhonoured_fields_before,
+        validate_after=_validate_responses_unhonoured_fields_after,
     ),
 }

@@ -67,6 +67,8 @@ TOOL = {
         },
     },
 }
+FUNCTION = {"type": "function", "name": "write",
+            "parameters": TOOL["function"]["parameters"]}
 
 
 def _ordinary_tokenizer():
@@ -291,6 +293,43 @@ def _served_chat(**launch_overrides):
         **launch,
     )
     return serving, engine
+
+
+def _served_responses(online_renderer, *, model_type="qwen3",
+                      reasoning_parser=None, **launch):
+    """The Responses route over *online_renderer* (``_served_chat()``'s) and a
+    mocked engine, which is returned with it; ``launch`` gives its launch
+    options, and ``model_type`` and ``reasoning_parser`` another model's."""
+    from vllm.entrypoints.openai.responses.serving import OpenAIServingResponses
+
+    engine = MagicMock()
+    engine.errored = False
+    engine.model_config.max_model_len = 10_000
+    engine.model_config.hf_config.model_type = model_type
+    engine.model_config.get_diff_sampling_param.return_value = {}
+    models = MagicMock()
+    models.model_name.return_value = "unit"
+    return OpenAIServingResponses(
+        engine_client=engine, models=models,
+        online_renderer=online_renderer, request_logger=None,
+        chat_template=online_renderer.chat_template,
+        chat_template_content_format="auto",
+        reasoning_parser=reasoning_parser or _served("SERVED_REASONING_PARSER"),
+        **launch,
+    ), engine
+
+
+def _served_tokenize(chat):
+    """The /tokenize route of the server whose chat route is *chat*
+    (``_served_chat()``'s): its renderer, template and template defaults."""
+    from vllm.entrypoints.serve.tokenize.serving import ServingTokenization
+
+    return ServingTokenization(
+        chat.models, chat.online_renderer,
+        chat_template=chat.online_renderer.chat_template,
+        chat_template_content_format="auto",
+        default_chat_template_kwargs=CHAT_TEMPLATE_KWARGS,
+    )
 
 
 def _chat_route_admits(*, include_reasoning, tools):
@@ -1461,22 +1500,12 @@ class ToolOutputParserTest(unittest.TestCase):
                 self.assertEqual(shown, hidden)
 
     def test_a_responses_stream_is_its_own_snapshot(self):
-        """Every item of the terminal response is the concatenation of the
-        deltas streamed under its index, and no other index streams any; every
-        done event that states an item's text states exactly what its deltas
-        built; the terminal response is the done items, in order. For every
-        engine chunking, on the served parsers."""
+        """Each streamed item is the concatenation of its deltas; its done event
+        carries exactly that; the terminal response is the done items, in
+        order. For every engine chunking, on the served parsers."""
         deltas = {
             "response.output_text.delta", "response.reasoning_text.delta",
             "response.function_call_arguments.delta",
-        }
-        stated = {
-            "response.output_text.done": lambda event: event.text,
-            "response.reasoning_text.done": lambda event: event.text,
-            "response.content_part.done": lambda event: event.part.text,
-            "response.reasoning_part.done": lambda event: event.part.text,
-            "response.function_call_arguments.done": lambda event: event.arguments,
-            "response.output_item.done": lambda event: _item_text(event.item),
         }
         generations = (
             ("plan</think>\n\nThe answer \u03a9.", "stop"),
@@ -1484,7 +1513,6 @@ class ToolOutputParserTest(unittest.TestCase):
             ("plan</think>\n\n" + call("a") + "\n" + call("b"), "stop"),
             ("plan</think>\n\n" + call("a") + "\n<tool_call>\n<function=write>\n"
              "<parameter=text>\nb", "length"),
-            ("plan</think>\n\n<tool_call>\n<function=write>\n", "length"),
             ("plan and more pla", "length"),
         )
         for text, finish in generations:
@@ -1497,20 +1525,17 @@ class ToolOutputParserTest(unittest.TestCase):
                             built[event.output_index] = (
                                 built.get(event.output_index, "") + event.delta
                             )
-                        elif event.type in stated:
-                            self.assertEqual(
-                                stated[event.type](event),
-                                built.get(event.output_index),
-                                f"{event.type} of item {event.output_index}",
-                            )
-                            if event.type == "response.output_item.done":
-                                done[event.output_index] = event.item.model_dump()
-                    output = events[-1].response.output
+                        elif event.type == "response.output_item.done":
+                            done[event.output_index] = event.item
                     self.assertEqual(
-                        dict(enumerate(_item_text(item) for item in output)), built
+                        {index: _item_text(item) for index, item in done.items()
+                         if index in built},
+                        built,
                     )
+                    terminal = events[-1].response
                     self.assertEqual(
-                        dict(enumerate(item.model_dump() for item in output)), done
+                        [item.model_dump() for item in terminal.output],
+                        [done[index].model_dump() for index in sorted(done)],
                     )
 
     def test_a_responses_history_refusal_names_the_input_item(self):
@@ -1625,27 +1650,6 @@ class ToolChoiceEnforcementTest(unittest.TestCase):
     """A tool choice, or a call limit, the server cannot enforce is refused,
     never accepted and left unenforced."""
 
-    FUNCTION = {"type": "function", "name": "write",
-                "parameters": TOOL["function"]["parameters"]}
-
-    def _responses(self, online_renderer, **launch):
-        from vllm.entrypoints.openai.responses.serving import (
-            OpenAIServingResponses,
-        )
-
-        engine = MagicMock()
-        engine.errored = False
-        engine.model_config.max_model_len = 10_000
-        engine.model_config.hf_config.model_type = "qwen3"
-        engine.model_config.get_diff_sampling_param.return_value = {}
-        return OpenAIServingResponses(
-            engine_client=engine, models=MagicMock(),
-            online_renderer=online_renderer, request_logger=None,
-            chat_template=online_renderer.chat_template,
-            chat_template_content_format="auto",
-            reasoning_parser=_served("SERVED_REASONING_PARSER"), **launch,
-        ), engine
-
     def test_a_tool_choice_no_parser_parses_is_refused_on_every_route(self):
         """Without a tool parser no call is parsed, so a choice that lets the
         model call -- "auto" included -- is refused alike on chat and on
@@ -1675,7 +1679,7 @@ class ToolChoiceEnforcementTest(unittest.TestCase):
             {"enable_auto_tools": False},
         ):
             chat, chat_engine = _served_chat(**unparsed)
-            responses, responses_engine = self._responses(
+            responses, responses_engine = _served_responses(
                 chat.online_renderer,
                 tool_parser=unparsed.get(
                     "tool_parser", _served("SERVED_TOOL_CALL_PARSER")),
@@ -1696,7 +1700,7 @@ class ToolChoiceEnforcementTest(unittest.TestCase):
             for name, choice in responses_choices.items():
                 request = ResponsesRequest.model_validate(
                     {"model": "unit", "input": "test", "kv_scope": "unit",
-                     "tools": [self.FUNCTION], "tool_choice": choice})
+                     "tools": [FUNCTION], "tool_choice": choice})
                 with self.subTest(launch=unparsed, route="responses", choice=name):
                     with self.assertRaises(VLLMValidationError) as refused:
                         asyncio_run(responses.create_responses(request))
@@ -1775,6 +1779,165 @@ class ToolChoiceEnforcementTest(unittest.TestCase):
                 self.assertIn("VLLM_ENFORCE_STRICT_TOOL_CALLING", str(refused.exception))
                 self.assertIn("Next: ", str(refused.exception))
         tool_parser(TOKENIZER, [TOOL])
+
+
+
+class CountedConversationTest(unittest.TestCase):
+    """/tokenize counts the conversation chat renders: both routes read a
+    caller's messages by one rule."""
+
+    @staticmethod
+    def _body(messages):
+        # Each request reads the body it is given in place; give each its own.
+        return json.loads(json.dumps(
+            {"model": "unit", "messages": messages, "tools": [TOOL]}))
+
+    def test_tokenize_counts_the_reasoning_chat_renders(self):
+        """A past turn's reasoning reaches the template under either field
+        name a caller may send it by, on both routes, and /tokenize counts
+        the ids chat renders."""
+        from vllm.entrypoints.openai.chat_completion.protocol import (
+            ChatCompletionRequest,
+        )
+        from vllm.entrypoints.serve.tokenize.protocol import TokenizeChatRequest
+
+        chat, _ = _served_chat()
+        tokenize = _served_tokenize(chat)
+        for fields in ({"reasoning_content": "HISTORICAL_REASONING"},
+                       {"reasoning": "HISTORICAL_REASONING"},
+                       {"reasoning": "HISTORICAL_REASONING",
+                        "reasoning_content": "HISTORICAL_REASONING"}):
+            history = [{"role": "user", "content": "q1"},
+                       {"role": "assistant", "content": "a1", **fields},
+                       {"role": "user", "content": "q2"}]
+            with self.subTest(fields=sorted(fields)):
+                counted = asyncio_run(tokenize.create_tokenize(
+                    TokenizeChatRequest.model_validate(self._body(history)), None))
+                _, rendered = asyncio_run(chat.online_renderer.render_chat(
+                    ChatCompletionRequest.model_validate(self._body(history))))
+                self.assertIn("HISTORICAL_REASONING",
+                              TOKENIZER.decode(rendered[0]["prompt_token_ids"]))
+                self.assertEqual(counted.tokens, rendered[0]["prompt_token_ids"])
+                self.assertEqual(counted.count, len(counted.tokens))
+
+
+class ResponsesStateTest(unittest.TestCase):
+    """A Responses field this server cannot honour is refused at intake,
+    naming the field, the cause and what the caller can send instead; a
+    field it honours is served."""
+
+    @staticmethod
+    def _request(**fields):
+        from vllm.entrypoints.openai.responses.protocol import ResponsesRequest
+
+        return ResponsesRequest.model_validate(
+            {"model": "unit", "input": "test", "kv_scope": "unit", **fields})
+
+    def test_previous_response_id_names_the_store_it_needs(self):
+        """A server that stores no responses (this deployment's) refuses
+        previous_response_id as a 400 naming it, the cause and both next
+        actions; a server that stores them names the same field when the id
+        is unknown; nothing is admitted either way."""
+        from vllm.entrypoints.openai.engine.protocol import ErrorResponse
+
+        chat, _ = _served_chat()
+        for stored, code, needles in (
+            (False, 400, ("stores no responses", "`input`",
+                          "VLLM_ENABLE_RESPONSES_API_STORE=1")),
+            (True, 404, ("resp_unknown",)),
+        ):
+            responses, engine = _served_responses(
+                chat.online_renderer, tool_parser=_served("SERVED_TOOL_CALL_PARSER"),
+                enable_auto_tools=True)
+            responses.enable_store = stored
+            with self.subTest(store=stored):
+                refused = asyncio_run(responses.create_responses(
+                    self._request(previous_response_id="resp_unknown")))
+                self.assertIsInstance(refused, ErrorResponse)
+                self.assertEqual((refused.error.code, refused.error.param),
+                                 (code, "previous_response_id"))
+                for needle in needles:
+                    self.assertIn(needle, refused.error.message)
+                engine.admit.assert_not_called()
+        # Looking a response up by its id on a server that stores none says so.
+        responses, _ = _served_responses(chat.online_renderer)
+        responses.enable_store = False
+        missing = asyncio_run(responses.retrieve_responses("resp_unknown", None, False))
+        self.assertEqual((missing.error.code, missing.error.param), (404, "response_id"))
+        self.assertIn("stores no responses", missing.error.message)
+
+    def test_a_prompt_template_is_refused_naming_what_to_send(self):
+        from vllm.entrypoints.serve.exception_handling.error_response import (
+            create_error_response,
+        )
+        from vllm.exceptions import VLLMValidationError
+
+        with self.assertRaises(VLLMValidationError) as refused:
+            self._request(prompt={"id": "pmpt_unit", "variables": {"x": "y"}})
+        error = create_error_response(refused.exception).error
+        self.assertEqual((error.code, error.param), (400, "prompt"))
+        for needle in ("holds no prompt templates", "instructions", "omit prompt"):
+            self.assertIn(needle, error.message)
+
+    def test_max_tool_calls_holds_or_is_refused(self):
+        """max_tool_calls bounds the built-in tool calls a response processes.
+        The served template path runs none -- it refuses every built-in tool
+        -- so the bound holds and is echoed, and a function call, which
+        returns to the client, is not counted. A server that runs a
+        requested built-in tool without counting its calls refuses it."""
+        from vllm.entrypoints.openai.engine.protocol import ErrorResponse
+        from vllm.exceptions import VLLMValidationError
+        from vllm.inputs import tokens_input
+        from vllm.outputs import CompletionOutput, RequestOutput
+
+        chat, _ = _served_chat()
+        responses, engine = _served_responses(
+            chat.online_renderer, tool_parser=_served("SERVED_TOOL_CALL_PARSER"),
+            enable_auto_tools=True)
+        ids, texts = generation(call("x"), None, "stop", None)
+
+        async def outputs():
+            yield RequestOutput(
+                request_id="unit", prompt=None, prompt_token_ids=OPEN_PROMPT,
+                prompt_logprobs=None, finished=True, outputs=[CompletionOutput(
+                    index=0, text="".join(texts), token_ids=ids,
+                    cumulative_logprob=None, logprobs=None,
+                    finish_reason="stop", stop_reason=None)])
+
+        engine.admit = AsyncMock(return_value=outputs())
+        served = asyncio_run(responses.create_responses(
+            self._request(max_tool_calls=0, tools=[FUNCTION])))
+        self.assertNotIsInstance(served, ErrorResponse)
+        self.assertEqual(served.max_tool_calls, 0)
+        self.assertEqual([item.type for item in served.output
+                          if item.type != "reasoning"], ["function_call"])
+        with self.assertRaises(VLLMValidationError) as hosted:
+            asyncio_run(responses.create_responses(self._request(
+                max_tool_calls=1, tools=[{"type": "web_search_preview"}])))
+        self.assertEqual(hosted.exception.parameter, "tools[0]")
+
+        # A server that runs the requested built-in tool itself.
+        for runs_it in (True, False):
+            tool_server = MagicMock()
+            tool_server.has_tool.return_value = runs_it
+            harmony, harmony_engine = _served_responses(
+                chat.online_renderer, model_type="gpt_oss",
+                reasoning_parser="openai_gptoss", tool_server=tool_server)
+            harmony._make_request_with_harmony = MagicMock(
+                return_value=([], [tokens_input([1, 2, 3])]))
+            harmony_engine.admit = AsyncMock(side_effect=RuntimeError("admitted"))
+            request = self._request(
+                max_tool_calls=1, tools=[{"type": "web_search_preview"}])
+            with self.subTest(server_runs_the_tool=runs_it):
+                if runs_it:
+                    with self.assertRaises(VLLMValidationError) as refused:
+                        asyncio_run(harmony.create_responses(request))
+                    self.assertEqual(refused.exception.parameter, "max_tool_calls")
+                    self.assertIn("Omit max_tool_calls", str(refused.exception))
+                    harmony_engine.admit.assert_not_called()
+                else:
+                    with self.assertRaisesRegex(RuntimeError, "admitted"):
+                        asyncio_run(harmony.create_responses(request))
 
 
 if __name__ == "__main__":

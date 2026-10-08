@@ -1,0 +1,224 @@
+diff --git a/tests/entrypoints/openai/responses/test_serving_responses.py b/tests/entrypoints/openai/responses/test_serving_responses.py
+index 0fe655a9ca22559a96f8a5a316badf2191170d0e..1079441ea83d10e725b662ecd9f6b3e694ae5543 100644
+--- a/tests/entrypoints/openai/responses/test_serving_responses.py
++++ b/tests/entrypoints/openai/responses/test_serving_responses.py
+@@ -1531,3 +1531,91 @@ async def test_a_continued_final_message_is_the_answer_on_both_responses_paths(
+         ("message", "wer is 4.")
+     ]
+     assert parser.reasoning_token_count == 0
++
++
++def _stateless_serving(*, enable_store, model_type="test", **launch):
++    engine_client = MagicMock()
++    engine_client.errored = False
++    engine_client.model_config.max_model_len = 100
++    engine_client.model_config.hf_config.model_type = model_type
++    engine_client.model_config.get_diff_sampling_param.return_value = {}
++    serving = OpenAIServingResponses(
++        engine_client=engine_client,
++        models=MagicMock(),
++        online_renderer=MagicMock(),
++        request_logger=None,
++        chat_template=None,
++        chat_template_content_format="auto",
++        **launch,
++    )
++    serving._check_model = AsyncMock(return_value=None)
++    serving.enable_store = enable_store
++    return serving, engine_client
++
++
++@pytest.mark.asyncio
++async def test_previous_response_id_on_a_server_that_stores_nothing_is_refused():
++    serving, engine = _stateless_serving(enable_store=False)
++    request = ResponsesRequest(
++        input="q", kv_scope="agent", previous_response_id="resp_unknown"
++    )
++    refused = await serving.create_responses(request)
++    assert isinstance(refused, ErrorResponse)
++    assert (refused.error.code, refused.error.param) == (400, "previous_response_id")
++    assert "stores no responses" in refused.error.message
++    assert "`input`" in refused.error.message
++    assert "VLLM_ENABLE_RESPONSES_API_STORE=1" in refused.error.message
++    engine.admit.assert_not_called()
++
++    missing = await serving.retrieve_responses("resp_unknown", None, False)
++    assert (missing.error.code, missing.error.param) == (404, "response_id")
++    assert "stores no responses" in missing.error.message
++
++
++@pytest.mark.asyncio
++async def test_an_unknown_previous_response_id_is_named_by_its_field():
++    serving, engine = _stateless_serving(enable_store=True)
++    request = ResponsesRequest(
++        input="q", kv_scope="agent", previous_response_id="resp_unknown"
++    )
++    assert serving._validate_create_responses_input(request) is None
++    missing = await serving.create_responses(request)
++    assert (missing.error.code, missing.error.param) == (404, "previous_response_id")
++    assert missing.error.message == "Response with id 'resp_unknown' not found."
++    engine.admit.assert_not_called()
++
++
++@pytest.mark.asyncio
++@pytest.mark.parametrize("runs_the_tool", [True, False])
++async def test_max_tool_calls_is_refused_where_built_in_calls_are_not_counted(
++    runs_the_tool,
++):
++    # max_tool_calls bounds the built-in tool calls a response processes; a
++    # server that runs one itself does not count them.
++    tool_server = MagicMock(spec=ToolServer)
++    tool_server.has_tool.return_value = runs_the_tool
++    serving, engine = _stateless_serving(
++        enable_store=False,
++        model_type="gpt_oss",
++        reasoning_parser="openai_gptoss",
++        tool_server=tool_server,
++    )
++    serving._make_request_with_harmony = MagicMock(
++        return_value=([], [tokens_input([1, 2, 3])])
++    )
++    engine.admit = AsyncMock(side_effect=RuntimeError("admitted"))
++    request = ResponsesRequest(
++        input="q",
++        kv_scope="agent",
++        max_tool_calls=1,
++        tools=[{"type": "web_search_preview"}],
++    )
++    if runs_the_tool:
++        with pytest.raises(VLLMValidationError) as refused:
++            await serving.create_responses(request)
++        assert refused.value.parameter == "max_tool_calls"
++        assert "Omit max_tool_calls" in str(refused.value)
++        engine.admit.assert_not_called()
++    else:
++        with pytest.raises(RuntimeError, match="admitted"):
++            await serving.create_responses(request)
+diff --git a/tests/tool_use/test_responses_request_validations.py b/tests/tool_use/test_responses_request_validations.py
+index 3de5054dc3f38ae665722d12dc2b3c7b0aba8d44..9f2db4dd3111573cf8a9826c458988d2c8d092e7 100644
+--- a/tests/tool_use/test_responses_request_validations.py
++++ b/tests/tool_use/test_responses_request_validations.py
+@@ -396,3 +396,19 @@ def test_responses_request_leaves_hosted_tools_to_the_route(hosted):
+         {"input": "Hello", "model": "test-model", "tools": [SAMPLE_TOOL, hosted]}
+     )
+     assert request.tools[1].type == hosted["type"]
++
++
++def test_a_prompt_template_is_refused_naming_what_to_send_instead():
++    """A prompt template lives with the provider that stores it; this server
++    holds none, so its text would never reach the model."""
++    with pytest.raises(VLLMValidationError) as refused:
++        _validate(
++            {
++                "input": "Hello",
++                "model": "test-model",
++                "prompt": {"id": "pmpt_123", "variables": {"city": "Paris"}},
++            }
++        )
++    assert refused.value.parameter == "prompt"
++    assert "holds no prompt templates" in str(refused.value)
++    assert "as instructions and input, and omit prompt" in str(refused.value)
+diff --git a/vllm/entrypoints/openai/responses/protocol.py b/vllm/entrypoints/openai/responses/protocol.py
+index 6212e109250089bc54eb58892e6e8a13a2c8fa6d..26c9a97d62923e4d60cdcedb7544187aa151bd9c 100644
+--- a/vllm/entrypoints/openai/responses/protocol.py
++++ b/vllm/entrypoints/openai/responses/protocol.py
+@@ -585,7 +585,11 @@ class ResponsesRequest(OpenAIBaseModel):
+     def validate_prompt(cls, data):
+         if data.get("prompt") is not None:
+             raise VLLMValidationError(
+-                "prompt template is not supported", parameter="prompt"
++                "prompt names a prompt template by its id, and this server "
++                "holds no prompt templates, so the template's text would "
++                "never reach the model. Send that text, with its variables "
++                "filled in, as instructions and input, and omit prompt.",
++                parameter="prompt",
+             )
+         return data
+ 
+diff --git a/vllm/entrypoints/openai/responses/serving.py b/vllm/entrypoints/openai/responses/serving.py
+index caaf567646bea50366e5e33cc1d5e0dbedd0f50d..5f054ad9f96df3c76f3c094803ab33f874e6a5f7 100644
+--- a/vllm/entrypoints/openai/responses/serving.py
++++ b/vllm/entrypoints/openai/responses/serving.py
+@@ -321,6 +321,23 @@ class OpenAIServingResponses(GenerateBaseServing):
+                 status_code=HTTPStatus.BAD_REQUEST,
+                 param="previous_response_id",
+             )
++        if request.previous_response_id is not None and not self.enable_store:
++            return self.create_error_response(
++                err_type="invalid_request_error",
++                message=(
++                    "previous_response_id continues a response this server "
++                    "stored, and this server stores no responses: it runs "
++                    "without `VLLM_ENABLE_RESPONSES_API_STORE`, so no response "
++                    "it returned can be continued by its id. Send the "
++                    "conversation so far in `input` -- its messages and each "
++                    "earlier response's output items -- and omit "
++                    "previous_response_id, or serve with "
++                    "`VLLM_ENABLE_RESPONSES_API_STORE=1` and create each "
++                    "response with `store` true."
++                ),
++                status_code=HTTPStatus.BAD_REQUEST,
++                param="previous_response_id",
++            )
+         return None
+ 
+     async def create_responses(
+@@ -372,7 +389,9 @@ class OpenAIServingResponses(GenerateBaseServing):
+             async with self.response_store_lock:
+                 prev_response = self.response_store.get(prev_response_id)
+             if prev_response is None:
+-                return self._make_not_found_error(prev_response_id)
++                return self._make_not_found_error(
++                    prev_response_id, parameter="previous_response_id"
++                )
+         else:
+             prev_response = None
+ 
+@@ -422,6 +441,18 @@ class OpenAIServingResponses(GenerateBaseServing):
+         else:
+             assert len(builtin_tool_list) == 0
+             available_tools = []
++        if request.max_tool_calls is not None and available_tools:
++            # The bound is on built-in calls, which this server runs itself;
++            # a function call returns to the client and is not counted.
++            raise VLLMValidationError(
++                "max_tool_calls bounds the built-in tool calls a response "
++                "processes, and this server runs this request's built-in tools "
++                "without counting their calls, so the bound would not hold. "
++                "Omit max_tool_calls, or declare what those tools do as "
++                "function tools, whose calls return to your client to run.",
++                parameter="max_tool_calls",
++                value=request.max_tool_calls,
++            )
+         tokenizer = self.renderer.get_tokenizer()
+ 
+         for engine_input in engine_inputs:
+@@ -1282,12 +1313,25 @@ class OpenAIServingResponses(GenerateBaseServing):
+                 logger.exception("Background task for %s was cancelled", response_id)
+         return response
+ 
+-    def _make_not_found_error(self, response_id: str) -> ErrorResponse:
++    def _make_not_found_error(
++        self, response_id: str, parameter: str = "response_id"
++    ) -> ErrorResponse:
++        """No stored response has *response_id*, which the caller sent as
++        *parameter*. A server that stores nothing says so, since no id could
++        be found there."""
++        message = f"Response with id '{response_id}' not found."
++        if not self.enable_store:
++            message += (
++                " This server stores no responses: it runs without "
++                "`VLLM_ENABLE_RESPONSES_API_STORE`. Serve with "
++                "`VLLM_ENABLE_RESPONSES_API_STORE=1` and create a response "
++                "with `store` true to find it by its id."
++            )
+         return self.create_error_response(
+             err_type="invalid_request_error",
+-            message=f"Response with id '{response_id}' not found.",
++            message=message,
+             status_code=HTTPStatus.NOT_FOUND,
+-            param="response_id",
++            param=parameter,
+         )
+ 
+     async def _process_simple_streaming_events(
