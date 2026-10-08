@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Build-time invariants for phase-safe multimodal workspace reuse."""
 
+import os
 from contextlib import contextmanager
 from types import SimpleNamespace
 
@@ -8,6 +9,8 @@ import numpy as np
 import torch
 
 from vllm.config import CUDAGraphMode
+from vllm.config import vllm as vllm_config
+from vllm.config.compilation import CompilationMode
 from vllm.utils import mem_utils
 from vllm.v1.attention.backends import turboquant_attn
 from vllm.v1.core import kv_cache_utils
@@ -544,6 +547,63 @@ def test_serving_scores_the_prompt_as_the_profile_measures() -> None:
     assert list(scored) == ["request"], scored
 
 
+def test_v2_runner_holds_no_declared_pool() -> None:
+    # The V2 runner's startup profile runs no attention and holds none of the
+    # workspaces, CUDA graphs or log-probability memory serving holds beside
+    # the pool, and nothing charges a holdback for them: a model V2 would
+    # serve by default is served by V1 when it declares a pool, and V2 forced
+    # is refused with the cause and a possible next action.
+    def selection(kv_cache_users):
+        config = SimpleNamespace(
+            model_config=SimpleNamespace(
+                model="dense", architectures=["Qwen3ForCausalLM"],
+                runner_type="generate", is_moe=False, is_quantized=False,
+                is_diffusion=False, logits_processors=None,
+                enable_prompt_embeds=False,
+            ),
+            parallel_config=SimpleNamespace(
+                prefill_context_parallel_size=1, tensor_parallel_size=1,
+                pipeline_parallel_size=1, distributed_executor_backend="mp",
+                enable_dbo=False, enable_elastic_ep=False,
+            ),
+            compilation_config=SimpleNamespace(
+                mode=CompilationMode.VLLM_COMPILE,
+                pass_config=SimpleNamespace(enable_sp=False),
+            ),
+            speculative_config=None,
+            cache_config=SimpleNamespace(
+                kv_sharing_fast_prefill=False, kv_cache_users=kv_cache_users
+            ),
+        )
+        for name in ("_dflash_needs_multi_kv_group",
+                     "_is_default_v2_model_runner_model",
+                     "_get_v2_model_runner_unsupported_features"):
+            setattr(config, name,
+                    getattr(vllm_config.VllmConfig, name).__get__(config))
+        return config
+
+    selects_v2 = vllm_config.VllmConfig.use_v2_model_runner.fget
+    saved_triton, saved_env = vllm_config.HAS_TRITON, os.environ.pop(
+        "VLLM_USE_V2_MODEL_RUNNER", None
+    )
+    vllm_config.HAS_TRITON = True
+    try:
+        assert selects_v2(selection(None)) is True
+        declared = selection(1)
+        assert selects_v2(declared) is False, "V2 selected for a declared pool"
+        try:
+            vllm_config.VllmConfig._validate_v2_model_runner(declared)
+        except ValueError as refusal:
+            assert "a KV pool declared with --kv-cache-users" in str(refusal)
+            assert "Next: " in str(refusal) and "V1 model runner" in str(refusal)
+        else:
+            raise AssertionError("V2 forced with a declared pool was admitted")
+    finally:
+        vllm_config.HAS_TRITON = saved_triton
+        if saved_env is not None:
+            os.environ["VLLM_USE_V2_MODEL_RUNNER"] = saved_env
+
+
 def test_profiled_context_covers_its_own_query() -> None:
     # The served profile gives every dummy request the longest context a
     # request holds; a request whose own share of the step is longer keeps a
@@ -599,5 +659,6 @@ if __name__ == "__main__":
     test_model_runner_phase_boundary()
     test_kv_bound_counts_each_phase_with_the_workspaces_it_holds()
     test_serving_scores_the_prompt_as_the_profile_measures()
+    test_v2_runner_holds_no_declared_pool()
     test_profiled_context_covers_its_own_query()
     print("vision workspace unit: passed")

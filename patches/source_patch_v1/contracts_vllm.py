@@ -2261,6 +2261,15 @@ def _validate_kv_physical_after(state: State) -> None:
     _require_in_symbol(state, runner, "GPUModelRunner._dummy_run", (
         "np.maximum(num_scheduled_tokens, profile_seq_lens)",
     ), label=label)
+    # The V2 runner, whose profile runs no attention, holds no declared pool.
+    _require_in_symbol(state, "vllm/config/vllm.py",
+                       "VllmConfig._get_v2_model_runner_unsupported_features", (
+        "if self.cache_config.kv_cache_users is not None:",
+        '"a KV pool declared with --kv-cache-users',
+    ), label=label)
+    require_python_symbols(state, "tests/test_config.py", {
+        "test_v2_model_runner_serves_no_declared_kv_pool": None,
+    }, label=label)
     forbid_text(state, worker, "Residents allocated after profiling", label=label)
     require_python_symbols(state, "tests/v1/worker/test_gpu_worker.py", {
         "test_physical_bound_charges_preexisting_residents_once": None,
@@ -4901,12 +4910,14 @@ CONTRACTS: Mapping[str, SemanticContract] = {
             "sampler and its prompt log probabilities at the most a request is "
             "admitted with, computed as serving computes them -- the peak of "
             "those phases above that with the stand-in pool taken off, CUDA "
-            "graph and frontend reservations."
+            "graph and frontend reservations. The V2 runner, whose profile runs "
+            "no attention, holds no declared pool."
         ),
         removal_condition=(
             "Remove when upstream's authoritative bound includes pre-snapshot "
             "residents exactly once, profiles attention and every workspace in "
-            "the phase that holds it, and keeps utilization as an estimate only."
+            "the phase that holds it on both model runners, and keeps "
+            "utilization as an estimate only."
         ),
         validate_before=_validate_kv_physical_before,
         validate_after=_validate_kv_physical_after,

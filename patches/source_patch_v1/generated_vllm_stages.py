@@ -59338,19 +59338,25 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'only 8-bit RGB or "\n'})},
  {'name': 'kv-physical-free-memory',
   'review_patch': 'patches/vllm-kv-physical-free-memory.patch',
-  'review_sha256': '9cc5b619c097a9ef3f8c10312444687c35a9853109e094f7a3dd17a3d776bca8',
+  'review_sha256': '732e5f0c0b546769b56f8fc00be097d47c4ccc25b19f806484201ae9d794bea3',
   'files': ({'path': 'tests/v1/worker/test_gpu_worker.py',
              'before_sha256': 'b140e35c5a06fd6f9c08937e705d904967dbf23c02f72f1b17185b8171fb08c6',
              'after_sha256': 'd0928b2ea8d87dbd2021b55d0c6915e210e29888274a4c9ccee15d4c8941579e'},
             {'path': 'vllm/v1/worker/gpu_worker.py',
              'before_sha256': '7beca2da40aa7f705231747fe268b5b3208a9cefbba3876e708f4400e5e74256',
-             'after_sha256': 'd18019441d4a4980a40c85a0d33685ad5eef0214b4c6a8bc3ecd1780ff60eb0b'},
+             'after_sha256': '4b21fef3b4bbe0c56ed4b4df081ef73701bed9b82696185eb30cb7989d6dc6a1'},
             {'path': 'vllm/v1/worker/gpu_model_runner.py',
              'before_sha256': 'a7bed200b304fdc17320a30178ded7669d4677e787947470b872ef0ec14b6c8b',
              'after_sha256': '4f11527a737f315ff26e33153dda70e2da7722185adb6f80c34269ee76493172'},
             {'path': 'vllm/v1/worker/workspace.py',
              'before_sha256': '14952bc14884394a74dcb937bcb1eecebffbf7579ca860601d9d02b6d5f8c611',
-             'after_sha256': '6749552a1aafdae3c6329b249f8135b5c6ae95992f54eaa65dd782c33afd2d26'}),
+             'after_sha256': '6749552a1aafdae3c6329b249f8135b5c6ae95992f54eaa65dd782c33afd2d26'},
+            {'path': 'tests/test_config.py',
+             'before_sha256': '86f531fbb4a43ebb53c403ceaff8966a39668e87079af5fad445ebd5bee37576',
+             'after_sha256': '6751072fd1994c86dbc59b1266935d6b8363df308c38bc3d25a55ca62a8915d4'},
+            {'path': 'vllm/config/vllm.py',
+             'before_sha256': '30f612691ee2a5a1511484fbcece4bd89ade72c4309e786771826cf12fad38df',
+             'after_sha256': '29e7d85b058d1d6be39597fee1ac1f1405babe0aa861334042f7199b1d9f6419'}),
   'edits': ({'name': 'tests/v1/worker/test_gpu_worker.py:landmark-1',
              'path': 'tests/v1/worker/test_gpu_worker.py',
              'before': '# SPDX-License-Identifier: Apache-2.0\n'
@@ -60469,13 +60475,13 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '        maybe_apply_startup_plan(self)\n'
                       '\n'
                       '        if self.use_v2_model_runner:\n'
-                      '            # The V2 runner profiles the text step with '
-                      'attention skipped and\n'
-                      "            # builds its pool's attention backends, and the "
-                      'workspaces they\n'
-                      '            # reserve, only after profiling: its bound omits '
-                      'what that profile\n'
-                      '            # does not run.\n'
+                      '            # The V2 runner holds no declared pool -- '
+                      'VllmConfig refuses one on\n'
+                      '            # it, since this profile runs no attention and the '
+                      'runner builds\n'
+                      '            # its attention backends, and the workspaces they '
+                      'reserve, only\n'
+                      '            # after it -- so this bound sizes no pool.\n'
                       '            profiling_kv_cache: Callable[[], '
                       'AbstractContextManager[int]] = (\n'
                       '                lambda: nullcontext(0)\n'
@@ -60522,13 +60528,13 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '        maybe_apply_startup_plan(self)\n'
                              '\n'
                              '        if self.use_v2_model_runner:\n'
-                             '            # The V2 runner profiles the text step with '
-                             'attention skipped and\n'
-                             "            # builds its pool's attention backends, and "
-                             'the workspaces they\n'
-                             '            # reserve, only after profiling: its bound '
-                             'omits what that profile\n'
-                             '            # does not run.\n'
+                             '            # The V2 runner holds no declared pool -- '
+                             'VllmConfig refuses one on\n'
+                             '            # it, since this profile runs no attention '
+                             'and the runner builds\n'
+                             '            # its attention backends, and the workspaces '
+                             'they reserve, only\n'
+                             '            # after it -- so this bound sizes no pool.\n'
                              '            profiling_kv_cache: Callable[[], '
                              'AbstractContextManager[int]] = (\n'
                              '                lambda: nullcontext(0)\n'
@@ -61938,7 +61944,327 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '\n'
                              '    def _driver_free_bytes(self) -> int | None:\n'
                              '        if self._device.type != "cuda":\n'
-                             '            return None\n'})},
+                             '            return None\n'},
+            {'name': 'tests/test_config.py:landmark-1',
+             'path': 'tests/test_config.py',
+             'before': '    assert '
+                       'VllmConfig._is_default_v2_model_runner_model(config) is '
+                       'expected\n'
+                       '\n'
+                       '\n'
+                       '@pytest.mark.skip_global_cleanup\n'
+                       'def '
+                       'test_with_hf_config_populates_missing_architectures_from_causal_lm_mapping(\n'
+                       '    monkeypatch,\n',
+             'after': '    assert VllmConfig._is_default_v2_model_runner_model(config) '
+                      'is expected\n'
+                      '\n'
+                      '\n'
+                      'def _v2_selection_config(kv_cache_users):\n'
+                      '    """The VllmConfig surface the V2 runner\'s selection reads, '
+                      'for a dense\n'
+                      '    generate model the V2 runner serves by default."""\n'
+                      '    config = SimpleNamespace(\n'
+                      '        model_config=SimpleNamespace(\n'
+                      '            model="Qwen/Qwen3-0.6B",\n'
+                      '            architectures=["Qwen3ForCausalLM"],\n'
+                      '            runner_type="generate",\n'
+                      '            is_moe=False,\n'
+                      '            is_quantized=False,\n'
+                      '            is_diffusion=False,\n'
+                      '            logits_processors=None,\n'
+                      '            enable_prompt_embeds=False,\n'
+                      '        ),\n'
+                      '        parallel_config=SimpleNamespace(\n'
+                      '            prefill_context_parallel_size=1,\n'
+                      '            tensor_parallel_size=1,\n'
+                      '            pipeline_parallel_size=1,\n'
+                      '            distributed_executor_backend="mp",\n'
+                      '            enable_dbo=False,\n'
+                      '            enable_elastic_ep=False,\n'
+                      '        ),\n'
+                      '        compilation_config=SimpleNamespace(\n'
+                      '            mode=CompilationMode.VLLM_COMPILE,\n'
+                      '            pass_config=SimpleNamespace(enable_sp=False),\n'
+                      '        ),\n'
+                      '        speculative_config=None,\n'
+                      '        cache_config=SimpleNamespace(\n'
+                      '            kv_sharing_fast_prefill=False, '
+                      'kv_cache_users=kv_cache_users\n'
+                      '        ),\n'
+                      '    )\n'
+                      '    for name in (\n'
+                      '        "_dflash_needs_multi_kv_group",\n'
+                      '        "_is_default_v2_model_runner_model",\n'
+                      '        "_get_v2_model_runner_unsupported_features",\n'
+                      '    ):\n'
+                      '        setattr(config, name, getattr(VllmConfig, '
+                      'name).__get__(config))\n'
+                      '    return config\n'
+                      '\n'
+                      '\n'
+                      'def '
+                      'test_v2_model_runner_serves_no_declared_kv_pool(monkeypatch):\n'
+                      '    """A declared pool is admitted against a bound the V2 '
+                      "runner's profile\n"
+                      '    cannot derive: a model V2 would serve by default is served '
+                      'by V1, and V2\n'
+                      '    forced is refused with the cause and a possible next '
+                      'action."""\n'
+                      '    monkeypatch.delenv("VLLM_USE_V2_MODEL_RUNNER", '
+                      'raising=False)\n'
+                      '    monkeypatch.setattr(vllm_config_module, "HAS_TRITON", '
+                      'True)\n'
+                      '    undeclared = _v2_selection_config(kv_cache_users=None)\n'
+                      '    assert VllmConfig.use_v2_model_runner.fget(undeclared) is '
+                      'True\n'
+                      '    declared = _v2_selection_config(kv_cache_users=1)\n'
+                      '    assert VllmConfig.use_v2_model_runner.fget(declared) is '
+                      'False\n'
+                      '    with pytest.raises(\n'
+                      '        ValueError,\n'
+                      '        match=r"a KV pool declared with --kv-cache-users '
+                      '.*Next: .*V1 model runner",\n'
+                      '    ):\n'
+                      '        VllmConfig._validate_v2_model_runner(declared)\n'
+                      '\n'
+                      '\n'
+                      '@pytest.mark.skip_global_cleanup\n'
+                      'def '
+                      'test_with_hf_config_populates_missing_architectures_from_causal_lm_mapping(\n'
+                      '    monkeypatch,\n',
+             'review_before': '    assert '
+                              'VllmConfig._is_default_v2_model_runner_model(config) is '
+                              'expected\n'
+                              '\n'
+                              '\n'
+                              '@pytest.mark.skip_global_cleanup\n'
+                              'def '
+                              'test_with_hf_config_populates_missing_architectures_from_causal_lm_mapping(\n'
+                              '    monkeypatch,\n',
+             'review_after': '    assert '
+                             'VllmConfig._is_default_v2_model_runner_model(config) is '
+                             'expected\n'
+                             '\n'
+                             '\n'
+                             'def _v2_selection_config(kv_cache_users):\n'
+                             '    """The VllmConfig surface the V2 runner\'s selection '
+                             'reads, for a dense\n'
+                             '    generate model the V2 runner serves by default."""\n'
+                             '    config = SimpleNamespace(\n'
+                             '        model_config=SimpleNamespace(\n'
+                             '            model="Qwen/Qwen3-0.6B",\n'
+                             '            architectures=["Qwen3ForCausalLM"],\n'
+                             '            runner_type="generate",\n'
+                             '            is_moe=False,\n'
+                             '            is_quantized=False,\n'
+                             '            is_diffusion=False,\n'
+                             '            logits_processors=None,\n'
+                             '            enable_prompt_embeds=False,\n'
+                             '        ),\n'
+                             '        parallel_config=SimpleNamespace(\n'
+                             '            prefill_context_parallel_size=1,\n'
+                             '            tensor_parallel_size=1,\n'
+                             '            pipeline_parallel_size=1,\n'
+                             '            distributed_executor_backend="mp",\n'
+                             '            enable_dbo=False,\n'
+                             '            enable_elastic_ep=False,\n'
+                             '        ),\n'
+                             '        compilation_config=SimpleNamespace(\n'
+                             '            mode=CompilationMode.VLLM_COMPILE,\n'
+                             '            '
+                             'pass_config=SimpleNamespace(enable_sp=False),\n'
+                             '        ),\n'
+                             '        speculative_config=None,\n'
+                             '        cache_config=SimpleNamespace(\n'
+                             '            kv_sharing_fast_prefill=False, '
+                             'kv_cache_users=kv_cache_users\n'
+                             '        ),\n'
+                             '    )\n'
+                             '    for name in (\n'
+                             '        "_dflash_needs_multi_kv_group",\n'
+                             '        "_is_default_v2_model_runner_model",\n'
+                             '        "_get_v2_model_runner_unsupported_features",\n'
+                             '    ):\n'
+                             '        setattr(config, name, getattr(VllmConfig, '
+                             'name).__get__(config))\n'
+                             '    return config\n'
+                             '\n'
+                             '\n'
+                             'def '
+                             'test_v2_model_runner_serves_no_declared_kv_pool(monkeypatch):\n'
+                             '    """A declared pool is admitted against a bound the '
+                             "V2 runner's profile\n"
+                             '    cannot derive: a model V2 would serve by default is '
+                             'served by V1, and V2\n'
+                             '    forced is refused with the cause and a possible next '
+                             'action."""\n'
+                             '    monkeypatch.delenv("VLLM_USE_V2_MODEL_RUNNER", '
+                             'raising=False)\n'
+                             '    monkeypatch.setattr(vllm_config_module, '
+                             '"HAS_TRITON", True)\n'
+                             '    undeclared = '
+                             '_v2_selection_config(kv_cache_users=None)\n'
+                             '    assert '
+                             'VllmConfig.use_v2_model_runner.fget(undeclared) is True\n'
+                             '    declared = _v2_selection_config(kv_cache_users=1)\n'
+                             '    assert VllmConfig.use_v2_model_runner.fget(declared) '
+                             'is False\n'
+                             '    with pytest.raises(\n'
+                             '        ValueError,\n'
+                             '        match=r"a KV pool declared with --kv-cache-users '
+                             '.*Next: .*V1 model runner",\n'
+                             '    ):\n'
+                             '        VllmConfig._validate_v2_model_runner(declared)\n'
+                             '\n'
+                             '\n'
+                             '@pytest.mark.skip_global_cleanup\n'
+                             'def '
+                             'test_with_hf_config_populates_missing_architectures_from_causal_lm_mapping(\n'
+                             '    monkeypatch,\n'},
+            {'name': 'vllm/config/vllm.py:landmark-1',
+             'path': 'vllm/config/vllm.py',
+             'before': '            # Will be added by '
+                       'https://github.com/vllm-project/vllm/pull/35045\n'
+                       '            unsupported.append("KV sharing fast prefill")\n'
+                       '\n'
+                       '        return unsupported\n'
+                       '\n'
+                       '    def _validate_v2_model_runner(self) -> None:\n',
+             'after': '            # Will be added by '
+                      'https://github.com/vllm-project/vllm/pull/35045\n'
+                      '            unsupported.append("KV sharing fast prefill")\n'
+                      '\n'
+                      '        if self.cache_config.kv_cache_users is not None:\n'
+                      '            # A declared pool is admitted against a bound '
+                      'derived from a\n'
+                      '            # profile of every phase serving runs, at its '
+                      'largest\n'
+                      '            # (Worker.determine_available_memory), with no '
+                      'utilization\n'
+                      "            # holdback charged against it. The V2 runner's "
+                      'profile skips\n'
+                      '            # attention, builds its attention backends and the '
+                      'workspaces they\n'
+                      '            # reserve only after profiling, charges no '
+                      'CUDA-graph memory, and\n'
+                      '            # samples without top-k, top-p or log probabilities '
+                      '-- what\n'
+                      "            # upstream's holdback absorbs -- so the bound would "
+                      'admit a pool\n'
+                      '            # that serving overruns.\n'
+                      '            unsupported.append(\n'
+                      '                "a KV pool declared with --kv-cache-users (its '
+                      'startup profile "\n'
+                      '                "runs no attention and holds none of the '
+                      'workspaces, CUDA "\n'
+                      '                "graphs or log-probability memory serving holds '
+                      'beside the "\n'
+                      '                "pool)"\n'
+                      '            )\n'
+                      '\n'
+                      '        return unsupported\n'
+                      '\n'
+                      '    def _validate_v2_model_runner(self) -> None:\n',
+             'review_before': '            # Will be added by '
+                              'https://github.com/vllm-project/vllm/pull/35045\n'
+                              '            unsupported.append("KV sharing fast '
+                              'prefill")\n'
+                              '\n'
+                              '        return unsupported\n'
+                              '\n'
+                              '    def _validate_v2_model_runner(self) -> None:\n',
+             'review_after': '            # Will be added by '
+                             'https://github.com/vllm-project/vllm/pull/35045\n'
+                             '            unsupported.append("KV sharing fast '
+                             'prefill")\n'
+                             '\n'
+                             '        if self.cache_config.kv_cache_users is not '
+                             'None:\n'
+                             '            # A declared pool is admitted against a '
+                             'bound derived from a\n'
+                             '            # profile of every phase serving runs, at '
+                             'its largest\n'
+                             '            # (Worker.determine_available_memory), with '
+                             'no utilization\n'
+                             '            # holdback charged against it. The V2 '
+                             "runner's profile skips\n"
+                             '            # attention, builds its attention backends '
+                             'and the workspaces they\n'
+                             '            # reserve only after profiling, charges no '
+                             'CUDA-graph memory, and\n'
+                             '            # samples without top-k, top-p or log '
+                             'probabilities -- what\n'
+                             "            # upstream's holdback absorbs -- so the "
+                             'bound would admit a pool\n'
+                             '            # that serving overruns.\n'
+                             '            unsupported.append(\n'
+                             '                "a KV pool declared with '
+                             '--kv-cache-users (its startup profile "\n'
+                             '                "runs no attention and holds none of the '
+                             'workspaces, CUDA "\n'
+                             '                "graphs or log-probability memory '
+                             'serving holds beside the "\n'
+                             '                "pool)"\n'
+                             '            )\n'
+                             '\n'
+                             '        return unsupported\n'
+                             '\n'
+                             '    def _validate_v2_model_runner(self) -> None:\n'},
+            {'name': 'vllm/config/vllm.py:landmark-2',
+             'path': 'vllm/config/vllm.py',
+             'before': '        unsupported = '
+                       'self._get_v2_model_runner_unsupported_features()\n'
+                       '        if unsupported:\n'
+                       '            raise ValueError(\n'
+                       '                f"Model Runner V2 does not yet support: {\', '
+                       '\'.join(unsupported)}"\n'
+                       '            )\n'
+                       '\n'
+                       '    def validate_block_size(self) -> None:\n',
+             'after': '        unsupported = '
+                      'self._get_v2_model_runner_unsupported_features()\n'
+                      '        if unsupported:\n'
+                      '            raise ValueError(\n'
+                      '                f"Model Runner V2 does not yet support: {\', '
+                      '\'.join(unsupported)}. "\n'
+                      '                "Next: serve without the listed features, or on '
+                      'the V1 model "\n'
+                      '                "runner (unset VLLM_USE_V2_MODEL_RUNNER) '
+                      'without what only the "\n'
+                      '                "V2 runner serves: prefill context parallelism, '
+                      'a DSpark or "\n'
+                      '                "mixed-attention DFlash draft, a diffusion '
+                      'model."\n'
+                      '            )\n'
+                      '\n'
+                      '    def validate_block_size(self) -> None:\n',
+             'review_before': '        unsupported = '
+                              'self._get_v2_model_runner_unsupported_features()\n'
+                              '        if unsupported:\n'
+                              '            raise ValueError(\n'
+                              '                f"Model Runner V2 does not yet support: '
+                              '{\', \'.join(unsupported)}"\n'
+                              '            )\n'
+                              '\n'
+                              '    def validate_block_size(self) -> None:\n',
+             'review_after': '        unsupported = '
+                             'self._get_v2_model_runner_unsupported_features()\n'
+                             '        if unsupported:\n'
+                             '            raise ValueError(\n'
+                             '                f"Model Runner V2 does not yet support: '
+                             '{\', \'.join(unsupported)}. "\n'
+                             '                "Next: serve without the listed '
+                             'features, or on the V1 model "\n'
+                             '                "runner (unset VLLM_USE_V2_MODEL_RUNNER) '
+                             'without what only the "\n'
+                             '                "V2 runner serves: prefill context '
+                             'parallelism, a DSpark or "\n'
+                             '                "mixed-attention DFlash draft, a '
+                             'diffusion model."\n'
+                             '            )\n'
+                             '\n'
+                             '    def validate_block_size(self) -> None:\n'})},
  {'name': 'qwen-single-call-grammar',
   'review_patch': 'patches/vllm-qwen-single-call-grammar.patch',
   'review_sha256': '878ba3d98284a326784ffced00a64b38dd827cbc80f136cf1e582df469c3eced',
@@ -123573,8 +123899,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': 'd0928b2ea8d87dbd2021b55d0c6915e210e29888274a4c9ccee15d4c8941579e',
              'after_sha256': '891756b253c818757be169666bf2cc69023008a76602a902949bbfb899f3da07'},
             {'path': 'vllm/v1/worker/gpu_worker.py',
-             'before_sha256': 'd18019441d4a4980a40c85a0d33685ad5eef0214b4c6a8bc3ecd1780ff60eb0b',
-             'after_sha256': '3a53dd932196040b7249c9734e5c2e582c489cf4789b676f10584b072fa34cf3'}),
+             'before_sha256': '4b21fef3b4bbe0c56ed4b4df081ef73701bed9b82696185eb30cb7989d6dc6a1',
+             'after_sha256': '05102a0517c7474ced720a9ec3e697608c8f9cd7c65aa41581d01fec1bc1917c'}),
   'edits': ({'name': 'tests/v1/worker/test_gpu_worker.py:landmark-1',
              'path': 'tests/v1/worker/test_gpu_worker.py',
              'before': '            profile_seq_lens=profile_seq_lens,\n'
@@ -148113,6 +148439,7 @@ FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5d
  'tests/reasoning/test_minimax_m3_reasoning_parser.py': 'c077f6abd750267b45867c461f50e472318d65d8870f066fdcd0b5daadc6b14c',
  'tests/renderers/test_hf.py': 'd6a2cc3febe2fc86138f019345a263018b63aea131541f9d82753c8d15260425',
  'tests/renderers/test_template_authorship.py': 'b2b34a541fa8d5e1155ab87d6d4e781c40bb01762042d44dd6da48668a32691d',
+ 'tests/test_config.py': '6751072fd1994c86dbc59b1266935d6b8363df308c38bc3d25a55ca62a8915d4',
  'tests/test_request_input_bounds.py': '6d5796773be3daa15c1dc369bed3bb36fec877b4735389a6893d7236aa25cd38',
  'tests/test_sampling_params.py': '9ce8ed07080994d48511465e8050a52ee1db8fdf5d0b2188bd6324b9276b3f97',
  'tests/tokenizers_/test_detokenize.py': 'd84dff3048856b762c2993a3aa130c4f508bbce9c59c9a815dabbf3ce5a3f234',
@@ -148164,7 +148491,7 @@ FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5d
  'vllm/config/cache.py': '82ab839cacb2e30f62f485c9e3ea32440fbf27beef00d1c60220f9776eb1ef43',
  'vllm/config/model.py': '6a0b5fdcb292fef440ee59321b7db437dae2cd5fd80eb2372fa3647fb163a3cf',
  'vllm/config/reasoning.py': '29a3bb76af99f67a7706f365fbcd3362205ef8af9db46b7f167374e68f8146ae',
- 'vllm/config/vllm.py': '30f612691ee2a5a1511484fbcece4bd89ade72c4309e786771826cf12fad38df',
+ 'vllm/config/vllm.py': '29e7d85b058d1d6be39597fee1ac1f1405babe0aa861334042f7199b1d9f6419',
  'vllm/distributed/kv_transfer/kv_connector/factory.py': '81a1025b6c3a89b301d102549e0576fc4d1639e3efe1a1f8c3ecffc8fde356bf',
  'vllm/distributed/kv_transfer/kv_connector/v1/base.py': '3e3a6f596c00e91bf65c685eaeabfd799c8c79c0884d824555c479b41a0f73e4',
  'vllm/distributed/kv_transfer/kv_connector/v1/example_hidden_states_connector.py': '9e37e8db97ad72d59ced3c678838485e9350afac7458708b06e665c40452482c',
@@ -148286,6 +148613,6 @@ FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5d
  'vllm/v1/structured_output/backend_xgrammar.py': '5f3263aefa001c4efb968cfb7accfb4d5dfaa584e3874d24af1e637f674019ff',
  'vllm/v1/structured_output/stop_checker.py': '0e67a59399516cf8c26648b632c89446bf9bc797cc03688238ba0b3f2529a231',
  'vllm/v1/worker/gpu_model_runner.py': '4f11527a737f315ff26e33153dda70e2da7722185adb6f80c34269ee76493172',
- 'vllm/v1/worker/gpu_worker.py': '3a53dd932196040b7249c9734e5c2e582c489cf4789b676f10584b072fa34cf3',
+ 'vllm/v1/worker/gpu_worker.py': '05102a0517c7474ced720a9ec3e697608c8f9cd7c65aa41581d01fec1bc1917c',
  'vllm/v1/worker/startup_plan.py': '2f4f50c34201390e50e10b578bc4cd964a4f5729334225fc30d815bb704aa81f',
  'vllm/v1/worker/workspace.py': '6749552a1aafdae3c6329b249f8135b5c6ae95992f54eaa65dd782c33afd2d26'}

@@ -315,7 +315,7 @@ It is intentionally reconstructed by the ordered, reviewed semantic transformati
 | patches/vllm-anthropic-input-fidelity.patch | 3252e25a6c2e9d8ee0eec4cb383fc292bff2afaac2e3becdc1006c68b3b02c3c |
 | patches/vllm-qwen-exact-tool-language.patch | e0bdd47262490c88bc600b858e3320efdd4dc4c80c218761fe01378b0e8c8134 |
 | patches/vllm-png-source-admission.patch | b1b684a96d7243ae647d4d8ce2fe69b7330b3ab243ea77903c4cfb346bc80549 |
-| patches/vllm-kv-physical-free-memory.patch | 9cc5b619c097a9ef3f8c10312444687c35a9853109e094f7a3dd17a3d776bca8 |
+| patches/vllm-kv-physical-free-memory.patch | 732e5f0c0b546769b56f8fc00be097d47c4ccc25b19f806484201ae9d794bea3 |
 | patches/vllm-qwen-single-call-grammar.patch | 878ba3d98284a326784ffced00a64b38dd827cbc80f136cf1e582df469c3eced |
 | patches/vllm-responses-history-integrity.patch | d2c6343087fc287eb6afe315cdfb9caa2909de140c82b57ee9d0c3ed9473983c |
 | patches/vllm-responses-stream-identity.patch | 9a3f1fb54f3e22f3df621ab681e675f7a916849bdceb6e555242df29d6028095 |
@@ -968,6 +968,16 @@ every row of a 2,048-token chunk, beside the chunk's bfloat16 logits, about
 profile, which runs every phase serving runs, would refuse the pool. Computed this
 way it holds about 0.47 GiB of logits, below the encoder's peak (by arithmetic
 from tensor shapes, not measured).
+
+Only the V1 model runner holds a declared pool. Upstream selects its V2 runner by
+default for dense, non-hybrid models; that runner's startup profile runs no
+attention, builds its attention backends and their workspaces only after
+profiling, charges no CUDA-graph memory and samples without log probabilities,
+which upstream's utilization holdback absorbs and this bound does not charge. A
+configuration with `--kv-cache-users` is therefore one the V2 runner does not
+support: by default such a model is served by V1, and forcing V2 is refused at
+configuration with the cause and the V1 runner as the next action. This launch's
+hybrid model is served by V1 either way.
 
 The derivation assumes that the caching allocator places each phase's peak,
 counted in allocated bytes, in the room the bound leaves: zero fragmentation. It

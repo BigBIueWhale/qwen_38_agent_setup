@@ -429,10 +429,10 @@ diff --git a/vllm/v1/worker/gpu_worker.py b/vllm/v1/worker/gpu_worker.py
 -            # max_num_batched_tokens
 -            self.model_runner.profile_run()
 +        if self.use_v2_model_runner:
-+            # The V2 runner profiles the text step with attention skipped and
-+            # builds its pool's attention backends, and the workspaces they
-+            # reserve, only after profiling: its bound omits what that profile
-+            # does not run.
++            # The V2 runner holds no declared pool -- VllmConfig refuses one on
++            # it, since this profile runs no attention and the runner builds
++            # its attention backends, and the workspaces they reserve, only
++            # after it -- so this bound sizes no pool.
 +            profiling_kv_cache: Callable[[], AbstractContextManager[int]] = (
 +                lambda: nullcontext(0)
 +            )
@@ -812,3 +812,110 @@ diff --git a/vllm/v1/worker/workspace.py b/vllm/v1/worker/workspace.py
      def _driver_free_bytes(self) -> int | None:
          if self._device.type != "cuda":
              return None
+diff --git a/tests/test_config.py b/tests/test_config.py
+--- a/tests/test_config.py
++++ b/tests/test_config.py
+@@ -336,6 +336,63 @@
+     assert VllmConfig._is_default_v2_model_runner_model(config) is expected
+ 
+ 
++def _v2_selection_config(kv_cache_users):
++    """The VllmConfig surface the V2 runner's selection reads, for a dense
++    generate model the V2 runner serves by default."""
++    config = SimpleNamespace(
++        model_config=SimpleNamespace(
++            model="Qwen/Qwen3-0.6B",
++            architectures=["Qwen3ForCausalLM"],
++            runner_type="generate",
++            is_moe=False,
++            is_quantized=False,
++            is_diffusion=False,
++            logits_processors=None,
++            enable_prompt_embeds=False,
++        ),
++        parallel_config=SimpleNamespace(
++            prefill_context_parallel_size=1,
++            tensor_parallel_size=1,
++            pipeline_parallel_size=1,
++            distributed_executor_backend="mp",
++            enable_dbo=False,
++            enable_elastic_ep=False,
++        ),
++        compilation_config=SimpleNamespace(
++            mode=CompilationMode.VLLM_COMPILE,
++            pass_config=SimpleNamespace(enable_sp=False),
++        ),
++        speculative_config=None,
++        cache_config=SimpleNamespace(
++            kv_sharing_fast_prefill=False, kv_cache_users=kv_cache_users
++        ),
++    )
++    for name in (
++        "_dflash_needs_multi_kv_group",
++        "_is_default_v2_model_runner_model",
++        "_get_v2_model_runner_unsupported_features",
++    ):
++        setattr(config, name, getattr(VllmConfig, name).__get__(config))
++    return config
++
++
++def test_v2_model_runner_serves_no_declared_kv_pool(monkeypatch):
++    """A declared pool is admitted against a bound the V2 runner's profile
++    cannot derive: a model V2 would serve by default is served by V1, and V2
++    forced is refused with the cause and a possible next action."""
++    monkeypatch.delenv("VLLM_USE_V2_MODEL_RUNNER", raising=False)
++    monkeypatch.setattr(vllm_config_module, "HAS_TRITON", True)
++    undeclared = _v2_selection_config(kv_cache_users=None)
++    assert VllmConfig.use_v2_model_runner.fget(undeclared) is True
++    declared = _v2_selection_config(kv_cache_users=1)
++    assert VllmConfig.use_v2_model_runner.fget(declared) is False
++    with pytest.raises(
++        ValueError,
++        match=r"a KV pool declared with --kv-cache-users .*Next: .*V1 model runner",
++    ):
++        VllmConfig._validate_v2_model_runner(declared)
++
++
+ @pytest.mark.skip_global_cleanup
+ def test_with_hf_config_populates_missing_architectures_from_causal_lm_mapping(
+     monkeypatch,
+diff --git a/vllm/config/vllm.py b/vllm/config/vllm.py
+--- a/vllm/config/vllm.py
++++ b/vllm/config/vllm.py
+@@ -2434,6 +2434,23 @@
+             # Will be added by https://github.com/vllm-project/vllm/pull/35045
+             unsupported.append("KV sharing fast prefill")
+ 
++        if self.cache_config.kv_cache_users is not None:
++            # A declared pool is admitted against a bound derived from a
++            # profile of every phase serving runs, at its largest
++            # (Worker.determine_available_memory), with no utilization
++            # holdback charged against it. The V2 runner's profile skips
++            # attention, builds its attention backends and the workspaces they
++            # reserve only after profiling, charges no CUDA-graph memory, and
++            # samples without top-k, top-p or log probabilities -- what
++            # upstream's holdback absorbs -- so the bound would admit a pool
++            # that serving overruns.
++            unsupported.append(
++                "a KV pool declared with --kv-cache-users (its startup profile "
++                "runs no attention and holds none of the workspaces, CUDA "
++                "graphs or log-probability memory serving holds beside the "
++                "pool)"
++            )
++
+         return unsupported
+ 
+     def _validate_v2_model_runner(self) -> None:
+@@ -2444,7 +2461,11 @@
+         unsupported = self._get_v2_model_runner_unsupported_features()
+         if unsupported:
+             raise ValueError(
+-                f"Model Runner V2 does not yet support: {', '.join(unsupported)}"
++                f"Model Runner V2 does not yet support: {', '.join(unsupported)}. "
++                "Next: serve without the listed features, or on the V1 model "
++                "runner (unset VLLM_USE_V2_MODEL_RUNNER) without what only the "
++                "V2 runner serves: prefill context parallelism, a DSpark or "
++                "mixed-attention DFlash draft, a diffusion model."
+             )
+ 
+     def validate_block_size(self) -> None:
