@@ -866,6 +866,49 @@ def test_kv_bound_refusal_names_only_possible_actions() -> None:
         assert message.endswith("or reduce max_model_len."), message
 
 
+def test_startup_plan_is_keyed_on_the_code_that_derived_it() -> None:
+    # A persisted plan replaces the profile; builds that patch one upstream
+    # commit share its version string, so a plan recorded by other code --
+    # another derivation of the bound -- must never match.
+    import tempfile
+    from pathlib import Path
+
+    import vllm
+    from vllm.v1.worker import startup_plan
+
+    platform = SimpleNamespace(
+        get_device_name=lambda device_id=0: "device",
+        get_device_total_memory=lambda device_id=0: 1 << 30,
+        get_device_capability=lambda device_id=0: (12, 0),
+    )
+    config = SimpleNamespace(compute_hash=lambda: "config")
+    digest = getattr(startup_plan, "installed_source_digest", None)
+    clear = getattr(digest, "cache_clear", lambda: None)
+    saved_platform, saved_file = startup_plan.current_platform, vllm.__file__
+    fingerprints = []
+    with tempfile.TemporaryDirectory() as root:
+        package = Path(root) / "vllm"
+        package.mkdir()
+        (package / "__init__.py").write_text("")
+        source = package / "gpu_worker.py"
+        startup_plan.current_platform = platform
+        vllm.__file__ = str(package / "__init__.py")
+        try:
+            for derivation in ("bound = 1\n", "bound = 2\n"):
+                source.write_text(derivation)
+                clear()
+                fingerprints.append(
+                    startup_plan.compute_plan_fingerprint(config, 0, 1)
+                )
+        finally:
+            startup_plan.current_platform = saved_platform
+            vllm.__file__ = saved_file
+            clear()
+    assert fingerprints[0] != fingerprints[1], (
+        "a startup plan recorded by other code would be adopted"
+    )
+
+
 def test_profiled_context_covers_its_own_query() -> None:
     # The served profile gives every dummy request the longest context a
     # request holds; a request whose own share of the step is longer keeps a
@@ -1028,6 +1071,7 @@ if __name__ == "__main__":
     test_serving_scores_the_prompt_as_the_profile_measures()
     test_v2_runner_holds_no_declared_pool()
     test_kv_bound_refusal_names_only_possible_actions()
+    test_startup_plan_is_keyed_on_the_code_that_derived_it()
     test_profiled_context_covers_its_own_query()
     test_dummy_step_records_the_layers_that_read_its_metadata()
     print("vision workspace unit: passed")

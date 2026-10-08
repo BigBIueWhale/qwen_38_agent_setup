@@ -124811,14 +124811,110 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '        TagFormat(\n'})},
  {'name': 'startup-plan-admission-bound',
   'review_patch': 'patches/vllm-startup-plan-admission-bound.patch',
-  'review_sha256': '340e4147f03da36ba5ca85db6c0d2f29bf7dbce0aabe4b536e591a582e2dea2c',
+  'review_sha256': '1d84af83471624421b048587487d40675e87a4ecdc14c24d084518a0d21a5ff0',
   'files': ({'path': 'tests/v1/worker/test_gpu_worker.py',
              'before_sha256': '12e6c5a8428a04aeae7e85ca7c34891745897a28c9da779029329adafd4b7b23',
-             'after_sha256': 'e22e989b4ec65f3938c069e3e9b39cb908f732629388492a3a3fad4f89ca0c38'},
+             'after_sha256': 'ed44ec605a0fdd47caec3a3fd9b17e00b30765322bd7bc2d140640b00e9cdeb2'},
             {'path': 'vllm/v1/worker/gpu_worker.py',
              'before_sha256': '4b21fef3b4bbe0c56ed4b4df081ef73701bed9b82696185eb30cb7989d6dc6a1',
-             'after_sha256': '05102a0517c7474ced720a9ec3e697608c8f9cd7c65aa41581d01fec1bc1917c'}),
+             'after_sha256': '05102a0517c7474ced720a9ec3e697608c8f9cd7c65aa41581d01fec1bc1917c'},
+            {'path': 'vllm/v1/worker/startup_plan.py',
+             'before_sha256': '2f4f50c34201390e50e10b578bc4cd964a4f5729334225fc30d815bb704aa81f',
+             'after_sha256': '72ead8346492acdcf1961352aea969cf96b97e615021dcfb198e9889b3084ef1'}),
   'edits': ({'name': 'tests/v1/worker/test_gpu_worker.py:landmark-1',
+             'path': 'tests/v1/worker/test_gpu_worker.py',
+             'before': '        assert base != fp(_plan_worker().vllm_config, 0, 1)\n'
+                       '    with patch("vllm.__version__", "0.0.0+plan-test"):\n'
+                       '        assert base != fp(_plan_worker().vllm_config, 0, 1)\n'
+                       '\n'
+                       '\n'
+                       'def test_startup_plan_apply_gate(plan_env):\n',
+             'after': '        assert base != fp(_plan_worker().vllm_config, 0, 1)\n'
+                      '    with patch("vllm.__version__", "0.0.0+plan-test"):\n'
+                      '        assert base != fp(_plan_worker().vllm_config, 0, 1)\n'
+                      '    # Builds that patch one upstream commit share its version: '
+                      'the installed\n'
+                      '    # source, not the version, identifies the code that derived '
+                      'the value.\n'
+                      '    with patch.object(\n'
+                      '        startup_plan, "installed_source_digest", lambda: '
+                      '"another-derivation"\n'
+                      '    ):\n'
+                      '        assert base != fp(_plan_worker().vllm_config, 0, 1)\n'
+                      '\n'
+                      '\n'
+                      'def '
+                      'test_installed_source_digest_covers_every_source_file(tmp_path):\n'
+                      '    """The digest reads every Python file of the installed '
+                      'package, so a\n'
+                      '    change to any one of them is another plan."""\n'
+                      '    import vllm\n'
+                      '\n'
+                      '    package = tmp_path / "vllm"\n'
+                      '    (package / "v1" / "worker").mkdir(parents=True)\n'
+                      '    (package / "__init__.py").write_text("")\n'
+                      '    source = package / "v1" / "worker" / "gpu_worker.py"\n'
+                      '    source.write_text("bound = 1\\n")\n'
+                      '    digest = startup_plan.installed_source_digest.__wrapped__\n'
+                      '    with patch.object(vllm, "__file__", str(package / '
+                      '"__init__.py")):\n'
+                      '        first = digest()\n'
+                      '        assert first == digest()\n'
+                      '        source.write_text("bound = 2\\n")\n'
+                      '        assert digest() != first\n'
+                      '\n'
+                      '\n'
+                      'def test_startup_plan_apply_gate(plan_env):\n',
+             'review_before': '        assert base != fp(_plan_worker().vllm_config, '
+                              '0, 1)\n'
+                              '    with patch("vllm.__version__", "0.0.0+plan-test"):\n'
+                              '        assert base != fp(_plan_worker().vllm_config, '
+                              '0, 1)\n'
+                              '\n'
+                              '\n'
+                              'def test_startup_plan_apply_gate(plan_env):\n',
+             'review_after': '        assert base != fp(_plan_worker().vllm_config, 0, '
+                             '1)\n'
+                             '    with patch("vllm.__version__", "0.0.0+plan-test"):\n'
+                             '        assert base != fp(_plan_worker().vllm_config, 0, '
+                             '1)\n'
+                             '    # Builds that patch one upstream commit share its '
+                             'version: the installed\n'
+                             '    # source, not the version, identifies the code that '
+                             'derived the value.\n'
+                             '    with patch.object(\n'
+                             '        startup_plan, "installed_source_digest", lambda: '
+                             '"another-derivation"\n'
+                             '    ):\n'
+                             '        assert base != fp(_plan_worker().vllm_config, 0, '
+                             '1)\n'
+                             '\n'
+                             '\n'
+                             'def '
+                             'test_installed_source_digest_covers_every_source_file(tmp_path):\n'
+                             '    """The digest reads every Python file of the '
+                             'installed package, so a\n'
+                             '    change to any one of them is another plan."""\n'
+                             '    import vllm\n'
+                             '\n'
+                             '    package = tmp_path / "vllm"\n'
+                             '    (package / "v1" / "worker").mkdir(parents=True)\n'
+                             '    (package / "__init__.py").write_text("")\n'
+                             '    source = package / "v1" / "worker" / '
+                             '"gpu_worker.py"\n'
+                             '    source.write_text("bound = 1\\n")\n'
+                             '    digest = '
+                             'startup_plan.installed_source_digest.__wrapped__\n'
+                             '    with patch.object(vllm, "__file__", str(package / '
+                             '"__init__.py")):\n'
+                             '        first = digest()\n'
+                             '        assert first == digest()\n'
+                             '        source.write_text("bound = 2\\n")\n'
+                             '        assert digest() != first\n'
+                             '\n'
+                             '\n'
+                             'def test_startup_plan_apply_gate(plan_env):\n'},
+            {'name': 'tests/v1/worker/test_gpu_worker.py:landmark-2',
              'path': 'tests/v1/worker/test_gpu_worker.py',
              'before': '            profile_seq_lens=profile_seq_lens,\n'
                        '        )\n'
@@ -125321,7 +125417,224 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '\n'
                              '        if self.use_v2_model_runner:\n'
                              '            # V2: Run full execute_model + sample_tokens '
-                             'to JIT compile triton kernels.\n'})},
+                             'to JIT compile triton kernels.\n'},
+            {'name': 'vllm/v1/worker/startup_plan.py:landmark-1',
+             'path': 'vllm/v1/worker/startup_plan.py',
+             'before': 'trusted.\n'
+                       '"""\n'
+                       '\n'
+                       'import hashlib\n'
+                       'import json\n'
+                       'import os\n'
+                       'from typing import TYPE_CHECKING\n'
+                       '\n'
+                       'import torch\n',
+             'after': 'trusted.\n'
+                      '"""\n'
+                      '\n'
+                      'import functools\n'
+                      'import hashlib\n'
+                      'import json\n'
+                      'import os\n'
+                      'from pathlib import Path\n'
+                      'from typing import TYPE_CHECKING\n'
+                      '\n'
+                      'import torch\n',
+             'review_before': 'trusted.\n'
+                              '"""\n'
+                              '\n'
+                              'import hashlib\n'
+                              'import json\n'
+                              'import os\n'
+                              'from typing import TYPE_CHECKING\n'
+                              '\n'
+                              'import torch\n',
+             'review_after': 'trusted.\n'
+                             '"""\n'
+                             '\n'
+                             'import functools\n'
+                             'import hashlib\n'
+                             'import json\n'
+                             'import os\n'
+                             'from pathlib import Path\n'
+                             'from typing import TYPE_CHECKING\n'
+                             '\n'
+                             'import torch\n'},
+            {'name': 'vllm/v1/worker/startup_plan.py:landmark-2',
+             'path': 'vllm/v1/worker/startup_plan.py',
+             'before': 'PLAN_SCHEMA_VERSION = 1\n'
+                       '\n'
+                       '\n'
+                       'def compute_plan_fingerprint(\n'
+                       '    vllm_config: VllmConfig, rank: int, world_size: int\n'
+                       ') -> str:\n',
+             'after': 'PLAN_SCHEMA_VERSION = 1\n'
+                      '\n'
+                      '\n'
+                      '@functools.cache\n'
+                      'def installed_source_digest() -> str:\n'
+                      '    """A digest of every Python source file of the installed '
+                      'vllm package.\n'
+                      '\n'
+                      '    The value a plan records is what this code derives -- the '
+                      'profile, the\n'
+                      '    bound, the model and its kernels -- and a version string '
+                      'does not\n'
+                      '    identify it: builds that patch one upstream commit share '
+                      'its version.\n'
+                      '    Any change to any of these files is therefore another '
+                      'plan.\n'
+                      '    """\n'
+                      '    import vllm\n'
+                      '\n'
+                      '    root = Path(vllm.__file__).resolve().parent\n'
+                      '    digest = hashlib.sha256()\n'
+                      '    for path in sorted(root.rglob("*.py")):\n'
+                      '        '
+                      'digest.update(path.relative_to(root).as_posix().encode())\n'
+                      '        digest.update(b"\\0")\n'
+                      '        digest.update(path.read_bytes())\n'
+                      '        digest.update(b"\\0")\n'
+                      '    return digest.hexdigest()\n'
+                      '\n'
+                      '\n'
+                      'def compute_plan_fingerprint(\n'
+                      '    vllm_config: VllmConfig, rank: int, world_size: int\n'
+                      ') -> str:\n',
+             'review_before': 'PLAN_SCHEMA_VERSION = 1\n'
+                              '\n'
+                              '\n'
+                              'def compute_plan_fingerprint(\n'
+                              '    vllm_config: VllmConfig, rank: int, world_size: '
+                              'int\n'
+                              ') -> str:\n',
+             'review_after': 'PLAN_SCHEMA_VERSION = 1\n'
+                             '\n'
+                             '\n'
+                             '@functools.cache\n'
+                             'def installed_source_digest() -> str:\n'
+                             '    """A digest of every Python source file of the '
+                             'installed vllm package.\n'
+                             '\n'
+                             '    The value a plan records is what this code derives '
+                             '-- the profile, the\n'
+                             '    bound, the model and its kernels -- and a version '
+                             'string does not\n'
+                             '    identify it: builds that patch one upstream commit '
+                             'share its version.\n'
+                             '    Any change to any of these files is therefore '
+                             'another plan.\n'
+                             '    """\n'
+                             '    import vllm\n'
+                             '\n'
+                             '    root = Path(vllm.__file__).resolve().parent\n'
+                             '    digest = hashlib.sha256()\n'
+                             '    for path in sorted(root.rglob("*.py")):\n'
+                             '        '
+                             'digest.update(path.relative_to(root).as_posix().encode())\n'
+                             '        digest.update(b"\\0")\n'
+                             '        digest.update(path.read_bytes())\n'
+                             '        digest.update(b"\\0")\n'
+                             '    return digest.hexdigest()\n'
+                             '\n'
+                             '\n'
+                             'def compute_plan_fingerprint(\n'
+                             '    vllm_config: VllmConfig, rank: int, world_size: int\n'
+                             ') -> str:\n'},
+            {'name': 'vllm/v1/worker/startup_plan.py:landmark-3',
+             'path': 'vllm/v1/worker/startup_plan.py',
+             'before': '    device identity (``DeviceConfig.compute_hash`` is empty), '
+                       'so device\n'
+                       '    name, total memory, compute capability, and the torch/CUDA '
+                       'build are\n'
+                       '    added here. The vLLM version is also pinned as an explicit '
+                       'factor so\n'
+                       '    version invalidation holds no matter how ``compute_hash`` '
+                       'evolves.\n'
+                       '    Rank is included because per-rank memory use differs under '
+                       'TP/PP.\n'
+                       '    Driver-only changes are not part of the key; the '
+                       'free-memory gate at\n'
+                       '    apply time bounds the residual risk.\n',
+             'after': '    device identity (``DeviceConfig.compute_hash`` is empty), '
+                      'so device\n'
+                      '    name, total memory, compute capability, and the torch/CUDA '
+                      'build are\n'
+                      '    added here. The vLLM version is also pinned as an explicit '
+                      'factor so\n'
+                      '    version invalidation holds no matter how ``compute_hash`` '
+                      'evolves, and\n'
+                      '    the installed source is (installed_source_digest), since '
+                      'the version\n'
+                      '    does not identify the code that derived the value.\n'
+                      '    Rank is included because per-rank memory use differs under '
+                      'TP/PP.\n'
+                      '    Driver-only changes are not part of the key; the '
+                      'free-memory gate at\n'
+                      '    apply time bounds the residual risk.\n',
+             'review_before': '    device identity (``DeviceConfig.compute_hash`` is '
+                              'empty), so device\n'
+                              '    name, total memory, compute capability, and the '
+                              'torch/CUDA build are\n'
+                              '    added here. The vLLM version is also pinned as an '
+                              'explicit factor so\n'
+                              '    version invalidation holds no matter how '
+                              '``compute_hash`` evolves.\n'
+                              '    Rank is included because per-rank memory use '
+                              'differs under TP/PP.\n'
+                              '    Driver-only changes are not part of the key; the '
+                              'free-memory gate at\n'
+                              '    apply time bounds the residual risk.\n',
+             'review_after': '    device identity (``DeviceConfig.compute_hash`` is '
+                             'empty), so device\n'
+                             '    name, total memory, compute capability, and the '
+                             'torch/CUDA build are\n'
+                             '    added here. The vLLM version is also pinned as an '
+                             'explicit factor so\n'
+                             '    version invalidation holds no matter how '
+                             '``compute_hash`` evolves, and\n'
+                             '    the installed source is (installed_source_digest), '
+                             'since the version\n'
+                             '    does not identify the code that derived the value.\n'
+                             '    Rank is included because per-rank memory use differs '
+                             'under TP/PP.\n'
+                             '    Driver-only changes are not part of the key; the '
+                             'free-memory gate at\n'
+                             '    apply time bounds the residual risk.\n'},
+            {'name': 'vllm/v1/worker/startup_plan.py:landmark-4',
+             'path': 'vllm/v1/worker/startup_plan.py',
+             'before': '    factors = {\n'
+                       '        "schema": PLAN_SCHEMA_VERSION,\n'
+                       '        "vllm": vllm_version,\n'
+                       '        "vllm_config": vllm_config.compute_hash(),\n'
+                       '        "device_name": current_platform.get_device_name(),\n'
+                       '        "device_total_memory": '
+                       'current_platform.get_device_total_memory(),\n',
+             'after': '    factors = {\n'
+                      '        "schema": PLAN_SCHEMA_VERSION,\n'
+                      '        "vllm": vllm_version,\n'
+                      '        "source": installed_source_digest(),\n'
+                      '        "vllm_config": vllm_config.compute_hash(),\n'
+                      '        "device_name": current_platform.get_device_name(),\n'
+                      '        "device_total_memory": '
+                      'current_platform.get_device_total_memory(),\n',
+             'review_before': '    factors = {\n'
+                              '        "schema": PLAN_SCHEMA_VERSION,\n'
+                              '        "vllm": vllm_version,\n'
+                              '        "vllm_config": vllm_config.compute_hash(),\n'
+                              '        "device_name": '
+                              'current_platform.get_device_name(),\n'
+                              '        "device_total_memory": '
+                              'current_platform.get_device_total_memory(),\n',
+             'review_after': '    factors = {\n'
+                             '        "schema": PLAN_SCHEMA_VERSION,\n'
+                             '        "vllm": vllm_version,\n'
+                             '        "source": installed_source_digest(),\n'
+                             '        "vllm_config": vllm_config.compute_hash(),\n'
+                             '        "device_name": '
+                             'current_platform.get_device_name(),\n'
+                             '        "device_total_memory": '
+                             'current_platform.get_device_total_memory(),\n'})},
  {'name': 'template-refusals-name-their-parameter',
   'review_patch': 'patches/vllm-template-refusals-name-their-parameter.patch',
   'review_sha256': '1f428332be39e4fb7f3c7f7eb5d6e3297f5dc70638fcd7f81d69b32f69d1fa26',
@@ -150307,7 +150620,7 @@ FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5d
  'tests/v1/structured_output/test_backend_xgrammar_stop_tokens.py': 'a844fe5cac07d9a7eb80c8c68fd306ac58935f2f821eb76c546a5440fe161599',
  'tests/v1/test_request.py': '6fa5d12659ebb955c0fec37b09074f75b5011e0ac6e7b7551b9175c99f5655d0',
  'tests/v1/worker/test_gpu_model_runner_mm_gather.py': '7076e2415a3a1246d6f1e22e978a4c32e7b87713d6d7ae5743960c3d31592759',
- 'tests/v1/worker/test_gpu_worker.py': 'e22e989b4ec65f3938c069e3e9b39cb908f732629388492a3a3fad4f89ca0c38',
+ 'tests/v1/worker/test_gpu_worker.py': 'ed44ec605a0fdd47caec3a3fd9b17e00b30765322bd7bc2d140640b00e9cdeb2',
  'tests/v1/worker/test_workspace.py': '0e96960d9c456857256f4202bf6b20efc5ae53a63132373d2408788f8599ede8',
  'vllm/config/cache.py': '82ab839cacb2e30f62f485c9e3ea32440fbf27beef00d1c60220f9776eb1ef43',
  'vllm/config/model.py': '6a0b5fdcb292fef440ee59321b7db437dae2cd5fd80eb2372fa3647fb163a3cf',
@@ -150435,5 +150748,5 @@ FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5d
  'vllm/v1/structured_output/stop_checker.py': '0e67a59399516cf8c26648b632c89446bf9bc797cc03688238ba0b3f2529a231',
  'vllm/v1/worker/gpu_model_runner.py': 'acbe02a1a30ee0cf288e1809f483918c089bebcbfbd821ea2279dfa78991b35a',
  'vllm/v1/worker/gpu_worker.py': '05102a0517c7474ced720a9ec3e697608c8f9cd7c65aa41581d01fec1bc1917c',
- 'vllm/v1/worker/startup_plan.py': '2f4f50c34201390e50e10b578bc4cd964a4f5729334225fc30d815bb704aa81f',
+ 'vllm/v1/worker/startup_plan.py': '72ead8346492acdcf1961352aea969cf96b97e615021dcfb198e9889b3084ef1',
  'vllm/v1/worker/workspace.py': '8dc9c9066dc131800837f3ca640adb642b3734dc6cc95698958805e4e55426e2'}

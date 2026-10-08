@@ -3603,8 +3603,19 @@ def _validate_plan_bound_after(state: State) -> None:
         "maybe_save_startup_plan(self, self.kv_physical_bound)",
     ), label=label)
     forbid_text(state, worker, "- int(self.total_consumed)", label=label)
+    # A plan is keyed on the code that derived it: builds that patch one
+    # upstream commit share its version string.
+    _require_in_symbol(state, "vllm/v1/worker/startup_plan.py",
+                       "compute_plan_fingerprint", (
+        '"source": installed_source_digest(),',
+    ), label=label)
+    _require_in_symbol(state, "vllm/v1/worker/startup_plan.py",
+                       "installed_source_digest", (
+        'root.rglob("*.py")',
+    ), label=label)
     require_python_symbols(state, "tests/v1/worker/test_gpu_worker.py", {
         "test_plan_shortcut_boot_admits_against_the_profiled_bound": None,
+        "test_installed_source_digest_covers_every_source_file": None,
     }, label=label)
 
 
@@ -4544,7 +4555,9 @@ CONTRACTS: Mapping[str, SemanticContract] = {
             "total memory minus measured residents, so a plan-shortcut boot "
             "admitted against a larger bound than the profiled boot it "
             "replaces whenever memory was occupied before profiling. The plan "
-            "persists the one bound determine_available_memory derives."
+            "persists the one bound determine_available_memory derives, keyed "
+            "on the installed source that derived it, since builds that patch "
+            "one upstream commit share its version string."
         ),
         removal_condition=(
             "Remove when pinned upstream persists the same admission bound its "

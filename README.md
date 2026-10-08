@@ -352,7 +352,7 @@ It is intentionally reconstructed by the ordered, reviewed semantic transformati
 | patches/vllm-template-authored-control-tokens.patch | 2a6e8b31826cf06d52acb3c87cae0c6c68a7acc2c8f01dd7848bc5e948977228 |
 | patches/vllm-nvfp4-native-kernel-required.patch | 9d9ce188b6670d687a725c4cdca37478f9dc78ef9f19685ddbcf5e9edd53b8b7 |
 | patches/vllm-qwen-arguments-read-by-grammar.patch | 9bf29aed999f1cfe12a58cc98b91fccafe615dfb7c22f13e9c681d1b54034837 |
-| patches/vllm-startup-plan-admission-bound.patch | 340e4147f03da36ba5ca85db6c0d2f29bf7dbce0aabe4b536e591a582e2dea2c |
+| patches/vllm-startup-plan-admission-bound.patch | 1d84af83471624421b048587487d40675e87a4ecdc14c24d084518a0d21a5ff0 |
 | patches/vllm-template-refusals-name-their-parameter.patch | 1f428332be39e4fb7f3c7f7eb5d6e3297f5dc70638fcd7f81d69b32f69d1fa26 |
 | patches/vllm-qwen-repeated-parameter-refusal.patch | af405e3be4a649264786bf7bc924c3e4053579eddde47030d9776eb1bc1c73c0 |
 | patches/vllm-generated-tokens-survive-parsing.patch | 3709ac24d4f098a27ffa57fedf9d3dec81a1e08392da07d225bb8b62d2e8ee2e |
