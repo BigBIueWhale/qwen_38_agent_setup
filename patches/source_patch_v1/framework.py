@@ -7,9 +7,13 @@ result is planned and checked before a disposable source tree is changed.
 
 Unified diffs remain review evidence.  They are parsed independently and must
 describe the exact same old/new blocks as the Python transformation data, at
-the same place: every hunk must land at the line its header names, every
-index line must name the blobs the stage transforms, and every created or
-deleted file must be declared as one.  They are never used to decide where or
+the same place: every hunk's header names where its old block starts in the
+file before the stage and where its new block starts after it, and how many
+lines each holds, and its body holds exactly those lines; every index line
+names the blobs the stage transforms; every created or deleted file is
+declared as one; and every mode a section states is the file's mode in the
+tree the stage transforms.  Each of these is proven against the replay of the
+stage data, never taken from the diff.  They are never used to decide where or
 how to edit a file.
 """
 
@@ -372,11 +376,15 @@ def require_python_symbols(
 
 @dataclass(frozen=True)
 class _ParsedReviewEdit:
+    """One hunk: its blocks, and the coordinates its header states."""
+
     path: str
     before: str
     after: str
     old_start: int
+    old_count: int
     new_start: int
+    new_count: int
 
 
 @dataclass(frozen=True)
@@ -389,20 +397,49 @@ class _ParsedReviewFile:
     # The abbreviated blob ids of the file before and after the stage, when the
     # section writes an index line.
     blobs: tuple[str, str] | None
+    # The git file mode the section states (its new or deleted file mode, or
+    # its index line's), when it states one.
+    mode: str | None = None
 
 
 _DIFF_HEADER = re.compile(r"^diff --git a/(.+) b/(.+)$")
-_HUNK_HEADER = re.compile(
-    r"^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@"
+# git omits a count of one; a count of zero names the line before the range.
+_HUNK_HEADER = re.compile(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@(?: .*)?$")
+_DELETED_FILE_HEADER = re.compile(r"^deleted file mode (\d{6})$")
+_NEW_FILE_HEADER = re.compile(r"^new file mode (\d{6})$")
+_INDEX_HEADER = re.compile(
+    r"^index ([0-9a-f]{7,40})\.\.([0-9a-f]{7,40})(?: (\d{6}))?$"
 )
-_DELETED_FILE_HEADER = re.compile(r"^deleted file mode \d+$")
-_NEW_FILE_HEADER = re.compile(r"^new file mode \d+$")
-_INDEX_HEADER = re.compile(r"^index ([0-9a-f]{7,40})\.\.([0-9a-f]{7,40})(?: \d+)?$")
+_OLD_FILE_HEADER = re.compile(r"^--- (?:a/(.+)|(/dev/null))$")
+_NEW_FILE_PATH_HEADER = re.compile(r"^\+\+\+ (?:b/(.+)|(/dev/null))$")
+# The modes git gives a regular file. The framework edits regular files only
+# and never changes a mode, so these are the only modes a section can state.
+_REGULAR_FILE_MODES = frozenset({"100644", "100755"})
+
+
+def git_file_mode(st_mode: int) -> str:
+    """The mode git records for a regular file, from its permission bits."""
+    return "100755" if st_mode & stat.S_IXUSR else "100644"
+
+
+def git_range_start(first_line: int, count: int) -> int:
+    """The start git writes for a range of *count* lines whose first line is
+    *first_line*: an empty range is named by the line before it."""
+    return first_line if count else first_line - 1
 
 
 def _parse_review_diff(
     data: bytes, *, label: str
 ) -> tuple[tuple[_ParsedReviewEdit, ...], dict[str, _ParsedReviewFile]]:
+    """Parse a review diff in git's unified grammar, and nothing looser.
+
+    Each file section is a ``diff --git`` header, then at most one new or
+    deleted file mode, at most one index line, and -- when the section has
+    hunks -- the ``---``/``+++`` pair and its hunks. A hunk's body is
+    delimited by its header's counts, as git delimits it: it holds exactly
+    the counted old and new lines, and what follows is a hunk or a section.
+    Any other line is refused, so nothing a review diff states goes unread.
+    """
     try:
         text = data.decode("utf-8")
     except UnicodeDecodeError as exc:
@@ -412,21 +449,39 @@ def _parse_review_diff(
     edits: list[_ParsedReviewEdit] = []
     files: dict[str, _ParsedReviewFile] = {}
     current_path: str | None = None
+    # Where in its section's grammar the parser stands: "header" (mode and
+    # index lines may follow), "old" / "new" (the path pair is open), "hunks".
+    phase = "none"
+    path_pair: tuple[str | None, str | None] = (None, None)
     index = 0
 
     def declare(**declared: object) -> None:
-        _require(
-            current_path is not None,
-            f"{label}: file declaration without file header",
-        )
         files[current_path] = _ParsedReviewFile(
             **{**files[current_path].__dict__, **declared}
         )
 
+    def declare_mode(mode: str, where: str) -> None:
+        _require(
+            mode in _REGULAR_FILE_MODES,
+            f"{label}: {current_path} {where} states mode {mode}, which is "
+            "not a regular file's",
+        )
+        stated = files[current_path].mode
+        _require(
+            stated in (None, mode),
+            f"{label}: {current_path} states modes {stated} and {mode}",
+        )
+        declare(mode=mode)
+
     while index < len(lines):
         raw = lines[index]
-        match = _DIFF_HEADER.match(raw.rstrip("\n"))
+        line = raw.rstrip("\n")
+        match = _DIFF_HEADER.match(line)
         if match:
+            _require(
+                phase in ("none", "header", "hunks"),
+                f"{label}: {current_path} opens its path pair without a hunk",
+            )
             _require(
                 match.group(1) == match.group(2),
                 f"{label}: rename/copy diffs are not supported: {raw!r}",
@@ -440,59 +495,127 @@ def _parse_review_diff(
             files[current_path] = _ParsedReviewFile(
                 current_path, created=False, deleted=False, blobs=None
             )
+            phase = "header"
             index += 1
             continue
-        if _DELETED_FILE_HEADER.match(raw.rstrip("\n")):
-            declare(deleted=True)
-            index += 1
-            continue
-        if _NEW_FILE_HEADER.match(raw.rstrip("\n")):
-            declare(created=True)
-            index += 1
-            continue
-        index_match = _INDEX_HEADER.match(raw.rstrip("\n"))
-        if index_match:
-            declare(blobs=(index_match.group(1), index_match.group(2)))
-            index += 1
-            continue
-        hunk_match = _HUNK_HEADER.match(raw.rstrip("\n"))
-        if hunk_match:
-            _require(current_path is not None, f"{label}: hunk without file header")
-            before: list[str] = []
-            after: list[str] = []
-            index += 1
-            while index < len(lines):
-                hunk_line = lines[index]
-                if _DIFF_HEADER.match(hunk_line.rstrip("\n")) or _HUNK_HEADER.match(
-                    hunk_line.rstrip("\n")
-                ):
-                    break
-                if hunk_line.startswith("\\ No newline at end of file"):
-                    raise PatchRefusedError(
-                        f"{label}: files without terminal newline are unsupported"
-                    )
-                prefix = hunk_line[:1]
-                payload = hunk_line[1:]
-                _require(
-                    prefix in {" ", "+", "-"},
-                    f"{label}: unsupported hunk line {hunk_line!r}",
+        _require(
+            current_path is not None,
+            f"{label}: line before the first file section: {raw!r}",
+        )
+        section = files[current_path]
+        if phase == "header":
+            deleted = _DELETED_FILE_HEADER.match(line)
+            created = _NEW_FILE_HEADER.match(line)
+            index_match = _INDEX_HEADER.match(line)
+            if (deleted or created) and not (
+                section.created or section.deleted or section.blobs
+            ):
+                declare(deleted=bool(deleted), created=bool(created))
+                declare_mode(
+                    (deleted or created).group(1),
+                    "deleted file mode" if deleted else "new file mode",
                 )
-                if prefix in {" ", "-"}:
-                    before.append(payload)
-                if prefix in {" ", "+"}:
-                    after.append(payload)
                 index += 1
-            edits.append(
-                _ParsedReviewEdit(
-                    current_path,
-                    "".join(before),
-                    "".join(after),
-                    int(hunk_match.group(1)),
-                    int(hunk_match.group(2)),
-                )
+                continue
+            if index_match and section.blobs is None:
+                declare(blobs=(index_match.group(1), index_match.group(2)))
+                if index_match.group(3) is not None:
+                    declare_mode(index_match.group(3), "index line")
+                index += 1
+                continue
+            old = _OLD_FILE_HEADER.match(line)
+            if old:
+                path_pair = (old.group(1), old.group(2))
+                phase = "old"
+                index += 1
+                continue
+        elif phase == "old":
+            new = _NEW_FILE_PATH_HEADER.match(line)
+            _require(new, f"{label}: {current_path}: '---' without '+++'")
+            old_path, old_null = path_pair
+            new_path, new_null = new.group(1), new.group(2)
+            _require(
+                old_path in (None, current_path) and new_path in (None, current_path)
+                and not (old_null and new_null),
+                f"{label}: {current_path}'s path pair names another file",
             )
+            _require(
+                bool(old_null) == section.created
+                and bool(new_null) == section.deleted,
+                f"{label}: {current_path}'s path pair says "
+                f"{'created' if old_null else 'deleted' if new_null else 'modified'}"
+                ", but its header does not",
+            )
+            phase = "new"
+            index += 1
             continue
+        hunk_match = _HUNK_HEADER.match(line)
+        _require(
+            hunk_match and phase in ("new", "hunks"),
+            f"{label}: {current_path}: unsupported review diff line {raw!r}",
+        )
+        old_start, old_count, new_start, new_count = (
+            int(hunk_match.group(1)),
+            int(hunk_match.group(2) or 1),
+            int(hunk_match.group(3)),
+            int(hunk_match.group(4) or 1),
+        )
+        before: list[str] = []
+        after: list[str] = []
         index += 1
+        old_left, new_left = old_count, new_count
+        while old_left or new_left:
+            _require(
+                index < len(lines),
+                f"{label}: {current_path}: a hunk ends {old_left} old and "
+                f"{new_left} new line(s) short of its header's counts",
+            )
+            hunk_line = lines[index]
+            if hunk_line.startswith("\\ No newline at end of file"):
+                raise PatchRefusedError(
+                    f"{label}: files without terminal newline are unsupported"
+                )
+            prefix = hunk_line[:1]
+            payload = hunk_line[1:]
+            _require(
+                prefix in {" ", "+", "-"},
+                f"{label}: {current_path}: a hunk ends {old_left} old and "
+                f"{new_left} new line(s) short of its header's counts at "
+                f"{hunk_line!r}",
+            )
+            if prefix in {" ", "-"}:
+                _require(
+                    old_left > 0,
+                    f"{label}: {current_path}: a hunk holds more old lines "
+                    f"than its header's {old_count}",
+                )
+                old_left -= 1
+                before.append(payload)
+            if prefix in {" ", "+"}:
+                _require(
+                    new_left > 0,
+                    f"{label}: {current_path}: a hunk holds more new lines "
+                    f"than its header's {new_count}",
+                )
+                new_left -= 1
+                after.append(payload)
+            index += 1
+        edits.append(
+            _ParsedReviewEdit(
+                current_path,
+                "".join(before),
+                "".join(after),
+                old_start,
+                old_count,
+                new_start,
+                new_count,
+            )
+        )
+        phase = "hunks"
+    _require(
+        phase in ("none", "header", "hunks"),
+        f"{label}: {current_path} opens its path pair without a hunk",
+    )
     _require(
         edits or any(file.deleted for file in files.values()),
         f"{label}: review diff contains no hunks",
@@ -595,6 +718,15 @@ class SourcePatchTransaction:
             state[path] = self._read_text(path)
         return state
 
+    def _read_modes(self) -> dict[str, str]:
+        """The git mode of every file the patch set names that exists."""
+        modes: dict[str, str] = {}
+        for path in self._all_paths():
+            candidate = self.source_root.joinpath(*PurePosixPath(path).parts)
+            if candidate.exists():
+                modes[path] = git_file_mode(candidate.lstat().st_mode)
+        return modes
+
     def _verify_identity(self, state: Mapping[str, str]) -> None:
         for path, digest in self.patchset.identity_files.items():
             _require(path in state, f"identity file missing: {path}")
@@ -646,18 +778,14 @@ class SourcePatchTransaction:
                 f"{sorted(parsed_paths)!r} but the Python patcher declares "
                 f"{sorted(stage_paths)!r}",
             )
-        expected = tuple(
-            _ParsedReviewEdit(
-                edit.path,
-                edit.review_before,
-                edit.review_after,
-                parsed_edit.old_start,
-                parsed_edit.new_start,
-            )
-            for edit, parsed_edit in zip(stage.edits, parsed)
-        )
+        # The blocks are the stage data's; a hunk's counts are its body's, by
+        # the parse. Where each hunk starts is proven by the replay (plan).
         _require(
-            parsed == expected,
+            [(edit.path, edit.before, edit.after) for edit in parsed]
+            == [
+                (edit.path, edit.review_before, edit.review_after)
+                for edit in stage.edits
+            ],
             f"{stage.name}: Python landmarks and review diff describe "
             "different transformations",
         )
@@ -743,10 +871,25 @@ class SourcePatchTransaction:
 
         planned = dict(state)
         changed: set[str] = set()
+        # The framework writes a file it creates 0644 and keeps every other
+        # file's mode, so a file's mode through every stage is its mode here.
+        modes = self._read_modes()
         for stage in self.patchset.stages:
             stage.validate_before(planned)
             contracts = {contract.path: contract for contract in stage.files}
             coordinates, declared = reviews[stage.name]
+            for path, review_file in declared.items():
+                actual_mode = modes.get(path, "100644")
+                _require(
+                    review_file.mode in (None, actual_mode),
+                    f"{stage.name}: the review diff states mode "
+                    f"{review_file.mode} for {path}, whose mode is "
+                    f"{actual_mode}; no writes performed",
+                )
+            # Per file, how far this stage's earlier hunks moved later lines,
+            # and the line after the last one's new block.
+            shift: dict[str, int] = {}
+            end: dict[str, int] = {}
             stage_before = {path: planned.get(path) for path in contracts}
             for path, contract in contracts.items():
                 if contract.before_sha256 is None:
@@ -774,38 +917,66 @@ class SourcePatchTransaction:
                         f"does not match the whole of {edit.path}; no "
                         "writes performed",
                     )
-                    planned[edit.path] = ""
-                    changed.add(edit.path)
-                    continue
-                before_count = current.count(edit.before)
-                _require(
-                    before_count == 1,
-                    f"{stage.name}:{edit.name}: expected one before landmark "
-                    f"in {edit.path}, found {before_count}; no writes performed",
-                )
-                after_count = after_outside_landmark(current, edit.before, edit.after)
-                _require(
-                    after_count == 0,
-                    f"{stage.name}:{edit.name}: after block already appears "
-                    f"{after_count} time(s) in {edit.path} outside its before "
-                    "landmark; source is partial or the landmarks overlap; no "
-                    "writes performed",
-                )
-                if edit.review_before:
-                    # Where the edit lands is proven, not only what it says:
-                    # within a stage a file's hunks apply in order, so each
-                    # one's review block starts at its header's new-file line.
-                    landed = current.index(edit.before) + len(
-                        edit.before.split(edit.review_before, 1)[0]
-                    )
-                    line = current.count("\n", 0, landed) + 1
+                    landed = 0
+                else:
+                    before_count = current.count(edit.before)
                     _require(
-                        line == coordinate.new_start,
-                        f"{stage.name}:{edit.name}: lands at line {line} of "
-                        f"{edit.path}, but its review hunk's header places it at "
-                        f"line {coordinate.new_start}; no writes performed",
+                        before_count == 1,
+                        f"{stage.name}:{edit.name}: expected one before landmark "
+                        f"in {edit.path}, found {before_count}; no writes performed",
                     )
-                planned[edit.path] = current.replace(edit.before, edit.after, 1)
+                    after_count = after_outside_landmark(
+                        current, edit.before, edit.after
+                    )
+                    _require(
+                        after_count == 0,
+                        f"{stage.name}:{edit.name}: after block already appears "
+                        f"{after_count} time(s) in {edit.path} outside its before "
+                        "landmark; source is partial or the landmarks overlap; no "
+                        "writes performed",
+                    )
+                    # A created file's hunk has no old block, and starts the file.
+                    landed = (
+                        current.index(edit.before)
+                        + len(edit.before.split(edit.review_before, 1)[0])
+                        if edit.review_before
+                        else 0
+                    )
+                # Where the edit lands is proven, not only what it says: a
+                # file's hunks apply in order, so the text this one meets holds
+                # the earlier ones' results and none of the later ones', which
+                # lie below it. Its new block starts where it lands, and its
+                # old block there less what the earlier hunks moved it; git
+                # names an empty block by the line before it.
+                line = current.count("\n", 0, landed) + 1
+                _require(
+                    line >= end.get(edit.path, 1),
+                    f"{stage.name}:{edit.name}: its review hunk starts inside or "
+                    f"above the one before it in {edit.path}; no writes performed",
+                )
+                _require(
+                    coordinate.new_start == git_range_start(line, coordinate.new_count),
+                    f"{stage.name}:{edit.name}: lands at line {line} of "
+                    f"{edit.path}, but its review hunk's header places it at "
+                    f"line {coordinate.new_start}; no writes performed",
+                )
+                old_start = git_range_start(
+                    line - shift.get(edit.path, 0), coordinate.old_count
+                )
+                _require(
+                    coordinate.old_start == old_start,
+                    f"{stage.name}:{edit.name}: starts at line {old_start} of "
+                    f"{edit.path} before the stage, but its review hunk's header "
+                    f"says line {coordinate.old_start}; no writes performed",
+                )
+                shift[edit.path] = (
+                    shift.get(edit.path, 0) + coordinate.new_count - coordinate.old_count
+                )
+                end[edit.path] = line + coordinate.new_count
+                planned[edit.path] = (
+                    "" if edit.after == ""
+                    else current.replace(edit.before, edit.after, 1)
+                )
                 changed.add(edit.path)
 
             for path, contract in contracts.items():

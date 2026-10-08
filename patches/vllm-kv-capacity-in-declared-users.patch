@@ -290,7 +290,7 @@ index 955e5c5bf02565c46f720a81b38ec7b115105412..b313a74b687e46de9f4c04fd8dd119d3
      ) as vllm_model:
          auto_fitted_len = (
 diff --git a/tests/v1/kv_connector/nixl_integration/run_multi_connector_accuracy_test.sh b/tests/v1/kv_connector/nixl_integration/run_multi_connector_accuracy_test.sh
-index ca042dd8ed64e9a58d14b8bc09675ec11c6fd776..c8ad4a95f40374e8f4af7ee3aacef0f962549b7d 100644
+index ca042dd8ed64e9a58d14b8bc09675ec11c6fd776..c8ad4a95f40374e8f4af7ee3aacef0f962549b7d 100755
 --- a/tests/v1/kv_connector/nixl_integration/run_multi_connector_accuracy_test.sh
 +++ b/tests/v1/kv_connector/nixl_integration/run_multi_connector_accuracy_test.sh
 @@ -65,7 +65,7 @@ KV_CONFIG_NORMAL='{
@@ -328,7 +328,7 @@ index ca042dd8ed64e9a58d14b8bc09675ec11c6fd776..c8ad4a95f40374e8f4af7ee3aacef0f9
      --tensor-parallel-size 1 \
      --kv-transfer-config '$kv_config'"
 diff --git a/tests/v1/kv_connector/nixl_integration/run_multi_connector_edge_case_test.sh b/tests/v1/kv_connector/nixl_integration/run_multi_connector_edge_case_test.sh
-index de6c9abcc6b0ce8af8e86159b544f1fbb39a2f06..ea766ba2e386bde389344ce8077e8fa6886b8f17 100644
+index de6c9abcc6b0ce8af8e86159b544f1fbb39a2f06..ea766ba2e386bde389344ce8077e8fa6886b8f17 100755
 --- a/tests/v1/kv_connector/nixl_integration/run_multi_connector_edge_case_test.sh
 +++ b/tests/v1/kv_connector/nixl_integration/run_multi_connector_edge_case_test.sh
 @@ -17,7 +17,7 @@
@@ -377,7 +377,7 @@ index de6c9abcc6b0ce8af8e86159b544f1fbb39a2f06..ea766ba2e386bde389344ce8077e8fa6
      --kv-transfer-config '$KV_CONFIG'"
  
 diff --git a/tests/v1/kv_connector/nixl_integration/spec_decode_acceptance_test.sh b/tests/v1/kv_connector/nixl_integration/spec_decode_acceptance_test.sh
-index 501ec332d69e440c451e280af96bc764a5b59512..c18b213459634aeb3e6064dcafacf39d3745cd8e 100644
+index 501ec332d69e440c451e280af96bc764a5b59512..c18b213459634aeb3e6064dcafacf39d3745cd8e 100755
 --- a/tests/v1/kv_connector/nixl_integration/spec_decode_acceptance_test.sh
 +++ b/tests/v1/kv_connector/nixl_integration/spec_decode_acceptance_test.sh
 @@ -53,13 +53,13 @@ NUM_DECODE_INSTANCES=${NUM_DECODE_INSTANCES:-1}
@@ -954,7 +954,7 @@ index 9ba1e5648749553be0e7324738d65bdb63f414e8..db7484143e5ab93714b0245b94ef578a
          cache=OffloadingCacheConfig(
              tokens_per_hash=kwargs.get("tokens_per_hash", 16),
 diff --git a/tests/v1/kv_offload/tiering/p2p/run_accuracy_test.sh b/tests/v1/kv_offload/tiering/p2p/run_accuracy_test.sh
-index 89300376a78360207d9c2ee3fb7269df27ee8fa2..0ffe8706b1cfcfcc60b5eeef6b3124c8531ee97d 100644
+index 89300376a78360207d9c2ee3fb7269df27ee8fa2..0ffe8706b1cfcfcc60b5eeef6b3124c8531ee97d 100755
 --- a/tests/v1/kv_offload/tiering/p2p/run_accuracy_test.sh
 +++ b/tests/v1/kv_offload/tiering/p2p/run_accuracy_test.sh
 @@ -26,7 +26,7 @@
@@ -1546,7 +1546,7 @@ index e3d0b2f1e5203822b8c1bcfb959b04d6039b8070..6303cc48a4736308be9cbc0c8ac888ae
              offload_group_size=offload_group_size,
              offload_num_in_group=offload_num_in_group,
 diff --git a/vllm/envs.py b/vllm/envs.py
-index 07a22dc7c794905c9076f9b8d2701d740e1023d3..bbfefef3a4ea1167dc7943b9ca1052260b80437f 100644
+index 07a22dc7c794905c9076f9b8d2701d740e1023d3..bbfefef3a4ea1167dc7943b9ca1052260b80437f 100755
 --- a/vllm/envs.py
 +++ b/vllm/envs.py
 @@ -2106,10 +2106,6 @@ environment_variables: dict[str, Callable[[], Any]] = {

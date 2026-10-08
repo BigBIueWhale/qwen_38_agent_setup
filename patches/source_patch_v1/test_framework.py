@@ -351,7 +351,9 @@ class SourcePatchTransactionTests(unittest.TestCase):
             **stage.__dict__, "review_sha256": sha256_bytes(undeclared.encode("utf-8"))
         })
         patchset = _patchset((stage,), final_files={"created.py": sha256_text(after)})
-        with self.assertRaisesRegex(PatchRefusedError, "declares creations"):
+        with self.assertRaisesRegex(
+            PatchRefusedError, "created.py's path pair says created, but its header does not"
+        ):
             SourcePatchTransaction(self.source, self.artifact, patchset).apply()
         self.assertFalse((self.source / "created.py").exists())
 
@@ -474,6 +476,234 @@ class SourcePatchTransactionTests(unittest.TestCase):
                 ):
                     SourcePatchTransaction(self.source, self.artifact, patchset).apply()
                 self.assertEqual((self.source / "module.py").read_text(), case_source)
+
+    def _stated_patchset(
+        self, *, source: str, result: str, edits: tuple[LandmarkEdit, ...], review: str
+    ) -> PatchSet:
+        """A stage over notes.txt whose review diff is exactly *review*."""
+        (self.source / "notes.txt").write_text(source, encoding="utf-8")
+        (self.artifact / "stated.patch").write_text(review, encoding="utf-8", newline="\n")
+        stage = PatchStage(
+            name="stated",
+            rationale="Synthetic review used to prove what a review diff may state.",
+            removal_condition="Remove when this framework test is removed.",
+            review_patch="stated.patch",
+            review_sha256=sha256_bytes(review.encode("utf-8")),
+            files=(FileIdentity("notes.txt", sha256_text(source), sha256_text(result)),),
+            edits=edits,
+            validate_before=_noop,
+            validate_after=_noop,
+        )
+        return _patchset((stage,), final_files={"notes.txt": sha256_text(result)})
+
+    # Two changes ten lines apart: the first adds a line, so the second's old
+    # block starts one line above its new block.
+    _TWO_HUNK_SOURCE = "".join(f"line {n}\n" for n in range(1, 21))
+    _TWO_HUNK_RESULT = _TWO_HUNK_SOURCE.replace(
+        "line 3\n", "line 3\nadded\n"
+    ).replace("line 15\n", "line fifteen\n")
+
+    def _two_hunk_edits(self) -> tuple[LandmarkEdit, ...]:
+        first_before = "line 2\nline 3\nline 4\n"
+        second_before = "line 14\nline 15\nline 16\n"
+        return (
+            LandmarkEdit(
+                name="notes.txt:landmark-1", path="notes.txt",
+                before=first_before, after="line 2\nline 3\nadded\nline 4\n",
+                review_before=first_before,
+                review_after="line 2\nline 3\nadded\nline 4\n",
+            ),
+            LandmarkEdit(
+                name="notes.txt:landmark-2", path="notes.txt",
+                before=second_before, after="line 14\nline fifteen\nline 16\n",
+                review_before=second_before,
+                review_after="line 14\nline fifteen\nline 16\n",
+            ),
+        )
+
+    def _two_hunk_review(
+        self, *, second_old: int = 14, second_new: int = 15, first_counts: str = "3 +2,4",
+        header: str = "index 0000000..0000000 100644\n",
+    ) -> str:
+        source, result = self._TWO_HUNK_SOURCE, self._TWO_HUNK_RESULT
+        header = header.replace(
+            "0000000..0000000",
+            f"{git_blob_id(source)[:7]}..{git_blob_id(result)[:7]}",
+        )
+        return (
+            "diff --git a/notes.txt b/notes.txt\n" + header
+            + "--- a/notes.txt\n+++ b/notes.txt\n"
+            + f"@@ -2,{first_counts} @@\n line 2\n line 3\n+added\n line 4\n"
+            + f"@@ -{second_old},3 +{second_new},3 @@\n line 14\n-line 15\n"
+            "+line fifteen\n line 16\n"
+        )
+
+    def _apply_stated(self, review: str) -> None:
+        SourcePatchTransaction(
+            self.source, self.artifact,
+            self._stated_patchset(
+                source=self._TWO_HUNK_SOURCE, result=self._TWO_HUNK_RESULT,
+                edits=self._two_hunk_edits(), review=review,
+            ),
+        ).apply()
+
+    def test_every_coordinate_a_hunk_header_states_is_proven(self) -> None:
+        # The true review applies.
+        self._apply_stated(self._two_hunk_review())
+        self.assertEqual(
+            (self.source / "notes.txt").read_text(), self._TWO_HUNK_RESULT
+        )
+        cases = (
+            # The second hunk's old block starts where its new block does less
+            # the line the first added: 14, not 15.
+            (self._two_hunk_review(second_old=15),
+             r"starts at line 14 of notes\.txt before the stage, but its review "
+             r"hunk's header says line 15"),
+            (self._two_hunk_review(second_new=14),
+             r"lands at line 15 of notes\.txt, but its review hunk's header "
+             r"places it at line 14"),
+            # A count that claims a line the body does not hold, or misses one
+            # it does.
+            (self._two_hunk_review(first_counts="3 +2,5"),
+             r"a hunk ends 0 old and 1 new line\(s\) short of its header's counts"),
+            (self._two_hunk_review(first_counts="3 +2,3"),
+             r"a hunk holds more new lines than its header's 3"),
+        )
+        for review, refusal in cases:
+            with self.subTest(refusal=refusal):
+                with self.assertRaisesRegex(PatchRefusedError, refusal):
+                    self._apply_stated(review)
+                self.assertEqual(
+                    (self.source / "notes.txt").read_text(), self._TWO_HUNK_SOURCE
+                )
+
+    def test_a_hunk_header_follows_gits_count_rules(self) -> None:
+        # git omits a count of one.
+        edit = LandmarkEdit(
+            name="notes.txt:landmark-1", path="notes.txt", before="a\n",
+            after="b\n", review_before="a\n", review_after="b\n",
+        )
+        review = (
+            "diff --git a/notes.txt b/notes.txt\n--- a/notes.txt\n+++ b/notes.txt\n"
+            "@@ -1 +1 @@\n-a\n+b\n"
+        )
+        transaction = SourcePatchTransaction(
+            self.source, self.artifact,
+            self._stated_patchset(source="a\n", result="b\n", edits=(edit,), review=review),
+        )
+        self.assertEqual(transaction.plan()[1].state, "planned")
+        # An empty range is named by the line before it: a created file's old
+        # range is 0,0, a deleted file's new range 0,0.
+        after = "created\n"
+        created = _stage(
+            self.artifact, name="create-file",
+            transformations=(("created.py", "", after),),
+        )
+        wrong = _review("created.py", "", after).replace("@@ -0,0 +1,1 @@", "@@ -1,0 +1,1 @@")
+        (self.artifact / created.review_patch).write_text(wrong, encoding="utf-8")
+        created = PatchStage(**{
+            **created.__dict__, "review_sha256": sha256_bytes(wrong.encode("utf-8"))
+        })
+        with self.assertRaisesRegex(
+            PatchRefusedError, r"starts at line 0 of created\.py before the stage, "
+            r"but its review hunk's header says line 1"
+        ):
+            SourcePatchTransaction(
+                self.source, self.artifact,
+                _patchset((created,), final_files={"created.py": sha256_text(after)}),
+            ).plan()
+
+    def test_a_stated_mode_is_the_files_mode(self) -> None:
+        for file_mode, stated, refused in (
+            (0o644, "100644", False), (0o755, "100755", False),
+            (0o755, "100644", True), (0o644, "100755", True),
+        ):
+            with self.subTest(file_mode=oct(file_mode), stated=stated):
+                review = self._two_hunk_review(
+                    header=f"index 0000000..0000000 {stated}\n"
+                )
+                patchset = self._stated_patchset(
+                    source=self._TWO_HUNK_SOURCE, result=self._TWO_HUNK_RESULT,
+                    edits=self._two_hunk_edits(), review=review,
+                )
+                (self.source / "notes.txt").chmod(file_mode)
+                transaction = SourcePatchTransaction(self.source, self.artifact, patchset)
+                if refused:
+                    with self.assertRaisesRegex(
+                        PatchRefusedError,
+                        rf"states mode {stated} for notes\.txt, whose mode is "
+                        rf"{'100755' if file_mode & 0o100 else '100644'}",
+                    ):
+                        transaction.plan()
+                else:
+                    self.assertEqual(transaction.plan()[1].state, "planned")
+        # A created file is written 0644, so it is declared 100644.
+        after = "created\n"
+        created = _stage(
+            self.artifact, name="create-file",
+            transformations=(("created.py", "", after),),
+        )
+        executable = _review("created.py", "", after).replace(
+            "new file mode 100644", "new file mode 100755"
+        )
+        (self.artifact / created.review_patch).write_text(executable, encoding="utf-8")
+        created = PatchStage(**{
+            **created.__dict__, "review_sha256": sha256_bytes(executable.encode("utf-8"))
+        })
+        with self.assertRaisesRegex(
+            PatchRefusedError, r"states mode 100755 for created\.py, whose mode is 100644"
+        ):
+            SourcePatchTransaction(
+                self.source, self.artifact,
+                _patchset((created,), final_files={"created.py": sha256_text(after)}),
+            ).plan()
+
+    def test_a_review_diff_states_nothing_unread(self) -> None:
+        true_review = self._two_hunk_review()
+        cases = (
+            # A mode change: no stage changes a mode.
+            (true_review.replace(
+                "index ", "old mode 100644\nnew mode 100755\nindex ", 1),
+             r"unsupported review diff line 'old mode 100644\\n'"),
+            # A path pair naming another file.
+            (true_review.replace("+++ b/notes.txt", "+++ b/vllm/notes.txt"),
+             r"notes\.txt's path pair names another file"),
+            # A path pair that says the file is created.
+            (true_review.replace("--- a/notes.txt", "--- /dev/null"),
+             r"notes\.txt's path pair says created, but its header does not"),
+            # A line outside every hunk.
+            (true_review + "-stray\n", r"unsupported review diff line '-stray\\n'"),
+            (true_review.replace("index ", "similarity index 90%\nindex ", 1),
+             r"unsupported review diff line 'similarity index 90%\\n'"),
+            ("preamble\n" + true_review, r"line before the first file section"),
+        )
+        for review, refusal in cases:
+            with self.subTest(refusal=refusal):
+                with self.assertRaisesRegex(PatchRefusedError, refusal):
+                    self._apply_stated(review)
+
+    def test_a_files_hunks_are_stated_in_order(self) -> None:
+        source, result = self._TWO_HUNK_SOURCE, self._TWO_HUNK_RESULT
+        first, second = self._two_hunk_edits()
+        swapped = (
+            "diff --git a/notes.txt b/notes.txt\n--- a/notes.txt\n+++ b/notes.txt\n"
+            "@@ -14,3 +14,3 @@\n line 14\n-line 15\n+line fifteen\n line 16\n"
+            "@@ -2,3 +2,4 @@\n line 2\n line 3\n+added\n line 4\n"
+        )
+        with self.assertRaisesRegex(
+            PatchRefusedError, r"starts inside or above the one before it in notes\.txt"
+        ):
+            SourcePatchTransaction(
+                self.source, self.artifact,
+                self._stated_patchset(
+                    source=source, result=result,
+                    edits=(
+                        LandmarkEdit(**{**second.__dict__, "name": "notes.txt:landmark-1"}),
+                        LandmarkEdit(**{**first.__dict__, "name": "notes.txt:landmark-2"}),
+                    ),
+                    review=swapped,
+                ),
+            ).apply()
 
     def test_unknown_source_drift_refuses_without_writes(self) -> None:
         before = "def value():\n    return 1\n"
@@ -699,27 +929,33 @@ class DeletionTransactionTests(unittest.TestCase):
         (self.source / "doomed.py").write_text(doomed, encoding="utf-8")
         # Review diff shows the emptying hunk but not the deleted-file
         # header: the Python data and the review evidence disagree about
-        # whether the file ceases to exist.
-        review = (
-            f"diff --git a/doomed.py b/doomed.py\n"
-            f"--- a/doomed.py\n"
-            f"+++ /dev/null\n"
-            f"@@ -1,2 +0,0 @@\n"
-            + "".join(f"-{line}" for line in doomed.splitlines(keepends=True))
-        )
-        stage = _deletion_stage(
-            self.artifact,
-            name="delete-doomed",
-            deletions=(("doomed.py", doomed),),
-            review_override=review,
-        )
-        transaction = SourcePatchTransaction(
-            self.source, self.artifact, _patchset((stage,), final_files={})
-        )
-
-        with self.assertRaisesRegex(PatchRefusedError, "declares deletions"):
-            transaction.apply()
-        self.assertTrue((self.source / "doomed.py").exists())
+        # whether the file ceases to exist. Its path pair either says the
+        # file is deleted, which its header does not, or that it survives,
+        # which the stage does not.
+        for new_path, refusal in (
+            ("/dev/null", "doomed.py's path pair says deleted, but its header does not"),
+            ("b/doomed.py", "declares deletions"),
+        ):
+            with self.subTest(new_path=new_path):
+                review = (
+                    f"diff --git a/doomed.py b/doomed.py\n"
+                    f"--- a/doomed.py\n"
+                    f"+++ {new_path}\n"
+                    f"@@ -1,2 +0,0 @@\n"
+                    + "".join(f"-{line}" for line in doomed.splitlines(keepends=True))
+                )
+                stage = _deletion_stage(
+                    self.artifact,
+                    name="delete-doomed",
+                    deletions=(("doomed.py", doomed),),
+                    review_override=review,
+                )
+                transaction = SourcePatchTransaction(
+                    self.source, self.artifact, _patchset((stage,), final_files={})
+                )
+                with self.assertRaisesRegex(PatchRefusedError, refusal):
+                    transaction.apply()
+                self.assertTrue((self.source / "doomed.py").exists())
 
     def test_deletion_landmark_mismatch_refuses_without_writes(self) -> None:
         expected = "def dead_code():\n    return None\n"
@@ -907,15 +1143,211 @@ class WorktreeStatusTests(unittest.TestCase):
         )
 
 
-def _reads_code_text(test: ast.expr) -> bool:
-    """Whether a condition asks if some text occurs in the code under check."""
+# What a validator reads of the code is a text test: whether a string occurs
+# in it (``in`` / ``not in`` beside a string constant), a string search or
+# string test of it, or code text -- a source, a symbol's source, an unparsed
+# node -- compared with a string. A validator's own constants compared with
+# each other (a loop over literal names) read nothing of the code.
+_TEXT_METHODS = frozenset({
+    "find", "rfind", "index", "rindex", "count", "startswith", "endswith",
+    "search", "match", "fullmatch", "findall", "finditer",
+})
+_CODE_TEXT = frozenset({"_source", "_symbol_source", "_branch_source", "unparse"})
+_REFUSALS = frozenset({"PatchRefusedError", "Exception", "BaseException"})
+
+
+def _is_code_text(node: ast.expr) -> bool:
     return any(
-        isinstance(node, ast.Compare)
-        and isinstance(node.left, ast.Constant)
-        and isinstance(node.left.value, str)
-        and any(isinstance(op, (ast.In, ast.NotIn)) for op in node.ops)
-        for node in ast.walk(test)
+        isinstance(inner, ast.Call)
+        and (
+            (isinstance(inner.func, ast.Name) and inner.func.id in _CODE_TEXT)
+            or (isinstance(inner.func, ast.Attribute) and inner.func.attr in _CODE_TEXT)
+        )
+        or isinstance(inner, ast.Subscript)
+        and isinstance(inner.value, ast.Name)
+        and inner.value.id == "state"
+        for inner in ast.walk(node)
     )
+
+
+def _reads_code_text(node: ast.AST, derived: frozenset[str] = frozenset()) -> bool:
+    """Whether *node* holds a text test of the code, or a name a text test
+    computed (*derived*)."""
+    for inner in ast.walk(node):
+        if isinstance(inner, ast.Name) and inner.id in derived:
+            return True
+        if isinstance(inner, ast.Compare):
+            sides = [inner.left, *inner.comparators]
+            strings = [
+                side for side in sides
+                if isinstance(side, ast.Constant) and isinstance(side.value, str)
+            ]
+            if strings and any(isinstance(op, (ast.In, ast.NotIn)) for op in inner.ops):
+                return True
+            if (
+                strings
+                and any(isinstance(op, (ast.Eq, ast.NotEq)) for op in inner.ops)
+                and any(_is_code_text(side) for side in sides)
+            ):
+                return True
+        if (
+            isinstance(inner, ast.Call)
+            and isinstance(inner.func, ast.Attribute)
+            and inner.func.attr in _TEXT_METHODS
+        ):
+            return True
+    return False
+
+
+def _alternatives(node: ast.AST) -> bool:
+    """Whether a comprehension iterates over alternatives the validator names
+    -- a literal tuple, list or set of locations -- rather than over the parts
+    of one location it reads (its lines, its nodes)."""
+    return isinstance(node, (ast.Tuple, ast.List, ast.Set))
+
+
+def _shape_choices(function: ast.FunctionDef) -> list[str]:
+    """Each place where *function* chooses, by the code's text, what to check
+    or accepts more than one shape of it. See ContractShapeTests."""
+    choices: list[str] = []
+    where = function.name
+
+    # Names a text test computed, to a fixed point: a choice can be made one
+    # assignment away from the test.
+    derived: set[str] = set()
+    while True:
+        before = len(derived)
+        for node in ast.walk(function):
+            if isinstance(node, (ast.Assign, ast.AnnAssign, ast.AugAssign)):
+                value = node.value
+                if value is not None and _reads_code_text(value, frozenset(derived)):
+                    targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+                    for target in targets:
+                        derived.update(
+                            name.id for name in ast.walk(target)
+                            if isinstance(name, ast.Name)
+                        )
+        if len(derived) == before:
+            break
+    derived_names = frozenset(derived)
+
+    parents: dict[ast.AST, ast.AST] = {}
+    for node in ast.walk(function):
+        for child in ast.iter_child_nodes(node):
+            parents[child] = node
+
+    def requirement(node: ast.AST) -> ast.expr | None:
+        """The condition of the requirement *node* lies in, if any."""
+        while node in parents:
+            parent = parents[node]
+            if (
+                isinstance(parent, ast.Call)
+                and isinstance(parent.func, ast.Name)
+                and parent.func.id == "_require"
+                and parent.args
+                and node is parent.args[0]
+            ):
+                return node
+            node = parent
+        return None
+
+    def search_loop(node: ast.AST) -> bool:
+        """An ``if`` that filters a loop over the parts of one location: the
+        imperative form of a search, which a requirement then holds to what
+        it found."""
+        parent = parents.get(node)
+        return (
+            isinstance(parent, ast.For)
+            and node in parent.body
+            and not _alternatives(parent.iter)
+        )
+
+    def judged_elsewhere(node: ast.AST) -> bool:
+        """Whether a short-circuit outside a requirement is part of a test
+        another rule judges: a branch's test, a comprehension's filter, or
+        the value of an assignment, whose name then counts as the test."""
+        while node in parents:
+            parent = parents[node]
+            if isinstance(parent, (ast.If, ast.IfExp, ast.While)) and node is parent.test:
+                return True
+            if isinstance(parent, ast.comprehension) and node in parent.ifs:
+                return True
+            if isinstance(parent, (ast.Assign, ast.AnnAssign, ast.AugAssign)):
+                return node is parent.value
+            if isinstance(parent, ast.stmt):
+                return False
+            node = parent
+        return False
+
+    def polarity(node: ast.AST, condition: ast.expr) -> bool:
+        """Whether *node* is asserted (True) or denied (False) by *condition*."""
+        positive = True
+        while node is not condition:
+            parent = parents[node]
+            if isinstance(parent, ast.UnaryOp) and isinstance(parent.op, ast.Not):
+                positive = not positive
+            node = parent
+        return positive
+
+    for node in ast.walk(function):
+        line = getattr(node, "lineno", function.lineno)
+        if isinstance(node, (ast.If, ast.IfExp, ast.While)):
+            if _reads_code_text(node.test, derived_names) and not (
+                isinstance(node, ast.If) and search_loop(node)
+            ):
+                choices.append(f"{where}:{line} branches on the code")
+        elif isinstance(node, ast.Match):
+            if _reads_code_text(node.subject, derived_names):
+                choices.append(f"{where}:{line} branches on the code")
+        elif isinstance(node, (ast.ListComp, ast.SetComp, ast.GeneratorExp, ast.DictComp)):
+            for generator in node.generators:
+                if _alternatives(generator.iter) and any(
+                    _reads_code_text(test, derived_names) for test in generator.ifs
+                ):
+                    choices.append(
+                        f"{where}:{line} chooses among locations by the code"
+                    )
+        elif isinstance(node, ast.BoolOp):
+            if not any(_reads_code_text(v, derived_names) for v in node.values):
+                continue
+            condition = requirement(node)
+            if condition is None:
+                if not judged_elsewhere(node):
+                    choices.append(f"{where}:{line} short-circuits on the code")
+                continue
+            positive = polarity(node, condition)
+            if isinstance(node.op, ast.Or) == positive:
+                choices.append(f"{where}:{line} accepts either of two shapes")
+        elif (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id in ("any", "all")
+            and node.args
+            and _reads_code_text(node.args[0], derived_names)
+        ):
+            condition = requirement(node)
+            if condition is None:
+                continue
+            if (node.func.id == "any") == polarity(node, condition):
+                choices.append(f"{where}:{line} accepts any of several shapes")
+        elif isinstance(node, ast.Try):
+            for handler in node.handlers:
+                caught = (
+                    [] if handler.type is None
+                    else handler.type.elts if isinstance(handler.type, ast.Tuple)
+                    else [handler.type]
+                )
+                if handler.type is None or any(
+                    isinstance(kind, ast.Name) and kind.id in _REFUSALS for kind in caught
+                ):
+                    choices.append(f"{where}:{line} chooses by whether a check fails")
+        if (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id.startswith("_validate_")
+        ):
+            choices.append(f"{where}:{line} runs {node.func.id}")
+    return choices
 
 
 class ContractShapeTests(unittest.TestCase):
@@ -926,32 +1358,84 @@ class ContractShapeTests(unittest.TestCase):
     hands its check to another stage's validator -- accepts a shape the code
     has left beside the one it has, and a regression to the left shape passes
     it. A stage that rewrites a construct an earlier contract pins is written
-    where the construct is first written instead.
+    where the construct is first written instead, or the construct is pinned
+    by the stage that moves it.
+
+    A validator chooses by the code's text wherever a text test of the code
+    decides control flow (an ``if``, a conditional expression, a ``while``, a
+    ``match``, a short-circuit ``and`` / ``or`` outside a requirement, or a
+    ``try`` that catches a check's refusal), filters a validator-named set of
+    locations, or makes a requirement accept alternatives (``or`` or ``any``
+    asserted, ``and`` or ``all`` denied); or wherever it runs another stage's
+    validator. A name a text test computed counts as the test. Not choices:
+    a search over the parts of one location (its lines, its nodes), by a
+    comprehension or a loop's ``if``, which requirements then hold to what it
+    found -- a search followed by an exact-count requirement; a conjunction a
+    requirement asserts; and tests of the validator's own constants.
     """
 
-    def test_no_validator_branches_on_the_shape_of_the_code(self) -> None:
+    def test_no_validator_chooses_by_the_code(self) -> None:
         path = Path(__file__).with_name("contracts_vllm.py")
         module = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
-        branches = []
-        for function in module.body:
-            if not (
-                isinstance(function, ast.FunctionDef)
-                and function.name.startswith("_validate_")
-            ):
-                continue
-            for node in ast.walk(function):
-                if isinstance(node, (ast.If, ast.IfExp, ast.While)):
-                    conditions = [node.test]
-                elif isinstance(node, ast.BoolOp) and isinstance(node.op, ast.Or):
-                    conditions = node.values
-                else:
-                    conditions = []
-                if any(_reads_code_text(condition) for condition in conditions):
-                    branches.append(f"{function.name}:{node.lineno} branches on the code")
-                if (
-                    isinstance(node, ast.Call)
-                    and isinstance(node.func, ast.Name)
-                    and node.func.id.startswith("_validate_")
-                ):
-                    branches.append(f"{function.name}:{node.lineno} runs {node.func.id}")
-        self.assertEqual(branches, [])
+        choices = [
+            choice
+            for function in module.body
+            if isinstance(function, ast.FunctionDef)
+            and function.name.startswith("_validate_")
+            for choice in _shape_choices(function)
+        ]
+        self.assertEqual(choices, [])
+
+    def test_the_detector_sees_every_form_of_choice(self) -> None:
+        chooses = {
+            "if": 'if "def f(" in _source(state, a, label=l):\n    check(a)',
+            "elif-derived": 'moved = "def f(" in _source(state, a, label=l)\n'
+                            'if moved:\n    check(a)',
+            "conditional": 'check(a if "x" in s else b)',
+            "while": 'while s.find("x") >= 0:\n    s = s[1:]',
+            "method": 'if s.startswith("def"):\n    check(a)',
+            "count": 'if s.count("x") == 1:\n    check(a)',
+            "unparse": 'if ast.unparse(node) == "f()":\n    check(a)',
+            "comprehension": 'found = [p for p in (a, b) if "def f(" in _source(state, p)]\n'
+                             '_require(len(found) == 1, l)\ncheck(found[0])',
+            "location loop": 'for p in (a, b):\n    if "def f(" in _source(state, p):\n'
+                             '        check(p)',
+            "or": '_require("x" in s or "y" in s, l)',
+            "denied and": '_require(not ("x" in s and "y" in s), l)',
+            "any": '_require(any("x" in _source(state, p) for p in (a, b)), l)',
+            "denied all": '_require(not all("x" in t for t in texts), l)',
+            "short-circuit": 'check("x" in s and a)',
+            "try": 'try:\n    check(a)\nexcept PatchRefusedError:\n    check(b)',
+            "bare try": 'try:\n    check(a)\nexcept:\n    check(b)',
+            "delegation": '_validate_other_after(state)',
+        }
+        pins = {
+            "requirement": '_require("x" not in s and "y" not in s, l)',
+            "conjunction": '_require("x" in s and len(found) == 1, l)',
+            "denied any": '_require(not any("x" in line for line in lines), l)',
+            "search": 'found = [n for n in ast.walk(t) if ast.unparse(n) == "f()"]\n'
+                      '_require(len(found) == 1, l)',
+            "comment filter": 'code = [line for line in s.splitlines()\n'
+                              '        if not line.strip().startswith("#")]\n'
+                              '_require(not any("x" in line for line in code), l)',
+            "search loop": 'for node in ast.walk(t):\n'
+                           '    if ast.unparse(node) == "f()":\n'
+                           '        found.append(node)\n'
+                           '_require(len(found) == 1, l)',
+            "own constants": 'for name in ("a", "b"):\n'
+                             '    require_text(state, name, "x", '
+                             'count=2 if name == "a" else 1, label=l)',
+        }
+
+        def function(body: str) -> ast.FunctionDef:
+            source = "def _validate_case(state):\n" + "".join(
+                f"    {line}\n" for line in body.splitlines()
+            )
+            return ast.parse(source).body[0]
+
+        for name, body in chooses.items():
+            with self.subTest(chooses=name):
+                self.assertNotEqual(_shape_choices(function(body)), [], body)
+        for name, body in pins.items():
+            with self.subTest(pins=name):
+                self.assertEqual(_shape_choices(function(body)), [], body)

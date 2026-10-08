@@ -1369,16 +1369,10 @@ def _validate_grouped_geometry_after(state: State) -> None:
         'requires_cow_source=spec.config.groups[idx].mamba_cache_mode == "align",',
         label=label,
     )
-    # The window classification resolves the grouped spec wherever it lives.
-    defining = [
-        path for path in (offload_config, scheduler)
-        if "def get_sliding_window_size_in_chunks(" in _source(state, path, label=label)
-    ]
-    _require(len(defining) == 1,
-             f"{label}: window classification defined in {defining!r}")
-    _require_in_symbol(state, defining[0], "get_sliding_window_size_in_chunks", (
-        "kv_cache_spec = get_kv_cache_spec_for_block_geometry(kv_cache_spec)",
-    ), label=label)
+    # That the window classification resolves the grouped spec is pinned by
+    # kv-capacity-in-declared-users, the stage that moves the classification
+    # to the offloading boundary: before it, where this stage writes it, and
+    # after it, where it stays.
 
 
 def _validate_agent_retention_before(state: State) -> None:
@@ -1524,6 +1518,7 @@ def _validate_declared_capacity_before(state: State) -> None:
     label = "declared KV capacity precondition"
     spec = "vllm/v1/kv_offload/cpu/spec.py"
     cache = "vllm/config/cache.py"
+    scheduler = "vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py"
     # The byte-denominated world this stage replaces.
     require_text(
         state,
@@ -1532,6 +1527,11 @@ def _validate_declared_capacity_before(state: State) -> None:
         label=label,
     )
     require_text(state, cache, "kv_offloading_size: float | None = None", label=label)
+    # The window classification this stage moves, resolving the grouped spec
+    # to its layers' geometry as grouped-kv-specs-use-layer-geometry wrote it.
+    _require_in_symbol(state, scheduler, "get_sliding_window_size_in_chunks", (
+        "kv_cache_spec = get_kv_cache_spec_for_block_geometry(kv_cache_spec)",
+    ), label=label)
 
 
 def _validate_declared_capacity_after(state: State) -> None:
@@ -1584,11 +1584,19 @@ def _validate_declared_capacity_after(state: State) -> None:
     forbid_text(state, "vllm/engine/arg_utils.py", "kv_offloading_backend", label=label)
     forbid_text(state, "vllm/envs.py", "VLLM_USE_SIMPLE_KV_OFFLOAD", label=label)
     forbid_text(state, "vllm/config/vllm.py", "VLLM_USE_SIMPLE_KV_OFFLOAD", label=label)
-    # The window classification is derived once at the offloading boundary.
+    # The window classification is derived once at the offloading boundary,
+    # from the grouped spec's layer geometry.
     require_text(
         state,
         "vllm/distributed/kv_transfer/kv_connector/v1/offloading/config.py",
         "def get_sliding_window_size_in_chunks(",
+        label=label,
+    )
+    _require_in_symbol(
+        state,
+        "vllm/distributed/kv_transfer/kv_connector/v1/offloading/config.py",
+        "get_sliding_window_size_in_chunks",
+        ("kv_cache_spec = get_kv_cache_spec_for_block_geometry(kv_cache_spec)",),
         label=label,
     )
     forbid_text(

@@ -314,14 +314,14 @@ It is intentionally reconstructed by the ordered, reviewed semantic transformati
 | patches/vllm-tool-truncation-finish-reason.patch | 7ee55158f31b5243b14b9d25ac250511a2fec7f8fca2101d2990d105eaa6b5a0 |
 | patches/vllm-qwen38-vision-runtime.patch | 03e091a252702011556eca614c0b41dee9b3643973431004415f3ee2ae987227 |
 | patches/vllm-qwen38-numerical-audits.patch | dc0b947db3727b522427a204edd1a930d637476a0f66d7d30e2da65c144ac944 |
-| patches/vllm-turboquant-fail-closed-guards.patch | b140445625c63a85d4cae5d878b1de472a9645b63e78c34249848082120b9ba3 |
-| patches/vllm-kv-offload-pinning-fail-closed.patch | 3a72f88d679a493d6ae0db6c05e171f9f0be6d44dca958ee351e6099df61a8ec |
+| patches/vllm-turboquant-fail-closed-guards.patch | df0a32bb40ca8495cf636e1dcc8da97c82654b99f4f54969bae420d3dcf81e28 |
+| patches/vllm-kv-offload-pinning-fail-closed.patch | 56ecf2d6f79c20fa7d6f17527ae4f86149e9a1a73f84c00c7b938b257b5e9927 |
 | patches/vllm-generation-requires-agent-id.patch | f9e387eb2a57a3c4177d10637faf2f44eb05436d09823cca83d55d4a1d6c20e7 |
 | patches/vllm-attention-growth-keeps-prefix-hash.patch | a6c38a841c05bcd4f5bfc573c99f1c4a849e7399af05b1e53096e15a43a97632 |
 | patches/vllm-grouped-kv-specs-use-layer-geometry.patch | 6bb249bc143a179ca317c72d2bf70ec118baa6f12dca19c0a59da2e3c935b814 |
 | patches/vllm-agent-grouped-offload-retention.patch | 36140417721a858ed623a605874cd7c094171e01acead53d76c851ea3929b551 |
 | patches/vllm-agentless-generation-routes-unmounted.patch | c485cf9d7d862c0f4214cd625d598fd8903c43c0e42947e9f847ce4052b156ff |
-| patches/vllm-kv-capacity-in-declared-users.patch | f06f1becfcc7c56bb3507d0cfb91e37991a9b89d75112fe69cea76f389a484f4 |
+| patches/vllm-kv-capacity-in-declared-users.patch | a1effdf2bc170d50a0e38dcabad61174122d764428e374d907fb6bd4d3b47003 |
 | patches/vllm-kv-declaration-within-physical-bound.patch | a8386795dc7792ed06f63d92159c22323b986bb93e25a0798417243e00a643e5 |
 | patches/vllm-exact-reasoning-usage.patch | 34a3291cda667e89ffa97f399b821a06adf9a0b14c7429b121e2b01492b7a8e6 |
 | patches/vllm-anthropic-input-fidelity.patch | 3252e25a6c2e9d8ee0eec4cb383fc292bff2afaac2e3becdc1006c68b3b02c3c |
@@ -378,10 +378,17 @@ and complete pre/post hashes, performs atomic transactions with rollback, and is
 itself covered by failure-path tests that the check runs. The
 unified diffs remain review artifacts, but they do not select mutation locations:
 each stage's data and its review diff must describe the same blocks at the same
-place. Every hunk must land at the line its header names, every index line must
-name the blobs the stage transforms, and every created or deleted file must be
-declared as one, so a landmark that matched an identical block elsewhere in a file
-is refused rather than applied. The compiler that writes the data anchors each
+place, and the diff may state nothing the replay of the stage data does not prove.
+Every hunk's header names where its old block starts before the stage and its new
+block after it -- by git's rules, an omitted count is one and an empty range is
+named by the line before it -- and its body holds exactly the counted lines; a
+file's hunks come in order; every index line names the blobs the stage transforms;
+every created or deleted file is declared as one, by its header and by its
+`---`/`+++` pair; and every mode a section states is the file's mode in the tree the
+stage transforms (a file the framework creates is 0644). A line git's grammar does
+not put in a section is refused. So a landmark that matched an identical block
+elsewhere in a file is refused rather than applied, and so is a diff whose
+coordinates, counts, paths or modes are false. The compiler that writes the data anchors each
 hunk at that line instead of choosing the nearest occurrence of its block.
 The build check rejects an ambiguous landmark, missing hunk, misplaced hunk, wrong
 stage, changed final hash, whitespace error, partial intermediate state, concurrent
