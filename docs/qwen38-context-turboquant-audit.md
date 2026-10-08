@@ -89,10 +89,11 @@ Therefore the raw native cache is:
 = 6.0625 GiB
 ```
 
-The launch reserves 6,925,634,765 bytes. vLLM's hybrid cache manager pages and
-aligns both full-attention cache and recurrent-layer state, reporting 264,115 cache
-tokens. The extra 1,971 cache slots are allocator headroom; the API context remains
-the official 262,144 total tokens.
+The launch declares the pool as one resident 262,144-token context
+(`--kv-cache-users 1`), not in bytes. vLLM derives its bytes from the KV cache spec at
+engine initialization: its hybrid cache manager pages and aligns both full-attention
+cache and recurrent-layer state, and the startup log reports the group-aware
+cache-token capacity. The API context remains the official 262,144 total tokens.
 
 K8V4 is not four-bit for both K and V. Keys are direct E4M3; values use an affine
 four-bit representation per 256-element vector. It is also not BF16 KV and is not

@@ -186,10 +186,41 @@ def completion_payload(images: list[ProbeImage], kv_scope: str) -> dict[str, Any
         "presence_penalty": 0.0,
         "repetition_penalty": 1.0,
         "reasoning_effort": "xhigh",
-        "max_tokens": 4_096,
+        # No max_tokens: the generation is bounded only by what the context
+        # window leaves after the prompt, which the server derives from its
+        # max_model_len -- the room any client sending these images has. A cap
+        # of the probe's own would decide when a long xhigh reasoning ends,
+        # which is not what this probe measures.
         "stream": False,
         "kv_scope": kv_scope,
     }
+
+
+def unfinished(response: dict[str, Any]) -> str | None:
+    """Why the generation ended before the model ended its answer, or None
+    when the model ended it.
+
+    A generation an output bound ended has no answer to check: what it wrote so
+    far would read as a transcription that omitted values, which is not what
+    happened.
+    """
+    finish_reason = response["choices"][0].get("finish_reason")
+    if finish_reason == "stop":
+        return None
+    usage = response.get("usage") or {}
+    bound = (
+        " The request sets no max_tokens: the server's bound ended it, which on "
+        "this launch is what the context window leaves after the prompt."
+        if finish_reason == "length"
+        else ""
+    )
+    return (
+        f"the generation ended with finish_reason {finish_reason!r} before the "
+        f"model ended its answer: {usage.get('completion_tokens')} tokens "
+        f"generated after a {usage.get('prompt_tokens')}-token prompt, "
+        f"{usage.get('total_tokens')} in all.{bound} Nothing was transcribed, so "
+        "this is not a transcription result."
+    )
 
 
 def run_quality_probe(count: int, timeout: int) -> None:
@@ -208,8 +239,10 @@ def run_quality_probe(count: int, timeout: int) -> None:
     if status != 200:
         raise RuntimeError(f"quality request returned HTTP {status}: {response}")
 
-    message = response["choices"][0]["message"]
-    answer = message.get("content") or ""
+    cut = unfinished(response)
+    if cut:
+        raise AssertionError(cut)
+    answer = response["choices"][0]["message"].get("content") or ""
     missing = [
         value
         for image in images

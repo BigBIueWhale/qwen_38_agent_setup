@@ -1461,12 +1461,22 @@ class ToolOutputParserTest(unittest.TestCase):
                 self.assertEqual(shown, hidden)
 
     def test_a_responses_stream_is_its_own_snapshot(self):
-        """Each streamed item is the concatenation of its deltas; its done event
-        carries exactly that; the terminal response is the done items, in
-        order. For every engine chunking, on the served parsers."""
+        """Every item of the terminal response is the concatenation of the
+        deltas streamed under its index, and no other index streams any; every
+        done event that states an item's text states exactly what its deltas
+        built; the terminal response is the done items, in order. For every
+        engine chunking, on the served parsers."""
         deltas = {
             "response.output_text.delta", "response.reasoning_text.delta",
             "response.function_call_arguments.delta",
+        }
+        stated = {
+            "response.output_text.done": lambda event: event.text,
+            "response.reasoning_text.done": lambda event: event.text,
+            "response.content_part.done": lambda event: event.part.text,
+            "response.reasoning_part.done": lambda event: event.part.text,
+            "response.function_call_arguments.done": lambda event: event.arguments,
+            "response.output_item.done": lambda event: _item_text(event.item),
         }
         generations = (
             ("plan</think>\n\nThe answer \u03a9.", "stop"),
@@ -1474,6 +1484,7 @@ class ToolOutputParserTest(unittest.TestCase):
             ("plan</think>\n\n" + call("a") + "\n" + call("b"), "stop"),
             ("plan</think>\n\n" + call("a") + "\n<tool_call>\n<function=write>\n"
              "<parameter=text>\nb", "length"),
+            ("plan</think>\n\n<tool_call>\n<function=write>\n", "length"),
             ("plan and more pla", "length"),
         )
         for text, finish in generations:
@@ -1486,17 +1497,20 @@ class ToolOutputParserTest(unittest.TestCase):
                             built[event.output_index] = (
                                 built.get(event.output_index, "") + event.delta
                             )
-                        elif event.type == "response.output_item.done":
-                            done[event.output_index] = event.item
+                        elif event.type in stated:
+                            self.assertEqual(
+                                stated[event.type](event),
+                                built.get(event.output_index),
+                                f"{event.type} of item {event.output_index}",
+                            )
+                            if event.type == "response.output_item.done":
+                                done[event.output_index] = event.item.model_dump()
+                    output = events[-1].response.output
                     self.assertEqual(
-                        {index: _item_text(item) for index, item in done.items()
-                         if index in built},
-                        built,
+                        dict(enumerate(_item_text(item) for item in output)), built
                     )
-                    terminal = events[-1].response
                     self.assertEqual(
-                        [item.model_dump() for item in terminal.output],
-                        [done[index].model_dump() for index in sorted(done)],
+                        dict(enumerate(item.model_dump() for item in output)), done
                     )
 
     def test_a_responses_history_refusal_names_the_input_item(self):

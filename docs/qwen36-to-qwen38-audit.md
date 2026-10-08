@@ -6,7 +6,10 @@ This is an evidence record, not a migration recipe. The historical repository wa
 read as a set of bug reports, design ideas, and test hypotheses. None of its runtime
 monkey patches was copied into this project. Every item below was re-evaluated against
 the pinned Qwen3.8 checkpoint, its real tokenizer/template, the pinned current vLLM
-source, and the actual RTX 5090 runtime.
+source, and the actual RTX 5090 runtime. Its measurements were taken during the audit
+unless they name a later runtime; each disposition, and each description of what the
+deployment does, states the current deployment, and a count the build check derives
+is pointed to rather than restated.
 
 ## Pins compared
 
@@ -134,13 +137,19 @@ and malformed historical tool calls fail rather than being coerced silently.
 Historical idea: prevent under-reporting caused by treating only one hybrid cache
 group as authoritative.
 
-Disposition: **upstream/current behavior supersedes it**. Current vLLM contains
-group-aware hybrid KV capacity accounting and reports the measured capacity directly.
-The actual final runtime reported 264,115 GPU KV-cache tokens and 1.01× concurrency
-at a 262,144-token request length. No historical allocator wrapper is installed.
+Disposition: **upstream/current behavior supersedes it**. Current vLLM accounts KV
+capacity across every hybrid cache group and reports it directly: the startup log's
+GPU KV-cache size and maximum concurrency are group-aware. The audited runtime, which
+sized its pool by an explicit byte count, reported 264,115 GPU KV-cache tokens and
+1.01× concurrency at a 262,144-token request length. No historical allocator wrapper
+is installed.
 
-Good idea retained: measured allocator output, not a hand-computed theoretical cache
-size, is the deployment authority.
+Good idea retained: no hand-computed cache size decides capacity. The pool is
+declared as a count of resident full-length user contexts (`--kv-cache-users`), and
+vLLM derives its bytes from the KV cache spec at engine initialization, where the page
+sizes and the hybrid group structure exist. The bound the engine measures at startup
+can refuse that declaration but never shrink it; README's "KV cache, context length,
+and VRAM" states the derivation.
 
 ### 3. `monkey_patch_reasoning_field_egress.py` — output alias
 
@@ -250,10 +259,17 @@ calls.
 Historical idea: compensate for vLLM's own CUDA initialization footprint when using a
 near-1.0 `gpu_memory_utilization` fraction.
 
-Disposition: **not needed and not installed**. This deployment uses an exact
-`--kv-cache-memory 6925634765`, not a utilization heuristic. The current vLLM path
-with explicit cache bytes skips the profiling decision that motivated the historical
-slack. Adding an environment-tunable GiB of slack would weaken the exact-memory lock.
+Disposition: **not needed and not installed**. This deployment declares its KV pool
+as one resident full-length context (`--kv-cache-users 1`), never as a utilization
+fraction or a byte count, and leaves `gpu_memory_utilization` at vLLM's default, where
+it governs only the startup free-memory requirement and an informational estimate; the
+near-1.0 fraction the historical slack existed for is never set. The declaration is
+admitted against a bound the engine derives at every startup from the device memory
+free when the instance started, after CUDA initialization, minus what profiling
+measures serving holding beside the pool (README, "KV cache, context length, and
+VRAM"), so nothing CUDA initialization holds needs an estimate. An
+environment-tunable GiB of slack would be a second memory decision beside the
+engine's.
 
 ### 10. `monkey_patch_tool_role_media_preserve.py` — media in tool results
 
@@ -312,33 +328,30 @@ Historical idea: runtime patches must either appear in every spawned interpreter
 cause startup to fail.
 
 Disposition: **retain the fail-closed objective, reject runtime monkey-patching**. The
-current changes are baked into an immutable Docker image. The build verifies upstream
-file hashes, patch hashes, live diffs, installed file hashes, and functional tests.
-Startup then re-hashes all twenty-nine reviewed runtime files, seven reviewed test
-files, the template, Dockerfile, allowlist, and build units. There is no
-launcher/sitecustomize registry that can drift between processes.
+current changes are baked into an immutable Docker image built from a verified
+reconstruction: `./scripts/build-vllm.sh` applies the review diffs to the pinned vLLM
+commit through the landmark framework and proves every file the stages name, and the
+image build checks the upstream and installed file hashes and runs the build units.
+`start.sh` and `status.sh` first run `./scripts/build-vllm.sh serve-check`, which
+repeats that verification and refuses unless the pinned image was built from exactly
+this commit's image inputs; after readiness, startup compares the installed bytes of
+the reviewed files and units `assert_running_profile` names
+(`scripts/runtime-common.sh`) with their pins. There is no launcher/sitecustomize
+registry that can drift between processes.
 
 ## Current-source changes that actually remain
 
-Nine reviewed diff artifacts reconstruct twenty-nine runtime-source changes, seven
-reviewed test changes, and one reviewed new workspace test:
+The current-source changes are the review diffs in `patches/`, one per stage, which
+the landmark framework in `patches/source_patch_v1/` applies to the pinned vLLM
+commit. README's "Exact vLLM and image provenance" lists each with its pin, and
+`./scripts/build-vllm.sh check` prints how many reviewed runtime and test files and
+review diffs the reconstruction it verified holds.
 
-| Diff | Purpose | SHA-256 |
-|---|---|---|
-| `patches/vllm-turboquant-k8v4-direct-workspace.patch` | remove unsafe duplicate K8V4 continuation workspace allocations | `a9721067f1a7ee9497a4bd51e47e3a474561189e881b4704bfc4beac8ea48380` |
-| `patches/vllm-enforce-auto-tool-schema.patch` | schema-constrain Qwen auto tool arguments for strict omitted/false/true without broadening other parsers | `4f75c793a9c2cdcfb2fd0768ba49a4e34748d3a37d8392b07d3592ca50939c07` |
-| `patches/vllm-qwen38-agent-defaults-and-thinking.patch` | explicit model defaults, Anthropic thinking controls, phase-ceiling request plumbing, fail-closed ordered tool-result correlation | `6428d2cfa77f28e57e117999d0ec8fab5430856c985ba530e04885c2f5c420b7` |
-| `patches/vllm-qwen38-separate-final-response-budget.patch` | count final tokens only after explicit reasoning end and enforce a separate hard ceiling | `f20d7dff41931248272842ed2c7a163c6f013e405ccf35733c40ff131a2fc503` |
-| `patches/vllm-qwen-implicit-tool-grammar-boundary.patch` | retain an implicit Qwen tool-start token as the structural grammar trigger and recover a final partial Qwen parameter consistently | `d231c6e2e7040c4cd4b38432cb8c794805afddbf2c6e4f7ff6febb78e3fd9f48` |
-| `patches/vllm-anthropic-validation-http400.patch` | report Anthropic request-conversion validation failures as HTTP 400, not HTTP 500 | `030b64be104e6ef57a40f6bae740dfa9d4634a420c6c93a395f62bfb98d6d053` |
-| `patches/vllm-tool-truncation-finish-reason.patch` | preserve truncation terminals, fail Responses incomplete events closed, flush deferred batch content, and carry phase budgets through Responses | `1a220f6db9b40967d867b3cfb1a92d95d907ca059718ffe61772b4cb4409f551` |
-| `patches/vllm-qwen38-vision-runtime.patch` | enforce lossless static-PNG ingress, chronological tool media, full BF16 image processing, and exact reclaimable vision workspace without reducing context, graphs, or prefill chunking | `f92603724861da5b5a364f43e57d3f95ef43a9dded8ae645278373850db3140f` |
-| `patches/vllm-qwen38-numerical-audits.patch` | add exact TurboQuant K8V4, Qwen3.8 context/MRoPE, and real-checkpoint NVFP4 production-kernel audits to the immutable build | `a73aa2f2ae3f82010eb2bafcdf663c2fe14854c30165dbc4d8457725bc3b6632` |
-
-The separate final-response ceiling is deliberately a hard ceiling: EOS and configured
+A request's final-response budget is deliberately a hard ceiling: EOS and configured
 stop sequences still win, but `min_tokens` cannot force generation past it. Multi-token
 reasoning-end delimiters are handled. Unit tests cover exact boundary, serialization,
-EOS precedence, `min_tokens`, invalid values, and server-ceiling clamping.
+EOS precedence, `min_tokens`, invalid values, and that no served ceiling lowers a
+request's budget.
 
 One honest limit remains: the final phase begins when the output contains an explicit
 reasoning-end token sequence. If a malformed generation never ends reasoning, the
@@ -415,7 +428,7 @@ and `stop_reason="final_response_token_budget"`.
   it did not justify carrying old frontend workarounds.
 - The best historical ideas retained were fail-closed verification, server-side
   explicit defaults, real-tokenizer testing, schema-constrained tool arguments, and
-  measured cache capacity.
+  cache capacity that no hand-computed size decides.
 - The most important obsolete ideas were the old parser wrappers, output-field rename,
   repetition detector, utilization-slack patch, and historical multimodal monkey
   patches. Vision instead received a current-source implementation with a narrower

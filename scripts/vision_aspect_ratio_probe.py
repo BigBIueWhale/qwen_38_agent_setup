@@ -14,7 +14,7 @@ from PIL import Image, ImageDraw, ImageFont
 from transformers import AutoTokenizer
 
 from probe_scope import new_conversation
-from vision_quality_probe import IMAGE_PIXELS, MODEL, post_json
+from vision_quality_probe import IMAGE_PIXELS, MODEL, post_json, unfinished
 
 
 FONT_PATH = "/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf"
@@ -214,10 +214,8 @@ def shape_payload(image: AspectImage, index: int, kv_scope: str) -> dict[str, An
     return {
         "model": MODEL,
         "messages": messages_for([image]),
-        # This is a vision-quality probe, not an output-budget probe.  A
-        # 4,096-token test cap allowed one correct-looking xhigh reasoning
-        # path to exhaust the budget before emitting its final answer.
-        "max_tokens": 16_384,
+        # No max_tokens, as in vision_quality_probe: the generation is bounded
+        # only by what the context window leaves after the prompt.
         "cache_salt": (
             f"vision-v10-aspect-final-{index}-"
             f"{image.width}x{image.height}"
@@ -318,8 +316,9 @@ def main() -> None:
                 f"HTTP {status}: {response}"
             )
 
+        cut = unfinished(response)
         answer = response["choices"][0]["message"].get("content") or ""
-        missing = [
+        missing = [] if cut else [
             code for code in (image.first, image.second) if code not in answer
         ]
         inference_proofs.append(
@@ -331,7 +330,8 @@ def main() -> None:
                     6,
                 ),
                 "expected": [image.first, image.second],
-                "passed": not missing,
+                "passed": cut is None and not missing,
+                "unfinished": cut,
                 "missing": missing,
                 "elapsed_seconds": round(elapsed, 3),
                 "usage": response["usage"],
@@ -355,8 +355,10 @@ def main() -> None:
             )
         )
         raise AssertionError(
-            "one or more exact-grid aspect ratios failed direct far-end pixel "
-            "retrieval; see the structured evidence above"
+            "one or more exact-grid aspect ratios failed; see the structured "
+            "evidence above: a shape that is 'unfinished' ended before its "
+            "answer, which says nothing of its pixels, and one with codes "
+            "'missing' failed direct far-end pixel retrieval"
         )
 
     print(

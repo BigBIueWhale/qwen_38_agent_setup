@@ -922,10 +922,11 @@ four FP16 scale/zero-point bytes. The raw cache is therefore 24,832 bytes per to
 - 6.0625 GiB at 262,144 tokens;
 - about 23.126 GiB at one million tokens.
 
-vLLM must also page and align the hybrid Gated DeltaNet state. The explicit
-6,925,634,765-byte allocation reports 264,115 cache-token capacity, 1.01 times native
-maximum concurrency. That leaves only 1,971 cache tokens beyond native, not a useful
-extended-context tier.
+vLLM must also page and align the hybrid Gated DeltaNet state. The pool is declared
+as one resident 262,144-token context (`--kv-cache-users 1`), not in bytes: vLLM
+derives its bytes from the KV cache spec at engine initialization, the Gated DeltaNet
+pages included, and the startup log states its group-aware cache-token capacity. A
+one-context pool is not an extended-context tier.
 
 The reviewed TurboQuant patch reuses the already reserved 1,024 MiB dequantization
 workspace as the final BF16 continuation buffers on the exact K8V4 key-FP8 path. It
@@ -1254,11 +1255,13 @@ encrypted reasoning is unsupported and refused explicitly.
 Responses streaming keeps each output item's ID and each function call's
 `call_id` through its added/done events and the terminal response. Terminal
 output uses the completed stream items, so callers can replay it with results
-correlated using the IDs first received in the stream; each streamed item is
-exactly the concatenation of its deltas, which the parser unit asserts for every
-engine chunking. Usage, the response's own status and every item's status are
-the same on both paths: in a truncated response the item the limit cut -- the
-last -- is incomplete, and the items it finished before the cut are completed.
+correlated using the IDs first received in the stream; every item of the terminal
+response is exactly the concatenation of the deltas streamed under its index, and
+every done event that states its text states exactly that, which the parser unit
+asserts for every engine chunking. Usage, the response's own status and every
+item's status are the same on both paths: in a truncated response the item the
+limit cut -- the last -- is incomplete, and the items it finished before the cut
+are completed.
 A message carries no log probabilities. They would be those of the tokens its
 text came from, and the model writes reasoning, message and calls as one token
 sequence in which a single token can end the message and begin a call, so no list
