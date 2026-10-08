@@ -153,6 +153,18 @@ This naming convention belongs to the probe; the backend treats the ID as
 opaque. The launcher runs probes by file, which supplies the name used by this
 convention.
 
+A probe runs only against the live backend, so `check` proves the half of it
+that needs no backend: `scripts/probe_requests_unit.py` loads every probe as the
+program the launcher runs and calls its `offline_requests()`, which builds one
+request through every body builder the probe sends through -- the functions its
+live run calls, with a value of a response's shape where a body continues one --
+and validates each body with the request model its route parses, taken from the
+API server's own app built offline from the reviewed runtime. A body the probe
+sends to be served must be taken; one it sends to be refused must be taken, or
+refused for the reason the probe holds the server's refusal to; and every route
+a probe names must be one its offline requests reach. A probe that cannot build
+its requests fails the check rather than a run on the card.
+
 The build is reproducible on a given host. Every file in the build context
 carries `SOURCE_DATE_EPOCH` as its mtime and fixed permissions, and the export
 clamps every layer timestamp to it, so reconstructing the source tree afresh for
@@ -408,7 +420,7 @@ Pinned build inputs and products:
 | Immutable base tag | qwen38-vllm:main-9df9b0b |
 | Immutable base ID | sha256:fa4a002a88b7043a1a89966dea8a500fe9696f84e75730d9da916f916048d401 |
 | Runtime Dockerfile SHA-256 | 319a602d81d5f30696609ad36c9e3ea421c08ef5d97623222eeec6ba1866f4fe |
-| Build verifier SHA-256 | f833c238d36fafc0414d3188c0ac8b87d6b9f3c99e3855cf0d655a1959949ce2 |
+| Build verifier SHA-256 | 1cfd9e55f63e92d586d5c19ae48ad235f235ceb884a9cc3919ca0f59fe99f908 |
 | Runtime validator SHA-256 | 65975561709b9876c31cd38a956971e7172ca7fc38cbdeac9733adec94a78d47 |
 
 The runtime image's profile, tag and archive name, which every release advances

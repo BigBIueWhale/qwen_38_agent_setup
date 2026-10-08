@@ -57,26 +57,178 @@ def require_rejected(path: str, payload: dict, needle: str) -> int:
     return status
 
 
-def tokenize(messages: list[dict], **template_kwargs) -> dict:
+SIMPLE_TURN = [{"role": "user", "content": "Return POLICY_OK."}]
+THINKING_BUDGET = 32
+
+
+def tokenize_payload(messages: list[dict], **template_kwargs) -> dict:
     payload: dict = {"model": MODEL, "messages": messages}
     if template_kwargs:
         payload["chat_template_kwargs"] = template_kwargs
-    status, response = post("/tokenize", payload)
+    return payload
+
+
+def text_count_payload(text: str) -> dict:
+    return {"model": MODEL, "prompt": text, "add_special_tokens": False}
+
+
+def chat_prompt_payload(messages: list[dict], kv_scope: str, **template_kwargs) -> dict:
+    payload: dict = {
+        "model": MODEL,
+        "messages": messages,
+        "max_tokens": 1,
+        "kv_scope": kv_scope,
+    }
+    if template_kwargs:
+        payload["chat_template_kwargs"] = template_kwargs
+    return payload
+
+
+def openai_turn_payload(kv_scope: str, **fields) -> dict:
+    return {
+        "model": MODEL,
+        "messages": SIMPLE_TURN,
+        "max_tokens": 128,
+        **fields,
+        "kv_scope": kv_scope,
+    }
+
+
+def anthropic_turn_payload(kv_scope: str, **fields) -> dict:
+    return {
+        "model": MODEL,
+        "messages": SIMPLE_TURN,
+        "max_tokens": 128,
+        **fields,
+        "kv_scope": kv_scope,
+    }
+
+
+def adaptive_max_payload(kv_scope: str) -> dict:
+    return {
+        "model": MODEL,
+        "messages": SIMPLE_TURN,
+        "max_tokens": 512,
+        "kv_scope": kv_scope,
+        "thinking": {"type": "adaptive"},
+        "output_config": {"effort": "max"},
+    }
+
+
+def thinking_budget_payload(kv_scope: str) -> dict:
+    # The budget must end thinking. The task needs far more than the budget's
+    # worth of reasoning, and max_tokens leaves room for an answer after it: a
+    # server that ignored the budget would think past it, or think until
+    # max_tokens and leave no answer.
+    return {
+        "model": MODEL,
+        "messages": [
+            {
+                "role": "user",
+                "content": (
+                    "Work out 17*23 + 19*29 step by step, then reply with "
+                    "POLICY_OK and the number."
+                ),
+            }
+        ],
+        "max_tokens": 256,
+        "kv_scope": kv_scope,
+        "thinking": {"type": "enabled", "budget_tokens": THINKING_BUDGET},
+        "output_config": {"effort": "xhigh"},
+    }
+
+
+def final_response_budget_payload(kv_scope: str) -> dict:
+    return {
+        "model": MODEL,
+        "messages": [
+            {
+                "role": "user",
+                "content": (
+                    "Think briefly, then write a numbered list of twenty "
+                    "different colors with one color per item. Do not use tools."
+                ),
+            }
+        ],
+        "max_tokens": 1024,
+        "kv_scope": kv_scope,
+        "final_response_token_budget": 5,
+    }
+
+
+def offline_requests() -> list[tuple[str, dict | None, str | None]]:
+    """Each kind of request main() sends, built without a server."""
+    history = [
+        {"role": "user", "content": "first turn"},
+        {"role": "assistant", "content": "visible result", "reasoning": "trace"},
+        {"role": "user", "content": "second turn"},
+    ]
+    legacy = [
+        history[0],
+        {"role": "assistant", "content": "visible result", "reasoning_content": "trace"},
+        history[2],
+    ]
+    return [
+        ("/tokenize", tokenize_payload(history), None),
+        ("/tokenize", tokenize_payload(SIMPLE_TURN, reasoning_effort="xhigh"), None),
+        ("/tokenize", text_count_payload("thinking"), None),
+        *(
+            (
+                "/v1/chat/completions",
+                chat_prompt_payload(messages, new_conversation(f"offline-{label}")),
+                None,
+            )
+            for label, messages in (("history", history), ("legacy", legacy))
+        ),
+        (
+            "/v1/chat/completions",
+            openai_turn_payload(new_conversation("offline-low"), reasoning_effort="low"),
+            "only xhigh",
+        ),
+        (
+            "/v1/chat/completions",
+            openai_turn_payload(
+                new_conversation("offline-disabled"),
+                chat_template_kwargs={"enable_thinking": False},
+            ),
+            "cannot be disabled",
+        ),
+        (
+            "/v1/messages",
+            anthropic_turn_payload(
+                new_conversation("offline-anthropic-disabled"), thinking={"type": "disabled"}
+            ),
+            "cannot be disabled",
+        ),
+        (
+            "/v1/messages",
+            anthropic_turn_payload(
+                new_conversation("offline-anthropic-low"), output_config={"effort": "low"}
+            ),
+            "only high",
+        ),
+        ("/v1/messages", adaptive_max_payload(new_conversation("offline-adaptive")), None),
+        ("/v1/messages", thinking_budget_payload(new_conversation("offline-budget")), None),
+        (
+            "/v1/chat/completions",
+            final_response_budget_payload(new_conversation("offline-final-budget")),
+            None,
+        ),
+    ]
+
+
+def tokenize(messages: list[dict], **template_kwargs) -> dict:
+    status, response = post("/tokenize", tokenize_payload(messages, **template_kwargs))
     if status != 200:
         raise RuntimeError(f"tokenize failed: status={status}, response={response}")
     return response
 
 
 def chat_prompt_tokens(messages: list[dict], label: str, **template_kwargs) -> int:
-    payload: dict = {
-        "model": MODEL,
-        "messages": messages,
-        "max_tokens": 1,
-        "kv_scope": new_conversation(label),
-    }
-    if template_kwargs:
-        payload["chat_template_kwargs"] = template_kwargs
-    status, response = post("/v1/chat/completions", payload)
+    status, response = post(
+        "/v1/chat/completions",
+        chat_prompt_payload(messages, new_conversation(label), **template_kwargs),
+    )
     if status != 200:
         raise RuntimeError(
             f"one-token Chat Completions probe failed: {status}, {response}"
@@ -137,69 +289,48 @@ def main() -> None:
             f"trace: legacy={legacy_tokens}, without={stripped_tokens}"
         )
 
-    simple = [{"role": "user", "content": "Return POLICY_OK."}]
-    xhigh = tokenize(simple, reasoning_effort="xhigh")
-    high = tokenize(simple, reasoning_effort="high")
-    maximum = tokenize(simple, reasoning_effort="max")
+    xhigh = tokenize(SIMPLE_TURN, reasoning_effort="xhigh")
+    high = tokenize(SIMPLE_TURN, reasoning_effort="high")
+    maximum = tokenize(SIMPLE_TURN, reasoning_effort="max")
     if not (xhigh["tokens"] == high["tokens"] == maximum["tokens"]):
         raise RuntimeError("high/max are not exact aliases for Qwen xhigh")
 
-    openai_base = {
-        "model": MODEL,
-        "messages": simple,
-        "max_tokens": 128,
-    }
-    openai_low = dict(
-        openai_base,
-        reasoning_effort="low",
-        kv_scope=new_conversation("openai-low-effort"),
-    )
-    openai_disabled = dict(
-        openai_base,
-        chat_template_kwargs={"enable_thinking": False},
-        kv_scope=new_conversation("openai-thinking-disabled"),
-    )
     openai_low_status = require_rejected(
-        "/v1/chat/completions", openai_low, "only xhigh"
+        "/v1/chat/completions",
+        openai_turn_payload(
+            new_conversation("openai-low-effort"), reasoning_effort="low"
+        ),
+        "only xhigh",
     )
     openai_disabled_status = require_rejected(
-        "/v1/chat/completions", openai_disabled, "cannot be disabled"
+        "/v1/chat/completions",
+        openai_turn_payload(
+            new_conversation("openai-thinking-disabled"),
+            chat_template_kwargs={"enable_thinking": False},
+        ),
+        "cannot be disabled",
     )
 
-    anthropic_base = {
-        "model": MODEL,
-        "messages": simple,
-        "max_tokens": 128,
-    }
     anthropic_disabled_status = require_rejected(
         "/v1/messages",
-        dict(
-            anthropic_base,
+        anthropic_turn_payload(
+            new_conversation("anthropic-thinking-disabled"),
             thinking={"type": "disabled"},
-            kv_scope=new_conversation("anthropic-thinking-disabled"),
         ),
         "cannot be disabled",
     )
     anthropic_low_status = require_rejected(
         "/v1/messages",
-        dict(
-            anthropic_base,
+        anthropic_turn_payload(
+            new_conversation("anthropic-low-effort"),
             output_config={"effort": "low"},
-            kv_scope=new_conversation("anthropic-low-effort"),
         ),
         "only high",
     )
 
     status, adaptive = post(
         "/v1/messages",
-        {
-            "model": MODEL,
-            "messages": simple,
-            "max_tokens": 512,
-            "kv_scope": new_conversation("anthropic-adaptive-max"),
-            "thinking": {"type": "adaptive"},
-            "output_config": {"effort": "max"},
-        },
+        adaptive_max_payload(new_conversation("anthropic-adaptive-max")),
         {"anthropic-version": "2023-06-01"},
     )
     if status != 200:
@@ -207,29 +338,10 @@ def main() -> None:
     if not any(block.get("type") == "thinking" for block in adaptive["content"]):
         raise RuntimeError(f"Anthropic adaptive/max omitted thinking: {adaptive}")
 
-    # The budget must end thinking. The task needs far more than the budget's
-    # worth of reasoning, and max_tokens leaves room for an answer after it: a
-    # server that ignored the budget would think past it, or think until
-    # max_tokens and leave no answer.
-    thinking_budget = 32
+    thinking_budget = THINKING_BUDGET
     status, capped = post(
         "/v1/messages",
-        {
-            "model": MODEL,
-            "messages": [
-                {
-                    "role": "user",
-                    "content": (
-                        "Work out 17*23 + 19*29 step by step, then reply with "
-                        "POLICY_OK and the number."
-                    ),
-                }
-            ],
-            "max_tokens": 256,
-            "kv_scope": new_conversation("anthropic-thinking-budget"),
-            "thinking": {"type": "enabled", "budget_tokens": thinking_budget},
-            "output_config": {"effort": "xhigh"},
-        },
+        thinking_budget_payload(new_conversation("anthropic-thinking-budget")),
         {"anthropic-version": "2023-06-01"},
     )
     if status != 200:
@@ -251,10 +363,7 @@ def main() -> None:
             "explicit thinking budget did not end thinking before max_tokens: "
             f"{capped}"
         )
-    status, thinking_tokenization = post(
-        "/tokenize",
-        {"model": MODEL, "prompt": thinking_text, "add_special_tokens": False},
-    )
+    status, thinking_tokenization = post("/tokenize", text_count_payload(thinking_text))
     if status != 200 or not 0 < thinking_tokenization.get("count", 0) <= thinking_budget:
         raise RuntimeError(
             f"thinking ran past its {thinking_budget}-token budget: status={status}, "
@@ -263,21 +372,7 @@ def main() -> None:
 
     status, phase_capped = post(
         "/v1/chat/completions",
-        {
-            "model": MODEL,
-            "messages": [
-                {
-                    "role": "user",
-                    "content": (
-                        "Think briefly, then write a numbered list of twenty "
-                        "different colors with one color per item. Do not use tools."
-                    ),
-                }
-            ],
-            "max_tokens": 1024,
-            "kv_scope": new_conversation("final-response-budget"),
-            "final_response_token_budget": 5,
-        },
+        final_response_budget_payload(new_conversation("final-response-budget")),
     )
     if status != 200:
         raise RuntimeError(
@@ -297,12 +392,7 @@ def main() -> None:
             f"phase-budget probe produced no separated reasoning: {phase_message}"
         )
     status, final_tokenization = post(
-        "/tokenize",
-        {
-            "model": MODEL,
-            "prompt": phase_message.get("content") or "",
-            "add_special_tokens": False,
-        },
+        "/tokenize", text_count_payload(phase_message.get("content") or "")
     )
     if status != 200 or final_tokenization.get("count") != 5:
         raise RuntimeError(

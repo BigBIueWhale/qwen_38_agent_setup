@@ -130,7 +130,7 @@ readonly SOURCE_PATCH_MANIFEST_SHA256="182d120ea4c897d0800ec5cad45d5d770ec6619fa
 # was added — the validator then refused a correct manifest. Every consumer
 # (build-vllm.sh, runtime-common.sh, generate-deployment-input-manifest.sh)
 # reads this declaration.
-readonly DEPLOYMENT_INPUT_FILE_COUNT="144"
+readonly DEPLOYMENT_INPUT_FILE_COUNT="145"
 readonly TURBOQUANT_PATCHED_FILE_SHA256="c3fef60cfa031a139bed6f413b2c40d0ea3bc6b48992455404a09459abbfa282"
 readonly TURBOQUANT_STORE_PATCHED_FILE_SHA256="298645bff68c6adab58261862602b86e7e714c3552a9fd89102d9ccd2b83e9f7"
 readonly TURBOQUANT_DECODE_PATCHED_FILE_SHA256="dab8b65ab7ddd6582de16e1fc7b1360ab0061b4a2a2b114f5d87ea0532fd726f"

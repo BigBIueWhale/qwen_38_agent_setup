@@ -203,6 +203,39 @@ def assert_equivalent_final_responses(nonstream: dict, streamed: dict) -> None:
             )
 
 
+def offline_requests() -> list[tuple[str, dict | None, str | None]]:
+    """Each kind of request main() sends, built without a server."""
+    scope = new_conversation("offline-tool-loop")
+    # The continuation replays the first response's output: a reasoning item
+    # and the function call, of the shapes the route returns.
+    first = {
+        "output": [
+            {
+                "type": "reasoning",
+                "id": "rs_offline",
+                "summary": [],
+                "content": [{"type": "reasoning_text", "text": "Read it first."}],
+            },
+            {
+                "type": "function_call",
+                "id": "fc_offline",
+                "call_id": "call_offline",
+                "name": "read_file",
+                "arguments": json.dumps({"path": PATH}),
+                "status": "completed",
+            },
+        ]
+    }
+    return [
+        ("/v1/responses", build(stream=stream, kv_scope=scope), None)
+        for build in (
+            base_payload,
+            lambda **kwargs: continuation_payload(first, **kwargs),
+        )
+        for stream in (False, True)
+    ]
+
+
 def main() -> None:
     argparse.ArgumentParser(description=__doc__).parse_args()
     scope = new_conversation("tool-loop")

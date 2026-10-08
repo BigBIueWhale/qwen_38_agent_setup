@@ -129,12 +129,39 @@ def post_json(
         return error.code, json.loads(error.read())
 
 
+def tokenize_payload(messages: list[dict[str, str]]) -> dict[str, Any]:
+    return {"model": MODEL, "messages": messages}
+
+
+def boundary_payload(
+    messages: list[dict[str, str]], cache_salt: str, kv_scope: str
+) -> dict[str, Any]:
+    return {
+        "model": MODEL,
+        "messages": messages,
+        "max_tokens": 1,
+        "cache_salt": cache_salt,
+        "kv_scope": kv_scope,
+    }
+
+
+def offline_requests() -> list[tuple[str, dict[str, Any] | None, str | None]]:
+    """Each kind of request main() sends, built without a server."""
+    messages = messages_for(1, 0, "offline")
+    return [
+        ("/tokenize", tokenize_payload(messages), None),
+        (
+            "/v1/chat/completions",
+            boundary_payload(
+                messages, "offline-cache", new_conversation("offline-boundary")
+            ),
+            None,
+        ),
+    ]
+
+
 def live_token_count(messages: list[dict[str, str]]) -> int:
-    status, response = post_json(
-        "/tokenize",
-        {"model": MODEL, "messages": messages},
-        timeout=300,
-    )
+    status, response = post_json("/tokenize", tokenize_payload(messages), timeout=300)
     if status != 200:
         raise AssertionError(f"/tokenize failed with HTTP {status}: {response}")
     return int(response["count"])
@@ -170,13 +197,11 @@ def main() -> None:
     started = time.monotonic()
     accepted_status, accepted = post_json(
         "/v1/chat/completions",
-        {
-            "model": MODEL,
-            "messages": accepted_messages,
-            "max_tokens": 1,
-            "cache_salt": f"{args.salt}-accepted-cache",
-            "kv_scope": new_conversation("accepted-boundary"),
-        },
+        boundary_payload(
+            accepted_messages,
+            f"{args.salt}-accepted-cache",
+            new_conversation("accepted-boundary"),
+        ),
         timeout=3_600,
     )
     accepted_elapsed = time.monotonic() - started
@@ -195,13 +220,11 @@ def main() -> None:
 
     rejected_status, rejected = post_json(
         "/v1/chat/completions",
-        {
-            "model": MODEL,
-            "messages": rejected_messages,
-            "max_tokens": 1,
-            "cache_salt": f"{args.salt}-rejected-cache",
-            "kv_scope": new_conversation("rejected-boundary"),
-        },
+        boundary_payload(
+            rejected_messages,
+            f"{args.salt}-rejected-cache",
+            new_conversation("rejected-boundary"),
+        ),
         timeout=300,
     )
     if rejected_status != 400:

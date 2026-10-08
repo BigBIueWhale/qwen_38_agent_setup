@@ -83,11 +83,37 @@ def build_messages(
     return messages, values
 
 
+def tokenize_payload(model: str, messages: list[dict]) -> dict:
+    return {"model": model, "messages": messages}
+
+
+def chat_payload(model: str, messages: list[dict], max_tokens: int, kv_scope: str) -> dict:
+    return {
+        "model": model,
+        "messages": messages,
+        "max_tokens": max_tokens,
+        "kv_scope": kv_scope,
+    }
+
+
+def offline_requests() -> list[tuple[str, dict | None, str | None]]:
+    """Each kind of request main() sends, built without a server."""
+    messages, _ = build_messages(1, 32_768, "offline")
+    return [
+        ("/tokenize", tokenize_payload(DEFAULT_MODEL, messages), None),
+        (
+            "/v1/chat/completions",
+            chat_payload(
+                DEFAULT_MODEL, messages, 1_024, new_conversation("offline-target")
+            ),
+            None,
+        ),
+    ]
+
+
 def vllm_token_count(base_url: str, model: str, messages: list[dict]) -> int:
     result = post_json(
-        f"{base_url}/tokenize",
-        {"model": model, "messages": messages},
-        timeout=300,
+        f"{base_url}/tokenize", tokenize_payload(model, messages), timeout=300
     )
     return int(result["count"])
 
@@ -157,12 +183,9 @@ def run_probe(
             f"Only {max_tokens} output tokens remain at input size {input_tokens}"
         )
 
-    payload = {
-        "model": model,
-        "messages": messages,
-        "max_tokens": max_tokens,
-        "kv_scope": new_conversation(f"target-{target}"),
-    }
+    payload = chat_payload(
+        model, messages, max_tokens, new_conversation(f"target-{target}")
+    )
     started = time.monotonic()
     response = post_json(
         f"{base_url}/v1/chat/completions", payload, timeout=3_600

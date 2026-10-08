@@ -81,12 +81,12 @@ def tokenizer_count(tokenizer: Any, messages: list[dict[str, Any]]) -> int:
     return len(encoded)
 
 
+def tokenize_payload(messages: list[dict[str, Any]]) -> dict[str, Any]:
+    return {"model": MODEL, "messages": messages}
+
+
 def live_token_count(messages: list[dict[str, Any]]) -> int:
-    status, response = post_json(
-        "/tokenize",
-        {"model": MODEL, "messages": messages},
-        timeout=600,
-    )
+    status, response = post_json("/tokenize", tokenize_payload(messages), timeout=600)
     if status != 200:
         raise AssertionError(f"/tokenize failed with HTTP {status}: {response}")
     return int(response["count"])
@@ -176,6 +176,21 @@ def completion_payload(
         "stream": False,
         "kv_scope": kv_scope,
     }
+
+
+def offline_requests() -> list[tuple[str, dict[str, Any] | None, str | None]]:
+    """Each kind of request main() sends, built without a server."""
+    messages = messages_for([make_image(0)], 1, 0, "offline")
+    return [
+        ("/tokenize", tokenize_payload(messages), None),
+        (
+            "/v1/chat/completions",
+            completion_payload(
+                messages, "offline-cold-cache", new_conversation("offline-boundary")
+            ),
+            None,
+        ),
+    ]
 
 
 def main() -> None:

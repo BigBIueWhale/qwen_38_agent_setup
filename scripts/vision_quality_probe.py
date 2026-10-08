@@ -244,12 +244,15 @@ def run_quality_probe(count: int, timeout: int) -> None:
     )
 
 
+def count_rejection_payload(image: ProbeImage, kv_scope: str) -> dict[str, Any]:
+    """One image more than a request may carry, with a one-token budget."""
+    return completion_payload([image] * (MAX_IMAGES + 1), kv_scope) | {"max_tokens": 1}
+
+
 def run_count_rejection(timeout: int) -> None:
-    image = make_image(0)
-    payload = completion_payload(
-        [image] * (MAX_IMAGES + 1), new_conversation("over-count-rejection")
+    payload = count_rejection_payload(
+        make_image(0), new_conversation("over-count-rejection")
     )
-    payload["max_tokens"] = 1
     status, response = post_json("/v1/chat/completions", payload, timeout=timeout)
     if status != 400:
         raise AssertionError(
@@ -259,6 +262,25 @@ def run_count_rejection(timeout: int) -> None:
     if "image" not in detail.lower() or str(MAX_IMAGES) not in detail:
         raise AssertionError(f"count rejection was not explicit: {response}")
     print(json.dumps({"status": "passed", "count_rejection": detail}, indent=2))
+
+
+def offline_requests() -> list[tuple[str, dict[str, Any] | None, str | None]]:
+    """Each kind of request main() sends, built without a server."""
+    image = make_image(0)
+    return [
+        (
+            "/v1/chat/completions",
+            completion_payload([image], new_conversation("offline-transcribe")),
+            None,
+        ),
+        (
+            "/v1/chat/completions",
+            count_rejection_payload(
+                image, new_conversation("offline-over-count-rejection")
+            ),
+            "image",
+        ),
+    ]
 
 
 def parse_args() -> argparse.Namespace:

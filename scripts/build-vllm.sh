@@ -922,6 +922,17 @@ for unit in chat_template_retention_unit tool_output_parser_unit vision_contract
     --entrypoint python3 "${BASE_IMAGE_TAG}" "/context/scripts/${unit}.py"
 done
 
+# The probes run only against the live backend, and the image does not carry
+# them, so this is where a probe that cannot build the requests it sends fails:
+# every probe builds each kind of request offline, through the builders its
+# live run sends through, and the API server's own app, built from the
+# reviewed runtime, validates each body with its route's request model.
+docker run --rm --network none --read-only --user "$(id -u):$(id -g)" \
+  --tmpfs /tmp:rw,nodev,nosuid,size=256m \
+  --env PYTHONDONTWRITEBYTECODE=1 --env CUDA_VISIBLE_DEVICES= \
+  --volume "${PROJECT_DIR}/scripts:/probes:ro" "${parser_unit_mounts[@]}" \
+  --entrypoint python3 "${BASE_IMAGE_TAG}" /probes/probe_requests_unit.py
+
 if [[ "${MODE}" == "check" || "${MODE}" == "serve-check" ]]; then
   # Every count below is derived from the objects this run just verified —
   # REVIEWED_STATUS and the deployment-input manifest — never restated by

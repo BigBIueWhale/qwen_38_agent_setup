@@ -206,10 +206,44 @@ def serialized_count(tokenizer: Any, messages: list[dict[str, Any]]) -> int:
     return len(encoded)
 
 
+def tokenize_payload(messages: list[dict[str, Any]]) -> dict[str, Any]:
+    return {"model": MODEL, "messages": messages}
+
+
+def shape_payload(image: AspectImage, index: int, kv_scope: str) -> dict[str, Any]:
+    return {
+        "model": MODEL,
+        "messages": messages_for([image]),
+        # This is a vision-quality probe, not an output-budget probe.  A
+        # 4,096-token test cap allowed one correct-looking xhigh reasoning
+        # path to exhaust the budget before emitting its final answer.
+        "max_tokens": 16_384,
+        "cache_salt": (
+            f"vision-v10-aspect-final-{index}-"
+            f"{image.width}x{image.height}"
+        ),
+        "stream": False,
+        "kv_scope": kv_scope,
+    }
+
+
+def offline_requests() -> list[tuple[str, dict[str, Any] | None, str | None]]:
+    """Each kind of request main() sends, built without a server."""
+    image = make_aspect_image(0, *SHAPES[0])
+    over_ratio = make_aspect_image(0, 21_824, 704)
+    return [
+        ("/tokenize", tokenize_payload(messages_for([image])), None),
+        ("/tokenize", tokenize_payload(messages_for([over_ratio])), "aspect ratio"),
+        (
+            "/v1/chat/completions",
+            shape_payload(image, 1, new_conversation("offline-shape")),
+            None,
+        ),
+    ]
+
+
 def live_count(messages: list[dict[str, Any]]) -> int:
-    status, response = post_json(
-        "/tokenize", {"model": MODEL, "messages": messages}, timeout=900
-    )
+    status, response = post_json("/tokenize", tokenize_payload(messages), timeout=900)
     if status != 200:
         raise AssertionError(f"/tokenize returned HTTP {status}: {response}")
     return int(response["count"])
@@ -250,9 +284,7 @@ def main() -> None:
 
     over_ratio = make_aspect_image(0, 21_824, 704)
     over_status, over_response = post_json(
-        "/tokenize",
-        {"model": MODEL, "messages": messages_for([over_ratio])},
-        timeout=900,
+        "/tokenize", tokenize_payload(messages_for([over_ratio])), timeout=900
     )
     if over_status != 400:
         raise AssertionError(
@@ -269,23 +301,12 @@ def main() -> None:
         # confound aspect-ratio perception with long cross-image enumeration.
         # Sampling remains Alibaba's server-side default; no deterministic-output
         # assumption is made.  The asserted invariant is direct pixel retrieval.
-        payload = {
-            "model": MODEL,
-            "messages": messages_for([image]),
-            # This is a vision-quality probe, not an output-budget probe.  A
-            # 4,096-token test cap allowed one correct-looking xhigh reasoning
-            # path to exhaust the budget before emitting its final answer.
-            "max_tokens": 16_384,
-            "cache_salt": (
-                f"vision-v10-aspect-final-{index}-"
-                f"{image.width}x{image.height}"
-            ),
-            "stream": False,
-            # Each shape is a fresh, independent single-turn conversation.
-            "kv_scope": new_conversation(
-                f"shape-{index}-{image.width}x{image.height}"
-            ),
-        }
+        # Each shape is a fresh, independent single-turn conversation.
+        payload = shape_payload(
+            image,
+            index,
+            new_conversation(f"shape-{index}-{image.width}x{image.height}"),
+        )
         started = time.monotonic()
         status, response = post_json(
             "/v1/chat/completions", payload, timeout=3_600

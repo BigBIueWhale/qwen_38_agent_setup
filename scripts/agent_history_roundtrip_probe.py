@@ -215,8 +215,8 @@ TEMPLATE_KWARGS: dict[str, Any] = {
 }
 
 
-def render_request(messages: list[dict[str, Any]]) -> dict[str, Any]:
-    payload = {
+def render_payload(messages: list[dict[str, Any]]) -> dict[str, Any]:
+    return {
         "model": MODEL,
         "messages": messages,
         "tools": TOOLS,
@@ -225,7 +225,10 @@ def render_request(messages: list[dict[str, Any]]) -> dict[str, Any]:
         "max_tokens": 1,
         "chat_template_kwargs": dict(TEMPLATE_KWARGS),
     }
-    return post_json("/v1/chat/completions/render", payload)
+
+
+def render_request(messages: list[dict[str, Any]]) -> dict[str, Any]:
+    return post_json("/v1/chat/completions/render", render_payload(messages))
 
 
 def generated_turn(
@@ -346,6 +349,85 @@ def parse_streaming(
     return "".join(reasoning_parts), "".join(content_parts), calls
 
 
+def anthropic_render_payload(call_ids: Sequence[str]) -> dict[str, Any]:
+    """The history as an Anthropic Messages request, converted as the Messages
+    route converts it, as a render request."""
+    anthropic = AnthropicMessagesRequest.model_validate(
+        {
+            "model": MODEL,
+            "system": SYSTEM,
+            "messages": [
+                {"role": "user", "content": USER},
+                {
+                    "role": "assistant",
+                    "content": [
+                        {"type": "thinking", "thinking": REASONING},
+                        *[
+                            {
+                                "type": "tool_use",
+                                "id": call_id,
+                                "name": name,
+                                "input": arguments,
+                            }
+                            for call_id, (name, arguments) in zip(
+                                call_ids, EXPECTED_CALLS, strict=True
+                            )
+                        ],
+                    ],
+                },
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "tool_result",
+                            "tool_use_id": call_id,
+                            "content": result,
+                        }
+                        for call_id, result in zip(
+                            call_ids, RESULTS, strict=True
+                        )
+                    ],
+                },
+            ],
+            "tools": [
+                {
+                    "name": tool["function"]["name"],
+                    "description": tool["function"]["description"],
+                    "input_schema": tool["function"]["parameters"],
+                    **(
+                        {"strict": tool["function"]["strict"]}
+                        if "strict" in tool["function"]
+                        else {}
+                    ),
+                }
+                for tool in TOOLS
+            ],
+            "tool_choice": {"type": "any", "disable_parallel_tool_use": False},
+            "max_tokens": 1,
+            # A Messages request is a generation request and names its line of
+            # work; the render it is converted into allocates no KV and names
+            # none.
+            "kv_scope": new_conversation("anthropic-history-render"),
+        }
+    )
+    converted = AnthropicServingMessages._convert_anthropic_to_openai_request(
+        anthropic,
+        merge_inline_system=True,
+    )
+    converted_payload = converted.model_dump(
+        mode="json",
+        by_alias=True,
+        exclude_none=True,
+        exclude={"kv_scope"},
+    )
+    # The Anthropic request carries no template kwargs of its own, so without
+    # this the converted side would inherit the deployment default while the
+    # OpenAI side states one, and the round trip's token-ID comparison would
+    # be measuring that difference instead of the conversion.
+    converted_payload["chat_template_kwargs"] = dict(TEMPLATE_KWARGS)
+    return converted_payload
+
+
 def synthetic_roundtrip(tokenizer: Any) -> dict[str, Any]:
     original_ids = ["call-roundtrip-a", "call-roundtrip-b"]
     original_history = make_history(original_ids)
@@ -397,78 +479,7 @@ def synthetic_roundtrip(tokenizer: Any) -> dict[str, Any]:
     if rendered["token_ids"] != rerendered["token_ids"]:
         raise AssertionError("render(parse(render(history))) changed prompt token IDs")
 
-    anthropic = AnthropicMessagesRequest.model_validate(
-        {
-            "model": MODEL,
-            "system": SYSTEM,
-            "messages": [
-                {"role": "user", "content": USER},
-                {
-                    "role": "assistant",
-                    "content": [
-                        {"type": "thinking", "thinking": REASONING},
-                        *[
-                            {
-                                "type": "tool_use",
-                                "id": call_id,
-                                "name": name,
-                                "input": arguments,
-                            }
-                            for call_id, (name, arguments) in zip(
-                                original_ids, EXPECTED_CALLS, strict=True
-                            )
-                        ],
-                    ],
-                },
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "tool_result",
-                            "tool_use_id": call_id,
-                            "content": result,
-                        }
-                        for call_id, result in zip(
-                            original_ids, RESULTS, strict=True
-                        )
-                    ],
-                },
-            ],
-            "tools": [
-                {
-                    "name": tool["function"]["name"],
-                    "description": tool["function"]["description"],
-                    "input_schema": tool["function"]["parameters"],
-                    **(
-                        {"strict": tool["function"]["strict"]}
-                        if "strict" in tool["function"]
-                        else {}
-                    ),
-                }
-                for tool in TOOLS
-            ],
-            "tool_choice": {"type": "any", "disable_parallel_tool_use": False},
-            "max_tokens": 1,
-            # A Messages request is a generation request and names its line of
-            # work; the render below allocates no KV and names none.
-            "kv_scope": new_conversation("anthropic-history-render"),
-        }
-    )
-    converted = AnthropicServingMessages._convert_anthropic_to_openai_request(
-        anthropic,
-        merge_inline_system=True,
-    )
-    converted_payload = converted.model_dump(
-        mode="json",
-        by_alias=True,
-        exclude_none=True,
-        exclude={"kv_scope"},
-    )
-    # The Anthropic request carries no template kwargs of its own, so without
-    # this the converted side would inherit the deployment default while the
-    # OpenAI side states one, and the token-ID comparison below would be
-    # measuring that difference instead of the conversion.
-    converted_payload["chat_template_kwargs"] = dict(TEMPLATE_KWARGS)
+    converted_payload = anthropic_render_payload(original_ids)
     anthropic_render = post_json(
         "/v1/chat/completions/render",
         converted_payload,
@@ -488,19 +499,22 @@ def synthetic_roundtrip(tokenizer: Any) -> dict[str, Any]:
     }
 
 
+LIVE_CALL_MESSAGES = [
+    {
+        "role": "developer",
+        "content": (
+            "Call inspect_record exactly once with every required constant. "
+            "Do not call any other tool."
+        ),
+    },
+    {"role": "user", "content": "Inspect the required record now."},
+]
+
+
 def live_call_payload(stream: bool, kv_scope: str) -> dict[str, Any]:
     return {
         "model": MODEL,
-        "messages": [
-            {
-                "role": "developer",
-                "content": (
-                    "Call inspect_record exactly once with every required constant. "
-                    "Do not call any other tool."
-                ),
-            },
-            {"role": "user", "content": "Inspect the required record now."},
-        ],
+        "messages": LIVE_CALL_MESSAGES,
         "tools": [inspect_tool()],
         "tool_choice": "required",
         "parallel_tool_calls": False,
@@ -527,6 +541,34 @@ def validate_live_call(message: dict[str, Any], finish_reason: str | None) -> No
         raise AssertionError(f"Live tool call changed typed arguments: {actual!r}")
     if not message.get("reasoning"):
         raise AssertionError("xhigh live tool call emitted no separated reasoning")
+
+
+def live_history_render_payload(message: dict[str, Any]) -> dict[str, Any]:
+    """The live turn ``message`` as history, through its call's result, as a
+    render request."""
+    call = message["tool_calls"][0]
+    history = [
+        *LIVE_CALL_MESSAGES,
+        {
+            "role": "assistant",
+            "content": message.get("content") or None,
+            "reasoning": message["reasoning"],
+            "tool_calls": [call],
+        },
+        {
+            "role": "tool",
+            "tool_call_id": call["id"],
+            "content": RESULTS[0],
+        },
+    ]
+    return {
+        "model": MODEL,
+        "messages": history,
+        "tools": [inspect_tool()],
+        "tool_choice": "auto",
+        "parallel_tool_calls": False,
+        "max_tokens": 1,
+    }
 
 
 def live_stream_nonstream() -> dict[str, Any]:
@@ -584,30 +626,9 @@ def live_stream_nonstream() -> dict[str, Any]:
     # parsed back without changing their typed call semantics.
     roundtrip_tokens = []
     for message in (nonstream_message, stream_message):
-        call = message["tool_calls"][0]
-        history = [
-            *live_call_payload(False, scope)["messages"],
-            {
-                "role": "assistant",
-                "content": message.get("content") or None,
-                "reasoning": message["reasoning"],
-                "tool_calls": [call],
-            },
-            {
-                "role": "tool",
-                "tool_call_id": call["id"],
-                "content": RESULTS[0],
-            },
-        ]
-        payload = {
-            "model": MODEL,
-            "messages": history,
-            "tools": [inspect_tool()],
-            "tool_choice": "auto",
-            "parallel_tool_calls": False,
-            "max_tokens": 1,
-        }
-        rendered = post_json("/v1/chat/completions/render", payload)
+        rendered = post_json(
+            "/v1/chat/completions/render", live_history_render_payload(message)
+        )
         roundtrip_tokens.append(len(rendered["token_ids"]))
 
     return {
@@ -619,6 +640,34 @@ def live_stream_nonstream() -> dict[str, Any]:
         "both_live_histories_rerendered": True,
         "rerendered_history_tokens": roundtrip_tokens,
     }
+
+
+def offline_requests() -> list[tuple[str, dict[str, Any] | None, str | None]]:
+    """Each kind of request main() sends, built without a server."""
+    call_ids = ["call-roundtrip-a", "call-roundtrip-b"]
+    history = make_history(call_ids)
+    scope = new_conversation("offline-live-tool-call")
+    # The live history carries a parsed turn, of the shape the route returns.
+    name, arguments = EXPECTED_CALLS[0]
+    message = {
+        "content": None,
+        "reasoning": REASONING,
+        "tool_calls": [
+            {
+                "id": "call_offline",
+                "type": "function",
+                "function": {"name": name, "arguments": json.dumps(arguments)},
+            }
+        ],
+    }
+    return [
+        ("/v1/chat/completions/render", render_payload(history), None),
+        ("/v1/chat/completions/render", render_payload(history[:2]), None),
+        ("/v1/chat/completions/render", anthropic_render_payload(call_ids), None),
+        ("/v1/chat/completions", live_call_payload(False, scope), None),
+        ("/v1/chat/completions", live_call_payload(True, scope), None),
+        ("/v1/chat/completions/render", live_history_render_payload(message), None),
+    ]
 
 
 def main() -> None:

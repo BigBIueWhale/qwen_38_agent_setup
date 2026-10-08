@@ -129,20 +129,22 @@ def iter_timed_sse(
             yield elapsed, data if data == "[DONE]" else json.loads(data)
 
 
-def rendered_prompt_ids(payload: dict[str, Any]) -> list[int]:
-    """Return the exact prompt token IDs the server renders for a request.
+def render_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    """The render request for a generation request.
 
     The render endpoint allocates no KV and needs no agent ID, so the
     transport, salt and ID fields are left out of what it is sent.
     """
-    rendered = request_json(
-        "/v1/chat/completions/render",
-        {
-            key: value
-            for key, value in payload.items()
-            if key not in {"stream", "stream_options", "cache_salt", "kv_scope"}
-        },
-    )
+    return {
+        key: value
+        for key, value in payload.items()
+        if key not in {"stream", "stream_options", "cache_salt", "kv_scope"}
+    }
+
+
+def rendered_prompt_ids(payload: dict[str, Any]) -> list[int]:
+    """Return the exact prompt token IDs the server renders for a request."""
+    rendered = request_json("/v1/chat/completions/render", render_payload(payload))
     assert isinstance(rendered, dict)
     return [int(token_id) for token_id in rendered["token_ids"]]
 
@@ -261,19 +263,112 @@ def fit_messages(
     return messages, tokenizer_count(tokenizer, template, messages), low
 
 
-def server_token_count(messages: list[dict[str, Any]]) -> int:
-    response = request_json(
-        "/tokenize",
-        {
-            "model": MODEL,
-            "messages": messages,
-            "tools": [tool()],
-            "chat_template_kwargs": {
-                "enable_thinking": True,
-                "reasoning_effort": "xhigh",
-            },
+def tokenize_payload(messages: list[dict[str, Any]]) -> dict[str, Any]:
+    return {
+        "model": MODEL,
+        "messages": messages,
+        "tools": [tool()],
+        "chat_template_kwargs": {
+            "enable_thinking": True,
+            "reasoning_effort": "xhigh",
         },
+    }
+
+
+def initial_payload(
+    messages: list[dict[str, Any]], cache_salt: str, kv_scope: str
+) -> dict[str, Any]:
+    return {
+        "model": MODEL,
+        "messages": messages,
+        "tools": [tool()],
+        "tool_choice": "required",
+        "parallel_tool_calls": False,
+        "max_tokens": 1_024,
+        "stream": True,
+        "stream_options": {"include_usage": True},
+        "cache_salt": cache_salt,
+        "kv_scope": kv_scope,
+    }
+
+
+def history_after(
+    messages: list[dict[str, Any]], initial: dict[str, Any], call: dict[str, Any]
+) -> list[dict[str, Any]]:
+    """The conversation through the tool result the initial turn's call got."""
+    return messages + [
+        {
+            "role": "assistant",
+            "content": initial["content"] or None,
+            "reasoning": initial["reasoning"],
+            "tool_calls": [call],
+        },
+        {
+            "role": "tool",
+            "tool_call_id": call["id"],
+            "content": TOOL_RESULT,
+        },
+    ]
+
+
+def continuation_payload(
+    history: list[dict[str, Any]], cache_salt: str, kv_scope: str
+) -> dict[str, Any]:
+    return {
+        "model": MODEL,
+        "messages": history,
+        "tools": [tool()],
+        "tool_choice": "none",
+        "parallel_tool_calls": False,
+        "max_tokens": 1,
+        "stream": True,
+        "stream_options": {"include_usage": True},
+        "cache_salt": cache_salt,
+        "kv_scope": kv_scope,
+    }
+
+
+def offline_requests() -> list[tuple[str, dict[str, Any] | None, str | None]]:
+    """Each kind of request main() sends, built without a server."""
+    messages = base_messages(1, "offline")
+    # The continuation carries the initial turn's streamed output: reasoning
+    # and one call, of the shape collect_stream reassembles.
+    initial = {"content": "", "reasoning": "Call the tool."}
+    call = {
+        "id": "call_offline",
+        "type": "function",
+        "function": {
+            "name": "read_cache_proof",
+            "arguments": json.dumps({"path": TOOL_PATH}),
+        },
+    }
+    history = history_after(messages, initial, call)
+    fork = history + [{"role": "user", "content": FORK_QUESTION}]
+    continuation = continuation_payload(
+        history, "offline-shared", new_conversation("offline-parent")
     )
+    return [
+        ("/metrics", None, None),
+        ("/tokenize", tokenize_payload(messages), None),
+        (
+            "/v1/chat/completions",
+            initial_payload(
+                messages, "offline-shared", new_conversation("offline-parent")
+            ),
+            None,
+        ),
+        ("/v1/chat/completions", continuation, None),
+        (
+            "/v1/chat/completions",
+            continuation_payload(fork, "offline-shared", new_conversation("offline-fork")),
+            None,
+        ),
+        ("/v1/chat/completions/render", render_payload(continuation), None),
+    ]
+
+
+def server_token_count(messages: list[dict[str, Any]]) -> int:
+    response = request_json("/tokenize", tokenize_payload(messages))
     assert isinstance(response, dict)
     return int(response["count"])
 
@@ -380,20 +475,10 @@ def main() -> None:
     control_salt = f"{args.salt}-fresh-control"
     # One conversation: the tool-call turn and its tool-result continuation.
     parent_scope = new_conversation("parent")
-    initial_payload = {
-        "model": MODEL,
-        "messages": messages,
-        "tools": [tool()],
-        "tool_choice": "required",
-        "parallel_tool_calls": False,
-        "max_tokens": 1_024,
-        "stream": True,
-        "stream_options": {"include_usage": True},
-        "cache_salt": shared_salt,
-        "kv_scope": parent_scope,
-    }
     before = metric_snapshot()
-    initial, after_initial, initial_delta = inference_delta(initial_payload, before)
+    initial, after_initial, initial_delta = inference_delta(
+        initial_payload(messages, shared_salt, parent_scope), before
+    )
     calls = initial["tool_calls"]
     if initial["finish_reason"] != "tool_calls" or len(calls) != 1:
         raise AssertionError(f"Initial agent turn did not produce one tool call: {initial}")
@@ -411,35 +496,8 @@ def main() -> None:
             f"Unique initial cache salt unexpectedly hit {initial_delta['hits']} tokens"
         )
 
-    history = messages + [
-        {
-            "role": "assistant",
-            "content": initial["content"] or None,
-            "reasoning": initial["reasoning"],
-            "tool_calls": [call],
-        },
-        {
-            "role": "tool",
-            "tool_call_id": call["id"],
-            "content": TOOL_RESULT,
-        },
-    ]
-    continuation_base = {
-        "model": MODEL,
-        "messages": history,
-        "tools": [tool()],
-        "tool_choice": "none",
-        "parallel_tool_calls": False,
-        "max_tokens": 1,
-        "stream": True,
-        "stream_options": {"include_usage": True},
-    }
-
-    cached_payload = {
-        **continuation_base,
-        "cache_salt": shared_salt,
-        "kv_scope": parent_scope,
-    }
+    history = history_after(messages, initial, call)
+    cached_payload = continuation_payload(history, shared_salt, parent_scope)
     cached, after_cached, cached_delta = inference_delta(
         cached_payload,
         after_initial,
@@ -449,19 +507,14 @@ def main() -> None:
     # runs before the control so nothing but the parent's own requests has
     # allocated since the parent's continuation.
     fork_scope = new_conversation("fork")
-    fork_payload = {
-        **continuation_base,
-        "messages": history + [{"role": "user", "content": FORK_QUESTION}],
-        "cache_salt": shared_salt,
-        "kv_scope": fork_scope,
-    }
+    fork_payload = continuation_payload(
+        history + [{"role": "user", "content": FORK_QUESTION}],
+        shared_salt,
+        fork_scope,
+    )
     fork, after_fork, fork_delta = inference_delta(fork_payload, after_cached)
     control_scope = new_conversation("fresh-control")
-    control_payload = {
-        **continuation_base,
-        "cache_salt": control_salt,
-        "kv_scope": control_scope,
-    }
+    control_payload = continuation_payload(history, control_salt, control_scope)
     control, _, control_delta = inference_delta(control_payload, after_fork)
 
     block_size = before["block_size"]

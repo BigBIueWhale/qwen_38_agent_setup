@@ -375,27 +375,65 @@ def real_tokenizer_and_grammar_probe() -> dict[str, Any]:
     }
 
 
-def openai_stream_call() -> dict[str, Any]:
-    initial_messages = [
-        {
-            "role": "developer",
-            "content": "You MUST call read_file exactly once before answering.",
-        },
-        {"role": "user", "content": f"Read {PATH}."},
-    ]
-    # The tool call and its continuation are one conversation.
-    scope = new_conversation("openai-tool-loop")
-    payload = {
+OPENAI_LOOP_MESSAGES = [
+    {
+        "role": "developer",
+        "content": "You MUST call read_file exactly once before answering.",
+    },
+    {"role": "user", "content": f"Read {PATH}."},
+]
+
+
+def openai_loop_payload(kv_scope: str) -> dict[str, Any]:
+    return {
         "model": MODEL,
-        "messages": initial_messages,
+        "messages": OPENAI_LOOP_MESSAGES,
         "tools": [read_file_tool(False)],
         "tool_choice": "required",
         "parallel_tool_calls": False,
         "max_tokens": 1_024,
         "stream": True,
         "stream_options": {"include_usage": True},
-        "kv_scope": scope,
+        "kv_scope": kv_scope,
     }
+
+
+def openai_loop_continuation_payload(
+    call: dict[str, str], content: str, reasoning: str, kv_scope: str
+) -> dict[str, Any]:
+    """The loop through the tool result for ``call``, the streamed call as
+    the deltas reassemble it."""
+    history_call = {
+        "id": call["id"],
+        "type": "function",
+        "function": {"name": call["name"], "arguments": call["arguments"]},
+    }
+    history_assistant: dict[str, Any] = {
+        "role": "assistant",
+        "content": content or None,
+        "tool_calls": [history_call],
+    }
+    if reasoning:
+        history_assistant["reasoning"] = reasoning
+    return {
+        "model": MODEL,
+        "messages": OPENAI_LOOP_MESSAGES
+        + [
+            history_assistant,
+            {"role": "tool", "tool_call_id": call["id"], "content": TOOL_RESULT},
+        ],
+        "tools": [read_file_tool(False)],
+        "tool_choice": "auto",
+        "max_tokens": 1_024,
+        "stream": True,
+        "kv_scope": kv_scope,
+    }
+
+
+def openai_stream_call() -> dict[str, Any]:
+    # The tool call and its continuation are one conversation.
+    scope = new_conversation("openai-tool-loop")
+    payload = openai_loop_payload(scope)
     calls: dict[int, dict[str, str]] = {}
     reasoning = ""
     content = ""
@@ -429,31 +467,9 @@ def openai_stream_call() -> dict[str, Any]:
     if call["name"] != "read_file" or json.loads(call["arguments"]) != {"path": PATH}:
         raise AssertionError(f"Incorrect reconstructed OpenAI stream call: {call}")
 
-    history_call = {
-        "id": call["id"],
-        "type": "function",
-        "function": {"name": call["name"], "arguments": call["arguments"]},
-    }
-    history_assistant: dict[str, Any] = {
-        "role": "assistant",
-        "content": content or None,
-        "tool_calls": [history_call],
-    }
-    if reasoning:
-        history_assistant["reasoning"] = reasoning
-    continuation_payload = {
-        "model": MODEL,
-        "messages": initial_messages
-        + [
-            history_assistant,
-            {"role": "tool", "tool_call_id": call["id"], "content": TOOL_RESULT},
-        ],
-        "tools": [read_file_tool(False)],
-        "tool_choice": "auto",
-        "max_tokens": 1_024,
-        "stream": True,
-        "kv_scope": scope,
-    }
+    continuation_payload = openai_loop_continuation_payload(
+        call, content, reasoning, scope
+    )
     answer = ""
     continuation_finish = None
     for _, event in iter_sse("/v1/chat/completions", continuation_payload):
@@ -530,21 +546,57 @@ def collect_anthropic_stream(payload: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def anthropic_stream_call() -> dict[str, Any]:
-    first_user = {"role": "user", "content": f"Read {PATH}."}
-    # The tool call and its continuation are one conversation.
-    scope = new_conversation("anthropic-tool-loop")
-    payload = {
+ANTHROPIC_LOOP_SYSTEM = "You MUST call read_file exactly once before answering."
+ANTHROPIC_LOOP_USER = {"role": "user", "content": f"Read {PATH}."}
+
+
+def anthropic_loop_payload(kv_scope: str) -> dict[str, Any]:
+    return {
         "model": MODEL,
-        "system": "You MUST call read_file exactly once before answering.",
-        "messages": [first_user],
+        "system": ANTHROPIC_LOOP_SYSTEM,
+        "messages": [ANTHROPIC_LOOP_USER],
         "tools": [anthropic_read_file_tool(False)],
         "tool_choice": {"type": "any", "disable_parallel_tool_use": True},
         "max_tokens": 1_024,
         "stream": True,
-        "kv_scope": scope,
+        "kv_scope": kv_scope,
     }
-    first = collect_anthropic_stream(payload)
+
+
+def anthropic_loop_continuation_payload(
+    content: list[dict[str, Any]], tool_use_id: str, kv_scope: str
+) -> dict[str, Any]:
+    """The loop through the tool result for the first turn's call; ``content``
+    is that turn's blocks as the stream reassembles them."""
+    return {
+        "model": MODEL,
+        "system": ANTHROPIC_LOOP_SYSTEM,
+        "messages": [
+            ANTHROPIC_LOOP_USER,
+            {"role": "assistant", "content": content},
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "tool_result",
+                        "tool_use_id": tool_use_id,
+                        "content": TOOL_RESULT,
+                    }
+                ],
+            },
+        ],
+        "tools": [anthropic_read_file_tool(False)],
+        "tool_choice": {"type": "auto", "disable_parallel_tool_use": True},
+        "max_tokens": 1_024,
+        "stream": True,
+        "kv_scope": kv_scope,
+    }
+
+
+def anthropic_stream_call() -> dict[str, Any]:
+    # The tool call and its continuation are one conversation.
+    scope = new_conversation("anthropic-tool-loop")
+    first = collect_anthropic_stream(anthropic_loop_payload(scope))
     uses = [block for block in first["content"] if block.get("type") == "tool_use"]
     if not first["message_stop"] or first["stop_reason"] != "tool_use" or len(uses) != 1:
         raise AssertionError(f"Malformed Anthropic tool stream: {first}")
@@ -553,29 +605,7 @@ def anthropic_stream_call() -> dict[str, Any]:
         raise AssertionError(f"Incorrect Anthropic stream tool call: {use}")
 
     continuation = collect_anthropic_stream(
-        {
-            "model": MODEL,
-            "system": payload["system"],
-            "messages": [
-                first_user,
-                {"role": "assistant", "content": first["content"]},
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "tool_result",
-                            "tool_use_id": use["id"],
-                            "content": TOOL_RESULT,
-                        }
-                    ],
-                },
-            ],
-            "tools": [anthropic_read_file_tool(False)],
-            "tool_choice": {"type": "auto", "disable_parallel_tool_use": True},
-            "max_tokens": 1_024,
-            "stream": True,
-            "kv_scope": scope,
-        }
+        anthropic_loop_continuation_payload(first["content"], use["id"], scope)
     )
     answer = "".join(
         block.get("text", "")
@@ -600,63 +630,57 @@ def anthropic_stream_call() -> dict[str, Any]:
     }
 
 
-def live_policy_probe() -> dict[str, Any]:
-    # Each request below stands alone, so each carries its own new agent ID.
-    no_tool = post_json(
-        "/v1/chat/completions",
-        {
-            "model": MODEL,
-            "messages": [
-                {
-                    "role": "user",
-                    "content": "Do not call a tool. Briefly say that tools are disabled.",
-                }
-            ],
-            "tools": [read_file_tool(False)],
-            "tool_choice": "none",
-            "max_tokens": 512,
-            "kv_scope": new_conversation("tool-choice-none"),
-        },
-    )["choices"][0]
-    if no_tool["message"].get("tool_calls"):
-        raise AssertionError(f"tool_choice=none returned a tool call: {no_tool}")
+def tool_choice_none_payload(kv_scope: str) -> dict[str, Any]:
+    return {
+        "model": MODEL,
+        "messages": [
+            {
+                "role": "user",
+                "content": "Do not call a tool. Briefly say that tools are disabled.",
+            }
+        ],
+        "tools": [read_file_tool(False)],
+        "tool_choice": "none",
+        "max_tokens": 512,
+        "kv_scope": kv_scope,
+    }
 
-    parallel = post_json(
-        "/v1/chat/completions",
-        {
-            "model": MODEL,
-            "messages": [
-                {
-                    "role": "developer",
-                    "content": "You must use read_file. Never answer directly.",
-                },
-                {
-                    "role": "user",
-                    "content": f"Call read_file twice for {PATH}, as two parallel calls.",
-                },
-            ],
-            "tools": [read_file_tool(False)],
-            "tool_choice": "required",
-            "parallel_tool_calls": False,
-            "max_tokens": 1_024,
-            "kv_scope": new_conversation("parallel-calls-disabled"),
-        },
-    )["choices"][0]
-    parallel_calls = parallel["message"].get("tool_calls") or []
-    if parallel.get("finish_reason") != "tool_calls" or len(parallel_calls) != 1:
-        raise AssertionError(f"parallel_tool_calls=false did not expose one call: {parallel}")
 
-    malformed_openai = {
+def parallel_disabled_payload(kv_scope: str) -> dict[str, Any]:
+    return {
+        "model": MODEL,
+        "messages": [
+            {
+                "role": "developer",
+                "content": "You must use read_file. Never answer directly.",
+            },
+            {
+                "role": "user",
+                "content": f"Call read_file twice for {PATH}, as two parallel calls.",
+            },
+        ],
+        "tools": [read_file_tool(False)],
+        "tool_choice": "required",
+        "parallel_tool_calls": False,
+        "max_tokens": 1_024,
+        "kv_scope": kv_scope,
+    }
+
+
+def orphan_openai_payload(kv_scope: str) -> dict[str, Any]:
+    return {
         "model": MODEL,
         "messages": [
             {"role": "user", "content": "test"},
             {"role": "tool", "tool_call_id": "orphan", "content": "bad"},
         ],
         "max_tokens": 16,
-        "kv_scope": new_conversation("openai-orphan-tool-result"),
+        "kv_scope": kv_scope,
     }
-    openai_error = expect_http_400("/v1/chat/completions", malformed_openai)
-    malformed_anthropic = {
+
+
+def orphan_anthropic_payload(kv_scope: str) -> dict[str, Any]:
+    return {
         "model": MODEL,
         "messages": [
             {
@@ -667,10 +691,92 @@ def live_policy_probe() -> dict[str, Any]:
             }
         ],
         "max_tokens": 16,
-        "kv_scope": new_conversation("anthropic-orphan-tool-result"),
+        "kv_scope": kv_scope,
     }
+
+
+def offline_requests() -> list[tuple[str, dict[str, Any] | None, str | None]]:
+    """Each kind of request main() sends, built without a server."""
+    openai_scope = new_conversation("offline-openai-tool-loop")
+    # Continuations carry the first turn's call as the stream reassembles it.
+    call = {
+        "id": "call_offline",
+        "name": "read_file",
+        "arguments": json.dumps({"path": PATH}),
+    }
+    anthropic_scope = new_conversation("offline-anthropic-tool-loop")
+    first_content = [
+        {"type": "thinking", "thinking": "Read it first.", "signature": ""},
+        {
+            "type": "tool_use",
+            "id": "toolu_offline",
+            "name": "read_file",
+            "input": {"path": PATH},
+        },
+    ]
+    return [
+        ("/v1/chat/completions", openai_loop_payload(openai_scope), None),
+        (
+            "/v1/chat/completions",
+            openai_loop_continuation_payload(call, "", "Read it first.", openai_scope),
+            None,
+        ),
+        ("/v1/messages", anthropic_loop_payload(anthropic_scope), None),
+        (
+            "/v1/messages",
+            anthropic_loop_continuation_payload(
+                first_content, "toolu_offline", anthropic_scope
+            ),
+            None,
+        ),
+        (
+            "/v1/chat/completions",
+            tool_choice_none_payload(new_conversation("offline-tool-choice-none")),
+            None,
+        ),
+        (
+            "/v1/chat/completions",
+            parallel_disabled_payload(new_conversation("offline-parallel-disabled")),
+            None,
+        ),
+        (
+            "/v1/chat/completions",
+            orphan_openai_payload(new_conversation("offline-openai-orphan")),
+            "orphan",
+        ),
+        (
+            "/v1/messages",
+            orphan_anthropic_payload(new_conversation("offline-anthropic-orphan")),
+            "orphan",
+        ),
+    ]
+
+
+def live_policy_probe() -> dict[str, Any]:
+    # Each request below stands alone, so each carries its own new agent ID.
+    no_tool = post_json(
+        "/v1/chat/completions",
+        tool_choice_none_payload(new_conversation("tool-choice-none")),
+    )["choices"][0]
+    if no_tool["message"].get("tool_calls"):
+        raise AssertionError(f"tool_choice=none returned a tool call: {no_tool}")
+
+    parallel = post_json(
+        "/v1/chat/completions",
+        parallel_disabled_payload(new_conversation("parallel-calls-disabled")),
+    )["choices"][0]
+    parallel_calls = parallel["message"].get("tool_calls") or []
+    if parallel.get("finish_reason") != "tool_calls" or len(parallel_calls) != 1:
+        raise AssertionError(f"parallel_tool_calls=false did not expose one call: {parallel}")
+
+    openai_error = expect_http_400(
+        "/v1/chat/completions",
+        orphan_openai_payload(new_conversation("openai-orphan-tool-result")),
+    )
     anthropic_error = expect_http_400(
-        "/v1/messages", malformed_anthropic, ANTHROPIC_HEADERS
+        "/v1/messages",
+        orphan_anthropic_payload(new_conversation("anthropic-orphan-tool-result")),
+        ANTHROPIC_HEADERS,
     )
     if anthropic_error.get("error", {}).get("type") != "invalid_request_error":
         raise AssertionError(f"Anthropic validation error type is wrong: {anthropic_error}")

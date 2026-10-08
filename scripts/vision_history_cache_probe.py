@@ -10,7 +10,8 @@ an exact value that exists only in the historical tool-result image.
 The cold request and its three warm redraws -- the same final turn over the same
 history, through both protocols -- are one conversation under one agent ID. The
 changed-image and moved-image controls are histories of their own, each under
-its own new ID. Render-only requests allocate no KV and carry no ID.
+its own new ID. Renders allocate no KV and carry no ID; the Anthropic history a
+render converts is a Messages request, which names its line of work.
 """
 
 from __future__ import annotations
@@ -140,7 +141,7 @@ def openai_messages(data_url: str, *, moved: bool = False) -> list[dict[str, Any
 
 
 def anthropic_payload(
-    data_url: str, *, stream: bool, salt: str, kv_scope: str | None
+    data_url: str, *, stream: bool, salt: str, kv_scope: str
 ) -> dict[str, Any]:
     encoded = data_url.split(",", 1)[1]
     payload = {
@@ -190,9 +191,8 @@ def anthropic_payload(
         "max_tokens": 16_384,
         "cache_salt": salt,
         "stream": stream,
+        "kv_scope": kv_scope,
     }
-    if kv_scope is not None:
-        payload["kv_scope"] = kv_scope
     return payload
 
 
@@ -358,29 +358,46 @@ def validate_delta(delta: dict[str, int], prompt_tokens: int) -> None:
         raise AssertionError(f"Expected exactly one image cache query: {delta}")
 
 
-def render_proof(
-    tokenizer: Any, data_url: str
-) -> tuple[dict[str, Any], dict[str, Any]]:
-    openai_render = request_json(
-        "/v1/chat/completions/render",
-        {
-            "model": MODEL,
-            "messages": openai_messages(data_url),
-            "max_tokens": 1,
-        },
-    )
-    assert isinstance(openai_render, dict)
+def openai_render_payload(data_url: str, *, moved: bool = False) -> dict[str, Any]:
+    return {
+        "model": MODEL,
+        "messages": openai_messages(data_url, moved=moved),
+        "max_tokens": 1,
+    }
 
+
+def anthropic_render_payload(data_url: str) -> dict[str, Any]:
+    """The Anthropic history, converted as the Messages route converts it, as
+    a render request.
+
+    A Messages request is a generation request and names its line of work;
+    the render it is converted into allocates no KV and names none.
+    """
     anthropic_request = AnthropicMessagesRequest.model_validate(
-        anthropic_payload(data_url, stream=False, salt="render-only", kv_scope=None)
+        anthropic_payload(
+            data_url,
+            stream=False,
+            salt="render-only",
+            kv_scope=new_conversation("anthropic-history-render"),
+        )
     )
     converted = AnthropicServingMessages._convert_anthropic_to_openai_request(
         anthropic_request, merge_inline_system=True
     )
+    return converted.model_dump(
+        mode="json", by_alias=True, exclude_none=True, exclude={"kv_scope"}
+    ) | {"max_tokens": 1}
+
+
+def render_proof(
+    tokenizer: Any, data_url: str
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    openai_render = request_json(
+        "/v1/chat/completions/render", openai_render_payload(data_url)
+    )
+    assert isinstance(openai_render, dict)
     anthropic_render = request_json(
-        "/v1/chat/completions/render",
-        converted.model_dump(mode="json", by_alias=True, exclude_none=True)
-        | {"max_tokens": 1},
+        "/v1/chat/completions/render", anthropic_render_payload(data_url)
     )
     assert isinstance(anthropic_render, dict)
     if openai_render["token_ids"] != anthropic_render["token_ids"]:
@@ -413,12 +430,7 @@ def render_proof(
         raise AssertionError("Omitted reasoning controls did not resolve to xhigh")
 
     moved_render = request_json(
-        "/v1/chat/completions/render",
-        {
-            "model": MODEL,
-            "messages": openai_messages(data_url, moved=True),
-            "max_tokens": 1,
-        },
+        "/v1/chat/completions/render", openai_render_payload(data_url, moved=True)
     )
     assert isinstance(moved_render, dict)
     if moved_render["token_ids"] == openai_render["token_ids"]:
@@ -633,6 +645,41 @@ def measured(fn, before: dict[str, int]) -> tuple[dict[str, Any], dict[str, int]
     validate_delta(delta, result["prompt_tokens"])
     result["cache_delta"] = delta
     return result, after
+
+
+def offline_requests() -> list[tuple[str, dict[str, Any] | None, str | None]]:
+    """Each kind of request main() sends, built without a server."""
+    data_url, _ = make_image("VX-0000", (228, 239, 248), "0" * 32)
+    salt = "vision-history-cache-offline"
+    scope = new_conversation("offline-tool-image-history")
+    return [
+        ("/v1/chat/completions/render", openai_render_payload(data_url), None),
+        ("/v1/chat/completions/render", anthropic_render_payload(data_url), None),
+        (
+            "/v1/chat/completions/render",
+            openai_render_payload(data_url, moved=True),
+            None,
+        ),
+        *(
+            (
+                "/v1/chat/completions",
+                openai_payload(
+                    data_url, stream=stream, salt=salt, kv_scope=scope, moved=moved
+                ),
+                None,
+            )
+            for stream, moved in ((True, False), (False, False), (True, True))
+        ),
+        *(
+            (
+                "/v1/messages",
+                anthropic_payload(data_url, stream=stream, salt=salt, kv_scope=scope),
+                None,
+            )
+            for stream in (True, False)
+        ),
+        ("/metrics", None, None),
+    ]
 
 
 def main() -> None:

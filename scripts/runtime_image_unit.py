@@ -126,6 +126,16 @@ class RuntimeImageTest(unittest.TestCase):
                        "--default-chat-template-kwargs"):
             self.assertIn(f"$(launch_arg_value {option})", script)
 
+    def test_probe_requests_unit_is_executed_during_check(self):
+        # The probes are not in the image; check runs every probe's offline
+        # request construction from the project, against the reviewed runtime.
+        script = (ROOT / "scripts/build-vllm.sh").read_text()
+        self.assertIn('--volume "${PROJECT_DIR}/scripts:/probes:ro" '
+                      '"${parser_unit_mounts[@]}"', script)
+        self.assertIn('"${BASE_IMAGE_TAG}" /probes/probe_requests_unit.py', script)
+        # A failure fails the gate: nothing after the unit discards its status.
+        self.assertRegex(script, r'/probes/probe_requests_unit\.py\n')
+
     def test_shared_prefix_unit_is_executed_during_build(self):
         recipe = (ROOT / "containers/Dockerfile.runtime").read_text()
         self.assertIn(

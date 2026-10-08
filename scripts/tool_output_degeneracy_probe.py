@@ -848,6 +848,42 @@ def responses_unit_boundary() -> dict[str, Any]:
     }
 
 
+def offline_requests() -> list[tuple[str, dict[str, Any] | None, str | None]]:
+    """Each kind of request main() sends, built without a server."""
+    budget = BUDGET_CANDIDATES[0]
+    scopes = {
+        route: new_conversation(f"offline-{label}-truncation")
+        for route, label in (
+            ("/v1/chat/completions", "chat"),
+            ("/v1/messages", "anthropic"),
+            ("/v1/responses", "responses"),
+        )
+    }
+    requests: list[tuple[str, dict[str, Any] | None, str | None]] = []
+    for stream in (False, True):
+        for tool_choice in ("required", "auto"):
+            requests.append(
+                (
+                    "/v1/chat/completions",
+                    chat_payload(
+                        tool_choice,
+                        budget,
+                        stream=stream,
+                        kv_scope=scopes["/v1/chat/completions"],
+                    ),
+                    None,
+                )
+            )
+        for route, build in (
+            ("/v1/messages", anthropic_payload),
+            ("/v1/responses", responses_payload),
+        ):
+            requests.append(
+                (route, build(budget, stream=stream, kv_scope=scopes[route]), None)
+            )
+    return requests
+
+
 def main() -> None:
     argparse.ArgumentParser(description=__doc__).parse_args()
     started = time.monotonic()

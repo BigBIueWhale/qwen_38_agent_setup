@@ -162,11 +162,40 @@ def unscoped_refusals(base_url: str) -> tuple[dict[str, dict], dict[str, dict]]:
     stream, so it is checked unstreamed only. The render and tokenize
     endpoints allocate nothing and need no agent, so they are not here.
     """
-    turn = [{"role": "user", "content": "Reply with one word."}]
     rendered = post_json(
-        f"{base_url}/tokenize", {"model": MODEL, "messages": turn}
+        f"{base_url}/tokenize", tokenize_payload(UNSCOPED_TURN)
     )["tokens"]
-    surfaces: dict[str, tuple[dict, dict, bool]] = {
+    refusals: dict[str, dict] = {}
+    stream_refusals: dict[str, dict] = {}
+    for path, (payload, headers, streams) in unscoped_surfaces(rendered).items():
+        status, body = post_status(f"{base_url}{path}", payload, headers)
+        refusals[path] = require_kv_scope_refusal(
+            path, "unscoped generation", status, body
+        )
+        if not streams:
+            continue
+        status, body = post_stream_status(
+            f"{base_url}{path}", {**payload, "stream": True}, headers
+        )
+        stream_refusals[path] = require_kv_scope_refusal(
+            path, "unscoped streaming generation", status, body
+        )
+    return refusals, stream_refusals
+
+
+UNSCOPED_TURN = [{"role": "user", "content": "Reply with one word."}]
+
+
+def tokenize_payload(messages: list[dict]) -> dict:
+    return {"model": MODEL, "messages": messages}
+
+
+def unscoped_surfaces(rendered: list[int]) -> dict[str, tuple[dict, dict, bool]]:
+    """Each generation route's request, complete but for ``kv_scope``, with the
+    headers it is sent with and whether the route streams; ``rendered`` is the
+    turn's prompt ids for the token-in-token-out surface."""
+    turn = UNSCOPED_TURN
+    return {
         "/v1/chat/completions": (
             {"model": MODEL, "messages": turn, "max_tokens": 1},
             {},
@@ -207,22 +236,6 @@ def unscoped_refusals(base_url: str) -> tuple[dict[str, dict], dict[str, dict]]:
             True,
         ),
     }
-    refusals: dict[str, dict] = {}
-    stream_refusals: dict[str, dict] = {}
-    for path, (payload, headers, streams) in surfaces.items():
-        status, body = post_status(f"{base_url}{path}", payload, headers)
-        refusals[path] = require_kv_scope_refusal(
-            path, "unscoped generation", status, body
-        )
-        if not streams:
-            continue
-        status, body = post_stream_status(
-            f"{base_url}{path}", {**payload, "stream": True}, headers
-        )
-        stream_refusals[path] = require_kv_scope_refusal(
-            path, "unscoped streaming generation", status, body
-        )
-    return refusals, stream_refusals
 
 
 def iter_sse_events(response: HTTPResponse) -> Iterator[dict | str]:
@@ -233,6 +246,24 @@ def iter_sse_events(response: HTTPResponse) -> Iterator[dict | str]:
             continue
         data = line[len("data: ") :]
         yield data if data == "[DONE]" else json.loads(data)
+
+
+OVERLAP_TURN = [
+    {
+        "role": "user",
+        "content": "List forty different colors, one per line, with a note on each.",
+    }
+]
+
+
+def overlap_payload(kv_scope: str, max_tokens: int, *, stream: bool) -> dict:
+    return {
+        "model": MODEL,
+        "messages": OVERLAP_TURN,
+        "max_tokens": max_tokens,
+        **({"stream": True} if stream else {}),
+        "kv_scope": kv_scope,
+    }
 
 
 def overlap_refusals(base_url: str) -> dict:
@@ -249,25 +280,10 @@ def overlap_refusals(base_url: str) -> dict:
     """
     path = "/v1/chat/completions"
     scope = new_conversation("overlap")
-    turn = [
-        {
-            "role": "user",
-            "content": (
-                "List forty different colors, one per line, with a note on each."
-            ),
-        }
-    ]
     request = urllib.request.Request(
         f"{base_url}{path}",
         data=json.dumps(
-            {
-                "model": MODEL,
-                "messages": turn,
-                "max_tokens": 256,
-                "stream": True,
-                "kv_scope": scope,
-            },
-            ensure_ascii=False,
+            overlap_payload(scope, 256, stream=True), ensure_ascii=False
         ).encode("utf-8"),
         headers={"Content-Type": "application/json", "Accept": "text/event-stream"},
     )
@@ -286,17 +302,10 @@ def overlap_refusals(base_url: str) -> dict:
             raise RuntimeError(
                 f"The request to overlap did not start generating: {opening}"
             )
-        overlapping = {
-            "model": MODEL,
-            "messages": turn,
-            "max_tokens": 1,
-            "kv_scope": scope,
-        }
         for label, stream in (("non_streaming", False), ("streaming", True)):
+            overlapping = overlap_payload(scope, 1, stream=stream)
             if stream:
-                status, body = post_stream_status(
-                    f"{base_url}{path}", {**overlapping, "stream": True}
-                )
+                status, body = post_stream_status(f"{base_url}{path}", overlapping)
             else:
                 status, body = post_status(f"{base_url}{path}", overlapping)
             refusal = require_kv_scope_refusal(
@@ -334,6 +343,10 @@ def overlap_refusals(base_url: str) -> dict:
     }
 
 
+def marker_payload(text: str) -> dict:
+    return {"model": MODEL, "prompt": text, "add_special_tokens": False}
+
+
 def marker_token_ids(base_url: str) -> dict[str, int]:
     """Resolve the single ids of the markers the served count is defined by.
 
@@ -344,10 +357,7 @@ def marker_token_ids(base_url: str) -> dict[str, int]:
     """
     ids: dict[str, int] = {}
     for text in (REASONING_END, TOOL_CALL_START, END_OF_TURN):
-        response = post_json(
-            f"{base_url}/tokenize",
-            {"model": MODEL, "prompt": text, "add_special_tokens": False},
-        )
+        response = post_json(f"{base_url}/tokenize", marker_payload(text))
         tokens = response.get("tokens")
         if not isinstance(tokens, list) or len(tokens) != 1:
             raise RuntimeError(f"{text!r} is not a single token: {response}")
@@ -396,43 +406,71 @@ def require_exact_usage(
     return expected
 
 
-def openai_trial(base_url: str, markers: dict[str, int]) -> dict:
-    tool = {
-        "type": "function",
-        "function": {
-            "name": "read_file",
-            "description": "Read a UTF-8 text file from the local workspace.",
-            "parameters": {
-                "type": "object",
-                "properties": {"path": {"type": "string"}},
-                "required": ["path"],
-                "additionalProperties": False,
-            },
+OPENAI_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "read_file",
+        "description": "Read a UTF-8 text file from the local workspace.",
+        "parameters": {
+            "type": "object",
+            "properties": {"path": {"type": "string"}},
+            "required": ["path"],
+            "additionalProperties": False,
         },
+    },
+}
+OPENAI_INITIAL = [
+    {
+        "role": "developer",
+        "content": (
+            "You are a local coding agent. You MUST call read_file before "
+            "answering and must never invent file contents."
+        ),
+    },
+    {"role": "user", "content": f"Read {PATH} and report its first heading."},
+]
+
+
+def openai_first_payload(kv_scope: str, *, stream: bool) -> dict:
+    payload = {
+        "model": MODEL,
+        "messages": OPENAI_INITIAL,
+        "tools": [OPENAI_TOOL],
+        "tool_choice": "auto",
+        "max_tokens": 1_024,
+        "kv_scope": kv_scope,
+        "return_token_ids": True,
     }
-    initial = [
-        {
-            "role": "developer",
-            "content": (
-                "You are a local coding agent. You MUST call read_file before "
-                "answering and must never invent file contents."
-            ),
-        },
-        {"role": "user", "content": f"Read {PATH} and report its first heading."},
-    ]
+    if stream:
+        payload |= {"stream": True, "stream_options": {"include_usage": True}}
+    return payload
+
+
+def openai_continuation_payload(
+    content: str | None, call: dict, kv_scope: str
+) -> dict:
+    return {
+        "model": MODEL,
+        "messages": OPENAI_INITIAL
+        + [
+            {"role": "assistant", "content": content, "tool_calls": [call]},
+            {"role": "tool", "tool_call_id": call["id"], "content": TOOL_RESULT},
+        ],
+        "tools": [OPENAI_TOOL],
+        "tool_choice": "auto",
+        "max_tokens": 1_024,
+        "kv_scope": kv_scope,
+        "return_token_ids": True,
+    }
+
+
+def openai_trial(base_url: str, markers: dict[str, int]) -> dict:
     # The tool call, its streamed redraw and the continuation are one
     # conversation.
     scope = new_conversation("openai-trial")
-    first_request = {
-        "model": MODEL,
-        "messages": initial,
-        "tools": [tool],
-        "tool_choice": "auto",
-        "max_tokens": 1_024,
-        "kv_scope": scope,
-        "return_token_ids": True,
-    }
-    first = post_json(f"{base_url}/v1/chat/completions", first_request)
+    first = post_json(
+        f"{base_url}/v1/chat/completions", openai_first_payload(scope, stream=False)
+    )
     choice = first["choices"][0]
     assistant = choice["message"]
     calls = assistant.get("tool_calls") or []
@@ -450,12 +488,7 @@ def openai_trial(base_url: str, markers: dict[str, int]) -> dict:
     # The same request streamed: the final usage chunk must describe the
     # ids the chunks carried, by the same boundary.
     streamed = post_sse(
-        f"{base_url}/v1/chat/completions",
-        {
-            **first_request,
-            "stream": True,
-            "stream_options": {"include_usage": True},
-        },
+        f"{base_url}/v1/chat/completions", openai_first_payload(scope, stream=True)
     )
     streamed_ids: list[int] = []
     for event in streamed:
@@ -468,29 +501,9 @@ def openai_trial(base_url: str, markers: dict[str, int]) -> dict:
         usage_chunks[0]["usage"], streamed_ids, markers, "OpenAI streamed tool call"
     )
 
-    messages = initial + [
-        {
-            "role": "assistant",
-            "content": assistant.get("content"),
-            "tool_calls": [call],
-        },
-        {
-            "role": "tool",
-            "tool_call_id": call["id"],
-            "content": TOOL_RESULT,
-        },
-    ]
     second = post_json(
         f"{base_url}/v1/chat/completions",
-        {
-            "model": MODEL,
-            "messages": messages,
-            "tools": [tool],
-            "tool_choice": "auto",
-            "max_tokens": 1_024,
-            "kv_scope": scope,
-            "return_token_ids": True,
-        },
+        openai_continuation_payload(assistant.get("content"), call, scope),
     )
     continuation = second["choices"][0]
     answer = continuation["message"].get("content") or ""
@@ -523,37 +536,56 @@ def openai_trial(base_url: str, markers: dict[str, int]) -> dict:
     }
 
 
-def anthropic_trial(base_url: str) -> dict:
-    tool = {
-        "name": "read_file",
-        "description": "Read a UTF-8 text file from the local workspace.",
-        "input_schema": {
-            "type": "object",
-            "properties": {"path": {"type": "string"}},
-            "required": ["path"],
-            "additionalProperties": False,
+ANTHROPIC_TOOL = {
+    "name": "read_file",
+    "description": "Read a UTF-8 text file from the local workspace.",
+    "input_schema": OPENAI_TOOL["function"]["parameters"],
+}
+ANTHROPIC_SYSTEM = (
+    "You are a local coding agent. You MUST call read_file before answering "
+    "and must never invent file contents."
+)
+ANTHROPIC_FIRST_USER = {
+    "role": "user",
+    "content": f"Read {PATH} and report its first heading.",
+}
+
+
+def anthropic_payload(messages: list[dict], kv_scope: str) -> dict:
+    return {
+        "model": MODEL,
+        "system": ANTHROPIC_SYSTEM,
+        "messages": messages,
+        "tools": [ANTHROPIC_TOOL],
+        "max_tokens": 1_024,
+        "kv_scope": kv_scope,
+    }
+
+
+def anthropic_continuation(content: list[dict], tool_use_id: str) -> list[dict]:
+    """The conversation through the tool result for the first turn's call."""
+    return [
+        ANTHROPIC_FIRST_USER,
+        {"role": "assistant", "content": content},
+        {
+            "role": "user",
+            "content": [
+                {
+                    "type": "tool_result",
+                    "tool_use_id": tool_use_id,
+                    "content": TOOL_RESULT,
+                }
+            ],
         },
-    }
-    system = (
-        "You are a local coding agent. You MUST call read_file before answering "
-        "and must never invent file contents."
-    )
-    first_user = {
-        "role": "user",
-        "content": f"Read {PATH} and report its first heading.",
-    }
+    ]
+
+
+def anthropic_trial(base_url: str) -> dict:
     # The tool call and its continuation are one conversation.
     scope = new_conversation("anthropic-trial")
     first = post_json(
         f"{base_url}/v1/messages",
-        {
-            "model": MODEL,
-            "system": system,
-            "messages": [first_user],
-            "tools": [tool],
-            "max_tokens": 1_024,
-            "kv_scope": scope,
-        },
+        anthropic_payload([ANTHROPIC_FIRST_USER], scope),
         ANTHROPIC_HEADERS,
     )
     tool_blocks = [block for block in first["content"] if block["type"] == "tool_use"]
@@ -563,30 +595,9 @@ def anthropic_trial(base_url: str) -> dict:
     if use["name"] != "read_file" or use["input"] != {"path": PATH}:
         raise RuntimeError(f"Incorrect Anthropic tool call: {use}")
 
-    messages = [
-        first_user,
-        {"role": "assistant", "content": first["content"]},
-        {
-            "role": "user",
-            "content": [
-                {
-                    "type": "tool_result",
-                    "tool_use_id": use["id"],
-                    "content": TOOL_RESULT,
-                }
-            ],
-        },
-    ]
     second = post_json(
         f"{base_url}/v1/messages",
-        {
-            "model": MODEL,
-            "system": system,
-            "messages": messages,
-            "tools": [tool],
-            "max_tokens": 1_024,
-            "kv_scope": scope,
-        },
+        anthropic_payload(anthropic_continuation(first["content"], use["id"]), scope),
         ANTHROPIC_HEADERS,
     )
     answer = "".join(
@@ -607,6 +618,68 @@ def anthropic_trial(base_url: str) -> dict:
         ),
         "heading_present": True,
     }
+
+
+def offline_requests() -> list[tuple[str, dict | None, str | None]]:
+    """Each kind of request main() sends, built without a server."""
+    requests: list[tuple[str, dict | None, str | None]] = [
+        ("/tokenize", tokenize_payload(UNSCOPED_TURN), None),
+        ("/tokenize", marker_payload(REASONING_END), None),
+    ]
+    # The token route is sent the turn's rendered ids; any ids have its shape.
+    for path, (payload, _, streams) in unscoped_surfaces([1, 2, 3]).items():
+        requests.append((path, payload, "kv_scope"))
+        if streams:
+            requests.append((path, {**payload, "stream": True}, "kv_scope"))
+    overlap_scope = new_conversation("offline-overlap")
+    requests.append(
+        ("/v1/chat/completions", overlap_payload(overlap_scope, 256, stream=True), None)
+    )
+    for stream in (False, True):
+        requests.append(
+            (
+                "/v1/chat/completions",
+                overlap_payload(overlap_scope, 1, stream=stream),
+                "kv_scope",
+            )
+        )
+    # Continuations carry the first turn's call, of the shape the routes return.
+    openai_scope = new_conversation("offline-openai-trial")
+    call = {
+        "id": "call_offline",
+        "type": "function",
+        "function": {"name": "read_file", "arguments": json.dumps({"path": PATH})},
+    }
+    requests += [
+        ("/v1/chat/completions", openai_first_payload(openai_scope, stream=False), None),
+        ("/v1/chat/completions", openai_first_payload(openai_scope, stream=True), None),
+        (
+            "/v1/chat/completions",
+            openai_continuation_payload(None, call, openai_scope),
+            None,
+        ),
+    ]
+    anthropic_scope = new_conversation("offline-anthropic-trial")
+    first_content = [
+        {"type": "thinking", "thinking": "Read it first.", "signature": ""},
+        {
+            "type": "tool_use",
+            "id": "toolu_offline",
+            "name": "read_file",
+            "input": {"path": PATH},
+        },
+    ]
+    requests += [
+        ("/v1/messages", anthropic_payload([ANTHROPIC_FIRST_USER], anthropic_scope), None),
+        (
+            "/v1/messages",
+            anthropic_payload(
+                anthropic_continuation(first_content, "toolu_offline"), anthropic_scope
+            ),
+            None,
+        ),
+    ]
+    return requests
 
 
 def main() -> None:
