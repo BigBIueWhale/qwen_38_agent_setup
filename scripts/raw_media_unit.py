@@ -31,6 +31,9 @@ processor.info = SimpleNamespace(
         image_token_id=101, vision_start_token_id=102,
         vision_end_token_id=103, video_token_id=104),
 )
+# What the processor derives from its own output for one dummy image (on the
+# served processor: <|image_pad|> alone); the derivation itself is driven below.
+processor.rendered_media_token_ids = {"image": frozenset({101})}
 updates = {"image": [[PromptReplacement("image", [101], [101, 101]).resolve(0)]]}
 info = MultiModalProcessingInfo(
     kwargs={"image": [None]}, hashes={"image": ["native"]}, prompt_updates=updates)
@@ -69,6 +72,72 @@ for tokens in ([7, 102, 101, 101, 103, 8], [7, 101, 8]):
         assert error.parameter == "token_ids"
     else:
         raise AssertionError("Rendered image tokens were accepted as text")
+
+# Every processor decides by the same rule, not Qwen3-VL's override alone:
+# the added-vocabulary ids a processor places where the model embeds an
+# item's features, read from its own output for one dummy item of each
+# modality it accepts, stand only inside a supplied item's span. Driven on a
+# processor with no rendered-span override of its own.
+from vllm.model_executor.models.llava import LlavaMultiModalProcessor
+from vllm.multimodal.processing.processor import PromptUpdateDetails
+
+OPEN, IMAGE, CLOSE, BOS = 5, 9, 6, 1
+span = [OPEN, IMAGE, IMAGE, IMAGE, CLOSE]
+plain_updates = {"image": [[PromptReplacement(
+    "image", [IMAGE], PromptUpdateDetails.select_token_id(span, IMAGE)).resolve(0)]]}
+plain_info = MultiModalProcessingInfo(
+    kwargs={"image": [None]}, hashes={"image": ["dummy"]},
+    prompt_updates=plain_updates)
+built = []
+plain = object.__new__(LlavaMultiModalProcessor)
+plain.info = SimpleNamespace(
+    ctx=SimpleNamespace(
+        get_mm_config=lambda: SimpleNamespace(limit_per_prompt={}),
+        model_config=SimpleNamespace(max_model_len=64)),
+    allowed_mm_limits={"image": 2, "video": 0},
+    # IMAGE and BOS are added vocabulary; OPEN and CLOSE frame the span but
+    # are never embedded.
+    get_tokenizer=lambda: SimpleNamespace(
+        get_added_vocab=lambda: {"<image>": IMAGE, "<s>": BOS, "<o>": OPEN}),
+)
+plain.dummy_inputs = SimpleNamespace(
+    get_dummy_processor_inputs=lambda seq_len, mm_counts, mm_options: (
+        built.append(dict(mm_counts))
+        or ProcessorInputs([BOS, IMAGE], SimpleNamespace(
+            get_all_counts=lambda: dict(mm_counts)))))
+plain._apply_hf_processor = lambda inputs, timing: (
+    list(inputs.prompt), plain_info, False)
+plain_route = SimpleNamespace(mm_processor=plain)
+BaseRenderer.require_no_rendered_media(plain_route, [BOS, 7, OPEN, 8])
+for tokens in ([BOS, *span, 7], [BOS, 7, IMAGE, 8]):
+    try:
+        BaseRenderer.require_no_rendered_media(plain_route, tokens)
+    except VLLMValidationError as error:
+        assert error.parameter == "token_ids"
+        assert "outside the span of any supplied image input" in str(error)
+    else:
+        raise AssertionError(
+            f"A processor without an override accepted media ids as text: {tokens}")
+plain._cached_apply_hf_processor = lambda inputs, timing: (
+    list(inputs.prompt.token_ids), plain_info, False)
+one_image = SimpleNamespace(get_all_counts=lambda: {"image": 1})
+for tokens, valid in (
+    ([BOS, *span, 7], True),
+    ([BOS, *span, 7, *span], False),  # a second span beyond the one image
+    ([BOS, *span, IMAGE], False),
+):
+    try:
+        output = plain.apply(
+            ProcessorInputs(RenderedPromptTokens(tokens), one_image),
+            TimingContext(enabled=False))
+    except VLLMValidationError:
+        assert not valid, tokens
+    else:
+        assert valid, f"A rendered span without its image was accepted: {tokens}"
+        assert output["prompt_token_ids"] == tokens
+assert plain.rendered_media_token_ids == {"image": frozenset({IMAGE})}, (
+    plain.rendered_media_token_ids)
+assert built == [{"image": 1}], built  # a modality the server refuses is not built
 
 # One decision of what an image part is. Every image part shape the chat
 # parser renders as an image -- both part types, extra keys, a null uuid, beside

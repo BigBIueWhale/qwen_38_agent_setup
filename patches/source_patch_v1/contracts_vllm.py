@@ -4256,11 +4256,34 @@ def _validate_render_every_image_after(state: State) -> None:
     }, label=label)
     require_text(state, "vllm/entrypoints/scale_out/token_in_token_out/serving.py",
                  "renderer.require_no_rendered_media(request.token_ids)", label=label)
+    # Every processor decides by one rule: the ids it embeds media at, read
+    # from its own output for one dummy item of each modality it accepts,
+    # stand only inside a supplied item's span.
+    processor = "vllm/multimodal/processing/processor.py"
+    _require_in_symbol(state, processor,
+        "BaseMultiModalProcessor.rendered_media_token_ids", (
+            "self.dummy_inputs.get_dummy_processor_inputs(",
+            "self._maybe_apply_prompt_updates(",
+            "get_added_vocab()",
+        ), label=label)
+    _require_in_symbol(state, processor,
+        "BaseMultiModalProcessor._find_rendered_prompt_placeholders", (
+            "self.rendered_media_token_ids.items()",
+            "if token in modality_of and position not in spanned:",
+        ), label=label)
+    # Derived once, where the renderer builds its processor: a processor that
+    # cannot derive it refuses startup, not a request.
+    _require_in_symbol(state, "vllm/renderers/base.py", "BaseRenderer.__init__", (
+        "dict(self.mm_processor.rendered_media_token_ids)",
+    ), label=label)
     require_python_symbols(
         state, "tests/entrypoints/scale_out/token_in_token_out/test_raw_media_boundary.py", {
             "test_render_carries_every_image_chat_renders": None,
             "test_input_image_names_its_required_detail": None,
             "test_rendered_media_spans_require_their_images": None,
+            "test_every_processor_reads_its_media_ids_from_its_own_output": None,
+            "test_a_processor_without_an_override_refuses_media_ids_as_text": None,
+            "test_rendered_media_holds_no_span_beyond_its_images": None,
         }, label=label)
 
 def _validate_rendered_prompt_truncation_before(state: State) -> None:
@@ -5693,7 +5716,12 @@ CONTRACTS: Mapping[str, SemanticContract] = {
             "the transport's one image shape. input_image.detail is required, "
             "as upstream's type declares, and refused naming detail where its "
             "absence was a 500; the generate text path refuses an image span "
-            "that arrives without its image."
+            "that arrives without its image. Every processor decides that by "
+            "one rule: the added-vocabulary ids it embeds media at, read from "
+            "its own output for one dummy item of each modality it accepts, "
+            "stand only inside a supplied item's span -- the processor's "
+            "per-item span search alone found nothing in ids that supply no "
+            "media, and nothing past the last supplied item."
         ),
         removal_condition=(
             "Remove when pinned upstream's render route carries every image "
