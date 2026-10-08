@@ -15,7 +15,7 @@ diff --git a/tests/v1/worker/test_gpu_worker.py b/tests/v1/worker/test_gpu_worke
  
  from vllm.utils.mem_constants import GiB_bytes
  from vllm.v1.worker import startup_plan
-@@ -77,3 +79,230 @@
+@@ -77,3 +79,389 @@
      explicit = _plan_worker(kv_bytes=7 * GiB_bytes)
      maybe_apply_startup_plan(explicit)
      assert explicit.cache_config.kv_cache_memory_bytes == 7 * GiB_bytes
@@ -141,7 +141,9 @@ diff --git a/tests/v1/worker/test_gpu_worker.py b/tests/v1/worker/test_gpu_worke
 +def test_served_profile_encodes_with_workspace_released_and_attends_in_text():
 +    """The profile runs each phase in the residency serving runs it in: the
 +    encoder with the reclaimable workspace released, the text step with it
-+    resident, attending over the longest context a request holds."""
++    resident, attending over the longest context a request holds, its
++    sampler and prompt log probabilities at the most a request is admitted
++    with."""
 +    from vllm.v1.worker import gpu_model_runner
 +
 +    events = []
@@ -156,6 +158,7 @@ diff --git a/tests/v1/worker/test_gpu_worker.py b/tests/v1/worker/test_gpu_worke
 +
 +    runner = SimpleNamespace(
 +        max_model_len=4096,
++        _largest_admitted_logprob_count=lambda: 20,
 +        _run_dummy_encoder=lambda: events.append("encoder"),
 +        _run_dummy_text_step=lambda **kwargs: events.append(("text", kwargs)),
 +    )
@@ -163,8 +166,164 @@ diff --git a/tests/v1/worker/test_gpu_worker.py b/tests/v1/worker/test_gpu_worke
 +        gpu_model_runner.GPUModelRunner.profile_served_phases(runner)
 +    assert events == [
 +        "released", "encoder", "restored",
-+        ("text", {"force_attention": True, "profile_seq_lens": 4096}),
++        (
++            "text",
++            {
++                "num_logprobs": 20,
++                "force_attention": True,
++                "profile_seq_lens": 4096,
++            },
++        ),
 +    ]
++
++
++@pytest.mark.parametrize(
++    ("max_logprobs", "expected"), [(20, 20), (0, 0), (-1, 1000), (5000, 1000)]
++)
++def test_largest_admitted_logprob_count(max_logprobs, expected):
++    """The most log probabilities per position SamplingParams admits: -1
++    admits the whole vocabulary, and no request can ask for more than it."""
++    from vllm.v1.worker import gpu_model_runner
++
++    runner = SimpleNamespace(
++        model_config=SimpleNamespace(
++            max_logprobs=max_logprobs, get_vocab_size=lambda: 1000
++        )
++    )
++    assert (
++        gpu_model_runner.GPUModelRunner._largest_admitted_logprob_count(runner)
++        == expected
++    )
++
++
++@pytest.mark.parametrize("num_logprobs", [None, 20])
++def test_served_text_step_samples_then_scores_the_prompt(num_logprobs):
++    """The served profile's text step samples with the counted log
++    probabilities, then scores every prompt row of the step; the CPU
++    warm-up (no count) samples as upstream does and scores nothing."""
++    from vllm.v1.worker import gpu_model_runner
++
++    events = []
++    hidden, last = torch.zeros(2048, 8), torch.zeros(1, 8)
++    runner = SimpleNamespace(
++        max_num_tokens=2048,
++        is_pooling_model=False,
++        encoder_cache={},
++        _dummy_run=lambda num_tokens, **kwargs: (
++            events.append(("forward", num_tokens, kwargs)) or (hidden, last)
++        ),
++        _dummy_sampler_run=lambda states, count: events.append(
++            ("sampler", states is last, count)
++        ),
++        _dummy_prompt_logprobs_run=lambda states, count: events.append(
++            ("prompt", states is hidden, count)
++        ),
++        _sync_device=lambda: None,
++    )
++    with patch.object(
++        gpu_model_runner,
++        "get_pp_group",
++        lambda: SimpleNamespace(is_last_rank=True),
++    ):
++        gpu_model_runner.GPUModelRunner._run_dummy_text_step(
++            runner, num_logprobs=num_logprobs, force_attention=True
++        )
++    expected = [
++        ("forward", 2048, {"is_profile": True, "force_attention": True}),
++        ("sampler", True, num_logprobs),
++    ]
++    if num_logprobs is not None:
++        expected.append(("prompt", True, num_logprobs))
++    assert events == expected
++
++
++def test_dummy_prompt_logprobs_scores_every_prompt_row_of_the_step():
++    """The dummy scores as serving does: the targets are a slice of a
++    prompt-length id tensor, one row per prompt position the step holds."""
++    from vllm.v1.worker import gpu_model_runner
++
++    calls = []
++
++    def computed(target_ids, hidden_states, logits_fn, count, mode):
++        calls.append(
++            (target_ids.shape[0], target_ids.dtype, hidden_states.shape[0], count,
++             mode, logits_fn)
++        )
++
++    for max_model_len, rows in ((4096, 2048), (1000, 999)):
++        calls.clear()
++        runner = SimpleNamespace(
++            max_num_tokens=2048,
++            max_model_len=max_model_len,
++            device=torch.device("cpu"),
++            model=SimpleNamespace(compute_logits=object()),
++            model_config=SimpleNamespace(logprobs_mode="raw_logits"),
++        )
++        with patch.object(
++            gpu_model_runner, "compute_prompt_logprobs_with_chunking", computed
++        ):
++            # The forward's output may be padded past the step's tokens.
++            gpu_model_runner.GPUModelRunner._dummy_prompt_logprobs_run(
++                runner, torch.zeros(2056, 8), 7
++            )
++        assert calls == [
++            (rows, torch.int64, rows, 7, "raw_logits", runner.model.compute_logits)
++        ]
++
++
++def test_prompt_logprobs_are_scored_by_the_profiled_function():
++    """Serving scores a chunk's prompt only through the function the profile
++    runs at its largest, never through a full-vocabulary log-softmax."""
++    import numpy as np
++
++    from vllm.v1.worker import gpu_model_runner
++
++    calls = []
++
++    def computed(target_ids, hidden_states, logits_fn, count, mode):
++        calls.append((target_ids.tolist(), hidden_states.shape[0], count, mode))
++        rows = target_ids.shape[0]
++        return (
++            torch.zeros(rows, count + 1, dtype=torch.int64),
++            torch.zeros(rows, count + 1),
++            torch.zeros(rows, dtype=torch.int64),
++        )
++
++    unprofiled = Mock(side_effect=AssertionError("unprofiled computation"))
++    request = SimpleNamespace(
++        prompt_token_ids=[5, 6, 7, 8, 9],
++        num_computed_tokens=0,
++        in_progress_prompt_logprobs_cpu=None,
++    )
++    runner = SimpleNamespace(
++        num_prompt_logprobs={"request": 2},
++        requests={"request": request},
++        device=torch.device("cpu"),
++        input_batch=SimpleNamespace(req_id_to_index={"request": 0}),
++        query_start_loc=SimpleNamespace(np=np.array([0, 5])),
++        model=SimpleNamespace(compute_logits=unprofiled),
++        sampler=SimpleNamespace(
++            compute_logprobs=unprofiled, gather_logprobs=unprofiled
++        ),
++        model_config=SimpleNamespace(logprobs_mode="raw_logprobs"),
++        _sync_device=lambda: None,
++    )
++    with (
++        patch.object(
++            gpu_model_runner, "compute_prompt_logprobs_with_chunking", computed
++        ),
++        patch.object(
++            gpu_model_runner,
++            "async_tensor_h2d",
++            lambda data, device, dtype=None: torch.tensor(data, dtype=dtype),
++        ),
++    ):
++        scored = gpu_model_runner.GPUModelRunner._get_prompt_logprobs_dict(
++            runner, torch.zeros(5, 8), {"request": 5}
++        )
++    assert calls == [([6, 7, 8, 9], 4, 2, "raw_logprobs")]
++    assert list(scored) == ["request"]
++    unprofiled.assert_not_called()
 +
 +
 +@pytest.mark.parametrize("fails", [False, True])
@@ -349,12 +508,12 @@ diff --git a/vllm/v1/worker/gpu_worker.py b/vllm/v1/worker/gpu_worker.py
 +        #    beyond THIS bound is refused loudly at engine initialization;
 +        #    one that merely exceeds the estimate proceeds.
 +        #
-+        #    The peak is the larger of the encoder phase's and the text
-+        #    step's, each with the workspaces it holds: profiling runs both
-+        #    in the residency serving runs them in (profile_served_phases),
-+        #    so the reclaimable workspace released around encoding is
-+        #    resident only through the text step and the sampler, where its
-+        #    bytes and the step's activations coincide.
++        #    The peak is the largest of the phases serving runs, each at its
++        #    largest and with the workspaces it holds: profiling runs them in
++        #    the residency serving runs them in (profile_served_phases), so
++        #    the reclaimable workspace released around encoding is resident
++        #    only through the text step, its sampler and its prompt log
++        #    probabilities, where its bytes and each phase's coincide.
          #
          # The utilization factor is deliberately NOT charged against the
 -        # declared pool. The superseded --kv-cache-memory byte flag ignored
@@ -402,7 +561,58 @@ diff --git a/vllm/v1/worker/gpu_worker.py b/vllm/v1/worker/gpu_worker.py
 diff --git a/vllm/v1/worker/gpu_model_runner.py b/vllm/v1/worker/gpu_model_runner.py
 --- a/vllm/v1/worker/gpu_model_runner.py
 +++ b/vllm/v1/worker/gpu_model_runner.py
-@@ -5978,9 +5978,10 @@
+@@ -220,6 +220,9 @@
+ from vllm.v1.worker.dp_utils import coordinate_batch_across_dp
+ from vllm.v1.worker.ec_connector_model_runner_mixin import ECConnectorModelRunnerMixin
+ from vllm.v1.worker.gpu.attn_utils import _reshape_attention_kv_cache
++from vllm.v1.worker.gpu.sample.prompt_logprob import (
++    compute_prompt_logprobs_with_chunking,
++)
+ from vllm.v1.worker.gpu_input_batch import CachedRequestState, InputBatch
+ from vllm.v1.worker.gpu_ubatch_wrapper import UBatchWrapper
+ from vllm.v1.worker.kv_connector_model_runner_mixin import KVConnectorModelRunnerMixin
+@@ -5798,28 +5801,31 @@
+                 # step. There are no more prompt logprobs to produce.
+                 continue
+ 
+-            # Get the logits corresponding to this req's prompt tokens.
++            # Get the hidden states of this req's prompt tokens.
+             # If this is a partial request (i.e. chunked prefill),
+             # then there is prompt logprob generated for each index.
+             req_idx = self.input_batch.req_id_to_index[req_id]
+             offset = self.query_start_loc.np[req_idx].item()
+             prompt_hidden_states = hidden_states[offset : offset + num_logits]
+-            logits = self.model.compute_logits(prompt_hidden_states)
+ 
+             # Get the "target" tokens for each index. For prompt at index i,
+             # the token at prompt index i+1 is the "sampled" token we want
+             # to gather the logprob for.
+             tgt_token_ids = prompt_token_ids[start_tok : start_tok + num_logits]
+ 
+-            # Compute prompt scores respecting logprobs_mode.
++            # Scores respecting logprobs_mode, computed as the V2 runner
++            # computes them: the logits of a bounded number of rows at a time,
++            # and only the requested scores, never a float32 log-softmax over
++            # the vocabulary for every row of the chunk. The startup profile
++            # runs this at its largest (_dummy_prompt_logprobs_run).
+             # NOTE: prompt tokens skip sampling processors, so
+             # processed_* and raw_* yield the same scores here.
+-            if self.model_config.logprobs_mode in ("raw_logits", "processed_logits"):
+-                scores = logits.to(torch.float32)
+-            else:
+-                scores = self.sampler.compute_logprobs(logits)
+-            token_ids, logprobs, ranks, _ = self.sampler.gather_logprobs(
+-                scores, num_prompt_logprobs, tgt_token_ids
++            token_ids, logprobs, ranks = compute_prompt_logprobs_with_chunking(
++                tgt_token_ids,
++                prompt_hidden_states,
++                self.model.compute_logits,
++                num_prompt_logprobs,
++                self.model_config.logprobs_mode,
+             )
+ 
+             # Transfer GPU->CPU async.
+@@ -5978,9 +5984,10 @@
              remove_lora: If False, dummy LoRAs are not destroyed after the run
              num_active_loras: Number of distinct active LoRAs to capture for.
                  LoRA is activated when num_active_loras > 0.
@@ -416,7 +626,7 @@ diff --git a/vllm/v1/worker/gpu_model_runner.py b/vllm/v1/worker/gpu_model_runne
          """
          mm_config = self.vllm_config.model_config.multimodal_config
          if mm_config and mm_config.mm_encoder_only:
-@@ -6126,7 +6127,10 @@
+@@ -6126,7 +6133,10 @@
              # Otherwise, it only happens for cudagraph_runtime_mode=FULL.
              if force_attention or cudagraph_runtime_mode == CUDAGraphMode.FULL:
                  if profile_seq_lens is not None:
@@ -428,7 +638,59 @@ diff --git a/vllm/v1/worker/gpu_model_runner.py b/vllm/v1/worker/gpu_model_runne
                  elif create_mixed_batch:
                      # In the mixed batch mode (used for FI warmup), we use
                      # shorter sequence lengths to run faster.
-@@ -6558,7 +6562,35 @@
+@@ -6354,6 +6364,7 @@
+     def _dummy_sampler_run(
+         self,
+         hidden_states: torch.Tensor,
++        max_num_logprobs: int | None = None,
+     ) -> torch.Tensor:
+         # The dummy hidden states may contain special values,
+         # like `inf` or `nan`.
+@@ -6378,7 +6389,7 @@
+             top_p=dummy_tensors(0.9),
+             top_k=dummy_tensors(logits.size(1) - 1),
+             generators={},
+-            max_num_logprobs=None,
++            max_num_logprobs=max_num_logprobs,
+             logprob_token_ids=None,
+             no_penalties=True,
+             prompt_token_ids=None,
+@@ -6470,5 +6481,34 @@
+             torch.accelerator.synchronize()
+         return sampler_output
+ 
++    def _largest_admitted_logprob_count(self) -> int:
++        """The most log probabilities per position a request is admitted
++        with, sampled or prompt (SamplingParams._validate_logprobs):
++        max_logprobs, where -1 admits the whole vocabulary."""
++        vocab_size = self.model_config.get_vocab_size()
++        max_logprobs = self.model_config.max_logprobs
++        return vocab_size if max_logprobs == -1 else min(max_logprobs, vocab_size)
++
++    def _dummy_prompt_logprobs_run(
++        self, hidden_states: torch.Tensor, num_prompt_logprobs: int
++    ) -> None:
++        """Compute prompt log probabilities for every prompt row a step can
++        hold, as _get_prompt_logprobs_dict does for a prefill chunk whose
++        request asked for them: the step's prompt-logprob phase at its
++        largest."""
++        num_rows = min(self.max_num_tokens, self.max_model_len - 1)
++        # Serving moves the whole prompt's ids to the device and slices the
++        # chunk's targets from them.
++        prompt_token_ids = torch.zeros(
++            self.max_model_len, dtype=torch.int64, device=self.device
++        )
++        compute_prompt_logprobs_with_chunking(
++            prompt_token_ids[1 : 1 + num_rows],
++            hidden_states[:num_rows],
++            self.model.compute_logits,
++            num_prompt_logprobs,
++            self.model_config.logprobs_mode,
++        )
++
+     def _dummy_pooler_run_task(
+         self,
+@@ -6558,7 +6598,38 @@
          return self._dummy_pooler_run_task(hidden_states, max_task)
  
      def profile_run(self) -> None:
@@ -449,26 +711,31 @@ diff --git a/vllm/v1/worker/gpu_model_runner.py b/vllm/v1/worker/gpu_model_runne
 +        runs it, and its outputs stay cached through the text step, as they
 +        stay while serving prefills the text that embeds them. The text step
 +        is max_num_tokens tokens with attention executed and every request's
-+        context at max_model_len, then the sampler; the reclaimable
-+        workspaces are resident through both. A memory profile around this
-+        therefore sees the peak of each phase together with the workspaces
-+        resident in that phase, and only those.
++        context at max_model_len, then the sampler and the step's prompt log
++        probabilities, each with the most log probabilities a request is
++        admitted with; the reclaimable workspaces are resident through all
++        three. A memory profile around this therefore sees the peak of each
++        phase together with the workspaces resident in that phase, and only
++        those.
 +        """
 +        with release_reclaimable_workspaces():
 +            self._run_dummy_encoder()
 +        self._run_dummy_text_step(
-+            force_attention=True, profile_seq_lens=self.max_model_len
++            num_logprobs=self._largest_admitted_logprob_count(),
++            force_attention=True, profile_seq_lens=self.max_model_len,
 +        )
 +
 +    def _run_dummy_encoder(self) -> None:
          if self.supports_mm_inputs:
              mm_config = self.model_config.multimodal_config
              if mm_config is not None and mm_config.skip_mm_profiling:
-@@ -6616,9 +6648,10 @@
+@@ -6616,15 +6687,22 @@
                          for i, output in enumerate(dummy_encoder_outputs):
                              self.encoder_cache[f"tmp_{i}"] = output
  
-+    def _run_dummy_text_step(self, **dummy_run_kwargs: Any) -> None:
++    def _run_dummy_text_step(
++        self, num_logprobs: int | None = None, **dummy_run_kwargs: Any
++    ) -> None:
          # Add `is_profile` here to pre-allocate communication buffers
          hidden_states, last_hidden_states = self._dummy_run(
 -            self.max_num_tokens, is_profile=True
@@ -476,7 +743,18 @@ diff --git a/vllm/v1/worker/gpu_model_runner.py b/vllm/v1/worker/gpu_model_runne
          )
          if get_pp_group().is_last_rank:
              if self.is_pooling_model:
-@@ -6632,7 +6665,7 @@
+                 output = self._dummy_pooler_run(hidden_states)
+             else:
+-                output = self._dummy_sampler_run(last_hidden_states)
++                output = self._dummy_sampler_run(last_hidden_states, num_logprobs)
++                if num_logprobs is not None:
++                    # Serving computes a chunk's prompt log probabilities
++                    # once it has sampled the step.
++                    self._dummy_prompt_logprobs_run(hidden_states, num_logprobs)
+         else:
+             output = None
+         self._sync_device()
+@@ -6632,7 +6710,7 @@
          self.encoder_cache.clear()
          gc.collect()
  
@@ -485,7 +763,7 @@ diff --git a/vllm/v1/worker/gpu_model_runner.py b/vllm/v1/worker/gpu_model_runne
          from vllm.v1.core.kv_cache_utils import (
              get_kv_cache_config_from_groups,
              get_kv_cache_groups,
-@@ -6658,7 +6691,33 @@
+@@ -6658,7 +6736,33 @@
          self.initialize_kv_cache(minimal_config, is_profiling=True)
          self.cache_config.num_gpu_blocks = minimal_config.num_blocks
  

@@ -2207,7 +2207,8 @@ def _validate_kv_physical_after(state: State) -> None:
     )
     # Each phase runs in the residency serving runs it in: the encoder with
     # the reclaimable workspace released, the text step attending at full
-    # context with it resident.
+    # context with it resident, then its sampler and its prompt log
+    # probabilities at the most a request is admitted with.
     _require_ordered(
         _symbol_source(state, runner, "GPUModelRunner.profile_served_phases",
                        label=label),
@@ -2215,10 +2216,36 @@ def _validate_kv_physical_after(state: State) -> None:
             "with release_reclaimable_workspaces():",
             "self._run_dummy_encoder()",
             "self._run_dummy_text_step(",
+            "num_logprobs=self._largest_admitted_logprob_count(),",
             "force_attention=True, profile_seq_lens=self.max_model_len",
         ),
         label=label,
         location=f"{runner}:GPUModelRunner.profile_served_phases",
+    )
+    _require_ordered(
+        _symbol_source(state, runner, "GPUModelRunner._run_dummy_text_step",
+                       label=label),
+        (
+            "self._dummy_sampler_run(last_hidden_states, num_logprobs)",
+            "self._dummy_prompt_logprobs_run(hidden_states, num_logprobs)",
+        ),
+        label=label,
+        location=f"{runner}:GPUModelRunner._run_dummy_text_step",
+    )
+    # Serving scores a chunk's prompt through the function the profile runs
+    # at its largest, never a float32 log-softmax over the vocabulary for
+    # every row of the chunk.
+    for symbol in ("GPUModelRunner._get_prompt_logprobs_dict",
+                   "GPUModelRunner._dummy_prompt_logprobs_run"):
+        _require_in_symbol(state, runner, symbol, (
+            "compute_prompt_logprobs_with_chunking(",
+        ), label=label)
+    _require(
+        "self.sampler.compute_logprobs(" not in _symbol_source(
+            state, runner, "GPUModelRunner._get_prompt_logprobs_dict", label=label
+        ),
+        f"{label}: prompt log probabilities take a full-vocabulary log-softmax "
+        "the profile does not run",
     )
     _require_ordered(
         _symbol_source(state, runner, "GPUModelRunner.profiling_kv_cache", label=label),
@@ -2238,6 +2265,10 @@ def _validate_kv_physical_after(state: State) -> None:
     require_python_symbols(state, "tests/v1/worker/test_gpu_worker.py", {
         "test_physical_bound_charges_preexisting_residents_once": None,
         "test_served_profile_encodes_with_workspace_released_and_attends_in_text": None,
+        "test_largest_admitted_logprob_count": None,
+        "test_served_text_step_samples_then_scores_the_prompt": None,
+        "test_dummy_prompt_logprobs_scores_every_prompt_row_of_the_step": None,
+        "test_prompt_logprobs_are_scored_by_the_profiled_function": None,
         "test_profiling_kv_cache_yields_stand_in_bytes_and_always_removes_it": None,
         "test_dummy_context_covers_its_own_query": None,
     }, label=label)
@@ -4864,11 +4895,13 @@ CONTRACTS: Mapping[str, SemanticContract] = {
             "The declared KV capacity cannot spend memory already occupied before "
             "profiling, nor memory serving holds beside its pool. Bound it by "
             "initially free memory minus what stays resident after a profile that "
-            "runs each phase in the residency serving runs it in -- the encoder "
-            "with the reclaimable workspace released, the text step attending to "
-            "a stand-in pool at full context with it resident, the sampler -- the "
-            "peak of those phases above that with the stand-in pool taken off, "
-            "CUDA graph and frontend reservations."
+            "runs each phase at its largest in the residency serving runs it in -- "
+            "the encoder with the reclaimable workspace released, the text step "
+            "attending to a stand-in pool at full context with it resident, its "
+            "sampler and its prompt log probabilities at the most a request is "
+            "admitted with, computed as serving computes them -- the peak of "
+            "those phases above that with the stand-in pool taken off, CUDA "
+            "graph and frontend reservations."
         ),
         removal_condition=(
             "Remove when upstream's authoritative bound includes pre-snapshot "

@@ -315,7 +315,7 @@ It is intentionally reconstructed by the ordered, reviewed semantic transformati
 | patches/vllm-anthropic-input-fidelity.patch | 3252e25a6c2e9d8ee0eec4cb383fc292bff2afaac2e3becdc1006c68b3b02c3c |
 | patches/vllm-qwen-exact-tool-language.patch | e0bdd47262490c88bc600b858e3320efdd4dc4c80c218761fe01378b0e8c8134 |
 | patches/vllm-png-source-admission.patch | b1b684a96d7243ae647d4d8ce2fe69b7330b3ab243ea77903c4cfb346bc80549 |
-| patches/vllm-kv-physical-free-memory.patch | 2fa5466ef1c8c5bc8d9651e269d83d8f7496fb8a5097273cb2c626dc7707471c |
+| patches/vllm-kv-physical-free-memory.patch | 9cc5b619c097a9ef3f8c10312444687c35a9853109e094f7a3dd17a3d776bca8 |
 | patches/vllm-qwen-single-call-grammar.patch | 878ba3d98284a326784ffced00a64b38dd827cbc80f136cf1e582df469c3eced |
 | patches/vllm-responses-history-integrity.patch | d2c6343087fc287eb6afe315cdfb9caa2909de140c82b57ee9d0c3ed9473983c |
 | patches/vllm-responses-stream-identity.patch | 9a3f1fb54f3e22f3df621ab681e675f7a916849bdceb6e555242df29d6028095 |
@@ -340,7 +340,7 @@ It is intentionally reconstructed by the ordered, reviewed semantic transformati
 | patches/vllm-template-authored-control-tokens.patch | 2a6e8b31826cf06d52acb3c87cae0c6c68a7acc2c8f01dd7848bc5e948977228 |
 | patches/vllm-nvfp4-native-kernel-required.patch | 9d9ce188b6670d687a725c4cdca37478f9dc78ef9f19685ddbcf5e9edd53b8b7 |
 | patches/vllm-qwen-arguments-read-by-grammar.patch | 9bf29aed999f1cfe12a58cc98b91fccafe615dfb7c22f13e9c681d1b54034837 |
-| patches/vllm-startup-plan-admission-bound.patch | f440e51f45e936dd6d490d47f9675bece8bb78f7f46503b924a15e23689db0c3 |
+| patches/vllm-startup-plan-admission-bound.patch | e1437c19b088b3bbd6ea4470176c719d92db7a8f8324c357545c7cf5858cf7ca |
 | patches/vllm-template-refusals-name-their-parameter.patch | 1f428332be39e4fb7f3c7f7eb5d6e3297f5dc70638fcd7f81d69b32f69d1fa26 |
 | patches/vllm-qwen-repeated-parameter-refusal.patch | af405e3be4a649264786bf7bc924c3e4053579eddde47030d9776eb1bc1c73c0 |
 | patches/vllm-generated-tokens-survive-parsing.patch | 3709ac24d4f098a27ffa57fedf9d3dec81a1e08392da07d225bb8b62d2e8ee2e |
@@ -945,17 +945,29 @@ its pool:
 - the residents measured when profiling ends: weights, non-torch allocations,
   every workspace (the 1,024 MiB continuation workspace among them) and the input
   batch's block tables;
-- the peak of the profiled phases above them, each run in the residency serving
-  runs it in: the vision encoder at its full budget with the continuation workspace
-  released, then a 2,048-token text step with attention executed against a
-  stand-in pool at the full 262,144-token context, its encoder outputs still cached
-  and the workspace resident, then the sampler. The peak is therefore the larger of
-  the encoder's and the text step's with the workspace it holds;
+- the peak of the profiled phases above them, each run at its largest in the
+  residency serving runs it in: the vision encoder at its full budget with the
+  continuation workspace released, then a 2,048-token text step with attention
+  executed against a stand-in pool at the full 262,144-token context, its encoder
+  outputs still cached and the workspace resident, then its sampler and its prompt
+  log probabilities, each with the most log probabilities a request is admitted
+  with. The peak is therefore the largest of these, each with the workspace it
+  holds;
 - the CUDA-graph estimate and the frontend's multimodal reservation.
 
 A warm pass before the measured one takes one-time compile and autotuning memory
 out of the measurement, and the stand-in pool's bytes come off the peak because the
 declared pool takes its place. The startup log states every term.
+
+Prompt log probabilities (chat's `prompt_logprobs`, or `echo` with `top_logprobs`)
+are computed as upstream's V2 runner computes them: the logits of at most 1,024
+prompt rows at a time, and only the requested scores. Computed as upstream's V1
+runner computes them -- a float32 log-softmax over the 248,320-token vocabulary for
+every row of a 2,048-token chunk, beside the chunk's bfloat16 logits, about
+2.8 GiB -- the phase would not fit beside this launch's one-user pool, and the
+profile, which runs every phase serving runs, would refuse the pool. Computed this
+way it holds about 0.47 GiB of logits, below the encoder's peak (by arithmetic
+from tensor shapes, not measured).
 
 The derivation assumes that the caching allocator places each phase's peak,
 counted in allocated bytes, in the room the bound leaves: zero fragmentation. It
@@ -965,9 +977,10 @@ sixteen). A run on the card confirms these assumptions and that the profiled tex
 step runs on this model; it does not decide the bound, and a profile that fails
 stops startup rather than admitting the pool. By the v29 startup log's arithmetic
 (bound 6.93 GiB, pool 6.45 GiB, profiled peak 1.85 GiB, a 0.48 GiB margin), the
-one-user pool stays admitted unless the text step's peak with the workspace
-resident, plus the residents the profile now counts beside it (attention builders,
-block tables, TurboQuant's per-layer arange cache), exceeds about 2.3 GiB. Reading the
+one-user pool stays admitted unless the largest of the text step's, its sampler's
+and its prompt scoring's peaks with the workspace resident, plus the residents the
+profile now counts beside it (attention builders, block tables, TurboQuant's
+per-layer arange cache), exceeds about 2.3 GiB. Reading the
 code puts that near 1.75 GiB; the profile decides it at each startup.
 
 On the exact final v13 live image:

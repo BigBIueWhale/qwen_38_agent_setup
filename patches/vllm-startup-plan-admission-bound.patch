@@ -1,7 +1,7 @@
 diff --git a/tests/v1/worker/test_gpu_worker.py b/tests/v1/worker/test_gpu_worker.py
 --- a/tests/v1/worker/test_gpu_worker.py
 +++ b/tests/v1/worker/test_gpu_worker.py
-@@ -306,3 +306,82 @@
+@@ -465,3 +465,82 @@
              profile_seq_lens=profile_seq_lens,
          )
      assert captured["seq_lens"] == expected

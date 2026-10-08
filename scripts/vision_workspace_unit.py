@@ -4,6 +4,7 @@
 from contextlib import contextmanager
 from types import SimpleNamespace
 
+import numpy as np
 import torch
 
 from vllm.config import CUDAGraphMode
@@ -260,7 +261,7 @@ def _profiled_bound(sizes: dict[str, int]) -> tuple[int, int]:
     total, others, weights, non_torch = 1 << 30, 3 << 20, 600 << 20, 40 << 20
     reclaimable, primary = sizes["reclaimable"], 1 << 20
     builders, input_batch, per_block, blocks = 3 << 20, 2 << 20, 5 << 20, 2
-    max_model_len = 4096
+    max_model_len, max_num_tokens, max_logprobs, vocab = 4096, 2048, 20, 1000
 
     manager = workspace.WorkspaceManager(torch.device("cpu"))
     device = _Device(total, others, manager)
@@ -311,11 +312,21 @@ def _profiled_bound(sizes: dict[str, int]) -> tuple[int, int]:
                 device.free("autotune_scratch")
         device.alloc("text", text)
         device.free("text")
-        return torch.zeros(4, 8), torch.zeros(1, 8)
+        return torch.zeros(max_num_tokens, 8), torch.zeros(1, 8)
 
-    def sampler(runner, hidden_states):
+    def sampler(runner, hidden_states, max_num_logprobs=None):
+        # The sampler at the most log probabilities a request is admitted with.
+        assert max_num_logprobs == max_logprobs, max_num_logprobs
         device.alloc("sampler", sizes["sampler"])
         device.free("sampler")
+
+    def prompt_logprobs(target_ids, hidden_states, logits_fn, count, mode):
+        # The step's prompt log probabilities at their largest: every prompt
+        # row of the step, at the most a request is admitted with.
+        assert len(target_ids) == hidden_states.shape[0] == max_num_tokens
+        assert count == max_logprobs, count
+        device.alloc("prompt_logprobs", sizes["prompt_logprobs"])
+        device.free("prompt_logprobs")
 
     def profile_cudagraph_memory(runner) -> int:
         init_minimal(runner)
@@ -336,6 +347,8 @@ def _profiled_bound(sizes: dict[str, int]) -> tuple[int, int]:
             "profiling_kv_cache",
             "_run_dummy_encoder",
             "_run_dummy_text_step",
+            "_dummy_prompt_logprobs_run",
+            "_largest_admitted_logprob_count",
         )
         if hasattr(gpu_model_runner.GPUModelRunner, name)
     }
@@ -357,9 +370,15 @@ def _profiled_bound(sizes: dict[str, int]) -> tuple[int, int]:
         multimodal_config=SimpleNamespace(skip_mm_profiling=False)
     )
     runner.mm_budget = budget
-    runner.model = SimpleNamespace(embed_multimodal=embed_multimodal)
+    runner.model_config.max_logprobs = max_logprobs
+    runner.model_config.get_vocab_size = lambda: vocab
+    runner.model_config.logprobs_mode = "raw_logprobs"
+    runner.model = SimpleNamespace(
+        embed_multimodal=embed_multimodal, compute_logits=None
+    )
+    runner.device = torch.device("cpu")
     runner.encoder_cache = EncoderCache()
-    runner.max_num_tokens = 2048
+    runner.max_num_tokens = max_num_tokens
     runner.max_model_len = max_model_len
     runner.is_pooling_model = False
     runner.model_memory_usage = weights
@@ -376,6 +395,9 @@ def _profiled_bound(sizes: dict[str, int]) -> tuple[int, int]:
     saved_worker_platform = gpu_worker.current_platform
     saved_reserve = gpu_worker.reserve_mm_ipc_gpu_memory
     saved_pp = gpu_model_runner.get_pp_group
+    saved_prompt_logprobs = getattr(
+        gpu_model_runner, "compute_prompt_logprobs_with_chunking", None
+    )
     accelerator.memory_stats = device.stats
     accelerator.get_memory_info = device.memory_info
     accelerator.memory_reserved = lambda device_=None: device.allocated()
@@ -389,6 +411,7 @@ def _profiled_bound(sizes: dict[str, int]) -> tuple[int, int]:
     gpu_worker.current_platform = SimpleNamespace(is_cuda_alike=lambda: True)
     gpu_worker.reserve_mm_ipc_gpu_memory = lambda bound, *args: bound
     gpu_model_runner.get_pp_group = lambda: SimpleNamespace(is_last_rank=True)
+    gpu_model_runner.compute_prompt_logprobs_with_chunking = prompt_logprobs
     try:
         init_snapshot = mem_utils.MemorySnapshot(device=torch.device("cpu"))
         device.alloc("weights", weights)
@@ -417,16 +440,19 @@ def _profiled_bound(sizes: dict[str, int]) -> tuple[int, int]:
         gpu_worker.current_platform = saved_worker_platform
         gpu_worker.reserve_mm_ipc_gpu_memory = saved_reserve
         gpu_model_runner.get_pp_group = saved_pp
+        gpu_model_runner.compute_prompt_logprobs_with_chunking = saved_prompt_logprobs
 
     # Serving's worst moment beside its pool: the residents (weights,
     # non-torch, the primary workspace, the input batch, the attention
-    # metadata builders) and the larger phase -- the encoder with the
-    # reclaimable workspace released, or the text step or sampler with it
-    # resident -- each with the encoder outputs it holds.
+    # metadata builders) and the largest phase -- the encoder with the
+    # reclaimable workspace released, or the text step, the sampler or a
+    # chunk's prompt log probabilities with it resident -- each with the
+    # encoder outputs it holds.
     phase = max(
         sizes["encoder"] + sizes["encoder_outputs"],
         reclaimable + sizes["encoder_outputs"] + sizes["text"] + sizes["attention"],
         reclaimable + sizes["encoder_outputs"] + sizes["sampler"],
+        reclaimable + sizes["encoder_outputs"] + sizes["prompt_logprobs"],
     )
     held = weights + non_torch + primary + input_batch + builders + phase
     return bound, total - others - held
@@ -440,6 +466,7 @@ def test_kv_bound_counts_each_phase_with_the_workspaces_it_holds() -> None:
         "text": 16 * mib,
         "attention": 6 * mib,
         "sampler": 4 * mib,
+        "prompt_logprobs": 12 * mib,
         # Larger than every phase: it may not reach the bound.
         "autotune": 200 * mib,
     }
@@ -447,6 +474,10 @@ def test_kv_bound_counts_each_phase_with_the_workspaces_it_holds() -> None:
         ("text step", {**base, "encoder": 40 * mib}),
         ("encoder", {**base, "encoder": 120 * mib}),
         ("sampler", {**base, "encoder": 40 * mib, "sampler": 30 * mib}),
+        (
+            "prompt log probabilities",
+            {**base, "encoder": 40 * mib, "prompt_logprobs": 50 * mib},
+        ),
     ):
         bound, room = _profiled_bound(sizes)
         assert bound == room, (
@@ -454,6 +485,63 @@ def test_kv_bound_counts_each_phase_with_the_workspaces_it_holds() -> None:
             f"leaves {room} B beside its residents and the larger phase "
             f"({bound - room:+d} B)"
         )
+
+
+def test_serving_scores_the_prompt_as_the_profile_measures() -> None:
+    # Serving computes a chunk's prompt log probabilities through the one
+    # function the startup profile runs at its largest, and through no
+    # full-vocabulary computation of its own that the profile never runs.
+    calls = []
+
+    def computed(target_ids, hidden_states, logits_fn, count, mode):
+        calls.append((target_ids.tolist(), hidden_states.shape[0], count, mode))
+        rows = len(target_ids)
+        return (
+            torch.zeros(rows, count + 1, dtype=torch.int64),
+            torch.zeros(rows, count + 1),
+            torch.zeros(rows, dtype=torch.int64),
+        )
+
+    def unprofiled(*args, **kwargs):
+        raise AssertionError(
+            "prompt log probabilities were computed outside the function the "
+            "startup profile measures"
+        )
+
+    request = SimpleNamespace(
+        prompt_token_ids=[5, 6, 7, 8, 9],
+        num_computed_tokens=0,
+        in_progress_prompt_logprobs_cpu=None,
+    )
+    runner = SimpleNamespace(
+        num_prompt_logprobs={"request": 2},
+        requests={"request": request},
+        device=torch.device("cpu"),
+        input_batch=SimpleNamespace(req_id_to_index={"request": 0}),
+        query_start_loc=SimpleNamespace(np=np.array([0, 5])),
+        model=SimpleNamespace(compute_logits=unprofiled),
+        sampler=SimpleNamespace(
+            compute_logprobs=unprofiled, gather_logprobs=unprofiled
+        ),
+        model_config=SimpleNamespace(logprobs_mode="raw_logprobs"),
+        _sync_device=lambda: None,
+    )
+    saved = getattr(gpu_model_runner, "compute_prompt_logprobs_with_chunking", None)
+    saved_h2d = gpu_model_runner.async_tensor_h2d
+    gpu_model_runner.compute_prompt_logprobs_with_chunking = computed
+    # A CPU stand-in for the pinned host-to-device copy.
+    gpu_model_runner.async_tensor_h2d = lambda data, device, dtype=None: (
+        torch.tensor(data, dtype=dtype)
+    )
+    try:
+        scored = gpu_model_runner.GPUModelRunner._get_prompt_logprobs_dict(
+            runner, torch.zeros(5, 8), {"request": 5}
+        )
+    finally:
+        gpu_model_runner.compute_prompt_logprobs_with_chunking = saved
+        gpu_model_runner.async_tensor_h2d = saved_h2d
+    assert calls == [([6, 7, 8, 9], 4, 2, "raw_logprobs")], calls
+    assert list(scored) == ["request"], scored
 
 
 def test_profiled_context_covers_its_own_query() -> None:
@@ -510,5 +598,6 @@ if __name__ == "__main__":
     test_turboquant_reservation_routing()
     test_model_runner_phase_boundary()
     test_kv_bound_counts_each_phase_with_the_workspaces_it_holds()
+    test_serving_scores_the_prompt_as_the_profile_measures()
     test_profiled_context_covers_its_own_query()
     print("vision workspace unit: passed")
