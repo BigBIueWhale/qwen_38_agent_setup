@@ -806,10 +806,10 @@ index 31ce2f5907b3d80763f81f4c91e6538a25f836b8..545354b772f58a3e83fbbed62411442c
  
  
 diff --git a/vllm/parser/qwen3.py b/vllm/parser/qwen3.py
-index 9d74bd3d050d738e8f11ea2ec5b43b67d1ef89a3..80c3768be5a29b20133412626d6925639e11fd0c 100644
+index 9938867bf9341bb6fc68e54a7fa1c056eeccd1e7..15a590b9e065e7a6428beda0eaba065af6ec1c78 100644
 --- a/vllm/parser/qwen3.py
 +++ b/vllm/parser/qwen3.py
-@@ -377,12 +377,6 @@ def qwen3_config(
+@@ -380,12 +380,6 @@ def qwen3_config(
                  ParserState.CONTENT,
                  (EventType.REASONING_END,),
              ),
@@ -822,7 +822,7 @@ index 9d74bd3d050d738e8f11ea2ec5b43b67d1ef89a3..80c3768be5a29b20133412626d692563
              # The opener ends reasoning where the grammar does, whether or
              # not a call follows it; the call itself starts at the function
              # opener, once the preamble proves the opener was the trigger.
-@@ -452,8 +446,10 @@ class Qwen3Parser(ParserEngine):
+@@ -455,8 +449,10 @@ class Qwen3Parser(ParserEngine):
      THINK_END = THINK_END
      TOOL_START = TOOL_CALL_START
      TOOL_END = TOOL_CALL_END
@@ -835,7 +835,7 @@ index 9d74bd3d050d738e8f11ea2ec5b43b67d1ef89a3..80c3768be5a29b20133412626d692563
      batch_tool_pass_uses_ids = True
  
      def _tool_arguments_reading(
-@@ -498,6 +494,22 @@ class Qwen3Parser(ParserEngine):
+@@ -501,6 +497,22 @@ class Qwen3Parser(ParserEngine):
              offset += 1
          return token_ids[offset:]
  
@@ -858,7 +858,7 @@ index 9d74bd3d050d738e8f11ea2ec5b43b67d1ef89a3..80c3768be5a29b20133412626d692563
      def __init__(
          self,
          tokenizer: TokenizerLike,
-@@ -507,15 +519,7 @@ class Qwen3Parser(ParserEngine):
+@@ -510,15 +522,7 @@ class Qwen3Parser(ParserEngine):
          chat_kwargs = kwargs.get("chat_template_kwargs", {}) or {}
          self.thinking_enabled = chat_kwargs.get("enable_thinking", True)
          kwargs.setdefault(

@@ -171,7 +171,7 @@ index 6bfd2af568c1c83e68912d33823b0202b1cbbd48..1563be02cdc1ca033cd5dd16a181fb33
          """When the prompt does NOT end in an open reasoning channel (e.g. a
          new turn that ends with ``<|turn>model\\n``), behaviour must match
 diff --git a/tests/parser/engine/test_qwen3.py b/tests/parser/engine/test_qwen3.py
-index 7525d2d1ecb5516454c890611dd677b6759e8eee..26f2d7cf1e1aea70b02f48f40e35a3119cd6179b 100644
+index b563c29ef698249608c0531a55a85fe0a1aedfc7..f360fab6679f9fb2485bf7bb3ce78aa129ee05bd 100644
 --- a/tests/parser/engine/test_qwen3.py
 +++ b/tests/parser/engine/test_qwen3.py
 @@ -252,7 +252,8 @@ class TestNonStreaming:
@@ -274,10 +274,10 @@ index 068bdfa2fb23f2a7d0aacbe38f75cafd163d567f..09d55e0ac16d541f9d510c57bc70c6fe
                  model_output_token_ids=completion.token_ids,
                  finish_reason=completion.finish_reason,
 diff --git a/vllm/entrypoints/openai/responses/serving.py b/vllm/entrypoints/openai/responses/serving.py
-index 88d26bd7aedacc2ab918bd6f5a4a736ae9e58960..7bdac98925369bc7b39b71889482751b6d273540 100644
+index 1fef667da2cb0c5c89a5137eb494c5e63443f820..33982dc90fa6b20582a2cf69bcab9be77f194551 100644
 --- a/vllm/entrypoints/openai/responses/serving.py
 +++ b/vllm/entrypoints/openai/responses/serving.py
-@@ -905,6 +905,7 @@ class OpenAIServingResponses(GenerateBaseServing):
+@@ -909,6 +909,7 @@ class OpenAIServingResponses(GenerateBaseServing):
          self._raise_if_error(final_res.outputs[0].finish_reason, request.request_id)
          return self._make_response_output_items(
              request, final_res.outputs[0], tokenizer, parser=context.response_parser,
@@ -285,7 +285,7 @@ index 88d26bd7aedacc2ab918bd6f5a4a736ae9e58960..7bdac98925369bc7b39b71889482751b
          )
  
      async def _finalize_response(
-@@ -1016,12 +1017,15 @@ class OpenAIServingResponses(GenerateBaseServing):
+@@ -1020,12 +1021,15 @@ class OpenAIServingResponses(GenerateBaseServing):
          final_output: CompletionOutput,
          tokenizer: TokenizerLike,
          parser: Parser | None = None,
@@ -828,7 +828,7 @@ index 7a302e74b22edd5d3598f8ab150f5cc404c11ece..5b62265d485b62f3688148fc15ae30bd
              self._raw_tool_parts.append(text)
          if self.state == ParserState.MESSAGE_HEADER:
 diff --git a/vllm/parser/qwen3.py b/vllm/parser/qwen3.py
-index 80c3768be5a29b20133412626d6925639e11fd0c..c2b558a70bd20afca509606aa26a7f3219677195 100644
+index 15a590b9e065e7a6428beda0eaba065af6ec1c78..d8dd36b89e17d01eaa817f96e78294e50c0feb17 100644
 --- a/vllm/parser/qwen3.py
 +++ b/vllm/parser/qwen3.py
 @@ -23,6 +23,7 @@ from __future__ import annotations
@@ -849,8 +849,8 @@ index 80c3768be5a29b20133412626d6925639e11fd0c..c2b558a70bd20afca509606aa26a7f32
          terminals={
              # Reasoning terminals
              "THINK_START": think_start,
-@@ -369,10 +373,6 @@ def qwen3_config(
-         # reaches a client that the grammar did not constrain.
+@@ -372,10 +376,6 @@ def qwen3_config(
+         # which shares this table, arms no grammar.
          transitions={
              # -- Reasoning transitions --
 -            (ParserState.REASONING, "THINK_START"): Transition(
@@ -860,7 +860,7 @@ index 80c3768be5a29b20133412626d6925639e11fd0c..c2b558a70bd20afca509606aa26a7f32
              (ParserState.REASONING, "THINK_END"): Transition(
                  ParserState.CONTENT,
                  (EventType.REASONING_END,),
-@@ -558,6 +558,30 @@ class Qwen3Parser(ParserEngine):
+@@ -561,6 +561,30 @@ class Qwen3Parser(ParserEngine):
              if tool_choice == "none" or not tools:
                  self.skip_tool_parsing = True
  

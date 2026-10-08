@@ -385,7 +385,7 @@ diff --git a/vllm/parser/qwen3.py b/vllm/parser/qwen3.py
          params[name] = _unframe_parameter_value(value, complete=False)
  
      if schema and unfinished is None:
-@@ -455,13 +470,14 @@
+@@ -458,13 +473,14 @@
              return _qwen3_arg_converter(
                  raw_args, partial, find_tool_schema(self._tools, func_name)
              )

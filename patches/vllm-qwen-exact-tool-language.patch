@@ -379,6 +379,38 @@ diff --git a/tests/parser/engine/test_qwen3.py b/tests/parser/engine/test_qwen3.
              "<param",
              "eter=limit>10</parameter>\n",
              "</function>\n",
+@@ -1175,3 +1322,31 @@
+         assert questions[0]["question"] == "Pick a color"
+         assert questions[0]["multiSelect"] is False
+         assert questions[0]["answer"] is None
++
++
++def test_the_qwen_tool_parser_is_never_served_without_its_grammar(monkeypatch):
++    """The Qwen tool parser's calls are its grammar's language, so it is
++    neither selected nor built while strict tool calling is off; another
++    parser keeps upstream's opt-out."""
++    from vllm.parser.parser_manager import ParserManager
++    from vllm.tool_parsers.hermes_tool_parser import Hermes2ProToolParser
++    from vllm.tool_parsers.qwen3_engine_tool_parser import Qwen3EngineToolParser
++
++    tools = [{"type": "function", "function": {"name": "f", "parameters": {}}}]
++
++    monkeypatch.setenv("VLLM_ENFORCE_STRICT_TOOL_CALLING", "0")
++    for name in ("qwen3_coder", "qwen3_xml", "mimo"):
++        with pytest.raises(ValueError, match="VLLM_ENFORCE_STRICT_TOOL_CALLING"):
++            ParserManager.get_tool_parser(name, enable_auto_tools=True)
++    with pytest.raises(ValueError, match="Next: "):
++        Qwen3EngineToolParser(MagicMock(), tools)
++    assert (
++        ParserManager.get_tool_parser("hermes", enable_auto_tools=True)
++        is Hermes2ProToolParser
++    )
++    monkeypatch.setenv("VLLM_ENFORCE_STRICT_TOOL_CALLING", "1")
++    assert (
++        ParserManager.get_tool_parser("qwen3_coder", enable_auto_tools=True)
++        is Qwen3EngineToolParser
++    )
++    Qwen3EngineToolParser(MagicMock(), tools)
 diff --git a/tests/parser/engine/test_qwen3_reasoning.py b/tests/parser/engine/test_qwen3_reasoning.py
 --- a/tests/parser/engine/test_qwen3_reasoning.py
 +++ b/tests/parser/engine/test_qwen3_reasoning.py
@@ -1488,7 +1520,7 @@ diff --git a/vllm/parser/qwen3.py b/vllm/parser/qwen3.py
  
  
  def _trim_wrapping_newlines(value: str) -> str:
-@@ -121,6 +124,12 @@
+@@ -121,6 +124,15 @@
              "TOOL_START": tool_start,
              "TOOL_END": tool_end,
          },
@@ -1496,12 +1528,15 @@ diff --git a/vllm/parser/qwen3.py b/vllm/parser/qwen3.py
 +        # ``<tool_call>\n<function=NAME>`` ... ``</function>\n</tool_call>``
 +        # and nothing else.  Every shape the grammar leaves as free text -- a
 +        # bare ``<function=``, a ``<tool_call>`` the trigger does not follow,
-+        # markup inside a parameter value -- is content here too, so no call
-+        # reaches a client that the grammar did not constrain.
++        # markup inside a parameter value -- is content here too. Where that
++        # grammar is armed no call therefore reaches a client that it did not
++        # constrain, and the Qwen tool parser is served only with it
++        # (Qwen3EngineToolParser.require_servable); Seed-OSS's tool parser,
++        # which shares this table, arms no grammar.
          transitions={
              # -- Reasoning transitions --
              (ParserState.REASONING, "THINK_START"): Transition(
-@@ -137,64 +146,45 @@
+@@ -137,64 +149,45 @@
                  ParserState.CONTENT,
                  (),
              ),
@@ -1580,7 +1615,7 @@ diff --git a/vllm/parser/qwen3.py b/vllm/parser/qwen3.py
          arg_converter=_qwen3_arg_converter,
          stream_arg_deltas=True,
          strip_trailing_reasoning_whitespace=False,
-@@ -208,6 +198,10 @@
+@@ -208,6 +201,10 @@
  
      - ``<tool_call>`` as implicit reasoning end
      - Unpaired ``<tool_call>`` token ID detection for ``is_reasoning_end``
@@ -1591,7 +1626,7 @@ diff --git a/vllm/parser/qwen3.py b/vllm/parser/qwen3.py
  
      Subclasses that share the grammar but differ only in the four wrapper
      token strings (reasoning + tool-call) override the class attributes
-@@ -219,6 +213,28 @@
+@@ -219,6 +216,28 @@
      THINK_END = THINK_END
      TOOL_START = TOOL_CALL_START
      TOOL_END = TOOL_CALL_END
@@ -1620,7 +1655,7 @@ diff --git a/vllm/parser/qwen3.py b/vllm/parser/qwen3.py
  
      def __init__(
          self,
-@@ -256,6 +272,25 @@
+@@ -256,6 +275,25 @@
          if not self.thinking_enabled:
              return None, model_output
          return super().extract_reasoning(model_output, request)
@@ -1646,3 +1681,70 @@ diff --git a/vllm/parser/qwen3.py b/vllm/parser/qwen3.py
  
      def is_reasoning_end(self, input_ids: list[int]) -> bool:
          if super().is_reasoning_end(input_ids):
+diff --git a/vllm/parser/parser_manager.py b/vllm/parser/parser_manager.py
+--- a/vllm/parser/parser_manager.py
++++ b/vllm/parser/parser_manager.py
+@@ -52,6 +52,7 @@
+                 f"tool_parser:'{tool_parser_name}' which has not "
+                 "been registered"
+             ) from e
++        parser.require_servable()
+         return parser
+ 
+     @classmethod
+diff --git a/vllm/tool_parsers/abstract_tool_parser.py b/vllm/tool_parsers/abstract_tool_parser.py
+--- a/vllm/tool_parsers/abstract_tool_parser.py
++++ b/vllm/tool_parsers/abstract_tool_parser.py
+@@ -70,11 +70,21 @@
+         ):
+             cls.supports_required_and_named = False
+ 
++    @classmethod
++    def require_servable(cls) -> None:
++        """Refuse a launch in which this parser cannot parse as it claims.
++
++        Asked when the server selects the parser (ParserManager) and whenever
++        one is built, so such a parser is neither served nor constructed.
++        Nothing to refuse unless a parser says otherwise.
++        """
++
+     def __init__(
+         self,
+         tokenizer: TokenizerLike,
+         tools: list[Tool] | None = None,
+     ):
++        self.require_servable()
+         self.prev_tool_call_arr: list[dict] = []
+         # the index of the tool call that is currently being parsed
+         self.current_tool_id: int = -1
+diff --git a/vllm/tool_parsers/qwen3_engine_tool_parser.py b/vllm/tool_parsers/qwen3_engine_tool_parser.py
+--- a/vllm/tool_parsers/qwen3_engine_tool_parser.py
++++ b/vllm/tool_parsers/qwen3_engine_tool_parser.py
+@@ -1,8 +1,27 @@
+ # SPDX-License-Identifier: Apache-2.0
+ # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
+ 
++import vllm.envs as envs
+ from vllm.parser.engine.registered_adapters import Qwen3ParserToolAdapter
+ 
+ 
+ class Qwen3EngineToolParser(Qwen3ParserToolAdapter):  # type: ignore[valid-type, misc]
+     structural_tag_model = "qwen_3_coder"
++
++    @classmethod
++    def require_servable(cls) -> None:
++        # A call is exactly the language the qwen_3_coder grammar admits
++        # (qwen3_config), so a call reaches a client only as that grammar
++        # constrained it. Strict tool calling off arms no grammar: calls the
++        # model wrote unconstrained would be parsed and returned, and a
++        # required or named choice would be forced through a JSON schema this
++        # XML format does not write.
++        if not envs.VLLM_ENFORCE_STRICT_TOOL_CALLING:
++            raise ValueError(
++                "The Qwen tool parser serves calls only through its tool-call "
++                "grammar, and VLLM_ENFORCE_STRICT_TOOL_CALLING is off, which "
++                "arms none: calls the model wrote unconstrained would be "
++                "returned as calls. Next: unset VLLM_ENFORCE_STRICT_TOOL_CALLING "
++                "(strict tool calling is on by default), or serve without "
++                "--tool-call-parser."
++            )

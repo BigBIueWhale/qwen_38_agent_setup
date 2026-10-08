@@ -241,9 +241,10 @@ def _served_model_config():
     return ServedModelConfig()
 
 
-def _served_chat():
+def _served_chat(**launch_overrides):
     """The chat route as the launch serves it -- template, parsers, renderer
-    -- over a mocked engine, which is returned with it."""
+    -- over a mocked engine, which is returned with it. ``launch_overrides``
+    replaces launch options (another server's)."""
     from types import SimpleNamespace
 
     from vllm.entrypoints.openai.chat_completion.serving import OpenAIServingChat
@@ -274,6 +275,7 @@ def _served_chat():
         reasoning_parser=_served("SERVED_REASONING_PARSER"),
         default_chat_template_kwargs=CHAT_TEMPLATE_KWARGS,
     )
+    launch.update(launch_overrides)
     serving = OpenAIServingChat(
         engine,
         OpenAIServingModels(engine_client=engine, base_model_paths=[
@@ -1603,6 +1605,162 @@ class ToolOutputParserTest(unittest.TestCase):
                         [logprob for _, logprob in reported],
                         [-(k + 1) / 100 for k in range(len(ids))],
                     )
+
+
+class ToolChoiceEnforcementTest(unittest.TestCase):
+    """A tool choice, or a call limit, the server cannot enforce is refused,
+    never accepted and left unenforced."""
+
+    FUNCTION = {"type": "function", "name": "write",
+                "parameters": TOOL["function"]["parameters"]}
+
+    def _responses(self, online_renderer, **launch):
+        from vllm.entrypoints.openai.responses.serving import (
+            OpenAIServingResponses,
+        )
+
+        engine = MagicMock()
+        engine.errored = False
+        engine.model_config.max_model_len = 10_000
+        engine.model_config.hf_config.model_type = "qwen3"
+        engine.model_config.get_diff_sampling_param.return_value = {}
+        return OpenAIServingResponses(
+            engine_client=engine, models=MagicMock(),
+            online_renderer=online_renderer, request_logger=None,
+            chat_template=online_renderer.chat_template,
+            chat_template_content_format="auto",
+            reasoning_parser=_served("SERVED_REASONING_PARSER"), **launch,
+        ), engine
+
+    def test_a_tool_choice_no_parser_parses_is_refused_on_every_route(self):
+        """Without a tool parser no call is parsed, so a choice that lets the
+        model call -- "auto" included -- is refused alike on chat and on
+        Responses, with the same 400 naming tool_choice, before anything is
+        admitted. Anthropic and the render route render through chat."""
+        from vllm.entrypoints.openai.chat_completion.protocol import (
+            ChatCompletionGenerationRequest,
+        )
+        from vllm.entrypoints.openai.responses.protocol import ResponsesRequest
+        from vllm.entrypoints.serve.exception_handling.error_response import (
+            create_error_response,
+        )
+        from vllm.exceptions import VLLMValidationError
+
+        chat_choices = {
+            "auto": "auto", "required": "required",
+            "function": {"type": "function", "function": {"name": "write"}},
+        }
+        responses_choices = {
+            "auto": "auto", "required": "required",
+            "function": {"type": "function", "name": "write"},
+            "allowed_tools": {"type": "allowed_tools", "mode": "required",
+                              "tools": [{"type": "function", "name": "write"}]},
+        }
+        for unparsed in (
+            {"tool_parser": None, "enable_auto_tools": False},
+            {"enable_auto_tools": False},
+        ):
+            chat, chat_engine = _served_chat(**unparsed)
+            responses, responses_engine = self._responses(
+                chat.online_renderer,
+                tool_parser=unparsed.get(
+                    "tool_parser", _served("SERVED_TOOL_CALL_PARSER")),
+                enable_auto_tools=False,
+            )
+            refusals = {}
+            for name, choice in chat_choices.items():
+                request = ChatCompletionGenerationRequest(
+                    model="unit", messages=[{"role": "user", "content": "test"}],
+                    kv_scope="unit", tools=[TOOL], tool_choice=choice,
+                )
+                with self.subTest(launch=unparsed, route="chat", choice=name):
+                    with self.assertRaises(VLLMValidationError) as refused:
+                        asyncio_run(chat.create_chat_completion(request))
+                    error = create_error_response(refused.exception).error
+                    self.assertEqual((error.code, error.param), (400, "tool_choice"))
+                    refusals[("chat", name)] = error.message
+            for name, choice in responses_choices.items():
+                request = ResponsesRequest.model_validate(
+                    {"model": "unit", "input": "test", "kv_scope": "unit",
+                     "tools": [self.FUNCTION], "tool_choice": choice})
+                with self.subTest(launch=unparsed, route="responses", choice=name):
+                    with self.assertRaises(VLLMValidationError) as refused:
+                        asyncio_run(responses.create_responses(request))
+                    error = create_error_response(refused.exception).error
+                    self.assertEqual((error.code, error.param), (400, "tool_choice"))
+                    refusals[("responses", name)] = error.message
+            chat_engine.admit.assert_not_called()
+            responses_engine.admit.assert_not_called()
+            for name in ("auto", "required", "function"):
+                with self.subTest(launch=unparsed, same_refusal=name):
+                    self.assertEqual(refusals[("chat", name)],
+                                     refusals[("responses", name)])
+            for message in refusals.values():
+                self.assertIn("--tool-call-parser", message)
+                self.assertIn("--enable-auto-tool-choice", message)
+                self.assertIn("tool_choice 'none'", message)
+
+    def test_a_call_limit_no_grammar_enforces_is_refused(self):
+        """parallel_tool_calls false is held by a grammar that takes the
+        limit, or by a forced choice that is one call; anywhere else it is
+        refused naming the parameter, and the served format holds it under
+        every choice."""
+        from vllm.exceptions import VLLMValidationError
+        from vllm.tool_parsers.structural_tag_registry import (
+            get_model_structural_tag,
+        )
+
+        chat_tool = request_for().tools
+        named = request_for(
+            choice={"type": "function", "function": {"name": "write"}}
+        ).tool_choice
+        strict_tool = request_for(tools=[{**TOOL, "function": {
+            **TOOL["function"], "strict": True}}]).tools
+        refused = [
+            ("qwen_3", chat_tool, "auto"), ("qwen_3", strict_tool, "auto"),
+            ("qwen_3", chat_tool, "required"), ("llama", chat_tool, "required"),
+            ("hermes", chat_tool, "auto"),
+        ]
+        for model, tools, choice in refused:
+            with self.subTest(model=model, choice=choice, refused=True):
+                with self.assertRaises(VLLMValidationError) as limit:
+                    get_model_structural_tag(model, tools, choice, False, False)
+                self.assertEqual(limit.exception.parameter, "parallel_tool_calls")
+                self.assertIn("parallel_tool_calls true", str(limit.exception))
+                # Allowing parallel calls is served as before.
+                get_model_structural_tag(model, tools, choice, False, True)
+        for model, tools, choice in (
+            ("qwen_3", chat_tool, named), ("hermes", strict_tool, "auto"),
+            ("hermes", chat_tool, "required"),
+        ):
+            with self.subTest(model=model, choice=choice, refused=False):
+                self.assertIsNotNone(
+                    get_model_structural_tag(model, tools, choice, False, False))
+        # The served format holds the limit under every choice
+        # (test_call_limit_is_decided_by_the_grammar runs its grammar).
+        served = PARSER.tool_parser_cls.structural_tag_model
+        for choice in ("auto", "required", named):
+            with self.subTest(served=served, choice=choice):
+                self.assertIsNotNone(get_model_structural_tag(
+                    served, chat_tool, choice, False, False))
+
+    def test_the_served_tool_parser_needs_its_grammar(self):
+        """The Qwen tool parser's calls are exactly its grammar's language, so
+        it is never selected, or built, while strict tool calling is off."""
+        from unittest.mock import patch
+
+        name = _served("SERVED_TOOL_CALL_PARSER")
+        tool_parser = ParserManager.get_tool_parser(name, enable_auto_tools=True)
+        with patch.dict(os.environ, {"VLLM_ENFORCE_STRICT_TOOL_CALLING": "0"}):
+            for build in (
+                lambda: ParserManager.get_tool_parser(name, enable_auto_tools=True),
+                lambda: tool_parser(TOKENIZER, [TOOL]),
+            ):
+                with self.assertRaises(ValueError) as refused:
+                    build()
+                self.assertIn("VLLM_ENFORCE_STRICT_TOOL_CALLING", str(refused.exception))
+                self.assertIn("Next: ", str(refused.exception))
+        tool_parser(TOKENIZER, [TOOL])
 
 
 if __name__ == "__main__":

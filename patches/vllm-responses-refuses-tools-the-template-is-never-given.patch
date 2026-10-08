@@ -244,10 +244,10 @@ index ecb07446c0be893b4f6bf781843b546840d106a7..2ea910539436f51201277f4426f01e3e
 +    assert refused.value.parameter == parameter
 +    renderer.preprocess_chat.assert_not_awaited()
 diff --git a/tests/tool_use/test_responses_request_validations.py b/tests/tool_use/test_responses_request_validations.py
-index f4c7cf36c5723219424caf89575589ad1ca7274a..6c48e7b6d194e929d83d6ea0f459e87b93e20d8d 100644
+index d0c7e601d44da49b8576e5a8190dfdcd1ce1a2d4..3de5054dc3f38ae665722d12dc2b3c7b0aba8d44 100644
 --- a/tests/tool_use/test_responses_request_validations.py
 +++ b/tests/tool_use/test_responses_request_validations.py
-@@ -333,3 +333,21 @@ def test_responses_request_refuses_a_hosted_tool_choice(tools):
+@@ -378,3 +378,21 @@ def test_responses_request_refuses_a_hosted_tool_choice(tools):
          }
      )
      assert error.parameter == "tool_choice"

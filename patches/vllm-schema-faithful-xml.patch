@@ -710,7 +710,7 @@ diff --git a/vllm/parser/qwen3.py b/vllm/parser/qwen3.py
      return json.dumps(params, ensure_ascii=False)
  
  
-@@ -180,9 +350,9 @@
+@@ -183,9 +353,9 @@
          },
          tool_preamble_text="\n",
          validate_tool_names=False,
@@ -721,7 +721,7 @@ diff --git a/vllm/parser/qwen3.py b/vllm/parser/qwen3.py
          tool_args_json=False,
      )
  
-@@ -210,8 +380,20 @@
+@@ -213,8 +383,20 @@
      TOOL_END = TOOL_CALL_END
      # The reasoning pass forwards a tool span verbatim, so the batch tool
      # pass splits on the same ids the streaming tool pass sees.

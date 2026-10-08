@@ -472,7 +472,7 @@ index 787cac75288474360d9a146233cdd40da47c5d66..5a979c3e9a992dd9a2db61e7f1ebfa49
              case _:
                  tool_choice = MistralNamedToolChoice.model_validate(
 diff --git a/vllm/tool_parsers/structural_tag_registry.py b/vllm/tool_parsers/structural_tag_registry.py
-index f96e02ea203d3ed85d87f5695bbb973169db6083..85f74b03672d072f1d3b270881154e6844bed6bc 100644
+index 6610b3e13743087fe839ba3cce9a49f15193e91b..230b8d2f57674dd9cb445611387b4b7caaa2f489 100644
 --- a/vllm/tool_parsers/structural_tag_registry.py
 +++ b/vllm/tool_parsers/structural_tag_registry.py
 @@ -43,7 +43,6 @@ ToolChoice: TypeAlias = (
@@ -483,7 +483,7 @@ index f96e02ea203d3ed85d87f5695bbb973169db6083..85f74b03672d072f1d3b270881154e68
  )
  AllowedToolRef: TypeAlias = dict[str, object]
  SimplifiedToolChoice: TypeAlias = Literal["auto", "required", "forced"]
-@@ -193,12 +192,9 @@ def _dump_tool_for_xgrammar(
+@@ -233,12 +232,9 @@ def _dump_tool_for_xgrammar(
  
  def _dump_tool_choice_for_xgrammar(
      tool_choice: ToolChoice,

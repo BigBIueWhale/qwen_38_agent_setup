@@ -2159,6 +2159,21 @@ def _validate_qwen_language_after(state: State) -> None:
         "tests/parser/engine/test_delegating_replay.py", {
             "test_qwen_value_markup_is_identical_in_batch_and_stream": None,
         }, label=label)
+    # The language is the grammar's, so the Qwen tool parser is neither
+    # selected nor built while strict tool calling arms no grammar.
+    _require_in_symbol(state, "vllm/tool_parsers/qwen3_engine_tool_parser.py",
+        "Qwen3EngineToolParser.require_servable", (
+            "if not envs.VLLM_ENFORCE_STRICT_TOOL_CALLING:",
+            "Next: unset VLLM_ENFORCE_STRICT_TOOL_CALLING",
+        ), label=label)
+    _require_in_symbol(state, "vllm/parser/parser_manager.py",
+        "ParserManager.get_tool_parser", ("parser.require_servable()",),
+        label=label)
+    _require_in_symbol(state, "vllm/tool_parsers/abstract_tool_parser.py",
+        "ToolParser.__init__", ("self.require_servable()",), label=label)
+    require_python_symbols(state, "tests/parser/engine/test_qwen3.py", {
+        "test_the_qwen_tool_parser_is_never_served_without_its_grammar": None,
+    }, label=label)
     require_python_symbols(state,
         "tests/parser/engine/test_reasoning_token_count.py", {
             "TestStreaming.test_boundary_ids_wait_for_detokenized_text": None,
@@ -2737,6 +2752,19 @@ def _validate_qwen_grammar_before(state: State) -> None:
 def _validate_qwen_grammar_after(state: State) -> None:
     label = "Qwen-owned tool grammar result"
     registry = "vllm/tool_parsers/structural_tag_registry.py"
+    # A call limit is held by the grammar or refused: an XGrammar builtin
+    # format takes none, and under "auto" a format arming its grammar only for
+    # a strict tool holds none without one.
+    _require_in_symbol(state, registry, "get_model_structural_tag", (
+        "and model in XGRAMMAR_BUILTIN_STRUCTURAL_TAG_MODELS",
+        "parallel_tool_calls false is held by the tool-call grammar",
+        'parameter="parallel_tool_calls",',
+    ), label=label)
+    require_python_symbols(state, "tests/tool_parsers/test_structural_tag_registry.py", {
+        "test_a_builtin_format_refuses_a_call_limit_it_cannot_hold": None,
+        "test_a_forced_choice_is_one_call_in_a_builtin_format": None,
+        "test_auto_without_a_strict_tool_refuses_a_call_limit": None,
+    }, label=label)
     require_python_symbols(state, registry, {
         "get_qwen_3_coder_structural_tag": (
             "tools", "builtin_tools", "tool_choice", "reasoning",
@@ -3973,7 +4001,24 @@ def _validate_responses_function_list_after(state: State) -> None:
             "ToolChoiceAllowed,",
             "tool_choice allowed_tools is enforced by a tool-call",
         ), label=label)
+    # A choice that lets the model call is refused alike on chat and on
+    # Responses while no tool parser parses the calls: one refusal, which both
+    # routes ask before rendering.
+    renderer = "vllm/renderers/online_renderer.py"
+    _require_in_symbol(state, renderer, "OnlineRenderer.require_tool_choice_parsed", (
+        "--enable-auto-tool-choice",
+        'parameter="tool_choice",',
+    ), label=label)
+    _require_in_symbol(state, renderer, "OnlineRenderer.render_chat", (
+        "self.require_tool_choice_parsed(request.tool_choice, self.parser)",
+    ), label=label)
+    forbid_text(state, renderer, "tool_parsing_unavailable", label=label)
+    _require_in_symbol(state, "vllm/entrypoints/openai/responses/serving.py",
+        "OpenAIServingResponses._make_request", (
+            "self.online_renderer.require_tool_choice_parsed(",
+        ), label=label)
     require_python_symbols(state, "tests/tool_use/test_responses_request_validations.py", {
+        "test_a_tool_choice_no_parser_parses_is_refused_alike": None,
         "test_responses_request_names_a_namespace_function_by_its_flat_name": None,
         "test_responses_request_refuses_a_name_the_model_is_not_offered": None,
         "test_responses_request_allowed_tools_lists_offered_functions": None,
@@ -4727,7 +4772,11 @@ CONTRACTS: Mapping[str, SemanticContract] = {
             "builder means taking the dispatch's one argument list, the "
             "request's call limit included: every registered builder takes it "
             "and holds the limit wherever its format can express one call, and "
-            "a refusal offers the formats the registry builds, read from it."
+            "a refusal offers the formats the registry builds, read from it. A "
+            "limit no grammar holds -- an XGrammar builtin format, which takes "
+            "none, or 'auto' without a strict tool where the format arms its "
+            "grammar only for one -- is refused naming parallel_tool_calls, "
+            "since the response layer drops no call."
         ),
         removal_condition=(
             "Remove when XGrammar's Qwen template excludes the parameter opener "
@@ -5047,7 +5096,9 @@ CONTRACTS: Mapping[str, SemanticContract] = {
             "is forwarded as the text it was. The batch tool pass splits on the "
             "generated ids after the reasoning boundary, as streaming does, so a "
             "text lookalike of a marker is content on both transports; a finished "
-            "parse reports a call cut before its wrapper as open."
+            "parse reports a call cut before its wrapper as open. Because the "
+            "language is the grammar's, the Qwen tool parser is neither selected "
+            "nor built while VLLM_ENFORCE_STRICT_TOOL_CALLING arms no grammar."
         ),
         removal_condition=(
             "Remove when upstream matches the Qwen grammar's trigger and parameter "
@@ -5581,7 +5632,10 @@ CONTRACTS: Mapping[str, SemanticContract] = {
             "and mode instead of arming and parsing nothing while the tools "
             "stay in the prompt; a choice no grammar enforces (hosted, MCP, "
             "custom) is refused naming tool_choice; and required with no "
-            "function to call is a 400, where it was a KeyError 500."
+            "function to call is a 400, where it was a KeyError 500. A choice "
+            "that lets the model call is refused while no tool parser parses "
+            "the calls, by the refusal chat gives: Responses rendered it and "
+            "returned the calls as text."
         ),
         removal_condition=(
             "Remove when pinned upstream gives the tool grammar the Responses "

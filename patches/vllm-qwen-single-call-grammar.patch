@@ -356,7 +356,7 @@ deleted file mode 100644
 diff --git a/vllm/tool_parsers/abstract_tool_parser.py b/vllm/tool_parsers/abstract_tool_parser.py
 --- a/vllm/tool_parsers/abstract_tool_parser.py
 +++ b/vllm/tool_parsers/abstract_tool_parser.py
-@@ -182,6 +182,7 @@
+@@ -192,6 +192,7 @@
              tools=request.tools,
              tool_choice=request.tool_choice,
              reasoning=reasoning,

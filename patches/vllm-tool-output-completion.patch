@@ -1465,7 +1465,7 @@ diff --git a/vllm/parser/engine/streaming_parser_engine.py b/vllm/parser/engine/
 diff --git a/vllm/parser/qwen3.py b/vllm/parser/qwen3.py
 --- a/vllm/parser/qwen3.py
 +++ b/vllm/parser/qwen3.py
-@@ -178,9 +178,9 @@
+@@ -181,9 +181,9 @@
                  (EventType.TOOL_CALL_CLOSED,),
              ),
          },

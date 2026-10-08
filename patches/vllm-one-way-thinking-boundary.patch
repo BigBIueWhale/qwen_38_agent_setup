@@ -313,7 +313,7 @@ diff --git a/vllm/parser/engine/parser_engine.py b/vllm/parser/engine/parser_eng
 diff --git a/vllm/parser/qwen3.py b/vllm/parser/qwen3.py
 --- a/vllm/parser/qwen3.py
 +++ b/vllm/parser/qwen3.py
-@@ -308,8 +308,15 @@
+@@ -311,8 +311,15 @@
                          continue
                      return True
          return False

@@ -19,7 +19,7 @@ diff --git a/vllm/parser/qwen3.py b/vllm/parser/qwen3.py
              params[name] = _unframe_parameter_value(value, complete=False)
  
      if schema and m is None:
-@@ -422,7 +426,10 @@
+@@ -425,7 +429,10 @@
          except (TypeError, ValueError) as exc:
              # Malformed parameter text is handled inside the decoder. An error
              # here must not enter the engine's provisional-converter fallback.

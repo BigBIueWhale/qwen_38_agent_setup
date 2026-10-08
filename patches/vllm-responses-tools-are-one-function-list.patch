@@ -1,8 +1,8 @@
 diff --git a/tests/tool_parsers/test_structural_tag_registry.py b/tests/tool_parsers/test_structural_tag_registry.py
-index 1df9457ba69ba1e1ce9f780feac756d2ea890cad..cd0c8115a011819065c36b7c0213c5dac3355441 100644
+index aa6078dd27e23b043a6ba819ab3fc14f40fb354f..04ebd309ae44d7a721bdb9ae1ea9aac54b88b3ee 100644
 --- a/tests/tool_parsers/test_structural_tag_registry.py
 +++ b/tests/tool_parsers/test_structural_tag_registry.py
-@@ -1237,3 +1237,90 @@ def test_kimi_k3_forced_tool_choice_builds_single_mandatory_call():
+@@ -1283,3 +1283,90 @@ def test_kimi_k3_forced_tool_choice_builds_single_mandatory_call():
      response_only = _k3_response("no call here")
      assert _is_grammar_accept_string(grammar, ok)
      assert not _is_grammar_accept_string(grammar, response_only)
@@ -94,7 +94,7 @@ index 1df9457ba69ba1e1ce9f780feac756d2ea890cad..cd0c8115a011819065c36b7c0213c5da
 +        _qwen3_grammar(request.tool_choice, None, tools=request.tools)
 +    assert refused.value.parameter == "tool_choice"
 diff --git a/tests/tool_use/test_responses_request_validations.py b/tests/tool_use/test_responses_request_validations.py
-index b50482960c820208d81fcd9aaae2fcdb1e5ce440..f4c7cf36c5723219424caf89575589ad1ca7274a 100644
+index b50482960c820208d81fcd9aaae2fcdb1e5ce440..d0c7e601d44da49b8576e5a8190dfdcd1ce1a2d4 100644
 --- a/tests/tool_use/test_responses_request_validations.py
 +++ b/tests/tool_use/test_responses_request_validations.py
 @@ -25,28 +25,56 @@ NAMED_TOOL_CHOICE = {
@@ -270,7 +270,7 @@ index b50482960c820208d81fcd9aaae2fcdb1e5ce440..f4c7cf36c5723219424caf89575589ad
          {"input": "Hello", "model": "test-model", "parallel_tool_calls": value}
      )
      sampling_params = request.to_sampling_params(default_max_tokens=16)
-@@ -220,7 +248,88 @@ def test_responses_response_parallel_tool_calls_null_resolves_to_default(
+@@ -220,7 +248,133 @@ def test_responses_response_parallel_tool_calls_null_resolves_to_default(
  
  def test_responses_request_parallel_tool_calls_null_accepted():
      """Client sending null must be accepted at request validation time."""
@@ -345,6 +345,51 @@ index b50482960c820208d81fcd9aaae2fcdb1e5ce440..f4c7cf36c5723219424caf89575589ad
 +        }
 +    )
 +    assert error.parameter == parameter
++
++
++@pytest.mark.parametrize(
++    "choice",
++    ["auto", "required", "named-chat", "named-responses", "allowed-tools"],
++)
++def test_a_tool_choice_no_parser_parses_is_refused_alike(choice):
++    """One refusal for chat and Responses: a choice that lets the model call
++    is refused while no tool parser parses the calls, and served otherwise."""
++    from types import SimpleNamespace
++
++    from openai.types.responses.tool_choice_allowed import ToolChoiceAllowed
++    from openai.types.responses.tool_choice_function import ToolChoiceFunction
++
++    from vllm.entrypoints.openai.chat_completion.protocol import (
++        ChatCompletionNamedFunction,
++        ChatCompletionNamedToolChoiceParam,
++    )
++    from vllm.renderers.online_renderer import OnlineRenderer
++
++    selected = {
++        "named-chat": ChatCompletionNamedToolChoiceParam(
++            type="function", function=ChatCompletionNamedFunction(name="get_weather")
++        ),
++        "named-responses": ToolChoiceFunction(type="function", name="get_weather"),
++        "allowed-tools": ToolChoiceAllowed(
++            type="allowed_tools", mode="required",
++            tools=[{"type": "function", "name": "get_weather"}],
++        ),
++    }.get(choice, choice)
++    renderer = SimpleNamespace(
++        renderer=SimpleNamespace(tokenizer=object()), use_harmony=False
++    )
++    for parser in (None, SimpleNamespace(tool_parser_cls=None)):
++        with pytest.raises(
++            VLLMValidationError, match="--enable-auto-tool-choice"
++        ) as refused:
++            OnlineRenderer.require_tool_choice_parsed(renderer, selected, parser)
++        assert refused.value.parameter == "tool_choice"
++        OnlineRenderer.require_tool_choice_parsed(renderer, "none", parser)
++    OnlineRenderer.require_tool_choice_parsed(
++        renderer, selected, SimpleNamespace(tool_parser_cls=object)
++    )
++    harmony = SimpleNamespace(renderer=renderer.renderer, use_harmony=True)
++    OnlineRenderer.require_tool_choice_parsed(harmony, selected, None)
 +
 +
 +@pytest.mark.parametrize("tools", [[], [SAMPLE_TOOL, {"type": "web_search_preview"}]])
@@ -463,7 +508,7 @@ index cc52a8d550a8fee56c205b4af38fa274f634f0ef..0ca3dcabb09ff4a98305e89417c1112b
  
  class ResponsesResponse(OpenAIBaseModel):
 diff --git a/vllm/entrypoints/openai/responses/serving.py b/vllm/entrypoints/openai/responses/serving.py
-index 79be425d750269817fc25e445d9e53a85c4aed96..88d26bd7aedacc2ab918bd6f5a4a736ae9e58960 100644
+index 79be425d750269817fc25e445d9e53a85c4aed96..1fef667da2cb0c5c89a5137eb494c5e63443f820 100644
 --- a/vllm/entrypoints/openai/responses/serving.py
 +++ b/vllm/entrypoints/openai/responses/serving.py
 @@ -87,7 +87,6 @@ from vllm.entrypoints.openai.responses.utils import (
@@ -491,6 +536,17 @@ index 79be425d750269817fc25e445d9e53a85c4aed96..88d26bd7aedacc2ab918bd6f5a4a736a
              if self.use_harmony:
                  context = HarmonyContext(
                      messages,
+@@ -610,6 +610,10 @@ class OpenAIServingResponses(GenerateBaseServing):
+         request: ResponsesRequest,
+         prev_response: ResponsesResponse | None,
+     ):
++        # The refusal chat gives a choice no parser of this server parses.
++        self.online_renderer.require_tool_choice_parsed(
++            request.tool_choice, self.parser
++        )
+         tool_dicts = construct_tool_dicts(
+             request.tools,
+             request.tool_choice,
 diff --git a/vllm/entrypoints/openai/responses/utils.py b/vllm/entrypoints/openai/responses/utils.py
 index 6c2253bbf314024691da4e58ce28a93d08e3b073..af20e57f2b680e3736c7931ce50dfff0bd6b287e 100644
 --- a/vllm/entrypoints/openai/responses/utils.py
@@ -600,7 +656,7 @@ index c011a54b2bd565e27ce88a3b509eae4013a86162..27a4f2773131719b7961222f50199221
  
          structural_tag = json.dumps(structure_tag.model_dump())
 diff --git a/vllm/tool_parsers/structural_tag_registry.py b/vllm/tool_parsers/structural_tag_registry.py
-index 7ba80c2ca23e71f5be12b603dc1aa75ad25d2991..2ba6ab295b7ef09d41626a595f2a1e4868b0733e 100644
+index 76810ab1cafe86840a68be7579955ad0df0751d6..efc32f99a005d2ff3cb378ee733732eb2df86b1a 100644
 --- a/vllm/tool_parsers/structural_tag_registry.py
 +++ b/vllm/tool_parsers/structural_tag_registry.py
 @@ -7,7 +7,7 @@ from collections.abc import Callable, Iterator, Sequence
@@ -636,8 +692,8 @@ index 7ba80c2ca23e71f5be12b603dc1aa75ad25d2991..2ba6ab295b7ef09d41626a595f2a1e48
      return False
  
  
-@@ -126,7 +130,7 @@ def get_model_structural_tag(
-     ):
+@@ -166,7 +170,7 @@ def get_model_structural_tag(
+             )
          return None
  
 -    dumped_tools = [_dump_tool_for_xgrammar(tool) for tool in tools]
@@ -645,7 +701,7 @@ index 7ba80c2ca23e71f5be12b603dc1aa75ad25d2991..2ba6ab295b7ef09d41626a595f2a1e48
      if model == "qwen_3_coder":
          # XGrammar deliberately interprets ``strict: false`` as an instruction
          # to replace the parameter schema with ``true``. That best-effort
-@@ -170,24 +174,36 @@ def get_model_structural_tag(
+@@ -210,24 +214,36 @@ def get_model_structural_tag(
      )
  
  
@@ -699,7 +755,7 @@ index 7ba80c2ca23e71f5be12b603dc1aa75ad25d2991..2ba6ab295b7ef09d41626a595f2a1e48
  
  
  def _dump_tool_choice_for_xgrammar(
-@@ -1217,6 +1233,16 @@ def get_qwen_3_coder_structural_tag(
+@@ -1257,6 +1273,16 @@ def get_qwen_3_coder_structural_tag(
              )
          answer = tags[0]
      else:
@@ -733,3 +789,116 @@ index 164198bbdfbf747582fce4e13d4738bc0f468366..dd30ff796086137ff1a549b851e25615
  def build_responses_tool_call_name_map(
      tools: list[ResponsesTool] | None,
  ) -> dict[str, ResponsesToolCallName]:
+diff --git a/vllm/renderers/online_renderer.py b/vllm/renderers/online_renderer.py
+index 59c646229c7b429e189b44d73f139dfd53f95a86..a8f480965423741617dace87eba9a25f3137c12e 100644
+--- a/vllm/renderers/online_renderer.py
++++ b/vllm/renderers/online_renderer.py
+@@ -4,6 +4,8 @@ from collections.abc import Sequence
+ from http import HTTPStatus
+ from typing import Any
+ 
++from openai.types.responses.tool_choice_allowed import ToolChoiceAllowed
++from openai.types.responses.tool_choice_function import ToolChoiceFunction
+ from openai_harmony import Message as OpenAIMessage
+ 
+ from vllm.config import ModelConfig
+@@ -28,6 +30,7 @@ from vllm.entrypoints.openai.parser.harmony_utils import (
+ from vllm.entrypoints.openai.responses.protocol import ResponsesRequest
+ from vllm.entrypoints.serve import create_error_response
+ from vllm.entrypoints.serve.utils.request_logger import RequestLogger
++from vllm.exceptions import VLLMValidationError
+ from vllm.inputs import (
+     EngineInput,
+     PromptType,
+@@ -101,6 +104,45 @@ class OnlineRenderer:
+             )
+         )
+ 
++    def require_tool_choice_parsed(
++        self, tool_choice: object, parser: type[Parser] | None
++    ) -> None:
++        """Refuse a tool choice that lets the model call when *parser*, the
++        parser the request's output will be parsed by, parses no calls.
++
++        A tool parser exists only when the server is started with both
++        --tool-call-parser and --enable-auto-tool-choice (ParserManager);
++        without one, every call the model wrote would reach the caller as
++        text, under any choice but "none". Every route that renders a request
++        with tools asks this before rendering: chat, and every route that
++        renders through it (Anthropic, render), and Responses. A Mistral
++        tokenizer and Harmony parse their calls without a tool parser.
++        """
++        if (
++            tool_choice == "none"
++            or (parser is not None and parser.tool_parser_cls is not None)
++            or is_mistral_tokenizer(self.renderer.tokenizer)
++            or self.use_harmony
++        ):
++            return
++        if isinstance(tool_choice, ChatCompletionNamedToolChoiceParam):
++            described = f"function {tool_choice.function.name!r}"
++        elif isinstance(tool_choice, ToolChoiceFunction):
++            described = f"function {tool_choice.name!r}"
++        elif isinstance(tool_choice, ToolChoiceAllowed):
++            described = f"allowed_tools ({tool_choice.mode!r})"
++        else:
++            described = repr(tool_choice)
++        raise VLLMValidationError(
++            f"tool_choice {described} lets the model call a function, and this "
++            "server parses no calls: it builds a tool parser only when started "
++            "with both --tool-call-parser and --enable-auto-tool-choice, so a "
++            "call would reach you as the text the model wrote. Send "
++            "tool_choice 'none' to have the model answer without calling, or "
++            "serve with --tool-call-parser and --enable-auto-tool-choice.",
++            parameter="tool_choice",
++        )
++
+     async def render_chat(
+         self,
+         request: ChatCompletionRequest,
+@@ -114,8 +156,6 @@ class OnlineRenderer:
+         """
+         tokenizer = self.renderer.tokenizer
+ 
+-        tool_parser = self.parser.tool_parser_cls if self.parser is not None else None
+-
+         if is_mistral_tokenizer(tokenizer):
+             # because of issues with pydantic we need to potentially
+             # re-serialize the tool_calls field of the request
+@@ -123,35 +163,7 @@ class OnlineRenderer:
+             _mt.truncate_tool_call_ids(request)  # type: ignore[arg-type]
+             _mt.validate_request_params(request)
+ 
+-        # Check if tool parsing is unavailable (common condition)
+-        tool_parsing_unavailable = (
+-            tool_parser is None
+-            and not is_mistral_tokenizer(tokenizer)
+-            and not self.use_harmony
+-        )
+-
+-        # Validate tool_choice when tool parsing is required but unavailable
+-        if tool_parsing_unavailable and request.tool_choice not in (
+-            None,
+-            "none",
+-        ):
+-            if request.tool_choice == "auto" and not self.enable_auto_tools:
+-                # for hf tokenizers, "auto" tools requires
+-                # --enable-auto-tool-choice and --tool-call-parser
+-                return self.create_error_response(
+-                    '"auto" tool choice requires '
+-                    "--enable-auto-tool-choice and --tool-call-parser to be set"
+-                )
+-            elif request.tool_choice != "auto":
+-                # "required" or named tool requires tool parser
+-                if isinstance(request.tool_choice, ChatCompletionNamedToolChoiceParam):
+-                    tool_choice_desc = f'function "{request.tool_choice.function.name}"'
+-                else:
+-                    tool_choice_desc = f'"{request.tool_choice}"'
+-                return self.create_error_response(
+-                    f"tool_choice={tool_choice_desc} requires "
+-                    "--tool-call-parser to be set"
+-                )
++        self.require_tool_choice_parsed(request.tool_choice, self.parser)
+ 
+         if request.tools is None or (
+             request.tool_choice == "none" and self.exclude_tools_when_tool_choice_none

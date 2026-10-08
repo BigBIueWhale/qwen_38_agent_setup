@@ -53907,7 +53907,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    return error_json_response(req, err)\n'})},
  {'name': 'qwen-exact-tool-language',
   'review_patch': 'patches/vllm-qwen-exact-tool-language.patch',
-  'review_sha256': 'e0bdd47262490c88bc600b858e3320efdd4dc4c80c218761fe01378b0e8c8134',
+  'review_sha256': 'b8e9a82a8b907f92cb22942d848c0c321a10aec2ecc38d8781837cf00b963410',
   'files': ({'path': 'tests/parser/engine/replay_harness.py',
              'before_sha256': '08a10377bcfa12cd7c6dcd8759e8783d8a5f84f00d0dd1f6dc9886e2d35a49d7',
              'after_sha256': '6bacf71a93469ca49bbdbfed3b109f82861f9ae3b5298e0d548c5440b0df13fe'},
@@ -53922,7 +53922,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'after_sha256': 'e3c906ca611720ddb682f38085f28e3d17ba382abc8fbdbe7938c3c309fbe801'},
             {'path': 'tests/parser/engine/test_qwen3.py',
              'before_sha256': 'edac38bdf88fdfb40317a5994bd4102219defd1d70d60fce692a29cc677981c8',
-             'after_sha256': 'ff2bab0e9fdafc5a9ac8b2cf3b74b760cc8668a387caf7dd749ca1f8edc730d6'},
+             'after_sha256': '84295ed9d3b8d05f9c2e31237c3fc22078bc8dc7fc476ae4552a253fc0c2c544'},
             {'path': 'tests/parser/engine/test_qwen3_reasoning.py',
              'before_sha256': '03298bb459bdb98166db9eca267e13d273bb884b26eb64e4dee8e78985283eb3',
              'after_sha256': '60a31db16f2b621403b9b2b5259407a44a5ce1e9e79b62e2c27f1cf505a4db21'},
@@ -53964,7 +53964,16 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'after_sha256': '476d20aa1bc0e340ada1310dfaa909d2dae8236d049bdb5258b1147a0c63e373'},
             {'path': 'vllm/parser/qwen3.py',
              'before_sha256': 'e5c192fda3ceba5c1686a790fd29b4ba663abdc9cbb7cc292634f4c503fd28e4',
-             'after_sha256': '2c0d5e5bec9e3b504894d278eeaeded0f282e627260f1f35689869dd1fdf9bb0'}),
+             'after_sha256': '8e544789c7c45daacdf6f53e63ec566eeb852e2f84ec34deab343187a61b2cbc'},
+            {'path': 'vllm/parser/parser_manager.py',
+             'before_sha256': '3269f2fcd71bfe90c76d1056701befa7eb5e753c599e6ce1b605d24b969ee100',
+             'after_sha256': '7b0217aa315fdcf5ae602d62dad8e2380772662d4946933a92491a28ad4082f4'},
+            {'path': 'vllm/tool_parsers/abstract_tool_parser.py',
+             'before_sha256': '5826dee6676d2ffc88856ab498c6271296b17c6f743a96646a2fc49a9008d1d7',
+             'after_sha256': 'c3387fb37fc8fa1f117cc19f21231c18ec1f2859ca1c67182bf66b884cdaa00e'},
+            {'path': 'vllm/tool_parsers/qwen3_engine_tool_parser.py',
+             'before_sha256': '3cf83a2a9408d72c79082825464b2c4dea1147ff390289dfb8936c5501114be9',
+             'after_sha256': '17cd6a04b4e78ede24c43592a9b4ff546a4f23be7766e70e3c02dde1eb0e0646'}),
   'edits': ({'name': 'tests/parser/engine/replay_harness.py:landmark-1',
              'path': 'tests/parser/engine/replay_harness.py',
              'before': '        full_text,\n'
@@ -55097,6 +55106,113 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '            "<param",\n'
                              '            "eter=limit>10</parameter>\\n",\n'
                              '            "</function>\\n",\n'},
+            {'name': 'tests/parser/engine/test_qwen3.py:landmark-5',
+             'path': 'tests/parser/engine/test_qwen3.py',
+             'before': '        args = json.loads(args_str)\n'
+                       '        questions = args["questions"]\n'
+                       '        assert isinstance(questions, list)\n'
+                       '        assert len(questions) == 1\n'
+                       '        assert questions[0]["question"] == "Pick a color"\n'
+                       '        assert questions[0]["multiSelect"] is False\n'
+                       '        assert questions[0]["answer"] is None\n',
+             'after': '        args = json.loads(args_str)\n'
+                      '        questions = args["questions"]\n'
+                      '        assert isinstance(questions, list)\n'
+                      '        assert len(questions) == 1\n'
+                      '        assert questions[0]["question"] == "Pick a color"\n'
+                      '        assert questions[0]["multiSelect"] is False\n'
+                      '        assert questions[0]["answer"] is None\n'
+                      '\n'
+                      '\n'
+                      'def '
+                      'test_the_qwen_tool_parser_is_never_served_without_its_grammar(monkeypatch):\n'
+                      '    """The Qwen tool parser\'s calls are its grammar\'s '
+                      'language, so it is\n'
+                      '    neither selected nor built while strict tool calling is '
+                      'off; another\n'
+                      '    parser keeps upstream\'s opt-out."""\n'
+                      '    from vllm.parser.parser_manager import ParserManager\n'
+                      '    from vllm.tool_parsers.hermes_tool_parser import '
+                      'Hermes2ProToolParser\n'
+                      '    from vllm.tool_parsers.qwen3_engine_tool_parser import '
+                      'Qwen3EngineToolParser\n'
+                      '\n'
+                      '    tools = [{"type": "function", "function": {"name": "f", '
+                      '"parameters": {}}}]\n'
+                      '\n'
+                      '    monkeypatch.setenv("VLLM_ENFORCE_STRICT_TOOL_CALLING", '
+                      '"0")\n'
+                      '    for name in ("qwen3_coder", "qwen3_xml", "mimo"):\n'
+                      '        with pytest.raises(ValueError, '
+                      'match="VLLM_ENFORCE_STRICT_TOOL_CALLING"):\n'
+                      '            ParserManager.get_tool_parser(name, '
+                      'enable_auto_tools=True)\n'
+                      '    with pytest.raises(ValueError, match="Next: "):\n'
+                      '        Qwen3EngineToolParser(MagicMock(), tools)\n'
+                      '    assert (\n'
+                      '        ParserManager.get_tool_parser("hermes", '
+                      'enable_auto_tools=True)\n'
+                      '        is Hermes2ProToolParser\n'
+                      '    )\n'
+                      '    monkeypatch.setenv("VLLM_ENFORCE_STRICT_TOOL_CALLING", '
+                      '"1")\n'
+                      '    assert (\n'
+                      '        ParserManager.get_tool_parser("qwen3_coder", '
+                      'enable_auto_tools=True)\n'
+                      '        is Qwen3EngineToolParser\n'
+                      '    )\n'
+                      '    Qwen3EngineToolParser(MagicMock(), tools)\n',
+             'review_before': '        assert questions[0]["question"] == "Pick a '
+                              'color"\n'
+                              '        assert questions[0]["multiSelect"] is False\n'
+                              '        assert questions[0]["answer"] is None\n',
+             'review_after': '        assert questions[0]["question"] == "Pick a '
+                             'color"\n'
+                             '        assert questions[0]["multiSelect"] is False\n'
+                             '        assert questions[0]["answer"] is None\n'
+                             '\n'
+                             '\n'
+                             'def '
+                             'test_the_qwen_tool_parser_is_never_served_without_its_grammar(monkeypatch):\n'
+                             '    """The Qwen tool parser\'s calls are its grammar\'s '
+                             'language, so it is\n'
+                             '    neither selected nor built while strict tool calling '
+                             'is off; another\n'
+                             '    parser keeps upstream\'s opt-out."""\n'
+                             '    from vllm.parser.parser_manager import '
+                             'ParserManager\n'
+                             '    from vllm.tool_parsers.hermes_tool_parser import '
+                             'Hermes2ProToolParser\n'
+                             '    from vllm.tool_parsers.qwen3_engine_tool_parser '
+                             'import Qwen3EngineToolParser\n'
+                             '\n'
+                             '    tools = [{"type": "function", "function": {"name": '
+                             '"f", "parameters": {}}}]\n'
+                             '\n'
+                             '    '
+                             'monkeypatch.setenv("VLLM_ENFORCE_STRICT_TOOL_CALLING", '
+                             '"0")\n'
+                             '    for name in ("qwen3_coder", "qwen3_xml", "mimo"):\n'
+                             '        with pytest.raises(ValueError, '
+                             'match="VLLM_ENFORCE_STRICT_TOOL_CALLING"):\n'
+                             '            ParserManager.get_tool_parser(name, '
+                             'enable_auto_tools=True)\n'
+                             '    with pytest.raises(ValueError, match="Next: "):\n'
+                             '        Qwen3EngineToolParser(MagicMock(), tools)\n'
+                             '    assert (\n'
+                             '        ParserManager.get_tool_parser("hermes", '
+                             'enable_auto_tools=True)\n'
+                             '        is Hermes2ProToolParser\n'
+                             '    )\n'
+                             '    '
+                             'monkeypatch.setenv("VLLM_ENFORCE_STRICT_TOOL_CALLING", '
+                             '"1")\n'
+                             '    assert (\n'
+                             '        ParserManager.get_tool_parser("qwen3_coder", '
+                             'enable_auto_tools=True)\n'
+                             '        is Qwen3EngineToolParser\n'
+                             '    )\n'
+                             '    Qwen3EngineToolParser(MagicMock(), tools)\n'},
             {'name': 'tests/parser/engine/test_qwen3_reasoning.py:landmark-1',
              'path': 'tests/parser/engine/test_qwen3_reasoning.py',
              'before': '        assert reasoning == "Reasoning here."\n'
@@ -58708,8 +58824,14 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '        # bare ``<function=``, a ``<tool_call>`` the trigger '
                       'does not follow,\n'
                       '        # markup inside a parameter value -- is content here '
-                      'too, so no call\n'
-                      '        # reaches a client that the grammar did not constrain.\n'
+                      'too. Where that\n'
+                      '        # grammar is armed no call therefore reaches a client '
+                      'that it did not\n'
+                      '        # constrain, and the Qwen tool parser is served only '
+                      'with it\n'
+                      "        # (Qwen3EngineToolParser.require_servable); Seed-OSS's "
+                      'tool parser,\n'
+                      '        # which shares this table, arms no grammar.\n'
                       '        transitions={\n'
                       '            # -- Reasoning transitions --\n'
                       '            (ParserState.REASONING, "THINK_START"): '
@@ -58733,9 +58855,14 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '        # bare ``<function=``, a ``<tool_call>`` the '
                              'trigger does not follow,\n'
                              '        # markup inside a parameter value -- is content '
-                             'here too, so no call\n'
-                             '        # reaches a client that the grammar did not '
-                             'constrain.\n'
+                             'here too. Where that\n'
+                             '        # grammar is armed no call therefore reaches a '
+                             'client that it did not\n'
+                             '        # constrain, and the Qwen tool parser is served '
+                             'only with it\n'
+                             '        # (Qwen3EngineToolParser.require_servable); '
+                             "Seed-OSS's tool parser,\n"
+                             '        # which shares this table, arms no grammar.\n'
                              '        transitions={\n'
                              '            # -- Reasoning transitions --\n'
                              '            (ParserState.REASONING, "THINK_START"): '
@@ -59228,7 +59355,220 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '\n'
                              '    def is_reasoning_end(self, input_ids: list[int]) -> '
                              'bool:\n'
-                             '        if super().is_reasoning_end(input_ids):\n'})},
+                             '        if super().is_reasoning_end(input_ids):\n'},
+            {'name': 'vllm/parser/parser_manager.py:landmark-1',
+             'path': 'vllm/parser/parser_manager.py',
+             'before': '                f"tool_parser:\'{tool_parser_name}\' which has '
+                       'not "\n'
+                       '                "been registered"\n'
+                       '            ) from e\n'
+                       '        return parser\n'
+                       '\n'
+                       '    @classmethod\n',
+             'after': '                f"tool_parser:\'{tool_parser_name}\' which has '
+                      'not "\n'
+                      '                "been registered"\n'
+                      '            ) from e\n'
+                      '        parser.require_servable()\n'
+                      '        return parser\n'
+                      '\n'
+                      '    @classmethod\n',
+             'review_before': '                f"tool_parser:\'{tool_parser_name}\' '
+                              'which has not "\n'
+                              '                "been registered"\n'
+                              '            ) from e\n'
+                              '        return parser\n'
+                              '\n'
+                              '    @classmethod\n',
+             'review_after': '                f"tool_parser:\'{tool_parser_name}\' '
+                             'which has not "\n'
+                             '                "been registered"\n'
+                             '            ) from e\n'
+                             '        parser.require_servable()\n'
+                             '        return parser\n'
+                             '\n'
+                             '    @classmethod\n'},
+            {'name': 'vllm/tool_parsers/abstract_tool_parser.py:landmark-1',
+             'path': 'vllm/tool_parsers/abstract_tool_parser.py',
+             'before': '        ):\n'
+                       '            cls.supports_required_and_named = False\n'
+                       '\n'
+                       '    def __init__(\n'
+                       '        self,\n'
+                       '        tokenizer: TokenizerLike,\n'
+                       '        tools: list[Tool] | None = None,\n'
+                       '    ):\n'
+                       '        self.prev_tool_call_arr: list[dict] = []\n'
+                       '        # the index of the tool call that is currently being '
+                       'parsed\n'
+                       '        self.current_tool_id: int = -1\n',
+             'after': '        ):\n'
+                      '            cls.supports_required_and_named = False\n'
+                      '\n'
+                      '    @classmethod\n'
+                      '    def require_servable(cls) -> None:\n'
+                      '        """Refuse a launch in which this parser cannot parse as '
+                      'it claims.\n'
+                      '\n'
+                      '        Asked when the server selects the parser '
+                      '(ParserManager) and whenever\n'
+                      '        one is built, so such a parser is neither served nor '
+                      'constructed.\n'
+                      '        Nothing to refuse unless a parser says otherwise.\n'
+                      '        """\n'
+                      '\n'
+                      '    def __init__(\n'
+                      '        self,\n'
+                      '        tokenizer: TokenizerLike,\n'
+                      '        tools: list[Tool] | None = None,\n'
+                      '    ):\n'
+                      '        self.require_servable()\n'
+                      '        self.prev_tool_call_arr: list[dict] = []\n'
+                      '        # the index of the tool call that is currently being '
+                      'parsed\n'
+                      '        self.current_tool_id: int = -1\n',
+             'review_before': '        ):\n'
+                              '            cls.supports_required_and_named = False\n'
+                              '\n'
+                              '    def __init__(\n'
+                              '        self,\n'
+                              '        tokenizer: TokenizerLike,\n'
+                              '        tools: list[Tool] | None = None,\n'
+                              '    ):\n'
+                              '        self.prev_tool_call_arr: list[dict] = []\n'
+                              '        # the index of the tool call that is currently '
+                              'being parsed\n'
+                              '        self.current_tool_id: int = -1\n',
+             'review_after': '        ):\n'
+                             '            cls.supports_required_and_named = False\n'
+                             '\n'
+                             '    @classmethod\n'
+                             '    def require_servable(cls) -> None:\n'
+                             '        """Refuse a launch in which this parser cannot '
+                             'parse as it claims.\n'
+                             '\n'
+                             '        Asked when the server selects the parser '
+                             '(ParserManager) and whenever\n'
+                             '        one is built, so such a parser is neither served '
+                             'nor constructed.\n'
+                             '        Nothing to refuse unless a parser says '
+                             'otherwise.\n'
+                             '        """\n'
+                             '\n'
+                             '    def __init__(\n'
+                             '        self,\n'
+                             '        tokenizer: TokenizerLike,\n'
+                             '        tools: list[Tool] | None = None,\n'
+                             '    ):\n'
+                             '        self.require_servable()\n'
+                             '        self.prev_tool_call_arr: list[dict] = []\n'
+                             '        # the index of the tool call that is currently '
+                             'being parsed\n'
+                             '        self.current_tool_id: int = -1\n'},
+            {'name': 'vllm/tool_parsers/qwen3_engine_tool_parser.py:landmark-1',
+             'path': 'vllm/tool_parsers/qwen3_engine_tool_parser.py',
+             'before': '# SPDX-License-Identifier: Apache-2.0\n'
+                       '# SPDX-FileCopyrightText: Copyright contributors to the vLLM '
+                       'project\n'
+                       '\n'
+                       'from vllm.parser.engine.registered_adapters import '
+                       'Qwen3ParserToolAdapter\n'
+                       '\n'
+                       '\n'
+                       'class Qwen3EngineToolParser(Qwen3ParserToolAdapter):  # type: '
+                       'ignore[valid-type, misc]\n'
+                       '    structural_tag_model = "qwen_3_coder"\n',
+             'after': '# SPDX-License-Identifier: Apache-2.0\n'
+                      '# SPDX-FileCopyrightText: Copyright contributors to the vLLM '
+                      'project\n'
+                      '\n'
+                      'import vllm.envs as envs\n'
+                      'from vllm.parser.engine.registered_adapters import '
+                      'Qwen3ParserToolAdapter\n'
+                      '\n'
+                      '\n'
+                      'class Qwen3EngineToolParser(Qwen3ParserToolAdapter):  # type: '
+                      'ignore[valid-type, misc]\n'
+                      '    structural_tag_model = "qwen_3_coder"\n'
+                      '\n'
+                      '    @classmethod\n'
+                      '    def require_servable(cls) -> None:\n'
+                      '        # A call is exactly the language the qwen_3_coder '
+                      'grammar admits\n'
+                      '        # (qwen3_config), so a call reaches a client only as '
+                      'that grammar\n'
+                      '        # constrained it. Strict tool calling off arms no '
+                      'grammar: calls the\n'
+                      '        # model wrote unconstrained would be parsed and '
+                      'returned, and a\n'
+                      '        # required or named choice would be forced through a '
+                      'JSON schema this\n'
+                      '        # XML format does not write.\n'
+                      '        if not envs.VLLM_ENFORCE_STRICT_TOOL_CALLING:\n'
+                      '            raise ValueError(\n'
+                      '                "The Qwen tool parser serves calls only through '
+                      'its tool-call "\n'
+                      '                "grammar, and VLLM_ENFORCE_STRICT_TOOL_CALLING '
+                      'is off, which "\n'
+                      '                "arms none: calls the model wrote unconstrained '
+                      'would be "\n'
+                      '                "returned as calls. Next: unset '
+                      'VLLM_ENFORCE_STRICT_TOOL_CALLING "\n'
+                      '                "(strict tool calling is on by default), or '
+                      'serve without "\n'
+                      '                "--tool-call-parser."\n'
+                      '            )\n',
+             'review_before': '# SPDX-License-Identifier: Apache-2.0\n'
+                              '# SPDX-FileCopyrightText: Copyright contributors to the '
+                              'vLLM project\n'
+                              '\n'
+                              'from vllm.parser.engine.registered_adapters import '
+                              'Qwen3ParserToolAdapter\n'
+                              '\n'
+                              '\n'
+                              'class Qwen3EngineToolParser(Qwen3ParserToolAdapter):  # '
+                              'type: ignore[valid-type, misc]\n'
+                              '    structural_tag_model = "qwen_3_coder"\n',
+             'review_after': '# SPDX-License-Identifier: Apache-2.0\n'
+                             '# SPDX-FileCopyrightText: Copyright contributors to the '
+                             'vLLM project\n'
+                             '\n'
+                             'import vllm.envs as envs\n'
+                             'from vllm.parser.engine.registered_adapters import '
+                             'Qwen3ParserToolAdapter\n'
+                             '\n'
+                             '\n'
+                             'class Qwen3EngineToolParser(Qwen3ParserToolAdapter):  # '
+                             'type: ignore[valid-type, misc]\n'
+                             '    structural_tag_model = "qwen_3_coder"\n'
+                             '\n'
+                             '    @classmethod\n'
+                             '    def require_servable(cls) -> None:\n'
+                             '        # A call is exactly the language the '
+                             'qwen_3_coder grammar admits\n'
+                             '        # (qwen3_config), so a call reaches a client '
+                             'only as that grammar\n'
+                             '        # constrained it. Strict tool calling off arms '
+                             'no grammar: calls the\n'
+                             '        # model wrote unconstrained would be parsed and '
+                             'returned, and a\n'
+                             '        # required or named choice would be forced '
+                             'through a JSON schema this\n'
+                             '        # XML format does not write.\n'
+                             '        if not envs.VLLM_ENFORCE_STRICT_TOOL_CALLING:\n'
+                             '            raise ValueError(\n'
+                             '                "The Qwen tool parser serves calls only '
+                             'through its tool-call "\n'
+                             '                "grammar, and '
+                             'VLLM_ENFORCE_STRICT_TOOL_CALLING is off, which "\n'
+                             '                "arms none: calls the model wrote '
+                             'unconstrained would be "\n'
+                             '                "returned as calls. Next: unset '
+                             'VLLM_ENFORCE_STRICT_TOOL_CALLING "\n'
+                             '                "(strict tool calling is on by default), '
+                             'or serve without "\n'
+                             '                "--tool-call-parser."\n'
+                             '            )\n'})},
  {'name': 'png-source-admission',
   'review_patch': 'patches/vllm-png-source-admission.patch',
   'review_sha256': 'b1b684a96d7243ae647d4d8ce2fe69b7330b3ab243ea77903c4cfb346bc80549',
@@ -63184,7 +63524,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    assert requested == {"continuation"}\n'})},
  {'name': 'qwen-single-call-grammar',
   'review_patch': 'patches/vllm-qwen-single-call-grammar.patch',
-  'review_sha256': '878ba3d98284a326784ffced00a64b38dd827cbc80f136cf1e582df469c3eced',
+  'review_sha256': 'e3859bebf3b97cc05446859f1cb13b1ba6c4048728394f876bd3a109fa9a80d9',
   'files': ({'path': 'tests/entrypoints/openai/chat_completion/test_parallel_tool_call_integrity.py',
              'before_sha256': None,
              'after_sha256': 'a4a6547338dbf625e3041e2578f2a8e314aa14d1520468c69ee17ff22998d9a2'},
@@ -63198,8 +63538,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': '8439c3798fefaecd689f499b48ed4e151fff104b4c92c992ce4455ded25cb186',
              'after_sha256': None},
             {'path': 'vllm/tool_parsers/abstract_tool_parser.py',
-             'before_sha256': '5826dee6676d2ffc88856ab498c6271296b17c6f743a96646a2fc49a9008d1d7',
-             'after_sha256': '91f4f3184e7f0eb6bc9e76d9ce4d3063cff58e0de8afc409038139e48314d0c8'},
+             'before_sha256': 'c3387fb37fc8fa1f117cc19f21231c18ec1f2859ca1c67182bf66b884cdaa00e',
+             'after_sha256': '251f5d7180e5b91bff6ff6f480528b1916dc7e8edf0187d622cf74be0f40d142'},
             {'path': 'vllm/tool_parsers/structural_tag_registry.py',
              'before_sha256': 'e88b5cd98ace7c76453552f5f08264e0be23d1a5bc9b9d15cc0f39ba75ec043e',
              'after_sha256': 'b6ddd5a890f31922b2f23cc7b84fd39b42783f65c8db121ba3d402b1e3266288'}),
@@ -83770,8 +84110,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
   'review_patch': 'patches/vllm-xml-text-fidelity.patch',
   'review_sha256': 'fea2ea6b6837aa30c59a5758837eb039649af16bffd49ffcad603058d59742d3',
   'files': ({'path': 'tests/parser/engine/test_qwen3.py',
-             'before_sha256': 'ff2bab0e9fdafc5a9ac8b2cf3b74b760cc8668a387caf7dd749ca1f8edc730d6',
-             'after_sha256': '0f01de04b2c7290acaf9e3fb509704589d853bb625bbe67d78dfb5b5d28e9452'},
+             'before_sha256': '84295ed9d3b8d05f9c2e31237c3fc22078bc8dc7fc476ae4552a253fc0c2c544',
+             'after_sha256': '22c94207c606b1495dd4aee8826e7796aca9c88a1ca2aff4f528be66e6a8ba4c'},
             {'path': 'tests/parser/engine/test_qwen_xml_fidelity.py',
              'before_sha256': None,
              'after_sha256': '2d41c84835a4ae718cf573e8a2f8f5ebe14df1282aab4b1491ed6abd70d5eb37'},
@@ -83794,8 +84134,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': 'a44e46e53af9c2dc527f431cad597419880982d070e09f513754eaba0baf273d',
              'after_sha256': '9c55358d0d81abbd3c954e42b9388cfe9f608377d04f70f60d62c7440831bad4'},
             {'path': 'vllm/parser/qwen3.py',
-             'before_sha256': '2c0d5e5bec9e3b504894d278eeaeded0f282e627260f1f35689869dd1fdf9bb0',
-             'after_sha256': '7da16cd0e85b8ff6e6544c260cdde2521b881dc2605b64b666fca6fdf97bbdca'},
+             'before_sha256': '8e544789c7c45daacdf6f53e63ec566eeb852e2f84ec34deab343187a61b2cbc',
+             'after_sha256': '06540c20ab51b38db6813eeae1fad3256515049cac70a99c959510ae4a379be3'},
             {'path': 'tests/parser/engine/test_parser_engine.py',
              'before_sha256': 'e3c906ca611720ddb682f38085f28e3d17ba382abc8fbdbe7938c3c309fbe801',
              'after_sha256': '6e16019a620f197a2bc159ca214fabef9a451b8c3dfe1776eb6572e249582cfb'},
@@ -85657,8 +85997,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': 'af028e500d1eafae7a357a6b2814c7e08d7d4892057a83002081135420005103',
              'after_sha256': '1ec656330956a89a6a5446e96282a2b049bb4504baad9f6779351e20958a7c25'},
             {'path': 'vllm/parser/qwen3.py',
-             'before_sha256': '7da16cd0e85b8ff6e6544c260cdde2521b881dc2605b64b666fca6fdf97bbdca',
-             'after_sha256': 'f86f2c698af67f665cd549b38007e92eba1cdbd1598aa5c4f71e73cf10fe5b09'}),
+             'before_sha256': '06540c20ab51b38db6813eeae1fad3256515049cac70a99c959510ae4a379be3',
+             'after_sha256': 'b78c3be542ba769cce700bc45e0823cb49334e9e01b90872b5e47609bbddd5a9'}),
   'edits': ({'name': 'tests/parser/engine/streaming_helpers.py:landmark-1',
              'path': 'tests/parser/engine/streaming_helpers.py',
              'before': '    cfg = getattr(parser, "parser_engine_config", None)\n'
@@ -88691,7 +89031,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '                        request_id=internal_req_id,\n'})},
  {'name': 'tool-output-completion',
   'review_patch': 'patches/vllm-tool-output-completion.patch',
-  'review_sha256': '51ec1e129e3467b6569e3557bebd57b2cd2c0ab809c81fb13d9e9a84300e4ce4',
+  'review_sha256': '68e8c9376d2adaca4bb6a977ef66bbd518c6f76660123301440bbcb2689781b8',
   'files': ({'path': 'tests/entrypoints/openai/chat_completion/test_parallel_tool_call_integrity.py',
              'before_sha256': 'a4a6547338dbf625e3041e2578f2a8e314aa14d1520468c69ee17ff22998d9a2',
              'after_sha256': 'e290f2c4df7bd842594db1fb4e66bf713bc6ff653cbadc8877958a955c0fa4c4'},
@@ -88702,8 +89042,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': '0451966ee298b08e799ef300029a144e66deb6debe5c1af43311aa1af622a277',
              'after_sha256': 'e3edf885a33aaecf5dd8d6fdeadad7f3eed60510eb4f43354f1273e52b974cfc'},
             {'path': 'tests/parser/engine/test_qwen3.py',
-             'before_sha256': '0f01de04b2c7290acaf9e3fb509704589d853bb625bbe67d78dfb5b5d28e9452',
-             'after_sha256': 'e08cb8b5ba3d19e80dca5da22730360c194fcfea7c899dcd84a0d1b7273099de'},
+             'before_sha256': '22c94207c606b1495dd4aee8826e7796aca9c88a1ca2aff4f528be66e6a8ba4c',
+             'after_sha256': '51c4ee6c496676a148aeda76f3fe6e4acb0fb4ed31993b9ac6c9dbbfc0e980a0'},
             {'path': 'tests/test_sampling_params.py',
              'before_sha256': '029468efd9149cb953ae7ba781db089ae1490b9d77eed7667931ce2d9855dc3a',
              'after_sha256': '9ce8ed07080994d48511465e8050a52ee1db8fdf5d0b2188bd6324b9276b3f97'},
@@ -88735,8 +89075,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': '4dfe9ac9a6f742237f962fecae6b72f596fe93684b107a2647e79eb52494b392',
              'after_sha256': '971e1b338169349d03bf04ad4bbd9702b97f6086cf4890d23321a0a37a5b385b'},
             {'path': 'vllm/parser/qwen3.py',
-             'before_sha256': 'f86f2c698af67f665cd549b38007e92eba1cdbd1598aa5c4f71e73cf10fe5b09',
-             'after_sha256': '0f2fd79645b9c4ed2f2e87dafa8a67015ec775418b671b387dca4dbfa25f02ac'},
+             'before_sha256': 'b78c3be542ba769cce700bc45e0823cb49334e9e01b90872b5e47609bbddd5a9',
+             'after_sha256': '34536ce7eb6c8fcd08ca7b5a279182014e5b73b6b766af8005d7932bdf560563'},
             {'path': 'vllm/renderers/online_derenderer.py',
              'before_sha256': '19887b06b24f2d83d69fcc1a1494c15d67dae6cc945a1bcd1ab9f5aa0c9284a5',
              'after_sha256': 'c93551f5e63e1b7e5d5bf105ca2e642a288644078feee561e8eef63267f7841d'},
@@ -95562,7 +95902,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '        ]\n'})},
  {'name': 'one-way-thinking-boundary',
   'review_patch': 'patches/vllm-one-way-thinking-boundary.patch',
-  'review_sha256': '63a69aea8a184a3875f50673a55058fb9e14dc3178abd8c5510de2770022f346',
+  'review_sha256': '0d438c545d4d49f159dd76e6d709e43fad0434c4a8e46c1abd330d7ee87ff9d3',
   'files': ({'path': 'tests/v1/logits_processors/test_correctness.py',
              'before_sha256': 'e9ae07b22a7d84a676e35dfb2b962504c3b7201f0e6b5d31e97e8c2ef0546e0a',
              'after_sha256': 'ce76f8c40dd6028b195600a2733656a877952b01eacd55b63dd9e619dd2f1290'},
@@ -95576,8 +95916,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': 'faf4f8a9aad387ba63a9df44980da9857619c3d99d13360df3039a262dba1efa',
              'after_sha256': '43329c8aa073ce3844e605165f073541b6c103ed65a1d6e42fa7792a6a470578'},
             {'path': 'vllm/parser/qwen3.py',
-             'before_sha256': '0f2fd79645b9c4ed2f2e87dafa8a67015ec775418b671b387dca4dbfa25f02ac',
-             'after_sha256': '1661e17f66a979600a730bfb9369a97be3f1f1719a1c2d7331af3892d388cfbb'},
+             'before_sha256': '34536ce7eb6c8fcd08ca7b5a279182014e5b73b6b766af8005d7932bdf560563',
+             'after_sha256': 'da47cdde5253e76f4ff4a102b96043399c4f082cd1314103c1a28b2c97a9e4a2'},
             {'path': 'vllm/reasoning/abs_reasoning_parsers.py',
              'before_sha256': 'd367196debd45d496653f66ac5b1a68a442db95dfe2d3e1a7a10df0144d53843',
              'after_sha256': '95e86d5bc477f00f5ed043273f64b76dc939374b118687bbcf834cc5d332c6c2'},
@@ -97035,10 +97375,10 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '                step_prefix_len = idx - start + 1\n'})},
  {'name': 'schema-faithful-xml',
   'review_patch': 'patches/vllm-schema-faithful-xml.patch',
-  'review_sha256': '97e73d566da1bbde490e78da1143d6052e93309b3bb67c90c56fda582af207c2',
+  'review_sha256': '165d05cf34e20f0d0be6b05b48ab2da44a35557da23d8195d22750c0c3e766a9',
   'files': ({'path': 'tests/parser/engine/test_qwen3.py',
-             'before_sha256': 'e08cb8b5ba3d19e80dca5da22730360c194fcfea7c899dcd84a0d1b7273099de',
-             'after_sha256': 'ca773868114ed9eb184bdde02a12763b644e4b14456f847f19e853b39721b569'},
+             'before_sha256': '51c4ee6c496676a148aeda76f3fe6e4acb0fb4ed31993b9ac6c9dbbfc0e980a0',
+             'after_sha256': '2ebf35427a055c45cfb2da1436ad7f231d298605c72ca663104e36d04ba9b6c4'},
             {'path': 'tests/parser/engine/test_qwen_xml_fidelity.py',
              'before_sha256': '969ed3d6968db465472951207d70c3ed70128f4c69f766ea3c41d46b754c8a2e',
              'after_sha256': 'ecff0586292555a116ada3b7d7e644896c73ff09d076983fc0415d4bbae17ffc'},
@@ -97046,8 +97386,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': '43329c8aa073ce3844e605165f073541b6c103ed65a1d6e42fa7792a6a470578',
              'after_sha256': 'a6a167574dbc69abc5c671af0138c8f7d68787722d4152eb04da4384c9c8c2a4'},
             {'path': 'vllm/parser/qwen3.py',
-             'before_sha256': '1661e17f66a979600a730bfb9369a97be3f1f1719a1c2d7331af3892d388cfbb',
-             'after_sha256': 'c84856f77e4c2d057bbc5e6bafecc23ef39d4f573b49f28c41b6cc420c381c68'},
+             'before_sha256': 'da47cdde5253e76f4ff4a102b96043399c4f082cd1314103c1a28b2c97a9e4a2',
+             'after_sha256': 'c3fbe53eb5ed609af65a544f81d90fb2fe07270a1683be5285fedcc66bc7dab4'},
             {'path': 'vllm/tool_parsers/utils.py',
              'before_sha256': '7d1dae2075f0ae425648b91f8c94358ea874db4972d5263f44ef8b268187fbe4',
              'after_sha256': '0399a0392644876bbcbdc2e9137b417aa842e7306a09a36d9836ef1d249de05d'}),
@@ -104032,11 +104372,11 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
   'review_patch': 'patches/vllm-qwen-canonical-parameter-framing.patch',
   'review_sha256': 'd438f9106c4a989d64837c21f5491d946065e6721570ad47664513347f150064',
   'files': ({'path': 'vllm/parser/qwen3.py',
-             'before_sha256': 'c84856f77e4c2d057bbc5e6bafecc23ef39d4f573b49f28c41b6cc420c381c68',
-             'after_sha256': 'ecbc647afb1f229ad556fbb055837f7a006b6bc7cc9d4d17e151e79d5fe8cde9'},
+             'before_sha256': 'c3fbe53eb5ed609af65a544f81d90fb2fe07270a1683be5285fedcc66bc7dab4',
+             'after_sha256': 'eba6cdae6f1b7421759dcdb822e32e72ce36d6dfab2302ec20e8f66816ba36cd'},
             {'path': 'tests/parser/engine/test_qwen3.py',
-             'before_sha256': 'ca773868114ed9eb184bdde02a12763b644e4b14456f847f19e853b39721b569',
-             'after_sha256': 'd37dc27c876210e016622c703fc98ca9ef23bb69f1addef5f5931226c8877d00'},
+             'before_sha256': '2ebf35427a055c45cfb2da1436ad7f231d298605c72ca663104e36d04ba9b6c4',
+             'after_sha256': '93f96ffa62f821fc889bdf5d906f5602e5c2d323a11e55e0c06d73f9347c86fb'},
             {'path': 'tests/parser/engine/test_qwen_xml_fidelity.py',
              'before_sha256': 'ecff0586292555a116ada3b7d7e644896c73ff09d076983fc0415d4bbae17ffc',
              'after_sha256': '32bc7c5b149b0577ffb47f646cea56d5c1f6bc95be31803e2a05a7959743a421'}),
@@ -104636,19 +104976,19 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'SCHEMA_CASES = [\n'})},
  {'name': 'qwen-owned-tool-grammar',
   'review_patch': 'patches/vllm-qwen-owned-tool-grammar.patch',
-  'review_sha256': '8eca87e7046eb5b01f37ebc93cafaec01479558ef102201dd74ef3ae8ad8a665',
+  'review_sha256': '39e5d3bfc5e60a453f25725e410ac14104d9f6e90381165516b874978cc8355b',
   'files': ({'path': 'vllm/tool_parsers/structural_tag_registry.py',
              'before_sha256': 'b6ddd5a890f31922b2f23cc7b84fd39b42783f65c8db121ba3d402b1e3266288',
-             'after_sha256': 'fdf9df55e89300ebf364f0765d3fff2b4b0d232fabfeeaed6c909ab3ce468b12'},
+             'after_sha256': 'de23555c6082da7de5d1c3543f8f2559f2662f044091cf0f16eeceba2982ff69'},
             {'path': 'vllm/parser/qwen3.py',
-             'before_sha256': 'ecbc647afb1f229ad556fbb055837f7a006b6bc7cc9d4d17e151e79d5fe8cde9',
-             'after_sha256': 'e74bb5667bea480948d40598f1b1ea5fc070a67ec2d90921a5047e7d0128df53'},
+             'before_sha256': 'eba6cdae6f1b7421759dcdb822e32e72ce36d6dfab2302ec20e8f66816ba36cd',
+             'after_sha256': '6f36cca5a53c8fd74fef2dbfd80b6638da905efd5fb3cd3ceba06d9cfa8326a5'},
             {'path': 'tests/tool_parsers/test_structural_tag_registry.py',
              'before_sha256': 'd45f5ba680c75277c0ae46bd6d90e90edefb124416fb1a0f204122a2198fb08a',
-             'after_sha256': 'e6885a848740d178422eff8381e66dbd31777cf2e57129be2d645e935317666f'},
+             'after_sha256': 'c05c0b20d35fd502894a8bbb4ce676fd8eeba1f392a94d3ad767477d4402224e'},
             {'path': 'tests/parser/engine/test_qwen3.py',
-             'before_sha256': 'd37dc27c876210e016622c703fc98ca9ef23bb69f1addef5f5931226c8877d00',
-             'after_sha256': 'c82a55107f08a0541792cdc99bcf32e019c694fc37f810d5d3b4e2e7199ca784'},
+             'before_sha256': '93f96ffa62f821fc889bdf5d906f5602e5c2d323a11e55e0c06d73f9347c86fb',
+             'after_sha256': '67a98831cfa59db4fa6e5e90ae2ede634de892e63c461290d74979a666aacddd'},
             {'path': 'tests/parser/engine/test_delegating_replay.py',
              'before_sha256': 'bd67af994d9d155b88a2071f180a6fd56fc67cbe5c423090b215568f632c5bca',
              'after_sha256': 'da1a123dd3df8e22cfdf5b5fa10c13198cc82b295294d0fb5933beff09e2b86f'},
@@ -104796,6 +105136,217 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '\n'
                              '\n'},
             {'name': 'vllm/tool_parsers/structural_tag_registry.py:landmark-4',
+             'path': 'vllm/tool_parsers/structural_tag_registry.py',
+             'before': '    return False\n'
+                       '\n'
+                       '\n'
+                       'def get_model_structural_tag(\n'
+                       '    model: str,\n'
+                       '    tools: Sequence[ChatCompletionToolsParam | ResponsesTool] '
+                       '| None,\n',
+             'after': '    return False\n'
+                      '\n'
+                      '\n'
+                      '# The next actions a caller has when a limit of one call cannot '
+                      'be held.\n'
+                      '_ALLOW_PARALLEL_CALLS = (\n'
+                      '    "Allow parallel calls (parallel_tool_calls true; on the '
+                      'Anthropic route, "\n'
+                      '    "tool_choice.disable_parallel_tool_use false) and the '
+                      'response carries "\n'
+                      '    "every call the model makes, or name the one function to '
+                      'call in "\n'
+                      '    "tool_choice."\n'
+                      ')\n'
+                      '\n'
+                      '\n'
+                      'def get_model_structural_tag(\n'
+                      '    model: str,\n'
+                      '    tools: Sequence[ChatCompletionToolsParam | ResponsesTool] | '
+                      'None,\n',
+             'review_before': '    return False\n'
+                              '\n'
+                              '\n'
+                              'def get_model_structural_tag(\n'
+                              '    model: str,\n'
+                              '    tools: Sequence[ChatCompletionToolsParam | '
+                              'ResponsesTool] | None,\n',
+             'review_after': '    return False\n'
+                             '\n'
+                             '\n'
+                             '# The next actions a caller has when a limit of one call '
+                             'cannot be held.\n'
+                             '_ALLOW_PARALLEL_CALLS = (\n'
+                             '    "Allow parallel calls (parallel_tool_calls true; on '
+                             'the Anthropic route, "\n'
+                             '    "tool_choice.disable_parallel_tool_use false) and '
+                             'the response carries "\n'
+                             '    "every call the model makes, or name the one '
+                             'function to call in "\n'
+                             '    "tool_choice."\n'
+                             ')\n'
+                             '\n'
+                             '\n'
+                             'def get_model_structural_tag(\n'
+                             '    model: str,\n'
+                             '    tools: Sequence[ChatCompletionToolsParam | '
+                             'ResponsesTool] | None,\n'},
+            {'name': 'vllm/tool_parsers/structural_tag_registry.py:landmark-5',
+             'path': 'vllm/tool_parsers/structural_tag_registry.py',
+             'before': '    if not tools or tool_choice == "none":\n'
+                       '        return None\n'
+                       '\n'
+                       '    # This single-purpose Qwen agent runtime treats every '
+                       'advertised Qwen tool\n'
+                       '    # schema as load-bearing. For auto tool choice the model '
+                       'still decides\n'
+                       '    # whether to call a tool, but once it starts a call '
+                       'xgrammar must constrain\n',
+             'after': '    if not tools or tool_choice == "none":\n'
+                      '        return None\n'
+                      '\n'
+                      '    # A limit of one call is held by the grammar, never by '
+                      'dropping calls the\n'
+                      '    # model made: a vLLM-owned builder takes it, and a forced '
+                      'choice is one\n'
+                      '    # call by itself. An XGrammar builtin format takes no '
+                      'limit, so with any\n'
+                      '    # other choice the request is refused rather than served '
+                      'unenforced.\n'
+                      '    one_call = isinstance(\n'
+                      '        tool_choice, ChatCompletionNamedToolChoiceParam | '
+                      'ToolChoiceFunction\n'
+                      '    )\n'
+                      '    if (\n'
+                      '        parallel_tool_calls is False\n'
+                      '        and not one_call\n'
+                      '        and model in XGRAMMAR_BUILTIN_STRUCTURAL_TAG_MODELS\n'
+                      '    ):\n'
+                      '        raise VLLMValidationError(\n'
+                      '            f"parallel_tool_calls false cannot be enforced in '
+                      'this server\'s "\n'
+                      '            f"{model!r} tool-call format: its grammar is '
+                      'XGrammar\'s builtin "\n'
+                      '            "one, which admits any number of calls and takes no '
+                      'limit, and a "\n'
+                      '            "call the model made is never dropped. "\n'
+                      '            + _ALLOW_PARALLEL_CALLS,\n'
+                      '            parameter="parallel_tool_calls",\n'
+                      '        )\n'
+                      '\n'
+                      '    # This single-purpose Qwen agent runtime treats every '
+                      'advertised Qwen tool\n'
+                      '    # schema as load-bearing. For auto tool choice the model '
+                      'still decides\n'
+                      '    # whether to call a tool, but once it starts a call '
+                      'xgrammar must constrain\n',
+             'review_before': '    if not tools or tool_choice == "none":\n'
+                              '        return None\n'
+                              '\n'
+                              '    # This single-purpose Qwen agent runtime treats '
+                              'every advertised Qwen tool\n'
+                              '    # schema as load-bearing. For auto tool choice the '
+                              'model still decides\n'
+                              '    # whether to call a tool, but once it starts a call '
+                              'xgrammar must constrain\n',
+             'review_after': '    if not tools or tool_choice == "none":\n'
+                             '        return None\n'
+                             '\n'
+                             '    # A limit of one call is held by the grammar, never '
+                             'by dropping calls the\n'
+                             '    # model made: a vLLM-owned builder takes it, and a '
+                             'forced choice is one\n'
+                             '    # call by itself. An XGrammar builtin format takes '
+                             'no limit, so with any\n'
+                             '    # other choice the request is refused rather than '
+                             'served unenforced.\n'
+                             '    one_call = isinstance(\n'
+                             '        tool_choice, ChatCompletionNamedToolChoiceParam '
+                             '| ToolChoiceFunction\n'
+                             '    )\n'
+                             '    if (\n'
+                             '        parallel_tool_calls is False\n'
+                             '        and not one_call\n'
+                             '        and model in '
+                             'XGRAMMAR_BUILTIN_STRUCTURAL_TAG_MODELS\n'
+                             '    ):\n'
+                             '        raise VLLMValidationError(\n'
+                             '            f"parallel_tool_calls false cannot be '
+                             'enforced in this server\'s "\n'
+                             '            f"{model!r} tool-call format: its grammar is '
+                             'XGrammar\'s builtin "\n'
+                             '            "one, which admits any number of calls and '
+                             'takes no limit, and a "\n'
+                             '            "call the model made is never dropped. "\n'
+                             '            + _ALLOW_PARALLEL_CALLS,\n'
+                             '            parameter="parallel_tool_calls",\n'
+                             '        )\n'
+                             '\n'
+                             '    # This single-purpose Qwen agent runtime treats '
+                             'every advertised Qwen tool\n'
+                             '    # schema as load-bearing. For auto tool choice the '
+                             'model still decides\n'
+                             '    # whether to call a tool, but once it starts a call '
+                             'xgrammar must constrain\n'},
+            {'name': 'vllm/tool_parsers/structural_tag_registry.py:landmark-6',
+             'path': 'vllm/tool_parsers/structural_tag_registry.py',
+             'before': '        and not _any_tool_strict(tools)\n'
+                       '        and model != "qwen_3_coder"\n'
+                       '    ):\n'
+                       '        return None\n'
+                       '\n'
+                       '    dumped_tools = [_dump_tool_for_xgrammar(tool) for tool in '
+                       'tools]\n',
+             'after': '        and not _any_tool_strict(tools)\n'
+                      '        and model != "qwen_3_coder"\n'
+                      '    ):\n'
+                      '        if parallel_tool_calls is False:\n'
+                      '            raise VLLMValidationError(\n'
+                      '                "parallel_tool_calls false is held by the '
+                      'tool-call grammar, "\n'
+                      '                f"and under tool_choice \'auto\' this server\'s '
+                      '{model!r} format "\n'
+                      '                "arms it only for a strict tool; none is, so '
+                      'nothing would "\n'
+                      '                "hold the model to one call. Mark the tools '
+                      'strict: true, or "\n'
+                      '                + _ALLOW_PARALLEL_CALLS[0].lower()\n'
+                      '                + _ALLOW_PARALLEL_CALLS[1:],\n'
+                      '                parameter="parallel_tool_calls",\n'
+                      '            )\n'
+                      '        return None\n'
+                      '\n'
+                      '    dumped_tools = [_dump_tool_for_xgrammar(tool) for tool in '
+                      'tools]\n',
+             'review_before': '        and not _any_tool_strict(tools)\n'
+                              '        and model != "qwen_3_coder"\n'
+                              '    ):\n'
+                              '        return None\n'
+                              '\n'
+                              '    dumped_tools = [_dump_tool_for_xgrammar(tool) for '
+                              'tool in tools]\n',
+             'review_after': '        and not _any_tool_strict(tools)\n'
+                             '        and model != "qwen_3_coder"\n'
+                             '    ):\n'
+                             '        if parallel_tool_calls is False:\n'
+                             '            raise VLLMValidationError(\n'
+                             '                "parallel_tool_calls false is held by '
+                             'the tool-call grammar, "\n'
+                             '                f"and under tool_choice \'auto\' this '
+                             'server\'s {model!r} format "\n'
+                             '                "arms it only for a strict tool; none '
+                             'is, so nothing would "\n'
+                             '                "hold the model to one call. Mark the '
+                             'tools strict: true, or "\n'
+                             '                + _ALLOW_PARALLEL_CALLS[0].lower()\n'
+                             '                + _ALLOW_PARALLEL_CALLS[1:],\n'
+                             '                parameter="parallel_tool_calls",\n'
+                             '            )\n'
+                             '        return None\n'
+                             '\n'
+                             '    dumped_tools = [_dump_tool_for_xgrammar(tool) for '
+                             'tool in tools]\n'},
+            {'name': 'vllm/tool_parsers/structural_tag_registry.py:landmark-7',
              'path': 'vllm/tool_parsers/structural_tag_registry.py',
              'before': '            builtin_tools,\n'
                        '            simplified_tool_choice,\n'
@@ -104956,7 +105507,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '\n'
                              '\n'
                              'def _dump_tool_for_xgrammar(\n'},
-            {'name': 'vllm/tool_parsers/structural_tag_registry.py:landmark-5',
+            {'name': 'vllm/tool_parsers/structural_tag_registry.py:landmark-8',
              'path': 'vllm/tool_parsers/structural_tag_registry.py',
              'before': '    builtin_tools: list[BuiltinToolParam],\n'
                        '    tool_choice: SimplifiedToolChoice,\n'
@@ -105031,7 +105582,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '            if tags\n'
                              '            else AnyTextFormat()\n'
                              '        )\n'},
-            {'name': 'vllm/tool_parsers/structural_tag_registry.py:landmark-6',
+            {'name': 'vllm/tool_parsers/structural_tag_registry.py:landmark-9',
              'path': 'vllm/tool_parsers/structural_tag_registry.py',
              'before': '            tags=_hermes_tool_tags(tools),\n'
                        '            separator="",\n'
@@ -105059,7 +105610,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '        )\n'
                              '\n'
                              '    return StructuralTag(format=suffix_tag)\n'},
-            {'name': 'vllm/tool_parsers/structural_tag_registry.py:landmark-7',
+            {'name': 'vllm/tool_parsers/structural_tag_registry.py:landmark-10',
              'path': 'vllm/tool_parsers/structural_tag_registry.py',
              'before': '    builtin_tools: list[BuiltinToolParam],\n'
                        '    tool_choice: SimplifiedToolChoice,\n'
@@ -105117,7 +105668,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '\n'
                              '    tags = _minimax_tool_tags(tools)\n'
                              '\n'},
-            {'name': 'vllm/tool_parsers/structural_tag_registry.py:landmark-8',
+            {'name': 'vllm/tool_parsers/structural_tag_registry.py:landmark-11',
              'path': 'vllm/tool_parsers/structural_tag_registry.py',
              'before': '                            tags=tags,\n'
                        '                            separator="",\n'
@@ -105172,7 +105723,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '            if tags\n'
                              '            else AnyTextFormat(excludes=["<think>", '
                              '"</think>"])\n'},
-            {'name': 'vllm/tool_parsers/structural_tag_registry.py:landmark-9',
+            {'name': 'vllm/tool_parsers/structural_tag_registry.py:landmark-12',
              'path': 'vllm/tool_parsers/structural_tag_registry.py',
              'before': '                    tags=tags,\n'
                        '                    separator="",\n'
@@ -105201,7 +105752,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '                ),\n'
                              '                ConstStringFormat(value=tool_call_end),\n'
                              '            ]\n'},
-            {'name': 'vllm/tool_parsers/structural_tag_registry.py:landmark-10',
+            {'name': 'vllm/tool_parsers/structural_tag_registry.py:landmark-13',
              'path': 'vllm/tool_parsers/structural_tag_registry.py',
              'before': '    ]\n'
                        '\n'
@@ -105265,7 +105816,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '        ),\n'
                              '        end=_K3_TOOLS_CLOSE,\n'
                              '    )\n'},
-            {'name': 'vllm/tool_parsers/structural_tag_registry.py:landmark-11',
+            {'name': 'vllm/tool_parsers/structural_tag_registry.py:landmark-14',
              'path': 'vllm/tool_parsers/structural_tag_registry.py',
              'before': '    builtin_tools: list[BuiltinToolParam],\n'
                        '    tool_choice: SimplifiedToolChoice,\n'
@@ -105311,7 +105862,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    trailer = '
                              'OptionalFormat(content=ConstStringFormat(value=_K3_MESSAGE_CLOSE))\n'
                              '\n'},
-            {'name': 'vllm/tool_parsers/structural_tag_registry.py:landmark-12',
+            {'name': 'vllm/tool_parsers/structural_tag_registry.py:landmark-15',
              'path': 'vllm/tool_parsers/structural_tag_registry.py',
              'before': '        )\n'
                        '\n'
@@ -106459,6 +107010,67 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '            grammar, "\\n" + begin + _MINIMAX_INVOKE * 2 + end\n'
                       '        ) is accepted\n'
                       '\n'
+                      '@pytest.mark.parametrize("model", '
+                      'sorted(XGRAMMAR_BUILTIN_STRUCTURAL_TAG_MODELS))\n'
+                      '@pytest.mark.parametrize("choice", ["auto", "required"])\n'
+                      'def test_a_builtin_format_refuses_a_call_limit_it_cannot_hold(\n'
+                      '    model, choice, sample_tools_strict\n'
+                      '):\n'
+                      '    """XGrammar\'s builtin grammars take no call limit, so one '
+                      'is refused\n'
+                      '    naming the parameter rather than admitted unenforced."""\n'
+                      '    from vllm.exceptions import VLLMValidationError\n'
+                      '\n'
+                      '    with pytest.raises(VLLMValidationError, '
+                      'match="parallel_tool_calls true") as refused:\n'
+                      '        get_model_structural_tag(\n'
+                      '            model, sample_tools_strict, choice, False, '
+                      'parallel_tool_calls=False\n'
+                      '        )\n'
+                      '    assert refused.value.parameter == "parallel_tool_calls"\n'
+                      '\n'
+                      '\n'
+                      'def '
+                      'test_a_forced_choice_is_one_call_in_a_builtin_format(sample_tools):\n'
+                      '    named = ChatCompletionNamedToolChoiceParam(\n'
+                      '        type="function", '
+                      'function=ChatCompletionNamedFunction(name="get_weather")\n'
+                      '    )\n'
+                      '    for parallel in (None, True, False):\n'
+                      '        assert get_model_structural_tag(\n'
+                      '            "qwen_3", sample_tools, named, False, '
+                      'parallel_tool_calls=parallel\n'
+                      '        ) is not None\n'
+                      '    for parallel in (None, True):\n'
+                      '        assert get_model_structural_tag(\n'
+                      '            "qwen_3", sample_tools, "required", False, '
+                      'parallel_tool_calls=parallel\n'
+                      '        ) is not None\n'
+                      '\n'
+                      '\n'
+                      '@pytest.mark.parametrize("model", ["hermes", "minimax", '
+                      '"kimi_k3"])\n'
+                      'def test_auto_without_a_strict_tool_refuses_a_call_limit(model, '
+                      'sample_tools):\n'
+                      '    """Under "auto" these formats arm their grammar only for a '
+                      'strict tool;\n'
+                      '    without one nothing would hold a limit, so it is '
+                      'refused."""\n'
+                      '    from vllm.exceptions import VLLMValidationError\n'
+                      '\n'
+                      '    with pytest.raises(VLLMValidationError, match="strict: '
+                      'true") as refused:\n'
+                      '        get_model_structural_tag(\n'
+                      '            model, sample_tools, "auto", False, '
+                      'parallel_tool_calls=False\n'
+                      '        )\n'
+                      '    assert refused.value.parameter == "parallel_tool_calls"\n'
+                      '    for parallel in (None, True):\n'
+                      '        assert get_model_structural_tag(\n'
+                      '            model, sample_tools, "auto", False, '
+                      'parallel_tool_calls=parallel\n'
+                      '        ) is None\n'
+                      '\n'
                       '\n'
                       '@pytest.mark.parametrize("model", '
                       'sorted(XGRAMMAR_BUILTIN_STRUCTURAL_TAG_MODELS))\n',
@@ -106576,6 +107188,73 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '            grammar, "\\n" + begin + _MINIMAX_INVOKE * 2 '
                              '+ end\n'
                              '        ) is accepted\n'
+                             '\n'
+                             '@pytest.mark.parametrize("model", '
+                             'sorted(XGRAMMAR_BUILTIN_STRUCTURAL_TAG_MODELS))\n'
+                             '@pytest.mark.parametrize("choice", ["auto", '
+                             '"required"])\n'
+                             'def '
+                             'test_a_builtin_format_refuses_a_call_limit_it_cannot_hold(\n'
+                             '    model, choice, sample_tools_strict\n'
+                             '):\n'
+                             '    """XGrammar\'s builtin grammars take no call limit, '
+                             'so one is refused\n'
+                             '    naming the parameter rather than admitted '
+                             'unenforced."""\n'
+                             '    from vllm.exceptions import VLLMValidationError\n'
+                             '\n'
+                             '    with pytest.raises(VLLMValidationError, '
+                             'match="parallel_tool_calls true") as refused:\n'
+                             '        get_model_structural_tag(\n'
+                             '            model, sample_tools_strict, choice, False, '
+                             'parallel_tool_calls=False\n'
+                             '        )\n'
+                             '    assert refused.value.parameter == '
+                             '"parallel_tool_calls"\n'
+                             '\n'
+                             '\n'
+                             'def '
+                             'test_a_forced_choice_is_one_call_in_a_builtin_format(sample_tools):\n'
+                             '    named = ChatCompletionNamedToolChoiceParam(\n'
+                             '        type="function", '
+                             'function=ChatCompletionNamedFunction(name="get_weather")\n'
+                             '    )\n'
+                             '    for parallel in (None, True, False):\n'
+                             '        assert get_model_structural_tag(\n'
+                             '            "qwen_3", sample_tools, named, False, '
+                             'parallel_tool_calls=parallel\n'
+                             '        ) is not None\n'
+                             '    for parallel in (None, True):\n'
+                             '        assert get_model_structural_tag(\n'
+                             '            "qwen_3", sample_tools, "required", False, '
+                             'parallel_tool_calls=parallel\n'
+                             '        ) is not None\n'
+                             '\n'
+                             '\n'
+                             '@pytest.mark.parametrize("model", ["hermes", "minimax", '
+                             '"kimi_k3"])\n'
+                             'def '
+                             'test_auto_without_a_strict_tool_refuses_a_call_limit(model, '
+                             'sample_tools):\n'
+                             '    """Under "auto" these formats arm their grammar only '
+                             'for a strict tool;\n'
+                             '    without one nothing would hold a limit, so it is '
+                             'refused."""\n'
+                             '    from vllm.exceptions import VLLMValidationError\n'
+                             '\n'
+                             '    with pytest.raises(VLLMValidationError, '
+                             'match="strict: true") as refused:\n'
+                             '        get_model_structural_tag(\n'
+                             '            model, sample_tools, "auto", False, '
+                             'parallel_tool_calls=False\n'
+                             '        )\n'
+                             '    assert refused.value.parameter == '
+                             '"parallel_tool_calls"\n'
+                             '    for parallel in (None, True):\n'
+                             '        assert get_model_structural_tag(\n'
+                             '            model, sample_tools, "auto", False, '
+                             'parallel_tool_calls=parallel\n'
+                             '        ) is None\n'
                              '\n'
                              '\n'
                              '@pytest.mark.parametrize("model", '
@@ -107708,13 +108387,13 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '        # Fallback for built-in tools\n'})},
  {'name': 'qwen-unique-tool-parameters',
   'review_patch': 'patches/vllm-qwen-unique-tool-parameters.patch',
-  'review_sha256': '6a76a61c743807215555cbd6b3bbdd8fcaba4abcaca69ef000d301df6c792d3b',
+  'review_sha256': 'a85108911b0e12757c5f88e2b3a8d4356e9a37c17f866a54049ef6aa6da42074',
   'files': ({'path': 'vllm/parser/qwen3.py',
-             'before_sha256': 'e74bb5667bea480948d40598f1b1ea5fc070a67ec2d90921a5047e7d0128df53',
-             'after_sha256': '0e2e348c350dc27220781d6af791d398d8e0943ac5d14553cbb431ec4914d393'},
+             'before_sha256': '6f36cca5a53c8fd74fef2dbfd80b6638da905efd5fb3cd3ceba06d9cfa8326a5',
+             'after_sha256': '80e93859d170307cb44a275d61233fc0bea01f4cacf82f04955f34408494c320'},
             {'path': 'tests/parser/engine/test_qwen3.py',
-             'before_sha256': 'c82a55107f08a0541792cdc99bcf32e019c694fc37f810d5d3b4e2e7199ca784',
-             'after_sha256': '1fd6129db802f6331f0e79c9db393771379727a9fda3c0901d6b9b9c4e87ebf3'},
+             'before_sha256': '67a98831cfa59db4fa6e5e90ae2ede634de892e63c461290d74979a666aacddd',
+             'after_sha256': 'f4787f638c5334a43891c86876e4827922455cb72003387c62d9425fcfb0fbf3'},
             {'path': 'tests/parser/engine/test_qwen_xml_fidelity.py',
              'before_sha256': '32bc7c5b149b0577ffb47f646cea56d5c1f6bc95be31803e2a05a7959743a421',
              'after_sha256': '3222b5f59f5ac7111b95877635364abf9e977716a7ebd8b1f157dff207aa5d12'}),
@@ -121109,13 +121788,13 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'kernel_cls.__name__)\n'})},
  {'name': 'qwen-arguments-read-by-grammar',
   'review_patch': 'patches/vllm-qwen-arguments-read-by-grammar.patch',
-  'review_sha256': '9bf29aed999f1cfe12a58cc98b91fccafe615dfb7c22f13e9c681d1b54034837',
+  'review_sha256': '8851f6fa3a49e1f9ac0a98239fa9d8f8563a916fce69c0dbe8b180fa6202a263',
   'files': ({'path': 'tests/parser/engine/test_qwen_xml_fidelity.py',
              'before_sha256': '3222b5f59f5ac7111b95877635364abf9e977716a7ebd8b1f157dff207aa5d12',
              'after_sha256': '6b3cac443f0363ce3cd64535edcbfd699177b2dd2f3715d719e8c1d8b5823534'},
             {'path': 'tests/tool_parsers/test_structural_tag_registry.py',
-             'before_sha256': 'e6885a848740d178422eff8381e66dbd31777cf2e57129be2d645e935317666f',
-             'after_sha256': '069d0f390832418ac8089d0499f47f6ea2704515d2cf47a1bf05cd318032aeaa'},
+             'before_sha256': 'c05c0b20d35fd502894a8bbb4ce676fd8eeba1f392a94d3ad767477d4402224e',
+             'after_sha256': '5b31801a4c41fe4c55af46573fb448ff00e6504f681467dcf38c18031ac13a3d'},
             {'path': 'vllm/parser/engine/parser_engine.py',
              'before_sha256': 'a6a167574dbc69abc5c671af0138c8f7d68787722d4152eb04da4384c9c8c2a4',
              'after_sha256': '09775cb1228448d958a2952530a34779b7f2118903fac561eb057043bb80cd18'},
@@ -121126,11 +121805,11 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': 'b0bd3ff96ea79eca7d979d6344b8b0862993db4a293ffce711da8980662106e2',
              'after_sha256': '36a82097dbd242c34cde10914e9de757f1d1c6b619edbe92928c726479c3b068'},
             {'path': 'vllm/parser/qwen3.py',
-             'before_sha256': '0e2e348c350dc27220781d6af791d398d8e0943ac5d14553cbb431ec4914d393',
-             'after_sha256': 'e8658b23759c164374f8dc3d2b5f6f40e125e8883553a2aeb66c13e52ab09ee2'},
+             'before_sha256': '80e93859d170307cb44a275d61233fc0bea01f4cacf82f04955f34408494c320',
+             'after_sha256': '8e5a02e91d39c754ffd2bf04fe50cb256a52163f02a2985ccfb99dfd7012a6ef'},
             {'path': 'vllm/tool_parsers/structural_tag_registry.py',
-             'before_sha256': 'fdf9df55e89300ebf364f0765d3fff2b4b0d232fabfeeaed6c909ab3ce468b12',
-             'after_sha256': 'bd6f62d84359bc185c7c1dd5009943a14c0734610024b75ab80fc87a18442674'}),
+             'before_sha256': 'de23555c6082da7de5d1c3543f8f2559f2662f044091cf0f16eeceba2982ff69',
+             'after_sha256': '46f03e1da57b367a868f159cb2bd0db484f6cf575f0ae06cad1d2778e745c994'}),
   'edits': ({'name': 'tests/parser/engine/test_qwen_xml_fidelity.py:landmark-1',
              'path': 'tests/parser/engine/test_qwen_xml_fidelity.py',
              'before': "            '</parameter>\\n</function>\\n</tool_call>')\n"
@@ -126876,13 +127555,13 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '\n'})},
  {'name': 'qwen-repeated-parameter-refusal',
   'review_patch': 'patches/vllm-qwen-repeated-parameter-refusal.patch',
-  'review_sha256': 'af405e3be4a649264786bf7bc924c3e4053579eddde47030d9776eb1bc1c73c0',
+  'review_sha256': '849fadaa43f2f8eafc0e98fae2c5c201e3b4a8c637de58720eebb94817768e31',
   'files': ({'path': 'tests/entrypoints/openai/chat_completion/test_repeated_tool_parameter_refusal.py',
              'before_sha256': None,
              'after_sha256': 'b8a7eed51747dddf980145be2609cf1a8136465bf0068a0f3c7b85424ab9a9d9'},
             {'path': 'tests/parser/engine/test_qwen3.py',
-             'before_sha256': '1fd6129db802f6331f0e79c9db393771379727a9fda3c0901d6b9b9c4e87ebf3',
-             'after_sha256': '517e2b218e9bbbf7f59f9b447fd1807708269bfe636ca0a429b0b74621adde4e'},
+             'before_sha256': 'f4787f638c5334a43891c86876e4827922455cb72003387c62d9425fcfb0fbf3',
+             'after_sha256': '4b87d3b572d58d43808e01050bc8cfcf88a3d3a99cb21e71933be63587d1406e'},
             {'path': 'tests/parser/engine/test_qwen_xml_fidelity.py',
              'before_sha256': '6b3cac443f0363ce3cd64535edcbfd699177b2dd2f3715d719e8c1d8b5823534',
              'after_sha256': '582dce451adaf23773987e81e57d82028697e570ba35360540a82e8287572a52'},
@@ -126899,8 +127578,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': 'fbd9ba671dccceef0eabf62b5fe19218ed38dda991b3519a3b92e02ad4b24b39',
              'after_sha256': '67389b072fab088e8d29e30536dd80b7be1e8aded133976f3043b760a9ac73f9'},
             {'path': 'vllm/parser/qwen3.py',
-             'before_sha256': 'e8658b23759c164374f8dc3d2b5f6f40e125e8883553a2aeb66c13e52ab09ee2',
-             'after_sha256': '6dd2a349ebcfedfe8aa6a9f318ab802bc83e663defca9d634c38cfefeda27b5a'}),
+             'before_sha256': '8e5a02e91d39c754ffd2bf04fe50cb256a52163f02a2985ccfb99dfd7012a6ef',
+             'after_sha256': '60e6c9ed5bebacd56b594604b27ccce180356c8389c2a8a4ba2a82a9eeead010'}),
   'edits': ({'name': 'tests/entrypoints/openai/chat_completion/test_repeated_tool_parameter_refusal.py:landmark-1',
              'path': 'tests/entrypoints/openai/chat_completion/test_repeated_tool_parameter_refusal.py',
              'before': '',
@@ -128142,7 +128821,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '        if not token_ids:\n'})},
  {'name': 'generated-tokens-survive-parsing',
   'review_patch': 'patches/vllm-generated-tokens-survive-parsing.patch',
-  'review_sha256': '3709ac24d4f098a27ffa57fedf9d3dec81a1e08392da07d225bb8b62d2e8ee2e',
+  'review_sha256': '3889af17e410853baa95ea40eba32baa5ed35d03e37822d55312861e21fba8b9',
   'files': ({'path': 'tests/parser/engine/test_deepseek_v4.py',
              'before_sha256': '6de6f7aaa3e8ff7fb058ac933cbf9ab2467a78bbe63659763729cbaa0bb488b4',
              'after_sha256': 'c4b1aad15dbaef851b7c76cd4e6a97e90df3316629dcb3fbf89da7473ec2953c'},
@@ -128177,8 +128856,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': 'eda9202c72a865dc1c32a14891d6104474f3514b90adbf87e1c81a80a11c2719',
              'after_sha256': '44411dca605b8cfd849c42b7c246aee2f7c2da168ecfa7e876fd770e92a4aa23'},
             {'path': 'vllm/parser/qwen3.py',
-             'before_sha256': '6dd2a349ebcfedfe8aa6a9f318ab802bc83e663defca9d634c38cfefeda27b5a',
-             'after_sha256': '316d5ce3e386ed18953b8ce1c78944c854a82e19b2b187de0d7f2c5419064249'},
+             'before_sha256': '60e6c9ed5bebacd56b594604b27ccce180356c8389c2a8a4ba2a82a9eeead010',
+             'after_sha256': '86eadde1cfc2952426bdcf7cecef0c369a2e952fe72f1d0a7ff0b81f84498993'},
             {'path': 'vllm/parser/engine/adapters.py',
              'before_sha256': '2679bf5609812dcd988d4039db0203eb9361e21d5360ea1a363ad51f9c3d839d',
              'after_sha256': '131fdf12c1ecb244f01b235eeda7bbf4facf65a80edc56256eba72745bb8e1d0'},
@@ -131246,7 +131925,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '                # non-reasoning outputs.\n'})},
  {'name': 'unspecified-tool-choice-is-the-default',
   'review_patch': 'patches/vllm-unspecified-tool-choice-is-the-default.patch',
-  'review_sha256': '8db1159ea73f23e20a7635b276f56abce085d9b0d83b3ea0d4599f275c5e8746',
+  'review_sha256': '54d10d87b699b7cb767f2403359bc6c6abd82a9fa3a8aa5bef4a2f2e26ab515d',
   'files': ({'path': 'tests/entrypoints/anthropic/test_anthropic_messages_conversion.py',
              'before_sha256': 'c9e0ceeaea3ef19464f1d0f16c86bfb40b96747a336a7c7ee6430b7c25d60243',
              'after_sha256': '30e03a0608325ec676971d1a02a04512004a3d61cb07875cbb36458162a94007'},
@@ -131272,8 +131951,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': '1ec656330956a89a6a5446e96282a2b049bb4504baad9f6779351e20958a7c25',
              'after_sha256': '0b74821f7c68d5cf572760288d82bb40c19dfe0c88a6f9412befcaf1cfdcf6e8'},
             {'path': 'vllm/tool_parsers/structural_tag_registry.py',
-             'before_sha256': 'bd6f62d84359bc185c7c1dd5009943a14c0734610024b75ab80fc87a18442674',
-             'after_sha256': 'b26afa7604527858d7c12b39b20a79bbd089995238ef55e1d0df3eb5d536ee7e'}),
+             'before_sha256': '46f03e1da57b367a868f159cb2bd0db484f6cf575f0ae06cad1d2778e745c994',
+             'after_sha256': 'd81da50074fd02a1bf81479f515973e2ef881045494d9679b7e219f066f52985'}),
   'edits': ({'name': 'tests/entrypoints/anthropic/test_anthropic_messages_conversion.py:landmark-1',
              'path': 'tests/entrypoints/anthropic/test_anthropic_messages_conversion.py',
              'before': "        assert not any(kind == 'message_stop' for kind, _ in "
@@ -132696,13 +133375,13 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '\n'})},
  {'name': 'call-only-answer-keeps-the-blank-line',
   'review_patch': 'patches/vllm-call-only-answer-keeps-the-blank-line.patch',
-  'review_sha256': '57c69104cb5b569050098993f4abb4e7f88299a43b6ac41f22e267dd8ab177a2',
+  'review_sha256': '989ac21aa1f40ad0ebaecd7bff8b4bcab8e42e8ec5fb3df698aecc5ed6da1fa3',
   'files': ({'path': 'tests/tool_parsers/test_structural_tag_registry.py',
-             'before_sha256': '069d0f390832418ac8089d0499f47f6ea2704515d2cf47a1bf05cd318032aeaa',
-             'after_sha256': '3fbc42eef3b13462d86990e287c15e35ae3d1faa8e5a0d9eb75b338787074540'},
+             'before_sha256': '5b31801a4c41fe4c55af46573fb448ff00e6504f681467dcf38c18031ac13a3d',
+             'after_sha256': '8872f79ce812561734e5343f5d1829e56e890b20c356e4283f997c606b1a0327'},
             {'path': 'vllm/tool_parsers/structural_tag_registry.py',
-             'before_sha256': 'b26afa7604527858d7c12b39b20a79bbd089995238ef55e1d0df3eb5d536ee7e',
-             'after_sha256': 'a8ef0a80ba38eb1321442bd67efd5c6b7462c4c884920027edb750d6be26891f'}),
+             'before_sha256': 'd81da50074fd02a1bf81479f515973e2ef881045494d9679b7e219f066f52985',
+             'after_sha256': '0351b606aa1e2ccb53496844c1af1e4d4a5f0d5d9ed97f2e58cde7301e7bd84c'}),
   'edits': ({'name': 'tests/tool_parsers/test_structural_tag_registry.py:landmark-1',
              'path': 'tests/tool_parsers/test_structural_tag_registry.py',
              'before': '    assert _is_grammar_accept_string(grammar, _QWEN3_CALL + '
@@ -133115,19 +133794,19 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    ]))\n'})},
  {'name': 'responses-tools-are-one-function-list',
   'review_patch': 'patches/vllm-responses-tools-are-one-function-list.patch',
-  'review_sha256': 'aa54ae92344ca7c9bdfe014a9676b7b63716e3c677e64cee4a8a6ac3b0c104e5',
+  'review_sha256': '5b4e5ae876a7979e669f3b597a341cd91e738d8e379a54644e6b9ac8c8316314',
   'files': ({'path': 'tests/tool_parsers/test_structural_tag_registry.py',
-             'before_sha256': '3fbc42eef3b13462d86990e287c15e35ae3d1faa8e5a0d9eb75b338787074540',
-             'after_sha256': '7d1fd82dfcf43352ff4b6953418cf762128bea9b78207a2313d9df9cb19b5f4b'},
+             'before_sha256': '8872f79ce812561734e5343f5d1829e56e890b20c356e4283f997c606b1a0327',
+             'after_sha256': 'fd3b03f516136d83e84c0013514f0890a5bd05089274240e48f57b1748e96e36'},
             {'path': 'tests/tool_use/test_responses_request_validations.py',
              'before_sha256': 'ac94348ad68957e11374ac5e9545dd62aba45dcd343206ad39481ef6dedd1a4d',
-             'after_sha256': '90f95b34cf4ed5b5b871798866787d76273e29f252c6128cfafeb139668f8e7f'},
+             'after_sha256': '647add3595bee47474e44bc425f3568abaa3c6392933dc0644b9e664c0b0c973'},
             {'path': 'vllm/entrypoints/openai/responses/protocol.py',
              'before_sha256': '689c1ec5ce05dc82f97b9354caa506674021b9aab0e89486e9bce4bc1837dc81',
              'after_sha256': '4e8950495f70120615206646053b3c4ad6db4475ac53dfd0dfa9b9b526d91405'},
             {'path': 'vllm/entrypoints/openai/responses/serving.py',
              'before_sha256': 'c1558c04476c0eba8e346155a00f39b897a45d12382cd1fd14366eef44669cdf',
-             'after_sha256': 'f58ed7ac2646486f8f9032846558a09d94ae8b5577d36d29c8c06f774b83ebf8'},
+             'after_sha256': '6f0b87055b9a77621a9fcc340e99eb0b32703cfbf0bc7ec32d8bfbbc5eeaa32b'},
             {'path': 'vllm/entrypoints/openai/responses/utils.py',
              'before_sha256': 'be5f27d4d169c32717203d4cd02a624d33b0604a016dbb1e61cb7b6f0614fd8f',
              'after_sha256': 'f9be4f4ad445c92ad456e4cfe5ef220f001da85d68ff0c49560810f9753d81b2'},
@@ -133135,11 +133814,14 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': 'eaffc8cd7340c05b76e5c3bc3541e65e327aa00927b7119d29b92a33d7c845ec',
              'after_sha256': 'a52399b65316163be152a4c3fa9fd832e80d293814ec421832438c00bb7e1816'},
             {'path': 'vllm/tool_parsers/structural_tag_registry.py',
-             'before_sha256': 'a8ef0a80ba38eb1321442bd67efd5c6b7462c4c884920027edb750d6be26891f',
-             'after_sha256': '02b776874c1ee5758bd0721ea1fba5f04b334e65d4a3f85c23851d8f324a32e6'},
+             'before_sha256': '0351b606aa1e2ccb53496844c1af1e4d4a5f0d5d9ed97f2e58cde7301e7bd84c',
+             'after_sha256': '84e704cfd579149a7232cb6f2c54cb4594cf6513736d281bab72327fcb536ea8'},
             {'path': 'vllm/tool_parsers/utils.py',
              'before_sha256': '0399a0392644876bbcbdc2e9137b417aa842e7306a09a36d9836ef1d249de05d',
-             'after_sha256': 'e2e93609470191c021cc9b67a781257b0bdb64954ca5a737faf972d27434f4a6'}),
+             'after_sha256': 'e2e93609470191c021cc9b67a781257b0bdb64954ca5a737faf972d27434f4a6'},
+            {'path': 'vllm/renderers/online_renderer.py',
+             'before_sha256': '1f12e251def8f81f3cf68e0030ddaaa8c988ac00a9f694c0718dd2d1d5c8f36f',
+             'after_sha256': '7651dc682374c8e4caa9cd6e86ddf22e9abfe401ed1aa7877b8e5306755404eb'}),
   'edits': ({'name': 'tests/tool_parsers/test_structural_tag_registry.py:landmark-1',
              'path': 'tests/tool_parsers/test_structural_tag_registry.py',
              'before': '    response_only = _k3_response("no call here")\n'
@@ -134117,6 +134799,69 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '    assert error.parameter == parameter\n'
                       '\n'
                       '\n'
+                      '@pytest.mark.parametrize(\n'
+                      '    "choice",\n'
+                      '    ["auto", "required", "named-chat", "named-responses", '
+                      '"allowed-tools"],\n'
+                      ')\n'
+                      'def '
+                      'test_a_tool_choice_no_parser_parses_is_refused_alike(choice):\n'
+                      '    """One refusal for chat and Responses: a choice that lets '
+                      'the model call\n'
+                      '    is refused while no tool parser parses the calls, and '
+                      'served otherwise."""\n'
+                      '    from types import SimpleNamespace\n'
+                      '\n'
+                      '    from openai.types.responses.tool_choice_allowed import '
+                      'ToolChoiceAllowed\n'
+                      '    from openai.types.responses.tool_choice_function import '
+                      'ToolChoiceFunction\n'
+                      '\n'
+                      '    from vllm.entrypoints.openai.chat_completion.protocol '
+                      'import (\n'
+                      '        ChatCompletionNamedFunction,\n'
+                      '        ChatCompletionNamedToolChoiceParam,\n'
+                      '    )\n'
+                      '    from vllm.renderers.online_renderer import OnlineRenderer\n'
+                      '\n'
+                      '    selected = {\n'
+                      '        "named-chat": ChatCompletionNamedToolChoiceParam(\n'
+                      '            type="function", '
+                      'function=ChatCompletionNamedFunction(name="get_weather")\n'
+                      '        ),\n'
+                      '        "named-responses": ToolChoiceFunction(type="function", '
+                      'name="get_weather"),\n'
+                      '        "allowed-tools": ToolChoiceAllowed(\n'
+                      '            type="allowed_tools", mode="required",\n'
+                      '            tools=[{"type": "function", "name": '
+                      '"get_weather"}],\n'
+                      '        ),\n'
+                      '    }.get(choice, choice)\n'
+                      '    renderer = SimpleNamespace(\n'
+                      '        renderer=SimpleNamespace(tokenizer=object()), '
+                      'use_harmony=False\n'
+                      '    )\n'
+                      '    for parser in (None, '
+                      'SimpleNamespace(tool_parser_cls=None)):\n'
+                      '        with pytest.raises(\n'
+                      '            VLLMValidationError, '
+                      'match="--enable-auto-tool-choice"\n'
+                      '        ) as refused:\n'
+                      '            OnlineRenderer.require_tool_choice_parsed(renderer, '
+                      'selected, parser)\n'
+                      '        assert refused.value.parameter == "tool_choice"\n'
+                      '        OnlineRenderer.require_tool_choice_parsed(renderer, '
+                      '"none", parser)\n'
+                      '    OnlineRenderer.require_tool_choice_parsed(\n'
+                      '        renderer, selected, '
+                      'SimpleNamespace(tool_parser_cls=object)\n'
+                      '    )\n'
+                      '    harmony = SimpleNamespace(renderer=renderer.renderer, '
+                      'use_harmony=True)\n'
+                      '    OnlineRenderer.require_tool_choice_parsed(harmony, '
+                      'selected, None)\n'
+                      '\n'
+                      '\n'
                       '@pytest.mark.parametrize("tools", [[], [SAMPLE_TOOL, {"type": '
                       '"web_search_preview"}]])\n'
                       'def '
@@ -134232,6 +134977,76 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '        }\n'
                              '    )\n'
                              '    assert error.parameter == parameter\n'
+                             '\n'
+                             '\n'
+                             '@pytest.mark.parametrize(\n'
+                             '    "choice",\n'
+                             '    ["auto", "required", "named-chat", '
+                             '"named-responses", "allowed-tools"],\n'
+                             ')\n'
+                             'def '
+                             'test_a_tool_choice_no_parser_parses_is_refused_alike(choice):\n'
+                             '    """One refusal for chat and Responses: a choice that '
+                             'lets the model call\n'
+                             '    is refused while no tool parser parses the calls, '
+                             'and served otherwise."""\n'
+                             '    from types import SimpleNamespace\n'
+                             '\n'
+                             '    from openai.types.responses.tool_choice_allowed '
+                             'import ToolChoiceAllowed\n'
+                             '    from openai.types.responses.tool_choice_function '
+                             'import ToolChoiceFunction\n'
+                             '\n'
+                             '    from '
+                             'vllm.entrypoints.openai.chat_completion.protocol import '
+                             '(\n'
+                             '        ChatCompletionNamedFunction,\n'
+                             '        ChatCompletionNamedToolChoiceParam,\n'
+                             '    )\n'
+                             '    from vllm.renderers.online_renderer import '
+                             'OnlineRenderer\n'
+                             '\n'
+                             '    selected = {\n'
+                             '        "named-chat": '
+                             'ChatCompletionNamedToolChoiceParam(\n'
+                             '            type="function", '
+                             'function=ChatCompletionNamedFunction(name="get_weather")\n'
+                             '        ),\n'
+                             '        "named-responses": '
+                             'ToolChoiceFunction(type="function", '
+                             'name="get_weather"),\n'
+                             '        "allowed-tools": ToolChoiceAllowed(\n'
+                             '            type="allowed_tools", mode="required",\n'
+                             '            tools=[{"type": "function", "name": '
+                             '"get_weather"}],\n'
+                             '        ),\n'
+                             '    }.get(choice, choice)\n'
+                             '    renderer = SimpleNamespace(\n'
+                             '        renderer=SimpleNamespace(tokenizer=object()), '
+                             'use_harmony=False\n'
+                             '    )\n'
+                             '    for parser in (None, '
+                             'SimpleNamespace(tool_parser_cls=None)):\n'
+                             '        with pytest.raises(\n'
+                             '            VLLMValidationError, '
+                             'match="--enable-auto-tool-choice"\n'
+                             '        ) as refused:\n'
+                             '            '
+                             'OnlineRenderer.require_tool_choice_parsed(renderer, '
+                             'selected, parser)\n'
+                             '        assert refused.value.parameter == "tool_choice"\n'
+                             '        '
+                             'OnlineRenderer.require_tool_choice_parsed(renderer, '
+                             '"none", parser)\n'
+                             '    OnlineRenderer.require_tool_choice_parsed(\n'
+                             '        renderer, selected, '
+                             'SimpleNamespace(tool_parser_cls=object)\n'
+                             '    )\n'
+                             '    harmony = '
+                             'SimpleNamespace(renderer=renderer.renderer, '
+                             'use_harmony=True)\n'
+                             '    OnlineRenderer.require_tool_choice_parsed(harmony, '
+                             'selected, None)\n'
                              '\n'
                              '\n'
                              '@pytest.mark.parametrize("tools", [[], [SAMPLE_TOOL, '
@@ -134653,6 +135468,43 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '            if self.use_harmony:\n'
                              '                context = HarmonyContext(\n'
                              '                    messages,\n'},
+            {'name': 'vllm/entrypoints/openai/responses/serving.py:landmark-4',
+             'path': 'vllm/entrypoints/openai/responses/serving.py',
+             'before': '        request: ResponsesRequest,\n'
+                       '        prev_response: ResponsesResponse | None,\n'
+                       '    ):\n'
+                       '        tool_dicts = construct_tool_dicts(\n'
+                       '            request.tools,\n'
+                       '            request.tool_choice,\n',
+             'after': '        request: ResponsesRequest,\n'
+                      '        prev_response: ResponsesResponse | None,\n'
+                      '    ):\n'
+                      '        # The refusal chat gives a choice no parser of this '
+                      'server parses.\n'
+                      '        self.online_renderer.require_tool_choice_parsed(\n'
+                      '            request.tool_choice, self.parser\n'
+                      '        )\n'
+                      '        tool_dicts = construct_tool_dicts(\n'
+                      '            request.tools,\n'
+                      '            request.tool_choice,\n',
+             'review_before': '        request: ResponsesRequest,\n'
+                              '        prev_response: ResponsesResponse | None,\n'
+                              '    ):\n'
+                              '        tool_dicts = construct_tool_dicts(\n'
+                              '            request.tools,\n'
+                              '            request.tool_choice,\n',
+             'review_after': '        request: ResponsesRequest,\n'
+                             '        prev_response: ResponsesResponse | None,\n'
+                             '    ):\n'
+                             '        # The refusal chat gives a choice no parser of '
+                             'this server parses.\n'
+                             '        '
+                             'self.online_renderer.require_tool_choice_parsed(\n'
+                             '            request.tool_choice, self.parser\n'
+                             '        )\n'
+                             '        tool_dicts = construct_tool_dicts(\n'
+                             '            request.tools,\n'
+                             '            request.tool_choice,\n'},
             {'name': 'vllm/entrypoints/openai/responses/utils.py:landmark-1',
              'path': 'vllm/entrypoints/openai/responses/utils.py',
              'before': '    return deepcopy(item)  # type: ignore[arg-type]\n'
@@ -135131,7 +135983,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '\n'},
             {'name': 'vllm/tool_parsers/structural_tag_registry.py:landmark-4',
              'path': 'vllm/tool_parsers/structural_tag_registry.py',
-             'before': '    ):\n'
+             'before': '            )\n'
                        '        return None\n'
                        '\n'
                        '    dumped_tools = [_dump_tool_for_xgrammar(tool) for tool in '
@@ -135141,7 +135993,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                        'as an instruction\n'
                        '        # to replace the parameter schema with ``true``. That '
                        'best-effort\n',
-             'after': '    ):\n'
+             'after': '            )\n'
                       '        return None\n'
                       '\n'
                       '    dumped_tools = _dump_tools_for_xgrammar(tools)\n'
@@ -135150,7 +136002,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       'an instruction\n'
                       '        # to replace the parameter schema with ``true``. That '
                       'best-effort\n',
-             'review_before': '    ):\n'
+             'review_before': '            )\n'
                               '        return None\n'
                               '\n'
                               '    dumped_tools = [_dump_tool_for_xgrammar(tool) for '
@@ -135160,7 +136012,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                               'false`` as an instruction\n'
                               '        # to replace the parameter schema with '
                               '``true``. That best-effort\n',
-             'review_after': '    ):\n'
+             'review_after': '            )\n'
                              '        return None\n'
                              '\n'
                              '    dumped_tools = _dump_tools_for_xgrammar(tools)\n'
@@ -135416,10 +136268,389 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '\n'
                              'def build_responses_tool_call_name_map(\n'
                              '    tools: list[ResponsesTool] | None,\n'
-                             ') -> dict[str, ResponsesToolCallName]:\n'})},
+                             ') -> dict[str, ResponsesToolCallName]:\n'},
+            {'name': 'vllm/renderers/online_renderer.py:landmark-1',
+             'path': 'vllm/renderers/online_renderer.py',
+             'before': 'from http import HTTPStatus\n'
+                       'from typing import Any\n'
+                       '\n'
+                       'from openai_harmony import Message as OpenAIMessage\n'
+                       '\n'
+                       'from vllm.config import ModelConfig\n',
+             'after': 'from http import HTTPStatus\n'
+                      'from typing import Any\n'
+                      '\n'
+                      'from openai.types.responses.tool_choice_allowed import '
+                      'ToolChoiceAllowed\n'
+                      'from openai.types.responses.tool_choice_function import '
+                      'ToolChoiceFunction\n'
+                      'from openai_harmony import Message as OpenAIMessage\n'
+                      '\n'
+                      'from vllm.config import ModelConfig\n',
+             'review_before': 'from http import HTTPStatus\n'
+                              'from typing import Any\n'
+                              '\n'
+                              'from openai_harmony import Message as OpenAIMessage\n'
+                              '\n'
+                              'from vllm.config import ModelConfig\n',
+             'review_after': 'from http import HTTPStatus\n'
+                             'from typing import Any\n'
+                             '\n'
+                             'from openai.types.responses.tool_choice_allowed import '
+                             'ToolChoiceAllowed\n'
+                             'from openai.types.responses.tool_choice_function import '
+                             'ToolChoiceFunction\n'
+                             'from openai_harmony import Message as OpenAIMessage\n'
+                             '\n'
+                             'from vllm.config import ModelConfig\n'},
+            {'name': 'vllm/renderers/online_renderer.py:landmark-2',
+             'path': 'vllm/renderers/online_renderer.py',
+             'before': 'from vllm.entrypoints.openai.responses.protocol import '
+                       'ResponsesRequest\n'
+                       'from vllm.entrypoints.serve import create_error_response\n'
+                       'from vllm.entrypoints.serve.utils.request_logger import '
+                       'RequestLogger\n'
+                       'from vllm.inputs import (\n'
+                       '    EngineInput,\n'
+                       '    PromptType,\n',
+             'after': 'from vllm.entrypoints.openai.responses.protocol import '
+                      'ResponsesRequest\n'
+                      'from vllm.entrypoints.serve import create_error_response\n'
+                      'from vllm.entrypoints.serve.utils.request_logger import '
+                      'RequestLogger\n'
+                      'from vllm.exceptions import VLLMValidationError\n'
+                      'from vllm.inputs import (\n'
+                      '    EngineInput,\n'
+                      '    PromptType,\n',
+             'review_before': 'from vllm.entrypoints.openai.responses.protocol import '
+                              'ResponsesRequest\n'
+                              'from vllm.entrypoints.serve import '
+                              'create_error_response\n'
+                              'from vllm.entrypoints.serve.utils.request_logger import '
+                              'RequestLogger\n'
+                              'from vllm.inputs import (\n'
+                              '    EngineInput,\n'
+                              '    PromptType,\n',
+             'review_after': 'from vllm.entrypoints.openai.responses.protocol import '
+                             'ResponsesRequest\n'
+                             'from vllm.entrypoints.serve import '
+                             'create_error_response\n'
+                             'from vllm.entrypoints.serve.utils.request_logger import '
+                             'RequestLogger\n'
+                             'from vllm.exceptions import VLLMValidationError\n'
+                             'from vllm.inputs import (\n'
+                             '    EngineInput,\n'
+                             '    PromptType,\n'},
+            {'name': 'vllm/renderers/online_renderer.py:landmark-3',
+             'path': 'vllm/renderers/online_renderer.py',
+             'before': '            )\n'
+                       '        )\n'
+                       '\n'
+                       '    async def render_chat(\n'
+                       '        self,\n'
+                       '        request: ChatCompletionRequest,\n',
+             'after': '            )\n'
+                      '        )\n'
+                      '\n'
+                      '    def require_tool_choice_parsed(\n'
+                      '        self, tool_choice: object, parser: type[Parser] | None\n'
+                      '    ) -> None:\n'
+                      '        """Refuse a tool choice that lets the model call when '
+                      '*parser*, the\n'
+                      "        parser the request's output will be parsed by, parses "
+                      'no calls.\n'
+                      '\n'
+                      '        A tool parser exists only when the server is started '
+                      'with both\n'
+                      '        --tool-call-parser and --enable-auto-tool-choice '
+                      '(ParserManager);\n'
+                      '        without one, every call the model wrote would reach the '
+                      'caller as\n'
+                      '        text, under any choice but "none". Every route that '
+                      'renders a request\n'
+                      '        with tools asks this before rendering: chat, and every '
+                      'route that\n'
+                      '        renders through it (Anthropic, render), and Responses. '
+                      'A Mistral\n'
+                      '        tokenizer and Harmony parse their calls without a tool '
+                      'parser.\n'
+                      '        """\n'
+                      '        if (\n'
+                      '            tool_choice == "none"\n'
+                      '            or (parser is not None and parser.tool_parser_cls '
+                      'is not None)\n'
+                      '            or is_mistral_tokenizer(self.renderer.tokenizer)\n'
+                      '            or self.use_harmony\n'
+                      '        ):\n'
+                      '            return\n'
+                      '        if isinstance(tool_choice, '
+                      'ChatCompletionNamedToolChoiceParam):\n'
+                      '            described = f"function '
+                      '{tool_choice.function.name!r}"\n'
+                      '        elif isinstance(tool_choice, ToolChoiceFunction):\n'
+                      '            described = f"function {tool_choice.name!r}"\n'
+                      '        elif isinstance(tool_choice, ToolChoiceAllowed):\n'
+                      '            described = f"allowed_tools '
+                      '({tool_choice.mode!r})"\n'
+                      '        else:\n'
+                      '            described = repr(tool_choice)\n'
+                      '        raise VLLMValidationError(\n'
+                      '            f"tool_choice {described} lets the model call a '
+                      'function, and this "\n'
+                      '            "server parses no calls: it builds a tool parser '
+                      'only when started "\n'
+                      '            "with both --tool-call-parser and '
+                      '--enable-auto-tool-choice, so a "\n'
+                      '            "call would reach you as the text the model wrote. '
+                      'Send "\n'
+                      '            "tool_choice \'none\' to have the model answer '
+                      'without calling, or "\n'
+                      '            "serve with --tool-call-parser and '
+                      '--enable-auto-tool-choice.",\n'
+                      '            parameter="tool_choice",\n'
+                      '        )\n'
+                      '\n'
+                      '    async def render_chat(\n'
+                      '        self,\n'
+                      '        request: ChatCompletionRequest,\n',
+             'review_before': '            )\n'
+                              '        )\n'
+                              '\n'
+                              '    async def render_chat(\n'
+                              '        self,\n'
+                              '        request: ChatCompletionRequest,\n',
+             'review_after': '            )\n'
+                             '        )\n'
+                             '\n'
+                             '    def require_tool_choice_parsed(\n'
+                             '        self, tool_choice: object, parser: type[Parser] '
+                             '| None\n'
+                             '    ) -> None:\n'
+                             '        """Refuse a tool choice that lets the model call '
+                             'when *parser*, the\n'
+                             "        parser the request's output will be parsed by, "
+                             'parses no calls.\n'
+                             '\n'
+                             '        A tool parser exists only when the server is '
+                             'started with both\n'
+                             '        --tool-call-parser and --enable-auto-tool-choice '
+                             '(ParserManager);\n'
+                             '        without one, every call the model wrote would '
+                             'reach the caller as\n'
+                             '        text, under any choice but "none". Every route '
+                             'that renders a request\n'
+                             '        with tools asks this before rendering: chat, and '
+                             'every route that\n'
+                             '        renders through it (Anthropic, render), and '
+                             'Responses. A Mistral\n'
+                             '        tokenizer and Harmony parse their calls without '
+                             'a tool parser.\n'
+                             '        """\n'
+                             '        if (\n'
+                             '            tool_choice == "none"\n'
+                             '            or (parser is not None and '
+                             'parser.tool_parser_cls is not None)\n'
+                             '            or '
+                             'is_mistral_tokenizer(self.renderer.tokenizer)\n'
+                             '            or self.use_harmony\n'
+                             '        ):\n'
+                             '            return\n'
+                             '        if isinstance(tool_choice, '
+                             'ChatCompletionNamedToolChoiceParam):\n'
+                             '            described = f"function '
+                             '{tool_choice.function.name!r}"\n'
+                             '        elif isinstance(tool_choice, '
+                             'ToolChoiceFunction):\n'
+                             '            described = f"function '
+                             '{tool_choice.name!r}"\n'
+                             '        elif isinstance(tool_choice, '
+                             'ToolChoiceAllowed):\n'
+                             '            described = f"allowed_tools '
+                             '({tool_choice.mode!r})"\n'
+                             '        else:\n'
+                             '            described = repr(tool_choice)\n'
+                             '        raise VLLMValidationError(\n'
+                             '            f"tool_choice {described} lets the model '
+                             'call a function, and this "\n'
+                             '            "server parses no calls: it builds a tool '
+                             'parser only when started "\n'
+                             '            "with both --tool-call-parser and '
+                             '--enable-auto-tool-choice, so a "\n'
+                             '            "call would reach you as the text the model '
+                             'wrote. Send "\n'
+                             '            "tool_choice \'none\' to have the model '
+                             'answer without calling, or "\n'
+                             '            "serve with --tool-call-parser and '
+                             '--enable-auto-tool-choice.",\n'
+                             '            parameter="tool_choice",\n'
+                             '        )\n'
+                             '\n'
+                             '    async def render_chat(\n'
+                             '        self,\n'
+                             '        request: ChatCompletionRequest,\n'},
+            {'name': 'vllm/renderers/online_renderer.py:landmark-4',
+             'path': 'vllm/renderers/online_renderer.py',
+             'before': '        """\n'
+                       '        tokenizer = self.renderer.tokenizer\n'
+                       '\n'
+                       '        tool_parser = self.parser.tool_parser_cls if '
+                       'self.parser is not None else None\n'
+                       '\n'
+                       '        if is_mistral_tokenizer(tokenizer):\n'
+                       '            # because of issues with pydantic we need to '
+                       'potentially\n'
+                       '            # re-serialize the tool_calls field of the '
+                       'request\n',
+             'after': '        """\n'
+                      '        tokenizer = self.renderer.tokenizer\n'
+                      '\n'
+                      '        if is_mistral_tokenizer(tokenizer):\n'
+                      '            # because of issues with pydantic we need to '
+                      'potentially\n'
+                      '            # re-serialize the tool_calls field of the '
+                      'request\n',
+             'review_before': '        """\n'
+                              '        tokenizer = self.renderer.tokenizer\n'
+                              '\n'
+                              '        tool_parser = self.parser.tool_parser_cls if '
+                              'self.parser is not None else None\n'
+                              '\n'
+                              '        if is_mistral_tokenizer(tokenizer):\n'
+                              '            # because of issues with pydantic we need '
+                              'to potentially\n'
+                              '            # re-serialize the tool_calls field of the '
+                              'request\n',
+             'review_after': '        """\n'
+                             '        tokenizer = self.renderer.tokenizer\n'
+                             '\n'
+                             '        if is_mistral_tokenizer(tokenizer):\n'
+                             '            # because of issues with pydantic we need to '
+                             'potentially\n'
+                             '            # re-serialize the tool_calls field of the '
+                             'request\n'},
+            {'name': 'vllm/renderers/online_renderer.py:landmark-5',
+             'path': 'vllm/renderers/online_renderer.py',
+             'before': '            _mt.truncate_tool_call_ids(request)  # type: '
+                       'ignore[arg-type]\n'
+                       '            _mt.validate_request_params(request)\n'
+                       '\n'
+                       '        # Check if tool parsing is unavailable (common '
+                       'condition)\n'
+                       '        tool_parsing_unavailable = (\n'
+                       '            tool_parser is None\n'
+                       '            and not is_mistral_tokenizer(tokenizer)\n'
+                       '            and not self.use_harmony\n'
+                       '        )\n'
+                       '\n'
+                       '        # Validate tool_choice when tool parsing is required '
+                       'but unavailable\n'
+                       '        if tool_parsing_unavailable and request.tool_choice '
+                       'not in (\n'
+                       '            None,\n'
+                       '            "none",\n'
+                       '        ):\n'
+                       '            if request.tool_choice == "auto" and not '
+                       'self.enable_auto_tools:\n'
+                       '                # for hf tokenizers, "auto" tools requires\n'
+                       '                # --enable-auto-tool-choice and '
+                       '--tool-call-parser\n'
+                       '                return self.create_error_response(\n'
+                       '                    \'"auto" tool choice requires \'\n'
+                       '                    "--enable-auto-tool-choice and '
+                       '--tool-call-parser to be set"\n'
+                       '                )\n'
+                       '            elif request.tool_choice != "auto":\n'
+                       '                # "required" or named tool requires tool '
+                       'parser\n'
+                       '                if isinstance(request.tool_choice, '
+                       'ChatCompletionNamedToolChoiceParam):\n'
+                       "                    tool_choice_desc = f'function "
+                       '"{request.tool_choice.function.name}"\'\n'
+                       '                else:\n'
+                       '                    tool_choice_desc = '
+                       'f\'"{request.tool_choice}"\'\n'
+                       '                return self.create_error_response(\n'
+                       '                    f"tool_choice={tool_choice_desc} requires '
+                       '"\n'
+                       '                    "--tool-call-parser to be set"\n'
+                       '                )\n'
+                       '\n'
+                       '        if request.tools is None or (\n'
+                       '            request.tool_choice == "none" and '
+                       'self.exclude_tools_when_tool_choice_none\n',
+             'after': '            _mt.truncate_tool_call_ids(request)  # type: '
+                      'ignore[arg-type]\n'
+                      '            _mt.validate_request_params(request)\n'
+                      '\n'
+                      '        self.require_tool_choice_parsed(request.tool_choice, '
+                      'self.parser)\n'
+                      '\n'
+                      '        if request.tools is None or (\n'
+                      '            request.tool_choice == "none" and '
+                      'self.exclude_tools_when_tool_choice_none\n',
+             'review_before': '            _mt.truncate_tool_call_ids(request)  # '
+                              'type: ignore[arg-type]\n'
+                              '            _mt.validate_request_params(request)\n'
+                              '\n'
+                              '        # Check if tool parsing is unavailable (common '
+                              'condition)\n'
+                              '        tool_parsing_unavailable = (\n'
+                              '            tool_parser is None\n'
+                              '            and not is_mistral_tokenizer(tokenizer)\n'
+                              '            and not self.use_harmony\n'
+                              '        )\n'
+                              '\n'
+                              '        # Validate tool_choice when tool parsing is '
+                              'required but unavailable\n'
+                              '        if tool_parsing_unavailable and '
+                              'request.tool_choice not in (\n'
+                              '            None,\n'
+                              '            "none",\n'
+                              '        ):\n'
+                              '            if request.tool_choice == "auto" and not '
+                              'self.enable_auto_tools:\n'
+                              '                # for hf tokenizers, "auto" tools '
+                              'requires\n'
+                              '                # --enable-auto-tool-choice and '
+                              '--tool-call-parser\n'
+                              '                return self.create_error_response(\n'
+                              '                    \'"auto" tool choice requires \'\n'
+                              '                    "--enable-auto-tool-choice and '
+                              '--tool-call-parser to be set"\n'
+                              '                )\n'
+                              '            elif request.tool_choice != "auto":\n'
+                              '                # "required" or named tool requires '
+                              'tool parser\n'
+                              '                if isinstance(request.tool_choice, '
+                              'ChatCompletionNamedToolChoiceParam):\n'
+                              "                    tool_choice_desc = f'function "
+                              '"{request.tool_choice.function.name}"\'\n'
+                              '                else:\n'
+                              '                    tool_choice_desc = '
+                              'f\'"{request.tool_choice}"\'\n'
+                              '                return self.create_error_response(\n'
+                              '                    f"tool_choice={tool_choice_desc} '
+                              'requires "\n'
+                              '                    "--tool-call-parser to be set"\n'
+                              '                )\n'
+                              '\n'
+                              '        if request.tools is None or (\n'
+                              '            request.tool_choice == "none" and '
+                              'self.exclude_tools_when_tool_choice_none\n',
+             'review_after': '            _mt.truncate_tool_call_ids(request)  # type: '
+                             'ignore[arg-type]\n'
+                             '            _mt.validate_request_params(request)\n'
+                             '\n'
+                             '        '
+                             'self.require_tool_choice_parsed(request.tool_choice, '
+                             'self.parser)\n'
+                             '\n'
+                             '        if request.tools is None or (\n'
+                             '            request.tool_choice == "none" and '
+                             'self.exclude_tools_when_tool_choice_none\n'})},
  {'name': 'batch-parse-starts-where-the-prompt-leaves',
   'review_patch': 'patches/vllm-batch-parse-starts-where-the-prompt-leaves.patch',
-  'review_sha256': 'bc8dc94b88990fbf99549ac8a9b8825bfa02a5225809071e73eab869e12de8db',
+  'review_sha256': '93de24091a3be1cd49dc0c8b90c859d5d9fdf6a075b822ae74dd61d5a6c1f376',
   'files': ({'path': 'tests/entrypoints/openai/responses/test_parsable_context_unit.py',
              'before_sha256': '8fd0bd655d13abdc9fe03e1c0bb0625225431624db8257e1db07c00ac3da2779',
              'after_sha256': '95f50d93d97370d426319b5dc94fce55b9cbca4ce9b3b95a930e42990dcbf4a2'},
@@ -135430,8 +136661,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': '572f6a6e5f448861276bf272ec8b4be14434a9fd31312d087230f682a18f5e3e',
              'after_sha256': 'e491dbb881f33dfddbb07cb8fbebc6e5f6196c58a4b027cf04ba8095ea52f82e'},
             {'path': 'tests/parser/engine/test_qwen3.py',
-             'before_sha256': '517e2b218e9bbbf7f59f9b447fd1807708269bfe636ca0a429b0b74621adde4e',
-             'after_sha256': 'e8b43bf3b75f045f61386002e45f6341ef2069f269c84ce2cb5433fc8b3c1c94'},
+             'before_sha256': '4b87d3b572d58d43808e01050bc8cfcf88a3d3a99cb21e71933be63587d1406e',
+             'after_sha256': '55644d168c156fd5a018f23f500870d7d6aa45fa0421b8e58809a07470db3dd1'},
             {'path': 'tests/parser/engine/test_qwen_xml_fidelity.py',
              'before_sha256': '582dce451adaf23773987e81e57d82028697e570ba35360540a82e8287572a52',
              'after_sha256': 'cf8997243513e0424feb9ff646cb249662e4574cd2c46b47df0d73ceb5ca6690'},
@@ -135448,8 +136679,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': '366cfb15ac59ce6e27790d4c176d87bc1cd623599d20299c68ff672f327e9376',
              'after_sha256': '2b84c0d0e733057b80e93075bbeae0a16a9a6a6274ad0b15d1506d1c77ce7a24'},
             {'path': 'vllm/entrypoints/openai/responses/serving.py',
-             'before_sha256': 'f58ed7ac2646486f8f9032846558a09d94ae8b5577d36d29c8c06f774b83ebf8',
-             'after_sha256': '148b0118ce43b302b33d88c86f4d9135e22e801a2decdd50a9561618269d71de'},
+             'before_sha256': '6f0b87055b9a77621a9fcc340e99eb0b32703cfbf0bc7ec32d8bfbbc5eeaa32b',
+             'after_sha256': 'fdd4d8b9165e3cda3197fa2b47761f7978d22d64728d916ebe7cc9ff4c5c29f0'},
             {'path': 'vllm/parser/abstract_parser.py',
              'before_sha256': 'a52399b65316163be152a4c3fa9fd832e80d293814ec421832438c00bb7e1816',
              'after_sha256': 'b2f627c28667ec2a064898e627232a5ebb7f59826ad9b961359d56226ff2c2ec'},
@@ -135478,8 +136709,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': '90958bf8f39a7080573ee9c2c6223c6b473210c1715c678231df925f39788003',
              'after_sha256': 'fda540aea5362d0e90ff947ec9e1e1ee73590954ec3d062fd8040b0b4124c4e7'},
             {'path': 'vllm/parser/qwen3.py',
-             'before_sha256': '316d5ce3e386ed18953b8ce1c78944c854a82e19b2b187de0d7f2c5419064249',
-             'after_sha256': 'bf098022c094468f392ed42c1105f53f9d783b81d357d86260ff1741641b9f1d'}),
+             'before_sha256': '86eadde1cfc2952426bdcf7cecef0c369a2e952fe72f1d0a7ff0b81f84498993',
+             'after_sha256': '96a7b60d196902541725fb29d78710140f953ef524217a7a4009bf8242b3795f'}),
   'edits': ({'name': 'tests/entrypoints/openai/responses/test_parsable_context_unit.py:landmark-1',
              'path': 'tests/entrypoints/openai/responses/test_parsable_context_unit.py',
              'before': '\n'
@@ -138283,8 +139514,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '            "THINK_START": think_start,\n'},
             {'name': 'vllm/parser/qwen3.py:landmark-3',
              'path': 'vllm/parser/qwen3.py',
-             'before': '        # reaches a client that the grammar did not '
-                       'constrain.\n'
+             'before': '        # which shares this table, arms no grammar.\n'
                        '        transitions={\n'
                        '            # -- Reasoning transitions --\n'
                        '            (ParserState.REASONING, "THINK_START"): '
@@ -138295,14 +139525,13 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                        '            (ParserState.REASONING, "THINK_END"): Transition(\n'
                        '                ParserState.CONTENT,\n'
                        '                (EventType.REASONING_END,),\n',
-             'after': '        # reaches a client that the grammar did not constrain.\n'
+             'after': '        # which shares this table, arms no grammar.\n'
                       '        transitions={\n'
                       '            # -- Reasoning transitions --\n'
                       '            (ParserState.REASONING, "THINK_END"): Transition(\n'
                       '                ParserState.CONTENT,\n'
                       '                (EventType.REASONING_END,),\n',
-             'review_before': '        # reaches a client that the grammar did not '
-                              'constrain.\n'
+             'review_before': '        # which shares this table, arms no grammar.\n'
                               '        transitions={\n'
                               '            # -- Reasoning transitions --\n'
                               '            (ParserState.REASONING, "THINK_START"): '
@@ -138314,8 +139543,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                               'Transition(\n'
                               '                ParserState.CONTENT,\n'
                               '                (EventType.REASONING_END,),\n',
-             'review_after': '        # reaches a client that the grammar did not '
-                             'constrain.\n'
+             'review_after': '        # which shares this table, arms no grammar.\n'
                              '        transitions={\n'
                              '            # -- Reasoning transitions --\n'
                              '            (ParserState.REASONING, "THINK_END"): '
@@ -145097,7 +146325,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    def process_images(*, mm_items, **kwargs):\n'})},
  {'name': 'rendered-prompts-are-never-truncated',
   'review_patch': 'patches/vllm-rendered-prompts-are-never-truncated.patch',
-  'review_sha256': '72e74c44c7c8b8ff3db8c7f73124fa82e196244f2b0f2f666a2315f3cef4cdc9',
+  'review_sha256': '3128a77dde8f5b5118d2893bb858183e7fc0f20573124441bb69b2e82251fc6d',
   'files': ({'path': 'tests/entrypoints/openai/chat_completion/test_serving_chat.py',
              'before_sha256': '82a3f7dad3c315ce9fa205613f8ab817a879d1a3ddb9a8c3fa72d43af51412c9',
              'after_sha256': '3a452a168070dbbbd75c879507ab7f0126290db385c44fd94776b144922d4795'},
@@ -145114,8 +146342,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': '8087737a2138cfb8783363382a399435e14fdb5036a9f34dbab10f5b84a70791',
              'after_sha256': 'ed6c4f9e352b17ea73f7fba1adf54e03ababf7f752658aafcf6d444d1d96a2f9'},
             {'path': 'vllm/entrypoints/openai/responses/serving.py',
-             'before_sha256': '148b0118ce43b302b33d88c86f4d9135e22e801a2decdd50a9561618269d71de',
-             'after_sha256': 'c0f404cdb953d6916b3515dc7719783bb8425978f6eac5f3f2511c41fd11576e'},
+             'before_sha256': 'fdd4d8b9165e3cda3197fa2b47761f7978d22d64728d916ebe7cc9ff4c5c29f0',
+             'after_sha256': '3a100ed86d98fcb176f15c7566f9535e27d68e2240390b7f4e64e142a3fc789c'},
             {'path': 'vllm/entrypoints/scale_out/render/serving.py',
              'before_sha256': '5c610ac0bdca6dcb4071a7b7952ffd3711fc600b89a9eca6a3e56e44fd00a674',
              'after_sha256': '5e144dd7d773e3af7f462dfe58c780b65c45cb5bd759234bb76f7a8b0725b0df'}),
@@ -149781,7 +151009,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'registration.\n'})},
  {'name': 'responses-refuses-tools-the-template-is-never-given',
   'review_patch': 'patches/vllm-responses-refuses-tools-the-template-is-never-given.patch',
-  'review_sha256': 'ee2c83118ee21815cfb582d432c61b9bebbde1845858f4c294bab0ce392abf85',
+  'review_sha256': 'eb497a85e0a2f3aa1907fcf22e34b62fe8dc91015a7f869293497d64ad5134b2',
   'files': ({'path': 'tests/entrypoints/openai/responses/test_parsable_context.py',
              'before_sha256': '1c1e227fda34d81b9493198f1202979295253fc337d141357d02b4a6923dbe38',
              'after_sha256': '689ff6d49b466e36ab73bbff52cd9733d288c8d98aeee47edb6e9bfbf03b8615'},
@@ -149789,8 +151017,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': 'f8bbcaa1c34d6a5ce237ccf92181695075cf23ac2825644c20b1b134d8da1ef1',
              'after_sha256': 'dc39c484458fa0812c4aa662a64f33b36ac398fcb57f004dcabc86946f5d3c84'},
             {'path': 'tests/tool_use/test_responses_request_validations.py',
-             'before_sha256': '90f95b34cf4ed5b5b871798866787d76273e29f252c6128cfafeb139668f8e7f',
-             'after_sha256': '0b898db5685b5c838c33804030c4b83987d7aea80f93b2eda5a5a65aba4f9b91'},
+             'before_sha256': '647add3595bee47474e44bc425f3568abaa3c6392933dc0644b9e664c0b0c973',
+             'after_sha256': '6cd29e2772a1466e47773941ef79d561d80507488e77d277a8f21a889c8b2595'},
             {'path': 'vllm/entrypoints/openai/responses/utils.py',
              'before_sha256': 'f9be4f4ad445c92ad456e4cfe5ef220f001da85d68ff0c49560810f9753d81b2',
              'after_sha256': '27228c0eb46d68278d35a8d5558e86935b47b04378d6d62df9cd6500b8c3fa0a'}),
@@ -151231,7 +152459,7 @@ FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5d
  'tests/parser/engine/test_gemma4_streaming_reasoning.py': 'e491dbb881f33dfddbb07cb8fbebc6e5f6196c58a4b027cf04ba8095ea52f82e',
  'tests/parser/engine/test_nemotron_v3.py': '65b1be9ad64bd16e08cea6d6886a33169aae31933c918587ea9e4ea8167975c5',
  'tests/parser/engine/test_parser_engine.py': '6546143c7cadd640eb6777d2cd326a07fac755f683299f1dfa3e1f61d5c049fa',
- 'tests/parser/engine/test_qwen3.py': 'e8b43bf3b75f045f61386002e45f6341ef2069f269c84ce2cb5433fc8b3c1c94',
+ 'tests/parser/engine/test_qwen3.py': '55644d168c156fd5a018f23f500870d7d6aa45fa0421b8e58809a07470db3dd1',
  'tests/parser/engine/test_qwen3_reasoning.py': '2206f7f6d206fedc20526c00b9d1794ffd39af4772a311dcc7a582a6be4b1bf2',
  'tests/parser/engine/test_qwen_terminal_authority.py': '15b1a503148a15e51bfc85798c7964342cc611e3dfb5451734020513259f8dad',
  'tests/parser/engine/test_qwen_xml_fidelity.py': 'cf8997243513e0424feb9ff646cb249662e4574cd2c46b47df0d73ceb5ca6690',
@@ -151251,11 +152479,11 @@ FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5d
  'tests/test_sampling_params.py': '9ce8ed07080994d48511465e8050a52ee1db8fdf5d0b2188bd6324b9276b3f97',
  'tests/tokenizers_/test_detokenize.py': 'd84dff3048856b762c2993a3aa130c4f508bbce9c59c9a815dabbf3ce5a3f234',
  'tests/tool_parsers/test_poolside_v1_tool_parser.py': 'c8ae44174b76860378a29c2d123d95377cec3eaa41b8062717fd05d294a063d7',
- 'tests/tool_parsers/test_structural_tag_registry.py': '7d1fd82dfcf43352ff4b6953418cf762128bea9b78207a2313d9df9cb19b5f4b',
+ 'tests/tool_parsers/test_structural_tag_registry.py': 'fd3b03f516136d83e84c0013514f0890a5bd05089274240e48f57b1748e96e36',
  'tests/tool_use/test_chat_completion_request_validations.py': '8717564eac279b5b5b25d2bf03f42e4922f455bd0360ff23cd073d59f857759f',
  'tests/tool_use/test_chat_completions.py': 'cdf5ea1140e43f57cf4d576e9982235e2b599ab497946462509e02dbdc2ab190',
  'tests/tool_use/test_gemma4_responses_adjust_request.py': 'ac6531c1601139d42c6eb05d967653656c6926e145bc21b21e6236e8c95d68b5',
- 'tests/tool_use/test_responses_request_validations.py': '0b898db5685b5c838c33804030c4b83987d7aea80f93b2eda5a5a65aba4f9b91',
+ 'tests/tool_use/test_responses_request_validations.py': '6cd29e2772a1466e47773941ef79d561d80507488e77d277a8f21a889c8b2595',
  'tests/v1/core/test_kv_cache_users_sizing.py': '9d5818d54d4daa6902eace4341a22d0931329c7c45dd4dfc093ce409f85502bf',
  'tests/v1/core/test_prefix_caching.py': '7ceb00826d43dc4186bb746e64c6e650784d536a04127ccd7d02162f1fea4c4f',
  'tests/v1/e2e/general/test_context_length.py': '11f1dc8484d92d6414607a3cb1670d2832919166450f4ed684e1cdc59b4ead81',
@@ -151332,7 +152560,7 @@ FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5d
  'vllm/entrypoints/openai/engine/protocol.py': '0d373e6820efe4bcbd625db972ba381a5070818669af0d06eda849a26efe78bc',
  'vllm/entrypoints/openai/responses/context.py': '2b84c0d0e733057b80e93075bbeae0a16a9a6a6274ad0b15d1506d1c77ce7a24',
  'vllm/entrypoints/openai/responses/protocol.py': 'ed6c4f9e352b17ea73f7fba1adf54e03ababf7f752658aafcf6d444d1d96a2f9',
- 'vllm/entrypoints/openai/responses/serving.py': 'c0f404cdb953d6916b3515dc7719783bb8425978f6eac5f3f2511c41fd11576e',
+ 'vllm/entrypoints/openai/responses/serving.py': '3a100ed86d98fcb176f15c7566f9535e27d68e2240390b7f4e64e142a3fc789c',
  'vllm/entrypoints/openai/responses/streaming_events.py': '86a2600626f9100b6dcecca1876a5c4b9b9ac671297e025cd95e3bcb93fa7aba',
  'vllm/entrypoints/openai/responses/utils.py': '27228c0eb46d68278d35a8d5558e86935b47b04378d6d62df9cd6500b8c3fa0a',
  'vllm/entrypoints/openai/run_batch.py': 'b33bb5bb911b300914c10ac7068610330706a4c3371211ea7a165c219139f89e',
@@ -151374,21 +152602,23 @@ FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5d
  'vllm/parser/minimax_m2.py': '38577327262d3df29c052240f7bbb1369b82a6d3697d85bd4e5c29d130662fa1',
  'vllm/parser/mistral.py': '0b74821f7c68d5cf572760288d82bb40c19dfe0c88a6f9412befcaf1cfdcf6e8',
  'vllm/parser/nemotron_v3.py': '544d2dcece372db535614d77ca6e4e276b8d1814df7ac47461192cd5737a0518',
- 'vllm/parser/qwen3.py': 'bf098022c094468f392ed42c1105f53f9d783b81d357d86260ff1741641b9f1d',
+ 'vllm/parser/parser_manager.py': '7b0217aa315fdcf5ae602d62dad8e2380772662d4946933a92491a28ad4082f4',
+ 'vllm/parser/qwen3.py': '96a7b60d196902541725fb29d78710140f953ef524217a7a4009bf8242b3795f',
  'vllm/reasoning/abs_reasoning_parsers.py': '95e86d5bc477f00f5ed043273f64b76dc939374b118687bbcf834cc5d332c6c2',
  'vllm/reasoning/basic_parsers.py': 'daf62cc0685705b5cac7c4c6e2c6d9a0182960b5d8ebafc2ca3c45f39653c598',
  'vllm/reasoning/minimax_m3_reasoning_parser.py': 'd91a8f1c7c34bc4d32d374e68038c719e61a1cac456c0538025bcbba0daf3cab',
  'vllm/renderers/base.py': '621bc608b55f26580122da553d854d84271b8f5f44777269631f91ff8a09f605',
  'vllm/renderers/hf.py': 'b06cb298f586607a036c8d976e0a08ac64eb317bfb8af1d4dc5329e690fb5e88',
  'vllm/renderers/online_derenderer.py': 'cdc9d9943329ae0d3dbfc69ad67f091b5df4ac8d3f2984ef0e4ae442be69b1b6',
- 'vllm/renderers/online_renderer.py': '1f12e251def8f81f3cf68e0030ddaaa8c988ac00a9f694c0718dd2d1d5c8f36f',
+ 'vllm/renderers/online_renderer.py': '7651dc682374c8e4caa9cd6e86ddf22e9abfe401ed1aa7877b8e5306755404eb',
  'vllm/renderers/params.py': '31572224d8ea355fb77d80e3725779436533108c78f779b94760c6e55e6f3bfd',
  'vllm/renderers/template_authorship.py': '3110bd0d138e29ef01a51f5c357a2e6dd000c0b8c26b7fea94a4161471e43cba',
  'vllm/sampling_params.py': 'c5e027fa409b8daf77bbbbd6fee97f13db52236ad14e7e4e3b546da35b182316',
  'vllm/tokenizers/detokenizer_utils.py': '7718979d813ed00d41116d92a5abf81524e393693a6b28fa1c2a6d8ff66c880d',
- 'vllm/tool_parsers/abstract_tool_parser.py': '91f4f3184e7f0eb6bc9e76d9ce4d3063cff58e0de8afc409038139e48314d0c8',
+ 'vllm/tool_parsers/abstract_tool_parser.py': '251f5d7180e5b91bff6ff6f480528b1916dc7e8edf0187d622cf74be0f40d142',
  'vllm/tool_parsers/poolside_v1_tool_parser.py': '5c99ae314256ef4e5ca076a96c9863413dc57bf074f3ac070b527be2d3fe0d8c',
- 'vllm/tool_parsers/structural_tag_registry.py': '02b776874c1ee5758bd0721ea1fba5f04b334e65d4a3f85c23851d8f324a32e6',
+ 'vllm/tool_parsers/qwen3_engine_tool_parser.py': '17cd6a04b4e78ede24c43592a9b4ff546a4f23be7766e70e3c02dde1eb0e0646',
+ 'vllm/tool_parsers/structural_tag_registry.py': '84e704cfd579149a7232cb6f2c54cb4594cf6513736d281bab72327fcb536ea8',
  'vllm/tool_parsers/utils.py': 'e2e93609470191c021cc9b67a781257b0bdb64954ca5a737faf972d27434f4a6',
  'vllm/v1/attention/backends/turboquant_attn.py': 'c3fef60cfa031a139bed6f413b2c40d0ea3bc6b48992455404a09459abbfa282',
  'vllm/v1/attention/ops/triton_turboquant_decode.py': 'dab8b65ab7ddd6582de16e1fc7b1360ab0061b4a2a2b114f5d87ea0532fd726f',
