@@ -1,5 +1,5 @@
 diff --git a/tests/v1/core/test_kv_cache_users_sizing.py b/tests/v1/core/test_kv_cache_users_sizing.py
-index 88a57dd44c275528350460b8e8cafbe75d07596c..927551a0b977dad9adac6d294c6c10578132c47f 100644
+index 88a57dd44c275528350460b8e8cafbe75d07596c..90deb9323343640c60f7e6c0a6eed23d98691c16 100644
 --- a/tests/v1/core/test_kv_cache_users_sizing.py
 +++ b/tests/v1/core/test_kv_cache_users_sizing.py
 @@ -7,6 +7,13 @@ block) on any machine: the same declaration has to produce the same block
@@ -25,7 +25,7 @@ index 88a57dd44c275528350460b8e8cafbe75d07596c..927551a0b977dad9adac6d294c6c1057
  from vllm.v1.kv_cache_interface import FullAttentionSpec
  
  pytestmark = pytest.mark.cpu_test
-@@ -59,19 +66,29 @@ def test_pool_holds_declared_users_plus_null_block(users, max_model_len):
+@@ -59,19 +66,45 @@ def test_pool_holds_declared_users_plus_null_block(users, max_model_len):
      assert kv_cache_config.kv_cache_tensors[0].size == (
          spec.page_size_bytes * expected_blocks
      )
@@ -52,13 +52,29 @@ index 88a57dd44c275528350460b8e8cafbe75d07596c..927551a0b977dad9adac6d294c6c1057
 +    # process holds is a cause, and freeing it is a next action.
 +    message = str(refusal.value)
 +    assert "the device memory free at startup profiling" in message
-+    assert "Free the device memory other processes hold" in message
++    assert "Next: free the device memory other processes hold" in message
 +    assert "declare fewer users, or reduce max_model_len" in message
++
++
++def test_one_declared_user_is_not_told_to_declare_fewer():
++    spec = _spec()
++    vllm_config = _vllm_config(64, 1)
++    expected_blocks = _blocks_per_user(64) + 1
++
++    with pytest.raises(ValueError, match="--kv-cache-users 1 requires") as refusal:
++        get_kv_cache_configs(
++            vllm_config,
++            [{"layer1": spec}],
++            [spec.page_size_bytes * expected_blocks - 1],
++        )
++    message = str(refusal.value)
++    assert "fewer users" not in message
++    assert "serve on a device with more memory, or reduce max_model_len" in message
  
  
  def test_missing_kv_cache_users_fails_closed():
 diff --git a/vllm/v1/core/kv_cache_utils.py b/vllm/v1/core/kv_cache_utils.py
-index 128e76ac624e87dbbd0582b4d5acabf72bf6ff89..07122caa6ba1546ae4be637da45766b5e16b601b 100644
+index 128e76ac624e87dbbd0582b4d5acabf72bf6ff89..af6e683adca033076ebb98f73b7b5bff101d83a6 100644
 --- a/vllm/v1/core/kv_cache_utils.py
 +++ b/vllm/v1/core/kv_cache_utils.py
 @@ -742,10 +742,11 @@ def _check_enough_kv_cache_memory(
@@ -125,7 +141,20 @@ index 128e76ac624e87dbbd0582b4d5acabf72bf6ff89..07122caa6ba1546ae4be637da45766b5
          users = vllm_config.cache_config.kv_cache_users
          assert users is not None
          per_user_bytes = _max_memory_usage_bytes_from_groups(
-@@ -2266,10 +2282,15 @@ def get_kv_cache_configs(
+@@ -2261,15 +2277,26 @@ def get_kv_cache_configs(
+         needed_blocks = users * per_user_blocks + 1
+         needed_bytes = needed_blocks * pool_bytes_per_block
+         if needed_bytes > available_memory_one_worker:
++            # Each action that can make the declaration fit: fewer users is
++            # one only while more than one is declared.
++            actions = [
++                "free the device memory other processes hold",
++                "serve on a device with more memory",
++                *(["declare fewer users"] if users > 1 else []),
++                "reduce max_model_len",
++            ]
+             raise ValueError(
+                 f"--kv-cache-users {users} requires "
                  f"{format_gib(needed_bytes)} GiB of KV cache "
                  f"({format_gib(per_user_bytes)} GiB per "
                  f"{vllm_config.model_config.max_model_len}-token context), "
@@ -136,12 +165,10 @@ index 128e76ac624e87dbbd0582b4d5acabf72bf6ff89..07122caa6ba1546ae4be637da45766b5
 +                f"but the KV bound is only "
 +                f"{format_gib(available_memory_one_worker)} GiB: the device "
 +                f"memory free at startup profiling, minus the residents it "
-+                f"measured (weights, non-torch allocations, the activation "
-+                f"peak, any charged CUDA-graph estimate) and frontend "
-+                f"reservations; the startup log gives each term. "
-+                f"Free the device memory other processes hold, serve on a "
-+                f"device with more memory, declare fewer users, or reduce "
-+                f"max_model_len."
++                f"measured (weights, non-torch allocations, workspaces), the "
++                f"peak of the phases it profiled, any charged CUDA-graph "
++                f"estimate and frontend reservations; the startup log gives "
++                f"each term. Next: {', '.join(actions[:-1])}, or {actions[-1]}."
              )
          kv_cache_configs.append(
              get_kv_cache_config_from_groups(

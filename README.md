@@ -322,7 +322,7 @@ It is intentionally reconstructed by the ordered, reviewed semantic transformati
 | patches/vllm-agent-grouped-offload-retention.patch | 36140417721a858ed623a605874cd7c094171e01acead53d76c851ea3929b551 |
 | patches/vllm-agentless-generation-routes-unmounted.patch | c485cf9d7d862c0f4214cd625d598fd8903c43c0e42947e9f847ce4052b156ff |
 | patches/vllm-kv-capacity-in-declared-users.patch | f06f1becfcc7c56bb3507d0cfb91e37991a9b89d75112fe69cea76f389a484f4 |
-| patches/vllm-kv-declaration-within-physical-bound.patch | 75526072aec94f8fd8e8e9ad9324408ce393b24c5cf50a8f801d87de62b24980 |
+| patches/vllm-kv-declaration-within-physical-bound.patch | a8386795dc7792ed06f63d92159c22323b986bb93e25a0798417243e00a643e5 |
 | patches/vllm-exact-reasoning-usage.patch | 34a3291cda667e89ffa97f399b821a06adf9a0b14c7429b121e2b01492b7a8e6 |
 | patches/vllm-anthropic-input-fidelity.patch | 3252e25a6c2e9d8ee0eec4cb383fc292bff2afaac2e3becdc1006c68b3b02c3c |
 | patches/vllm-qwen-exact-tool-language.patch | e0bdd47262490c88bc600b858e3320efdd4dc4c80c218761fe01378b0e8c8134 |

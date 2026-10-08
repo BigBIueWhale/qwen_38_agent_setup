@@ -45283,13 +45283,13 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'not None\n'})},
  {'name': 'kv-declaration-within-physical-bound',
   'review_patch': 'patches/vllm-kv-declaration-within-physical-bound.patch',
-  'review_sha256': '75526072aec94f8fd8e8e9ad9324408ce393b24c5cf50a8f801d87de62b24980',
+  'review_sha256': 'a8386795dc7792ed06f63d92159c22323b986bb93e25a0798417243e00a643e5',
   'files': ({'path': 'tests/v1/core/test_kv_cache_users_sizing.py',
              'before_sha256': '284c057cde0646e1a254a3687c15f3a3b0d97c1603e5f242b249d0aa2b685085',
-             'after_sha256': 'dcac678c981a8685cb4a404eb4843bd80bebf12df63b35a45194f32a85e8647a'},
+             'after_sha256': '9d5818d54d4daa6902eace4341a22d0931329c7c45dd4dfc093ce409f85502bf'},
             {'path': 'vllm/v1/core/kv_cache_utils.py',
              'before_sha256': '79c7730dbfe63a3ae177507629aa19864eab52796a239ebcbce315fe98dbb407',
-             'after_sha256': 'f0a146b3f311d2ae983e3d05f1267d35492298cf45d5f171d1bfd3e8da019c40'},
+             'after_sha256': 'b552f99b71992372066e5eec7e49afeaca12f2c4f1a3171be10bbafca55eded9'},
             {'path': 'vllm/v1/worker/gpu_worker.py',
              'before_sha256': '2867bd3bc8449b5805bdfe2f0d0e2c557b42a864ca3eb3c0dca548d577605806',
              'after_sha256': '7beca2da40aa7f705231747fe268b5b3208a9cefbba3876e708f4400e5e74256'}),
@@ -45440,10 +45440,28 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '    message = str(refusal.value)\n'
                       '    assert "the device memory free at startup profiling" in '
                       'message\n'
-                      '    assert "Free the device memory other processes hold" in '
-                      'message\n'
+                      '    assert "Next: free the device memory other processes hold" '
+                      'in message\n'
                       '    assert "declare fewer users, or reduce max_model_len" in '
                       'message\n'
+                      '\n'
+                      '\n'
+                      'def test_one_declared_user_is_not_told_to_declare_fewer():\n'
+                      '    spec = _spec()\n'
+                      '    vllm_config = _vllm_config(64, 1)\n'
+                      '    expected_blocks = _blocks_per_user(64) + 1\n'
+                      '\n'
+                      '    with pytest.raises(ValueError, match="--kv-cache-users 1 '
+                      'requires") as refusal:\n'
+                      '        get_kv_cache_configs(\n'
+                      '            vllm_config,\n'
+                      '            [{"layer1": spec}],\n'
+                      '            [spec.page_size_bytes * expected_blocks - 1],\n'
+                      '        )\n'
+                      '    message = str(refusal.value)\n'
+                      '    assert "fewer users" not in message\n'
+                      '    assert "serve on a device with more memory, or reduce '
+                      'max_model_len" in message\n'
                       '\n'
                       '\n'
                       'def test_missing_kv_cache_users_fails_closed():\n',
@@ -45503,10 +45521,30 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    message = str(refusal.value)\n'
                              '    assert "the device memory free at startup profiling" '
                              'in message\n'
-                             '    assert "Free the device memory other processes hold" '
-                             'in message\n'
+                             '    assert "Next: free the device memory other processes '
+                             'hold" in message\n'
                              '    assert "declare fewer users, or reduce '
                              'max_model_len" in message\n'
+                             '\n'
+                             '\n'
+                             'def '
+                             'test_one_declared_user_is_not_told_to_declare_fewer():\n'
+                             '    spec = _spec()\n'
+                             '    vllm_config = _vllm_config(64, 1)\n'
+                             '    expected_blocks = _blocks_per_user(64) + 1\n'
+                             '\n'
+                             '    with pytest.raises(ValueError, '
+                             'match="--kv-cache-users 1 requires") as refusal:\n'
+                             '        get_kv_cache_configs(\n'
+                             '            vllm_config,\n'
+                             '            [{"layer1": spec}],\n'
+                             '            [spec.page_size_bytes * expected_blocks - '
+                             '1],\n'
+                             '        )\n'
+                             '    message = str(refusal.value)\n'
+                             '    assert "fewer users" not in message\n'
+                             '    assert "serve on a device with more memory, or '
+                             'reduce max_model_len" in message\n'
                              '\n'
                              '\n'
                              'def test_missing_kv_cache_users_fails_closed():\n'},
@@ -45790,7 +45828,12 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '_max_memory_usage_bytes_from_groups(\n'},
             {'name': 'vllm/v1/core/kv_cache_utils.py:landmark-5',
              'path': 'vllm/v1/core/kv_cache_utils.py',
-             'before': '                f"{format_gib(needed_bytes)} GiB of KV cache '
+             'before': '        needed_blocks = users * per_user_blocks + 1\n'
+                       '        needed_bytes = needed_blocks * pool_bytes_per_block\n'
+                       '        if needed_bytes > available_memory_one_worker:\n'
+                       '            raise ValueError(\n'
+                       '                f"--kv-cache-users {users} requires "\n'
+                       '                f"{format_gib(needed_bytes)} GiB of KV cache '
                        '"\n'
                        '                f"({format_gib(per_user_bytes)} GiB per "\n'
                        '                '
@@ -45805,7 +45848,22 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                        '            )\n'
                        '        kv_cache_configs.append(\n'
                        '            get_kv_cache_config_from_groups(\n',
-             'after': '                f"{format_gib(needed_bytes)} GiB of KV cache "\n'
+             'after': '        needed_blocks = users * per_user_blocks + 1\n'
+                      '        needed_bytes = needed_blocks * pool_bytes_per_block\n'
+                      '        if needed_bytes > available_memory_one_worker:\n'
+                      '            # Each action that can make the declaration fit: '
+                      'fewer users is\n'
+                      '            # one only while more than one is declared.\n'
+                      '            actions = [\n'
+                      '                "free the device memory other processes hold",\n'
+                      '                "serve on a device with more memory",\n'
+                      '                *(["declare fewer users"] if users > 1 else '
+                      '[]),\n'
+                      '                "reduce max_model_len",\n'
+                      '            ]\n'
+                      '            raise ValueError(\n'
+                      '                f"--kv-cache-users {users} requires "\n'
+                      '                f"{format_gib(needed_bytes)} GiB of KV cache "\n'
                       '                f"({format_gib(per_user_bytes)} GiB per "\n'
                       '                '
                       'f"{vllm_config.model_config.max_model_len}-token context), "\n'
@@ -45814,21 +45872,24 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       'GiB: the device "\n'
                       '                f"memory free at startup profiling, minus the '
                       'residents it "\n'
-                      '                f"measured (weights, non-torch allocations, the '
-                      'activation "\n'
-                      '                f"peak, any charged CUDA-graph estimate) and '
-                      'frontend "\n'
-                      '                f"reservations; the startup log gives each '
-                      'term. "\n'
-                      '                f"Free the device memory other processes hold, '
-                      'serve on a "\n'
-                      '                f"device with more memory, declare fewer users, '
-                      'or reduce "\n'
-                      '                f"max_model_len."\n'
+                      '                f"measured (weights, non-torch allocations, '
+                      'workspaces), the "\n'
+                      '                f"peak of the phases it profiled, any charged '
+                      'CUDA-graph "\n'
+                      '                f"estimate and frontend reservations; the '
+                      'startup log gives "\n'
+                      '                f"each term. Next: {\', \'.join(actions[:-1])}, '
+                      'or {actions[-1]}."\n'
                       '            )\n'
                       '        kv_cache_configs.append(\n'
                       '            get_kv_cache_config_from_groups(\n',
-             'review_before': '                f"{format_gib(needed_bytes)} GiB of KV '
+             'review_before': '        needed_blocks = users * per_user_blocks + 1\n'
+                              '        needed_bytes = needed_blocks * '
+                              'pool_bytes_per_block\n'
+                              '        if needed_bytes > available_memory_one_worker:\n'
+                              '            raise ValueError(\n'
+                              '                f"--kv-cache-users {users} requires "\n'
+                              '                f"{format_gib(needed_bytes)} GiB of KV '
                               'cache "\n'
                               '                f"({format_gib(per_user_bytes)} GiB per '
                               '"\n'
@@ -45846,7 +45907,24 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                               '            )\n'
                               '        kv_cache_configs.append(\n'
                               '            get_kv_cache_config_from_groups(\n',
-             'review_after': '                f"{format_gib(needed_bytes)} GiB of KV '
+             'review_after': '        needed_blocks = users * per_user_blocks + 1\n'
+                             '        needed_bytes = needed_blocks * '
+                             'pool_bytes_per_block\n'
+                             '        if needed_bytes > available_memory_one_worker:\n'
+                             '            # Each action that can make the declaration '
+                             'fit: fewer users is\n'
+                             '            # one only while more than one is declared.\n'
+                             '            actions = [\n'
+                             '                "free the device memory other processes '
+                             'hold",\n'
+                             '                "serve on a device with more memory",\n'
+                             '                *(["declare fewer users"] if users > 1 '
+                             'else []),\n'
+                             '                "reduce max_model_len",\n'
+                             '            ]\n'
+                             '            raise ValueError(\n'
+                             '                f"--kv-cache-users {users} requires "\n'
+                             '                f"{format_gib(needed_bytes)} GiB of KV '
                              'cache "\n'
                              '                f"({format_gib(per_user_bytes)} GiB per '
                              '"\n'
@@ -45860,16 +45938,13 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '                f"memory free at startup profiling, '
                              'minus the residents it "\n'
                              '                f"measured (weights, non-torch '
-                             'allocations, the activation "\n'
-                             '                f"peak, any charged CUDA-graph estimate) '
-                             'and frontend "\n'
-                             '                f"reservations; the startup log gives '
-                             'each term. "\n'
-                             '                f"Free the device memory other processes '
-                             'hold, serve on a "\n'
-                             '                f"device with more memory, declare fewer '
-                             'users, or reduce "\n'
-                             '                f"max_model_len."\n'
+                             'allocations, workspaces), the "\n'
+                             '                f"peak of the phases it profiled, any '
+                             'charged CUDA-graph "\n'
+                             '                f"estimate and frontend reservations; '
+                             'the startup log gives "\n'
+                             '                f"each term. Next: {\', '
+                             '\'.join(actions[:-1])}, or {actions[-1]}."\n'
                              '            )\n'
                              '        kv_cache_configs.append(\n'
                              '            get_kv_cache_config_from_groups(\n'},
@@ -150195,7 +150270,7 @@ FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5d
  'tests/tool_use/test_chat_completions.py': 'cdf5ea1140e43f57cf4d576e9982235e2b599ab497946462509e02dbdc2ab190',
  'tests/tool_use/test_gemma4_responses_adjust_request.py': 'ac6531c1601139d42c6eb05d967653656c6926e145bc21b21e6236e8c95d68b5',
  'tests/tool_use/test_responses_request_validations.py': '0b898db5685b5c838c33804030c4b83987d7aea80f93b2eda5a5a65aba4f9b91',
- 'tests/v1/core/test_kv_cache_users_sizing.py': 'dcac678c981a8685cb4a404eb4843bd80bebf12df63b35a45194f32a85e8647a',
+ 'tests/v1/core/test_kv_cache_users_sizing.py': '9d5818d54d4daa6902eace4341a22d0931329c7c45dd4dfc093ce409f85502bf',
  'tests/v1/core/test_prefix_caching.py': '7ceb00826d43dc4186bb746e64c6e650784d536a04127ccd7d02162f1fea4c4f',
  'tests/v1/e2e/general/test_context_length.py': '11f1dc8484d92d6414607a3cb1670d2832919166450f4ed684e1cdc59b4ead81',
  'tests/v1/engine/test_async_llm_admission.py': '4a5421ef0cffc3d68484ef0d8caf1d9082e7fc3ab0dc943e7488d59420b41ca5',
@@ -150333,7 +150408,7 @@ FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5d
  'vllm/v1/attention/ops/triton_turboquant_decode.py': 'dab8b65ab7ddd6582de16e1fc7b1360ab0061b4a2a2b114f5d87ea0532fd726f',
  'vllm/v1/attention/ops/triton_turboquant_store.py': '298645bff68c6adab58261862602b86e7e714c3552a9fd89102d9ccd2b83e9f7',
  'vllm/v1/core/block_pool.py': '7370727256c2743a952053572503e6bd8f51c61edf8cddf030e34898c8d2903f',
- 'vllm/v1/core/kv_cache_utils.py': 'f0a146b3f311d2ae983e3d05f1267d35492298cf45d5f171d1bfd3e8da019c40',
+ 'vllm/v1/core/kv_cache_utils.py': 'b552f99b71992372066e5eec7e49afeaca12f2c4f1a3171be10bbafca55eded9',
  'vllm/v1/core/sched/scheduler.py': '92a95c3223987c7eacafecb30d4cceb32bfc8a754718a69f97bc094f6253abf9',
  'vllm/v1/core/sched/utils.py': 'bd79fd9adb8cff3a89559afa415ac7beca093ed523a0e86b73e72cd0628c4368',
  'vllm/v1/core/single_type_kv_cache_manager.py': 'c96644fbb3404fe67151abdb46dcbfbde6788f7d65eb29c1ab8060caa0c628df',

@@ -831,6 +831,41 @@ def test_v2_runner_holds_no_declared_pool() -> None:
             os.environ["VLLM_USE_V2_MODEL_RUNNER"] = saved_env
 
 
+def test_kv_bound_refusal_names_only_possible_actions() -> None:
+    # A declaration beyond the bound is refused with the actions that can make
+    # it fit; declaring fewer users is one only while more than one is.
+    from vllm.config import CacheConfig
+
+    spec = FullAttentionSpec(
+        block_size=16, num_kv_heads=2, head_size=64, dtype=torch.float32
+    )
+    for users, fewer in ((1, False), (4, True)):
+        cache = CacheConfig()
+        cache.kv_cache_users = users
+        config = SimpleNamespace(
+            model_config=SimpleNamespace(max_model_len=64, original_max_model_len=64),
+            cache_config=cache,
+            speculative_config=None,
+            kv_transfer_config=None,
+            scheduler_config=SimpleNamespace(disable_hybrid_kv_cache_manager=False),
+            parallel_config=SimpleNamespace(
+                decode_context_parallel_size=1, prefill_context_parallel_size=1
+            ),
+        )
+        # One context fits; the declared users and the null block do not.
+        bound = spec.page_size_bytes * (4 * users + 1) - 1
+        try:
+            kv_cache_utils.get_kv_cache_configs(config, [{"layer": spec}], [bound])
+        except ValueError as refusal:
+            message = str(refusal)
+        else:
+            raise AssertionError(f"--kv-cache-users {users} beyond the bound was admitted")
+        assert f"--kv-cache-users {users} requires" in message, message
+        assert "Next: free the device memory other processes hold" in message, message
+        assert ("declare fewer users" in message) is fewer, message
+        assert message.endswith("or reduce max_model_len."), message
+
+
 def test_profiled_context_covers_its_own_query() -> None:
     # The served profile gives every dummy request the longest context a
     # request holds; a request whose own share of the step is longer keeps a
@@ -992,6 +1027,7 @@ if __name__ == "__main__":
     test_kv_bound_refuses_a_text_step_that_skips_what_serving_runs()
     test_serving_scores_the_prompt_as_the_profile_measures()
     test_v2_runner_holds_no_declared_pool()
+    test_kv_bound_refusal_names_only_possible_actions()
     test_profiled_context_covers_its_own_query()
     test_dummy_step_records_the_layers_that_read_its_metadata()
     print("vision workspace unit: passed")

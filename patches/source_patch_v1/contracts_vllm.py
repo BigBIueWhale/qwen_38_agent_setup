@@ -1629,8 +1629,14 @@ def _validate_physical_bound_after(state: State) -> None:
     require_text(state, kv_utils, 'f"but the KV bound is only "', label=label)
     require_text(state, kv_utils, 'f"memory free at startup profiling, minus the residents it "',
                  label=label)
-    require_text(state, kv_utils, 'f"Free the device memory other processes hold, serve on a "',
-                 label=label)
+    _require_in_symbol(state, kv_utils, "get_kv_cache_configs", (
+        '"free the device memory other processes hold",',
+        '*(["declare fewer users"] if users > 1 else []),',
+        '"reduce max_model_len",',
+    ), label=label)
+    require_python_symbols(state, "tests/v1/core/test_kv_cache_users_sizing.py", {
+        "test_one_declared_user_is_not_told_to_declare_fewer": None,
+    }, label=label)
     forbid_text(state, kv_utils, "total device memory minus", label=label)
     forbid_text(state, kv_utils, "Try increasing `gpu_memory_utilization`", label=label)
 
