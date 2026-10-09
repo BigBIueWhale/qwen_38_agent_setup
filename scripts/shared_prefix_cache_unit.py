@@ -33,7 +33,11 @@ from vllm.v1.engine.core import EngineCoreProc
 from vllm.v1.engine.input_processor import InputProcessor
 from vllm.v1.kv_offload.base import LookupResult, ReqContext
 from vllm.v1.kv_offload.cpu.manager import CPUOffloadingManager
-from vllm.v1.kv_offload.tiering.p2p.manager import _annotate_req_context
+from vllm.v1.kv_offload.tiering.p2p.manager import (
+    _annotate_req_context,
+    _parse_dest,
+    _parse_source,
+)
 from vllm.v1.request import Request
 from vllm.v1.serial_utils import MsgpackDecoder, MsgpackEncoder
 
@@ -110,6 +114,13 @@ DEPLOYED_KV_TRANSFER = KVTransferConfig(
     kv_connector_extra_config={'cpu_kv_cache_users': 1},
 )
 NIXL_KV_TRANSFER = KVTransferConfig(kv_connector='NixlConnector', kv_role='kv_both')
+MOONCAKE_KV_TRANSFER = KVTransferConfig(kv_connector='MooncakeConnector',
+                                        kv_role='kv_both')
+# What a NIXL prefill node returns for its decode node, which upstream's proxy
+# hands on as the decode request's own.
+NIXL_REMOTE_PREFILL = {'do_remote_prefill': True, 'remote_block_ids': [[1, 2]],
+                       'remote_engine_id': 'e', 'remote_request_id': 'r',
+                       'remote_host': 'h', 'remote_port': 5600, 'tp_size': 1}
 P2P_KV_TRANSFER = KVTransferConfig(
     kv_connector='OffloadingConnector', kv_role='kv_both',
     kv_connector_extra_config={'spec_name': 'TieringOffloadingSpec',
@@ -224,7 +235,7 @@ def check_kv_transfer_values_are_what_their_connector_reads():
     peer = {'kv_request_id': 't', 'remote_host': '10.0.0.1', 'remote_port': 5710}
     taken = [{'remote_prefiller': peer}, {'remote_kv_source': peer},
              {'remote_decoder': {'kv_request_id': 't'}},
-             {'remote_decoder': {}, 'remote_kv_source': peer}]
+             {'remote_decoder': {'kv_request_id': 't'}, 'remote_kv_source': peer}]
     refused = [{'remote_kv_source': 'x'}, {'remote_decoder': 'x'},
                {'remote_prefiller': [1]}]
     # Unhashable, it raises later, where the tier keys its sessions by it.
@@ -247,6 +258,96 @@ def check_kv_transfer_values_are_what_their_connector_reads():
             pass
         else:
             raise AssertionError(f'the P2P tier reads {params!r}; admission refuses it')
+
+
+def check_kv_transfer_values_are_read_with_their_companions():
+    """A value that asks a connector to act is read only together with the
+    keys its connector reads it with, and never beside one it excludes; the
+    connectors' own readers either raised on such a request inside the engine
+    core -- NIXL's and Mooncake's decode node record a remote prefill by those
+    keys, for an aborted request too -- or acted on one key and dropped the
+    other. A null or false asks for nothing: upstream's proxies fill the keys
+    a prefill node does not use with it."""
+    from vllm.distributed.kv_transfer.kv_connector.v1.mooncake.mooncake_connector import (
+        MooncakeConnectorMetadata,
+    )
+    from vllm.distributed.kv_transfer.kv_connector.v1.nixl.metadata import (
+        NixlConnectorMetadata,
+    )
+
+    nixl = admission(NIXL_KV_TRANSFER)
+    admit(nixl, kv_transfer_params=NIXL_REMOTE_PREFILL)
+    meta = NixlConnectorMetadata()
+    meta.add_new_req_to_recv('r', [], dict(NIXL_REMOTE_PREFILL))
+    assert meta.reqs_to_recv['r'].remote.host == 'h', meta.reqs_to_recv
+    admit(nixl, kv_transfer_params={
+        'do_remote_decode': True, 'do_remote_prefill': False, 'remote_engine_id': None,
+        'remote_block_ids': None, 'remote_host': None, 'remote_port': None})
+    for dropped, listed in (
+        (('remote_block_ids',), "'remote_block_ids'"),
+        (('remote_host', 'remote_port'), "'remote_host' and 'remote_port'"),
+        (('remote_block_ids', 'remote_engine_id', 'remote_request_id', 'remote_host',
+          'remote_port'), "'remote_block_ids', 'remote_engine_id', "
+                          "'remote_request_id', 'remote_host' and 'remote_port'"),
+    ):
+        params = {key: value for key, value in NIXL_REMOTE_PREFILL.items()
+                  if key not in dropped}
+        message = refusal(nixl, kv_transfer_params=params)
+        assert "key 'do_remote_prefill' is a boolean (True), which NixlConnector " \
+            'acts on only together with ' in message, message
+        assert f'this request sends no value for {listed}. Next: send ' in message, message
+        try:
+            NixlConnectorMetadata().add_new_req_to_recv('r', [], params)
+        except KeyError:
+            pass
+        else:
+            raise AssertionError(f'NIXL records {params!r}; admission refuses it')
+        # A null is no value: admission refuses it beside do_remote_prefill.
+        refusal(nixl, kv_transfer_params={**NIXL_REMOTE_PREFILL,
+                                          **dict.fromkeys(dropped)})
+
+    mooncake = admission(MOONCAKE_KV_TRANSFER)
+    complete = {'do_remote_prefill': True, 'transfer_id': 't',
+                'remote_engine_id': 'e', 'remote_bootstrap_addr': 'h:1'}
+    admit(mooncake, kv_transfer_params=complete)
+    MooncakeConnectorMetadata().add_new_req('r', [], dict(complete))
+    params = {'do_remote_prefill': True, 'transfer_id': 't'}
+    message = refusal(mooncake, kv_transfer_params=params)
+    assert "no value for 'remote_engine_id' and 'remote_bootstrap_addr'" in message, message
+    try:
+        MooncakeConnectorMetadata().add_new_req('r', [], params)
+    except KeyError:
+        pass
+    else:
+        raise AssertionError(f'Mooncake records {params!r}; admission refuses it')
+    message = refusal(mooncake, kv_transfer_params={'do_remote_decode': True})
+    assert "no value for 'transfer_id'. Next: send it beside" in message, message
+
+    p2p = admission(P2P_KV_TRANSFER)
+    peer = {'kv_request_id': 't', 'remote_host': '10.0.0.1', 'remote_port': 5710}
+    for params in ({'remote_prefiller': {}}, {'remote_kv_source': {'kv_request_id': 't'}},
+                   {'remote_prefiller': {'kv_request_id': 't', 'remote_host': 'h'}}):
+        ((key, _),) = params.items()
+        message = refusal(p2p, kv_transfer_params=params)
+        assert f'{key!r} must be an object whose kv_request_id is a string' in message, message
+        assert _parse_source(params) is None, params
+    message = refusal(p2p, kv_transfer_params={'remote_decoder': {}})
+    assert "'remote_decoder' must be an object whose kv_request_id is a string" in message
+    assert _parse_dest({'remote_decoder': {}}).kv_request_id is None
+    other = {**peer, 'kv_request_id': 'other'}
+    for beside, value in (('remote_kv_source', other),
+                          ('remote_decoder', {'kv_request_id': 'other'})):
+        params = {'remote_prefiller': peer, beside: value}
+        message = refusal(p2p, kv_transfer_params=params)
+        assert f"'remote_prefiller' is sent beside {beside!r}" in message, message
+        assert 'Next: remove ' in message, message
+    # The tier read the prefiller and dropped the other source.
+    assert _parse_source({'remote_prefiller': peer,
+                          'remote_kv_source': other}).kv_request_id == 't'
+    legal = {'remote_decoder': {'kv_request_id': 'd'}, 'remote_kv_source': peer}
+    admit(p2p, kv_transfer_params=legal)
+    assert (_parse_source(legal).kv_request_id, _parse_dest(legal).kv_request_id) == (
+        't', 'd')
 
 
 def check_pooling_offload_is_refused_at_startup():
@@ -341,7 +442,11 @@ async def check_rejection_notice_identity():
     await refuse(serving, chat(kv_transfer_params={'do_remote_prefill': True,
                                                    'remote_engine_id': ['e']}))
     notify.assert_not_awaited()
-    refused = chat(kv_transfer_params={'do_remote_prefill': True})
+    # Nor one whose remote prefill lacks the keys that name its blocks: the
+    # connector records the notice's transfer by them, and raised without.
+    await refuse(serving, chat(kv_transfer_params={'do_remote_prefill': True}))
+    notify.assert_not_awaited()
+    refused = chat(kv_transfer_params=NIXL_REMOTE_PREFILL)
     await refuse(serving, refused)
     (request_id, params, scope), _ = notify.await_args
     assert (request_id, scope) == (refused.request_id, 'agent'), (request_id, scope)
@@ -410,6 +515,7 @@ def main():
     asyncio.run(check_stream_identity())
     asyncio.run(check_kv_transfer_params_admission())
     check_kv_transfer_values_are_what_their_connector_reads()
+    check_kv_transfer_values_are_read_with_their_companions()
     check_pooling_offload_is_refused_at_startup()
     check_a_refused_engine_request_is_its_own_error()
     asyncio.run(check_rejection_notice_identity())

@@ -366,7 +366,7 @@ It is intentionally reconstructed by the ordered, reviewed semantic transformati
 | patches/vllm-batch-invariance-substitutes-no-nvfp4-kernel.patch | c79baaee0a51275f5f522d266fe6b315c200e6951920c2454d5c80cadbb92f44 |
 | patches/vllm-render-carries-every-image-chat-renders.patch | 9c20792ac98dfabdc44691217947d18ad7eee940f236343f531a891cde9a72b1 |
 | patches/vllm-rendered-prompts-are-never-truncated.patch | 3128a77dde8f5b5118d2893bb858183e7fc0f20573124441bb69b2e82251fc6d |
-| patches/vllm-kv-transfer-params-are-declared.patch | 18316e69260279327deed84b584ee87d6960fe757a298640edcd5400d24de2e2 |
+| patches/vllm-kv-transfer-params-are-declared.patch | fbe7824e788905358711686784cdb3659d184661f4f59de873516f4ad2ccdb6f |
 | patches/vllm-responses-refuses-tools-the-template-is-never-given.patch | eb497a85e0a2f3aa1907fcf22e34b62fe8dc91015a7f869293497d64ad5134b2 |
 | patches/vllm-chat-stream-carries-every-token-logprob.patch | ca15dadd152454fe5b3fbcb710b8c7b5ce3221c038617b9e0d0985953aecbf47 |
 | patches/vllm-chat-messages-read-by-one-rule.patch | 5bf8a2d69d7ab1c6b9ee423740d34616a69e857d64816f68b9b9b1d509455f7f |
@@ -580,7 +580,25 @@ Consequences:
   of another shape -- a negative or non-integer `max_offload_tokens`, a P2P peer
   that is not an object, an ID that is not a string -- is refused with a 400
   naming the key and the shape: the connector reads it inside the engine core,
-  where such a value raised for every request the engine served. Upstream's
+  where such a value raised for every request the engine served. The same
+  declaration states the keys a value is read with and those it is never read
+  beside. A NIXL or Mooncake decode node's `do_remote_prefill` true needs the
+  keys naming the remote request -- for NIXL its engine, request ID, host and
+  port, with the block IDs in pull mode and the TP size in push mode, and in
+  pull mode block IDs need the other four; for Mooncake the transfer ID, the
+  engine and the bootstrap address -- because the connector records the
+  transfer by them inside the engine core, for an aborted request's rejection
+  notice too, and raises there without them. A P2P peer object needs every field, and
+  `remote_prefiller` is refused beside `remote_decoder` (two roles) and
+  `remote_kv_source` (a second source, which the tier dropped). Each such
+  request is refused with a 400 naming the keys. A null or false asks for
+  nothing, so the keys upstream's proxies fill with null for a prefill node are
+  taken. The hidden-states connector reads a request's `hidden_states_path`
+  only where its operator sets `allow_custom_save_path`, and writes under its
+  own storage path otherwise, so elsewhere the key is refused naming that
+  setting. The runtime image has no NIXL or Mooncake
+  package, which those connectors and the P2P tier's transport need, and this
+  launch's CPU tier takes one key that needs no other. Upstream's
   `prompt_token_ids`, a prefill node's prompt ids for decode-side reuse, is
   refused for what this server does instead: it renders every prompt from the
   request through its template. A refused request's remote-prefill notice

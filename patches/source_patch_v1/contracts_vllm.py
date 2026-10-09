@@ -4482,6 +4482,22 @@ def _validate_kv_transfer_params_keys_after(state: State) -> None:
     _require_in_symbol(state, v1 + "base.py", "KVTransferParamsKeys.__or__", (
         "_all_of(union[name], shape) if name in union else shape",
     ), label=label)
+    # The same declaration states the keys a value is read with and those it
+    # is never read beside; null and false ask for nothing; a key two
+    # declarations define is read with what either reads it with.
+    _require_in_symbol(state, v1 + "base.py", "KVTransferParamShape", (
+        "requires: tuple[str, ...] = ()",
+        "excludes: tuple[str, ...] = ()",
+        "def requiring(self, *keys: str)",
+        "def excluding(self, *keys: str)",
+    ), label=label)
+    _require_in_symbol(state, v1 + "base.py", "asks", (
+        "return value is not None and value is not False",
+    ), label=label)
+    _require_in_symbol(state, v1 + "base.py", "_all_of", (
+        "requires=tuple(dict.fromkeys(first.requires + second.requires))",
+        "excludes=tuple(dict.fromkeys(first.excludes + second.excludes))",
+    ), label=label)
     _require_in_symbol(state, v1 + "multi_connector.py",
                        "MultiConnector.get_kv_transfer_params_keys", (
         "keys |= connector_cls.get_kv_transfer_params_keys(child_config)",
@@ -4517,11 +4533,29 @@ def _validate_kv_transfer_params_keys_after(state: State) -> None:
     # those its request_finished returns for the peer node.
     for path, qualname, needles in (
         (v1 + "nixl/connector.py", "NixlBaseConnector",
-         ('"do_remote_prefill"', '"transfer_mode"')),
+         ('"do_remote_prefill"', '"transfer_mode"',
+          # A proxy fills what a prefill node does not use with null.
+          '"remote_block_ids": _REMOTE_BLOCK_IDS',
+          '"remote_engine_id": nullable(STRING)',
+          '"remote_request_id": nullable(STRING)',
+          '"remote_host": nullable(STRING)',
+          '"remote_port": nullable(INTEGER)')),
+        # Each mode reads do_remote_prefill with the keys it indexes for it.
+        (v1 + "nixl/connector.py", "NixlPullConnector",
+         ('"do_remote_prefill": BOOLEAN.requiring(',
+          '"remote_block_ids", *cls._REMOTE_REQUEST_KEYS',
+          '"remote_block_ids": _REMOTE_BLOCK_IDS.requiring(')),
+        (v1 + "nixl/connector.py", "NixlPushConnector",
+         ('"do_remote_prefill": BOOLEAN.requiring(',
+          '*cls._REMOTE_REQUEST_KEYS, "tp_size"')),
         (v1 + "mooncake/mooncake_connector.py", "MooncakeConnector",
-         ('"remote_bootstrap_addr"',)),
+         ('"remote_bootstrap_addr"',
+          '"transfer_id", "remote_engine_id", "remote_bootstrap_addr"',
+          '"do_remote_decode": BOOLEAN.requiring("transfer_id")')),
         (v1 + "moriio/moriio_connector.py", "MoRIIOConnector",
-         ('"is_request_leader"',)),
+         ('"is_request_leader"',
+          '"remote_block_ids": nullable(list_of(INTEGER, "integers"))',
+          '"remote_engine_id": nullable(STRING)')),
         (v1 + "lmcache_connector.py", "LMCacheConnectorV1",
          ("if not cls._uses_native_adapter(vllm_config):",
           "with use_native set in ",
@@ -4529,10 +4563,18 @@ def _validate_kv_transfer_params_keys_after(state: State) -> None:
         (v1 + "lmcache_mp_connector.py", "LMCacheMPConnectorUpstream",
          ('"num_lmcache_extra_cached_tokens"',)),
         (v1 + "example_hidden_states_connector.py", "ExampleHiddenStatesConnector",
-         ('"hidden_states_path"', '"include_output_tokens"')),
+         ('"hidden_states_path"', '"include_output_tokens"',
+          '"allow_custom_save_path", False',
+          "takes hidden_states_path only where")),
         ("vllm/v1/kv_offload/tiering/p2p/manager.py", "P2PSecondaryTierManager",
          ("REMOTE_PREFILLER_KEY: peer", "REMOTE_DECODER_KEY: object_with(",
-          "REMOTE_KV_SOURCE_KEY: peer")),
+          "REMOTE_KV_SOURCE_KEY: peer",
+          'required=("kv_request_id", "remote_host", "remote_port")',
+          'required=("kv_request_id",)',
+          "REMOTE_PREFILLER_KEY: peer.excluding(",
+          "REMOTE_DECODER_KEY, REMOTE_KV_SOURCE_KEY",
+          ").excluding(REMOTE_PREFILLER_KEY)",
+          "REMOTE_KV_SOURCE_KEY: peer.excluding(REMOTE_PREFILLER_KEY)")),
     ):
         _require_in_symbol(state, path, f"{qualname}.get_kv_transfer_params_keys",
                            needles, label=label)
@@ -4556,6 +4598,13 @@ def _validate_kv_transfer_params_keys_after(state: State) -> None:
             "declared.defines(key)",
             "return self._undefined_keys_refusal(refused)",
             "if not shape.conforms(value):",
+            # Then each value that asks is read only with its companions, and
+            # never beside a key it excludes that asks too.
+            "if not asks(value):",
+            "for companion in shape.requires",
+            "if kv_transfer_params.get(companion) is None",
+            "for other in shape.excludes",
+            "if asks(kv_transfer_params.get(other))",
         ),
         label=label,
         location=f"{processor}:InputProcessor.kv_transfer_params_refusal",
@@ -4588,6 +4637,13 @@ def _validate_kv_transfer_params_keys_after(state: State) -> None:
         "test_a_connector_that_declares_nothing_reads_nothing": None,
         "test_a_key_two_connectors_define_holds_its_value_to_both": None,
         "test_each_value_is_held_to_what_its_connector_reads": None,
+        "test_a_key_two_connectors_define_is_read_with_what_either_reads_it_with": None,
+        "test_only_null_and_false_ask_for_nothing": None,
+        "test_a_proxy_fills_the_keys_naming_a_remote_request_with_null": None,
+        "test_a_value_is_read_with_the_keys_its_connector_reads_it_with": None,
+        "test_a_multi_connector_reads_a_value_with_what_its_children_read_it_with": None,
+        "test_a_remote_prefill_requires_every_key_its_connector_indexes_for_it": None,
+        "test_a_hidden_states_path_is_taken_only_where_custom_paths_are_allowed": None,
     }, label=label)
     require_python_symbols(state, "tests/v1/engine/test_kv_transfer_params_admission.py", {
         "test_the_cpu_offload_tier_admits_its_store_cap": None,
@@ -4601,6 +4657,10 @@ def _validate_kv_transfer_params_keys_after(state: State) -> None:
         "test_lmcache_without_its_native_adapter_names_use_native": None,
         "test_a_value_the_connector_cannot_read_is_refused_naming_its_shape": None,
         "test_parameters_admission_refuses_reach_no_connector_as_a_notice": None,
+        "test_a_key_filled_with_null_or_false_asks_for_nothing": None,
+        "test_a_value_without_the_keys_it_is_read_with_is_refused_naming_them": None,
+        "test_a_key_beside_one_it_is_never_read_with_is_refused": None,
+        "test_a_notice_names_the_blocks_only_with_the_keys_that_name_them": None,
     }, label=label)
     require_python_symbols(state, "tests/entrypoints/openai/chat_completion/test_chat_completion.py", {
         "test_kv_transfer_params_no_connector_takes_are_refused": None,
@@ -6134,9 +6194,21 @@ CONTRACTS: Mapping[str, SemanticContract] = {
             "declared key carries the shape of the value its connector reads -- "
             "inside the engine core, where the P2P tier's .get on a string, or a "
             "list hashed as an ID, raised for every request the engine served. "
-            "Admission refuses any other key, a value of another shape, and a "
+            "The same declaration states the keys a value is read with and those "
+            "it is never read beside: NIXL's and Mooncake's decode node record a "
+            "remote prefill by the keys naming the remote request -- for an "
+            "aborted request too, whose notice then raised KeyError in the engine "
+            "core -- and skipped a transfer missing them; the P2P tier dropped a "
+            "source beside remote_prefiller and ran without a peer object's "
+            "missing fields. Null and false ask for nothing, so upstream's "
+            "proxies, which fill the keys a prefill node does not use with null, "
+            "are admitted. The hidden-states connector takes a request's path "
+            "only where its operator allows custom save paths. "
+            "Admission refuses any other key, a value of another shape, a value "
+            "without its companions or beside a key it excludes, and a "
             "non-object, with a 400 naming the key, the connector and what it "
-            "takes or the shape, and a next action the caller can take; upstream's "
+            "takes, the shape or the other keys, and a next action the caller can "
+            "take; upstream's "
             "reused prompt ids, which no layer here takes, are refused for what "
             "this server does instead. Only a connector that takes "
             "do_remote_prefill is told of a refused request's remote-prefill "

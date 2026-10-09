@@ -73,17 +73,19 @@ index 77f76c3c527712b9a49808a5b90817f637bfce8f..43fd038e041228afea78a78465abc098
      request = ChatCompletionGenerationRequest(
 diff --git a/tests/v1/engine/test_kv_transfer_params_admission.py b/tests/v1/engine/test_kv_transfer_params_admission.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..aacc8fe1fe4036a10d03abf7a4bd5635f3bb5ac7
+index 0000000000000000000000000000000000000000..354d63fb4745a3ba3de000799aa157e339df889d
 --- /dev/null
 +++ b/tests/v1/engine/test_kv_transfer_params_admission.py
-@@ -0,0 +1,256 @@
+@@ -0,0 +1,345 @@
 +# SPDX-License-Identifier: Apache-2.0
 +# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
 +"""Admission refuses kv_transfer_params that no configured KV connector
-+takes, naming the key and the connector, and a value that is not what the
-+connector reads, naming its shape, before the request reaches the engine; and
-+only a connector that takes do_remote_prefill is told of a refused request's
-+remote-prefill blocks, when admission takes the parameters it names them by."""
++takes, naming the key and the connector; a value that is not what the
++connector reads, naming its shape; and a value sent without the keys the
++connector reads it with, or beside one it never reads it with, naming them --
++before the request reaches the engine. Only a connector that takes
++do_remote_prefill is told of a refused request's remote-prefill blocks, when
++admission takes the parameters it names them by."""
 +
 +import asyncio
 +from types import SimpleNamespace
@@ -109,6 +111,19 @@ index 0000000000000000000000000000000000000000..aacc8fe1fe4036a10d03abf7a4bd5635
 +    kv_connector_extra_config={"cpu_kv_cache_users": 1},
 +)
 +NIXL = KVTransferConfig(kv_connector="NixlConnector", kv_role="kv_both")
++NIXL_PUSH = KVTransferConfig(kv_connector="NixlPushConnector", kv_role="kv_both")
++MOONCAKE = KVTransferConfig(kv_connector="MooncakeConnector", kv_role="kv_both")
++# What a NIXL prefill node returns for its decode node, which upstream's proxy
++# hands on as the decode request's own (toy_proxy_server.py).
++REMOTE_PREFILL = {
++    "do_remote_prefill": True,
++    "remote_block_ids": [[1, 2]],
++    "remote_engine_id": "e",
++    "remote_request_id": "r",
++    "remote_host": "h",
++    "remote_port": 5600,
++    "tp_size": 1,
++}
 +P2P = KVTransferConfig(
 +    kv_connector="OffloadingConnector",
 +    kv_role="kv_both",
@@ -268,7 +283,72 @@ index 0000000000000000000000000000000000000000..aacc8fe1fe4036a10d03abf7a4bd5635
 +
 +
 +def test_a_connector_that_takes_the_key_admits_it():
-+    _admit(_admission(NIXL), kv_transfer_params={"do_remote_prefill": True})
++    _admit(_admission(NIXL), kv_transfer_params=REMOTE_PREFILL)
++    _admit(_admission(NIXL_PUSH), kv_transfer_params=REMOTE_PREFILL)
++
++
++def test_a_key_filled_with_null_or_false_asks_for_nothing():
++    """Upstream's proxy sends a prefill node the keys it does not use as null
++    and do_remote_prefill false (toy_proxy_server.py)."""
++    _admit(
++        _admission(NIXL),
++        kv_transfer_params={
++            "do_remote_decode": True,
++            "do_remote_prefill": False,
++            "remote_engine_id": None,
++            "remote_block_ids": None,
++            "remote_host": None,
++            "remote_port": None,
++        },
++    )
++
++
++@pytest.mark.parametrize(
++    "config,kv_transfer_params,key,missing",
++    [
++        (NIXL, {"do_remote_prefill": True}, "do_remote_prefill",
++         "'remote_block_ids', 'remote_engine_id', 'remote_request_id', "
++         "'remote_host' and 'remote_port'"),
++        (NIXL, {**REMOTE_PREFILL, "remote_host": None, "remote_port": None},
++         "do_remote_prefill", "'remote_host' and 'remote_port'"),
++        (NIXL, {"do_remote_decode": True, "remote_block_ids": [[1]]},
++         "remote_block_ids",
++         "'remote_engine_id', 'remote_request_id', 'remote_host' and 'remote_port'"),
++        (NIXL_PUSH, {k: v for k, v in REMOTE_PREFILL.items() if k != "tp_size"},
++         "do_remote_prefill", "'tp_size'"),
++        (MOONCAKE, {"do_remote_prefill": True, "transfer_id": "t"},
++         "do_remote_prefill", "'remote_engine_id' and 'remote_bootstrap_addr'"),
++        (MOONCAKE, {"do_remote_decode": True}, "do_remote_decode", "'transfer_id'"),
++    ],
++)
++def test_a_value_without_the_keys_it_is_read_with_is_refused_naming_them(
++    config, kv_transfer_params, key, missing
++):
++    """Without them the connector skipped the transfer, or indexed the
++    missing keys inside the engine core and raised there."""
++    message = str(_refusal(_admission(config), kv_transfer_params=kv_transfer_params))
++    assert f"kv_transfer_params key {key!r} is " in message
++    assert f", and this request sends no value for {missing}. Next: send " in message
++    assert f" beside {key!r}, or remove {key!r}." in message
++
++
++_PEER = {"kv_request_id": "t", "remote_host": "10.0.0.1", "remote_port": 5710}
++
++
++@pytest.mark.parametrize(
++    "other,value",
++    [("remote_kv_source", _PEER), ("remote_decoder", {"kv_request_id": "t"})],
++)
++def test_a_key_beside_one_it_is_never_read_with_is_refused(other, value):
++    """The P2P tier pulls from one source and plays one role for a request;
++    beside a remote_prefiller it read only that and dropped a source."""
++    params = {"remote_prefiller": _PEER, other: value}
++    message = str(_refusal(_admission(P2P), kv_transfer_params=params))
++    assert (
++        f"key 'remote_prefiller' is sent beside {other!r}, and OffloadingConnector "
++        f"acts on 'remote_prefiller' only without it. Next: remove "
++        f"'remote_prefiller', or remove {other!r}."
++    ) in message
 +
 +
 +@pytest.mark.parametrize("smuggled", ["x", ["a"], 3])
@@ -326,23 +406,33 @@ index 0000000000000000000000000000000000000000..aacc8fe1fe4036a10d03abf7a4bd5635
 +    notify.assert_not_awaited()
 +
 +
++def test_a_notice_names_the_blocks_only_with_the_keys_that_name_them():
++    """The connector records the notice's transfer by the keys its
++    do_remote_prefill is read with; without them it raised in the engine core
++    for every user."""
++    serving, notify = _serving(NIXL)
++    _rejected(serving, _request(kv_transfer_params={"do_remote_prefill": True}))
++    notify.assert_not_awaited()
++
++
 +def test_a_connector_that_takes_remote_prefill_is_told_of_the_refusal():
 +    serving, notify = _serving(NIXL)
-+    request = _request(kv_transfer_params={"do_remote_prefill": True})
++    request = _request(kv_transfer_params=REMOTE_PREFILL)
 +    _rejected(serving, request)
 +    notify.assert_awaited_once_with(
-+        request.request_id, {"do_remote_prefill": True}, "a", data_parallel_rank=None
++        request.request_id, REMOTE_PREFILL, "a", data_parallel_rank=None
 +    )
 diff --git a/tests/v1/kv_connector/unit/test_kv_transfer_params_keys.py b/tests/v1/kv_connector/unit/test_kv_transfer_params_keys.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..f11e1e2bbc3b34e520163dc585eb1f0798e541f3
+index 0000000000000000000000000000000000000000..b940e2a178119a29751cf515875d709d438f2580
 --- /dev/null
 +++ b/tests/v1/kv_connector/unit/test_kv_transfer_params_keys.py
-@@ -0,0 +1,426 @@
+@@ -0,0 +1,583 @@
 +# SPDX-License-Identifier: Apache-2.0
 +# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
 +"""Each KV connector declares the request ``kv_transfer_params`` keys its
-+protocol defines, as it is configured."""
++protocol defines, as it is configured, each with the shape of its value and
++the keys that value is read with."""
 +
 +import ast
 +import importlib.util
@@ -357,11 +447,13 @@ index 0000000000000000000000000000000000000000..f11e1e2bbc3b34e520163dc585eb1f07
 +from vllm.distributed.kv_transfer.kv_connector.factory import KVConnectorFactory
 +from vllm.distributed.kv_transfer.kv_connector.v1.base import (
 +    ANY_VALUE,
++    BOOLEAN,
 +    INTEGER,
 +    NON_NEGATIVE_INTEGER,
 +    STRING,
 +    KVConnectorBase_V1,
 +    KVTransferParamsKeys,
++    asks,
 +)
 +
 +VLLM = Path(vllm.__file__).parent
@@ -416,6 +508,21 @@ index 0000000000000000000000000000000000000000..f11e1e2bbc3b34e520163dc585eb1f07
 +    assert (
 +        KVTransferParamsKeys(keys={"n": INTEGER}) | KVTransferParamsKeys(keys={"n": INTEGER})
 +    ).shape_of("n") == INTEGER
++
++
++def test_a_key_two_connectors_define_is_read_with_what_either_reads_it_with():
++    union = KVTransferParamsKeys(
++        keys={"go": BOOLEAN.requiring("a").excluding("x")}
++    ) | KVTransferParamsKeys(keys={"go": BOOLEAN.requiring("b", "a")})
++    shape = union.shape_of("go")
++    assert shape.requires == ("a", "b") and shape.excludes == ("x",)
++    assert str(shape) == "a boolean" and shape.conforms(True)
++    assert BOOLEAN.requiring("a") != BOOLEAN and BOOLEAN.requiring() == BOOLEAN
++
++
++def test_only_null_and_false_ask_for_nothing():
++    assert not asks(None) and not asks(False)
++    assert asks(True) and asks(0) and asks("") and asks([]) and asks({})
 +
 +
 +def test_scalar_shapes_take_only_their_json_type():
@@ -524,6 +631,9 @@ index 0000000000000000000000000000000000000000..f11e1e2bbc3b34e520163dc585eb1f07
 +            ("remote_decoder", "x"),
 +            ("remote_prefiller", [1]),
 +            ("remote_prefiller", {"kv_request_id": ["t"]}),
++            ("remote_prefiller", {}),
++            ("remote_kv_source", {"kv_request_id": "t", "remote_host": "10.0.0.1"}),
++            ("remote_decoder", {}),
 +            ("kv_load_tiers", "cpu"),
 +            ("kv_load_tiers", [{"medium": "tape"}]),
 +            ("max_offload_tokens", -1),
@@ -553,6 +663,8 @@ index 0000000000000000000000000000000000000000..f11e1e2bbc3b34e520163dc585eb1f07
 +            ("remote_num_tokens", "32"),
 +            ("remote_block_ids", [1, 2]),
 +            ("do_remote_prefill", "false"),
++            ("do_remote_prefill", None),
++            ("tp_size", None),
 +        ],
 +    ),
 +    (
@@ -578,7 +690,7 @@ index 0000000000000000000000000000000000000000..f11e1e2bbc3b34e520163dc585eb1f07
 +    ),
 +    (
 +        "ExampleHiddenStatesConnector",
-+        {},
++        {"kv_connector_extra_config": {"allow_custom_save_path": True}},
 +        {"hidden_states_path": "/tmp/x.pt", "include_output_tokens": True},
 +        [("hidden_states_path", 3)],
 +    ),
@@ -598,6 +710,140 @@ index 0000000000000000000000000000000000000000..f11e1e2bbc3b34e520163dc585eb1f07
 +        assert keys.shape_of(key).conforms(value), (key, value)
 +    for key, value in refused:
 +        assert not keys.shape_of(key).conforms(value), (key, value)
++
++
++def test_a_proxy_fills_the_keys_naming_a_remote_request_with_null():
++    """Upstream's proxies send a prefill node do_remote_decode with the block
++    IDs and the keys naming a remote request set to null (toy_proxy_server.py);
++    a null asks for nothing, so each of them takes one."""
++    for kv_connector in ("NixlConnector", "NixlPushConnector"):
++        keys = _keys(kv_connector)
++        for key in (
++            "remote_block_ids",
++            "remote_engine_id",
++            "remote_request_id",
++            "remote_host",
++            "remote_port",
++        ):
++            assert keys.shape_of(key).conforms(None), (kv_connector, key)
++
++
++_REMOTE_REQUEST = (
++    "remote_engine_id",
++    "remote_request_id",
++    "remote_host",
++    "remote_port",
++)
++
++
++@pytest.mark.parametrize(
++    "kv_connector,extra,key,requires,excludes",
++    [
++        ("NixlConnector", {}, "do_remote_prefill",
++         ("remote_block_ids", *_REMOTE_REQUEST), ()),
++        ("NixlConnector", {}, "remote_block_ids", _REMOTE_REQUEST, ()),
++        ("NixlConnector", {}, "do_remote_decode", (), ()),
++        ("NixlPushConnector", {}, "do_remote_prefill",
++         (*_REMOTE_REQUEST, "tp_size"), ()),
++        ("NixlPushConnector", {}, "remote_block_ids", (), ()),
++        ("MooncakeConnector", {}, "do_remote_prefill",
++         ("transfer_id", "remote_engine_id", "remote_bootstrap_addr"), ()),
++        ("MooncakeConnector", {}, "do_remote_decode", ("transfer_id",), ()),
++        ("OffloadingConnector", _tiering({"type": "p2p"}), "remote_prefiller", (),
++         ("remote_decoder", "remote_kv_source")),
++        ("OffloadingConnector", _tiering({"type": "p2p"}), "remote_decoder", (),
++         ("remote_prefiller",)),
++        ("OffloadingConnector", _tiering({"type": "p2p"}), "remote_kv_source", (),
++         ("remote_prefiller",)),
++    ],
++)
++def test_a_value_is_read_with_the_keys_its_connector_reads_it_with(
++    kv_connector, extra, key, requires, excludes
++):
++    shape = _keys(kv_connector, **extra).shape_of(key)
++    assert (shape.requires, shape.excludes) == (requires, excludes)
++
++
++def test_a_multi_connector_reads_a_value_with_what_its_children_read_it_with():
++    children = [
++        {"kv_connector": "NixlConnector", "kv_role": "kv_both"},
++        {"kv_connector": "MooncakeConnector", "kv_role": "kv_both"},
++    ]
++    keys = _keys("MultiConnector", kv_connector_extra_config={"connectors": children})
++    assert keys.shape_of("do_remote_prefill").requires == (
++        "remote_block_ids",
++        *_REMOTE_REQUEST,
++        "transfer_id",
++        "remote_bootstrap_addr",
++    )
++
++
++def _subscripted(
++    function: ast.FunctionDef, context: type[ast.expr_context]
++) -> set[str]:
++    return {
++        node.slice.value
++        for node in ast.walk(function)
++        if isinstance(node, ast.Subscript)
++        and isinstance(node.ctx, context)
++        and ast.unparse(node.value) in _RECEIVERS
++        and isinstance(node.slice, ast.Constant)
++        and isinstance(node.slice.value, str)
++    }
++
++
++def _function(relative: str, qualname: str) -> ast.FunctionDef:
++    tree = ast.parse((CONNECTORS / relative).read_text())
++    owner, name = qualname.split(".")
++    (cls,) = (n for n in tree.body if isinstance(n, ast.ClassDef) and n.name == owner)
++    (function,) = (
++        n for n in cls.body if isinstance(n, ast.FunctionDef) and n.name == name
++    )
++    return function
++
++
++def test_a_remote_prefill_requires_every_key_its_connector_indexes_for_it():
++    """A decode node acting on do_remote_prefill true indexes these keys of
++    the request -- for an aborted request too, whose notice reaches the
++    connector -- and a missing one raised KeyError in the engine core. The
++    keys it requires are exactly the ones it indexes."""
++    recv = _subscripted(
++        _function("nixl/metadata.py", "NixlConnectorMetadata.add_new_req_to_recv"),
++        ast.Load,
++    )
++    assert set(_keys("NixlConnector").shape_of("do_remote_prefill").requires) == recv
++    # A push decode node registers with the prefill node from keys it indexes,
++    # and seeds the block IDs it then records itself.
++    push = _function(
++        "nixl/push_scheduler.py", "NixlPushConnectorScheduler.update_state_after_alloc"
++    )
++    pushed = (_subscripted(push, ast.Load) | recv) - _subscripted(push, ast.Store)
++    assert set(_keys("NixlPushConnector").shape_of("do_remote_prefill").requires) == (
++        pushed
++    )
++    mooncake = _subscripted(
++        _function(
++            "mooncake/mooncake_connector.py", "MooncakeConnectorMetadata.add_new_req"
++        ),
++        ast.Load,
++    )
++    assert set(_keys("MooncakeConnector").shape_of("do_remote_prefill").requires) == (
++        mooncake
++    )
++
++
++def test_a_hidden_states_path_is_taken_only_where_custom_paths_are_allowed():
++    """Without allow_custom_save_path the connector writes under its storage
++    path whatever path a request names, so it takes none."""
++    keys = _keys("ExampleHiddenStatesConnector")
++    assert not keys.defines("hidden_states_path")
++    assert keys.defines("include_output_tokens")
++    (reason,) = keys.undeclared
++    assert "only where its operator sets allow_custom_save_path" in reason
++    assert _keys(
++        "ExampleHiddenStatesConnector",
++        kv_connector_extra_config={"allow_custom_save_path": True},
++    ).defines("hidden_states_path")
 +
 +
 +# The source cross-check: every key a connector's modules read from a
@@ -718,7 +964,7 @@ index 0000000000000000000000000000000000000000..f11e1e2bbc3b34e520163dc585eb1f07
 +    ),
 +    (
 +        "ExampleHiddenStatesConnector",
-+        {},
++        {"kv_connector_extra_config": {"allow_custom_save_path": True}},
 +        ("distributed/kv_transfer/kv_connector/v1/example_hidden_states_connector.py",),
 +        None,
 +    ),
@@ -796,7 +1042,7 @@ index aad7999d08a2a76392d1419f2cf1df6fc1a23127..99d3fbd51e9e5b67959b4ee95bb0aa19
      def supports_hma_config(cls, kv_transfer_config: "KVTransferConfig") -> bool:
          """Return whether this KV transfer config supports HMA.
 diff --git a/vllm/distributed/kv_transfer/kv_connector/v1/base.py b/vllm/distributed/kv_transfer/kv_connector/v1/base.py
-index e49dbebb1234de82221d9274d889376af8825e99..6ec3d0fb50896f79fc8946e5b3c844707665e5ef 100644
+index e49dbebb1234de82221d9274d889376af8825e99..281108496254e2be4caf2af256cacbcbd1f9c98e 100644
 --- a/vllm/distributed/kv_transfer/kv_connector/v1/base.py
 +++ b/vllm/distributed/kv_transfer/kv_connector/v1/base.py
 @@ -42,7 +42,8 @@ The class provides the following primitives:
@@ -805,30 +1051,56 @@ index e49dbebb1234de82221d9274d889376af8825e99..6ec3d0fb50896f79fc8946e5b3c84470
  from abc import ABC, abstractmethod
 -from collections.abc import Callable, Iterable
 +from collections.abc import Callable, Iterable, Mapping
-+from dataclasses import dataclass, field
++from dataclasses import dataclass, field, replace
  from typing import TYPE_CHECKING, Any, Literal
  
  import torch
-@@ -168,6 +169,167 @@ class KVConnectorWorkerMetadata(ABC):
+@@ -168,6 +169,203 @@ class KVConnectorWorkerMetadata(ABC):
          pass
  
  
 +@dataclass(frozen=True)
 +class KVTransferParamShape:
-+    """The JSON value a connector's protocol defines under one request
-+    ``kv_transfer_params`` key: what its code reads that value as.
++    """What a connector's protocol defines under one request
++    ``kv_transfer_params`` key: the JSON value its code reads there, and the
++    other keys it reads that value with.
 +
 +    A connector reads a request's parameters inside the engine core, where a
 +    value of another shape -- a string where it calls ``.get``, a list where
 +    it hashes -- raises for every request the engine serves. Admission holds
 +    each value to its key's shape instead, and refuses one that is not.
++
++    A value that asks the connector to act -- any value but null and false
++    (see ``asks``) -- is read only together with each key in ``requires``,
++    sent with a value that is not null, and never beside a key in
++    ``excludes`` that asks too. Without its companions a connector either
++    skips the action, so the caller is told of a transfer that never
++    happens, or reads the missing keys inside the engine core and raises
++    there; beside a key it excludes, it acts on one and drops the other.
++    Admission refuses both, naming the keys.
 +    """
 +
 +    description: str
 +    conforms: Callable[[object], bool] = field(compare=False, repr=False)
++    requires: tuple[str, ...] = ()
++    excludes: tuple[str, ...] = ()
 +
 +    def __str__(self) -> str:
 +        return self.description
++
++    def requiring(self, *keys: str) -> "KVTransferParamShape":
++        """This shape, read only together with ``keys``."""
++        return replace(self, requires=tuple(dict.fromkeys(self.requires + keys)))
++
++    def excluding(self, *keys: str) -> "KVTransferParamShape":
++        """This shape, never read beside ``keys``."""
++        return replace(self, excludes=tuple(dict.fromkeys(self.excludes + keys)))
++
++
++def asks(value: object) -> bool:
++    """Whether a request's value asks its connector to act: null and false
++    ask for nothing, so a proxy may fill a key it does not use with either."""
++    return value is not None and value is not False
 +
 +
 +def _shape(description: str, conforms: Callable[[object], bool]) -> KVTransferParamShape:
@@ -908,26 +1180,36 @@ index e49dbebb1234de82221d9274d889376af8825e99..6ec3d0fb50896f79fc8946e5b3c84470
 +def _all_of(
 +    first: KVTransferParamShape, second: KVTransferParamShape
 +) -> KVTransferParamShape:
++    """A value two declarations define: it has both shapes and is read with
++    the keys either reads it with."""
 +    if first == second:
 +        return first
-+    return _shape(
-+        f"{first}, and {second}",
++    return KVTransferParamShape(
++        first.description
++        if first.description == second.description
++        else f"{first}, and {second}",
 +        lambda value: first.conforms(value) and second.conforms(value),
++        requires=tuple(dict.fromkeys(first.requires + second.requires)),
++        excludes=tuple(dict.fromkeys(first.excludes + second.excludes)),
 +    )
 +
 +
 +@dataclass(frozen=True)
 +class KVTransferParamsKeys:
 +    """The request ``kv_transfer_params`` keys a connector's protocol defines,
-+    each with the shape of the value the connector reads under it.
++    each with the shape of the value the connector reads under it and the
++    keys it reads that value with.
 +
 +    These are the keys the connector reads from a request and the keys it
 +    returns for a peer, since a proxy hands one node's returned parameters to
 +    the next node as that request's own. Every key under one of
 +    ``namespaces`` (prefixes) is defined too, for a connector whose request
 +    vocabulary is open-ended. Admission refuses a request that names a key no
-+    configured connector defines, so no parameter is ignored unseen, and one
-+    whose value is not its key's shape, so no value is dereferenced unseen.
++    configured connector defines, so no parameter is ignored unseen; one
++    whose value is not its key's shape, so no value is dereferenced unseen;
++    and one that sends a value without the keys it is read with, or beside a
++    key it is never read with, so no parameter acts on keys that are not
++    there.
 +    ``undeclared`` says, for a connector that could declare what it reads but
 +    does not, what its operator does to declare it.
 +    """
@@ -940,8 +1222,8 @@ index e49dbebb1234de82221d9274d889376af8825e99..6ec3d0fb50896f79fc8946e5b3c84470
 +        return key in self.keys or key.startswith(tuple(self.namespaces))
 +
 +    def shape_of(self, key: str) -> KVTransferParamShape:
-+        """The shape a value of the defined ``key`` must have: every
-+        declaration that defines it holds it."""
++        """The shape a value of the defined ``key`` must have, and the keys it
++        is read with: every declaration that defines it holds it."""
 +        shapes = [self.keys[key]] if key in self.keys else []
 +        shapes += [
 +            shape for prefix, shape in self.namespaces.items() if key.startswith(prefix)
@@ -977,7 +1259,7 @@ index e49dbebb1234de82221d9274d889376af8825e99..6ec3d0fb50896f79fc8946e5b3c84470
  class KVConnectorBase_V1(ABC):
      """
      Base class for KV connectors.
-@@ -607,6 +769,24 @@ class KVConnectorBase_V1(ABC):
+@@ -607,6 +805,24 @@ class KVConnectorBase_V1(ABC):
          # scheduler alive (e.g. extend has_unfinished_requests).
          return False
  
@@ -1003,7 +1285,7 @@ index e49dbebb1234de82221d9274d889376af8825e99..6ec3d0fb50896f79fc8946e5b3c84470
      def get_required_kvcache_layout(cls, vllm_config: "VllmConfig") -> str | None:
          """
 diff --git a/vllm/distributed/kv_transfer/kv_connector/v1/example_hidden_states_connector.py b/vllm/distributed/kv_transfer/kv_connector/v1/example_hidden_states_connector.py
-index 299ff037ad2cbf3c6d811aaf031b2072153d874d..35d68b8189e0f8bd18f81d8d38a57762f36adbf4 100644
+index 299ff037ad2cbf3c6d811aaf031b2072153d874d..6ee32d7e71058ea2dca0311c4b267a0ef04c940d 100644
 --- a/vllm/distributed/kv_transfer/kv_connector/v1/example_hidden_states_connector.py
 +++ b/vllm/distributed/kv_transfer/kv_connector/v1/example_hidden_states_connector.py
 @@ -16,7 +16,10 @@ from vllm.config import VllmConfig, get_layers_from_vllm_config
@@ -1017,7 +1299,7 @@ index 299ff037ad2cbf3c6d811aaf031b2072153d874d..35d68b8189e0f8bd18f81d8d38a57762
      SupportsHMA,
  )
  from vllm.distributed.parallel_state import get_tensor_model_parallel_rank
-@@ -109,6 +112,16 @@ class ExampleHiddenStatesConnector(KVConnectorBase_V1, SupportsHMA):
+@@ -109,6 +112,32 @@ class ExampleHiddenStatesConnector(KVConnectorBase_V1, SupportsHMA):
          # Must be False so that drafter kv cache isn't merged with verifier's
          return False
  
@@ -1025,8 +1307,24 @@ index 299ff037ad2cbf3c6d811aaf031b2072153d874d..35d68b8189e0f8bd18f81d8d38a57762
 +    def get_kv_transfer_params_keys(
 +        cls, vllm_config: VllmConfig
 +    ) -> KVTransferParamsKeys:
-+        # A request may name its own output file and ask for the generated
-+        # tokens' hidden states too; the file is returned under the same key.
++        # A request may ask for the generated tokens' hidden states too, and,
++        # where its operator allows custom save paths, name its own output
++        # file; the file is returned under the same key. Without that
++        # allowance it logs a path a request names and writes under its
++        # storage path instead, so the key is not taken.
++        assert vllm_config.kv_transfer_config is not None
++        if not vllm_config.kv_transfer_config.get_from_extra_config(
++            "allow_custom_save_path", False
++        ):
++            return KVTransferParamsKeys(
++                keys={"include_output_tokens": BOOLEAN},
++                undeclared=(
++                    f"{cls.__name__} writes each request's hidden states under "
++                    "its storage path, and takes hidden_states_path only where "
++                    "its operator sets allow_custom_save_path in "
++                    "kv_connector_extra_config",
++                ),
++            )
 +        return KVTransferParamsKeys(
 +            keys={"hidden_states_path": STRING, "include_output_tokens": BOOLEAN}
 +        )
@@ -1156,7 +1454,7 @@ index 8786e91a5a14b4a204305d8891d2dbcaed6e2e16..448896ad526e16d0033c81981dca4307
      def get_required_kvcache_layout(cls, vllm_config: "VllmConfig") -> str | None:
          """
 diff --git a/vllm/distributed/kv_transfer/kv_connector/v1/mooncake/mooncake_connector.py b/vllm/distributed/kv_transfer/kv_connector/v1/mooncake/mooncake_connector.py
-index dd94ffb2f9ed824505748f9742ed27ce5cfbaf00..52bb5f18fa1407dbd8b7924d30e87add651171f5 100644
+index dd94ffb2f9ed824505748f9742ed27ce5cfbaf00..03b5e56e72a11ce71a501914b33c0880266b9666 100644
 --- a/vllm/distributed/kv_transfer/kv_connector/v1/mooncake/mooncake_connector.py
 +++ b/vllm/distributed/kv_transfer/kv_connector/v1/mooncake/mooncake_connector.py
 @@ -25,9 +25,12 @@ from vllm.distributed.kv_transfer.kv_connector.utils import (
@@ -1172,7 +1470,7 @@ index dd94ffb2f9ed824505748f9742ed27ce5cfbaf00..52bb5f18fa1407dbd8b7924d30e87add
      SupportsHMA,
  )
  from vllm.distributed.kv_transfer.kv_connector.v1.metrics import KVConnectorStats
-@@ -467,6 +470,22 @@ class MooncakeConnectorMetadata(KVConnectorMetadata):
+@@ -467,6 +470,30 @@ class MooncakeConnectorMetadata(KVConnectorMetadata):
  
  
  class MooncakeConnector(KVConnectorBase_V1, SupportsHMA):
@@ -1181,11 +1479,19 @@ index dd94ffb2f9ed824505748f9742ed27ce5cfbaf00..52bb5f18fa1407dbd8b7924d30e87add
 +        cls, vllm_config: VllmConfig
 +    ) -> KVTransferParamsKeys:
 +        # Set by the router; request_finished returns none for the peer. The
-+        # scheduler keys its transfer sets by transfer_id and the engine ID.
++        # scheduler keys its transfer sets by transfer_id and the engine ID. A
++        # decode node acts on do_remote_prefill true by pulling the transfer
++        # from the prefill engine at the bootstrap address, and records it,
++        # an aborted request included, by all three
++        # (MooncakeConnectorMetadata.add_new_req); a prefill node acts on
++        # do_remote_decode true only for a transfer_id, which the decode
++        # node's pull names.
 +        return KVTransferParamsKeys(
 +            keys={
-+                "do_remote_prefill": BOOLEAN,
-+                "do_remote_decode": BOOLEAN,
++                "do_remote_prefill": BOOLEAN.requiring(
++                    "transfer_id", "remote_engine_id", "remote_bootstrap_addr"
++                ),
++                "do_remote_decode": BOOLEAN.requiring("transfer_id"),
 +                "transfer_id": STRING,
 +                "remote_engine_id": STRING,
 +                "remote_bootstrap_addr": STRING,
@@ -1196,10 +1502,10 @@ index dd94ffb2f9ed824505748f9742ed27ce5cfbaf00..52bb5f18fa1407dbd8b7924d30e87add
          self,
          vllm_config: VllmConfig,
 diff --git a/vllm/distributed/kv_transfer/kv_connector/v1/moriio/moriio_connector.py b/vllm/distributed/kv_transfer/kv_connector/v1/moriio/moriio_connector.py
-index c53c0eb99eb37fa4e6bdc18470b423bf5ee48dc0..310a184b317f0d7fbd9a5a743327d22a11285a48 100644
+index c53c0eb99eb37fa4e6bdc18470b423bf5ee48dc0..000b46c36e383585217159343a9611823b6c77c9 100644
 --- a/vllm/distributed/kv_transfer/kv_connector/v1/moriio/moriio_connector.py
 +++ b/vllm/distributed/kv_transfer/kv_connector/v1/moriio/moriio_connector.py
-@@ -19,9 +19,16 @@ import zmq
+@@ -19,9 +19,17 @@ import zmq
  
  from vllm.config import CUDAGraphMode, VllmConfig
  from vllm.distributed.kv_transfer.kv_connector.v1.base import (
@@ -1213,10 +1519,11 @@ index c53c0eb99eb37fa4e6bdc18470b423bf5ee48dc0..310a184b317f0d7fbd9a5a743327d22a
 +    KVTransferParamsKeys,
 +    either,
 +    list_of,
++    nullable,
  )
  from vllm.distributed.kv_transfer.kv_connector.v1.moriio.moriio_common import (
      ROLE,
-@@ -190,6 +197,37 @@ def resolve_moriio_transfer_ack(
+@@ -190,6 +198,43 @@ def resolve_moriio_transfer_ack(
  
  
  class MoRIIOConnector(KVConnectorBase_V1):
@@ -1229,14 +1536,20 @@ index c53c0eb99eb37fa4e6bdc18470b423bf5ee48dc0..310a184b317f0d7fbd9a5a743327d22a
 +        # Each value has the type ReqMeta holds; the ports, the per-pod DP
 +        # size and the TP sizes are converted with int() where they are read,
 +        # so their decimal text is taken too, while remote_dp_rank and
-+        # remote_dp_size reach port arithmetic as they were sent.
++        # remote_dp_size reach port arithmetic as they were sent. The block
++        # IDs and the engine ID are also taken null, which upstream's proxy
++        # sends for both legs before the prefill leg returns them
++        # (moriio_toy_proxy_server.py). No key states what do_remote_prefill
++        # is read with: in WRITE mode the decode node allocates its own
++        # blocks, and the peer's address may be embedded in the request ID
++        # instead of sent as keys.
 +        return KVTransferParamsKeys(
 +            keys={
 +                "do_remote_prefill": BOOLEAN,
 +                "do_remote_decode": BOOLEAN,
 +                "transfer_id": STRING,
-+                "remote_block_ids": list_of(INTEGER, "integers"),
-+                "remote_engine_id": STRING,
++                "remote_block_ids": nullable(list_of(INTEGER, "integers")),
++                "remote_engine_id": nullable(STRING),
 +                "remote_host": STRING,
 +                "remote_hosts": either(list_of(STRING, "strings"), STRING),
 +                "remote_handshake_port": INTEGER_OR_DIGITS,
@@ -1287,7 +1600,7 @@ index 957b15ea40c15a4158c19dc6dbc626fcb7edb33e..6887f7737dc160726fac4e873257ace7
      def get_required_kvcache_layout(cls, vllm_config: "VllmConfig") -> str | None:
          """
 diff --git a/vllm/distributed/kv_transfer/kv_connector/v1/nixl/connector.py b/vllm/distributed/kv_transfer/kv_connector/v1/nixl/connector.py
-index 0b7a5d572869efa70cb05214a15b66988c3bb995..b646e184cc0f6d2ba71c3ae93541b3269ad85238 100644
+index 0b7a5d572869efa70cb05214a15b66988c3bb995..9d33ee72a0e8a367f64365d82798ca5dd8d143d7 100644
 --- a/vllm/distributed/kv_transfer/kv_connector/v1/nixl/connector.py
 +++ b/vllm/distributed/kv_transfer/kv_connector/v1/nixl/connector.py
 @@ -26,8 +26,15 @@ from vllm.distributed.kv_transfer.kv_connector.v1.base import (
@@ -1306,10 +1619,27 @@ index 0b7a5d572869efa70cb05214a15b66988c3bb995..b646e184cc0f6d2ba71c3ae93541b326
  )
  from vllm.distributed.kv_transfer.kv_connector.v1.metrics import (
      KVConnectorPromMetrics,
-@@ -79,6 +86,36 @@ logger = init_logger(__name__)
+@@ -75,10 +82,55 @@ if TYPE_CHECKING:
+ 
+ logger = init_logger(__name__)
+ 
++_REMOTE_BLOCK_IDS = nullable(
++    list_of(list_of(INTEGER, "integers"), "lists of integers, one per group")
++)
++
+ 
  class NixlBaseConnector(KVConnectorBase_V1, SupportsHMA):
      """Base connector with common logic shared by pull and push modes."""
  
++    # The keys naming the remote request a transfer is with: its engine, its
++    # ID there, and that engine's side channel.
++    _REMOTE_REQUEST_KEYS = (
++        "remote_engine_id",
++        "remote_request_id",
++        "remote_host",
++        "remote_port",
++    )
++
 +    @classmethod
 +    def get_kv_transfer_params_keys(
 +        cls, vllm_config: VllmConfig
@@ -1319,18 +1649,20 @@ index 0b7a5d572869efa70cb05214a15b66988c3bb995..b646e184cc0f6d2ba71c3ae93541b326
 +        # returned for the router and read by neither side. Each value has the
 +        # type request_finished returns and RemoteMeta/ReqMeta hold: the
 +        # schedulers hash the IDs, do arithmetic on the counts and index the
-+        # block IDs, one list per KV cache group.
++        # block IDs, one list per KV cache group. The block IDs and the keys
++        # naming the remote request are also taken null: upstream's proxies
++        # send them null to a prefill node beside do_remote_decode
++        # (toy_proxy_server.py), and a null asks for nothing. Which of them
++        # do_remote_prefill is read with, each mode declares.
 +        return KVTransferParamsKeys(
 +            keys={
 +                "do_remote_prefill": BOOLEAN,
 +                "do_remote_decode": BOOLEAN,
-+                "remote_block_ids": list_of(
-+                    list_of(INTEGER, "integers"), "lists of integers, one per group"
-+                ),
-+                "remote_engine_id": STRING,
-+                "remote_request_id": STRING,
-+                "remote_host": STRING,
-+                "remote_port": INTEGER,
++                "remote_block_ids": _REMOTE_BLOCK_IDS,
++                "remote_engine_id": nullable(STRING),
++                "remote_request_id": nullable(STRING),
++                "remote_host": nullable(STRING),
++                "remote_port": nullable(INTEGER),
 +                "remote_block_size": nullable(INTEGER),
 +                "remote_blocks_expiry_time": nullable(NUMBER),
 +                "remote_num_tokens": nullable(INTEGER),
@@ -1343,6 +1675,56 @@ index 0b7a5d572869efa70cb05214a15b66988c3bb995..b646e184cc0f6d2ba71c3ae93541b326
      @property
      def supports_divergent_local_hybrid_hits(self) -> bool:
          return True
+@@ -326,6 +378,26 @@ class NixlBaseConnector(KVConnectorBase_V1, SupportsHMA):
+ class NixlPullConnector(NixlBaseConnector):
+     """Pull-based (READ) NIXL KV transfer connector."""
+ 
++    @classmethod
++    def get_kv_transfer_params_keys(
++        cls, vllm_config: VllmConfig
++    ) -> KVTransferParamsKeys:
++        # A decode node acts on do_remote_prefill true by reading the prefill
++        # node's blocks of the remote request: the scheduler records each such
++        # request, an aborted one included, by its block IDs and the remote
++        # request's keys (NixlConnectorMetadata.add_new_req_to_recv). A prefill
++        # node reads a decode node's blocks back only beside the same keys.
++        return super().get_kv_transfer_params_keys(vllm_config) | KVTransferParamsKeys(
++            keys={
++                "do_remote_prefill": BOOLEAN.requiring(
++                    "remote_block_ids", *cls._REMOTE_REQUEST_KEYS
++                ),
++                "remote_block_ids": _REMOTE_BLOCK_IDS.requiring(
++                    *cls._REMOTE_REQUEST_KEYS
++                ),
++            }
++        )
++
+     def __init__(
+         self,
+         vllm_config: VllmConfig,
+@@ -354,5 +426,22 @@ class NixlPullConnector(NixlBaseConnector):
+ class NixlPushConnector(NixlBaseConnector):
+     """Push-based (WRITE) NIXL KV transfer connector."""
+ 
++    @classmethod
++    def get_kv_transfer_params_keys(
++        cls, vllm_config: VllmConfig
++    ) -> KVTransferParamsKeys:
++        # A decode node acts on do_remote_prefill true by registering blocks
++        # of its own with the prefill node -- whose engine, side channel and
++        # TP size the registration reads -- and the scheduler records the
++        # request, an aborted one included, by the remote request's keys. It
++        # reads no remote block IDs: the prefill node writes into its blocks.
++        return super().get_kv_transfer_params_keys(vllm_config) | KVTransferParamsKeys(
++            keys={
++                "do_remote_prefill": BOOLEAN.requiring(
++                    *cls._REMOTE_REQUEST_KEYS, "tp_size"
++                ),
++            }
++        )
++
+     def __init__(
+         self,
 diff --git a/vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py b/vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py
 index f727163b9e4c82d5176abf5e8f09acf829b3dce9..52d5498e4b8bf72961ab40384df0ce016b42c5aa 100644
 --- a/vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py
@@ -1469,18 +1851,19 @@ index d47535c226fe1a48b9956f9940ab0e8ae8d2da86..d7c887c94a25106d5bb71c13ddb41484
  
          notify = True
 diff --git a/vllm/v1/engine/input_processor.py b/vllm/v1/engine/input_processor.py
-index 0fa36770c5333eb51ed6c96683a45846ae5eacd3..b1c7eb6e1ac081dcbe7c13829d55f2053c647a6c 100644
+index 0fa36770c5333eb51ed6c96683a45846ae5eacd3..c06acf69e81c099eda3fd1a63f24f19410177f80 100644
 --- a/vllm/v1/engine/input_processor.py
 +++ b/vllm/v1/engine/input_processor.py
-@@ -7,6 +7,7 @@ from typing import Any, Literal
+@@ -7,6 +7,8 @@ from typing import Any, Literal
  
  import vllm.envs as envs
  from vllm.config import VllmConfig
 +from vllm.distributed.kv_transfer.kv_connector.factory import KVConnectorFactory
++from vllm.distributed.kv_transfer.kv_connector.v1.base import asks
  from vllm.exceptions import VLLMValidationError
  from vllm.inputs import (
      EngineInput,
-@@ -35,4 +36,29 @@ from vllm.v1.engine import EngineCoreRequest
+@@ -35,4 +37,36 @@ from vllm.v1.engine import EngineCoreRequest
  logger = init_logger(__name__)
  
  
@@ -1509,8 +1892,15 @@ index 0fa36770c5333eb51ed6c96683a45846ae5eacd3..b1c7eb6e1ac081dcbe7c13829d55f205
 +    return f"{kinds.get(type(value), type(value).__name__)} ({shown})"
 +
 +
++def _listed(keys: list[str] | tuple[str, ...]) -> str:
++    quoted = list(map(repr, keys))
++    if len(quoted) == 1:
++        return quoted[0]
++    return ", ".join(quoted[:-1]) + " and " + quoted[-1]
++
++
  class InputProcessor:
-@@ -55,6 +81,17 @@ class InputProcessor:
+@@ -55,6 +89,17 @@ class InputProcessor:
  
          self.generation_config_fields = model_config.try_get_generation_config()
  
@@ -1528,7 +1918,7 @@ index 0fa36770c5333eb51ed6c96683a45846ae5eacd3..b1c7eb6e1ac081dcbe7c13829d55f205
          self.renderer = renderer or renderer_from_config(vllm_config)
  
          self.supports_mm_inputs = mm_registry.supports_multimodal_inputs(model_config)
-@@ -107,6 +144,7 @@ class InputProcessor:
+@@ -107,6 +152,7 @@ class InputProcessor:
                  self.structured_outputs_config,
                  self.tokenizer,
              )
@@ -1536,7 +1926,7 @@ index 0fa36770c5333eb51ed6c96683a45846ae5eacd3..b1c7eb6e1ac081dcbe7c13829d55f205
  
              if self.model_config.return_sampling_mask:
                  if params.temperature <= 0:
-@@ -160,6 +198,73 @@ class InputProcessor:
+@@ -160,6 +206,104 @@ class InputProcessor:
                  f"but got {type(params).__name__}"
              )
  
@@ -1552,7 +1942,8 @@ index 0fa36770c5333eb51ed6c96683a45846ae5eacd3..b1c7eb6e1ac081dcbe7c13829d55f205
 +
 +    def kv_transfer_params_refusal(self, kv_transfer_params: object) -> str | None:
 +        """Why admission refuses these kv_transfer_params, or None when the
-+        configured connector takes every key and every value."""
++        configured connector takes every key and every value, each beside the
++        keys it is read with."""
 +        if not isinstance(kv_transfer_params, dict):
 +            return (
 +                "kv_transfer_params must be an object of KV connector parameters, "
@@ -1575,6 +1966,36 @@ index 0fa36770c5333eb51ed6c96683a45846ae5eacd3..b1c7eb6e1ac081dcbe7c13829d55f205
 +                    f"{self.kv_connector_name} reads it, not "
 +                    f"{_json_kind(value)}. Next: send it in that shape, or "
 +                    "remove it."
++                )
++        for key, value in kv_transfer_params.items():
++            if not asks(value):
++                continue
++            shape = declared.shape_of(key)
++            missing = [
++                companion
++                for companion in shape.requires
++                if kv_transfer_params.get(companion) is None
++            ]
++            if missing:
++                return (
++                    f"kv_transfer_params key {key!r} is {_json_kind(value)}, "
++                    f"which {self.kv_connector_name} acts on only together "
++                    f"with {_listed(shape.requires)}, and this request sends "
++                    f"no value for {_listed(missing)}. Next: send "
++                    f"{'it' if len(missing) == 1 else 'them'} beside {key!r}, "
++                    f"or remove {key!r}."
++                )
++            beside = [
++                other
++                for other in shape.excludes
++                if asks(kv_transfer_params.get(other))
++            ]
++            if beside:
++                return (
++                    f"kv_transfer_params key {key!r} is sent beside "
++                    f"{_listed(beside)}, and {self.kv_connector_name} acts on "
++                    f"{key!r} only without {'it' if len(beside) == 1 else 'them'}"
++                    f". Next: remove {key!r}, or remove {_listed(beside)}."
 +                )
 +        return None
 +
@@ -1693,7 +2114,7 @@ index 768d7e328ad7ba4b59b9d3bcc2752a1ad1ba52fe..3e79316fdfd360c83a6e611382212cd7
          """Return and reset metric observations collected by this tier."""
          return None
 diff --git a/vllm/v1/kv_offload/tiering/p2p/manager.py b/vllm/v1/kv_offload/tiering/p2p/manager.py
-index f76ed59b5c7823ace2505b2fb4936c7adfa10952..8dbd82da58b96de8e91f7da6ea098b3a3a19be10 100644
+index f76ed59b5c7823ace2505b2fb4936c7adfa10952..3dd065db87d1b2c1058dd884d75c44579596b785 100644
 --- a/vllm/v1/kv_offload/tiering/p2p/manager.py
 +++ b/vllm/v1/kv_offload/tiering/p2p/manager.py
 @@ -18,6 +18,12 @@ from typing import TYPE_CHECKING, Any
@@ -1748,7 +2169,7 @@ index f76ed59b5c7823ace2505b2fb4936c7adfa10952..8dbd82da58b96de8e91f7da6ea098b3a
  
  
  def _peer_id_from_params(role_params: dict) -> str | None:
-@@ -198,6 +209,25 @@ class P2PSecondaryTierManager(SecondaryTierManager):
+@@ -198,6 +209,37 @@ class P2PSecondaryTierManager(SecondaryTierManager):
      and existing sessions are polled even when no requests are scheduled.
      """
  
@@ -1759,15 +2180,27 @@ index f76ed59b5c7823ace2505b2fb4936c7adfa10952..8dbd82da58b96de8e91f7da6ea098b3a
 +    ) -> KVTransferParamsKeys:
 +        # Each names a peer as an object the parsers above read with .get; the
 +        # request ID keys the tier's sessions, and host and port form the peer
-+        # address (docs/features/kv_offloading_usage.md).
++        # address (docs/features/kv_offloading_usage.md). A peer object
++        # without all three is no source to _parse_source, so the request ran
++        # without the transfer it named; a decoder object without its request
++        # ID failed its store. The protocol forbids remote_prefiller beside
++        # either other key: this peer cannot be a prefiller's decoder and a
++        # decoder's prefiller for one request, nor pull from two sources --
++        # _parse_source reads remote_prefiller and drops a remote_kv_source
++        # beside it. A prefill producer may also pull from a source.
 +        peer = object_with(
-+            {"kv_request_id": STRING, "remote_host": STRING, "remote_port": INTEGER}
++            {"kv_request_id": STRING, "remote_host": STRING, "remote_port": INTEGER},
++            required=("kv_request_id", "remote_host", "remote_port"),
 +        )
 +        return KVTransferParamsKeys(
 +            keys={
-+                REMOTE_PREFILLER_KEY: peer,
-+                REMOTE_DECODER_KEY: object_with({"kv_request_id": STRING}),
-+                REMOTE_KV_SOURCE_KEY: peer,
++                REMOTE_PREFILLER_KEY: peer.excluding(
++                    REMOTE_DECODER_KEY, REMOTE_KV_SOURCE_KEY
++                ),
++                REMOTE_DECODER_KEY: object_with(
++                    {"kv_request_id": STRING}, required=("kv_request_id",)
++                ).excluding(REMOTE_PREFILLER_KEY),
++                REMOTE_KV_SOURCE_KEY: peer.excluding(REMOTE_PREFILLER_KEY),
 +            }
 +        )
 +
