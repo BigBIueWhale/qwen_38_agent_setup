@@ -23,6 +23,19 @@ test runs:
                           not say so fails here, which is what makes it say so.
   --reviewed-set release  every reviewed test, in the built image, on the GPU
                           and with the network (build).
+  --reviewed-set collection
+                          every reviewed test file imported and its tests built
+                          as the release set collects them, and none run, with
+                          no GPU and no network (check). A collection error
+                          fails the run, so a module that cannot be collected
+                          is found by check rather than by a build that can then
+                          pin nothing. The one exception is a module that
+                          declares a GPU in its module-level pytestmark and
+                          cannot be imported without one: it is excused only
+                          when its imports and its declaration -- the module's
+                          source up to and including that pytestmark -- run
+                          here, so what fails is what follows the declaration
+                          of the need, and it is named with its error.
 
 A reviewed file that runs no test, skips no module and declares no need fails
 the run: nothing the runner is given goes unexecuted unsaid. A runtime module the
@@ -38,6 +51,7 @@ from __future__ import annotations
 
 import ast
 import importlib.abc
+import importlib.util
 import json
 import os
 import sys
@@ -89,6 +103,37 @@ def _declared_needs(module: Path) -> tuple[str, ...]:
     return tuple(need for need in NEEDS if need in needs)
 
 
+def _declaration_runs(module: Path, root: Path) -> str | None:
+    """Run a module's source up to and including its module-level
+    ``pytestmark``, in a module of the name pytest imports it under; None when
+    that runs, or the error that stopped it."""
+    source = module.read_text()
+    ends = [
+        node.end_lineno
+        for node in ast.parse(source, filename=str(module)).body
+        if isinstance(node, ast.Assign)
+        and any(
+            isinstance(target, ast.Name) and target.id == "pytestmark"
+            for target in node.targets
+        )
+    ]
+    if not ends:
+        return "the module declares nothing at module level"
+    head = "".join(source.splitlines(keepends=True)[: ends[-1]])
+    package = module.parent
+    parts = [module.stem]
+    while (package / "__init__.py").exists():
+        parts.insert(0, package.name)
+        package = package.parent
+    spec = importlib.util.spec_from_file_location(".".join(parts), module)
+    namespace = importlib.util.module_from_spec(spec)
+    try:
+        exec(compile(head, str(module), "exec"), namespace.__dict__)
+    except BaseException as error:  # noqa: BLE001 - the error is the answer
+        return f"{type(error).__name__}: {error}"
+    return None
+
+
 if __name__ != "__main__":
     import pytest
 
@@ -96,6 +141,7 @@ if __name__ != "__main__":
         0, _DeletedRuntimeModules(_paths("REVIEWED_DELETED_RUNTIME_FILES"))
     )
     _skipped_modules: set[str] = set()
+    _uncollected_modules: dict[str, str] = {}
 
     class _Run:
         def __init__(self, config) -> None:
@@ -115,7 +161,10 @@ if __name__ != "__main__":
             self.declared_modules: dict[str, tuple[str, ...]] = {}
             self.declared_tests: Counter[str] = Counter()
             self.collected_files: set[str] = set()
+            self.collected_tests = 0
             self.unaccounted: list[str] = []
+            self.gpu_only: dict[str, str] = {}
+            self.collection_errors: dict[str, str] = {}
 
         def wanted(self, path: Path) -> bool | None:
             if path.is_dir():
@@ -130,11 +179,12 @@ if __name__ != "__main__":
         parser.addoption(
             "--reviewed-set",
             dest="reviewed_set",
-            choices=("offline", "release"),
+            choices=("offline", "release", "collection"),
             required=True,
             help="offline: the reviewed tests that declare no need, with no GPU "
             "and no network (check). release: every reviewed test, on the GPU "
-            "with the network (build).",
+            "with the network (build). collection: every reviewed test file "
+            "collected as release collects it, and none run (check).",
         )
         parser.addoption(
             "--reviewed-shard",
@@ -145,7 +195,11 @@ if __name__ != "__main__":
         )
 
     def pytest_configure(config):
-        config.stash[_RUN] = _Run(config)
+        run = _Run(config)
+        config.stash[_RUN] = run
+        if run.reviewed_set == "collection":
+            config.option.collectonly = True
+            config.option.continue_on_collection_errors = True
 
     def pytest_ignore_collect(collection_path, config):
         run = config.stash[_RUN]
@@ -165,6 +219,10 @@ if __name__ != "__main__":
         # and its reason is reported with the others.
         if report.skipped and report.nodeid.endswith(".py"):
             _skipped_modules.add(report.nodeid)
+        if report.failed and report.nodeid.endswith(".py"):
+            lines = [line for line in str(report.longrepr).splitlines() if line.strip()]
+            errors = [line[1:].strip() for line in lines if line.startswith("E ")]
+            _uncollected_modules[report.nodeid] = (errors or lines or ["no error text"])[-1]
 
     def pytest_collection_modifyitems(config, items):
         run = config.stash[_RUN]
@@ -178,7 +236,8 @@ if __name__ != "__main__":
         run.collected_files = {
             item.path.relative_to(run.root).as_posix() for item in items
         }
-        if run.reviewed_set == "release":
+        run.collected_tests = len(items)
+        if run.reviewed_set != "offline":
             return
         kept, declared = [], []
         for item in items:
@@ -193,9 +252,31 @@ if __name__ != "__main__":
 
     def pytest_sessionfinish(session, exitstatus):
         run = session.config.stash[_RUN]
-        accounted = run.collected_files | set(run.declared_modules) | _skipped_modules
+        for relative, error in sorted(_uncollected_modules.items()):
+            module = run.root / relative
+            if run.reviewed_set == "collection" and "gpu" in _declared_needs(module):
+                stopped = _declaration_runs(module, run.root)
+                if stopped is None:
+                    run.gpu_only[relative] = error
+                    continue
+                error = f"{error}; its imports and declaration stop here too: {stopped}"
+            run.collection_errors[relative] = error
+        accounted = (
+            run.collected_files
+            | set(run.declared_modules)
+            | _skipped_modules
+            | set(_uncollected_modules)
+        )
         run.unaccounted = sorted(set(run.reviewed.values()) - accounted)
-        if run.unaccounted and session.exitstatus == pytest.ExitCode.OK:
+        if run.reviewed_set == "collection":
+            # Collection errors stop nothing in this set, so the set decides:
+            # every module collected, or excused by the need it declares.
+            session.exitstatus = (
+                pytest.ExitCode.TESTS_FAILED
+                if run.collection_errors or run.unaccounted
+                else pytest.ExitCode.OK
+            )
+        elif run.unaccounted and session.exitstatus == pytest.ExitCode.OK:
             session.exitstatus = pytest.ExitCode.TESTS_FAILED
 
     def _reason(report) -> str:
@@ -225,6 +306,10 @@ if __name__ != "__main__":
                 f"REVIEWED_TESTS NOT RUN: {relative} ran no test, skipped no "
                 "module and declares no need"
             )
+        for relative, error in run.collection_errors.items():
+            terminalreporter.write_line(
+                f"REVIEWED_TESTS NOT COLLECTED: {relative}: {error}"
+            )
         report = {
             "set": run.reviewed_set,
             "reviewed_files": len(run.reviewed),
@@ -241,6 +326,11 @@ if __name__ != "__main__":
                 r for r in run.support if (run.root / r).resolve() in imported
             ),
             "unaccounted": run.unaccounted,
+            "collected_files": len(run.collected_files),
+            "collected_tests": run.collected_tests,
+            "gpu_only": run.gpu_only,
+            "skipped_modules": sorted(_skipped_modules),
+            "collection_errors": run.collection_errors,
         }
         terminalreporter.write_line("REVIEWED_TESTS_JSON " + json.dumps(report))
 
@@ -263,7 +353,16 @@ def _merge(logs: list[str]) -> int:
     declared_modules: dict[str, list[str]] = {}
     declared_tests: Counter[str] = Counter()
     ran, imported, unaccounted = set(), set(), []
+    gpu_only: dict[str, str] = {}
+    collection_errors: dict[str, str] = {}
+    collected_files = collected_tests = 0
+    skipped_modules: set[str] = set()
     for r in reports:
+        skipped_modules.update(r["skipped_modules"])
+        gpu_only.update(r["gpu_only"])
+        collection_errors.update(r["collection_errors"])
+        collected_files += r["collected_files"]
+        collected_tests += r["collected_tests"]
         counts.update(r["counts"])
         for outcome, counter in reasons.items():
             counter.update(r["reasons"][outcome])
@@ -277,12 +376,41 @@ def _merge(logs: list[str]) -> int:
             print(f"REVIEWED_TESTS {outcome} {count}: {reason}")
     for relative in sorted(unaccounted):
         print(f"REVIEWED_TESTS NOT RUN: {relative}")
+    for relative, error in sorted(collection_errors.items()):
+        print(f"REVIEWED_TESTS NOT COLLECTED: {relative}: {error}")
+    reviewed = sum(r["reviewed_files"] for r in reports)
+    if reviewed_set == "collection":
+        text = (
+            f"Reviewed test collection: of the {reviewed} reviewed test files, "
+            "check collected as build's release set collects them, with no GPU "
+            f"and no network, {collected_files}, {collected_tests} tests, and ran "
+            "none"
+        )
+        if skipped_modules:
+            text += (
+                f"; {len(skipped_modules)} skip themselves at import here, so only "
+                "build collects what follows the skip: "
+                + ", ".join(sorted(skipped_modules))
+            )
+        if gpu_only:
+            text += (
+                f"; {len(gpu_only)} declare a GPU and cannot be imported without "
+                "one, so only build collects them whole, and their imports and "
+                "declarations ran here: "
+                + "; ".join(f"{path} ({error})" for path, error in sorted(gpu_only.items()))
+            )
+        if collection_errors or unaccounted:
+            text += (
+                f"; {len(collection_errors) + len(unaccounted)} could not be "
+                "collected, so build could not run the release set"
+            )
+        print("REVIEWED_TESTS_SUMMARY " + text + ".")
+        return 1 if collection_errors or unaccounted else 0
     where = (
         "check ran here, with no GPU and no network,"
         if reviewed_set == "offline"
         else "build ran in the image it made, on the GPU and with the network,"
     )
-    reviewed = sum(r["reviewed_files"] for r in reports)
     text = (
         f"Reviewed tests: of the {reviewed} reviewed test files, {where} "
         f"{len(ran)}: {counts['passed']} tests passed, {counts['skipped']} skipped "
@@ -306,7 +434,7 @@ def _merge(logs: list[str]) -> int:
         "through the tests that import them."
     )
     print("REVIEWED_TESTS_SUMMARY " + text)
-    return 1 if unaccounted or bad else 0
+    return 1 if unaccounted or collection_errors or bad else 0
 
 
 if __name__ == "__main__":

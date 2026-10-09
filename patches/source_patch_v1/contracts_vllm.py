@@ -5114,9 +5114,22 @@ def _validate_test_declarations_after(state: State) -> None:
     # cause, strictly: a change that lets it pass fails until the mark goes.
     connector = "tests/multimodal/media/test_connector.py"
     require_text(state, connector,
-                 "    strict=True,\n    raises=VLLMUnprocessableEntityError,\n",
-                 count=4, label=label)
-    require_text(state, connector, "Refused by the Qwen3.8 image contract", count=4,
+                 "IMAGE_CONTRACT_REFUSES = pytest.mark.xfail(\n    strict=True,\n"
+                 "    raises=VLLMUnprocessableEntityError,\n",
+                 label=label)
+    require_text(state, connector, "Refused by the Qwen3.8 image contract",
+                 label=label)
+    require_text(state, connector, "\n@IMAGE_CONTRACT_REFUSES\n", count=3,
+                 label=label)
+    # The round trip of the admitted form runs: its reference images are not
+    # fetched, and only its non-PNG cases are refused.
+    _require_in_symbol(state, connector, "url_images", (
+        "ImageAsset(base).read_bytes(ext)",
+    ), label=label)
+    forbid_text(state, connector, "local_asset_server.get_image_asset(", label=label)
+    require_text(state, connector,
+                 '            suffix, marks=() if suffix == ".png" else '
+                 "IMAGE_CONTRACT_REFUSES\n",
                  label=label)
     # A module that cannot be imported without a GPU says so where the runner
     # reads it without importing it: its module-level pytestmark.
@@ -6590,7 +6603,10 @@ CONTRACTS: Mapping[str, SemanticContract] = {
             "same way. Every test that carries neither runs with no GPU and no "
             "network, and fails there if it needs one unsaid. Upstream's tests "
             "of image fetching the Qwen3.8 image contract refuses are strict "
-            "xfails naming the contract and the exception it raises."
+            "xfails naming the contract and the exception it raises, as is each "
+            "non-PNG case of the base64 round trip, whose reference images are "
+            "read from the asset store rather than fetched, so its PNG cases -- "
+            "the form the contract admits -- run and must pass."
         ),
         removal_condition=(
             "Remove when pinned upstream's tests declare what they need of the "

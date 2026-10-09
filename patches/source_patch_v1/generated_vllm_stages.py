@@ -161495,7 +161495,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    async def _process_simple_streaming_events(\n'})},
  {'name': 'reviewed-tests-declare-what-they-need',
   'review_patch': 'patches/vllm-reviewed-tests-declare-what-they-need.patch',
-  'review_sha256': 'a9b3d97b35a8e459e45e1101f8a24cfa0fec4273ef7f7baf27266ea6d4831c84',
+  'review_sha256': '7954646a17b9cdedaeab47bc57581924fbf2049b36a61261240bd63f3f7851b9',
   'files': ({'path': 'tests/conftest.py',
              'before_sha256': '9bd103ee369ded600a0cad2a5414a2337bcbc00ec86d66d039a8c14032deee42',
              'after_sha256': '6aa1c39d3d977ac381290eb00adb9a3c33fd34733c95623a07fd6c171d7840f4'},
@@ -161573,7 +161573,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'after_sha256': 'ac833e9859fe892d7568c051222c4bc87adc538110076b412df4b1b812f9479d'},
             {'path': 'tests/multimodal/media/test_connector.py',
              'before_sha256': 'a1d5fa45a5e6ed9188abe1d47375b6e0e23417f009fe3ed35455e95de4b78c64',
-             'after_sha256': 'cc0f832b6b6e371c836049e1b43e090ddecd8c418b8d970e48daf9cacc1d11e6'},
+             'after_sha256': '4221d7f6b2dd9950a627aa60d24ce7763af1782bf2fa626c94f9882df1135d07'},
             {'path': 'tests/multimodal/media/test_video.py',
              'before_sha256': '5209e06ba71fb2d8dd2ef4c5d445322a1387df52b30cd1beb472bd8b9fd8e49f',
              'after_sha256': '3bf69e8799d687f4f8dcc28b0fbe6dd2d2a2434ac2bd492faebb9c805b9ed367'},
@@ -161603,7 +161603,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'after_sha256': '8147e5c25a69016b74075d3061984463debbf00877a463d3d2bc333fbf42bb49'},
             {'path': 'tests/v1/engine/test_fast_incdec_prefix_err.py',
              'before_sha256': '2a0cfd6b4d151db30253ac7cde7503838894eaefb71834bd7d5947f705017b53',
-             'after_sha256': '180ff53115b5045804a481c452f11fba9abe55776fb7e1cc7dabe888628e2366'},
+             'after_sha256': '71c0fec8e157c046b9b8623e93845550d00a733e15be5c6eaf59afde69eeba43'},
             {'path': 'tests/v1/engine/test_output_processor.py',
              'before_sha256': '252fcac7e3674b2308985403822978d68df753edb053cafa8042d85593fb6525',
              'after_sha256': '444c51fd6fab6f165086b209f7b4778be08adf8d2e2851ac0405213a692d4428'},
@@ -164216,19 +164216,64 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '\n'},
             {'name': 'tests/multimodal/media/test_connector.py:landmark-1',
              'path': 'tests/multimodal/media/test_connector.py',
-             'before': '    return (np.asarray(a) == np.asarray(convert_image_mode(b, '
-                       'a.mode))).all()\n'
+             'before': 'from PIL import Image, ImageChops\n'
+                       '\n'
+                       'from vllm.assets.base import VLLM_S3_BUCKET_URL\n'
+                       'from vllm.exceptions import VLLMUnprocessableEntityError, '
+                       'VLLMValidationError\n'
+                       'from vllm.multimodal.image import convert_image_mode\n'
+                       'from vllm.multimodal.inputs import PlaceholderRange\n',
+             'after': 'from PIL import Image, ImageChops\n'
+                      '\n'
+                      'from vllm.assets.base import VLLM_S3_BUCKET_URL\n'
+                      'from vllm.assets.image import ImageAsset\n'
+                      'from vllm.exceptions import VLLMUnprocessableEntityError, '
+                      'VLLMValidationError\n'
+                      'from vllm.multimodal.image import convert_image_mode\n'
+                      'from vllm.multimodal.inputs import PlaceholderRange\n',
+             'review_before': 'from PIL import Image, ImageChops\n'
+                              '\n'
+                              'from vllm.assets.base import VLLM_S3_BUCKET_URL\n'
+                              'from vllm.exceptions import '
+                              'VLLMUnprocessableEntityError, VLLMValidationError\n'
+                              'from vllm.multimodal.image import convert_image_mode\n'
+                              'from vllm.multimodal.inputs import PlaceholderRange\n',
+             'review_after': 'from PIL import Image, ImageChops\n'
+                             '\n'
+                             'from vllm.assets.base import VLLM_S3_BUCKET_URL\n'
+                             'from vllm.assets.image import ImageAsset\n'
+                             'from vllm.exceptions import '
+                             'VLLMUnprocessableEntityError, VLLMValidationError\n'
+                             'from vllm.multimodal.image import convert_image_mode\n'
+                             'from vllm.multimodal.inputs import PlaceholderRange\n'},
+            {'name': 'tests/multimodal/media/test_connector.py:landmark-2',
+             'path': 'tests/multimodal/media/test_connector.py',
+             'before': ']\n'
                        '\n'
                        '\n'
-                       '@pytest.mark.asyncio\n'
-                       '@pytest.mark.parametrize("image_url", TEST_IMAGE_ASSETS, '
-                       'indirect=True)\n'
-                       'async def test_fetch_image_http(image_url: str):\n',
-             'after': '    return (np.asarray(a) == np.asarray(convert_image_mode(b, '
-                      'a.mode))).all()\n'
+                       '@pytest.fixture(scope="module")\n'
+                       'def url_images(local_asset_server) -> dict[str, Image.Image]:\n'
+                       '    return {\n'
+                       '        image_url: '
+                       'local_asset_server.get_image_asset(image_url)\n'
+                       '        for image_url in TEST_IMAGE_ASSETS\n'
+                       '    }\n'
+                       '\n'
+                       '\n'
+                       'def get_supported_suffixes() -> tuple[str, ...]:\n',
+             'after': ']\n'
                       '\n'
                       '\n'
-                      '@pytest.mark.xfail(\n'
+                      '# The Qwen3.8 image contract (stage qwen38-vision-runtime), '
+                      'which this fork\n'
+                      '# applies to every model it serves, admits only an inline '
+                      'lossless PNG data URL.\n'
+                      '# A test, or a case, that reads an image another way is refused '
+                      'with this\n'
+                      '# exception, and says so strictly: a change that lets it pass '
+                      'fails until the\n'
+                      '# mark goes.\n'
+                      'IMAGE_CONTRACT_REFUSES = pytest.mark.xfail(\n'
                       '    strict=True,\n'
                       '    raises=VLLMUnprocessableEntityError,\n'
                       '    reason=(\n'
@@ -164241,6 +164286,100 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '        "way."\n'
                       '    ),\n'
                       ')\n'
+                      '\n'
+                      '\n'
+                      '@pytest.fixture(scope="module")\n'
+                      'def url_images() -> dict[str, Image.Image]:\n'
+                      '    # Each asset as a fetch decodes it, read from the asset '
+                      'store rather than\n'
+                      '    # fetched: the image contract refuses every URL but an '
+                      'inline PNG, the local\n'
+                      "    # asset server's included.\n"
+                      '    images = {}\n'
+                      '    for name in TEST_IMAGE_ASSETS:\n'
+                      '        base, ext = name.rsplit(".", 1)\n'
+                      '        image = '
+                      'Image.open(BytesIO(ImageAsset(base).read_bytes(ext)))\n'
+                      '        image.load()\n'
+                      '        images[name] = convert_image_mode(image, "RGB")\n'
+                      '    return images\n'
+                      '\n'
+                      '\n'
+                      'def get_supported_suffixes() -> tuple[str, ...]:\n',
+             'review_before': ']\n'
+                              '\n'
+                              '\n'
+                              '@pytest.fixture(scope="module")\n'
+                              'def url_images(local_asset_server) -> dict[str, '
+                              'Image.Image]:\n'
+                              '    return {\n'
+                              '        image_url: '
+                              'local_asset_server.get_image_asset(image_url)\n'
+                              '        for image_url in TEST_IMAGE_ASSETS\n'
+                              '    }\n'
+                              '\n'
+                              '\n'
+                              'def get_supported_suffixes() -> tuple[str, ...]:\n',
+             'review_after': ']\n'
+                             '\n'
+                             '\n'
+                             '# The Qwen3.8 image contract (stage '
+                             'qwen38-vision-runtime), which this fork\n'
+                             '# applies to every model it serves, admits only an '
+                             'inline lossless PNG data URL.\n'
+                             '# A test, or a case, that reads an image another way is '
+                             'refused with this\n'
+                             '# exception, and says so strictly: a change that lets it '
+                             'pass fails until the\n'
+                             '# mark goes.\n'
+                             'IMAGE_CONTRACT_REFUSES = pytest.mark.xfail(\n'
+                             '    strict=True,\n'
+                             '    raises=VLLMUnprocessableEntityError,\n'
+                             '    reason=(\n'
+                             '        "Refused by the Qwen3.8 image contract (stage '
+                             'qwen38-vision-runtime), "\n'
+                             '        "which this fork applies to every model it '
+                             'serves: it admits only an "\n'
+                             '        "inline lossless PNG data URL, and this test '
+                             'reads an image another "\n'
+                             '        "way."\n'
+                             '    ),\n'
+                             ')\n'
+                             '\n'
+                             '\n'
+                             '@pytest.fixture(scope="module")\n'
+                             'def url_images() -> dict[str, Image.Image]:\n'
+                             '    # Each asset as a fetch decodes it, read from the '
+                             'asset store rather than\n'
+                             '    # fetched: the image contract refuses every URL but '
+                             'an inline PNG, the local\n'
+                             "    # asset server's included.\n"
+                             '    images = {}\n'
+                             '    for name in TEST_IMAGE_ASSETS:\n'
+                             '        base, ext = name.rsplit(".", 1)\n'
+                             '        image = '
+                             'Image.open(BytesIO(ImageAsset(base).read_bytes(ext)))\n'
+                             '        image.load()\n'
+                             '        images[name] = convert_image_mode(image, "RGB")\n'
+                             '    return images\n'
+                             '\n'
+                             '\n'
+                             'def get_supported_suffixes() -> tuple[str, ...]:\n'},
+            {'name': 'tests/multimodal/media/test_connector.py:landmark-3',
+             'path': 'tests/multimodal/media/test_connector.py',
+             'before': '    return (np.asarray(a) == np.asarray(convert_image_mode(b, '
+                       'a.mode))).all()\n'
+                       '\n'
+                       '\n'
+                       '@pytest.mark.asyncio\n'
+                       '@pytest.mark.parametrize("image_url", TEST_IMAGE_ASSETS, '
+                       'indirect=True)\n'
+                       'async def test_fetch_image_http(image_url: str):\n',
+             'after': '    return (np.asarray(a) == np.asarray(convert_image_mode(b, '
+                      'a.mode))).all()\n'
+                      '\n'
+                      '\n'
+                      '@IMAGE_CONTRACT_REFUSES\n'
                       '@pytest.mark.asyncio\n'
                       '@pytest.mark.parametrize("image_url", TEST_IMAGE_ASSETS, '
                       'indirect=True)\n'
@@ -164257,50 +164396,43 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'np.asarray(convert_image_mode(b, a.mode))).all()\n'
                              '\n'
                              '\n'
-                             '@pytest.mark.xfail(\n'
-                             '    strict=True,\n'
-                             '    raises=VLLMUnprocessableEntityError,\n'
-                             '    reason=(\n'
-                             '        "Refused by the Qwen3.8 image contract (stage '
-                             'qwen38-vision-runtime), "\n'
-                             '        "which this fork applies to every model it '
-                             'serves: it admits only an "\n'
-                             '        "inline lossless PNG data URL, and this test '
-                             'reads an image another "\n'
-                             '        "way."\n'
-                             '    ),\n'
-                             ')\n'
+                             '@IMAGE_CONTRACT_REFUSES\n'
                              '@pytest.mark.asyncio\n'
                              '@pytest.mark.parametrize("image_url", TEST_IMAGE_ASSETS, '
                              'indirect=True)\n'
                              'async def test_fetch_image_http(image_url: str):\n'},
-            {'name': 'tests/multimodal/media/test_connector.py:landmark-2',
+            {'name': 'tests/multimodal/media/test_connector.py:landmark-4',
              'path': 'tests/multimodal/media/test_connector.py',
              'before': '    assert _image_equals(image_sync, image_async)\n'
                        '\n'
                        '\n'
                        '@pytest.mark.asyncio\n'
                        '@pytest.mark.parametrize("raw_image_url", TEST_IMAGE_ASSETS)\n'
-                       '@pytest.mark.parametrize("suffix", get_supported_suffixes())\n',
+                       '@pytest.mark.parametrize("suffix", get_supported_suffixes())\n'
+                       'async def test_fetch_image_base64(\n'
+                       '    url_images: dict[str, Image.Image], raw_image_url: str, '
+                       'suffix: str\n'
+                       '):\n',
              'after': '    assert _image_equals(image_sync, image_async)\n'
                       '\n'
                       '\n'
-                      '@pytest.mark.xfail(\n'
-                      '    strict=True,\n'
-                      '    raises=VLLMUnprocessableEntityError,\n'
-                      '    reason=(\n'
-                      '        "Refused by the Qwen3.8 image contract (stage '
-                      'qwen38-vision-runtime), "\n'
-                      '        "which this fork applies to every model it serves: it '
-                      'admits only an "\n'
-                      '        "inline lossless PNG data URL, and this test reads an '
-                      'image another "\n'
-                      '        "way."\n'
-                      '    ),\n'
-                      ')\n'
+                      '@pytest.mark.network\n'
                       '@pytest.mark.asyncio\n'
                       '@pytest.mark.parametrize("raw_image_url", TEST_IMAGE_ASSETS)\n'
-                      '@pytest.mark.parametrize("suffix", get_supported_suffixes())\n',
+                      '@pytest.mark.parametrize(\n'
+                      '    "suffix",\n'
+                      '    [\n'
+                      '        pytest.param(\n'
+                      '            suffix, marks=() if suffix == ".png" else '
+                      'IMAGE_CONTRACT_REFUSES\n'
+                      '        )\n'
+                      '        for suffix in get_supported_suffixes()\n'
+                      '    ],\n'
+                      ')\n'
+                      'async def test_fetch_image_base64(\n'
+                      '    url_images: dict[str, Image.Image], raw_image_url: str, '
+                      'suffix: str\n'
+                      '):\n',
              'review_before': '    assert _image_equals(image_sync, image_async)\n'
                               '\n'
                               '\n'
@@ -164308,29 +164440,33 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                               '@pytest.mark.parametrize("raw_image_url", '
                               'TEST_IMAGE_ASSETS)\n'
                               '@pytest.mark.parametrize("suffix", '
-                              'get_supported_suffixes())\n',
+                              'get_supported_suffixes())\n'
+                              'async def test_fetch_image_base64(\n'
+                              '    url_images: dict[str, Image.Image], raw_image_url: '
+                              'str, suffix: str\n'
+                              '):\n',
              'review_after': '    assert _image_equals(image_sync, image_async)\n'
                              '\n'
                              '\n'
-                             '@pytest.mark.xfail(\n'
-                             '    strict=True,\n'
-                             '    raises=VLLMUnprocessableEntityError,\n'
-                             '    reason=(\n'
-                             '        "Refused by the Qwen3.8 image contract (stage '
-                             'qwen38-vision-runtime), "\n'
-                             '        "which this fork applies to every model it '
-                             'serves: it admits only an "\n'
-                             '        "inline lossless PNG data URL, and this test '
-                             'reads an image another "\n'
-                             '        "way."\n'
-                             '    ),\n'
-                             ')\n'
+                             '@pytest.mark.network\n'
                              '@pytest.mark.asyncio\n'
                              '@pytest.mark.parametrize("raw_image_url", '
                              'TEST_IMAGE_ASSETS)\n'
-                             '@pytest.mark.parametrize("suffix", '
-                             'get_supported_suffixes())\n'},
-            {'name': 'tests/multimodal/media/test_connector.py:landmark-3',
+                             '@pytest.mark.parametrize(\n'
+                             '    "suffix",\n'
+                             '    [\n'
+                             '        pytest.param(\n'
+                             '            suffix, marks=() if suffix == ".png" else '
+                             'IMAGE_CONTRACT_REFUSES\n'
+                             '        )\n'
+                             '        for suffix in get_supported_suffixes()\n'
+                             '    ],\n'
+                             ')\n'
+                             'async def test_fetch_image_base64(\n'
+                             '    url_images: dict[str, Image.Image], raw_image_url: '
+                             'str, suffix: str\n'
+                             '):\n'},
+            {'name': 'tests/multimodal/media/test_connector.py:landmark-5',
              'path': 'tests/multimodal/media/test_connector.py',
              'before': '        assert _image_equals(data_image_sync, '
                        'data_image_async)\n'
@@ -164344,19 +164480,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       'data_image_async)\n'
                       '\n'
                       '\n'
-                      '@pytest.mark.xfail(\n'
-                      '    strict=True,\n'
-                      '    raises=VLLMUnprocessableEntityError,\n'
-                      '    reason=(\n'
-                      '        "Refused by the Qwen3.8 image contract (stage '
-                      'qwen38-vision-runtime), "\n'
-                      '        "which this fork applies to every model it serves: it '
-                      'admits only an "\n'
-                      '        "inline lossless PNG data URL, and this test reads an '
-                      'image another "\n'
-                      '        "way."\n'
-                      '    ),\n'
-                      ')\n'
+                      '@IMAGE_CONTRACT_REFUSES\n'
                       '@pytest.mark.asyncio\n'
                       '@pytest.mark.parametrize("image_url", TEST_IMAGE_ASSETS, '
                       'indirect=True)\n'
@@ -164374,25 +164498,13 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'data_image_async)\n'
                              '\n'
                              '\n'
-                             '@pytest.mark.xfail(\n'
-                             '    strict=True,\n'
-                             '    raises=VLLMUnprocessableEntityError,\n'
-                             '    reason=(\n'
-                             '        "Refused by the Qwen3.8 image contract (stage '
-                             'qwen38-vision-runtime), "\n'
-                             '        "which this fork applies to every model it '
-                             'serves: it admits only an "\n'
-                             '        "inline lossless PNG data URL, and this test '
-                             'reads an image another "\n'
-                             '        "way."\n'
-                             '    ),\n'
-                             ')\n'
+                             '@IMAGE_CONTRACT_REFUSES\n'
                              '@pytest.mark.asyncio\n'
                              '@pytest.mark.parametrize("image_url", TEST_IMAGE_ASSETS, '
                              'indirect=True)\n'
                              'async def test_fetch_image_local_files(image_url: '
                              'str):\n'},
-            {'name': 'tests/multimodal/media/test_connector.py:landmark-4',
+            {'name': 'tests/multimodal/media/test_connector.py:landmark-6',
              'path': 'tests/multimodal/media/test_connector.py',
              'before': '            '
                        'connector.fetch_image(f"file://{temp_dir}/../{os.path.basename(image_url)}")\n'
@@ -164408,19 +164520,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       'connector.fetch_image(f"file://{temp_dir}/../{os.path.basename(image_url)}")\n'
                       '\n'
                       '\n'
-                      '@pytest.mark.xfail(\n'
-                      '    strict=True,\n'
-                      '    raises=VLLMUnprocessableEntityError,\n'
-                      '    reason=(\n'
-                      '        "Refused by the Qwen3.8 image contract (stage '
-                      'qwen38-vision-runtime), "\n'
-                      '        "which this fork applies to every model it serves: it '
-                      'admits only an "\n'
-                      '        "inline lossless PNG data URL, and this test reads an '
-                      'image another "\n'
-                      '        "way."\n'
-                      '    ),\n'
-                      ')\n'
+                      '@IMAGE_CONTRACT_REFUSES\n'
                       '@pytest.mark.asyncio\n'
                       '@pytest.mark.parametrize("image_url", [TEST_IMAGE_ASSETS[0]], '
                       'indirect=True)\n'
@@ -164441,26 +164541,14 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'connector.fetch_image(f"file://{temp_dir}/../{os.path.basename(image_url)}")\n'
                              '\n'
                              '\n'
-                             '@pytest.mark.xfail(\n'
-                             '    strict=True,\n'
-                             '    raises=VLLMUnprocessableEntityError,\n'
-                             '    reason=(\n'
-                             '        "Refused by the Qwen3.8 image contract (stage '
-                             'qwen38-vision-runtime), "\n'
-                             '        "which this fork applies to every model it '
-                             'serves: it admits only an "\n'
-                             '        "inline lossless PNG data URL, and this test '
-                             'reads an image another "\n'
-                             '        "way."\n'
-                             '    ),\n'
-                             ')\n'
+                             '@IMAGE_CONTRACT_REFUSES\n'
                              '@pytest.mark.asyncio\n'
                              '@pytest.mark.parametrize("image_url", '
                              '[TEST_IMAGE_ASSETS[0]], indirect=True)\n'
                              'async def '
                              'test_fetch_image_local_files_with_space_in_name(image_url: '
                              'str):\n'},
-            {'name': 'tests/multimodal/media/test_connector.py:landmark-5',
+            {'name': 'tests/multimodal/media/test_connector.py:landmark-7',
              'path': 'tests/multimodal/media/test_connector.py',
              'before': '        connector.fetch_image(broken_img)\n'
                        '\n'
@@ -164490,7 +164578,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '@pytest.mark.asyncio\n'
                              '@pytest.mark.parametrize("video_url", '
                              'TEST_VIDEO_URLS)\n'},
-            {'name': 'tests/multimodal/media/test_connector.py:landmark-6',
+            {'name': 'tests/multimodal/media/test_connector.py:landmark-8',
              'path': 'tests/multimodal/media/test_connector.py',
              'before': '    assert metadata_sync == metadata_async\n'
                        '\n'
@@ -164520,7 +164608,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '@pytest.mark.parametrize("video_url", TEST_VIDEO_URLS)\n'
                              '@pytest.mark.parametrize("max_duration", [1, 60, '
                              '1800])\n'},
-            {'name': 'tests/multimodal/media/test_connector.py:landmark-7',
+            {'name': 'tests/multimodal/media/test_connector.py:landmark-9',
              'path': 'tests/multimodal/media/test_connector.py',
              'before': '    assert pr.extract_embeds_range() == expected\n'
                        '\n'
@@ -166391,13 +166479,28 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '[("JackFram/llama-160m", 2048)])\n'},
             {'name': 'tests/v1/engine/test_fast_incdec_prefix_err.py:landmark-1',
              'path': 'tests/v1/engine/test_fast_incdec_prefix_err.py',
-             'before': 'from vllm.v1.engine import EngineCoreRequest\n'
+             'before': '# SPDX-License-Identifier: Apache-2.0\n'
+                       '# SPDX-FileCopyrightText: Copyright contributors to the vLLM '
+                       'project\n'
+                       '\n'
+                       'from transformers import AutoTokenizer\n'
+                       '\n'
+                       'from vllm.sampling_params import SamplingParams\n'
+                       'from vllm.v1.engine import EngineCoreRequest\n'
                        'from vllm.v1.engine.detokenizer import IncrementalDetokenizer\n'
                        '\n'
                        '# ruff: noqa: E501\n'
                        '\n'
                        '\n',
-             'after': 'from vllm.v1.engine import EngineCoreRequest\n'
+             'after': '# SPDX-License-Identifier: Apache-2.0\n'
+                      '# SPDX-FileCopyrightText: Copyright contributors to the vLLM '
+                      'project\n'
+                      '\n'
+                      'import pytest\n'
+                      'from transformers import AutoTokenizer\n'
+                      '\n'
+                      'from vllm.sampling_params import SamplingParams\n'
+                      'from vllm.v1.engine import EngineCoreRequest\n'
                       'from vllm.v1.engine.detokenizer import IncrementalDetokenizer\n'
                       '\n'
                       'pytestmark = pytest.mark.network\n'
@@ -166405,14 +166508,29 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '# ruff: noqa: E501\n'
                       '\n'
                       '\n',
-             'review_before': 'from vllm.v1.engine import EngineCoreRequest\n'
+             'review_before': '# SPDX-License-Identifier: Apache-2.0\n'
+                              '# SPDX-FileCopyrightText: Copyright contributors to the '
+                              'vLLM project\n'
+                              '\n'
+                              'from transformers import AutoTokenizer\n'
+                              '\n'
+                              'from vllm.sampling_params import SamplingParams\n'
+                              'from vllm.v1.engine import EngineCoreRequest\n'
                               'from vllm.v1.engine.detokenizer import '
                               'IncrementalDetokenizer\n'
                               '\n'
                               '# ruff: noqa: E501\n'
                               '\n'
                               '\n',
-             'review_after': 'from vllm.v1.engine import EngineCoreRequest\n'
+             'review_after': '# SPDX-License-Identifier: Apache-2.0\n'
+                             '# SPDX-FileCopyrightText: Copyright contributors to the '
+                             'vLLM project\n'
+                             '\n'
+                             'import pytest\n'
+                             'from transformers import AutoTokenizer\n'
+                             '\n'
+                             'from vllm.sampling_params import SamplingParams\n'
+                             'from vllm.v1.engine import EngineCoreRequest\n'
                              'from vllm.v1.engine.detokenizer import '
                              'IncrementalDetokenizer\n'
                              '\n'
@@ -169141,7 +169259,7 @@ FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5d
  'tests/evals/gsm8k/test_gsm8k_offloading.py': 'a7ced3b714c418120c2e4d5cfb55690d3b11baa96083256c2bb640dc80eec3f6',
  'tests/model_executor/kernels/test_nvfp4_native_selection.py': '734053c7d0594ac215a3305105aaf122315b5ae2f2ca8d91ed35d73a18c20f90',
  'tests/models/language/pooling/test_reward.py': 'ac833e9859fe892d7568c051222c4bc87adc538110076b412df4b1b812f9479d',
- 'tests/multimodal/media/test_connector.py': 'cc0f832b6b6e371c836049e1b43e090ddecd8c418b8d970e48daf9cacc1d11e6',
+ 'tests/multimodal/media/test_connector.py': '4221d7f6b2dd9950a627aa60d24ce7763af1782bf2fa626c94f9882df1135d07',
  'tests/multimodal/media/test_image.py': '7fae5970499f78c6e67f31e5870f8dce77836d38f2d3a1252d85d4fbf444d215',
  'tests/multimodal/media/test_unprocessable_entity_error.py': '4a53412f2e66b610f78b2678bcbf259bc97d98360640ae767f87bc3a14de7684',
  'tests/multimodal/media/test_video.py': '3bf69e8799d687f4f8dcc28b0fbe6dd2d2a2434ac2bd492faebb9c805b9ed367',
@@ -169187,7 +169305,7 @@ FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5d
  'tests/v1/engine/test_engine_core.py': '7834fa7eaeb25518e4af756f0dc56c420a1c8e5c906057643a41241a17162485',
  'tests/v1/engine/test_engine_core_client.py': 'f395ab80e7d75fce9007629c5a1c696ca675a41de25e9837d5916f8d1b916a2a',
  'tests/v1/engine/test_engine_request_identity.py': 'ab2797f33f2cd1aeaa07bf7c35cd1d51665d2de4c91406a21d3c696f50423938',
- 'tests/v1/engine/test_fast_incdec_prefix_err.py': '180ff53115b5045804a481c452f11fba9abe55776fb7e1cc7dabe888628e2366',
+ 'tests/v1/engine/test_fast_incdec_prefix_err.py': '71c0fec8e157c046b9b8623e93845550d00a733e15be5c6eaf59afde69eeba43',
  'tests/v1/engine/test_kv_scope_single_flight.py': 'b201e5a9ce502d182fcc5d5d10f2fc64333308642586398e9b594c79365af0a0',
  'tests/v1/engine/test_kv_transfer_params_admission.py': '8b9f3e19f018a30abe93944226f0d6c74b47d2fbf024c286eec3fd653d2e9ca9',
  'tests/v1/engine/test_output_processor.py': '444c51fd6fab6f165086b209f7b4778be08adf8d2e2851ac0405213a692d4428',

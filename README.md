@@ -131,7 +131,8 @@ unit in check and in build rather than inside the Dockerfile. The probes that
 parse fixed outputs locally build the same composition (`scripts/probe_parser.py`),
 named by `run-probe.sh` from the launch.
 
-Every test file the reviewed stages change or add is executed. `check` and
+Every test file the reviewed stages change or add is collected, and each of its
+tests runs wherever its own condition holds. `check` and
 `build` read the set from the verified stage data, never from a list, and run it
 with a pinned runner: the wheels in `test-runner/` -- pytest and the plugins
 vLLM's tests use, at the versions vLLM's `requirements/test/cuda.txt` pins at the
@@ -143,7 +144,16 @@ Face hub, or a remote URL) carries the `gpu` or `network` mark the tree's
 module-level `pytestmark` is read without importing the module, so a module that
 cannot even be imported without a GPU says so the same way.
 `scripts/reviewed_tests_plugin.py` collects those files and nothing else.
-`check` runs every reviewed test that carries neither mark, on the base image
+`check` first collects every one of them exactly as `build`'s release set will --
+every module imported and its tests built, none run -- because a release run that
+meets one collection error runs nothing, and `build` could then pin no image; so a
+module whose declaration, import or test construction is broken fails `check`.
+Two kinds of module can be collected whole only where a GPU is, and `check` names
+both: one that skips itself at import without a GPU, and one that declares a GPU
+in its `pytestmark` and cannot be imported without one, whose imports and
+declaration -- its source up to and including that `pytestmark` -- must still run
+in `check`, so a broken declaration fails there too.
+`check` then runs every reviewed test that carries neither mark, on the base image
 with exactly the reviewed runtime files the image carries and the runtime files
 the patch set deletes made unimportable, with no GPU and no network, so a test
 that needs either and does not say so fails there. `build` runs every reviewed
@@ -153,13 +163,21 @@ free enough for the vLLM servers the tests start, access to the Hugging Face hub
 and `HF_TOKEN` in the environment for the gated repositories some tests read;
 what it downloads is kept under the run's export directory and removed with it,
 at whatever revision the hub serves -- the one test input that is not pinned.
-`serve-check` does not run the tests. A test that fails for a cause this tree
-keeps by design says so with a strict `xfail` naming the cause and the exception
-it raises: the upstream image-fetching tests the Qwen3.8 image contract refuses.
+`serve-check` does not run the tests. Every test runs under a per-test timeout
+(`REVIEWED_TEST_TIMEOUT_SECONDS` in `scripts/build-vllm.sh`), so a test that hangs
+ends its run naming itself instead of holding `check` or `build` forever. A test
+that fails for a cause this tree keeps by design says so with a strict `xfail`
+naming the cause and the exception it raises: the upstream image-fetching tests
+the Qwen3.8 image contract refuses, and each non-PNG case of the base64 round
+trip, whose PNG cases -- the form the contract admits -- run and must pass.
 `check`'s summary names what ran, what was skipped by its own condition and what
 no gate runs: the reviewed shell scripts under `tests/`, which start prefill and
-decode servers that exchange KV through NIXL or the P2P tier, and the test files
-the patch set leaves as upstream has them.
+decode servers that exchange KV through NIXL or the P2P tier; the test files the
+patch set leaves as upstream has them; and every reviewed test whose own
+condition holds on no machine this deployment has -- an `optional` test (neither
+set passes `--optional`), a ROCm-only test, one that needs more than the one GPU
+`build` requires, or one that imports a package the image does not carry -- which
+`build` skips as `check` does and names, with its reason, among its skips.
 
 | Runner wheel | SHA-256, as PyPI publishes it |
 |---|---|
@@ -410,7 +428,7 @@ It is intentionally reconstructed by the ordered, reviewed semantic transformati
 | patches/vllm-chat-stream-carries-every-token-logprob.patch | ca15dadd152454fe5b3fbcb710b8c7b5ce3221c038617b9e0d0985953aecbf47 |
 | patches/vllm-chat-messages-read-by-one-rule.patch | 5bf8a2d69d7ab1c6b9ee423740d34616a69e857d64816f68b9b9b1d509455f7f |
 | patches/vllm-responses-refuses-what-it-cannot-honour.patch | 35fcb2a68faa1a6fb99a83b6d7726ffc45f1b6e84cbb2ed7d9fe152575bf10f3 |
-| patches/vllm-reviewed-tests-declare-what-they-need.patch | a9b3d97b35a8e459e45e1101f8a24cfa0fec4273ef7f7baf27266ea6d4831c84 |
+| patches/vllm-reviewed-tests-declare-what-they-need.patch | 7954646a17b9cdedaeab47bc57581924fbf2049b36a61261240bd63f3f7851b9 |
 | patches/vllm-priority-is-refused-where-nothing-orders-by-it.patch | 96346e5bf71726008f4449389d91a18531fd57fe63f930b2400e059ab168571a |
 
 The reconstructed tree's runtime-source and test changes, new files and
@@ -470,7 +488,7 @@ Pinned build inputs and products:
 | Immutable base tag | qwen38-vllm:main-9df9b0b |
 | Immutable base ID | sha256:fa4a002a88b7043a1a89966dea8a500fe9696f84e75730d9da916f916048d401 |
 | Runtime Dockerfile SHA-256 | ebf001f705dd37cac3f60665e661ccf2385fbf15325cd998e3e600860494f44f |
-| Build verifier SHA-256 | 041890603eb9d9f208b55a3db8456f9c714db229cacf985cec1a0ba0d8607fff |
+| Build verifier SHA-256 | 3d3427a638fae536a4b4170fd558b4d991abc3cc41786bfbe8e9e0f0df58661d |
 | Runtime validator SHA-256 | e4ea7693d3f30e00de4a6b5733a0fb490c6f9deee927d42580083c9c851a04f8 |
 
 The runtime image's profile, tag and archive name, which every release advances

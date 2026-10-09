@@ -1001,6 +1001,13 @@ readonly -a test_runner_wheels
 # with the network; a gated Hugging Face repository is read with the HF_TOKEN of
 # the environment build runs in, and what the tests download is kept under this
 # run's export directory and removed with it.
+# collection: every reviewed test file, imported and its tests built as the
+# release set collects them, and none run, on the offline machine. A release run
+# that meets a collection error runs nothing, so build could pin no image; this
+# is where such an error is found. The plugin names what only build can collect:
+# a module that skips itself at import without a GPU, and one that declares a
+# GPU and cannot be imported without one -- whose imports and declaration must
+# still run here.
 # Both read the served model's tokenizer files, checked against the model manifest
 # above, where a test asks for the pinned local tokenizer (QWEN_TOKENIZER_PATH).
 # The tree's own vllm/ is masked, so a test imports the installed package, and a
@@ -1010,14 +1017,29 @@ readonly -a test_runner_wheels
 # host, one process takes 16.5 minutes, six take 5.8 and twelve 4.0; the set's
 # result does not depend on the count.
 readonly OFFLINE_REVIEWED_TEST_SHARDS=12
+# Every reviewed test runs under this timeout, setup and teardown included
+# (pytest-timeout, pinned with the runner), so a test that hangs ends its run
+# naming itself instead of holding check or build forever. It is a declared
+# policy, not a measurement: the longest offline test measured 34 seconds, and
+# a release test's first use of a server pays for a model download and for
+# upstream's own wait of up to 480 seconds for that server to come up, so half
+# an hour is past anything a test legitimately does and ends a hung build
+# within the hour.
+readonly REVIEWED_TEST_TIMEOUT_SECONDS=1800
 run_reviewed_tests() {
   local reviewed_set="$1" image="$2" shards="$3" image_note="" shard failed=false
   local log_dir="${BUILD_EXPORT_DIR}/reviewed-tests-${reviewed_set}"
-  local -a machine pids=() logs=()
+  local -a machine pids=() logs=() verbosity=(-q)
   case "${reviewed_set}" in
     offline)
       machine=(--network none --env CUDA_VISIBLE_DEVICES= --env HF_HUB_OFFLINE=1
         "${parser_unit_mounts[@]}")
+      ;;
+    collection)
+      machine=(--network none --env CUDA_VISIBLE_DEVICES= --env HF_HUB_OFFLINE=1
+        "${parser_unit_mounts[@]}")
+      # Collected, not run: pytest names each file's count, not each test.
+      verbosity=(-qq)
       ;;
     release)
       image_note="; ${image} was not pinned"
@@ -1044,16 +1066,20 @@ run_reviewed_tests() {
       "${served_model_mounts[@]}" --env QWEN_TOKENIZER_PATH=/served-model \
       "${machine[@]}" --workdir /reviewed --entrypoint bash "${image}" -c '
         set -euo pipefail
-        reviewed_set="$1" shard="$2"; shift 2
+        reviewed_set="$1" shard="$2" timeout="$3" verbosity="$4"; shift 4
         for wheel in "$@"; do python3 -m zipfile -e "${wheel}" /tmp/test-runner; done
         PYTHONPATH=/tmp/test-runner:/test-runner-plugin exec python3 -m pytest \
           -p no:cacheprovider -p reviewed_tests_plugin --reviewed-set "${reviewed_set}" \
-          --reviewed-shard "${shard}" -q -rfE --tb=short --disable-warnings tests' \
-      run-reviewed-tests "${reviewed_set}" "$1" "${test_runner_wheels[@]}"
+          --reviewed-shard "${shard}" --timeout "${timeout}" "${verbosity}" -rfE \
+          --tb=short --disable-warnings tests' \
+      run-reviewed-tests "${reviewed_set}" "$1" "${REVIEWED_TEST_TIMEOUT_SECONDS}" \
+      "${verbosity[@]}" "${test_runner_wheels[@]}"
   }
   if ((shards == 1)); then
     logs=("${log_dir}/shard-1.log")
-    reviewed_tests_shard 1/1 2>&1 | tee "${logs[0]}" | sed '/^REVIEWED_TESTS_JSON /d' ||
+    # A collection names each file's count; the merge below says what they add up to.
+    reviewed_tests_shard 1/1 2>&1 | tee "${logs[0]}" |
+      sed -e '/^REVIEWED_TESTS_JSON /d' -e '/^tests\/[^ ]*\.py: [0-9][0-9]*$/d' ||
       failed=true
   else
     # The shards run at once, each its own pytest process in its own container,
@@ -1093,7 +1119,10 @@ readonly upstream_test_file_count
 if [[ "${MODE}" == "serve-check" ]]; then
   reviewed_tests_summary="serve-check does not run the reviewed tests; check runs every one that needs neither a GPU nor the network, and build runs them all before it pins an image."
 else
+  run_reviewed_tests collection "${BASE_IMAGE_TAG}" 1
+  reviewed_tests_collection="${reviewed_tests_summary}"
   run_reviewed_tests offline "${BASE_IMAGE_TAG}" "${OFFLINE_REVIEWED_TEST_SHARDS}"
+  reviewed_tests_summary="${reviewed_tests_collection}"$'\n'"${reviewed_tests_summary}"
 fi
 
 if [[ "${MODE}" == "check" || "${MODE}" == "serve-check" ]]; then
@@ -1124,8 +1153,12 @@ if [[ "${MODE}" == "check" || "${MODE}" == "serve-check" ]]; then
   echo "${reviewed_tests_summary}"
   echo "Not executed by any gate: the ${#reviewed_test_scripts[@]} reviewed" \
     "shell scripts under tests/ (${reviewed_test_scripts[*]}), which start prefill" \
-    "and decode servers that exchange KV through NIXL or the P2P tier, and the" \
-    "${upstream_test_file_count} test files the patch set leaves as upstream has them."
+    "and decode servers that exchange KV through NIXL or the P2P tier; the" \
+    "${upstream_test_file_count} test files the patch set leaves as upstream has them;" \
+    "and every reviewed test whose own condition holds on no machine this deployment" \
+    "has -- an optional test (neither set passes --optional), a ROCm-only test, one" \
+    "that needs more than the one GPU build requires, or one that imports a package" \
+    "the image does not carry -- which build skips as check does and names among its skips."
   if [[ "${MODE}" == "serve-check" ]]; then
     require_image_built_from_inputs "${image_inputs_sha256}" "${context_file_count}"
   fi
