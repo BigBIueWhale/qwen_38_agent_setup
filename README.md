@@ -101,8 +101,8 @@ Advanced reproducibility operations are deliberately separate from serving mode:
 The check reconstructs the source tree from the pinned upstream commit through every
 landmark-aware transformation and assembles the build context from that
 reconstruction. The build does the same, then runs offline from the exact base image
-on that context, runs the units that need the GPU in the image it made on this
-host's GPU, and pins what it made only once they pass: a build of the inputs the
+on that context, runs the units that need the GPU and every reviewed test in the
+image it made on this host's GPU, and pins what it made only once they pass: a build of the inputs the
 pinned image was built from must reproduce its ID and fails otherwise, and a build of
 any other inputs writes its own ID into `config/runtime-v1.sh`. A host without the
 validated GPU is refused before anything is built. Materialise writes the verified
@@ -129,11 +129,50 @@ against the model manifest before it is mounted, fed the deltas the native
 decoder produces. The image does not carry that tokenizer, so the build runs this
 unit in check and in build rather than inside the Dockerfile. The probes that
 parse fixed outputs locally build the same composition (`scripts/probe_parser.py`),
-named by `run-probe.sh` from the launch. The vLLM test files the reviewed stages
-modify are review artifacts the check hashes and does not execute: no pinned
-input of the check can run them -- the base image has no test runner, and many
-need a GPU or hub downloads -- so what this deployment relies on is asserted by
-the units above.
+named by `run-probe.sh` from the launch.
+
+Every test file the reviewed stages change or add is executed. `check` and
+`build` read the set from the verified stage data, never from a list, and run it
+with a pinned runner: the wheels in `test-runner/` -- pytest and the plugins
+vLLM's tests use, at the versions vLLM's `requirements/test/cuda.txt` pins at the
+pinned commit -- are deployment inputs like every script, verified with them and
+unpacked inside the container, never installed on the host. Where a test runs is
+the test's own statement: a test that needs a GPU or the network (the Hugging
+Face hub, or a remote URL) carries the `gpu` or `network` mark the tree's
+`tests/conftest.py` registers, on itself, its class or its module, and a
+module-level `pytestmark` is read without importing the module, so a module that
+cannot even be imported without a GPU says so the same way.
+`scripts/reviewed_tests_plugin.py` collects those files and nothing else.
+`check` runs every reviewed test that carries neither mark, on the base image
+with exactly the reviewed runtime files the image carries and the runtime files
+the patch set deletes made unimportable, with no GPU and no network, so a test
+that needs either and does not say so fails there. `build` runs every reviewed
+test in the image it has built, on the host's GPU and with the network, beside
+the two GPU units, and pins the image only if they pass. That run needs the card
+free enough for the vLLM servers the tests start, access to the Hugging Face hub,
+and `HF_TOKEN` in the environment for the gated repositories some tests read;
+what it downloads is kept under the run's export directory and removed with it,
+at whatever revision the hub serves -- the one test input that is not pinned.
+`serve-check` does not run the tests. A test that fails for a cause this tree
+keeps by design says so with a strict `xfail` naming the cause and the exception
+it raises: the upstream image-fetching tests the Qwen3.8 image contract refuses.
+`check`'s summary names what ran, what was skipped by its own condition and what
+no gate runs: the reviewed shell scripts under `tests/`, which start prefill and
+decode servers that exchange KV through NIXL or the P2P tier, and the test files
+the patch set leaves as upstream has them.
+
+| Runner wheel | SHA-256, as PyPI publishes it |
+|---|---|
+| test-runner/iniconfig-2.0.0-py3-none-any.whl | b6a85871a79d2e3b22d2d1b94ac2824226a63c6b741c88f7ae975f18b6778374 |
+| test-runner/pluggy-1.5.0-py3-none-any.whl | 44e1ad92c8ca002de6377e165f3e0f1be63266ab4d554740532335b9d75ea669 |
+| test-runner/pytest-9.1.0-py3-none-any.whl | 8ebb0e7888bdf2bdfc602ec51f8f62d50200af37356c74e503c79a94f5c81f32 |
+| test-runner/pytest_asyncio-1.4.0-py3-none-any.whl | 933ca923a23075a87fb7070c0ec272a6848489824d887c85c812670932835aa1 |
+| test-runner/pytest_timeout-2.3.1-py3-none-any.whl | 68188cb703edfc6a18fad98dc25a3c61e9f24d644b0b70f33af545219fc7813e |
+| test-runner/tblib-3.1.0-py3-none-any.whl | 670bb4582578134b3d81a84afa1b016128b429f3d48e6cbbaecc9d15675e984e |
+
+A reader verifies each against the digest PyPI publishes for that file
+(`https://pypi.org/pypi/<name>/<version>/json`); `check` verifies them against
+`config/deployment-inputs.sha256` on every run.
 
 The live probes are launched the same way, through one launcher for the whole
 suite:
@@ -316,7 +355,7 @@ It is intentionally reconstructed by the ordered, reviewed semantic transformati
 | patches/vllm-qwen38-numerical-audits.patch | dc0b947db3727b522427a204edd1a930d637476a0f66d7d30e2da65c144ac944 |
 | patches/vllm-turboquant-fail-closed-guards.patch | df0a32bb40ca8495cf636e1dcc8da97c82654b99f4f54969bae420d3dcf81e28 |
 | patches/vllm-kv-offload-pinning-fail-closed.patch | 56ecf2d6f79c20fa7d6f17527ae4f86149e9a1a73f84c00c7b938b257b5e9927 |
-| patches/vllm-generation-requires-agent-id.patch | 564ba3f1ba0bae5368656a70d5403424f5563ed8cea6a5f29313ed9190d59b98 |
+| patches/vllm-generation-requires-agent-id.patch | 692ca68034a9ab3b826310b4098127eb392ce87903d99df39e342aa8db4e3125 |
 | patches/vllm-attention-growth-keeps-prefix-hash.patch | a6c38a841c05bcd4f5bfc573c99f1c4a849e7399af05b1e53096e15a43a97632 |
 | patches/vllm-grouped-kv-specs-use-layer-geometry.patch | 6bb249bc143a179ca317c72d2bf70ec118baa6f12dca19c0a59da2e3c935b814 |
 | patches/vllm-agent-grouped-offload-retention.patch | 1141e2ad5e72e11c608c2ea73228cbce3939844b0d32155f140ee246e033744d |
@@ -325,7 +364,7 @@ It is intentionally reconstructed by the ordered, reviewed semantic transformati
 | patches/vllm-kv-declaration-within-physical-bound.patch | a8386795dc7792ed06f63d92159c22323b986bb93e25a0798417243e00a643e5 |
 | patches/vllm-exact-reasoning-usage.patch | 34a3291cda667e89ffa97f399b821a06adf9a0b14c7429b121e2b01492b7a8e6 |
 | patches/vllm-anthropic-input-fidelity.patch | 3252e25a6c2e9d8ee0eec4cb383fc292bff2afaac2e3becdc1006c68b3b02c3c |
-| patches/vllm-qwen-exact-tool-language.patch | b8e9a82a8b907f92cb22942d848c0c321a10aec2ecc38d8781837cf00b963410 |
+| patches/vllm-qwen-exact-tool-language.patch | 59b8cf13cbd9f3d036eb1f2fe5d4ce52dbdfdb41bee641b84c85de95525170ed |
 | patches/vllm-png-source-admission.patch | b1b684a96d7243ae647d4d8ce2fe69b7330b3ab243ea77903c4cfb346bc80549 |
 | patches/vllm-kv-physical-free-memory.patch | dfafb63c87ea6383cdac064514339bd65481c89d96fbfa0740bd844244cf830d |
 | patches/vllm-qwen-single-call-grammar.patch | e3859bebf3b97cc05446859f1cb13b1ba6c4048728394f876bd3a109fa9a80d9 |
@@ -339,11 +378,11 @@ It is intentionally reconstructed by the ordered, reviewed semantic transformati
 | patches/vllm-xml-text-fidelity.patch | fea2ea6b6837aa30c59a5758837eb039649af16bffd49ffcad603058d59742d3 |
 | patches/vllm-phase-aware-parser-terminals.patch | 8310845e39bed950883182690894f3ed94d0e55c8ef16d89c750d925fef65b21 |
 | patches/vllm-input-stream-agent-identity.patch | caee1588ff260cb866404a91889b3962f8f94b468fa5f5eb81720f1e8c88d67a |
-| patches/vllm-tool-output-completion.patch | 68e8c9376d2adaca4bb6a977ef66bbd518c6f76660123301440bbcb2689781b8 |
+| patches/vllm-tool-output-completion.patch | 14fe08ae3de2e4ac941224247174960fe61dc71634f6d6c3b1aa853850fd8db5 |
 | patches/vllm-one-way-thinking-boundary.patch | 0d438c545d4d49f159dd76e6d709e43fad0434c4a8e46c1abd330d7ee87ff9d3 |
 | patches/vllm-schema-faithful-xml.patch | 165d05cf34e20f0d0be6b05b48ab2da44a35557da23d8195d22750c0c3e766a9 |
 | patches/vllm-token-text-provenance.patch | 954b36cb444f7e644e29d13f7a9d3c000512a0d616bbf2b6cd3cb8f4e880dd44 |
-| patches/vllm-precise-request-errors.patch | 5620e9394e9d636b6f875bb9a04c21d54b5a9629f6a6651cda3be79d98be43f2 |
+| patches/vllm-precise-request-errors.patch | b7e45dd43f5317946b18594b3906dce0a6f6f88dae2187ce066d1b9f66511172 |
 | patches/vllm-qwen-canonical-parameter-framing.patch | d438f9106c4a989d64837c21f5491d946065e6721570ad47664513347f150064 |
 | patches/vllm-qwen-owned-tool-grammar.patch | 258f6cc1e78cd00a2b197ec0c8d525b52004b72b13795067cc6f6fcec646e5d5 |
 | patches/vllm-qwen-unique-tool-parameters.patch | a85108911b0e12757c5f88e2b3a8d4356e9a37c17f866a54049ef6aa6da42074 |
@@ -357,9 +396,9 @@ It is intentionally reconstructed by the ordered, reviewed semantic transformati
 | patches/vllm-qwen-repeated-parameter-refusal.patch | 849fadaa43f2f8eafc0e98fae2c5c201e3b4a8c637de58720eebb94817768e31 |
 | patches/vllm-generated-tokens-survive-parsing.patch | 3889af17e410853baa95ea40eba32baa5ed35d03e37822d55312861e21fba8b9 |
 | patches/vllm-include-reasoning-shapes-the-response.patch | d3b41899464142ffffb04efd0b19647153e322b10c7f9fc1e14af0f290af98d1 |
-| patches/vllm-unspecified-tool-choice-is-the-default.patch | d962d3c3fbd96a909a0c03e8f6a3c987ece5f0e7c27ca81571d68bda1d97cdaa |
+| patches/vllm-unspecified-tool-choice-is-the-default.patch | 7d7810467d3e7fdaacd3edbac231ea16521bc7dd84fca2b4ccfed40f1856fa27 |
 | patches/vllm-call-only-answer-keeps-the-blank-line.patch | c5815801d29b3ecb7a6aeba3ef586aac53950b6229c2b7fb315b95acd54501b1 |
-| patches/vllm-responses-tools-are-one-function-list.patch | a1c2f1c1b654e7d28b8e7c09d7db7acebde33fbc0773a299ac27f5b55d5f4122 |
+| patches/vllm-responses-tools-are-one-function-list.patch | 9120b9b03f87e1eb4757f2265b3c0db16484170d30b685618be83a093c8404fd |
 | patches/vllm-batch-parse-starts-where-the-prompt-leaves.patch | c580e2dbb0d3435c88cfea00d5fab43bf60336432bdbaf01706dfa881ba3451a |
 | patches/vllm-derender-text-is-the-detokenizers.patch | 3dcee7c4e7fb45b6bbec3f8f90fa9c77266acc37ea0ab43ce43b975cdb3d847d |
 | patches/vllm-output-constraints-refused-beside-tool-calls.patch | b82f6259428441aee55d157443bcedc1d98fb247ef9a521106408671a24ae533 |
@@ -367,10 +406,11 @@ It is intentionally reconstructed by the ordered, reviewed semantic transformati
 | patches/vllm-render-carries-every-image-chat-renders.patch | 9c20792ac98dfabdc44691217947d18ad7eee940f236343f531a891cde9a72b1 |
 | patches/vllm-rendered-prompts-are-never-truncated.patch | 3128a77dde8f5b5118d2893bb858183e7fc0f20573124441bb69b2e82251fc6d |
 | patches/vllm-kv-transfer-params-are-declared.patch | fbe7824e788905358711686784cdb3659d184661f4f59de873516f4ad2ccdb6f |
-| patches/vllm-responses-refuses-tools-the-template-is-never-given.patch | eb497a85e0a2f3aa1907fcf22e34b62fe8dc91015a7f869293497d64ad5134b2 |
+| patches/vllm-responses-refuses-tools-the-template-is-never-given.patch | 5c3106c820032060101e732329f2d234c9c3c84bcd5e21c4e05ebf55679aecd2 |
 | patches/vllm-chat-stream-carries-every-token-logprob.patch | ca15dadd152454fe5b3fbcb710b8c7b5ce3221c038617b9e0d0985953aecbf47 |
 | patches/vllm-chat-messages-read-by-one-rule.patch | 5bf8a2d69d7ab1c6b9ee423740d34616a69e857d64816f68b9b9b1d509455f7f |
 | patches/vllm-responses-refuses-what-it-cannot-honour.patch | 35fcb2a68faa1a6fb99a83b6d7726ffc45f1b6e84cbb2ed7d9fe152575bf10f3 |
+| patches/vllm-reviewed-tests-declare-what-they-need.patch | a9b3d97b35a8e459e45e1101f8a24cfa0fec4273ef7f7baf27266ea6d4831c84 |
 
 The reconstructed tree's runtime-source and test changes, new files and
 deletions are counted by ./scripts/build-vllm.sh check, which derives and prints
@@ -428,9 +468,9 @@ Pinned build inputs and products:
 |---|---|
 | Immutable base tag | qwen38-vllm:main-9df9b0b |
 | Immutable base ID | sha256:fa4a002a88b7043a1a89966dea8a500fe9696f84e75730d9da916f916048d401 |
-| Runtime Dockerfile SHA-256 | 2d19f9b3f939a7eb8e2c0ed0f4db5f8a5786ebf213170a86e7914fb2d1d05ba5 |
-| Build verifier SHA-256 | a24f4b88316b6f8689a15500cf4eb19f736771922e2f48e77edfdaf56bd2c8fd |
-| Runtime validator SHA-256 | 1db635d3954fc5f9d2d3bad9fc442629f56fd6cc796034293fe0e49cdad654a8 |
+| Runtime Dockerfile SHA-256 | 564ed4115e1ffbab3a6af1c28cd5cd1c3f6df0bcb995d6e3411fc9c28c5a9e44 |
+| Build verifier SHA-256 | cb6aeb5ae4b1bb236958491cac0ed93b85ff78140cf30f7b752807f12713a29f |
+| Runtime validator SHA-256 | 15b71d9ce4cd34ed4e05538492b7f329e382cbd7fa5eeb9b82c9ccb8fce3c138 |
 
 The runtime image's profile, tag and archive name, which every release advances
 together, are declared in `config/runtime-v1.sh`, and the archive lives under

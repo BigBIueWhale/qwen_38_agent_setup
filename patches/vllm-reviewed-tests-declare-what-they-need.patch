@@ -1,0 +1,1889 @@
+diff --git a/tests/conftest.py b/tests/conftest.py
+index e277b35dd46baabe1cc7da04e81f9a0c20059985..95e3a7a5f84948039c69777ede34e075fdcc8775 100644
+--- a/tests/conftest.py
++++ b/tests/conftest.py
+@@ -1572,6 +1572,22 @@ def pytest_addoption(parser):
+     )
+ 
+ 
++def pytest_configure(config):
++    # What a test needs that a machine may lack, declared on the test itself --
++    # on the test, its class, or its module's pytestmark -- so a runner can run
++    # it where that exists, and every other test where it does not. A test that
++    # needs one and does not say so fails on a machine without it.
++    config.addinivalue_line(
++        "markers",
++        "gpu: the test needs a GPU (a GPU build of vLLM resolves no platform "
++        "without one)",
++    )
++    config.addinivalue_line(
++        "markers",
++        "network: the test needs the network: the Hugging Face hub or a remote URL",
++    )
++
++
+ def pytest_collection_modifyitems(config, items):
+     if config.getoption("--optional"):
+         # --optional given in cli: do not skip optional tests
+diff --git a/tests/detokenizer/test_min_tokens.py b/tests/detokenizer/test_min_tokens.py
+index e0c376094f59ec1300a86170ba003f7645d88f31..7731b700ac420b4294d8b3f58e1e6ac370ab25cd 100644
+--- a/tests/detokenizer/test_min_tokens.py
++++ b/tests/detokenizer/test_min_tokens.py
+@@ -8,6 +8,8 @@ from vllm import SamplingParams
+ from vllm.v1.engine import EngineCoreRequest
+ from vllm.v1.engine.detokenizer import FastIncrementalDetokenizer
+ 
++pytestmark = pytest.mark.network
++
+ PROMPT = "Hello, my name is Lee, and I'm a student in the " + "college of engineering"
+ 
+ 
+diff --git a/tests/distributed/test_rocm_quick_reduce.py b/tests/distributed/test_rocm_quick_reduce.py
+index 2db724dc70e23a4f8d017e0f6935bea18da1d949..310bf42419079db8bba0a7052df011ab7a61e3a2 100644
+--- a/tests/distributed/test_rocm_quick_reduce.py
++++ b/tests/distributed/test_rocm_quick_reduce.py
+@@ -25,10 +25,13 @@ from vllm.utils.network_utils import get_open_port
+ 
+ from ..utils import multi_gpu_test
+ 
+-pytestmark = pytest.mark.skipif(
+-    not current_platform.is_rocm(),
+-    reason="ROCm-only quick-reduce tests",
+-)
++pytestmark = [
++    pytest.mark.gpu,
++    pytest.mark.skipif(
++        not current_platform.is_rocm(),
++        reason="ROCm-only quick-reduce tests",
++    ),
++]
+ 
+ MB = 1024 * 1024
+ WORLD_SIZE = 2
+diff --git a/tests/engine/test_arg_utils.py b/tests/engine/test_arg_utils.py
+index 7e82694e486e84a823220b12cbe3bb593ea9ef91..eef1090a7be7e3a54e4dc0251902307e94873295 100644
+--- a/tests/engine/test_arg_utils.py
++++ b/tests/engine/test_arg_utils.py
+@@ -206,6 +206,7 @@ def test_get_kwargs():
+     assert kwargs["nested_config"]["type"]('{"field": 2}') == NestedConfig(2)  # type: ignore[call-arg]
+ 
+ 
++@pytest.mark.gpu
+ def test_jit_monitor_verbose_arg():
+     parser = EngineArgs.add_cli_args(FlexibleArgumentParser())
+     args = parser.parse_args(["--jit-monitor-verbose"])
+@@ -214,6 +215,7 @@ def test_jit_monitor_verbose_arg():
+     assert EngineArgs(model="test", jit_monitor_verbose=True).jit_monitor_verbose
+ 
+ 
++@pytest.mark.gpu
+ @pytest.mark.parametrize("mode", ["warn", "error"])
+ def test_jit_monitor_mode_arg(mode):
+     parser = EngineArgs.add_cli_args(FlexibleArgumentParser())
+@@ -234,6 +236,7 @@ def test_hf_token_get_kwargs():
+     assert "action" not in kwargs
+ 
+ 
++@pytest.mark.gpu
+ @pytest.mark.parametrize(
+     ("cli_args", "expected"),
+     [
+@@ -251,6 +254,7 @@ def test_hf_token_cli_arg(cli_args, expected):
+     assert args.hf_token == expected
+ 
+ 
++@pytest.mark.gpu
+ @pytest.mark.parametrize(
+     ("arg", "expected"),
+     [
+@@ -275,6 +279,7 @@ def test_media_io_kwargs_parser(arg, expected):
+     assert args.media_io_kwargs == expected
+ 
+ 
++@pytest.mark.gpu
+ @pytest.mark.parametrize(
+     ("args", "expected"),
+     [
+@@ -298,6 +303,7 @@ def test_optimization_level(args, expected):
+     assert parsed_args.compilation_config.mode is None
+ 
+ 
++@pytest.mark.gpu
+ @pytest.mark.parametrize(
+     ("args", "expected"),
+     [
+@@ -316,6 +322,7 @@ def test_mode_parser(args, expected):
+     assert parsed_args.compilation_config.mode == expected
+ 
+ 
++@pytest.mark.gpu
+ def test_compilation_config():
+     parser = EngineArgs.add_cli_args(FlexibleArgumentParser())
+ 
+@@ -351,6 +358,7 @@ def test_compilation_config():
+     )
+ 
+ 
++@pytest.mark.gpu
+ def test_attention_config():
+     from vllm.v1.attention.backends.registry import AttentionBackendEnum
+ 
+@@ -469,6 +477,7 @@ def test_attention_config():
+         engine_args.create_engine_config()
+ 
+ 
++@pytest.mark.gpu
+ def test_prefix_cache_default():
+     parser = EngineArgs.add_cli_args(FlexibleArgumentParser())
+     args = parser.parse_args([])
+@@ -488,6 +497,7 @@ def test_prefix_cache_default():
+     assert not engine_args.enable_prefix_caching
+ 
+ 
++@pytest.mark.gpu
+ @pytest.mark.parametrize(
+     ("arg", "expected", "option"),
+     [
+@@ -506,6 +516,7 @@ def test_composite_arg_parser(arg, expected, option):
+     assert getattr(args, option.replace("-", "_")) == expected
+ 
+ 
++@pytest.mark.gpu
+ def test_human_readable_model_len():
+     # `exit_on_error` disabled to test invalid values below
+     parser = EngineArgs.add_cli_args(FlexibleArgumentParser(exit_on_error=False))
+@@ -565,6 +576,7 @@ def test_human_readable_model_len():
+             parser.parse_args(["--max-model-len", invalid])
+ 
+ 
++@pytest.mark.gpu
+ def test_human_readable_other_args():
+     # Test human-readable parsing for other integer args
+     # that were added to use human_readable_int parser
+@@ -597,6 +609,7 @@ def test_human_readable_other_args():
+     assert args.max_num_batched_tokens == 2**10 * 4
+ 
+ 
++@pytest.mark.gpu
+ def test_numa_bind_args():
+     parser = EngineArgs.add_cli_args(FlexibleArgumentParser())
+     args = parser.parse_args(
+@@ -620,6 +633,8 @@ def test_numa_bind_args():
+     assert engine_args.numa_bind_cpus == ["0-3", "4-7", "8-11", "12-15"]
+ 
+ 
++@pytest.mark.gpu
++@pytest.mark.network
+ def test_ir_op_priority():
+     from vllm.config.kernel import IrOpPriorityConfig, KernelConfig
+ 
+@@ -695,6 +710,7 @@ def test_cloud_storage_tokenizer_skips_get_model_path(monkeypatch):
+ 
+ 
+ class TestDeviceIds:
++    @pytest.mark.network
+     def test_device_ids_with_cvd_out_of_range(self, monkeypatch):
+         """--device-ids index beyond the CVD set raises ValueError."""
+         from vllm.platforms import current_platform
+@@ -705,6 +721,7 @@ class TestDeviceIds:
+         with pytest.raises(ValueError, match="out of range"):
+             args._resolve_device_ids()
+ 
++    @pytest.mark.network
+     def test_device_ids_with_cvd_resolve_to_physical_ids(self, monkeypatch):
+         """--device-ids are CVD-local indices resolved to physical ids."""
+         from vllm.platforms import current_platform
+@@ -714,6 +731,7 @@ class TestDeviceIds:
+         args = EngineArgs(model="m", device_ids=[0, 1])
+         assert args._resolve_device_ids() == [4, 5]
+ 
++    @pytest.mark.network
+     def test_device_ids_with_uuid_cvd_resolve_to_physical_ids(self, monkeypatch):
+         """--device-ids support UUID CVD values resolved by the platform."""
+         from vllm.platforms import current_platform
+@@ -731,6 +749,7 @@ class TestDeviceIds:
+         args = EngineArgs(model="m", device_ids=[0, 1])
+         assert args._resolve_device_ids() == [4, 5]
+ 
++    @pytest.mark.network
+     def test_device_ids_with_uuid_args_resolve_to_physical_ids(self, monkeypatch):
+         """UUID --device-ids are resolved to physical IDs immediately."""
+         from vllm.platforms import current_platform
+@@ -744,17 +763,20 @@ class TestDeviceIds:
+         args = EngineArgs(model="m", device_ids=["GPU-abcd1234"])
+         assert args._resolve_device_ids() == [4]
+ 
++    @pytest.mark.network
+     def test_device_ids_reject_mixed_integer_and_uuid_args(self):
+         """--device-ids must not mix CVD indices and UUIDs."""
+         args = EngineArgs(model="m", device_ids=[0, "GPU-abcd1234"])
+         with pytest.raises(ValueError, match="must not mix"):
+             args._resolve_device_ids()
+ 
++    @pytest.mark.network
+     def test_no_device_ids(self):
+         """No --device-ids returns None."""
+         args = EngineArgs(model="m")
+         assert args._resolve_device_ids() is None
+ 
++    @pytest.mark.gpu
+     def test_cli_parsing(self):
+         """--device-ids parses comma-separated string from CLI."""
+         parser = FlexibleArgumentParser()
+@@ -762,6 +784,7 @@ class TestDeviceIds:
+         parsed = parser.parse_args(["--model", "m", "--device-ids", "0,2,4"])
+         assert parsed.device_ids == [0, 2, 4]
+ 
++    @pytest.mark.gpu
+     def test_cli_parsing_uuid(self):
+         """--device-ids parses comma-separated UUID strings from CLI."""
+         parser = FlexibleArgumentParser()
+@@ -804,12 +827,14 @@ class TestDeviceIds:
+ 
+         assert current_platform.logical_device_id_to_visible_device_id(0) == 1
+ 
++    @pytest.mark.network
+     def test_device_ids_reject_duplicates(self):
+         """--device-ids must not contain duplicate entries."""
+         args = EngineArgs(model="m", device_ids=[2, 2])
+         with pytest.raises(ValueError, match="duplicates"):
+             args._resolve_device_ids()
+ 
++    @pytest.mark.gpu
+     def test_cli_parsing_strips_whitespace(self):
+         """--device-ids tolerates whitespace around commas."""
+         parser = FlexibleArgumentParser()
+diff --git a/tests/entrypoints/multimodal/openai/chat_completion/test_video.py b/tests/entrypoints/multimodal/openai/chat_completion/test_video.py
+index a88f2dc6399366348de3e8b1e3cd088f3473991d..fc373939a3c86e35fd1aeee031a7cde18b9119d0 100644
+--- a/tests/entrypoints/multimodal/openai/chat_completion/test_video.py
++++ b/tests/entrypoints/multimodal/openai/chat_completion/test_video.py
+@@ -12,6 +12,8 @@ from vllm.assets.base import VLLM_S3_BUCKET_URL
+ from vllm.multimodal.utils import encode_video_url, fetch_video
+ from vllm.platforms import current_platform
+ 
++pytestmark = [pytest.mark.gpu, pytest.mark.network]
++
+ MODEL_NAME = "llava-hf/llava-onevision-qwen2-0.5b-ov-hf"
+ MAXIMUM_VIDEOS = 3
+ 
+diff --git a/tests/entrypoints/multimodal/openai/chat_completion/test_vision.py b/tests/entrypoints/multimodal/openai/chat_completion/test_vision.py
+index efe45ee482ccd1d5866b9fee360f9dda090122e7..86347a7e2ef12fb36e3984af1a87ccb4b69a7ff3 100644
+--- a/tests/entrypoints/multimodal/openai/chat_completion/test_vision.py
++++ b/tests/entrypoints/multimodal/openai/chat_completion/test_vision.py
+@@ -14,6 +14,8 @@ from vllm.multimodal.media import MediaWithBytes
+ from vllm.multimodal.utils import encode_image_url, fetch_image
+ from vllm.platforms import current_platform
+ 
++pytestmark = [pytest.mark.gpu, pytest.mark.network]
++
+ MODEL_NAME = "microsoft/Phi-3.5-vision-instruct"
+ MAXIMUM_IMAGES = 2
+ 
+diff --git a/tests/entrypoints/openai/chat_completion/test_chat_completion.py b/tests/entrypoints/openai/chat_completion/test_chat_completion.py
+index 855b7b1c2cce4e98a817e0eff82e213d841044b6..f1215da0fd2dd8d493d0950fdd5a10b07d665abb 100644
+--- a/tests/entrypoints/openai/chat_completion/test_chat_completion.py
++++ b/tests/entrypoints/openai/chat_completion/test_chat_completion.py
+@@ -7,6 +7,8 @@ import pytest_asyncio
+ 
+ from tests.utils import RemoteOpenAIServer
+ 
++pytestmark = [pytest.mark.gpu, pytest.mark.network]
++
+ # any model with a chat template defined in tokenizer_config should work here
+ MODEL_NAME = "Qwen/Qwen2.5-1.5B-Instruct"
+ 
+diff --git a/tests/entrypoints/openai/chat_completion/test_chat_error.py b/tests/entrypoints/openai/chat_completion/test_chat_error.py
+index e23093dd1581d825de5c291fe2b099787446a8b2..f007bcef5c7d0680e7b965b1543149da6af8dec1 100644
+--- a/tests/entrypoints/openai/chat_completion/test_chat_error.py
++++ b/tests/entrypoints/openai/chat_completion/test_chat_error.py
+@@ -120,6 +120,7 @@ def _build_serving_chat(engine: AsyncLLM) -> OpenAIServingChat:
+     return serving_chat
+ 
+ 
++@pytest.mark.network
+ @pytest.mark.asyncio
+ async def test_chat_error_non_stream():
+     """test finish_reason='error' returns 500 InternalServerError (non-streaming)"""
+@@ -172,6 +173,7 @@ async def test_chat_error_non_stream():
+         await serving_chat.create_chat_completion(request)
+ 
+ 
++@pytest.mark.network
+ @pytest.mark.asyncio
+ async def test_openai_chat_keeps_mm_cache_for_engine_execution():
+     mock_engine = MagicMock(spec=AsyncLLM)
+@@ -224,6 +226,7 @@ def _build_serving_render(engine: AsyncLLM) -> ServingRender:
+     return serving_render
+ 
+ 
++@pytest.mark.network
+ @pytest.mark.asyncio
+ async def test_renderer_only_chat_request_skips_mm_cache():
+     mock_engine = MagicMock(spec=AsyncLLM)
+@@ -248,6 +251,7 @@ async def test_renderer_only_chat_request_skips_mm_cache():
+     )
+ 
+ 
++@pytest.mark.network
+ @pytest.mark.asyncio
+ async def test_chat_error_stream():
+     """test finish_reason='error' returns 500 InternalServerError (streaming)"""
+diff --git a/tests/entrypoints/openai/chat_completion/test_logprob_token_ids.py b/tests/entrypoints/openai/chat_completion/test_logprob_token_ids.py
+index 4418be27896135a53ac14e0a005abf2f65d475d7..46741c14efb261e5447b3f60ceedf6dfc07b0da6 100644
+--- a/tests/entrypoints/openai/chat_completion/test_logprob_token_ids.py
++++ b/tests/entrypoints/openai/chat_completion/test_logprob_token_ids.py
+@@ -119,6 +119,8 @@ def test_requests_reject_explicit_token_ids_with_beam_search():
+         )
+ 
+ 
++@pytest.mark.gpu
++@pytest.mark.network
+ @pytest.mark.asyncio
+ @pytest.mark.parametrize(
+     ("requested_ids", "top_logprobs", "sampled_id"),
+@@ -158,6 +160,8 @@ async def test_logprob_token_ids_returns_requested_ids(
+             assert not math.isinf(e.logprob)
+ 
+ 
++@pytest.mark.gpu
++@pytest.mark.network
+ @pytest.mark.asyncio
+ async def test_logprob_token_ids_stream_with_no_top_k(server):
+     async with server.get_async_client() as client:
+@@ -188,6 +192,8 @@ async def test_logprob_token_ids_stream_with_no_top_k(server):
+     assert set(returned_token_ids) == {42, 5000}
+ 
+ 
++@pytest.mark.gpu
++@pytest.mark.network
+ @pytest.mark.asyncio
+ async def test_logprob_token_ids_default_behavior_unchanged(server):
+     """Without `logprob_token_ids`, the response carries the natural top-k
+diff --git a/tests/entrypoints/openai/chat_completion/test_serving_chat.py b/tests/entrypoints/openai/chat_completion/test_serving_chat.py
+index a2a3ca052c6d9b6773ee799e836bf0f71721061b..e24eaefc95081ceb7e09991553824206236d8a6c 100644
+--- a/tests/entrypoints/openai/chat_completion/test_serving_chat.py
++++ b/tests/entrypoints/openai/chat_completion/test_serving_chat.py
+@@ -166,6 +166,8 @@ async def gptoss_speculative_client(gptoss_speculative_server):
+ 
+ 
+ class TestGPTOSSChat:
++    @pytest.mark.gpu
++    @pytest.mark.network
+     @pytest.mark.asyncio
+     async def test_gpt_oss_chat_tool_call_streaming(
+         self, gptoss_client: OpenAI, with_tool_parser: bool
+@@ -224,6 +226,8 @@ class TestGPTOSSChat:
+             assert len(args_buf) == 0
+             assert len(content_buf) > 0
+ 
++    @pytest.mark.gpu
++    @pytest.mark.network
+     @pytest.mark.asyncio
+     async def test_gpt_oss_multi_turn_chat(
+         self, gptoss_client: OpenAI, with_tool_parser: bool
+@@ -290,6 +294,8 @@ class TestGPTOSSChat:
+             second_msg.tool_calls is not None and len(second_msg.tool_calls) > 0
+         )
+ 
++    @pytest.mark.gpu
++    @pytest.mark.network
+     @pytest.mark.asyncio
+     async def test_gpt_oss_tool_message_array_content(
+         self, gptoss_client: OpenAI, with_tool_parser: bool
+@@ -415,6 +421,8 @@ class TestGPTOSSChat:
+         assert response_multi_array is not None
+         assert response_multi_array.choices[0].message is not None
+ 
++    @pytest.mark.gpu
++    @pytest.mark.network
+     @pytest.mark.asyncio
+     async def test_gpt_oss_tool_choice_none(
+         self,
+@@ -480,6 +488,8 @@ class TestGPTOSSChat:
+ 
+ 
+ class TestGPTOSSSpeculativeChat:
++    @pytest.mark.gpu
++    @pytest.mark.network
+     @pytest.mark.asyncio
+     async def test_gpt_oss_speculative_reasoning_leakage(
+         self,
+@@ -914,6 +924,7 @@ def test_mm_prompt_tokens_details():
+     assert details.multimodal_tokens == {"image": 600, "video": 1200}
+ 
+ 
++@pytest.mark.network
+ @pytest.mark.asyncio
+ async def test_serving_chat_returns_correct_model_name():
+     mock_engine = MagicMock(spec=AsyncLLM)
+@@ -943,6 +954,7 @@ async def test_serving_chat_returns_correct_model_name():
+     assert await serving_chat.create_chat_completion(req) == MODEL_NAME
+ 
+ 
++@pytest.mark.network
+ @pytest.mark.asyncio
+ @pytest.mark.parametrize("include_reasoning", [True, False])
+ async def test_include_reasoning_leaves_the_reasoning_state_to_the_prompt(
+@@ -970,6 +982,7 @@ async def test_include_reasoning_leaves_the_reasoning_state_to_the_prompt(
+     assert mock_engine.admit.call_args.kwargs["reasoning_ended"] is False
+ 
+ 
++@pytest.mark.network
+ @pytest.mark.asyncio
+ async def test_serving_chat_should_set_correct_max_tokens():
+     mock_engine = MagicMock(spec=AsyncLLM)
+@@ -1202,6 +1215,7 @@ async def test_serving_chat_mistral_token_ids_prompt_too_long_is_rejected():
+         await serving_chat.create_chat_completion(req)
+ 
+ 
++@pytest.mark.network
+ @pytest.mark.asyncio
+ async def test_serving_chat_could_load_correct_generation_config():
+     mock_model_config = MockModelConfig()
+@@ -1249,6 +1263,7 @@ async def test_serving_chat_could_load_correct_generation_config():
+     assert mock_engine.admit.call_args.args[1].repetition_penalty == 1.05
+ 
+ 
++@pytest.mark.network
+ @pytest.mark.parametrize("model_type", ["gpt_oss", "any"])
+ @pytest.mark.asyncio
+ async def test_serving_chat_did_set_correct_cache_salt(model_type):
+@@ -1301,6 +1316,7 @@ async def test_serving_chat_did_set_correct_cache_salt(model_type):
+     assert captured_inputs[0]["cache_salt"] == "test_salt"
+ 
+ 
++@pytest.mark.network
+ @pytest.mark.asyncio
+ async def test_serving_chat_data_parallel_rank_extraction():
+     """Test that data_parallel_rank is properly extracted from header and
+@@ -1530,6 +1546,7 @@ class TestServingChatWithHarmony:
+             return await accumulate_streaming_response(result)
+         return await result
+ 
++    @pytest.mark.network
+     @pytest.mark.asyncio
+     @pytest.mark.parametrize(
+         "include_reasoning", [True, False], ids=["with_reasoning", "no_reasoning"]
+@@ -1596,6 +1613,7 @@ class TestServingChatWithHarmony:
+             expected_input_messages_2,
+         )
+ 
++    @pytest.mark.network
+     @pytest.mark.asyncio
+     async def test_system_message_without_tools(self, serving_chat, stream):
+         """Leading system message produces a developer message with
+@@ -1618,6 +1636,7 @@ class TestServingChatWithHarmony:
+             ],
+         )
+ 
++    @pytest.mark.network
+     @pytest.mark.asyncio
+     async def test_system_message_with_tools(self, serving_chat, stream, weather_tools):
+         """Leading system message is folded into the developer message
+@@ -1643,6 +1662,7 @@ class TestServingChatWithHarmony:
+             ],
+         )
+ 
++    @pytest.mark.network
+     @pytest.mark.asyncio
+     async def test_tool_call_response_with_content(
+         self, serving_chat, stream, weather_tools, weather_messages_start
+@@ -1726,6 +1746,7 @@ class TestServingChatWithHarmony:
+             ],
+         )
+ 
++    @pytest.mark.network
+     @pytest.mark.asyncio
+     async def test_multi_turn_tools_and_reasoning(
+         self, serving_chat, stream, weather_tools, weather_messages_start
+@@ -1941,6 +1962,7 @@ class TestServingChatWithHarmony:
+             ],
+         )
+ 
++    @pytest.mark.network
+     @pytest.mark.asyncio
+     async def test_non_tool_reasoning(self, serving_chat):
+         messages: list[dict[str, Any]] = [
+@@ -1974,6 +1996,7 @@ class TestServingChatWithHarmony:
+             ],
+         )
+ 
++    @pytest.mark.network
+     @pytest.mark.asyncio
+     async def test_non_tool_reasoning_empty_content(self, serving_chat):
+         messages: list[dict[str, Any]] = [
+@@ -2003,6 +2026,7 @@ class TestServingChatWithHarmony:
+             ],
+         )
+ 
++    @pytest.mark.network
+     @pytest.mark.asyncio
+     async def test_non_tool_reasoning_empty_content_list(self, serving_chat):
+         messages: list[dict[str, Any]] = [
+@@ -2033,6 +2057,7 @@ class TestServingChatWithHarmony:
+         )
+ 
+ 
++@pytest.mark.network
+ @pytest.mark.asyncio
+ async def test_tool_choice_validation_without_parser():
+     """Test that tool_choice='required' or named tool without tool_parser
+@@ -2108,6 +2133,7 @@ async def test_tool_choice_validation_without_parser():
+     assert "ChatCompletionNamedToolChoiceParam" not in response_named.error.message
+ 
+ 
++@pytest.mark.network
+ @pytest.mark.asyncio
+ async def test_streaming_n_gt1_independent_tool_parsers():
+     """n>1 streaming must use independent parser instances
+diff --git a/tests/entrypoints/openai/completion/test_completion.py b/tests/entrypoints/openai/completion/test_completion.py
+index 90fdf07e18c2c23d99a24638576b27ef72a19651..d10757d517ffe42cc35243182c7ba3335cb7f6de 100644
+--- a/tests/entrypoints/openai/completion/test_completion.py
++++ b/tests/entrypoints/openai/completion/test_completion.py
+@@ -13,6 +13,8 @@ from vllm.entrypoints.openai.completion.protocol import CompletionRequest
+ from vllm.sampling_params import SamplingParams
+ from vllm.tokenizers import get_tokenizer
+ 
++pytestmark = [pytest.mark.gpu, pytest.mark.network]
++
+ # any model with a chat template should work here
+ MODEL_NAME = "facebook/opt-125m"
+ 
+diff --git a/tests/entrypoints/openai/completion/test_completion_error.py b/tests/entrypoints/openai/completion/test_completion_error.py
+index 6e91cf0547a95014af8bbc2cd9eb9c77737b52b1..808b192436afae5879366334838627e03c83e268 100644
+--- a/tests/entrypoints/openai/completion/test_completion_error.py
++++ b/tests/entrypoints/openai/completion/test_completion_error.py
+@@ -196,6 +196,7 @@ def test_completion_per_request_metrics_suppressed_for_multiple_prompts():
+     assert response.metrics is None
+ 
+ 
++@pytest.mark.network
+ @pytest.mark.asyncio
+ async def test_completion_error_non_stream():
+     """test finish_reason='error' returns 500 InternalServerError (non-streaming)"""
+@@ -248,6 +249,7 @@ async def test_completion_error_non_stream():
+         await serving_completion.create_completion(request)
+ 
+ 
++@pytest.mark.network
+ @pytest.mark.asyncio
+ async def test_openai_completion_keeps_mm_cache_for_engine_execution():
+     mock_engine = MagicMock(spec=AsyncLLM)
+@@ -305,6 +307,7 @@ def _build_serving_render(engine: AsyncLLM) -> ServingRender:
+     return serving_render
+ 
+ 
++@pytest.mark.network
+ @pytest.mark.asyncio
+ async def test_renderer_only_completion_request_skips_mm_cache():
+     mock_engine = MagicMock(spec=AsyncLLM)
+@@ -335,6 +338,7 @@ async def test_renderer_only_completion_request_skips_mm_cache():
+     )
+ 
+ 
++@pytest.mark.network
+ @pytest.mark.asyncio
+ async def test_completion_error_stream():
+     """test finish_reason='error' returns 500 InternalServerError (streaming)"""
+diff --git a/tests/entrypoints/openai/completion/test_lora_resolvers.py b/tests/entrypoints/openai/completion/test_lora_resolvers.py
+index cec5ef9842b2a168ec8bd19bc4f2006162a297d7..9953b900c1cf29f2515b561dbea5ba980567c3b0 100644
+--- a/tests/entrypoints/openai/completion/test_lora_resolvers.py
++++ b/tests/entrypoints/openai/completion/test_lora_resolvers.py
+@@ -21,6 +21,8 @@ from vllm.renderers.online_renderer import OnlineRenderer
+ from vllm.tokenizers.registry import cached_tokenizer_from_config
+ from vllm.v1.engine.async_llm import AsyncLLM
+ 
++pytestmark = pytest.mark.network
++
+ MODEL_NAME = "openai-community/gpt2"
+ BASE_MODEL_PATHS = [BaseModelPath(name=MODEL_NAME, model_path=MODEL_NAME)]
+ 
+diff --git a/tests/entrypoints/openai/responses/test_basic.py b/tests/entrypoints/openai/responses/test_basic.py
+index 1202f84a81f1eb113175867c6c4cf214f726256b..d7570c7a74b98b57472c38db256ec5486baac539 100644
+--- a/tests/entrypoints/openai/responses/test_basic.py
++++ b/tests/entrypoints/openai/responses/test_basic.py
+@@ -5,6 +5,8 @@ import openai  # use the official client for correctness check
+ import openai.types.responses as openai_responses_types
+ import pytest
+ 
++pytestmark = [pytest.mark.gpu, pytest.mark.network]
++
+ 
+ @pytest.mark.asyncio
+ async def test_simple_input(client: openai.AsyncOpenAI):
+diff --git a/tests/entrypoints/openai/responses/test_parsable_context.py b/tests/entrypoints/openai/responses/test_parsable_context.py
+index 4270f2fcf187ca434e58e3c6e1698fbfefe64b03..9798c9103355b8103f3e9db585948c97f18223c0 100644
+--- a/tests/entrypoints/openai/responses/test_parsable_context.py
++++ b/tests/entrypoints/openai/responses/test_parsable_context.py
+@@ -17,6 +17,8 @@ from .conftest import (
+     retry_for_tool_call,
+ )
+ 
++pytestmark = [pytest.mark.gpu, pytest.mark.network]
++
+ logger = logging.getLogger(__name__)
+ 
+ MODEL_NAME = "Qwen/Qwen3-8B"
+diff --git a/tests/entrypoints/openai/responses/test_simple.py b/tests/entrypoints/openai/responses/test_simple.py
+index 2548b3ba8c5148107fa77dbeca456720f1f3af71..f79fcccb903469d1781dc338765832d5d711bb6d 100644
+--- a/tests/entrypoints/openai/responses/test_simple.py
++++ b/tests/entrypoints/openai/responses/test_simple.py
+@@ -9,6 +9,8 @@ from tests.utils import RemoteOpenAIServer
+ 
+ from .conftest import validate_streaming_event_stack
+ 
++pytestmark = [pytest.mark.gpu, pytest.mark.network]
++
+ MODEL_NAME = "Qwen/Qwen3-8B"
+ 
+ 
+diff --git a/tests/entrypoints/openai/test_return_tokens_as_ids.py b/tests/entrypoints/openai/test_return_tokens_as_ids.py
+index 05a36febad0cce1445d331859a772479379e2522..0a8c2cc3d4fefdf18f2c48e24b4e6628c1a1c53c 100644
+--- a/tests/entrypoints/openai/test_return_tokens_as_ids.py
++++ b/tests/entrypoints/openai/test_return_tokens_as_ids.py
+@@ -11,6 +11,8 @@ from vllm.tokenizers import get_tokenizer
+ 
+ from ...utils import RemoteOpenAIServer
+ 
++pytestmark = [pytest.mark.gpu, pytest.mark.network]
++
+ MODEL_NAME = "Qwen/Qwen3-0.6B"
+ 
+ 
+diff --git a/tests/entrypoints/scale_out/derender/test_derender.py b/tests/entrypoints/scale_out/derender/test_derender.py
+index 61e2614a81287f1ffbbe1f9d085e8233c4394611..316bb16039f85c8b4eec380159740692b4e32fdc 100644
+--- a/tests/entrypoints/scale_out/derender/test_derender.py
++++ b/tests/entrypoints/scale_out/derender/test_derender.py
+@@ -10,6 +10,8 @@ import pytest_asyncio
+ from tests.utils import RemoteLaunchRenderServer
+ from vllm.tokenizers import get_tokenizer
+ 
++pytestmark = [pytest.mark.gpu, pytest.mark.network]
++
+ MODEL_NAME = "hmellor/tiny-random-LlamaForCausalLM"
+ 
+ 
+diff --git a/tests/entrypoints/scale_out/derender/test_derender_parity.py b/tests/entrypoints/scale_out/derender/test_derender_parity.py
+index 7f7406cc0acc66a70ece8aa7da03e1140548995c..64784c3d3f0527c48aa57481e0fe5073463ec504 100644
+--- a/tests/entrypoints/scale_out/derender/test_derender_parity.py
++++ b/tests/entrypoints/scale_out/derender/test_derender_parity.py
+@@ -27,6 +27,8 @@ import pytest_asyncio
+ 
+ from tests.utils import RemoteOpenAIServer
+ 
++pytestmark = [pytest.mark.gpu, pytest.mark.network]
++
+ MODEL = "deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B"
+ ARGS = [
+     "--enable-auto-tool-choice",
+diff --git a/tests/entrypoints/scale_out/derender/test_derender_stream.py b/tests/entrypoints/scale_out/derender/test_derender_stream.py
+index 2772b787ef9ef6d4c0cd37fab4496d3c1c6b5470..c7f4f783d288099ab9dd36bba968863abd47d5e8 100644
+--- a/tests/entrypoints/scale_out/derender/test_derender_stream.py
++++ b/tests/entrypoints/scale_out/derender/test_derender_stream.py
+@@ -24,6 +24,8 @@ from vllm.entrypoints.scale_out.token_in_token_out.protocol import (
+     GenerateStreamResponse,
+ )
+ 
++pytestmark = [pytest.mark.gpu, pytest.mark.network]
++
+ MODEL_NAME = "hmellor/tiny-random-LlamaForCausalLM"
+ 
+ 
+diff --git a/tests/entrypoints/scale_out/render/test_render_multimodal.py b/tests/entrypoints/scale_out/render/test_render_multimodal.py
+index aa47a0a60f447fb20d3983cedbbffee5c9a6afbb..acbd99f8c193303bc75f5d2e19516506c246fe72 100644
+--- a/tests/entrypoints/scale_out/render/test_render_multimodal.py
++++ b/tests/entrypoints/scale_out/render/test_render_multimodal.py
+@@ -10,6 +10,8 @@ import pytest_asyncio
+ from tests.utils import RemoteOpenAIServer
+ from vllm.multimodal.utils import encode_image_url
+ 
++pytestmark = [pytest.mark.gpu, pytest.mark.network]
++
+ VISION_MODEL_NAME = "Qwen/Qwen3-VL-2B-Instruct"
+ 
+ 
+diff --git a/tests/entrypoints/scale_out/token_in_token_out/test_serving_multimodal_tokens.py b/tests/entrypoints/scale_out/token_in_token_out/test_serving_multimodal_tokens.py
+index 2c1c49d16d57ef11b0230c0dad49f98bbaa4899e..0ca8d49051703a19fd917318f323d375008e9727 100644
+--- a/tests/entrypoints/scale_out/token_in_token_out/test_serving_multimodal_tokens.py
++++ b/tests/entrypoints/scale_out/token_in_token_out/test_serving_multimodal_tokens.py
+@@ -17,6 +17,8 @@ from PIL import Image
+ from tests.utils import RemoteOpenAIServer
+ from vllm.multimodal.utils import encode_image_url
+ 
++pytestmark = [pytest.mark.gpu, pytest.mark.network]
++
+ MODEL_NAME = "Qwen/Qwen3-VL-2B-Instruct"
+ GEN_ENDPOINT = "/inference/v1/generate"
+ RENDER_ENDPOINT = "/v1/chat/completions/render"
+diff --git a/tests/entrypoints/serve/lora/test_lora_adapters.py b/tests/entrypoints/serve/lora/test_lora_adapters.py
+index cd23e0fafe098dcbab87c3c09911fea91e9bb282..f28f5c5eaf8038a4fd92dd8584c868b6db96a5a6 100644
+--- a/tests/entrypoints/serve/lora/test_lora_adapters.py
++++ b/tests/entrypoints/serve/lora/test_lora_adapters.py
+@@ -12,6 +12,8 @@ import pytest_asyncio
+ 
+ from tests.utils import RemoteOpenAIServer
+ 
++pytestmark = [pytest.mark.gpu, pytest.mark.network]
++
+ # any model with a chat template should work here
+ MODEL_NAME = "Qwen/Qwen3-0.6B"
+ 
+diff --git a/tests/entrypoints/unit_tests/test_chat_utils.py b/tests/entrypoints/unit_tests/test_chat_utils.py
+index a75292d8e8f5ff5fbc50d1af682cd92cb66bc0d4..5d4868bd037302390dd654de32ff338c098a8e32 100644
+--- a/tests/entrypoints/unit_tests/test_chat_utils.py
++++ b/tests/entrypoints/unit_tests/test_chat_utils.py
+@@ -33,6 +33,8 @@ from vllm.multimodal.utils import (
+ from vllm.renderers.params import ChatParams
+ from vllm.utils.serial_utils import tensor2base64
+ 
++pytestmark = pytest.mark.network
++
+ KIMI_K2_5_MODEL_ID = "moonshotai/Kimi-K2.5"
+ PHI3V_MODEL_ID = "microsoft/Phi-3.5-vision-instruct"
+ QWEN2AUDIO_MODEL_ID = "Qwen/Qwen2-Audio-7B-Instruct"
+diff --git a/tests/models/language/pooling/test_reward.py b/tests/models/language/pooling/test_reward.py
+index 7ec1f2f358c9aa0ead01cd12ffe5f328221689da..169a692fe4343396a5b2e868bab4042c5f158ba5 100644
+--- a/tests/models/language/pooling/test_reward.py
++++ b/tests/models/language/pooling/test_reward.py
+@@ -15,6 +15,8 @@ from ....conftest import HfRunner
+ from ....utils import VLLM_PATH
+ from ...registry import HF_EXAMPLE_MODELS
+ 
++pytestmark = [pytest.mark.gpu, pytest.mark.network]
++
+ if TYPE_CHECKING:
+     from _typeshed import StrPath
+ 
+diff --git a/tests/multimodal/media/test_connector.py b/tests/multimodal/media/test_connector.py
+index fe8ec840e59b5ecd977b211029c20b6175f5eda7..04879d3e21debae8aa0cb85f25e73a773a534174 100644
+--- a/tests/multimodal/media/test_connector.py
++++ b/tests/multimodal/media/test_connector.py
+@@ -57,6 +57,16 @@ def _image_equals(a: Image.Image, b: Image.Image) -> bool:
+     return (np.asarray(a) == np.asarray(convert_image_mode(b, a.mode))).all()
+ 
+ 
++@pytest.mark.xfail(
++    strict=True,
++    raises=VLLMUnprocessableEntityError,
++    reason=(
++        "Refused by the Qwen3.8 image contract (stage qwen38-vision-runtime), "
++        "which this fork applies to every model it serves: it admits only an "
++        "inline lossless PNG data URL, and this test reads an image another "
++        "way."
++    ),
++)
+ @pytest.mark.asyncio
+ @pytest.mark.parametrize("image_url", TEST_IMAGE_ASSETS, indirect=True)
+ async def test_fetch_image_http(image_url: str):
+@@ -67,6 +77,16 @@ async def test_fetch_image_http(image_url: str):
+     assert _image_equals(image_sync, image_async)
+ 
+ 
++@pytest.mark.xfail(
++    strict=True,
++    raises=VLLMUnprocessableEntityError,
++    reason=(
++        "Refused by the Qwen3.8 image contract (stage qwen38-vision-runtime), "
++        "which this fork applies to every model it serves: it admits only an "
++        "inline lossless PNG data URL, and this test reads an image another "
++        "way."
++    ),
++)
+ @pytest.mark.asyncio
+ @pytest.mark.parametrize("raw_image_url", TEST_IMAGE_ASSETS)
+ @pytest.mark.parametrize("suffix", get_supported_suffixes())
+@@ -111,6 +131,16 @@ async def test_fetch_image_base64(
+         assert _image_equals(data_image_sync, data_image_async)
+ 
+ 
++@pytest.mark.xfail(
++    strict=True,
++    raises=VLLMUnprocessableEntityError,
++    reason=(
++        "Refused by the Qwen3.8 image contract (stage qwen38-vision-runtime), "
++        "which this fork applies to every model it serves: it admits only an "
++        "inline lossless PNG data URL, and this test reads an image another "
++        "way."
++    ),
++)
+ @pytest.mark.asyncio
+ @pytest.mark.parametrize("image_url", TEST_IMAGE_ASSETS, indirect=True)
+ async def test_fetch_image_local_files(image_url: str):
+@@ -152,6 +182,16 @@ async def test_fetch_image_local_files(image_url: str):
+             connector.fetch_image(f"file://{temp_dir}/../{os.path.basename(image_url)}")
+ 
+ 
++@pytest.mark.xfail(
++    strict=True,
++    raises=VLLMUnprocessableEntityError,
++    reason=(
++        "Refused by the Qwen3.8 image contract (stage qwen38-vision-runtime), "
++        "which this fork applies to every model it serves: it admits only an "
++        "inline lossless PNG data URL, and this test reads an image another "
++        "way."
++    ),
++)
+ @pytest.mark.asyncio
+ @pytest.mark.parametrize("image_url", [TEST_IMAGE_ASSETS[0]], indirect=True)
+ async def test_fetch_image_local_files_with_space_in_name(image_url: str):
+@@ -192,6 +232,7 @@ async def test_fetch_image_error_conversion():
+         connector.fetch_image(broken_img)
+ 
+ 
++@pytest.mark.network
+ @pytest.mark.flaky(reruns=3, reruns_delay=5)
+ @pytest.mark.asyncio
+ @pytest.mark.parametrize("video_url", TEST_VIDEO_URLS)
+@@ -215,6 +256,7 @@ async def test_fetch_video_http(video_url: str, num_frames: int):
+     assert metadata_sync == metadata_async
+ 
+ 
++@pytest.mark.network
+ @pytest.mark.asyncio
+ @pytest.mark.parametrize("video_url", TEST_VIDEO_URLS)
+ @pytest.mark.parametrize("max_duration", [1, 60, 1800])
+@@ -295,6 +337,7 @@ def test_placeholder_range_extract_embeds_range(offset, is_embed, expected):
+     assert pr.extract_embeds_range() == expected
+ 
+ 
++@pytest.mark.network
+ @pytest.mark.asyncio
+ @pytest.mark.parametrize("video_url", TEST_VIDEO_URLS)
+ @pytest.mark.parametrize("num_frames", [-1, 32, 1800])
+diff --git a/tests/multimodal/media/test_video.py b/tests/multimodal/media/test_video.py
+index 6ec76022bf05d3ebe2594bd26e6b4ba260067683..9f86261a228d17c289d2a911cf3e6a69d4b2e67f 100644
+--- a/tests/multimodal/media/test_video.py
++++ b/tests/multimodal/media/test_video.py
+@@ -72,6 +72,7 @@ def test_video_media_io_kwargs(monkeypatch: pytest.MonkeyPatch):
+             _ = videoio.load_bytes(b"test")
+ 
+ 
++@pytest.mark.network
+ @pytest.mark.parametrize("is_color", [True, False])
+ @pytest.mark.parametrize("fourcc, ext", [("mp4v", "mp4"), ("XVID", "avi")])
+ def test_opencv_video_io_colorspace(tmp_path, is_color: bool, fourcc: str, ext: str):
+diff --git a/tests/parser/mistral/test_tool_calls.py b/tests/parser/mistral/test_tool_calls.py
+index 8de5facfb3a6b8fed2ac85678c7f5e17771af394..bb64d96db725db4eb7628fd4461a6a65c0ba233c 100644
+--- a/tests/parser/mistral/test_tool_calls.py
++++ b/tests/parser/mistral/test_tool_calls.py
+@@ -45,6 +45,8 @@ from vllm.tokenizers.detokenizer_utils import detokenize_incrementally
+ from vllm.tokenizers.mistral import MistralTokenizer
+ from vllm.tool_parsers.mistral_tool_parser import MistralToolParser
+ 
++pytestmark = pytest.mark.network
++
+ _DUMMY_REQUEST = ChatCompletionRequest(messages=[], model="test")
+ 
+ 
+diff --git a/tests/reasoning/test_base_thinking_reasoning_parser.py b/tests/reasoning/test_base_thinking_reasoning_parser.py
+index a34641ac6fe155d039bc009172fe7e2772334d6a..b99646b1747017f3817430c1994e6c0ab41f59a9 100644
+--- a/tests/reasoning/test_base_thinking_reasoning_parser.py
++++ b/tests/reasoning/test_base_thinking_reasoning_parser.py
+@@ -8,6 +8,8 @@ from tests.reasoning.utils import run_reasoning_extraction
+ from vllm.entrypoints.openai.chat_completion.protocol import ChatCompletionRequest
+ from vllm.reasoning.basic_parsers import BaseThinkingReasoningParser
+ 
++pytestmark = pytest.mark.network
++
+ 
+ # Create a concrete test implementation of BaseThinkingReasoningParser
+ class TestThinkingReasoningParser(BaseThinkingReasoningParser):
+diff --git a/tests/renderers/test_hf.py b/tests/renderers/test_hf.py
+index 700e445c504041dd7ef5709c05cbad1501fe2ce2..b3726b35690eefae66bfebaa13935f33d15f0615 100644
+--- a/tests/renderers/test_hf.py
++++ b/tests/renderers/test_hf.py
+@@ -111,6 +111,7 @@ def test_no_load_chat_template_literallike():
+     assert template_content == template
+ 
+ 
++@pytest.mark.network
+ @pytest.mark.parametrize(
+     "model",
+     [
+@@ -169,6 +170,7 @@ def test_resolve_chat_template(sample_json_schema, model, use_tools):
+     assert isinstance(chat_template, str)
+ 
+ 
++@pytest.mark.network
+ @pytest.mark.parametrize(
+     "model, expected_kwargs",
+     [
+@@ -361,6 +363,7 @@ def test_resolve_chat_template_kwargs_with_template_name():
+ 
+ # NOTE: Qwen2-Audio default chat template is specially defined inside
+ # processor class instead of using `tokenizer_config.json`
++@pytest.mark.network
+ @pytest.mark.parametrize(
+     ("model", "expected_format"),
+     [
+@@ -421,6 +424,7 @@ def test_resolve_content_format_hf_defined(model, expected_format):
+     assert resolved_format == expected_format
+ 
+ 
++@pytest.mark.network
+ @pytest.mark.parametrize(
+     ("model", "expected_format"),
+     [
+@@ -478,6 +482,7 @@ def test_resolve_content_format_fallbacks(model, expected_format):
+     assert resolved_format == expected_format
+ 
+ 
++@pytest.mark.network
+ @pytest.mark.parametrize(
+     ("template_path", "expected_format"),
+     [
+@@ -534,6 +539,7 @@ def test_resolve_content_format_examples(template_path, expected_format):
+     assert resolved_format == expected_format
+ 
+ 
++@pytest.mark.network
+ @pytest.mark.parametrize(
+     "model,template,add_generation_prompt,continue_final_message,expected_output",
+     MODEL_TEMPLATE_GENERATION_OUTPUT,
+@@ -715,6 +721,7 @@ class TestSafeApplyChatTemplateDeveloperRole:
+     def tokenizer(self):
+         return get_tokenizer("facebook/opt-125m")
+ 
++    @pytest.mark.network
+     def test_developer_converted_to_system_for_chatml(self, model_config, tokenizer):
+         conversation = [
+             {"role": "developer", "content": "You are a helpful assistant."},
+@@ -731,6 +738,7 @@ class TestSafeApplyChatTemplateDeveloperRole:
+         assert "You are a helpful assistant." in result
+         assert "<|im_start|>developer" not in result
+ 
++    @pytest.mark.network
+     def test_developer_preserved_when_template_supports_it(
+         self, model_config, tokenizer
+     ):
+@@ -748,6 +756,7 @@ class TestSafeApplyChatTemplateDeveloperRole:
+         assert "<|im_start|>developer" in result
+         assert "You are a helpful assistant." in result
+ 
++    @pytest.mark.network
+     def test_developer_does_not_crash_strict_template(self, model_config, tokenizer):
+         conversation = [
+             {"role": "developer", "content": "You are a helpful assistant."},
+@@ -763,6 +772,7 @@ class TestSafeApplyChatTemplateDeveloperRole:
+         assert "<|im_start|>system" in result
+         assert "You are a helpful assistant." in result
+ 
++    @pytest.mark.network
+     def test_no_developer_messages_no_overhead(self, model_config, tokenizer):
+         conversation = [
+             {"role": "system", "content": "You are helpful."},
+@@ -778,6 +788,7 @@ class TestSafeApplyChatTemplateDeveloperRole:
+         assert "<|im_start|>system" in result
+         assert "You are helpful." in result
+ 
++    @pytest.mark.network
+     def test_developer_at_non_first_position_consolidated(
+         self, model_config, tokenizer
+     ):
+@@ -800,6 +811,7 @@ class TestSafeApplyChatTemplateDeveloperRole:
+         assert "Be concise." in result
+         assert "What is 2+2?" in result
+ 
++    @pytest.mark.network
+     def test_developer_only_no_prior_system(self, model_config, tokenizer):
+         conversation = [
+             {"role": "user", "content": "Hello"},
+diff --git a/tests/test_config.py b/tests/test_config.py
+index a2c4caeeea6771fed8ac28363da0dde774d3d3e7..875de6b4aeb6eb285d8e4df27c57a4c8579760f2 100644
+--- a/tests/test_config.py
++++ b/tests/test_config.py
+@@ -37,6 +37,7 @@ from vllm.v1.attention.backend import AttentionCGSupport
+ DEVICE_TYPE = current_platform.device_type
+ 
+ 
++@pytest.mark.gpu
+ def test_compile_config_repr_succeeds():
+     # setup: VllmBackend mutates the config object
+     config = VllmConfig()
+@@ -468,6 +469,7 @@ def test_with_hf_config_leaves_unknown_model_type_without_architectures(
+     assert updated.model_config.hf_config.architectures is None
+ 
+ 
++@pytest.mark.gpu
+ def test_async_scheduling_with_pipeline_parallelism_is_allowed():
+     cfg = VllmConfig(
+         scheduler_config=SchedulerConfig(
+@@ -524,6 +526,8 @@ def test_reconfigure_for_independent_dp_rank_on_multinode_dense_model():
+     assert parallel_config.world_size == 8
+ 
+ 
++@pytest.mark.gpu
++@pytest.mark.network
+ def test_draft_model_enables_async_scheduling_by_default():
+     parallel_config = ParallelConfig(distributed_executor_backend="uni")
+     model_config = ModelConfig("Qwen/Qwen3-0.6B", max_model_len=2048)
+@@ -632,6 +636,7 @@ def test_update_config():
+         update_config(config3, {"a": {"nonexistent": 1}})
+ 
+ 
++@pytest.mark.network
+ @pytest.mark.parametrize(
+     ("model_id", "expected_runner_type", "expected_convert_type"),
+     [
+@@ -650,6 +655,7 @@ def test_auto_runner(model_id, expected_runner_type, expected_convert_type):
+     assert config.convert_type == expected_convert_type
+ 
+ 
++@pytest.mark.network
+ @pytest.mark.parametrize(
+     ("model_id", "expected_runner_type", "expected_convert_type"),
+     [
+@@ -668,6 +674,7 @@ def test_pooling_runner(model_id, expected_runner_type, expected_convert_type):
+     assert config.convert_type == expected_convert_type
+ 
+ 
++@pytest.mark.network
+ @pytest.mark.parametrize(
+     ("model_id", "expected_runner_type", "expected_convert_type"),
+     [
+@@ -688,6 +695,7 @@ MODEL_IDS_EXPECTED = [
+ ]
+ 
+ 
++@pytest.mark.network
+ @pytest.mark.parametrize("model_id_expected", MODEL_IDS_EXPECTED)
+ def test_disable_sliding_window(model_id_expected):
+     model_id, expected = model_id_expected
+@@ -695,6 +703,7 @@ def test_disable_sliding_window(model_id_expected):
+     assert model_config.max_model_len == expected
+ 
+ 
++@pytest.mark.network
+ @pytest.mark.skipif(
+     current_platform.is_rocm(), reason="Xformers backend is not supported on ROCm."
+ )
+@@ -708,6 +717,7 @@ def test_get_pooling_config():
+     assert model_config.pooler_config.tok_pooling_type == "ALL"
+ 
+ 
++@pytest.mark.network
+ @pytest.mark.skipif(
+     current_platform.is_rocm(), reason="Xformers backend is not supported on ROCm."
+ )
+@@ -719,6 +729,7 @@ def test_get_pooling_config_from_args():
+     assert asdict(model_config.pooler_config) == asdict(pooler_config)
+ 
+ 
++@pytest.mark.network
+ @pytest.mark.parametrize(
+     ("model_id", "default_pooling_type", "pooling_type"),
+     [
+@@ -732,6 +743,7 @@ def test_default_seq_pooling_type(model_id, default_pooling_type, pooling_type):
+     assert model_config.pooler_config.seq_pooling_type == pooling_type
+ 
+ 
++@pytest.mark.network
+ @pytest.mark.parametrize(
+     ("model_id", "default_pooling_type", "pooling_type"),
+     [
+@@ -745,6 +757,7 @@ def test_default_tok_pooling_type(model_id, default_pooling_type, pooling_type):
+     assert model_config.pooler_config.tok_pooling_type == pooling_type
+ 
+ 
++@pytest.mark.network
+ @pytest.mark.parametrize(
+     ("model_id", "expected_is_moe_model"),
+     [
+@@ -764,6 +777,7 @@ def test_moe_model_detection(model_id, expected_is_moe_model):
+     assert model_config.is_moe == expected_is_moe_model
+ 
+ 
++@pytest.mark.network
+ @pytest.mark.parametrize(
+     ("model_id", "quantized"),
+     [
+@@ -782,6 +796,7 @@ def test_is_quantized(model_id, quantized):
+     assert model_config.is_quantized == quantized
+ 
+ 
++@pytest.mark.network
+ @pytest.mark.skipif(
+     current_platform.is_rocm(), reason="Xformers backend is not supported on ROCm."
+ )
+@@ -795,6 +810,7 @@ def test_get_bert_tokenization_sentence_transformer_config():
+     assert bert_bge_model_config["do_lower_case"]
+ 
+ 
++@pytest.mark.network
+ def test_rope_customization():
+     TEST_ROPE_PARAMETERS = {
+         "rope_theta": 16_000_000.0,
+@@ -842,6 +858,7 @@ def test_rope_customization():
+     assert longchat_model_config.max_model_len == 4096
+ 
+ 
++@pytest.mark.network
+ def test_nested_hf_overrides():
+     """Test that nested hf_overrides work correctly."""
+     # Test with a model that has text_config
+@@ -873,6 +890,7 @@ def test_nested_hf_overrides():
+     assert model_config.hf_config.vision_config.hidden_size == 512
+ 
+ 
++@pytest.mark.network
+ def test_model_class_overrides_registers_target():
+     """`model_class_overrides` redirects an architecture to a custom class."""
+     from vllm.model_executor.models import ModelRegistry
+@@ -897,6 +915,7 @@ def test_model_class_overrides_registers_target():
+         ModelRegistry.models.pop(arch, None)
+ 
+ 
++@pytest.mark.network
+ @pytest.mark.skipif(
+     current_platform.is_rocm(), reason="Encoder Decoder models not supported on ROCm."
+ )
+@@ -914,6 +933,7 @@ def test_is_encoder_decoder(model_id, is_encoder_decoder):
+     assert config.is_encoder_decoder == is_encoder_decoder
+ 
+ 
++@pytest.mark.network
+ @pytest.mark.parametrize(
+     ("model_id", "uses_mrope"),
+     [
+@@ -927,6 +947,7 @@ def test_uses_mrope(model_id, uses_mrope):
+     assert config.uses_mrope == uses_mrope
+ 
+ 
++@pytest.mark.network
+ def test_generation_config_loading():
+     model_id = "Qwen/Qwen2.5-1.5B-Instruct"
+ 
+@@ -973,6 +994,7 @@ def test_generation_config_loading():
+     assert model_config.get_diff_sampling_param() == override_generation_config
+ 
+ 
++@pytest.mark.gpu
+ @pytest.mark.parametrize(
+     "pt_load_map_location",
+     [
+@@ -987,6 +1009,7 @@ def test_load_config_pt_load_map_location(pt_load_map_location):
+     assert config.load_config.pt_load_map_location == pt_load_map_location
+ 
+ 
++@pytest.mark.network
+ @pytest.mark.parametrize(
+     ("model_id", "max_model_len", "expected_max_len", "should_raise"),
+     [
+@@ -1145,6 +1168,7 @@ def test_s3_url_different_model_and_tokenizer(mock_pull_files):
+     assert mock_pull_files.call_args_list[1][0][0] == tokenizer_url
+ 
+ 
++@pytest.mark.network
+ @pytest.mark.parametrize(
+     ("model_id", "expected_attn_type", "expected_result", "reason"),
+     [
+@@ -1264,6 +1288,7 @@ def test_is_chunked_prefill_supported(
+     assert reason in caplog_vllm.text
+ 
+ 
++@pytest.mark.network
+ @pytest.mark.parametrize(
+     ("model_id", "expected_attn_type", "expected_result", "reason"),
+     [
+@@ -1383,6 +1408,7 @@ def test_is_prefix_caching_supported(
+     assert reason in caplog_vllm.text
+ 
+ 
++@pytest.mark.gpu
+ @pytest.mark.parametrize(
+     ("backend", "custom_ops", "expected"),
+     [
+@@ -1444,6 +1470,8 @@ def test_validate_mamba_align_subblock_prefill():
+     VllmConfig.validate_block_size(config)
+ 
+ 
++@pytest.mark.gpu
++@pytest.mark.network
+ @pytest.mark.parametrize(
+     ("model_id", "compilation_config", "optimization_level"),
+     [
+@@ -1531,6 +1559,7 @@ def test_vllm_config_defaults(model_id, compilation_config, optimization_level):
+         )
+ 
+ 
++@pytest.mark.gpu
+ def test_vllm_config_callable_defaults():
+     """Test that callable defaults work in the config system.
+ 
+@@ -1671,6 +1700,7 @@ def test_vllm_config_explicit_overrides():
+     assert config.compilation_config.cudagraph_mode == CUDAGraphMode.FULL_AND_PIECEWISE
+ 
+ 
++@pytest.mark.gpu
+ def test_fusion_pass_op_priority():
+     """This test checks that custom op enablement & IR op priority
+     correctly control default fusions"""
+@@ -1715,6 +1745,8 @@ def test_scheduler_config_init():
+         print(SchedulerConfig.default_factory().max_model_len)
+ 
+ 
++@pytest.mark.gpu
++@pytest.mark.network
+ @pytest.mark.parametrize(
+     (
+         "model_id",
+@@ -1766,6 +1798,7 @@ def test_fault_tolerance_requires_single_api_server():
+     ParallelConfig(enable_fault_tolerance=True, _api_process_count=1)
+ 
+ 
++@pytest.mark.network
+ def test_renderer_num_workers_with_mm_cache():
+     """Disallow renderer_num_workers > 1 with the mm processor cache only for
+     pooling models, whose preprocessing runs on the renderer workers."""
+@@ -1799,6 +1832,7 @@ def test_renderer_num_workers_with_mm_cache():
+     assert config.renderer_num_workers == 1
+ 
+ 
++@pytest.mark.network
+ def test_eagle_draft_model_config():
+     """Test that EagleDraft model config is correctly set."""
+     target_model_config = ModelConfig(
+@@ -1872,6 +1906,7 @@ def test_ir_op_priority_str():
+         priority_config = IrOpPriorityConfig(rms_norm=["vllm_c", 4, "native"])
+ 
+ 
++@pytest.mark.gpu
+ def test_ir_op_priority_ctx():
+     """Test that the priority-setting context sets priority correctly."""
+     from vllm import ir
+@@ -1918,6 +1953,7 @@ def test_load_config_rejects_non_string_load_format(bad_load_format):
+ REVISION = "c1899de289a04d12100db370d81485cdf75e47ca"
+ 
+ 
++@pytest.mark.network
+ @patch("vllm.config.model.resolve_revision", return_value=ResolvedRevision(REVISION))
+ def test_revision_not_resolved_when_weights_differ_from_model(mock_resolve):
+     model_weights = "unsloth/Qwen3-0.6B-GGUF:Q8_0"
+@@ -1925,6 +1961,7 @@ def test_revision_not_resolved_when_weights_differ_from_model(mock_resolve):
+     assert config.revision is None
+ 
+ 
++@pytest.mark.network
+ @patch("vllm.config.model.resolve_revision", return_value=ResolvedRevision(REVISION))
+ def test_revision_resolved_when_weights_match_model(mock_resolve):
+     model = "Qwen/Qwen3-0.6B"
+diff --git a/tests/tokenizers_/test_detokenize.py b/tests/tokenizers_/test_detokenize.py
+index fffafd640b552bf98c20a63bbb597f00706a448c..012c9ecf30643a5acdb489ea03d764d4dbe6a494 100644
+--- a/tests/tokenizers_/test_detokenize.py
++++ b/tests/tokenizers_/test_detokenize.py
+@@ -100,6 +100,7 @@ def tokenizer(tokenizer_name):
+     )
+ 
+ 
++@pytest.mark.network
+ @pytest.mark.parametrize("tokenizer_name", ["mistralai/Pixtral-12B-2409"])
+ @pytest.mark.parametrize(
+     "truth",
+@@ -141,6 +142,7 @@ def skip_special_tokens(request, tokenizer_name) -> Generator[bool, Any, None]:
+         yield bool(request.param)
+ 
+ 
++@pytest.mark.network
+ @pytest.mark.parametrize("truth", TRUTH)
+ @pytest.mark.parametrize("with_prompt", [True, False])
+ @pytest.mark.parametrize("tokenizer_name", TOKENIZERS)
+@@ -224,6 +226,7 @@ def test_decode_streaming(
+     assert out_ids == all_input_ids[starting_index:]
+ 
+ 
++@pytest.mark.network
+ @pytest.mark.parametrize("tokenizer_name", TOKENIZERS)
+ @pytest.mark.parametrize("fast", (True, False))
+ def test_oov_decode(tokenizer, fast):
+diff --git a/tests/tool_use/test_chat_completions.py b/tests/tool_use/test_chat_completions.py
+index d79c10627230686a9543c090d6e2657229c06bd7..9016b6857af2f35dedc4caf7256ba6894220a71f 100644
+--- a/tests/tool_use/test_chat_completions.py
++++ b/tests/tool_use/test_chat_completions.py
+@@ -12,6 +12,8 @@ from .utils import (
+     ensure_system_prompt,
+ )
+ 
++pytestmark = [pytest.mark.gpu, pytest.mark.network]
++
+ 
+ # test: make sure chat completions without tools provided work even when tools
+ # are enabled. This makes sure tool call chat templates work, AND that the tool
+diff --git a/tests/v1/core/test_kv_cache_users_sizing.py b/tests/v1/core/test_kv_cache_users_sizing.py
+index 90deb9323343640c60f7e6c0a6eed23d98691c16..9c662dd7fcf413c6243e3bf6fd2f209e5cada6cc 100644
+--- a/tests/v1/core/test_kv_cache_users_sizing.py
++++ b/tests/v1/core/test_kv_cache_users_sizing.py
+@@ -24,7 +24,7 @@ from vllm.utils.math_utils import cdiv
+ from vllm.v1.core.kv_cache_utils import _pool_bytes_per_block, get_kv_cache_configs
+ from vllm.v1.kv_cache_interface import FullAttentionSpec
+ 
+-pytestmark = pytest.mark.cpu_test
++pytestmark = [pytest.mark.gpu, pytest.mark.network, pytest.mark.cpu_test]
+ 
+ BLOCK_SIZE = 16
+ 
+diff --git a/tests/v1/e2e/general/test_context_length.py b/tests/v1/e2e/general/test_context_length.py
+index b313a74b687e46de9f4c04fd8dd119d3fda77057..5e00792d06d03e237a7841e7555cbd0bc192c9d9 100644
+--- a/tests/v1/e2e/general/test_context_length.py
++++ b/tests/v1/e2e/general/test_context_length.py
+@@ -17,6 +17,8 @@ from tests.conftest import VllmRunner
+ from tests.utils import create_new_process_for_each_test
+ from vllm.exceptions import VLLMValidationError
+ 
++pytestmark = [pytest.mark.gpu, pytest.mark.network]
++
+ 
+ @create_new_process_for_each_test()
+ @pytest.mark.parametrize("model, max_model_len", [("JackFram/llama-160m", 2048)])
+diff --git a/tests/v1/engine/test_fast_incdec_prefix_err.py b/tests/v1/engine/test_fast_incdec_prefix_err.py
+index f87b32758768bfad3bb2e31f44ba05290aeff865..74019230fa4882a11ae154afb8cdda0df9dfc740 100644
+--- a/tests/v1/engine/test_fast_incdec_prefix_err.py
++++ b/tests/v1/engine/test_fast_incdec_prefix_err.py
+@@ -7,6 +7,8 @@ from vllm.sampling_params import SamplingParams
+ from vllm.v1.engine import EngineCoreRequest
+ from vllm.v1.engine.detokenizer import IncrementalDetokenizer
+ 
++pytestmark = pytest.mark.network
++
+ # ruff: noqa: E501
+ 
+ 
+diff --git a/tests/v1/engine/test_output_processor.py b/tests/v1/engine/test_output_processor.py
+index 269b01daf0b786432d9dc7012178d296ed55927b..d2f8721ecfd34b591b68274eeed05ef2f6ed128c 100644
+--- a/tests/v1/engine/test_output_processor.py
++++ b/tests/v1/engine/test_output_processor.py
+@@ -29,6 +29,8 @@ from vllm.v1.engine import (
+ from vllm.v1.engine.output_processor import OutputProcessor, RequestOutputCollector
+ from vllm.v1.metrics.stats import IterationStats, SchedulerStats
+ 
++pytestmark = pytest.mark.network
++
+ 
+ def _ref_convert_id_to_token(
+     tokenizer: TokenizerLike,
+diff --git a/tests/v1/kv_connector/unit/offloading_connector/test_events.py b/tests/v1/kv_connector/unit/offloading_connector/test_events.py
+index f6865f17ae5c4086de09b831053328293e5e11f6..0b401c7f7fb5a826e40560b57686d38bfb2406c4 100644
+--- a/tests/v1/kv_connector/unit/offloading_connector/test_events.py
++++ b/tests/v1/kv_connector/unit/offloading_connector/test_events.py
+@@ -597,6 +597,8 @@ def test_reset_cache_clears_side_table():
+     assert not tracker._pending_event_metadata
+ 
+ 
++@pytest.mark.gpu
++@pytest.mark.network
+ def test_tiering_accepts_self_describing_kv_events():
+     vllm_config = create_vllm_config(
+         block_size=4,
+diff --git a/tests/v1/kv_connector/unit/offloading_connector/test_scheduler.py b/tests/v1/kv_connector/unit/offloading_connector/test_scheduler.py
+index 68d63fddc7f28ae665cab89db8dc9038fe27831b..7e7d88a35e4b6fd6b4a8f83e5698bb1e5b721a06 100644
+--- a/tests/v1/kv_connector/unit/offloading_connector/test_scheduler.py
++++ b/tests/v1/kv_connector/unit/offloading_connector/test_scheduler.py
+@@ -212,6 +212,8 @@ def test_partial_lookup_requires_every_cache_group():
+     assert req_status.partial_tail_boundary is None
+ 
+ 
++@pytest.mark.gpu
++@pytest.mark.network
+ def test_scheduler_reports_allocation_failure(request_runner):
+     runner = request_runner(
+         block_size=4,
+@@ -229,6 +231,8 @@ def test_scheduler_reports_allocation_failure(request_runner):
+     assert reduced[_ConnectorMetricName.ALLOCATION_FAILURE] == 2
+ 
+ 
++@pytest.mark.gpu
++@pytest.mark.network
+ @pytest.mark.parametrize("async_scheduling", [True, False])
+ @pytest.mark.parametrize("prompt_offset", [-1, -2])
+ def test_last_block_offloaded_at_request_finish(
+@@ -268,6 +272,8 @@ def test_last_block_offloaded_at_request_finish(
+     assert "0" not in cs._req_status
+ 
+ 
++@pytest.mark.gpu
++@pytest.mark.network
+ @pytest.mark.parametrize("async_scheduling", [True, False])
+ def test_abort_queued_request_does_not_build_store_job(
+     request_runner, async_scheduling: bool
+@@ -302,6 +308,8 @@ def test_abort_queued_request_does_not_build_store_job(
+     assert queued_req_id not in runner.connector_scheduler._req_status
+ 
+ 
++@pytest.mark.gpu
++@pytest.mark.network
+ def test_scheduler_reports_lookup_sync_delay(request_runner):
+     runner = request_runner(
+         block_size=4,
+@@ -369,6 +377,8 @@ def test_is_store_reachable_swa_chunk(
+     )
+ 
+ 
++@pytest.mark.gpu
++@pytest.mark.network
+ def test_scheduler_reports_lookup_async_delay_on_resolve(request_runner):
+     """A deferred lookup reports its async delay once it resolves."""
+     runner = request_runner(
+@@ -389,6 +399,8 @@ def test_scheduler_reports_lookup_async_delay_on_resolve(request_runner):
+     assert reduced[f"{_ConnectorMetricName.LOOKUP_ASYNC_DELAY}_sum"] > 0
+ 
+ 
++@pytest.mark.gpu
++@pytest.mark.network
+ def test_max_offload_tokens_zero_does_not_record_pending_lookups(request_runner):
+     runner = request_runner(
+         block_size=4,
+@@ -419,6 +431,8 @@ def test_max_offload_tokens_zero_does_not_record_pending_lookups(request_runner)
+     assert list(runner.connector_scheduler.take_events()) == []
+ 
+ 
++@pytest.mark.gpu
++@pytest.mark.network
+ def test_abort_before_hit_uses_placeholder_then_later_hit_heals_removal(
+     request_runner,
+ ):
+@@ -482,6 +496,8 @@ def test_abort_before_hit_uses_placeholder_then_later_hit_heals_removal(
+     assert key not in tracker._pending_event_metadata
+ 
+ 
++@pytest.mark.gpu
++@pytest.mark.network
+ @pytest.mark.parametrize("blocks_per_chunk", [1, 2])
+ def test_promotion_hit_precedes_stored_event_translation(
+     request_runner,
+@@ -542,6 +558,8 @@ def test_promotion_hit_precedes_stored_event_translation(
+     assert events[0].token_ids == token_ids
+ 
+ 
++@pytest.mark.gpu
++@pytest.mark.network
+ @pytest.mark.parametrize("async_scheduling", [True, False])
+ def test_offloading_connector(request_runner, async_scheduling: bool):
+     block_size = 4
+@@ -652,6 +670,8 @@ def test_offloading_connector(request_runner, async_scheduling: bool):
+     runner.run(decoded_tokens=[EOS_TOKEN_ID], expected_loaded=(3, 4, 5))
+ 
+ 
++@pytest.mark.gpu
++@pytest.mark.network
+ @pytest.mark.parametrize("async_scheduling", [True, False])
+ def test_request_preemption(request_runner, async_scheduling: bool):
+     block_size = 4
+@@ -724,6 +744,8 @@ def test_request_preemption(request_runner, async_scheduling: bool):
+     assert runner.connector_scheduler._block_id_to_pending_jobs == {}
+ 
+ 
++@pytest.mark.gpu
++@pytest.mark.network
+ @pytest.mark.parametrize("async_scheduling", [True, False])
+ def test_on_request_finished_not_deferred_until_store_completion(
+     request_runner, async_scheduling: bool
+@@ -799,6 +821,8 @@ def test_on_request_finished_not_deferred_until_store_completion(
+     assert finished_idx < min(store_indices), calls
+ 
+ 
++@pytest.mark.gpu
++@pytest.mark.network
+ @pytest.mark.parametrize("async_scheduling", [True, False])
+ def test_on_request_finished_fires_after_final_block_store(
+     request_runner, async_scheduling: bool
+@@ -838,6 +862,8 @@ def test_on_request_finished_fires_after_final_block_store(
+     assert finished_idx > max(prepare_indices), calls
+ 
+ 
++@pytest.mark.gpu
++@pytest.mark.network
+ @pytest.mark.parametrize("async_scheduling", [True, False])
+ def test_concurrent_lookups_of_the_same_prefix(request_runner, async_scheduling: bool):
+     block_size = 4
+@@ -902,6 +928,8 @@ def test_concurrent_lookups_of_the_same_prefix(request_runner, async_scheduling:
+     assert runner.connector_scheduler._block_id_to_pending_jobs == {}
+ 
+ 
++@pytest.mark.gpu
++@pytest.mark.network
+ @pytest.mark.parametrize("async_scheduling", [True, False])
+ def test_abort_loading_requests(request_runner, async_scheduling: bool):
+     block_size = 4
+@@ -956,6 +984,8 @@ def test_abort_loading_requests(request_runner, async_scheduling: bool):
+     assert req_id not in runner.scheduler.requests
+ 
+ 
++@pytest.mark.gpu
++@pytest.mark.network
+ @pytest.mark.parametrize("async_scheduling", [True, False])
+ def test_two_groups_full_and_sliding_window(request_runner, async_scheduling: bool):
+     block_size = 4
+@@ -1053,6 +1083,8 @@ def test_two_groups_full_and_sliding_window(request_runner, async_scheduling: bo
+     )
+ 
+ 
++@pytest.mark.gpu
++@pytest.mark.network
+ @pytest.mark.parametrize("async_scheduling", [True, False])
+ def test_two_groups_different_block_sizes(request_runner, async_scheduling: bool):
+     tokens_per_hash = 4
+@@ -1458,6 +1490,8 @@ class TestSlidingWindowLookup:
+         )
+ 
+ 
++@pytest.mark.gpu
++@pytest.mark.network
+ @pytest.mark.parametrize("async_scheduling", [True, False])
+ def test_request_level_policy_stores_all_blocks(request_runner, async_scheduling: bool):
+     """With REQUEST_LEVEL policy, all blocks are stored — including prefix hits."""
+@@ -1514,6 +1548,8 @@ def test_request_level_policy_stores_all_blocks(request_runner, async_scheduling
+ # ---------------------------------------------------------------------------
+ 
+ 
++@pytest.mark.gpu
++@pytest.mark.network
+ def test_loads_do_not_populate_fence_index(request_runner):
+     """Loads don't populate _block_id_to_pending_jobs (protected by
+     delay_free_blocks while in flight)."""
+@@ -1529,6 +1565,8 @@ def test_loads_do_not_populate_fence_index(request_runner):
+     assert runner.connector_scheduler._block_id_to_pending_jobs == {}
+ 
+ 
++@pytest.mark.gpu
++@pytest.mark.network
+ def test_fence_at_update_state_after_alloc(request_runner):
+     """A load reusing a finished request's pending-store block triggers
+     a flush via update_state_after_alloc's fence.
+@@ -1583,6 +1621,8 @@ def test_fence_at_update_state_after_alloc(request_runner):
+     assert runner.connector_scheduler._block_id_to_pending_jobs == {}
+ 
+ 
++@pytest.mark.gpu
++@pytest.mark.network
+ def test_fence_at_build_store_jobs(request_runner):
+     """A new prefill (no load -> update_state_after_alloc returns early)
+     reusing a finished request's pending-store block is flushed by
+@@ -1633,6 +1673,8 @@ def test_fence_at_build_store_jobs(request_runner):
+     assert runner.connector_scheduler._block_id_to_pending_jobs == {}
+ 
+ 
++@pytest.mark.gpu
++@pytest.mark.network
+ @pytest.mark.parametrize("async_scheduling", [True, False])
+ def test_complete_store_called_per_job(request_runner, async_scheduling: bool):
+     """complete_store fires per-job, not deferred to request finish.
+@@ -1673,6 +1715,8 @@ def test_complete_store_called_per_job(request_runner, async_scheduling: bool):
+     assert runner.manager.complete_store.call_count == 0
+ 
+ 
++@pytest.mark.gpu
++@pytest.mark.network
+ @pytest.mark.parametrize("async_scheduling", [True, False])
+ def test_complete_store_waits_for_all_worker_acks(
+     request_runner, async_scheduling: bool
+@@ -1718,6 +1762,8 @@ def test_complete_store_waits_for_all_worker_acks(
+     assert job_id not in runner.connector_scheduler._jobs
+ 
+ 
++@pytest.mark.gpu
++@pytest.mark.network
+ @pytest.mark.parametrize("async_scheduling", [True, False])
+ def test_max_offload_tokens_validation(request_runner, async_scheduling: bool):
+     """Validates max_offload_tokens: type coercion, boundary values, and capping.
+@@ -1812,6 +1858,8 @@ def test_max_offload_tokens_validation(request_runner, async_scheduling: bool):
+     )
+ 
+ 
++@pytest.mark.gpu
++@pytest.mark.network
+ @pytest.mark.parametrize("async_scheduling", [True, False])
+ def test_offload_prompt_only(request_runner, async_scheduling: bool):
+     """offload_prompt_only=True offloads prompt blocks but never decode blocks.
+@@ -1862,6 +1910,8 @@ def test_offload_prompt_only(request_runner, async_scheduling: bool):
+     assert len(offered_keys) == num_prompt_blocks
+ 
+ 
++@pytest.mark.gpu
++@pytest.mark.network
+ @pytest.mark.parametrize("async_scheduling", [True, False])
+ def test_reset_cache(request_runner, async_scheduling: bool):
+     """reset_cache flushes in-flight loads, calls manager.reset_cache(), resets
+@@ -1942,6 +1992,8 @@ def test_reset_cache(request_runner, async_scheduling: bool):
+             assert group_state.next_stored_chunk_idx == 0
+ 
+ 
++@pytest.mark.gpu
++@pytest.mark.network
+ @pytest.mark.parametrize("async_scheduling", [True, False])
+ def test_reset_cache_finalizes_finished_request_with_pending_store(
+     request_runner, async_scheduling: bool
+@@ -2028,6 +2080,8 @@ def test_pending_transfer_defers_prefix_lookup():
+     scheduler.manager.lookup.assert_not_called()
+ 
+ 
++@pytest.mark.gpu
++@pytest.mark.network
+ def test_async_preempt_readmit_before_transfer_output_is_deferred(request_runner):
+     """A preempted request can be scheduled again before flush output is read.
+ 
+@@ -2089,6 +2143,8 @@ def test_async_preempt_readmit_before_transfer_output_is_deferred(request_runner
+     assert req_status.transfer_jobs == pending_store_jobs
+ 
+ 
++@pytest.mark.gpu
++@pytest.mark.network
+ @pytest.mark.parametrize("async_scheduling", [True, False])
+ def test_swa_alignment_skip(request_runner, async_scheduling: bool):
+     """Store the window at the common resume boundary across group sizes."""
+@@ -2186,6 +2242,8 @@ def test_swa_alignment_skip(request_runner, async_scheduling: bool):
+     )
+ 
+ 
++@pytest.mark.gpu
++@pytest.mark.network
+ @pytest.mark.parametrize("async_scheduling", [True, False])
+ def test_stale_sliding_window_block_after_prepare_store_failure(
+     request_runner, async_scheduling: bool
+@@ -2261,6 +2319,8 @@ def test_stale_sliding_window_block_after_prepare_store_failure(
+     )
+ 
+ 
++@pytest.mark.gpu
++@pytest.mark.network
+ @pytest.mark.parametrize("async_scheduling", [True, False])
+ def test_skip_reading_prefix_cache(request_runner, async_scheduling: bool):
+     """When skip_reading_prefix_cache=True, the offloading connector must not
+@@ -2371,6 +2431,8 @@ class TestEagle:
+     # Lookup unit tests: call _lookup() directly via request_runner
+     # -------------------------------------------------------------------
+ 
++    @pytest.mark.gpu
++    @pytest.mark.network
+     def test_full_attn_lookup_pops_one_block(self, request_runner):
+         """Full-attn eagle group with 3 blocks all hit → pop to 2 blocks."""
+         block_size = 4
+@@ -2404,6 +2466,8 @@ class TestEagle:
+         # 3 hits, pop to 2 → 2 * block_size = 8 tokens loadable
+         assert sched._lookup(req_status) == 8
+ 
++    @pytest.mark.gpu
++    @pytest.mark.network
+     def test_full_attn_lookup_single_block_returns_zero(self, request_runner):
+         """Full-attn eagle group with 1 block hit → pop to 0 → returns 0."""
+         block_size = 4
+@@ -2437,6 +2501,8 @@ class TestEagle:
+         # 1 hit, pop to 0 → new_num_hit_tokens < block_size → return 0
+         assert sched._lookup(req_status) == 0
+ 
++    @pytest.mark.gpu
++    @pytest.mark.network
+     def test_full_attn_lookup_no_hits_returns_zero(self, request_runner):
+         """Full-attn eagle group with 0 hits returns 0 before pop."""
+         block_size = 4
+@@ -2465,6 +2531,8 @@ class TestEagle:
+         )
+         assert sched._lookup(req_status) == 0
+ 
++    @pytest.mark.gpu
++    @pytest.mark.network
+     def test_sw_lookup_inflates_query_max(self, request_runner):
+         """SW eagle group inflates query_max so _sliding_window_lookup gets
+         one extra key beyond what max_hit_size_tokens alone would yield.
+@@ -2526,6 +2594,8 @@ class TestEagle:
+         # SW finds window of 3 → returns 4, pop to 3 → 3*4=12
+         assert result == 12
+ 
++    @pytest.mark.gpu
++    @pytest.mark.network
+     def test_sw_lookup_requires_extra_window_block(self, request_runner):
+         """SW eagle with W=2 and only 2 keys (both hit) uses prefix fallback.
+ 
+@@ -2567,6 +2637,8 @@ class TestEagle:
+         # Prefix fallback returns 2, pop to 1 → 1*4 = 4 tokens
+         assert sched._lookup(req_status) == 4
+ 
++    @pytest.mark.gpu
++    @pytest.mark.network
+     def test_sw_lookup_w_plus_one_hits_returns_w_blocks(self, request_runner):
+         """SW eagle with W=2, 3 contiguous hits → pop to 2 → returns 2*bs."""
+         block_size = 4
+@@ -2604,6 +2676,8 @@ class TestEagle:
+         )
+         assert sched._lookup(req_status) == 8
+ 
++    @pytest.mark.gpu
++    @pytest.mark.network
+     def test_eagle_verified_prevents_double_pop(self, request_runner):
+         """Once an eagle group has popped, it doesn't pop again on re-iteration.
+ 
+@@ -2659,6 +2733,8 @@ class TestEagle:
+         # Final: 8 tokens
+         assert sched._lookup(req_status) == 8
+ 
++    @pytest.mark.gpu
++    @pytest.mark.network
+     def test_non_eagle_tighten_clears_eagle_verified(self, request_runner):
+         """Non-eagle group tightening clears eagle_verified → eagle re-pops.
+ 
+@@ -2714,6 +2790,8 @@ class TestEagle:
+         #   Finds 1 hit, pop to 0 → new_num_hit = 0 < block_size → return 0
+         assert sched._lookup(req_status) == 0
+ 
++    @pytest.mark.gpu
++    @pytest.mark.network
+     def test_eagle_verified_survives_eagle_tighten(self, request_runner):
+         """Eagle group tightening does NOT clear eagle_verified.
+ 
+@@ -2771,6 +2849,8 @@ class TestEagle:
+     # Integration tests: store and load via request_runner
+     # -------------------------------------------------------------------
+ 
++    @pytest.mark.gpu
++    @pytest.mark.network
+     @pytest.mark.parametrize("async_scheduling", [True, False])
+     def test_full_attn_store_excludes_trailing_decode_block(
+         self, request_runner, async_scheduling: bool
+@@ -2843,6 +2923,8 @@ class TestEagle:
+             ),
+         )
+ 
++    @pytest.mark.gpu
++    @pytest.mark.network
+     @pytest.mark.parametrize("async_scheduling", [True, False])
+     def test_sw_store_excludes_trailing_decode_block(
+         self, request_runner, async_scheduling: bool
+@@ -2889,6 +2971,8 @@ class TestEagle:
+             expected_stored=((0, 0), (0, 1), (0, 2)),
+         )
+ 
++    @pytest.mark.gpu
++    @pytest.mark.network
+     @pytest.mark.parametrize("async_scheduling", [True, False])
+     def test_single_block_stored_at_end_of_prefill(
+         self, request_runner, async_scheduling: bool
+@@ -2927,6 +3011,8 @@ class TestEagle:
+         )
+         runner.run(decoded_tokens=[EOS_TOKEN_ID], expected_stored=((0, 0),))
+ 
++    @pytest.mark.gpu
++    @pytest.mark.network
+     @pytest.mark.parametrize("async_scheduling", [True, False])
+     def test_multichunk_store_no_interior_holes(
+         self, request_runner, async_scheduling: bool
+@@ -2991,6 +3077,8 @@ class TestEagle:
+             f"interior hole in stored blocks: {offsets}"
+         )
+ 
++    @pytest.mark.gpu
++    @pytest.mark.network
+     @pytest.mark.parametrize("async_scheduling", [True, False])
+     def test_full_attn_store_then_load(self, request_runner, async_scheduling: bool):
+         """Eagle group constrains load: convergence tightens both groups.
+@@ -3074,6 +3162,8 @@ class TestEagle:
+ # ---------------------------------------------------------------------------
+ 
+ 
++@pytest.mark.gpu
++@pytest.mark.network
+ def test_request_finished_with_pending_stores_populates_fence(request_runner):
+     """When a request finishes with in-flight store jobs, the fence index
+     (_block_id_to_pending_jobs) is correctly populated with the store jobs'
+@@ -3149,6 +3239,8 @@ def test_request_finished_with_pending_stores_populates_fence(request_runner):
+     assert req_id not in runner.connector_scheduler._req_status
+ 
+ 
++@pytest.mark.gpu
++@pytest.mark.network
+ def test_multiple_in_flight_stores_all_flushed_by_fence(request_runner):
+     """When a request finishes with multiple in-flight store jobs,
+     ALL jobs are flushed when a new request reuses their blocks.
+@@ -3209,6 +3301,8 @@ def test_multiple_in_flight_stores_all_flushed_by_fence(request_runner):
+     assert len(runner.connector_scheduler._jobs) == 0
+ 
+ 
++@pytest.mark.gpu
++@pytest.mark.network
+ def test_request_finished_mixed_full_attn_and_sliding_window(
+     request_runner,
+ ):
+diff --git a/tests/v1/kv_connector/unit/test_offloading_connector.py b/tests/v1/kv_connector/unit/test_offloading_connector.py
+index 5e9c622868d23b599503c4956d0b389e354e7f76..4d7a37c757ddba5a9800bfa8003055b798d034e4 100644
+--- a/tests/v1/kv_connector/unit/test_offloading_connector.py
++++ b/tests/v1/kv_connector/unit/test_offloading_connector.py
+@@ -15,6 +15,8 @@ from vllm.config import KVEventsConfig, KVTransferConfig
+ from vllm.distributed.kv_events import BlockStored, KVEventBatch
+ from vllm.platforms import current_platform
+ 
++pytestmark = [pytest.mark.gpu, pytest.mark.network]
++
+ CPU_BLOCK_SIZES: int = 64 if current_platform.is_xpu() else 48
+ _ATTN_BACKENDS: list[str] = []
+ if current_platform.is_cuda():
+diff --git a/tests/v1/logits_processors/test_correctness.py b/tests/v1/logits_processors/test_correctness.py
+index 6fb9924f3f9549a6344a262229e3951b306bdd01..2f2e462bb0d6293d57e56b99d908a10237b1df17 100644
+--- a/tests/v1/logits_processors/test_correctness.py
++++ b/tests/v1/logits_processors/test_correctness.py
+@@ -38,6 +38,8 @@ from vllm.v1.sample.thinking_budget_state import (
+     maybe_create_thinking_budget_state_holder,
+ )
+ 
++pytestmark = pytest.mark.gpu
++
+ PIN_MEMORY_AVAILABLE = is_pin_memory_available()
+ MAX_NUM_REQS = 256
+ VOCAB_SIZE = 1024
+diff --git a/tests/v1/simple_kv_offload/test_scheduler.py b/tests/v1/simple_kv_offload/test_scheduler.py
+index 7d8bc5d29c360b4d2ddd3b8e076d94e4643549a7..24481d0d82ec2438e621337b66e977eefc7d7002 100644
+--- a/tests/v1/simple_kv_offload/test_scheduler.py
++++ b/tests/v1/simple_kv_offload/test_scheduler.py
+@@ -45,6 +45,8 @@ from vllm.v1.request import Request
+ from vllm.v1.simple_kv_offload.manager import SimpleCPUOffloadScheduler
+ from vllm.v1.simple_kv_offload.metadata import SimpleCPUOffloadWorkerMetadata
+ 
++pytestmark = pytest.mark.network
++
+ # ---------------------------------------------------------------------------
+ # Constants
+ # ---------------------------------------------------------------------------
+diff --git a/tests/v1/structured_output/test_backend_xgrammar_stop_tokens.py b/tests/v1/structured_output/test_backend_xgrammar_stop_tokens.py
+index 8095ca758217b01f72e9d98bb516b570b7c538ab..3b227170a2f19e3d3c34360932567a2e7e585395 100644
+--- a/tests/v1/structured_output/test_backend_xgrammar_stop_tokens.py
++++ b/tests/v1/structured_output/test_backend_xgrammar_stop_tokens.py
+@@ -43,6 +43,7 @@ def backend() -> XgrammarBackend:
+     )
+ 
+ 
++@pytest.mark.gpu
+ def test_request_stop_tokens_gated_to_grammar_terminal(backend: XgrammarBackend):
+     schema = '{"type": "string"}'
+     default = backend.compile_grammar(StructuredOutputOptions.JSON, schema)
+diff --git a/tests/v1/worker/test_gpu_model_runner_mm_gather.py b/tests/v1/worker/test_gpu_model_runner_mm_gather.py
+index 9f549b6070922137b5e77d7073875026b1622f68..baf834e3f7a75940b9e81442c73c1e6897fb89ce 100644
+--- a/tests/v1/worker/test_gpu_model_runner_mm_gather.py
++++ b/tests/v1/worker/test_gpu_model_runner_mm_gather.py
+@@ -60,6 +60,7 @@ def _gather(features, cached, *, num_scheduled, shift, num_computed=0):
+     )
+ 
+ 
++@pytest.mark.gpu
+ def test_draft_shift_uses_boundary_feature_when_cached():
+     """The drafter's +1 look-ahead reaches the feature at offset ==
+     processed_end; when it is already cached it is used for the look-ahead
+@@ -74,6 +75,7 @@ def test_draft_shift_uses_boundary_feature_when_cached():
+     assert int(is_mm_embed.sum()) == 8
+ 
+ 
++@pytest.mark.gpu
+ def test_draft_shift_tolerates_missing_boundary_feature():
+     """When the +1 look-ahead feature past the processed boundary is not yet
+     encoded, fall back to the token embedding instead of raising."""
+@@ -86,6 +88,7 @@ def test_draft_shift_tolerates_missing_boundary_feature():
+     assert int(is_mm_embed.sum()) == 7
+ 
+ 
++@pytest.mark.gpu
+ def test_draft_shift_raises_on_interior_miss():
+     """A miss for a feature within the processed range (not the look-ahead
+     boundary) is a real invariant violation, even on the drafter path."""
+@@ -94,6 +97,7 @@ def test_draft_shift_raises_on_interior_miss():
+         _gather([f0], [], num_scheduled=8, shift=1)
+ 
+ 
++@pytest.mark.gpu
+ def test_target_path_raises_on_encoder_cache_miss():
+     """On the target path (no shift) a miss is a real invariant violation."""
+     f0 = _feature("h0", offset=0, length=8)

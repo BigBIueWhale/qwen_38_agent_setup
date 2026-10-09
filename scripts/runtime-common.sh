@@ -919,6 +919,7 @@ assert_running_profile() {
       /usr/local/lib/python3.12/dist-packages/vllm/parser/deepseek_v4.py \
       /usr/local/lib/python3.12/dist-packages/vllm/parser/inkling.py \
       /usr/local/lib/python3.12/dist-packages/vllm/parser/kimi_k2.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/parser/kimi_k3.py \
       /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/scale_out/derender/serving.py \
       /usr/local/lib/python3.12/dist-packages/vllm/multimodal/processing/inputs.py \
       /usr/local/lib/python3.12/dist-packages/vllm/multimodal/processing/processor.py \
@@ -1017,6 +1018,7 @@ assert_running_profile() {
     "${DEEPSEEK_V4_PARSER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/deepseek_v4.py \
     "${INKLING_PARSER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/inkling.py \
     "${KIMI_K2_PARSER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/kimi_k2.py \
+    "${KIMI_K3_PARSER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/kimi_k3.py \
     "${DERENDER_SERVING_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/scale_out/derender/serving.py \
     "${MM_PROCESSOR_INPUTS_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/multimodal/processing/inputs.py \
     "${MM_PROCESSOR_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/multimodal/processing/processor.py \

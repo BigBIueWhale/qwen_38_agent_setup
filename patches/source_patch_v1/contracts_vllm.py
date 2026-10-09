@@ -1336,6 +1336,11 @@ def _validate_agent_id_after(state: State) -> None:
     _require_in_symbol(state, core, "EngineCoreProc._handle_refused_add_request", (
         "self._send_error_outputs_to_client([request_id], client_index)",
     ), label=label)
+    # A request a test builds is a request the server admits: it names its
+    # line of work.
+    kimi_k3_tests = "tests/tool_use/test_kimi_k3_tool_parser.py"
+    require_text(state, kimi_k3_tests, '        kv_scope="agent",\n', count=2, label=label)
+    require_text(state, kimi_k3_tests, '            "kv_scope": "agent",\n', label=label)
 
 
 def _validate_attention_prefix_hash_before(state: State) -> None:
@@ -2220,6 +2225,18 @@ def _validate_qwen_language_after(state: State) -> None:
         "tests/parser/engine/test_reasoning_token_count.py", {
             "TestStreaming.test_boundary_ids_wait_for_detokenized_text": None,
         }, label=label)
+    # Every override of the extraction this stage gives the content's ids
+    # takes them and hands them on: an override that does not is a TypeError
+    # on every complete parse of its format.
+    _require_in_symbol(state, "vllm/parser/kimi_k3.py", "KimiK3Parser._extract_tool_calls", (
+        "content_token_ids: Sequence[int] = (),",
+        "content, request, enable_auto_tools, content_token_ids",
+    ), label=label)
+    _require_in_symbol(state, "vllm/parser/mistral.py",
+        "MistralParser.extract_tool_calls_from_content", (
+            "content_token_ids: Sequence[int] = (),",
+            "content, request, content_token_ids",
+        ), label=label)
 
 
 def _validate_png_source_before(state: State) -> None:
@@ -3202,6 +3219,16 @@ def _validate_tool_completion_after(state: State) -> None:
             "test_structural_stop_cannot_remove_the_closing_wrapper": None,
             "test_structural_stop_through_qwen_output_processor": None,
         }, label=label)
+    # The terminal reaches every override of the extraction, as the ids do.
+    _require_in_symbol(state, "vllm/parser/kimi_k3.py", "KimiK3Parser._extract_tool_calls", (
+        "output_terminal: tuple[str | None, str | int | None] | None = None,",
+        "content_token_ids,\n                output_terminal,",
+    ), label=label)
+    _require_in_symbol(state, "vllm/parser/mistral.py",
+        "MistralParser.extract_tool_calls_from_content", (
+            "output_terminal: tuple[str | None, str | int | None] | None = None,",
+            "content, request, content_token_ids, output_terminal",
+        ), label=label)
 
 
 def _validate_thinking_boundary_before(state: State) -> None:
@@ -3404,6 +3431,9 @@ def _validate_precise_errors_after(state: State) -> None:
         "test_internal_image_pipeline_error_keeps_its_server_cause": None,
         "test_invalid_base64_image_is_a_typed_request_error": None,
     }, label=label)
+    require_text(state, "tests/multimodal/media/test_connector.py",
+                 'pytest.raises(VLLMValidationError, match="Failed to load image")',
+                 count=2, label=label)
 
 
 def _validate_admission_before(state: State) -> None:
@@ -4107,6 +4137,12 @@ def _validate_responses_function_list_after(state: State) -> None:
         "test_qwen3_admits_the_names_the_responses_prompt_offers": None,
         "test_qwen3_required_refuses_tools_that_offer_no_function": None,
     }, label=label)
+    # _make_request asks the renderer's tool-choice check, so the tests that
+    # drive it give their renderer OnlineRenderer's own.
+    require_text(state, "tests/entrypoints/openai/responses/test_responses_utils.py",
+                 "    renderer.require_tool_choice_parsed = partial(\n"
+                 "        OnlineRenderer.require_tool_choice_parsed, renderer\n"
+                 "    )\n", label=label)
 
 def _validate_batch_parse_from_prompt_before(state: State) -> None:
     label = "Batch parse from the prompt state precondition"
@@ -4720,6 +4756,9 @@ def _validate_responses_tools_never_given_after(state: State) -> None:
         require_python_symbols(state, path, tests, label=label)
     forbid_text(state, "tests/entrypoints/openai/responses/test_parsable_context.py",
                 "async def test_mcp_tool_call(", label=label)
+    require_text(state, "tests/entrypoints/openai/responses/test_responses_utils.py",
+                 "    serving.parser = SimpleNamespace(tool_parser_cls=object)\n",
+                 label=label)
 
 
 def _validate_chat_stream_logprobs_before(state: State) -> None:
@@ -4936,6 +4975,46 @@ def _validate_responses_unhonoured_fields_after(state: State) -> None:
         "test_a_value_that_asks_for_what_the_server_does_is_served": ("fields",),
         "test_every_responses_parameter_is_applied_or_refused": None,
     }, label=label)
+
+
+_CONFTEST = "tests/conftest.py"
+_GPU_MARK = (
+    '        "gpu: the test needs a GPU (a GPU build of vLLM resolves no platform "\n'
+)
+_NETWORK_MARK = (
+    '        "network: the test needs the network: the Hugging Face hub or a remote URL",\n'
+)
+
+
+def _validate_test_declarations_before(state: State) -> None:
+    label = "Reviewed test declarations precondition"
+    require_text(state, _CONFTEST, "def pytest_collection_modifyitems(config, items):\n",
+                 label=label)
+    forbid_text(state, _CONFTEST, "def pytest_configure(config):", label=label)
+
+
+def _validate_test_declarations_after(state: State) -> None:
+    label = "Reviewed test declarations result"
+    # The tree's own tests register what a test may need, so the marks mean
+    # the same under any runner.
+    _require_in_symbol(state, _CONFTEST, "pytest_configure", (
+        'config.addinivalue_line(\n        "markers",\n' + _GPU_MARK,
+        'config.addinivalue_line(\n        "markers",\n' + _NETWORK_MARK,
+    ), label=label)
+    # A test this tree refuses by design says so, with the exception and the
+    # cause, strictly: a change that lets it pass fails until the mark goes.
+    connector = "tests/multimodal/media/test_connector.py"
+    require_text(state, connector,
+                 "    strict=True,\n    raises=VLLMUnprocessableEntityError,\n",
+                 count=4, label=label)
+    require_text(state, connector, "Refused by the Qwen3.8 image contract", count=4,
+                 label=label)
+    # A module that cannot be imported without a GPU says so where the runner
+    # reads it without importing it: its module-level pytestmark.
+    require_text(state, "tests/distributed/test_rocm_quick_reduce.py",
+                 "pytestmark = [\n    pytest.mark.gpu,\n", label=label)
+    require_text(state, "tests/v1/logits_processors/test_correctness.py",
+                 "\npytestmark = pytest.mark.gpu\n", label=label)
 
 
 def validate_final(state: State) -> None:
@@ -6330,5 +6409,27 @@ CONTRACTS: Mapping[str, SemanticContract] = {
         ),
         validate_before=_validate_responses_unhonoured_fields_before,
         validate_after=_validate_responses_unhonoured_fields_after,
+    ),
+    "reviewed-tests-declare-what-they-need": SemanticContract(
+        rationale=(
+            "The test files the patch set changes or adds were hashed and "
+            "executed by nothing, so commits broke them unnoticed. A runner "
+            "executes them now, and where a test runs is the test's own "
+            "statement: tests/conftest.py registers a gpu and a network mark, "
+            "and a test that needs a GPU or the network -- the Hugging Face hub "
+            "or a remote URL -- carries the mark on itself, its class, or its "
+            "module's pytestmark, which is read without importing the module, "
+            "so a module that cannot even be imported without a GPU says so the "
+            "same way. Every test that carries neither runs with no GPU and no "
+            "network, and fails there if it needs one unsaid. Upstream's tests "
+            "of image fetching the Qwen3.8 image contract refuses are strict "
+            "xfails naming the contract and the exception it raises."
+        ),
+        removal_condition=(
+            "Remove when pinned upstream's tests declare what they need of the "
+            "machine in a form a runner reads before importing them."
+        ),
+        validate_before=_validate_test_declarations_before,
+        validate_after=_validate_test_declarations_after,
     ),
 }

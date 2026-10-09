@@ -23,6 +23,11 @@ It does not relicense third-party material. In particular:
 - Container base images, system packages, Python/Rust/JavaScript dependencies,
   NVIDIA components, and other bundled tools retain their respective upstream
   licenses. Their inclusion or pinning does not change those terms.
+- The wheels in [`test-runner/`](test-runner/) are the reviewed-test runner,
+  committed exactly as PyPI publishes them, each carrying its license in its
+  `.dist-info`: pytest 9.1.0, pluggy 1.5.0, iniconfig 2.0.0 and pytest-timeout
+  2.3.1 (MIT), tblib 3.1.0 (BSD-2-Clause) and pytest-asyncio 1.4.0 (Apache
+  License 2.0). The Unlicense does not apply to them.
 
 The checkpoint weights and local Docker image archives are deliberately not
 committed to this Git repository. Their local presence does not place them under

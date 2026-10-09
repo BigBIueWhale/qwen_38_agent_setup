@@ -459,7 +459,7 @@ index 87416b6b5e1291555244383c47f65da5a2cbd2ed..c011a54b2bd565e27ce88a3b509eae40
                  not supports_required_and_named
                  and (is_named_tool_choice or is_required_tool_choice)
 diff --git a/vllm/parser/mistral.py b/vllm/parser/mistral.py
-index a3355815449e8538edced0c6767b07c7ceb26c12..ea24fe4939fc9e08fb1ace9fa5e659c554709d09 100644
+index 0f1675987f2b90ee5f13c535a0a18242c4a66f9f..20fe7ae058082d96f865b5401d8eda44c877209e 100644
 --- a/vllm/parser/mistral.py
 +++ b/vllm/parser/mistral.py
 @@ -428,8 +428,6 @@ class MistralParser(ParserEngine):

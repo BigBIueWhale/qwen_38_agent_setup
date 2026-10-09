@@ -187,6 +187,7 @@ RESPONSES_TOOLS_NEVER_GIVEN_PATCH_FILE="${PROJECT_DIR}/patches/vllm-responses-re
 CHAT_STREAM_LOGPROBS_PATCH_FILE="${PROJECT_DIR}/patches/vllm-chat-stream-carries-every-token-logprob.patch"
 CHAT_MESSAGES_ONE_RULE_PATCH_FILE="${PROJECT_DIR}/patches/vllm-chat-messages-read-by-one-rule.patch"
 RESPONSES_REFUSES_UNHONOURED_PATCH_FILE="${PROJECT_DIR}/patches/vllm-responses-refuses-what-it-cannot-honour.patch"
+REVIEWED_TESTS_DECLARE_NEEDS_PATCH_FILE="${PROJECT_DIR}/patches/vllm-reviewed-tests-declare-what-they-need.patch"
 
 if [[ ! -f "${DEPLOYMENT_INPUT_MANIFEST}" || -L "${DEPLOYMENT_INPUT_MANIFEST}" ]]; then
   echo "Deployment-input manifest is missing or is not a regular non-symlink file." >&2
@@ -340,7 +341,8 @@ printf '%s  %s\n' \
   "${RESPONSES_TOOLS_NEVER_GIVEN_PATCH_DIFF_SHA256}" "${RESPONSES_TOOLS_NEVER_GIVEN_PATCH_FILE}" \
   "${CHAT_STREAM_LOGPROBS_PATCH_DIFF_SHA256}" "${CHAT_STREAM_LOGPROBS_PATCH_FILE}" \
   "${CHAT_MESSAGES_ONE_RULE_PATCH_DIFF_SHA256}" "${CHAT_MESSAGES_ONE_RULE_PATCH_FILE}" \
-  "${RESPONSES_REFUSES_UNHONOURED_PATCH_DIFF_SHA256}" "${RESPONSES_REFUSES_UNHONOURED_PATCH_FILE}" | \
+  "${RESPONSES_REFUSES_UNHONOURED_PATCH_DIFF_SHA256}" "${RESPONSES_REFUSES_UNHONOURED_PATCH_FILE}" \
+  "${REVIEWED_TESTS_DECLARE_NEEDS_PATCH_DIFF_SHA256}" "${REVIEWED_TESTS_DECLARE_NEEDS_PATCH_FILE}" | \
   sha256sum --check --strict
 
 printf '%s  %s\n' \
@@ -486,7 +488,7 @@ done <<<"${context_sources}"
 install -D -m 0644 -- "${DOCKERFILE}" "${BUILD_CONTEXT}/containers/Dockerfile.runtime"
 find "${BUILD_CONTEXT}" -mindepth 1 -type d -exec chmod 0755 {} +
 find "${BUILD_CONTEXT}" -exec touch --no-dereference --date="@${SOURCE_DATE_EPOCH}" {} +
-remove_reconstruction
+# The reconstruction stays until the reviewed tests below have run from it.
 
 # Everything that determines the image, and nothing that does not: the base
 # image, every option and argument the build is given -- the options below
@@ -688,6 +690,8 @@ image_build_options=(
   --build-arg "INKLING_PARSER_PATCHED_FILE_SHA256=${INKLING_PARSER_PATCHED_FILE_SHA256}"
   --build-arg "KIMI_K2_PARSER_UPSTREAM_FILE_SHA256=${KIMI_K2_PARSER_UPSTREAM_FILE_SHA256}"
   --build-arg "KIMI_K2_PARSER_PATCHED_FILE_SHA256=${KIMI_K2_PARSER_PATCHED_FILE_SHA256}"
+  --build-arg "KIMI_K3_PARSER_UPSTREAM_FILE_SHA256=${KIMI_K3_PARSER_UPSTREAM_FILE_SHA256}"
+  --build-arg "KIMI_K3_PARSER_PATCHED_FILE_SHA256=${KIMI_K3_PARSER_PATCHED_FILE_SHA256}"
   --build-arg "XML_TEXT_FIDELITY_PATCH_DIFF_SHA256=${XML_TEXT_FIDELITY_PATCH_DIFF_SHA256}"
   --build-arg "DERENDER_SERVING_UPSTREAM_FILE_SHA256=${DERENDER_SERVING_UPSTREAM_FILE_SHA256}"
   --build-arg "DERENDER_SERVING_PATCHED_FILE_SHA256=${DERENDER_SERVING_PATCHED_FILE_SHA256}"
@@ -947,7 +951,149 @@ docker run --rm --network none --read-only --user "$(id -u):$(id -g)" \
   --volume "${PROJECT_DIR}/scripts:/probes:ro" "${parser_unit_mounts[@]}" \
   --entrypoint python3 "${BASE_IMAGE_TAG}" /probes/probe_requests_unit.py
 
+# The reviewed tests: every file under tests/ the patch set changes or adds, read
+# from REVIEWED_STATUS, never listed by hand -- a stage that adds a test adds it
+# here. The runner is pinned like every other input: the wheels in test-runner/
+# (pytest and the plugins vLLM's tests use, at the versions vLLM's
+# requirements/test/cuda.txt pins at VLLM_COMMIT) are deployment inputs, verified
+# above, and are unpacked inside the container from exactly the entries the
+# deployment-input manifest names. Where a test runs is the test's own
+# declaration: it carries the gpu or network mark the tree's tests/conftest.py
+# registers, on itself, its class or its module, when it needs what a machine may
+# lack. scripts/reviewed_tests_plugin.py collects these files and nothing else,
+# runs the selected set and reports, on lines prefixed REVIEWED_TESTS, what it did
+# and did not execute.
+reviewed_test_files=()
+reviewed_test_support_files=()
+reviewed_test_scripts=()
+deleted_runtime_files=()
+while IFS= read -r status_line; do
+  status_path="${status_line:3}"
+  case "${status_line}" in
+    " M tests/"*|"?? tests/"*)
+      case "${status_path##*/}" in
+        test_*.py) reviewed_test_files+=("${status_path}") ;;
+        *.py) reviewed_test_support_files+=("${status_path}") ;;
+        *) reviewed_test_scripts+=("${status_path}") ;;
+      esac
+      ;;
+    " D vllm/"*) deleted_runtime_files+=("${status_path}") ;;
+  esac
+done <<<"${REVIEWED_STATUS}"
+readonly -a reviewed_test_files reviewed_test_support_files reviewed_test_scripts \
+  deleted_runtime_files
+mapfile -t test_runner_wheels < <(
+  sed -n 's#^[0-9a-f]\{64\}  test-runner/\([^/]*\.whl\)$#/test-runner/\1#p' \
+    "${DEPLOYMENT_INPUT_MANIFEST}"
+)
+((${#test_runner_wheels[@]} > 0)) || \
+  die "The deployment-input manifest pins no test-runner wheel."
+readonly -a test_runner_wheels
+
+# offline: the reviewed tests that declare no need, on the base image with
+# exactly the context's reviewed runtime files overlaid -- the bytes the image
+# carries, as the units above run them -- with no GPU and no network.
+# release: every reviewed test, in the image the build made, on this host's GPU,
+# with the network; a gated Hugging Face repository is read with the HF_TOKEN of
+# the environment build runs in, and what the tests download is kept under this
+# run's export directory and removed with it.
+# Both read the served model's tokenizer files, checked against the model manifest
+# above, where a test asks for the pinned local tokenizer (QWEN_TOKENIZER_PATH).
+# The tree's own vllm/ is masked, so a test imports the installed package, and a
+# runtime module the patch set deletes cannot be imported, as in the image.
+# check runs the offline set in this many shards at once: pytest processes of
+# about 1 GB each, each given every twelfth reviewed file. Measured on a 24-CPU
+# host, one process takes 16.5 minutes, six take 5.8 and twelve 4.0; the set's
+# result does not depend on the count.
+readonly OFFLINE_REVIEWED_TEST_SHARDS=12
+run_reviewed_tests() {
+  local reviewed_set="$1" image="$2" shards="$3" image_note="" shard failed=false
+  local log_dir="${BUILD_EXPORT_DIR}/reviewed-tests-${reviewed_set}"
+  local -a machine pids=() logs=()
+  case "${reviewed_set}" in
+    offline)
+      machine=(--network none --env CUDA_VISIBLE_DEVICES= --env HF_HUB_OFFLINE=1
+        "${parser_unit_mounts[@]}")
+      ;;
+    release)
+      image_note="; ${image} was not pinned"
+      install -d -m 0700 "${BUILD_EXPORT_DIR}/reviewed-tests-cache"
+      machine=(--gpus all --network bridge --env HF_TOKEN
+        --volume "${BUILD_EXPORT_DIR}/reviewed-tests-cache:/reviewed-tests-cache"
+        --env HF_HOME=/reviewed-tests-cache/huggingface
+        --env VLLM_CACHE_ROOT=/reviewed-tests-cache/vllm
+        --env XDG_CACHE_HOME=/reviewed-tests-cache/xdg)
+      ;;
+  esac
+  install -d -m 0700 "${log_dir}"
+  reviewed_tests_shard() {
+    docker run --rm --read-only --user "$(id -u):$(id -g)" \
+      --cap-drop ALL --security-opt no-new-privileges:true \
+      --tmpfs /tmp:rw,nodev,nosuid,size=4g \
+      --env HOME=/tmp --env PYTHONDONTWRITEBYTECODE=1 \
+      --env "REVIEWED_TEST_FILES=${reviewed_test_files[*]}" \
+      --env "REVIEWED_TEST_SUPPORT_FILES=${reviewed_test_support_files[*]}" \
+      --env "REVIEWED_DELETED_RUNTIME_FILES=${deleted_runtime_files[*]}" \
+      --volume "${RECONSTRUCTION}:/reviewed:ro" --tmpfs /reviewed/vllm:ro,size=4k \
+      --volume "${PROJECT_DIR}/test-runner:/test-runner:ro" \
+      --volume "${PROJECT_DIR}/scripts/reviewed_tests_plugin.py:/test-runner-plugin/reviewed_tests_plugin.py:ro" \
+      "${served_model_mounts[@]}" --env QWEN_TOKENIZER_PATH=/served-model \
+      "${machine[@]}" --workdir /reviewed --entrypoint bash "${image}" -c '
+        set -euo pipefail
+        reviewed_set="$1" shard="$2"; shift 2
+        for wheel in "$@"; do python3 -m zipfile -e "${wheel}" /tmp/test-runner; done
+        PYTHONPATH=/tmp/test-runner:/test-runner-plugin exec python3 -m pytest \
+          -p no:cacheprovider -p reviewed_tests_plugin --reviewed-set "${reviewed_set}" \
+          --reviewed-shard "${shard}" -q -rfE --tb=short --disable-warnings tests' \
+      run-reviewed-tests "${reviewed_set}" "$1" "${test_runner_wheels[@]}"
+  }
+  if ((shards == 1)); then
+    logs=("${log_dir}/shard-1.log")
+    reviewed_tests_shard 1/1 2>&1 | tee "${logs[0]}" | sed '/^REVIEWED_TESTS_JSON /d' ||
+      failed=true
+  else
+    # The shards run at once, each its own pytest process in its own container,
+    # and are reported in order once all have ended.
+    for ((shard = 1; shard <= shards; shard++)); do
+      logs+=("${log_dir}/shard-${shard}.log")
+      reviewed_tests_shard "${shard}/${shards}" >"${logs[-1]}" 2>&1 &
+      pids+=("$!")
+    done
+    for shard in "${!pids[@]}"; do
+      wait "${pids[shard]}" || failed=true
+      printf 'Reviewed tests, %s set, shard %d of %d:\n' \
+        "${reviewed_set}" "$((shard + 1))" "${shards}"
+      sed -e '/^REVIEWED_TESTS_JSON /d' -e 's/^/  /' "${logs[shard]}"
+    done
+  fi
+  docker run --rm --network none --read-only --user "$(id -u):$(id -g)" \
+    --volume "${log_dir}:/reviewed-tests:ro" \
+    --volume "${PROJECT_DIR}/scripts/reviewed_tests_plugin.py:/test-runner-plugin/reviewed_tests_plugin.py:ro" \
+    --entrypoint python3 "${BASE_IMAGE_TAG}" \
+    /test-runner-plugin/reviewed_tests_plugin.py merge "${logs[@]/#"${log_dir}"//reviewed-tests}" \
+    >"${log_dir}/merged.log" || failed=true
+  sed '/^REVIEWED_TESTS_SUMMARY /d' "${log_dir}/merged.log"
+  [[ "${failed}" == false ]] || \
+    die "The reviewed tests failed (the ${reviewed_set} set)${image_note}." \
+      "Their output is above; the lines prefixed REVIEWED_TESTS say what ran and what did not." \
+      "Next: fix what failed. A test that needs a GPU or the network this set does not give it says so with the gpu or network mark."
+  reviewed_tests_summary="$(sed -n 's/^REVIEWED_TESTS_SUMMARY //p' "${log_dir}/merged.log")"
+}
+# What no gate runs, said beside what the runner ran: the shell scripts under
+# tests/ the patch set changes, and the test files it leaves as upstream has them.
+upstream_test_file_count="$(
+  find "${RECONSTRUCTION}/tests" -type f -name 'test_*.py' | wc -l
+)"
+upstream_test_file_count=$((upstream_test_file_count - ${#reviewed_test_files[@]}))
+readonly upstream_test_file_count
+if [[ "${MODE}" == "serve-check" ]]; then
+  reviewed_tests_summary="serve-check does not run the reviewed tests; check runs every one that needs neither a GPU nor the network, and build runs them all before it pins an image."
+else
+  run_reviewed_tests offline "${BASE_IMAGE_TAG}" "${OFFLINE_REVIEWED_TEST_SHARDS}"
+fi
+
 if [[ "${MODE}" == "check" || "${MODE}" == "serve-check" ]]; then
+  remove_reconstruction
   # Every count below is derived from the objects this run just verified —
   # REVIEWED_STATUS and the deployment-input manifest — never restated by
   # hand: a hand count here is one more copy that can drift from the thing
@@ -967,11 +1113,15 @@ if [[ "${MODE}" == "check" || "${MODE}" == "serve-check" ]]; then
     "${deleted_runtime_count} reviewed runtime source deletions," \
     "${modified_test_count} reviewed modified test files," \
     "${new_test_count} reviewed new test files," \
-    "${deleted_test_count} reviewed test deletions (hashed review artifacts the" \
-    "check does not execute)," \
+    "${deleted_test_count} reviewed test deletions," \
     "${modified_doc_count} reviewed modified documentation files," \
     "${review_diff_count} review diffs, agent template, numerical audit" \
-    "units, and all build units are exact."
+    "units, the test runner, and all build units are exact."
+  echo "${reviewed_tests_summary}"
+  echo "Not executed by any gate: the ${#reviewed_test_scripts[@]} reviewed" \
+    "shell scripts under tests/ (${reviewed_test_scripts[*]}), which start prefill" \
+    "and decode servers that exchange KV through NIXL or the P2P tier, and the" \
+    "${upstream_test_file_count} test files the patch set leaves as upstream has them."
   if [[ "${MODE}" == "serve-check" ]]; then
     require_image_built_from_inputs "${image_inputs_sha256}" "${context_file_count}"
   fi
@@ -1086,6 +1236,7 @@ actual_installed_report="$(
     /usr/local/lib/python3.12/dist-packages/vllm/parser/deepseek_v4.py \
     /usr/local/lib/python3.12/dist-packages/vllm/parser/inkling.py \
     /usr/local/lib/python3.12/dist-packages/vllm/parser/kimi_k2.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/parser/kimi_k3.py \
     /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/scale_out/derender/serving.py \
     /usr/local/lib/python3.12/dist-packages/vllm/multimodal/processing/inputs.py \
     /usr/local/lib/python3.12/dist-packages/vllm/multimodal/processing/processor.py \
@@ -1184,6 +1335,7 @@ expected_installed_report="$(printf '%s  %s\n' \
   "${DEEPSEEK_V4_PARSER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/deepseek_v4.py \
   "${INKLING_PARSER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/inkling.py \
   "${KIMI_K2_PARSER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/kimi_k2.py \
+  "${KIMI_K3_PARSER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/kimi_k3.py \
   "${DERENDER_SERVING_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/scale_out/derender/serving.py \
   "${MM_PROCESSOR_INPUTS_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/multimodal/processing/inputs.py \
   "${MM_PROCESSOR_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/multimodal/processing/processor.py \
@@ -1387,6 +1539,12 @@ fi
 # The units that need the GPU run in this image, on this host's GPU, before
 # anything pins it or moves IMAGE_TAG to it.
 run_gpu_release_units "${actual_image_id}"
+# Every reviewed test, in this image, on this host's GPU and with the network,
+# beside the units above and on the same terms: the image is pinned only once
+# they pass.
+run_reviewed_tests release "${actual_image_id}" 1
+echo "${reviewed_tests_summary}"
+remove_reconstruction
 
 # The build is the only witness of the image it made, so it writes the pin
 # itself. A build of the inputs the pin was made from must reproduce it and is

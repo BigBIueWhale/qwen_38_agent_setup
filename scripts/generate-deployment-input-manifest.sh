@@ -69,6 +69,7 @@ done < <(
     'patches/source_patch_v1/*' \
     'scripts/*.py' \
     'scripts/*.sh' \
+    'test-runner/*.whl' \
     start.sh \
     status.sh \
     stop.sh | LC_ALL=C sort -z

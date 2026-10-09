@@ -276,11 +276,13 @@ ARG DEEPSEEK_V32_PARSER_UPSTREAM_FILE_SHA256
 ARG DEEPSEEK_V4_PARSER_UPSTREAM_FILE_SHA256
 ARG INKLING_PARSER_UPSTREAM_FILE_SHA256
 ARG KIMI_K2_PARSER_UPSTREAM_FILE_SHA256
+ARG KIMI_K3_PARSER_UPSTREAM_FILE_SHA256
 RUN printf '%s  %s\n' \
   "${DEEPSEEK_V32_PARSER_UPSTREAM_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/deepseek_v32.py \
   "${DEEPSEEK_V4_PARSER_UPSTREAM_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/deepseek_v4.py \
   "${INKLING_PARSER_UPSTREAM_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/inkling.py \
   "${KIMI_K2_PARSER_UPSTREAM_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/kimi_k2.py \
+  "${KIMI_K3_PARSER_UPSTREAM_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/kimi_k3.py \
   | sha256sum --check --strict
 
 ARG GEMMA4_PARSER_UPSTREAM_FILE_SHA256
@@ -558,6 +560,7 @@ ARG DEEPSEEK_V32_PARSER_PATCHED_FILE_SHA256
 ARG DEEPSEEK_V4_PARSER_PATCHED_FILE_SHA256
 ARG INKLING_PARSER_PATCHED_FILE_SHA256
 ARG KIMI_K2_PARSER_PATCHED_FILE_SHA256
+ARG KIMI_K3_PARSER_PATCHED_FILE_SHA256
 ARG DERENDER_SERVING_PATCHED_FILE_SHA256
 ARG MM_PROCESSOR_INPUTS_PATCHED_FILE_SHA256
 ARG MM_PROCESSOR_PATCHED_FILE_SHA256
@@ -949,11 +952,13 @@ COPY --chmod=0644 vllm/vllm/parser/deepseek_v32.py /usr/local/lib/python3.12/dis
 COPY --chmod=0644 vllm/vllm/parser/deepseek_v4.py /usr/local/lib/python3.12/dist-packages/vllm/parser/deepseek_v4.py
 COPY --chmod=0644 vllm/vllm/parser/inkling.py /usr/local/lib/python3.12/dist-packages/vllm/parser/inkling.py
 COPY --chmod=0644 vllm/vllm/parser/kimi_k2.py /usr/local/lib/python3.12/dist-packages/vllm/parser/kimi_k2.py
+COPY --chmod=0644 vllm/vllm/parser/kimi_k3.py /usr/local/lib/python3.12/dist-packages/vllm/parser/kimi_k3.py
 RUN printf '%s  %s\n' \
   "${DEEPSEEK_V32_PARSER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/deepseek_v32.py \
   "${DEEPSEEK_V4_PARSER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/deepseek_v4.py \
   "${INKLING_PARSER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/inkling.py \
   "${KIMI_K2_PARSER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/kimi_k2.py \
+  "${KIMI_K3_PARSER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/kimi_k3.py \
   | sha256sum --check --strict
 COPY --chmod=0644 vllm/vllm/parser/gemma4.py /usr/local/lib/python3.12/dist-packages/vllm/parser/gemma4.py
 COPY --chmod=0644 vllm/vllm/parser/glm47_moe.py /usr/local/lib/python3.12/dist-packages/vllm/parser/glm47_moe.py

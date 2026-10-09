@@ -2341,3 +2341,31 @@ index 55fe5b90c587c77318e54bc0a849262fe90f25c1..c46104347dbc522cd06abd551b67ef37
      def _handle_request_preproc_error(self, request: EngineCoreRequest) -> None:
          """Log and return a request-scoped error response for exceptions raised
          from the add request preprocessing in the input socket processing thread.
+diff --git a/tests/tool_use/test_kimi_k3_tool_parser.py b/tests/tool_use/test_kimi_k3_tool_parser.py
+index 118c51db574e5511d4659e93dd57ec4058c3f7d6..7631d5a609b2ccd37d6609e9f1d1a7cca4638d8e 100644
+--- a/tests/tool_use/test_kimi_k3_tool_parser.py
++++ b/tests/tool_use/test_kimi_k3_tool_parser.py
+@@ -69,6 +69,7 @@ def _request() -> ChatCompletionRequest:
+             }
+         ],
+         tool_choice="auto",
++        kv_scope="agent",
+     )
+ 
+ 
+@@ -86,6 +87,7 @@ def _named_request() -> ChatCompletionRequest:
+             }
+         ],
+         tool_choice={"type": "function", "function": {"name": "calc"}},
++        kv_scope="agent",
+     )
+ 
+ 
+@@ -102,6 +104,7 @@ def _responses_request(*, tool_choice="auto") -> ResponsesRequest:
+                 }
+             ],
+             "tool_choice": tool_choice,
++            "kv_scope": "agent",
+         }
+     )
+ 

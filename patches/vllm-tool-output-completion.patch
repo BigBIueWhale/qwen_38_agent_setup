@@ -2139,3 +2139,39 @@ new file mode 100644
 +        self.protected_spans = [
 +            span for span in self.protected_spans if span[1] > offset
 +        ]
+diff --git a/vllm/parser/kimi_k3.py b/vllm/parser/kimi_k3.py
+index e40e9a95e7f293f46c2b54157c5069363c108dd6..8011f9cfd35a115366de8f63d8a41e94b63d3d54 100644
+--- a/vllm/parser/kimi_k3.py
++++ b/vllm/parser/kimi_k3.py
+@@ -31,10 +31,12 @@ class KimiK3Parser(DelegatingParser):
+         request: ChatCompletionRequest | ResponsesRequest,
+         enable_auto_tools: bool = False,
+         content_token_ids: Sequence[int] = (),
++        output_terminal: tuple[str | None, str | int | None] | None = None,
+     ) -> tuple[list[FunctionCall] | None, str | None]:
+         if self._tool_parser is None or not enable_auto_tools:
+             return super()._extract_tool_calls(
+-                content, request, enable_auto_tools, content_token_ids
++                content, request, enable_auto_tools, content_token_ids,
++                output_terminal,
+             )
+ 
+         tool_call_info = self.extract_tool_calls(content or "", request=request)
+diff --git a/vllm/parser/mistral.py b/vllm/parser/mistral.py
+index 761183af0c665cb1ae9e0655fb79d3a5bb5483b3..57c681ba22f5753a08874bda6fd7bace14be2173 100644
+--- a/vllm/parser/mistral.py
++++ b/vllm/parser/mistral.py
+@@ -519,11 +519,12 @@ class MistralParser(ParserEngine):
+         content: str,
+         request: ChatCompletionRequest,
+         content_token_ids: Sequence[int] = (),
++        output_terminal: tuple[str | None, str | int | None] | None = None,
+     ) -> ExtractedToolCallInformation:
+         if self._is_pre_v11:
+             return self._legacy_extract_tool_calls(content, request)
+         return super().extract_tool_calls_from_content(
+-            content, request, content_token_ids
++            content, request, content_token_ids, output_terminal
+         )
+ 
+     def _legacy_extract_tool_calls(

@@ -902,3 +902,56 @@ index 59c646229c7b429e189b44d73f139dfd53f95a86..a8f480965423741617dace87eba9a25f
  
          if request.tools is None or (
              request.tool_choice == "none" and self.exclude_tools_when_tool_choice_none
+diff --git a/tests/entrypoints/openai/responses/test_responses_utils.py b/tests/entrypoints/openai/responses/test_responses_utils.py
+index ecb07446c0be893b4f6bf781843b546840d106a7..ce3ca0afd1437903d6fbfa688717b66ebb113895 100644
+--- a/tests/entrypoints/openai/responses/test_responses_utils.py
++++ b/tests/entrypoints/openai/responses/test_responses_utils.py
+@@ -2,6 +2,7 @@
+ # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
+ 
+ from copy import deepcopy
++from functools import partial
+ from types import SimpleNamespace
+ from unittest.mock import AsyncMock, patch
+ 
+@@ -31,6 +32,7 @@ from vllm.entrypoints.openai.engine.protocol import FunctionCall
+ from vllm.entrypoints.openai.responses.protocol import ResponsesRequest
+ from vllm.entrypoints.openai.responses.serving import OpenAIServingResponses
+ from vllm.exceptions import VLLMValidationError
++from vllm.renderers.online_renderer import OnlineRenderer
+ 
+ 
+ def _single_chat_message(item):
+@@ -1059,14 +1061,28 @@ def test_conversion_does_not_mutate_replayed_easy_input():
+     assert items == frozen
+ 
+ 
+-@pytest.mark.asyncio
+-@pytest.mark.parametrize("stream", [False, True])
+-@pytest.mark.parametrize("valid", [False, True])
+-async def test_responses_history_is_validated_before_rendering(stream, valid):
++def _online_renderer_rendering_nothing() -> SimpleNamespace:
++    """What _make_request reads of the OnlineRenderer, with its own tool-choice
++    check: a request reaches what a test checks after it only as it would on a
++    server. preprocess_chat renders nothing and records whether it was reached.
++    """
+     renderer = SimpleNamespace(
+         exclude_tools_when_tool_choice_none=False,
+         preprocess_chat=AsyncMock(return_value=(None, ["engine input"])),
++        renderer=SimpleNamespace(tokenizer=None),
++        use_harmony=False,
++    )
++    renderer.require_tool_choice_parsed = partial(
++        OnlineRenderer.require_tool_choice_parsed, renderer
+     )
++    return renderer
++
++
++@pytest.mark.asyncio
++@pytest.mark.parametrize("stream", [False, True])
++@pytest.mark.parametrize("valid", [False, True])
++async def test_responses_history_is_validated_before_rendering(stream, valid):
++    renderer = _online_renderer_rendering_nothing()
+     serving = object.__new__(OpenAIServingResponses)
+     serving.online_renderer = renderer
+     serving.chat_template = None
