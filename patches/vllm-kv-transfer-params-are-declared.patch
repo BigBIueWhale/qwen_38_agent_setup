@@ -73,10 +73,10 @@ index 77f76c3c527712b9a49808a5b90817f637bfce8f..43fd038e041228afea78a78465abc098
      request = ChatCompletionGenerationRequest(
 diff --git a/tests/v1/engine/test_kv_transfer_params_admission.py b/tests/v1/engine/test_kv_transfer_params_admission.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..354d63fb4745a3ba3de000799aa157e339df889d
+index 0000000000000000000000000000000000000000..8919f30dbb52525ef1e2b81e76f3c0e223d60cba
 --- /dev/null
 +++ b/tests/v1/engine/test_kv_transfer_params_admission.py
-@@ -0,0 +1,345 @@
+@@ -0,0 +1,355 @@
 +# SPDX-License-Identifier: Apache-2.0
 +# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
 +"""Admission refuses kv_transfer_params that no configured KV connector
@@ -247,6 +247,16 @@ index 0000000000000000000000000000000000000000..354d63fb4745a3ba3de000799aa157e3
 +        (P2P, {"remote_prefiller": [1]}, "an object whose kv_request_id"),
 +        (DEPLOYED, {"max_offload_tokens": -1}, "a non-negative integer"),
 +        (NIXL, {"remote_engine_id": ["e"]}, "a string"),
++        (NIXL, {"remote_block_ids": []},
++         "a non-empty list of lists of integers, one per KV cache group or null"),
++        (KVTransferConfig(kv_connector="MooncakeConnector", kv_role="kv_producer"),
++         {"do_remote_prefill": True},
++         "false on this kv_producer node, which prefills for a decode node; a "
++         "remote prefill is pulled by a kv_consumer or kv_both node"),
++        (KVTransferConfig(kv_connector="MooncakeConnector", kv_role="kv_consumer"),
++         {"do_remote_decode": True},
++         "false on this kv_consumer node, which decodes what a prefill node "
++         "sends; a remote decode is served by a kv_producer or kv_both node"),
 +    ],
 +)
 +def test_a_value_the_connector_cannot_read_is_refused_naming_its_shape(
@@ -263,9 +273,9 @@ index 0000000000000000000000000000000000000000..354d63fb4745a3ba3de000799aa157e3
 +
 +
 +def _kind(value) -> str:
-+    return {str: "a string", list: "a list", int: "an integer"}[type(value)] + (
-+        f" ({value!r})"
-+    )
++    return {
++        str: "a string", list: "a list", int: "an integer", bool: "a boolean",
++    }[type(value)] + f" ({value!r})"
 +
 +
 +def test_a_value_the_connector_reads_is_admitted():
@@ -424,10 +434,10 @@ index 0000000000000000000000000000000000000000..354d63fb4745a3ba3de000799aa157e3
 +    )
 diff --git a/tests/v1/kv_connector/unit/test_kv_transfer_params_keys.py b/tests/v1/kv_connector/unit/test_kv_transfer_params_keys.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..b940e2a178119a29751cf515875d709d438f2580
+index 0000000000000000000000000000000000000000..8fb8ee40402392af14a93e584782d1072fa711d8
 --- /dev/null
 +++ b/tests/v1/kv_connector/unit/test_kv_transfer_params_keys.py
-@@ -0,0 +1,583 @@
+@@ -0,0 +1,682 @@
 +# SPDX-License-Identifier: Apache-2.0
 +# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
 +"""Each KV connector declares the request ``kv_transfer_params`` keys its
@@ -460,12 +470,14 @@ index 0000000000000000000000000000000000000000..b940e2a178119a29751cf515875d709d
 +CONNECTORS = VLLM / "distributed/kv_transfer/kv_connector/v1"
 +
 +
-+def _config(kv_connector: str | None, **extra) -> SimpleNamespace:
++def _config(
++    kv_connector: str | None, kv_role: str = "kv_both", **extra
++) -> SimpleNamespace:
 +    if kv_connector is None:
 +        return SimpleNamespace(kv_transfer_config=None)
 +    return SimpleNamespace(
 +        kv_transfer_config=KVTransferConfig(
-+            kv_connector=kv_connector, kv_role="kv_both", **extra
++            kv_connector=kv_connector, kv_role=kv_role, **extra
 +        )
 +    )
 +
@@ -634,6 +646,19 @@ index 0000000000000000000000000000000000000000..b940e2a178119a29751cf515875d709d
 +            ("remote_prefiller", {}),
 +            ("remote_kv_source", {"kv_request_id": "t", "remote_host": "10.0.0.1"}),
 +            ("remote_decoder", {}),
++            # The parsers read these as no peer, and the request ran without
++            # the transfer it named; the transport refused the last three
++            # inside the engine core.
++            ("remote_prefiller", {"kv_request_id": "", "remote_host": "h",
++                                  "remote_port": 5710}),
++            ("remote_decoder", {"kv_request_id": ""}),
++            *(
++                (key, {"kv_request_id": "t", "remote_host": host,
++                       "remote_port": port})
++                for key in ("remote_prefiller", "remote_kv_source")
++                for host, port in (("", 5710), ("h", 0), ("h", 70000),
++                                   ("h", -1), ("a b", 5710), ("-h", 5710))
++            ),
 +            ("kv_load_tiers", "cpu"),
 +            ("kv_load_tiers", [{"medium": "tape"}]),
 +            ("max_offload_tokens", -1),
@@ -665,6 +690,8 @@ index 0000000000000000000000000000000000000000..b940e2a178119a29751cf515875d709d
 +            ("do_remote_prefill", "false"),
 +            ("do_remote_prefill", None),
 +            ("tp_size", None),
++            # One list per KV cache group: an empty one names no group.
++            ("remote_block_ids", []),
 +        ],
 +    ),
 +    (
@@ -710,6 +737,88 @@ index 0000000000000000000000000000000000000000..b940e2a178119a29751cf515875d709d
 +        assert keys.shape_of(key).conforms(value), (key, value)
 +    for key, value in refused:
 +        assert not keys.shape_of(key).conforms(value), (key, value)
++
++
++@pytest.mark.parametrize(
++    "host",
++    ["10.0.0.1", "::1", "[::1]", "localhost", "prefill-0.svc.cluster.local",
++     "prefill_0"],
++)
++def test_a_peer_host_is_an_address_or_a_host_name(host):
++    keys = _keys("OffloadingConnector", **_tiering({"type": "p2p"}))
++    peer = {"kv_request_id": "t", "remote_host": host, "remote_port": 1}
++    assert keys.shape_of("remote_kv_source").conforms(peer)
++    assert keys.shape_of("remote_prefiller").conforms({**peer, "remote_port": 65535})
++
++
++@pytest.mark.parametrize("kv_role", ["kv_producer", "kv_consumer", "kv_both"])
++def test_a_mooncake_node_is_refused_what_its_role_never_does(kv_role):
++    """The scheduler asserts, inside the engine core, that a kv_producer is
++    never asked to pull a remote prefill and a kv_consumer never to serve a
++    remote decode. Admission refuses exactly what the real scheduler raises
++    on, on that role, and admits the rest; false and null ask for nothing."""
++    import torch
++
++    from vllm.distributed.kv_transfer.kv_connector.v1.mooncake.mooncake_connector import (  # noqa: E501
++        MooncakeConnectorScheduler,
++    )
++    from vllm.v1.kv_cache_interface import (
++        FullAttentionSpec,
++        KVCacheConfig,
++        KVCacheGroupSpec,
++    )
++
++    def scheduler():
++        return MooncakeConnectorScheduler(
++            SimpleNamespace(
++                cache_config=SimpleNamespace(block_size=16),
++                kv_transfer_config=SimpleNamespace(kv_role=kv_role),
++                scheduler_config=SimpleNamespace(disable_hybrid_kv_cache_manager=True),
++            ),
++            "engine",
++            KVCacheConfig(
++                num_blocks=100,
++                kv_cache_tensors=[],
++                kv_cache_groups=[KVCacheGroupSpec(["layer"], FullAttentionSpec(
++                    block_size=16, num_kv_heads=1, head_size=1, dtype=torch.float32,
++                ))],
++            ),
++        )
++
++    def request(params):
++        return SimpleNamespace(
++            request_id="r", kv_transfer_params=params,
++            prompt_token_ids=list(range(40)), num_prompt_tokens=40, status=None,
++        )
++
++    def raises(call) -> bool:
++        try:
++            call()
++        except AssertionError:
++            return True
++        return False
++
++    remote = {
++        "transfer_id": "t", "remote_engine_id": "e", "remote_bootstrap_addr": "h:1",
++    }
++    raised = {
++        "do_remote_prefill": raises(lambda: scheduler().get_num_new_matched_tokens(
++            request({"do_remote_prefill": True, **remote}), 0)),
++        "do_remote_decode": raises(lambda: scheduler().request_finished(
++            request({"do_remote_decode": True, "transfer_id": "t"}), ([1],))),
++    }
++    assert raised == {
++        "do_remote_prefill": kv_role == "kv_producer",
++        "do_remote_decode": kv_role == "kv_consumer",
++    }
++    keys = _keys("MooncakeConnector", kv_role=kv_role)
++    for key, raised_there in raised.items():
++        assert keys.shape_of(key).conforms(True) is not raised_there, key
++        assert keys.shape_of(key).conforms(False), key
++    if kv_role != "kv_both":
++        refused = keys.shape_of(
++            "do_remote_prefill" if kv_role == "kv_producer" else "do_remote_decode")
++        assert str(refused).startswith(f"false on this {kv_role} node")
 +
 +
 +def test_a_proxy_fills_the_keys_naming_a_remote_request_with_null():
@@ -1042,12 +1151,14 @@ index aad7999d08a2a76392d1419f2cf1df6fc1a23127..99d3fbd51e9e5b67959b4ee95bb0aa19
      def supports_hma_config(cls, kv_transfer_config: "KVTransferConfig") -> bool:
          """Return whether this KV transfer config supports HMA.
 diff --git a/vllm/distributed/kv_transfer/kv_connector/v1/base.py b/vllm/distributed/kv_transfer/kv_connector/v1/base.py
-index e49dbebb1234de82221d9274d889376af8825e99..281108496254e2be4caf2af256cacbcbd1f9c98e 100644
+index e49dbebb1234de82221d9274d889376af8825e99..c359c343856a0acd2299b3c8d62266fb5d5cb50e 100644
 --- a/vllm/distributed/kv_transfer/kv_connector/v1/base.py
 +++ b/vllm/distributed/kv_transfer/kv_connector/v1/base.py
-@@ -42,7 +42,8 @@ The class provides the following primitives:
+@@ -41,8 +41,10 @@ The class provides the following primitives:
+ """
  
  import enum
++import ipaddress
  from abc import ABC, abstractmethod
 -from collections.abc import Callable, Iterable
 +from collections.abc import Callable, Iterable, Mapping
@@ -1055,7 +1166,7 @@ index e49dbebb1234de82221d9274d889376af8825e99..281108496254e2be4caf2af256cacbcb
  from typing import TYPE_CHECKING, Any, Literal
  
  import torch
-@@ -168,6 +169,203 @@ class KVConnectorWorkerMetadata(ABC):
+@@ -168,6 +170,244 @@ class KVConnectorWorkerMetadata(ABC):
          pass
  
  
@@ -1115,6 +1226,36 @@ index e49dbebb1234de82221d9274d889376af8825e99..281108496254e2be4caf2af256cacbcb
 +)
 +NUMBER = _shape("a number", lambda value: type(value) in (int, float))
 +STRING = _shape("a string", lambda value: type(value) is str)
++NON_EMPTY_STRING = _shape(
++    "a non-empty string", lambda value: type(value) is str and value != ""
++)
++PORT = _shape(
++    "an integer from 1 to 65535",
++    lambda value: type(value) is int and 1 <= value <= 65535,
++)
++
++
++def _names_a_host(value: object) -> bool:
++    """An IP address -- an IPv6 one bracketed or not -- or a host name of
++    dot-separated labels of ASCII letters, digits, '-' and '_', none empty and
++    none beginning with '-': what a peer address can name."""
++    if type(value) is not str or not value.isascii():
++        return False
++    literal = value[1:-1] if value.startswith("[") and value.endswith("]") else value
++    try:
++        ipaddress.ip_address(literal)
++        return True
++    except ValueError:
++        pass
++    return 0 < len(value) <= 253 and all(
++        label
++        and not label.startswith("-")
++        and all(char.isalnum() or char in "-_" for char in label)
++        for label in value.split(".")
++    )
++
++
++HOST = _shape("a host name or an IP address", _names_a_host)
 +INTEGER_OR_DIGITS = _shape(
 +    "an integer or a string of its decimal digits",
 +    lambda value: type(value) is int
@@ -1126,6 +1267,17 @@ index e49dbebb1234de82221d9274d889376af8825e99..281108496254e2be4caf2af256cacbcb
 +    return _shape(
 +        f"{shape} or null", lambda value: value is None or shape.conforms(value)
 +    )
++
++
++def non_empty(shape: KVTransferParamShape, described: str) -> KVTransferParamShape:
++    """A value of ``shape`` with at least one item, *described* in full."""
++    return _shape(described, lambda value: shape.conforms(value) and len(value) > 0)
++
++
++def asking_nothing(described: str) -> KVTransferParamShape:
++    """A key a node in this configuration never acts on: only null or false,
++    which ask for nothing (see ``asks``). *described* says why."""
++    return _shape(described, lambda value: not asks(value))
 +
 +
 +def either(*shapes: KVTransferParamShape) -> KVTransferParamShape:
@@ -1259,7 +1411,7 @@ index e49dbebb1234de82221d9274d889376af8825e99..281108496254e2be4caf2af256cacbcb
  class KVConnectorBase_V1(ABC):
      """
      Base class for KV connectors.
-@@ -607,6 +805,24 @@ class KVConnectorBase_V1(ABC):
+@@ -607,6 +847,24 @@ class KVConnectorBase_V1(ABC):
          # scheduler alive (e.g. extend has_unfinished_requests).
          return False
  
@@ -1454,15 +1606,16 @@ index 8786e91a5a14b4a204305d8891d2dbcaed6e2e16..448896ad526e16d0033c81981dca4307
      def get_required_kvcache_layout(cls, vllm_config: "VllmConfig") -> str | None:
          """
 diff --git a/vllm/distributed/kv_transfer/kv_connector/v1/mooncake/mooncake_connector.py b/vllm/distributed/kv_transfer/kv_connector/v1/mooncake/mooncake_connector.py
-index dd94ffb2f9ed824505748f9742ed27ce5cfbaf00..03b5e56e72a11ce71a501914b33c0880266b9666 100644
+index dd94ffb2f9ed824505748f9742ed27ce5cfbaf00..3290befc98901e399ebda54e5a8e5ea169de7c10 100644
 --- a/vllm/distributed/kv_transfer/kv_connector/v1/mooncake/mooncake_connector.py
 +++ b/vllm/distributed/kv_transfer/kv_connector/v1/mooncake/mooncake_connector.py
-@@ -25,9 +25,12 @@ from vllm.distributed.kv_transfer.kv_connector.utils import (
+@@ -25,9 +25,13 @@ from vllm.distributed.kv_transfer.kv_connector.utils import (
      get_current_attn_backends,
  )
  from vllm.distributed.kv_transfer.kv_connector.v1.base import (
 +    BOOLEAN,
 +    STRING,
++    asking_nothing,
      KVConnectorBase_V1,
      KVConnectorMetadata,
      KVConnectorRole,
@@ -1470,7 +1623,7 @@ index dd94ffb2f9ed824505748f9742ed27ce5cfbaf00..03b5e56e72a11ce71a501914b33c0880
      SupportsHMA,
  )
  from vllm.distributed.kv_transfer.kv_connector.v1.metrics import KVConnectorStats
-@@ -467,6 +470,30 @@ class MooncakeConnectorMetadata(KVConnectorMetadata):
+@@ -467,6 +471,48 @@ class MooncakeConnectorMetadata(KVConnectorMetadata):
  
  
  class MooncakeConnector(KVConnectorBase_V1, SupportsHMA):
@@ -1485,13 +1638,31 @@ index dd94ffb2f9ed824505748f9742ed27ce5cfbaf00..03b5e56e72a11ce71a501914b33c0880
 +        # an aborted request included, by all three
 +        # (MooncakeConnectorMetadata.add_new_req); a prefill node acts on
 +        # do_remote_decode true only for a transfer_id, which the decode
-+        # node's pull names.
++        # node's pull names. A node's role says which of the two it can be
++        # asked: the scheduler asserts a kv_producer is never asked to pull a
++        # remote prefill and a kv_consumer never to serve a remote decode,
++        # inside the engine core.
++        assert vllm_config.kv_transfer_config is not None
++        kv_role = vllm_config.kv_transfer_config.kv_role
++        do_remote_prefill = BOOLEAN.requiring(
++            "transfer_id", "remote_engine_id", "remote_bootstrap_addr"
++        )
++        if kv_role == "kv_producer":
++            do_remote_prefill = asking_nothing(
++                "false on this kv_producer node, which prefills for a decode "
++                "node; a remote prefill is pulled by a kv_consumer or kv_both node"
++            )
++        do_remote_decode = BOOLEAN.requiring("transfer_id")
++        if kv_role == "kv_consumer":
++            do_remote_decode = asking_nothing(
++                "false on this kv_consumer node, which decodes what a prefill "
++                "node sends; a remote decode is served by a kv_producer or "
++                "kv_both node"
++            )
 +        return KVTransferParamsKeys(
 +            keys={
-+                "do_remote_prefill": BOOLEAN.requiring(
-+                    "transfer_id", "remote_engine_id", "remote_bootstrap_addr"
-+                ),
-+                "do_remote_decode": BOOLEAN.requiring("transfer_id"),
++                "do_remote_prefill": do_remote_prefill,
++                "do_remote_decode": do_remote_decode,
 +                "transfer_id": STRING,
 +                "remote_engine_id": STRING,
 +                "remote_bootstrap_addr": STRING,
@@ -1600,10 +1771,10 @@ index 957b15ea40c15a4158c19dc6dbc626fcb7edb33e..6887f7737dc160726fac4e873257ace7
      def get_required_kvcache_layout(cls, vllm_config: "VllmConfig") -> str | None:
          """
 diff --git a/vllm/distributed/kv_transfer/kv_connector/v1/nixl/connector.py b/vllm/distributed/kv_transfer/kv_connector/v1/nixl/connector.py
-index 0b7a5d572869efa70cb05214a15b66988c3bb995..9d33ee72a0e8a367f64365d82798ca5dd8d143d7 100644
+index 0b7a5d572869efa70cb05214a15b66988c3bb995..6d1607e5123d0907ab7a29ede9dc05632392390c 100644
 --- a/vllm/distributed/kv_transfer/kv_connector/v1/nixl/connector.py
 +++ b/vllm/distributed/kv_transfer/kv_connector/v1/nixl/connector.py
-@@ -26,8 +26,15 @@ from vllm.distributed.kv_transfer.kv_connector.v1.base import (
+@@ -26,8 +26,16 @@ from vllm.distributed.kv_transfer.kv_connector.v1.base import (
      KVConnectorBase_V1,
      KVConnectorHandshakeMetadata,
      KVConnectorMetadata,
@@ -1615,16 +1786,25 @@ index 0b7a5d572869efa70cb05214a15b66988c3bb995..9d33ee72a0e8a367f64365d82798ca5d
 +    KVTransferParamsKeys,
      SupportsHMA,
 +    list_of,
++    non_empty,
 +    nullable,
  )
  from vllm.distributed.kv_transfer.kv_connector.v1.metrics import (
      KVConnectorPromMetrics,
-@@ -75,10 +82,55 @@ if TYPE_CHECKING:
+@@ -75,10 +83,63 @@ if TYPE_CHECKING:
  
  logger = init_logger(__name__)
  
++# One list per KV cache group, and every cache has a group: an empty list
++# names no group's blocks, and a decode node told to pull it counts the whole
++# prompt as remote and then finds nothing to receive ("assert
++# num_external_tokens == 0" in the pull scheduler). A full prefix hit is the
++# local block list being empty, never this one.
 +_REMOTE_BLOCK_IDS = nullable(
-+    list_of(list_of(INTEGER, "integers"), "lists of integers, one per group")
++    non_empty(
++        list_of(list_of(INTEGER, "integers")),
++        "a non-empty list of lists of integers, one per KV cache group",
++    )
 +)
 +
  
@@ -1675,7 +1855,7 @@ index 0b7a5d572869efa70cb05214a15b66988c3bb995..9d33ee72a0e8a367f64365d82798ca5d
      @property
      def supports_divergent_local_hybrid_hits(self) -> bool:
          return True
-@@ -326,6 +378,26 @@ class NixlBaseConnector(KVConnectorBase_V1, SupportsHMA):
+@@ -326,6 +387,26 @@ class NixlBaseConnector(KVConnectorBase_V1, SupportsHMA):
  class NixlPullConnector(NixlBaseConnector):
      """Pull-based (READ) NIXL KV transfer connector."""
  
@@ -1702,7 +1882,7 @@ index 0b7a5d572869efa70cb05214a15b66988c3bb995..9d33ee72a0e8a367f64365d82798ca5d
      def __init__(
          self,
          vllm_config: VllmConfig,
-@@ -354,5 +426,22 @@ class NixlPullConnector(NixlBaseConnector):
+@@ -354,6 +435,23 @@ class NixlPullConnector(NixlBaseConnector):
  class NixlPushConnector(NixlBaseConnector):
      """Push-based (WRITE) NIXL KV transfer connector."""
  
@@ -1725,6 +1905,7 @@ index 0b7a5d572869efa70cb05214a15b66988c3bb995..9d33ee72a0e8a367f64365d82798ca5d
 +
      def __init__(
          self,
+         vllm_config: VllmConfig,
 diff --git a/vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py b/vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py
 index f727163b9e4c82d5176abf5e8f09acf829b3dce9..52d5498e4b8bf72961ab40384df0ce016b42c5aa 100644
 --- a/vllm/distributed/kv_transfer/kv_connector/v1/offloading/scheduler.py
@@ -2114,23 +2295,24 @@ index 768d7e328ad7ba4b59b9d3bcc2752a1ad1ba52fe..3e79316fdfd360c83a6e611382212cd7
          """Return and reset metric observations collected by this tier."""
          return None
 diff --git a/vllm/v1/kv_offload/tiering/p2p/manager.py b/vllm/v1/kv_offload/tiering/p2p/manager.py
-index f76ed59b5c7823ace2505b2fb4936c7adfa10952..3dd065db87d1b2c1058dd884d75c44579596b785 100644
+index f76ed59b5c7823ace2505b2fb4936c7adfa10952..9547e6a64a483946db75fa19ee6709424f3c86be 100644
 --- a/vllm/v1/kv_offload/tiering/p2p/manager.py
 +++ b/vllm/v1/kv_offload/tiering/p2p/manager.py
-@@ -18,6 +18,12 @@ from typing import TYPE_CHECKING, Any
+@@ -18,6 +18,13 @@ from typing import TYPE_CHECKING, Any
  from typing_extensions import override
  
  import vllm.envs as envs
 +from vllm.distributed.kv_transfer.kv_connector.v1.base import (
-+    INTEGER,
-+    STRING,
++    HOST,
++    NON_EMPTY_STRING,
++    PORT,
 +    KVTransferParamsKeys,
 +    object_with,
 +)
  from vllm.logger import init_logger
  from vllm.v1.kv_offload.base import (
      LookupResult,
-@@ -60,6 +66,11 @@ _SHUTDOWN_DRAIN_TIMEOUT_S = 3.0
+@@ -60,6 +67,11 @@ _SHUTDOWN_DRAIN_TIMEOUT_S = 3.0
  # enough to avoid busy-spinning the scheduler thread.
  _DRAIN_SLEEP_S = 0.001
  
@@ -2142,7 +2324,7 @@ index f76ed59b5c7823ace2505b2fb4936c7adfa10952..3dd065db87d1b2c1058dd884d75c4457
  
  def _remote_prefiller_params(kv_params: dict | None) -> dict | None:
      """Return the ``remote_prefiller`` sub-dict, or None if absent.
-@@ -69,7 +80,7 @@ def _remote_prefiller_params(kv_params: dict | None) -> dict | None:
+@@ -69,7 +81,7 @@ def _remote_prefiller_params(kv_params: dict | None) -> dict | None:
      """
      if not kv_params:
          return None
@@ -2151,7 +2333,7 @@ index f76ed59b5c7823ace2505b2fb4936c7adfa10952..3dd065db87d1b2c1058dd884d75c4457
  
  
  def _remote_decoder_params(kv_params: dict | None) -> dict | None:
-@@ -80,7 +91,7 @@ def _remote_decoder_params(kv_params: dict | None) -> dict | None:
+@@ -80,7 +92,7 @@ def _remote_decoder_params(kv_params: dict | None) -> dict | None:
      """
      if not kv_params:
          return None
@@ -2160,7 +2342,7 @@ index f76ed59b5c7823ace2505b2fb4936c7adfa10952..3dd065db87d1b2c1058dd884d75c4457
  
  
  def _remote_kv_source_params(kv_params: dict | None) -> dict | None:
-@@ -91,7 +102,7 @@ def _remote_kv_source_params(kv_params: dict | None) -> dict | None:
+@@ -91,7 +103,7 @@ def _remote_kv_source_params(kv_params: dict | None) -> dict | None:
      """
      if not kv_params:
          return None
@@ -2169,7 +2351,7 @@ index f76ed59b5c7823ace2505b2fb4936c7adfa10952..3dd065db87d1b2c1058dd884d75c4457
  
  
  def _peer_id_from_params(role_params: dict) -> str | None:
-@@ -198,6 +209,37 @@ class P2PSecondaryTierManager(SecondaryTierManager):
+@@ -198,6 +210,46 @@ class P2PSecondaryTierManager(SecondaryTierManager):
      and existing sessions are polled even when no requests are scheduled.
      """
  
@@ -2187,9 +2369,18 @@ index f76ed59b5c7823ace2505b2fb4936c7adfa10952..3dd065db87d1b2c1058dd884d75c4457
 +        # either other key: this peer cannot be a prefiller's decoder and a
 +        # decoder's prefiller for one request, nor pull from two sources --
 +        # _parse_source reads remote_prefiller and drops a remote_kv_source
-+        # beside it. A prefill producer may also pull from a source.
++        # beside it. A prefill producer may also pull from a source. The
++        # parsers read an empty request ID, an empty host or port 0 as no peer,
++        # so the request ran without the transfer it named, and the tier's
++        # transport refused a negative port or a host its address grammar
++        # does not take inside the engine core; each field is a value the
++        # peer address and session can be.
 +        peer = object_with(
-+            {"kv_request_id": STRING, "remote_host": STRING, "remote_port": INTEGER},
++            {
++                "kv_request_id": NON_EMPTY_STRING,
++                "remote_host": HOST,
++                "remote_port": PORT,
++            },
 +            required=("kv_request_id", "remote_host", "remote_port"),
 +        )
 +        return KVTransferParamsKeys(
@@ -2198,7 +2389,7 @@ index f76ed59b5c7823ace2505b2fb4936c7adfa10952..3dd065db87d1b2c1058dd884d75c4457
 +                    REMOTE_DECODER_KEY, REMOTE_KV_SOURCE_KEY
 +                ),
 +                REMOTE_DECODER_KEY: object_with(
-+                    {"kv_request_id": STRING}, required=("kv_request_id",)
++                    {"kv_request_id": NON_EMPTY_STRING}, required=("kv_request_id",)
 +                ).excluding(REMOTE_PREFILLER_KEY),
 +                REMOTE_KV_SOURCE_KEY: peer.excluding(REMOTE_PREFILLER_KEY),
 +            }

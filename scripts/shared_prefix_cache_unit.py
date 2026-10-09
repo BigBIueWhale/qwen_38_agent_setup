@@ -283,6 +283,11 @@ def check_kv_transfer_values_are_read_with_their_companions():
     admit(nixl, kv_transfer_params={
         'do_remote_decode': True, 'do_remote_prefill': False, 'remote_engine_id': None,
         'remote_block_ids': None, 'remote_host': None, 'remote_port': None})
+    # One block-ID list per KV cache group: an empty one names no group, and a
+    # pull counted the whole prompt as remote with nothing to receive.
+    message = refusal(nixl, kv_transfer_params={**NIXL_REMOTE_PREFILL,
+                                                'remote_block_ids': []})
+    assert 'a non-empty list of lists of integers, one per KV cache group' in message
     for dropped, listed in (
         (('remote_block_ids',), "'remote_block_ids'"),
         (('remote_host', 'remote_port'), "'remote_host' and 'remote_port'"),
@@ -329,10 +334,22 @@ def check_kv_transfer_values_are_read_with_their_companions():
                    {'remote_prefiller': {'kv_request_id': 't', 'remote_host': 'h'}}):
         ((key, _),) = params.items()
         message = refusal(p2p, kv_transfer_params=params)
-        assert f'{key!r} must be an object whose kv_request_id is a string' in message, message
+        assert (f'{key!r} must be an object whose kv_request_id is a non-empty '
+                'string') in message, message
         assert _parse_source(params) is None, params
     message = refusal(p2p, kv_transfer_params={'remote_decoder': {}})
-    assert "'remote_decoder' must be an object whose kv_request_id is a string" in message
+    assert ("'remote_decoder' must be an object whose kv_request_id is a non-empty "
+            'string') in message, message
+    # An empty request ID or host, or port 0, is no peer to the tier's parsers,
+    # which ran the request without the transfer it named; a negative port or
+    # a host outside the transport's grammar raised inside the engine core.
+    for field, value in (('kv_request_id', ''), ('remote_host', ''), ('remote_port', 0)):
+        params = {'remote_prefiller': {**peer, field: value}}
+        refusal(p2p, kv_transfer_params=params)
+        assert _parse_source(params) is None, params
+    for field, value in (('remote_port', -1), ('remote_host', 'a b')):
+        refusal(p2p, kv_transfer_params={'remote_kv_source': {**peer, field: value}})
+    admit(p2p, kv_transfer_params={'remote_kv_source': {**peer, 'remote_host': '[::1]'}})
     assert _parse_dest({'remote_decoder': {}}).kv_request_id is None
     other = {**peer, 'kv_request_id': 'other'}
     for beside, value in (('remote_kv_source', other),

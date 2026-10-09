@@ -4664,7 +4664,7 @@ def _validate_kv_transfer_params_keys_after(state: State) -> None:
         (v1 + "mooncake/mooncake_connector.py", "MooncakeConnector",
          ('"remote_bootstrap_addr"',
           '"transfer_id", "remote_engine_id", "remote_bootstrap_addr"',
-          '"do_remote_decode": BOOLEAN.requiring("transfer_id")')),
+          'do_remote_decode = BOOLEAN.requiring("transfer_id")')),
         (v1 + "moriio/moriio_connector.py", "MoRIIOConnector",
          ('"is_request_leader"',
           '"remote_block_ids": nullable(list_of(INTEGER, "integers"))',
@@ -4757,7 +4757,45 @@ def _validate_kv_transfer_params_keys_after(state: State) -> None:
         "test_a_multi_connector_reads_a_value_with_what_its_children_read_it_with": None,
         "test_a_remote_prefill_requires_every_key_its_connector_indexes_for_it": None,
         "test_a_hidden_states_path_is_taken_only_where_custom_paths_are_allowed": None,
+        "test_a_peer_host_is_an_address_or_a_host_name": ("host",),
+        "test_a_mooncake_node_is_refused_what_its_role_never_does": ("kv_role",),
     }, label=label)
+    # A value a connector reads inside the engine core is held to the values
+    # it can act on, not only to its JSON type: a P2P peer's ID, host and port
+    # (the parsers read empty ones as no peer, the transport refused the rest
+    # in the engine core), a NIXL block-ID list (one per KV cache group), and
+    # the remote action a Mooncake node's role lets it take (its scheduler
+    # asserts the other).
+    base = "vllm/distributed/kv_transfer/kv_connector/v1/base.py"
+    for construct in (
+        'NON_EMPTY_STRING = _shape(\n    "a non-empty string"',
+        'PORT = _shape(\n    "an integer from 1 to 65535",',
+        'HOST = _shape("a host name or an IP address", _names_a_host)',
+    ):
+        require_text(state, base, construct, label=label)
+    require_python_symbols(state, base, {
+        "_names_a_host": ("value",),
+        "non_empty": ("shape", "described"),
+        "asking_nothing": ("described",),
+    }, label=label)
+    require_text(state, "vllm/distributed/kv_transfer/kv_connector/v1/nixl/connector.py",
+                 '"a non-empty list of lists of integers, one per KV cache group",',
+                 label=label)
+    _require_in_symbol(state, "vllm/v1/kv_offload/tiering/p2p/manager.py",
+                       "P2PSecondaryTierManager.get_kv_transfer_params_keys", (
+        '"kv_request_id": NON_EMPTY_STRING,',
+        '"remote_host": HOST,',
+        '"remote_port": PORT,',
+        '{"kv_request_id": NON_EMPTY_STRING}, required=("kv_request_id",)',
+    ), label=label)
+    _require_in_symbol(state,
+        "vllm/distributed/kv_transfer/kv_connector/v1/mooncake/mooncake_connector.py",
+        "MooncakeConnector.get_kv_transfer_params_keys", (
+            'if kv_role == "kv_producer":',
+            '"false on this kv_producer node, which prefills for a decode "',
+            'if kv_role == "kv_consumer":',
+            '"false on this kv_consumer node, which decodes what a prefill "',
+        ), label=label)
     require_python_symbols(state, "tests/v1/engine/test_kv_transfer_params_admission.py", {
         "test_the_cpu_offload_tier_admits_its_store_cap": None,
         "test_a_key_the_configured_connector_does_not_take_is_refused_naming_both": None,
@@ -6420,7 +6458,18 @@ CONTRACTS: Mapping[str, SemanticContract] = {
             "this server does instead. Only a connector that takes "
             "do_remote_prefill is told of a refused request's remote-prefill "
             "blocks, and only by parameters admission takes, since the notice "
-            "reaches the connector without crossing admission."
+            "reaches the connector without crossing admission. A shape holds a "
+            "value to what its connector can act on, not only its JSON type: a "
+            "P2P peer's request ID and host must be non-empty and its port from "
+            "1 to 65535 (the parsers read an empty one as no peer and the request "
+            "ran without its transfer; the transport raised on a negative port "
+            "or a host its address grammar refuses, inside the engine core); a "
+            "NIXL block-ID list is one list per KV cache group, never empty "
+            "(the pull scheduler counted the prompt as remote and asserted on "
+            "nothing to receive); and a Mooncake node is refused the remote "
+            "action its role never takes -- a kv_producer pulling a remote "
+            "prefill, a kv_consumer serving a remote decode -- which its "
+            "scheduler asserts against inside the engine core."
         ),
         removal_condition=(
             "Remove when pinned upstream has each KV connector declare the request "

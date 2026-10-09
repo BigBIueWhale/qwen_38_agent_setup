@@ -405,7 +405,7 @@ It is intentionally reconstructed by the ordered, reviewed semantic transformati
 | patches/vllm-batch-invariance-substitutes-no-nvfp4-kernel.patch | c79baaee0a51275f5f522d266fe6b315c200e6951920c2454d5c80cadbb92f44 |
 | patches/vllm-render-carries-every-image-chat-renders.patch | 9c20792ac98dfabdc44691217947d18ad7eee940f236343f531a891cde9a72b1 |
 | patches/vllm-rendered-prompts-are-never-truncated.patch | 3128a77dde8f5b5118d2893bb858183e7fc0f20573124441bb69b2e82251fc6d |
-| patches/vllm-kv-transfer-params-are-declared.patch | fbe7824e788905358711686784cdb3659d184661f4f59de873516f4ad2ccdb6f |
+| patches/vllm-kv-transfer-params-are-declared.patch | d44e3599d90aac1fd397d562ee8f16af6cbaf6707be1ff6b2b252e5112a3931d |
 | patches/vllm-responses-refuses-tools-the-template-is-never-given.patch | 5c3106c820032060101e732329f2d234c9c3c84bcd5e21c4e05ebf55679aecd2 |
 | patches/vllm-chat-stream-carries-every-token-logprob.patch | ca15dadd152454fe5b3fbcb710b8c7b5ce3221c038617b9e0d0985953aecbf47 |
 | patches/vllm-chat-messages-read-by-one-rule.patch | 5bf8a2d69d7ab1c6b9ee423740d34616a69e857d64816f68b9b9b1d509455f7f |
@@ -637,7 +637,13 @@ Consequences:
   taken. The hidden-states connector reads a request's `hidden_states_path`
   only where its operator sets `allow_custom_save_path`, and writes under its
   own storage path otherwise, so elsewhere the key is refused naming that
-  setting. The runtime image has no NIXL or Mooncake
+  setting. A value is held to what its connector can act on, not only to its
+  JSON type: a P2P peer's request ID and host are non-empty (an IP address or a
+  host name) and its port is from 1 to 65535, a NIXL `remote_block_ids` list
+  holds one list per KV cache group and is never empty, and a Mooncake
+  `kv_producer` is refused `do_remote_prefill` true and a `kv_consumer`
+  `do_remote_decode` true -- each ended the engine core, or ran the request
+  without the transfer it named. The runtime image has no NIXL or Mooncake
   package, which those connectors and the P2P tier's transport need, and this
   launch's CPU tier takes one key that needs no other. Upstream's
   `prompt_token_ids`, a prefill node's prompt ids for decode-side reuse, is
