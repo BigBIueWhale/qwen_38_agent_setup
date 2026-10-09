@@ -138761,7 +138761,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    serving.chat_template = None\n'})},
  {'name': 'batch-parse-starts-where-the-prompt-leaves',
   'review_patch': 'patches/vllm-batch-parse-starts-where-the-prompt-leaves.patch',
-  'review_sha256': 'c580e2dbb0d3435c88cfea00d5fab43bf60336432bdbaf01706dfa881ba3451a',
+  'review_sha256': 'd917bec32f5355212382310d1fa75e045595e900d8d806a9ebe105a4484fc12f',
   'files': ({'path': 'tests/entrypoints/openai/responses/test_parsable_context_unit.py',
              'before_sha256': '8fd0bd655d13abdc9fe03e1c0bb0625225431624db8257e1db07c00ac3da2779',
              'after_sha256': '95f50d93d97370d426319b5dc94fce55b9cbca4ce9b3b95a930e42990dcbf4a2'},
@@ -138806,7 +138806,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'after_sha256': 'cf2cf56da08af417457b76cf9a335b5724d2d75855906e957c83069171ff2354'},
             {'path': 'vllm/renderers/online_derenderer.py',
              'before_sha256': 'c93551f5e63e1b7e5d5bf105ca2e642a288644078feee561e8eef63267f7841d',
-             'after_sha256': 'bf62d1a3e0ec31184899e1dda2a05707d7e464a1789bb4770f2b8e9d011499c3'},
+             'after_sha256': '41d0ef98230d7f67142274d09954a1fceaee7fbb10117d5a22c93ce531eaed0c'},
             {'path': 'tests/parser/engine/test_reasoning_token_count.py',
              'before_sha256': 'dab4d5943f8887c1c56e884b77d63898e24fbcce16393ed240aabe61f555d280',
              'after_sha256': '8eadc5059845dacc54dd7b2fa725e6a4745daa2a94cb16d13238916df26cbd2c'},
@@ -138821,7 +138821,13 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'after_sha256': 'fda540aea5362d0e90ff947ec9e1e1ee73590954ec3d062fd8040b0b4124c4e7'},
             {'path': 'vllm/parser/qwen3.py',
              'before_sha256': '86eadde1cfc2952426bdcf7cecef0c369a2e952fe72f1d0a7ff0b81f84498993',
-             'after_sha256': '96a7b60d196902541725fb29d78710140f953ef524217a7a4009bf8242b3795f'}),
+             'after_sha256': '96a7b60d196902541725fb29d78710140f953ef524217a7a4009bf8242b3795f'},
+            {'path': 'tests/entrypoints/scale_out/derender/test_terminal_metadata.py',
+             'before_sha256': 'e3edf885a33aaecf5dd8d6fdeadad7f3eed60510eb4f43354f1273e52b974cfc',
+             'after_sha256': '282ef80ea470eee299c6c1f7510ca259c6b4dcd4a2787d7f2946335a723dc5bb'},
+            {'path': 'vllm/entrypoints/scale_out/derender/serving.py',
+             'before_sha256': '3beb23995dddcfac4b98bf38f5948bd992ff06bf99290157317ba7018f57a6d7',
+             'after_sha256': 'a0e5d8bb78802f26e77849ef9622a4863d9596aa13bf6bd808c3399099431321'}),
   'edits': ({'name': 'tests/entrypoints/openai/responses/test_parsable_context_unit.py:landmark-1',
              'path': 'tests/entrypoints/openai/responses/test_parsable_context_unit.py',
              'before': '\n'
@@ -140699,6 +140705,351 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '                break\n'},
             {'name': 'vllm/renderers/online_derenderer.py:landmark-1',
              'path': 'vllm/renderers/online_derenderer.py',
+             'before': '    CompletionResponseStreamChoice,\n'
+                       '    CompletionStreamResponse,\n'
+                       ')\n'
+                       'from vllm.entrypoints.openai.engine.protocol import '
+                       'DeltaMessage, ToolCall, UsageInfo\n'
+                       'from vllm.entrypoints.scale_out.token_in_token_out.protocol '
+                       'import (\n'
+                       '    DerenderStreamState,\n'
+                       '    GenerateResponse,\n',
+             'after': '    CompletionResponseStreamChoice,\n'
+                      '    CompletionStreamResponse,\n'
+                      ')\n'
+                      'from vllm.entrypoints.openai.engine.protocol import (\n'
+                      '    DeltaMessage,\n'
+                      '    ErrorResponse,\n'
+                      '    ToolCall,\n'
+                      '    UsageInfo,\n'
+                      ')\n'
+                      'from vllm.entrypoints.scale_out.token_in_token_out.protocol '
+                      'import (\n'
+                      '    DerenderStreamState,\n'
+                      '    GenerateResponse,\n',
+             'review_before': '    CompletionResponseStreamChoice,\n'
+                              '    CompletionStreamResponse,\n'
+                              ')\n'
+                              'from vllm.entrypoints.openai.engine.protocol import '
+                              'DeltaMessage, ToolCall, UsageInfo\n'
+                              'from '
+                              'vllm.entrypoints.scale_out.token_in_token_out.protocol '
+                              'import (\n'
+                              '    DerenderStreamState,\n'
+                              '    GenerateResponse,\n',
+             'review_after': '    CompletionResponseStreamChoice,\n'
+                             '    CompletionStreamResponse,\n'
+                             ')\n'
+                             'from vllm.entrypoints.openai.engine.protocol import (\n'
+                             '    DeltaMessage,\n'
+                             '    ErrorResponse,\n'
+                             '    ToolCall,\n'
+                             '    UsageInfo,\n'
+                             ')\n'
+                             'from '
+                             'vllm.entrypoints.scale_out.token_in_token_out.protocol '
+                             'import (\n'
+                             '    DerenderStreamState,\n'
+                             '    GenerateResponse,\n'},
+            {'name': 'vllm/renderers/online_derenderer.py:landmark-2',
+             'path': 'vllm/renderers/online_derenderer.py',
+             'before': ')\n'
+                       'from vllm.entrypoints.serve.utils.request_logger import '
+                       'RequestLogger\n'
+                       'from vllm.logger import init_logger\n'
+                       'from vllm.parser import Parser, ParserManager\n'
+                       'from vllm.renderers import BaseRenderer\n'
+                       'from vllm.tokenizers import TokenizerLike\n'
+                       'from vllm.tokenizers.detokenizer_utils import '
+                       'detokenize_incrementally\n'
+                       'from vllm.utils import random_uuid\n',
+             'after': ')\n'
+                      'from vllm.entrypoints.serve.utils.request_logger import '
+                      'RequestLogger\n'
+                      'from vllm.logger import init_logger\n'
+                      'from vllm.parser import Parser\n'
+                      'from vllm.renderers import BaseRenderer\n'
+                      'from vllm.renderers.inputs.preprocess import '
+                      'extract_prompt_components\n'
+                      'from vllm.renderers.online_renderer import OnlineRenderer\n'
+                      'from vllm.tokenizers import TokenizerLike\n'
+                      'from vllm.tokenizers.detokenizer_utils import '
+                      'detokenize_incrementally\n'
+                      'from vllm.utils import random_uuid\n',
+             'review_before': ')\n'
+                              'from vllm.entrypoints.serve.utils.request_logger import '
+                              'RequestLogger\n'
+                              'from vllm.logger import init_logger\n'
+                              'from vllm.parser import Parser, ParserManager\n'
+                              'from vllm.renderers import BaseRenderer\n'
+                              'from vllm.tokenizers import TokenizerLike\n'
+                              'from vllm.tokenizers.detokenizer_utils import '
+                              'detokenize_incrementally\n'
+                              'from vllm.utils import random_uuid\n',
+             'review_after': ')\n'
+                             'from vllm.entrypoints.serve.utils.request_logger import '
+                             'RequestLogger\n'
+                             'from vllm.logger import init_logger\n'
+                             'from vllm.parser import Parser\n'
+                             'from vllm.renderers import BaseRenderer\n'
+                             'from vllm.renderers.inputs.preprocess import '
+                             'extract_prompt_components\n'
+                             'from vllm.renderers.online_renderer import '
+                             'OnlineRenderer\n'
+                             'from vllm.tokenizers import TokenizerLike\n'
+                             'from vllm.tokenizers.detokenizer_utils import '
+                             'detokenize_incrementally\n'
+                             'from vllm.utils import random_uuid\n'},
+            {'name': 'vllm/renderers/online_derenderer.py:landmark-3',
+             'path': 'vllm/renderers/online_derenderer.py',
+             'before': '        self.renderer = renderer\n'
+                       '        self.request_logger = request_logger\n'
+                       '\n'
+                       '        self.enable_auto_tools = enable_auto_tools\n'
+                       '        self.exclude_tools_when_tool_choice_none = '
+                       'exclude_tools_when_tool_choice_none\n'
+                       '        self.use_harmony = model_config.hf_config.model_type '
+                       '== "gpt_oss"\n'
+                       '        self.parser: type[Parser] | None = '
+                       'ParserManager.get_parser(\n'
+                       '            tool_parser_name=tool_parser,\n'
+                       '            reasoning_parser_name=reasoning_parser,\n'
+                       '            enable_auto_tools=enable_auto_tools,\n'
+                       '            model_name=model_config.model,\n'
+                       '            is_harmony=self.use_harmony,\n'
+                       '        )\n'
+                       '\n'
+                       '        self.chat_template = chat_template\n'
+                       '        self.chat_template_content_format: '
+                       'ChatTemplateContentFormatOption = (\n',
+             'after': '        self.renderer = renderer\n'
+                      '        self.request_logger = request_logger\n'
+                      '\n'
+                      '        # The prompt a generation continues is the one /render '
+                      'renders for\n'
+                      '        # the request derender is given: derender renders it '
+                      'again, with the\n'
+                      '        # renderer and settings /render renders with, so the '
+                      'parse starts\n'
+                      '        # where that prompt leaves reasoning, as the chat '
+                      "route's does.\n"
+                      '        self.online_renderer = OnlineRenderer(\n'
+                      '            model_config,\n'
+                      '            renderer,\n'
+                      '            request_logger=request_logger,\n'
+                      '            chat_template=chat_template,\n'
+                      '            '
+                      'chat_template_content_format=chat_template_content_format,\n'
+                      '            '
+                      'trust_request_chat_template=trust_request_chat_template,\n'
+                      '            enable_auto_tools=enable_auto_tools,\n'
+                      '            '
+                      'exclude_tools_when_tool_choice_none=exclude_tools_when_tool_choice_none,\n'
+                      '            tool_parser=tool_parser,\n'
+                      '            reasoning_parser=reasoning_parser,\n'
+                      '            '
+                      'default_chat_template_kwargs=default_chat_template_kwargs,\n'
+                      '            log_error_stack=log_error_stack,\n'
+                      '        )\n'
+                      '        self.enable_auto_tools = enable_auto_tools\n'
+                      '        self.exclude_tools_when_tool_choice_none = '
+                      'exclude_tools_when_tool_choice_none\n'
+                      '        self.use_harmony = self.online_renderer.use_harmony\n'
+                      '        self.parser: type[Parser] | None = '
+                      'self.online_renderer.parser\n'
+                      '\n'
+                      '        self.chat_template = chat_template\n'
+                      '        self.chat_template_content_format: '
+                      'ChatTemplateContentFormatOption = (\n',
+             'review_before': '        self.renderer = renderer\n'
+                              '        self.request_logger = request_logger\n'
+                              '\n'
+                              '        self.enable_auto_tools = enable_auto_tools\n'
+                              '        self.exclude_tools_when_tool_choice_none = '
+                              'exclude_tools_when_tool_choice_none\n'
+                              '        self.use_harmony = '
+                              'model_config.hf_config.model_type == "gpt_oss"\n'
+                              '        self.parser: type[Parser] | None = '
+                              'ParserManager.get_parser(\n'
+                              '            tool_parser_name=tool_parser,\n'
+                              '            reasoning_parser_name=reasoning_parser,\n'
+                              '            enable_auto_tools=enable_auto_tools,\n'
+                              '            model_name=model_config.model,\n'
+                              '            is_harmony=self.use_harmony,\n'
+                              '        )\n'
+                              '\n'
+                              '        self.chat_template = chat_template\n'
+                              '        self.chat_template_content_format: '
+                              'ChatTemplateContentFormatOption = (\n',
+             'review_after': '        self.renderer = renderer\n'
+                             '        self.request_logger = request_logger\n'
+                             '\n'
+                             '        # The prompt a generation continues is the one '
+                             '/render renders for\n'
+                             '        # the request derender is given: derender '
+                             'renders it again, with the\n'
+                             '        # renderer and settings /render renders with, so '
+                             'the parse starts\n'
+                             '        # where that prompt leaves reasoning, as the '
+                             "chat route's does.\n"
+                             '        self.online_renderer = OnlineRenderer(\n'
+                             '            model_config,\n'
+                             '            renderer,\n'
+                             '            request_logger=request_logger,\n'
+                             '            chat_template=chat_template,\n'
+                             '            '
+                             'chat_template_content_format=chat_template_content_format,\n'
+                             '            '
+                             'trust_request_chat_template=trust_request_chat_template,\n'
+                             '            enable_auto_tools=enable_auto_tools,\n'
+                             '            '
+                             'exclude_tools_when_tool_choice_none=exclude_tools_when_tool_choice_none,\n'
+                             '            tool_parser=tool_parser,\n'
+                             '            reasoning_parser=reasoning_parser,\n'
+                             '            '
+                             'default_chat_template_kwargs=default_chat_template_kwargs,\n'
+                             '            log_error_stack=log_error_stack,\n'
+                             '        )\n'
+                             '        self.enable_auto_tools = enable_auto_tools\n'
+                             '        self.exclude_tools_when_tool_choice_none = '
+                             'exclude_tools_when_tool_choice_none\n'
+                             '        self.use_harmony = '
+                             'self.online_renderer.use_harmony\n'
+                             '        self.parser: type[Parser] | None = '
+                             'self.online_renderer.parser\n'
+                             '\n'
+                             '        self.chat_template = chat_template\n'
+                             '        self.chat_template_content_format: '
+                             'ChatTemplateContentFormatOption = (\n'},
+            {'name': 'vllm/renderers/online_derenderer.py:landmark-4',
+             'path': 'vllm/renderers/online_derenderer.py',
+             'before': '        self,\n'
+                       '        generate_response: GenerateResponse,\n'
+                       '        chat_request: ChatCompletionRequest | None = None,\n'
+                       '    ) -> list[ChatCompletionResponseChoice]:\n'
+                       '        return await '
+                       'self._derender_chat_async(generate_response, chat_request)\n'
+                       '\n'
+                       '    def _derender_chat(\n'
+                       '        self,\n'
+                       '        generate_response: GenerateResponse,\n'
+                       '        chat_request: ChatCompletionRequest | None = None,\n'
+                       '    ) -> list[ChatCompletionResponseChoice]:\n'
+                       '        tokenizer = self.renderer.get_tokenizer()\n'
+                       '        choices: list[ChatCompletionResponseChoice] = []\n',
+             'after': '        self,\n'
+                      '        generate_response: GenerateResponse,\n'
+                      '        chat_request: ChatCompletionRequest | None = None,\n'
+                      '    ) -> list[ChatCompletionResponseChoice] | ErrorResponse:\n'
+                      '        """Derender a generation, parsing it from the prompt it '
+                      'continued.\n'
+                      '\n'
+                      '        With a parser and the request, the prompt is rendered '
+                      'from the request\n'
+                      '        exactly as /render renders it, and the parser reads it, '
+                      'as on the chat\n'
+                      '        route; a request that does not render is refused as '
+                      '/render refuses\n'
+                      '        it, never parsed without its prompt. The parse is given '
+                      'the request\n'
+                      '        the render adjusted, as the chat route parses with its '
+                      'own.\n'
+                      '        """\n'
+                      '        prompt_token_ids: list[int] | None = None\n'
+                      '        if self.parser is not None and chat_request is not '
+                      'None:\n'
+                      '            chat_request = chat_request.model_copy(deep=True)\n'
+                      '            rendered = await self.online_renderer.render_chat(\n'
+                      '                chat_request, skip_mm_cache=True\n'
+                      '            )\n'
+                      '            if isinstance(rendered, ErrorResponse):\n'
+                      '                return rendered\n'
+                      '            _, (engine_input,) = rendered\n'
+                      '            prompt_token_ids = extract_prompt_components(\n'
+                      '                self.model_config, engine_input\n'
+                      '            ).token_ids\n'
+                      '        return await self._derender_chat_async(\n'
+                      '            generate_response, chat_request, prompt_token_ids\n'
+                      '        )\n'
+                      '\n'
+                      '    def _derender_chat(\n'
+                      '        self,\n'
+                      '        generate_response: GenerateResponse,\n'
+                      '        chat_request: ChatCompletionRequest | None,\n'
+                      '        prompt_token_ids: list[int] | None,\n'
+                      '    ) -> list[ChatCompletionResponseChoice]:\n'
+                      '        tokenizer = self.renderer.get_tokenizer()\n'
+                      '        choices: list[ChatCompletionResponseChoice] = []\n',
+             'review_before': '        self,\n'
+                              '        generate_response: GenerateResponse,\n'
+                              '        chat_request: ChatCompletionRequest | None = '
+                              'None,\n'
+                              '    ) -> list[ChatCompletionResponseChoice]:\n'
+                              '        return await '
+                              'self._derender_chat_async(generate_response, '
+                              'chat_request)\n'
+                              '\n'
+                              '    def _derender_chat(\n'
+                              '        self,\n'
+                              '        generate_response: GenerateResponse,\n'
+                              '        chat_request: ChatCompletionRequest | None = '
+                              'None,\n'
+                              '    ) -> list[ChatCompletionResponseChoice]:\n'
+                              '        tokenizer = self.renderer.get_tokenizer()\n'
+                              '        choices: list[ChatCompletionResponseChoice] = '
+                              '[]\n',
+             'review_after': '        self,\n'
+                             '        generate_response: GenerateResponse,\n'
+                             '        chat_request: ChatCompletionRequest | None = '
+                             'None,\n'
+                             '    ) -> list[ChatCompletionResponseChoice] | '
+                             'ErrorResponse:\n'
+                             '        """Derender a generation, parsing it from the '
+                             'prompt it continued.\n'
+                             '\n'
+                             '        With a parser and the request, the prompt is '
+                             'rendered from the request\n'
+                             '        exactly as /render renders it, and the parser '
+                             'reads it, as on the chat\n'
+                             '        route; a request that does not render is refused '
+                             'as /render refuses\n'
+                             '        it, never parsed without its prompt. The parse '
+                             'is given the request\n'
+                             '        the render adjusted, as the chat route parses '
+                             'with its own.\n'
+                             '        """\n'
+                             '        prompt_token_ids: list[int] | None = None\n'
+                             '        if self.parser is not None and chat_request is '
+                             'not None:\n'
+                             '            chat_request = '
+                             'chat_request.model_copy(deep=True)\n'
+                             '            rendered = await '
+                             'self.online_renderer.render_chat(\n'
+                             '                chat_request, skip_mm_cache=True\n'
+                             '            )\n'
+                             '            if isinstance(rendered, ErrorResponse):\n'
+                             '                return rendered\n'
+                             '            _, (engine_input,) = rendered\n'
+                             '            prompt_token_ids = '
+                             'extract_prompt_components(\n'
+                             '                self.model_config, engine_input\n'
+                             '            ).token_ids\n'
+                             '        return await self._derender_chat_async(\n'
+                             '            generate_response, chat_request, '
+                             'prompt_token_ids\n'
+                             '        )\n'
+                             '\n'
+                             '    def _derender_chat(\n'
+                             '        self,\n'
+                             '        generate_response: GenerateResponse,\n'
+                             '        chat_request: ChatCompletionRequest | None,\n'
+                             '        prompt_token_ids: list[int] | None,\n'
+                             '    ) -> list[ChatCompletionResponseChoice]:\n'
+                             '        tokenizer = self.renderer.get_tokenizer()\n'
+                             '        choices: list[ChatCompletionResponseChoice] = '
+                             '[]\n'},
+            {'name': 'vllm/renderers/online_derenderer.py:landmark-5',
+             'path': 'vllm/renderers/online_derenderer.py',
              'before': '                reasoning, content, tool_calls = '
                        'parser.parse_output(\n'
                        '                    decoded_text,\n'
@@ -140710,27 +141061,15 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       'parser.parse_output(\n'
                       '                    decoded_text,\n'
                       '                    chat_request,\n'
-                      '                    # This route is given the generated ids and '
-                      'the request,\n'
-                      '                    # never the prompt ids /render wrote, so it '
-                      'cannot read\n'
-                      '                    # where that prompt left reasoning and '
-                      'parses, as upstream\n'
-                      '                    # does, as if reasoning were open and its '
-                      'opener left to\n'
-                      '                    # the model: a continued final message, '
-                      'whose prompt\n'
-                      '                    # already closed reasoning, is parsed as '
-                      'reasoning here,\n'
-                      '                    # and a <think> generated as the first '
-                      'token, which a\n'
-                      '                    # prompt that opened reasoning makes '
-                      'reasoning text, is\n'
-                      '                    # read as the opener and has no text. Given '
-                      'those prompt\n'
-                      "                    # ids, this call parses as the chat route's "
-                      'does.\n'
-                      '                    prompt_token_ids=None,\n'
+                      '                    # The prompt derender_chat rendered: a '
+                      'continued final\n'
+                      '                    # message, whose prompt closed reasoning, '
+                      'is the answer,\n'
+                      '                    # and a <think> the model writes after a '
+                      'prompt that\n'
+                      '                    # opened reasoning is reasoning text, as on '
+                      'the chat route.\n'
+                      '                    prompt_token_ids=prompt_token_ids,\n'
                       '                    enable_auto_tools=self.enable_auto_tools,\n'
                       '                    model_output_token_ids=choice.token_ids,\n'
                       '                    finish_reason=choice.finish_reason,\n',
@@ -140748,27 +141087,15 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'parser.parse_output(\n'
                              '                    decoded_text,\n'
                              '                    chat_request,\n'
-                             '                    # This route is given the generated '
-                             'ids and the request,\n'
-                             '                    # never the prompt ids /render '
-                             'wrote, so it cannot read\n'
-                             '                    # where that prompt left reasoning '
-                             'and parses, as upstream\n'
-                             '                    # does, as if reasoning were open '
-                             'and its opener left to\n'
-                             '                    # the model: a continued final '
-                             'message, whose prompt\n'
-                             '                    # already closed reasoning, is '
-                             'parsed as reasoning here,\n'
-                             '                    # and a <think> generated as the '
-                             'first token, which a\n'
-                             '                    # prompt that opened reasoning makes '
-                             'reasoning text, is\n'
-                             '                    # read as the opener and has no '
-                             'text. Given those prompt\n'
-                             '                    # ids, this call parses as the chat '
-                             "route's does.\n"
-                             '                    prompt_token_ids=None,\n'
+                             '                    # The prompt derender_chat rendered: '
+                             'a continued final\n'
+                             '                    # message, whose prompt closed '
+                             'reasoning, is the answer,\n'
+                             '                    # and a <think> the model writes '
+                             'after a prompt that\n'
+                             '                    # opened reasoning is reasoning '
+                             'text, as on the chat route.\n'
+                             '                    prompt_token_ids=prompt_token_ids,\n'
                              '                    '
                              'enable_auto_tools=self.enable_auto_tools,\n'
                              '                    '
@@ -141773,10 +142100,137 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    def is_reasoning_end(self, input_ids: list[int]) -> '
                              'bool:\n'
                              '        if super().is_reasoning_end(input_ids):\n'
-                             '            return True\n'})},
+                             '            return True\n'},
+            {'name': 'tests/entrypoints/scale_out/derender/test_terminal_metadata.py:landmark-1',
+             'path': 'tests/entrypoints/scale_out/derender/test_terminal_metadata.py',
+             'before': '        incoming = GenerateResponse.model_validate_json(\n'
+                       '            '
+                       'GenerateResponse.model_validate(payload).model_dump_json())\n'
+                       "        if surface == 'chat':\n"
+                       '            choice = renderer._derender_chat(incoming)[0]\n'
+                       '            text = choice.message.content\n'
+                       '        else:\n'
+                       '            choices, _, _ = '
+                       'renderer._derender_completion([incoming])\n',
+             'after': '        incoming = GenerateResponse.model_validate_json(\n'
+                      '            '
+                      'GenerateResponse.model_validate(payload).model_dump_json())\n'
+                      "        if surface == 'chat':\n"
+                      '            choice = renderer._derender_chat(incoming, None, '
+                      'None)[0]\n'
+                      '            text = choice.message.content\n'
+                      '        else:\n'
+                      '            choices, _, _ = '
+                      'renderer._derender_completion([incoming])\n',
+             'review_before': '        incoming = '
+                              'GenerateResponse.model_validate_json(\n'
+                              '            '
+                              'GenerateResponse.model_validate(payload).model_dump_json())\n'
+                              "        if surface == 'chat':\n"
+                              '            choice = '
+                              'renderer._derender_chat(incoming)[0]\n'
+                              '            text = choice.message.content\n'
+                              '        else:\n'
+                              '            choices, _, _ = '
+                              'renderer._derender_completion([incoming])\n',
+             'review_after': '        incoming = '
+                             'GenerateResponse.model_validate_json(\n'
+                             '            '
+                             'GenerateResponse.model_validate(payload).model_dump_json())\n'
+                             "        if surface == 'chat':\n"
+                             '            choice = renderer._derender_chat(incoming, '
+                             'None, None)[0]\n'
+                             '            text = choice.message.content\n'
+                             '        else:\n'
+                             '            choices, _, _ = '
+                             'renderer._derender_completion([incoming])\n'},
+            {'name': 'tests/entrypoints/scale_out/derender/test_terminal_metadata.py:landmark-2',
+             'path': 'tests/entrypoints/scale_out/derender/test_terminal_metadata.py',
+             'before': "            'type': 'object', 'properties': {'text': {'type': "
+                       "'string'}},\n"
+                       '        }},\n'
+                       '    }])\n'
+                       '    choice = renderer._derender_chat(incoming, request)[0]\n'
+                       "    executable = closed and finish == 'stop' and stop is None\n"
+                       "    assert choice.finish_reason == ('tool_calls' if executable "
+                       'else finish)\n'
+                       '    assert choice.stop_reason == stop\n',
+             'after': "            'type': 'object', 'properties': {'text': {'type': "
+                      "'string'}},\n"
+                      '        }},\n'
+                      '    }])\n'
+                      "    # Parsed from the parser's own start, reasoning open: a "
+                      'prompt that\n'
+                      '    # opened reasoning leaves it there.\n'
+                      '    choice = renderer._derender_chat(incoming, request, '
+                      'None)[0]\n'
+                      "    executable = closed and finish == 'stop' and stop is None\n"
+                      "    assert choice.finish_reason == ('tool_calls' if executable "
+                      'else finish)\n'
+                      '    assert choice.stop_reason == stop\n',
+             'review_before': "            'type': 'object', 'properties': {'text': "
+                              "{'type': 'string'}},\n"
+                              '        }},\n'
+                              '    }])\n'
+                              '    choice = renderer._derender_chat(incoming, '
+                              'request)[0]\n'
+                              "    executable = closed and finish == 'stop' and stop "
+                              'is None\n'
+                              "    assert choice.finish_reason == ('tool_calls' if "
+                              'executable else finish)\n'
+                              '    assert choice.stop_reason == stop\n',
+             'review_after': "            'type': 'object', 'properties': {'text': "
+                             "{'type': 'string'}},\n"
+                             '        }},\n'
+                             '    }])\n'
+                             "    # Parsed from the parser's own start, reasoning "
+                             'open: a prompt that\n'
+                             '    # opened reasoning leaves it there.\n'
+                             '    choice = renderer._derender_chat(incoming, request, '
+                             'None)[0]\n'
+                             "    executable = closed and finish == 'stop' and stop is "
+                             'None\n'
+                             "    assert choice.finish_reason == ('tool_calls' if "
+                             'executable else finish)\n'
+                             '    assert choice.stop_reason == stop\n'},
+            {'name': 'vllm/entrypoints/scale_out/derender/serving.py:landmark-1',
+             'path': 'vllm/entrypoints/scale_out/derender/serving.py',
+             'before': '            )\n'
+                       '        except ValueError as exc:\n'
+                       '            return self.create_error_response(str(exc))\n'
+                       '\n'
+                       '        prompt_tokens = (\n'
+                       '            request.prompt_tokens if request.prompt_tokens is '
+                       'not None else 0\n',
+             'after': '            )\n'
+                      '        except ValueError as exc:\n'
+                      '            return self.create_error_response(str(exc))\n'
+                      '        if isinstance(choices, ErrorResponse):\n'
+                      '            return choices\n'
+                      '\n'
+                      '        prompt_tokens = (\n'
+                      '            request.prompt_tokens if request.prompt_tokens is '
+                      'not None else 0\n',
+             'review_before': '            )\n'
+                              '        except ValueError as exc:\n'
+                              '            return '
+                              'self.create_error_response(str(exc))\n'
+                              '\n'
+                              '        prompt_tokens = (\n'
+                              '            request.prompt_tokens if '
+                              'request.prompt_tokens is not None else 0\n',
+             'review_after': '            )\n'
+                             '        except ValueError as exc:\n'
+                             '            return self.create_error_response(str(exc))\n'
+                             '        if isinstance(choices, ErrorResponse):\n'
+                             '            return choices\n'
+                             '\n'
+                             '        prompt_tokens = (\n'
+                             '            request.prompt_tokens if '
+                             'request.prompt_tokens is not None else 0\n'})},
  {'name': 'derender-text-is-the-detokenizers',
   'review_patch': 'patches/vllm-derender-text-is-the-detokenizers.patch',
-  'review_sha256': '3dcee7c4e7fb45b6bbec3f8f90fa9c77266acc37ea0ab43ce43b975cdb3d847d',
+  'review_sha256': '6d58660374c6280441e8e950001d4585859b98684f8ecf0ef5ba1aa7ea40e4dd',
   'files': ({'path': 'tests/entrypoints/scale_out/derender/test_derender.py',
              'before_sha256': '3416a07fdc8241799d3ea888295eaaafe4cf01d569195e2f0351af793c63928b',
              'after_sha256': '210db8e1b18615c08fd072c37ca80357148c14ed205b55fb3b68e0a01d592055'},
@@ -141787,11 +142241,11 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': 'ba472381827558b28b8a859ff1da7a67383fc071b4615038260e70d91e94700a',
              'after_sha256': 'd1456066a8e1a3ef9d66571a14eb31bd5e05d56d571018920615138f8b10bf41'},
             {'path': 'tests/entrypoints/scale_out/derender/test_terminal_metadata.py',
-             'before_sha256': 'e3edf885a33aaecf5dd8d6fdeadad7f3eed60510eb4f43354f1273e52b974cfc',
-             'after_sha256': 'a1105a96507b731060a9d9290abefe355dbd1dd5d63954472297901af364b426'},
+             'before_sha256': '282ef80ea470eee299c6c1f7510ca259c6b4dcd4a2787d7f2946335a723dc5bb',
+             'after_sha256': '500ca243d68c1490ac9bbf733242e1559a0a6977f23865472d0ac68d3d077da5'},
             {'path': 'vllm/renderers/online_derenderer.py',
-             'before_sha256': 'bf62d1a3e0ec31184899e1dda2a05707d7e464a1789bb4770f2b8e9d011499c3',
-             'after_sha256': '172cafb37112a99d88dbbb078f696af25c7bc23dccd58d11164d502764a5212d'},
+             'before_sha256': '41d0ef98230d7f67142274d09954a1fceaee7fbb10117d5a22c93ce531eaed0c',
+             'after_sha256': '0fdc80834bb7c8f1cdfbe54085a39ce15859b09fe623eefc9144002b9702219d'},
             {'path': 'vllm/v1/engine/detokenizer.py',
              'before_sha256': '3af97dd30fa95fb8e294b2de407012d365b124006ee324c576cba3d3a9d58c21',
              'after_sha256': '49c4f4c012b9fc6b1a6363b56a7aa04b14a7791575db5ecac3d9fa669405c704'},
@@ -143453,7 +143907,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '            response = '
                       'GenerateResponse.model_validate(payload)\n'
                       "            if surface == 'chat':\n"
-                      '                derenderer._derender_chat(response, chat)\n'
+                      '                derenderer._derender_chat(response, chat, '
+                      'None)\n'
                       '            else:\n'
                       '                derenderer._derender_completion([response], '
                       'None, completion)\n'
@@ -143655,7 +144110,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'GenerateResponse.model_validate(payload)\n'
                              "            if surface == 'chat':\n"
                              '                derenderer._derender_chat(response, '
-                             'chat)\n'
+                             'chat, None)\n'
                              '            else:\n'
                              '                '
                              'derenderer._derender_completion([response], None, '
@@ -143748,8 +144203,11 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                        'from vllm.entrypoints.serve.utils.request_logger import '
                        'RequestLogger\n'
                        'from vllm.logger import init_logger\n'
-                       'from vllm.parser import Parser, ParserManager\n'
+                       'from vllm.parser import Parser\n'
                        'from vllm.renderers import BaseRenderer\n'
+                       'from vllm.renderers.inputs.preprocess import '
+                       'extract_prompt_components\n'
+                       'from vllm.renderers.online_renderer import OnlineRenderer\n'
                        'from vllm.tokenizers import TokenizerLike\n'
                        'from vllm.tokenizers.detokenizer_utils import '
                        'detokenize_incrementally\n'
@@ -143764,8 +144222,11 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       'RequestLogger\n'
                       'from vllm.exceptions import VLLMValidationError\n'
                       'from vllm.logger import init_logger\n'
-                      'from vllm.parser import Parser, ParserManager\n'
+                      'from vllm.parser import Parser\n'
                       'from vllm.renderers import BaseRenderer\n'
+                      'from vllm.renderers.inputs.preprocess import '
+                      'extract_prompt_components\n'
+                      'from vllm.renderers.online_renderer import OnlineRenderer\n'
                       'from vllm.sampling_params import model_eos_token_ids\n'
                       'from vllm.tokenizers import TokenizerLike\n'
                       'from vllm.tokenizers.detokenizer_utils import '
@@ -143782,8 +144243,12 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                               'from vllm.entrypoints.serve.utils.request_logger import '
                               'RequestLogger\n'
                               'from vllm.logger import init_logger\n'
-                              'from vllm.parser import Parser, ParserManager\n'
+                              'from vllm.parser import Parser\n'
                               'from vllm.renderers import BaseRenderer\n'
+                              'from vllm.renderers.inputs.preprocess import '
+                              'extract_prompt_components\n'
+                              'from vllm.renderers.online_renderer import '
+                              'OnlineRenderer\n'
                               'from vllm.tokenizers import TokenizerLike\n'
                               'from vllm.tokenizers.detokenizer_utils import '
                               'detokenize_incrementally\n'
@@ -143798,8 +144263,12 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'RequestLogger\n'
                              'from vllm.exceptions import VLLMValidationError\n'
                              'from vllm.logger import init_logger\n'
-                             'from vllm.parser import Parser, ParserManager\n'
+                             'from vllm.parser import Parser\n'
                              'from vllm.renderers import BaseRenderer\n'
+                             'from vllm.renderers.inputs.preprocess import '
+                             'extract_prompt_components\n'
+                             'from vllm.renderers.online_renderer import '
+                             'OnlineRenderer\n'
                              'from vllm.sampling_params import model_eos_token_ids\n'
                              'from vllm.tokenizers import TokenizerLike\n'
                              'from vllm.tokenizers.detokenizer_utils import '
@@ -143817,9 +144286,10 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                        '        self.renderer = renderer\n'
                        '        self.request_logger = request_logger\n'
                        '\n'
-                       '        self.enable_auto_tools = enable_auto_tools\n'
-                       '        self.exclude_tools_when_tool_choice_none = '
-                       'exclude_tools_when_tool_choice_none\n',
+                       '        # The prompt a generation continues is the one /render '
+                       'renders for\n'
+                       '        # the request derender is given: derender renders it '
+                       'again, with the\n',
              'after': '        self.model_config = model_config\n'
                       '        self.renderer = renderer\n'
                       '        self.request_logger = request_logger\n'
@@ -143831,16 +144301,18 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       'renderer.get_eos_token_id()\n'
                       '        )\n'
                       '\n'
-                      '        self.enable_auto_tools = enable_auto_tools\n'
-                      '        self.exclude_tools_when_tool_choice_none = '
-                      'exclude_tools_when_tool_choice_none\n',
+                      '        # The prompt a generation continues is the one /render '
+                      'renders for\n'
+                      '        # the request derender is given: derender renders it '
+                      'again, with the\n',
              'review_before': '        self.model_config = model_config\n'
                               '        self.renderer = renderer\n'
                               '        self.request_logger = request_logger\n'
                               '\n'
-                              '        self.enable_auto_tools = enable_auto_tools\n'
-                              '        self.exclude_tools_when_tool_choice_none = '
-                              'exclude_tools_when_tool_choice_none\n',
+                              '        # The prompt a generation continues is the one '
+                              '/render renders for\n'
+                              '        # the request derender is given: derender '
+                              'renders it again, with the\n',
              'review_after': '        self.model_config = model_config\n'
                              '        self.renderer = renderer\n'
                              '        self.request_logger = request_logger\n'
@@ -143852,9 +144324,10 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'renderer.get_eos_token_id()\n'
                              '        )\n'
                              '\n'
-                             '        self.enable_auto_tools = enable_auto_tools\n'
-                             '        self.exclude_tools_when_tool_choice_none = '
-                             'exclude_tools_when_tool_choice_none\n'},
+                             '        # The prompt a generation continues is the one '
+                             '/render renders for\n'
+                             '        # the request derender is given: derender '
+                             'renders it again, with the\n'},
             {'name': 'vllm/renderers/online_derenderer.py:landmark-3',
              'path': 'vllm/renderers/online_derenderer.py',
              'before': '        tokenizer = self.renderer.get_tokenizer()\n'
@@ -166877,7 +167350,7 @@ FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5d
  'tests/entrypoints/scale_out/derender/test_derender.py': '4becee9b27f66899e3fdaadc32d55cc9e4c7fa7ca86ef74b1fa1e99af13370da',
  'tests/entrypoints/scale_out/derender/test_derender_parity.py': '06c8c0e02ca5c829a89f97414cd45420ca83e6245b0942b5e4f13433485e6b9c',
  'tests/entrypoints/scale_out/derender/test_derender_stream.py': 'fdb50a6f217e552aaa98bb4b624e00829d1a4e06b8cf2a7b94708345750956c1',
- 'tests/entrypoints/scale_out/derender/test_terminal_metadata.py': 'a1105a96507b731060a9d9290abefe355dbd1dd5d63954472297901af364b426',
+ 'tests/entrypoints/scale_out/derender/test_terminal_metadata.py': '500ca243d68c1490ac9bbf733242e1559a0a6977f23865472d0ac68d3d077da5',
  'tests/entrypoints/scale_out/render/test_render_multimodal.py': '8f368e4a09ebf5e8f42510b6d5438d51aee1170cc3c5df9aa939b797ceffcb19',
  'tests/entrypoints/scale_out/token_in_token_out/test_generate_stream.py': '13b1be9e04274bb00e881b08e5eeb3927429567f0392e8db65b469f26aa2b464',
  'tests/entrypoints/scale_out/token_in_token_out/test_protocol.py': 'fc3d4cb03caedf41942409f0e93ec59e3a07ce511af798c10e87eaca104115c5',
@@ -167015,7 +167488,7 @@ FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5d
  'vllm/entrypoints/openai/run_batch.py': 'b33bb5bb911b300914c10ac7068610330706a4c3371211ea7a165c219139f89e',
  'vllm/entrypoints/pooling/base/protocol.py': '59c55f568cb5b333272ca122f302f667bf971613d1628602373b50e12898844b',
  'vllm/entrypoints/pooling/scoring/io_processor.py': 'aaa0d78c9432298095134f2fc5f07ca18f613b139912aef01a43ade162bdb5d4',
- 'vllm/entrypoints/scale_out/derender/serving.py': '3beb23995dddcfac4b98bf38f5948bd992ff06bf99290157317ba7018f57a6d7',
+ 'vllm/entrypoints/scale_out/derender/serving.py': 'a0e5d8bb78802f26e77849ef9622a4863d9596aa13bf6bd808c3399099431321',
  'vllm/entrypoints/scale_out/render/serving.py': '5e144dd7d773e3af7f462dfe58c780b65c45cb5bd759234bb76f7a8b0725b0df',
  'vllm/entrypoints/scale_out/token_in_token_out/api_router.py': 'e5f8519bfe5fd44989a1228df00886aefc13dce36bf6b59a430f64fd92b5165a',
  'vllm/entrypoints/scale_out/token_in_token_out/protocol.py': '29488a4819c8b9d6476d9b909341949a5fff434a5b485959b1338ec703cd1c23',
@@ -167060,7 +167533,7 @@ FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5d
  'vllm/reasoning/minimax_m3_reasoning_parser.py': 'd91a8f1c7c34bc4d32d374e68038c719e61a1cac456c0538025bcbba0daf3cab',
  'vllm/renderers/base.py': '621bc608b55f26580122da553d854d84271b8f5f44777269631f91ff8a09f605',
  'vllm/renderers/hf.py': 'b06cb298f586607a036c8d976e0a08ac64eb317bfb8af1d4dc5329e690fb5e88',
- 'vllm/renderers/online_derenderer.py': '172cafb37112a99d88dbbb078f696af25c7bc23dccd58d11164d502764a5212d',
+ 'vllm/renderers/online_derenderer.py': '0fdc80834bb7c8f1cdfbe54085a39ce15859b09fe623eefc9144002b9702219d',
  'vllm/renderers/online_renderer.py': '7651dc682374c8e4caa9cd6e86ddf22e9abfe401ed1aa7877b8e5306755404eb',
  'vllm/renderers/params.py': '31572224d8ea355fb77d80e3725779436533108c78f779b94760c6e55e6f3bfd',
  'vllm/renderers/template_authorship.py': '3110bd0d138e29ef01a51f5c357a2e6dd000c0b8c26b7fea94a4161471e43cba',

@@ -4250,14 +4250,37 @@ def _validate_batch_parse_from_prompt_after(state: State) -> None:
         ("vllm/entrypoints/openai/responses/context.py",
          "ParsableContext.append_output", "prompt_token_ids=output.prompt_token_ids"),
         ("vllm/renderers/online_derenderer.py", "OnlineDerenderer._derender_chat",
-         "prompt_token_ids=None"),
+         "prompt_token_ids=prompt_token_ids"),
     ):
         _require_in_symbol(state, path, symbol, (needle,), label=label)
-    # Derender is given no prompt; its call says what it then reads.
-    _require_in_symbol(state, "vllm/renderers/online_derenderer.py",
-                       "OnlineDerenderer._derender_chat", (
-                           "read as the opener and has no text",
-                           "this call parses as the chat route's does",
+    # Derender renders the prompt from the request it is given, with the
+    # renderer and settings /render renders with, refuses a request that does
+    # not render, and parses from that prompt; nothing parses without it.
+    derenderer = "vllm/renderers/online_derenderer.py"
+    _require_in_symbol(state, derenderer, "OnlineDerenderer.__init__", (
+        "self.online_renderer = OnlineRenderer(",
+        "self.parser: type[Parser] | None = self.online_renderer.parser",
+    ), label=label)
+    _require_ordered(_symbol_source(state, derenderer, "OnlineDerenderer.derender_chat",
+                                    label=label), (
+        "if self.parser is not None and chat_request is not None:",
+        "chat_request = chat_request.model_copy(deep=True)",
+        "rendered = await self.online_renderer.render_chat(",
+        "chat_request, skip_mm_cache=True",
+        "if isinstance(rendered, ErrorResponse):",
+        "return rendered",
+        "prompt_token_ids = extract_prompt_components(",
+        "generate_response, chat_request, prompt_token_ids",
+    ), label=label, location=f"{derenderer}:OnlineDerenderer.derender_chat")
+    _require_in_symbol(state, derenderer, "OnlineDerenderer._derender_chat", (
+        "prompt_token_ids: list[int] | None,\n    ) -> list[ChatCompletionResponseChoice]:",
+    ), label=label)
+    forbid_text(state, derenderer, "read as the opener and has no text", label=label)
+    forbid_text(state, derenderer, "ParserManager.get_parser(", label=label)
+    _require_in_symbol(state, "vllm/entrypoints/scale_out/derender/serving.py",
+                       "ServingDerender.derender_chat_response", (
+                           "if isinstance(choices, ErrorResponse):\n"
+                           "            return choices",
                        ), label=label)
     forbid_text(state, "vllm/entrypoints/openai/chat_completion/batch_serving.py",
                 "parser.parse(", label=label)
@@ -6118,13 +6141,17 @@ CONTRACTS: Mapping[str, SemanticContract] = {
             "opened reasoning, so a <think> the model writes is reasoning text; "
             "elsewhere only a generation's first token can be the opener, which "
             "a template that leaves the opener to the model expects. Derender "
-            "receives no prompt ids and passes none, so a continued final "
-            "message is reasoning there, as on upstream's derender, and a "
-            "<think> as a generation's first token is read as its opener and "
-            "has no text, though the prompt /render wrote opened reasoning; "
-            "given those ids the same call reads both as chat does. Carrying "
-            "them would be new protocol, and re-rendering the request a "
-            "second render, on a route this deployment's client does not call."
+            "is given the request /render rendered but not the prompt ids, and "
+            "parsed as if reasoning were open and its opener left to the "
+            "model: a continued final message was reasoning, and a <think> the "
+            "model wrote as its first token lost its text, though the prompt "
+            "had opened reasoning. It renders that prompt again now, with the "
+            "renderer and settings /render renders with (0.12 to 0.17 s for a "
+            "210,035-token history and 0.7 s with a 4096x4096 PNG, measured on "
+            "CPU), "
+            "refuses a request that does not render as /render refuses it, and "
+            "parses from the prompt as chat does: a second render on that route "
+            "rather than a token of the model's text lost, and no new protocol."
         ),
         removal_condition=(
             "Remove when pinned upstream's complete-output parse starts from the "

@@ -559,24 +559,121 @@ index 2995a9dac0d10a3ef0773ff99328e20973532166..f5f9155f29965bbe6ff2009febb292bf
              if token_id in special_ids:
                  break
 diff --git a/vllm/renderers/online_derenderer.py b/vllm/renderers/online_derenderer.py
-index 3a0be5eeec6c5586b58023568ef12f97edacbe10..44bd5b83d47b56b12360863ef384ff0955ce7400 100644
+index 3a0be5eeec6c5586b58023568ef12f97edacbe10..8f0de5c7cc1e7780d9ce6e12f9a042197d4bd8d9 100644
 --- a/vllm/renderers/online_derenderer.py
 +++ b/vllm/renderers/online_derenderer.py
-@@ -142,6 +142,17 @@ class OnlineDerenderer:
+@@ -21,7 +21,12 @@ from vllm.entrypoints.openai.completion.protocol import (
+     CompletionResponseStreamChoice,
+     CompletionStreamResponse,
+ )
+-from vllm.entrypoints.openai.engine.protocol import DeltaMessage, ToolCall, UsageInfo
++from vllm.entrypoints.openai.engine.protocol import (
++    DeltaMessage,
++    ErrorResponse,
++    ToolCall,
++    UsageInfo,
++)
+ from vllm.entrypoints.scale_out.token_in_token_out.protocol import (
+     DerenderStreamState,
+     GenerateResponse,
+@@ -29,8 +34,10 @@ from vllm.entrypoints.scale_out.token_in_token_out.protocol import (
+ )
+ from vllm.entrypoints.serve.utils.request_logger import RequestLogger
+ from vllm.logger import init_logger
+-from vllm.parser import Parser, ParserManager
++from vllm.parser import Parser
+ from vllm.renderers import BaseRenderer
++from vllm.renderers.inputs.preprocess import extract_prompt_components
++from vllm.renderers.online_renderer import OnlineRenderer
+ from vllm.tokenizers import TokenizerLike
+ from vllm.tokenizers.detokenizer_utils import detokenize_incrementally
+ from vllm.utils import random_uuid
+@@ -60,16 +67,28 @@ class OnlineDerenderer:
+         self.renderer = renderer
+         self.request_logger = request_logger
+ 
+-        self.enable_auto_tools = enable_auto_tools
+-        self.exclude_tools_when_tool_choice_none = exclude_tools_when_tool_choice_none
+-        self.use_harmony = model_config.hf_config.model_type == "gpt_oss"
+-        self.parser: type[Parser] | None = ParserManager.get_parser(
+-            tool_parser_name=tool_parser,
+-            reasoning_parser_name=reasoning_parser,
++        # The prompt a generation continues is the one /render renders for
++        # the request derender is given: derender renders it again, with the
++        # renderer and settings /render renders with, so the parse starts
++        # where that prompt leaves reasoning, as the chat route's does.
++        self.online_renderer = OnlineRenderer(
++            model_config,
++            renderer,
++            request_logger=request_logger,
++            chat_template=chat_template,
++            chat_template_content_format=chat_template_content_format,
++            trust_request_chat_template=trust_request_chat_template,
+             enable_auto_tools=enable_auto_tools,
+-            model_name=model_config.model,
+-            is_harmony=self.use_harmony,
++            exclude_tools_when_tool_choice_none=exclude_tools_when_tool_choice_none,
++            tool_parser=tool_parser,
++            reasoning_parser=reasoning_parser,
++            default_chat_template_kwargs=default_chat_template_kwargs,
++            log_error_stack=log_error_stack,
+         )
++        self.enable_auto_tools = enable_auto_tools
++        self.exclude_tools_when_tool_choice_none = exclude_tools_when_tool_choice_none
++        self.use_harmony = self.online_renderer.use_harmony
++        self.parser: type[Parser] | None = self.online_renderer.parser
+ 
+         self.chat_template = chat_template
+         self.chat_template_content_format: ChatTemplateContentFormatOption = (
+@@ -97,13 +116,36 @@ class OnlineDerenderer:
+         self,
+         generate_response: GenerateResponse,
+         chat_request: ChatCompletionRequest | None = None,
+-    ) -> list[ChatCompletionResponseChoice]:
+-        return await self._derender_chat_async(generate_response, chat_request)
++    ) -> list[ChatCompletionResponseChoice] | ErrorResponse:
++        """Derender a generation, parsing it from the prompt it continued.
++
++        With a parser and the request, the prompt is rendered from the request
++        exactly as /render renders it, and the parser reads it, as on the chat
++        route; a request that does not render is refused as /render refuses
++        it, never parsed without its prompt. The parse is given the request
++        the render adjusted, as the chat route parses with its own.
++        """
++        prompt_token_ids: list[int] | None = None
++        if self.parser is not None and chat_request is not None:
++            chat_request = chat_request.model_copy(deep=True)
++            rendered = await self.online_renderer.render_chat(
++                chat_request, skip_mm_cache=True
++            )
++            if isinstance(rendered, ErrorResponse):
++                return rendered
++            _, (engine_input,) = rendered
++            prompt_token_ids = extract_prompt_components(
++                self.model_config, engine_input
++            ).token_ids
++        return await self._derender_chat_async(
++            generate_response, chat_request, prompt_token_ids
++        )
+ 
+     def _derender_chat(
+         self,
+         generate_response: GenerateResponse,
+-        chat_request: ChatCompletionRequest | None = None,
++        chat_request: ChatCompletionRequest | None,
++        prompt_token_ids: list[int] | None,
+     ) -> list[ChatCompletionResponseChoice]:
+         tokenizer = self.renderer.get_tokenizer()
+         choices: list[ChatCompletionResponseChoice] = []
+@@ -142,6 +184,11 @@ class OnlineDerenderer:
                  reasoning, content, tool_calls = parser.parse_output(
                      decoded_text,
                      chat_request,
-+                    # This route is given the generated ids and the request,
-+                    # never the prompt ids /render wrote, so it cannot read
-+                    # where that prompt left reasoning and parses, as upstream
-+                    # does, as if reasoning were open and its opener left to
-+                    # the model: a continued final message, whose prompt
-+                    # already closed reasoning, is parsed as reasoning here,
-+                    # and a <think> generated as the first token, which a
-+                    # prompt that opened reasoning makes reasoning text, is
-+                    # read as the opener and has no text. Given those prompt
-+                    # ids, this call parses as the chat route's does.
-+                    prompt_token_ids=None,
++                    # The prompt derender_chat rendered: a continued final
++                    # message, whose prompt closed reasoning, is the answer,
++                    # and a <think> the model writes after a prompt that
++                    # opened reasoning is reasoning text, as on the chat route.
++                    prompt_token_ids=prompt_token_ids,
                      enable_auto_tools=self.enable_auto_tools,
                      model_output_token_ids=choice.token_ids,
                      finish_reason=choice.finish_reason,
@@ -896,3 +993,40 @@ index 15a590b9e065e7a6428beda0eaba065af6ec1c78..d8dd36b89e17d01eaa817f96e78294e5
      def is_reasoning_end(self, input_ids: list[int]) -> bool:
          if super().is_reasoning_end(input_ids):
              return True
+diff --git a/tests/entrypoints/scale_out/derender/test_terminal_metadata.py b/tests/entrypoints/scale_out/derender/test_terminal_metadata.py
+index fcb0f378714335ece573ba62bab5cd3cc70ac88a..fa6c46ea8a831035eb2933d0620d318ea6df1bcf 100644
+--- a/tests/entrypoints/scale_out/derender/test_terminal_metadata.py
++++ b/tests/entrypoints/scale_out/derender/test_terminal_metadata.py
+@@ -41,7 +41,7 @@ async def test_derender_keeps_empty_output_and_observed_terminal(surface, stream
+         incoming = GenerateResponse.model_validate_json(
+             GenerateResponse.model_validate(payload).model_dump_json())
+         if surface == 'chat':
+-            choice = renderer._derender_chat(incoming)[0]
++            choice = renderer._derender_chat(incoming, None, None)[0]
+             text = choice.message.content
+         else:
+             choices, _, _ = renderer._derender_completion([incoming])
+@@ -91,7 +91,9 @@ def test_derender_only_commits_closed_calls_at_eos(finish, stop, closed):
+             'type': 'object', 'properties': {'text': {'type': 'string'}},
+         }},
+     }])
+-    choice = renderer._derender_chat(incoming, request)[0]
++    # Parsed from the parser's own start, reasoning open: a prompt that
++    # opened reasoning leaves it there.
++    choice = renderer._derender_chat(incoming, request, None)[0]
+     executable = closed and finish == 'stop' and stop is None
+     assert choice.finish_reason == ('tool_calls' if executable else finish)
+     assert choice.stop_reason == stop
+diff --git a/vllm/entrypoints/scale_out/derender/serving.py b/vllm/entrypoints/scale_out/derender/serving.py
+index 42feb3c6a5ffe638cb4455aa81bfaebd0c3a0040..9c84edb524d04527a44af6027d25e7fba5fe0d66 100644
+--- a/vllm/entrypoints/scale_out/derender/serving.py
++++ b/vllm/entrypoints/scale_out/derender/serving.py
+@@ -144,6 +144,8 @@ class ServingDerender(BaseServing):
+             )
+         except ValueError as exc:
+             return self.create_error_response(str(exc))
++        if isinstance(choices, ErrorResponse):
++            return choices
+ 
+         prompt_tokens = (
+             request.prompt_tokens if request.prompt_tokens is not None else 0

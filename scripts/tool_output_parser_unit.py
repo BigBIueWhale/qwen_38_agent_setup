@@ -240,6 +240,9 @@ def _served_model_config():
         def get_diff_sampling_param(self):
             return {}
 
+        def try_get_generation_config(self):
+            return GENERATION_CONFIG
+
     return ServedModelConfig()
 
 
@@ -876,12 +879,13 @@ class ToolOutputParserTest(unittest.TestCase):
         token id -- has no text unless the caller asked to see stop text, and a
         length cut inside a character shows nothing of it; derender decides
         both where the detokenizer does, so the same ids parse to the same
-        message on the chat route and on derender, batch and stream, except
-        where only the prompt decides: given none, derender reads a <think> as
-        the first generated token as the opener. Derender reads a stop from its
-        caller, not from the engine, so it accepts one exactly where the
-        engine, on the served generation config, would have stopped with that
-        stop_reason, and refuses any other, naming the choice.
+        message on the chat route and on derender, batch and stream. Derender
+        renders the prompt the generation continued, as /render renders it, so
+        where the prompt decides -- a <think> the model writes as its first
+        token, a continued final message -- it reads as chat does. Derender
+        reads a stop from its caller, not from the engine, so it accepts one
+        exactly where the engine, on the served generation config, would have
+        stopped with that stop_reason, and refuses any other, naming the choice.
         """
         import types
 
@@ -962,7 +966,8 @@ class ToolOutputParserTest(unittest.TestCase):
                     "index": 0, "finish_reason": finish, "stop_reason": stop,
                     "token_ids": list(ids),
                 }])
-                message = derenderer._derender_chat(response, request)[0].message
+                message = derenderer._derender_chat(
+                    response, request, OPEN_PROMPT)[0].message
                 self.assertEqual(
                     (message.reasoning, message.content,
                      [(c.function.name, c.function.arguments)
@@ -989,19 +994,49 @@ class ToolOutputParserTest(unittest.TestCase):
                     streamed += delta.choices[0].text
                 self.assertEqual(streamed, served)
 
-        # Derender is given no prompt, so it reads a generation as if its
-        # prompt had left the opener to the model: a <think> the model writes
-        # as its first token, reasoning text on the chat route, whose served
-        # prompt opened reasoning, has no text there.
-        ids = encode("<think>plan</think>\n\nok") + [MODEL_EOS[0]]
-        response = GenerateResponse(request_id="unit", choices=[{
-            "index": 0, "finish_reason": "stop", "stop_reason": None,
-            "token_ids": ids,
-        }])
-        message = derenderer._derender_chat(response, request_for())[0].message
-        self.assertEqual(parse("<think>plan</think>\n\nok", None)[:2],
-                         ("<think>plan", "\n\nok"))
-        self.assertEqual((message.reasoning, message.content), ("plan", "\n\nok"))
+        # Derender renders the prompt from the request it is given, as /render
+        # renders it, and parses from it as chat does: a <think> the model
+        # writes after a prompt that opened reasoning is reasoning text, and a
+        # continued final message, whose prompt closed reasoning, is the answer.
+        serving, engine = _served_chat()
+        rendering = OnlineDerenderer(
+            engine.model_config, engine.renderer, request_logger=None,
+            chat_template=serving.online_renderer.chat_template,
+            chat_template_content_format="auto", enable_auto_tools=True,
+            tool_parser=_served("SERVED_TOOL_CALL_PARSER"),
+            reasoning_parser=_served("SERVED_REASONING_PARSER"),
+            default_chat_template_kwargs=CHAT_TEMPLATE_KWARGS,
+        )
+        fresh = [{"role": "user", "content": "test"}]
+        continued = fresh + [{"role": "assistant", "content": "Sure"}]
+        for name, messages, continue_final, text, expected in (
+            ("fresh", fresh, False, "plan</think>\n\nok", ("plan", "\n\nok")),
+            ("fresh, a first-token <think>", fresh, False,
+             "<think>plan</think>\n\nok", ("<think>plan", "\n\nok")),
+            ("continued", continued, True, "plan</think>\n\nok",
+             ("", "plan</think>\n\nok")),
+            ("continued, a first-token <think>", continued, True,
+             "<think>plan</think>\n\nok", ("", "<think>plan</think>\n\nok")),
+        ):
+            with self.subTest(case=name):
+                request = ChatCompletionRequest(
+                    model="unit", messages=messages, tools=[TOOL],
+                    tool_choice="auto", add_generation_prompt=not continue_final,
+                    continue_final_message=continue_final,
+                )
+                ids = encode(text) + [MODEL_EOS[0]]
+                response = GenerateResponse(request_id="unit", choices=[{
+                    "index": 0, "finish_reason": "stop", "stop_reason": None,
+                    "token_ids": ids,
+                }])
+                (choice,) = asyncio_run(rendering.derender_chat(response, request))
+                chat = parse(text, None, request=request.model_copy(deep=True),
+                             prompt=rendered_prompt(messages,
+                                                    continue_final=continue_final))
+                self.assertEqual(
+                    (choice.message.reasoning or "", choice.message.content or ""),
+                    chat[:2])
+                self.assertEqual(chat[:2], expected)
 
         request = request_for()
         completion = CompletionRequest(model="unit", prompt="prompt")
@@ -1022,7 +1057,7 @@ class ToolOutputParserTest(unittest.TestCase):
                 chunk = GenerateStreamResponse(request_id="unit", choices=[choice])
                 for field, derender in (
                     ("generate_response.choices[0]",
-                     lambda: derenderer._derender_chat(response, request)),
+                     lambda: derenderer._derender_chat(response, request, OPEN_PROMPT)),
                     ("generate_responses[0].choices[0]",
                      lambda: derenderer._derender_completion([response], None, completion)),
                     ("generate_chunk.choices[0]",

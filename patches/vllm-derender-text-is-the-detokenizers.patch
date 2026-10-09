@@ -320,7 +320,7 @@ index 014a8d7bc6b616f8716973d3397e7835a0da9a42..2772b787ef9ef6d4c0cd37fab4496d3c
              },
              "stream_state": None,
 diff --git a/tests/entrypoints/scale_out/derender/test_terminal_metadata.py b/tests/entrypoints/scale_out/derender/test_terminal_metadata.py
-index fcb0f378714335ece573ba62bab5cd3cc70ac88a..1846326155a68999a890cbf177051b06a32dc6fe 100644
+index fa6c46ea8a831035eb2933d0620d318ea6df1bcf..dcdc5424f2ee770d7a1d23d5a8a0ff02a16abc00 100644
 --- a/tests/entrypoints/scale_out/derender/test_terminal_metadata.py
 +++ b/tests/entrypoints/scale_out/derender/test_terminal_metadata.py
 @@ -20,8 +20,19 @@ from vllm.renderers.online_derenderer import OnlineDerenderer
@@ -382,7 +382,7 @@ index fcb0f378714335ece573ba62bab5cd3cc70ac88a..1846326155a68999a890cbf177051b06
      renderer.enable_auto_tools = True
      renderer.use_harmony = True
      incoming = GenerateResponse.model_validate(dict(request_id='request', choices=[dict(
-@@ -101,3 +120,140 @@ def test_derender_only_commits_closed_calls_at_eos(finish, stop, closed):
+@@ -103,3 +122,140 @@ def test_derender_only_commits_closed_calls_at_eos(finish, stop, closed):
      else:
          assert not choice.message.tool_calls
          assert choice.message.content == body
@@ -463,7 +463,7 @@ index fcb0f378714335ece573ba62bab5cd3cc70ac88a..1846326155a68999a890cbf177051b06
 +        else:
 +            response = GenerateResponse.model_validate(payload)
 +            if surface == 'chat':
-+                derenderer._derender_chat(response, chat)
++                derenderer._derender_chat(response, chat, None)
 +            else:
 +                derenderer._derender_completion([response], None, completion)
 +    field = ('generate_chunk.choices[0]' if stream
@@ -524,17 +524,19 @@ index fcb0f378714335ece573ba62bab5cd3cc70ac88a..1846326155a68999a890cbf177051b06
 +    assert error['param'] == choice
 +    assert error['message'].startswith(f"{choice} reports finish_reason 'stop'")
 diff --git a/vllm/renderers/online_derenderer.py b/vllm/renderers/online_derenderer.py
-index 44bd5b83d47b56b12360863ef384ff0955ce7400..c53e14b6d04b0315b8de57b77368f7811cdbc531 100644
+index 8f0de5c7cc1e7780d9ce6e12f9a042197d4bd8d9..3796fc2b72c365cc5ad81e2ec4cecdd122e8bfb8 100644
 --- a/vllm/renderers/online_derenderer.py
 +++ b/vllm/renderers/online_derenderer.py
-@@ -28,13 +28,16 @@ from vllm.entrypoints.scale_out.token_in_token_out.protocol import (
+@@ -33,15 +33,18 @@ from vllm.entrypoints.scale_out.token_in_token_out.protocol import (
      GenerateStreamResponse,
  )
  from vllm.entrypoints.serve.utils.request_logger import RequestLogger
 +from vllm.exceptions import VLLMValidationError
  from vllm.logger import init_logger
- from vllm.parser import Parser, ParserManager
+ from vllm.parser import Parser
  from vllm.renderers import BaseRenderer
+ from vllm.renderers.inputs.preprocess import extract_prompt_components
+ from vllm.renderers.online_renderer import OnlineRenderer
 +from vllm.sampling_params import model_eos_token_ids
  from vllm.tokenizers import TokenizerLike
  from vllm.tokenizers.detokenizer_utils import detokenize_incrementally
@@ -544,7 +546,7 @@ index 44bd5b83d47b56b12360863ef384ff0955ce7400..c53e14b6d04b0315b8de57b77368f781
  
  logger = init_logger(__name__)
  
-@@ -59,6 +62,11 @@ class OnlineDerenderer:
+@@ -66,6 +69,11 @@ class OnlineDerenderer:
          self.model_config = model_config
          self.renderer = renderer
          self.request_logger = request_logger
@@ -554,9 +556,9 @@ index 44bd5b83d47b56b12360863ef384ff0955ce7400..c53e14b6d04b0315b8de57b77368f781
 +            model_config.try_get_generation_config(), renderer.get_eos_token_id()
 +        )
  
-         self.enable_auto_tools = enable_auto_tools
-         self.exclude_tools_when_tool_choice_none = exclude_tools_when_tool_choice_none
-@@ -108,19 +116,29 @@ class OnlineDerenderer:
+         # The prompt a generation continues is the one /render renders for
+         # the request derender is given: derender renders it again, with the
+@@ -150,19 +158,29 @@ class OnlineDerenderer:
          tokenizer = self.renderer.get_tokenizer()
          choices: list[ChatCompletionResponseChoice] = []
  
@@ -590,7 +592,7 @@ index 44bd5b83d47b56b12360863ef384ff0955ce7400..c53e14b6d04b0315b8de57b77368f781
                  )
  
                  chat_template_kwargs: dict[str, Any] = {}
-@@ -195,8 +213,8 @@ class OnlineDerenderer:
+@@ -231,8 +249,8 @@ class OnlineDerenderer:
                      if chat_request is not None
                      else True
                  )
@@ -601,7 +603,7 @@ index 44bd5b83d47b56b12360863ef384ff0955ce7400..c53e14b6d04b0315b8de57b77368f781
                  )
                  message = ChatMessage(role="assistant", content=decoded_text)
  
-@@ -218,6 +236,27 @@ class OnlineDerenderer:
+@@ -254,6 +272,27 @@ class OnlineDerenderer:
  
          return choices
  
@@ -629,7 +631,7 @@ index 44bd5b83d47b56b12360863ef384ff0955ce7400..c53e14b6d04b0315b8de57b77368f781
      def _detokenize_delta(
          self,
          tokenizer: TokenizerLike,
-@@ -345,8 +384,15 @@ class OnlineDerenderer:
+@@ -381,8 +420,15 @@ class OnlineDerenderer:
          stream_choices: list[ChatCompletionResponseStreamChoice] = []
          updated_state = state
  
@@ -647,7 +649,7 @@ index 44bd5b83d47b56b12360863ef384ff0955ce7400..c53e14b6d04b0315b8de57b77368f781
              new_text, updated_state = self._detokenize_delta(
                  tokenizer, delta_tids, updated_state, skip_special_tokens=skip_special
              )
-@@ -419,10 +465,21 @@ class OnlineDerenderer:
+@@ -455,10 +501,21 @@ class OnlineDerenderer:
          total_completion_tokens = 0
          index = 0
  
@@ -673,7 +675,7 @@ index 44bd5b83d47b56b12360863ef384ff0955ce7400..c53e14b6d04b0315b8de57b77368f781
                  )
                  completion_logprobs = None
                  if choice.logprobs is not None:
-@@ -495,8 +552,16 @@ class OnlineDerenderer:
+@@ -531,8 +588,16 @@ class OnlineDerenderer:
          stream_choices: list[CompletionResponseStreamChoice] = []
          updated_state = state
  
@@ -692,7 +694,7 @@ index 44bd5b83d47b56b12360863ef384ff0955ce7400..c53e14b6d04b0315b8de57b77368f781
              new_text, updated_state = self._detokenize_delta(
                  tokenizer, delta_tids, updated_state, skip_special_tokens=skip_special
              )
-@@ -529,6 +594,57 @@ class OnlineDerenderer:
+@@ -565,6 +630,57 @@ class OnlineDerenderer:
          return chunk, updated_state
  
  
