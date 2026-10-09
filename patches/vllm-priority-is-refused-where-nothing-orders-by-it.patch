@@ -1,0 +1,161 @@
+diff --git a/tests/v1/engine/test_priority_admission.py b/tests/v1/engine/test_priority_admission.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..9721f4a9a6099efbfdd97cee1820f0f59b4e02cc
+--- /dev/null
++++ b/tests/v1/engine/test_priority_admission.py
+@@ -0,0 +1,87 @@
++# SPDX-License-Identifier: Apache-2.0
++# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
++"""A priority orders requests only where the scheduler orders by it.
++
++Admission, which every route that reaches the engine passes, refuses a priority
++a first-come-first-served scheduler would not apply, naming the parameter,
++before the request reaches the engine; priority 0, which asks for nothing, and
++any priority under priority scheduling are admitted. A route that reads the
++priority from its header refuses a header that is not an integer, instead of
++serving the request as if it had not been sent."""
++
++from types import SimpleNamespace
++from unittest.mock import patch
++
++import pytest
++
++import vllm.v1.engine.input_processor as input_processor_module
++from vllm.entrypoints.generate.base.serving import (
++    PRIORITY_HEADER,
++    GenerateBaseServing,
++)
++from vllm.exceptions import VLLMValidationError
++from vllm.sampling_params import SamplingParams
++from vllm.v1.engine.input_processor import InputProcessor
++
++
++def _admission(policy: str) -> InputProcessor:
++    vllm_config = SimpleNamespace(
++        model_config=SimpleNamespace(
++            try_get_generation_config=lambda: {}, return_sampling_mask=False
++        ),
++        cache_config=None,
++        lora_config=None,
++        scheduler_config=SimpleNamespace(policy=policy),
++        speculative_config=None,
++        structured_outputs_config=None,
++        observability_config=None,
++        use_v2_model_runner=False,
++        reasoning_config=None,
++        kv_transfer_config=None,
++    )
++    with patch.object(input_processor_module, "InputPreprocessor"):
++        return InputProcessor(
++            vllm_config,
++            SimpleNamespace(_executor=None, tokenizer=None),
++            mm_registry=SimpleNamespace(supports_multimodal_inputs=lambda _: False),
++        )
++
++
++@pytest.mark.parametrize("priority", [1, -1, 2**63 - 1])
++def test_a_priority_first_come_first_served_would_not_apply_is_refused(priority):
++    with pytest.raises(VLLMValidationError) as refused:
++        _admission("fcfs").process_inputs(
++            "request",
++            {"type": "token", "prompt_token_ids": [1]},
++            SamplingParams(),
++            ("generate",),
++            priority=priority,
++        )
++    assert refused.value.parameter == "priority"
++    assert refused.value.value == priority
++    message = str(refused.value)
++    assert "first come, first served (--scheduling-policy fcfs)" in message
++    assert "Send priority 0 or omit it" in message
++    assert "--scheduling-policy priority" in message
++
++
++def test_a_priority_that_asks_for_nothing_or_is_applied_is_admitted():
++    _admission("fcfs")._validate_priority(0)
++    for priority in (-3, 0, 7):
++        _admission("priority")._validate_priority(priority)
++
++
++@pytest.mark.parametrize("header", ["high", "1.5", ""])
++def test_a_priority_header_that_is_not_an_integer_is_refused(header):
++    raw_request = SimpleNamespace(headers={PRIORITY_HEADER: header})
++    with pytest.raises(VLLMValidationError) as refused:
++        GenerateBaseServing._get_priority(SimpleNamespace(priority=0), raw_request)
++    assert refused.value.parameter == PRIORITY_HEADER
++    assert refused.value.value == header
++
++
++def test_a_priority_header_that_is_an_integer_is_the_priority():
++    request = SimpleNamespace(priority=0)
++    raw_request = SimpleNamespace(headers={PRIORITY_HEADER: "3"})
++    assert GenerateBaseServing._get_priority(request, raw_request) == 3
++    assert GenerateBaseServing._get_priority(request, SimpleNamespace(headers={})) == 0
+diff --git a/vllm/entrypoints/generate/base/serving.py b/vllm/entrypoints/generate/base/serving.py
+index d7c887c94a25106d5bb71c13ddb4148470b8c9fa..08aae6ef433abae77e834b50de938a09d476dcf5 100644
+--- a/vllm/entrypoints/generate/base/serving.py
++++ b/vllm/entrypoints/generate/base/serving.py
+@@ -31,6 +31,7 @@ from vllm.entrypoints.openai.responses.protocol import ResponsesRequest
+ from vllm.entrypoints.serve.engine.serving import BaseServing
+ from vllm.entrypoints.serve.engine.typing import AnyRequest
+ from vllm.entrypoints.serve.utils.request_logger import RequestLogger
++from vllm.exceptions import VLLMValidationError
+ from vllm.inputs import EngineInput
+ from vllm.logger import init_logger
+ from vllm.logprobs import Logprob, PromptLogprobs
+@@ -259,7 +260,13 @@ class GenerateBaseServing(BaseServing, BeamSearchOnlineMixin):
+                 try:
+                     return int(priority)
+                 except ValueError:
+-                    pass
++                    raise VLLMValidationError(
++                        f"The {PRIORITY_HEADER} header is {priority!r}, and a "
++                        "priority is an integer. Send an integer, or omit the "
++                        "header.",
++                        parameter=PRIORITY_HEADER,
++                        value=priority,
++                    ) from None
+         return request.priority
+ 
+     async def _with_kv_transfer_rejection_cleanup(
+diff --git a/vllm/v1/engine/input_processor.py b/vllm/v1/engine/input_processor.py
+index c06acf69e81c099eda3fd1a63f24f19410177f80..bae16938e19a4bfa8c6745a44a1ee7f9f471c5e1 100644
+--- a/vllm/v1/engine/input_processor.py
++++ b/vllm/v1/engine/input_processor.py
+@@ -133,6 +133,28 @@ class InputProcessor:
+     def get_tokenizer(self) -> TokenizerLike:
+         return self.renderer.get_tokenizer()
+ 
++    def _validate_priority(self, priority: int) -> None:
++        """A priority orders requests only where the scheduler orders by it.
++
++        Every route that reaches the engine is admitted here, so this holds
++        for all of them. A first-come-first-served scheduler serves requests
++        in arrival order whatever their priority, so a priority other than 0
++        asks for an order nothing applies, and is refused.
++        """
++        if priority == 0:
++            return
++        policy = self.scheduler_config.policy
++        if policy != "priority":
++            raise VLLMValidationError(
++                f"priority {priority} orders a request only under priority "
++                "scheduling, and this server schedules first come, first served "
++                f"(--scheduling-policy {policy}): the request would be served in "
++                "arrival order whatever its priority. Send priority 0 or omit "
++                "it, or serve with --scheduling-policy priority.",
++                parameter="priority",
++                value=priority,
++            )
++
+     def _validate_params(
+         self,
+         params: SamplingParams | PoolingParams,
+@@ -415,6 +437,7 @@ class InputProcessor:
+         resumable: bool = False,
+         session_id: str | None = None,
+     ) -> EngineCoreRequest:
++        self._validate_priority(priority)
+         self._validate_params(params, supported_tasks)
+         self._validate_lora(lora_request)
+ 

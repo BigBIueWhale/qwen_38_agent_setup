@@ -5040,6 +5040,49 @@ def _validate_test_declarations_after(state: State) -> None:
                  "\npytestmark = pytest.mark.gpu\n", label=label)
 
 
+_INPUT_PROCESSOR = "vllm/v1/engine/input_processor.py"
+_GENERATE_BASE_SERVING = "vllm/entrypoints/generate/base/serving.py"
+
+
+def _validate_priority_refusal_before(state: State) -> None:
+    label = "Priority refusal precondition"
+    forbid_text(state, _INPUT_PROCESSOR, "def _validate_priority(", label=label)
+    require_text(state, _GENERATE_BASE_SERVING,
+                 "                except ValueError:\n                    pass\n",
+                 label=label)
+
+
+def _validate_priority_refusal_after(state: State) -> None:
+    label = "Priority refusal result"
+    # Admission, which every route that reaches the engine passes, refuses a
+    # priority the scheduler would not apply, before anything else it checks.
+    _require_ordered(_symbol_source(state, _INPUT_PROCESSOR,
+                                    "InputProcessor.process_inputs", label=label), (
+        ") -> EngineCoreRequest:\n        self._validate_priority(priority)\n",
+        "self._validate_params(params, supported_tasks)",
+    ), label=label, location=f"{_INPUT_PROCESSOR}:InputProcessor.process_inputs")
+    _require_in_symbol(state, _INPUT_PROCESSOR, "InputProcessor._validate_priority", (
+        "if priority == 0:\n            return\n",
+        'if policy != "priority":',
+        'parameter="priority",',
+        '"arrival order whatever its priority. Send priority 0 or omit "',
+        '"it, or serve with --scheduling-policy priority."',
+    ), label=label)
+    # A header the route reads the priority from is refused when it is not one.
+    _require_in_symbol(state, _GENERATE_BASE_SERVING, "GenerateBaseServing._get_priority", (
+        "raise VLLMValidationError(",
+        "parameter=PRIORITY_HEADER,",
+    ), label=label)
+    forbid_text(state, _GENERATE_BASE_SERVING,
+                "                except ValueError:\n                    pass\n", label=label)
+    require_python_symbols(state, "tests/v1/engine/test_priority_admission.py", {
+        "test_a_priority_first_come_first_served_would_not_apply_is_refused": ("priority",),
+        "test_a_priority_that_asks_for_nothing_or_is_applied_is_admitted": None,
+        "test_a_priority_header_that_is_not_an_integer_is_refused": ("header",),
+        "test_a_priority_header_that_is_an_integer_is_the_priority": None,
+    }, label=label)
+
+
 def validate_final(state: State) -> None:
     """Reassert every durable semantic invariant on the complete tree.
 
@@ -6458,5 +6501,28 @@ CONTRACTS: Mapping[str, SemanticContract] = {
         ),
         validate_before=_validate_test_declarations_before,
         validate_after=_validate_test_declarations_after,
+    ),
+    "priority-is-refused-where-nothing-orders-by-it": SemanticContract(
+        rationale=(
+            "Every request model's priority field says a priority other than 0 "
+            "raises an error unless the server schedules by priority, and none "
+            "did: under the default first-come-first-served scheduler the "
+            "priority was carried to the engine and never read, so a caller was "
+            "told an order applied that nothing applied. Admission, which every "
+            "route that reaches the engine passes (chat, completions, Responses "
+            "and its built-in tool turns, generate, pooling, and the offline "
+            "LLM), refuses it there, before the request reaches the engine, "
+            "naming priority, the policy, and both next actions; 0, which asks "
+            "for nothing, and any priority under priority scheduling are "
+            "admitted. A route that reads the priority from its "
+            "X-Vllm-Priority header served a header that was not an integer as "
+            "if it had not been sent, and refuses it."
+        ),
+        removal_condition=(
+            "Remove when pinned upstream refuses a priority its scheduler does "
+            "not apply, as its request models already state."
+        ),
+        validate_before=_validate_priority_refusal_before,
+        validate_after=_validate_priority_refusal_after,
     ),
 }

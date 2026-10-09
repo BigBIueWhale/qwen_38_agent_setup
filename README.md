@@ -411,6 +411,7 @@ It is intentionally reconstructed by the ordered, reviewed semantic transformati
 | patches/vllm-chat-messages-read-by-one-rule.patch | 5bf8a2d69d7ab1c6b9ee423740d34616a69e857d64816f68b9b9b1d509455f7f |
 | patches/vllm-responses-refuses-what-it-cannot-honour.patch | 35fcb2a68faa1a6fb99a83b6d7726ffc45f1b6e84cbb2ed7d9fe152575bf10f3 |
 | patches/vllm-reviewed-tests-declare-what-they-need.patch | a9b3d97b35a8e459e45e1101f8a24cfa0fec4273ef7f7baf27266ea6d4831c84 |
+| patches/vllm-priority-is-refused-where-nothing-orders-by-it.patch | 96346e5bf71726008f4449389d91a18531fd57fe63f930b2400e059ab168571a |
 
 The reconstructed tree's runtime-source and test changes, new files and
 deletions are counted by ./scripts/build-vllm.sh check, which derives and prints
@@ -469,7 +470,7 @@ Pinned build inputs and products:
 | Immutable base tag | qwen38-vllm:main-9df9b0b |
 | Immutable base ID | sha256:fa4a002a88b7043a1a89966dea8a500fe9696f84e75730d9da916f916048d401 |
 | Runtime Dockerfile SHA-256 | 564ed4115e1ffbab3a6af1c28cd5cd1c3f6df0bcb995d6e3411fc9c28c5a9e44 |
-| Build verifier SHA-256 | cb6aeb5ae4b1bb236958491cac0ed93b85ff78140cf30f7b752807f12713a29f |
+| Build verifier SHA-256 | 5fcf10db070399face48611a91d71f6ef89842bc80a8e75d7b165c2b4a6afb66 |
 | Runtime validator SHA-256 | 15b71d9ce4cd34ed4e05538492b7f329e382cbd7fa5eeb9b82c9ccb8fce3c138 |
 
 The runtime image's profile, tag and archive name, which every release advances
@@ -646,6 +647,12 @@ Consequences:
 - A pooling model is refused the OffloadingConnector's CPU tier when the
   connector is built: the tier accounts the offloaded KV cache per agent ID,
   which only a generation request carries.
+- The server schedules first come, first served (vLLM's default; the launch
+  names no `--scheduling-policy`), so a request's `priority` orders nothing. A
+  priority other than 0 is refused with a 400 naming `priority`, at the
+  admission every route that reaches the engine passes, as each request model's
+  own description of the field says; an `X-Vllm-Priority` header that is not an
+  integer is refused naming the header.
 - Multimodal profiling is mandatory and cannot be skipped to obtain a deceptively
   optimistic allocation.
 - All unquantized model computation, including the entire vision tower, uses BF16.
