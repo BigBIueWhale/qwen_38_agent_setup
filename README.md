@@ -345,21 +345,21 @@ It is intentionally reconstructed by the ordered, reviewed semantic transformati
 | patches/vllm-token-text-provenance.patch | 954b36cb444f7e644e29d13f7a9d3c000512a0d616bbf2b6cd3cb8f4e880dd44 |
 | patches/vllm-precise-request-errors.patch | 5620e9394e9d636b6f875bb9a04c21d54b5a9629f6a6651cda3be79d98be43f2 |
 | patches/vllm-qwen-canonical-parameter-framing.patch | d438f9106c4a989d64837c21f5491d946065e6721570ad47664513347f150064 |
-| patches/vllm-qwen-owned-tool-grammar.patch | 39e5d3bfc5e60a453f25725e410ac14104d9f6e90381165516b874978cc8355b |
+| patches/vllm-qwen-owned-tool-grammar.patch | 258f6cc1e78cd00a2b197ec0c8d525b52004b72b13795067cc6f6fcec646e5d5 |
 | patches/vllm-qwen-unique-tool-parameters.patch | a85108911b0e12757c5f88e2b3a8d4356e9a37c17f866a54049ef6aa6da42074 |
 | patches/vllm-generation-admission-before-response.patch | 6418c42eb3fca2492473e5411f9463d21d1473a0cc55187a2a9a530ddfc44b86 |
 | patches/vllm-kv-scope-single-flight.patch | b84b915c38e2c1d32b278bf88dcd5ac7228b9a680b746e2842783dbe1942540a |
 | patches/vllm-template-authored-control-tokens.patch | 2a6e8b31826cf06d52acb3c87cae0c6c68a7acc2c8f01dd7848bc5e948977228 |
 | patches/vllm-nvfp4-native-kernel-required.patch | 9d9ce188b6670d687a725c4cdca37478f9dc78ef9f19685ddbcf5e9edd53b8b7 |
-| patches/vllm-qwen-arguments-read-by-grammar.patch | 8851f6fa3a49e1f9ac0a98239fa9d8f8563a916fce69c0dbe8b180fa6202a263 |
+| patches/vllm-qwen-arguments-read-by-grammar.patch | 917feab55fd43ae42b05078bd5c1546acaf685a533f4ac38be66bacf817fc564 |
 | patches/vllm-startup-plan-admission-bound.patch | 1d84af83471624421b048587487d40675e87a4ecdc14c24d084518a0d21a5ff0 |
 | patches/vllm-template-refusals-name-their-parameter.patch | 1f428332be39e4fb7f3c7f7eb5d6e3297f5dc70638fcd7f81d69b32f69d1fa26 |
 | patches/vllm-qwen-repeated-parameter-refusal.patch | 849fadaa43f2f8eafc0e98fae2c5c201e3b4a8c637de58720eebb94817768e31 |
 | patches/vllm-generated-tokens-survive-parsing.patch | 3889af17e410853baa95ea40eba32baa5ed35d03e37822d55312861e21fba8b9 |
 | patches/vllm-include-reasoning-shapes-the-response.patch | d3b41899464142ffffb04efd0b19647153e322b10c7f9fc1e14af0f290af98d1 |
-| patches/vllm-unspecified-tool-choice-is-the-default.patch | 54d10d87b699b7cb767f2403359bc6c6abd82a9fa3a8aa5bef4a2f2e26ab515d |
-| patches/vllm-call-only-answer-keeps-the-blank-line.patch | 989ac21aa1f40ad0ebaecd7bff8b4bcab8e42e8ec5fb3df698aecc5ed6da1fa3 |
-| patches/vllm-responses-tools-are-one-function-list.patch | 5b4e5ae876a7979e669f3b597a341cd91e738d8e379a54644e6b9ac8c8316314 |
+| patches/vllm-unspecified-tool-choice-is-the-default.patch | d962d3c3fbd96a909a0c03e8f6a3c987ece5f0e7c27ca81571d68bda1d97cdaa |
+| patches/vllm-call-only-answer-keeps-the-blank-line.patch | c5815801d29b3ecb7a6aeba3ef586aac53950b6229c2b7fb315b95acd54501b1 |
+| patches/vllm-responses-tools-are-one-function-list.patch | a1c2f1c1b654e7d28b8e7c09d7db7acebde33fbc0773a299ac27f5b55d5f4122 |
 | patches/vllm-batch-parse-starts-where-the-prompt-leaves.patch | 93de24091a3be1cd49dc0c8b90c859d5d9fdf6a075b822ae74dd61d5a6c1f376 |
 | patches/vllm-derender-text-is-the-detokenizers.patch | 9d8f6d45beba5c79671444be4e9604c4352c7fe5346d78573bfc4fbc91bfb4b6 |
 | patches/vllm-output-constraints-refused-beside-tool-calls.patch | b82f6259428441aee55d157443bcedc1d98fb247ef9a521106408671a24ae533 |
@@ -428,9 +428,9 @@ Pinned build inputs and products:
 |---|---|
 | Immutable base tag | qwen38-vllm:main-9df9b0b |
 | Immutable base ID | sha256:fa4a002a88b7043a1a89966dea8a500fe9696f84e75730d9da916f916048d401 |
-| Runtime Dockerfile SHA-256 | fe87ba7c6dd20403cf4abc85ce902bd27128c235d562febe5954c57b5aa3fb2a |
-| Build verifier SHA-256 | c68af72ed44aa4d4aaf80cbc4739b5bf372bc803db540dd0dff6266bd35d1a53 |
-| Runtime validator SHA-256 | 4a9ebd2d86bc89891d4128a90cfb61a45792bd632d035cc6d529c7811004e0d7 |
+| Runtime Dockerfile SHA-256 | 2d19f9b3f939a7eb8e2c0ed0f4db5f8a5786ebf213170a86e7914fb2d1d05ba5 |
+| Build verifier SHA-256 | a24f4b88316b6f8689a15500cf4eb19f736771922e2f48e77edfdaf56bd2c8fd |
+| Runtime validator SHA-256 | 1db635d3954fc5f9d2d3bad9fc442629f56fd6cc796034293fe0e49cdad654a8 |
 
 The runtime image's profile, tag and archive name, which every release advances
 together, are declared in `config/runtime-v1.sh`, and the archive lives under
@@ -1322,10 +1322,13 @@ enforce it refuses. The qwen3_coder tool parser is neither selected nor built wh
 `VLLM_ENFORCE_STRICT_TOOL_CALLING` is off, since that arms no grammar. On a server
 without a tool parser, a tool choice that lets the model call is refused with one 400
 on chat, Responses and every route that renders through chat, rather than returning
-the call as text. `parallel_tool_calls` false is refused, naming the parameter, where
-the armed format cannot hold one call: an XGrammar builtin format, or `auto` without a
-strict tool on a format that arms its grammar only for one; the qwen3_coder grammar
-holds it under every choice.
+the call as text. `parallel_tool_calls` false is held only by the tool-call grammar
+the request arms, and is refused, naming the parameter, wherever none holds it: an
+XGrammar builtin format, `auto` without a strict tool on a format that arms its
+grammar only for one, and a tool parser that arms none -- it names no format, or
+`VLLM_ENFORCE_STRICT_TOOL_CALLING` is off -- unless its own grammar takes the limit,
+as Mistral's does where its tokenizer supports one. A forced choice is one call. The
+qwen3_coder grammar holds the limit under every choice.
 
 The exact `<tool_call>\n<function=` trigger starts a constrained call. While
 reasoning is active, the reasoning boundary requires its actual token ID. After

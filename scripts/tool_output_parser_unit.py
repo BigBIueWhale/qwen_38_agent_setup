@@ -1762,6 +1762,54 @@ class ToolChoiceEnforcementTest(unittest.TestCase):
                 self.assertIsNotNone(get_model_structural_tag(
                     served, chat_tool, choice, False, False))
 
+    def test_a_call_limit_without_a_grammar_is_refused_on_every_route(self):
+        """A tool parser with no tool-call grammar holds no limit of one call,
+        so parallel_tool_calls false is refused alike on chat and on
+        Responses, with the same 400 naming it, before anything is admitted,
+        under every choice that lets the model make more than one call.
+        Anthropic and the render route render through chat."""
+        from vllm.entrypoints.openai.chat_completion.protocol import (
+            ChatCompletionGenerationRequest,
+        )
+        from vllm.entrypoints.openai.responses.protocol import ResponsesRequest
+        from vllm.entrypoints.serve.exception_handling.error_response import (
+            create_error_response,
+        )
+        from vllm.exceptions import VLLMValidationError
+
+        chat, chat_engine = _served_chat(tool_parser="pythonic")
+        responses, responses_engine = _served_responses(
+            chat.online_renderer, tool_parser="pythonic", enable_auto_tools=True,
+        )
+        for choice in ("auto", "required"):
+            refusals = []
+            for route, request, serve in (
+                ("chat", ChatCompletionGenerationRequest(
+                    model="unit", messages=[{"role": "user", "content": "test"}],
+                    kv_scope="unit", tools=[TOOL], tool_choice=choice,
+                    parallel_tool_calls=False,
+                ), chat.create_chat_completion),
+                ("responses", ResponsesRequest.model_validate(
+                    {"model": "unit", "input": "test", "kv_scope": "unit",
+                     "tools": [FUNCTION], "tool_choice": choice,
+                     "parallel_tool_calls": False}
+                ), responses.create_responses),
+            ):
+                with self.subTest(route=route, choice=choice):
+                    with self.assertRaises(VLLMValidationError) as refused:
+                        asyncio_run(serve(request))
+                    error = create_error_response(refused.exception).error
+                    self.assertEqual(
+                        (error.code, error.param), (400, "parallel_tool_calls"))
+                    self.assertIn("(PythonicToolParser) has no tool-call grammar",
+                                  error.message)
+                    self.assertIn("parallel_tool_calls true", error.message)
+                    refusals.append(error.message)
+            with self.subTest(same_refusal=choice):
+                self.assertEqual(len(set(refusals)), 1)
+        chat_engine.admit.assert_not_called()
+        responses_engine.admit.assert_not_called()
+
     def test_the_served_tool_parser_needs_its_grammar(self):
         """The Qwen tool parser's calls are exactly its grammar's language, so
         it is never selected, or built, while strict tool calling is off."""

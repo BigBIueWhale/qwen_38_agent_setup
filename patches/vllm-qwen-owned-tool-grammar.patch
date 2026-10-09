@@ -39,7 +39,7 @@ diff --git a/vllm/tool_parsers/structural_tag_registry.py b/vllm/tool_parsers/st
  _VLLM_STRUCTURAL_TAG_REGISTRY: dict[str, StructuralTagBuilder] = {}
  
  
-@@ -99,6 +99,15 @@
+@@ -99,6 +99,85 @@
      return False
  
  
@@ -52,55 +52,111 @@ diff --git a/vllm/tool_parsers/structural_tag_registry.py b/vllm/tool_parsers/st
 +)
 +
 +
++def require_call_limit_held(
++    tool_choice: ToolChoice,
++    parallel_tool_calls: bool | None,
++    cause: str,
++    *,
++    next_action: str = "",
++) -> None:
++    """Refuse a limit of one call that no grammar holds.
++
++    A limit is held by the tool-call grammar the request arms, never by
++    dropping calls the model made; a forced choice is one call by itself and
++    "none" lets the model make none. Every place that finds no grammar holding
++    the limit -- a format whose grammar takes none, an unarmed grammar, a
++    parser with none -- refuses here, with *cause* saying why and
++    *next_action* naming any further step that would hold it.
++    """
++    if (
++        parallel_tool_calls is not False
++        or tool_choice == "none"
++        or isinstance(
++            tool_choice, ChatCompletionNamedToolChoiceParam | ToolChoiceFunction
++        )
++    ):
++        return
++    actions = _ALLOW_PARALLEL_CALLS
++    if next_action:
++        actions = f"{next_action}, or {actions[0].lower()}{actions[1:]}"
++    raise VLLMValidationError(
++        "parallel_tool_calls false is held only by the tool-call grammar, "
++        f"never by dropping a call the model made, and {cause}. {actions}",
++        parameter="parallel_tool_calls",
++    )
++
++
++def require_unarmed_call_limit_held(
++    model: str | None,
++    parser_name: str,
++    tool_choice: ToolChoice,
++    parallel_tool_calls: bool | None,
++) -> None:
++    """Refuse a limit of one call where a tool parser's structural format arms
++    no grammar: it names no format (*model* None), or the format's grammar is
++    left unarmed because VLLM_ENFORCE_STRICT_TOOL_CALLING is off."""
++    if model is None:
++        require_call_limit_held(
++            tool_choice,
++            parallel_tool_calls,
++            f"this server's tool parser ({parser_name}) has no tool-call grammar",
++        )
++        return
++    # Arming the format's grammar holds the limit only where vLLM builds it;
++    # an XGrammar builtin one takes none. Under "auto" a vLLM-built format
++    # arms it for a strict tool alone (the Qwen parser, which arms it for
++    # every tool, is never built with the switch off).
++    next_action = ""
++    if model in _VLLM_STRUCTURAL_TAG_REGISTRY:
++        next_action = (
++            "Serve with VLLM_ENFORCE_STRICT_TOOL_CALLING on, which arms the "
++            f"{model!r} grammar that holds it"
++            + (" for a strict tool" if tool_choice == "auto" else "")
++        )
++    require_call_limit_held(
++        tool_choice,
++        parallel_tool_calls,
++        "this server runs with VLLM_ENFORCE_STRICT_TOOL_CALLING off, which "
++        f"leaves its {model!r} tool-call grammar unarmed",
++        next_action=next_action,
++    )
++
++
  def get_model_structural_tag(
      model: str,
      tools: Sequence[ChatCompletionToolsParam | ResponsesTool] | None,
-@@ -111,6 +120,27 @@
+@@ -111,6 +190,16 @@
      if not tools or tool_choice == "none":
          return None
  
-+    # A limit of one call is held by the grammar, never by dropping calls the
-+    # model made: a vLLM-owned builder takes it, and a forced choice is one
-+    # call by itself. An XGrammar builtin format takes no limit, so with any
-+    # other choice the request is refused rather than served unenforced.
-+    one_call = isinstance(
-+        tool_choice, ChatCompletionNamedToolChoiceParam | ToolChoiceFunction
-+    )
-+    if (
-+        parallel_tool_calls is False
-+        and not one_call
-+        and model in XGRAMMAR_BUILTIN_STRUCTURAL_TAG_MODELS
-+    ):
-+        raise VLLMValidationError(
-+            f"parallel_tool_calls false cannot be enforced in this server's "
-+            f"{model!r} tool-call format: its grammar is XGrammar's builtin "
-+            "one, which admits any number of calls and takes no limit, and a "
-+            "call the model made is never dropped. "
-+            + _ALLOW_PARALLEL_CALLS,
-+            parameter="parallel_tool_calls",
++    # A vLLM-owned builder takes the limit; an XGrammar builtin format takes
++    # none, so with a choice of more than one call it is refused.
++    if model in XGRAMMAR_BUILTIN_STRUCTURAL_TAG_MODELS:
++        require_call_limit_held(
++            tool_choice,
++            parallel_tool_calls,
++            f"this server's {model!r} tool-call format is XGrammar's builtin "
++            "one, whose grammar admits any number of calls and takes no limit",
 +        )
 +
      # This single-purpose Qwen agent runtime treats every advertised Qwen tool
      # schema as load-bearing. For auto tool choice the model still decides
      # whether to call a tool, but once it starts a call xgrammar must constrain
-@@ -122,6 +152,16 @@
+@@ -122,6 +211,13 @@
          and not _any_tool_strict(tools)
          and model != "qwen_3_coder"
      ):
-+        if parallel_tool_calls is False:
-+            raise VLLMValidationError(
-+                "parallel_tool_calls false is held by the tool-call grammar, "
-+                f"and under tool_choice 'auto' this server's {model!r} format "
-+                "arms it only for a strict tool; none is, so nothing would "
-+                "hold the model to one call. Mark the tools strict: true, or "
-+                + _ALLOW_PARALLEL_CALLS[0].lower()
-+                + _ALLOW_PARALLEL_CALLS[1:],
-+                parameter="parallel_tool_calls",
-+            )
++        require_call_limit_held(
++            tool_choice,
++            parallel_tool_calls,
++            f"under tool_choice 'auto' this server's {model!r} format arms its "
++            "grammar only for a strict tool, and none is",
++            next_action="Mark the tools strict: true",
++        )
          return None
  
      dumped_tools = [_dump_tool_for_xgrammar(tool) for tool in tools]
-@@ -146,35 +186,26 @@
+@@ -146,35 +242,26 @@
              builtin_tools,
              simplified_tool_choice,
              reasoning,
@@ -146,7 +202,7 @@ diff --git a/vllm/tool_parsers/structural_tag_registry.py b/vllm/tool_parsers/st
  
  
  def _dump_tool_for_xgrammar(
-@@ -281,15 +312,19 @@
+@@ -281,15 +368,19 @@
      builtin_tools: list[BuiltinToolParam],
      tool_choice: SimplifiedToolChoice,
      reasoning: bool,
@@ -167,7 +223,7 @@ diff --git a/vllm/tool_parsers/structural_tag_registry.py b/vllm/tool_parsers/st
              if tags
              else AnyTextFormat()
          )
-@@ -305,6 +340,7 @@
+@@ -305,6 +396,7 @@
              tags=_hermes_tool_tags(tools),
              separator="",
              at_least_one=True,
@@ -175,7 +231,7 @@ diff --git a/vllm/tool_parsers/structural_tag_registry.py b/vllm/tool_parsers/st
          )
  
      return StructuralTag(format=suffix_tag)
-@@ -330,12 +366,15 @@
+@@ -330,12 +422,15 @@
      builtin_tools: list[BuiltinToolParam],
      tool_choice: SimplifiedToolChoice,
      reasoning: bool,
@@ -191,7 +247,7 @@ diff --git a/vllm/tool_parsers/structural_tag_registry.py b/vllm/tool_parsers/st
  
      tags = _minimax_tool_tags(tools)
  
-@@ -350,11 +389,13 @@
+@@ -350,11 +445,13 @@
                              tags=tags,
                              separator="",
                              at_least_one=True,
@@ -205,7 +261,7 @@ diff --git a/vllm/tool_parsers/structural_tag_registry.py b/vllm/tool_parsers/st
              )
              if tags
              else AnyTextFormat(excludes=["<think>", "</think>"])
-@@ -380,6 +421,7 @@
+@@ -380,6 +477,7 @@
                      tags=tags,
                      separator="",
                      at_least_one=True,
@@ -213,7 +269,7 @@ diff --git a/vllm/tool_parsers/structural_tag_registry.py b/vllm/tool_parsers/st
                  ),
                  ConstStringFormat(value=tool_call_end),
              ]
-@@ -602,13 +644,16 @@
+@@ -602,13 +700,16 @@
      ]
  
  
@@ -231,7 +287,7 @@ diff --git a/vllm/tool_parsers/structural_tag_registry.py b/vllm/tool_parsers/st
          ),
          end=_K3_TOOLS_CLOSE,
      )
-@@ -620,8 +665,11 @@
+@@ -620,8 +721,11 @@
      builtin_tools: list[BuiltinToolParam],
      tool_choice: SimplifiedToolChoice,
      reasoning: bool,
@@ -243,7 +299,7 @@ diff --git a/vllm/tool_parsers/structural_tag_registry.py b/vllm/tool_parsers/st
  
      trailer = OptionalFormat(content=ConstStringFormat(value=_K3_MESSAGE_CLOSE))
  
-@@ -631,14 +679,343 @@
+@@ -631,14 +735,343 @@
          )
  
      if tool_choice == "auto":
@@ -619,7 +675,7 @@ diff --git a/tests/tool_parsers/test_structural_tag_registry.py b/tests/tool_par
      XGRAMMAR_BUILTIN_STRUCTURAL_TAG_MODELS,
      get_function_parameters,
      get_model_structural_tag,
-@@ -73,11 +72,115 @@
+@@ -73,11 +72,231 @@
      ]
  
  
@@ -736,10 +792,126 @@ diff --git a/tests/tool_parsers/test_structural_tag_registry.py b/tests/tool_par
 +        assert get_model_structural_tag(
 +            model, sample_tools, "auto", False, parallel_tool_calls=parallel
 +        ) is None
++
++
++def _limited(tools, choice, parallel_tool_calls=False):
++    return ChatCompletionRequest(
++        messages=[], model="m", tools=[tool.model_dump() for tool in tools],
++        tool_choice=choice, parallel_tool_calls=parallel_tool_calls,
++    )
++
++
++_NAMED = {"type": "function", "function": {"name": "get_weather"}}
++
++
++@pytest.mark.parametrize("choice", ["auto", "required"])
++def test_a_parser_without_a_tool_grammar_refuses_a_call_limit(choice, sample_tools):
++    """A tool parser that names no structural format arms no tool-call
++    grammar, so nothing holds a limit of one call: it is refused naming the
++    parameter on every route, which all arm their request through the
++    composed parser's adjust_request. A forced choice is one call, and "none"
++    and an unlimited request are served as before."""
++    from vllm.exceptions import VLLMValidationError
++
++    class NoGrammarToolParser(ToolParser):
++        pass
++
++    class TestParser(DelegatingParser):
++        tool_parser_cls = NoGrammarToolParser
++
++    for build in (
++        lambda request: NoGrammarToolParser(MagicMock()).get_structural_tag(request),
++        lambda request: TestParser(MagicMock(), sample_tools).adjust_request(request),
++    ):
++        with pytest.raises(
++            VLLMValidationError, match="parallel_tool_calls true"
++        ) as refused:
++            build(_limited(sample_tools, choice))
++        assert refused.value.parameter == "parallel_tool_calls"
++        assert "NoGrammarToolParser) has no tool-call grammar" in str(refused.value)
++        for served in (
++            _limited(sample_tools, choice, None), _limited(sample_tools, choice, True),
++            _limited(sample_tools, _NAMED), _limited(sample_tools, "none"),
++        ):
++            build(served)
++
++
++@pytest.mark.parametrize("choice", ["auto", "required"])
++def test_strict_tool_calling_off_refuses_a_call_limit(
++    choice, sample_tools, monkeypatch
++):
++    """With VLLM_ENFORCE_STRICT_TOOL_CALLING off a parser's format arms no
++    grammar, so a limit of one call is refused naming the switch. Turning it
++    on is offered only where it would hold the limit: a format vLLM builds
++    (under "auto", for a strict tool), never an XGrammar builtin one."""
++    from vllm.exceptions import VLLMValidationError
++
++    monkeypatch.setenv("VLLM_ENFORCE_STRICT_TOOL_CALLING", "0")
++
++    class HermesFormat(ToolParser):
++        structural_tag_model = "hermes"
++
++    class BuiltinFormat(ToolParser):
++        structural_tag_model = "qwen_3"
++
++    for parser_cls, offered in ((HermesFormat, True), (BuiltinFormat, False)):
++        parser = parser_cls(MagicMock())
++        with pytest.raises(
++            VLLMValidationError, match="parallel_tool_calls true"
++        ) as refused:
++            parser.get_structural_tag(_limited(sample_tools, choice))
++        message = str(refused.value)
++        assert refused.value.parameter == "parallel_tool_calls"
++        assert "VLLM_ENFORCE_STRICT_TOOL_CALLING off" in message
++        assert ("Serve with VLLM_ENFORCE_STRICT_TOOL_CALLING on" in message) is offered
++        assert ("for a strict tool" in message) is (offered and choice == "auto")
++        assert parser.get_structural_tag(_limited(sample_tools, _NAMED)) is None
++        assert parser.get_structural_tag(_limited(sample_tools, choice, True)) is None
++
++
++def test_mistral_grammar_holds_its_call_limit(sample_tools, monkeypatch):
++    """mistral-common's grammar takes parallel_tool_calls, so a Mistral
++    tokenizer that supports it holds the limit on chat; the legacy path --
++    Responses, or a tokenizer without grammar support -- takes none and is
++    refused. The declaration is the predicate adjust_request branches on."""
++    from vllm.entrypoints.openai.responses.protocol import ResponsesRequest
++    from vllm.exceptions import VLLMValidationError
++    from vllm.parser import mistral as mistral_parser
++    from vllm.tool_parsers.mistral_tool_parser import MistralToolParser
++
++    tokenizer = MagicMock()
++    tokenizer.get_vocab.return_value = {"[TOOL_CALLS]": 1}
++    tokenizer.supports_grammar = True
++    tokenizer.version = 13
++    monkeypatch.setattr(mistral_parser, "is_mistral_tokenizer", lambda _: True)
++    parser = MistralToolParser(tokenizer)
++    request = _limited(sample_tools, "auto")
++    assert parser.own_grammar_holds_call_limit(request)
++    assert parser.get_structural_tag(request) is None
++
++    responses = ResponsesRequest.model_validate({
++        "model": "m", "input": "t", "kv_scope": "unit", "parallel_tool_calls": False,
++        "tools": [{"type": "function", "name": "get_weather",
++                   "parameters": sample_tools[0].function.parameters}],
++    })
++    tokenizer.supports_grammar = False
++    for legacy in (_limited(sample_tools, "auto"), responses):
++        assert not parser.own_grammar_holds_call_limit(legacy)
++        with pytest.raises(VLLMValidationError, match="MistralToolParser") as refused:
++            parser.get_structural_tag(legacy)
++        assert refused.value.parameter == "parallel_tool_calls"
++
++    calls = []
++    monkeypatch.setattr(
++        mistral_parser.MistralParser, "arms_grammar",
++        lambda self, request: calls.append(request) or False,
++    )
++    parser.adjust_request(_limited(sample_tools, "auto"))
++    assert len(calls) == 1
  
  
  @pytest.mark.parametrize("model", sorted(XGRAMMAR_BUILTIN_STRUCTURAL_TAG_MODELS))
-@@ -237,7 +340,7 @@
+@@ -237,7 +456,7 @@
  
  
  def test_kimi_k3_registered_as_vllm_builtin():
@@ -748,7 +920,7 @@ diff --git a/tests/tool_parsers/test_structural_tag_registry.py b/tests/tool_par
      assert KimiK3ToolParser.structural_tag_model == "kimi_k3"
  
  
-@@ -331,4 +434,21 @@
+@@ -331,4 +550,21 @@
      assert not _is_grammar_accept_string(_k3_grammar("required"), body)
  
  
@@ -770,7 +942,7 @@ diff --git a/tests/tool_parsers/test_structural_tag_registry.py b/tests/tool_par
 +
 +
  def test_kimi_k3_schema_without_required_accepts_empty_call():
-@@ -509,9 +629,7 @@
+@@ -509,9 +745,7 @@
      assert sample_tools_strict[0].function.parameters is not None
  
  
@@ -781,7 +953,7 @@ diff --git a/tests/tool_parsers/test_structural_tag_registry.py b/tests/tool_par
  def test_auto_tool_choice_skips_structural_tag_without_strict(
      model: str,
      sample_tools: list[ChatCompletionToolsParam],
-@@ -543,8 +661,53 @@
+@@ -543,8 +777,53 @@
      assert fmt["triggers"] == ["<tool_call>\n<function="]
      assert fmt["excludes"] == ["<think>", "</think>"]
      assert fmt["stop_after_first"] is False
@@ -837,7 +1009,7 @@ diff --git a/tests/tool_parsers/test_structural_tag_registry.py b/tests/tool_par
      )
  
  
-@@ -657,6 +820,210 @@
+@@ -657,6 +936,210 @@
      assert not _is_grammar_accept_string(
          grammar, _QWEN3_CALL.replace("city", "colour")
      )
@@ -1127,3 +1299,127 @@ diff --git a/vllm/parser/harmony.py b/vllm/parser/harmony.py
  
      if builtin_tools:
          # Fallback for built-in tools
+diff --git a/vllm/parser/mistral.py b/vllm/parser/mistral.py
+--- a/vllm/parser/mistral.py
++++ b/vllm/parser/mistral.py
+@@ -306,11 +306,14 @@
+             )
+         self.tool_call_regex = re.compile(r"\[{.*}\]", re.DOTALL)
+ 
+-    def adjust_request(
+-        self, request: ChatCompletionRequest | ResponsesRequest
+-    ) -> ChatCompletionRequest | ResponsesRequest:
+-        if not isinstance(request, ResponsesRequest) and request._grammar_from_parser:
+-            return request
++    def arms_grammar(self, request: ChatCompletionRequest | ResponsesRequest) -> bool:
++        """Whether adjust_request arms mistral-common's grammar for *request*,
++        which takes its tool choice and parallel_tool_calls, rather than the
++        legacy path, which takes no call limit."""
++        if isinstance(request, ResponsesRequest):
++            return False
++        if request._grammar_from_parser:
++            return True
+         so_non_supported_attributes = [
+             "regex",
+             "choice",
+@@ -325,18 +328,23 @@
+             for attribute in so_non_supported_attributes
+         )
+         response_format_non_supported_active = (
+-            isinstance(request, ResponsesRequest)
+-            or request.response_format is not None
++            request.response_format is not None
+             and request.response_format.type == "structural_tag"
+         )
++        return (
++            is_mistral_tokenizer(self.model_tokenizer)
++            and self.model_tokenizer.supports_grammar
++            and not any_so_non_supported_active
++            and not response_format_non_supported_active
++        )
+ 
+-        if (
+-            not is_mistral_tokenizer(self.model_tokenizer)
+-            or isinstance(request, ResponsesRequest)
+-            or not self.model_tokenizer.supports_grammar
+-            or any_so_non_supported_active
+-            or response_format_non_supported_active
+-        ):
++    def adjust_request(
++        self, request: ChatCompletionRequest | ResponsesRequest
++    ) -> ChatCompletionRequest | ResponsesRequest:
++        if not isinstance(request, ResponsesRequest) and request._grammar_from_parser:
++            return request
++
++        if not self.arms_grammar(request):
+             request = super().adjust_request(request)
+             if request.tools and request.tool_choice != "none":
+                 # Keep special tokens so the [TOOL_CALLS] marker
+diff --git a/vllm/tool_parsers/abstract_tool_parser.py b/vllm/tool_parsers/abstract_tool_parser.py
+--- a/vllm/tool_parsers/abstract_tool_parser.py
++++ b/vllm/tool_parsers/abstract_tool_parser.py
+@@ -175,20 +175,42 @@
+ 
+         return request
+ 
++    def own_grammar_holds_call_limit(
++        self, request: ChatCompletionRequest | ResponsesRequest
++    ) -> bool:
++        """Whether the grammar this parser arms itself in adjust_request, with
++        no structural tag, holds *request*'s limit of one call. None does
++        unless a parser says otherwise."""
++        return False
++
+     def get_structural_tag(
+         self,
+         request: ChatCompletionRequest | ResponsesRequest,
+         *,
+         reasoning: bool = False,
+     ):
+-        if self.structural_tag_model is None:
+-            return None
+-        if not envs.VLLM_ENFORCE_STRICT_TOOL_CALLING:
++        """The tool-call grammar this parser's structural format arms for
++        *request*, or None. With none armed -- the parser names no format, or
++        VLLM_ENFORCE_STRICT_TOOL_CALLING is off -- a limit of one call is
++        refused unless the parser's own grammar holds it."""
++        from vllm.tool_parsers.structural_tag_registry import (
++            get_model_structural_tag,
++            require_unarmed_call_limit_held,
++        )
++
++        model = self.structural_tag_model
++        if model is None or not envs.VLLM_ENFORCE_STRICT_TOOL_CALLING:
++            if not self.own_grammar_holds_call_limit(request):
++                require_unarmed_call_limit_held(
++                    model,
++                    type(self).__name__,
++                    request.tool_choice,
++                    request.parallel_tool_calls,
++                )
+             return None
+-        from vllm.tool_parsers.structural_tag_registry import get_model_structural_tag
+ 
+         return get_model_structural_tag(
+-            model=self.structural_tag_model,
++            model=model,
+             tools=request.tools,
+             tool_choice=request.tool_choice,
+             reasoning=reasoning,
+diff --git a/vllm/tool_parsers/mistral_tool_parser.py b/vllm/tool_parsers/mistral_tool_parser.py
+--- a/vllm/tool_parsers/mistral_tool_parser.py
++++ b/vllm/tool_parsers/mistral_tool_parser.py
+@@ -35,6 +35,13 @@
+         """Return the token id for :attr:`bot_token`."""
+         return self._parser_engine.bot_token_id
+ 
++    def own_grammar_holds_call_limit(
++        self, request: ChatCompletionRequest | ResponsesRequest
++    ) -> bool:
++        # mistral-common's grammar takes parallel_tool_calls; the legacy path
++        # takes no call limit.
++        return self._parser_engine.arms_grammar(request)
++
+     def adjust_request(
+         self,
+         request: ChatCompletionRequest | ResponsesRequest,

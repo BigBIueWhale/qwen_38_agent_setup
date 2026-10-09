@@ -2794,18 +2794,54 @@ def _validate_qwen_grammar_before(state: State) -> None:
 def _validate_qwen_grammar_after(state: State) -> None:
     label = "Qwen-owned tool grammar result"
     registry = "vllm/tool_parsers/structural_tag_registry.py"
-    # A call limit is held by the grammar or refused: an XGrammar builtin
-    # format takes none, and under "auto" a format arming its grammar only for
-    # a strict tool holds none without one.
-    _require_in_symbol(state, registry, "get_model_structural_tag", (
-        "and model in XGRAMMAR_BUILTIN_STRUCTURAL_TAG_MODELS",
-        "parallel_tool_calls false is held by the tool-call grammar",
+    # A call limit is held by the grammar the request arms or refused, by one
+    # refusal and nowhere else: an XGrammar builtin format takes none; under
+    # "auto" a format arming its grammar only for a strict tool holds none
+    # without one; and a tool parser whose format arms no grammar -- it names
+    # none, or VLLM_ENFORCE_STRICT_TOOL_CALLING is off -- holds none unless
+    # its own grammar takes the limit, as Mistral's does where it is armed.
+    _require_in_symbol(state, registry, "require_call_limit_held", (
+        "parallel_tool_calls false is held only by the tool-call grammar",
+        "_ALLOW_PARALLEL_CALLS",
         'parameter="parallel_tool_calls",',
+    ), label=label)
+    require_text(state, registry, 'parameter="parallel_tool_calls"', label=label)
+    forbid_text(state, registry, "parallel_tool_calls false cannot be enforced",
+                label=label)
+    _require_in_symbol(state, registry, "get_model_structural_tag", (
+        "if model in XGRAMMAR_BUILTIN_STRUCTURAL_TAG_MODELS:",
+        'next_action="Mark the tools strict: true"',
+    ), label=label)
+    _require_in_symbol(state, registry, "require_unarmed_call_limit_held", (
+        "has no tool-call grammar",
+        "VLLM_ENFORCE_STRICT_TOOL_CALLING off",
+        "if model in _VLLM_STRUCTURAL_TAG_REGISTRY:",
+    ), label=label)
+    tool_parser = "vllm/tool_parsers/abstract_tool_parser.py"
+    _require_in_symbol(state, tool_parser, "ToolParser.get_structural_tag", (
+        "if not self.own_grammar_holds_call_limit(request):",
+        "require_unarmed_call_limit_held(",
+    ), label=label)
+    _require_in_symbol(state, tool_parser,
+                       "ToolParser.own_grammar_holds_call_limit", (
+        "return False",
+    ), label=label)
+    # Mistral's declaration is the predicate its adjust_request branches on,
+    # so what it claims and what it arms cannot disagree.
+    _require_in_symbol(state, "vllm/parser/mistral.py", "MistralParser.adjust_request", (
+        "if not self.arms_grammar(request):",
+    ), label=label)
+    _require_in_symbol(state, "vllm/tool_parsers/mistral_tool_parser.py",
+                       "MistralToolParser.own_grammar_holds_call_limit", (
+        "return self._parser_engine.arms_grammar(request)",
     ), label=label)
     require_python_symbols(state, "tests/tool_parsers/test_structural_tag_registry.py", {
         "test_a_builtin_format_refuses_a_call_limit_it_cannot_hold": None,
         "test_a_forced_choice_is_one_call_in_a_builtin_format": None,
         "test_auto_without_a_strict_tool_refuses_a_call_limit": None,
+        "test_a_parser_without_a_tool_grammar_refuses_a_call_limit": None,
+        "test_strict_tool_calling_off_refuses_a_call_limit": None,
+        "test_mistral_grammar_holds_its_call_limit": None,
     }, label=label)
     require_python_symbols(state, registry, {
         "get_qwen_3_coder_structural_tag": (
@@ -5037,8 +5073,11 @@ CONTRACTS: Mapping[str, SemanticContract] = {
             "a refusal offers the formats the registry builds, read from it. A "
             "limit no grammar holds -- an XGrammar builtin format, which takes "
             "none, or 'auto' without a strict tool where the format arms its "
-            "grammar only for one -- is refused naming parallel_tool_calls, "
-            "since the response layer drops no call."
+            "grammar only for one, or a tool parser whose format arms no grammar "
+            "(it names none, or VLLM_ENFORCE_STRICT_TOOL_CALLING is off) and "
+            "whose own grammar takes no limit -- is refused naming "
+            "parallel_tool_calls, by one refusal, since the response layer "
+            "drops no call."
         ),
         removal_condition=(
             "Remove when XGrammar's Qwen template excludes the parameter opener "

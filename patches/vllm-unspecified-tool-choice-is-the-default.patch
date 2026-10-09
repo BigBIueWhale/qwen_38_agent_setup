@@ -459,10 +459,10 @@ index 87416b6b5e1291555244383c47f65da5a2cbd2ed..c011a54b2bd565e27ce88a3b509eae40
                  not supports_required_and_named
                  and (is_named_tool_choice or is_required_tool_choice)
 diff --git a/vllm/parser/mistral.py b/vllm/parser/mistral.py
-index 787cac75288474360d9a146233cdd40da47c5d66..5a979c3e9a992dd9a2db61e7f1ebfa492a62ce1b 100644
+index a3355815449e8538edced0c6767b07c7ceb26c12..ea24fe4939fc9e08fb1ace9fa5e659c554709d09 100644
 --- a/vllm/parser/mistral.py
 +++ b/vllm/parser/mistral.py
-@@ -420,8 +420,6 @@ class MistralParser(ParserEngine):
+@@ -428,8 +428,6 @@ class MistralParser(ParserEngine):
          match request.tool_choice:
              case "none" | "auto" | "required":
                  tool_choice = MistralToolChoiceEnum(request.tool_choice)
@@ -472,7 +472,7 @@ index 787cac75288474360d9a146233cdd40da47c5d66..5a979c3e9a992dd9a2db61e7f1ebfa49
              case _:
                  tool_choice = MistralNamedToolChoice.model_validate(
 diff --git a/vllm/tool_parsers/structural_tag_registry.py b/vllm/tool_parsers/structural_tag_registry.py
-index 6610b3e13743087fe839ba3cce9a49f15193e91b..230b8d2f57674dd9cb445611387b4b7caaa2f489 100644
+index e2db621208157c33d8a52d98bd22eae4b72eafb2..cebb80918b6989c8dc1fea66072646109d6fa12f 100644
 --- a/vllm/tool_parsers/structural_tag_registry.py
 +++ b/vllm/tool_parsers/structural_tag_registry.py
 @@ -43,7 +43,6 @@ ToolChoice: TypeAlias = (
@@ -483,7 +483,7 @@ index 6610b3e13743087fe839ba3cce9a49f15193e91b..230b8d2f57674dd9cb445611387b4b7c
  )
  AllowedToolRef: TypeAlias = dict[str, object]
  SimplifiedToolChoice: TypeAlias = Literal["auto", "required", "forced"]
-@@ -233,12 +232,9 @@ def _dump_tool_for_xgrammar(
+@@ -289,12 +288,9 @@ def _dump_tool_for_xgrammar(
  
  def _dump_tool_choice_for_xgrammar(
      tool_choice: ToolChoice,

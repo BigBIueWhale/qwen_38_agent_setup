@@ -1,8 +1,8 @@
 diff --git a/tests/tool_parsers/test_structural_tag_registry.py b/tests/tool_parsers/test_structural_tag_registry.py
-index aa6078dd27e23b043a6ba819ab3fc14f40fb354f..04ebd309ae44d7a721bdb9ae1ea9aac54b88b3ee 100644
+index 00adf1bcae4cf8a8f4a08826b63a7b06cbe438ef..17edb0f9be329ff59b0ca4ff6fd8dee3d72c9f35 100644
 --- a/tests/tool_parsers/test_structural_tag_registry.py
 +++ b/tests/tool_parsers/test_structural_tag_registry.py
-@@ -1283,3 +1283,90 @@ def test_kimi_k3_forced_tool_choice_builds_single_mandatory_call():
+@@ -1399,3 +1399,90 @@ def test_kimi_k3_forced_tool_choice_builds_single_mandatory_call():
      response_only = _k3_response("no call here")
      assert _is_grammar_accept_string(grammar, ok)
      assert not _is_grammar_accept_string(grammar, response_only)
@@ -656,7 +656,7 @@ index c011a54b2bd565e27ce88a3b509eae4013a86162..27a4f2773131719b7961222f50199221
  
          structural_tag = json.dumps(structure_tag.model_dump())
 diff --git a/vllm/tool_parsers/structural_tag_registry.py b/vllm/tool_parsers/structural_tag_registry.py
-index 76810ab1cafe86840a68be7579955ad0df0751d6..efc32f99a005d2ff3cb378ee733732eb2df86b1a 100644
+index 7f407940fae2aad07b867202a276d5d4ff265e7e..9eddd914d9e19cbba742a6f15a7f10b89315efe0 100644
 --- a/vllm/tool_parsers/structural_tag_registry.py
 +++ b/vllm/tool_parsers/structural_tag_registry.py
 @@ -7,7 +7,7 @@ from collections.abc import Callable, Iterator, Sequence
@@ -692,8 +692,8 @@ index 76810ab1cafe86840a68be7579955ad0df0751d6..efc32f99a005d2ff3cb378ee733732eb
      return False
  
  
-@@ -166,7 +170,7 @@ def get_model_structural_tag(
-             )
+@@ -222,7 +226,7 @@ def get_model_structural_tag(
+         )
          return None
  
 -    dumped_tools = [_dump_tool_for_xgrammar(tool) for tool in tools]
@@ -701,7 +701,7 @@ index 76810ab1cafe86840a68be7579955ad0df0751d6..efc32f99a005d2ff3cb378ee733732eb
      if model == "qwen_3_coder":
          # XGrammar deliberately interprets ``strict: false`` as an instruction
          # to replace the parameter schema with ``true``. That best-effort
-@@ -210,24 +214,36 @@ def get_model_structural_tag(
+@@ -266,24 +270,36 @@ def get_model_structural_tag(
      )
  
  
@@ -755,7 +755,7 @@ index 76810ab1cafe86840a68be7579955ad0df0751d6..efc32f99a005d2ff3cb378ee733732eb
  
  
  def _dump_tool_choice_for_xgrammar(
-@@ -1257,6 +1273,16 @@ def get_qwen_3_coder_structural_tag(
+@@ -1313,6 +1329,16 @@ def get_qwen_3_coder_structural_tag(
              )
          answer = tags[0]
      else:

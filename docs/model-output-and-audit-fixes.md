@@ -583,8 +583,9 @@ builder and applies it while building.
 
 The Chat response layer returns every call actually produced in both streaming
 and batch responses. Its old filtering module is deleted, including its image
-copy and bytecode. Where a call-count grammar is inactive, output cannot be
-silently changed to make it appear that the model emitted only one call.
+copy and bytecode. Output is never changed to make it appear that the model
+emitted only one call: where no call-count grammar holds a limit of one call, the
+request is refused naming `parallel_tool_calls` (the Qwen grammar stage below).
 
 Validation: 95 tests pass, including actual XGrammar acceptance/rejection for
 each choice and reasoning setting, request-to-grammar propagation, and real
