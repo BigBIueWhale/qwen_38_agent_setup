@@ -1524,7 +1524,10 @@ template -- so its description is accepted with it, like every description
 inside the schema, and what the model should know about the format belongs in
 `instructions` or `input`. A key the Responses API does not define is accepted
 and ignored, as upstream accepts unknown keys on every route (logged at debug
-level).
+level). That is deliberate and stays: ignoring keys an API does not define is the
+convention of the APIs these routes implement, and refusing one would break a
+caller over a key that is the caller's to remove. What Responses refuses is a
+parameter the API defines and this server does not apply (above).
 
 An output constraint cannot hold beside a callable tool, because the call grammar
 covers the whole output. A request that could call a tool and also constrains its
