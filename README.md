@@ -384,22 +384,22 @@ It is intentionally reconstructed by the ordered, reviewed semantic transformati
 | patches/vllm-token-text-provenance.patch | 954b36cb444f7e644e29d13f7a9d3c000512a0d616bbf2b6cd3cb8f4e880dd44 |
 | patches/vllm-precise-request-errors.patch | b7e45dd43f5317946b18594b3906dce0a6f6f88dae2187ce066d1b9f66511172 |
 | patches/vllm-qwen-canonical-parameter-framing.patch | d438f9106c4a989d64837c21f5491d946065e6721570ad47664513347f150064 |
-| patches/vllm-qwen-owned-tool-grammar.patch | 258f6cc1e78cd00a2b197ec0c8d525b52004b72b13795067cc6f6fcec646e5d5 |
+| patches/vllm-qwen-owned-tool-grammar.patch | 37e9af5982e8616eecbf7a79304bb6653cbf71edb04b524bd463ba378bc3c7c0 |
 | patches/vllm-qwen-unique-tool-parameters.patch | a85108911b0e12757c5f88e2b3a8d4356e9a37c17f866a54049ef6aa6da42074 |
 | patches/vllm-generation-admission-before-response.patch | 6418c42eb3fca2492473e5411f9463d21d1473a0cc55187a2a9a530ddfc44b86 |
 | patches/vllm-kv-scope-single-flight.patch | b84b915c38e2c1d32b278bf88dcd5ac7228b9a680b746e2842783dbe1942540a |
 | patches/vllm-template-authored-control-tokens.patch | 2a6e8b31826cf06d52acb3c87cae0c6c68a7acc2c8f01dd7848bc5e948977228 |
 | patches/vllm-nvfp4-native-kernel-required.patch | 9d9ce188b6670d687a725c4cdca37478f9dc78ef9f19685ddbcf5e9edd53b8b7 |
-| patches/vllm-qwen-arguments-read-by-grammar.patch | 917feab55fd43ae42b05078bd5c1546acaf685a533f4ac38be66bacf817fc564 |
+| patches/vllm-qwen-arguments-read-by-grammar.patch | c72d081ad1a32ca3e35d83fd1b536c2e8ddf56675b8ab851192c66cb8c1fc9b1 |
 | patches/vllm-startup-plan-admission-bound.patch | 1d84af83471624421b048587487d40675e87a4ecdc14c24d084518a0d21a5ff0 |
 | patches/vllm-template-refusals-name-their-parameter.patch | 1f428332be39e4fb7f3c7f7eb5d6e3297f5dc70638fcd7f81d69b32f69d1fa26 |
 | patches/vllm-qwen-repeated-parameter-refusal.patch | 849fadaa43f2f8eafc0e98fae2c5c201e3b4a8c637de58720eebb94817768e31 |
 | patches/vllm-generated-tokens-survive-parsing.patch | 3889af17e410853baa95ea40eba32baa5ed35d03e37822d55312861e21fba8b9 |
 | patches/vllm-include-reasoning-shapes-the-response.patch | d3b41899464142ffffb04efd0b19647153e322b10c7f9fc1e14af0f290af98d1 |
-| patches/vllm-unspecified-tool-choice-is-the-default.patch | 7d7810467d3e7fdaacd3edbac231ea16521bc7dd84fca2b4ccfed40f1856fa27 |
-| patches/vllm-call-only-answer-keeps-the-blank-line.patch | c5815801d29b3ecb7a6aeba3ef586aac53950b6229c2b7fb315b95acd54501b1 |
-| patches/vllm-responses-tools-are-one-function-list.patch | 9120b9b03f87e1eb4757f2265b3c0db16484170d30b685618be83a093c8404fd |
-| patches/vllm-batch-parse-starts-where-the-prompt-leaves.patch | d917bec32f5355212382310d1fa75e045595e900d8d806a9ebe105a4484fc12f |
+| patches/vllm-unspecified-tool-choice-is-the-default.patch | 5b2421dd2ec9c994321e6a7929acb486b5b12b934e83c4d1759c400bd2100b47 |
+| patches/vllm-call-only-answer-keeps-the-blank-line.patch | 20f0397ef6220e0398ea66a869a5da914e6793eab1bc259b70b234f76241dc56 |
+| patches/vllm-responses-tools-are-one-function-list.patch | 8c714f2b25802121cbfd628620b8689c7180c9b8d7e3241c6caecad99cf3f9c0 |
+| patches/vllm-batch-parse-starts-where-the-prompt-leaves.patch | fa448319b58cea79ffa08141b31bfa74889dd57e72de354d840187d2d56392a8 |
 | patches/vllm-derender-text-is-the-detokenizers.patch | 6d58660374c6280441e8e950001d4585859b98684f8ecf0ef5ba1aa7ea40e4dd |
 | patches/vllm-output-constraints-refused-beside-tool-calls.patch | b82f6259428441aee55d157443bcedc1d98fb247ef9a521106408671a24ae533 |
 | patches/vllm-batch-invariance-substitutes-no-nvfp4-kernel.patch | c79baaee0a51275f5f522d266fe6b315c200e6951920c2454d5c80cadbb92f44 |
@@ -469,9 +469,9 @@ Pinned build inputs and products:
 |---|---|
 | Immutable base tag | qwen38-vllm:main-9df9b0b |
 | Immutable base ID | sha256:fa4a002a88b7043a1a89966dea8a500fe9696f84e75730d9da916f916048d401 |
-| Runtime Dockerfile SHA-256 | 564ed4115e1ffbab3a6af1c28cd5cd1c3f6df0bcb995d6e3411fc9c28c5a9e44 |
-| Build verifier SHA-256 | 5fcf10db070399face48611a91d71f6ef89842bc80a8e75d7b165c2b4a6afb66 |
-| Runtime validator SHA-256 | 15b71d9ce4cd34ed4e05538492b7f329e382cbd7fa5eeb9b82c9ccb8fce3c138 |
+| Runtime Dockerfile SHA-256 | ebf001f705dd37cac3f60665e661ccf2385fbf15325cd998e3e600860494f44f |
+| Build verifier SHA-256 | 041890603eb9d9f208b55a3db8456f9c714db229cacf985cec1a0ba0d8607fff |
+| Runtime validator SHA-256 | e4ea7693d3f30e00de4a6b5733a0fb490c6f9deee927d42580083c9c851a04f8 |
 
 The runtime image's profile, tag and archive name, which every release advances
 together, are declared in `config/runtime-v1.sh`, and the archive lives under
@@ -1393,7 +1393,19 @@ XGrammar builtin format, `auto` without a strict tool on a format that arms its
 grammar only for one, and a tool parser that arms none -- it names no format, or
 `VLLM_ENFORCE_STRICT_TOOL_CALLING` is off -- unless its own grammar takes the limit,
 as Mistral's does where its tokenizer supports one. A forced choice is one call. The
-qwen3_coder grammar holds the limit under every choice.
+qwen3_coder grammar holds the limit under every choice. A forced choice -- `required`,
+a named function, or `allowed_tools` -- is held the same way, by a grammar the request
+arms and the parse reads back as the call, and is refused naming `tool_choice` wherever
+none holds it, offering `auto` or `none`: a tool parser whose format arms no grammar
+holds `required` and a named function only where the base's call schema is armed and
+read back as the call (Mistral by its own grammar, or its legacy array on chat), and
+`allowed_tools` nowhere. Gemma 4, MiniMax M3, Muse Glimmer, Poolside v1, dots and
+inkling held none under either switch setting, and GLM 4.5/4.7, Ling 3, Kimi K3 and
+Mistral on Responses none with `VLLM_ENFORCE_STRICT_TOOL_CALLING` off; each served a
+plain answer, or the forced JSON as text, under the choice. Kimi K2 with the switch
+off armed nothing and read any answer as the call, and now arms the call schema
+through the base hook as every other format there does. Every format holds a forced
+choice once armed, so turning the switch on is offered wherever a parser names one.
 
 The exact `<tool_call>\n<function=` trigger starts a constrained call. While
 reasoning is active, the reasoning boundary requires its actual token ID. After

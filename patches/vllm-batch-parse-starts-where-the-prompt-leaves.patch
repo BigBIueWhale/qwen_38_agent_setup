@@ -302,10 +302,10 @@ index 1fef667da2cb0c5c89a5137eb494c5e63443f820..33982dc90fa6b20582a2cf69bcab9be7
                  model_output_token_ids=final_output.token_ids,
                  finish_reason=final_output.finish_reason,
 diff --git a/vllm/parser/abstract_parser.py b/vllm/parser/abstract_parser.py
-index 27a4f2773131719b7961222f50199221db967b72..8a2709431195e73bae9fe399b5bc82fa032b4149 100644
+index ddacdb6155fd63620f4b4926b1d0d0f3873aac8d..cd939c21edd2b830a9cfea778f81baad06999aea 100644
 --- a/vllm/parser/abstract_parser.py
 +++ b/vllm/parser/abstract_parser.py
-@@ -230,11 +230,19 @@ class Parser:
+@@ -229,11 +229,19 @@ class Parser:
          model_output: str,
          request: ChatCompletionRequest | ResponsesRequest,
          *,
@@ -325,7 +325,7 @@ index 27a4f2773131719b7961222f50199221db967b72..8a2709431195e73bae9fe399b5bc82fa
          return self.parse(
              model_output, request, enable_auto_tools=enable_auto_tools,
              model_output_token_ids=model_output_token_ids,
-@@ -288,9 +296,9 @@ class Parser:
+@@ -287,9 +295,9 @@ class Parser:
              return DeltaMessage(reasoning=reasoning)
  
          _, content, calls = self.parse_output(
@@ -338,7 +338,7 @@ index 27a4f2773131719b7961222f50199221db967b72..8a2709431195e73bae9fe399b5bc82fa
          )
          prefix = "".join(state.emitted_content)
          content = content or ""
-@@ -1012,11 +1020,33 @@ class DelegatingParser(Parser):
+@@ -1002,11 +1010,33 @@ class DelegatingParser(Parser):
          )
          return reasoning, content, tool_calls
  
@@ -372,7 +372,7 @@ index 27a4f2773131719b7961222f50199221db967b72..8a2709431195e73bae9fe399b5bc82fa
          finish_reason: str | None,
          stop_reason: str | int | None,
          enable_auto_tools: bool = False,
-@@ -1024,12 +1054,19 @@ class DelegatingParser(Parser):
+@@ -1014,12 +1044,19 @@ class DelegatingParser(Parser):
      ) -> tuple[str | None, str | None, list[FunctionCall] | None]:
          self._initialize_history_tool_call_cnt(request)
          self._stream_state.generated_token_count = len(model_output_token_ids)
@@ -396,7 +396,7 @@ index 27a4f2773131719b7961222f50199221db967b72..8a2709431195e73bae9fe399b5bc82fa
              output_terminal=(finish_reason, stop_reason),
          )
          return reasoning, content, tool_calls
-@@ -1049,17 +1086,7 @@ class DelegatingParser(Parser):
+@@ -1039,17 +1076,7 @@ class DelegatingParser(Parser):
  
          if not state.prompt_reasoning_checked and prompt_token_ids is not None:
              state.prompt_reasoning_checked = True

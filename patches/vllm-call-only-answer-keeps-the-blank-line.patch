@@ -1,8 +1,8 @@
 diff --git a/tests/tool_parsers/test_structural_tag_registry.py b/tests/tool_parsers/test_structural_tag_registry.py
-index ac836c1a0c2f79987a394599b6eddaf69c4063ed..00adf1bcae4cf8a8f4a08826b63a7b06cbe438ef 100644
+index 1aa1fa7eb0e4742041489bd76655e69fc06e12ae..a009d493f5cddcb3581811b4350d85ab33b7ba85 100644
 --- a/tests/tool_parsers/test_structural_tag_registry.py
 +++ b/tests/tool_parsers/test_structural_tag_registry.py
-@@ -891,6 +891,28 @@ def test_qwen3_required_allows_several_calls_when_parallel_is_on():
+@@ -1049,6 +1049,28 @@ def test_qwen3_required_allows_several_calls_when_parallel_is_on():
      assert _is_grammar_accept_string(grammar, _QWEN3_CALL + "\n" + _QWEN3_CALL)
  
  
@@ -32,10 +32,10 @@ index ac836c1a0c2f79987a394599b6eddaf69c4063ed..00adf1bcae4cf8a8f4a08826b63a7b06
  @pytest.mark.parametrize("choice", ["auto", "required", "named"])
  def test_single_qwen_call_preserves_the_builtin_reasoning_prefix(reasoning, choice):
 diff --git a/vllm/tool_parsers/structural_tag_registry.py b/vllm/tool_parsers/structural_tag_registry.py
-index cebb80918b6989c8dc1fea66072646109d6fa12f..7f407940fae2aad07b867202a276d5d4ff265e7e 100644
+index 59a110ecda035b9b78781d44ee2aeeb3f9665329..d8ff65fed70f3d03791bfc77e0f3fe1b2f8b365c 100644
 --- a/vllm/tool_parsers/structural_tag_registry.py
 +++ b/vllm/tool_parsers/structural_tag_registry.py
-@@ -771,9 +771,13 @@ def get_kimi_k3_structural_tag(
+@@ -849,9 +849,13 @@ def get_kimi_k3_structural_tag(
  #
  # Every other production this builder has reproduces XGrammar's Qwen language
  # exactly, including its ``[ \n\t]*`` padding around every value, its ordered
@@ -52,7 +52,7 @@ index cebb80918b6989c8dc1fea66072646109d6fa12f..7f407940fae2aad07b867202a276d5d4
  #
  # The language is defined once, as ``_QwenArguments``: which production each
  # parameter's value is written in and where undeclared names may appear. The
-@@ -1290,7 +1294,7 @@ def get_qwen_3_coder_structural_tag(
+@@ -1368,7 +1372,7 @@ def get_qwen_3_coder_structural_tag(
      single_call = parallel_tool_calls is False
  
      if tool_choice == "auto":
@@ -61,7 +61,7 @@ index cebb80918b6989c8dc1fea66072646109d6fa12f..7f407940fae2aad07b867202a276d5d4
              TriggeredTagsFormat(
                  triggers=[_QWEN_CALL_TRIGGER],
                  tags=tags,
-@@ -1307,22 +1311,46 @@ def get_qwen_3_coder_structural_tag(
+@@ -1385,22 +1389,46 @@ def get_qwen_3_coder_structural_tag(
                  "function this request also declares in `tools`.",
                  parameter="tool_choice",
              )

@@ -2829,15 +2829,45 @@ def _validate_qwen_grammar_after(state: State) -> None:
         "if model in XGRAMMAR_BUILTIN_STRUCTURAL_TAG_MODELS:",
         'next_action="Mark the tools strict: true"',
     ), label=label)
-    _require_in_symbol(state, registry, "require_unarmed_call_limit_held", (
+    _require_in_symbol(state, registry, "_unarmed_cause", (
         "has no tool-call grammar",
         "VLLM_ENFORCE_STRICT_TOOL_CALLING off",
+    ), label=label)
+    _require_in_symbol(state, registry, "require_unarmed_call_limit_held", (
+        "_unarmed_cause(model, parser_name)",
         "if model in _VLLM_STRUCTURAL_TAG_REGISTRY:",
+        "named_choice_held=named_choice_held",
+    ), label=label)
+    # Naming the one function is offered only where a named choice is held.
+    _require_in_symbol(state, registry, "require_call_limit_held", (
+        "_ALLOW_PARALLEL_CALLS + (_NAME_THE_FUNCTION if named_choice_held else \"\")",
+    ), label=label)
+    # A forced choice -- required, a named function, allowed_tools -- is held
+    # by a grammar the parse reads back, or refused by one refusal naming
+    # tool_choice: every format holds one once armed, so the switch is
+    # offered wherever a parser names a format.
+    _require_in_symbol(state, registry, "require_choice_held", (
+        'if tool_choice in ("auto", "none"):',
+        "is held only by a ",
+        'parameter="tool_choice",',
+    ), label=label)
+    _require_in_symbol(state, registry, "require_unarmed_choice_held", (
+        "_unarmed_cause(model, parser_name)",
+        "Serve with VLLM_ENFORCE_STRICT_TOOL_CALLING on, which arms ",
     ), label=label)
     tool_parser = "vllm/tool_parsers/abstract_tool_parser.py"
-    _require_in_symbol(state, tool_parser, "ToolParser.get_structural_tag", (
+    _require_ordered(_symbol_source(state, tool_parser, "ToolParser.get_structural_tag",
+                                    label=label), (
+        "forced_choice_held = self.forced_choice_held_without_grammar(request)",
+        "if isinstance(request.tool_choice, ToolChoiceAllowed) or not (",
+        "require_unarmed_choice_held(",
         "if not self.own_grammar_holds_call_limit(request):",
         "require_unarmed_call_limit_held(",
+        "named_choice_held=forced_choice_held,",
+    ), label=label, location=f"{tool_parser}:ToolParser.get_structural_tag")
+    _require_in_symbol(state, tool_parser,
+                       "ToolParser.forced_choice_held_without_grammar", (
+        "return self.supports_required_and_named",
     ), label=label)
     _require_in_symbol(state, tool_parser,
                        "ToolParser.own_grammar_holds_call_limit", (
@@ -2852,6 +2882,17 @@ def _validate_qwen_grammar_after(state: State) -> None:
                        "MistralToolParser.own_grammar_holds_call_limit", (
         "return self._parser_engine.arms_grammar(request)",
     ), label=label)
+    _require_in_symbol(state, "vllm/tool_parsers/mistral_tool_parser.py",
+                       "MistralToolParser.forced_choice_held_without_grammar", (
+        "return self._parser_engine.arms_grammar(request) or (",
+        "and self._parser_engine._is_pre_v11",
+    ), label=label)
+    # With its format unarmed, Kimi K2 holds a forced choice by the call's
+    # JSON schema, as every other format parser does there.
+    _require_in_symbol(state, "vllm/tool_parsers/kimi_k2_tool_parser.py",
+                       "KimiK2ToolParser.adjust_request", (
+        "request = ToolParser.adjust_request(self, request)",
+    ), label=label)
     require_python_symbols(state, "tests/tool_parsers/test_structural_tag_registry.py", {
         "test_a_builtin_format_refuses_a_call_limit_it_cannot_hold": None,
         "test_a_forced_choice_is_one_call_in_a_builtin_format": None,
@@ -2859,6 +2900,12 @@ def _validate_qwen_grammar_after(state: State) -> None:
         "test_a_parser_without_a_tool_grammar_refuses_a_call_limit": None,
         "test_strict_tool_calling_off_refuses_a_call_limit": None,
         "test_mistral_grammar_holds_its_call_limit": None,
+        "test_a_parser_that_holds_no_forced_choice_refuses_it": ("choice", "sample_tools"),
+        "test_a_parser_that_reads_the_call_schema_holds_a_forced_choice": None,
+        "test_strict_tool_calling_off_offers_the_switch_for_a_forced_choice": None,
+        "test_naming_the_function_is_offered_only_where_a_named_choice_is_held": None,
+        "test_mistral_holds_a_forced_choice_where_its_grammar_or_legacy_array_does": None,
+        "test_kimi_k2_holds_a_forced_choice_by_the_call_schema": None,
     }, label=label)
     require_python_symbols(state, registry, {
         "get_qwen_3_coder_structural_tag": (
@@ -4104,11 +4151,12 @@ def _validate_responses_function_list_after(state: State) -> None:
             'parameter=f"tool_choice.tools[{index}]"',
             "cannot be enforced",
         ), label=label)
+    # allowed_tools reaches the tool grammar the composed parser arms; where
+    # none is armed, the tool parser has refused it (qwen-owned-tool-grammar).
     _require_in_symbol(state, "vllm/parser/abstract_parser.py",
-        "DelegatingParser._apply_structural_tag", (
-            "ToolChoiceAllowed,",
-            "tool_choice allowed_tools is enforced by a tool-call",
-        ), label=label)
+        "DelegatingParser._apply_structural_tag", ("ToolChoiceAllowed,",), label=label)
+    forbid_text(state, "vllm/parser/abstract_parser.py",
+                "tool_choice allowed_tools is enforced by a tool-call", label=label)
     # A choice that lets the model call is refused alike on chat and on
     # Responses while no tool parser parses the calls: one refusal, which both
     # routes ask before rendering.

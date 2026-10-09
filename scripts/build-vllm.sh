@@ -793,6 +793,8 @@ image_build_options=(
   --build-arg "ENGINE_PROTOCOL_PATCHED_FILE_SHA256=${ENGINE_PROTOCOL_PATCHED_FILE_SHA256}"
   --build-arg "MISTRAL_TOOL_PARSER_PATCHED_FILE_SHA256=${MISTRAL_TOOL_PARSER_PATCHED_FILE_SHA256}"
   --build-arg "MISTRAL_TOOL_PARSER_UPSTREAM_FILE_SHA256=${MISTRAL_TOOL_PARSER_UPSTREAM_FILE_SHA256}"
+  --build-arg "KIMI_K2_TOOL_PARSER_PATCHED_FILE_SHA256=${KIMI_K2_TOOL_PARSER_PATCHED_FILE_SHA256}"
+  --build-arg "KIMI_K2_TOOL_PARSER_UPSTREAM_FILE_SHA256=${KIMI_K2_TOOL_PARSER_UPSTREAM_FILE_SHA256}"
   --build-arg "POOLING_BASE_PROTOCOL_PATCHED_FILE_SHA256=${POOLING_BASE_PROTOCOL_PATCHED_FILE_SHA256}"
   --build-arg "POOLING_BASE_PROTOCOL_UPSTREAM_FILE_SHA256=${POOLING_BASE_PROTOCOL_UPSTREAM_FILE_SHA256}"
   --build-arg "ENGINE_CORE_PATCHED_FILE_SHA256=${ENGINE_CORE_PATCHED_FILE_SHA256}"
@@ -1206,6 +1208,7 @@ actual_installed_report="$(
     /usr/local/lib/python3.12/dist-packages/vllm/v1/core/sched/scheduler.py \
     /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/async_llm.py \
     /usr/local/lib/python3.12/dist-packages/vllm/tool_parsers/mistral_tool_parser.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/tool_parsers/kimi_k2_tool_parser.py \
     /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/pooling/base/protocol.py \
     /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/core.py \
     /usr/local/lib/python3.12/dist-packages/vllm/tool_parsers/qwen3_engine_tool_parser.py \
@@ -1305,6 +1308,7 @@ expected_installed_report="$(printf '%s  %s\n' \
   "${V1_SCHEDULER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/core/sched/scheduler.py \
   "${ASYNC_LLM_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/async_llm.py \
   "${MISTRAL_TOOL_PARSER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/tool_parsers/mistral_tool_parser.py \
+  "${KIMI_K2_TOOL_PARSER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/tool_parsers/kimi_k2_tool_parser.py \
   "${POOLING_BASE_PROTOCOL_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/pooling/base/protocol.py \
   "${ENGINE_CORE_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/core.py \
   "${QWEN3_ENGINE_TOOL_PARSER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/tool_parsers/qwen3_engine_tool_parser.py \

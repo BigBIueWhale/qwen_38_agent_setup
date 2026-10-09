@@ -1,7 +1,8 @@
 diff --git a/vllm/tool_parsers/structural_tag_registry.py b/vllm/tool_parsers/structural_tag_registry.py
+index 03d497fd04dac5266c7033be0e8d6479e1de544b..6765fad79ca1f32bec38b67ab309cb7086f22c1f 100644
 --- a/vllm/tool_parsers/structural_tag_registry.py
 +++ b/vllm/tool_parsers/structural_tag_registry.py
-@@ -34,6 +34,7 @@
+@@ -34,6 +34,7 @@ from vllm.entrypoints.openai.chat_completion.protocol import (
      ChatCompletionNamedToolChoiceParam,
      ChatCompletionToolsParam,
  )
@@ -9,7 +10,7 @@ diff --git a/vllm/tool_parsers/structural_tag_registry.py b/vllm/tool_parsers/st
  
  ToolChoice: TypeAlias = (
      Literal["none", "auto", "required"]
-@@ -49,6 +50,7 @@
+@@ -49,6 +50,7 @@ StructuralTagBuilder: TypeAlias = Callable[
          list[BuiltinToolParam],
          SimplifiedToolChoice,
          bool,
@@ -17,7 +18,7 @@ diff --git a/vllm/tool_parsers/structural_tag_registry.py b/vllm/tool_parsers/st
      ],
      StructuralTag,
  ]
-@@ -63,18 +65,16 @@
+@@ -63,18 +65,16 @@ XGRAMMAR_BUILTIN_STRUCTURAL_TAG_MODELS = frozenset(
          "deepseek_r1",
          "deepseek_v3_1",
          "qwen_3_5",
@@ -39,16 +40,23 @@ diff --git a/vllm/tool_parsers/structural_tag_registry.py b/vllm/tool_parsers/st
  _VLLM_STRUCTURAL_TAG_REGISTRY: dict[str, StructuralTagBuilder] = {}
  
  
-@@ -99,6 +99,85 @@
+@@ -99,6 +99,163 @@ def _any_tool_strict(
      return False
  
  
-+# The next actions a caller has when a limit of one call cannot be held.
++# The next actions a caller has when a limit of one call cannot be held:
++# allowing parallel calls always, and naming the one function to call only
++# where a named choice is held.
 +_ALLOW_PARALLEL_CALLS = (
 +    "Allow parallel calls (parallel_tool_calls true; on the Anthropic route, "
 +    "tool_choice.disable_parallel_tool_use false) and the response carries "
-+    "every call the model makes, or name the one function to call in "
-+    "tool_choice."
++    "every call the model makes"
++)
++_NAME_THE_FUNCTION = ", or name the one function to call in tool_choice"
++# The next actions a caller has when a forced tool choice cannot be held.
++_CHOOSE_AUTO_OR_NONE = (
++    'Send tool_choice "auto", and the response carries any call the model '
++    'makes, or "none"'
 +)
 +
 +
@@ -58,6 +66,7 @@ diff --git a/vllm/tool_parsers/structural_tag_registry.py b/vllm/tool_parsers/st
 +    cause: str,
 +    *,
 +    next_action: str = "",
++    named_choice_held: bool = True,
 +) -> None:
 +    """Refuse a limit of one call that no grammar holds.
 +
@@ -66,7 +75,8 @@ diff --git a/vllm/tool_parsers/structural_tag_registry.py b/vllm/tool_parsers/st
 +    "none" lets the model make none. Every place that finds no grammar holding
 +    the limit -- a format whose grammar takes none, an unarmed grammar, a
 +    parser with none -- refuses here, with *cause* saying why and
-+    *next_action* naming any further step that would hold it.
++    *next_action* naming any further step that would hold it. Naming the one
++    function to call is offered only where a named choice is held.
 +    """
 +    if (
 +        parallel_tool_calls is not False
@@ -76,13 +86,77 @@ diff --git a/vllm/tool_parsers/structural_tag_registry.py b/vllm/tool_parsers/st
 +        )
 +    ):
 +        return
-+    actions = _ALLOW_PARALLEL_CALLS
++    actions = _ALLOW_PARALLEL_CALLS + (_NAME_THE_FUNCTION if named_choice_held else "")
 +    if next_action:
 +        actions = f"{next_action}, or {actions[0].lower()}{actions[1:]}"
 +    raise VLLMValidationError(
 +        "parallel_tool_calls false is held only by the tool-call grammar, "
-+        f"never by dropping a call the model made, and {cause}. {actions}",
++        f"never by dropping a call the model made, and {cause}. {actions}.",
 +        parameter="parallel_tool_calls",
++    )
++
++
++def _described_choice(tool_choice: ToolChoice) -> str:
++    if isinstance(tool_choice, ChatCompletionNamedToolChoiceParam):
++        return f"function {tool_choice.function.name!r}"
++    if isinstance(tool_choice, ToolChoiceFunction):
++        return f"function {tool_choice.name!r}"
++    if isinstance(tool_choice, ToolChoiceAllowed):
++        return f"allowed_tools ({tool_choice.mode!r})"
++    return repr(tool_choice)
++
++
++def require_choice_held(
++    tool_choice: ToolChoice, cause: str, *, next_action: str = ""
++) -> None:
++    """Refuse a forced tool choice -- "required", a named function, or
++    allowed_tools -- that no grammar holds.
++
++    A forced choice is held only by a grammar the request arms and the parse
++    reads back as the call, never by reading whatever the model writes as
++    one: unheld, a plain answer is served under it as if the choice had been
++    "auto". "auto" and "none" ask for nothing a grammar must hold. Every
++    place that finds no grammar holding the choice refuses here, with *cause*
++    saying why and *next_action* naming any further step that would hold it.
++    """
++    if tool_choice in ("auto", "none"):
++        return
++    actions = _CHOOSE_AUTO_OR_NONE
++    if next_action:
++        actions = f"{next_action}, or {actions[0].lower()}{actions[1:]}"
++    raise VLLMValidationError(
++        f"tool_choice {_described_choice(tool_choice)} is held only by a "
++        "tool-call grammar, never by reading whatever the model writes as a "
++        f"call, and {cause}. {actions}.",
++        parameter="tool_choice",
++    )
++
++
++def _unarmed_cause(model: str | None, parser_name: str) -> str:
++    if model is None:
++        return f"this server's tool parser ({parser_name}) has no tool-call grammar"
++    return (
++        "this server runs with VLLM_ENFORCE_STRICT_TOOL_CALLING off, which "
++        f"leaves its {model!r} tool-call grammar unarmed"
++    )
++
++
++def require_unarmed_choice_held(
++    model: str | None, parser_name: str, tool_choice: ToolChoice
++) -> None:
++    """Refuse a forced tool choice where a tool parser's structural format
++    arms no grammar and the parser holds the choice no other way. Every
++    format holds a forced choice once armed, so turning the switch on is
++    offered wherever the parser names one."""
++    require_choice_held(
++        tool_choice,
++        _unarmed_cause(model, parser_name),
++        next_action=(
++            ""
++            if model is None
++            else "Serve with VLLM_ENFORCE_STRICT_TOOL_CALLING on, which arms "
++            f"the {model!r} grammar that holds it"
++        ),
 +    )
 +
 +
@@ -91,15 +165,20 @@ diff --git a/vllm/tool_parsers/structural_tag_registry.py b/vllm/tool_parsers/st
 +    parser_name: str,
 +    tool_choice: ToolChoice,
 +    parallel_tool_calls: bool | None,
++    *,
++    named_choice_held: bool,
 +) -> None:
 +    """Refuse a limit of one call where a tool parser's structural format arms
 +    no grammar: it names no format (*model* None), or the format's grammar is
-+    left unarmed because VLLM_ENFORCE_STRICT_TOOL_CALLING is off."""
++    left unarmed because VLLM_ENFORCE_STRICT_TOOL_CALLING is off.
++    *named_choice_held* says whether the parser holds a named choice without
++    one, so naming the function is offered."""
 +    if model is None:
 +        require_call_limit_held(
 +            tool_choice,
 +            parallel_tool_calls,
-+            f"this server's tool parser ({parser_name}) has no tool-call grammar",
++            _unarmed_cause(model, parser_name),
++            named_choice_held=named_choice_held,
 +        )
 +        return
 +    # Arming the format's grammar holds the limit only where vLLM builds it;
@@ -116,16 +195,16 @@ diff --git a/vllm/tool_parsers/structural_tag_registry.py b/vllm/tool_parsers/st
 +    require_call_limit_held(
 +        tool_choice,
 +        parallel_tool_calls,
-+        "this server runs with VLLM_ENFORCE_STRICT_TOOL_CALLING off, which "
-+        f"leaves its {model!r} tool-call grammar unarmed",
++        _unarmed_cause(model, parser_name),
 +        next_action=next_action,
++        named_choice_held=named_choice_held,
 +    )
 +
 +
  def get_model_structural_tag(
      model: str,
      tools: Sequence[ChatCompletionToolsParam | ResponsesTool] | None,
-@@ -111,6 +190,16 @@
+@@ -111,6 +268,16 @@ def get_model_structural_tag(
      if not tools or tool_choice == "none":
          return None
  
@@ -142,7 +221,7 @@ diff --git a/vllm/tool_parsers/structural_tag_registry.py b/vllm/tool_parsers/st
      # This single-purpose Qwen agent runtime treats every advertised Qwen tool
      # schema as load-bearing. For auto tool choice the model still decides
      # whether to call a tool, but once it starts a call xgrammar must constrain
-@@ -122,6 +211,13 @@
+@@ -122,6 +289,13 @@ def get_model_structural_tag(
          and not _any_tool_strict(tools)
          and model != "qwen_3_coder"
      ):
@@ -156,7 +235,7 @@ diff --git a/vllm/tool_parsers/structural_tag_registry.py b/vllm/tool_parsers/st
          return None
  
      dumped_tools = [_dump_tool_for_xgrammar(tool) for tool in tools]
-@@ -146,35 +242,26 @@
+@@ -146,35 +320,26 @@ def get_model_structural_tag(
              builtin_tools,
              simplified_tool_choice,
              reasoning,
@@ -202,7 +281,7 @@ diff --git a/vllm/tool_parsers/structural_tag_registry.py b/vllm/tool_parsers/st
  
  
  def _dump_tool_for_xgrammar(
-@@ -281,15 +368,19 @@
+@@ -281,15 +446,19 @@ def get_hermes_structural_tag(
      builtin_tools: list[BuiltinToolParam],
      tool_choice: SimplifiedToolChoice,
      reasoning: bool,
@@ -223,7 +302,7 @@ diff --git a/vllm/tool_parsers/structural_tag_registry.py b/vllm/tool_parsers/st
              if tags
              else AnyTextFormat()
          )
-@@ -305,6 +396,7 @@
+@@ -305,6 +474,7 @@ def get_hermes_structural_tag(
              tags=_hermes_tool_tags(tools),
              separator="",
              at_least_one=True,
@@ -231,7 +310,7 @@ diff --git a/vllm/tool_parsers/structural_tag_registry.py b/vllm/tool_parsers/st
          )
  
      return StructuralTag(format=suffix_tag)
-@@ -330,12 +422,15 @@
+@@ -330,12 +500,15 @@ def get_minimax_structural_tag(
      builtin_tools: list[BuiltinToolParam],
      tool_choice: SimplifiedToolChoice,
      reasoning: bool,
@@ -247,7 +326,7 @@ diff --git a/vllm/tool_parsers/structural_tag_registry.py b/vllm/tool_parsers/st
  
      tags = _minimax_tool_tags(tools)
  
-@@ -350,11 +445,13 @@
+@@ -350,11 +523,13 @@ def get_minimax_structural_tag(
                              tags=tags,
                              separator="",
                              at_least_one=True,
@@ -261,7 +340,7 @@ diff --git a/vllm/tool_parsers/structural_tag_registry.py b/vllm/tool_parsers/st
              )
              if tags
              else AnyTextFormat(excludes=["<think>", "</think>"])
-@@ -380,6 +477,7 @@
+@@ -380,6 +555,7 @@ def get_minimax_structural_tag(
                      tags=tags,
                      separator="",
                      at_least_one=True,
@@ -269,7 +348,7 @@ diff --git a/vllm/tool_parsers/structural_tag_registry.py b/vllm/tool_parsers/st
                  ),
                  ConstStringFormat(value=tool_call_end),
              ]
-@@ -602,13 +700,16 @@
+@@ -602,13 +778,16 @@ def _k3_response_prefix() -> list[Any]:
      ]
  
  
@@ -287,7 +366,7 @@ diff --git a/vllm/tool_parsers/structural_tag_registry.py b/vllm/tool_parsers/st
          ),
          end=_K3_TOOLS_CLOSE,
      )
-@@ -620,8 +721,11 @@
+@@ -620,8 +799,11 @@ def get_kimi_k3_structural_tag(
      builtin_tools: list[BuiltinToolParam],
      tool_choice: SimplifiedToolChoice,
      reasoning: bool,
@@ -299,7 +378,7 @@ diff --git a/vllm/tool_parsers/structural_tag_registry.py b/vllm/tool_parsers/st
  
      trailer = OptionalFormat(content=ConstStringFormat(value=_K3_MESSAGE_CLOSE))
  
-@@ -631,14 +735,343 @@
+@@ -631,14 +813,343 @@ def get_kimi_k3_structural_tag(
          )
  
      if tool_choice == "auto":
@@ -663,9 +742,10 @@ diff --git a/vllm/parser/qwen3.py b/vllm/parser/qwen3.py
      r"<parameter=([^>]*)>"
      r"(.*?)"
 diff --git a/tests/tool_parsers/test_structural_tag_registry.py b/tests/tool_parsers/test_structural_tag_registry.py
+index 6eee6130b576da46fbbdad651fd7e85d0e8eab2f..01b8f5ccef2309a40bf379f2d4f7c4ca34b3b207 100644
 --- a/tests/tool_parsers/test_structural_tag_registry.py
 +++ b/tests/tool_parsers/test_structural_tag_registry.py
-@@ -30,8 +30,7 @@
+@@ -30,8 +30,7 @@ from vllm.tool_parsers.llama_tool_parser import Llama3JsonToolParser
  from vllm.tool_parsers.minimax_m2_tool_parser import MinimaxM2ToolParser
  from vllm.tool_parsers.qwen3_engine_tool_parser import Qwen3EngineToolParser
  from vllm.tool_parsers.structural_tag_registry import (
@@ -675,7 +755,7 @@ diff --git a/tests/tool_parsers/test_structural_tag_registry.py b/tests/tool_par
      XGRAMMAR_BUILTIN_STRUCTURAL_TAG_MODELS,
      get_function_parameters,
      get_model_structural_tag,
-@@ -73,11 +72,231 @@
+@@ -73,11 +72,389 @@ def sample_tools_strict() -> list[ChatCompletionToolsParam]:
      ]
  
  
@@ -908,10 +988,168 @@ diff --git a/tests/tool_parsers/test_structural_tag_registry.py b/tests/tool_par
 +    )
 +    parser.adjust_request(_limited(sample_tools, "auto"))
 +    assert len(calls) == 1
++
++
++def _forced(tools, choice):
++    return ChatCompletionRequest(
++        messages=[], model="m", tools=[tool.model_dump() for tool in tools],
++        tool_choice=choice,
++    )
++
++
++@pytest.mark.parametrize("choice", ["required", _NAMED])
++def test_a_parser_that_holds_no_forced_choice_refuses_it(choice, sample_tools):
++    """A tool parser with no tool-call grammar that does not read the base's
++    call schema back as the call holds no forced choice: "required" and a named
++    function are refused naming tool_choice on every route, with only the
++    actions that exist; "auto" and "none" are served."""
++    from vllm.exceptions import VLLMValidationError
++
++    class NativeOnlyToolParser(ToolParser):
++        supports_required_and_named = False
++
++    class TestParser(DelegatingParser):
++        tool_parser_cls = NativeOnlyToolParser
++
++    for build in (
++        lambda request: NativeOnlyToolParser(MagicMock()).get_structural_tag(request),
++        lambda request: TestParser(MagicMock(), sample_tools).adjust_request(request),
++    ):
++        with pytest.raises(
++            VLLMValidationError, match="is held only by a tool-call grammar"
++        ) as refused:
++            build(_forced(sample_tools, choice))
++        message = str(refused.value)
++        assert refused.value.parameter == "tool_choice"
++        assert "(NativeOnlyToolParser) has no tool-call grammar" in message
++        assert 'Send tool_choice "auto", and the response carries' in message
++        assert "VLLM_ENFORCE_STRICT_TOOL_CALLING" not in message
++        build(_forced(sample_tools, "auto"))
++        build(_forced(sample_tools, "none"))
++
++
++def test_a_parser_that_reads_the_call_schema_holds_a_forced_choice(sample_tools):
++    """The base arms the call's JSON schema for a forced choice, and a parser
++    that reads it back as the call holds the choice with no grammar of its
++    own; allowed_tools, which no schema holds, is refused."""
++    from vllm.exceptions import VLLMValidationError
++
++    class JsonCallToolParser(ToolParser):
++        pass
++
++    parser = JsonCallToolParser(MagicMock())
++    for choice in ("required", _NAMED):
++        assert parser.forced_choice_held_without_grammar(_forced(sample_tools, choice))
++        assert parser.get_structural_tag(_forced(sample_tools, choice)) is None
++        assert parser.adjust_request(_forced(sample_tools, choice)).structured_outputs
++    allowed = _responses_request(
++        [{"type": "function", "name": "get_weather", "parameters": {}}],
++        {"type": "allowed_tools", "mode": "auto",
++         "tools": [{"type": "function", "name": "get_weather"}]},
++    )
++    with pytest.raises(VLLMValidationError, match="allowed_tools") as refused:
++        parser.get_structural_tag(allowed)
++    assert refused.value.parameter == "tool_choice"
++
++
++def test_strict_tool_calling_off_offers_the_switch_for_a_forced_choice(
++    sample_tools, monkeypatch
++):
++    """With VLLM_ENFORCE_STRICT_TOOL_CALLING off a format parser that reads
++    calls natively holds no forced choice; every format holds one once armed,
++    so turning the switch on is offered, for a builtin format too."""
++    from vllm.exceptions import VLLMValidationError
++
++    monkeypatch.setenv("VLLM_ENFORCE_STRICT_TOOL_CALLING", "0")
++
++    for model in ("hermes", "qwen_3"):
++
++        class NativeFormat(ToolParser):
++            structural_tag_model = model
++            supports_required_and_named = False
++
++        with pytest.raises(VLLMValidationError) as refused:
++            NativeFormat(MagicMock()).get_structural_tag(_forced(sample_tools, "required"))
++        message = str(refused.value)
++        assert refused.value.parameter == "tool_choice"
++        assert "VLLM_ENFORCE_STRICT_TOOL_CALLING off" in message
++        assert (
++            "Serve with VLLM_ENFORCE_STRICT_TOOL_CALLING on, which arms the "
++            f"{model!r} grammar that holds it"
++        ) in message
++
++
++def test_naming_the_function_is_offered_only_where_a_named_choice_is_held(
++    sample_tools,
++):
++    """A limit of one call no grammar holds is refused offering what exists:
++    naming the one function to call only where a named choice is held."""
++    from vllm.exceptions import VLLMValidationError
++
++    class JsonCallToolParser(ToolParser):
++        pass
++
++    class NativeOnlyToolParser(ToolParser):
++        supports_required_and_named = False
++
++    for parser_cls, offered in ((JsonCallToolParser, True), (NativeOnlyToolParser, False)):
++        with pytest.raises(VLLMValidationError) as refused:
++            parser_cls(MagicMock()).get_structural_tag(_limited(sample_tools, "auto"))
++        assert refused.value.parameter == "parallel_tool_calls"
++        assert ("name the one function to call" in str(refused.value)) is offered
++
++
++def test_mistral_holds_a_forced_choice_where_its_grammar_or_legacy_array_does(
++    sample_tools, monkeypatch
++):
++    """mistral-common's grammar takes the tool choice; without it a chat
++    request on a pre-v11 tokenizer is held by the JSON array the legacy path
++    arms and reads. On Responses, or on a v11 tokenizer without grammar
++    support, nothing holds a forced choice, and it is refused."""
++    from vllm.entrypoints.openai.responses.protocol import ResponsesRequest
++    from vllm.exceptions import VLLMValidationError
++    from vllm.parser import mistral as mistral_parser
++    from vllm.tool_parsers.mistral_tool_parser import MistralToolParser
++
++    monkeypatch.setattr(mistral_parser, "is_mistral_tokenizer", lambda _: True)
++    tokenizer = MagicMock()
++    tokenizer.get_vocab.return_value = {"[TOOL_CALLS]": 1}
++    tokenizer.supports_grammar = True
++    tokenizer.version = 13
++    assert MistralToolParser(tokenizer).forced_choice_held_without_grammar(
++        _forced(sample_tools, "required"))
++    tokenizer.version = 7
++    assert MistralToolParser(tokenizer).forced_choice_held_without_grammar(
++        _forced(sample_tools, _NAMED))
++    tokenizer.version = 13
++    tokenizer.supports_grammar = False
++    parser = MistralToolParser(tokenizer)
++    responses = ResponsesRequest.model_validate({
++        "model": "m", "input": "t", "kv_scope": "unit", "tool_choice": "required",
++        "tools": [{"type": "function", "name": "get_weather",
++                   "parameters": sample_tools[0].function.parameters}],
++    })
++    for unheld in (_forced(sample_tools, "required"), responses):
++        assert not parser.forced_choice_held_without_grammar(unheld)
++        with pytest.raises(VLLMValidationError, match="MistralToolParser") as refused:
++            parser.get_structural_tag(unheld)
++        assert refused.value.parameter == "tool_choice"
++
++
++def test_kimi_k2_holds_a_forced_choice_by_the_call_schema(sample_tools):
++    """With no structural tag armed, Kimi K2 holds a forced choice as every
++    other format does there: its adjust_request arms the call's JSON schema
++    through the base hook, and "auto" arms none."""
++    tokenizer = MagicMock()
++    tokenizer.get_vocab.return_value = {}
++    parser = KimiK2ToolParser(tokenizer)
++    for choice in ("required", _NAMED):
++        assert parser.adjust_request(_forced(sample_tools, choice)).structured_outputs.json
++    assert parser.adjust_request(_forced(sample_tools, "auto")).structured_outputs is None
  
  
  @pytest.mark.parametrize("model", sorted(XGRAMMAR_BUILTIN_STRUCTURAL_TAG_MODELS))
-@@ -237,7 +456,7 @@
+@@ -237,7 +614,7 @@ def _k3_grammar(tool_choice, tools=None):
  
  
  def test_kimi_k3_registered_as_vllm_builtin():
@@ -920,7 +1158,7 @@ diff --git a/tests/tool_parsers/test_structural_tag_registry.py b/tests/tool_par
      assert KimiK3ToolParser.structural_tag_model == "kimi_k3"
  
  
-@@ -331,4 +550,21 @@
+@@ -331,6 +708,23 @@ def test_kimi_k3_required_rejects_invalid(body: str):
      assert not _is_grammar_accept_string(_k3_grammar("required"), body)
  
  
@@ -942,7 +1180,9 @@ diff --git a/tests/tool_parsers/test_structural_tag_registry.py b/tests/tool_par
 +
 +
  def test_kimi_k3_schema_without_required_accepts_empty_call():
-@@ -509,9 +745,7 @@
+     tools = [
+         ChatCompletionToolsParam(
+@@ -509,9 +903,7 @@ def test_xgrammar_function_parameters_are_preserved(
      assert sample_tools_strict[0].function.parameters is not None
  
  
@@ -953,7 +1193,7 @@ diff --git a/tests/tool_parsers/test_structural_tag_registry.py b/tests/tool_par
  def test_auto_tool_choice_skips_structural_tag_without_strict(
      model: str,
      sample_tools: list[ChatCompletionToolsParam],
-@@ -543,8 +777,53 @@
+@@ -543,8 +935,53 @@ def test_qwen3_auto_tool_choice_is_constrained_without_strict(
      assert fmt["triggers"] == ["<tool_call>\n<function="]
      assert fmt["excludes"] == ["<think>", "</think>"]
      assert fmt["stop_after_first"] is False
@@ -1009,12 +1249,10 @@ diff --git a/tests/tool_parsers/test_structural_tag_registry.py b/tests/tool_par
      )
  
  
-@@ -657,6 +936,210 @@
-     assert not _is_grammar_accept_string(
-         grammar, _QWEN3_CALL.replace("city", "colour")
+@@ -659,6 +1096,210 @@ def test_qwen3_grammar_rejects_what_the_parser_now_treats_as_text():
      )
-+
-+
+ 
+ 
 +def _qwen_schema_tools(parameters: dict) -> list[ChatCompletionToolsParam]:
 +    return [
 +        ChatCompletionToolsParam(
@@ -1217,9 +1455,11 @@ diff --git a/tests/tool_parsers/test_structural_tag_registry.py b/tests/tool_par
 +    )
 +
 +    assert _is_grammar_accept_string(grammar, _qwen_call("v", "anything"))
- 
- 
++
++
  def test_get_function_parameters_relaxes_function_strict_false():
+     function = SimpleNamespace(
+         parameters={"type": "object", "properties": {}},
 diff --git a/tests/parser/engine/test_qwen3.py b/tests/parser/engine/test_qwen3.py
 --- a/tests/parser/engine/test_qwen3.py
 +++ b/tests/parser/engine/test_qwen3.py
@@ -1356,9 +1596,18 @@ diff --git a/vllm/parser/mistral.py b/vllm/parser/mistral.py
              if request.tools and request.tool_choice != "none":
                  # Keep special tokens so the [TOOL_CALLS] marker
 diff --git a/vllm/tool_parsers/abstract_tool_parser.py b/vllm/tool_parsers/abstract_tool_parser.py
+index 459209a79128fd5c28c61a48a8473facc43a6e3b..d71172eb46be6cef3b0e01c0fa436ee00630dce6 100644
 --- a/vllm/tool_parsers/abstract_tool_parser.py
 +++ b/vllm/tool_parsers/abstract_tool_parser.py
-@@ -175,20 +175,42 @@
+@@ -13,6 +13,7 @@ from openai.types.responses import (
+     ResponseTextConfig,
+ )
+ from openai.types.responses.function_tool import FunctionTool
++from openai.types.responses.tool_choice_allowed import ToolChoiceAllowed
+ 
+ import vllm.envs as envs
+ from vllm.entrypoints.openai.chat_completion.protocol import (
+@@ -175,20 +176,63 @@ class ToolParser:
  
          return request
  
@@ -1369,6 +1618,17 @@ diff --git a/vllm/tool_parsers/abstract_tool_parser.py b/vllm/tool_parsers/abstr
 +        no structural tag, holds *request*'s limit of one call. None does
 +        unless a parser says otherwise."""
 +        return False
++
++    def forced_choice_held_without_grammar(
++        self, request: ChatCompletionRequest | ResponsesRequest
++    ) -> bool:
++        """Whether, with no structural tag armed, *request*'s forced tool
++        choice -- "required" or a named function -- is held: the output is
++        constrained to a call and read back as one. The base adjust_request
++        arms the JSON schema of the call, and the composed parser reads the
++        output as that JSON exactly where supports_required_and_named; a
++        parser that arms or reads otherwise says so."""
++        return self.supports_required_and_named
 +
      def get_structural_tag(
          self,
@@ -1381,21 +1641,31 @@ diff --git a/vllm/tool_parsers/abstract_tool_parser.py b/vllm/tool_parsers/abstr
 -        if not envs.VLLM_ENFORCE_STRICT_TOOL_CALLING:
 +        """The tool-call grammar this parser's structural format arms for
 +        *request*, or None. With none armed -- the parser names no format, or
-+        VLLM_ENFORCE_STRICT_TOOL_CALLING is off -- a limit of one call is
-+        refused unless the parser's own grammar holds it."""
++        VLLM_ENFORCE_STRICT_TOOL_CALLING is off -- a forced tool choice is
++        refused unless the parser holds it without one, allowed_tools always,
++        and a limit of one call unless the parser's own grammar holds it."""
 +        from vllm.tool_parsers.structural_tag_registry import (
 +            get_model_structural_tag,
 +            require_unarmed_call_limit_held,
++            require_unarmed_choice_held,
 +        )
 +
 +        model = self.structural_tag_model
 +        if model is None or not envs.VLLM_ENFORCE_STRICT_TOOL_CALLING:
++            forced_choice_held = self.forced_choice_held_without_grammar(request)
++            if isinstance(request.tool_choice, ToolChoiceAllowed) or not (
++                forced_choice_held
++            ):
++                require_unarmed_choice_held(
++                    model, type(self).__name__, request.tool_choice
++                )
 +            if not self.own_grammar_holds_call_limit(request):
 +                require_unarmed_call_limit_held(
 +                    model,
 +                    type(self).__name__,
 +                    request.tool_choice,
 +                    request.parallel_tool_calls,
++                    named_choice_held=forced_choice_held,
 +                )
              return None
 -        from vllm.tool_parsers.structural_tag_registry import get_model_structural_tag
@@ -1407,9 +1677,10 @@ diff --git a/vllm/tool_parsers/abstract_tool_parser.py b/vllm/tool_parsers/abstr
              tool_choice=request.tool_choice,
              reasoning=reasoning,
 diff --git a/vllm/tool_parsers/mistral_tool_parser.py b/vllm/tool_parsers/mistral_tool_parser.py
+index 01bddd4ed6682db9f2ca3cda5da507ea3faa1a1e..c99402bb006d8831e6c4085949d8dfe8d73fd264 100644
 --- a/vllm/tool_parsers/mistral_tool_parser.py
 +++ b/vllm/tool_parsers/mistral_tool_parser.py
-@@ -35,6 +35,13 @@
+@@ -35,6 +35,29 @@ class MistralToolParser(MistralParserToolAdapter):  # type: ignore[valid-type, m
          """Return the token id for :attr:`bot_token`."""
          return self._parser_engine.bot_token_id
  
@@ -1420,6 +1691,47 @@ diff --git a/vllm/tool_parsers/mistral_tool_parser.py b/vllm/tool_parsers/mistra
 +        # takes no call limit.
 +        return self._parser_engine.arms_grammar(request)
 +
++    def forced_choice_held_without_grammar(
++        self, request: ChatCompletionRequest | ResponsesRequest
++    ) -> bool:
++        # mistral-common's grammar takes the tool choice. Without it a chat
++        # request on a pre-v11 tokenizer is held by the JSON array the legacy
++        # path arms and reads; on Responses, or a v11 tokenizer without
++        # grammar support, nothing holds it.
++        from vllm.entrypoints.openai.chat_completion.protocol import (
++            ChatCompletionRequest,
++        )
++
++        return self._parser_engine.arms_grammar(request) or (
++            isinstance(request, ChatCompletionRequest)
++            and self._parser_engine._is_pre_v11
++        )
++
      def adjust_request(
          self,
          request: ChatCompletionRequest | ResponsesRequest,
+diff --git a/vllm/tool_parsers/kimi_k2_tool_parser.py b/vllm/tool_parsers/kimi_k2_tool_parser.py
+index d1cc483018335dc19df9bc41c5f9e3ac637e4871..1d3808c9a3caff359bfabadafb15ced5713cc799 100644
+--- a/vllm/tool_parsers/kimi_k2_tool_parser.py
++++ b/vllm/tool_parsers/kimi_k2_tool_parser.py
+@@ -6,6 +6,7 @@ from vllm.entrypoints.openai.chat_completion.protocol import (
+ )
+ from vllm.entrypoints.openai.responses.protocol import ResponsesRequest
+ from vllm.parser.engine.registered_adapters import KimiK2ParserToolAdapter
++from vllm.tool_parsers.abstract_tool_parser import ToolParser
+ 
+ 
+ class KimiK2ToolParser(KimiK2ParserToolAdapter):  # type: ignore[valid-type, misc]
+@@ -15,6 +16,12 @@ class KimiK2ToolParser(KimiK2ParserToolAdapter):  # type: ignore[valid-type, mis
+         self,
+         request: ChatCompletionRequest | ResponsesRequest,
+     ) -> ChatCompletionRequest | ResponsesRequest:
++        # With no structural tag armed (VLLM_ENFORCE_STRICT_TOOL_CALLING off),
++        # a forced choice is held as every other format holds it there: the
++        # base hook arms the call's JSON schema, which the parse reads as the
++        # call. Only that hook: the engine's would show special tokens for a
++        # request that calls no tools.
++        request = ToolParser.adjust_request(self, request)
+         if request.tools and request.tool_choice != "none":
+             request.skip_special_tokens = False
+         return request

@@ -1861,6 +1861,57 @@ class ToolChoiceEnforcementTest(unittest.TestCase):
         chat_engine.admit.assert_not_called()
         responses_engine.admit.assert_not_called()
 
+    def test_a_forced_choice_no_grammar_holds_is_refused_on_every_route(self):
+        """A tool parser that arms no grammar and does not read the base's
+        call schema back as the call holds no forced choice: "required" and a
+        named function are refused alike on chat and on Responses, with the
+        same 400 naming tool_choice, before anything is admitted, and the
+        refusal offers only what exists -- "auto" or "none". Anthropic and the
+        render route render through chat."""
+        from vllm.entrypoints.openai.chat_completion.protocol import (
+            ChatCompletionGenerationRequest,
+        )
+        from vllm.entrypoints.openai.responses.protocol import ResponsesRequest
+        from vllm.entrypoints.serve.exception_handling.error_response import (
+            create_error_response,
+        )
+        from vllm.exceptions import VLLMValidationError
+
+        chat, chat_engine = _served_chat(tool_parser="dots")
+        responses, responses_engine = _served_responses(
+            chat.online_renderer, tool_parser="dots", enable_auto_tools=True,
+        )
+        for name, chat_choice, responses_choice in (
+            ("required", "required", "required"),
+            ("named", {"type": "function", "function": {"name": "write"}},
+             {"type": "function", "name": "write"}),
+        ):
+            refusals = []
+            for route, request, serve in (
+                ("chat", ChatCompletionGenerationRequest(
+                    model="unit", messages=[{"role": "user", "content": "test"}],
+                    kv_scope="unit", tools=[TOOL], tool_choice=chat_choice,
+                ), chat.create_chat_completion),
+                ("responses", ResponsesRequest.model_validate(
+                    {"model": "unit", "input": "test", "kv_scope": "unit",
+                     "tools": [FUNCTION], "tool_choice": responses_choice}
+                ), responses.create_responses),
+            ):
+                with self.subTest(route=route, choice=name):
+                    with self.assertRaises(VLLMValidationError) as refused:
+                        asyncio_run(serve(request))
+                    error = create_error_response(refused.exception).error
+                    self.assertEqual((error.code, error.param), (400, "tool_choice"))
+                    self.assertIn("is held only by a tool-call grammar", error.message)
+                    self.assertIn("(DotsToolParser) has no tool-call grammar",
+                                  error.message)
+                    self.assertIn('Send tool_choice "auto"', error.message)
+                    refusals.append(error.message)
+            with self.subTest(same_refusal=name):
+                self.assertEqual(len(set(refusals)), 1)
+        chat_engine.admit.assert_not_called()
+        responses_engine.admit.assert_not_called()
+
     def test_the_served_tool_parser_needs_its_grammar(self):
         """The Qwen tool parser's calls are exactly its grammar's language, so
         it is never selected, or built, while strict tool calling is off."""

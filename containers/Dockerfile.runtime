@@ -503,8 +503,10 @@ RUN printf '%s  %s\n' \
   | sha256sum --check --strict
 
 ARG MISTRAL_TOOL_PARSER_UPSTREAM_FILE_SHA256
+ARG KIMI_K2_TOOL_PARSER_UPSTREAM_FILE_SHA256
 RUN printf '%s  %s\n' \
   "${MISTRAL_TOOL_PARSER_UPSTREAM_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/tool_parsers/mistral_tool_parser.py \
+  "${KIMI_K2_TOOL_PARSER_UPSTREAM_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/tool_parsers/kimi_k2_tool_parser.py \
   | sha256sum --check --strict
 
 FROM upstream-verifier AS runtime
@@ -528,6 +530,7 @@ ARG V1_DETOKENIZER_PATCHED_FILE_SHA256
 ARG V1_SCHEDULER_PATCHED_FILE_SHA256
 ARG ASYNC_LLM_PATCHED_FILE_SHA256
 ARG MISTRAL_TOOL_PARSER_PATCHED_FILE_SHA256
+ARG KIMI_K2_TOOL_PARSER_PATCHED_FILE_SHA256
 ARG POOLING_BASE_PROTOCOL_PATCHED_FILE_SHA256
 ARG ENGINE_CORE_PATCHED_FILE_SHA256
 ARG QWEN3_ENGINE_TOOL_PARSER_PATCHED_FILE_SHA256
@@ -1141,8 +1144,10 @@ RUN printf '%s  %s\n' \
   "${POOLING_BASE_PROTOCOL_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/pooling/base/protocol.py \
   | sha256sum --check --strict
 COPY --chmod=0644 vllm/vllm/tool_parsers/mistral_tool_parser.py /usr/local/lib/python3.12/dist-packages/vllm/tool_parsers/mistral_tool_parser.py
+COPY --chmod=0644 vllm/vllm/tool_parsers/kimi_k2_tool_parser.py /usr/local/lib/python3.12/dist-packages/vllm/tool_parsers/kimi_k2_tool_parser.py
 RUN printf '%s  %s\n' \
   "${MISTRAL_TOOL_PARSER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/tool_parsers/mistral_tool_parser.py \
+  "${KIMI_K2_TOOL_PARSER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/tool_parsers/kimi_k2_tool_parser.py \
   | sha256sum --check --strict
 COPY --chmod=0644 chat_template.jinja /opt/qwen38/chat_template.jinja
 COPY --chmod=0644 scripts/phase_budget_unit.py /opt/qwen38/phase_budget_unit.py
