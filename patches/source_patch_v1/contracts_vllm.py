@@ -4753,15 +4753,86 @@ def _validate_responses_unhonoured_fields_after(state: State) -> None:
         'parameter="prompt",',
     ), label=label)
     forbid_text(state, protocol, "prompt template is not supported", label=label)
+    # A parameter of the pinned API the request does not declare is refused,
+    # the set read from the client types; of reasoning and text only effort
+    # and format are applied; the rest is refused unless it asks only for what
+    # the server does anyway. One refusal, one table of reasons.
+    for construct in (
+        "_API_PARAMETERS = frozenset(\n"
+        "    ResponseCreateParamsStreaming.__required_keys__\n"
+        "    | ResponseCreateParamsStreaming.__optional_keys__\n)",
+        '    "reasoning": frozenset({"effort"}),\n'
+        '    "text": frozenset({"format"}),\n',
+        '    "reasoning.context": frozenset({"auto"}),\n'
+        '    "text.verbosity": frozenset({"medium"}),\n'
+        '    "service_tier": frozenset({"auto", "default"}),\n'
+        '    "stream_options.include_obfuscation": frozenset({False}),\n',
+    ):
+        _require(_source(state, protocol, label=label).count(construct) == 1,
+                 f"{label}: {protocol} lacks the single construct {construct!r}")
+    _require_in_symbol(state, protocol, "_refuse_not_applied", (
+        "_NOT_APPLIED.get(",
+        "parameter=parameter,",
+    ), label=label)
+    applied = _require_in_symbol(state, protocol,
+        "ResponsesRequest.refuse_what_is_not_applied", (
+            "for name in sorted(_API_PARAMETERS - type(self).model_fields.keys()):",
+            "for owner, applied in _APPLIED_SETTINGS.items():",
+            "sorted(type(settings).model_fields.keys() - applied)",
+            '_refuse_not_applied("service_tier", self.service_tier)',
+            '_refuse_not_applied("stream_options.include_obfuscation", obfuscation)',
+            '_refuse_not_applied("include", "reasoning.encrypted_content")',
+        ), label=label)
+    require_text(state, protocol,
+                 '    @model_validator(mode="after")\n'
+                 '    def refuse_what_is_not_applied(self) -> "ResponsesRequest":\n',
+                 label=label)
+    _require("raise " not in applied,
+             f"{label}: ResponsesRequest.refuse_what_is_not_applied refuses "
+             "other than through _refuse_not_applied")
+    for parameter in ("conversation", "context_management", "moderation",
+                      "prompt_cache_options", "prompt_cache_retention",
+                      "reasoning.summary", "reasoning.generate_summary",
+                      "reasoning.context", "reasoning.mode", "text.verbosity",
+                      "service_tier", "stream_options.include_obfuscation",
+                      "include"):
+        require_text(state, protocol, f'    "{parameter}": (\n', label=label)
+    # The route refuses what its launch cannot serve: a store sent true with
+    # the store off, Harmony history without Harmony, and the outputs of a
+    # code interpreter it runs itself.
+    _require_in_symbol(state, serving,
+        "OpenAIServingResponses._validate_create_responses_input", (
+            "if request.previous_input_messages and not self.use_harmony:",
+            'param="previous_input_messages",',
+            '"store" in request.model_fields_set',
+            'param="store",',
+        ), label=label)
+    _require_ordered(create, (
+        "if request.max_tool_calls is not None and available_tools:",
+        '"code_interpreter_call.outputs" in request.include',
+        'and "python" in available_tools',
+        'value="code_interpreter_call.outputs",',
+        "generator = await self._generate_with_builtin_tools(",
+    ), label=label, location=f"{serving}:_create_responses")
+    forbid_text(state, serving, "we opted\n            # to implicitly disable store",
+                label=label)
     require_python_symbols(state,
         "tests/entrypoints/openai/responses/test_serving_responses.py", {
             "test_previous_response_id_on_a_server_that_stores_nothing_is_refused": None,
             "test_an_unknown_previous_response_id_is_named_by_its_field": None,
             "test_max_tool_calls_is_refused_where_built_in_calls_are_not_counted": (
                 "runs_the_tool",),
+            "test_store_sent_true_on_a_server_that_stores_nothing_is_refused": None,
+            "test_previous_input_messages_without_harmony_are_refused": None,
+            "test_code_interpreter_outputs_are_refused_where_the_server_runs_the_code": (
+                "runs_the_tool",),
         }, label=label)
     require_python_symbols(state, "tests/tool_use/test_responses_request_validations.py", {
         "test_a_prompt_template_is_refused_naming_what_to_send_instead": None,
+        "test_a_parameter_this_server_does_not_apply_is_refused": (
+            "fields", "parameter"),
+        "test_a_value_that_asks_for_what_the_server_does_is_served": ("fields",),
+        "test_every_responses_parameter_is_applied_or_refused": None,
     }, label=label)
 
 
@@ -6117,12 +6188,24 @@ CONTRACTS: Mapping[str, SemanticContract] = {
             "template refusal names why and what to send instead. "
             "max_tool_calls counts built-in tool calls: the template path runs "
             "none, so it holds there; a server that runs a requested built-in "
-            "tool itself, uncounted, refuses it before admission."
+            "tool itself, uncounted, refuses it before admission. Every other "
+            "Responses parameter was accepted whether or not it was applied: "
+            "the API parameters the request model does not declare (as "
+            "conversation, moderation, context_management) passed as extra "
+            "keys, and reasoning.summary, text.verbosity, a processing tier, "
+            "stream obfuscation, encrypted reasoning, a store sent true without "
+            "a store, Harmony history without Harmony, and a code interpreter's "
+            "outputs were served without what they asked. Each is refused, "
+            "naming it, its cause and what to send instead; the undeclared "
+            "parameters are read from the pinned client types, so none can be "
+            "added unrefused, and a value that asks only for what the server "
+            "does anyway is served."
         ),
         removal_condition=(
             "Remove when pinned upstream refuses previous_response_id without "
-            "a store by its field and cause, and applies or refuses "
-            "max_tool_calls where it runs built-in tools."
+            "a store by its field and cause, applies or refuses max_tool_calls "
+            "where it runs built-in tools, and refuses every Responses "
+            "parameter it does not apply."
         ),
         validate_before=_validate_responses_unhonoured_fields_before,
         validate_after=_validate_responses_unhonoured_fields_after,

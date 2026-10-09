@@ -370,7 +370,7 @@ It is intentionally reconstructed by the ordered, reviewed semantic transformati
 | patches/vllm-responses-refuses-tools-the-template-is-never-given.patch | eb497a85e0a2f3aa1907fcf22e34b62fe8dc91015a7f869293497d64ad5134b2 |
 | patches/vllm-chat-stream-carries-every-token-logprob.patch | ca15dadd152454fe5b3fbcb710b8c7b5ce3221c038617b9e0d0985953aecbf47 |
 | patches/vllm-chat-messages-read-by-one-rule.patch | 5bf8a2d69d7ab1c6b9ee423740d34616a69e857d64816f68b9b9b1d509455f7f |
-| patches/vllm-responses-refuses-what-it-cannot-honour.patch | 9848b7a06c5eb092889f9fc9f6025d67bea28a029b03da9f2d8378cebdac924f |
+| patches/vllm-responses-refuses-what-it-cannot-honour.patch | 35fcb2a68faa1a6fb99a83b6d7726ffc45f1b6e84cbb2ed7d9fe152575bf10f3 |
 
 The reconstructed tree's runtime-source and test changes, new files and
 deletions are counted by ./scripts/build-vllm.sh check, which derives and prints
@@ -1400,13 +1400,39 @@ input, or let the client compact it. Completions keep `truncate_prompt_tokens`,
 whose prompt is the caller's own text.
 
 A Responses field the server cannot honour is refused with a 400 naming it, the
-cause and what to send instead. This deployment stores no responses (it runs
+cause and what to send instead. A parameter of the pinned Responses API that the
+request model does not declare is one the server does not apply, so it is refused
+when sent -- `conversation`, `context_management`, `moderation`,
+`prompt_cache_options` and `prompt_cache_retention` -- the set read from the
+pinned client types rather than listed. Of `reasoning` only `effort` is applied,
+by the chat template; `summary` and `generate_summary` (the server writes no
+summary: each reasoning item carries the reasoning itself), `mode`, and `context`
+other than `auto` are refused. Of `text`, `format` is applied and `verbosity`
+other than `medium` is refused. So are `service_tier` other than `auto` or
+`default`, `stream_options.include_obfuscation` true, and `include`
+`reasoning.encrypted_content`: nothing is encrypted, and a later request reads a
+reasoning item from its content. This deployment stores no responses (it runs
 without `VLLM_ENABLE_RESPONSES_API_STORE`), so `previous_response_id` is refused:
-send the conversation so far in `input`. `prompt` names a prompt template this
-server does not hold: send its text as `instructions` and `input`.
-`max_tool_calls` counts built-in tool calls, which the template path never runs, so
-it holds and is echoed; it does not count function calls, which return to the
-client. A server that runs a requested built-in tool itself refuses it.
+send the conversation so far in `input`; so is `store` sent true, while `store`
+left at the API's default asks for nothing and is served as false.
+`previous_input_messages` is read only for a model rendered with Harmony and is
+refused here. `prompt` names a prompt template this server does not hold: send
+its text as `instructions` and `input`. `max_tool_calls` counts built-in tool
+calls, which the template path never runs, so it holds and is echoed; it does
+not count function calls, which return to the client. A server that runs a
+requested built-in tool itself refuses it there, and refuses `include`
+`code_interpreter_call.outputs`, since that tool's output goes to the model and
+into no response item. Served as they are, because they ask nothing of the
+response: `user` and `safety_identifier`, which identify the caller's end user;
+`metadata`, echoed; and `prompt_cache_key`, a routing hint the prefix cache,
+which matches every prompt's prefix, does not need. The format `text.format`
+names constrains decoding and is not put in the prompt -- neither its schema nor
+its `description` reaches the model, as with chat's `response_format` on this
+template -- so its description is accepted with it, like every description
+inside the schema, and what the model should know about the format belongs in
+`instructions` or `input`. A key the Responses API does not define is accepted
+and ignored, as upstream accepts unknown keys on every route (logged at debug
+level).
 
 An output constraint cannot hold beside a callable tool, because the call grammar
 covers the whole output. A request that could call a tool and also constrains its

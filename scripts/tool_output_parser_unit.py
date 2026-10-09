@@ -1939,6 +1939,71 @@ class ResponsesStateTest(unittest.TestCase):
                     with self.assertRaisesRegex(RuntimeError, "admitted"):
                         asyncio_run(harmony.create_responses(request))
 
+    def test_a_parameter_the_server_does_not_apply_is_refused(self):
+        """A Responses parameter this server does not apply is a 400 naming
+        it, before anything is admitted, never served as if it held; a value
+        that asks only for what the server does anyway is served."""
+        from vllm.entrypoints.openai.engine.protocol import ErrorResponse
+        from vllm.entrypoints.serve.exception_handling.error_response import (
+            create_error_response,
+        )
+        from vllm.exceptions import VLLMValidationError
+
+        for fields, parameter in (
+            ({"conversation": "conv_unit"}, "conversation"),
+            ({"context_management": [{"type": "compaction"}]}, "context_management"),
+            ({"moderation": {"model": "omni-moderation-latest"}}, "moderation"),
+            ({"prompt_cache_retention": "24h"}, "prompt_cache_retention"),
+            ({"reasoning": {"effort": "xhigh", "summary": "auto"}},
+             "reasoning.summary"),
+            ({"reasoning": {"context": "current_turn"}}, "reasoning.context"),
+            ({"text": {"verbosity": "low"}}, "text.verbosity"),
+            ({"service_tier": "priority"}, "service_tier"),
+            ({"stream": True, "stream_options": {"include_obfuscation": True}},
+             "stream_options.include_obfuscation"),
+            ({"include": ["reasoning.encrypted_content"]}, "include"),
+        ):
+            with self.subTest(parameter=parameter):
+                with self.assertRaises(VLLMValidationError) as refused:
+                    self._request(**fields)
+                error = create_error_response(refused.exception).error
+                self.assertEqual((error.code, error.param), (400, parameter))
+                self.assertIn(parameter.split(".")[0], error.message)
+
+        # Refused by the route: what this server's launch cannot serve.
+        chat, _ = _served_chat()
+        for fields, parameter, needle in (
+            ({"store": True}, "store", "stores no responses"),
+            ({"previous_input_messages": [{"role": "user", "content": "x"}]},
+             "previous_input_messages", "items of `input`"),
+        ):
+            responses, engine = _served_responses(
+                chat.online_renderer, tool_parser=_served("SERVED_TOOL_CALL_PARSER"),
+                enable_auto_tools=True)
+            responses.enable_store = False
+            with self.subTest(parameter=parameter):
+                refused = asyncio_run(responses.create_responses(self._request(**fields)))
+                self.assertIsInstance(refused, ErrorResponse)
+                self.assertEqual((refused.error.code, refused.error.param),
+                                 (400, parameter))
+                self.assertIn(needle, refused.error.message)
+                engine.admit.assert_not_called()
+
+        # Served: each asks only for what the server does without it.
+        for fields in (
+            {"reasoning": {"effort": "xhigh", "context": "auto"}},
+            {"text": {"verbosity": "medium"}},
+            {"service_tier": "default"},
+            {"stream_options": {"include_obfuscation": False}},
+            {"safety_identifier": "end-user", "user": "end-user",
+             "prompt_cache_key": "unit", "metadata": {"run": "unit"}},
+        ):
+            with self.subTest(served=sorted(fields)):
+                responses, _ = _served_responses(chat.online_renderer)
+                responses.enable_store = False
+                self.assertIsNone(responses._validate_create_responses_input(
+                    self._request(**fields)))
+
 
 if __name__ == "__main__":
     unittest.main()

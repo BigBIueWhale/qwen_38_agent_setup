@@ -1,8 +1,8 @@
 diff --git a/tests/entrypoints/openai/responses/test_serving_responses.py b/tests/entrypoints/openai/responses/test_serving_responses.py
-index 0fe655a9ca22559a96f8a5a316badf2191170d0e..1079441ea83d10e725b662ecd9f6b3e694ae5543 100644
+index 0fe655a9ca22559a96f8a5a316badf2191170d0e..dd7a973b3ce6c077904f08c7b9f79fc815993a24 100644
 --- a/tests/entrypoints/openai/responses/test_serving_responses.py
 +++ b/tests/entrypoints/openai/responses/test_serving_responses.py
-@@ -1531,3 +1531,91 @@ async def test_a_continued_final_message_is_the_answer_on_both_responses_paths(
+@@ -1531,3 +1531,167 @@ async def test_a_continued_final_message_is_the_answer_on_both_responses_paths(
          ("message", "wer is 4.")
      ]
      assert parser.reasoning_token_count == 0
@@ -94,11 +94,87 @@ index 0fe655a9ca22559a96f8a5a316badf2191170d0e..1079441ea83d10e725b662ecd9f6b3e6
 +    else:
 +        with pytest.raises(RuntimeError, match="admitted"):
 +            await serving.create_responses(request)
++
++
++@pytest.mark.asyncio
++async def test_store_sent_true_on_a_server_that_stores_nothing_is_refused():
++    serving, engine = _stateless_serving(enable_store=False)
++    refused = await serving.create_responses(
++        ResponsesRequest(input="q", kv_scope="agent", store=True)
++    )
++    assert isinstance(refused, ErrorResponse)
++    assert (refused.error.code, refused.error.param) == (400, "store")
++    assert "stores no responses" in refused.error.message
++    assert "VLLM_ENABLE_RESPONSES_API_STORE=1" in refused.error.message
++    engine.admit.assert_not_called()
++    # store is true by the API's default when it is not sent; that asks for
++    # nothing, and the request is served without storing.
++    assert (
++        serving._validate_create_responses_input(
++            ResponsesRequest(input="q", kv_scope="agent")
++        )
++        is None
++    )
++
++
++@pytest.mark.asyncio
++async def test_previous_input_messages_without_harmony_are_refused():
++    serving, engine = _stateless_serving(enable_store=False)
++    refused = await serving.create_responses(
++        ResponsesRequest(
++            input="q",
++            kv_scope="agent",
++            previous_input_messages=[{"role": "user", "content": "earlier"}],
++        )
++    )
++    assert isinstance(refused, ErrorResponse)
++    assert (refused.error.code, refused.error.param) == (
++        400,
++        "previous_input_messages",
++    )
++    assert "items of `input`" in refused.error.message
++    engine.admit.assert_not_called()
++
++
++@pytest.mark.asyncio
++@pytest.mark.parametrize("runs_the_tool", [True, False])
++async def test_code_interpreter_outputs_are_refused_where_the_server_runs_the_code(
++    runs_the_tool,
++):
++    # A Harmony tool's output goes back to the model as a message; no output
++    # item carries it.
++    tool_server = MagicMock(spec=ToolServer)
++    tool_server.has_tool.return_value = runs_the_tool
++    serving, engine = _stateless_serving(
++        enable_store=False,
++        model_type="gpt_oss",
++        reasoning_parser="openai_gptoss",
++        tool_server=tool_server,
++    )
++    serving._make_request_with_harmony = MagicMock(
++        return_value=([], [tokens_input([1, 2, 3])])
++    )
++    engine.admit = AsyncMock(side_effect=RuntimeError("admitted"))
++    request = ResponsesRequest(
++        input="q",
++        kv_scope="agent",
++        include=["code_interpreter_call.outputs"],
++        tools=[{"type": "code_interpreter", "container": {"type": "auto"}}],
++    )
++    if runs_the_tool:
++        with pytest.raises(VLLMValidationError) as refused:
++            await serving.create_responses(request)
++        assert refused.value.parameter == "include"
++        assert "Remove it from include" in str(refused.value)
++        engine.admit.assert_not_called()
++    else:
++        with pytest.raises(RuntimeError, match="admitted"):
++            await serving.create_responses(request)
 diff --git a/tests/tool_use/test_responses_request_validations.py b/tests/tool_use/test_responses_request_validations.py
-index 3de5054dc3f38ae665722d12dc2b3c7b0aba8d44..9f2db4dd3111573cf8a9826c458988d2c8d092e7 100644
+index 3de5054dc3f38ae665722d12dc2b3c7b0aba8d44..8a364c97bdb8ece01f32e2a9088577b7e3402a69 100644
 --- a/tests/tool_use/test_responses_request_validations.py
 +++ b/tests/tool_use/test_responses_request_validations.py
-@@ -396,3 +396,19 @@ def test_responses_request_leaves_hosted_tools_to_the_route(hosted):
+@@ -396,3 +396,95 @@ def test_responses_request_leaves_hosted_tools_to_the_route(hosted):
          {"input": "Hello", "model": "test-model", "tools": [SAMPLE_TOOL, hosted]}
      )
      assert request.tools[1].type == hosted["type"]
@@ -118,11 +194,248 @@ index 3de5054dc3f38ae665722d12dc2b3c7b0aba8d44..9f2db4dd3111573cf8a9826c458988d2
 +    assert refused.value.parameter == "prompt"
 +    assert "holds no prompt templates" in str(refused.value)
 +    assert "as instructions and input, and omit prompt" in str(refused.value)
++
++
++@pytest.mark.parametrize(
++    ("fields", "parameter"),
++    [
++        ({"conversation": "conv_123"}, "conversation"),
++        ({"conversation": {"id": "conv_123"}}, "conversation"),
++        ({"context_management": [{"type": "compaction"}]}, "context_management"),
++        ({"moderation": {"model": "omni-moderation-latest"}}, "moderation"),
++        ({"prompt_cache_options": {"mode": "explicit"}}, "prompt_cache_options"),
++        ({"prompt_cache_retention": "24h"}, "prompt_cache_retention"),
++        ({"reasoning": {"effort": "high", "summary": "auto"}}, "reasoning.summary"),
++        (
++            {"reasoning": {"generate_summary": "concise"}},
++            "reasoning.generate_summary",
++        ),
++        ({"reasoning": {"context": "current_turn"}}, "reasoning.context"),
++        ({"reasoning": {"mode": "pro"}}, "reasoning.mode"),
++        ({"text": {"verbosity": "low"}}, "text.verbosity"),
++        ({"service_tier": "priority"}, "service_tier"),
++        ({"service_tier": "flex"}, "service_tier"),
++        (
++            {"stream": True, "stream_options": {"include_obfuscation": True}},
++            "stream_options.include_obfuscation",
++        ),
++        ({"include": ["reasoning.encrypted_content"]}, "include"),
++    ],
++)
++def test_a_parameter_this_server_does_not_apply_is_refused(fields, parameter):
++    """A request that asks for what this server does not do is refused,
++    naming the parameter and what to send instead, never served without
++    it."""
++    refused = _refusal({"input": "Hello", "model": "test-model", **fields})
++    assert refused.parameter == parameter
++    message = str(refused)
++    assert parameter in message
++    assert any(action in message for action in ("Omit", "omit", "Remove", "Send"))
++
++
++@pytest.mark.parametrize(
++    "fields",
++    [
++        {"conversation": None},
++        {"safety_identifier": "user-123"},
++        {"user": "user-123"},
++        {"prompt_cache_key": "agent-7"},
++        {"metadata": {"run": "7"}},
++        {"reasoning": {"effort": "high"}},
++        {"reasoning": {"effort": "high", "context": "auto"}},
++        {"text": {"verbosity": "medium"}},
++        {"service_tier": "default"},
++        {"stream": True, "stream_options": {"include_obfuscation": False}},
++        {"include": ["file_search_call.results"]},
++    ],
++)
++def test_a_value_that_asks_for_what_the_server_does_is_served(fields):
++    _validate({"input": "Hello", "model": "test-model", **fields})
++
++
++def test_every_responses_parameter_is_applied_or_refused():
++    """The parameters of the pinned Responses API this request declares
++    nothing for are the ones it refuses; each has its own reason."""
++    from vllm.entrypoints.openai.responses.protocol import (
++        _API_PARAMETERS,
++        _NOT_APPLIED,
++    )
++
++    undeclared = _API_PARAMETERS - ResponsesRequest.model_fields.keys()
++    assert undeclared == {
++        "context_management",
++        "conversation",
++        "moderation",
++        "prompt_cache_options",
++        "prompt_cache_retention",
++    }
++    assert undeclared <= _NOT_APPLIED.keys()
 diff --git a/vllm/entrypoints/openai/responses/protocol.py b/vllm/entrypoints/openai/responses/protocol.py
-index 6212e109250089bc54eb58892e6e8a13a2c8fa6d..26c9a97d62923e4d60cdcedb7544187aa151bd9c 100644
+index 6212e109250089bc54eb58892e6e8a13a2c8fa6d..562f8356e7085dcc81312dd55ce07e80a75fdace 100644
 --- a/vllm/entrypoints/openai/responses/protocol.py
 +++ b/vllm/entrypoints/openai/responses/protocol.py
-@@ -585,7 +585,11 @@ class ResponsesRequest(OpenAIBaseModel):
+@@ -4,7 +4,7 @@
+ # Adapted from
+ # https://github.com/lm-sys/FastChat/blob/168ccc29d3f7edc50823016105c024fe2282732a/fastchat/protocol/openai_api_protocol.py
+ import time
+-from typing import Any, Literal, TypeAlias
++from typing import Any, Literal, NoReturn, TypeAlias
+ 
+ from openai.types.responses import (
+     ResponseCodeInterpreterCallCodeDeltaEvent,
+@@ -46,6 +46,10 @@ from openai.types.responses import (
+     ResponseIncompleteEvent as OpenAIResponseIncompleteEvent,
+ )
+ from openai.types.responses.response import IncompleteDetails, ToolChoice
++from openai.types.responses.response_create_params import (
++    ResponseCreateParamsStreaming,
++    StreamOptions,
++)
+ from openai.types.responses.response_reasoning_item import (
+     Content as ResponseReasoningTextContent,
+ )
+@@ -93,5 +97,124 @@ logger = init_logger(__name__)
+ _INT64_MIN = -(2**63)
+ _INT64_MAX = 2**63 - 1
+ 
++# Every parameter of the Responses API, as the pinned client types define it.
++# A parameter ResponsesRequest does not declare is one this server does not
++# apply, so a request that sends one is refused rather than served without it.
++_API_PARAMETERS = frozenset(
++    ResponseCreateParamsStreaming.__required_keys__
++    | ResponseCreateParamsStreaming.__optional_keys__
++)
++
++# The reasoning and text settings this server applies: reasoning.effort, which
++# the prompt carries, and text.format, which constrains the output. Every other
++# setting of either is refused unless its value is one the server serves.
++_APPLIED_SETTINGS = {
++    "reasoning": frozenset({"effort"}),
++    "text": frozenset({"format"}),
++}
++
++# The values of a parameter the server does not apply that ask only for what it
++# does anyway: the model reads the reasoning items it is sent (context "auto"),
++# answers at its own length (the default verbosity, "medium"), on the one tier
++# this server has, with no padding on streamed events.
++_SERVED_ANYWAY = {
++    "reasoning.context": frozenset({"auto"}),
++    "text.verbosity": frozenset({"medium"}),
++    "service_tier": frozenset({"auto", "default"}),
++    "stream_options.include_obfuscation": frozenset({False}),
++}
++
++# What each parameter this server does not apply asks for, why the response
++# would be made without it, and what to send instead.
++_NOT_APPLIED = {
++    "conversation": (
++        "conversation adds a stored conversation's items to the input and this "
++        "response's items to the conversation, and this server stores no "
++        "conversations, so the model would read none of it. Send the "
++        "conversation's items in `input`, and omit conversation."
++    ),
++    "context_management": (
++        "context_management asks the server to compact the conversation as it "
++        "grows, and this server compacts nothing: the model reads the input as "
++        "it is sent. Shorten the input yourself, for example by dropping or "
++        "summarising earlier items, and omit context_management."
++    ),
++    "moderation": (
++        "moderation asks the server to score or block the input and the "
++        "output, and this server runs no moderation. Moderate them yourself, "
++        "and omit moderation."
++    ),
++    "prompt_cache_options": (
++        "prompt_cache_options sets which prefixes of a prompt are cached and "
++        "for how long, and this server caches prompt prefixes by its own "
++        "policy, which a request cannot set. Omit prompt_cache_options; "
++        "prefixes are still cached and reused."
++    ),
++    "prompt_cache_retention": (
++        "prompt_cache_retention sets how long a prompt's cached prefix is "
++        "kept, and this server keeps cached prefixes by its own policy, which "
++        "a request cannot set. Omit prompt_cache_retention; prefixes are "
++        "still cached and reused."
++    ),
++    "reasoning.summary": (
++        "reasoning.summary asks for a summary of the model's reasoning, and "
++        "this server writes none: each reasoning item carries the reasoning as "
++        "the model wrote it, in its content. Omit reasoning.summary."
++    ),
++    "reasoning.generate_summary": (
++        "reasoning.generate_summary, the former name of reasoning.summary, "
++        "asks for a summary of the model's reasoning, and this server writes "
++        "none: each reasoning item carries the reasoning as the model wrote "
++        "it, in its content. Omit reasoning.generate_summary."
++    ),
++    "reasoning.context": (
++        "reasoning.context sets which earlier reasoning items the model reads, "
++        "and this server has no such setting: the model reads the reasoning "
++        "items sent in `input`, as its prompt format renders them. Send in "
++        "`input` the reasoning items the model should read, and send "
++        'reasoning.context "auto" or omit it.'
++    ),
++    "reasoning.mode": (
++        "reasoning.mode selects how the model reasons, and this server runs "
++        "the model one way. Omit reasoning.mode."
++    ),
++    "text.verbosity": (
++        "text.verbosity asks for a shorter or longer answer, and this server "
++        "applies no such setting. Ask for the length you want in "
++        '`instructions` or `input`, and send text.verbosity "medium" or omit '
++        "it."
++    ),
++    "service_tier": (
++        "service_tier asks for a processing tier, and this server processes "
++        'every request alike. Send "auto" or "default", or omit service_tier.'
++    ),
++    "stream_options.include_obfuscation": (
++        "stream_options.include_obfuscation asks for random padding on each "
++        "streamed event, and this server adds none. Send it false, or omit "
++        "stream_options."
++    ),
++    "include": (
++        'include "reasoning.encrypted_content" asks for each reasoning item to '
++        "carry its reasoning encrypted, and this server encrypts nothing: a "
++        "reasoning item carries the reasoning in its content, and a later "
++        "request reads it from there. Remove it from include, and send the "
++        "reasoning items back in `input` as they were returned."
++    ),
++}
++
++
++def _refuse_not_applied(parameter: str, value: Any) -> NoReturn:
++    """Refuse a request for *parameter*, which this server does not apply."""
++    raise VLLMValidationError(
++        _NOT_APPLIED.get(
++            parameter,
++            f"{parameter} is a Responses parameter this server does not "
++            "apply, so the response would be made without what it asks. "
++            f"Omit {parameter}.",
++        ),
++        parameter=parameter,
++        value=value,
++    )
++
+ 
+ class InputTokensDetails(OpenAIBaseModel):
+@@ -182,6 +305,7 @@ class ResponsesRequest(OpenAIBaseModel):
+     previous_response_id: str | None = None
+     prompt: ResponsePrompt | None = None
+     reasoning: Reasoning | None = None
++    safety_identifier: str | None = None
+     include_reasoning: bool = Field(
+         default=True,
+         description=(
+@@ -209,6 +333,7 @@ class ResponsesRequest(OpenAIBaseModel):
+     service_tier: Literal["auto", "default", "flex", "scale", "priority"] = "auto"
+     store: bool | None = True
+     stream: bool | None = False
++    stream_options: StreamOptions | None = None
+     temperature: float | None = None
+     text: ResponseTextConfig | None = None
+     tool_choice: ToolChoice = "auto"
+@@ -585,9 +710,43 @@ class ResponsesRequest(OpenAIBaseModel):
      def validate_prompt(cls, data):
          if data.get("prompt") is not None:
              raise VLLMValidationError(
@@ -135,14 +448,78 @@ index 6212e109250089bc54eb58892e6e8a13a2c8fa6d..26c9a97d62923e4d60cdcedb7544187a
              )
          return data
  
++    @model_validator(mode="after")
++    def refuse_what_is_not_applied(self) -> "ResponsesRequest":
++        """A Responses parameter this server does not apply is refused, naming
++        it, rather than served as if it held. A value that asks only for what
++        the server does anyway is served."""
++        sent = self.model_extra or {}
++        for name in sorted(_API_PARAMETERS - type(self).model_fields.keys()):
++            if sent.get(name) is not None:
++                _refuse_not_applied(name, sent[name])
++        for owner, applied in _APPLIED_SETTINGS.items():
++            settings = getattr(self, owner)
++            if settings is None:
++                continue
++            for name in sorted(type(settings).model_fields.keys() - applied):
++                parameter = f"{owner}.{name}"
++                value = getattr(settings, name)
++                if value is not None and value not in _SERVED_ANYWAY.get(
++                    parameter, ()
++                ):
++                    _refuse_not_applied(parameter, value)
++        if self.service_tier not in _SERVED_ANYWAY["service_tier"]:
++            _refuse_not_applied("service_tier", self.service_tier)
++        if self.stream_options is not None:
++            obfuscation = self.stream_options.get("include_obfuscation", False)
++            if obfuscation not in _SERVED_ANYWAY["stream_options.include_obfuscation"]:
++                _refuse_not_applied("stream_options.include_obfuscation", obfuscation)
++        if self.include and "reasoning.encrypted_content" in self.include:
++            _refuse_not_applied("include", "reasoning.encrypted_content")
++        return self
++
+     @model_validator(mode="before")
+     @classmethod
 diff --git a/vllm/entrypoints/openai/responses/serving.py b/vllm/entrypoints/openai/responses/serving.py
-index caaf567646bea50366e5e33cc1d5e0dbedd0f50d..5f054ad9f96df3c76f3c094803ab33f874e6a5f7 100644
+index caaf567646bea50366e5e33cc1d5e0dbedd0f50d..8c15b36b33567b9224a7582ec1f44c5af7e2b09d 100644
 --- a/vllm/entrypoints/openai/responses/serving.py
 +++ b/vllm/entrypoints/openai/responses/serving.py
-@@ -321,6 +321,23 @@ class OpenAIServingResponses(GenerateBaseServing):
+@@ -321,6 +321,55 @@ class OpenAIServingResponses(GenerateBaseServing):
                  status_code=HTTPStatus.BAD_REQUEST,
                  param="previous_response_id",
              )
++        if request.previous_input_messages and not self.use_harmony:
++            return self.create_error_response(
++                err_type="invalid_request_error",
++                message=(
++                    "previous_input_messages is read only when this server "
++                    "renders the model's prompt with Harmony, and it renders "
++                    "this model's prompts with the chat template, so the "
++                    "model would read none of those messages. Send them as "
++                    "items of `input` -- messages, function calls and their "
++                    "outputs -- and omit previous_input_messages."
++                ),
++                status_code=HTTPStatus.BAD_REQUEST,
++                param="previous_input_messages",
++            )
++        if (
++            "store" in request.model_fields_set
++            and request.store
++            and not self.enable_store
++        ):
++            return self.create_error_response(
++                err_type="invalid_request_error",
++                message=(
++                    "store true asks this server to keep the response for "
++                    "retrieval by its id, and this server stores no "
++                    "responses: it runs without "
++                    "`VLLM_ENABLE_RESPONSES_API_STORE`. Send store false or "
++                    "omit it, or serve with "
++                    "`VLLM_ENABLE_RESPONSES_API_STORE=1`."
++                ),
++                status_code=HTTPStatus.BAD_REQUEST,
++                param="store",
++            )
 +        if request.previous_response_id is not None and not self.enable_store:
 +            return self.create_error_response(
 +                err_type="invalid_request_error",
@@ -163,7 +540,23 @@ index caaf567646bea50366e5e33cc1d5e0dbedd0f50d..5f054ad9f96df3c76f3c094803ab33f8
          return None
  
      async def create_responses(
-@@ -372,7 +389,9 @@ class OpenAIServingResponses(GenerateBaseServing):
+@@ -358,12 +407,9 @@ class OpenAIServingResponses(GenerateBaseServing):
+             raise self.engine_client.dead_error
+ 
+         if request.store and not self.enable_store:
+-            # Disable the store option.
+-            # NOTE(woosuk): Although returning an error is possible, we opted
+-            # to implicitly disable store and process the request anyway, as
+-            # we assume most users do not intend to actually store the response
+-            # (i.e., their request's `store=True` just because it's the default
+-            # value).
++            # A store the request did not send is the API's default, not a
++            # request to store, so it is served as false; a store true the
++            # request sent was refused above.
+             request.store = False
+ 
+         # Handle the previous response ID.
+@@ -372,7 +418,9 @@ class OpenAIServingResponses(GenerateBaseServing):
              async with self.response_store_lock:
                  prev_response = self.response_store.get(prev_response_id)
              if prev_response is None:
@@ -174,7 +567,7 @@ index caaf567646bea50366e5e33cc1d5e0dbedd0f50d..5f054ad9f96df3c76f3c094803ab33f8
          else:
              prev_response = None
  
-@@ -422,6 +441,18 @@ class OpenAIServingResponses(GenerateBaseServing):
+@@ -422,6 +470,33 @@ class OpenAIServingResponses(GenerateBaseServing):
          else:
              assert len(builtin_tool_list) == 0
              available_tools = []
@@ -190,10 +583,25 @@ index caaf567646bea50366e5e33cc1d5e0dbedd0f50d..5f054ad9f96df3c76f3c094803ab33f8
 +                parameter="max_tool_calls",
 +                value=request.max_tool_calls,
 +            )
++        if (
++            request.include
++            and "code_interpreter_call.outputs" in request.include
++            and "python" in available_tools
++        ):
++            # A Harmony tool's output goes back to the model as a message; no
++            # output item carries it.
++            raise VLLMValidationError(
++                'include "code_interpreter_call.outputs" asks for the output of '
++                "the code this server runs for the model, and no response this "
++                "server makes carries it: the output goes to the model, not "
++                "into the response. Remove it from include.",
++                parameter="include",
++                value="code_interpreter_call.outputs",
++            )
          tokenizer = self.renderer.get_tokenizer()
  
          for engine_input in engine_inputs:
-@@ -1282,12 +1313,25 @@ class OpenAIServingResponses(GenerateBaseServing):
+@@ -1282,12 +1357,25 @@ class OpenAIServingResponses(GenerateBaseServing):
                  logger.exception("Background task for %s was cancelled", response_id)
          return response
  
