@@ -4217,6 +4217,12 @@ def _validate_batch_parse_from_prompt_after(state: State) -> None:
          "prompt_token_ids=None"),
     ):
         _require_in_symbol(state, path, symbol, (needle,), label=label)
+    # Derender is given no prompt; its call says what it then reads.
+    _require_in_symbol(state, "vllm/renderers/online_derenderer.py",
+                       "OnlineDerenderer._derender_chat", (
+                           "read as the opener and has no text",
+                           "this call parses as the chat route's does",
+                       ), label=label)
     forbid_text(state, "vllm/entrypoints/openai/chat_completion/batch_serving.py",
                 "parser.parse(", label=label)
     for path, tests in (
@@ -6035,7 +6041,11 @@ CONTRACTS: Mapping[str, SemanticContract] = {
             "a template that leaves the opener to the model expects. Derender "
             "receives no prompt ids and passes none, so a continued final "
             "message is reasoning there, as on upstream's derender, and a "
-            "<think> as a generation's first token is read as its opener."
+            "<think> as a generation's first token is read as its opener and "
+            "has no text, though the prompt /render wrote opened reasoning; "
+            "given those ids the same call reads both as chat does. Carrying "
+            "them would be new protocol, and re-rendering the request a "
+            "second render, on a route this deployment's client does not call."
         ),
         removal_condition=(
             "Remove when pinned upstream's complete-output parse starts from the "

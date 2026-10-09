@@ -360,8 +360,8 @@ It is intentionally reconstructed by the ordered, reviewed semantic transformati
 | patches/vllm-unspecified-tool-choice-is-the-default.patch | d962d3c3fbd96a909a0c03e8f6a3c987ece5f0e7c27ca81571d68bda1d97cdaa |
 | patches/vllm-call-only-answer-keeps-the-blank-line.patch | c5815801d29b3ecb7a6aeba3ef586aac53950b6229c2b7fb315b95acd54501b1 |
 | patches/vllm-responses-tools-are-one-function-list.patch | a1c2f1c1b654e7d28b8e7c09d7db7acebde33fbc0773a299ac27f5b55d5f4122 |
-| patches/vllm-batch-parse-starts-where-the-prompt-leaves.patch | 93de24091a3be1cd49dc0c8b90c859d5d9fdf6a075b822ae74dd61d5a6c1f376 |
-| patches/vllm-derender-text-is-the-detokenizers.patch | 9d8f6d45beba5c79671444be4e9604c4352c7fe5346d78573bfc4fbc91bfb4b6 |
+| patches/vllm-batch-parse-starts-where-the-prompt-leaves.patch | c580e2dbb0d3435c88cfea00d5fab43bf60336432bdbaf01706dfa881ba3451a |
+| patches/vllm-derender-text-is-the-detokenizers.patch | 3dcee7c4e7fb45b6bbec3f8f90fa9c77266acc37ea0ab43ce43b975cdb3d847d |
 | patches/vllm-output-constraints-refused-beside-tool-calls.patch | b82f6259428441aee55d157443bcedc1d98fb247ef9a521106408671a24ae533 |
 | patches/vllm-batch-invariance-substitutes-no-nvfp4-kernel.patch | c79baaee0a51275f5f522d266fe6b315c200e6951920c2454d5c80cadbb92f44 |
 | patches/vllm-render-carries-every-image-chat-renders.patch | 9c20792ac98dfabdc44691217947d18ad7eee940f236343f531a891cde9a72b1 |
@@ -1355,18 +1355,20 @@ ordinary text tokens, matching XGrammar's text language. Ordinary-token thinking
 marker spellings inside reasoning remain reasoning. Both tokenizations are
 checked with native XGrammar and through streaming and batch parsing.
 
-The parser deletes nothing the model generated. A special token its format does
-not act on -- the vision and audio markers among them, which the served template
-itself spells -- is the text it decodes to, in reasoning, in the answer and inside
+The parser deletes nothing the model generated, given the prompt it continues --
+on every route but derender (below). A special token its format does not act
+on -- the vision and audio markers among them, which the served template itself
+spells -- is the text it decodes to, in reasoning, in the answer and inside
 a call's arguments, and a second `</think>` after reasoning has ended is content,
 as a literal `<think>` there already was. A `<think>` the model writes inside its
 reasoning is part of it: every served generation prompt ends inside the `<think>`
 the template wrote, and the parser reads the prompt. Only a generation whose
-prompt left the opener to the model -- a template that writes none, or derender,
-which is given no prompt -- opens its reasoning with `<think>`, and only as its
-first token. Upstream's Qwen grammar deletes every `<think>` in reasoning, the
-model's own included. Upstream's parser engine deletes every
-special token its format does not act on by default. Here that deletion erased the
+prompt left the opener to the model -- a template that writes none -- opens its
+reasoning with `<think>`, and only as its first token. Derender, which is given
+no prompt, reads every generation that way, and so is the one place a `<think>`
+the model writes loses its text (below). Upstream's Qwen grammar deletes every
+`<think>` in reasoning, the model's own included. Upstream's parser engine
+deletes every special token its format does not act on by default. Here that deletion erased the
 model's output from the record and, beside the content ids the batch tool pass
 splits on, left an id whose text was gone, which the token-position scanner
 refuses: a whole response failed with 500 and a stream lost the token or failed,
@@ -1383,12 +1385,17 @@ model continues, on Chat Completions as on Responses. The complete-output parse
 reads that one decision as the stream does, so a continued final message -- whose
 prompt already closed reasoning -- is the answer on both transports, never
 reasoning in one and content in the other. Derender is given no prompt and parses
-as if reasoning were open, as upstream's derender does: a continued final
-message's answer is reasoning there, and empty with `include_reasoning` off. The
-"parser parity" that upstream's derender guide
-(`vllm/docs/serving/online_serving/derenderer.md`) states -- the same content,
-reasoning and tool-call split as a served Chat request -- does not hold here for
-a continued final message.
+as if reasoning were open and its opener left to the model, as upstream's
+derender does: a continued final message's answer is reasoning there, and empty
+with `include_reasoning` off, and a `<think>` the model writes as its first token
+-- reasoning text on Chat, since every served generation prompt opened reasoning
+-- is read as the opener and has no text. The "parser parity" that upstream's
+derender guide (`vllm/docs/serving/online_serving/derenderer.md`) states -- the
+same content, reasoning and tool-call split as a served Chat request -- holds in
+neither case. Given the prompt ids `/render` wrote, derender's own parse reads
+both as Chat does, by the same call and the same rule; the route carries none,
+and stays so: carrying the ids would be new protocol, and re-rendering the
+request a second render, on a route this deployment's client does not call.
 
 A tool choice that is not specified -- omitted or `null` -- is `auto` when tools
 are declared and `none` otherwise. The chat request and the Anthropic conversion

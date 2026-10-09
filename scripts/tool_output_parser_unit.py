@@ -876,10 +876,12 @@ class ToolOutputParserTest(unittest.TestCase):
         token id -- has no text unless the caller asked to see stop text, and a
         length cut inside a character shows nothing of it; derender decides
         both where the detokenizer does, so the same ids parse to the same
-        message on the chat route and on derender, batch and stream. Derender
-        reads a stop from its caller, not from the engine, so it accepts one
-        exactly where the engine, on the served generation config, would have
-        stopped with that stop_reason, and refuses any other, naming the choice.
+        message on the chat route and on derender, batch and stream, except
+        where only the prompt decides: given none, derender reads a <think> as
+        the first generated token as the opener. Derender reads a stop from its
+        caller, not from the engine, so it accepts one exactly where the
+        engine, on the served generation config, would have stopped with that
+        stop_reason, and refuses any other, naming the choice.
         """
         import types
 
@@ -986,6 +988,20 @@ class ToolOutputParserTest(unittest.TestCase):
                         "unit", chunk, state, completion_request=completion))
                     streamed += delta.choices[0].text
                 self.assertEqual(streamed, served)
+
+        # Derender is given no prompt, so it reads a generation as if its
+        # prompt had left the opener to the model: a <think> the model writes
+        # as its first token, reasoning text on the chat route, whose served
+        # prompt opened reasoning, has no text there.
+        ids = encode("<think>plan</think>\n\nok") + [MODEL_EOS[0]]
+        response = GenerateResponse(request_id="unit", choices=[{
+            "index": 0, "finish_reason": "stop", "stop_reason": None,
+            "token_ids": ids,
+        }])
+        message = derenderer._derender_chat(response, request_for())[0].message
+        self.assertEqual(parse("<think>plan</think>\n\nok", None)[:2],
+                         ("<think>plan", "\n\nok"))
+        self.assertEqual((message.reasoning, message.content), ("plan", "\n\nok"))
 
         request = request_for()
         completion = CompletionRequest(model="unit", prompt="prompt")

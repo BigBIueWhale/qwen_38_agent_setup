@@ -138154,7 +138154,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'self.exclude_tools_when_tool_choice_none\n'})},
  {'name': 'batch-parse-starts-where-the-prompt-leaves',
   'review_patch': 'patches/vllm-batch-parse-starts-where-the-prompt-leaves.patch',
-  'review_sha256': '93de24091a3be1cd49dc0c8b90c859d5d9fdf6a075b822ae74dd61d5a6c1f376',
+  'review_sha256': 'c580e2dbb0d3435c88cfea00d5fab43bf60336432bdbaf01706dfa881ba3451a',
   'files': ({'path': 'tests/entrypoints/openai/responses/test_parsable_context_unit.py',
              'before_sha256': '8fd0bd655d13abdc9fe03e1c0bb0625225431624db8257e1db07c00ac3da2779',
              'after_sha256': '95f50d93d97370d426319b5dc94fce55b9cbca4ce9b3b95a930e42990dcbf4a2'},
@@ -138199,7 +138199,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'after_sha256': 'cf2cf56da08af417457b76cf9a335b5724d2d75855906e957c83069171ff2354'},
             {'path': 'vllm/renderers/online_derenderer.py',
              'before_sha256': 'c93551f5e63e1b7e5d5bf105ca2e642a288644078feee561e8eef63267f7841d',
-             'after_sha256': 'aa7e50be91195b3781f184a37f6c6f24e0b830cedaced3229dc18436f3ebf407'},
+             'after_sha256': 'bf62d1a3e0ec31184899e1dda2a05707d7e464a1789bb4770f2b8e9d011499c3'},
             {'path': 'tests/parser/engine/test_reasoning_token_count.py',
              'before_sha256': 'dab4d5943f8887c1c56e884b77d63898e24fbcce16393ed240aabe61f555d280',
              'after_sha256': '8eadc5059845dacc54dd7b2fa725e6a4745daa2a94cb16d13238916df26cbd2c'},
@@ -140107,11 +140107,22 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       'the request,\n'
                       '                    # never the prompt ids /render wrote, so it '
                       'cannot read\n'
-                      '                    # where that prompt left reasoning: a '
-                      'continued final\n'
-                      '                    # message, whose prompt already closed it, '
-                      'is parsed as\n'
-                      '                    # reasoning here, as upstream parses it.\n'
+                      '                    # where that prompt left reasoning and '
+                      'parses, as upstream\n'
+                      '                    # does, as if reasoning were open and its '
+                      'opener left to\n'
+                      '                    # the model: a continued final message, '
+                      'whose prompt\n'
+                      '                    # already closed reasoning, is parsed as '
+                      'reasoning here,\n'
+                      '                    # and a <think> generated as the first '
+                      'token, which a\n'
+                      '                    # prompt that opened reasoning makes '
+                      'reasoning text, is\n'
+                      '                    # read as the opener and has no text. Given '
+                      'those prompt\n'
+                      "                    # ids, this call parses as the chat route's "
+                      'does.\n'
                       '                    prompt_token_ids=None,\n'
                       '                    enable_auto_tools=self.enable_auto_tools,\n'
                       '                    model_output_token_ids=choice.token_ids,\n'
@@ -140134,12 +140145,22 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'ids and the request,\n'
                              '                    # never the prompt ids /render '
                              'wrote, so it cannot read\n'
-                             '                    # where that prompt left reasoning: '
-                             'a continued final\n'
-                             '                    # message, whose prompt already '
-                             'closed it, is parsed as\n'
-                             '                    # reasoning here, as upstream parses '
-                             'it.\n'
+                             '                    # where that prompt left reasoning '
+                             'and parses, as upstream\n'
+                             '                    # does, as if reasoning were open '
+                             'and its opener left to\n'
+                             '                    # the model: a continued final '
+                             'message, whose prompt\n'
+                             '                    # already closed reasoning, is '
+                             'parsed as reasoning here,\n'
+                             '                    # and a <think> generated as the '
+                             'first token, which a\n'
+                             '                    # prompt that opened reasoning makes '
+                             'reasoning text, is\n'
+                             '                    # read as the opener and has no '
+                             'text. Given those prompt\n'
+                             '                    # ids, this call parses as the chat '
+                             "route's does.\n"
                              '                    prompt_token_ids=None,\n'
                              '                    '
                              'enable_auto_tools=self.enable_auto_tools,\n'
@@ -141148,7 +141169,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '            return True\n'})},
  {'name': 'derender-text-is-the-detokenizers',
   'review_patch': 'patches/vllm-derender-text-is-the-detokenizers.patch',
-  'review_sha256': '9d8f6d45beba5c79671444be4e9604c4352c7fe5346d78573bfc4fbc91bfb4b6',
+  'review_sha256': '3dcee7c4e7fb45b6bbec3f8f90fa9c77266acc37ea0ab43ce43b975cdb3d847d',
   'files': ({'path': 'tests/entrypoints/scale_out/derender/test_derender.py',
              'before_sha256': '3416a07fdc8241799d3ea888295eaaafe4cf01d569195e2f0351af793c63928b',
              'after_sha256': '210db8e1b18615c08fd072c37ca80357148c14ed205b55fb3b68e0a01d592055'},
@@ -141162,8 +141183,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': 'e3edf885a33aaecf5dd8d6fdeadad7f3eed60510eb4f43354f1273e52b974cfc',
              'after_sha256': 'a1105a96507b731060a9d9290abefe355dbd1dd5d63954472297901af364b426'},
             {'path': 'vllm/renderers/online_derenderer.py',
-             'before_sha256': 'aa7e50be91195b3781f184a37f6c6f24e0b830cedaced3229dc18436f3ebf407',
-             'after_sha256': 'cdc9d9943329ae0d3dbfc69ad67f091b5df4ac8d3f2984ef0e4ae442be69b1b6'},
+             'before_sha256': 'bf62d1a3e0ec31184899e1dda2a05707d7e464a1789bb4770f2b8e9d011499c3',
+             'after_sha256': '172cafb37112a99d88dbbb078f696af25c7bc23dccd58d11164d502764a5212d'},
             {'path': 'vllm/v1/engine/detokenizer.py',
              'before_sha256': '3af97dd30fa95fb8e294b2de407012d365b124006ee324c576cba3d3a9d58c21',
              'after_sha256': '49c4f4c012b9fc6b1a6363b56a7aa04b14a7791575db5ecac3d9fa669405c704'},
@@ -159282,7 +159303,7 @@ FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5d
  'vllm/reasoning/minimax_m3_reasoning_parser.py': 'd91a8f1c7c34bc4d32d374e68038c719e61a1cac456c0538025bcbba0daf3cab',
  'vllm/renderers/base.py': '621bc608b55f26580122da553d854d84271b8f5f44777269631f91ff8a09f605',
  'vllm/renderers/hf.py': 'b06cb298f586607a036c8d976e0a08ac64eb317bfb8af1d4dc5329e690fb5e88',
- 'vllm/renderers/online_derenderer.py': 'cdc9d9943329ae0d3dbfc69ad67f091b5df4ac8d3f2984ef0e4ae442be69b1b6',
+ 'vllm/renderers/online_derenderer.py': '172cafb37112a99d88dbbb078f696af25c7bc23dccd58d11164d502764a5212d',
  'vllm/renderers/online_renderer.py': '7651dc682374c8e4caa9cd6e86ddf22e9abfe401ed1aa7877b8e5306755404eb',
  'vllm/renderers/params.py': '31572224d8ea355fb77d80e3725779436533108c78f779b94760c6e55e6f3bfd',
  'vllm/renderers/template_authorship.py': '3110bd0d138e29ef01a51f5c357a2e6dd000c0b8c26b7fea94a4161471e43cba',
