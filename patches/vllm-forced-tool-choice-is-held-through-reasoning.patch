@@ -488,7 +488,7 @@ index cd939c21edd2b830a9cfea778f81baad06999aea..ba379a74d1f0544d0bda6bc771188633
          if isinstance(request, ResponsesRequest):
              request.text = None
 diff --git a/vllm/parser/engine/adapters.py b/vllm/parser/engine/adapters.py
-index bf514f70d1a727daae2ad9b06b2221a8249a84dd..60396d242ca3f3ba7a4ed2f7960b6cf2ef1d4d12 100644
+index ad4212f3b8ec839d1309b7bb2ae84c902015a9f6..87c426a92be173fcafd8abdbb725bc9d6a22211e 100644
 --- a/vllm/parser/engine/adapters.py
 +++ b/vllm/parser/engine/adapters.py
 @@ -85,6 +85,9 @@ class ParserEngineReasoningAdapter(ReasoningParser):
@@ -577,10 +577,10 @@ index 20fe7ae058082d96f865b5401d8eda44c877209e..31799773bbce3849a9338d4bbca4af73
              return request
  
 diff --git a/vllm/parser/qwen3.py b/vllm/parser/qwen3.py
-index d8dd36b89e17d01eaa817f96e78294e50c0feb17..3c635d8015bb42ff662c7f6a39fc33771647ad0d 100644
+index ee2024f22f830ebe9d5241b5837e7e7083b71a69..6f76812510fbbbda803baf209bc5b896fabdac2b 100644
 --- a/vllm/parser/qwen3.py
 +++ b/vllm/parser/qwen3.py
-@@ -585,6 +585,28 @@ class Qwen3Parser(ParserEngine):
+@@ -712,6 +712,28 @@ class Qwen3Parser(ParserEngine):
              if token_id == end_id:
                  return
  

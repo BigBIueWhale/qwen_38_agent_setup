@@ -3368,7 +3368,7 @@ def _validate_xml_schema_after(state: State) -> None:
         "find_tool_schema(self._tools, func_name)", "_qwen3_arg_converter(",
     ), label=label)
     _require_in_symbol(state, qwen, "_qwen3_arg_converter", (
-        "if schema and ", "return _decode_xml_parameters(params, schema)",
+        "if schema and ", "_decode_xml_parameters(params, schema)",
     ), label=label)
     _require_in_symbol(state, qwen, "_decode_xml_parameters", (
         "object_pairs_hook=_unique_json_object", "parse_constant=_reject_non_json_number",
@@ -3747,21 +3747,54 @@ def _validate_grammar_read_arguments_after(state: State) -> None:
         "_QWEN_JSON.raw_decode(text, begin)",
         "elif opener < 0 or opener > closer:",
     ), label=label)
-    # The parser reads by that definition, and keeps the repeat refusal.
+    # The parser reads by that definition, and keeps the repeat refusal. Under
+    # the grammar it reads in nothing else: text the grammar has no reading
+    # of, and a whole call no reading of satisfies its schema, are refused,
+    # never read by the transport's rule or returned as text.
     _require_in_symbol(state, qwen, "_qwen3_arg_converter", (
         "reading = read_qwen_arguments(raw_args, schema or {})",
-        "if schema and unfinished is None:",
+        "raise _NoGrammarReading()",
+        "whole = reading.complete",
+        "if schema and whole:",
+        "if grammar is not None:\n            raise _NoSchemaReading()",
         "if name in params:",
     ), label=label)
     _require_in_symbol(state, qwen, "_qwen3_arguments_reading", (
+        "raise _NoGrammarReading()",
         "return ArgumentsReading(reading.complete, reading.inside_parameter)",
     ), label=label)
+    # One declaration decides the mode: the grammar the engine reads its
+    # calls by is the one its tool adapter arms, and Seed-OSS declares none.
+    require_text(state, qwen,
+                 "structural_tag_model: ClassVar[str | None] = _QWEN_GRAMMAR",
+                 label=label)
+    require_text(state, "vllm/parser/seed_oss.py", "structural_tag_model = None",
+                 label=label)
+    _require_in_symbol(state, "vllm/parser/engine/adapters.py", "make_adapters", (
+        'tool_namespace["structural_tag_model"] = parser_engine_cls.structural_tag_model',
+    ), label=label)
+    for path in ("vllm/tool_parsers/qwen3_engine_tool_parser.py",
+                 "vllm/tool_parsers/seed_oss_engine_tool_parser.py"):
+        forbid_text(state, path, "structural_tag_model =", label=label)
+    forbid_text(state, qwen, "a parser registered without", label=label)
+    _require_in_symbol(state, qwen, "Qwen3Parser._convert_tool_arguments", (
+        "self.structural_tag_model,",
+        "except _NoGrammarReading:",
+        "except _NoSchemaReading:",
+        "raise QwenToolCallOutsideSchemaError(func_name) from None",
+    ), label=label)
+    require_python_symbols(state, qwen, {
+        "QwenToolCallUnreadError": None,
+        "QwenToolCallOutsideSchemaError": None,
+    }, label=label)
     _require_in_symbol(state, qwen, "qwen3_config", (
         "arguments_reading=_qwen3_arguments_reading",
         "(EventType.TOOL_CALL_END, EventType.TOOL_CALL_CLOSED)",
     ), label=label)
     _require_in_symbol(state, qwen, "Qwen3Parser._tool_arguments_reading", (
         "find_tool_schema(self._tools, func_name)",
+        "self.structural_tag_model,",
+        "raise QwenToolCallUnreadError(",
     ), label=label)
     # The engine has no second notion of being inside a value: the format's
     # reading of the arguments decides whether the closing sequence ends the
@@ -3789,6 +3822,12 @@ def _validate_grammar_read_arguments_after(state: State) -> None:
         "test_whole_body_closes_at_the_wrapper_while_a_json_reading_is_open": None,
         "test_truncated_json_value_is_the_unfinished_parameter": None,
         "test_closing_sequence_inside_a_raw_value_does_not_end_the_call": None,
+        "test_text_the_grammar_cannot_write_is_refused_not_read_by_another_rule": None,
+        "test_call_its_schema_refuses_is_refused_not_retyped": None,
+        "test_value_its_schema_refuses_is_refused_not_returned_as_text": None,
+    }, label=label)
+    require_python_symbols(state, "tests/parser/engine/test_seed_oss.py", {
+        "test_arguments_are_read_as_the_transport_carries_them": None,
     }, label=label)
     require_python_symbols(state, "tests/tool_parsers/test_structural_tag_registry.py", {
         "test_qwen3_arguments_are_read_by_the_grammar_productions": None,
@@ -5491,7 +5530,14 @@ CONTRACTS: Mapping[str, SemanticContract] = {
             "as content. The grammar's productions are decided once; the "
             "grammar is rendered from them and the parser reads argument text "
             "by them, and a call ends only at its closing sequence after "
-            "arguments that read whole."
+            "arguments that read whole. The grammar a format's calls are read "
+            "by is one declaration, which its tool parser arms: under it, text "
+            "the grammar has no reading of is refused (a 5xx naming the call), "
+            "never read by the transport's rule, which would hide a disagreement "
+            "between grammar and reader, and a whole call no reading of satisfies "
+            "its schema is refused (422) rather than returned with every value "
+            "as text. Seed-OSS declares no grammar and reads only as the "
+            "transport carries its calls."
         ),
         removal_condition=(
             "Remove when pinned upstream reads Qwen XML tool arguments by the "

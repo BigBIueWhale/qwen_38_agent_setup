@@ -408,16 +408,16 @@ It is intentionally reconstructed by the ordered, reviewed semantic transformati
 | patches/vllm-kv-scope-single-flight.patch | b84b915c38e2c1d32b278bf88dcd5ac7228b9a680b746e2842783dbe1942540a |
 | patches/vllm-template-authored-control-tokens.patch | 2a6e8b31826cf06d52acb3c87cae0c6c68a7acc2c8f01dd7848bc5e948977228 |
 | patches/vllm-nvfp4-native-kernel-required.patch | 9d9ce188b6670d687a725c4cdca37478f9dc78ef9f19685ddbcf5e9edd53b8b7 |
-| patches/vllm-qwen-arguments-read-by-grammar.patch | c72d081ad1a32ca3e35d83fd1b536c2e8ddf56675b8ab851192c66cb8c1fc9b1 |
+| patches/vllm-qwen-arguments-read-by-grammar.patch | 8e66284107f33305459b322d930d686a5ae859c9d3f033c79cc58a759028c7ca |
 | patches/vllm-startup-plan-admission-bound.patch | 1d84af83471624421b048587487d40675e87a4ecdc14c24d084518a0d21a5ff0 |
 | patches/vllm-template-refusals-name-their-parameter.patch | 1f428332be39e4fb7f3c7f7eb5d6e3297f5dc70638fcd7f81d69b32f69d1fa26 |
-| patches/vllm-qwen-repeated-parameter-refusal.patch | 849fadaa43f2f8eafc0e98fae2c5c201e3b4a8c637de58720eebb94817768e31 |
-| patches/vllm-generated-tokens-survive-parsing.patch | 3889af17e410853baa95ea40eba32baa5ed35d03e37822d55312861e21fba8b9 |
+| patches/vllm-qwen-repeated-parameter-refusal.patch | 0f32f29fdd2b3d18a45821ebb390ca6c7dd43b47787777a76d76d8c27c1bc899 |
+| patches/vllm-generated-tokens-survive-parsing.patch | c809cc7070d91b58668c07e7d82d6c7909909cf46e3b1993f0d8c369aecf5519 |
 | patches/vllm-include-reasoning-shapes-the-response.patch | d3b41899464142ffffb04efd0b19647153e322b10c7f9fc1e14af0f290af98d1 |
 | patches/vllm-unspecified-tool-choice-is-the-default.patch | 5b2421dd2ec9c994321e6a7929acb486b5b12b934e83c4d1759c400bd2100b47 |
 | patches/vllm-call-only-answer-keeps-the-blank-line.patch | 20f0397ef6220e0398ea66a869a5da914e6793eab1bc259b70b234f76241dc56 |
 | patches/vllm-responses-tools-are-one-function-list.patch | 8c714f2b25802121cbfd628620b8689c7180c9b8d7e3241c6caecad99cf3f9c0 |
-| patches/vllm-batch-parse-starts-where-the-prompt-leaves.patch | fa448319b58cea79ffa08141b31bfa74889dd57e72de354d840187d2d56392a8 |
+| patches/vllm-batch-parse-starts-where-the-prompt-leaves.patch | 85ea420f229e08ebaff18d01de09a4653520cfb247c271f7a7e25b76dfd0b894 |
 | patches/vllm-derender-text-is-the-detokenizers.patch | 6d58660374c6280441e8e950001d4585859b98684f8ecf0ef5ba1aa7ea40e4dd |
 | patches/vllm-output-constraints-refused-beside-tool-calls.patch | b82f6259428441aee55d157443bcedc1d98fb247ef9a521106408671a24ae533 |
 | patches/vllm-batch-invariance-substitutes-no-nvfp4-kernel.patch | c79baaee0a51275f5f522d266fe6b315c200e6951920c2454d5c80cadbb92f44 |
@@ -430,8 +430,8 @@ It is intentionally reconstructed by the ordered, reviewed semantic transformati
 | patches/vllm-responses-refuses-what-it-cannot-honour.patch | 35fcb2a68faa1a6fb99a83b6d7726ffc45f1b6e84cbb2ed7d9fe152575bf10f3 |
 | patches/vllm-reviewed-tests-declare-what-they-need.patch | 7954646a17b9cdedaeab47bc57581924fbf2049b36a61261240bd63f3f7851b9 |
 | patches/vllm-priority-is-refused-where-nothing-orders-by-it.patch | 96346e5bf71726008f4449389d91a18531fd57fe63f930b2400e059ab168571a |
-| patches/vllm-forced-tool-choice-is-held-through-reasoning.patch | 1fe814cd8618d2d0ecd414f7c4e6e341b89f9ef016c1f727fd87d44a01a98e96 |
-| patches/vllm-qwen-format-is-served-as-one-engine.patch | 470c5801cc66e1554cefe90dd06db92d97a593c57dd9f1c6c419bc18bac93809 |
+| patches/vllm-forced-tool-choice-is-held-through-reasoning.patch | 9dd2c950842869d1456bf8d61d6738e7222c6f352c280ba7faa200ab9b43964d |
+| patches/vllm-qwen-format-is-served-as-one-engine.patch | e06d5ea04c1e63a216d99cc27767cd3e295342bca68851f5a48f0a497a43e775 |
 
 The reconstructed tree's runtime-source and test changes, new files and
 deletions are counted by ./scripts/build-vllm.sh check, which derives and prints
@@ -489,9 +489,9 @@ Pinned build inputs and products:
 |---|---|
 | Immutable base tag | qwen38-vllm:main-9df9b0b |
 | Immutable base ID | sha256:fa4a002a88b7043a1a89966dea8a500fe9696f84e75730d9da916f916048d401 |
-| Runtime Dockerfile SHA-256 | ebf001f705dd37cac3f60665e661ccf2385fbf15325cd998e3e600860494f44f |
-| Build verifier SHA-256 | 6a0d2c68fad31637f911b8b64b260cfc7443ad63a7dc4e5127e234a8e180f7e0 |
-| Runtime validator SHA-256 | e4ea7693d3f30e00de4a6b5733a0fb490c6f9deee927d42580083c9c851a04f8 |
+| Runtime Dockerfile SHA-256 | 6741f59e39e53f43dc42574b02854e301f3c81e451061076d45648bce1b87fc5 |
+| Build verifier SHA-256 | a8c809c023f855388a2d3623774adc8859fc40b0941f9fa638a02f7e20ebc20d |
+| Runtime validator SHA-256 | 87c1840636a84ed042fcac9283bfbe1ed70a717872f6d51968d9f24f2b438f59 |
 
 The runtime image's profile, tag and archive name, which every release advances
 together, are declared in `config/runtime-v1.sh`, and the archive lives under
@@ -1646,13 +1646,21 @@ references, enum/const constraints and composition. The complete decoded object
 must validate. A schema-valid raw string keeps all its bytes. Grammar padding
 is removed only when the schema requires that interpretation; ambiguous values
 prefer their original string representation. Encoded JSON objects, arrays and
-numbers keep their original representation. Cut or untypable values stay raw
-for diagnostics and client validation. All parameter constraints are available
+numbers keep their original representation. A call the generation cut short
+keeps its values raw, as the diagnostic it is. The grammar does not enforce
+every constraint a schema can state -- one across parameters, a value of
+several types, which it writes as text, a declared name written through an open
+schema's undeclared-name production -- so the model can write a whole call no
+reading of which validates. That call is refused, status 422, an
+`UnprocessableEntityError` naming the call, and no call is published: returned
+with its values as text, it would carry every value the model wrote correctly
+with the wrong type. The model wrote it; the next action is the caller's,
+generate the response again. All parameter constraints are available
 before argument JSON is emitted; executable calls still wait for EOS.
 If one call repeats a parameter name, decoding refuses the call before either
 value can replace the other. This covers complete output and an unfinished
-trailing parameter on either transport, including schemas that allow additional
-properties. The response is the unprocessable-entity refusal, status 422, that
+trailing parameter in either reading mode, including schemas that allow
+additional properties. The response is the unprocessable-entity refusal, status 422, that
 a well-formed request gets when what it leads to cannot be served, typed as
 `RepeatedToolParameterError` -- inside a stream already under way, its error
 event with that type and code -- naming the call's tool and the repeated
@@ -1689,7 +1697,17 @@ the call unless its arguments can only be read as still inside a parameter --
 then they are that parameter's text. A declared parameter is
 read by its declared production while its slot is still open, and by the
 undeclared-name production only after that. A call that names a parameter twice
-in that reading is refused as above.
+in that reading is refused as above. Those productions read every text the
+grammar writes, whole or cut short, so argument text they have no reading of is
+output the grammar did not constrain, or a disagreement between the grammar and
+its reader: it is refused, status 500 naming the call and both causes, and never
+read by another rule, which is what would hide the disagreement. The grammar a
+format's calls are read by is one declaration, its engine's
+`structural_tag_model`, from which its tool parser takes the grammar it arms.
+Seed-OSS, which shares the call syntax, declares none, arms none and reads its
+calls only as the transport carries them -- each value runs to its closer --
+returning a call no reading of which validates with its values as text, for
+its client to validate.
 
 A parameter value is framed by the transport, not by the value. The served
 template renders `<parameter=NAME>`, a newline, the value, a newline, and

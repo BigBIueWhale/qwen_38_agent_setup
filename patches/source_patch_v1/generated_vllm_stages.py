@@ -124620,10 +124620,10 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'kernel_cls.__name__)\n'})},
  {'name': 'qwen-arguments-read-by-grammar',
   'review_patch': 'patches/vllm-qwen-arguments-read-by-grammar.patch',
-  'review_sha256': 'c72d081ad1a32ca3e35d83fd1b536c2e8ddf56675b8ab851192c66cb8c1fc9b1',
+  'review_sha256': '8e66284107f33305459b322d930d686a5ae859c9d3f033c79cc58a759028c7ca',
   'files': ({'path': 'tests/parser/engine/test_qwen_xml_fidelity.py',
              'before_sha256': '3222b5f59f5ac7111b95877635364abf9e977716a7ebd8b1f157dff207aa5d12',
-             'after_sha256': '6b3cac443f0363ce3cd64535edcbfd699177b2dd2f3715d719e8c1d8b5823534'},
+             'after_sha256': '8aac5f2c0dbcf3513357f353935c9c6d317a12dfcd6fa0ed057cb0874a3cfc58'},
             {'path': 'tests/tool_parsers/test_structural_tag_registry.py',
              'before_sha256': '938a95e9673a82dfc7740400b2f2bde210e4179262b9a43cdad86f1922c21786',
              'after_sha256': '293a69aa819e313eeac3639c5b8cf5232950f3d3008eb687d9fb849699aa9bf5'},
@@ -124638,11 +124638,304 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'after_sha256': '36a82097dbd242c34cde10914e9de757f1d1c6b619edbe92928c726479c3b068'},
             {'path': 'vllm/parser/qwen3.py',
              'before_sha256': '80e93859d170307cb44a275d61233fc0bea01f4cacf82f04955f34408494c320',
-             'after_sha256': '8e5a02e91d39c754ffd2bf04fe50cb256a52163f02a2985ccfb99dfd7012a6ef'},
+             'after_sha256': 'a0bee0bf2956fa1251ec18037fac6039e3e211bc50e444ef0eab5bf7dfcbd465'},
             {'path': 'vllm/tool_parsers/structural_tag_registry.py',
              'before_sha256': '3ecad1cf14c4b586fdcc4b86d143d7aa033f39fced0f5971b231aac237b74aa3',
-             'after_sha256': '2ea92605cbf55f46835626c0f1c54e725167cf6c50381c5c4766ab1a7bc2dd8e'}),
+             'after_sha256': '2ea92605cbf55f46835626c0f1c54e725167cf6c50381c5c4766ab1a7bc2dd8e'},
+            {'path': 'tests/parser/engine/test_seed_oss.py',
+             'before_sha256': '9f2af2c75f71c6fb280f2a2a4a2bb8eaecf1c919c083e6c925f6d6f81cc2c236',
+             'after_sha256': 'b0f229145be602e9281f20d7861ba5f76cc387b87891ab766ee0377bdccc381c'},
+            {'path': 'vllm/parser/engine/adapters.py',
+             'before_sha256': '2679bf5609812dcd988d4039db0203eb9361e21d5360ea1a363ad51f9c3d839d',
+             'after_sha256': 'addd30a577ef699a4b255cd58c46ebc08821809259f1f196327e6c9333d2ff17'},
+            {'path': 'vllm/parser/seed_oss.py',
+             'before_sha256': 'db0206257e19ce94859a458c1e95fe2e31e233a68d631d5ae4dff064aa9c960c',
+             'after_sha256': '9e50fd8b12f8bac832bbe79eaccd19ed9b667cc23b1b53cd08434c4e8c0b627b'},
+            {'path': 'vllm/tool_parsers/qwen3_engine_tool_parser.py',
+             'before_sha256': '17cd6a04b4e78ede24c43592a9b4ff546a4f23be7766e70e3c02dde1eb0e0646',
+             'after_sha256': '665c41e9b430c3194f8268926316f4924293752bdbd94e3b598193fde52457f7'},
+            {'path': 'vllm/tool_parsers/seed_oss_engine_tool_parser.py',
+             'before_sha256': '79a3fe7f00090de0c861a8db795616dcdf0a42f214f449eb418d7afb811bb24a',
+             'after_sha256': '6528c2738bc250cdb0f19d88f451e7eae8978e4281a458d7e940b41ea145b648'}),
   'edits': ({'name': 'tests/parser/engine/test_qwen_xml_fidelity.py:landmark-1',
+             'path': 'tests/parser/engine/test_qwen_xml_fidelity.py',
+             'before': "    ('1', 'boolean'), ('TRUE', 'boolean'),\n"
+                       '    (\'{"count":1,"count":2}\', \'object\'),\n'
+                       '])\n'
+                       'def '
+                       'test_invalid_value_is_preserved_for_client_validation(value, '
+                       'schema_type, chunk_size):\n'
+                       "    schema = {'type': 'object', 'properties': {'value': "
+                       "{'type': schema_type}}}\n"
+                       '    body = '
+                       "('plan</think><tool_call>\\n<function=write>\\n<parameter=value>' "
+                       '+ value\n'
+                       "            + '</parameter>\\n</function>\\n</tool_call>')\n"
+                       '    _, _, calls = parse(body, chunk_size, schema=schema)\n'
+                       "    assert [json.loads(call) for call in calls] == [{'value': "
+                       'value}]\n'
+                       '\n'
+                       '\n'
+                       "@pytest.mark.parametrize('chunk_size', [None, 1])\n",
+             'after': "    ('1', 'boolean'), ('TRUE', 'boolean'),\n"
+                      '    (\'{"count":1,"count":2}\', \'object\'),\n'
+                      '])\n'
+                      'def '
+                      'test_value_its_schema_refuses_is_refused_not_returned_as_text(\n'
+                      '    value, schema_type, chunk_size\n'
+                      '):\n'
+                      '    """The grammar writes a declared name as an undeclared one '
+                      'too where the\n'
+                      '    schema leaves extras open, so it admits each of these '
+                      'values, as text;\n'
+                      '    no reading of them is what the schema declares, so the call '
+                      'is refused\n'
+                      '    rather than returned with a value its schema does not '
+                      'admit."""\n'
+                      '    from vllm.parser.qwen3 import '
+                      'QwenToolCallOutsideSchemaError\n'
+                      '\n'
+                      "    schema = {'type': 'object', 'properties': {'value': "
+                      "{'type': schema_type}}}\n"
+                      '    call = '
+                      "('<tool_call>\\n<function=write>\\n<parameter=value>' + value\n"
+                      "            + '</parameter>\\n</function>\\n</tool_call>')\n"
+                      '    assert _grammar_accepts(schema, call)\n'
+                      '    with pytest.raises(QwenToolCallOutsideSchemaError, '
+                      'match="\'write\' has arguments"):\n'
+                      "        parse('plan</think>' + call, chunk_size, "
+                      'schema=schema)\n'
+                      '\n'
+                      '\n'
+                      "@pytest.mark.parametrize('chunk_size', [None, 1, 13])\n"
+                      "@pytest.mark.parametrize('schema,arguments', [\n"
+                      '    # A value of several types rides the raw channel, which '
+                      'writes any text.\n'
+                      "    ({'type': 'object', 'required': ['n', 'k'], "
+                      "'additionalProperties': False,\n"
+                      "      'properties': {'n': {'type': ['integer', 'null']}, 'k': "
+                      "{'type': 'integer'}}},\n"
+                      '     '
+                      "'<parameter=n>\\nabc\\n</parameter>\\n<parameter=k>\\n5\\n</parameter>\\n'),\n"
+                      '    # The grammar writes no constraint across parameters.\n'
+                      "    ({'type': 'object', 'additionalProperties': False,\n"
+                      "      'properties': {'a': {'type': 'string'}, 'b': {'type': "
+                      "'string'},\n"
+                      "                     'k': {'type': 'integer'}},\n"
+                      "      'oneOf': [{'required': ['a']}, {'required': ['b']}]},\n"
+                      '     '
+                      "'<parameter=a>\\nx\\n</parameter>\\n<parameter=b>\\ny\\n</parameter>\\n'\n"
+                      "     '<parameter=k>\\n5\\n</parameter>\\n'),\n"
+                      '])\n'
+                      'def test_call_its_schema_refuses_is_refused_not_retyped(schema, '
+                      'arguments, chunk_size):\n'
+                      '    """A whole call the grammar writes and no reading of '
+                      'satisfies its\n'
+                      '    schema is refused: returned with every value as text, it '
+                      'would carry\n'
+                      '    ``k`` -- which the model wrote as the integer it declares '
+                      '-- as a\n'
+                      '    string."""\n'
+                      '    from vllm.parser.qwen3 import '
+                      'QwenToolCallOutsideSchemaError\n'
+                      '\n'
+                      "    call = ('<tool_call>\\n<function=write>\\n' + arguments\n"
+                      "            + '</function>\\n</tool_call>')\n"
+                      '    assert _grammar_accepts(schema, call)\n'
+                      '    with pytest.raises(QwenToolCallOutsideSchemaError, '
+                      'match="\'write\' has arguments"):\n'
+                      "        parse('plan</think>' + call, chunk_size, "
+                      'schema=schema)\n'
+                      '\n'
+                      '\n'
+                      "CLOSED_SHELL_SCHEMA = {'type': 'object', 'required': "
+                      "['command'],\n"
+                      "    'additionalProperties': False, 'properties': {\n"
+                      "        'command': {'type': 'string'}, 'is_background': "
+                      "{'type': 'boolean'},\n"
+                      "        'description': {'type': 'string'}}}\n"
+                      '\n'
+                      '\n'
+                      "@pytest.mark.parametrize('chunk_size', [None, 1, 13])\n"
+                      "@pytest.mark.parametrize('arguments', [\n"
+                      '    # Out of declared order.\n'
+                      '    '
+                      "'<parameter=command>\\nls\\n</parameter>\\n<parameter=description>\\nlist\\n'\n"
+                      '    '
+                      "'</parameter>\\n<parameter=is_background>\\ntrue\\n</parameter>\\n',\n"
+                      '    # A name the closed schema does not declare.\n'
+                      '    '
+                      "'<parameter=command>\\nls\\n</parameter>\\n<parameter=cwd>\\n/tmp\\n</parameter>\\n',\n"
+                      '])\n'
+                      'def '
+                      'test_text_the_grammar_cannot_write_is_refused_not_read_by_another_rule(\n'
+                      '    arguments, chunk_size\n'
+                      '):\n'
+                      '    """The parser reads a call only as the grammar armed for it '
+                      'writes it.\n'
+                      '    Text that grammar has no reading of is no generation it '
+                      'constrained, so\n'
+                      "    reading it by the transport's rule instead would return a "
+                      'call the\n'
+                      '    grammar never admitted and hide the disagreement."""\n'
+                      '    from vllm.parser.qwen3 import QwenToolCallUnreadError\n'
+                      '\n'
+                      "    call = ('<tool_call>\\n<function=write>\\n' + arguments\n"
+                      "            + '</function>\\n</tool_call>')\n"
+                      '    assert not _grammar_accepts(CLOSED_SHELL_SCHEMA, call)\n'
+                      '    with pytest.raises(QwenToolCallUnreadError,\n'
+                      "                       match='qwen_3_coder tool-call grammar "
+                      "has no reading of'):\n"
+                      "        parse('plan</think>' + call, chunk_size, "
+                      'schema=CLOSED_SHELL_SCHEMA)\n'
+                      '\n'
+                      '\n'
+                      "@pytest.mark.parametrize('chunk_size', [None, 1])\n",
+             'review_before': "    ('1', 'boolean'), ('TRUE', 'boolean'),\n"
+                              '    (\'{"count":1,"count":2}\', \'object\'),\n'
+                              '])\n'
+                              'def '
+                              'test_invalid_value_is_preserved_for_client_validation(value, '
+                              'schema_type, chunk_size):\n'
+                              "    schema = {'type': 'object', 'properties': {'value': "
+                              "{'type': schema_type}}}\n"
+                              '    body = '
+                              "('plan</think><tool_call>\\n<function=write>\\n<parameter=value>' "
+                              '+ value\n'
+                              '            + '
+                              "'</parameter>\\n</function>\\n</tool_call>')\n"
+                              '    _, _, calls = parse(body, chunk_size, '
+                              'schema=schema)\n'
+                              '    assert [json.loads(call) for call in calls] == '
+                              "[{'value': value}]\n"
+                              '\n'
+                              '\n'
+                              "@pytest.mark.parametrize('chunk_size', [None, 1])\n",
+             'review_after': "    ('1', 'boolean'), ('TRUE', 'boolean'),\n"
+                             '    (\'{"count":1,"count":2}\', \'object\'),\n'
+                             '])\n'
+                             'def '
+                             'test_value_its_schema_refuses_is_refused_not_returned_as_text(\n'
+                             '    value, schema_type, chunk_size\n'
+                             '):\n'
+                             '    """The grammar writes a declared name as an '
+                             'undeclared one too where the\n'
+                             '    schema leaves extras open, so it admits each of '
+                             'these values, as text;\n'
+                             '    no reading of them is what the schema declares, so '
+                             'the call is refused\n'
+                             '    rather than returned with a value its schema does '
+                             'not admit."""\n'
+                             '    from vllm.parser.qwen3 import '
+                             'QwenToolCallOutsideSchemaError\n'
+                             '\n'
+                             "    schema = {'type': 'object', 'properties': {'value': "
+                             "{'type': schema_type}}}\n"
+                             '    call = '
+                             "('<tool_call>\\n<function=write>\\n<parameter=value>' + "
+                             'value\n'
+                             '            + '
+                             "'</parameter>\\n</function>\\n</tool_call>')\n"
+                             '    assert _grammar_accepts(schema, call)\n'
+                             '    with pytest.raises(QwenToolCallOutsideSchemaError, '
+                             'match="\'write\' has arguments"):\n'
+                             "        parse('plan</think>' + call, chunk_size, "
+                             'schema=schema)\n'
+                             '\n'
+                             '\n'
+                             "@pytest.mark.parametrize('chunk_size', [None, 1, 13])\n"
+                             "@pytest.mark.parametrize('schema,arguments', [\n"
+                             '    # A value of several types rides the raw channel, '
+                             'which writes any text.\n'
+                             "    ({'type': 'object', 'required': ['n', 'k'], "
+                             "'additionalProperties': False,\n"
+                             "      'properties': {'n': {'type': ['integer', 'null']}, "
+                             "'k': {'type': 'integer'}}},\n"
+                             '     '
+                             "'<parameter=n>\\nabc\\n</parameter>\\n<parameter=k>\\n5\\n</parameter>\\n'),\n"
+                             '    # The grammar writes no constraint across '
+                             'parameters.\n'
+                             "    ({'type': 'object', 'additionalProperties': False,\n"
+                             "      'properties': {'a': {'type': 'string'}, 'b': "
+                             "{'type': 'string'},\n"
+                             "                     'k': {'type': 'integer'}},\n"
+                             "      'oneOf': [{'required': ['a']}, {'required': "
+                             "['b']}]},\n"
+                             '     '
+                             "'<parameter=a>\\nx\\n</parameter>\\n<parameter=b>\\ny\\n</parameter>\\n'\n"
+                             "     '<parameter=k>\\n5\\n</parameter>\\n'),\n"
+                             '])\n'
+                             'def '
+                             'test_call_its_schema_refuses_is_refused_not_retyped(schema, '
+                             'arguments, chunk_size):\n'
+                             '    """A whole call the grammar writes and no reading of '
+                             'satisfies its\n'
+                             '    schema is refused: returned with every value as '
+                             'text, it would carry\n'
+                             '    ``k`` -- which the model wrote as the integer it '
+                             'declares -- as a\n'
+                             '    string."""\n'
+                             '    from vllm.parser.qwen3 import '
+                             'QwenToolCallOutsideSchemaError\n'
+                             '\n'
+                             "    call = ('<tool_call>\\n<function=write>\\n' + "
+                             'arguments\n'
+                             "            + '</function>\\n</tool_call>')\n"
+                             '    assert _grammar_accepts(schema, call)\n'
+                             '    with pytest.raises(QwenToolCallOutsideSchemaError, '
+                             'match="\'write\' has arguments"):\n'
+                             "        parse('plan</think>' + call, chunk_size, "
+                             'schema=schema)\n'
+                             '\n'
+                             '\n'
+                             "CLOSED_SHELL_SCHEMA = {'type': 'object', 'required': "
+                             "['command'],\n"
+                             "    'additionalProperties': False, 'properties': {\n"
+                             "        'command': {'type': 'string'}, 'is_background': "
+                             "{'type': 'boolean'},\n"
+                             "        'description': {'type': 'string'}}}\n"
+                             '\n'
+                             '\n'
+                             "@pytest.mark.parametrize('chunk_size', [None, 1, 13])\n"
+                             "@pytest.mark.parametrize('arguments', [\n"
+                             '    # Out of declared order.\n'
+                             '    '
+                             "'<parameter=command>\\nls\\n</parameter>\\n<parameter=description>\\nlist\\n'\n"
+                             '    '
+                             "'</parameter>\\n<parameter=is_background>\\ntrue\\n</parameter>\\n',\n"
+                             '    # A name the closed schema does not declare.\n'
+                             '    '
+                             "'<parameter=command>\\nls\\n</parameter>\\n<parameter=cwd>\\n/tmp\\n</parameter>\\n',\n"
+                             '])\n'
+                             'def '
+                             'test_text_the_grammar_cannot_write_is_refused_not_read_by_another_rule(\n'
+                             '    arguments, chunk_size\n'
+                             '):\n'
+                             '    """The parser reads a call only as the grammar armed '
+                             'for it writes it.\n'
+                             '    Text that grammar has no reading of is no generation '
+                             'it constrained, so\n'
+                             "    reading it by the transport's rule instead would "
+                             'return a call the\n'
+                             '    grammar never admitted and hide the '
+                             'disagreement."""\n'
+                             '    from vllm.parser.qwen3 import '
+                             'QwenToolCallUnreadError\n'
+                             '\n'
+                             "    call = ('<tool_call>\\n<function=write>\\n' + "
+                             'arguments\n'
+                             "            + '</function>\\n</tool_call>')\n"
+                             '    assert not _grammar_accepts(CLOSED_SHELL_SCHEMA, '
+                             'call)\n'
+                             '    with pytest.raises(QwenToolCallUnreadError,\n'
+                             "                       match='qwen_3_coder tool-call "
+                             "grammar has no reading of'):\n"
+                             "        parse('plan</think>' + call, chunk_size, "
+                             'schema=CLOSED_SHELL_SCHEMA)\n'
+                             '\n'
+                             '\n'
+                             "@pytest.mark.parametrize('chunk_size', [None, 1])\n"},
+            {'name': 'tests/parser/engine/test_qwen_xml_fidelity.py:landmark-2',
              'path': 'tests/parser/engine/test_qwen_xml_fidelity.py',
              'before': "            '</parameter>\\n</function>\\n</tool_call>')\n"
                        "    with pytest.raises(RuntimeError, match='Qwen XML argument "
@@ -124758,8 +125051,15 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       'then cannot\n'
                       '    continue a JSON string: the wrapper ends the call, read by '
                       'the reading\n'
-                      '    the grammar kept.\n'
+                      '    the grammar kept. That reading is the text ``["x``, which '
+                      'the declared\n'
+                      '    array refuses, so the whole call is refused; a call left '
+                      'open would be\n'
+                      '    returned as its diagnostic instead.\n'
                       '    """\n'
+                      '    from vllm.parser.qwen3 import '
+                      'QwenToolCallOutsideSchemaError\n'
+                      '\n'
                       "    schema = {'type': 'object', 'properties': {\n"
                       "        'ignore': {'type': 'array', 'items': {'type': "
                       "'string'}}}}\n"
@@ -124767,11 +125067,9 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '(\'<tool_call>\\n<function=write>\\n<parameter=ignore>\\n["x</parameter>\\n\'\n'
                       "            '</function>\\n</tool_call>')\n"
                       '    assert _grammar_accepts(schema, call)\n'
-                      "    reasoning, content, calls = parse('plan</think>' + call, "
-                      'chunk_size, schema=schema)\n'
-                      "    assert (reasoning, content) == ('plan', '')\n"
-                      "    assert [json.loads(c) for c in calls] == [{'ignore': "
-                      '\'["x\'}]\n'
+                      '    with pytest.raises(QwenToolCallOutsideSchemaError):\n'
+                      "        parse('plan</think>' + call, chunk_size, "
+                      'schema=schema)\n'
                       '\n'
                       '\n'
                       "@pytest.mark.parametrize('chunk_size', [None, 1, 3])\n"
@@ -124929,8 +125227,15 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'newline then cannot\n'
                              '    continue a JSON string: the wrapper ends the call, '
                              'read by the reading\n'
-                             '    the grammar kept.\n'
+                             '    the grammar kept. That reading is the text ``["x``, '
+                             'which the declared\n'
+                             '    array refuses, so the whole call is refused; a call '
+                             'left open would be\n'
+                             '    returned as its diagnostic instead.\n'
                              '    """\n'
+                             '    from vllm.parser.qwen3 import '
+                             'QwenToolCallOutsideSchemaError\n'
+                             '\n'
                              "    schema = {'type': 'object', 'properties': {\n"
                              "        'ignore': {'type': 'array', 'items': {'type': "
                              "'string'}}}}\n"
@@ -124938,11 +125243,9 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '(\'<tool_call>\\n<function=write>\\n<parameter=ignore>\\n["x</parameter>\\n\'\n'
                              "            '</function>\\n</tool_call>')\n"
                              '    assert _grammar_accepts(schema, call)\n'
-                             "    reasoning, content, calls = parse('plan</think>' + "
-                             'call, chunk_size, schema=schema)\n'
-                             "    assert (reasoning, content) == ('plan', '')\n"
-                             "    assert [json.loads(c) for c in calls] == [{'ignore': "
-                             '\'["x\'}]\n'
+                             '    with pytest.raises(QwenToolCallOutsideSchemaError):\n'
+                             "        parse('plan</think>' + call, chunk_size, "
+                             'schema=schema)\n'
                              '\n'
                              '\n'
                              "@pytest.mark.parametrize('chunk_size', [None, 1, 3])\n"
@@ -126406,7 +126709,17 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'EventType.TOOL_CALL_START:\n'},
             {'name': 'vllm/parser/qwen3.py:landmark-1',
              'path': 'vllm/parser/qwen3.py',
-             'before': 'from vllm.parser.engine.events import EventType\n'
+             'before': 'import functools\n'
+                       'import json\n'
+                       'from itertools import product\n'
+                       'from typing import TYPE_CHECKING\n'
+                       'from urllib.parse import unquote\n'
+                       '\n'
+                       'import regex as re\n'
+                       'from jsonschema import Draft202012Validator\n'
+                       'from referencing import Registry\n'
+                       '\n'
+                       'from vllm.parser.engine.events import EventType\n'
                        'from vllm.parser.engine.parser_engine import ParserEngine\n'
                        'from vllm.parser.engine.parser_engine_config import (\n'
                        '    ParserEngineConfig,\n'
@@ -126417,7 +126730,19 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                        'from vllm.tool_parsers.utils import find_tool_schema\n'
                        '\n'
                        'if TYPE_CHECKING:\n',
-             'after': 'from vllm.parser.engine.events import EventType\n'
+             'after': 'import functools\n'
+                      'import json\n'
+                      'from itertools import product\n'
+                      'from typing import TYPE_CHECKING, ClassVar\n'
+                      'from urllib.parse import unquote\n'
+                      '\n'
+                      'import regex as re\n'
+                      'from jsonschema import Draft202012Validator\n'
+                      'from referencing import Registry\n'
+                      '\n'
+                      'from vllm.exceptions import VLLMServerError, '
+                      'VLLMUnprocessableEntityError\n'
+                      'from vllm.parser.engine.events import EventType\n'
                       'from vllm.parser.engine.parser_engine import ParserEngine\n'
                       'from vllm.parser.engine.parser_engine_config import (\n'
                       '    ArgumentsReading,\n'
@@ -126431,7 +126756,17 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       'from vllm.tool_parsers.utils import find_tool_schema\n'
                       '\n'
                       'if TYPE_CHECKING:\n',
-             'review_before': 'from vllm.parser.engine.events import EventType\n'
+             'review_before': 'import functools\n'
+                              'import json\n'
+                              'from itertools import product\n'
+                              'from typing import TYPE_CHECKING\n'
+                              'from urllib.parse import unquote\n'
+                              '\n'
+                              'import regex as re\n'
+                              'from jsonschema import Draft202012Validator\n'
+                              'from referencing import Registry\n'
+                              '\n'
+                              'from vllm.parser.engine.events import EventType\n'
                               'from vllm.parser.engine.parser_engine import '
                               'ParserEngine\n'
                               'from vllm.parser.engine.parser_engine_config import (\n'
@@ -126443,7 +126778,19 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                               'from vllm.tool_parsers.utils import find_tool_schema\n'
                               '\n'
                               'if TYPE_CHECKING:\n',
-             'review_after': 'from vllm.parser.engine.events import EventType\n'
+             'review_after': 'import functools\n'
+                             'import json\n'
+                             'from itertools import product\n'
+                             'from typing import TYPE_CHECKING, ClassVar\n'
+                             'from urllib.parse import unquote\n'
+                             '\n'
+                             'import regex as re\n'
+                             'from jsonschema import Draft202012Validator\n'
+                             'from referencing import Registry\n'
+                             '\n'
+                             'from vllm.exceptions import VLLMServerError, '
+                             'VLLMUnprocessableEntityError\n'
+                             'from vllm.parser.engine.events import EventType\n'
                              'from vllm.parser.engine.parser_engine import '
                              'ParserEngine\n'
                              'from vllm.parser.engine.parser_engine_config import (\n'
@@ -126478,17 +126825,22 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'after': 'PARAM_START = "<parameter="\n'
                       'PARAM_END = "</parameter>"\n'
                       '\n'
-                      "# Argument text is read by the grammar's own productions\n"
+                      "# A call's argument text is read in one mode, the one the "
+                      "parser's declared\n"
+                      '# grammar decides (``Qwen3Parser.structural_tag_model``). Under '
+                      'the Qwen\n'
+                      "# grammar it is read by that grammar's own productions\n"
                       '# (``read_qwen_arguments``): a value ends at its own closer, '
                       'which for a JSON\n'
-                      '# value is the first one outside its strings. Text the grammar '
-                      'has no reading\n'
-                      '# of at all is output no grammar constrained -- a parser '
-                      'registered without\n'
-                      '# one -- and is read as the transport always read it: each '
-                      'value runs to the\n'
-                      '# next closer, and a value with no closer is the final, cut-off '
-                      'one.\n'
+                      '# value is the first one outside its strings, and text the '
+                      'grammar has no\n'
+                      '# reading of is refused, since every generation it constrained '
+                      'has one. A\n'
+                      '# format that declares no grammar (Seed-OSS) reads it as the '
+                      'transport always\n'
+                      '# read it: each value runs to the next closer, and a value with '
+                      'no closer is\n'
+                      '# the final, cut-off one.\n'
                       '_PARAM_RE = re.compile(\n'
                       '    r"<parameter=([^>]*)>"\n'
                       '    r"(.*?)"\n',
@@ -126510,22 +126862,444 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'review_after': 'PARAM_START = "<parameter="\n'
                              'PARAM_END = "</parameter>"\n'
                              '\n'
-                             "# Argument text is read by the grammar's own "
-                             'productions\n'
+                             "# A call's argument text is read in one mode, the one "
+                             "the parser's declared\n"
+                             '# grammar decides '
+                             '(``Qwen3Parser.structural_tag_model``). Under the Qwen\n'
+                             "# grammar it is read by that grammar's own productions\n"
                              '# (``read_qwen_arguments``): a value ends at its own '
                              'closer, which for a JSON\n'
-                             '# value is the first one outside its strings. Text the '
-                             'grammar has no reading\n'
-                             '# of at all is output no grammar constrained -- a parser '
-                             'registered without\n'
-                             '# one -- and is read as the transport always read it: '
-                             'each value runs to the\n'
-                             '# next closer, and a value with no closer is the final, '
-                             'cut-off one.\n'
+                             '# value is the first one outside its strings, and text '
+                             'the grammar has no\n'
+                             '# reading of is refused, since every generation it '
+                             'constrained has one. A\n'
+                             '# format that declares no grammar (Seed-OSS) reads it as '
+                             'the transport always\n'
+                             '# read it: each value runs to the next closer, and a '
+                             'value with no closer is\n'
+                             '# the final, cut-off one.\n'
                              '_PARAM_RE = re.compile(\n'
                              '    r"<parameter=([^>]*)>"\n'
                              '    r"(.*?)"\n'},
             {'name': 'vllm/parser/qwen3.py:landmark-3',
+             'path': 'vllm/parser/qwen3.py',
+             'before': '        return {"allOf": constraints} if constraints else '
+                       'True\n'
+                       '\n'
+                       '\n'
+                       'def _unique_json_object(pairs: list[tuple[str, object]]) -> '
+                       'dict:\n'
+                       '    result = dict(pairs)\n'
+                       '    if len(result) != len(pairs):\n',
+             'after': '        return {"allOf": constraints} if constraints else True\n'
+                      '\n'
+                      '\n'
+                      'class _NoGrammarReading(Exception):\n'
+                      '    """Argument text the grammar that writes the format\'s '
+                      'calls has no\n'
+                      '    reading of. The reader knows only the text; the parser, '
+                      'which knows the\n'
+                      '    call, answers it with :class:`QwenToolCallUnreadError`. It '
+                      'is no\n'
+                      "    ValueError, which the engine's provisional-converter "
+                      'fallback catches."""\n'
+                      '\n'
+                      '\n'
+                      'class _NoSchemaReading(Exception):\n'
+                      '    """A whole argument body no reading of which its tool\'s '
+                      'schema admits.\n'
+                      '    The parser answers it with '
+                      ':class:`QwenToolCallOutsideSchemaError`."""\n'
+                      '\n'
+                      '\n'
+                      'class QwenToolCallUnreadError(VLLMServerError):\n'
+                      '    """The grammar that wrote a call has no reading of its '
+                      'arguments.\n'
+                      '\n'
+                      '    A parser that reads calls by the grammar armed for them '
+                      'reads exactly the\n'
+                      '    language that grammar writes, so this is output that '
+                      'grammar did not\n'
+                      '    constrain, or a disagreement between the grammar and its '
+                      'reading here.\n'
+                      '    Either way the call is not read some other way: reading it '
+                      'by another\n'
+                      '    rule is what would hide the disagreement. On every route '
+                      'that arms the\n'
+                      '    grammar itself only the second is possible, which is the '
+                      "server's\n"
+                      '    failure, so it is a 5xx.\n'
+                      '    """\n'
+                      '\n'
+                      '    def __init__(self, tool: str, grammar: str) -> None:\n'
+                      '        super().__init__(\n'
+                      '            f"The model\'s call to {tool!r} has argument text '
+                      'the {grammar} "\n'
+                      '            "tool-call grammar has no reading of. This parser '
+                      'reads a call only "\n'
+                      '            "as that grammar writes it, and every generation '
+                      'the grammar "\n'
+                      '            "constrained has a reading, so the call is refused '
+                      'rather than read "\n'
+                      '            "by another rule: either the generation was made '
+                      'without the "\n'
+                      '            "grammar its request armed (a /generate request '
+                      'whose sampling "\n'
+                      '            "parameters omit the structured outputs /render '
+                      'returned), or the "\n'
+                      '            "grammar and its reading here disagree, which is a '
+                      'defect of this "\n'
+                      '            "server. Next: generate under the structured '
+                      'outputs /render "\n'
+                      '            "returned; if they were applied, report the request '
+                      'and the "\n'
+                      '            "generated text."\n'
+                      '        )\n'
+                      '        self.tool = tool\n'
+                      '\n'
+                      '\n'
+                      'class '
+                      'QwenToolCallOutsideSchemaError(VLLMUnprocessableEntityError):\n'
+                      '    """The model wrote a whole call no reading of which '
+                      "satisfies its tool's\n"
+                      '    parameters schema.\n'
+                      '\n'
+                      '    The Qwen grammar writes each declared parameter in its '
+                      'declared\n'
+                      '    production, but not every constraint a JSON schema can '
+                      'state -- one\n'
+                      '    across parameters, a value of several types, which it '
+                      'carries as text,\n'
+                      '    a ``multipleOf`` -- so the model can write a call its '
+                      'schema refuses.\n'
+                      '    No reading of such a call is its arguments, and returning '
+                      'every value as\n'
+                      '    text would change the type of each value the model wrote '
+                      'correctly, so\n'
+                      '    the call is refused, naming it, as a call that repeats a '
+                      'parameter is:\n'
+                      '    the request was sound and the server did not fail. The next '
+                      'action is\n'
+                      "    the caller's, to generate the response again.\n"
+                      '    """\n'
+                      '\n'
+                      '    def __init__(self, tool: str) -> None:\n'
+                      '        super().__init__(\n'
+                      '            f"The model\'s call to {tool!r} has arguments no '
+                      'reading of which "\n'
+                      '            "satisfies the tool\'s parameters schema: the '
+                      'tool-call grammar does "\n'
+                      '            "not enforce every constraint a schema can state, '
+                      'and the model "\n'
+                      '            "wrote one the schema refuses. The call is refused '
+                      'rather than "\n'
+                      '            "returned with values its schema does not admit. '
+                      'Generate the "\n'
+                      '            "response again."\n'
+                      '        )\n'
+                      '        self.tool = tool\n'
+                      '\n'
+                      '\n'
+                      'def _unique_json_object(pairs: list[tuple[str, object]]) -> '
+                      'dict:\n'
+                      '    result = dict(pairs)\n'
+                      '    if len(result) != len(pairs):\n',
+             'review_before': '        return {"allOf": constraints} if constraints '
+                              'else True\n'
+                              '\n'
+                              '\n'
+                              'def _unique_json_object(pairs: list[tuple[str, '
+                              'object]]) -> dict:\n'
+                              '    result = dict(pairs)\n'
+                              '    if len(result) != len(pairs):\n',
+             'review_after': '        return {"allOf": constraints} if constraints '
+                             'else True\n'
+                             '\n'
+                             '\n'
+                             'class _NoGrammarReading(Exception):\n'
+                             '    """Argument text the grammar that writes the '
+                             "format's calls has no\n"
+                             '    reading of. The reader knows only the text; the '
+                             'parser, which knows the\n'
+                             '    call, answers it with '
+                             ':class:`QwenToolCallUnreadError`. It is no\n'
+                             "    ValueError, which the engine's provisional-converter "
+                             'fallback catches."""\n'
+                             '\n'
+                             '\n'
+                             'class _NoSchemaReading(Exception):\n'
+                             '    """A whole argument body no reading of which its '
+                             "tool's schema admits.\n"
+                             '    The parser answers it with '
+                             ':class:`QwenToolCallOutsideSchemaError`."""\n'
+                             '\n'
+                             '\n'
+                             'class QwenToolCallUnreadError(VLLMServerError):\n'
+                             '    """The grammar that wrote a call has no reading of '
+                             'its arguments.\n'
+                             '\n'
+                             '    A parser that reads calls by the grammar armed for '
+                             'them reads exactly the\n'
+                             '    language that grammar writes, so this is output that '
+                             'grammar did not\n'
+                             '    constrain, or a disagreement between the grammar and '
+                             'its reading here.\n'
+                             '    Either way the call is not read some other way: '
+                             'reading it by another\n'
+                             '    rule is what would hide the disagreement. On every '
+                             'route that arms the\n'
+                             '    grammar itself only the second is possible, which is '
+                             "the server's\n"
+                             '    failure, so it is a 5xx.\n'
+                             '    """\n'
+                             '\n'
+                             '    def __init__(self, tool: str, grammar: str) -> '
+                             'None:\n'
+                             '        super().__init__(\n'
+                             '            f"The model\'s call to {tool!r} has argument '
+                             'text the {grammar} "\n'
+                             '            "tool-call grammar has no reading of. This '
+                             'parser reads a call only "\n'
+                             '            "as that grammar writes it, and every '
+                             'generation the grammar "\n'
+                             '            "constrained has a reading, so the call is '
+                             'refused rather than read "\n'
+                             '            "by another rule: either the generation was '
+                             'made without the "\n'
+                             '            "grammar its request armed (a /generate '
+                             'request whose sampling "\n'
+                             '            "parameters omit the structured outputs '
+                             '/render returned), or the "\n'
+                             '            "grammar and its reading here disagree, '
+                             'which is a defect of this "\n'
+                             '            "server. Next: generate under the structured '
+                             'outputs /render "\n'
+                             '            "returned; if they were applied, report the '
+                             'request and the "\n'
+                             '            "generated text."\n'
+                             '        )\n'
+                             '        self.tool = tool\n'
+                             '\n'
+                             '\n'
+                             'class '
+                             'QwenToolCallOutsideSchemaError(VLLMUnprocessableEntityError):\n'
+                             '    """The model wrote a whole call no reading of which '
+                             "satisfies its tool's\n"
+                             '    parameters schema.\n'
+                             '\n'
+                             '    The Qwen grammar writes each declared parameter in '
+                             'its declared\n'
+                             '    production, but not every constraint a JSON schema '
+                             'can state -- one\n'
+                             '    across parameters, a value of several types, which '
+                             'it carries as text,\n'
+                             '    a ``multipleOf`` -- so the model can write a call '
+                             'its schema refuses.\n'
+                             '    No reading of such a call is its arguments, and '
+                             'returning every value as\n'
+                             '    text would change the type of each value the model '
+                             'wrote correctly, so\n'
+                             '    the call is refused, naming it, as a call that '
+                             'repeats a parameter is:\n'
+                             '    the request was sound and the server did not fail. '
+                             'The next action is\n'
+                             "    the caller's, to generate the response again.\n"
+                             '    """\n'
+                             '\n'
+                             '    def __init__(self, tool: str) -> None:\n'
+                             '        super().__init__(\n'
+                             '            f"The model\'s call to {tool!r} has '
+                             'arguments no reading of which "\n'
+                             '            "satisfies the tool\'s parameters schema: '
+                             'the tool-call grammar does "\n'
+                             '            "not enforce every constraint a schema can '
+                             'state, and the model "\n'
+                             '            "wrote one the schema refuses. The call is '
+                             'refused rather than "\n'
+                             '            "returned with values its schema does not '
+                             'admit. Generate the "\n'
+                             '            "response again."\n'
+                             '        )\n'
+                             '        self.tool = tool\n'
+                             '\n'
+                             '\n'
+                             'def _unique_json_object(pairs: list[tuple[str, object]]) '
+                             '-> dict:\n'
+                             '    result = dict(pairs)\n'
+                             '    if len(result) != len(pairs):\n'},
+            {'name': 'vllm/parser/qwen3.py:landmark-4',
+             'path': 'vllm/parser/qwen3.py',
+             'before': '    raise ValueError(f"Non-JSON numeric literal in an XML '
+                       'parameter: {value}")\n'
+                       '\n'
+                       '\n'
+                       'def _decode_xml_parameters(params: dict[str, str], schema: '
+                       'dict) -> str:\n'
+                       '    """Decode only schema-proven JSON values; XML strings keep '
+                       'their bytes."""\n'
+                       '    context = _XMLParameterSchema(schema, params)\n'
+                       '    domains = []\n'
+                       '    for name, text in params.items():\n',
+             'after': '    raise ValueError(f"Non-JSON numeric literal in an XML '
+                      'parameter: {value}")\n'
+                      '\n'
+                      '\n'
+                      'def _decode_xml_parameters(params: dict[str, str], schema: '
+                      'dict) -> str | None:\n'
+                      '    """Decode only schema-proven JSON values; XML strings keep '
+                      'their bytes.\n'
+                      '\n'
+                      '    None when no reading of the parameters satisfies the '
+                      'schema: what that\n'
+                      "    means is the reading mode's to say "
+                      '(``_qwen3_arg_converter``)."""\n'
+                      '    context = _XMLParameterSchema(schema, params)\n'
+                      '    domains = []\n'
+                      '    for name, text in params.items():\n',
+             'review_before': '    raise ValueError(f"Non-JSON numeric literal in an '
+                              'XML parameter: {value}")\n'
+                              '\n'
+                              '\n'
+                              'def _decode_xml_parameters(params: dict[str, str], '
+                              'schema: dict) -> str:\n'
+                              '    """Decode only schema-proven JSON values; XML '
+                              'strings keep their bytes."""\n'
+                              '    context = _XMLParameterSchema(schema, params)\n'
+                              '    domains = []\n'
+                              '    for name, text in params.items():\n',
+             'review_after': '    raise ValueError(f"Non-JSON numeric literal in an '
+                             'XML parameter: {value}")\n'
+                             '\n'
+                             '\n'
+                             'def _decode_xml_parameters(params: dict[str, str], '
+                             'schema: dict) -> str | None:\n'
+                             '    """Decode only schema-proven JSON values; XML '
+                             'strings keep their bytes.\n'
+                             '\n'
+                             '    None when no reading of the parameters satisfies the '
+                             'schema: what that\n'
+                             "    means is the reading mode's to say "
+                             '(``_qwen3_arg_converter``)."""\n'
+                             '    context = _XMLParameterSchema(schema, params)\n'
+                             '    domains = []\n'
+                             '    for name, text in params.items():\n'},
+            {'name': 'vllm/parser/qwen3.py:landmark-5',
+             'path': 'vllm/parser/qwen3.py',
+             'before': '            if not isinstance(value, str) and '
+                       'field.is_valid(value):\n'
+                       '                candidates.append((value, text))\n'
+                       '        if not candidates:\n'
+                       '            return json.dumps(params, ensure_ascii=False)\n'
+                       '        domains.append(candidates)\n'
+                       '    while True:\n'
+                       '        context.values = {name: values[0][0] for name, values '
+                       'in zip(params, domains)}\n',
+             'after': '            if not isinstance(value, str) and '
+                      'field.is_valid(value):\n'
+                      '                candidates.append((value, text))\n'
+                      '        if not candidates:\n'
+                      '            return None\n'
+                      '        domains.append(candidates)\n'
+                      '    while True:\n'
+                      '        context.values = {name: values[0][0] for name, values '
+                      'in zip(params, domains)}\n',
+             'review_before': '            if not isinstance(value, str) and '
+                              'field.is_valid(value):\n'
+                              '                candidates.append((value, text))\n'
+                              '        if not candidates:\n'
+                              '            return json.dumps(params, '
+                              'ensure_ascii=False)\n'
+                              '        domains.append(candidates)\n'
+                              '    while True:\n'
+                              '        context.values = {name: values[0][0] for name, '
+                              'values in zip(params, domains)}\n',
+             'review_after': '            if not isinstance(value, str) and '
+                             'field.is_valid(value):\n'
+                             '                candidates.append((value, text))\n'
+                             '        if not candidates:\n'
+                             '            return None\n'
+                             '        domains.append(candidates)\n'
+                             '    while True:\n'
+                             '        context.values = {name: values[0][0] for name, '
+                             'values in zip(params, domains)}\n'},
+            {'name': 'vllm/parser/qwen3.py:landmark-6',
+             'path': 'vllm/parser/qwen3.py',
+             'before': '            field = context.field(name)\n'
+                       '            narrowed.append([value for value in values if '
+                       'field.is_valid(value[0])])\n'
+                       '        if any(not values for values in narrowed):\n'
+                       '            return json.dumps(params, ensure_ascii=False)\n'
+                       '        if all(len(a) == len(b) for a, b in zip(domains, '
+                       'narrowed)):\n'
+                       '            break\n'
+                       '        domains = narrowed\n',
+             'after': '            field = context.field(name)\n'
+                      '            narrowed.append([value for value in values if '
+                      'field.is_valid(value[0])])\n'
+                      '        if any(not values for values in narrowed):\n'
+                      '            return None\n'
+                      '        if all(len(a) == len(b) for a, b in zip(domains, '
+                      'narrowed)):\n'
+                      '            break\n'
+                      '        domains = narrowed\n',
+             'review_before': '            field = context.field(name)\n'
+                              '            narrowed.append([value for value in values '
+                              'if field.is_valid(value[0])])\n'
+                              '        if any(not values for values in narrowed):\n'
+                              '            return json.dumps(params, '
+                              'ensure_ascii=False)\n'
+                              '        if all(len(a) == len(b) for a, b in '
+                              'zip(domains, narrowed)):\n'
+                              '            break\n'
+                              '        domains = narrowed\n',
+             'review_after': '            field = context.field(name)\n'
+                             '            narrowed.append([value for value in values '
+                             'if field.is_valid(value[0])])\n'
+                             '        if any(not values for values in narrowed):\n'
+                             '            return None\n'
+                             '        if all(len(a) == len(b) for a, b in zip(domains, '
+                             'narrowed)):\n'
+                             '            break\n'
+                             '        domains = narrowed\n'},
+            {'name': 'vllm/parser/qwen3.py:landmark-7',
+             'path': 'vllm/parser/qwen3.py',
+             'before': '                json.dumps(name, ensure_ascii=False) + ": " + '
+                       'value[1]\n'
+                       '                for name, value in zip(params, values)\n'
+                       '            ) + "}"\n'
+                       '    return json.dumps(params, ensure_ascii=False)\n'
+                       '\n'
+                       '\n'
+                       'def _unframe_parameter_value(value: str, *, complete: bool) -> '
+                       'str:\n',
+             'after': '                json.dumps(name, ensure_ascii=False) + ": " + '
+                      'value[1]\n'
+                      '                for name, value in zip(params, values)\n'
+                      '            ) + "}"\n'
+                      '    return None\n'
+                      '\n'
+                      '\n'
+                      'def _unframe_parameter_value(value: str, *, complete: bool) -> '
+                      'str:\n',
+             'review_before': '                json.dumps(name, ensure_ascii=False) + '
+                              '": " + value[1]\n'
+                              '                for name, value in zip(params, values)\n'
+                              '            ) + "}"\n'
+                              '    return json.dumps(params, ensure_ascii=False)\n'
+                              '\n'
+                              '\n'
+                              'def _unframe_parameter_value(value: str, *, complete: '
+                              'bool) -> str:\n',
+             'review_after': '                json.dumps(name, ensure_ascii=False) + '
+                             '": " + value[1]\n'
+                             '                for name, value in zip(params, values)\n'
+                             '            ) + "}"\n'
+                             '    return None\n'
+                             '\n'
+                             '\n'
+                             'def _unframe_parameter_value(value: str, *, complete: '
+                             'bool) -> str:\n'},
+            {'name': 'vllm/parser/qwen3.py:landmark-8',
              'path': 'vllm/parser/qwen3.py',
              'before': '    return value\n'
                        '\n'
@@ -126561,46 +127335,87 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                        '    if schema and m is None:\n'
                        '        return _decode_xml_parameters(params, schema)\n'
                        '\n'
-                       '    return json.dumps(params, ensure_ascii=False)\n',
+                       '    return json.dumps(params, ensure_ascii=False)\n'
+                       '\n',
              'after': '    return value\n'
                       '\n'
                       '\n'
                       'def _transport_parameters(\n'
                       '    raw_args: str,\n'
                       ') -> tuple[list[tuple[str, str]], tuple[str, str] | None]:\n'
-                      '    """Read argument text no grammar constrained: values run to '
-                      'the next closer."""\n'
+                      '    """Read argument text as the transport carries it: values '
+                      'run to the next\n'
+                      '    closer, and a value with no closer is the final, cut-off '
+                      'one."""\n'
                       '    closed = [(match.group(1), match.group(2)) for match in '
                       '_PARAM_RE.finditer(raw_args)]\n'
                       '    m = _PARTIAL_PARAM_RE.search(_PARAM_RE.sub("", raw_args))\n'
                       '    return closed, (m.group(1), m.group(2)) if m else None\n'
                       '\n'
                       '\n'
+                      "# The grammar that writes the Qwen format's calls: the format's "
+                      'declaration\n'
+                      '# (``Qwen3Parser.structural_tag_model``), and the reading the '
+                      "format's own\n"
+                      '# configuration -- a bare engine over ``qwen3_config`` -- reads '
+                      'its calls in.\n'
+                      '_QWEN_GRAMMAR = "qwen_3_coder"\n'
+                      '\n'
+                      '\n'
                       'def _qwen3_arguments_reading(\n'
-                      '    raw_args: str, schema: dict | None = None\n'
+                      '    raw_args: str, schema: dict | None = None, grammar: str | '
+                      'None = _QWEN_GRAMMAR\n'
                       ') -> ArgumentsReading:\n'
-                      '    """How a call\'s argument text reads, which decides whether '
-                      "the call's\n"
+                      '    """How a call\'s argument text reads, in the mode *grammar* '
+                      '-- the\n'
+                      "    declaring parser's grammar -- decides, which decides "
+                      "whether the call's\n"
                       '    closing wrapper after it ends the call or continues a '
                       'parameter."""\n'
-                      '    reading = read_qwen_arguments(raw_args, schema or {})\n'
-                      '    if reading is not None:\n'
-                      '        return ArgumentsReading(reading.complete, '
-                      'reading.inside_parameter)\n'
-                      '    inside = PARAM_START in _PARAM_RE.sub("", raw_args)\n'
-                      '    return ArgumentsReading(complete=not inside, '
+                      '    if grammar is None:\n'
+                      '        inside = PARAM_START in _PARAM_RE.sub("", raw_args)\n'
+                      '        return ArgumentsReading(complete=not inside, '
                       'inside_parameter=inside)\n'
+                      '    reading = read_qwen_arguments(raw_args, schema or {})\n'
+                      '    if reading is None:\n'
+                      '        raise _NoGrammarReading()\n'
+                      '    return ArgumentsReading(reading.complete, '
+                      'reading.inside_parameter)\n'
                       '\n'
                       '\n'
                       'def _qwen3_arg_converter(\n'
-                      '    raw_args: str, partial: bool, schema: dict | None = None\n'
+                      '    raw_args: str,\n'
+                      '    partial: bool,\n'
+                      '    schema: dict | None = None,\n'
+                      '    grammar: str | None = _QWEN_GRAMMAR,\n'
                       ') -> str:\n'
-                      '    reading = read_qwen_arguments(raw_args, schema or {})\n'
-                      '    if reading is None:\n'
+                      '    """A call\'s arguments, read in the mode *grammar* -- the '
+                      'declaring\n'
+                      "    parser's grammar -- decides.\n"
+                      '\n'
+                      '    Under the grammar, a whole body is decoded by its schema '
+                      'and refused when\n'
+                      '    no reading satisfies it, and a body the generation cut '
+                      'short is the raw\n'
+                      '    diagnostic its text is so far. With none, nothing '
+                      'constrained the call,\n'
+                      "    so it is the client's to validate: a body with no "
+                      'unfinished parameter is\n'
+                      '    decoded where its schema proves a reading, and otherwise '
+                      'every value is\n'
+                      "    the text the model wrote, as upstream's reader returns "
+                      'every value.\n'
+                      '    """\n'
+                      '    if grammar is None:\n'
                       '        closed, unfinished = _transport_parameters(raw_args)\n'
+                      '        whole = unfinished is None\n'
                       '    else:\n'
+                      '        reading = read_qwen_arguments(raw_args, schema or {})\n'
+                      '        if reading is None:\n'
+                      '            raise _NoGrammarReading()\n'
                       '        closed, unfinished = list(reading.parameters), '
                       'reading.unfinished\n'
+                      '        whole = reading.complete\n'
                       '\n'
                       '    params: dict[str, str] = {}\n'
                       '    for name, value in closed:\n'
@@ -126610,8 +127425,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '        params[name] = _unframe_parameter_value(value, '
                       'complete=True)\n'
                       '\n'
-                      '    # An unfinished parameter is a raw diagnostic on both '
-                      'transports.\n'
+                      '    # An unfinished parameter is a raw diagnostic in both '
+                      'modes.\n'
                       '    if unfinished is not None:\n'
                       '        name, value = unfinished\n'
                       '        if name in params:\n'
@@ -126620,10 +127435,15 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '        params[name] = _unframe_parameter_value(value, '
                       'complete=False)\n'
                       '\n'
-                      '    if schema and unfinished is None:\n'
-                      '        return _decode_xml_parameters(params, schema)\n'
+                      '    if schema and whole:\n'
+                      '        decoded = _decode_xml_parameters(params, schema)\n'
+                      '        if decoded is not None:\n'
+                      '            return decoded\n'
+                      '        if grammar is not None:\n'
+                      '            raise _NoSchemaReading()\n'
                       '\n'
-                      '    return json.dumps(params, ensure_ascii=False)\n',
+                      '    return json.dumps(params, ensure_ascii=False)\n'
+                      '\n',
              'review_before': '    return value\n'
                               '\n'
                               '\n'
@@ -126659,7 +127479,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                               '    if schema and m is None:\n'
                               '        return _decode_xml_parameters(params, schema)\n'
                               '\n'
-                              '    return json.dumps(params, ensure_ascii=False)\n',
+                              '    return json.dumps(params, ensure_ascii=False)\n'
+                              '\n',
              'review_after': '    return value\n'
                              '\n'
                              '\n'
@@ -126667,8 +127488,10 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    raw_args: str,\n'
                              ') -> tuple[list[tuple[str, str]], tuple[str, str] | '
                              'None]:\n'
-                             '    """Read argument text no grammar constrained: values '
-                             'run to the next closer."""\n'
+                             '    """Read argument text as the transport carries it: '
+                             'values run to the next\n'
+                             '    closer, and a value with no closer is the final, '
+                             'cut-off one."""\n'
                              '    closed = [(match.group(1), match.group(2)) for match '
                              'in _PARAM_RE.finditer(raw_args)]\n'
                              '    m = _PARTIAL_PARAM_RE.search(_PARAM_RE.sub("", '
@@ -126677,35 +127500,73 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'None\n'
                              '\n'
                              '\n'
+                             "# The grammar that writes the Qwen format's calls: the "
+                             "format's declaration\n"
+                             '# (``Qwen3Parser.structural_tag_model``), and the '
+                             "reading the format's own\n"
+                             '# configuration -- a bare engine over ``qwen3_config`` '
+                             '-- reads its calls in.\n'
+                             '_QWEN_GRAMMAR = "qwen_3_coder"\n'
+                             '\n'
+                             '\n'
                              'def _qwen3_arguments_reading(\n'
-                             '    raw_args: str, schema: dict | None = None\n'
+                             '    raw_args: str, schema: dict | None = None, grammar: '
+                             'str | None = _QWEN_GRAMMAR\n'
                              ') -> ArgumentsReading:\n'
-                             '    """How a call\'s argument text reads, which decides '
+                             '    """How a call\'s argument text reads, in the mode '
+                             '*grammar* -- the\n'
+                             "    declaring parser's grammar -- decides, which decides "
                              "whether the call's\n"
                              '    closing wrapper after it ends the call or continues '
                              'a parameter."""\n'
-                             '    reading = read_qwen_arguments(raw_args, schema or '
-                             '{})\n'
-                             '    if reading is not None:\n'
-                             '        return ArgumentsReading(reading.complete, '
-                             'reading.inside_parameter)\n'
-                             '    inside = PARAM_START in _PARAM_RE.sub("", raw_args)\n'
-                             '    return ArgumentsReading(complete=not inside, '
+                             '    if grammar is None:\n'
+                             '        inside = PARAM_START in _PARAM_RE.sub("", '
+                             'raw_args)\n'
+                             '        return ArgumentsReading(complete=not inside, '
                              'inside_parameter=inside)\n'
-                             '\n'
-                             '\n'
-                             'def _qwen3_arg_converter(\n'
-                             '    raw_args: str, partial: bool, schema: dict | None = '
-                             'None\n'
-                             ') -> str:\n'
                              '    reading = read_qwen_arguments(raw_args, schema or '
                              '{})\n'
                              '    if reading is None:\n'
+                             '        raise _NoGrammarReading()\n'
+                             '    return ArgumentsReading(reading.complete, '
+                             'reading.inside_parameter)\n'
+                             '\n'
+                             '\n'
+                             'def _qwen3_arg_converter(\n'
+                             '    raw_args: str,\n'
+                             '    partial: bool,\n'
+                             '    schema: dict | None = None,\n'
+                             '    grammar: str | None = _QWEN_GRAMMAR,\n'
+                             ') -> str:\n'
+                             '    """A call\'s arguments, read in the mode *grammar* '
+                             '-- the declaring\n'
+                             "    parser's grammar -- decides.\n"
+                             '\n'
+                             '    Under the grammar, a whole body is decoded by its '
+                             'schema and refused when\n'
+                             '    no reading satisfies it, and a body the generation '
+                             'cut short is the raw\n'
+                             '    diagnostic its text is so far. With none, nothing '
+                             'constrained the call,\n'
+                             "    so it is the client's to validate: a body with no "
+                             'unfinished parameter is\n'
+                             '    decoded where its schema proves a reading, and '
+                             'otherwise every value is\n'
+                             "    the text the model wrote, as upstream's reader "
+                             'returns every value.\n'
+                             '    """\n'
+                             '    if grammar is None:\n'
                              '        closed, unfinished = '
                              '_transport_parameters(raw_args)\n'
+                             '        whole = unfinished is None\n'
                              '    else:\n'
+                             '        reading = read_qwen_arguments(raw_args, schema '
+                             'or {})\n'
+                             '        if reading is None:\n'
+                             '            raise _NoGrammarReading()\n'
                              '        closed, unfinished = list(reading.parameters), '
                              'reading.unfinished\n'
+                             '        whole = reading.complete\n'
                              '\n'
                              '    params: dict[str, str] = {}\n'
                              '    for name, value in closed:\n'
@@ -126715,8 +127576,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '        params[name] = _unframe_parameter_value(value, '
                              'complete=True)\n'
                              '\n'
-                             '    # An unfinished parameter is a raw diagnostic on '
-                             'both transports.\n'
+                             '    # An unfinished parameter is a raw diagnostic in '
+                             'both modes.\n'
                              '    if unfinished is not None:\n'
                              '        name, value = unfinished\n'
                              '        if name in params:\n'
@@ -126725,11 +127586,17 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '        params[name] = _unframe_parameter_value(value, '
                              'complete=False)\n'
                              '\n'
-                             '    if schema and unfinished is None:\n'
-                             '        return _decode_xml_parameters(params, schema)\n'
+                             '    if schema and whole:\n'
+                             '        decoded = _decode_xml_parameters(params, '
+                             'schema)\n'
+                             '        if decoded is not None:\n'
+                             '            return decoded\n'
+                             '        if grammar is not None:\n'
+                             '            raise _NoSchemaReading()\n'
                              '\n'
-                             '    return json.dumps(params, ensure_ascii=False)\n'},
-            {'name': 'vllm/parser/qwen3.py:landmark-4',
+                             '    return json.dumps(params, ensure_ascii=False)\n'
+                             '\n'},
+            {'name': 'vllm/parser/qwen3.py:landmark-9',
              'path': 'vllm/parser/qwen3.py',
              'before': '                ParserState.TOOL_ARGS,\n'
                        '                (),\n'
@@ -126868,53 +127735,171 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '        stream_arg_deltas=False,\n'
                              '        strip_trailing_reasoning_whitespace=False,\n'
                              '        tool_args_json=False,\n'},
-            {'name': 'vllm/parser/qwen3.py:landmark-5',
+            {'name': 'vllm/parser/qwen3.py:landmark-10',
              'path': 'vllm/parser/qwen3.py',
-             'before': '    # pass splits on the same ids the streaming tool pass '
+             'before': '    THINK_END = THINK_END\n'
+                       '    TOOL_START = TOOL_CALL_START\n'
+                       '    TOOL_END = TOOL_CALL_END\n'
+                       '    # The reasoning pass forwards a tool span verbatim, so the '
+                       'batch tool\n'
+                       '    # pass splits on the same ids the streaming tool pass '
                        'sees.\n'
                        '    batch_tool_pass_uses_ids = True\n'
                        '\n'
                        '    def _convert_tool_arguments(\n'
                        '        self, raw_args: str, func_name: str, partial: bool\n'
-                       '    ) -> str:\n',
-             'after': '    # pass splits on the same ids the streaming tool pass '
+                       '    ) -> str:\n'
+                       '        try:\n'
+                       '            return _qwen3_arg_converter(\n'
+                       '                raw_args, partial, '
+                       'find_tool_schema(self._tools, func_name)\n'
+                       '            )\n'
+                       '        except (TypeError, ValueError) as exc:\n'
+                       '            # Malformed parameter text is handled inside the '
+                       'decoder. An error\n'
+                       "            # here must not enter the engine's "
+                       'provisional-converter fallback.\n',
+             'after': '    THINK_END = THINK_END\n'
+                      '    TOOL_START = TOOL_CALL_START\n'
+                      '    TOOL_END = TOOL_CALL_END\n'
+                      "    # The grammar that writes this format's calls, and so the "
+                      'one fact that\n'
+                      '    # decides both where they come from and how they are read: '
+                      "the format's\n"
+                      "    # tool parser arms it (``make_adapters`` gives the engine's "
+                      'tool adapter\n'
+                      "    # this declaration as its own), and a call's arguments are "
+                      'read by its\n'
+                      '    # productions, text with no reading refused. A format that '
+                      'declares none\n'
+                      '    # (Seed-OSS) arms no grammar and reads its calls as the '
+                      'transport carries\n'
+                      '    # them.\n'
+                      '    structural_tag_model: ClassVar[str | None] = _QWEN_GRAMMAR\n'
+                      '    # The reasoning pass forwards a tool span verbatim, so the '
+                      'batch tool\n'
+                      '    # pass splits on the same ids the streaming tool pass '
                       'sees.\n'
                       '    batch_tool_pass_uses_ids = True\n'
                       '\n'
                       '    def _tool_arguments_reading(\n'
                       '        self, func_name: str, raw_args: str\n'
                       '    ) -> ArgumentsReading:\n'
-                      '        return _qwen3_arguments_reading(\n'
-                      '            raw_args, find_tool_schema(self._tools, func_name)\n'
-                      '        )\n'
+                      '        try:\n'
+                      '            return _qwen3_arguments_reading(\n'
+                      '                raw_args, find_tool_schema(self._tools, '
+                      'func_name),\n'
+                      '                self.structural_tag_model,\n'
+                      '            )\n'
+                      '        except _NoGrammarReading:\n'
+                      '            raise QwenToolCallUnreadError(\n'
+                      '                func_name, self.structural_tag_model\n'
+                      '            ) from None\n'
                       '\n'
                       '    def _convert_tool_arguments(\n'
                       '        self, raw_args: str, func_name: str, partial: bool\n'
-                      '    ) -> str:\n',
-             'review_before': '    # pass splits on the same ids the streaming tool '
+                      '    ) -> str:\n'
+                      '        try:\n'
+                      '            return _qwen3_arg_converter(\n'
+                      '                raw_args, partial, '
+                      'find_tool_schema(self._tools, func_name),\n'
+                      '                self.structural_tag_model,\n'
+                      '            )\n'
+                      '        except _NoGrammarReading:\n'
+                      '            raise QwenToolCallUnreadError(\n'
+                      '                func_name, self.structural_tag_model\n'
+                      '            ) from None\n'
+                      '        except _NoSchemaReading:\n'
+                      '            raise QwenToolCallOutsideSchemaError(func_name) '
+                      'from None\n'
+                      '        except (TypeError, ValueError) as exc:\n'
+                      '            # Malformed parameter text is handled inside the '
+                      'decoder. An error\n'
+                      "            # here must not enter the engine's "
+                      'provisional-converter fallback.\n',
+             'review_before': '    THINK_END = THINK_END\n'
+                              '    TOOL_START = TOOL_CALL_START\n'
+                              '    TOOL_END = TOOL_CALL_END\n'
+                              '    # The reasoning pass forwards a tool span verbatim, '
+                              'so the batch tool\n'
+                              '    # pass splits on the same ids the streaming tool '
                               'pass sees.\n'
                               '    batch_tool_pass_uses_ids = True\n'
                               '\n'
                               '    def _convert_tool_arguments(\n'
                               '        self, raw_args: str, func_name: str, partial: '
                               'bool\n'
-                              '    ) -> str:\n',
-             'review_after': '    # pass splits on the same ids the streaming tool '
+                              '    ) -> str:\n'
+                              '        try:\n'
+                              '            return _qwen3_arg_converter(\n'
+                              '                raw_args, partial, '
+                              'find_tool_schema(self._tools, func_name)\n'
+                              '            )\n'
+                              '        except (TypeError, ValueError) as exc:\n'
+                              '            # Malformed parameter text is handled '
+                              'inside the decoder. An error\n'
+                              "            # here must not enter the engine's "
+                              'provisional-converter fallback.\n',
+             'review_after': '    THINK_END = THINK_END\n'
+                             '    TOOL_START = TOOL_CALL_START\n'
+                             '    TOOL_END = TOOL_CALL_END\n'
+                             "    # The grammar that writes this format's calls, and "
+                             'so the one fact that\n'
+                             '    # decides both where they come from and how they are '
+                             "read: the format's\n"
+                             '    # tool parser arms it (``make_adapters`` gives the '
+                             "engine's tool adapter\n"
+                             "    # this declaration as its own), and a call's "
+                             'arguments are read by its\n'
+                             '    # productions, text with no reading refused. A '
+                             'format that declares none\n'
+                             '    # (Seed-OSS) arms no grammar and reads its calls as '
+                             'the transport carries\n'
+                             '    # them.\n'
+                             '    structural_tag_model: ClassVar[str | None] = '
+                             '_QWEN_GRAMMAR\n'
+                             '    # The reasoning pass forwards a tool span verbatim, '
+                             'so the batch tool\n'
+                             '    # pass splits on the same ids the streaming tool '
                              'pass sees.\n'
                              '    batch_tool_pass_uses_ids = True\n'
                              '\n'
                              '    def _tool_arguments_reading(\n'
                              '        self, func_name: str, raw_args: str\n'
                              '    ) -> ArgumentsReading:\n'
-                             '        return _qwen3_arguments_reading(\n'
-                             '            raw_args, find_tool_schema(self._tools, '
-                             'func_name)\n'
-                             '        )\n'
+                             '        try:\n'
+                             '            return _qwen3_arguments_reading(\n'
+                             '                raw_args, find_tool_schema(self._tools, '
+                             'func_name),\n'
+                             '                self.structural_tag_model,\n'
+                             '            )\n'
+                             '        except _NoGrammarReading:\n'
+                             '            raise QwenToolCallUnreadError(\n'
+                             '                func_name, self.structural_tag_model\n'
+                             '            ) from None\n'
                              '\n'
                              '    def _convert_tool_arguments(\n'
                              '        self, raw_args: str, func_name: str, partial: '
                              'bool\n'
-                             '    ) -> str:\n'},
+                             '    ) -> str:\n'
+                             '        try:\n'
+                             '            return _qwen3_arg_converter(\n'
+                             '                raw_args, partial, '
+                             'find_tool_schema(self._tools, func_name),\n'
+                             '                self.structural_tag_model,\n'
+                             '            )\n'
+                             '        except _NoGrammarReading:\n'
+                             '            raise QwenToolCallUnreadError(\n'
+                             '                func_name, self.structural_tag_model\n'
+                             '            ) from None\n'
+                             '        except _NoSchemaReading:\n'
+                             '            raise '
+                             'QwenToolCallOutsideSchemaError(func_name) from None\n'
+                             '        except (TypeError, ValueError) as exc:\n'
+                             '            # Malformed parameter text is handled inside '
+                             'the decoder. An error\n'
+                             "            # here must not enter the engine's "
+                             'provisional-converter fallback.\n'},
             {'name': 'vllm/tool_parsers/structural_tag_registry.py:landmark-1',
              'path': 'vllm/tool_parsers/structural_tag_registry.py',
              'before': '# SPDX-License-Identifier: Apache-2.0\n'
@@ -128319,7 +129304,345 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'def _qwen_tool_tags(tools: list[FunctionToolParam]) -> '
                              'list[TagFormat]:\n'
                              '    return [\n'
-                             '        TagFormat(\n'})},
+                             '        TagFormat(\n'},
+            {'name': 'tests/parser/engine/test_seed_oss.py:landmark-1',
+             'path': 'tests/parser/engine/test_seed_oss.py',
+             'before': '    assert '
+                       'json.loads(tool_result.tool_calls[0].function.arguments) == {\n'
+                       '        "city": "Barcelona"\n'
+                       '    }\n',
+             'after': '    assert '
+                      'json.loads(tool_result.tool_calls[0].function.arguments) == {\n'
+                      '        "city": "Barcelona"\n'
+                      '    }\n'
+                      '\n'
+                      '\n'
+                      'def _closed_tool_request(mock_request, parameters):\n'
+                      '    mock_request.tools = '
+                      '[ChatCompletionToolsParam.model_validate({\n'
+                      '        "type": "function", "function": {"name": "run", '
+                      '"parameters": parameters},\n'
+                      '    })]\n'
+                      '    return mock_request\n'
+                      '\n'
+                      '\n'
+                      '@pytest.mark.parametrize("arguments,expected", [\n'
+                      '    # Out of declared order, which the Qwen grammar cannot '
+                      'write.\n'
+                      '    '
+                      '("<parameter=command>ls</parameter>\\n<parameter=description>list</parameter>\\n"\n'
+                      '     "<parameter=is_background>true</parameter>\\n",\n'
+                      '     {"command": "ls", "description": "list", "is_background": '
+                      'True}),\n'
+                      '    # A value its schema refuses, kept as the text the model '
+                      'wrote.\n'
+                      '    '
+                      '("<parameter=command>ls</parameter>\\n<parameter=is_background>TRUE</parameter>\\n",\n'
+                      '     {"command": "ls", "is_background": "TRUE"}),\n'
+                      '])\n'
+                      'def test_arguments_are_read_as_the_transport_carries_them(\n'
+                      '    tool_parser, mock_request, arguments, expected\n'
+                      '):\n'
+                      '    """No grammar writes seed_oss\'s calls, so its tool parser '
+                      'arms none and\n'
+                      "    reads every call in the transport's one mode: each value "
+                      'runs to its\n'
+                      '    closer, and a call no reading of satisfies its schema is '
+                      "the client's to\n"
+                      '    validate."""\n'
+                      '    from vllm.tool_parsers.seed_oss_engine_tool_parser import '
+                      'SeedOssEngineToolParser\n'
+                      '\n'
+                      '    assert SeedOssParser.structural_tag_model is None\n'
+                      '    assert SeedOssEngineToolParser.structural_tag_model is '
+                      'None\n'
+                      '    request = _closed_tool_request(mock_request, {\n'
+                      '        "type": "object", "required": ["command"], '
+                      '"additionalProperties": False,\n'
+                      '        "properties": {"command": {"type": "string"},\n'
+                      '                       "is_background": {"type": "boolean"},\n'
+                      '                       "description": {"type": "string"}},\n'
+                      '    })\n'
+                      '    text = (\n'
+                      '        f"{TOOL_CALL_START}\\n<function=run>\\n" + arguments\n'
+                      '        + f"</function>\\n{TOOL_CALL_END}"\n'
+                      '    )\n'
+                      '    result = tool_parser.extract_tool_calls(text, request)\n'
+                      '    assert [tc.function.name for tc in result.tool_calls] == '
+                      '["run"]\n'
+                      '    assert json.loads(result.tool_calls[0].function.arguments) '
+                      '== expected\n',
+             'review_before': '    assert '
+                              'json.loads(tool_result.tool_calls[0].function.arguments) '
+                              '== {\n'
+                              '        "city": "Barcelona"\n'
+                              '    }\n',
+             'review_after': '    assert '
+                             'json.loads(tool_result.tool_calls[0].function.arguments) '
+                             '== {\n'
+                             '        "city": "Barcelona"\n'
+                             '    }\n'
+                             '\n'
+                             '\n'
+                             'def _closed_tool_request(mock_request, parameters):\n'
+                             '    mock_request.tools = '
+                             '[ChatCompletionToolsParam.model_validate({\n'
+                             '        "type": "function", "function": {"name": "run", '
+                             '"parameters": parameters},\n'
+                             '    })]\n'
+                             '    return mock_request\n'
+                             '\n'
+                             '\n'
+                             '@pytest.mark.parametrize("arguments,expected", [\n'
+                             '    # Out of declared order, which the Qwen grammar '
+                             'cannot write.\n'
+                             '    '
+                             '("<parameter=command>ls</parameter>\\n<parameter=description>list</parameter>\\n"\n'
+                             '     "<parameter=is_background>true</parameter>\\n",\n'
+                             '     {"command": "ls", "description": "list", '
+                             '"is_background": True}),\n'
+                             '    # A value its schema refuses, kept as the text the '
+                             'model wrote.\n'
+                             '    '
+                             '("<parameter=command>ls</parameter>\\n<parameter=is_background>TRUE</parameter>\\n",\n'
+                             '     {"command": "ls", "is_background": "TRUE"}),\n'
+                             '])\n'
+                             'def '
+                             'test_arguments_are_read_as_the_transport_carries_them(\n'
+                             '    tool_parser, mock_request, arguments, expected\n'
+                             '):\n'
+                             '    """No grammar writes seed_oss\'s calls, so its tool '
+                             'parser arms none and\n'
+                             "    reads every call in the transport's one mode: each "
+                             'value runs to its\n'
+                             '    closer, and a call no reading of satisfies its '
+                             "schema is the client's to\n"
+                             '    validate."""\n'
+                             '    from vllm.tool_parsers.seed_oss_engine_tool_parser '
+                             'import SeedOssEngineToolParser\n'
+                             '\n'
+                             '    assert SeedOssParser.structural_tag_model is None\n'
+                             '    assert SeedOssEngineToolParser.structural_tag_model '
+                             'is None\n'
+                             '    request = _closed_tool_request(mock_request, {\n'
+                             '        "type": "object", "required": ["command"], '
+                             '"additionalProperties": False,\n'
+                             '        "properties": {"command": {"type": "string"},\n'
+                             '                       "is_background": {"type": '
+                             '"boolean"},\n'
+                             '                       "description": {"type": '
+                             '"string"}},\n'
+                             '    })\n'
+                             '    text = (\n'
+                             '        f"{TOOL_CALL_START}\\n<function=run>\\n" + '
+                             'arguments\n'
+                             '        + f"</function>\\n{TOOL_CALL_END}"\n'
+                             '    )\n'
+                             '    result = tool_parser.extract_tool_calls(text, '
+                             'request)\n'
+                             '    assert [tc.function.name for tc in '
+                             'result.tool_calls] == ["run"]\n'
+                             '    assert '
+                             'json.loads(result.tool_calls[0].function.arguments) == '
+                             'expected\n'},
+            {'name': 'vllm/parser/engine/adapters.py:landmark-1',
+             'path': 'vllm/parser/engine/adapters.py',
+             'before': '        (ParserEngineReasoningAdapter,),\n'
+                       '        {"_parser_engine_cls": parser_engine_cls},\n'
+                       '    )\n'
+                       '    tool_adapter = type(\n'
+                       '        f"{parser_engine_cls.__name__}ToolAdapter",\n'
+                       '        (ParserEngineToolAdapter,),\n'
+                       '        {"_parser_engine_cls": parser_engine_cls},\n'
+                       '    )\n'
+                       '    # Let the serving layer find the adapters and call '
+                       'adjust_request(),\n'
+                       '    # which sets skip_special_tokens=False for the '
+                       'detokenizer.\n',
+             'after': '        (ParserEngineReasoningAdapter,),\n'
+                      '        {"_parser_engine_cls": parser_engine_cls},\n'
+                      '    )\n'
+                      '    tool_namespace: dict[str, object] = {"_parser_engine_cls": '
+                      'parser_engine_cls}\n'
+                      '    # An engine that reads its calls by the grammar that writes '
+                      'them declares\n'
+                      '    # that grammar, and its tool parser arms exactly it: one '
+                      'declaration\n'
+                      '    # decides both.\n'
+                      '    if hasattr(parser_engine_cls, "structural_tag_model"):\n'
+                      '        tool_namespace["structural_tag_model"] = '
+                      'parser_engine_cls.structural_tag_model\n'
+                      '    tool_adapter = type(\n'
+                      '        f"{parser_engine_cls.__name__}ToolAdapter",\n'
+                      '        (ParserEngineToolAdapter,),\n'
+                      '        tool_namespace,\n'
+                      '    )\n'
+                      '    # Let the serving layer find the adapters and call '
+                      'adjust_request(),\n'
+                      '    # which sets skip_special_tokens=False for the '
+                      'detokenizer.\n',
+             'review_before': '        (ParserEngineReasoningAdapter,),\n'
+                              '        {"_parser_engine_cls": parser_engine_cls},\n'
+                              '    )\n'
+                              '    tool_adapter = type(\n'
+                              '        f"{parser_engine_cls.__name__}ToolAdapter",\n'
+                              '        (ParserEngineToolAdapter,),\n'
+                              '        {"_parser_engine_cls": parser_engine_cls},\n'
+                              '    )\n'
+                              '    # Let the serving layer find the adapters and call '
+                              'adjust_request(),\n'
+                              '    # which sets skip_special_tokens=False for the '
+                              'detokenizer.\n',
+             'review_after': '        (ParserEngineReasoningAdapter,),\n'
+                             '        {"_parser_engine_cls": parser_engine_cls},\n'
+                             '    )\n'
+                             '    tool_namespace: dict[str, object] = '
+                             '{"_parser_engine_cls": parser_engine_cls}\n'
+                             '    # An engine that reads its calls by the grammar that '
+                             'writes them declares\n'
+                             '    # that grammar, and its tool parser arms exactly it: '
+                             'one declaration\n'
+                             '    # decides both.\n'
+                             '    if hasattr(parser_engine_cls, '
+                             '"structural_tag_model"):\n'
+                             '        tool_namespace["structural_tag_model"] = '
+                             'parser_engine_cls.structural_tag_model\n'
+                             '    tool_adapter = type(\n'
+                             '        f"{parser_engine_cls.__name__}ToolAdapter",\n'
+                             '        (ParserEngineToolAdapter,),\n'
+                             '        tool_namespace,\n'
+                             '    )\n'
+                             '    # Let the serving layer find the adapters and call '
+                             'adjust_request(),\n'
+                             '    # which sets skip_special_tokens=False for the '
+                             'detokenizer.\n'},
+            {'name': 'vllm/parser/seed_oss.py:landmark-1',
+             'path': 'vllm/parser/seed_oss.py',
+             'before': '    </tool_call> -> </seed:tool_call>\n'
+                       '\n'
+                       '``<function=...>`` and ``<parameter=...>`` are byte-identical, '
+                       'so the\n'
+                       'entire transition table and ``_qwen3_arg_converter`` are '
+                       'inherited from\n'
+                       ':class:`Qwen3Parser` unchanged.\n'
+                       '"""\n'
+                       '\n'
+                       'from __future__ import annotations\n',
+             'after': '    </tool_call> -> </seed:tool_call>\n'
+                      '\n'
+                      '``<function=...>`` and ``<parameter=...>`` are byte-identical, '
+                      'so the\n'
+                      'entire transition table is inherited from :class:`Qwen3Parser` '
+                      'unchanged.\n'
+                      "No grammar writes seed_oss's calls -- its tool parser arms none "
+                      '-- so their\n'
+                      'arguments are read as the transport carries them.\n'
+                      '"""\n'
+                      '\n'
+                      'from __future__ import annotations\n',
+             'review_before': '    </tool_call> -> </seed:tool_call>\n'
+                              '\n'
+                              '``<function=...>`` and ``<parameter=...>`` are '
+                              'byte-identical, so the\n'
+                              'entire transition table and ``_qwen3_arg_converter`` '
+                              'are inherited from\n'
+                              ':class:`Qwen3Parser` unchanged.\n'
+                              '"""\n'
+                              '\n'
+                              'from __future__ import annotations\n',
+             'review_after': '    </tool_call> -> </seed:tool_call>\n'
+                             '\n'
+                             '``<function=...>`` and ``<parameter=...>`` are '
+                             'byte-identical, so the\n'
+                             'entire transition table is inherited from '
+                             ':class:`Qwen3Parser` unchanged.\n'
+                             "No grammar writes seed_oss's calls -- its tool parser "
+                             'arms none -- so their\n'
+                             'arguments are read as the transport carries them.\n'
+                             '"""\n'
+                             '\n'
+                             'from __future__ import annotations\n'},
+            {'name': 'vllm/parser/seed_oss.py:landmark-2',
+             'path': 'vllm/parser/seed_oss.py',
+             'before': '    THINK_END = "</seed:think>"\n'
+                       '    TOOL_START = "<seed:tool_call>"\n'
+                       '    TOOL_END = "</seed:tool_call>"\n',
+             'after': '    THINK_END = "</seed:think>"\n'
+                      '    TOOL_START = "<seed:tool_call>"\n'
+                      '    TOOL_END = "</seed:tool_call>"\n'
+                      '    structural_tag_model = None\n',
+             'review_before': '    THINK_END = "</seed:think>"\n'
+                              '    TOOL_START = "<seed:tool_call>"\n'
+                              '    TOOL_END = "</seed:tool_call>"\n',
+             'review_after': '    THINK_END = "</seed:think>"\n'
+                             '    TOOL_START = "<seed:tool_call>"\n'
+                             '    TOOL_END = "</seed:tool_call>"\n'
+                             '    structural_tag_model = None\n'},
+            {'name': 'vllm/tool_parsers/qwen3_engine_tool_parser.py:landmark-1',
+             'path': 'vllm/tool_parsers/qwen3_engine_tool_parser.py',
+             'before': '\n'
+                       '\n'
+                       'class Qwen3EngineToolParser(Qwen3ParserToolAdapter):  # type: '
+                       'ignore[valid-type, misc]\n'
+                       '    structural_tag_model = "qwen_3_coder"\n'
+                       '\n'
+                       '    @classmethod\n'
+                       '    def require_servable(cls) -> None:\n',
+             'after': '\n'
+                      '\n'
+                      'class Qwen3EngineToolParser(Qwen3ParserToolAdapter):  # type: '
+                      'ignore[valid-type, misc]\n'
+                      '    # Arms the grammar its engine declares '
+                      '(Qwen3Parser.structural_tag_model)\n'
+                      '    # and reads calls by.\n'
+                      '\n'
+                      '    @classmethod\n'
+                      '    def require_servable(cls) -> None:\n',
+             'review_before': '\n'
+                              '\n'
+                              'class Qwen3EngineToolParser(Qwen3ParserToolAdapter):  # '
+                              'type: ignore[valid-type, misc]\n'
+                              '    structural_tag_model = "qwen_3_coder"\n'
+                              '\n'
+                              '    @classmethod\n'
+                              '    def require_servable(cls) -> None:\n',
+             'review_after': '\n'
+                             '\n'
+                             'class Qwen3EngineToolParser(Qwen3ParserToolAdapter):  # '
+                             'type: ignore[valid-type, misc]\n'
+                             '    # Arms the grammar its engine declares '
+                             '(Qwen3Parser.structural_tag_model)\n'
+                             '    # and reads calls by.\n'
+                             '\n'
+                             '    @classmethod\n'
+                             '    def require_servable(cls) -> None:\n'},
+            {'name': 'vllm/tool_parsers/seed_oss_engine_tool_parser.py:landmark-1',
+             'path': 'vllm/tool_parsers/seed_oss_engine_tool_parser.py',
+             'before': '\n'
+                       '\n'
+                       'class SeedOssEngineToolParser(SeedOssParserToolAdapter):  # '
+                       'type: ignore[valid-type, misc]\n'
+                       '    structural_tag_model = None\n',
+             'after': '\n'
+                      '\n'
+                      'class SeedOssEngineToolParser(SeedOssParserToolAdapter):  # '
+                      'type: ignore[valid-type, misc]\n'
+                      '    """Arms the grammar its engine declares, which is none\n'
+                      '    (SeedOssParser.structural_tag_model)."""\n',
+             'review_before': '\n'
+                              '\n'
+                              'class '
+                              'SeedOssEngineToolParser(SeedOssParserToolAdapter):  # '
+                              'type: ignore[valid-type, misc]\n'
+                              '    structural_tag_model = None\n',
+             'review_after': '\n'
+                             '\n'
+                             'class '
+                             'SeedOssEngineToolParser(SeedOssParserToolAdapter):  # '
+                             'type: ignore[valid-type, misc]\n'
+                             '    """Arms the grammar its engine declares, which is '
+                             'none\n'
+                             '    (SeedOssParser.structural_tag_model)."""\n'})},
  {'name': 'startup-plan-admission-bound',
   'review_patch': 'patches/vllm-startup-plan-admission-bound.patch',
   'review_sha256': '1d84af83471624421b048587487d40675e87a4ecdc14c24d084518a0d21a5ff0',
@@ -130387,7 +131710,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '\n'})},
  {'name': 'qwen-repeated-parameter-refusal',
   'review_patch': 'patches/vllm-qwen-repeated-parameter-refusal.patch',
-  'review_sha256': '849fadaa43f2f8eafc0e98fae2c5c201e3b4a8c637de58720eebb94817768e31',
+  'review_sha256': '0f32f29fdd2b3d18a45821ebb390ca6c7dd43b47787777a76d76d8c27c1bc899',
   'files': ({'path': 'tests/entrypoints/openai/chat_completion/test_repeated_tool_parameter_refusal.py',
              'before_sha256': None,
              'after_sha256': 'b8a7eed51747dddf980145be2609cf1a8136465bf0068a0f3c7b85424ab9a9d9'},
@@ -130395,8 +131718,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': 'f4787f638c5334a43891c86876e4827922455cb72003387c62d9425fcfb0fbf3',
              'after_sha256': '4b87d3b572d58d43808e01050bc8cfcf88a3d3a99cb21e71933be63587d1406e'},
             {'path': 'tests/parser/engine/test_qwen_xml_fidelity.py',
-             'before_sha256': '6b3cac443f0363ce3cd64535edcbfd699177b2dd2f3715d719e8c1d8b5823534',
-             'after_sha256': '582dce451adaf23773987e81e57d82028697e570ba35360540a82e8287572a52'},
+             'before_sha256': '8aac5f2c0dbcf3513357f353935c9c6d317a12dfcd6fa0ed057cb0874a3cfc58',
+             'after_sha256': 'c9085f5690131ab3074be8338e3e17686a09ebac9860ccd7e1d80ba532df6aa8'},
             {'path': 'vllm/entrypoints/openai/chat_completion/serving.py',
              'before_sha256': '5a75f7b5c7fdbdfc02116396ad45938a60350633fedeb06a40b01cbb65e76c96',
              'after_sha256': '9357f6c195b933b0805acd1e515ca192219e360ffbac0f4738721bee6cbd5508'},
@@ -130410,8 +131733,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': 'fbd9ba671dccceef0eabf62b5fe19218ed38dda991b3519a3b92e02ad4b24b39',
              'after_sha256': '67389b072fab088e8d29e30536dd80b7be1e8aded133976f3043b760a9ac73f9'},
             {'path': 'vllm/parser/qwen3.py',
-             'before_sha256': '8e5a02e91d39c754ffd2bf04fe50cb256a52163f02a2985ccfb99dfd7012a6ef',
-             'after_sha256': '60e6c9ed5bebacd56b594604b27ccce180356c8389c2a8a4ba2a82a9eeead010'}),
+             'before_sha256': 'a0bee0bf2956fa1251ec18037fac6039e3e211bc50e444ef0eab5bf7dfcbd465',
+             'after_sha256': 'e694f032aa8390c271fa08e1786fd6aee312b2d0a058d74f698b1186c7a21172'}),
   'edits': ({'name': 'tests/entrypoints/openai/chat_completion/test_repeated_tool_parameter_refusal.py:landmark-1',
              'path': 'tests/entrypoints/openai/chat_completion/test_repeated_tool_parameter_refusal.py',
              'before': '',
@@ -131400,43 +132723,48 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before': 'from jsonschema import Draft202012Validator\n'
                        'from referencing import Registry\n'
                        '\n'
+                       'from vllm.exceptions import VLLMServerError, '
+                       'VLLMUnprocessableEntityError\n'
                        'from vllm.parser.engine.events import EventType\n'
-                       'from vllm.parser.engine.parser_engine import ParserEngine\n'
-                       'from vllm.parser.engine.parser_engine_config import (\n',
+                       'from vllm.parser.engine.parser_engine import ParserEngine\n',
              'after': 'from jsonschema import Draft202012Validator\n'
                       'from referencing import Registry\n'
                       '\n'
                       'from vllm.entrypoints.openai.engine.protocol import '
                       'RepeatedToolParameterError\n'
+                      'from vllm.exceptions import VLLMServerError, '
+                      'VLLMUnprocessableEntityError\n'
                       'from vllm.parser.engine.events import EventType\n'
-                      'from vllm.parser.engine.parser_engine import ParserEngine\n'
-                      'from vllm.parser.engine.parser_engine_config import (\n',
+                      'from vllm.parser.engine.parser_engine import ParserEngine\n',
              'review_before': 'from jsonschema import Draft202012Validator\n'
                               'from referencing import Registry\n'
                               '\n'
+                              'from vllm.exceptions import VLLMServerError, '
+                              'VLLMUnprocessableEntityError\n'
                               'from vllm.parser.engine.events import EventType\n'
                               'from vllm.parser.engine.parser_engine import '
-                              'ParserEngine\n'
-                              'from vllm.parser.engine.parser_engine_config import (\n',
+                              'ParserEngine\n',
              'review_after': 'from jsonschema import Draft202012Validator\n'
                              'from referencing import Registry\n'
                              '\n'
                              'from vllm.entrypoints.openai.engine.protocol import '
                              'RepeatedToolParameterError\n'
+                             'from vllm.exceptions import VLLMServerError, '
+                             'VLLMUnprocessableEntityError\n'
                              'from vllm.parser.engine.events import EventType\n'
                              'from vllm.parser.engine.parser_engine import '
-                             'ParserEngine\n'
-                             'from vllm.parser.engine.parser_engine_config import (\n'},
+                             'ParserEngine\n'},
             {'name': 'vllm/parser/qwen3.py:landmark-2',
              'path': 'vllm/parser/qwen3.py',
              'before': '        return {"allOf": constraints} if constraints else '
                        'True\n'
                        '\n'
                        '\n'
-                       'def _unique_json_object(pairs: list[tuple[str, object]]) -> '
-                       'dict:\n'
-                       '    result = dict(pairs)\n'
-                       '    if len(result) != len(pairs):\n',
+                       'class _NoGrammarReading(Exception):\n'
+                       '    """Argument text the grammar that writes the format\'s '
+                       'calls has no\n'
+                       '    reading of. The reader knows only the text; the parser, '
+                       'which knows the\n',
              'after': '        return {"allOf": constraints} if constraints else True\n'
                       '\n'
                       '\n'
@@ -131457,18 +132785,20 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '        self.name = name\n'
                       '\n'
                       '\n'
-                      'def _unique_json_object(pairs: list[tuple[str, object]]) -> '
-                      'dict:\n'
-                      '    result = dict(pairs)\n'
-                      '    if len(result) != len(pairs):\n',
+                      'class _NoGrammarReading(Exception):\n'
+                      '    """Argument text the grammar that writes the format\'s '
+                      'calls has no\n'
+                      '    reading of. The reader knows only the text; the parser, '
+                      'which knows the\n',
              'review_before': '        return {"allOf": constraints} if constraints '
                               'else True\n'
                               '\n'
                               '\n'
-                              'def _unique_json_object(pairs: list[tuple[str, '
-                              'object]]) -> dict:\n'
-                              '    result = dict(pairs)\n'
-                              '    if len(result) != len(pairs):\n',
+                              'class _NoGrammarReading(Exception):\n'
+                              '    """Argument text the grammar that writes the '
+                              "format's calls has no\n"
+                              '    reading of. The reader knows only the text; the '
+                              'parser, which knows the\n',
              'review_after': '        return {"allOf": constraints} if constraints '
                              'else True\n'
                              '\n'
@@ -131492,10 +132822,11 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '        self.name = name\n'
                              '\n'
                              '\n'
-                             'def _unique_json_object(pairs: list[tuple[str, object]]) '
-                             '-> dict:\n'
-                             '    result = dict(pairs)\n'
-                             '    if len(result) != len(pairs):\n'},
+                             'class _NoGrammarReading(Exception):\n'
+                             '    """Argument text the grammar that writes the '
+                             "format's calls has no\n"
+                             '    reading of. The reader knows only the text; the '
+                             'parser, which knows the\n'},
             {'name': 'vllm/parser/qwen3.py:landmark-3',
              'path': 'vllm/parser/qwen3.py',
              'before': '    params: dict[str, str] = {}\n'
@@ -131506,8 +132837,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                        '        params[name] = _unframe_parameter_value(value, '
                        'complete=True)\n'
                        '\n'
-                       '    # An unfinished parameter is a raw diagnostic on both '
-                       'transports.\n'
+                       '    # An unfinished parameter is a raw diagnostic in both '
+                       'modes.\n'
                        '    if unfinished is not None:\n'
                        '        name, value = unfinished\n'
                        '        if name in params:\n'
@@ -131516,7 +132847,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                        '        params[name] = _unframe_parameter_value(value, '
                        'complete=False)\n'
                        '\n'
-                       '    if schema and unfinished is None:\n',
+                       '    if schema and whole:\n',
              'after': '    params: dict[str, str] = {}\n'
                       '    for name, value in closed:\n'
                       '        if name in params:\n'
@@ -131524,8 +132855,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '        params[name] = _unframe_parameter_value(value, '
                       'complete=True)\n'
                       '\n'
-                      '    # An unfinished parameter is a raw diagnostic on both '
-                      'transports.\n'
+                      '    # An unfinished parameter is a raw diagnostic in both '
+                      'modes.\n'
                       '    if unfinished is not None:\n'
                       '        name, value = unfinished\n'
                       '        if name in params:\n'
@@ -131533,7 +132864,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '        params[name] = _unframe_parameter_value(value, '
                       'complete=False)\n'
                       '\n'
-                      '    if schema and unfinished is None:\n',
+                      '    if schema and whole:\n',
              'review_before': '    params: dict[str, str] = {}\n'
                               '    for name, value in closed:\n'
                               '        if name in params:\n'
@@ -131542,8 +132873,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                               '        params[name] = _unframe_parameter_value(value, '
                               'complete=True)\n'
                               '\n'
-                              '    # An unfinished parameter is a raw diagnostic on '
-                              'both transports.\n'
+                              '    # An unfinished parameter is a raw diagnostic in '
+                              'both modes.\n'
                               '    if unfinished is not None:\n'
                               '        name, value = unfinished\n'
                               '        if name in params:\n'
@@ -131552,7 +132883,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                               '        params[name] = _unframe_parameter_value(value, '
                               'complete=False)\n'
                               '\n'
-                              '    if schema and unfinished is None:\n',
+                              '    if schema and whole:\n',
              'review_after': '    params: dict[str, str] = {}\n'
                              '    for name, value in closed:\n'
                              '        if name in params:\n'
@@ -131560,8 +132891,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '        params[name] = _unframe_parameter_value(value, '
                              'complete=True)\n'
                              '\n'
-                             '    # An unfinished parameter is a raw diagnostic on '
-                             'both transports.\n'
+                             '    # An unfinished parameter is a raw diagnostic in '
+                             'both modes.\n'
                              '    if unfinished is not None:\n'
                              '        name, value = unfinished\n'
                              '        if name in params:\n'
@@ -131569,13 +132900,13 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '        params[name] = _unframe_parameter_value(value, '
                              'complete=False)\n'
                              '\n'
-                             '    if schema and unfinished is None:\n'},
+                             '    if schema and whole:\n'},
             {'name': 'vllm/parser/qwen3.py:landmark-4',
              'path': 'vllm/parser/qwen3.py',
-             'before': '            return _qwen3_arg_converter(\n'
-                       '                raw_args, partial, '
-                       'find_tool_schema(self._tools, func_name)\n'
-                       '            )\n'
+             'before': '            ) from None\n'
+                       '        except _NoSchemaReading:\n'
+                       '            raise QwenToolCallOutsideSchemaError(func_name) '
+                       'from None\n'
                        '        except (TypeError, ValueError) as exc:\n'
                        '            # Malformed parameter text is handled inside the '
                        'decoder. An error\n'
@@ -131589,10 +132920,10 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                        '    def extract_batch_content_ids(self, token_ids, *, '
                        'token_offset: int = 0):\n'
                        '        if not token_ids:\n',
-             'after': '            return _qwen3_arg_converter(\n'
-                      '                raw_args, partial, '
-                      'find_tool_schema(self._tools, func_name)\n'
-                      '            )\n'
+             'after': '            ) from None\n'
+                      '        except _NoSchemaReading:\n'
+                      '            raise QwenToolCallOutsideSchemaError(func_name) '
+                      'from None\n'
                       '        except _RepeatedParameter as repeat:\n'
                       "            # The model's slip, answered as a refusal naming "
                       'the call and the\n'
@@ -131611,10 +132942,10 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '    def extract_batch_content_ids(self, token_ids, *, '
                       'token_offset: int = 0):\n'
                       '        if not token_ids:\n',
-             'review_before': '            return _qwen3_arg_converter(\n'
-                              '                raw_args, partial, '
-                              'find_tool_schema(self._tools, func_name)\n'
-                              '            )\n'
+             'review_before': '            ) from None\n'
+                              '        except _NoSchemaReading:\n'
+                              '            raise '
+                              'QwenToolCallOutsideSchemaError(func_name) from None\n'
                               '        except (TypeError, ValueError) as exc:\n'
                               '            # Malformed parameter text is handled '
                               'inside the decoder. An error\n'
@@ -131629,10 +132960,10 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                               '    def extract_batch_content_ids(self, token_ids, *, '
                               'token_offset: int = 0):\n'
                               '        if not token_ids:\n',
-             'review_after': '            return _qwen3_arg_converter(\n'
-                             '                raw_args, partial, '
-                             'find_tool_schema(self._tools, func_name)\n'
-                             '            )\n'
+             'review_after': '            ) from None\n'
+                             '        except _NoSchemaReading:\n'
+                             '            raise '
+                             'QwenToolCallOutsideSchemaError(func_name) from None\n'
                              '        except _RepeatedParameter as repeat:\n'
                              "            # The model's slip, answered as a refusal "
                              'naming the call and the\n'
@@ -131653,7 +132984,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '        if not token_ids:\n'})},
  {'name': 'generated-tokens-survive-parsing',
   'review_patch': 'patches/vllm-generated-tokens-survive-parsing.patch',
-  'review_sha256': '3889af17e410853baa95ea40eba32baa5ed35d03e37822d55312861e21fba8b9',
+  'review_sha256': 'c809cc7070d91b58668c07e7d82d6c7909909cf46e3b1993f0d8c369aecf5519',
   'files': ({'path': 'tests/parser/engine/test_deepseek_v4.py',
              'before_sha256': '6de6f7aaa3e8ff7fb058ac933cbf9ab2467a78bbe63659763729cbaa0bb488b4',
              'after_sha256': 'c4b1aad15dbaef851b7c76cd4e6a97e90df3316629dcb3fbf89da7473ec2953c'},
@@ -131688,11 +133019,11 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': 'eda9202c72a865dc1c32a14891d6104474f3514b90adbf87e1c81a80a11c2719',
              'after_sha256': '44411dca605b8cfd849c42b7c246aee2f7c2da168ecfa7e876fd770e92a4aa23'},
             {'path': 'vllm/parser/qwen3.py',
-             'before_sha256': '60e6c9ed5bebacd56b594604b27ccce180356c8389c2a8a4ba2a82a9eeead010',
-             'after_sha256': '86eadde1cfc2952426bdcf7cecef0c369a2e952fe72f1d0a7ff0b81f84498993'},
+             'before_sha256': 'e694f032aa8390c271fa08e1786fd6aee312b2d0a058d74f698b1186c7a21172',
+             'after_sha256': '191cf74b7c7eef5eee663996a5fcfaa3c882f8ffb34e600f8215650f45de26ab'},
             {'path': 'vllm/parser/engine/adapters.py',
-             'before_sha256': '2679bf5609812dcd988d4039db0203eb9361e21d5360ea1a363ad51f9c3d839d',
-             'after_sha256': '131fdf12c1ecb244f01b235eeda7bbf4facf65a80edc56256eba72745bb8e1d0'},
+             'before_sha256': 'addd30a577ef699a4b255cd58c46ebc08821809259f1f196327e6c9333d2ff17',
+             'after_sha256': '929160563db76367ed29643459be0da5e7c85ca723ce0e9627c8a6e51b7f3377'},
             {'path': 'vllm/parser/nemotron_v3.py',
              'before_sha256': '9d77b45debb4fb820cc448dfbeeccb53b384f8124b0ef6627ddba9777dcfa6df',
              'after_sha256': '544d2dcece372db535614d77ca6e4e276b8d1814df7ac47461192cd5737a0518'}),
@@ -134305,9 +135636,11 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'opener was the trigger.\n'},
             {'name': 'vllm/parser/qwen3.py:landmark-2',
              'path': 'vllm/parser/qwen3.py',
-             'before': '    THINK_END = THINK_END\n'
-                       '    TOOL_START = TOOL_CALL_START\n'
-                       '    TOOL_END = TOOL_CALL_END\n'
+             'before': '    # (Seed-OSS) arms no grammar and reads its calls as the '
+                       'transport carries\n'
+                       '    # them.\n'
+                       '    structural_tag_model: ClassVar[str | None] = '
+                       '_QWEN_GRAMMAR\n'
                        '    # The reasoning pass forwards a tool span verbatim, so the '
                        'batch tool\n'
                        '    # pass splits on the same ids the streaming tool pass '
@@ -134315,9 +135648,10 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                        '    batch_tool_pass_uses_ids = True\n'
                        '\n'
                        '    def _tool_arguments_reading(\n',
-             'after': '    THINK_END = THINK_END\n'
-                      '    TOOL_START = TOOL_CALL_START\n'
-                      '    TOOL_END = TOOL_CALL_END\n'
+             'after': '    # (Seed-OSS) arms no grammar and reads its calls as the '
+                      'transport carries\n'
+                      '    # them.\n'
+                      '    structural_tag_model: ClassVar[str | None] = _QWEN_GRAMMAR\n'
                       '    # The reasoning pass forwards everything after the boundary '
                       'as the text\n'
                       '    # it was generated as -- content and tool spans alike, a '
@@ -134328,9 +135662,11 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '    batch_tool_pass_uses_ids = True\n'
                       '\n'
                       '    def _tool_arguments_reading(\n',
-             'review_before': '    THINK_END = THINK_END\n'
-                              '    TOOL_START = TOOL_CALL_START\n'
-                              '    TOOL_END = TOOL_CALL_END\n'
+             'review_before': '    # (Seed-OSS) arms no grammar and reads its calls as '
+                              'the transport carries\n'
+                              '    # them.\n'
+                              '    structural_tag_model: ClassVar[str | None] = '
+                              '_QWEN_GRAMMAR\n'
                               '    # The reasoning pass forwards a tool span verbatim, '
                               'so the batch tool\n'
                               '    # pass splits on the same ids the streaming tool '
@@ -134338,9 +135674,11 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                               '    batch_tool_pass_uses_ids = True\n'
                               '\n'
                               '    def _tool_arguments_reading(\n',
-             'review_after': '    THINK_END = THINK_END\n'
-                             '    TOOL_START = TOOL_CALL_START\n'
-                             '    TOOL_END = TOOL_CALL_END\n'
+             'review_after': '    # (Seed-OSS) arms no grammar and reads its calls as '
+                             'the transport carries\n'
+                             '    # them.\n'
+                             '    structural_tag_model: ClassVar[str | None] = '
+                             '_QWEN_GRAMMAR\n'
                              '    # The reasoning pass forwards everything after the '
                              'boundary as the text\n'
                              '    # it was generated as -- content and tool spans '
@@ -139566,7 +140904,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    serving.chat_template = None\n'})},
  {'name': 'batch-parse-starts-where-the-prompt-leaves',
   'review_patch': 'patches/vllm-batch-parse-starts-where-the-prompt-leaves.patch',
-  'review_sha256': 'fa448319b58cea79ffa08141b31bfa74889dd57e72de354d840187d2d56392a8',
+  'review_sha256': '85ea420f229e08ebaff18d01de09a4653520cfb247c271f7a7e25b76dfd0b894',
   'files': ({'path': 'tests/entrypoints/openai/responses/test_parsable_context_unit.py',
              'before_sha256': '8fd0bd655d13abdc9fe03e1c0bb0625225431624db8257e1db07c00ac3da2779',
              'after_sha256': '95f50d93d97370d426319b5dc94fce55b9cbca4ce9b3b95a930e42990dcbf4a2'},
@@ -139580,8 +140918,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': '4b87d3b572d58d43808e01050bc8cfcf88a3d3a99cb21e71933be63587d1406e',
              'after_sha256': '55644d168c156fd5a018f23f500870d7d6aa45fa0421b8e58809a07470db3dd1'},
             {'path': 'tests/parser/engine/test_qwen_xml_fidelity.py',
-             'before_sha256': '582dce451adaf23773987e81e57d82028697e570ba35360540a82e8287572a52',
-             'after_sha256': 'cf8997243513e0424feb9ff646cb249662e4574cd2c46b47df0d73ceb5ca6690'},
+             'before_sha256': 'c9085f5690131ab3074be8338e3e17686a09ebac9860ccd7e1d80ba532df6aa8',
+             'after_sha256': '03d874c8c2a5e8676d27370e0d9bcbd79caa59f92084cdbe70eca0b1f50af48a'},
             {'path': 'tests/v1/structured_output/test_backend_xgrammar_stop_tokens.py',
              'before_sha256': '5bccea5e5739b479439ef4be796dce56af686581064f6eb1ba0feab87238050a',
              'after_sha256': 'a844fe5cac07d9a7eb80c8c68fd306ac58935f2f821eb76c546a5440fe161599'},
@@ -139625,8 +140963,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': '90958bf8f39a7080573ee9c2c6223c6b473210c1715c678231df925f39788003',
              'after_sha256': 'fda540aea5362d0e90ff947ec9e1e1ee73590954ec3d062fd8040b0b4124c4e7'},
             {'path': 'vllm/parser/qwen3.py',
-             'before_sha256': '86eadde1cfc2952426bdcf7cecef0c369a2e952fe72f1d0a7ff0b81f84498993',
-             'after_sha256': '96a7b60d196902541725fb29d78710140f953ef524217a7a4009bf8242b3795f'},
+             'before_sha256': '191cf74b7c7eef5eee663996a5fcfaa3c882f8ffb34e600f8215650f45de26ab',
+             'after_sha256': '9c2fce0df476cf32fb31dce480299849587b7a196d0862c596c1ba1a1bb58687'},
             {'path': 'tests/entrypoints/scale_out/derender/test_terminal_metadata.py',
              'before_sha256': 'e3edf885a33aaecf5dd8d6fdeadad7f3eed60510eb4f43354f1273e52b974cfc',
              'after_sha256': '282ef80ea470eee299c6c1f7510ca259c6b4dcd4a2787d7f2946335a723dc5bb'},
@@ -142713,27 +144051,27 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                        'import functools\n'
                        'import json\n'
                        'from itertools import product\n'
-                       'from typing import TYPE_CHECKING\n'
+                       'from typing import TYPE_CHECKING, ClassVar\n'
                        'from urllib.parse import unquote\n',
              'after': '\n'
                       'import functools\n'
                       'import json\n'
                       'from collections.abc import Sequence\n'
                       'from itertools import product\n'
-                      'from typing import TYPE_CHECKING\n'
+                      'from typing import TYPE_CHECKING, ClassVar\n'
                       'from urllib.parse import unquote\n',
              'review_before': '\n'
                               'import functools\n'
                               'import json\n'
                               'from itertools import product\n'
-                              'from typing import TYPE_CHECKING\n'
+                              'from typing import TYPE_CHECKING, ClassVar\n'
                               'from urllib.parse import unquote\n',
              'review_after': '\n'
                              'import functools\n'
                              'import json\n'
                              'from collections.abc import Sequence\n'
                              'from itertools import product\n'
-                             'from typing import TYPE_CHECKING\n'
+                             'from typing import TYPE_CHECKING, ClassVar\n'
                              'from urllib.parse import unquote\n'},
             {'name': 'vllm/parser/qwen3.py:landmark-2',
              'path': 'vllm/parser/qwen3.py',
@@ -169202,7 +170540,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '\n'})},
  {'name': 'forced-tool-choice-is-held-through-reasoning',
   'review_patch': 'patches/vllm-forced-tool-choice-is-held-through-reasoning.patch',
-  'review_sha256': '1fe814cd8618d2d0ecd414f7c4e6e341b89f9ef016c1f727fd87d44a01a98e96',
+  'review_sha256': '9dd2c950842869d1456bf8d61d6738e7222c6f352c280ba7faa200ab9b43964d',
   'files': ({'path': 'tests/v1/structured_output/test_forced_choice_holds_through_reasoning.py',
              'before_sha256': None,
              'after_sha256': '57f4218e5a2bc19447f458f8c92c7eb37c9292a9a9f4bd6ee799b5efccc2796c'},
@@ -169210,8 +170548,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': '2f03dbae35caeaf68d801c59312c3116467022ed5b882558a7d8cf3ba75b099c',
              'after_sha256': '72664cd25461a0a1f85fdc0a6c577b3a6b3dbfe00bcf525139bf2677390d4c5c'},
             {'path': 'vllm/parser/engine/adapters.py',
-             'before_sha256': '131fdf12c1ecb244f01b235eeda7bbf4facf65a80edc56256eba72745bb8e1d0',
-             'after_sha256': '5182dfc3a3be873ac5d20109aaed522c5f83747d0abb7286f2df237af448c5ee'},
+             'before_sha256': '929160563db76367ed29643459be0da5e7c85ca723ce0e9627c8a6e51b7f3377',
+             'after_sha256': 'dadb674c29b4bef109c3dfe53b82f6f6207d8c58b14798485b43bdc68f8c2352'},
             {'path': 'vllm/parser/engine/parser_engine.py',
              'before_sha256': 'c16a765917aa45519a82c681def062a50a9a653e13c353cd6eb0468a7ae1fc0f',
              'after_sha256': 'e4456bd2cbfcd29ef89115fd6d196a1b3f2041628b0a38683014c4e8edeab418'},
@@ -169222,8 +170560,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': 'ad2f1229f172cacedce5de96693bc27e98f800cad2e5fb4ca3286de650f24552',
              'after_sha256': '5beb61717a4afca899bffcf8da2bd58efb44ab80972bca37a49f2ccf6b41f456'},
             {'path': 'vllm/parser/qwen3.py',
-             'before_sha256': '96a7b60d196902541725fb29d78710140f953ef524217a7a4009bf8242b3795f',
-             'after_sha256': 'ba31163d8e3732b28a9a6ed87443469d6e8750db46b7c34a03280fd7a58c3a7d'},
+             'before_sha256': '9c2fce0df476cf32fb31dce480299849587b7a196d0862c596c1ba1a1bb58687',
+             'after_sha256': '56174519015ae193efb28bfda9241e0a3c3dc196b8209849b5e8277356ae0ed5'},
             {'path': 'vllm/reasoning/abs_reasoning_parsers.py',
              'before_sha256': '95e86d5bc477f00f5ed043273f64b76dc939374b118687bbcf834cc5d332c6c2',
              'after_sha256': 'f386d2591f01dca1970ff6ca3c6579a3376d47becd30d276d321695b9dbcdf69'},
@@ -171829,7 +173167,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '**(request.reasoning_parser_kwargs or {})\n'})},
  {'name': 'qwen-format-is-served-as-one-engine',
   'review_patch': 'patches/vllm-qwen-format-is-served-as-one-engine.patch',
-  'review_sha256': '470c5801cc66e1554cefe90dd06db92d97a593c57dd9f1c6c419bc18bac93809',
+  'review_sha256': 'e06d5ea04c1e63a216d99cc27767cd3e295342bca68851f5a48f0a497a43e775',
   'files': ({'path': 'tests/parser/engine/test_qwen3.py',
              'before_sha256': '55644d168c156fd5a018f23f500870d7d6aa45fa0421b8e58809a07470db3dd1',
              'after_sha256': 'e2de6d03656c4fe5c8ba34fcfc17690eb5f12ed2e5dc4542507ddd496a141ec5'},
@@ -171852,8 +173190,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': '7b0217aa315fdcf5ae602d62dad8e2380772662d4946933a92491a28ad4082f4',
              'after_sha256': 'c3174da47cf85db7fb8a2db4e70014814697f724feb0a86fe3b7b244be7b2789'},
             {'path': 'vllm/parser/qwen3.py',
-             'before_sha256': 'ba31163d8e3732b28a9a6ed87443469d6e8750db46b7c34a03280fd7a58c3a7d',
-             'after_sha256': '961b8eea9fdba2f36dc6cc40e1d332820e35771adbd285c244af9eeda39a0deb'}),
+             'before_sha256': '56174519015ae193efb28bfda9241e0a3c3dc196b8209849b5e8277356ae0ed5',
+             'after_sha256': '32d31cfc07b3ac214237134e11f9f45c1931252d2edca965efe943643c8f1603'}),
   'edits': ({'name': 'tests/parser/engine/test_qwen3.py:landmark-1',
              'path': 'tests/parser/engine/test_qwen3.py',
              'before': '        is Qwen3EngineToolParser\n'
@@ -173973,34 +175311,38 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '        r_cls = reasoning_parser_cls\n'},
             {'name': 'vllm/parser/qwen3.py:landmark-1',
              'path': 'vllm/parser/qwen3.py',
-             'before': 'from referencing import Registry\n'
-                       '\n'
+             'before': '\n'
                        'from vllm.entrypoints.openai.engine.protocol import '
                        'RepeatedToolParameterError\n'
+                       'from vllm.exceptions import VLLMServerError, '
+                       'VLLMUnprocessableEntityError\n'
                        'from vllm.parser.engine.events import EventType\n'
                        'from vllm.parser.engine.parser_engine import ParserEngine\n'
                        'from vllm.parser.engine.parser_engine_config import (\n',
-             'after': 'from referencing import Registry\n'
-                      '\n'
+             'after': '\n'
                       'from vllm.entrypoints.openai.engine.protocol import '
                       'RepeatedToolParameterError\n'
+                      'from vllm.exceptions import VLLMServerError, '
+                      'VLLMUnprocessableEntityError\n'
                       'from vllm.parser.abstract_parser import '
                       'apply_tool_structural_tag\n'
                       'from vllm.parser.engine.events import EventType\n'
                       'from vllm.parser.engine.parser_engine import ParserEngine\n'
                       'from vllm.parser.engine.parser_engine_config import (\n',
-             'review_before': 'from referencing import Registry\n'
-                              '\n'
+             'review_before': '\n'
                               'from vllm.entrypoints.openai.engine.protocol import '
                               'RepeatedToolParameterError\n'
+                              'from vllm.exceptions import VLLMServerError, '
+                              'VLLMUnprocessableEntityError\n'
                               'from vllm.parser.engine.events import EventType\n'
                               'from vllm.parser.engine.parser_engine import '
                               'ParserEngine\n'
                               'from vllm.parser.engine.parser_engine_config import (\n',
-             'review_after': 'from referencing import Registry\n'
-                             '\n'
+             'review_after': '\n'
                              'from vllm.entrypoints.openai.engine.protocol import '
                              'RepeatedToolParameterError\n'
+                             'from vllm.exceptions import VLLMServerError, '
+                             'VLLMUnprocessableEntityError\n'
                              'from vllm.parser.abstract_parser import '
                              'apply_tool_structural_tag\n'
                              'from vllm.parser.engine.events import EventType\n'
@@ -174357,10 +175699,10 @@ FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5d
  'tests/parser/engine/test_qwen3.py': 'e2de6d03656c4fe5c8ba34fcfc17690eb5f12ed2e5dc4542507ddd496a141ec5',
  'tests/parser/engine/test_qwen3_reasoning.py': '22ffc106ef527b9eb0dc2bfe18aa3521d776038e4cbd7cd82266a09bc663da0a',
  'tests/parser/engine/test_qwen_terminal_authority.py': '15b1a503148a15e51bfc85798c7964342cc611e3dfb5451734020513259f8dad',
- 'tests/parser/engine/test_qwen_xml_fidelity.py': 'cf8997243513e0424feb9ff646cb249662e4574cd2c46b47df0d73ceb5ca6690',
+ 'tests/parser/engine/test_qwen_xml_fidelity.py': '03d874c8c2a5e8676d27370e0d9bcbd79caa59f92084cdbe70eca0b1f50af48a',
  'tests/parser/engine/test_reasoning_token_count.py': 'eb34907215ea15718e74e6837515dacdf9bf5640e0722b6c23467144f33e4203',
  'tests/parser/engine/test_replay.py': '1b8286ef3218108f0f2cbe28bbe7f0315bc01af6e4282ce76b243255c5d97309',
- 'tests/parser/engine/test_seed_oss.py': '9f2af2c75f71c6fb280f2a2a4a2bb8eaecf1c919c083e6c925f6d6f81cc2c236',
+ 'tests/parser/engine/test_seed_oss.py': 'b0f229145be602e9281f20d7861ba5f76cc387b87891ab766ee0377bdccc381c',
  'tests/parser/engine/test_token_id_scanner.py': '5e4524f0bc2096c0962246eac497ad014f7da4026d5265a39e3fea52d2a0a0e8',
  'tests/parser/engine/trace_builder.py': '12311dc9d1686394bc7b4499e32b353dabe02c650942c0c9d3d376da5e55fcb0',
  'tests/parser/mistral/test_tool_calls.py': '60ca9b0eab438c35b4dde48419aedaa937dd25087cb509c60de4771065070e98',
@@ -174487,7 +175829,7 @@ FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5d
  'vllm/parser/abstract_parser.py': '4f8b6c0fa381892adfb0f26c6e7557cbb2df1beed9f2fbb17f2618b31bea6376',
  'vllm/parser/deepseek_v32.py': '1fe0aec597caf6c10ff9905a3b1918c2a8608b5b1df32127ff8038c10f5d9b1c',
  'vllm/parser/deepseek_v4.py': 'a95f86eb4146d3096a73f1076260bbc58630a74c377b9da1d7e66d65e898465f',
- 'vllm/parser/engine/adapters.py': '5182dfc3a3be873ac5d20109aaed522c5f83747d0abb7286f2df237af448c5ee',
+ 'vllm/parser/engine/adapters.py': 'dadb674c29b4bef109c3dfe53b82f6f6207d8c58b14798485b43bdc68f8c2352',
  'vllm/parser/engine/events.py': 'd0ed492bbe28c19b6ec0446770a21754bfa844a70888ef5706587b0bbea51405',
  'vllm/parser/engine/parser_engine.py': 'e4456bd2cbfcd29ef89115fd6d196a1b3f2041628b0a38683014c4e8edeab418',
  'vllm/parser/engine/parser_engine_config.py': '8bf66e2f858682d6b4f7d24f7c9d38a94eefec7c6c2e891e0e5026e8cc0a92a7',
@@ -174503,7 +175845,8 @@ FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5d
  'vllm/parser/mistral.py': '5beb61717a4afca899bffcf8da2bd58efb44ab80972bca37a49f2ccf6b41f456',
  'vllm/parser/nemotron_v3.py': '544d2dcece372db535614d77ca6e4e276b8d1814df7ac47461192cd5737a0518',
  'vllm/parser/parser_manager.py': 'c3174da47cf85db7fb8a2db4e70014814697f724feb0a86fe3b7b244be7b2789',
- 'vllm/parser/qwen3.py': '961b8eea9fdba2f36dc6cc40e1d332820e35771adbd285c244af9eeda39a0deb',
+ 'vllm/parser/qwen3.py': '32d31cfc07b3ac214237134e11f9f45c1931252d2edca965efe943643c8f1603',
+ 'vllm/parser/seed_oss.py': '9e50fd8b12f8bac832bbe79eaccd19ed9b667cc23b1b53cd08434c4e8c0b627b',
  'vllm/reasoning/abs_reasoning_parsers.py': 'f386d2591f01dca1970ff6ca3c6579a3376d47becd30d276d321695b9dbcdf69',
  'vllm/reasoning/basic_parsers.py': 'daf62cc0685705b5cac7c4c6e2c6d9a0182960b5d8ebafc2ca3c45f39653c598',
  'vllm/reasoning/minimax_m3_reasoning_parser.py': 'd91a8f1c7c34bc4d32d374e68038c719e61a1cac456c0538025bcbba0daf3cab',
@@ -174519,7 +175862,8 @@ FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5d
  'vllm/tool_parsers/kimi_k2_tool_parser.py': '178c3aed95e4c8bacf24a2b6dd517d445735c540b455d6c479c5058ed0ab80c9',
  'vllm/tool_parsers/mistral_tool_parser.py': 'cbf301445f81aaf820d2efe65133d3439a389a001b14564269e442599f05fef5',
  'vllm/tool_parsers/poolside_v1_tool_parser.py': '5c99ae314256ef4e5ca076a96c9863413dc57bf074f3ac070b527be2d3fe0d8c',
- 'vllm/tool_parsers/qwen3_engine_tool_parser.py': '17cd6a04b4e78ede24c43592a9b4ff546a4f23be7766e70e3c02dde1eb0e0646',
+ 'vllm/tool_parsers/qwen3_engine_tool_parser.py': '665c41e9b430c3194f8268926316f4924293752bdbd94e3b598193fde52457f7',
+ 'vllm/tool_parsers/seed_oss_engine_tool_parser.py': '6528c2738bc250cdb0f19d88f451e7eae8978e4281a458d7e940b41ea145b648',
  'vllm/tool_parsers/structural_tag_registry.py': '617b1aa077546f996bb39794320907d9466eaf6e11030dbd9010d329b29e97da',
  'vllm/tool_parsers/utils.py': 'e2e93609470191c021cc9b67a781257b0bdb64954ca5a737faf972d27434f4a6',
  'vllm/v1/attention/backends/turboquant_attn.py': 'c3fef60cfa031a139bed6f413b2c40d0ea3bc6b48992455404a09459abbfa282',

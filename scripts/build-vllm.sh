@@ -795,6 +795,10 @@ image_build_options=(
   --build-arg "STREAMING_PARSER_ENGINE_PATCHED_FILE_SHA256=${STREAMING_PARSER_ENGINE_PATCHED_FILE_SHA256}"
   --build-arg "TOKEN_ID_SCANNER_PATCHED_FILE_SHA256=${TOKEN_ID_SCANNER_PATCHED_FILE_SHA256}"
   --build-arg "ENGINE_PROTOCOL_PATCHED_FILE_SHA256=${ENGINE_PROTOCOL_PATCHED_FILE_SHA256}"
+  --build-arg "SEED_OSS_ENGINE_TOOL_PARSER_PATCHED_FILE_SHA256=${SEED_OSS_ENGINE_TOOL_PARSER_PATCHED_FILE_SHA256}"
+  --build-arg "SEED_OSS_ENGINE_TOOL_PARSER_UPSTREAM_FILE_SHA256=${SEED_OSS_ENGINE_TOOL_PARSER_UPSTREAM_FILE_SHA256}"
+  --build-arg "SEED_OSS_PARSER_PATCHED_FILE_SHA256=${SEED_OSS_PARSER_PATCHED_FILE_SHA256}"
+  --build-arg "SEED_OSS_PARSER_UPSTREAM_FILE_SHA256=${SEED_OSS_PARSER_UPSTREAM_FILE_SHA256}"
   --build-arg "MISTRAL_TOOL_PARSER_PATCHED_FILE_SHA256=${MISTRAL_TOOL_PARSER_PATCHED_FILE_SHA256}"
   --build-arg "MISTRAL_TOOL_PARSER_UPSTREAM_FILE_SHA256=${MISTRAL_TOOL_PARSER_UPSTREAM_FILE_SHA256}"
   --build-arg "KIMI_K2_TOOL_PARSER_PATCHED_FILE_SHA256=${KIMI_K2_TOOL_PARSER_PATCHED_FILE_SHA256}"
@@ -1244,6 +1248,8 @@ actual_installed_report="$(
     /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/detokenizer.py \
     /usr/local/lib/python3.12/dist-packages/vllm/v1/core/sched/scheduler.py \
     /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/async_llm.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/tool_parsers/seed_oss_engine_tool_parser.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/parser/seed_oss.py \
     /usr/local/lib/python3.12/dist-packages/vllm/tool_parsers/mistral_tool_parser.py \
     /usr/local/lib/python3.12/dist-packages/vllm/tool_parsers/kimi_k2_tool_parser.py \
     /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/pooling/base/protocol.py \
@@ -1344,6 +1350,8 @@ expected_installed_report="$(printf '%s  %s\n' \
   "${V1_DETOKENIZER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/detokenizer.py \
   "${V1_SCHEDULER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/core/sched/scheduler.py \
   "${ASYNC_LLM_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/async_llm.py \
+  "${SEED_OSS_ENGINE_TOOL_PARSER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/tool_parsers/seed_oss_engine_tool_parser.py \
+  "${SEED_OSS_PARSER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/seed_oss.py \
   "${MISTRAL_TOOL_PARSER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/tool_parsers/mistral_tool_parser.py \
   "${KIMI_K2_TOOL_PARSER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/tool_parsers/kimi_k2_tool_parser.py \
   "${POOLING_BASE_PROTOCOL_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/pooling/base/protocol.py \

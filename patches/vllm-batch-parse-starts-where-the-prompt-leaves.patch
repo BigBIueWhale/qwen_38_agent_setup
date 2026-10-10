@@ -185,7 +185,7 @@ index b563c29ef698249608c0531a55a85fe0a1aedfc7..f360fab6679f9fb2485bf7bb3ce78aa1
          assert not calls
          assert content == text
 diff --git a/tests/parser/engine/test_qwen_xml_fidelity.py b/tests/parser/engine/test_qwen_xml_fidelity.py
-index 5008bc93091b0bd73b97c2fd1c821d7f6ab169a6..25a0db2f86680ebae3c21485582f777341614f74 100644
+index a6d38b02748d62d1b14bd47ff850c188aaa7ea79..8172a19e40eea31c628a8addcad57c2827154f0d 100644
 --- a/tests/parser/engine/test_qwen_xml_fidelity.py
 +++ b/tests/parser/engine/test_qwen_xml_fidelity.py
 @@ -17,6 +17,9 @@ TOOL = {'type': 'function', 'function': {'name': 'write', 'parameters': {
@@ -930,7 +930,7 @@ index 7a302e74b22edd5d3598f8ab150f5cc404c11ece..5b62265d485b62f3688148fc15ae30bd
              self._raw_tool_parts.append(text)
          if self.state == ParserState.MESSAGE_HEADER:
 diff --git a/vllm/parser/qwen3.py b/vllm/parser/qwen3.py
-index 15a590b9e065e7a6428beda0eaba065af6ec1c78..d8dd36b89e17d01eaa817f96e78294e50c0feb17 100644
+index 1825d53ec261203fe242755b24b49e8e7473a1b3..ee2024f22f830ebe9d5241b5837e7e7083b71a69 100644
 --- a/vllm/parser/qwen3.py
 +++ b/vllm/parser/qwen3.py
 @@ -23,6 +23,7 @@ from __future__ import annotations
@@ -939,9 +939,9 @@ index 15a590b9e065e7a6428beda0eaba065af6ec1c78..d8dd36b89e17d01eaa817f96e78294e5
  import json
 +from collections.abc import Sequence
  from itertools import product
- from typing import TYPE_CHECKING
+ from typing import TYPE_CHECKING, ClassVar
  from urllib.parse import unquote
-@@ -339,6 +340,9 @@ def qwen3_config(
+@@ -445,6 +446,9 @@ def qwen3_config(
      return ParserEngineConfig(
          name=name,
          initial_state=ParserState.REASONING if thinking else ParserState.CONTENT,
@@ -951,7 +951,7 @@ index 15a590b9e065e7a6428beda0eaba065af6ec1c78..d8dd36b89e17d01eaa817f96e78294e5
          terminals={
              # Reasoning terminals
              "THINK_START": think_start,
-@@ -372,10 +376,6 @@ def qwen3_config(
+@@ -478,10 +482,6 @@ def qwen3_config(
          # which shares this table, arms no grammar.
          transitions={
              # -- Reasoning transitions --
@@ -962,7 +962,7 @@ index 15a590b9e065e7a6428beda0eaba065af6ec1c78..d8dd36b89e17d01eaa817f96e78294e5
              (ParserState.REASONING, "THINK_END"): Transition(
                  ParserState.CONTENT,
                  (EventType.REASONING_END,),
-@@ -561,6 +561,30 @@ class Qwen3Parser(ParserEngine):
+@@ -688,6 +688,30 @@ class Qwen3Parser(ParserEngine):
              if tool_choice == "none" or not tools:
                  self.skip_tool_parsing = True
  

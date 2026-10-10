@@ -344,10 +344,10 @@ diff --git a/vllm/parser/qwen3.py b/vllm/parser/qwen3.py
  from referencing import Registry
  
 +from vllm.entrypoints.openai.engine.protocol import RepeatedToolParameterError
+ from vllm.exceptions import VLLMServerError, VLLMUnprocessableEntityError
  from vllm.parser.engine.events import EventType
  from vllm.parser.engine.parser_engine import ParserEngine
- from vllm.parser.engine.parser_engine_config import (
-@@ -175,6 +176,20 @@
+@@ -179,6 +180,20 @@
          return {"allOf": constraints} if constraints else True
  
  
@@ -365,10 +365,10 @@ diff --git a/vllm/parser/qwen3.py b/vllm/parser/qwen3.py
 +        self.name = name
 +
 +
- def _unique_json_object(pairs: list[tuple[str, object]]) -> dict:
-     result = dict(pairs)
-     if len(result) != len(pairs):
-@@ -295,14 +310,14 @@
+ class _NoGrammarReading(Exception):
+     """Argument text the grammar that writes the format's calls has no
+     reading of. The reader knows only the text; the parser, which knows the
+@@ -397,14 +412,14 @@
      params: dict[str, str] = {}
      for name, value in closed:
          if name in params:
@@ -376,7 +376,7 @@ diff --git a/vllm/parser/qwen3.py b/vllm/parser/qwen3.py
 +            raise _RepeatedParameter(name)
          params[name] = _unframe_parameter_value(value, complete=True)
  
-     # An unfinished parameter is a raw diagnostic on both transports.
+     # An unfinished parameter is a raw diagnostic in both modes.
      if unfinished is not None:
          name, value = unfinished
          if name in params:
@@ -384,11 +384,11 @@ diff --git a/vllm/parser/qwen3.py b/vllm/parser/qwen3.py
 +            raise _RepeatedParameter(name)
          params[name] = _unframe_parameter_value(value, complete=False)
  
-     if schema and unfinished is None:
-@@ -458,13 +473,14 @@
-             return _qwen3_arg_converter(
-                 raw_args, partial, find_tool_schema(self._tools, func_name)
-             )
+     if schema and whole:
+@@ -585,13 +600,14 @@
+             ) from None
+         except _NoSchemaReading:
+             raise QwenToolCallOutsideSchemaError(func_name) from None
 +        except _RepeatedParameter as repeat:
 +            # The model's slip, answered as a refusal naming the call and the
 +            # parameter rather than returned with one of the two values.

@@ -1,7 +1,92 @@
 diff --git a/tests/parser/engine/test_qwen_xml_fidelity.py b/tests/parser/engine/test_qwen_xml_fidelity.py
 --- a/tests/parser/engine/test_qwen_xml_fidelity.py
 +++ b/tests/parser/engine/test_qwen_xml_fidelity.py
-@@ -435,3 +435,109 @@
+@@ -415,12 +415,80 @@
+     ('1', 'boolean'), ('TRUE', 'boolean'),
+     ('{"count":1,"count":2}', 'object'),
+ ])
+-def test_invalid_value_is_preserved_for_client_validation(value, schema_type, chunk_size):
++def test_value_its_schema_refuses_is_refused_not_returned_as_text(
++    value, schema_type, chunk_size
++):
++    """The grammar writes a declared name as an undeclared one too where the
++    schema leaves extras open, so it admits each of these values, as text;
++    no reading of them is what the schema declares, so the call is refused
++    rather than returned with a value its schema does not admit."""
++    from vllm.parser.qwen3 import QwenToolCallOutsideSchemaError
++
+     schema = {'type': 'object', 'properties': {'value': {'type': schema_type}}}
+-    body = ('plan</think><tool_call>\n<function=write>\n<parameter=value>' + value
++    call = ('<tool_call>\n<function=write>\n<parameter=value>' + value
+             + '</parameter>\n</function>\n</tool_call>')
+-    _, _, calls = parse(body, chunk_size, schema=schema)
+-    assert [json.loads(call) for call in calls] == [{'value': value}]
++    assert _grammar_accepts(schema, call)
++    with pytest.raises(QwenToolCallOutsideSchemaError, match="'write' has arguments"):
++        parse('plan</think>' + call, chunk_size, schema=schema)
++
++
++@pytest.mark.parametrize('chunk_size', [None, 1, 13])
++@pytest.mark.parametrize('schema,arguments', [
++    # A value of several types rides the raw channel, which writes any text.
++    ({'type': 'object', 'required': ['n', 'k'], 'additionalProperties': False,
++      'properties': {'n': {'type': ['integer', 'null']}, 'k': {'type': 'integer'}}},
++     '<parameter=n>\nabc\n</parameter>\n<parameter=k>\n5\n</parameter>\n'),
++    # The grammar writes no constraint across parameters.
++    ({'type': 'object', 'additionalProperties': False,
++      'properties': {'a': {'type': 'string'}, 'b': {'type': 'string'},
++                     'k': {'type': 'integer'}},
++      'oneOf': [{'required': ['a']}, {'required': ['b']}]},
++     '<parameter=a>\nx\n</parameter>\n<parameter=b>\ny\n</parameter>\n'
++     '<parameter=k>\n5\n</parameter>\n'),
++])
++def test_call_its_schema_refuses_is_refused_not_retyped(schema, arguments, chunk_size):
++    """A whole call the grammar writes and no reading of satisfies its
++    schema is refused: returned with every value as text, it would carry
++    ``k`` -- which the model wrote as the integer it declares -- as a
++    string."""
++    from vllm.parser.qwen3 import QwenToolCallOutsideSchemaError
++
++    call = ('<tool_call>\n<function=write>\n' + arguments
++            + '</function>\n</tool_call>')
++    assert _grammar_accepts(schema, call)
++    with pytest.raises(QwenToolCallOutsideSchemaError, match="'write' has arguments"):
++        parse('plan</think>' + call, chunk_size, schema=schema)
++
++
++CLOSED_SHELL_SCHEMA = {'type': 'object', 'required': ['command'],
++    'additionalProperties': False, 'properties': {
++        'command': {'type': 'string'}, 'is_background': {'type': 'boolean'},
++        'description': {'type': 'string'}}}
++
++
++@pytest.mark.parametrize('chunk_size', [None, 1, 13])
++@pytest.mark.parametrize('arguments', [
++    # Out of declared order.
++    '<parameter=command>\nls\n</parameter>\n<parameter=description>\nlist\n'
++    '</parameter>\n<parameter=is_background>\ntrue\n</parameter>\n',
++    # A name the closed schema does not declare.
++    '<parameter=command>\nls\n</parameter>\n<parameter=cwd>\n/tmp\n</parameter>\n',
++])
++def test_text_the_grammar_cannot_write_is_refused_not_read_by_another_rule(
++    arguments, chunk_size
++):
++    """The parser reads a call only as the grammar armed for it writes it.
++    Text that grammar has no reading of is no generation it constrained, so
++    reading it by the transport's rule instead would return a call the
++    grammar never admitted and hide the disagreement."""
++    from vllm.parser.qwen3 import QwenToolCallUnreadError
++
++    call = ('<tool_call>\n<function=write>\n' + arguments
++            + '</function>\n</tool_call>')
++    assert not _grammar_accepts(CLOSED_SHELL_SCHEMA, call)
++    with pytest.raises(QwenToolCallUnreadError,
++                       match='qwen_3_coder tool-call grammar has no reading of'):
++        parse('plan</think>' + call, chunk_size, schema=CLOSED_SHELL_SCHEMA)
+ 
+ 
+ @pytest.mark.parametrize('chunk_size', [None, 1])
+@@ -435,3 +503,112 @@
              '</parameter>\n</function>\n</tool_call>')
      with pytest.raises(RuntimeError, match='Qwen XML argument decoding failed'):
          parse(body, chunk_size)
@@ -79,16 +164,19 @@ diff --git a/tests/parser/engine/test_qwen_xml_fidelity.py b/tests/parser/engine
 +    After ``["x</parameter>`` the array's string is still open, but the
 +    undeclared slot has also closed a raw value, and a newline then cannot
 +    continue a JSON string: the wrapper ends the call, read by the reading
-+    the grammar kept.
++    the grammar kept. That reading is the text ``["x``, which the declared
++    array refuses, so the whole call is refused; a call left open would be
++    returned as its diagnostic instead.
 +    """
++    from vllm.parser.qwen3 import QwenToolCallOutsideSchemaError
++
 +    schema = {'type': 'object', 'properties': {
 +        'ignore': {'type': 'array', 'items': {'type': 'string'}}}}
 +    call = ('<tool_call>\n<function=write>\n<parameter=ignore>\n["x</parameter>\n'
 +            '</function>\n</tool_call>')
 +    assert _grammar_accepts(schema, call)
-+    reasoning, content, calls = parse('plan</think>' + call, chunk_size, schema=schema)
-+    assert (reasoning, content) == ('plan', '')
-+    assert [json.loads(c) for c in calls] == [{'ignore': '["x'}]
++    with pytest.raises(QwenToolCallOutsideSchemaError):
++        parse('plan</think>' + call, chunk_size, schema=schema)
 +
 +
 +@pytest.mark.parametrize('chunk_size', [None, 1, 3])
@@ -551,7 +639,19 @@ diff --git a/vllm/parser/engine/streaming_parser_engine.py b/vllm/parser/engine/
 diff --git a/vllm/parser/qwen3.py b/vllm/parser/qwen3.py
 --- a/vllm/parser/qwen3.py
 +++ b/vllm/parser/qwen3.py
-@@ -34,11 +34,13 @@
+@@ -24,21 +24,24 @@
+ import functools
+ import json
+ from itertools import product
+-from typing import TYPE_CHECKING
++from typing import TYPE_CHECKING, ClassVar
+ from urllib.parse import unquote
+ 
+ import regex as re
+ from jsonschema import Draft202012Validator
+ from referencing import Registry
+ 
++from vllm.exceptions import VLLMServerError, VLLMUnprocessableEntityError
  from vllm.parser.engine.events import EventType
  from vllm.parser.engine.parser_engine import ParserEngine
  from vllm.parser.engine.parser_engine_config import (
@@ -565,7 +665,7 @@ diff --git a/vllm/parser/qwen3.py b/vllm/parser/qwen3.py
  from vllm.tool_parsers.utils import find_tool_schema
  
  if TYPE_CHECKING:
-@@ -58,11 +60,12 @@
+@@ -58,11 +61,15 @@
  PARAM_START = "<parameter="
  PARAM_END = "</parameter>"
  
@@ -574,49 +674,196 @@ diff --git a/vllm/parser/qwen3.py b/vllm/parser/qwen3.py
 -# other markup inside a value -- ``</function>``, ``</tool_call>``, a bare
 -# ``<parameter`` -- is the value's text; a value with no closer is the final,
 -# cut-off one.
-+# Argument text is read by the grammar's own productions
++# A call's argument text is read in one mode, the one the parser's declared
++# grammar decides (``Qwen3Parser.structural_tag_model``). Under the Qwen
++# grammar it is read by that grammar's own productions
 +# (``read_qwen_arguments``): a value ends at its own closer, which for a JSON
-+# value is the first one outside its strings. Text the grammar has no reading
-+# of at all is output no grammar constrained -- a parser registered without
-+# one -- and is read as the transport always read it: each value runs to the
-+# next closer, and a value with no closer is the final, cut-off one.
++# value is the first one outside its strings, and text the grammar has no
++# reading of is refused, since every generation it constrained has one. A
++# format that declares no grammar (Seed-OSS) reads it as the transport always
++# read it: each value runs to the next closer, and a value with no closer is
++# the final, cut-off one.
  _PARAM_RE = re.compile(
      r"<parameter=([^>]*)>"
      r"(.*?)"
-@@ -259,30 +262,50 @@
+@@ -172,6 +179,74 @@
+         return {"allOf": constraints} if constraints else True
+ 
+ 
++class _NoGrammarReading(Exception):
++    """Argument text the grammar that writes the format's calls has no
++    reading of. The reader knows only the text; the parser, which knows the
++    call, answers it with :class:`QwenToolCallUnreadError`. It is no
++    ValueError, which the engine's provisional-converter fallback catches."""
++
++
++class _NoSchemaReading(Exception):
++    """A whole argument body no reading of which its tool's schema admits.
++    The parser answers it with :class:`QwenToolCallOutsideSchemaError`."""
++
++
++class QwenToolCallUnreadError(VLLMServerError):
++    """The grammar that wrote a call has no reading of its arguments.
++
++    A parser that reads calls by the grammar armed for them reads exactly the
++    language that grammar writes, so this is output that grammar did not
++    constrain, or a disagreement between the grammar and its reading here.
++    Either way the call is not read some other way: reading it by another
++    rule is what would hide the disagreement. On every route that arms the
++    grammar itself only the second is possible, which is the server's
++    failure, so it is a 5xx.
++    """
++
++    def __init__(self, tool: str, grammar: str) -> None:
++        super().__init__(
++            f"The model's call to {tool!r} has argument text the {grammar} "
++            "tool-call grammar has no reading of. This parser reads a call only "
++            "as that grammar writes it, and every generation the grammar "
++            "constrained has a reading, so the call is refused rather than read "
++            "by another rule: either the generation was made without the "
++            "grammar its request armed (a /generate request whose sampling "
++            "parameters omit the structured outputs /render returned), or the "
++            "grammar and its reading here disagree, which is a defect of this "
++            "server. Next: generate under the structured outputs /render "
++            "returned; if they were applied, report the request and the "
++            "generated text."
++        )
++        self.tool = tool
++
++
++class QwenToolCallOutsideSchemaError(VLLMUnprocessableEntityError):
++    """The model wrote a whole call no reading of which satisfies its tool's
++    parameters schema.
++
++    The Qwen grammar writes each declared parameter in its declared
++    production, but not every constraint a JSON schema can state -- one
++    across parameters, a value of several types, which it carries as text,
++    a ``multipleOf`` -- so the model can write a call its schema refuses.
++    No reading of such a call is its arguments, and returning every value as
++    text would change the type of each value the model wrote correctly, so
++    the call is refused, naming it, as a call that repeats a parameter is:
++    the request was sound and the server did not fail. The next action is
++    the caller's, to generate the response again.
++    """
++
++    def __init__(self, tool: str) -> None:
++        super().__init__(
++            f"The model's call to {tool!r} has arguments no reading of which "
++            "satisfies the tool's parameters schema: the tool-call grammar does "
++            "not enforce every constraint a schema can state, and the model "
++            "wrote one the schema refuses. The call is refused rather than "
++            "returned with values its schema does not admit. Generate the "
++            "response again."
++        )
++        self.tool = tool
++
++
+ def _unique_json_object(pairs: list[tuple[str, object]]) -> dict:
+     result = dict(pairs)
+     if len(result) != len(pairs):
+@@ -183,8 +258,11 @@
+     raise ValueError(f"Non-JSON numeric literal in an XML parameter: {value}")
+ 
+ 
+-def _decode_xml_parameters(params: dict[str, str], schema: dict) -> str:
+-    """Decode only schema-proven JSON values; XML strings keep their bytes."""
++def _decode_xml_parameters(params: dict[str, str], schema: dict) -> str | None:
++    """Decode only schema-proven JSON values; XML strings keep their bytes.
++
++    None when no reading of the parameters satisfies the schema: what that
++    means is the reading mode's to say (``_qwen3_arg_converter``)."""
+     context = _XMLParameterSchema(schema, params)
+     domains = []
+     for name, text in params.items():
+@@ -207,7 +285,7 @@
+             if not isinstance(value, str) and field.is_valid(value):
+                 candidates.append((value, text))
+         if not candidates:
+-            return json.dumps(params, ensure_ascii=False)
++            return None
+         domains.append(candidates)
+     while True:
+         context.values = {name: values[0][0] for name, values in zip(params, domains)}
+@@ -219,7 +297,7 @@
+             field = context.field(name)
+             narrowed.append([value for value in values if field.is_valid(value[0])])
+         if any(not values for values in narrowed):
+-            return json.dumps(params, ensure_ascii=False)
++            return None
+         if all(len(a) == len(b) for a, b in zip(domains, narrowed)):
+             break
+         domains = narrowed
+@@ -233,7 +311,7 @@
+                 json.dumps(name, ensure_ascii=False) + ": " + value[1]
+                 for name, value in zip(params, values)
+             ) + "}"
+-    return json.dumps(params, ensure_ascii=False)
++    return None
+ 
+ 
+ def _unframe_parameter_value(value: str, *, complete: bool) -> str:
+@@ -259,31 +337,82 @@
      return value
  
  
 +def _transport_parameters(
 +    raw_args: str,
 +) -> tuple[list[tuple[str, str]], tuple[str, str] | None]:
-+    """Read argument text no grammar constrained: values run to the next closer."""
++    """Read argument text as the transport carries it: values run to the next
++    closer, and a value with no closer is the final, cut-off one."""
 +    closed = [(match.group(1), match.group(2)) for match in _PARAM_RE.finditer(raw_args)]
 +    m = _PARTIAL_PARAM_RE.search(_PARAM_RE.sub("", raw_args))
 +    return closed, (m.group(1), m.group(2)) if m else None
 +
 +
++# The grammar that writes the Qwen format's calls: the format's declaration
++# (``Qwen3Parser.structural_tag_model``), and the reading the format's own
++# configuration -- a bare engine over ``qwen3_config`` -- reads its calls in.
++_QWEN_GRAMMAR = "qwen_3_coder"
++
++
 +def _qwen3_arguments_reading(
-+    raw_args: str, schema: dict | None = None
++    raw_args: str, schema: dict | None = None, grammar: str | None = _QWEN_GRAMMAR
 +) -> ArgumentsReading:
-+    """How a call's argument text reads, which decides whether the call's
++    """How a call's argument text reads, in the mode *grammar* -- the
++    declaring parser's grammar -- decides, which decides whether the call's
 +    closing wrapper after it ends the call or continues a parameter."""
++    if grammar is None:
++        inside = PARAM_START in _PARAM_RE.sub("", raw_args)
++        return ArgumentsReading(complete=not inside, inside_parameter=inside)
 +    reading = read_qwen_arguments(raw_args, schema or {})
-+    if reading is not None:
-+        return ArgumentsReading(reading.complete, reading.inside_parameter)
-+    inside = PARAM_START in _PARAM_RE.sub("", raw_args)
-+    return ArgumentsReading(complete=not inside, inside_parameter=inside)
++    if reading is None:
++        raise _NoGrammarReading()
++    return ArgumentsReading(reading.complete, reading.inside_parameter)
 +
 +
  def _qwen3_arg_converter(
-     raw_args: str, partial: bool, schema: dict | None = None
+-    raw_args: str, partial: bool, schema: dict | None = None
++    raw_args: str,
++    partial: bool,
++    schema: dict | None = None,
++    grammar: str | None = _QWEN_GRAMMAR,
  ) -> str:
 -    params: dict[str, str] = {}
-+    reading = read_qwen_arguments(raw_args, schema or {})
-+    if reading is None:
++    """A call's arguments, read in the mode *grammar* -- the declaring
++    parser's grammar -- decides.
++
++    Under the grammar, a whole body is decoded by its schema and refused when
++    no reading satisfies it, and a body the generation cut short is the raw
++    diagnostic its text is so far. With none, nothing constrained the call,
++    so it is the client's to validate: a body with no unfinished parameter is
++    decoded where its schema proves a reading, and otherwise every value is
++    the text the model wrote, as upstream's reader returns every value.
++    """
++    if grammar is None:
 +        closed, unfinished = _transport_parameters(raw_args)
++        whole = unfinished is None
 +    else:
++        reading = read_qwen_arguments(raw_args, schema or {})
++        if reading is None:
++            raise _NoGrammarReading()
 +        closed, unfinished = list(reading.parameters), reading.unfinished
++        whole = reading.complete
  
 -    for match in _PARAM_RE.finditer(raw_args):
 -        name = match.group(1)
@@ -627,7 +874,7 @@ diff --git a/vllm/parser/qwen3.py b/vllm/parser/qwen3.py
              raise ValueError(f"Qwen XML repeats parameter {name!r}")
          params[name] = _unframe_parameter_value(value, complete=True)
  
-     # An unfinished parameter is a raw diagnostic on both transports.
+-    # An unfinished parameter is a raw diagnostic on both transports.
 -    remaining = _PARAM_RE.sub("", raw_args)
 -    m = _PARTIAL_PARAM_RE.search(remaining)
 -    if m:
@@ -637,18 +884,26 @@ diff --git a/vllm/parser/qwen3.py b/vllm/parser/qwen3.py
 -            if name in params:
 -                raise ValueError(f"Qwen XML repeats parameter {name!r}")
 -            params[name] = _unframe_parameter_value(value, complete=False)
+-
+-    if schema and m is None:
+-        return _decode_xml_parameters(params, schema)
++    # An unfinished parameter is a raw diagnostic in both modes.
 +    if unfinished is not None:
 +        name, value = unfinished
 +        if name in params:
 +            raise ValueError(f"Qwen XML repeats parameter {name!r}")
 +        params[name] = _unframe_parameter_value(value, complete=False)
- 
--    if schema and m is None:
-+    if schema and unfinished is None:
-         return _decode_xml_parameters(params, schema)
++
++    if schema and whole:
++        decoded = _decode_xml_parameters(params, schema)
++        if decoded is not None:
++            return decoded
++        if grammar is not None:
++            raise _NoSchemaReading()
  
      return json.dumps(params, ensure_ascii=False)
-@@ -368,26 +391,28 @@
+ 
+@@ -368,26 +497,28 @@
                  ParserState.TOOL_ARGS,
                  (),
              ),
@@ -687,20 +942,53 @@ diff --git a/vllm/parser/qwen3.py b/vllm/parser/qwen3.py
          stream_arg_deltas=False,
          strip_trailing_reasoning_whitespace=False,
          tool_args_json=False,
-@@ -419,6 +444,13 @@
+@@ -415,17 +546,45 @@
+     THINK_END = THINK_END
+     TOOL_START = TOOL_CALL_START
+     TOOL_END = TOOL_CALL_END
++    # The grammar that writes this format's calls, and so the one fact that
++    # decides both where they come from and how they are read: the format's
++    # tool parser arms it (``make_adapters`` gives the engine's tool adapter
++    # this declaration as its own), and a call's arguments are read by its
++    # productions, text with no reading refused. A format that declares none
++    # (Seed-OSS) arms no grammar and reads its calls as the transport carries
++    # them.
++    structural_tag_model: ClassVar[str | None] = _QWEN_GRAMMAR
+     # The reasoning pass forwards a tool span verbatim, so the batch tool
      # pass splits on the same ids the streaming tool pass sees.
      batch_tool_pass_uses_ids = True
  
 +    def _tool_arguments_reading(
 +        self, func_name: str, raw_args: str
 +    ) -> ArgumentsReading:
-+        return _qwen3_arguments_reading(
-+            raw_args, find_tool_schema(self._tools, func_name)
-+        )
++        try:
++            return _qwen3_arguments_reading(
++                raw_args, find_tool_schema(self._tools, func_name),
++                self.structural_tag_model,
++            )
++        except _NoGrammarReading:
++            raise QwenToolCallUnreadError(
++                func_name, self.structural_tag_model
++            ) from None
 +
      def _convert_tool_arguments(
          self, raw_args: str, func_name: str, partial: bool
      ) -> str:
+         try:
+             return _qwen3_arg_converter(
+-                raw_args, partial, find_tool_schema(self._tools, func_name)
++                raw_args, partial, find_tool_schema(self._tools, func_name),
++                self.structural_tag_model,
+             )
++        except _NoGrammarReading:
++            raise QwenToolCallUnreadError(
++                func_name, self.structural_tag_model
++            ) from None
++        except _NoSchemaReading:
++            raise QwenToolCallOutsideSchemaError(func_name) from None
+         except (TypeError, ValueError) as exc:
+             # Malformed parameter text is handled inside the decoder. An error
+             # here must not enter the engine's provisional-converter fallback.
 diff --git a/vllm/tool_parsers/structural_tag_registry.py b/vllm/tool_parsers/structural_tag_registry.py
 --- a/vllm/tool_parsers/structural_tag_registry.py
 +++ b/vllm/tool_parsers/structural_tag_registry.py
@@ -1166,3 +1454,116 @@ diff --git a/vllm/tool_parsers/structural_tag_registry.py b/vllm/tool_parsers/st
  def _qwen_tool_tags(tools: list[FunctionToolParam]) -> list[TagFormat]:
      return [
          TagFormat(
+diff --git a/tests/parser/engine/test_seed_oss.py b/tests/parser/engine/test_seed_oss.py
+--- a/tests/parser/engine/test_seed_oss.py
++++ b/tests/parser/engine/test_seed_oss.py
+@@ -209,3 +209,45 @@
+     assert json.loads(tool_result.tool_calls[0].function.arguments) == {
+         "city": "Barcelona"
+     }
++
++
++def _closed_tool_request(mock_request, parameters):
++    mock_request.tools = [ChatCompletionToolsParam.model_validate({
++        "type": "function", "function": {"name": "run", "parameters": parameters},
++    })]
++    return mock_request
++
++
++@pytest.mark.parametrize("arguments,expected", [
++    # Out of declared order, which the Qwen grammar cannot write.
++    ("<parameter=command>ls</parameter>\n<parameter=description>list</parameter>\n"
++     "<parameter=is_background>true</parameter>\n",
++     {"command": "ls", "description": "list", "is_background": True}),
++    # A value its schema refuses, kept as the text the model wrote.
++    ("<parameter=command>ls</parameter>\n<parameter=is_background>TRUE</parameter>\n",
++     {"command": "ls", "is_background": "TRUE"}),
++])
++def test_arguments_are_read_as_the_transport_carries_them(
++    tool_parser, mock_request, arguments, expected
++):
++    """No grammar writes seed_oss's calls, so its tool parser arms none and
++    reads every call in the transport's one mode: each value runs to its
++    closer, and a call no reading of satisfies its schema is the client's to
++    validate."""
++    from vllm.tool_parsers.seed_oss_engine_tool_parser import SeedOssEngineToolParser
++
++    assert SeedOssParser.structural_tag_model is None
++    assert SeedOssEngineToolParser.structural_tag_model is None
++    request = _closed_tool_request(mock_request, {
++        "type": "object", "required": ["command"], "additionalProperties": False,
++        "properties": {"command": {"type": "string"},
++                       "is_background": {"type": "boolean"},
++                       "description": {"type": "string"}},
++    })
++    text = (
++        f"{TOOL_CALL_START}\n<function=run>\n" + arguments
++        + f"</function>\n{TOOL_CALL_END}"
++    )
++    result = tool_parser.extract_tool_calls(text, request)
++    assert [tc.function.name for tc in result.tool_calls] == ["run"]
++    assert json.loads(result.tool_calls[0].function.arguments) == expected
+diff --git a/vllm/parser/engine/adapters.py b/vllm/parser/engine/adapters.py
+--- a/vllm/parser/engine/adapters.py
++++ b/vllm/parser/engine/adapters.py
+@@ -245,10 +245,16 @@
+         (ParserEngineReasoningAdapter,),
+         {"_parser_engine_cls": parser_engine_cls},
+     )
++    tool_namespace: dict[str, object] = {"_parser_engine_cls": parser_engine_cls}
++    # An engine that reads its calls by the grammar that writes them declares
++    # that grammar, and its tool parser arms exactly it: one declaration
++    # decides both.
++    if hasattr(parser_engine_cls, "structural_tag_model"):
++        tool_namespace["structural_tag_model"] = parser_engine_cls.structural_tag_model
+     tool_adapter = type(
+         f"{parser_engine_cls.__name__}ToolAdapter",
+         (ParserEngineToolAdapter,),
+-        {"_parser_engine_cls": parser_engine_cls},
++        tool_namespace,
+     )
+     # Let the serving layer find the adapters and call adjust_request(),
+     # which sets skip_special_tokens=False for the detokenizer.
+diff --git a/vllm/parser/seed_oss.py b/vllm/parser/seed_oss.py
+--- a/vllm/parser/seed_oss.py
++++ b/vllm/parser/seed_oss.py
+@@ -11,8 +11,9 @@
+     </tool_call> -> </seed:tool_call>
+ 
+ ``<function=...>`` and ``<parameter=...>`` are byte-identical, so the
+-entire transition table and ``_qwen3_arg_converter`` are inherited from
+-:class:`Qwen3Parser` unchanged.
++entire transition table is inherited from :class:`Qwen3Parser` unchanged.
++No grammar writes seed_oss's calls -- its tool parser arms none -- so their
++arguments are read as the transport carries them.
+ """
+ 
+ from __future__ import annotations
+@@ -26,3 +27,4 @@
+     THINK_END = "</seed:think>"
+     TOOL_START = "<seed:tool_call>"
+     TOOL_END = "</seed:tool_call>"
++    structural_tag_model = None
+diff --git a/vllm/tool_parsers/qwen3_engine_tool_parser.py b/vllm/tool_parsers/qwen3_engine_tool_parser.py
+--- a/vllm/tool_parsers/qwen3_engine_tool_parser.py
++++ b/vllm/tool_parsers/qwen3_engine_tool_parser.py
+@@ -6,7 +6,8 @@
+ 
+ 
+ class Qwen3EngineToolParser(Qwen3ParserToolAdapter):  # type: ignore[valid-type, misc]
+-    structural_tag_model = "qwen_3_coder"
++    # Arms the grammar its engine declares (Qwen3Parser.structural_tag_model)
++    # and reads calls by.
+ 
+     @classmethod
+     def require_servable(cls) -> None:
+diff --git a/vllm/tool_parsers/seed_oss_engine_tool_parser.py b/vllm/tool_parsers/seed_oss_engine_tool_parser.py
+--- a/vllm/tool_parsers/seed_oss_engine_tool_parser.py
++++ b/vllm/tool_parsers/seed_oss_engine_tool_parser.py
+@@ -5,4 +5,5 @@
+ 
+ 
+ class SeedOssEngineToolParser(SeedOssParserToolAdapter):  # type: ignore[valid-type, misc]
+-    structural_tag_model = None
++    """Arms the grammar its engine declares, which is none
++    (SeedOssParser.structural_tag_model)."""

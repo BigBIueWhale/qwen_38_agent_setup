@@ -806,10 +806,10 @@ index 31ce2f5907b3d80763f81f4c91e6538a25f836b8..545354b772f58a3e83fbbed62411442c
  
  
 diff --git a/vllm/parser/qwen3.py b/vllm/parser/qwen3.py
-index 9938867bf9341bb6fc68e54a7fa1c056eeccd1e7..15a590b9e065e7a6428beda0eaba065af6ec1c78 100644
+index 075fa54c0f281d08a594b01fbfa6faac68231aab..1825d53ec261203fe242755b24b49e8e7473a1b3 100644
 --- a/vllm/parser/qwen3.py
 +++ b/vllm/parser/qwen3.py
-@@ -380,12 +380,6 @@ def qwen3_config(
+@@ -486,12 +486,6 @@ def qwen3_config(
                  ParserState.CONTENT,
                  (EventType.REASONING_END,),
              ),
@@ -822,10 +822,10 @@ index 9938867bf9341bb6fc68e54a7fa1c056eeccd1e7..15a590b9e065e7a6428beda0eaba065a
              # The opener ends reasoning where the grammar does, whether or
              # not a call follows it; the call itself starts at the function
              # opener, once the preamble proves the opener was the trigger.
-@@ -455,8 +449,10 @@ class Qwen3Parser(ParserEngine):
-     THINK_END = THINK_END
-     TOOL_START = TOOL_CALL_START
-     TOOL_END = TOOL_CALL_END
+@@ -569,8 +563,10 @@ class Qwen3Parser(ParserEngine):
+     # (Seed-OSS) arms no grammar and reads its calls as the transport carries
+     # them.
+     structural_tag_model: ClassVar[str | None] = _QWEN_GRAMMAR
 -    # The reasoning pass forwards a tool span verbatim, so the batch tool
 -    # pass splits on the same ids the streaming tool pass sees.
 +    # The reasoning pass forwards everything after the boundary as the text
@@ -835,7 +835,7 @@ index 9938867bf9341bb6fc68e54a7fa1c056eeccd1e7..15a590b9e065e7a6428beda0eaba065a
      batch_tool_pass_uses_ids = True
  
      def _tool_arguments_reading(
-@@ -501,6 +497,22 @@ class Qwen3Parser(ParserEngine):
+@@ -628,6 +624,22 @@ class Qwen3Parser(ParserEngine):
              offset += 1
          return token_ids[offset:]
  
@@ -858,7 +858,7 @@ index 9938867bf9341bb6fc68e54a7fa1c056eeccd1e7..15a590b9e065e7a6428beda0eaba065a
      def __init__(
          self,
          tokenizer: TokenizerLike,
-@@ -510,15 +522,7 @@ class Qwen3Parser(ParserEngine):
+@@ -637,15 +649,7 @@ class Qwen3Parser(ParserEngine):
          chat_kwargs = kwargs.get("chat_template_kwargs", {}) or {}
          self.thinking_enabled = chat_kwargs.get("enable_thinking", True)
          kwargs.setdefault(
@@ -876,7 +876,7 @@ index 9938867bf9341bb6fc68e54a7fa1c056eeccd1e7..15a590b9e065e7a6428beda0eaba065a
          super().__init__(
              tokenizer,
 diff --git a/vllm/parser/engine/adapters.py b/vllm/parser/engine/adapters.py
-index c126c18174da6cc0e1e307fc3d72026f165494e7..bf514f70d1a727daae2ad9b06b2221a8249a84dd 100644
+index 81a977b21dba7403904432f8b40cc314361a4359..ad4212f3b8ec839d1309b7bb2ae84c902015a9f6 100644
 --- a/vllm/parser/engine/adapters.py
 +++ b/vllm/parser/engine/adapters.py
 @@ -240,6 +240,7 @@ class ParserEngineToolAdapter(ToolParser):

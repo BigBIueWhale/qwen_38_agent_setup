@@ -681,18 +681,18 @@ index 1c4ed03266a1618456edc1dd8981197aa3382a37..4ba5f54f60aa1611d13e18ea99b4a2b6
  
          r_cls = reasoning_parser_cls
 diff --git a/vllm/parser/qwen3.py b/vllm/parser/qwen3.py
-index 3c635d8015bb42ff662c7f6a39fc33771647ad0d..eb247764be10d562910a5112e1b6ec8ddfcb6ab5 100644
+index 6f76812510fbbbda803baf209bc5b896fabdac2b..242392eb5a147228b86f0b8b20f274c0859e1767 100644
 --- a/vllm/parser/qwen3.py
 +++ b/vllm/parser/qwen3.py
-@@ -33,6 +33,7 @@ from jsonschema import Draft202012Validator
- from referencing import Registry
+@@ -34,6 +34,7 @@ from referencing import Registry
  
  from vllm.entrypoints.openai.engine.protocol import RepeatedToolParameterError
+ from vllm.exceptions import VLLMServerError, VLLMUnprocessableEntityError
 +from vllm.parser.abstract_parser import apply_tool_structural_tag
  from vllm.parser.engine.events import EventType
  from vllm.parser.engine.parser_engine import ParserEngine
  from vllm.parser.engine.parser_engine_config import (
-@@ -564,26 +565,31 @@ class Qwen3Parser(ParserEngine):
+@@ -691,26 +692,31 @@ class Qwen3Parser(ParserEngine):
      def adjust_initial_state_from_prompt(
          self, prompt_token_ids: Sequence[int]
      ) -> None:
@@ -735,7 +735,7 @@ index 3c635d8015bb42ff662c7f6a39fc33771647ad0d..eb247764be10d562910a5112e1b6ec8d
  
      def prompt_leaves_reasoning_open(self, prompt_token_ids: Sequence[int]) -> bool:
          """The prompt's last reasoning marker is ``<think>`` -- every
-@@ -666,3 +672,37 @@ class Qwen3Parser(ParserEngine):
+@@ -793,3 +799,37 @@ class Qwen3Parser(ParserEngine):
                  continue
              return input_ids[i:]
          return input_ids

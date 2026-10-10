@@ -509,6 +509,16 @@ RUN printf '%s  %s\n' \
   "${KIMI_K2_TOOL_PARSER_UPSTREAM_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/tool_parsers/kimi_k2_tool_parser.py \
   | sha256sum --check --strict
 
+ARG SEED_OSS_PARSER_UPSTREAM_FILE_SHA256
+RUN printf '%s  %s\n' \
+  "${SEED_OSS_PARSER_UPSTREAM_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/seed_oss.py \
+  | sha256sum --check --strict
+
+ARG SEED_OSS_ENGINE_TOOL_PARSER_UPSTREAM_FILE_SHA256
+RUN printf '%s  %s\n' \
+  "${SEED_OSS_ENGINE_TOOL_PARSER_UPSTREAM_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/tool_parsers/seed_oss_engine_tool_parser.py \
+  | sha256sum --check --strict
+
 FROM upstream-verifier AS runtime
 ARG HF_RENDERER_PATCHED_FILE_SHA256
 ARG TEMPLATE_AUTHORSHIP_PATCHED_FILE_SHA256
@@ -529,6 +539,8 @@ ARG V1_OUTPUT_PROCESSOR_PATCHED_FILE_SHA256
 ARG V1_DETOKENIZER_PATCHED_FILE_SHA256
 ARG V1_SCHEDULER_PATCHED_FILE_SHA256
 ARG ASYNC_LLM_PATCHED_FILE_SHA256
+ARG SEED_OSS_ENGINE_TOOL_PARSER_PATCHED_FILE_SHA256
+ARG SEED_OSS_PARSER_PATCHED_FILE_SHA256
 ARG MISTRAL_TOOL_PARSER_PATCHED_FILE_SHA256
 ARG KIMI_K2_TOOL_PARSER_PATCHED_FILE_SHA256
 ARG POOLING_BASE_PROTOCOL_PATCHED_FILE_SHA256
@@ -1148,6 +1160,14 @@ COPY --chmod=0644 vllm/vllm/tool_parsers/kimi_k2_tool_parser.py /usr/local/lib/p
 RUN printf '%s  %s\n' \
   "${MISTRAL_TOOL_PARSER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/tool_parsers/mistral_tool_parser.py \
   "${KIMI_K2_TOOL_PARSER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/tool_parsers/kimi_k2_tool_parser.py \
+  | sha256sum --check --strict
+COPY --chmod=0644 vllm/vllm/parser/seed_oss.py /usr/local/lib/python3.12/dist-packages/vllm/parser/seed_oss.py
+RUN printf '%s  %s\n' \
+  "${SEED_OSS_PARSER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/seed_oss.py \
+  | sha256sum --check --strict
+COPY --chmod=0644 vllm/vllm/tool_parsers/seed_oss_engine_tool_parser.py /usr/local/lib/python3.12/dist-packages/vllm/tool_parsers/seed_oss_engine_tool_parser.py
+RUN printf '%s  %s\n' \
+  "${SEED_OSS_ENGINE_TOOL_PARSER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/tool_parsers/seed_oss_engine_tool_parser.py \
   | sha256sum --check --strict
 COPY --chmod=0644 chat_template.jinja /opt/qwen38/chat_template.jinja
 COPY --chmod=0644 scripts/phase_budget_unit.py /opt/qwen38/phase_budget_unit.py
