@@ -384,7 +384,7 @@ It is intentionally reconstructed by the ordered, reviewed semantic transformati
 | patches/vllm-anthropic-input-fidelity.patch | 3252e25a6c2e9d8ee0eec4cb383fc292bff2afaac2e3becdc1006c68b3b02c3c |
 | patches/vllm-qwen-exact-tool-language.patch | 59b8cf13cbd9f3d036eb1f2fe5d4ce52dbdfdb41bee641b84c85de95525170ed |
 | patches/vllm-png-source-admission.patch | b1b684a96d7243ae647d4d8ce2fe69b7330b3ab243ea77903c4cfb346bc80549 |
-| patches/vllm-kv-physical-free-memory.patch | dfafb63c87ea6383cdac064514339bd65481c89d96fbfa0740bd844244cf830d |
+| patches/vllm-kv-physical-free-memory.patch | 3038eb020a40122aef51fb4b8932390961136cb82ab3b127761cc187d2378e1d |
 | patches/vllm-qwen-single-call-grammar.patch | e3859bebf3b97cc05446859f1cb13b1ba6c4048728394f876bd3a109fa9a80d9 |
 | patches/vllm-responses-history-integrity.patch | d2c6343087fc287eb6afe315cdfb9caa2909de140c82b57ee9d0c3ed9473983c |
 | patches/vllm-responses-stream-identity.patch | 9a3f1fb54f3e22f3df621ab681e675f7a916849bdceb6e555242df29d6028095 |
@@ -489,9 +489,9 @@ Pinned build inputs and products:
 |---|---|
 | Immutable base tag | qwen38-vllm:main-9df9b0b |
 | Immutable base ID | sha256:fa4a002a88b7043a1a89966dea8a500fe9696f84e75730d9da916f916048d401 |
-| Runtime Dockerfile SHA-256 | b11d9fb8ae1f745a0a32c4b87def44344a8c64a40aa5d517e78b79ea5e48c6c7 |
-| Build verifier SHA-256 | ae9cf017a44da4216bb7dad9a426b5d0ddae264ea64fa1acbaa8fecff2a0a367 |
-| Runtime validator SHA-256 | 9800024cd815daded403728c52a409df72e1ab360cd8fa0e7b8b9067f02e9e14 |
+| Runtime Dockerfile SHA-256 | 4c227d43786f48dc140930ecf1f67fa380fe15dadacc5353c2bb6e2e9da90e27 |
+| Build verifier SHA-256 | e80499d66e11e5ac4f5bdebef77d544c08ee32daca58aeaaac28005201ae0509 |
+| Runtime validator SHA-256 | 042322eea26ef019b398900c82efaf23838d674c37a10a2208ffdf526794f97c |
 
 The runtime image's profile, tag and archive name, which every release advances
 together, are declared in `config/runtime-v1.sh`, and the archive lives under
@@ -1104,7 +1104,16 @@ every row of a 2,048-token chunk, beside the chunk's bfloat16 logits, about
 2.8 GiB -- the phase would not fit beside this launch's one-user pool, and the
 profile, which runs every phase serving runs, would refuse the pool. Computed this
 way it holds about 0.47 GiB of logits, below the encoder's peak (by arithmetic
-from tensor shapes, not measured).
+from tensor shapes, not measured). That scoring launches two Triton kernels. A
+CPU backend without Triton -- upstream's CPU image builds triton-cpu for amd64
+only -- has the placeholder module alone, so its model runner substitutes them,
+as it substitutes every other Triton kernel it runs: the float32 log-softmax at
+the requested ids, and a token's rank as the count of logits at least its own. A
+reviewed test runs that scoring with Triton absent against a float64 reference.
+For a target whose logit is -inf the Triton rank kernel also counts the padding
+of its last 8,192-wide block (253,952 against the vocabulary's 248,320, measured
+under the Triton interpreter), which the CPU count does not; that kernel is
+upstream's V2 code, and no gate runs it.
 
 Only the V1 model runner holds a declared pool. Upstream selects its V2 runner by
 default for dense, non-hybrid models; that runner's startup profile runs no

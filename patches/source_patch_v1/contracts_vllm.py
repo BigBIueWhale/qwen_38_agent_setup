@@ -2371,6 +2371,24 @@ def _validate_kv_physical_after(state: State) -> None:
         f"{label}: prompt log probabilities take a full-vocabulary log-softmax "
         "the profile does not run",
     )
+    # That function launches Triton kernels; the CPU model runner substitutes
+    # each one it launches, as it substitutes every Triton kernel it runs, so a
+    # CPU backend without Triton scores prompts by the same function.
+    _require_in_symbol(state, "vllm/v1/worker/cpu_model_runner.py",
+                       "CPUModelRunner._postprocess_triton", (
+        "gpu_logprob.compute_token_logprobs = cpu_tl.compute_token_logprobs",
+        "gpu_logprob._ranks_kernel = cpu_tl.ranks_kernel",
+    ), label=label)
+    require_python_symbols(state, "vllm/utils/cpu_triton_utils.py", {
+        "compute_token_logprobs": ("logits", "token_ids"),
+        "_ranks_kernel_impl": (
+            "output", "logits", "logits_stride", "token_ids", "vocab_size",
+            "BLOCK_SIZE",
+        ),
+    }, label=label)
+    require_python_symbols(state, "tests/v1/worker/test_cpu_prompt_logprobs.py", {
+        "test_cpu_backend_scores_prompt_logprobs_without_triton": None,
+    }, label=label)
     _require_ordered(
         _symbol_source(state, runner, "GPUModelRunner.profiling_kv_cache", label=label),
         (
@@ -5945,7 +5963,9 @@ CONTRACTS: Mapping[str, SemanticContract] = {
             "the encoder with the reclaimable workspace released, the text step "
             "attending to a stand-in pool at full context with it resident, its "
             "sampler and its prompt log probabilities at the most a request is "
-            "admitted with, computed as serving computes them -- the peak of "
+            "admitted with, computed as serving computes them (on the CPU "
+            "backend through its model runner's substitutes for that scoring's "
+            "Triton kernels) -- the peak of "
             "those phases above that with the stand-in pool taken off, CUDA "
             "graph and frontend reservations. The profile witnesses what its "
             "text step ran -- every layer holding KV cache or state read its "

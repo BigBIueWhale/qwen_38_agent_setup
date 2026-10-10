@@ -1191,3 +1191,142 @@ diff --git a/tests/v1/worker/test_workspace.py b/tests/v1/worker/test_workspace.
 +    assert manager.unrequested_reclaimable_workspaces(requested) == {"other": 256}
 +    manager.get_reclaimable_simultaneous("other", ((32,), torch.uint8))
 +    assert requested == {"continuation"}
+diff --git a/tests/v1/worker/test_cpu_prompt_logprobs.py b/tests/v1/worker/test_cpu_prompt_logprobs.py
+new file mode 100644
+--- /dev/null
++++ b/tests/v1/worker/test_cpu_prompt_logprobs.py
+@@ -0,0 +1,80 @@
++# SPDX-License-Identifier: Apache-2.0
++# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
++"""V1 prompt log probabilities on a CPU backend with no Triton.
++
++V1 scores prompts as the V2 runner does (compute_prompt_logprobs_with_chunking),
++through Triton kernels; a CPU image built without Triton (every architecture but
++amd64) has only the placeholder module. The CPU model runner substitutes each
++kernel that scoring launches, as it substitutes every other Triton kernel it
++runs, so the real scoring runs there. Run in a process of its own whose import
++of ``triton`` fails, as on such an image, so the substitution cannot reach any
++other test.
++"""
++
++import json
++import subprocess
++import sys
++import textwrap
++
++_SCORING = textwrap.dedent(
++    """
++    import json, sys
++    sys.modules["triton"] = None  # an image built without Triton
++
++    import torch
++
++    from vllm.triton_utils import HAS_TRITON, triton
++    assert HAS_TRITON is False and type(triton).__name__ == "TritonPlaceholder"
++    from vllm.v1.worker.cpu_model_runner import CPUModelRunner
++    from vllm.v1.worker.gpu.sample.prompt_logprob import (
++        compute_prompt_logprobs_with_chunking,
++    )
++
++    CPUModelRunner._postprocess_triton(None)
++    results = []
++    torch.manual_seed(0)
++    # More rows than one chunk of 1,024; a target whose logit is -inf ranks last.
++    for rows, vocab, dtype, k, mode in (
++        (1030, 4096, torch.float32, 5, "raw_logprobs"),
++        (300, 4096, torch.bfloat16, 3, "raw_logprobs"),
++        (7, 257, torch.float32, -1, "raw_logprobs"),
++        (9, 512, torch.float32, 4, "raw_logits"),
++    ):
++        logits = (torch.randn(rows, vocab) * 4).to(dtype)
++        targets = torch.randint(0, vocab, (rows,))
++        logits[3, targets[3]] = float("-inf")
++        ids, scores, ranks = compute_prompt_logprobs_with_chunking(
++            targets, logits, lambda hidden: hidden, k, mode
++        )
++        wide = logits.to(torch.float64)
++        expected = (
++            wide if mode == "raw_logits" else torch.log_softmax(wide, dim=-1)
++        ).gather(-1, ids.to(torch.int64))
++        finite = torch.isfinite(expected)
++        results.append({
++            "ids_start_with_targets": bool((ids[:, 0] == targets).all()),
++            "topk_ids": bool((ids[:, 1:] == torch.topk(
++                logits, vocab if k == -1 else k, dim=-1).indices).all()),
++            "infinite_where_expected": bool(
++                (torch.isfinite(scores.to(torch.float64)) == finite).all()),
++            "max_error": float((scores.to(torch.float64) - expected)[finite].abs().max()),
++            "ranks": bool((ranks == (logits >= logits.gather(
++                -1, targets.unsqueeze(-1))).sum(-1)).all()),
++            "last_rank": int(ranks[3]),
++            "vocab": vocab,
++        })
++    print("SCORES " + json.dumps(results))
++    """
++)
++
++
++def test_cpu_backend_scores_prompt_logprobs_without_triton():
++    run = subprocess.run([sys.executable, "-c", _SCORING], capture_output=True,
++                         text=True, timeout=600)
++    assert run.returncode == 0, run.stderr[-4000:]
++    (line,) = [l for l in run.stdout.splitlines() if l.startswith("SCORES ")]
++    for result in json.loads(line[len("SCORES "):]):
++        assert result["ids_start_with_targets"] and result["topk_ids"], result
++        assert result["infinite_where_expected"] and result["ranks"], result
++        assert result["max_error"] < 1e-4, result
++        assert result["last_rank"] == result["vocab"], result
+diff --git a/vllm/utils/cpu_triton_utils.py b/vllm/utils/cpu_triton_utils.py
+--- a/vllm/utils/cpu_triton_utils.py
++++ b/vllm/utils/cpu_triton_utils.py
+@@ -477,6 +477,33 @@
+ sample_recovered_tokens_kernel = _FuncWrapper(_sample_recovered_tokens_kernel_impl)
+ 
+ 
++# For compute_token_logprobs in vllm/v1/worker/gpu/sample/logprob.py, through
++# which V1 scores prompt log probabilities as the V2 runner does: each row's
++# float32 log-softmax, read at token_ids. The Triton version computes the
++# launch width with triton.next_power_of_2 before it launches, so the function
++# is replaced whole.
++def compute_token_logprobs(
++    logits: torch.Tensor, token_ids: torch.Tensor
++) -> torch.Tensor:
++    logits = logits.to(torch.float32)
++    return logits.gather(-1, token_ids.to(torch.int64)) - torch.logsumexp(
++        logits, dim=-1, keepdim=True
++    )
++
++
++# For _ranks_kernel in vllm/v1/worker/gpu/sample/logprob.py: how many of a
++# row's logits are at least its token's, over the vocabulary.
++def _ranks_kernel_impl(
++    output, logits, logits_stride, token_ids, vocab_size, BLOCK_SIZE=None
++):
++    logits = logits[:, :vocab_size]
++    token_logits = logits.gather(-1, token_ids.to(torch.int64).unsqueeze(-1))
++    output.copy_((logits >= token_logits).sum(-1))
++
++
++ranks_kernel = _FuncWrapper(_ranks_kernel_impl)
++
++
+ def _batch_memcpy_impl(src_ptrs, dst_ptrs, sizes, BLOCK_SIZE=None):
+     # BLOCK_SIZE is unused; kept for signature parity with the Triton kernel.
+     for src, dst, size in zip(src_ptrs.tolist(), dst_ptrs.tolist(), sizes.tolist()):
+diff --git a/vllm/v1/worker/cpu_model_runner.py b/vllm/v1/worker/cpu_model_runner.py
+--- a/vllm/v1/worker/cpu_model_runner.py
++++ b/vllm/v1/worker/cpu_model_runner.py
+@@ -121,6 +121,13 @@
+ 
+         vllm.v1.worker.mamba_utils.batch_memcpy_kernel = cpu_tl.batch_memcpy_kernel
+ 
++        # Prompt log probabilities: V1 scores them as the V2 runner does
++        # (compute_prompt_logprobs_with_chunking), through these.
++        import vllm.v1.worker.gpu.sample.logprob as gpu_logprob
++
++        gpu_logprob.compute_token_logprobs = cpu_tl.compute_token_logprobs
++        gpu_logprob._ranks_kernel = cpu_tl.ranks_kernel
++
+     @instrument(span_name="Loading (CPU)")
+     def load_model(self, load_dummy_weights: bool = False) -> None:
+         if load_dummy_weights:

@@ -886,6 +886,8 @@ assert_running_profile() {
       /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/detokenizer.py \
       /usr/local/lib/python3.12/dist-packages/vllm/v1/core/sched/scheduler.py \
       /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/async_llm.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/v1/worker/cpu_model_runner.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/utils/cpu_triton_utils.py \
       /usr/local/lib/python3.12/dist-packages/vllm/tool_parsers/seed_oss_engine_tool_parser.py \
       /usr/local/lib/python3.12/dist-packages/vllm/parser/seed_oss.py \
       /usr/local/lib/python3.12/dist-packages/vllm/tool_parsers/mistral_tool_parser.py \
@@ -988,6 +990,8 @@ assert_running_profile() {
     "${V1_DETOKENIZER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/detokenizer.py \
     "${V1_SCHEDULER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/core/sched/scheduler.py \
     "${ASYNC_LLM_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/async_llm.py \
+    "${CPU_MODEL_RUNNER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/worker/cpu_model_runner.py \
+    "${CPU_TRITON_UTILS_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/utils/cpu_triton_utils.py \
     "${SEED_OSS_ENGINE_TOOL_PARSER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/tool_parsers/seed_oss_engine_tool_parser.py \
     "${SEED_OSS_PARSER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/seed_oss.py \
     "${MISTRAL_TOOL_PARSER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/tool_parsers/mistral_tool_parser.py \
