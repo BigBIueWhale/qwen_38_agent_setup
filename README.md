@@ -489,9 +489,9 @@ Pinned build inputs and products:
 |---|---|
 | Immutable base tag | qwen38-vllm:main-9df9b0b |
 | Immutable base ID | sha256:fa4a002a88b7043a1a89966dea8a500fe9696f84e75730d9da916f916048d401 |
-| Runtime Dockerfile SHA-256 | 6741f59e39e53f43dc42574b02854e301f3c81e451061076d45648bce1b87fc5 |
-| Build verifier SHA-256 | a8c809c023f855388a2d3623774adc8859fc40b0941f9fa638a02f7e20ebc20d |
-| Runtime validator SHA-256 | 87c1840636a84ed042fcac9283bfbe1ed70a717872f6d51968d9f24f2b438f59 |
+| Runtime Dockerfile SHA-256 | b11d9fb8ae1f745a0a32c4b87def44344a8c64a40aa5d517e78b79ea5e48c6c7 |
+| Build verifier SHA-256 | ae9cf017a44da4216bb7dad9a426b5d0ddae264ea64fa1acbaa8fecff2a0a367 |
+| Runtime validator SHA-256 | 9800024cd815daded403728c52a409df72e1ab360cd8fa0e7b8b9067f02e9e14 |
 
 The runtime image's profile, tag and archive name, which every release advances
 together, are declared in `config/runtime-v1.sh`, and the archive lives under
@@ -1353,9 +1353,13 @@ Responses streaming keeps each output item's ID and each function call's
 `call_id` through its added/done events and the terminal response. Terminal
 output uses the completed stream items, so callers can replay it with results
 correlated using the IDs first received in the stream; every item of the terminal
-response is exactly the concatenation of the deltas streamed under its index, and
-every done event that states its text states exactly that, which the parser unit
-asserts for every engine chunking. Usage, the response's own status and every
+response is exactly the concatenation of the deltas streamed under its index, no
+other index streams any, every done event that states its text states exactly
+that, and the terminal response is the done items in order. One rule states it,
+`scripts/responses_stream_rule.py`, which the parser unit applies to every engine
+chunking -- a call cut right after its function header among the cases -- and
+`responses_protocol_probe.py` to the live server; the image carries it beside the
+unit. Usage, the response's own status and every
 item's status are the same on both paths: in a truncated response the item the
 limit cut -- the last -- is incomplete, and the items it finished before the cut
 are completed.

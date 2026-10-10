@@ -651,6 +651,7 @@ image_build_options=(
   --build-arg "NVFP4_KERNEL_UNIT_SHA256=${NVFP4_KERNEL_UNIT_SHA256}"
   --build-arg "REASONING_USAGE_UNIT_SHA256=${REASONING_USAGE_UNIT_SHA256}"
   --build-arg "TOOL_OUTPUT_PARSER_UNIT_SHA256=${TOOL_OUTPUT_PARSER_UNIT_SHA256}"
+  --build-arg "RESPONSES_STREAM_RULE_SHA256=${RESPONSES_STREAM_RULE_SHA256}"
   --build-arg "QWEN_GRAMMAR_UNIT_SHA256=${QWEN_GRAMMAR_UNIT_SHA256}"
   --build-arg "TEMPLATE_AUTHORSHIP_UNIT_SHA256=${TEMPLATE_AUTHORSHIP_UNIT_SHA256}"
   --build-arg "NATIVE_FP4_SELECTION_UNIT_SHA256=${NATIVE_FP4_SELECTION_UNIT_SHA256}"
@@ -892,6 +893,7 @@ printf '%s  %s\n' \
   "${CHAT_TEMPLATE_RETENTION_UNIT_SHA256}" "${BUILD_CONTEXT}/scripts/chat_template_retention_unit.py" \
   "${NVFP4_KERNEL_UNIT_SHA256}" "${BUILD_CONTEXT}/scripts/nvfp4_kernel_unit.py" \
   "${TOOL_OUTPUT_PARSER_UNIT_SHA256}" "${BUILD_CONTEXT}/scripts/tool_output_parser_unit.py" \
+  "${RESPONSES_STREAM_RULE_SHA256}" "${BUILD_CONTEXT}/scripts/responses_stream_rule.py" \
   "${REASONING_USAGE_UNIT_SHA256}" "${BUILD_CONTEXT}/scripts/reasoning_usage_unit.py" \
   "${QWEN_GRAMMAR_UNIT_SHA256}" "${BUILD_CONTEXT}/scripts/qwen_grammar_unit.py" \
   "${TEMPLATE_AUTHORSHIP_UNIT_SHA256}" "${BUILD_CONTEXT}/scripts/template_authorship_unit.py" \
@@ -1544,6 +1546,7 @@ reasoning_usage_installed_report="$(
     /usr/local/lib/python3.12/dist-packages/vllm/parser/engine/token_id_scanner.py \
     /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/engine/protocol.py \
     /opt/qwen38/tool_output_parser_unit.py \
+    /opt/qwen38/responses_stream_rule.py \
     /opt/qwen38/reasoning_usage_unit.py
 )"
 expected_reasoning_usage_installed_report="$(printf '%s  %s\n' \
@@ -1555,6 +1558,7 @@ expected_reasoning_usage_installed_report="$(printf '%s  %s\n' \
   "${TOKEN_ID_SCANNER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/engine/token_id_scanner.py \
   "${ENGINE_PROTOCOL_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/engine/protocol.py \
   "${TOOL_OUTPUT_PARSER_UNIT_SHA256}" /opt/qwen38/tool_output_parser_unit.py \
+  "${RESPONSES_STREAM_RULE_SHA256}" /opt/qwen38/responses_stream_rule.py \
   "${REASONING_USAGE_UNIT_SHA256}" /opt/qwen38/reasoning_usage_unit.py)"
 if [[ "${reasoning_usage_installed_report}" != "${expected_reasoning_usage_installed_report}" ]]; then
   echo "Built image contains unexpected reasoning-usage bytes." >&2

@@ -26,6 +26,8 @@ from vllm.parser import ParserManager
 from vllm.tokenizers import get_tokenizer
 from vllm.tokenizers.detokenizer_utils import NativeDecodeStream
 
+from responses_stream_rule import assert_stream_is_its_snapshot
+
 
 def asyncio_run(awaitable):
     return asyncio.run(awaitable)
@@ -607,12 +609,6 @@ def engine_walk(prompt, params, admitted, ids):
             if not grammar.accept_tokens(request.request_id, advanced):
                 raise AssertionError(f"the grammar rejected {advanced}")
     return steps, grammar
-
-
-def _item_text(item):
-    if item.type == "function_call":
-        return item.arguments
-    return "".join(part.text for part in (item.content or []))
 
 
 class ToolOutputParserTest(unittest.TestCase):
@@ -1784,43 +1780,32 @@ class ToolOutputParserTest(unittest.TestCase):
                 self.assertEqual(shown, hidden)
 
     def test_a_responses_stream_is_its_own_snapshot(self):
-        """Each streamed item is the concatenation of its deltas; its done event
-        carries exactly that; the terminal response is the done items, in
-        order. For every engine chunking, on the served parsers."""
-        deltas = {
-            "response.output_text.delta", "response.reasoning_text.delta",
-            "response.function_call_arguments.delta",
-        }
+        """Every item of the terminal response is the concatenation of the
+        deltas streamed under its index, and no other index streams any; every
+        done event that states an item's text states exactly what its deltas
+        built; the terminal response is the done items, in order, with
+        contiguous sequence numbers. For every engine chunking, on the served
+        parsers, as the route streams the events: the rule
+        responses_protocol_probe holds the live server to, read from the one
+        module both import."""
         generations = (
             ("plan</think>\n\nThe answer \u03a9.", "stop"),
             ("plan</think>\n\nLet me look.\n\n" + call("a b"), "stop"),
             ("plan</think>\n\n" + call("a") + "\n" + call("b"), "stop"),
             ("plan</think>\n\n" + call("a") + "\n<tool_call>\n<function=write>\n"
              "<parameter=text>\nb", "length"),
+            # A call cut right after its function header.
+            ("plan</think>\n\n<tool_call>\n<function=write>\n", "length"),
             ("plan and more pla", "length"),
         )
         for text, finish in generations:
             for chunk in (1, 2, 3, 5, 64):
                 with self.subTest(text=text, chunk=chunk):
-                    events = _responses_events(text, chunk, finish)
-                    built, done = {}, {}
-                    for event in events:
-                        if event.type in deltas:
-                            built[event.output_index] = (
-                                built.get(event.output_index, "") + event.delta
-                            )
-                        elif event.type == "response.output_item.done":
-                            done[event.output_index] = event.item
-                    self.assertEqual(
-                        {index: _item_text(item) for index, item in done.items()
-                         if index in built},
-                        built,
-                    )
-                    terminal = events[-1].response
-                    self.assertEqual(
-                        [item.model_dump() for item in terminal.output],
-                        [done[index].model_dump() for index in sorted(done)],
-                    )
+                    events = [
+                        json.loads(event.model_dump_json(indent=None, by_alias=True))
+                        for event in _responses_events(text, chunk, finish)
+                    ]
+                    assert_stream_is_its_snapshot(events, events[-1]["response"])
 
     def test_a_responses_history_refusal_names_the_input_item(self):
         """Responses validates its tool history after converting it to chat

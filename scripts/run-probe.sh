@@ -52,6 +52,7 @@ INNER
 # A probe that parses locally builds the parser the launch serves
 # (scripts/probe_parser.py), named here from the launch itself.
 tar --create --file - --directory "${SCRIPT_DIR}" probe_scope.py probe_parser.py \
+    responses_stream_rule.py \
     "${probes[@]##*/}" |
   docker exec --interactive \
     --env "SERVED_REASONING_PARSER=$(launch_arg_value --reasoning-parser)" \

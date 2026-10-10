@@ -1095,6 +1095,7 @@ assert_running_profile() {
       /usr/local/lib/python3.12/dist-packages/vllm/parser/engine/token_id_scanner.py \
       /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/engine/protocol.py \
       /opt/qwen38/tool_output_parser_unit.py \
+      /opt/qwen38/responses_stream_rule.py \
       /opt/qwen38/reasoning_usage_unit.py
   )"
   expected_reasoning_usage_installed_report="$(printf '%s  %s\n' \
@@ -1106,6 +1107,7 @@ assert_running_profile() {
     "${TOKEN_ID_SCANNER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/parser/engine/token_id_scanner.py \
     "${ENGINE_PROTOCOL_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/engine/protocol.py \
     "${TOOL_OUTPUT_PARSER_UNIT_SHA256}" /opt/qwen38/tool_output_parser_unit.py \
+    "${RESPONSES_STREAM_RULE_SHA256}" /opt/qwen38/responses_stream_rule.py \
     "${REASONING_USAGE_UNIT_SHA256}" /opt/qwen38/reasoning_usage_unit.py)"
   [[ "${reasoning_usage_installed_report}" == "${expected_reasoning_usage_installed_report}" ]] || \
     die "Running reasoning-usage bytes do not match the reviewed profile." \
