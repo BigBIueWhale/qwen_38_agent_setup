@@ -2409,8 +2409,33 @@ def _validate_kv_physical_after(state: State) -> None:
         "if self.cache_config.kv_cache_users is not None:",
         '"a KV pool declared with --kv-cache-users',
     ), label=label)
+    # What only the V2 runner serves is one list, which selects it and which
+    # its refusal names; a model only it implements says so itself, through
+    # the registry, and is refused at configuration with no launch to offer.
+    _require_in_symbol(state, "vllm/config/vllm.py",
+                       "VllmConfig.use_v2_model_runner", (
+        "if self._only_v2_model_runner_serves():",
+    ), label=label)
+    _require_in_symbol(state, "vllm/config/vllm.py",
+                       "VllmConfig._only_v2_model_runner_serves", (
+        "model_config.requires_v2_model_runner",
+    ), label=label)
+    _require_in_symbol(state, "vllm/config/vllm.py",
+                       "VllmConfig._validate_v2_model_runner", (
+        "needs = self._only_v2_model_runner_serves()",
+        "no launch \"\n                \"of this server serves this model.",
+    ), label=label)
+    forbid_text(state, "vllm/config/vllm.py",
+                "a DSpark or \"\n                \"mixed-attention DFlash draft, a diffusion model.",
+                label=label)
+    require_text(state, "vllm/model_executor/models/longcat_flash_ngram.py",
+                 "    requires_v2_model_runner = True\n", label=label)
+    require_text(state, "vllm/model_executor/models/registry.py",
+                 'requires_v2_model_runner=getattr(model, "requires_v2_model_runner", False),',
+                 label=label)
     require_python_symbols(state, "tests/test_config.py", {
         "test_v2_model_runner_serves_no_declared_kv_pool": None,
+        "test_what_only_the_v2_runner_serves_selects_it_and_its_refusal": None,
     }, label=label)
     forbid_text(state, worker, "Residents allocated after profiling", label=label)
     require_python_symbols(state, "tests/v1/worker/test_gpu_worker.py", {

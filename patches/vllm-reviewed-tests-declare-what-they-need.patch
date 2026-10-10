@@ -1014,7 +1014,7 @@ index 700e445c504041dd7ef5709c05cbad1501fe2ce2..b3726b35690eefae66bfebaa13935f33
          conversation = [
              {"role": "user", "content": "Hello"},
 diff --git a/tests/test_config.py b/tests/test_config.py
-index a2c4caeeea6771fed8ac28363da0dde774d3d3e7..875de6b4aeb6eb285d8e4df27c57a4c8579760f2 100644
+index 01c806c4949f28a0a58b3ac6e18ed500fc5be38b..81d9cf51c4ecbe1f8e828fffe767af87a71340c1 100644
 --- a/tests/test_config.py
 +++ b/tests/test_config.py
 @@ -37,6 +37,7 @@ from vllm.v1.attention.backend import AttentionCGSupport
@@ -1025,7 +1025,7 @@ index a2c4caeeea6771fed8ac28363da0dde774d3d3e7..875de6b4aeb6eb285d8e4df27c57a4c8
  def test_compile_config_repr_succeeds():
      # setup: VllmBackend mutates the config object
      config = VllmConfig()
-@@ -468,6 +469,7 @@ def test_with_hf_config_leaves_unknown_model_type_without_architectures(
+@@ -507,6 +508,7 @@ def test_with_hf_config_leaves_unknown_model_type_without_architectures(
      assert updated.model_config.hf_config.architectures is None
  
  
@@ -1033,7 +1033,7 @@ index a2c4caeeea6771fed8ac28363da0dde774d3d3e7..875de6b4aeb6eb285d8e4df27c57a4c8
  def test_async_scheduling_with_pipeline_parallelism_is_allowed():
      cfg = VllmConfig(
          scheduler_config=SchedulerConfig(
-@@ -524,6 +526,8 @@ def test_reconfigure_for_independent_dp_rank_on_multinode_dense_model():
+@@ -563,6 +565,8 @@ def test_reconfigure_for_independent_dp_rank_on_multinode_dense_model():
      assert parallel_config.world_size == 8
  
  
@@ -1042,7 +1042,7 @@ index a2c4caeeea6771fed8ac28363da0dde774d3d3e7..875de6b4aeb6eb285d8e4df27c57a4c8
  def test_draft_model_enables_async_scheduling_by_default():
      parallel_config = ParallelConfig(distributed_executor_backend="uni")
      model_config = ModelConfig("Qwen/Qwen3-0.6B", max_model_len=2048)
-@@ -632,6 +636,7 @@ def test_update_config():
+@@ -671,6 +675,7 @@ def test_update_config():
          update_config(config3, {"a": {"nonexistent": 1}})
  
  
@@ -1050,7 +1050,7 @@ index a2c4caeeea6771fed8ac28363da0dde774d3d3e7..875de6b4aeb6eb285d8e4df27c57a4c8
  @pytest.mark.parametrize(
      ("model_id", "expected_runner_type", "expected_convert_type"),
      [
-@@ -650,6 +655,7 @@ def test_auto_runner(model_id, expected_runner_type, expected_convert_type):
+@@ -689,6 +694,7 @@ def test_auto_runner(model_id, expected_runner_type, expected_convert_type):
      assert config.convert_type == expected_convert_type
  
  
@@ -1058,7 +1058,7 @@ index a2c4caeeea6771fed8ac28363da0dde774d3d3e7..875de6b4aeb6eb285d8e4df27c57a4c8
  @pytest.mark.parametrize(
      ("model_id", "expected_runner_type", "expected_convert_type"),
      [
-@@ -668,6 +674,7 @@ def test_pooling_runner(model_id, expected_runner_type, expected_convert_type):
+@@ -707,6 +713,7 @@ def test_pooling_runner(model_id, expected_runner_type, expected_convert_type):
      assert config.convert_type == expected_convert_type
  
  
@@ -1066,7 +1066,7 @@ index a2c4caeeea6771fed8ac28363da0dde774d3d3e7..875de6b4aeb6eb285d8e4df27c57a4c8
  @pytest.mark.parametrize(
      ("model_id", "expected_runner_type", "expected_convert_type"),
      [
-@@ -688,6 +695,7 @@ MODEL_IDS_EXPECTED = [
+@@ -727,6 +734,7 @@ MODEL_IDS_EXPECTED = [
  ]
  
  
@@ -1074,7 +1074,7 @@ index a2c4caeeea6771fed8ac28363da0dde774d3d3e7..875de6b4aeb6eb285d8e4df27c57a4c8
  @pytest.mark.parametrize("model_id_expected", MODEL_IDS_EXPECTED)
  def test_disable_sliding_window(model_id_expected):
      model_id, expected = model_id_expected
-@@ -695,6 +703,7 @@ def test_disable_sliding_window(model_id_expected):
+@@ -734,6 +742,7 @@ def test_disable_sliding_window(model_id_expected):
      assert model_config.max_model_len == expected
  
  
@@ -1082,7 +1082,7 @@ index a2c4caeeea6771fed8ac28363da0dde774d3d3e7..875de6b4aeb6eb285d8e4df27c57a4c8
  @pytest.mark.skipif(
      current_platform.is_rocm(), reason="Xformers backend is not supported on ROCm."
  )
-@@ -708,6 +717,7 @@ def test_get_pooling_config():
+@@ -747,6 +756,7 @@ def test_get_pooling_config():
      assert model_config.pooler_config.tok_pooling_type == "ALL"
  
  
@@ -1090,7 +1090,7 @@ index a2c4caeeea6771fed8ac28363da0dde774d3d3e7..875de6b4aeb6eb285d8e4df27c57a4c8
  @pytest.mark.skipif(
      current_platform.is_rocm(), reason="Xformers backend is not supported on ROCm."
  )
-@@ -719,6 +729,7 @@ def test_get_pooling_config_from_args():
+@@ -758,6 +768,7 @@ def test_get_pooling_config_from_args():
      assert asdict(model_config.pooler_config) == asdict(pooler_config)
  
  
@@ -1098,7 +1098,7 @@ index a2c4caeeea6771fed8ac28363da0dde774d3d3e7..875de6b4aeb6eb285d8e4df27c57a4c8
  @pytest.mark.parametrize(
      ("model_id", "default_pooling_type", "pooling_type"),
      [
-@@ -732,6 +743,7 @@ def test_default_seq_pooling_type(model_id, default_pooling_type, pooling_type):
+@@ -771,6 +782,7 @@ def test_default_seq_pooling_type(model_id, default_pooling_type, pooling_type):
      assert model_config.pooler_config.seq_pooling_type == pooling_type
  
  
@@ -1106,7 +1106,7 @@ index a2c4caeeea6771fed8ac28363da0dde774d3d3e7..875de6b4aeb6eb285d8e4df27c57a4c8
  @pytest.mark.parametrize(
      ("model_id", "default_pooling_type", "pooling_type"),
      [
-@@ -745,6 +757,7 @@ def test_default_tok_pooling_type(model_id, default_pooling_type, pooling_type):
+@@ -784,6 +796,7 @@ def test_default_tok_pooling_type(model_id, default_pooling_type, pooling_type):
      assert model_config.pooler_config.tok_pooling_type == pooling_type
  
  
@@ -1114,7 +1114,7 @@ index a2c4caeeea6771fed8ac28363da0dde774d3d3e7..875de6b4aeb6eb285d8e4df27c57a4c8
  @pytest.mark.parametrize(
      ("model_id", "expected_is_moe_model"),
      [
-@@ -764,6 +777,7 @@ def test_moe_model_detection(model_id, expected_is_moe_model):
+@@ -803,6 +816,7 @@ def test_moe_model_detection(model_id, expected_is_moe_model):
      assert model_config.is_moe == expected_is_moe_model
  
  
@@ -1122,7 +1122,7 @@ index a2c4caeeea6771fed8ac28363da0dde774d3d3e7..875de6b4aeb6eb285d8e4df27c57a4c8
  @pytest.mark.parametrize(
      ("model_id", "quantized"),
      [
-@@ -782,6 +796,7 @@ def test_is_quantized(model_id, quantized):
+@@ -821,6 +835,7 @@ def test_is_quantized(model_id, quantized):
      assert model_config.is_quantized == quantized
  
  
@@ -1130,7 +1130,7 @@ index a2c4caeeea6771fed8ac28363da0dde774d3d3e7..875de6b4aeb6eb285d8e4df27c57a4c8
  @pytest.mark.skipif(
      current_platform.is_rocm(), reason="Xformers backend is not supported on ROCm."
  )
-@@ -795,6 +810,7 @@ def test_get_bert_tokenization_sentence_transformer_config():
+@@ -834,6 +849,7 @@ def test_get_bert_tokenization_sentence_transformer_config():
      assert bert_bge_model_config["do_lower_case"]
  
  
@@ -1138,7 +1138,7 @@ index a2c4caeeea6771fed8ac28363da0dde774d3d3e7..875de6b4aeb6eb285d8e4df27c57a4c8
  def test_rope_customization():
      TEST_ROPE_PARAMETERS = {
          "rope_theta": 16_000_000.0,
-@@ -842,6 +858,7 @@ def test_rope_customization():
+@@ -881,6 +897,7 @@ def test_rope_customization():
      assert longchat_model_config.max_model_len == 4096
  
  
@@ -1146,7 +1146,7 @@ index a2c4caeeea6771fed8ac28363da0dde774d3d3e7..875de6b4aeb6eb285d8e4df27c57a4c8
  def test_nested_hf_overrides():
      """Test that nested hf_overrides work correctly."""
      # Test with a model that has text_config
-@@ -873,6 +890,7 @@ def test_nested_hf_overrides():
+@@ -912,6 +929,7 @@ def test_nested_hf_overrides():
      assert model_config.hf_config.vision_config.hidden_size == 512
  
  
@@ -1154,7 +1154,7 @@ index a2c4caeeea6771fed8ac28363da0dde774d3d3e7..875de6b4aeb6eb285d8e4df27c57a4c8
  def test_model_class_overrides_registers_target():
      """`model_class_overrides` redirects an architecture to a custom class."""
      from vllm.model_executor.models import ModelRegistry
-@@ -897,6 +915,7 @@ def test_model_class_overrides_registers_target():
+@@ -936,6 +954,7 @@ def test_model_class_overrides_registers_target():
          ModelRegistry.models.pop(arch, None)
  
  
@@ -1162,7 +1162,7 @@ index a2c4caeeea6771fed8ac28363da0dde774d3d3e7..875de6b4aeb6eb285d8e4df27c57a4c8
  @pytest.mark.skipif(
      current_platform.is_rocm(), reason="Encoder Decoder models not supported on ROCm."
  )
-@@ -914,6 +933,7 @@ def test_is_encoder_decoder(model_id, is_encoder_decoder):
+@@ -953,6 +972,7 @@ def test_is_encoder_decoder(model_id, is_encoder_decoder):
      assert config.is_encoder_decoder == is_encoder_decoder
  
  
@@ -1170,7 +1170,7 @@ index a2c4caeeea6771fed8ac28363da0dde774d3d3e7..875de6b4aeb6eb285d8e4df27c57a4c8
  @pytest.mark.parametrize(
      ("model_id", "uses_mrope"),
      [
-@@ -927,6 +947,7 @@ def test_uses_mrope(model_id, uses_mrope):
+@@ -966,6 +986,7 @@ def test_uses_mrope(model_id, uses_mrope):
      assert config.uses_mrope == uses_mrope
  
  
@@ -1178,7 +1178,7 @@ index a2c4caeeea6771fed8ac28363da0dde774d3d3e7..875de6b4aeb6eb285d8e4df27c57a4c8
  def test_generation_config_loading():
      model_id = "Qwen/Qwen2.5-1.5B-Instruct"
  
-@@ -973,6 +994,7 @@ def test_generation_config_loading():
+@@ -1012,6 +1033,7 @@ def test_generation_config_loading():
      assert model_config.get_diff_sampling_param() == override_generation_config
  
  
@@ -1186,7 +1186,7 @@ index a2c4caeeea6771fed8ac28363da0dde774d3d3e7..875de6b4aeb6eb285d8e4df27c57a4c8
  @pytest.mark.parametrize(
      "pt_load_map_location",
      [
-@@ -987,6 +1009,7 @@ def test_load_config_pt_load_map_location(pt_load_map_location):
+@@ -1026,6 +1048,7 @@ def test_load_config_pt_load_map_location(pt_load_map_location):
      assert config.load_config.pt_load_map_location == pt_load_map_location
  
  
@@ -1194,7 +1194,7 @@ index a2c4caeeea6771fed8ac28363da0dde774d3d3e7..875de6b4aeb6eb285d8e4df27c57a4c8
  @pytest.mark.parametrize(
      ("model_id", "max_model_len", "expected_max_len", "should_raise"),
      [
-@@ -1145,6 +1168,7 @@ def test_s3_url_different_model_and_tokenizer(mock_pull_files):
+@@ -1184,6 +1207,7 @@ def test_s3_url_different_model_and_tokenizer(mock_pull_files):
      assert mock_pull_files.call_args_list[1][0][0] == tokenizer_url
  
  
@@ -1202,7 +1202,7 @@ index a2c4caeeea6771fed8ac28363da0dde774d3d3e7..875de6b4aeb6eb285d8e4df27c57a4c8
  @pytest.mark.parametrize(
      ("model_id", "expected_attn_type", "expected_result", "reason"),
      [
-@@ -1264,6 +1288,7 @@ def test_is_chunked_prefill_supported(
+@@ -1303,6 +1327,7 @@ def test_is_chunked_prefill_supported(
      assert reason in caplog_vllm.text
  
  
@@ -1210,7 +1210,7 @@ index a2c4caeeea6771fed8ac28363da0dde774d3d3e7..875de6b4aeb6eb285d8e4df27c57a4c8
  @pytest.mark.parametrize(
      ("model_id", "expected_attn_type", "expected_result", "reason"),
      [
-@@ -1383,6 +1408,7 @@ def test_is_prefix_caching_supported(
+@@ -1422,6 +1447,7 @@ def test_is_prefix_caching_supported(
      assert reason in caplog_vllm.text
  
  
@@ -1218,7 +1218,7 @@ index a2c4caeeea6771fed8ac28363da0dde774d3d3e7..875de6b4aeb6eb285d8e4df27c57a4c8
  @pytest.mark.parametrize(
      ("backend", "custom_ops", "expected"),
      [
-@@ -1444,6 +1470,8 @@ def test_validate_mamba_align_subblock_prefill():
+@@ -1483,6 +1509,8 @@ def test_validate_mamba_align_subblock_prefill():
      VllmConfig.validate_block_size(config)
  
  
@@ -1227,7 +1227,7 @@ index a2c4caeeea6771fed8ac28363da0dde774d3d3e7..875de6b4aeb6eb285d8e4df27c57a4c8
  @pytest.mark.parametrize(
      ("model_id", "compilation_config", "optimization_level"),
      [
-@@ -1531,6 +1559,7 @@ def test_vllm_config_defaults(model_id, compilation_config, optimization_level):
+@@ -1570,6 +1598,7 @@ def test_vllm_config_defaults(model_id, compilation_config, optimization_level):
          )
  
  
@@ -1235,7 +1235,7 @@ index a2c4caeeea6771fed8ac28363da0dde774d3d3e7..875de6b4aeb6eb285d8e4df27c57a4c8
  def test_vllm_config_callable_defaults():
      """Test that callable defaults work in the config system.
  
-@@ -1671,6 +1700,7 @@ def test_vllm_config_explicit_overrides():
+@@ -1710,6 +1739,7 @@ def test_vllm_config_explicit_overrides():
      assert config.compilation_config.cudagraph_mode == CUDAGraphMode.FULL_AND_PIECEWISE
  
  
@@ -1243,7 +1243,7 @@ index a2c4caeeea6771fed8ac28363da0dde774d3d3e7..875de6b4aeb6eb285d8e4df27c57a4c8
  def test_fusion_pass_op_priority():
      """This test checks that custom op enablement & IR op priority
      correctly control default fusions"""
-@@ -1715,6 +1745,8 @@ def test_scheduler_config_init():
+@@ -1754,6 +1784,8 @@ def test_scheduler_config_init():
          print(SchedulerConfig.default_factory().max_model_len)
  
  
@@ -1252,7 +1252,7 @@ index a2c4caeeea6771fed8ac28363da0dde774d3d3e7..875de6b4aeb6eb285d8e4df27c57a4c8
  @pytest.mark.parametrize(
      (
          "model_id",
-@@ -1766,6 +1798,7 @@ def test_fault_tolerance_requires_single_api_server():
+@@ -1805,6 +1837,7 @@ def test_fault_tolerance_requires_single_api_server():
      ParallelConfig(enable_fault_tolerance=True, _api_process_count=1)
  
  
@@ -1260,7 +1260,7 @@ index a2c4caeeea6771fed8ac28363da0dde774d3d3e7..875de6b4aeb6eb285d8e4df27c57a4c8
  def test_renderer_num_workers_with_mm_cache():
      """Disallow renderer_num_workers > 1 with the mm processor cache only for
      pooling models, whose preprocessing runs on the renderer workers."""
-@@ -1799,6 +1832,7 @@ def test_renderer_num_workers_with_mm_cache():
+@@ -1838,6 +1871,7 @@ def test_renderer_num_workers_with_mm_cache():
      assert config.renderer_num_workers == 1
  
  
@@ -1268,7 +1268,7 @@ index a2c4caeeea6771fed8ac28363da0dde774d3d3e7..875de6b4aeb6eb285d8e4df27c57a4c8
  def test_eagle_draft_model_config():
      """Test that EagleDraft model config is correctly set."""
      target_model_config = ModelConfig(
-@@ -1872,6 +1906,7 @@ def test_ir_op_priority_str():
+@@ -1911,6 +1945,7 @@ def test_ir_op_priority_str():
          priority_config = IrOpPriorityConfig(rms_norm=["vllm_c", 4, "native"])
  
  
@@ -1276,7 +1276,7 @@ index a2c4caeeea6771fed8ac28363da0dde774d3d3e7..875de6b4aeb6eb285d8e4df27c57a4c8
  def test_ir_op_priority_ctx():
      """Test that the priority-setting context sets priority correctly."""
      from vllm import ir
-@@ -1918,6 +1953,7 @@ def test_load_config_rejects_non_string_load_format(bad_load_format):
+@@ -1957,6 +1992,7 @@ def test_load_config_rejects_non_string_load_format(bad_load_format):
  REVISION = "c1899de289a04d12100db370d81485cdf75e47ca"
  
  
@@ -1284,7 +1284,7 @@ index a2c4caeeea6771fed8ac28363da0dde774d3d3e7..875de6b4aeb6eb285d8e4df27c57a4c8
  @patch("vllm.config.model.resolve_revision", return_value=ResolvedRevision(REVISION))
  def test_revision_not_resolved_when_weights_differ_from_model(mock_resolve):
      model_weights = "unsloth/Qwen3-0.6B-GGUF:Q8_0"
-@@ -1925,6 +1961,7 @@ def test_revision_not_resolved_when_weights_differ_from_model(mock_resolve):
+@@ -1964,6 +2000,7 @@ def test_revision_not_resolved_when_weights_differ_from_model(mock_resolve):
      assert config.revision is None
  
  

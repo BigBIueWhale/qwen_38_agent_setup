@@ -384,7 +384,7 @@ It is intentionally reconstructed by the ordered, reviewed semantic transformati
 | patches/vllm-anthropic-input-fidelity.patch | 3252e25a6c2e9d8ee0eec4cb383fc292bff2afaac2e3becdc1006c68b3b02c3c |
 | patches/vllm-qwen-exact-tool-language.patch | 59b8cf13cbd9f3d036eb1f2fe5d4ce52dbdfdb41bee641b84c85de95525170ed |
 | patches/vllm-png-source-admission.patch | b1b684a96d7243ae647d4d8ce2fe69b7330b3ab243ea77903c4cfb346bc80549 |
-| patches/vllm-kv-physical-free-memory.patch | 3038eb020a40122aef51fb4b8932390961136cb82ab3b127761cc187d2378e1d |
+| patches/vllm-kv-physical-free-memory.patch | 1d5324b3443e0f4f5d503d0cf8d97649204689932d82cbd25343d16c91dfb969 |
 | patches/vllm-qwen-single-call-grammar.patch | e3859bebf3b97cc05446859f1cb13b1ba6c4048728394f876bd3a109fa9a80d9 |
 | patches/vllm-responses-history-integrity.patch | d2c6343087fc287eb6afe315cdfb9caa2909de140c82b57ee9d0c3ed9473983c |
 | patches/vllm-responses-stream-identity.patch | 9a3f1fb54f3e22f3df621ab681e675f7a916849bdceb6e555242df29d6028095 |
@@ -428,7 +428,7 @@ It is intentionally reconstructed by the ordered, reviewed semantic transformati
 | patches/vllm-chat-stream-carries-every-token-logprob.patch | ca15dadd152454fe5b3fbcb710b8c7b5ce3221c038617b9e0d0985953aecbf47 |
 | patches/vllm-chat-messages-read-by-one-rule.patch | 5bf8a2d69d7ab1c6b9ee423740d34616a69e857d64816f68b9b9b1d509455f7f |
 | patches/vllm-responses-refuses-what-it-cannot-honour.patch | 35fcb2a68faa1a6fb99a83b6d7726ffc45f1b6e84cbb2ed7d9fe152575bf10f3 |
-| patches/vllm-reviewed-tests-declare-what-they-need.patch | 7954646a17b9cdedaeab47bc57581924fbf2049b36a61261240bd63f3f7851b9 |
+| patches/vllm-reviewed-tests-declare-what-they-need.patch | e130a96a50fd0c5adfb5a102784aa5ad33991d82dbe506ba204b2c426b6a098d |
 | patches/vllm-priority-is-refused-where-nothing-orders-by-it.patch | 96346e5bf71726008f4449389d91a18531fd57fe63f930b2400e059ab168571a |
 | patches/vllm-forced-tool-choice-is-held-through-reasoning.patch | 9dd2c950842869d1456bf8d61d6738e7222c6f352c280ba7faa200ab9b43964d |
 | patches/vllm-qwen-format-is-served-as-one-engine.patch | e06d5ea04c1e63a216d99cc27767cd3e295342bca68851f5a48f0a497a43e775 |
@@ -489,9 +489,9 @@ Pinned build inputs and products:
 |---|---|
 | Immutable base tag | qwen38-vllm:main-9df9b0b |
 | Immutable base ID | sha256:fa4a002a88b7043a1a89966dea8a500fe9696f84e75730d9da916f916048d401 |
-| Runtime Dockerfile SHA-256 | 61244d9034617444bc4bd209c6cfbc58d42a74206c4f364e51f6e08ac1361767 |
-| Build verifier SHA-256 | 414d0316fdddb16596343b47f751612f89c8e753915195e8dc868907480a2c0d |
-| Runtime validator SHA-256 | eb3ed01ba80c26553b4de9ec958469b025a6413159e58f17ea5a5daa2e5a08a1 |
+| Runtime Dockerfile SHA-256 | 803c7bbeb4af50a79aedb9dad84115859778b534b94e0f586c2e43fa2c06f6e6 |
+| Build verifier SHA-256 | 4ecb246b263348bbf33b5bb9644dab05d989fdd0d2bbbbbd50857cca5111376a |
+| Runtime validator SHA-256 | a41148448cd4232cd43797225b34e456153d4c36a1e256644423afefe68ec567 |
 
 The runtime image's profile, tag and archive name, which every release advances
 together, are declared in `config/runtime-v1.sh`, and the archive lives under
@@ -1126,8 +1126,15 @@ profiling, charges no CUDA-graph memory and samples without log probabilities,
 which upstream's utilization holdback absorbs and this bound does not charge. A
 configuration with `--kv-cache-users` is therefore one the V2 runner does not
 support: by default such a model is served by V1, and forcing V2 is refused at
-configuration with the cause and the V1 runner as the next action. This launch's
-hybrid model is served by V1 either way.
+configuration with the cause and the V1 runner as the next action. What only the
+V2 runner serves is one list (`VllmConfig._only_v2_model_runner_serves`), which
+selects it and which that refusal names: prefill context parallelism, a DSpark
+draft and a mixed-attention DFlash draft are launch options to drop, after which
+V1 serves the rest; a diffusion model and an architecture whose model class says
+only V2 implements it (`requires_v2_model_runner`, LongCat-Flash-Lite's
+`LongcatFlashNgramForCausalLM`) are the model itself, and with a KV cache such a
+model is refused at configuration, before its weights load, as one no launch of
+this server serves. This launch's hybrid model is served by V1 either way.
 
 The derivation assumes that the caching allocator places each phase's peak,
 counted in allocated bytes, in the room the bound leaves: zero fragmentation. It

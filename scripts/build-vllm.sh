@@ -796,6 +796,10 @@ image_build_options=(
   --build-arg "STREAMING_PARSER_ENGINE_PATCHED_FILE_SHA256=${STREAMING_PARSER_ENGINE_PATCHED_FILE_SHA256}"
   --build-arg "TOKEN_ID_SCANNER_PATCHED_FILE_SHA256=${TOKEN_ID_SCANNER_PATCHED_FILE_SHA256}"
   --build-arg "ENGINE_PROTOCOL_PATCHED_FILE_SHA256=${ENGINE_PROTOCOL_PATCHED_FILE_SHA256}"
+  --build-arg "LONGCAT_FLASH_NGRAM_MODEL_PATCHED_FILE_SHA256=${LONGCAT_FLASH_NGRAM_MODEL_PATCHED_FILE_SHA256}"
+  --build-arg "LONGCAT_FLASH_NGRAM_MODEL_UPSTREAM_FILE_SHA256=${LONGCAT_FLASH_NGRAM_MODEL_UPSTREAM_FILE_SHA256}"
+  --build-arg "MODEL_REGISTRY_PATCHED_FILE_SHA256=${MODEL_REGISTRY_PATCHED_FILE_SHA256}"
+  --build-arg "MODEL_REGISTRY_UPSTREAM_FILE_SHA256=${MODEL_REGISTRY_UPSTREAM_FILE_SHA256}"
   --build-arg "P2P_ZMQ_TRANSPORT_PATCHED_FILE_SHA256=${P2P_ZMQ_TRANSPORT_PATCHED_FILE_SHA256}"
   --build-arg "P2P_ZMQ_TRANSPORT_UPSTREAM_FILE_SHA256=${P2P_ZMQ_TRANSPORT_UPSTREAM_FILE_SHA256}"
   --build-arg "CPU_MODEL_RUNNER_PATCHED_FILE_SHA256=${CPU_MODEL_RUNNER_PATCHED_FILE_SHA256}"
@@ -1256,6 +1260,8 @@ actual_installed_report="$(
     /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/detokenizer.py \
     /usr/local/lib/python3.12/dist-packages/vllm/v1/core/sched/scheduler.py \
     /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/async_llm.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/model_executor/models/longcat_flash_ngram.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/model_executor/models/registry.py \
     /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/tiering/p2p/control/zmq.py \
     /usr/local/lib/python3.12/dist-packages/vllm/v1/worker/cpu_model_runner.py \
     /usr/local/lib/python3.12/dist-packages/vllm/utils/cpu_triton_utils.py \
@@ -1361,6 +1367,8 @@ expected_installed_report="$(printf '%s  %s\n' \
   "${V1_DETOKENIZER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/detokenizer.py \
   "${V1_SCHEDULER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/core/sched/scheduler.py \
   "${ASYNC_LLM_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/async_llm.py \
+  "${LONGCAT_FLASH_NGRAM_MODEL_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/model_executor/models/longcat_flash_ngram.py \
+  "${MODEL_REGISTRY_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/model_executor/models/registry.py \
   "${P2P_ZMQ_TRANSPORT_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/tiering/p2p/control/zmq.py \
   "${CPU_MODEL_RUNNER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/worker/cpu_model_runner.py \
   "${CPU_TRITON_UTILS_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/utils/cpu_triton_utils.py \

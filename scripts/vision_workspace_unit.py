@@ -780,16 +780,19 @@ def test_v2_runner_holds_no_declared_pool() -> None:
     # the pool, and nothing charges a holdback for them: a model V2 would
     # serve by default is served by V1 when it declares a pool, and V2 forced
     # is refused with the cause and a possible next action.
-    def selection(kv_cache_users):
+    def selection(kv_cache_users, architecture="Qwen3ForCausalLM",
+                  only_v2=False, prefill_context_parallel_size=1):
         config = SimpleNamespace(
             model_config=SimpleNamespace(
-                model="dense", architectures=["Qwen3ForCausalLM"],
+                model="dense", architectures=[architecture],
+                architecture=architecture, requires_v2_model_runner=only_v2,
                 runner_type="generate", is_moe=False, is_quantized=False,
-                is_diffusion=False, logits_processors=None,
-                enable_prompt_embeds=False,
+                is_diffusion=False, is_attention_free=False, use_mla=False,
+                logits_processors=None, enable_prompt_embeds=False,
             ),
             parallel_config=SimpleNamespace(
-                prefill_context_parallel_size=1, tensor_parallel_size=1,
+                prefill_context_parallel_size=prefill_context_parallel_size,
+                tensor_parallel_size=1,
                 pipeline_parallel_size=1, distributed_executor_backend="mp",
                 enable_dbo=False, enable_elastic_ep=False,
             ),
@@ -803,11 +806,25 @@ def test_v2_runner_holds_no_declared_pool() -> None:
             ),
         )
         for name in ("_dflash_needs_multi_kv_group",
+                     "_only_v2_model_runner_serves",
                      "_is_default_v2_model_runner_model",
                      "_get_v2_model_runner_unsupported_features"):
             setattr(config, name,
                     getattr(vllm_config.VllmConfig, name).__get__(config))
         return config
+
+    # That a model only the V2 runner implements is the model's own
+    # declaration, read by the registry as its other interfaces are.
+    from vllm.model_executor.models.longcat_flash_ngram import (
+        LongcatFlashNgramForCausalLM,
+    )
+    from vllm.model_executor.models.qwen3 import Qwen3ForCausalLM
+    from vllm.model_executor.models.registry import _ModelInfo
+
+    for model_cls, only_v2 in ((LongcatFlashNgramForCausalLM, True),
+                               (Qwen3ForCausalLM, False)):
+        info = _ModelInfo.from_model_cls(model_cls)
+        assert info.requires_v2_model_runner is only_v2, (model_cls, info)
 
     selects_v2 = vllm_config.VllmConfig.use_v2_model_runner.fget
     saved_triton, saved_env = vllm_config.HAS_TRITON, os.environ.pop(
@@ -825,6 +842,34 @@ def test_v2_runner_holds_no_declared_pool() -> None:
             assert "Next: " in str(refusal) and "V1 model runner" in str(refusal)
         else:
             raise AssertionError("V2 forced with a declared pool was admitted")
+        # What only the V2 runner serves selects it, and the refusal names what
+        # the same table lists: a launch option the operator can drop, after
+        # which V1 serves the rest; a model only V2 implements, which no
+        # launch of this server serves -- before its weights load, whether or
+        # not the pool is declared, since a model with a KV cache is served
+        # here only with one.
+        pcp = selection(1, prefill_context_parallel_size=2)
+        assert selects_v2(pcp) is True
+        try:
+            vllm_config.VllmConfig._validate_v2_model_runner(pcp)
+        except ValueError as refusal:
+            assert "serve without prefill context parallelism" in str(refusal)
+            assert "so that the V1 model runner serves it" in str(refusal)
+            assert "serve without the listed features" not in str(refusal)
+        else:
+            raise AssertionError("PCP with a declared pool was admitted on V2")
+        for users in (1, None):
+            longcat = selection(users, "LongcatFlashNgramForCausalLM", only_v2=True)
+            assert selects_v2(longcat) is True, "a V2-only model routed to V1"
+            (need,) = [need for need, _ in longcat._only_v2_model_runner_serves()]
+            try:
+                vllm_config.VllmConfig._validate_v2_model_runner(longcat)
+            except ValueError as refusal:
+                assert need in str(refusal), (need, str(refusal))
+                assert "no launch of this server serves this model" in str(refusal)
+                assert "V1 model runner" not in str(refusal)
+            else:
+                raise AssertionError("a V2-only model with a KV cache was admitted")
     finally:
         vllm_config.HAS_TRITON = saved_triton
         if saved_env is not None:

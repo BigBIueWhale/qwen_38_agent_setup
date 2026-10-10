@@ -1062,26 +1062,35 @@ diff --git a/vllm/v1/worker/workspace.py b/vllm/v1/worker/workspace.py
 diff --git a/tests/test_config.py b/tests/test_config.py
 --- a/tests/test_config.py
 +++ b/tests/test_config.py
-@@ -336,6 +336,63 @@
+@@ -336,6 +336,102 @@
      assert VllmConfig._is_default_v2_model_runner_model(config) is expected
  
  
-+def _v2_selection_config(kv_cache_users):
++def _v2_selection_config(
++    kv_cache_users,
++    architecture="Qwen3ForCausalLM",
++    only_v2=False,
++    prefill_context_parallel_size=1,
++):
 +    """The VllmConfig surface the V2 runner's selection reads, for a dense
-+    generate model the V2 runner serves by default."""
++    generate model the V2 runner serves by default, or *architecture*."""
 +    config = SimpleNamespace(
 +        model_config=SimpleNamespace(
 +            model="Qwen/Qwen3-0.6B",
-+            architectures=["Qwen3ForCausalLM"],
++            architectures=[architecture],
++            architecture=architecture,
++            requires_v2_model_runner=only_v2,
 +            runner_type="generate",
 +            is_moe=False,
 +            is_quantized=False,
 +            is_diffusion=False,
++            is_attention_free=False,
++            use_mla=False,
 +            logits_processors=None,
 +            enable_prompt_embeds=False,
 +        ),
 +        parallel_config=SimpleNamespace(
-+            prefill_context_parallel_size=1,
++            prefill_context_parallel_size=prefill_context_parallel_size,
 +            tensor_parallel_size=1,
 +            pipeline_parallel_size=1,
 +            distributed_executor_backend="mp",
@@ -1099,6 +1108,7 @@ diff --git a/tests/test_config.py b/tests/test_config.py
 +    )
 +    for name in (
 +        "_dflash_needs_multi_kv_group",
++        "_only_v2_model_runner_serves",
 +        "_is_default_v2_model_runner_model",
 +        "_get_v2_model_runner_unsupported_features",
 +    ):
@@ -1123,13 +1133,111 @@ diff --git a/tests/test_config.py b/tests/test_config.py
 +        VllmConfig._validate_v2_model_runner(declared)
 +
 +
++def test_what_only_the_v2_runner_serves_selects_it_and_its_refusal(monkeypatch):
++    """One list, _only_v2_model_runner_serves, selects the V2 runner and names
++    what its refusal offers: a launch option the operator can drop, after
++    which the V1 runner serves the rest, and a model only V2 implements,
++    which no launch of this server serves -- refused at configuration,
++    before its weights load, declared pool or not, since a model with a KV
++    cache is served here only with one."""
++    monkeypatch.delenv("VLLM_USE_V2_MODEL_RUNNER", raising=False)
++    monkeypatch.setattr(vllm_config_module, "HAS_TRITON", True)
++    pcp = _v2_selection_config(kv_cache_users=1, prefill_context_parallel_size=2)
++    assert VllmConfig.use_v2_model_runner.fget(pcp) is True
++    with pytest.raises(ValueError) as refusal:
++        VllmConfig._validate_v2_model_runner(pcp)
++    assert "serve without prefill context parallelism" in str(refusal.value)
++    assert "so that the V1 model runner serves it" in str(refusal.value)
++    assert "serve without the listed features" not in str(refusal.value)
++    for kv_cache_users in (1, None):
++        longcat = _v2_selection_config(
++            kv_cache_users, "LongcatFlashNgramForCausalLM", only_v2=True
++        )
++        assert VllmConfig.use_v2_model_runner.fget(longcat) is True
++        (need,) = [need for need, _ in longcat._only_v2_model_runner_serves()]
++        with pytest.raises(ValueError) as refusal:
++            VllmConfig._validate_v2_model_runner(longcat)
++        assert need in str(refusal.value)
++        assert "no launch of this server serves this model" in str(refusal.value)
++        assert "V1 model runner" not in str(refusal.value)
++
++
  @pytest.mark.skip_global_cleanup
  def test_with_hf_config_populates_missing_architectures_from_causal_lm_mapping(
      monkeypatch,
 diff --git a/vllm/config/vllm.py b/vllm/config/vllm.py
 --- a/vllm/config/vllm.py
 +++ b/vllm/config/vllm.py
-@@ -2434,6 +2434,23 @@
+@@ -614,26 +614,10 @@
+         if use_v2_model_runner is not None:
+             return use_v2_model_runner
+ 
+-        # PCP runtime support is implemented only by the V2 model runner.
+-        if self.parallel_config.prefill_context_parallel_size > 1:
+-            return True
+-
+-        # DSpark is implemented only by the V2 GPU model runner, and DeepSeek-V4
+-        # is not otherwise a default-V2 architecture, so force V2 for it. If V2
+-        # is unsupported for the rest of the config, _validate_v2_model_runner
+-        # raises rather than silently falling back to V1 (which can't run dspark).
+-        if (
+-            self.speculative_config is not None
+-            and self.speculative_config.method == "dspark"
+-        ):
+-            return True
+-
+-        # Mixed sliding/full DFlash drafts need multiple KV groups (V2 only);
+-        # force V2 as for dspark, since a hybrid target otherwise defaults to V1.
+-        if self._dflash_needs_multi_kv_group():
+-            return True
+-
+-        if self.model_config is not None and self.model_config.is_diffusion:
++        # What only the V2 runner serves selects it. If V2 is unsupported for
++        # the rest of the config, _validate_v2_model_runner raises rather than
++        # silently falling back to V1, which cannot serve it.
++        if self._only_v2_model_runner_serves():
+             return True
+ 
+         if not self._is_default_v2_model_runner_model():
+@@ -656,5 +640,37 @@
+ 
+         return True
+ 
++    def _only_v2_model_runner_serves(self) -> list[tuple[str, bool]]:
++        """What in this configuration only the V2 model runner serves, each with
++        whether it is the model itself, which no launch option removes. The one
++        list: use_v2_model_runner selects V2 for each, and
++        _validate_v2_model_runner's refusal names them."""
++        needs: list[tuple[str, bool]] = []
++        # PCP runtime support is implemented only by the V2 model runner.
++        if self.parallel_config.prefill_context_parallel_size > 1:
++            needs.append(("prefill context parallelism", False))
++        # DSpark is implemented only by the V2 GPU model runner, and
++        # DeepSeek-V4 is not otherwise a default-V2 architecture.
++        if (
++            self.speculative_config is not None
++            and self.speculative_config.method == "dspark"
++        ):
++            needs.append(("a DSpark draft", False))
++        # Mixed sliding/full DFlash drafts need multiple KV groups (V2 only),
++        # and a hybrid target otherwise defaults to V1.
++        if self._dflash_needs_multi_kv_group():
++            needs.append((
++                "a DFlash draft mixing sliding-window and full attention", False
++            ))
++        model_config = self.model_config
++        if model_config is not None and model_config.is_diffusion:
++            needs.append(("a diffusion model", True))
++        if model_config is not None and model_config.requires_v2_model_runner:
++            needs.append((
++                f"{model_config.architecture}, which only the V2 runner implements",
++                True,
++            ))
++        return needs
++
+     def _dflash_needs_multi_kv_group(self) -> bool:
+         """Whether a DFlash draft mixes sliding-window and full attention."""
+@@ -2434,6 +2450,23 @@
              # Will be added by https://github.com/vllm-project/vllm/pull/35045
              unsupported.append("KV sharing fast prefill")
  
@@ -1153,16 +1261,43 @@ diff --git a/vllm/config/vllm.py b/vllm/config/vllm.py
          return unsupported
  
      def _validate_v2_model_runner(self) -> None:
-@@ -2444,7 +2461,11 @@
+@@ -2441,10 +2474,38 @@
+         if not HAS_TRITON:
+             raise ValueError("Model Runner V2 requires Triton.")
+ 
++        needs = self._only_v2_model_runner_serves()
++        inherent = [need for need, of_the_model in needs if of_the_model]
++        removable = [need for need, of_the_model in needs if not of_the_model]
++        model_config = self.model_config
++        # A model with a KV cache is served here only with a pool declared by
++        # --kv-cache-users (get_kv_cache_configs), which the V2 runner does not
++        # hold (_get_v2_model_runner_unsupported_features).
++        needs_pool = model_config is not None and not model_config.is_attention_free
++        if inherent and needs_pool:
++            raise ValueError(
++                f"Only the V2 model runner serves {', '.join(inherent)}, and this "
++                "server serves a model with a KV cache only with a pool declared "
++                "by --kv-cache-users, which the V2 runner does not hold: no launch "
++                "of this server serves this model."
++            )
++
          unsupported = self._get_v2_model_runner_unsupported_features()
          if unsupported:
++            alternatives = []
++            if not (needs_pool and self.cache_config.kv_cache_users is not None):
++                alternatives.append("serve without the listed features")
++            # V2 was chosen by what only it serves, or, where nothing here
++            # needs it, by VLLM_USE_V2_MODEL_RUNNER.
++            to_v1 = [f"serve without {', '.join(removable)}"] if removable else []
++            if envs.VLLM_USE_V2_MODEL_RUNNER or not needs:
++                to_v1.append("unset VLLM_USE_V2_MODEL_RUNNER")
++            alternatives.append(
++                f"{' and '.join(to_v1)}, so that the V1 model runner serves it"
++            )
              raise ValueError(
 -                f"Model Runner V2 does not yet support: {', '.join(unsupported)}"
 +                f"Model Runner V2 does not yet support: {', '.join(unsupported)}. "
-+                "Next: serve without the listed features, or on the V1 model "
-+                "runner (unset VLLM_USE_V2_MODEL_RUNNER) without what only the "
-+                "V2 runner serves: prefill context parallelism, a DSpark or "
-+                "mixed-attention DFlash draft, a diffusion model."
++                f"Next: {'; or '.join(alternatives)}."
              )
  
      def validate_block_size(self) -> None:
@@ -1330,3 +1465,52 @@ diff --git a/vllm/v1/worker/cpu_model_runner.py b/vllm/v1/worker/cpu_model_runne
      @instrument(span_name="Loading (CPU)")
      def load_model(self, load_dummy_weights: bool = False) -> None:
          if load_dummy_weights:
+diff --git a/vllm/config/model.py b/vllm/config/model.py
+--- a/vllm/config/model.py
++++ b/vllm/config/model.py
+@@ -1839,6 +1839,12 @@
+     def is_attention_free(self) -> bool:
+         return self._model_info.is_attention_free
+ 
++    @property
++    def requires_v2_model_runner(self) -> bool:
++        """Only the V2 model runner implements this architecture: its model
++        class says so (``requires_v2_model_runner``)."""
++        return self._model_info.requires_v2_model_runner
++
+     @property
+     def is_hybrid(self) -> bool:
+         if not self._model_info.is_hybrid:
+diff --git a/vllm/model_executor/models/longcat_flash_ngram.py b/vllm/model_executor/models/longcat_flash_ngram.py
+--- a/vllm/model_executor/models/longcat_flash_ngram.py
++++ b/vllm/model_executor/models/longcat_flash_ngram.py
+@@ -204,6 +204,10 @@
+ class LongcatFlashNgramForCausalLM(nn.Module, SupportsLoRA, SupportsPP):
+     """LongCat-Flash-Lite for causal LM (MRV2-only, n-gram embedding)."""
+ 
++    # Only the V2 model runner implements its n-gram embedding state; the
++    # configuration reads this and selects that runner (VllmConfig).
++    requires_v2_model_runner = True
++
+     packed_modules_mapping = {
+         "qkv_proj": ["q_proj", "k_proj", "v_proj"],
+         "gate_up_proj": ["gate_proj", "up_proj"],
+diff --git a/vllm/model_executor/models/registry.py b/vllm/model_executor/models/registry.py
+--- a/vllm/model_executor/models/registry.py
++++ b/vllm/model_executor/models/registry.py
+@@ -835,6 +835,7 @@
+     supports_transcription_only: bool
+     supported_video_pruning_methods: tuple[str, ...]
+     supports_mm_device_do_normalize: bool
++    requires_v2_model_runner: bool
+ 
+     @staticmethod
+     def from_model_cls(model: type[nn.Module]) -> "_ModelInfo":
+@@ -871,6 +872,7 @@
+             supports_mm_device_do_normalize=getattr(
+                 model, "supports_mm_device_do_normalize", False
+             ),
++            requires_v2_model_runner=getattr(model, "requires_v2_model_runner", False),
+         )
+ 
+ 
