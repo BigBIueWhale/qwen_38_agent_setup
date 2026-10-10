@@ -529,6 +529,11 @@ RUN printf '%s  %s\n' \
   "${CPU_MODEL_RUNNER_UPSTREAM_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/worker/cpu_model_runner.py \
   | sha256sum --check --strict
 
+ARG P2P_ZMQ_TRANSPORT_UPSTREAM_FILE_SHA256
+RUN printf '%s  %s\n' \
+  "${P2P_ZMQ_TRANSPORT_UPSTREAM_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/tiering/p2p/control/zmq.py \
+  | sha256sum --check --strict
+
 FROM upstream-verifier AS runtime
 ARG HF_RENDERER_PATCHED_FILE_SHA256
 ARG TEMPLATE_AUTHORSHIP_PATCHED_FILE_SHA256
@@ -549,6 +554,7 @@ ARG V1_OUTPUT_PROCESSOR_PATCHED_FILE_SHA256
 ARG V1_DETOKENIZER_PATCHED_FILE_SHA256
 ARG V1_SCHEDULER_PATCHED_FILE_SHA256
 ARG ASYNC_LLM_PATCHED_FILE_SHA256
+ARG P2P_ZMQ_TRANSPORT_PATCHED_FILE_SHA256
 ARG CPU_MODEL_RUNNER_PATCHED_FILE_SHA256
 ARG CPU_TRITON_UTILS_PATCHED_FILE_SHA256
 ARG SEED_OSS_ENGINE_TOOL_PARSER_PATCHED_FILE_SHA256
@@ -1189,6 +1195,10 @@ RUN printf '%s  %s\n' \
 COPY --chmod=0644 vllm/vllm/v1/worker/cpu_model_runner.py /usr/local/lib/python3.12/dist-packages/vllm/v1/worker/cpu_model_runner.py
 RUN printf '%s  %s\n' \
   "${CPU_MODEL_RUNNER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/worker/cpu_model_runner.py \
+  | sha256sum --check --strict
+COPY --chmod=0644 vllm/vllm/v1/kv_offload/tiering/p2p/control/zmq.py /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/tiering/p2p/control/zmq.py
+RUN printf '%s  %s\n' \
+  "${P2P_ZMQ_TRANSPORT_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/tiering/p2p/control/zmq.py \
   | sha256sum --check --strict
 COPY --chmod=0644 chat_template.jinja /opt/qwen38/chat_template.jinja
 COPY --chmod=0644 scripts/phase_budget_unit.py /opt/qwen38/phase_budget_unit.py

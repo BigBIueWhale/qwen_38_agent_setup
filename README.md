@@ -423,7 +423,7 @@ It is intentionally reconstructed by the ordered, reviewed semantic transformati
 | patches/vllm-batch-invariance-substitutes-no-nvfp4-kernel.patch | c79baaee0a51275f5f522d266fe6b315c200e6951920c2454d5c80cadbb92f44 |
 | patches/vllm-render-carries-every-image-chat-renders.patch | 9c20792ac98dfabdc44691217947d18ad7eee940f236343f531a891cde9a72b1 |
 | patches/vllm-rendered-prompts-are-never-truncated.patch | 3128a77dde8f5b5118d2893bb858183e7fc0f20573124441bb69b2e82251fc6d |
-| patches/vllm-kv-transfer-params-are-declared.patch | d44e3599d90aac1fd397d562ee8f16af6cbaf6707be1ff6b2b252e5112a3931d |
+| patches/vllm-kv-transfer-params-are-declared.patch | 79fdec1387802c9fcd952c1b0094598f5d0853bc75401e5040701feab4ea4f14 |
 | patches/vllm-responses-refuses-tools-the-template-is-never-given.patch | 5c3106c820032060101e732329f2d234c9c3c84bcd5e21c4e05ebf55679aecd2 |
 | patches/vllm-chat-stream-carries-every-token-logprob.patch | ca15dadd152454fe5b3fbcb710b8c7b5ce3221c038617b9e0d0985953aecbf47 |
 | patches/vllm-chat-messages-read-by-one-rule.patch | 5bf8a2d69d7ab1c6b9ee423740d34616a69e857d64816f68b9b9b1d509455f7f |
@@ -489,9 +489,9 @@ Pinned build inputs and products:
 |---|---|
 | Immutable base tag | qwen38-vllm:main-9df9b0b |
 | Immutable base ID | sha256:fa4a002a88b7043a1a89966dea8a500fe9696f84e75730d9da916f916048d401 |
-| Runtime Dockerfile SHA-256 | 4c227d43786f48dc140930ecf1f67fa380fe15dadacc5353c2bb6e2e9da90e27 |
-| Build verifier SHA-256 | e80499d66e11e5ac4f5bdebef77d544c08ee32daca58aeaaac28005201ae0509 |
-| Runtime validator SHA-256 | 042322eea26ef019b398900c82efaf23838d674c37a10a2208ffdf526794f97c |
+| Runtime Dockerfile SHA-256 | 61244d9034617444bc4bd209c6cfbc58d42a74206c4f364e51f6e08ac1361767 |
+| Build verifier SHA-256 | 414d0316fdddb16596343b47f751612f89c8e753915195e8dc868907480a2c0d |
+| Runtime validator SHA-256 | eb3ed01ba80c26553b4de9ec958469b025a6413159e58f17ea5a5daa2e5a08a1 |
 
 The runtime image's profile, tag and archive name, which every release advances
 together, are declared in `config/runtime-v1.sh`, and the archive lives under
@@ -658,8 +658,12 @@ Consequences:
   only where its operator sets `allow_custom_save_path`, and writes under its
   own storage path otherwise, so elsewhere the key is refused naming that
   setting. A value is held to what its connector can act on, not only to its
-  JSON type: a P2P peer's request ID and host are non-empty (an IP address or a
-  host name) and its port is from 1 to 65535, a NIXL `remote_block_ids` list
+  JSON type: a P2P peer's request ID is non-empty, its host is one the tier's
+  transport can dial -- an IPv4 address or a host name whose labels begin and end
+  with a letter or digit, as the transport itself states it
+  (`ZmqTransport.dialable_host`): libzmq refuses a host beginning with `_` inside
+  the engine core, and the transport's sockets dial IPv4 only -- and its port is
+  from 1 to 65535, a NIXL `remote_block_ids` list
   holds one list per KV cache group and is never empty, and a Mooncake
   `kv_producer` is refused `do_remote_prefill` true and a `kv_consumer`
   `do_remote_decode` true -- each ended the engine core, or ran the request

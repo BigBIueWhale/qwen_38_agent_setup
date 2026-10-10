@@ -152516,7 +152516,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '\n'})},
  {'name': 'kv-transfer-params-are-declared',
   'review_patch': 'patches/vllm-kv-transfer-params-are-declared.patch',
-  'review_sha256': 'd44e3599d90aac1fd397d562ee8f16af6cbaf6707be1ff6b2b252e5112a3931d',
+  'review_sha256': '79fdec1387802c9fcd952c1b0094598f5d0853bc75401e5040701feab4ea4f14',
   'files': ({'path': 'tests/entrypoints/openai/chat_completion/test_chat_completion.py',
              'before_sha256': '84894aca3b4eae56b835d2f0b7a94005d40667bace8251ed8bfdadf06d85ff90',
              'after_sha256': 'dcae61a3fc75e638b6841780e6888a9c8b0a2ff23dbd03aea365ad401cb146af'},
@@ -152528,13 +152528,13 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'after_sha256': '8b9f3e19f018a30abe93944226f0d6c74b47d2fbf024c286eec3fd653d2e9ca9'},
             {'path': 'tests/v1/kv_connector/unit/test_kv_transfer_params_keys.py',
              'before_sha256': None,
-             'after_sha256': '29d9d5190db6c803813aaa4f5926282c430a22fdb1e31f47e4b20b7407fa333e'},
+             'after_sha256': 'e50a952ca2b176aa4bec0a7de05cb6a4281d2463a6972ad4f271df5831e42bc6'},
             {'path': 'vllm/distributed/kv_transfer/kv_connector/factory.py',
              'before_sha256': '00dfbc3e6c9472bbeab63ba3a9d93d5b1d49e66a306a189d3d0996a935b6532a',
              'after_sha256': '81a1025b6c3a89b301d102549e0576fc4d1639e3efe1a1f8c3ecffc8fde356bf'},
             {'path': 'vllm/distributed/kv_transfer/kv_connector/v1/base.py',
              'before_sha256': 'c4dcdf1a86896ef10e668b3656bfe1537679f91ac7083e4122a7204a4abef3ab',
-             'after_sha256': 'f27bb16f2c8cccc86dc9ad20d3f9b4a8ff0a525ebb53ea33df4418e1463f7b3a'},
+             'after_sha256': '69ba8adf653f385f5ca99e3e0c0e15147008de513f97bd09cf3ab19573b2b848'},
             {'path': 'vllm/distributed/kv_transfer/kv_connector/v1/example_hidden_states_connector.py',
              'before_sha256': 'f7addcd445c0e55581d475beba99351f67d1539608ff73d1d5b158db84f160a7',
              'after_sha256': 'd28da3cdafd53a29686d4b63a2b151d17ccde609ce7c58965127f7ac21ff83ca'},
@@ -152576,10 +152576,13 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'after_sha256': 'd598f2ed12385ca8cfaeabdce4a304bcbbc88d1f8b8468c73f6397260de7f0f5'},
             {'path': 'vllm/v1/kv_offload/tiering/p2p/manager.py',
              'before_sha256': '1fae3dc09c9ec4af1451cc8252ae180480cf87563ddfdd247dcd2937d1992148',
-             'after_sha256': '2985232a0ac6448a086bb2bc14fd3cf4419f8840cbd3ca01fbae01314c7ee9e4'},
+             'after_sha256': '93cec15e9329c2a77419008f7f0209ad24fbfb07d1685128f0782f79edf20afb'},
             {'path': 'vllm/v1/kv_offload/tiering/spec.py',
              'before_sha256': '3a6b5ed06a6231519fe129af52845a528d6804f76ef8bdc9416a4c79e6073041',
-             'after_sha256': '772f19230d5ebecae44ae06538589a51f0f204d320325b7745bfe43767199fe1'}),
+             'after_sha256': '772f19230d5ebecae44ae06538589a51f0f204d320325b7745bfe43767199fe1'},
+            {'path': 'vllm/v1/kv_offload/tiering/p2p/control/zmq.py',
+             'before_sha256': '55be43570ef68c69db506a996d68869f8d76006cc85c55115b1f85d7a9431eff',
+             'after_sha256': 'abc4c162720cd762e7e6cd205807753cce315ca79990685531fedbf2c66e2b39'}),
   'edits': ({'name': 'tests/entrypoints/openai/chat_completion/test_chat_completion.py:landmark-1',
              'path': 'tests/entrypoints/openai/chat_completion/test_chat_completion.py',
              'before': '        )\n'
@@ -154033,7 +154036,9 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       'request ran without\n'
                       '            # the transfer it named; the transport refused the '
                       'last three\n'
-                      '            # inside the engine core.\n'
+                      '            # inside the engine core (see also\n'
+                      '            # '
+                      'test_a_peer_host_admission_takes_is_one_the_transport_dials).\n'
                       '            ("remote_prefiller", {"kv_request_id": "", '
                       '"remote_host": "h",\n'
                       '                                  "remote_port": 5710}),\n'
@@ -154137,11 +154142,10 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '\n'
                       '@pytest.mark.parametrize(\n'
                       '    "host",\n'
-                      '    ["10.0.0.1", "::1", "[::1]", "localhost", '
-                      '"prefill-0.svc.cluster.local",\n'
-                      '     "prefill_0"],\n'
+                      '    ["10.0.0.1", "localhost", "prefill-0.svc.cluster.local", '
+                      '"prefill_0"],\n'
                       ')\n'
-                      'def test_a_peer_host_is_an_address_or_a_host_name(host):\n'
+                      'def test_a_peer_host_is_an_ipv4_address_or_a_host_name(host):\n'
                       '    keys = _keys("OffloadingConnector", **_tiering({"type": '
                       '"p2p"}))\n'
                       '    peer = {"kv_request_id": "t", "remote_host": host, '
@@ -154149,6 +154153,51 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '    assert keys.shape_of("remote_kv_source").conforms(peer)\n'
                       '    assert keys.shape_of("remote_prefiller").conforms({**peer, '
                       '"remote_port": 65535})\n'
+                      '\n'
+                      '\n'
+                      '_PEER_HOSTS = [\n'
+                      '    "10.0.0.1", "1.2.3.4", "localhost", '
+                      '"prefill-0.svc.cluster.local", "prefill_0",\n'
+                      '    "h_", "h-", "_h", "_", "_.a", "a._b", "a.-b", "-h", "a b", '
+                      '"", "a..b",\n'
+                      '    "999.1.1.1", "a" * 64, "::1", "[::1]", "fe80::1",\n'
+                      ']\n'
+                      '\n'
+                      '\n'
+                      '@pytest.mark.parametrize("host", _PEER_HOSTS)\n'
+                      'def '
+                      'test_a_peer_host_admission_takes_is_one_the_transport_dials(host):\n'
+                      '    """Admission holds a P2P peer\'s host to what the tier\'s '
+                      'transport states it\n'
+                      '    can dial, ZmqTransport.dialable_host, the one definition of '
+                      'it: libzmq\n'
+                      '    accepts every host admitted, where its address check '
+                      'refuses the others\n'
+                      '    inside the engine core, and no IPv6 address is admitted, '
+                      'which the\n'
+                      '    transport\'s IPv4-only sockets never reach."""\n'
+                      '    import zmq\n'
+                      '\n'
+                      '    from vllm.v1.kv_offload.tiering.p2p.control.zmq import '
+                      'ZmqTransport\n'
+                      '\n'
+                      '    keys = _keys("OffloadingConnector", **_tiering({"type": '
+                      '"p2p"}))\n'
+                      '    peer = {"kv_request_id": "t", "remote_host": host, '
+                      '"remote_port": 5710}\n'
+                      '    admitted = '
+                      'keys.shape_of("remote_kv_source").conforms(peer)\n'
+                      '    assert admitted == ZmqTransport.dialable_host(host)\n'
+                      '    if not admitted:\n'
+                      '        return\n'
+                      '    assert ":" not in host\n'
+                      '    context = zmq.Context()\n'
+                      '    dealer = context.socket(zmq.DEALER)\n'
+                      '    try:\n'
+                      '        dealer.connect(f"tcp://{host}:5710")\n'
+                      '    finally:\n'
+                      '        dealer.close(linger=0)\n'
+                      '        context.term()\n'
                       '\n'
                       '\n'
                       '@pytest.mark.parametrize("kv_role", ["kv_producer", '
@@ -154894,7 +154943,9 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'request ran without\n'
                              '            # the transfer it named; the transport '
                              'refused the last three\n'
-                             '            # inside the engine core.\n'
+                             '            # inside the engine core (see also\n'
+                             '            # '
+                             'test_a_peer_host_admission_takes_is_one_the_transport_dials).\n'
                              '            ("remote_prefiller", {"kv_request_id": "", '
                              '"remote_host": "h",\n'
                              '                                  "remote_port": '
@@ -155001,12 +155052,11 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '\n'
                              '@pytest.mark.parametrize(\n'
                              '    "host",\n'
-                             '    ["10.0.0.1", "::1", "[::1]", "localhost", '
-                             '"prefill-0.svc.cluster.local",\n'
-                             '     "prefill_0"],\n'
+                             '    ["10.0.0.1", "localhost", '
+                             '"prefill-0.svc.cluster.local", "prefill_0"],\n'
                              ')\n'
                              'def '
-                             'test_a_peer_host_is_an_address_or_a_host_name(host):\n'
+                             'test_a_peer_host_is_an_ipv4_address_or_a_host_name(host):\n'
                              '    keys = _keys("OffloadingConnector", '
                              '**_tiering({"type": "p2p"}))\n'
                              '    peer = {"kv_request_id": "t", "remote_host": host, '
@@ -155016,6 +155066,51 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    assert '
                              'keys.shape_of("remote_prefiller").conforms({**peer, '
                              '"remote_port": 65535})\n'
+                             '\n'
+                             '\n'
+                             '_PEER_HOSTS = [\n'
+                             '    "10.0.0.1", "1.2.3.4", "localhost", '
+                             '"prefill-0.svc.cluster.local", "prefill_0",\n'
+                             '    "h_", "h-", "_h", "_", "_.a", "a._b", "a.-b", "-h", '
+                             '"a b", "", "a..b",\n'
+                             '    "999.1.1.1", "a" * 64, "::1", "[::1]", "fe80::1",\n'
+                             ']\n'
+                             '\n'
+                             '\n'
+                             '@pytest.mark.parametrize("host", _PEER_HOSTS)\n'
+                             'def '
+                             'test_a_peer_host_admission_takes_is_one_the_transport_dials(host):\n'
+                             '    """Admission holds a P2P peer\'s host to what the '
+                             "tier's transport states it\n"
+                             '    can dial, ZmqTransport.dialable_host, the one '
+                             'definition of it: libzmq\n'
+                             '    accepts every host admitted, where its address check '
+                             'refuses the others\n'
+                             '    inside the engine core, and no IPv6 address is '
+                             'admitted, which the\n'
+                             '    transport\'s IPv4-only sockets never reach."""\n'
+                             '    import zmq\n'
+                             '\n'
+                             '    from vllm.v1.kv_offload.tiering.p2p.control.zmq '
+                             'import ZmqTransport\n'
+                             '\n'
+                             '    keys = _keys("OffloadingConnector", '
+                             '**_tiering({"type": "p2p"}))\n'
+                             '    peer = {"kv_request_id": "t", "remote_host": host, '
+                             '"remote_port": 5710}\n'
+                             '    admitted = '
+                             'keys.shape_of("remote_kv_source").conforms(peer)\n'
+                             '    assert admitted == ZmqTransport.dialable_host(host)\n'
+                             '    if not admitted:\n'
+                             '        return\n'
+                             '    assert ":" not in host\n'
+                             '    context = zmq.Context()\n'
+                             '    dealer = context.socket(zmq.DEALER)\n'
+                             '    try:\n'
+                             '        dealer.connect(f"tcp://{host}:5710")\n'
+                             '    finally:\n'
+                             '        dealer.close(linger=0)\n'
+                             '        context.term()\n'
                              '\n'
                              '\n'
                              '@pytest.mark.parametrize("kv_role", ["kv_producer", '
@@ -155600,36 +155695,30 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'supports HMA.\n'},
             {'name': 'vllm/distributed/kv_transfer/kv_connector/v1/base.py:landmark-1',
              'path': 'vllm/distributed/kv_transfer/kv_connector/v1/base.py',
-             'before': '"""\n'
-                       '\n'
+             'before': '\n'
                        'import enum\n'
                        'from abc import ABC, abstractmethod\n'
                        'from collections.abc import Callable, Iterable\n'
                        'from typing import TYPE_CHECKING, Any, Literal\n'
                        '\n'
                        'import torch\n',
-             'after': '"""\n'
-                      '\n'
+             'after': '\n'
                       'import enum\n'
-                      'import ipaddress\n'
                       'from abc import ABC, abstractmethod\n'
                       'from collections.abc import Callable, Iterable, Mapping\n'
                       'from dataclasses import dataclass, field, replace\n'
                       'from typing import TYPE_CHECKING, Any, Literal\n'
                       '\n'
                       'import torch\n',
-             'review_before': '"""\n'
-                              '\n'
+             'review_before': '\n'
                               'import enum\n'
                               'from abc import ABC, abstractmethod\n'
                               'from collections.abc import Callable, Iterable\n'
                               'from typing import TYPE_CHECKING, Any, Literal\n'
                               '\n'
                               'import torch\n',
-             'review_after': '"""\n'
-                             '\n'
+             'review_after': '\n'
                              'import enum\n'
-                             'import ipaddress\n'
                              'from abc import ABC, abstractmethod\n'
                              'from collections.abc import Callable, Iterable, Mapping\n'
                              'from dataclasses import dataclass, field, replace\n'
@@ -155735,32 +155824,6 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       ')\n'
                       '\n'
                       '\n'
-                      'def _names_a_host(value: object) -> bool:\n'
-                      '    """An IP address -- an IPv6 one bracketed or not -- or a '
-                      'host name of\n'
-                      "    dot-separated labels of ASCII letters, digits, '-' and '_', "
-                      'none empty and\n'
-                      "    none beginning with '-': what a peer address can "
-                      'name."""\n'
-                      '    if type(value) is not str or not value.isascii():\n'
-                      '        return False\n'
-                      '    literal = value[1:-1] if value.startswith("[") and '
-                      'value.endswith("]") else value\n'
-                      '    try:\n'
-                      '        ipaddress.ip_address(literal)\n'
-                      '        return True\n'
-                      '    except ValueError:\n'
-                      '        pass\n'
-                      '    return 0 < len(value) <= 253 and all(\n'
-                      '        label\n'
-                      '        and not label.startswith("-")\n'
-                      '        and all(char.isalnum() or char in "-_" for char in '
-                      'label)\n'
-                      '        for label in value.split(".")\n'
-                      '    )\n'
-                      '\n'
-                      '\n'
-                      'HOST = _shape("a host name or an IP address", _names_a_host)\n'
                       'INTEGER_OR_DIGITS = _shape(\n'
                       '    "an integer or a string of its decimal digits",\n'
                       '    lambda value: type(value) is int\n'
@@ -156066,33 +156129,6 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              ')\n'
                              '\n'
                              '\n'
-                             'def _names_a_host(value: object) -> bool:\n'
-                             '    """An IP address -- an IPv6 one bracketed or not -- '
-                             'or a host name of\n'
-                             "    dot-separated labels of ASCII letters, digits, '-' "
-                             "and '_', none empty and\n"
-                             "    none beginning with '-': what a peer address can "
-                             'name."""\n'
-                             '    if type(value) is not str or not value.isascii():\n'
-                             '        return False\n'
-                             '    literal = value[1:-1] if value.startswith("[") and '
-                             'value.endswith("]") else value\n'
-                             '    try:\n'
-                             '        ipaddress.ip_address(literal)\n'
-                             '        return True\n'
-                             '    except ValueError:\n'
-                             '        pass\n'
-                             '    return 0 < len(value) <= 253 and all(\n'
-                             '        label\n'
-                             '        and not label.startswith("-")\n'
-                             '        and all(char.isalnum() or char in "-_" for char '
-                             'in label)\n'
-                             '        for label in value.split(".")\n'
-                             '    )\n'
-                             '\n'
-                             '\n'
-                             'HOST = _shape("a host name or an IP address", '
-                             '_names_a_host)\n'
                              'INTEGER_OR_DIGITS = _shape(\n'
                              '    "an integer or a string of its decimal digits",\n'
                              '    lambda value: type(value) is int\n'
@@ -159002,9 +159038,9 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       'import vllm.envs as envs\n'
                       'from vllm.distributed.kv_transfer.kv_connector.v1.base import '
                       '(\n'
-                      '    HOST,\n'
                       '    NON_EMPTY_STRING,\n'
                       '    PORT,\n'
+                      '    KVTransferParamShape,\n'
                       '    KVTransferParamsKeys,\n'
                       '    object_with,\n'
                       ')\n'
@@ -159022,9 +159058,9 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'import vllm.envs as envs\n'
                              'from vllm.distributed.kv_transfer.kv_connector.v1.base '
                              'import (\n'
-                             '    HOST,\n'
                              '    NON_EMPTY_STRING,\n'
                              '    PORT,\n'
+                             '    KVTransferParamShape,\n'
                              '    KVTransferParamsKeys,\n'
                              '    object_with,\n'
                              ')\n'
@@ -159219,15 +159255,23 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       'port 0 as no peer,\n'
                       '        # so the request ran without the transfer it named, and '
                       "the tier's\n"
-                      '        # transport refused a negative port or a host its '
-                      'address grammar\n'
-                      '        # does not take inside the engine core; each field is a '
-                      'value the\n'
-                      '        # peer address and session can be.\n'
+                      '        # transport refused a negative port inside the engine '
+                      'core; each field\n'
+                      '        # is a value the peer address and session can be. The '
+                      'host is one the\n'
+                      "        # tier's transport can dial, as the transport itself "
+                      'states it\n'
+                      '        # (ZmqTransport.dialable_host): libzmq refused the rest '
+                      'inside the\n'
+                      '        # engine core, and an IPv6 address the transport never '
+                      'reaches.\n'
                       '        peer = object_with(\n'
                       '            {\n'
                       '                "kv_request_id": NON_EMPTY_STRING,\n'
-                      '                "remote_host": HOST,\n'
+                      '                "remote_host": KVTransferParamShape(\n'
+                      '                    "a host name or an IPv4 address", '
+                      'ZmqTransport.dialable_host\n'
+                      '                ),\n'
                       '                "remote_port": PORT,\n'
                       '            },\n'
                       '            required=("kv_request_id", "remote_host", '
@@ -159290,15 +159334,23 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'host or port 0 as no peer,\n'
                              '        # so the request ran without the transfer it '
                              "named, and the tier's\n"
-                             '        # transport refused a negative port or a host '
-                             'its address grammar\n'
-                             '        # does not take inside the engine core; each '
-                             'field is a value the\n'
-                             '        # peer address and session can be.\n'
+                             '        # transport refused a negative port inside the '
+                             'engine core; each field\n'
+                             '        # is a value the peer address and session can '
+                             'be. The host is one the\n'
+                             "        # tier's transport can dial, as the transport "
+                             'itself states it\n'
+                             '        # (ZmqTransport.dialable_host): libzmq refused '
+                             'the rest inside the\n'
+                             '        # engine core, and an IPv6 address the transport '
+                             'never reaches.\n'
                              '        peer = object_with(\n'
                              '            {\n'
                              '                "kv_request_id": NON_EMPTY_STRING,\n'
-                             '                "remote_host": HOST,\n'
+                             '                "remote_host": KVTransferParamShape(\n'
+                             '                    "a host name or an IPv4 address", '
+                             'ZmqTransport.dialable_host\n'
+                             '                ),\n'
                              '                "remote_port": PORT,\n'
                              '            },\n'
                              '            required=("kv_request_id", "remote_host", '
@@ -159461,7 +159513,202 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'CPUOffloadingSpec.EXTRA_CONFIG_KEYS | {\n'
                              '        "secondary_tiers",\n'
                              '        # Host byte-layout request, certified at worker '
-                             'registration.\n'})},
+                             'registration.\n'},
+            {'name': 'vllm/v1/kv_offload/tiering/p2p/control/zmq.py:landmark-1',
+             'path': 'vllm/v1/kv_offload/tiering/p2p/control/zmq.py',
+             'before': '\n'
+                       'from __future__ import annotations\n'
+                       '\n'
+                       'from collections.abc import Sequence\n'
+                       'from dataclasses import dataclass\n'
+                       '\n'
+                       'import msgspec\n'
+                       'import zmq\n'
+                       'import zmq.utils.monitor\n'
+                       '\n',
+             'after': '\n'
+                      'from __future__ import annotations\n'
+                      '\n'
+                      'import ipaddress\n'
+                      'from collections.abc import Sequence\n'
+                      'from dataclasses import dataclass\n'
+                      '\n'
+                      'import msgspec\n'
+                      'import regex as re\n'
+                      'import zmq\n'
+                      'import zmq.utils.monitor\n'
+                      '\n',
+             'review_before': '\n'
+                              'from __future__ import annotations\n'
+                              '\n'
+                              'from collections.abc import Sequence\n'
+                              'from dataclasses import dataclass\n'
+                              '\n'
+                              'import msgspec\n'
+                              'import zmq\n'
+                              'import zmq.utils.monitor\n'
+                              '\n',
+             'review_after': '\n'
+                             'from __future__ import annotations\n'
+                             '\n'
+                             'import ipaddress\n'
+                             'from collections.abc import Sequence\n'
+                             'from dataclasses import dataclass\n'
+                             '\n'
+                             'import msgspec\n'
+                             'import regex as re\n'
+                             'import zmq\n'
+                             'import zmq.utils.monitor\n'
+                             '\n'},
+            {'name': 'vllm/v1/kv_offload/tiering/p2p/control/zmq.py:landmark-2',
+             'path': 'vllm/v1/kv_offload/tiering/p2p/control/zmq.py',
+             'before': '    return f"tcp://{host}:{port}"\n'
+                       '\n'
+                       '\n'
+                       'def _apply_heartbeat(sock: zmq.Socket) -> None:\n'
+                       '    sock.setsockopt(zmq.HEARTBEAT_IVL, _HEARTBEAT_IVL_MS)\n'
+                       '    sock.setsockopt(zmq.HEARTBEAT_TIMEOUT, '
+                       '_HEARTBEAT_TIMEOUT_MS)\n',
+             'after': '    return f"tcp://{host}:{port}"\n'
+                      '\n'
+                      '\n'
+                      "# One label of a host name: 1 to 63 ASCII letters, digits, '-' "
+                      "and '_',\n"
+                      '# beginning and ending with a letter or digit.\n'
+                      '_HOST_LABEL = '
+                      're.compile(r"[A-Za-z0-9](?:[A-Za-z0-9_-]{0,61}[A-Za-z0-9])?")\n'
+                      '\n'
+                      '\n'
+                      'def _apply_heartbeat(sock: zmq.Socket) -> None:\n'
+                      '    sock.setsockopt(zmq.HEARTBEAT_IVL, _HEARTBEAT_IVL_MS)\n'
+                      '    sock.setsockopt(zmq.HEARTBEAT_TIMEOUT, '
+                      '_HEARTBEAT_TIMEOUT_MS)\n',
+             'review_before': '    return f"tcp://{host}:{port}"\n'
+                              '\n'
+                              '\n'
+                              'def _apply_heartbeat(sock: zmq.Socket) -> None:\n'
+                              '    sock.setsockopt(zmq.HEARTBEAT_IVL, '
+                              '_HEARTBEAT_IVL_MS)\n'
+                              '    sock.setsockopt(zmq.HEARTBEAT_TIMEOUT, '
+                              '_HEARTBEAT_TIMEOUT_MS)\n',
+             'review_after': '    return f"tcp://{host}:{port}"\n'
+                             '\n'
+                             '\n'
+                             '# One label of a host name: 1 to 63 ASCII letters, '
+                             "digits, '-' and '_',\n"
+                             '# beginning and ending with a letter or digit.\n'
+                             '_HOST_LABEL = '
+                             're.compile(r"[A-Za-z0-9](?:[A-Za-z0-9_-]{0,61}[A-Za-z0-9])?")\n'
+                             '\n'
+                             '\n'
+                             'def _apply_heartbeat(sock: zmq.Socket) -> None:\n'
+                             '    sock.setsockopt(zmq.HEARTBEAT_IVL, '
+                             '_HEARTBEAT_IVL_MS)\n'
+                             '    sock.setsockopt(zmq.HEARTBEAT_TIMEOUT, '
+                             '_HEARTBEAT_TIMEOUT_MS)\n'},
+            {'name': 'vllm/v1/kv_offload/tiering/p2p/control/zmq.py:landmark-3',
+             'path': 'vllm/v1/kv_offload/tiering/p2p/control/zmq.py',
+             'before': '    # ZmqConnection lifecycle\n'
+                       '    # '
+                       '------------------------------------------------------------------\n'
+                       '\n'
+                       '    def connect(self, peer_id: str) -> ZmqConnection:\n'
+                       '        """Open an outbound connection to a remote peer.\n'
+                       '\n',
+             'after': '    # ZmqConnection lifecycle\n'
+                      '    # '
+                      '------------------------------------------------------------------\n'
+                      '\n'
+                      '    @staticmethod\n'
+                      '    def dialable_host(host: object) -> bool:\n'
+                      '        """Whether this transport can dial a peer at *host*: an '
+                      'IPv4 address,\n'
+                      '        or a host name of dot-separated labels '
+                      '(``_HOST_LABEL``), the last\n'
+                      '        not all digits, 253 characters at most.\n'
+                      '\n'
+                      '        libzmq refuses a connect address whose first character '
+                      'is not a\n'
+                      "        letter, a digit, '[' or ':', synchronously, in the "
+                      "caller's thread --\n"
+                      "        the engine core's, for a peer a request names -- and "
+                      'these sockets\n'
+                      '        never set ZMQ_IPV6, so they dial IPv4 only and an IPv6 '
+                      'address is no\n'
+                      "        peer they reach. A request's peer is admitted only with "
+                      'a host this\n'
+                      "        takes (the P2P tier's "
+                      '``get_kv_transfer_params_keys``).\n'
+                      '        """\n'
+                      '        if type(host) is not str or not host.isascii():\n'
+                      '            return False\n'
+                      '        try:\n'
+                      '            return ipaddress.ip_address(host).version == 4\n'
+                      '        except ValueError:\n'
+                      '            pass\n'
+                      '        labels = host.split(".")\n'
+                      '        return (\n'
+                      '            len(host) <= 253\n'
+                      '            and all(_HOST_LABEL.fullmatch(label) for label in '
+                      'labels)\n'
+                      '            and not labels[-1].isdigit()\n'
+                      '        )\n'
+                      '\n'
+                      '    def connect(self, peer_id: str) -> ZmqConnection:\n'
+                      '        """Open an outbound connection to a remote peer.\n'
+                      '\n',
+             'review_before': '    # ZmqConnection lifecycle\n'
+                              '    # '
+                              '------------------------------------------------------------------\n'
+                              '\n'
+                              '    def connect(self, peer_id: str) -> ZmqConnection:\n'
+                              '        """Open an outbound connection to a remote '
+                              'peer.\n'
+                              '\n',
+             'review_after': '    # ZmqConnection lifecycle\n'
+                             '    # '
+                             '------------------------------------------------------------------\n'
+                             '\n'
+                             '    @staticmethod\n'
+                             '    def dialable_host(host: object) -> bool:\n'
+                             '        """Whether this transport can dial a peer at '
+                             '*host*: an IPv4 address,\n'
+                             '        or a host name of dot-separated labels '
+                             '(``_HOST_LABEL``), the last\n'
+                             '        not all digits, 253 characters at most.\n'
+                             '\n'
+                             '        libzmq refuses a connect address whose first '
+                             'character is not a\n'
+                             "        letter, a digit, '[' or ':', synchronously, in "
+                             "the caller's thread --\n"
+                             "        the engine core's, for a peer a request names -- "
+                             'and these sockets\n'
+                             '        never set ZMQ_IPV6, so they dial IPv4 only and '
+                             'an IPv6 address is no\n'
+                             "        peer they reach. A request's peer is admitted "
+                             'only with a host this\n'
+                             "        takes (the P2P tier's "
+                             '``get_kv_transfer_params_keys``).\n'
+                             '        """\n'
+                             '        if type(host) is not str or not host.isascii():\n'
+                             '            return False\n'
+                             '        try:\n'
+                             '            return ipaddress.ip_address(host).version == '
+                             '4\n'
+                             '        except ValueError:\n'
+                             '            pass\n'
+                             '        labels = host.split(".")\n'
+                             '        return (\n'
+                             '            len(host) <= 253\n'
+                             '            and all(_HOST_LABEL.fullmatch(label) for '
+                             'label in labels)\n'
+                             '            and not labels[-1].isdigit()\n'
+                             '        )\n'
+                             '\n'
+                             '    def connect(self, peer_id: str) -> ZmqConnection:\n'
+                             '        """Open an outbound connection to a remote '
+                             'peer.\n'
+                             '\n'})},
  {'name': 'responses-refuses-tools-the-template-is-never-given',
   'review_patch': 'patches/vllm-responses-refuses-tools-the-template-is-never-given.patch',
   'review_sha256': '5c3106c820032060101e732329f2d234c9c3c84bcd5e21c4e05ebf55679aecd2',
@@ -176137,7 +176384,7 @@ FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5d
  'tests/v1/kv_connector/unit/offloading_connector/test_worker.py': 'b8e5d70410134842f12a6a5274e3a60cf423549bd45ae923311fcbc618da6805',
  'tests/v1/kv_connector/unit/test_config.py': '2cf96896c553f9baac251f14a86bb41291842c36992ae91a15402e3d586ba349',
  'tests/v1/kv_connector/unit/test_hma_auto_config.py': '3b9bec3a98b2ee5dca12a315a58307389f517c850c7ce30eb26ce9f8ec305588',
- 'tests/v1/kv_connector/unit/test_kv_transfer_params_keys.py': '29d9d5190db6c803813aaa4f5926282c430a22fdb1e31f47e4b20b7407fa333e',
+ 'tests/v1/kv_connector/unit/test_kv_transfer_params_keys.py': 'e50a952ca2b176aa4bec0a7de05cb6a4281d2463a6972ad4f271df5831e42bc6',
  'tests/v1/kv_connector/unit/test_offloading_connector.py': '664a830528faf8d69dfe361c57176a834b204383383683890b6ba63164013ea9',
  'tests/v1/kv_offload/cpu/test_manager.py': '1dea9c01dc15292db00ad856b0c4eade9ed4bd65bbf01620e72234b80ba991ab',
  'tests/v1/kv_offload/test_factory.py': '0debbb44dca2a75026823a66463c247a1dcbcd6aa73e5d9982d45ad75f5ebf3f',
@@ -176162,7 +176409,7 @@ FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5d
  'vllm/config/reasoning.py': '29a3bb76af99f67a7706f365fbcd3362205ef8af9db46b7f167374e68f8146ae',
  'vllm/config/vllm.py': '29e7d85b058d1d6be39597fee1ac1f1405babe0aa861334042f7199b1d9f6419',
  'vllm/distributed/kv_transfer/kv_connector/factory.py': '81a1025b6c3a89b301d102549e0576fc4d1639e3efe1a1f8c3ecffc8fde356bf',
- 'vllm/distributed/kv_transfer/kv_connector/v1/base.py': 'f27bb16f2c8cccc86dc9ad20d3f9b4a8ff0a525ebb53ea33df4418e1463f7b3a',
+ 'vllm/distributed/kv_transfer/kv_connector/v1/base.py': '69ba8adf653f385f5ca99e3e0c0e15147008de513f97bd09cf3ab19573b2b848',
  'vllm/distributed/kv_transfer/kv_connector/v1/example_hidden_states_connector.py': 'd28da3cdafd53a29686d4b63a2b151d17ccde609ce7c58965127f7ac21ff83ca',
  'vllm/distributed/kv_transfer/kv_connector/v1/lmcache_connector.py': 'c1c6f1d757b67bd76c14b41886f94bdc2e24036fdf9d80e75dc2cbf236f64583',
  'vllm/distributed/kv_transfer/kv_connector/v1/lmcache_mp_connector.py': '3370a40b0ed33f00870e27d75e07423d25148e29d8d4a089511d1f37693645bd',
@@ -176283,7 +176530,8 @@ FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5d
  'vllm/v1/kv_offload/cpu/spec.py': '87c0a6cc2560ab6e4203b17eacd87deb8c4dafe4185daf0fdd0770cfdb4bb25b',
  'vllm/v1/kv_offload/tiering/base.py': 'd598f2ed12385ca8cfaeabdce4a304bcbbc88d1f8b8468c73f6397260de7f0f5',
  'vllm/v1/kv_offload/tiering/manager.py': 'b63a0d85d3cff32a27f82ebc9df6749cf2e64e6fe439dcae7adad00000817a13',
- 'vllm/v1/kv_offload/tiering/p2p/manager.py': '2985232a0ac6448a086bb2bc14fd3cf4419f8840cbd3ca01fbae01314c7ee9e4',
+ 'vllm/v1/kv_offload/tiering/p2p/control/zmq.py': 'abc4c162720cd762e7e6cd205807753cce315ca79990685531fedbf2c66e2b39',
+ 'vllm/v1/kv_offload/tiering/p2p/manager.py': '93cec15e9329c2a77419008f7f0209ad24fbfb07d1685128f0782f79edf20afb',
  'vllm/v1/kv_offload/tiering/spec.py': '772f19230d5ebecae44ae06538589a51f0f204d320325b7745bfe43767199fe1',
  'vllm/v1/request.py': '3c84a41a030aa2d09d329ec63ee6c4527c80043b1f4abb8d85a8cf132cfeea21',
  'vllm/v1/sample/thinking_budget_state.py': '2de2bd4623f27a3f610c9f84b37cab0a9fb17d4da7574748994d4e209d89cb07',

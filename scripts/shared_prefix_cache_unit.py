@@ -342,14 +342,20 @@ def check_kv_transfer_values_are_read_with_their_companions():
             'string') in message, message
     # An empty request ID or host, or port 0, is no peer to the tier's parsers,
     # which ran the request without the transfer it named; a negative port or
-    # a host outside the transport's grammar raised inside the engine core.
+    # a host libzmq's address check refuses raised inside the engine core, and
+    # an IPv6 address is one the transport's IPv4-only sockets never reach.
     for field, value in (('kv_request_id', ''), ('remote_host', ''), ('remote_port', 0)):
         params = {'remote_prefiller': {**peer, field: value}}
         refusal(p2p, kv_transfer_params=params)
         assert _parse_source(params) is None, params
-    for field, value in (('remote_port', -1), ('remote_host', 'a b')):
-        refusal(p2p, kv_transfer_params={'remote_kv_source': {**peer, field: value}})
-    admit(p2p, kv_transfer_params={'remote_kv_source': {**peer, 'remote_host': '[::1]'}})
+    for field, value in (('remote_port', -1), ('remote_host', 'a b'),
+                         ('remote_host', '_h'), ('remote_host', '[::1]')):
+        message = refusal(
+            p2p, kv_transfer_params={'remote_kv_source': {**peer, field: value}})
+        if field == 'remote_host':
+            assert 'remote_host is a host name or an IPv4 address' in message, message
+    admit(p2p, kv_transfer_params={
+        'remote_kv_source': {**peer, 'remote_host': 'prefill-0.svc.cluster.local'}})
     assert _parse_dest({'remote_decoder': {}}).kv_request_id is None
     other = {**peer, 'kv_request_id': 'other'}
     for beside, value in (('remote_kv_source', other),

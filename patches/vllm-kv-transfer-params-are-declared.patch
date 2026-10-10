@@ -434,10 +434,10 @@ index 0000000000000000000000000000000000000000..8919f30dbb52525ef1e2b81e76f3c0e2
 +    )
 diff --git a/tests/v1/kv_connector/unit/test_kv_transfer_params_keys.py b/tests/v1/kv_connector/unit/test_kv_transfer_params_keys.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..8fb8ee40402392af14a93e584782d1072fa711d8
+index 0000000000000000000000000000000000000000..af813276d86e184ff2fd2a3dabd0f75ac5a3f2a7
 --- /dev/null
 +++ b/tests/v1/kv_connector/unit/test_kv_transfer_params_keys.py
-@@ -0,0 +1,682 @@
+@@ -0,0 +1,716 @@
 +# SPDX-License-Identifier: Apache-2.0
 +# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
 +"""Each KV connector declares the request ``kv_transfer_params`` keys its
@@ -648,7 +648,8 @@ index 0000000000000000000000000000000000000000..8fb8ee40402392af14a93e584782d107
 +            ("remote_decoder", {}),
 +            # The parsers read these as no peer, and the request ran without
 +            # the transfer it named; the transport refused the last three
-+            # inside the engine core.
++            # inside the engine core (see also
++            # test_a_peer_host_admission_takes_is_one_the_transport_dials).
 +            ("remote_prefiller", {"kv_request_id": "", "remote_host": "h",
 +                                  "remote_port": 5710}),
 +            ("remote_decoder", {"kv_request_id": ""}),
@@ -741,14 +742,47 @@ index 0000000000000000000000000000000000000000..8fb8ee40402392af14a93e584782d107
 +
 +@pytest.mark.parametrize(
 +    "host",
-+    ["10.0.0.1", "::1", "[::1]", "localhost", "prefill-0.svc.cluster.local",
-+     "prefill_0"],
++    ["10.0.0.1", "localhost", "prefill-0.svc.cluster.local", "prefill_0"],
 +)
-+def test_a_peer_host_is_an_address_or_a_host_name(host):
++def test_a_peer_host_is_an_ipv4_address_or_a_host_name(host):
 +    keys = _keys("OffloadingConnector", **_tiering({"type": "p2p"}))
 +    peer = {"kv_request_id": "t", "remote_host": host, "remote_port": 1}
 +    assert keys.shape_of("remote_kv_source").conforms(peer)
 +    assert keys.shape_of("remote_prefiller").conforms({**peer, "remote_port": 65535})
++
++
++_PEER_HOSTS = [
++    "10.0.0.1", "1.2.3.4", "localhost", "prefill-0.svc.cluster.local", "prefill_0",
++    "h_", "h-", "_h", "_", "_.a", "a._b", "a.-b", "-h", "a b", "", "a..b",
++    "999.1.1.1", "a" * 64, "::1", "[::1]", "fe80::1",
++]
++
++
++@pytest.mark.parametrize("host", _PEER_HOSTS)
++def test_a_peer_host_admission_takes_is_one_the_transport_dials(host):
++    """Admission holds a P2P peer's host to what the tier's transport states it
++    can dial, ZmqTransport.dialable_host, the one definition of it: libzmq
++    accepts every host admitted, where its address check refuses the others
++    inside the engine core, and no IPv6 address is admitted, which the
++    transport's IPv4-only sockets never reach."""
++    import zmq
++
++    from vllm.v1.kv_offload.tiering.p2p.control.zmq import ZmqTransport
++
++    keys = _keys("OffloadingConnector", **_tiering({"type": "p2p"}))
++    peer = {"kv_request_id": "t", "remote_host": host, "remote_port": 5710}
++    admitted = keys.shape_of("remote_kv_source").conforms(peer)
++    assert admitted == ZmqTransport.dialable_host(host)
++    if not admitted:
++        return
++    assert ":" not in host
++    context = zmq.Context()
++    dealer = context.socket(zmq.DEALER)
++    try:
++        dealer.connect(f"tcp://{host}:5710")
++    finally:
++        dealer.close(linger=0)
++        context.term()
 +
 +
 +@pytest.mark.parametrize("kv_role", ["kv_producer", "kv_consumer", "kv_both"])
@@ -1151,14 +1185,12 @@ index aad7999d08a2a76392d1419f2cf1df6fc1a23127..99d3fbd51e9e5b67959b4ee95bb0aa19
      def supports_hma_config(cls, kv_transfer_config: "KVTransferConfig") -> bool:
          """Return whether this KV transfer config supports HMA.
 diff --git a/vllm/distributed/kv_transfer/kv_connector/v1/base.py b/vllm/distributed/kv_transfer/kv_connector/v1/base.py
-index e49dbebb1234de82221d9274d889376af8825e99..c359c343856a0acd2299b3c8d62266fb5d5cb50e 100644
+index e49dbebb1234de82221d9274d889376af8825e99..9c005196344808265080079a825f44778767184d 100644
 --- a/vllm/distributed/kv_transfer/kv_connector/v1/base.py
 +++ b/vllm/distributed/kv_transfer/kv_connector/v1/base.py
-@@ -41,8 +41,10 @@ The class provides the following primitives:
- """
+@@ -42,7 +42,8 @@ The class provides the following primitives:
  
  import enum
-+import ipaddress
  from abc import ABC, abstractmethod
 -from collections.abc import Callable, Iterable
 +from collections.abc import Callable, Iterable, Mapping
@@ -1166,7 +1198,7 @@ index e49dbebb1234de82221d9274d889376af8825e99..c359c343856a0acd2299b3c8d62266fb
  from typing import TYPE_CHECKING, Any, Literal
  
  import torch
-@@ -168,6 +170,244 @@ class KVConnectorWorkerMetadata(ABC):
+@@ -168,6 +169,223 @@ class KVConnectorWorkerMetadata(ABC):
          pass
  
  
@@ -1235,27 +1267,6 @@ index e49dbebb1234de82221d9274d889376af8825e99..c359c343856a0acd2299b3c8d62266fb
 +)
 +
 +
-+def _names_a_host(value: object) -> bool:
-+    """An IP address -- an IPv6 one bracketed or not -- or a host name of
-+    dot-separated labels of ASCII letters, digits, '-' and '_', none empty and
-+    none beginning with '-': what a peer address can name."""
-+    if type(value) is not str or not value.isascii():
-+        return False
-+    literal = value[1:-1] if value.startswith("[") and value.endswith("]") else value
-+    try:
-+        ipaddress.ip_address(literal)
-+        return True
-+    except ValueError:
-+        pass
-+    return 0 < len(value) <= 253 and all(
-+        label
-+        and not label.startswith("-")
-+        and all(char.isalnum() or char in "-_" for char in label)
-+        for label in value.split(".")
-+    )
-+
-+
-+HOST = _shape("a host name or an IP address", _names_a_host)
 +INTEGER_OR_DIGITS = _shape(
 +    "an integer or a string of its decimal digits",
 +    lambda value: type(value) is int
@@ -1411,7 +1422,7 @@ index e49dbebb1234de82221d9274d889376af8825e99..c359c343856a0acd2299b3c8d62266fb
  class KVConnectorBase_V1(ABC):
      """
      Base class for KV connectors.
-@@ -607,6 +847,24 @@ class KVConnectorBase_V1(ABC):
+@@ -607,6 +825,24 @@ class KVConnectorBase_V1(ABC):
          # scheduler alive (e.g. extend has_unfinished_requests).
          return False
  
@@ -2295,7 +2306,7 @@ index 768d7e328ad7ba4b59b9d3bcc2752a1ad1ba52fe..3e79316fdfd360c83a6e611382212cd7
          """Return and reset metric observations collected by this tier."""
          return None
 diff --git a/vllm/v1/kv_offload/tiering/p2p/manager.py b/vllm/v1/kv_offload/tiering/p2p/manager.py
-index f76ed59b5c7823ace2505b2fb4936c7adfa10952..9547e6a64a483946db75fa19ee6709424f3c86be 100644
+index f76ed59b5c7823ace2505b2fb4936c7adfa10952..0e8a2ad3cc36d4f75b7049f1bc906ddf152edfe2 100644
 --- a/vllm/v1/kv_offload/tiering/p2p/manager.py
 +++ b/vllm/v1/kv_offload/tiering/p2p/manager.py
 @@ -18,6 +18,13 @@ from typing import TYPE_CHECKING, Any
@@ -2303,9 +2314,9 @@ index f76ed59b5c7823ace2505b2fb4936c7adfa10952..9547e6a64a483946db75fa19ee670942
  
  import vllm.envs as envs
 +from vllm.distributed.kv_transfer.kv_connector.v1.base import (
-+    HOST,
 +    NON_EMPTY_STRING,
 +    PORT,
++    KVTransferParamShape,
 +    KVTransferParamsKeys,
 +    object_with,
 +)
@@ -2351,7 +2362,7 @@ index f76ed59b5c7823ace2505b2fb4936c7adfa10952..9547e6a64a483946db75fa19ee670942
  
  
  def _peer_id_from_params(role_params: dict) -> str | None:
-@@ -198,6 +210,46 @@ class P2PSecondaryTierManager(SecondaryTierManager):
+@@ -198,6 +210,50 @@ class P2PSecondaryTierManager(SecondaryTierManager):
      and existing sessions are polled even when no requests are scheduled.
      """
  
@@ -2372,13 +2383,17 @@ index f76ed59b5c7823ace2505b2fb4936c7adfa10952..9547e6a64a483946db75fa19ee670942
 +        # beside it. A prefill producer may also pull from a source. The
 +        # parsers read an empty request ID, an empty host or port 0 as no peer,
 +        # so the request ran without the transfer it named, and the tier's
-+        # transport refused a negative port or a host its address grammar
-+        # does not take inside the engine core; each field is a value the
-+        # peer address and session can be.
++        # transport refused a negative port inside the engine core; each field
++        # is a value the peer address and session can be. The host is one the
++        # tier's transport can dial, as the transport itself states it
++        # (ZmqTransport.dialable_host): libzmq refused the rest inside the
++        # engine core, and an IPv6 address the transport never reaches.
 +        peer = object_with(
 +            {
 +                "kv_request_id": NON_EMPTY_STRING,
-+                "remote_host": HOST,
++                "remote_host": KVTransferParamShape(
++                    "a host name or an IPv4 address", ZmqTransport.dialable_host
++                ),
 +                "remote_port": PORT,
 +            },
 +            required=("kv_request_id", "remote_host", "remote_port"),
@@ -2444,3 +2459,65 @@ index 4eb1caa132803b891c6e1d27ca74f51caadfe0f3..6fe5cdd220144f840c49a60519bb0d67
      EXTRA_CONFIG_KEYS: frozenset[str] = CPUOffloadingSpec.EXTRA_CONFIG_KEYS | {
          "secondary_tiers",
          # Host byte-layout request, certified at worker registration.
+diff --git a/vllm/v1/kv_offload/tiering/p2p/control/zmq.py b/vllm/v1/kv_offload/tiering/p2p/control/zmq.py
+index 42dc2c69846bfb52c5a1fb99f192ec6bc2f42813..bd5c78506acd397ca554c6837101af11d540b4b3 100644
+--- a/vllm/v1/kv_offload/tiering/p2p/control/zmq.py
++++ b/vllm/v1/kv_offload/tiering/p2p/control/zmq.py
+@@ -9,10 +9,12 @@ management). Message-content agnostic.
+ 
+ from __future__ import annotations
+ 
++import ipaddress
+ from collections.abc import Sequence
+ from dataclasses import dataclass
+ 
+ import msgspec
++import regex as re
+ import zmq
+ import zmq.utils.monitor
+ 
+@@ -37,6 +39,11 @@ def _tcp_addr(host: str, port: int | str) -> str:
+     return f"tcp://{host}:{port}"
+ 
+ 
++# One label of a host name: 1 to 63 ASCII letters, digits, '-' and '_',
++# beginning and ending with a letter or digit.
++_HOST_LABEL = re.compile(r"[A-Za-z0-9](?:[A-Za-z0-9_-]{0,61}[A-Za-z0-9])?")
++
++
+ def _apply_heartbeat(sock: zmq.Socket) -> None:
+     sock.setsockopt(zmq.HEARTBEAT_IVL, _HEARTBEAT_IVL_MS)
+     sock.setsockopt(zmq.HEARTBEAT_TIMEOUT, _HEARTBEAT_TIMEOUT_MS)
+@@ -138,6 +145,32 @@ class ZmqTransport(ControlTransport):
+     # ZmqConnection lifecycle
+     # ------------------------------------------------------------------
+ 
++    @staticmethod
++    def dialable_host(host: object) -> bool:
++        """Whether this transport can dial a peer at *host*: an IPv4 address,
++        or a host name of dot-separated labels (``_HOST_LABEL``), the last
++        not all digits, 253 characters at most.
++
++        libzmq refuses a connect address whose first character is not a
++        letter, a digit, '[' or ':', synchronously, in the caller's thread --
++        the engine core's, for a peer a request names -- and these sockets
++        never set ZMQ_IPV6, so they dial IPv4 only and an IPv6 address is no
++        peer they reach. A request's peer is admitted only with a host this
++        takes (the P2P tier's ``get_kv_transfer_params_keys``).
++        """
++        if type(host) is not str or not host.isascii():
++            return False
++        try:
++            return ipaddress.ip_address(host).version == 4
++        except ValueError:
++            pass
++        labels = host.split(".")
++        return (
++            len(host) <= 253
++            and all(_HOST_LABEL.fullmatch(label) for label in labels)
++            and not labels[-1].isdigit()
++        )
++
+     def connect(self, peer_id: str) -> ZmqConnection:
+         """Open an outbound connection to a remote peer.
+ 

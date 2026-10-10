@@ -4837,7 +4837,8 @@ def _validate_kv_transfer_params_keys_after(state: State) -> None:
         "test_a_multi_connector_reads_a_value_with_what_its_children_read_it_with": None,
         "test_a_remote_prefill_requires_every_key_its_connector_indexes_for_it": None,
         "test_a_hidden_states_path_is_taken_only_where_custom_paths_are_allowed": None,
-        "test_a_peer_host_is_an_address_or_a_host_name": ("host",),
+        "test_a_peer_host_is_an_ipv4_address_or_a_host_name": ("host",),
+        "test_a_peer_host_admission_takes_is_one_the_transport_dials": ("host",),
         "test_a_mooncake_node_is_refused_what_its_role_never_does": ("kv_role",),
     }, label=label)
     # A value a connector reads inside the engine core is held to the values
@@ -4845,26 +4846,34 @@ def _validate_kv_transfer_params_keys_after(state: State) -> None:
     # (the parsers read empty ones as no peer, the transport refused the rest
     # in the engine core), a NIXL block-ID list (one per KV cache group), and
     # the remote action a Mooncake node's role lets it take (its scheduler
-    # asserts the other).
+    # asserts the other). A peer's host is what the tier's transport states it
+    # can dial, read where the transport states it: one definition.
     base = "vllm/distributed/kv_transfer/kv_connector/v1/base.py"
     for construct in (
         'NON_EMPTY_STRING = _shape(\n    "a non-empty string"',
         'PORT = _shape(\n    "an integer from 1 to 65535",',
-        'HOST = _shape("a host name or an IP address", _names_a_host)',
     ):
         require_text(state, base, construct, label=label)
     require_python_symbols(state, base, {
-        "_names_a_host": ("value",),
         "non_empty": ("shape", "described"),
         "asking_nothing": ("described",),
     }, label=label)
+    forbid_text(state, base, "_names_a_host", label=label)
+    transport = "vllm/v1/kv_offload/tiering/p2p/control/zmq.py"
+    require_python_symbols(state, transport, {
+        "ZmqTransport.dialable_host": ("host",),
+    }, label=label)
+    _require_in_symbol(state, transport, "ZmqTransport.dialable_host", (
+        "return ipaddress.ip_address(host).version == 4",
+        "all(_HOST_LABEL.fullmatch(label) for label in labels)",
+    ), label=label)
     require_text(state, "vllm/distributed/kv_transfer/kv_connector/v1/nixl/connector.py",
                  '"a non-empty list of lists of integers, one per KV cache group",',
                  label=label)
     _require_in_symbol(state, "vllm/v1/kv_offload/tiering/p2p/manager.py",
                        "P2PSecondaryTierManager.get_kv_transfer_params_keys", (
         '"kv_request_id": NON_EMPTY_STRING,',
-        '"remote_host": HOST,',
+        '"a host name or an IPv4 address", ZmqTransport.dialable_host',
         '"remote_port": PORT,',
         '{"kv_request_id": NON_EMPTY_STRING}, required=("kv_request_id",)',
     ), label=label)
@@ -6774,7 +6783,10 @@ CONTRACTS: Mapping[str, SemanticContract] = {
             "P2P peer's request ID and host must be non-empty and its port from "
             "1 to 65535 (the parsers read an empty one as no peer and the request "
             "ran without its transfer; the transport raised on a negative port "
-            "or a host its address grammar refuses, inside the engine core); a "
+            "inside the engine core), and its host one the tier's transport "
+            "states it can dial (libzmq's address check raised on one beginning "
+            "with '_' inside the engine core, and the IPv4-only sockets never "
+            "reach an IPv6 address); a "
             "NIXL block-ID list is one list per KV cache group, never empty "
             "(the pull scheduler counted the prompt as remote and asserted on "
             "nothing to receive); and a Mooncake node is refused the remote "
