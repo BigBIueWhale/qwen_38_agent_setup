@@ -870,8 +870,30 @@ def test_v2_runner_holds_no_declared_pool() -> None:
                 assert "V1 model runner" not in str(refusal)
             else:
                 raise AssertionError("a V2-only model with a KV cache was admitted")
+        # With VLLM_USE_V2_MODEL_RUNNER=0, which selects V1, the same list
+        # refuses each entry at configuration, offering only what can work.
+        os.environ["VLLM_USE_V2_MODEL_RUNNER"] = "0"
+        vllm_config.VllmConfig._validate_v1_model_runner(selection(1))
+        for users in (1, None):
+            for config, offered in (
+                (selection(users, prefill_context_parallel_size=2),
+                 "Next: serve without prefill context parallelism, so that the "
+                 "V1 model runner serves it."),
+                (selection(users, "LongcatFlashNgramForCausalLM", only_v2=True),
+                 "no launch of this server serves this model."),
+            ):
+                assert selects_v2(config) is False
+                try:
+                    vllm_config.VllmConfig._validate_v1_model_runner(config)
+                except ValueError as refusal:
+                    assert "VLLM_USE_V2_MODEL_RUNNER=0 selects the V1 model runner" in (
+                        str(refusal))
+                    assert str(refusal).endswith(offered), str(refusal)
+                else:
+                    raise AssertionError("a V2-only entry was admitted on V1")
     finally:
         vllm_config.HAS_TRITON = saved_triton
+        os.environ.pop("VLLM_USE_V2_MODEL_RUNNER", None)
         if saved_env is not None:
             os.environ["VLLM_USE_V2_MODEL_RUNNER"] = saved_env
 

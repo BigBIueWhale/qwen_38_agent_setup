@@ -396,7 +396,7 @@ It is intentionally reconstructed by the ordered, reviewed semantic transformati
 | patches/vllm-anthropic-input-fidelity.patch | 3252e25a6c2e9d8ee0eec4cb383fc292bff2afaac2e3becdc1006c68b3b02c3c |
 | patches/vllm-qwen-exact-tool-language.patch | 59b8cf13cbd9f3d036eb1f2fe5d4ce52dbdfdb41bee641b84c85de95525170ed |
 | patches/vllm-png-source-admission.patch | b1b684a96d7243ae647d4d8ce2fe69b7330b3ab243ea77903c4cfb346bc80549 |
-| patches/vllm-kv-physical-free-memory.patch | fb747012c1dcb3da3bf4b9ed3518ac145e765845086daca3d46a085d7d74266f |
+| patches/vllm-kv-physical-free-memory.patch | 3b589b4c876bb8bd4b530679072a7870b27046b8d4322e99f5d27330db881c47 |
 | patches/vllm-qwen-single-call-grammar.patch | e3859bebf3b97cc05446859f1cb13b1ba6c4048728394f876bd3a109fa9a80d9 |
 | patches/vllm-responses-history-integrity.patch | d2c6343087fc287eb6afe315cdfb9caa2909de140c82b57ee9d0c3ed9473983c |
 | patches/vllm-responses-stream-identity.patch | 9a3f1fb54f3e22f3df621ab681e675f7a916849bdceb6e555242df29d6028095 |
@@ -429,8 +429,8 @@ It is intentionally reconstructed by the ordered, reviewed semantic transformati
 | patches/vllm-unspecified-tool-choice-is-the-default.patch | 117d04e45cadbf603df42e7a791a7dbf17e18bc70fe09e651d8d327dbe8ea77f |
 | patches/vllm-call-only-answer-keeps-the-blank-line.patch | ee0a60323a8369fd240d876d8a9cdb3028123e5e944bdfa2a75d485284d7b2c8 |
 | patches/vllm-responses-tools-are-one-function-list.patch | 4dfbcc6e6a98665509ecaf2c62ef6ef588888b1322bbc7cd66c0dee555fee1ba |
-| patches/vllm-batch-parse-starts-where-the-prompt-leaves.patch | 024ab581b360770d2fc79b737b892ff2e9b525f18f92914222bc73eda4e17362 |
-| patches/vllm-derender-text-is-the-detokenizers.patch | 6d58660374c6280441e8e950001d4585859b98684f8ecf0ef5ba1aa7ea40e4dd |
+| patches/vllm-batch-parse-starts-where-the-prompt-leaves.patch | 406967661cca86d463589a924a68420606de9401f775c632028d86d89a994efd |
+| patches/vllm-derender-text-is-the-detokenizers.patch | a64bc4a8b753f1f3f563f92e4742e14f81d9a89a7ee5966368ad065bea6ef73f |
 | patches/vllm-output-constraints-refused-beside-tool-calls.patch | 63c51d73a14b6e26114ce09f634833fa3a5f7663c6b5b4c746559ceb6d4ad3f2 |
 | patches/vllm-batch-invariance-substitutes-no-nvfp4-kernel.patch | c79baaee0a51275f5f522d266fe6b315c200e6951920c2454d5c80cadbb92f44 |
 | patches/vllm-render-carries-every-image-chat-renders.patch | fffaffa0ad8a75f44fd701347c33325eab00e33e4e3aff1e4d004ad6305c20db |
@@ -440,9 +440,9 @@ It is intentionally reconstructed by the ordered, reviewed semantic transformati
 | patches/vllm-chat-stream-carries-every-token-logprob.patch | 9cd91385900057736146a83351f6c625f4983701bf8d3982c0c056bc6df6af62 |
 | patches/vllm-chat-messages-read-by-one-rule.patch | 5b8648ba48900da0cffc9b57c34cf723f9829d4ee79111fa5f1145528afa6f3a |
 | patches/vllm-responses-refuses-what-it-cannot-honour.patch | eb7495a9eae9ad46cd5466d5f61354619012feba5b4bf79bcff6956b19af0cff |
-| patches/vllm-reviewed-tests-declare-what-they-need.patch | e8e48b898b8c6ee8e6a34e3efebc2ada7bca4841bd9c8903967b6d44ceac2bb7 |
+| patches/vllm-reviewed-tests-declare-what-they-need.patch | 8f5806269e83e6ec4747518497379f8e67ef1fd27b803e815f593a8815385f6f |
 | patches/vllm-priority-is-refused-where-nothing-orders-by-it.patch | 96346e5bf71726008f4449389d91a18531fd57fe63f930b2400e059ab168571a |
-| patches/vllm-forced-tool-choice-is-held-through-reasoning.patch | 54ee3ace70dd9cbbce22b24a4e862f4352f02ddb5fdd7ce165395234e4a8a704 |
+| patches/vllm-forced-tool-choice-is-held-through-reasoning.patch | 3316ee1758c01e36f478b7ec7bf810b82e13ba11ee686b22a3ec521deb451852 |
 | patches/vllm-qwen-format-is-served-as-one-engine.patch | 56bc4387db6a732ee7deecf89edcc60c8e7d20f46eae88e4f1a6d0deb6020644 |
 
 The reconstructed tree's runtime-source and test changes, new files and
@@ -1162,7 +1162,12 @@ V1 serves the rest; a diffusion model and an architecture whose model class says
 only V2 implements it (`requires_v2_model_runner`, LongCat-Flash-Lite's
 `LongcatFlashNgramForCausalLM`) are the model itself, and with a KV cache such a
 model is refused at configuration, before its weights load, as one no launch of
-this server serves. This launch's hybrid model is served by V1 either way.
+this server serves. `VLLM_USE_V2_MODEL_RUNNER=0`, which selects V1, is refused by
+the same list at configuration: a launch option only V2 serves is offered to
+drop, after which V1 serves the rest; a model only V2 implements is refused as
+above where it has a KV cache, and offered `VLLM_USE_V2_MODEL_RUNNER` unset where
+it has none and V2 serves the rest. This launch's hybrid model is served by V1
+either way.
 
 The derivation assumes that the caching allocator places each phase's peak,
 counted in allocated bytes, in the room the bound leaves: zero fragmentation. It
@@ -1574,16 +1579,27 @@ then writes the reasoning too -- any text but `<tool_call>`, closed by
 `</think>` -- then the blank line the template writes after `</think>`, then the
 call: the call-only answer the model is trained on. The engine applies it from
 the first generated token, so a model EOS is masked until the call is complete
-and the generation cannot end inside its reasoning with no call; a length stop
-remains possible. Chat, Responses, Anthropic and `/render` arm it for the prompt
-they render, and the request's `structured_outputs.enable_in_reasoning` carries
-it to the engine and the stop checker on every route, `/generate` included. A
-caller may set that field on a constraint of its own, which is then applied in
-reasoning as well, as `--structured-outputs-config` `enable_in_reasoning` applies
-every constraint. XGrammar reads text: a `</think>` the model spells in ordinary
-tokens also ends the reasoning the grammar holds, so the blank line and the call
-must follow it, while the parser, which ends reasoning only at the token, keeps
-that text as reasoning; and the reasoning cannot contain the text `<tool_call>`,
+and the generation cannot end inside its reasoning with no call, unless the
+model spells both `</think>` and the call in ordinary tokens (below): the
+request then ends `stop` with no call, which a forced choice's response shows.
+Neither spelling is the one the model is trained to write, and how often it
+occurs is not measured. A length stop remains possible. Chat, Responses,
+Anthropic and `/render` arm it for the prompt they render, and the request's
+`structured_outputs.enable_in_reasoning` carries it to the engine and the stop
+checker on every route, `/generate` included. Where the template is rendered --
+chat, batch chat, Responses and `/render` -- the template decides where the
+model reasons, so a caller's `enable_in_reasoning: true` is refused (400,
+parameter `structured_outputs`), naming why and that `/v1/completions` and
+`/generate`, where the caller supplies the prompt, take it; there a caller's
+constraint is applied in reasoning as well, as `--structured-outputs-config`
+`enable_in_reasoning` applies every constraint. Anthropic builds its chat
+request from its own fields, none of which carries it, and derender's chat
+request, which it renders again, is refused it as `/render` is. XGrammar reads
+text: a `</think>` the model spells in ordinary tokens also ends the reasoning
+the grammar holds, so the blank line and the call must follow it, while the parser,
+which ends reasoning only at the token, keeps that text as reasoning -- a call
+spelled in ordinary tokens after it is reasoning to the parser too, the residual
+above; and the reasoning cannot contain the text `<tool_call>`,
 at which the parser would end it with a call no grammar held. Only a format vLLM
 builds with a reasoning form, for a reasoning parser that closes reasoning as the
 format does, holds it: the Qwen XML format (`qwen3_coder`) with the Qwen3

@@ -675,7 +675,7 @@ index 2995a9dac0d10a3ef0773ff99328e20973532166..f5f9155f29965bbe6ff2009febb292bf
              if token_id in special_ids:
                  break
 diff --git a/vllm/renderers/online_derenderer.py b/vllm/renderers/online_derenderer.py
-index 3a0be5eeec6c5586b58023568ef12f97edacbe10..8f0de5c7cc1e7780d9ce6e12f9a042197d4bd8d9 100644
+index 3a0be5eeec6c5586b58023568ef12f97edacbe10..ed511316c08158a6e8428d90d85ae127a2efa91d 100644
 --- a/vllm/renderers/online_derenderer.py
 +++ b/vllm/renderers/online_derenderer.py
 @@ -21,7 +21,12 @@ from vllm.entrypoints.openai.completion.protocol import (
@@ -704,7 +704,7 @@ index 3a0be5eeec6c5586b58023568ef12f97edacbe10..8f0de5c7cc1e7780d9ce6e12f9a04219
  from vllm.tokenizers import TokenizerLike
  from vllm.tokenizers.detokenizer_utils import detokenize_incrementally
  from vllm.utils import random_uuid
-@@ -60,16 +67,28 @@ class OnlineDerenderer:
+@@ -60,16 +67,32 @@ class OnlineDerenderer:
          self.renderer = renderer
          self.request_logger = request_logger
  
@@ -717,7 +717,11 @@ index 3a0be5eeec6c5586b58023568ef12f97edacbe10..8f0de5c7cc1e7780d9ce6e12f9a04219
 +        # The prompt a generation continues is the one /render renders for
 +        # the request derender is given: derender renders it again, with the
 +        # renderer and settings /render renders with, so the parse starts
-+        # where that prompt leaves reasoning, as the chat route's does.
++        # where that prompt leaves reasoning, as the chat route's does. This
++        # OnlineRenderer wraps the renderer it is given -- the instance /render
++        # renders with -- and derives nothing of its own: the media ids a
++        # rendered span embeds are that renderer's, derived once when it was
++        # built (BaseRenderer.rendered_media_token_ids).
 +        self.online_renderer = OnlineRenderer(
 +            model_config,
 +            renderer,
@@ -741,7 +745,7 @@ index 3a0be5eeec6c5586b58023568ef12f97edacbe10..8f0de5c7cc1e7780d9ce6e12f9a04219
  
          self.chat_template = chat_template
          self.chat_template_content_format: ChatTemplateContentFormatOption = (
-@@ -97,13 +116,36 @@ class OnlineDerenderer:
+@@ -97,13 +120,36 @@ class OnlineDerenderer:
          self,
          generate_response: GenerateResponse,
          chat_request: ChatCompletionRequest | None = None,
@@ -781,7 +785,7 @@ index 3a0be5eeec6c5586b58023568ef12f97edacbe10..8f0de5c7cc1e7780d9ce6e12f9a04219
      ) -> list[ChatCompletionResponseChoice]:
          tokenizer = self.renderer.get_tokenizer()
          choices: list[ChatCompletionResponseChoice] = []
-@@ -142,6 +184,11 @@ class OnlineDerenderer:
+@@ -142,6 +188,11 @@ class OnlineDerenderer:
                  reasoning, content, tool_calls = parser.parse_output(
                      decoded_text,
                      chat_request,

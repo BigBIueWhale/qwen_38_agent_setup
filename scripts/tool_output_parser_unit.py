@@ -1321,6 +1321,68 @@ class ToolOutputParserTest(unittest.TestCase):
                 with self.subTest(parsers=(reasoning, tool), choice=choice):
                     self.assertEqual(answers, {"closed": upstream, "open": upstream})
 
+    def test_a_caller_holds_a_constraint_in_reasoning_only_with_its_own_prompt(self):
+        """structured_outputs.enable_in_reasoning is the server's where the
+        chat template is rendered -- chat, batch chat, Responses, /render and
+        the chat request derender renders again -- since the template decides
+        where the model reasons: a caller's true is refused there by that
+        cause, naming where it is an input. Where the caller supplies the
+        prompt -- completions, /generate -- it is one; and what the server
+        sets for a forced choice reaches /generate in what /render returns."""
+        from vllm.entrypoints.openai.chat_completion.protocol import (
+            BatchChatCompletionRequest,
+            ChatCompletionGenerationRequest,
+        )
+        from vllm.entrypoints.openai.completion.protocol import CompletionRequest
+        from vllm.entrypoints.openai.responses.protocol import ResponsesRequest
+        from vllm.entrypoints.scale_out.token_in_token_out.protocol import (
+            TokenGenerationRequest,
+        )
+        from vllm.exceptions import VLLMValidationError
+
+        held = {"json": {"type": "object"}, "enable_in_reasoning": True}
+        messages = [{"role": "user", "content": "test"}]
+        chat, _ = _served_chat()
+        for route, refuse in (
+            ("chat", lambda so: ChatCompletionGenerationRequest.model_validate({
+                "model": "unit", "messages": messages, "kv_scope": "unit",
+                "structured_outputs": so})),
+            ("batch", lambda so: BatchChatCompletionRequest.model_validate({
+                "model": "unit", "messages": [messages], "kv_scope": ["unit"],
+                "structured_outputs": so})),
+            ("responses", lambda so: ResponsesRequest.model_validate({
+                "model": "unit", "input": "test", "kv_scope": "unit",
+                "structured_outputs": so})),
+            ("render and derender", lambda so: ChatCompletionRequest.model_validate({
+                "model": "unit", "messages": messages, "structured_outputs": so})),
+        ):
+            with self.subTest(refused=route):
+                with self.assertRaises(VLLMValidationError) as refused:
+                    refuse(held)
+                self.assertEqual(refused.exception.parameter, "structured_outputs")
+                self.assertIn("the template decides where the model reasons",
+                              str(refused.exception))
+                self.assertIn("/v1/completions or /generate", str(refused.exception))
+                # A constraint that asks for nothing held is the caller's.
+                refuse(dict(held, enable_in_reasoning=False))
+        for route, params in (
+            ("completions", CompletionRequest.model_validate({
+                "model": "unit", "prompt": "x", "kv_scope": "unit",
+                "structured_outputs": held}).to_sampling_params(16, {})),
+            ("generate", TokenGenerationRequest.model_validate({
+                "token_ids": [1], "kv_scope": "unit",
+                "sampling_params": {"structured_outputs": held},
+            }).to_sampling_params(16, {})),
+        ):
+            with self.subTest(input=route):
+                self.assertTrue(params.structured_outputs.enable_in_reasoning)
+        # What the server sets for a forced choice reaches /generate in what
+        # /render returns.
+        named = {"type": "function", "function": {"name": "write"}}
+        _, generated, _ = _render_admission(
+            (chat, None), messages=messages, tools=[TOOL], tool_choice=named)
+        self.assertTrue(generated.structured_outputs.enable_in_reasoning)
+
     def test_native_grammar_suspends_text_stops_inside_values(self):
         from vllm import SamplingParams
         from vllm.sampling_params import StructuredOutputsParams
@@ -1736,8 +1798,11 @@ class ToolOutputParserTest(unittest.TestCase):
         render a grammar that writes the reasoning, and the engine applies it
         from the first generated token: a model EOS is masked until the call
         is complete, so the generation cannot end inside its reasoning with
-        no call, and a ``<tool_call>`` inside the reasoning is masked at its
-        opener. "auto" and allowed_tools in mode "auto", which ask for no
+        no call -- unless the model spells both ``</think>`` and the call in
+        ordinary tokens, which the grammar takes for its closer and the call
+        and the parser keeps as reasoning, ending stop with no call (not the
+        trained spelling; how often, unmeasured) -- and a ``<tool_call>``
+        inside the reasoning is masked at its opener. "auto" and allowed_tools in mode "auto", which ask for no
         call, and a prompt that closed reasoning arm the grammar that starts
         once reasoning has ended."""
         reasoning = encode("I read the files, so I record what I found.")

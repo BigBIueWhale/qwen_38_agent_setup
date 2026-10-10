@@ -2436,7 +2436,20 @@ def _validate_kv_physical_after(state: State) -> None:
     require_python_symbols(state, "tests/test_config.py", {
         "test_v2_model_runner_serves_no_declared_kv_pool": None,
         "test_what_only_the_v2_runner_serves_selects_it_and_its_refusal": None,
+        "test_what_only_the_v2_runner_serves_is_refused_by_the_same_list_on_v1": None,
     }, label=label)
+    # With VLLM_USE_V2_MODEL_RUNNER=0 the same list refuses its entries on V1.
+    _require_in_symbol(state, "vllm/config/vllm.py", "VllmConfig.__post_init__", (
+        "self._validate_v2_model_runner()\n        else:\n"
+        "            self._validate_v1_model_runner()",
+    ), label=label)
+    _require_in_symbol(state, "vllm/config/vllm.py", "VllmConfig._validate_v1_model_runner", (
+        "needs = self._only_v2_model_runner_serves()",
+        "VLLM_USE_V2_MODEL_RUNNER=0 selects the V1 model runner",
+        "no launch of this server serves this model.",
+    ), label=label)
+    forbid_text(state, "vllm/config/vllm.py", "Remove VLLM_USE_V2_MODEL_RUNNER=0.",
+                label=label)
     # So a reward model with a KV cache is served by the V1 runner, which holds
     # its declared pool, and forcing V2 is refused by that cause.
     reward = "tests/models/language/pooling/test_reward.py"
@@ -4478,6 +4491,7 @@ def _validate_batch_parse_from_prompt_after(state: State) -> None:
     _require_in_symbol(state, derenderer, "OnlineDerenderer.__init__", (
         "self.online_renderer = OnlineRenderer(",
         "self.parser: type[Parser] | None = self.online_renderer.parser",
+        "and derives nothing of its own",
     ), label=label)
     _require_ordered(_symbol_source(state, derenderer, "OnlineDerenderer.derender_chat",
                                     label=label), (
@@ -5536,6 +5550,40 @@ def _validate_forced_choice_reasoning_after(state: State) -> None:
         "test_a_caller_stop_inside_the_reasoning_waits_for_the_call": None,
         "test_render_carries_the_hold_to_generate": None,
     }, label=label)
+    # Where the template is rendered it decides where the model reasons, so a
+    # caller's own hold is refused there; it is an input where the caller
+    # supplies the prompt, and the server still sets it with its grammar.
+    require_python_symbols(state, "vllm/entrypoints/openai/engine/protocol.py", {
+        "refuse_caller_reasoning_hold": ("structured_outputs",),
+    }, label=label)
+    _require_in_symbol(state, "vllm/entrypoints/openai/engine/protocol.py",
+                       "refuse_caller_reasoning_hold", (
+                           'parameter="structured_outputs",',
+                           "/v1/completions or /generate",
+                       ), label=label)
+    chat_protocol = "vllm/entrypoints/openai/chat_completion/protocol.py"
+    _require_in_symbol(state, chat_protocol,
+                       "ChatCompletionRequest.check_structured_outputs_count", (
+                           'refuse_caller_reasoning_hold(data["structured_outputs"])',
+                       ), label=label)
+    _require_in_symbol(state, chat_protocol, "BatchChatCompletionRequest.check_batch_mode", (
+        "refuse_caller_reasoning_hold(structured_outputs)",
+    ), label=label)
+    _require_in_symbol(state, "vllm/entrypoints/openai/responses/protocol.py",
+                       "ResponsesRequest.check_reasoning_hold", (
+                           'refuse_caller_reasoning_hold(data.get("structured_outputs"))',
+                       ), label=label)
+    for path in ("vllm/entrypoints/openai/completion/protocol.py",
+                 "vllm/entrypoints/scale_out/token_in_token_out/protocol.py"):
+        forbid_text(state, path, "refuse_caller_reasoning_hold", label=label)
+    # What the grammar cannot hold is said where it is claimed: a closer and a
+    # call the model spells in ordinary tokens end the request stop, no call.
+    require_text(state, _STRUCTURAL_TAG_REGISTRY,
+                 "the generation cannot end inside it -- unless the model spells both\n",
+                 label=label)
+    require_text(state, _FORCED_CHOICE_REASONING_TEST,
+                 "``<tool_call>`` inside the reasoning cannot end it before the call -- unless the\n",
+                 label=label)
 
 
 _QWEN_PARSER = "vllm/parser/qwen3.py"
@@ -7169,7 +7217,14 @@ CONTRACTS: Mapping[str, SemanticContract] = {
             "engine and the stop checker apply it from the first generated "
             "token on every route that carries them, /render to /generate "
             "included. EOS and a caller stop are held until the call is "
-            "complete; a length stop remains. Only a format vLLM builds with a "
+            "complete; a length stop remains; and a closer and a call the model "
+            "spells in ordinary tokens -- not the trained spelling -- are read "
+            "as the closer and the call by the grammar, which reads text, and "
+            "as reasoning by the parser, so that request ends stop with no "
+            "call. Where the template is rendered the template decides where "
+            "the model reasons, so a caller's own enable_in_reasoning is "
+            "refused there; it is an input where the caller supplies the "
+            "prompt. Only a format vLLM builds with a "
             "reasoning form, for a reasoning parser that closes reasoning as it "
             "does, is armed so; every other format, a closed prompt and a "
             "choice that asks for no call start the grammar where reasoning "

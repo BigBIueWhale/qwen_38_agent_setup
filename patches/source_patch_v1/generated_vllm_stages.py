@@ -60621,7 +60621,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'only 8-bit RGB or "\n'})},
  {'name': 'kv-physical-free-memory',
   'review_patch': 'patches/vllm-kv-physical-free-memory.patch',
-  'review_sha256': 'fb747012c1dcb3da3bf4b9ed3518ac145e765845086daca3d46a085d7d74266f',
+  'review_sha256': '3b589b4c876bb8bd4b530679072a7870b27046b8d4322e99f5d27330db881c47',
   'files': ({'path': 'tests/v1/worker/test_gpu_worker.py',
              'before_sha256': 'b140e35c5a06fd6f9c08937e705d904967dbf23c02f72f1b17185b8171fb08c6',
              'after_sha256': '12e6c5a8428a04aeae7e85ca7c34891745897a28c9da779029329adafd4b7b23'},
@@ -60636,10 +60636,10 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'after_sha256': '8dc9c9066dc131800837f3ca640adb642b3734dc6cc95698958805e4e55426e2'},
             {'path': 'tests/test_config.py',
              'before_sha256': '86f531fbb4a43ebb53c403ceaff8966a39668e87079af5fad445ebd5bee37576',
-             'after_sha256': '6ebafc5c8948c2432e87f68fc441b08fbe708385f488858727a45813bed32296'},
+             'after_sha256': '6c7f13f7dedeb33a2443aa612ee21aab496b04bac42e931a5e6c99f4d9b83f33'},
             {'path': 'vllm/config/vllm.py',
              'before_sha256': '30f612691ee2a5a1511484fbcece4bd89ade72c4309e786771826cf12fad38df',
-             'after_sha256': 'e9b9a3f46a473f41d5c16bc31ed9bb20d8a91d0eef0f1ba83207339eaade1d16'},
+             'after_sha256': '53392057d78f5fb9f5beec65f097a0a1151bf66a8de7802455dfe418da70fd07'},
             {'path': 'tests/v1/worker/test_workspace.py',
              'before_sha256': 'ee6d86cbb1af9b0a363d1cb280fbee3b29e02fcd02f9b3320645968cc635b39f',
              'after_sha256': '0e96960d9c456857256f4202bf6b20efc5ae53a63132373d2408788f8599ede8'},
@@ -64148,6 +64148,60 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '        assert "V1 model runner" not in str(refusal.value)\n'
                       '\n'
                       '\n'
+                      'def '
+                      'test_what_only_the_v2_runner_serves_is_refused_by_the_same_list_on_v1(\n'
+                      '    monkeypatch,\n'
+                      '):\n'
+                      '    """With VLLM_USE_V2_MODEL_RUNNER=0, which selects the V1 '
+                      'runner, an entry\n'
+                      '    of the same list is refused at configuration, offering only '
+                      'what can\n'
+                      '    work: dropping a launch option only V2 serves, after which '
+                      'V1 serves the\n'
+                      '    rest; for a model only V2 implements that has a KV cache, '
+                      'nothing, since\n'
+                      '    the V2 runner does not hold the pool this server serves it '
+                      'with. A\n'
+                      "    configuration the list names nothing of is V1's to "
+                      'serve."""\n'
+                      '    monkeypatch.setenv("VLLM_USE_V2_MODEL_RUNNER", "0")\n'
+                      '    monkeypatch.setattr(vllm_config_module, "HAS_TRITON", '
+                      'True)\n'
+                      '    '
+                      'VllmConfig._validate_v1_model_runner(_v2_selection_config(kv_cache_users=1))\n'
+                      '    for kv_cache_users in (1, None):\n'
+                      '        pcp = _v2_selection_config(kv_cache_users, '
+                      'prefill_context_parallel_size=2)\n'
+                      '        assert VllmConfig.use_v2_model_runner.fget(pcp) is '
+                      'False\n'
+                      '        with pytest.raises(ValueError) as refusal:\n'
+                      '            VllmConfig._validate_v1_model_runner(pcp)\n'
+                      '        assert str(refusal.value) == (\n'
+                      '            "Only the V2 model runner serves prefill context '
+                      'parallelism, and "\n'
+                      '            "VLLM_USE_V2_MODEL_RUNNER=0 selects the V1 model '
+                      'runner. Next: serve "\n'
+                      '            "without prefill context parallelism, so that the '
+                      'V1 model runner "\n'
+                      '            "serves it."\n'
+                      '        )\n'
+                      '        longcat = _v2_selection_config(\n'
+                      '            kv_cache_users, "LongcatFlashNgramForCausalLM", '
+                      'only_v2=True\n'
+                      '        )\n'
+                      '        assert VllmConfig.use_v2_model_runner.fget(longcat) is '
+                      'False\n'
+                      '        with pytest.raises(ValueError) as refusal:\n'
+                      '            VllmConfig._validate_v1_model_runner(longcat)\n'
+                      '        assert "LongcatFlashNgramForCausalLM, which only the V2 '
+                      'runner implements" in (\n'
+                      '            str(refusal.value)\n'
+                      '        )\n'
+                      '        assert "no launch of this server serves this model" in '
+                      'str(refusal.value)\n'
+                      '        assert "Next:" not in str(refusal.value)\n'
+                      '\n'
+                      '\n'
                       '@pytest.mark.skip_global_cleanup\n'
                       'def '
                       'test_with_hf_config_populates_missing_architectures_from_causal_lm_mapping(\n'
@@ -64295,6 +64349,61 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'model" in str(refusal.value)\n'
                              '        assert "V1 model runner" not in '
                              'str(refusal.value)\n'
+                             '\n'
+                             '\n'
+                             'def '
+                             'test_what_only_the_v2_runner_serves_is_refused_by_the_same_list_on_v1(\n'
+                             '    monkeypatch,\n'
+                             '):\n'
+                             '    """With VLLM_USE_V2_MODEL_RUNNER=0, which selects '
+                             'the V1 runner, an entry\n'
+                             '    of the same list is refused at configuration, '
+                             'offering only what can\n'
+                             '    work: dropping a launch option only V2 serves, after '
+                             'which V1 serves the\n'
+                             '    rest; for a model only V2 implements that has a KV '
+                             'cache, nothing, since\n'
+                             '    the V2 runner does not hold the pool this server '
+                             'serves it with. A\n'
+                             "    configuration the list names nothing of is V1's to "
+                             'serve."""\n'
+                             '    monkeypatch.setenv("VLLM_USE_V2_MODEL_RUNNER", "0")\n'
+                             '    monkeypatch.setattr(vllm_config_module, '
+                             '"HAS_TRITON", True)\n'
+                             '    '
+                             'VllmConfig._validate_v1_model_runner(_v2_selection_config(kv_cache_users=1))\n'
+                             '    for kv_cache_users in (1, None):\n'
+                             '        pcp = _v2_selection_config(kv_cache_users, '
+                             'prefill_context_parallel_size=2)\n'
+                             '        assert VllmConfig.use_v2_model_runner.fget(pcp) '
+                             'is False\n'
+                             '        with pytest.raises(ValueError) as refusal:\n'
+                             '            VllmConfig._validate_v1_model_runner(pcp)\n'
+                             '        assert str(refusal.value) == (\n'
+                             '            "Only the V2 model runner serves prefill '
+                             'context parallelism, and "\n'
+                             '            "VLLM_USE_V2_MODEL_RUNNER=0 selects the V1 '
+                             'model runner. Next: serve "\n'
+                             '            "without prefill context parallelism, so '
+                             'that the V1 model runner "\n'
+                             '            "serves it."\n'
+                             '        )\n'
+                             '        longcat = _v2_selection_config(\n'
+                             '            kv_cache_users, '
+                             '"LongcatFlashNgramForCausalLM", only_v2=True\n'
+                             '        )\n'
+                             '        assert '
+                             'VllmConfig.use_v2_model_runner.fget(longcat) is False\n'
+                             '        with pytest.raises(ValueError) as refusal:\n'
+                             '            '
+                             'VllmConfig._validate_v1_model_runner(longcat)\n'
+                             '        assert "LongcatFlashNgramForCausalLM, which only '
+                             'the V2 runner implements" in (\n'
+                             '            str(refusal.value)\n'
+                             '        )\n'
+                             '        assert "no launch of this server serves this '
+                             'model" in str(refusal.value)\n'
+                             '        assert "Next:" not in str(refusal.value)\n'
                              '\n'
                              '\n'
                              '@pytest.mark.skip_global_cleanup\n'
@@ -64523,13 +64632,81 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'and full attention."""\n'},
             {'name': 'vllm/config/vllm.py:landmark-3',
              'path': 'vllm/config/vllm.py',
+             'before': '\n'
+                       '        if self.use_v2_model_runner:\n'
+                       '            self._validate_v2_model_runner()\n'
+                       '        elif '
+                       'self.parallel_config.prefill_context_parallel_size > 1:\n'
+                       '            raise ValueError(\n'
+                       '                "Prefill context parallelism requires Model '
+                       'Runner V2. "\n'
+                       '                "Remove VLLM_USE_V2_MODEL_RUNNER=0."\n'
+                       '            )\n'
+                       '\n'
+                       '        # Re-compute compile ranges after platform-specific '
+                       'config updates\n'
+                       '        # (e.g., XPU may lower max_num_batched_tokens when MLA '
+                       'is enabled)\n',
+             'after': '\n'
+                      '        if self.use_v2_model_runner:\n'
+                      '            self._validate_v2_model_runner()\n'
+                      '        else:\n'
+                      '            self._validate_v1_model_runner()\n'
+                      '\n'
+                      '        # Re-compute compile ranges after platform-specific '
+                      'config updates\n'
+                      '        # (e.g., XPU may lower max_num_batched_tokens when MLA '
+                      'is enabled)\n',
+             'review_before': '\n'
+                              '        if self.use_v2_model_runner:\n'
+                              '            self._validate_v2_model_runner()\n'
+                              '        elif '
+                              'self.parallel_config.prefill_context_parallel_size > '
+                              '1:\n'
+                              '            raise ValueError(\n'
+                              '                "Prefill context parallelism requires '
+                              'Model Runner V2. "\n'
+                              '                "Remove VLLM_USE_V2_MODEL_RUNNER=0."\n'
+                              '            )\n'
+                              '\n'
+                              '        # Re-compute compile ranges after '
+                              'platform-specific config updates\n'
+                              '        # (e.g., XPU may lower max_num_batched_tokens '
+                              'when MLA is enabled)\n',
+             'review_after': '\n'
+                             '        if self.use_v2_model_runner:\n'
+                             '            self._validate_v2_model_runner()\n'
+                             '        else:\n'
+                             '            self._validate_v1_model_runner()\n'
+                             '\n'
+                             '        # Re-compute compile ranges after '
+                             'platform-specific config updates\n'
+                             '        # (e.g., XPU may lower max_num_batched_tokens '
+                             'when MLA is enabled)\n'},
+            {'name': 'vllm/config/vllm.py:landmark-4',
+             'path': 'vllm/config/vllm.py',
              'before': '            # Will be added by '
                        'https://github.com/vllm-project/vllm/pull/35045\n'
                        '            unsupported.append("KV sharing fast prefill")\n'
                        '\n'
                        '        return unsupported\n'
                        '\n'
-                       '    def _validate_v2_model_runner(self) -> None:\n',
+                       '    def _validate_v2_model_runner(self) -> None:\n'
+                       '        """Check for features not yet supported by the V2 '
+                       'model runner."""\n'
+                       '        if not HAS_TRITON:\n'
+                       '            raise ValueError("Model Runner V2 requires '
+                       'Triton.")\n'
+                       '\n'
+                       '        unsupported = '
+                       'self._get_v2_model_runner_unsupported_features()\n'
+                       '        if unsupported:\n'
+                       '            raise ValueError(\n'
+                       '                f"Model Runner V2 does not yet support: {\', '
+                       '\'.join(unsupported)}"\n'
+                       '            )\n'
+                       '\n'
+                       '    def validate_block_size(self) -> None:\n',
              'after': '            # Will be added by '
                       'https://github.com/vllm-project/vllm/pull/35045\n'
                       '            unsupported.append("KV sharing fast prefill")\n'
@@ -64564,68 +64741,74 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '\n'
                       '        return unsupported\n'
                       '\n'
-                      '    def _validate_v2_model_runner(self) -> None:\n',
-             'review_before': '            # Will be added by '
-                              'https://github.com/vllm-project/vllm/pull/35045\n'
-                              '            unsupported.append("KV sharing fast '
-                              'prefill")\n'
-                              '\n'
-                              '        return unsupported\n'
-                              '\n'
-                              '    def _validate_v2_model_runner(self) -> None:\n',
-             'review_after': '            # Will be added by '
-                             'https://github.com/vllm-project/vllm/pull/35045\n'
-                             '            unsupported.append("KV sharing fast '
-                             'prefill")\n'
-                             '\n'
-                             '        if self.cache_config.kv_cache_users is not '
-                             'None:\n'
-                             '            # A declared pool is admitted against a '
-                             'bound derived from a\n'
-                             '            # profile of every phase serving runs, at '
-                             'its largest\n'
-                             '            # (Worker.determine_available_memory), with '
-                             'no utilization\n'
-                             '            # holdback charged against it. The V2 '
-                             "runner's profile skips\n"
-                             '            # attention, builds its attention backends '
-                             'and the workspaces they\n'
-                             '            # reserve only after profiling, charges no '
-                             'CUDA-graph memory, and\n'
-                             '            # samples without top-k, top-p or log '
-                             'probabilities -- what\n'
-                             "            # upstream's holdback absorbs -- so the "
-                             'bound would admit a pool\n'
-                             '            # that serving overruns.\n'
-                             '            unsupported.append(\n'
-                             '                "a KV pool declared with '
-                             '--kv-cache-users (its startup profile "\n'
-                             '                "runs no attention and holds none of the '
-                             'workspaces, CUDA "\n'
-                             '                "graphs or log-probability memory '
-                             'serving holds beside the "\n'
-                             '                "pool)"\n'
-                             '            )\n'
-                             '\n'
-                             '        return unsupported\n'
-                             '\n'
-                             '    def _validate_v2_model_runner(self) -> None:\n'},
-            {'name': 'vllm/config/vllm.py:landmark-4',
-             'path': 'vllm/config/vllm.py',
-             'before': '        if not HAS_TRITON:\n'
-                       '            raise ValueError("Model Runner V2 requires '
-                       'Triton.")\n'
-                       '\n'
-                       '        unsupported = '
-                       'self._get_v2_model_runner_unsupported_features()\n'
-                       '        if unsupported:\n'
-                       '            raise ValueError(\n'
-                       '                f"Model Runner V2 does not yet support: {\', '
-                       '\'.join(unsupported)}"\n'
-                       '            )\n'
-                       '\n'
-                       '    def validate_block_size(self) -> None:\n',
-             'after': '        if not HAS_TRITON:\n'
+                      '    def _validate_v1_model_runner(self) -> None:\n'
+                      '        """Refuse, at configuration, what only the V2 model '
+                      'runner serves where\n'
+                      '        the V1 runner serves this configuration. The same list '
+                      'selects V2\n'
+                      '        otherwise (use_v2_model_runner), so only '
+                      'VLLM_USE_V2_MODEL_RUNNER=0\n'
+                      '        can bring one of its entries here; the refusal offers '
+                      'what can work."""\n'
+                      '        needs = self._only_v2_model_runner_serves()\n'
+                      '        if not needs:\n'
+                      '            return\n'
+                      '        inherent = [need for need, of_the_model in needs if '
+                      'of_the_model]\n'
+                      '        removable = [need for need, of_the_model in needs if '
+                      'not of_the_model]\n'
+                      '        model_config = self.model_config\n'
+                      '        # As in _validate_v2_model_runner: a model with a KV '
+                      'cache is served\n'
+                      '        # here only with a declared pool, which the V2 runner '
+                      'does not hold.\n'
+                      '        needs_pool = model_config is not None and not '
+                      'model_config.is_attention_free\n'
+                      '        refused = (\n'
+                      '            f"Only the V2 model runner serves {\', \'.join(need '
+                      'for need, _ in needs)}, "\n'
+                      '            "and VLLM_USE_V2_MODEL_RUNNER=0 selects the V1 '
+                      'model runner"\n'
+                      '        )\n'
+                      '        if inherent and needs_pool:\n'
+                      '            raise ValueError(\n'
+                      '                f"{refused}; this server serves a model with a '
+                      'KV cache only with "\n'
+                      '                "a pool declared by --kv-cache-users, which the '
+                      'V2 runner does "\n'
+                      '                "not hold: no launch of this server serves this '
+                      'model."\n'
+                      '            )\n'
+                      '        alternatives = []\n'
+                      '        if not inherent:\n'
+                      '            alternatives.append(\n'
+                      '                f"serve without {\', \'.join(removable)}, so '
+                      'that the V1 model "\n'
+                      '                "runner serves it"\n'
+                      '            )\n'
+                      '        if not needs_pool and HAS_TRITON:\n'
+                      '            unsupported = '
+                      'self._get_v2_model_runner_unsupported_features()\n'
+                      '            to_v2 = "unset VLLM_USE_V2_MODEL_RUNNER"\n'
+                      '            if unsupported:\n'
+                      '                to_v2 = f"serve without {\', '
+                      '\'.join(unsupported)} and {to_v2}"\n'
+                      '            alternatives.append(f"{to_v2}, so that the V2 model '
+                      'runner serves it")\n'
+                      '        if not alternatives:\n'
+                      '            raise ValueError(\n'
+                      '                f"{refused}, and the V2 model runner requires '
+                      'Triton, which this "\n'
+                      '                "installation lacks: no launch of this server '
+                      'serves this model."\n'
+                      '            )\n'
+                      '        raise ValueError(f"{refused}. Next: {\'; or '
+                      '\'.join(alternatives)}.")\n'
+                      '\n'
+                      '    def _validate_v2_model_runner(self) -> None:\n'
+                      '        """Check for features not yet supported by the V2 model '
+                      'runner."""\n'
+                      '        if not HAS_TRITON:\n'
                       '            raise ValueError("Model Runner V2 requires '
                       'Triton.")\n'
                       '\n'
@@ -64679,7 +64862,17 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '            )\n'
                       '\n'
                       '    def validate_block_size(self) -> None:\n',
-             'review_before': '        if not HAS_TRITON:\n'
+             'review_before': '            # Will be added by '
+                              'https://github.com/vllm-project/vllm/pull/35045\n'
+                              '            unsupported.append("KV sharing fast '
+                              'prefill")\n'
+                              '\n'
+                              '        return unsupported\n'
+                              '\n'
+                              '    def _validate_v2_model_runner(self) -> None:\n'
+                              '        """Check for features not yet supported by the '
+                              'V2 model runner."""\n'
+                              '        if not HAS_TRITON:\n'
                               '            raise ValueError("Model Runner V2 requires '
                               'Triton.")\n'
                               '\n'
@@ -64692,7 +64885,110 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                               '            )\n'
                               '\n'
                               '    def validate_block_size(self) -> None:\n',
-             'review_after': '        if not HAS_TRITON:\n'
+             'review_after': '            # Will be added by '
+                             'https://github.com/vllm-project/vllm/pull/35045\n'
+                             '            unsupported.append("KV sharing fast '
+                             'prefill")\n'
+                             '\n'
+                             '        if self.cache_config.kv_cache_users is not '
+                             'None:\n'
+                             '            # A declared pool is admitted against a '
+                             'bound derived from a\n'
+                             '            # profile of every phase serving runs, at '
+                             'its largest\n'
+                             '            # (Worker.determine_available_memory), with '
+                             'no utilization\n'
+                             '            # holdback charged against it. The V2 '
+                             "runner's profile skips\n"
+                             '            # attention, builds its attention backends '
+                             'and the workspaces they\n'
+                             '            # reserve only after profiling, charges no '
+                             'CUDA-graph memory, and\n'
+                             '            # samples without top-k, top-p or log '
+                             'probabilities -- what\n'
+                             "            # upstream's holdback absorbs -- so the "
+                             'bound would admit a pool\n'
+                             '            # that serving overruns.\n'
+                             '            unsupported.append(\n'
+                             '                "a KV pool declared with '
+                             '--kv-cache-users (its startup profile "\n'
+                             '                "runs no attention and holds none of the '
+                             'workspaces, CUDA "\n'
+                             '                "graphs or log-probability memory '
+                             'serving holds beside the "\n'
+                             '                "pool)"\n'
+                             '            )\n'
+                             '\n'
+                             '        return unsupported\n'
+                             '\n'
+                             '    def _validate_v1_model_runner(self) -> None:\n'
+                             '        """Refuse, at configuration, what only the V2 '
+                             'model runner serves where\n'
+                             '        the V1 runner serves this configuration. The '
+                             'same list selects V2\n'
+                             '        otherwise (use_v2_model_runner), so only '
+                             'VLLM_USE_V2_MODEL_RUNNER=0\n'
+                             '        can bring one of its entries here; the refusal '
+                             'offers what can work."""\n'
+                             '        needs = self._only_v2_model_runner_serves()\n'
+                             '        if not needs:\n'
+                             '            return\n'
+                             '        inherent = [need for need, of_the_model in needs '
+                             'if of_the_model]\n'
+                             '        removable = [need for need, of_the_model in '
+                             'needs if not of_the_model]\n'
+                             '        model_config = self.model_config\n'
+                             '        # As in _validate_v2_model_runner: a model with '
+                             'a KV cache is served\n'
+                             '        # here only with a declared pool, which the V2 '
+                             'runner does not hold.\n'
+                             '        needs_pool = model_config is not None and not '
+                             'model_config.is_attention_free\n'
+                             '        refused = (\n'
+                             '            f"Only the V2 model runner serves {\', '
+                             '\'.join(need for need, _ in needs)}, "\n'
+                             '            "and VLLM_USE_V2_MODEL_RUNNER=0 selects the '
+                             'V1 model runner"\n'
+                             '        )\n'
+                             '        if inherent and needs_pool:\n'
+                             '            raise ValueError(\n'
+                             '                f"{refused}; this server serves a model '
+                             'with a KV cache only with "\n'
+                             '                "a pool declared by --kv-cache-users, '
+                             'which the V2 runner does "\n'
+                             '                "not hold: no launch of this server '
+                             'serves this model."\n'
+                             '            )\n'
+                             '        alternatives = []\n'
+                             '        if not inherent:\n'
+                             '            alternatives.append(\n'
+                             '                f"serve without {\', '
+                             '\'.join(removable)}, so that the V1 model "\n'
+                             '                "runner serves it"\n'
+                             '            )\n'
+                             '        if not needs_pool and HAS_TRITON:\n'
+                             '            unsupported = '
+                             'self._get_v2_model_runner_unsupported_features()\n'
+                             '            to_v2 = "unset VLLM_USE_V2_MODEL_RUNNER"\n'
+                             '            if unsupported:\n'
+                             '                to_v2 = f"serve without {\', '
+                             '\'.join(unsupported)} and {to_v2}"\n'
+                             '            alternatives.append(f"{to_v2}, so that the '
+                             'V2 model runner serves it")\n'
+                             '        if not alternatives:\n'
+                             '            raise ValueError(\n'
+                             '                f"{refused}, and the V2 model runner '
+                             'requires Triton, which this "\n'
+                             '                "installation lacks: no launch of this '
+                             'server serves this model."\n'
+                             '            )\n'
+                             '        raise ValueError(f"{refused}. Next: {\'; or '
+                             '\'.join(alternatives)}.")\n'
+                             '\n'
+                             '    def _validate_v2_model_runner(self) -> None:\n'
+                             '        """Check for features not yet supported by the '
+                             'V2 model runner."""\n'
+                             '        if not HAS_TRITON:\n'
                              '            raise ValueError("Model Runner V2 requires '
                              'Triton.")\n'
                              '\n'
@@ -143568,7 +143864,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    serving.chat_template = None\n'})},
  {'name': 'batch-parse-starts-where-the-prompt-leaves',
   'review_patch': 'patches/vllm-batch-parse-starts-where-the-prompt-leaves.patch',
-  'review_sha256': '024ab581b360770d2fc79b737b892ff2e9b525f18f92914222bc73eda4e17362',
+  'review_sha256': '406967661cca86d463589a924a68420606de9401f775c632028d86d89a994efd',
   'files': ({'path': 'tests/entrypoints/openai/responses/test_parsable_context_unit.py',
              'before_sha256': '8fd0bd655d13abdc9fe03e1c0bb0625225431624db8257e1db07c00ac3da2779',
              'after_sha256': '95f50d93d97370d426319b5dc94fce55b9cbca4ce9b3b95a930e42990dcbf4a2'},
@@ -143613,7 +143909,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'after_sha256': 'cf2cf56da08af417457b76cf9a335b5724d2d75855906e957c83069171ff2354'},
             {'path': 'vllm/renderers/online_derenderer.py',
              'before_sha256': 'c93551f5e63e1b7e5d5bf105ca2e642a288644078feee561e8eef63267f7841d',
-             'after_sha256': '41d0ef98230d7f67142274d09954a1fceaee7fbb10117d5a22c93ce531eaed0c'},
+             'after_sha256': '6e1394b69ef93c0ae6ef3f7c291afbcb5fd016adb434c79271267c37a2e8f276'},
             {'path': 'tests/parser/engine/test_reasoning_token_count.py',
              'before_sha256': 'dab4d5943f8887c1c56e884b77d63898e24fbcce16393ed240aabe61f555d280',
              'after_sha256': '8eadc5059845dacc54dd7b2fa725e6a4745daa2a94cb16d13238916df26cbd2c'},
@@ -146084,7 +146380,14 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '        # renderer and settings /render renders with, so the '
                       'parse starts\n'
                       '        # where that prompt leaves reasoning, as the chat '
-                      "route's does.\n"
+                      "route's does. This\n"
+                      '        # OnlineRenderer wraps the renderer it is given -- the '
+                      'instance /render\n'
+                      '        # renders with -- and derives nothing of its own: the '
+                      'media ids a\n'
+                      "        # rendered span embeds are that renderer's, derived "
+                      'once when it was\n'
+                      '        # built (BaseRenderer.rendered_media_token_ids).\n'
                       '        self.online_renderer = OnlineRenderer(\n'
                       '            model_config,\n'
                       '            renderer,\n'
@@ -146143,7 +146446,15 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '        # renderer and settings /render renders with, so '
                              'the parse starts\n'
                              '        # where that prompt leaves reasoning, as the '
-                             "chat route's does.\n"
+                             "chat route's does. This\n"
+                             '        # OnlineRenderer wraps the renderer it is given '
+                             '-- the instance /render\n'
+                             '        # renders with -- and derives nothing of its '
+                             'own: the media ids a\n'
+                             "        # rendered span embeds are that renderer's, "
+                             'derived once when it was\n'
+                             '        # built '
+                             '(BaseRenderer.rendered_media_token_ids).\n'
                              '        self.online_renderer = OnlineRenderer(\n'
                              '            model_config,\n'
                              '            renderer,\n'
@@ -147859,7 +148170,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '            rf_type = (\n'})},
  {'name': 'derender-text-is-the-detokenizers',
   'review_patch': 'patches/vllm-derender-text-is-the-detokenizers.patch',
-  'review_sha256': '6d58660374c6280441e8e950001d4585859b98684f8ecf0ef5ba1aa7ea40e4dd',
+  'review_sha256': 'a64bc4a8b753f1f3f563f92e4742e14f81d9a89a7ee5966368ad065bea6ef73f',
   'files': ({'path': 'tests/entrypoints/scale_out/derender/test_derender.py',
              'before_sha256': '3416a07fdc8241799d3ea888295eaaafe4cf01d569195e2f0351af793c63928b',
              'after_sha256': '210db8e1b18615c08fd072c37ca80357148c14ed205b55fb3b68e0a01d592055'},
@@ -147873,8 +148184,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': '282ef80ea470eee299c6c1f7510ca259c6b4dcd4a2787d7f2946335a723dc5bb',
              'after_sha256': '500ca243d68c1490ac9bbf733242e1559a0a6977f23865472d0ac68d3d077da5'},
             {'path': 'vllm/renderers/online_derenderer.py',
-             'before_sha256': '41d0ef98230d7f67142274d09954a1fceaee7fbb10117d5a22c93ce531eaed0c',
-             'after_sha256': '0fdc80834bb7c8f1cdfbe54085a39ce15859b09fe623eefc9144002b9702219d'},
+             'before_sha256': '6e1394b69ef93c0ae6ef3f7c291afbcb5fd016adb434c79271267c37a2e8f276',
+             'after_sha256': '34570e1cb60037963921d0730cc0211bf3f721c145393e6f95879f91de7786dc'},
             {'path': 'vllm/v1/engine/detokenizer.py',
              'before_sha256': '3af97dd30fa95fb8e294b2de407012d365b124006ee324c576cba3d3a9d58c21',
              'after_sha256': '49c4f4c012b9fc6b1a6363b56a7aa04b14a7791575db5ecac3d9fa669405c704'},
@@ -167249,7 +167560,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    async def _process_simple_streaming_events(\n'})},
  {'name': 'reviewed-tests-declare-what-they-need',
   'review_patch': 'patches/vllm-reviewed-tests-declare-what-they-need.patch',
-  'review_sha256': 'e8e48b898b8c6ee8e6a34e3efebc2ada7bca4841bd9c8903967b6d44ceac2bb7',
+  'review_sha256': '8f5806269e83e6ec4747518497379f8e67ef1fd27b803e815f593a8815385f6f',
   'files': ({'path': 'tests/conftest.py',
              'before_sha256': '9bd103ee369ded600a0cad2a5414a2337bcbc00ec86d66d039a8c14032deee42',
              'after_sha256': '6aa1c39d3d977ac381290eb00adb9a3c33fd34733c95623a07fd6c171d7840f4'},
@@ -167341,8 +167652,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': 'd6a2cc3febe2fc86138f019345a263018b63aea131541f9d82753c8d15260425',
              'after_sha256': 'f48a27cbf617e03cf107cabc845d8204bee7b1dae6ad610f9a051e87379fc4c0'},
             {'path': 'tests/test_config.py',
-             'before_sha256': '6ebafc5c8948c2432e87f68fc441b08fbe708385f488858727a45813bed32296',
-             'after_sha256': 'c3ed8f8b4a366450623d86e49f2c95a92dce9201eb65b43788df62f97bf8fa7d'},
+             'before_sha256': '6c7f13f7dedeb33a2443aa612ee21aab496b04bac42e931a5e6c99f4d9b83f33',
+             'after_sha256': '4cd7ba4ffb0daa6fb651fe4d439a6f179b5ac96dc7088e32fccd7b4a2fd521cd'},
             {'path': 'tests/tokenizers_/test_detokenize.py',
              'before_sha256': 'd84dff3048856b762c2993a3aa130c4f508bbce9c59c9a815dabbf3ce5a3f234',
              'after_sha256': 'ea16499de7740efdc590751f0575c6538b58bd6217b925a9f73346a171678b28'},
@@ -175887,10 +176198,10 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '\n'})},
  {'name': 'forced-tool-choice-is-held-through-reasoning',
   'review_patch': 'patches/vllm-forced-tool-choice-is-held-through-reasoning.patch',
-  'review_sha256': '54ee3ace70dd9cbbce22b24a4e862f4352f02ddb5fdd7ce165395234e4a8a704',
+  'review_sha256': '3316ee1758c01e36f478b7ec7bf810b82e13ba11ee686b22a3ec521deb451852',
   'files': ({'path': 'tests/v1/structured_output/test_forced_choice_holds_through_reasoning.py',
              'before_sha256': None,
-             'after_sha256': '57f4218e5a2bc19447f458f8c92c7eb37c9292a9a9f4bd6ee799b5efccc2796c'},
+             'after_sha256': '17f54d7b4e48c1ab130660d11c61358ff81d6226cc53708de3e9c63e6e38869a'},
             {'path': 'vllm/parser/abstract_parser.py',
              'before_sha256': 'c12de53fc081a75a87cf52a21055cb03a3f1fd2f7dd14bd976af6799e75aeacb',
              'after_sha256': '8ebe4f08c43aef333850ec8f361eee61c6cd394977f7ba0e3d0426693602826c'},
@@ -175917,16 +176228,25 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'after_sha256': '8c1faf2dbe6a3a795dc98acce6e596283e744223ce1e3a73b5dda3204720048c'},
             {'path': 'vllm/sampling_params.py',
              'before_sha256': 'c5e027fa409b8daf77bbbbd6fee97f13db52236ad14e7e4e3b546da35b182316',
-             'after_sha256': 'ad8d259f77333ada561c48285248fad2a43d1dfab37ddc18e03edffe4da8af2f'},
+             'after_sha256': '47b427e71a57ee5f22e5593bac155397f77830c45bb073c5e4ed21d1be571960'},
             {'path': 'vllm/tool_parsers/structural_tag_registry.py',
              'before_sha256': '114ae35d93497b1627826e2a2ab6dbeb62ee973d0221801b8e3fef07dbc06621',
-             'after_sha256': '1589c77885533246e8a0d2bbcf64fb1ea9cc6d307f519dafee89086564a7b36b'},
+             'after_sha256': '6bc6415c2710ff3522afb6ac8ca88a5468a81841a7dfdafe98bd18f27a2c31af'},
             {'path': 'vllm/v1/request.py',
              'before_sha256': '80eb55815d50c131c6d40ea1ceb7f00453f898ec58441675234593c7e81b807d',
              'after_sha256': '3c84a41a030aa2d09d329ec63ee6c4527c80043b1f4abb8d85a8cf132cfeea21'},
             {'path': 'vllm/v1/structured_output/stop_checker.py',
              'before_sha256': '0e67a59399516cf8c26648b632c89446bf9bc797cc03688238ba0b3f2529a231',
-             'after_sha256': '066c27f3cb7e173d514fab55adde2d5d86120c9ed0402beb6cf089d27b86263a'}),
+             'after_sha256': '066c27f3cb7e173d514fab55adde2d5d86120c9ed0402beb6cf089d27b86263a'},
+            {'path': 'vllm/entrypoints/openai/chat_completion/protocol.py',
+             'before_sha256': '65d1ce949ff2358f120642e7182c37bc30acb99066b8df78a59a2ae00604bf17',
+             'after_sha256': 'e3fb80f2224e1c13a9cf5434bd501f8f66b542544e47b1d77a82405ae5836247'},
+            {'path': 'vllm/entrypoints/openai/engine/protocol.py',
+             'before_sha256': 'f14144bf2e0b8b597e542d024ee1b0c073fef3056970984dd8c046c2cf193800',
+             'after_sha256': '5b4d42420eef25af7e5c98d5fe49ebaaea2399d677cc94db7fc07c36f7da5151'},
+            {'path': 'vllm/entrypoints/openai/responses/protocol.py',
+             'before_sha256': 'efe5743a895d7fbb2e6f2d16dc6b2d50fe6dff2b63089a2d64bfc89ad3e517c9',
+             'after_sha256': '5717b9b12990227472abc32dfcde585352f8702355f32b7eb401ba5cbe28c77c'}),
   'edits': ({'name': 'tests/v1/structured_output/test_forced_choice_holds_through_reasoning.py:landmark-1',
              'path': 'tests/v1/structured_output/test_forced_choice_holds_through_reasoning.py',
              'before': '',
@@ -175951,7 +176271,16 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       "grammar from the first generated token: EOS, a caller's stop "
                       'string and a\n'
                       '``<tool_call>`` inside the reasoning cannot end it before the '
-                      'call.\n'
+                      'call -- unless the\n'
+                      'model spells both ``</think>`` and the call in ordinary tokens, '
+                      'which the\n'
+                      'grammar, reading text, takes for its closer and the call, while '
+                      'the reasoning\n'
+                      'parser, which ends reasoning only at the ``</think>`` token, '
+                      'keeps them as\n'
+                      'reasoning: the request then ends "stop" with no call. Neither '
+                      'spelling is the\n'
+                      'trained one; how often it occurs is not measured.\n'
                       '"""\n'
                       '\n'
                       'import json\n'
@@ -176451,7 +176780,16 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              "grammar from the first generated token: EOS, a caller's "
                              'stop string and a\n'
                              '``<tool_call>`` inside the reasoning cannot end it '
-                             'before the call.\n'
+                             'before the call -- unless the\n'
+                             'model spells both ``</think>`` and the call in ordinary '
+                             'tokens, which the\n'
+                             'grammar, reading text, takes for its closer and the '
+                             'call, while the reasoning\n'
+                             'parser, which ends reasoning only at the ``</think>`` '
+                             'token, keeps them as\n'
+                             'reasoning: the request then ends "stop" with no call. '
+                             'Neither spelling is the\n'
+                             'trained one; how often it occurs is not measured.\n'
                              '"""\n'
                              '\n'
                              'import json\n'
@@ -177821,7 +178159,13 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       'so the two\n'
                       '    travel together on every route that carries these '
                       'parameters, /render and\n'
-                      '    /generate among them."""\n'
+                      '    /generate among them. A caller sets it only where the '
+                      'caller supplies the\n'
+                      '    prompt (completions, /generate): a route that renders the '
+                      'chat template\n'
+                      "    refuses a caller's true, since the template decides where "
+                      'the model\n'
+                      '    reasons (``refuse_caller_reasoning_hold``)."""\n'
                       '\n'
                       '    _backend: str | None = field(default=None, init=False)\n'
                       '    """CAUTION: Should only be set by '
@@ -177848,7 +178192,13 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'sets it, so the two\n'
                              '    travel together on every route that carries these '
                              'parameters, /render and\n'
-                             '    /generate among them."""\n'
+                             '    /generate among them. A caller sets it only where '
+                             'the caller supplies the\n'
+                             '    prompt (completions, /generate): a route that '
+                             'renders the chat template\n'
+                             "    refuses a caller's true, since the template decides "
+                             'where the model\n'
+                             '    reasons (``refuse_caller_reasoning_hold``)."""\n'
                              '\n'
                              '    _backend: str | None = field(default=None, '
                              'init=False)\n'
@@ -178316,8 +178666,20 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       'itself, from the\n'
                       '        # first token generated after a prompt that left '
                       'reasoning open, so\n'
-                      '        # the generation cannot end inside it. The reasoning is '
-                      'any text but\n'
+                      '        # the generation cannot end inside it -- unless the '
+                      'model spells both\n'
+                      '        # the closer and the call in ordinary tokens: the '
+                      'grammar reads text,\n'
+                      '        # so it takes them for its closer and the call, while '
+                      'the reasoning\n'
+                      '        # parser, which ends reasoning only at the ``</think>`` '
+                      'token, keeps\n'
+                      '        # them as reasoning, and the request ends stop with no '
+                      'call. Neither\n'
+                      '        # spelling is the one the model is trained to write; '
+                      'how often it\n'
+                      '        # occurs is not measured. The reasoning is any text '
+                      'but\n'
                       '        # ``<tool_call>``: the reasoning parser ends reasoning '
                       'at that token,\n'
                       "        # and a call opened inside the grammar's reasoning "
@@ -178358,8 +178720,20 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'closer itself, from the\n'
                              '        # first token generated after a prompt that left '
                              'reasoning open, so\n'
-                             '        # the generation cannot end inside it. The '
-                             'reasoning is any text but\n'
+                             '        # the generation cannot end inside it -- unless '
+                             'the model spells both\n'
+                             '        # the closer and the call in ordinary tokens: '
+                             'the grammar reads text,\n'
+                             '        # so it takes them for its closer and the call, '
+                             'while the reasoning\n'
+                             '        # parser, which ends reasoning only at the '
+                             '``</think>`` token, keeps\n'
+                             '        # them as reasoning, and the request ends stop '
+                             'with no call. Neither\n'
+                             '        # spelling is the one the model is trained to '
+                             'write; how often it\n'
+                             '        # occurs is not measured. The reasoning is any '
+                             'text but\n'
                              '        # ``<tool_call>``: the reasoning parser ends '
                              'reasoning at that token,\n'
                              "        # and a call opened inside the grammar's "
@@ -178511,7 +178885,333 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'ReasoningParserManager.get_reasoning_parser(config.reasoning_parser)\n'
                              '            self.reasoner = cls(\n'
                              '                tokenizer=tokenizer, '
-                             '**(request.reasoning_parser_kwargs or {})\n'})},
+                             '**(request.reasoning_parser_kwargs or {})\n'},
+            {'name': 'vllm/entrypoints/openai/chat_completion/protocol.py:landmark-1',
+             'path': 'vllm/entrypoints/openai/chat_completion/protocol.py',
+             'before': '    ToolCall,\n'
+                       '    UsageInfo,\n'
+                       '    output_constraint_beside_tool_calls,\n'
+                       '    structured_outputs_from_response_format,\n'
+                       '    validate_structural_tag_response_format,\n'
+                       '    validate_structured_outputs_structural_tag,\n',
+             'after': '    ToolCall,\n'
+                      '    UsageInfo,\n'
+                      '    output_constraint_beside_tool_calls,\n'
+                      '    refuse_caller_reasoning_hold,\n'
+                      '    structured_outputs_from_response_format,\n'
+                      '    validate_structural_tag_response_format,\n'
+                      '    validate_structured_outputs_structural_tag,\n',
+             'review_before': '    ToolCall,\n'
+                              '    UsageInfo,\n'
+                              '    output_constraint_beside_tool_calls,\n'
+                              '    structured_outputs_from_response_format,\n'
+                              '    validate_structural_tag_response_format,\n'
+                              '    validate_structured_outputs_structural_tag,\n',
+             'review_after': '    ToolCall,\n'
+                             '    UsageInfo,\n'
+                             '    output_constraint_beside_tool_calls,\n'
+                             '    refuse_caller_reasoning_hold,\n'
+                             '    structured_outputs_from_response_format,\n'
+                             '    validate_structural_tag_response_format,\n'
+                             '    validate_structured_outputs_structural_tag,\n'},
+            {'name': 'vllm/entrypoints/openai/chat_completion/protocol.py:landmark-2',
+             'path': 'vllm/entrypoints/openai/chat_completion/protocol.py',
+             'before': '\n'
+                       '        if data.get("structured_outputs", None) is None:\n'
+                       '            return data\n'
+                       '\n'
+                       '        structured_outputs_kwargs = '
+                       'data["structured_outputs"]\n'
+                       '        # structured_outputs may arrive as a dict (from '
+                       'JSON/raw kwargs) or\n',
+             'after': '\n'
+                      '        if data.get("structured_outputs", None) is None:\n'
+                      '            return data\n'
+                      '        # A chat request is rendered by the template, which '
+                      'decides where the\n'
+                      '        # model reasons: on chat, /render and the request '
+                      'derender re-renders.\n'
+                      '        '
+                      'refuse_caller_reasoning_hold(data["structured_outputs"])\n'
+                      '\n'
+                      '        structured_outputs_kwargs = data["structured_outputs"]\n'
+                      '        # structured_outputs may arrive as a dict (from '
+                      'JSON/raw kwargs) or\n',
+             'review_before': '\n'
+                              '        if data.get("structured_outputs", None) is '
+                              'None:\n'
+                              '            return data\n'
+                              '\n'
+                              '        structured_outputs_kwargs = '
+                              'data["structured_outputs"]\n'
+                              '        # structured_outputs may arrive as a dict (from '
+                              'JSON/raw kwargs) or\n',
+             'review_after': '\n'
+                             '        if data.get("structured_outputs", None) is '
+                             'None:\n'
+                             '            return data\n'
+                             '        # A chat request is rendered by the template, '
+                             'which decides where the\n'
+                             '        # model reasons: on chat, /render and the '
+                             'request derender re-renders.\n'
+                             '        '
+                             'refuse_caller_reasoning_hold(data["structured_outputs"])\n'
+                             '\n'
+                             '        structured_outputs_kwargs = '
+                             'data["structured_outputs"]\n'
+                             '        # structured_outputs may arrive as a dict (from '
+                             'JSON/raw kwargs) or\n'},
+            {'name': 'vllm/entrypoints/openai/chat_completion/protocol.py:landmark-3',
+             'path': 'vllm/entrypoints/openai/chat_completion/protocol.py',
+             'before': '                '
+                       'validate_structural_tag_response_format(response_format)\n'
+                       '        if (structured_outputs := '
+                       'data.get("structured_outputs")) is not None:\n'
+                       '            '
+                       'validate_structured_outputs_structural_tag(structured_outputs)\n'
+                       '        # best_of reaches no sampling parameter; a value other '
+                       'than 1 would\n'
+                       '        # ask for a fan-out this route never performs.\n'
+                       '        require_one_sequence(data.get("n"), "n")\n',
+             'after': '                '
+                      'validate_structural_tag_response_format(response_format)\n'
+                      '        if (structured_outputs := '
+                      'data.get("structured_outputs")) is not None:\n'
+                      '            '
+                      'validate_structured_outputs_structural_tag(structured_outputs)\n'
+                      '            refuse_caller_reasoning_hold(structured_outputs)\n'
+                      '        # best_of reaches no sampling parameter; a value other '
+                      'than 1 would\n'
+                      '        # ask for a fan-out this route never performs.\n'
+                      '        require_one_sequence(data.get("n"), "n")\n',
+             'review_before': '                '
+                              'validate_structural_tag_response_format(response_format)\n'
+                              '        if (structured_outputs := '
+                              'data.get("structured_outputs")) is not None:\n'
+                              '            '
+                              'validate_structured_outputs_structural_tag(structured_outputs)\n'
+                              '        # best_of reaches no sampling parameter; a '
+                              'value other than 1 would\n'
+                              '        # ask for a fan-out this route never performs.\n'
+                              '        require_one_sequence(data.get("n"), "n")\n',
+             'review_after': '                '
+                             'validate_structural_tag_response_format(response_format)\n'
+                             '        if (structured_outputs := '
+                             'data.get("structured_outputs")) is not None:\n'
+                             '            '
+                             'validate_structured_outputs_structural_tag(structured_outputs)\n'
+                             '            '
+                             'refuse_caller_reasoning_hold(structured_outputs)\n'
+                             '        # best_of reaches no sampling parameter; a value '
+                             'other than 1 would\n'
+                             '        # ask for a fan-out this route never performs.\n'
+                             '        require_one_sequence(data.get("n"), "n")\n'},
+            {'name': 'vllm/entrypoints/openai/engine/protocol.py:landmark-1',
+             'path': 'vllm/entrypoints/openai/engine/protocol.py',
+             'before': '        )\n'
+                       '\n'
+                       '\n'
+                       'class StreamOptions(OpenAIBaseModel):\n'
+                       '    include_usage: bool | None = False\n'
+                       '    continuous_usage_stats: bool | None = False\n',
+             'after': '        )\n'
+                      '\n'
+                      '\n'
+                      'def refuse_caller_reasoning_hold(structured_outputs: Any) -> '
+                      'None:\n'
+                      '    """Refuse a caller\'s '
+                      'structured_outputs.enable_in_reasoning where the\n'
+                      '    server renders the chat template.\n'
+                      '\n'
+                      "    Where the model reasons is the template's: the server holds "
+                      'a grammar\n'
+                      '    through the reasoning a rendered prompt leaves open only '
+                      'for a tool choice\n'
+                      '    whose answer is calls, and sets the field with that '
+                      'grammar\n'
+                      '    (apply_tool_structural_tag), after the request is read. A '
+                      "caller's own\n"
+                      '    constraint held in reasoning would apply from the first '
+                      'generated token,\n'
+                      '    before the model has reasoned. It stays an input where the '
+                      'caller supplies\n'
+                      '    the prompt: completions and /generate.\n'
+                      '    """\n'
+                      '    from vllm.sampling_params import StructuredOutputsParams\n'
+                      '\n'
+                      '    if isinstance(structured_outputs, '
+                      'StructuredOutputsParams):\n'
+                      '        held = structured_outputs.enable_in_reasoning\n'
+                      '    elif isinstance(structured_outputs, dict):\n'
+                      '        held = structured_outputs.get("enable_in_reasoning")\n'
+                      '    else:\n'
+                      '        return\n'
+                      '    if held:\n'
+                      '        raise VLLMValidationError(\n'
+                      '            "structured_outputs.enable_in_reasoning is the '
+                      'server\'s to set on a "\n'
+                      '            "route that renders the chat template: the template '
+                      'decides where "\n'
+                      '            "the model reasons, and the server holds only a '
+                      'tool choice whose "\n'
+                      '            "answer is calls through the reasoning the rendered '
+                      'prompt leaves "\n'
+                      '            "open. A constraint of the caller\'s applies once '
+                      'reasoning has "\n'
+                      '            "ended. Next: omit enable_in_reasoning, or send a '
+                      'prompt of your "\n'
+                      '            "own to /v1/completions or /generate, where a '
+                      'constraint held in "\n'
+                      '            "reasoning applies from the first generated '
+                      'token.",\n'
+                      '            parameter="structured_outputs",\n'
+                      '        )\n'
+                      '\n'
+                      '\n'
+                      'class StreamOptions(OpenAIBaseModel):\n'
+                      '    include_usage: bool | None = False\n'
+                      '    continuous_usage_stats: bool | None = False\n',
+             'review_before': '        )\n'
+                              '\n'
+                              '\n'
+                              'class StreamOptions(OpenAIBaseModel):\n'
+                              '    include_usage: bool | None = False\n'
+                              '    continuous_usage_stats: bool | None = False\n',
+             'review_after': '        )\n'
+                             '\n'
+                             '\n'
+                             'def refuse_caller_reasoning_hold(structured_outputs: '
+                             'Any) -> None:\n'
+                             '    """Refuse a caller\'s '
+                             'structured_outputs.enable_in_reasoning where the\n'
+                             '    server renders the chat template.\n'
+                             '\n'
+                             "    Where the model reasons is the template's: the "
+                             'server holds a grammar\n'
+                             '    through the reasoning a rendered prompt leaves open '
+                             'only for a tool choice\n'
+                             '    whose answer is calls, and sets the field with that '
+                             'grammar\n'
+                             '    (apply_tool_structural_tag), after the request is '
+                             "read. A caller's own\n"
+                             '    constraint held in reasoning would apply from the '
+                             'first generated token,\n'
+                             '    before the model has reasoned. It stays an input '
+                             'where the caller supplies\n'
+                             '    the prompt: completions and /generate.\n'
+                             '    """\n'
+                             '    from vllm.sampling_params import '
+                             'StructuredOutputsParams\n'
+                             '\n'
+                             '    if isinstance(structured_outputs, '
+                             'StructuredOutputsParams):\n'
+                             '        held = structured_outputs.enable_in_reasoning\n'
+                             '    elif isinstance(structured_outputs, dict):\n'
+                             '        held = '
+                             'structured_outputs.get("enable_in_reasoning")\n'
+                             '    else:\n'
+                             '        return\n'
+                             '    if held:\n'
+                             '        raise VLLMValidationError(\n'
+                             '            "structured_outputs.enable_in_reasoning is '
+                             'the server\'s to set on a "\n'
+                             '            "route that renders the chat template: the '
+                             'template decides where "\n'
+                             '            "the model reasons, and the server holds '
+                             'only a tool choice whose "\n'
+                             '            "answer is calls through the reasoning the '
+                             'rendered prompt leaves "\n'
+                             '            "open. A constraint of the caller\'s applies '
+                             'once reasoning has "\n'
+                             '            "ended. Next: omit enable_in_reasoning, or '
+                             'send a prompt of your "\n'
+                             '            "own to /v1/completions or /generate, where '
+                             'a constraint held in "\n'
+                             '            "reasoning applies from the first generated '
+                             'token.",\n'
+                             '            parameter="structured_outputs",\n'
+                             '        )\n'
+                             '\n'
+                             '\n'
+                             'class StreamOptions(OpenAIBaseModel):\n'
+                             '    include_usage: bool | None = False\n'
+                             '    continuous_usage_stats: bool | None = False\n'},
+            {'name': 'vllm/entrypoints/openai/responses/protocol.py:landmark-1',
+             'path': 'vllm/entrypoints/openai/responses/protocol.py',
+             'before': '    OpenAIBaseModel,\n'
+                       '    StopParam,\n'
+                       '    output_constraint_beside_tool_calls,\n'
+                       ')\n'
+                       'from vllm.exceptions import VLLMValidationError\n'
+                       'from vllm.logger import init_logger\n',
+             'after': '    OpenAIBaseModel,\n'
+                      '    StopParam,\n'
+                      '    output_constraint_beside_tool_calls,\n'
+                      '    refuse_caller_reasoning_hold,\n'
+                      ')\n'
+                      'from vllm.exceptions import VLLMValidationError\n'
+                      'from vllm.logger import init_logger\n',
+             'review_before': '    OpenAIBaseModel,\n'
+                              '    StopParam,\n'
+                              '    output_constraint_beside_tool_calls,\n'
+                              ')\n'
+                              'from vllm.exceptions import VLLMValidationError\n'
+                              'from vllm.logger import init_logger\n',
+             'review_after': '    OpenAIBaseModel,\n'
+                             '    StopParam,\n'
+                             '    output_constraint_beside_tool_calls,\n'
+                             '    refuse_caller_reasoning_hold,\n'
+                             ')\n'
+                             'from vllm.exceptions import VLLMValidationError\n'
+                             'from vllm.logger import init_logger\n'},
+            {'name': 'vllm/entrypoints/openai/responses/protocol.py:landmark-2',
+             'path': 'vllm/entrypoints/openai/responses/protocol.py',
+             'before': '        data["input"] = processed_input\n'
+                       '        return data\n'
+                       '\n'
+                       '    @model_validator(mode="before")\n'
+                       '    @classmethod\n'
+                       '    def check_tool_usage(cls, data):\n',
+             'after': '        data["input"] = processed_input\n'
+                      '        return data\n'
+                      '\n'
+                      '    @model_validator(mode="before")\n'
+                      '    @classmethod\n'
+                      '    def check_reasoning_hold(cls, data):\n'
+                      '        # A Responses request renders the template, which '
+                      'decides where the\n'
+                      '        # model reasons.\n'
+                      '        if isinstance(data, dict):\n'
+                      '            '
+                      'refuse_caller_reasoning_hold(data.get("structured_outputs"))\n'
+                      '        return data\n'
+                      '\n'
+                      '    @model_validator(mode="before")\n'
+                      '    @classmethod\n'
+                      '    def check_tool_usage(cls, data):\n',
+             'review_before': '        data["input"] = processed_input\n'
+                              '        return data\n'
+                              '\n'
+                              '    @model_validator(mode="before")\n'
+                              '    @classmethod\n'
+                              '    def check_tool_usage(cls, data):\n',
+             'review_after': '        data["input"] = processed_input\n'
+                             '        return data\n'
+                             '\n'
+                             '    @model_validator(mode="before")\n'
+                             '    @classmethod\n'
+                             '    def check_reasoning_hold(cls, data):\n'
+                             '        # A Responses request renders the template, '
+                             'which decides where the\n'
+                             '        # model reasons.\n'
+                             '        if isinstance(data, dict):\n'
+                             '            '
+                             'refuse_caller_reasoning_hold(data.get("structured_outputs"))\n'
+                             '        return data\n'
+                             '\n'
+                             '    @model_validator(mode="before")\n'
+                             '    @classmethod\n'
+                             '    def check_tool_usage(cls, data):\n'})},
  {'name': 'qwen-format-is-served-as-one-engine',
   'review_patch': 'patches/vllm-qwen-format-is-served-as-one-engine.patch',
   'review_sha256': '56bc4387db6a732ee7deecf89edcc60c8e7d20f46eae88e4f1a6d0deb6020644',
@@ -181050,7 +181750,7 @@ FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5d
  'tests/reasoning/test_minimax_m3_reasoning_parser.py': 'c077f6abd750267b45867c461f50e472318d65d8870f066fdcd0b5daadc6b14c',
  'tests/renderers/test_hf.py': 'f48a27cbf617e03cf107cabc845d8204bee7b1dae6ad610f9a051e87379fc4c0',
  'tests/renderers/test_template_authorship.py': 'b2b34a541fa8d5e1155ab87d6d4e781c40bb01762042d44dd6da48668a32691d',
- 'tests/test_config.py': 'c3ed8f8b4a366450623d86e49f2c95a92dce9201eb65b43788df62f97bf8fa7d',
+ 'tests/test_config.py': '4cd7ba4ffb0daa6fb651fe4d439a6f179b5ac96dc7088e32fccd7b4a2fd521cd',
  'tests/test_request_input_bounds.py': '6d5796773be3daa15c1dc369bed3bb36fec877b4735389a6893d7236aa25cd38',
  'tests/test_sampling_params.py': '9ce8ed07080994d48511465e8050a52ee1db8fdf5d0b2188bd6324b9276b3f97',
  'tests/tokenizers_/test_detokenize.py': 'ea16499de7740efdc590751f0575c6538b58bd6217b925a9f73346a171678b28',
@@ -181097,7 +181797,7 @@ FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5d
  'tests/v1/simple_kv_offload/test_scheduler.py': '038c017d6e2bff9336497806ae2ce837d1010859b5d84907819e40f13ab8d1f0',
  'tests/v1/streaming_input/test_async_llm_streaming.py': '72f195575d01e0ed48fa0b3d426951b46393cfde3f434a5863e6c169c82bf3ba',
  'tests/v1/structured_output/test_backend_xgrammar_stop_tokens.py': '665040a33a0f729c8f34169addeb554c37e2432071ccad20cb989575d7937baa',
- 'tests/v1/structured_output/test_forced_choice_holds_through_reasoning.py': '57f4218e5a2bc19447f458f8c92c7eb37c9292a9a9f4bd6ee799b5efccc2796c',
+ 'tests/v1/structured_output/test_forced_choice_holds_through_reasoning.py': '17f54d7b4e48c1ab130660d11c61358ff81d6226cc53708de3e9c63e6e38869a',
  'tests/v1/test_request.py': '6fa5d12659ebb955c0fec37b09074f75b5011e0ac6e7b7551b9175c99f5655d0',
  'tests/v1/worker/test_cpu_prompt_logprobs.py': 'cd6e4b91b390d3dd77ad5fe2206f2c1698c2b88037196e65078c9990e89e9ebe',
  'tests/v1/worker/test_gpu_model_runner_mm_gather.py': '37e656077f517eb3d47a3bf772f4288a21c764a5ee59a63a9711db0e0dd1411b',
@@ -181106,7 +181806,7 @@ FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5d
  'vllm/config/cache.py': '82ab839cacb2e30f62f485c9e3ea32440fbf27beef00d1c60220f9776eb1ef43',
  'vllm/config/model.py': '08fc7b086c31e4f0118afc40abbda2407438a3da20cef3164649b0bc55a1c538',
  'vllm/config/reasoning.py': '29a3bb76af99f67a7706f365fbcd3362205ef8af9db46b7f167374e68f8146ae',
- 'vllm/config/vllm.py': 'e9b9a3f46a473f41d5c16bc31ed9bb20d8a91d0eef0f1ba83207339eaade1d16',
+ 'vllm/config/vllm.py': '53392057d78f5fb9f5beec65f097a0a1151bf66a8de7802455dfe418da70fd07',
  'vllm/distributed/kv_transfer/kv_connector/factory.py': '81a1025b6c3a89b301d102549e0576fc4d1639e3efe1a1f8c3ecffc8fde356bf',
  'vllm/distributed/kv_transfer/kv_connector/v1/base.py': '69ba8adf653f385f5ca99e3e0c0e15147008de513f97bd09cf3ab19573b2b848',
  'vllm/distributed/kv_transfer/kv_connector/v1/example_hidden_states_connector.py': 'd28da3cdafd53a29686d4b63a2b151d17ccde609ce7c58965127f7ac21ff83ca',
@@ -181131,15 +181831,15 @@ FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5d
  'vllm/entrypoints/llm.py': '79f9bb1212884746964a347f7e4b39087b5ac084b1d72821a12efd2fb85bcb03',
  'vllm/entrypoints/openai/chat_completion/api_router.py': '9cb8a56328bcfea734cc252e1291b17aee6c42e7208c9c8f883ad5a434bace17',
  'vllm/entrypoints/openai/chat_completion/batch_serving.py': '0128239bec0d027246d4b7d63762ed188831bc6caf1a0243698fa64e5f36c5d9',
- 'vllm/entrypoints/openai/chat_completion/protocol.py': '65d1ce949ff2358f120642e7182c37bc30acb99066b8df78a59a2ae00604bf17',
+ 'vllm/entrypoints/openai/chat_completion/protocol.py': 'e3fb80f2224e1c13a9cf5434bd501f8f66b542544e47b1d77a82405ae5836247',
  'vllm/entrypoints/openai/chat_completion/serving.py': '7dbe634a0d87ccfbfc967955d6e6967259bf6895feeaa564fcf0f0070a5df36e',
  'vllm/entrypoints/openai/cli_args.py': '2c74b481652e1b7154df7836a98eb3ef1377092dc8ac4ae02095160907b5e36e',
  'vllm/entrypoints/openai/completion/api_router.py': '95f7e88069d896bb2a616a50ca3c3c9d1fd1b2314b785b87696ad936fd205363',
  'vllm/entrypoints/openai/completion/protocol.py': 'a92405770e6d4f3b3732b0a42ebdc335441a448be9fc2ce4f92b02d16e6e0ca2',
  'vllm/entrypoints/openai/completion/serving.py': '47877f22727b674109b923e182471aa9948c75e22502b184b02a9882df4a54c5',
- 'vllm/entrypoints/openai/engine/protocol.py': 'f14144bf2e0b8b597e542d024ee1b0c073fef3056970984dd8c046c2cf193800',
+ 'vllm/entrypoints/openai/engine/protocol.py': '5b4d42420eef25af7e5c98d5fe49ebaaea2399d677cc94db7fc07c36f7da5151',
  'vllm/entrypoints/openai/responses/context.py': '2b84c0d0e733057b80e93075bbeae0a16a9a6a6274ad0b15d1506d1c77ce7a24',
- 'vllm/entrypoints/openai/responses/protocol.py': 'efe5743a895d7fbb2e6f2d16dc6b2d50fe6dff2b63089a2d64bfc89ad3e517c9',
+ 'vllm/entrypoints/openai/responses/protocol.py': '5717b9b12990227472abc32dfcde585352f8702355f32b7eb401ba5cbe28c77c',
  'vllm/entrypoints/openai/responses/serving.py': '016a873050426d5d6d2aca25e1ed571d04b67e1f7f5feb9504e1d1cdf7c2f845',
  'vllm/entrypoints/openai/responses/streaming_events.py': '86a2600626f9100b6dcecca1876a5c4b9b9ac671297e025cd95e3bcb93fa7aba',
  'vllm/entrypoints/openai/responses/utils.py': '27228c0eb46d68278d35a8d5558e86935b47b04378d6d62df9cd6500b8c3fa0a',
@@ -181195,11 +181895,11 @@ FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5d
  'vllm/reasoning/minimax_m3_reasoning_parser.py': 'd91a8f1c7c34bc4d32d374e68038c719e61a1cac456c0538025bcbba0daf3cab',
  'vllm/renderers/base.py': '3e9df34ee1763d03666a66c0747215d300a10f007620e5564302fc261c769d3b',
  'vllm/renderers/hf.py': 'b06cb298f586607a036c8d976e0a08ac64eb317bfb8af1d4dc5329e690fb5e88',
- 'vllm/renderers/online_derenderer.py': '0fdc80834bb7c8f1cdfbe54085a39ce15859b09fe623eefc9144002b9702219d',
+ 'vllm/renderers/online_derenderer.py': '34570e1cb60037963921d0730cc0211bf3f721c145393e6f95879f91de7786dc',
  'vllm/renderers/online_renderer.py': '8c1faf2dbe6a3a795dc98acce6e596283e744223ce1e3a73b5dda3204720048c',
  'vllm/renderers/params.py': '31572224d8ea355fb77d80e3725779436533108c78f779b94760c6e55e6f3bfd',
  'vllm/renderers/template_authorship.py': '3110bd0d138e29ef01a51f5c357a2e6dd000c0b8c26b7fea94a4161471e43cba',
- 'vllm/sampling_params.py': 'ad8d259f77333ada561c48285248fad2a43d1dfab37ddc18e03edffe4da8af2f',
+ 'vllm/sampling_params.py': '47b427e71a57ee5f22e5593bac155397f77830c45bb073c5e4ed21d1be571960',
  'vllm/tokenizers/detokenizer_utils.py': '7718979d813ed00d41116d92a5abf81524e393693a6b28fa1c2a6d8ff66c880d',
  'vllm/tool_parsers/abstract_tool_parser.py': 'f8bac92a9d48e192656f987940fed5a9562fa6ce9fa45c8241b8c643bbb6f1ef',
  'vllm/tool_parsers/kimi_k2_tool_parser.py': '178c3aed95e4c8bacf24a2b6dd517d445735c540b455d6c479c5058ed0ab80c9',
@@ -181207,7 +181907,7 @@ FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5d
  'vllm/tool_parsers/poolside_v1_tool_parser.py': '5c99ae314256ef4e5ca076a96c9863413dc57bf074f3ac070b527be2d3fe0d8c',
  'vllm/tool_parsers/qwen3_engine_tool_parser.py': '665c41e9b430c3194f8268926316f4924293752bdbd94e3b598193fde52457f7',
  'vllm/tool_parsers/seed_oss_engine_tool_parser.py': '6528c2738bc250cdb0f19d88f451e7eae8978e4281a458d7e940b41ea145b648',
- 'vllm/tool_parsers/structural_tag_registry.py': '1589c77885533246e8a0d2bbcf64fb1ea9cc6d307f519dafee89086564a7b36b',
+ 'vllm/tool_parsers/structural_tag_registry.py': '6bc6415c2710ff3522afb6ac8ca88a5468a81841a7dfdafe98bd18f27a2c31af',
  'vllm/tool_parsers/utils.py': 'e2e93609470191c021cc9b67a781257b0bdb64954ca5a737faf972d27434f4a6',
  'vllm/utils/cpu_triton_utils.py': '02f2fd58becfe31a40efa1bd116820e78a242d4db23c36a80a2c28becd3b0ff1',
  'vllm/v1/attention/backends/turboquant_attn.py': 'c3fef60cfa031a139bed6f413b2c40d0ea3bc6b48992455404a09459abbfa282',

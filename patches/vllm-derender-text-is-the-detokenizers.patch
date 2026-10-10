@@ -524,7 +524,7 @@ index fa6c46ea8a831035eb2933d0620d318ea6df1bcf..dcdc5424f2ee770d7a1d23d5a8a0ff02
 +    assert error['param'] == choice
 +    assert error['message'].startswith(f"{choice} reports finish_reason 'stop'")
 diff --git a/vllm/renderers/online_derenderer.py b/vllm/renderers/online_derenderer.py
-index 8f0de5c7cc1e7780d9ce6e12f9a042197d4bd8d9..3796fc2b72c365cc5ad81e2ec4cecdd122e8bfb8 100644
+index ed511316c08158a6e8428d90d85ae127a2efa91d..a6c40077429252015a5fbcbe1b73b241ce4dae34 100644
 --- a/vllm/renderers/online_derenderer.py
 +++ b/vllm/renderers/online_derenderer.py
 @@ -33,15 +33,18 @@ from vllm.entrypoints.scale_out.token_in_token_out.protocol import (
@@ -558,7 +558,7 @@ index 8f0de5c7cc1e7780d9ce6e12f9a042197d4bd8d9..3796fc2b72c365cc5ad81e2ec4cecdd1
  
          # The prompt a generation continues is the one /render renders for
          # the request derender is given: derender renders it again, with the
-@@ -150,19 +158,29 @@ class OnlineDerenderer:
+@@ -154,19 +162,29 @@ class OnlineDerenderer:
          tokenizer = self.renderer.get_tokenizer()
          choices: list[ChatCompletionResponseChoice] = []
  
@@ -592,7 +592,7 @@ index 8f0de5c7cc1e7780d9ce6e12f9a042197d4bd8d9..3796fc2b72c365cc5ad81e2ec4cecdd1
                  )
  
                  chat_template_kwargs: dict[str, Any] = {}
-@@ -231,8 +249,8 @@ class OnlineDerenderer:
+@@ -235,8 +253,8 @@ class OnlineDerenderer:
                      if chat_request is not None
                      else True
                  )
@@ -603,7 +603,7 @@ index 8f0de5c7cc1e7780d9ce6e12f9a042197d4bd8d9..3796fc2b72c365cc5ad81e2ec4cecdd1
                  )
                  message = ChatMessage(role="assistant", content=decoded_text)
  
-@@ -254,6 +272,27 @@ class OnlineDerenderer:
+@@ -258,6 +276,27 @@ class OnlineDerenderer:
  
          return choices
  
@@ -631,7 +631,7 @@ index 8f0de5c7cc1e7780d9ce6e12f9a042197d4bd8d9..3796fc2b72c365cc5ad81e2ec4cecdd1
      def _detokenize_delta(
          self,
          tokenizer: TokenizerLike,
-@@ -381,8 +420,15 @@ class OnlineDerenderer:
+@@ -385,8 +424,15 @@ class OnlineDerenderer:
          stream_choices: list[ChatCompletionResponseStreamChoice] = []
          updated_state = state
  
@@ -649,7 +649,7 @@ index 8f0de5c7cc1e7780d9ce6e12f9a042197d4bd8d9..3796fc2b72c365cc5ad81e2ec4cecdd1
              new_text, updated_state = self._detokenize_delta(
                  tokenizer, delta_tids, updated_state, skip_special_tokens=skip_special
              )
-@@ -455,10 +501,21 @@ class OnlineDerenderer:
+@@ -459,10 +505,21 @@ class OnlineDerenderer:
          total_completion_tokens = 0
          index = 0
  
@@ -675,7 +675,7 @@ index 8f0de5c7cc1e7780d9ce6e12f9a042197d4bd8d9..3796fc2b72c365cc5ad81e2ec4cecdd1
                  )
                  completion_logprobs = None
                  if choice.logprobs is not None:
-@@ -531,8 +588,16 @@ class OnlineDerenderer:
+@@ -535,8 +592,16 @@ class OnlineDerenderer:
          stream_choices: list[CompletionResponseStreamChoice] = []
          updated_state = state
  
@@ -694,7 +694,7 @@ index 8f0de5c7cc1e7780d9ce6e12f9a042197d4bd8d9..3796fc2b72c365cc5ad81e2ec4cecdd1
              new_text, updated_state = self._detokenize_delta(
                  tokenizer, delta_tids, updated_state, skip_special_tokens=skip_special
              )
-@@ -565,6 +630,57 @@ class OnlineDerenderer:
+@@ -569,6 +634,57 @@ class OnlineDerenderer:
          return chunk, updated_state
  
  

@@ -1062,7 +1062,7 @@ diff --git a/vllm/v1/worker/workspace.py b/vllm/v1/worker/workspace.py
 diff --git a/tests/test_config.py b/tests/test_config.py
 --- a/tests/test_config.py
 +++ b/tests/test_config.py
-@@ -336,6 +336,102 @@
+@@ -336,6 +336,138 @@
      assert VllmConfig._is_default_v2_model_runner_model(config) is expected
  
  
@@ -1162,6 +1162,42 @@ diff --git a/tests/test_config.py b/tests/test_config.py
 +        assert "V1 model runner" not in str(refusal.value)
 +
 +
++def test_what_only_the_v2_runner_serves_is_refused_by_the_same_list_on_v1(
++    monkeypatch,
++):
++    """With VLLM_USE_V2_MODEL_RUNNER=0, which selects the V1 runner, an entry
++    of the same list is refused at configuration, offering only what can
++    work: dropping a launch option only V2 serves, after which V1 serves the
++    rest; for a model only V2 implements that has a KV cache, nothing, since
++    the V2 runner does not hold the pool this server serves it with. A
++    configuration the list names nothing of is V1's to serve."""
++    monkeypatch.setenv("VLLM_USE_V2_MODEL_RUNNER", "0")
++    monkeypatch.setattr(vllm_config_module, "HAS_TRITON", True)
++    VllmConfig._validate_v1_model_runner(_v2_selection_config(kv_cache_users=1))
++    for kv_cache_users in (1, None):
++        pcp = _v2_selection_config(kv_cache_users, prefill_context_parallel_size=2)
++        assert VllmConfig.use_v2_model_runner.fget(pcp) is False
++        with pytest.raises(ValueError) as refusal:
++            VllmConfig._validate_v1_model_runner(pcp)
++        assert str(refusal.value) == (
++            "Only the V2 model runner serves prefill context parallelism, and "
++            "VLLM_USE_V2_MODEL_RUNNER=0 selects the V1 model runner. Next: serve "
++            "without prefill context parallelism, so that the V1 model runner "
++            "serves it."
++        )
++        longcat = _v2_selection_config(
++            kv_cache_users, "LongcatFlashNgramForCausalLM", only_v2=True
++        )
++        assert VllmConfig.use_v2_model_runner.fget(longcat) is False
++        with pytest.raises(ValueError) as refusal:
++            VllmConfig._validate_v1_model_runner(longcat)
++        assert "LongcatFlashNgramForCausalLM, which only the V2 runner implements" in (
++            str(refusal.value)
++        )
++        assert "no launch of this server serves this model" in str(refusal.value)
++        assert "Next:" not in str(refusal.value)
++
++
  @pytest.mark.skip_global_cleanup
  def test_with_hf_config_populates_missing_architectures_from_causal_lm_mapping(
      monkeypatch,
@@ -1237,7 +1273,21 @@ diff --git a/vllm/config/vllm.py b/vllm/config/vllm.py
 +
      def _dflash_needs_multi_kv_group(self) -> bool:
          """Whether a DFlash draft mixes sliding-window and full attention."""
-@@ -2434,6 +2450,23 @@
+@@ -1563,11 +1579,8 @@
+ 
+         if self.use_v2_model_runner:
+             self._validate_v2_model_runner()
+-        elif self.parallel_config.prefill_context_parallel_size > 1:
+-            raise ValueError(
+-                "Prefill context parallelism requires Model Runner V2. "
+-                "Remove VLLM_USE_V2_MODEL_RUNNER=0."
+-            )
++        else:
++            self._validate_v1_model_runner()
+ 
+         # Re-compute compile ranges after platform-specific config updates
+         # (e.g., XPU may lower max_num_batched_tokens when MLA is enabled)
+@@ -2434,17 +2447,105 @@
              # Will be added by https://github.com/vllm-project/vllm/pull/35045
              unsupported.append("KV sharing fast prefill")
  
@@ -1260,8 +1310,51 @@ diff --git a/vllm/config/vllm.py b/vllm/config/vllm.py
 +
          return unsupported
  
++    def _validate_v1_model_runner(self) -> None:
++        """Refuse, at configuration, what only the V2 model runner serves where
++        the V1 runner serves this configuration. The same list selects V2
++        otherwise (use_v2_model_runner), so only VLLM_USE_V2_MODEL_RUNNER=0
++        can bring one of its entries here; the refusal offers what can work."""
++        needs = self._only_v2_model_runner_serves()
++        if not needs:
++            return
++        inherent = [need for need, of_the_model in needs if of_the_model]
++        removable = [need for need, of_the_model in needs if not of_the_model]
++        model_config = self.model_config
++        # As in _validate_v2_model_runner: a model with a KV cache is served
++        # here only with a declared pool, which the V2 runner does not hold.
++        needs_pool = model_config is not None and not model_config.is_attention_free
++        refused = (
++            f"Only the V2 model runner serves {', '.join(need for need, _ in needs)}, "
++            "and VLLM_USE_V2_MODEL_RUNNER=0 selects the V1 model runner"
++        )
++        if inherent and needs_pool:
++            raise ValueError(
++                f"{refused}; this server serves a model with a KV cache only with "
++                "a pool declared by --kv-cache-users, which the V2 runner does "
++                "not hold: no launch of this server serves this model."
++            )
++        alternatives = []
++        if not inherent:
++            alternatives.append(
++                f"serve without {', '.join(removable)}, so that the V1 model "
++                "runner serves it"
++            )
++        if not needs_pool and HAS_TRITON:
++            unsupported = self._get_v2_model_runner_unsupported_features()
++            to_v2 = "unset VLLM_USE_V2_MODEL_RUNNER"
++            if unsupported:
++                to_v2 = f"serve without {', '.join(unsupported)} and {to_v2}"
++            alternatives.append(f"{to_v2}, so that the V2 model runner serves it")
++        if not alternatives:
++            raise ValueError(
++                f"{refused}, and the V2 model runner requires Triton, which this "
++                "installation lacks: no launch of this server serves this model."
++            )
++        raise ValueError(f"{refused}. Next: {'; or '.join(alternatives)}.")
++
      def _validate_v2_model_runner(self) -> None:
-@@ -2441,10 +2474,38 @@
+         """Check for features not yet supported by the V2 model runner."""
          if not HAS_TRITON:
              raise ValueError("Model Runner V2 requires Triton.")
  

@@ -1,9 +1,9 @@
 diff --git a/tests/v1/structured_output/test_forced_choice_holds_through_reasoning.py b/tests/v1/structured_output/test_forced_choice_holds_through_reasoning.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..ba3964fb4a4f8961c4a5ea58b6a4e144587e7564
+index 0000000000000000000000000000000000000000..306d97d3a6fe2b5e13e3a780335738200bfe82e1
 --- /dev/null
 +++ b/tests/v1/structured_output/test_forced_choice_holds_through_reasoning.py
-@@ -0,0 +1,378 @@
+@@ -0,0 +1,383 @@
 +# SPDX-License-Identifier: Apache-2.0
 +# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
 +"""A forced tool choice is held over the whole generation, reasoning included.
@@ -15,7 +15,12 @@ index 0000000000000000000000000000000000000000..ba3964fb4a4f8961c4a5ea58b6a4e144
 +Qwen format's grammar writes the reasoning as well, the request's structured-
 +output parameters say so (``enable_in_reasoning``), and the engine applies the
 +grammar from the first generated token: EOS, a caller's stop string and a
-+``<tool_call>`` inside the reasoning cannot end it before the call.
++``<tool_call>`` inside the reasoning cannot end it before the call -- unless the
++model spells both ``</think>`` and the call in ordinary tokens, which the
++grammar, reading text, takes for its closer and the call, while the reasoning
++parser, which ends reasoning only at the ``</think>`` token, keeps them as
++reasoning: the request then ends "stop" with no call. Neither spelling is the
++trained one; how often it occurs is not measured.
 +"""
 +
 +import json
@@ -656,10 +661,10 @@ index a8f480965423741617dace87eba9a25f3137c12e..bb6810229e955147251a1694ac14edb5
  
          return conversation, [engine_input]
 diff --git a/vllm/sampling_params.py b/vllm/sampling_params.py
-index ce6d6d5cf50cc8f9ad01b6cdaeb48a7a0a7ef33e..975457a06785d634d128d57c534c2ba5e965c1c5 100644
+index ce6d6d5cf50cc8f9ad01b6cdaeb48a7a0a7ef33e..7aefc3556d295c2af8d06974b0e22c835de88529 100644
 --- a/vllm/sampling_params.py
 +++ b/vllm/sampling_params.py
-@@ -190,6 +190,13 @@ class StructuredOutputsParams:
+@@ -190,6 +190,16 @@ class StructuredOutputsParams:
      disable_additional_properties: bool = False
      whitespace_pattern: str | None = None
      structural_tag: str | None = None
@@ -669,12 +674,15 @@ index ce6d6d5cf50cc8f9ad01b6cdaeb48a7a0a7ef33e..975457a06785d634d128d57c534c2ba5
 +    ``StructuredOutputsConfig.enable_in_reasoning`` does for every request. A
 +    tool-call grammar that writes the reasoning itself sets it, so the two
 +    travel together on every route that carries these parameters, /render and
-+    /generate among them."""
++    /generate among them. A caller sets it only where the caller supplies the
++    prompt (completions, /generate): a route that renders the chat template
++    refuses a caller's true, since the template decides where the model
++    reasons (``refuse_caller_reasoning_hold``)."""
  
      _backend: str | None = field(default=None, init=False)
      """CAUTION: Should only be set by Processor._validate_structured_output"""
 diff --git a/vllm/tool_parsers/structural_tag_registry.py b/vllm/tool_parsers/structural_tag_registry.py
-index 3d20dcc3870ead3c896398b4dfc36912ca7b6724..59bd5651a562231b6fdefd505bee0911b34a74c6 100644
+index 3d20dcc3870ead3c896398b4dfc36912ca7b6724..c84c9c6ed8e943fc8adc8ab5c29ceb7ef32e135c 100644
 --- a/vllm/tool_parsers/structural_tag_registry.py
 +++ b/vllm/tool_parsers/structural_tag_registry.py
 @@ -79,18 +79,55 @@ XGRAMMAR_BUILTIN_STRUCTURAL_TAG_MODELS = frozenset(
@@ -793,14 +801,20 @@ index 3d20dcc3870ead3c896398b4dfc36912ca7b6724..59bd5651a562231b6fdefd505bee0911
  def get_qwen_3_coder_structural_tag(
      tools: list[FunctionToolParam],
      builtin_tools: list[BuiltinToolParam],
-@@ -1434,9 +1487,19 @@ def get_qwen_3_coder_structural_tag(
+@@ -1434,9 +1487,25 @@ def get_qwen_3_coder_structural_tag(
      # call, which is the shape the model is trained to produce.
      separator = ConstStringFormat(value=_QWEN_THINK_SUFFIX)
      if reasoning:
 -        # The grammar writes the reasoning and its closer itself.
 +        # The grammar writes the reasoning and its closer itself, from the
 +        # first token generated after a prompt that left reasoning open, so
-+        # the generation cannot end inside it. The reasoning is any text but
++        # the generation cannot end inside it -- unless the model spells both
++        # the closer and the call in ordinary tokens: the grammar reads text,
++        # so it takes them for its closer and the call, while the reasoning
++        # parser, which ends reasoning only at the ``</think>`` token, keeps
++        # them as reasoning, and the request ends stop with no call. Neither
++        # spelling is the one the model is trained to write; how often it
++        # occurs is not measured. The reasoning is any text but
 +        # ``<tool_call>``: the reasoning parser ends reasoning at that token,
 +        # and a call opened inside the grammar's reasoning would be one no
 +        # grammar held. The answer follows ``</think>`` and the blank line,
@@ -858,3 +872,106 @@ index e820079aa7a86c5a9c27dc9a399cf6ea9173f06c..b307d175aaae1a67f60f710ee5134f5f
              cls = ReasoningParserManager.get_reasoning_parser(config.reasoning_parser)
              self.reasoner = cls(
                  tokenizer=tokenizer, **(request.reasoning_parser_kwargs or {})
+diff --git a/vllm/entrypoints/openai/chat_completion/protocol.py b/vllm/entrypoints/openai/chat_completion/protocol.py
+index b0b2792504c8c7f034216ce3bd9e700d503f5bd5..73d2e1179219ec17bd90840506b185f9e138d3fe 100644
+--- a/vllm/entrypoints/openai/chat_completion/protocol.py
++++ b/vllm/entrypoints/openai/chat_completion/protocol.py
+@@ -40,6 +40,7 @@ from vllm.entrypoints.openai.engine.protocol import (
+     ToolCall,
+     UsageInfo,
+     output_constraint_beside_tool_calls,
++    refuse_caller_reasoning_hold,
+     structured_outputs_from_response_format,
+     validate_structural_tag_response_format,
+     validate_structured_outputs_structural_tag,
+@@ -853,6 +854,9 @@ class ChatCompletionRequest(OpenAIBaseModel):
+ 
+         if data.get("structured_outputs", None) is None:
+             return data
++        # A chat request is rendered by the template, which decides where the
++        # model reasons: on chat, /render and the request derender re-renders.
++        refuse_caller_reasoning_hold(data["structured_outputs"])
+ 
+         structured_outputs_kwargs = data["structured_outputs"]
+         # structured_outputs may arrive as a dict (from JSON/raw kwargs) or
+@@ -1232,6 +1236,7 @@ class BatchChatCompletionRequest(OpenAIBaseModel):
+                 validate_structural_tag_response_format(response_format)
+         if (structured_outputs := data.get("structured_outputs")) is not None:
+             validate_structured_outputs_structural_tag(structured_outputs)
++            refuse_caller_reasoning_hold(structured_outputs)
+         # best_of reaches no sampling parameter; a value other than 1 would
+         # ask for a fan-out this route never performs.
+         require_one_sequence(data.get("n"), "n")
+diff --git a/vllm/entrypoints/openai/engine/protocol.py b/vllm/entrypoints/openai/engine/protocol.py
+index 8dd31c4e41bf2bcc6c306d435e64f76af5500270..ec87db4eede52e35ddddceb96d5abdb0f86ed70c 100644
+--- a/vllm/entrypoints/openai/engine/protocol.py
++++ b/vllm/entrypoints/openai/engine/protocol.py
+@@ -359,6 +359,40 @@ def validate_structured_outputs_structural_tag(
+         )
+ 
+ 
++def refuse_caller_reasoning_hold(structured_outputs: Any) -> None:
++    """Refuse a caller's structured_outputs.enable_in_reasoning where the
++    server renders the chat template.
++
++    Where the model reasons is the template's: the server holds a grammar
++    through the reasoning a rendered prompt leaves open only for a tool choice
++    whose answer is calls, and sets the field with that grammar
++    (apply_tool_structural_tag), after the request is read. A caller's own
++    constraint held in reasoning would apply from the first generated token,
++    before the model has reasoned. It stays an input where the caller supplies
++    the prompt: completions and /generate.
++    """
++    from vllm.sampling_params import StructuredOutputsParams
++
++    if isinstance(structured_outputs, StructuredOutputsParams):
++        held = structured_outputs.enable_in_reasoning
++    elif isinstance(structured_outputs, dict):
++        held = structured_outputs.get("enable_in_reasoning")
++    else:
++        return
++    if held:
++        raise VLLMValidationError(
++            "structured_outputs.enable_in_reasoning is the server's to set on a "
++            "route that renders the chat template: the template decides where "
++            "the model reasons, and the server holds only a tool choice whose "
++            "answer is calls through the reasoning the rendered prompt leaves "
++            "open. A constraint of the caller's applies once reasoning has "
++            "ended. Next: omit enable_in_reasoning, or send a prompt of your "
++            "own to /v1/completions or /generate, where a constraint held in "
++            "reasoning applies from the first generated token.",
++            parameter="structured_outputs",
++        )
++
++
+ class StreamOptions(OpenAIBaseModel):
+     include_usage: bool | None = False
+     continuous_usage_stats: bool | None = False
+diff --git a/vllm/entrypoints/openai/responses/protocol.py b/vllm/entrypoints/openai/responses/protocol.py
+index 562f8356e7085dcc81312dd55ce07e80a75fdace..7a29374b2bb115094d16855a1d658e02963c1cbb 100644
+--- a/vllm/entrypoints/openai/responses/protocol.py
++++ b/vllm/entrypoints/openai/responses/protocol.py
+@@ -76,6 +76,7 @@ from vllm.entrypoints.openai.engine.protocol import (
+     OpenAIBaseModel,
+     StopParam,
+     output_constraint_beside_tool_calls,
++    refuse_caller_reasoning_hold,
+ )
+ from vllm.exceptions import VLLMValidationError
+ from vllm.logger import init_logger
+@@ -846,6 +847,15 @@ class ResponsesRequest(OpenAIBaseModel):
+         data["input"] = processed_input
+         return data
+ 
++    @model_validator(mode="before")
++    @classmethod
++    def check_reasoning_hold(cls, data):
++        # A Responses request renders the template, which decides where the
++        # model reasons.
++        if isinstance(data, dict):
++            refuse_caller_reasoning_hold(data.get("structured_outputs"))
++        return data
++
+     @model_validator(mode="before")
+     @classmethod
+     def check_tool_usage(cls, data):
