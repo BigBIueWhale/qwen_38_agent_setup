@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
-"""The parser composition serving builds, for a probe that parses locally.
+"""The parser serving builds, for a probe that parses locally.
 
 A probe that checks a policy by parsing a fixed output must parse it the way the
-served route does: the reasoning parser and the tool-call parser the launch
-selects, composed by ``ParserManager`` into the two-pass parser serving
-constructs, with the launch's default template arguments. A single engine built
-directly is a different parser -- it has no reasoning-to-tool hand-off -- so a
-policy it passes says nothing about the route. ``scripts/run-probe.sh`` names
-what the launch gives ``--reasoning-parser``, ``--tool-call-parser`` and
-``--default-chat-template-kwargs`` in ``SERVED_REASONING_PARSER``,
-``SERVED_TOOL_CALL_PARSER`` and ``SERVED_CHAT_TEMPLATE_KWARGS``.
+served route does: with the parser ``ParserManager`` builds for the reasoning
+parser and the tool-call parser the launch selects -- for this launch, the one
+Qwen engine both adapt -- and the launch's default template arguments, so what
+the probe holds is the route's parser, not one built beside it.
+``scripts/run-probe.sh`` names what the launch gives ``--reasoning-parser``,
+``--tool-call-parser`` and ``--default-chat-template-kwargs`` in
+``SERVED_REASONING_PARSER``, ``SERVED_TOOL_CALL_PARSER`` and
+``SERVED_CHAT_TEMPLATE_KWARGS``.
 """
 
 from __future__ import annotations

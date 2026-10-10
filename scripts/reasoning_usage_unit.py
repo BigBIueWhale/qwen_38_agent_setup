@@ -160,7 +160,7 @@ assert (reasoning, content, tool_calls) == ("ABC", "DE", None), (
 )
 assert batched.reasoning_token_count == 3
 assert batched.generated_token_count == len(ids)
-assert batched.reasoning_parser.count_reasoning_tokens(ids) == 3
+assert batched.count_reasoning_tokens(ids) == 3
 
 # The usage field the endpoint builds: summed across choices, absent rather
 # than zero when a choice has no exact count, and refused when the parser

@@ -1,0 +1,775 @@
+diff --git a/tests/parser/engine/test_qwen3.py b/tests/parser/engine/test_qwen3.py
+index f360fab6679f9fb2485bf7bb3ce78aa129ee05bd..6397f416eb1a1ef045859582c358891c2185469c 100644
+--- a/tests/parser/engine/test_qwen3.py
++++ b/tests/parser/engine/test_qwen3.py
+@@ -1357,3 +1357,139 @@ def test_the_qwen_tool_parser_is_never_served_without_its_grammar(monkeypatch):
+         is Qwen3EngineToolParser
+     )
+     Qwen3EngineToolParser(MagicMock(), tools)
++
++
++def test_the_qwen_format_is_served_as_one_engine():
++    """A reasoning parser and a tool parser that both adapt the Qwen engine
++    are served as that one engine, which parses the output in one pass; the
++    serving layer reads the two configured parsers from the class, as it
++    reads a composed parser's. Two engines, or a reasoning parser served
++    without a tool parser, stay composed."""
++    from itertools import product
++
++    from vllm.parser.abstract_parser import DelegatingParser
++    from vllm.parser.parser_manager import ParserManager
++    from vllm.parser.qwen3 import Qwen3ServedParser
++    from vllm.reasoning import ReasoningParserManager
++    from vllm.tool_parsers import ToolParserManager
++
++    tokenizer = make_mock_tokenizer({TOOL_CALL_START: 100, TOOL_CALL_END: 101})
++    for reasoning, tool in product(("qwen3", "mimo"), ("qwen3_coder", "qwen3_xml", "mimo")):
++        served = ParserManager.get_parser(
++            tool_parser_name=tool, reasoning_parser_name=reasoning,
++            enable_auto_tools=True,
++        )
++        assert issubclass(served, Qwen3ServedParser), (reasoning, tool)
++        assert not issubclass(served, DelegatingParser)
++        assert served.reasoning_parser_cls is (
++            ReasoningParserManager.get_reasoning_parser(reasoning)
++        )
++        assert served.tool_parser_cls is ToolParserManager.get_tool_parser(tool)
++        parser = served(tokenizer, [])
++        assert parser.reasoning_parser is None
++        assert parser.tool_parser is None
++    for reasoning, tool, auto in (
++        ("nemotron_v3", "qwen3_coder", True),
++        ("qwen3", "qwen3_coder", False),
++    ):
++        composed = ParserManager.get_parser(
++            tool_parser_name=tool, reasoning_parser_name=reasoning,
++            enable_auto_tools=auto,
++        )
++        assert issubclass(composed, DelegatingParser), (reasoning, tool, auto)
++
++
++@pytest.mark.parametrize("thinking", [True, False])
++def test_the_one_engine_arms_the_grammar_a_composition_arms(thinking):
++    """The served engine arms the grammar a composition of the same two
++    parsers arms, for every tool choice and wherever the prompt leaves
++    reasoning: one function decides what the grammar covers and where the
++    engine applies it, so the request's structured-output parameters --
++    ``enable_in_reasoning`` among them -- are the same."""
++    import copy
++
++    from vllm.entrypoints.openai.chat_completion.protocol import (
++        ChatCompletionRequest,
++    )
++    from vllm.entrypoints.openai.responses.protocol import ResponsesRequest
++    from vllm.parser.abstract_parser import DelegatingParser
++    from vllm.parser.parser_manager import ParserManager
++
++    served = ParserManager.get_parser(
++        tool_parser_name="qwen3_coder", reasoning_parser_name="qwen3",
++        enable_auto_tools=True,
++    )
++    composed = type("Composed", (DelegatingParser,), {
++        "reasoning_parser_cls": served.reasoning_parser_cls,
++        "tool_parser_cls": served.tool_parser_cls,
++    })
++    think, think_end, text = 50, 51, 7
++    tokenizer = make_mock_tokenizer({
++        "<think>": think, "</think>": think_end,
++        TOOL_CALL_START: 100, TOOL_CALL_END: 101,
++    })
++    parameters = {
++        "type": "object", "properties": {"text": {"type": "string"}},
++        "required": ["text"], "additionalProperties": False,
++    }
++    tool = {"type": "function", "function": {"name": "write", "parameters": parameters}}
++    function = {"type": "function", "name": "write", "parameters": parameters}
++
++    def chat(**fields):
++        return ChatCompletionRequest(model="m", messages=[], tools=[tool], **fields)
++
++    def responses(choice):
++        return ResponsesRequest.model_validate({
++            "model": "m", "input": "x", "tools": [function], "tool_choice": choice,
++            "kv_scope": "unit",
++        })
++
++    def allowed(mode):
++        return {"type": "allowed_tools", "mode": mode,
++                "tools": [{"type": "function", "name": "write"}]}
++
++    named = {"type": "function", "function": {"name": "write"}}
++    requests = [
++        chat(tool_choice="auto"), chat(tool_choice="none"),
++        chat(tool_choice="required"), chat(tool_choice=named),
++        chat(tool_choice="required", parallel_tool_calls=False),
++        chat(tool_choice="auto", parallel_tool_calls=False),
++        ChatCompletionRequest(model="m", messages=[]),
++        responses("required"), responses({"type": "function", "name": "write"}),
++        responses(allowed("required")), responses(allowed("auto")),
++        responses("none"),
++    ]
++    prompts = [
++        # The served generation prompt ends inside the <think> it wrote.
++        [text, think, text],
++        # A continued final message closed reasoning.
++        [think, text, think_end, text],
++        # A call the prompt opened after its reasoning ends that reasoning.
++        [think, text, 100, text],
++        # A template that leaves the opener to the model.
++        [text],
++        # No rendered prompt.
++        None,
++    ]
++    kwargs = {"chat_template_kwargs": {"enable_thinking": thinking}}
++    held = 0
++    for request in requests:
++        for prompt in prompts:
++            armed = [
++                parser_cls(tokenizer, request.tools, **kwargs).adjust_request(
++                    copy.deepcopy(request), prompt_token_ids=prompt
++                )
++                for parser_cls in (composed, served)
++            ]
++            dumps = [(
++                adjusted.skip_special_tokens,
++                adjusted.structured_outputs,
++                getattr(adjusted, "response_format", None),
++                getattr(adjusted, "text", None),
++            ) for adjusted in armed]
++            assert dumps[0] == dumps[1], (request.tool_choice, prompt)
++            outputs = armed[1].structured_outputs
++            held += bool(outputs is not None and outputs.enable_in_reasoning)
++    # The forced choices are held through reasoning exactly where the
++    # prompt left it open while the model thinks.
++    assert held == (6 if thinking else 0)
+diff --git a/tests/parser/engine/test_qwen3_reasoning.py b/tests/parser/engine/test_qwen3_reasoning.py
+index bc6eca255ea16891a335658e1d6932932a241bf0..b5b1014f498312f860518daa5b0788f8faa91544 100644
+--- a/tests/parser/engine/test_qwen3_reasoning.py
++++ b/tests/parser/engine/test_qwen3_reasoning.py
+@@ -170,16 +170,36 @@ class TestNonStreaming:
+         assert content == "Answer."
+ 
+     def test_prompt_without_an_opener_leaves_it_to_the_model(self, parser):
+-        """A prompt whose last reasoning marker is no opener keeps the
+-        configured start: the generation's first token opens reasoning."""
+-        parser.adjust_initial_state_from_prompt(
+-            [_THINK_START_ID, _THINK_END_ID, _TEXT_ID]
+-        )
++        """A prompt with no reasoning marker keeps the configured start: the
++        generation's first token opens reasoning."""
++        parser.adjust_initial_state_from_prompt([_TEXT_ID])
+         text = "<think>Plan</think>Answer."
+         reasoning, content = parser.extract_reasoning(text, None)
+         assert reasoning == "Plan"
+         assert content == "Answer."
+ 
++    @pytest.mark.parametrize(
++        "prompt",
++        [
++            # A continued final message: the prompt's last marker is the closer.
++            [_THINK_START_ID, _TEXT_ID, _THINK_END_ID, _TEXT_ID],
++            # A call the prompt opened after its reasoning ends that reasoning.
++            [_THINK_START_ID, _TEXT_ID, _TOOL_CALL_ID, _TEXT_ID],
++        ],
++        ids=["closer", "unpaired_call"],
++    )
++    def test_prompt_that_closed_reasoning_leaves_only_content(self, parser, prompt):
++        """A prompt that closed reasoning leaves every generated token outside
++        it, as ``is_reasoning_end`` reads that prompt: markers the generation
++        writes are its text, and nothing is counted as reasoning."""
++        assert parser.is_reasoning_end(prompt)
++        parser.adjust_initial_state_from_prompt(prompt)
++        text = "<think>Plan</think>Answer."
++        reasoning, content = parser.extract_reasoning(text, None)
++        assert reasoning is None
++        assert content == text
++        assert parser.count_reasoning_tokens([_THINK_START_ID, _TEXT_ID]) == 0
++
+     def test_second_think_end_is_content(self, parser):
+         """Reasoning ends once; a later </think> is text the model wrote."""
+         text = "Reasoning here.</think>Content here.</think>More content."
+@@ -495,6 +515,26 @@ class TestStreaming:
+         assert reasoning == "<think>plan"
+         assert content == "done"
+ 
++    def test_streaming_after_a_prompt_that_closed_reasoning_is_content(
++        self, parser
++    ):
++        """A prompt that closed reasoning leaves the stream content from its
++        first token, exactly as in batch."""
++        parser.adjust_initial_state_from_prompt([_THINK_START_ID, _THINK_END_ID])
++        reasoning, content = simulate_reasoning_streaming(
++            parser,
++            ["<think>", "plan", "</think>", "done"],
++            [
++                (_THINK_START_ID,),
++                (1,),
++                (_THINK_END_ID,),
++                (2,),
++            ],
++        )
++        assert reasoning == ""
++        assert content == "<think>plan</think>done"
++        assert parser.reasoning_token_count == 0
++
+     def test_streaming_second_think_end_is_content(self, parser):
+         """A second </think> token is content, exactly as in batch."""
+         reasoning, content = simulate_reasoning_streaming(
+diff --git a/tests/parser/engine/test_reasoning_token_count.py b/tests/parser/engine/test_reasoning_token_count.py
+index a6c31222ff027f519281b8a80d84200b1ac7465c..3b3a353f86dc935d4a8af803e4aff62a6e2b0148 100644
+--- a/tests/parser/engine/test_reasoning_token_count.py
++++ b/tests/parser/engine/test_reasoning_token_count.py
+@@ -4,8 +4,8 @@
+ 
+ Every count here is checked against the position of the boundary id in the
+ generated id stream -- the only definition that cannot drift from the split
+-the client received -- through the same composed parser the chat endpoint
+-uses, on both the delta-by-delta and the batch path.
++the client received -- through the same parser the chat endpoint uses, on
++both the delta-by-delta and the batch path.
+ """
+ 
+ import importlib
+@@ -77,7 +77,7 @@ def request_stub():
+ 
+ 
+ @pytest.fixture
+-def composed_parser(tokenizer):
++def served_parser(tokenizer):
+     """The parser the chat endpoint builds for this deployment."""
+     parser_cls = ParserManager.get_parser(
+         tool_parser_name="qwen3_coder",
+@@ -179,7 +179,7 @@ class PromptOpenedGrammar(ParserEngine):
+ class TestStreaming:
+     @pytest.mark.parametrize("implicit", [False, True])
+     def test_boundary_ids_wait_for_detokenized_text(
+-        self, composed_parser, request_stub, implicit
++        self, served_parser, request_stub, implicit
+     ):
+         call = (
+             TOOL_CALL_START,
+@@ -188,30 +188,30 @@ class TestStreaming:
+         )
+         boundary = TOOL_CALL_START if implicit else THINK_END
+         _, delayed_ids = tokens("A", boundary)
+-        first = composed_parser.parse_delta(
++        first = served_parser.parse_delta(
+             "A", delayed_ids, request_stub, prompt_token_ids=[1, 2, 3], finished=False
+         )
+         tail = call[1:] if implicit else call
+         tail_text, tail_ids = tokens(*tail)
+-        last = composed_parser.parse_delta(
++        last = served_parser.parse_delta(
+             boundary + tail_text, tail_ids, request_stub, finished=True
+         )
+         assert joined([first, last], "reasoning") == "A"
+         assert last and last.tool_calls
+-        assert composed_parser.reasoning_token_count == 1
+-        assert composed_parser.generated_token_count == len(delayed_ids) + len(tail_ids)
++        assert served_parser.reasoning_token_count == 1
++        assert served_parser.generated_token_count == len(delayed_ids) + len(tail_ids)
+ 
+-    def test_counts_ids_before_the_explicit_end(self, composed_parser, request_stub):
++    def test_counts_ids_before_the_explicit_end(self, served_parser, request_stub):
+         deltas = [("A", "B"), ("C", THINK_END, "D"), ("E",)]
+-        outputs = stream(composed_parser, request_stub, deltas)
++        outputs = stream(served_parser, request_stub, deltas)
+ 
+         assert joined(outputs, "reasoning") == "ABC"
+         assert joined(outputs, "content") == "DE"
+-        assert composed_parser.reasoning_token_count == 3
+-        assert composed_parser.generated_token_count == 6
++        assert served_parser.reasoning_token_count == 3
++        assert served_parser.generated_token_count == 6
+ 
+     def test_counts_ids_before_the_implicit_tool_call_end(
+-        self, composed_parser, request_stub
++        self, served_parser, request_stub
+     ):
+         call = (
+             TOOL_CALL_START,
+@@ -219,47 +219,47 @@ class TestStreaming:
+             TOOL_CALL_END,
+         )
+         deltas = [("A", "B"), ("C",), call]
+-        outputs = stream(composed_parser, request_stub, deltas)
++        outputs = stream(served_parser, request_stub, deltas)
+ 
+         assert joined(outputs, "reasoning") == "ABC"
+         assert any(delta and delta.tool_calls for delta in outputs)
+-        assert composed_parser.reasoning_token_count == 3
+-        assert composed_parser.generated_token_count == 3 + len(call)
++        assert served_parser.reasoning_token_count == 3
++        assert served_parser.generated_token_count == 3 + len(call)
+ 
+     def test_counts_every_id_when_reasoning_never_ends(
+-        self, composed_parser, request_stub
++        self, served_parser, request_stub
+     ):
+         # A generation cut by max_tokens inside reasoning is all reasoning,
+         # and a special token generated before the boundary is a generated
+         # id inside it, exactly as completion_tokens counts it.
+         deltas = [("A", THINK_START, "B"), ("C", END_OF_TURN)]
+-        stream(composed_parser, request_stub, deltas)
++        stream(served_parser, request_stub, deltas)
+ 
+-        assert composed_parser.reasoning_token_count == 5
+-        assert composed_parser.generated_token_count == 5
++        assert served_parser.reasoning_token_count == 5
++        assert served_parser.generated_token_count == 5
+ 
+-    def test_boundary_inside_a_merged_delta(self, composed_parser, request_stub):
++    def test_boundary_inside_a_merged_delta(self, served_parser, request_stub):
+         # A lagging server merges several steps into one delta; the count
+         # still splits at the boundary id within it.
+         deltas = [("A", "B", "C", THINK_END, "D", "E", "F")]
+-        outputs = stream(composed_parser, request_stub, deltas)
++        outputs = stream(served_parser, request_stub, deltas)
+ 
+         assert joined(outputs, "reasoning") == "ABC"
+         assert joined(outputs, "content") == "DEF"
+-        assert composed_parser.reasoning_token_count == 3
++        assert served_parser.reasoning_token_count == 3
+ 
+-    def test_starts_at_zero_before_any_delta(self, composed_parser):
+-        assert composed_parser.reasoning_token_count == 0
+-        assert composed_parser.generated_token_count == 0
++    def test_starts_at_zero_before_any_delta(self, served_parser):
++        assert served_parser.reasoning_token_count == 0
++        assert served_parser.generated_token_count == 0
+ 
+ 
+ class TestBatch:
+     def test_batch_split_is_made_on_ids_and_counted(
+-        self, composed_parser, request_stub
++        self, served_parser, request_stub
+     ):
+         text, ids = tokens("A", "B", "C", THINK_END, "D", "E")
+ 
+-        reasoning, content, tool_calls = composed_parser.parse(
++        reasoning, content, tool_calls = served_parser.parse(
+             text,
+             request_stub,
+             enable_auto_tools=True,
+@@ -269,8 +269,8 @@ class TestBatch:
+         assert reasoning == "ABC"
+         assert content == "DE"
+         assert not tool_calls
+-        assert composed_parser.reasoning_token_count == 3
+-        assert composed_parser.generated_token_count == len(ids)
++        assert served_parser.reasoning_token_count == 3
++        assert served_parser.generated_token_count == len(ids)
+ 
+     def test_batch_and_stream_agree_on_the_same_generation(
+         self, tokenizer, request_stub
+@@ -295,13 +295,13 @@ class TestBatch:
+         assert streamed.reasoning_token_count == batched.reasoning_token_count == 2
+ 
+     def test_whole_sequence_count_matches_the_incremental_count(
+-        self, composed_parser, request_stub
++        self, served_parser, request_stub
+     ):
+         _, ids = tokens("A", "B", THINK_END, "C")
+-        stream(composed_parser, request_stub, [("A", "B"), (THINK_END, "C")])
++        stream(served_parser, request_stub, [("A", "B"), (THINK_END, "C")])
+ 
+-        assert composed_parser.reasoning_parser.count_reasoning_tokens(ids) == 2
+-        assert composed_parser.reasoning_token_count == 2
++        assert served_parser.count_reasoning_tokens(ids) == 2
++        assert served_parser.reasoning_token_count == 2
+ 
+ 
+ class TestRefusals:
+diff --git a/vllm/entrypoints/openai/chat_completion/serving.py b/vllm/entrypoints/openai/chat_completion/serving.py
+index 58ac785ba6dd16285e97e485448489c95b427e3c..e34febca6ea34f52dfe8a76388393f252a0ad65c 100644
+--- a/vllm/entrypoints/openai/chat_completion/serving.py
++++ b/vllm/entrypoints/openai/chat_completion/serving.py
+@@ -334,7 +334,7 @@ class OpenAIServingChat(GenerateBaseServing):
+                 # `think?` rule that handles both reasoning and
+                 # non-reasoning outputs.
+                 reasoning_ended = True
+-            elif parser is not None and parser.reasoning_parser is not None:
++            elif parser is not None and parser.reasoning_parser_cls is not None:
+                 reasoning_ended = parser.is_reasoning_end(prompt_token_ids or [])
+             else:
+                 reasoning_ended = None
+@@ -352,7 +352,7 @@ class OpenAIServingChat(GenerateBaseServing):
+                 reasoning_parser_kwargs={
+                     "chat_template_kwargs": chat_template_kwargs,
+                 }
+-                if parser is not None and parser.reasoning_parser is not None
++                if parser is not None and parser.reasoning_parser_cls is not None
+                 else None,
+             )
+ 
+diff --git a/vllm/entrypoints/openai/responses/serving.py b/vllm/entrypoints/openai/responses/serving.py
+index 8c15b36b33567b9224a7582ec1f44c5af7e2b09d..88c9c049cb3efe84f3efa5d56263eb2d2f7c8307 100644
+--- a/vllm/entrypoints/openai/responses/serving.py
++++ b/vllm/entrypoints/openai/responses/serving.py
+@@ -559,13 +559,17 @@ class OpenAIServingResponses(GenerateBaseServing):
+ 
+             if (
+                 context.response_parser is not None
+-                and context.response_parser.reasoning_parser is not None
++                and context.response_parser.reasoning_parser_cls is not None
+             ):
+                 reasoning_parser_kwargs = {
+                     "chat_template_kwargs": chat_template_kwargs,
+                 }
++                # A format served as one engine has no separate reasoning
++                # parser to prepare the tag.
++                reasoning_parser = context.response_parser.reasoning_parser
+                 if (
+-                    isinstance(
++                    reasoning_parser is not None
++                    and isinstance(
+                         struct_out := sampling_params.structured_outputs,
+                         StructuredOutputsParams,
+                     )
+@@ -574,7 +578,7 @@ class OpenAIServingResponses(GenerateBaseServing):
+                     sampling_params.structured_outputs = replace(
+                         struct_out,
+                         structural_tag=(
+-                            context.response_parser.reasoning_parser.prepare_structured_tag(
++                            reasoning_parser.prepare_structured_tag(
+                                 struct_out.structural_tag, self.tool_server
+                             )
+                         ),
+diff --git a/vllm/parser/abstract_parser.py b/vllm/parser/abstract_parser.py
+index ba379a74d1f0544d0bda6bc771188633fc8d0113..f7d896a0ef94bece399e3e17d27c99fbefb3bb33 100644
+--- a/vllm/parser/abstract_parser.py
++++ b/vllm/parser/abstract_parser.py
+@@ -7,6 +7,7 @@ from abc import abstractmethod
+ from collections.abc import Sequence
+ from dataclasses import dataclass, field
+ from functools import cached_property
++from typing import TYPE_CHECKING
+ 
+ from openai.types.responses import ToolChoiceAllowed, ToolChoiceFunction
+ from pydantic import TypeAdapter, ValidationError
+@@ -40,6 +41,9 @@ from vllm.tool_parsers.streaming import (
+     extract_required_tool_call_streaming,
+ )
+ 
++if TYPE_CHECKING:
++    from vllm.parser.engine.parser_engine import ParserEngine
++
+ logger = init_logger(__name__)
+ 
+ 
+@@ -511,6 +515,91 @@ class Parser:
+         """
+ 
+ 
++def tool_grammar_holds_reasoning(
++    request: ChatCompletionRequest | ResponsesRequest,
++    tool_parser: ToolParser,
++    reasoning_parser: "ReasoningParser | ParserEngine | None",
++    prompt_token_ids: Sequence[int] | None,
++) -> bool:
++    """Whether the tool grammar armed for *request* also writes the
++    reasoning: its choice's answer is only calls, the generation that
++    continues *prompt_token_ids* begins inside reasoning the prompt
++    opened, and the tool format writes reasoning closed as the reasoning
++    parser closes it. A grammar that starts once reasoning has ended
++    leaves the model free to end such a generation inside its reasoning,
++    with no call."""
++    from vllm.tool_parsers.structural_tag_registry import (
++        holds_choice_through_reasoning,
++    )
++
++    return (
++        prompt_token_ids is not None
++        and reasoning_parser is not None
++        and holds_choice_through_reasoning(
++            tool_parser.structural_tag_model,
++            request.tool_choice,
++            reasoning_parser.reasoning_end_str,
++        )
++        and reasoning_parser.prompt_leaves_reasoning_open(prompt_token_ids)
++    )
++
++
++def apply_tool_structural_tag(
++    request: ChatCompletionRequest | ResponsesRequest,
++    tool_parser: ToolParser,
++    reasoning_parser: "ReasoningParser | ParserEngine | None",
++    prompt_token_ids: Sequence[int] | None,
++) -> ChatCompletionRequest | ResponsesRequest:
++    """Arm for *request* the tool-call grammar *tool_parser*'s format
++    declares, for the prompt *prompt_token_ids* the request rendered.
++
++    The one place a request's tool choice becomes its decoding grammar,
++    whichever parser reads the output: the composed parser passes its
++    reasoning parser as *reasoning_parser*, and a format served as one
++    engine passes the engine, which reads the reasoning itself.
++    """
++    if not request.tools:
++        return request
++
++    need_tool_calling = (
++        request.tool_choice == "auto"
++        or request.tool_choice == "required"
++        or isinstance(
++            request.tool_choice,
++            (
++                ChatCompletionNamedToolChoiceParam,
++                ToolChoiceFunction,
++                ToolChoiceAllowed,
++            ),
++        )
++    )
++    if not need_tool_calling:
++        return request
++
++    # One value decides both what the grammar covers and where the engine
++    # applies it, so the two cannot disagree on any route.
++    holds_reasoning = tool_grammar_holds_reasoning(
++        request, tool_parser, reasoning_parser, prompt_token_ids
++    )
++    structure_tag = tool_parser.get_structural_tag(
++        request,
++        reasoning=holds_reasoning,
++    )
++    if structure_tag is None:
++        return request
++
++    structural_tag = json.dumps(structure_tag.model_dump())
++    request.structured_outputs = StructuredOutputsParams(
++        structural_tag=structural_tag,
++        enable_in_reasoning=holds_reasoning,
++    )
++    if isinstance(request, ResponsesRequest):
++        request.text = None
++    else:
++        request.response_format = None
++    return request
++
++
+ class DelegatingParser(Parser):
+     """
+     A Parser implementation that delegates to separate ReasoningParser and
+@@ -729,78 +818,16 @@ class DelegatingParser(Parser):
+             request = self._tool_parser.adjust_request(request)
+         return request
+ 
+-    def _grammar_holds_reasoning(
+-        self,
+-        request: ChatCompletionRequest | ResponsesRequest,
+-        prompt_token_ids: Sequence[int] | None,
+-    ) -> bool:
+-        """Whether the tool grammar armed for *request* also writes the
+-        reasoning: its choice's answer is only calls, the generation that
+-        continues *prompt_token_ids* begins inside reasoning the prompt
+-        opened, and the tool format writes reasoning closed as the reasoning
+-        parser closes it. A grammar that starts once reasoning has ended
+-        leaves the model free to end such a generation inside its reasoning,
+-        with no call."""
+-        from vllm.tool_parsers.structural_tag_registry import (
+-            holds_choice_through_reasoning,
+-        )
+-
+-        reasoning_parser = self._reasoning_parser
+-        return (
+-            prompt_token_ids is not None
+-            and reasoning_parser is not None
+-            and self._tool_parser is not None
+-            and holds_choice_through_reasoning(
+-                self._tool_parser.structural_tag_model,
+-                request.tool_choice,
+-                reasoning_parser.reasoning_end_str,
+-            )
+-            and reasoning_parser.prompt_leaves_reasoning_open(prompt_token_ids)
+-        )
+-
+     def _apply_structural_tag(
+         self,
+         request: ChatCompletionRequest | ResponsesRequest,
+         prompt_token_ids: Sequence[int] | None,
+     ) -> ChatCompletionRequest | ResponsesRequest:
+-        if self._tool_parser is None or not request.tools:
+-            return request
+-
+-        need_tool_calling = (
+-            request.tool_choice == "auto"
+-            or request.tool_choice == "required"
+-            or isinstance(
+-                request.tool_choice,
+-                (
+-                    ChatCompletionNamedToolChoiceParam,
+-                    ToolChoiceFunction,
+-                    ToolChoiceAllowed,
+-                ),
+-            )
+-        )
+-        if not need_tool_calling:
+-            return request
+-
+-        # One value decides both what the grammar covers and where the engine
+-        # applies it, so the two cannot disagree on any route.
+-        holds_reasoning = self._grammar_holds_reasoning(request, prompt_token_ids)
+-        structure_tag = self._tool_parser.get_structural_tag(
+-            request,
+-            reasoning=holds_reasoning,
+-        )
+-        if structure_tag is None:
++        if self._tool_parser is None:
+             return request
+-
+-        structural_tag = json.dumps(structure_tag.model_dump())
+-        request.structured_outputs = StructuredOutputsParams(
+-            structural_tag=structural_tag,
+-            enable_in_reasoning=holds_reasoning,
++        return apply_tool_structural_tag(
++            request, self._tool_parser, self._reasoning_parser, prompt_token_ids
+         )
+-        if isinstance(request, ResponsesRequest):
+-            request.text = None
+-        else:
+-            request.response_format = None
+-        return request
+ 
+     def extract_reasoning_streaming(
+         self,
+diff --git a/vllm/parser/parser_manager.py b/vllm/parser/parser_manager.py
+index 1c4ed03266a1618456edc1dd8981197aa3382a37..4ba5f54f60aa1611d13e18ea99b4a2b635824aee 100644
+--- a/vllm/parser/parser_manager.py
++++ b/vllm/parser/parser_manager.py
+@@ -86,7 +86,8 @@ class ParserManager:
+         Get a Parser that handles both reasoning and tool parsing.
+ 
+         Composes individual reasoning and tool parsers into a single
+-        DelegatingParser subclass.
++        DelegatingParser subclass, except where both adapt the Qwen engine,
++        which is then served as that one engine (Qwen3ServedParser).
+ 
+         Args:
+             tool_parser_name: The name of the tool parser.
+@@ -129,6 +130,34 @@ class ParserManager:
+ 
+             return _KimiK3Parser
+ 
++        from vllm.parser.engine.adapters import (
++            ParserEngineReasoningAdapter,
++            ParserEngineToolAdapter,
++        )
++
++        if (
++            reasoning_parser_cls is not None
++            and tool_parser_cls is not None
++            and issubclass(reasoning_parser_cls, ParserEngineReasoningAdapter)
++            and issubclass(tool_parser_cls, ParserEngineToolAdapter)
++        ):
++            from vllm.parser.qwen3 import Qwen3Parser, Qwen3ServedParser
++
++            if (
++                reasoning_parser_cls._parser_engine_cls is Qwen3Parser
++                and tool_parser_cls._parser_engine_cls is Qwen3Parser
++            ):
++                # Both parsers adapt the one Qwen engine, which parses the
++                # output itself: one pass decides reasoning, content and calls.
++                r_cls = reasoning_parser_cls
++                t_cls = tool_parser_cls
++
++                class _Qwen3ServedParser(Qwen3ServedParser):
++                    reasoning_parser_cls = r_cls
++                    tool_parser_cls = t_cls
++
++                return _Qwen3ServedParser
++
+         from vllm.parser.abstract_parser import DelegatingParser
+ 
+         r_cls = reasoning_parser_cls
+diff --git a/vllm/parser/qwen3.py b/vllm/parser/qwen3.py
+index 3c635d8015bb42ff662c7f6a39fc33771647ad0d..eb247764be10d562910a5112e1b6ec8ddfcb6ab5 100644
+--- a/vllm/parser/qwen3.py
++++ b/vllm/parser/qwen3.py
+@@ -33,6 +33,7 @@ from jsonschema import Draft202012Validator
+ from referencing import Registry
+ 
+ from vllm.entrypoints.openai.engine.protocol import RepeatedToolParameterError
++from vllm.parser.abstract_parser import apply_tool_structural_tag
+ from vllm.parser.engine.events import EventType
+ from vllm.parser.engine.parser_engine import ParserEngine
+ from vllm.parser.engine.parser_engine_config import (
+@@ -564,26 +565,31 @@ class Qwen3Parser(ParserEngine):
+     def adjust_initial_state_from_prompt(
+         self, prompt_token_ids: Sequence[int]
+     ) -> None:
+-        """A prompt that opened reasoning leaves the model no opener to write.
+-
+-        When the prompt's last reasoning marker is ``<think>`` -- every
+-        generation prompt the served template writes ends with it -- the
+-        reasoning is open, and a ``<think>`` the model generates is part of
+-        it. Otherwise the configured start holds: the generation's first
++        """Begin where the prompt leaves reasoning, on the streaming and the
++        batch parse alike.
++
++        A prompt that already closed reasoning -- a continued final message,
++        or a template that writes the closer itself -- leaves every generated
++        token outside it, exactly as ``is_reasoning_end`` reads that prompt
++        for the structured-output gate: the generation is content from its
++        first token. A prompt that opened reasoning leaves the model no
++        opener to write: when its last reasoning marker is ``<think>`` --
++        every generation prompt the served template writes ends with it --
++        the reasoning is open, and a ``<think>`` the model generates is part
++        of it. Otherwise the configured start holds: the generation's first
+         token may open reasoning, as a template that leaves the opener to the
+-        model expects. A prompt that closed reasoning is parsed as content
+-        before this is asked.
++        model expects.
+         """
+         if not self.thinking_enabled:
+             return
++        if self.is_reasoning_end(list(prompt_token_ids)):
++            self._start_in(ParserState.CONTENT)
++            return
+         start_id = self._reasoning_start_token_id
+-        end_id = self._reasoning_end_token_id
+         for token_id in reversed(prompt_token_ids):
+             if token_id == start_id:
+                 self._start_in(ParserState.REASONING, reasoning_opened=True)
+                 return
+-            if token_id == end_id:
+-                return
+ 
+     def prompt_leaves_reasoning_open(self, prompt_token_ids: Sequence[int]) -> bool:
+         """The prompt's last reasoning marker is ``<think>`` -- every
+@@ -666,3 +672,37 @@ class Qwen3Parser(ParserEngine):
+                 continue
+             return input_ids[i:]
+         return input_ids
++
++
++class Qwen3ServedParser(Qwen3Parser):
++    """The Qwen format, served as one engine.
++
++    ``ParserManager`` serves it wherever the reasoning parser and the tool
++    parser a launch names both adapt :class:`Qwen3Parser`, and binds those
++    two as ``reasoning_parser_cls`` and ``tool_parser_cls``, where the
++    serving layer reads a launch's parsers; this class names none itself.
++    One pass over the generation decides reasoning, content and calls,
++    beginning where the prompt leaves reasoning. The tool parser declares
++    the decoding grammar, which ``apply_tool_structural_tag`` arms, as it
++    arms a composed parser's.
++    """
++
++    reasoning_parser_cls = None
++    tool_parser_cls = None
++
++    def adjust_request(
++        self,
++        request: ChatCompletionRequest | ResponsesRequest,
++        *,
++        prompt_token_ids: Sequence[int] | None = None,
++    ) -> ChatCompletionRequest | ResponsesRequest:
++        # The engine keeps special tokens in the text it reads; the grammar
++        # is armed for the prompt the request rendered, the engine reading
++        # where that prompt leaves reasoning; and the tool parser adjusts the
++        # request last, as it does wherever it is served.
++        request = super().adjust_request(request, prompt_token_ids=prompt_token_ids)
++        tool_parser = self.tool_parser_cls(self.model_tokenizer, request.tools)
++        request = apply_tool_structural_tag(
++            request, tool_parser, self, prompt_token_ids
++        )
++        return tool_parser.adjust_request(request)

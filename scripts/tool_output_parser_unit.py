@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """CPU checks of the installed Qwen parser's wire-visible language, run as
-serving runs it: the parser composition the launch selects, on the served
-tokenizer, fed the deltas its native decoder produces.
+serving runs it: the parser the launch's reasoning and tool-call parsers
+select, on the served tokenizer, fed the deltas its native decoder produces.
 
 The build mounts the served model's tokenizer and generation files, each checked
 against the model manifest, at ``SERVED_MODEL``, and names what the launch gives
 ``--reasoning-parser``, ``--tool-call-parser`` and
 ``--default-chat-template-kwargs`` in ``SERVED_REASONING_PARSER``,
 ``SERVED_TOOL_CALL_PARSER`` and ``SERVED_CHAT_TEMPLATE_KWARGS``. Nothing here has
-a second tokenizer or a second composition to fall back to: run any other way,
-the unit fails at import, naming what it lacks.
+a second tokenizer or a second parser to fall back to: run any other way, the
+unit fails at import, naming what it lacks.
 """
 
 import asyncio
@@ -1258,6 +1258,23 @@ class ToolOutputParserTest(unittest.TestCase):
             for chunk in (None, 1, 3, 1000):
                 with self.subTest(opened=prompt is OPEN_PROMPT, chunk=chunk):
                     self.assertEqual(parse(text, chunk, prompt=prompt)[:3], expected)
+
+    def test_the_served_format_is_parsed_by_one_engine(self):
+        """The reasoning parser and the tool-call parser the launch names
+        both adapt one engine, and that engine is the parser serving builds:
+        one pass over each generation decides reasoning, content and calls,
+        and where the prompt leaves reasoning is the engine's own reading of
+        it. The serving layer reads the launch's two parsers from the class.
+        """
+        from vllm.parser.abstract_parser import DelegatingParser
+
+        engine = PARSER.reasoning_parser_cls._parser_engine_cls
+        self.assertIs(PARSER.tool_parser_cls._parser_engine_cls, engine)
+        self.assertTrue(issubclass(PARSER, engine))
+        self.assertFalse(issubclass(PARSER, DelegatingParser))
+        parser = PARSER(TOKENIZER, [TOOL], chat_template_kwargs=CHAT_TEMPLATE_KWARGS)
+        self.assertIsNone(parser.reasoning_parser)
+        self.assertIsNone(parser.tool_parser)
 
     def test_a_format_whose_ids_and_text_could_disagree_never_registers(self):
         """The served format gives its batch tool pass the content ids, which is

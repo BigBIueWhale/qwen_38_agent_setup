@@ -105,6 +105,28 @@ def _require_ordered(
         cursor = found + len(needle)
 
 
+def _function_holding(
+    state: State, path: str, needles: Sequence[str], *, label: str
+) -> str:
+    """The source of the one function or method in *path* that holds every
+    construct in *needles*: a decision pinned by what it does and required to
+    be made in one place, whichever function of the module makes it."""
+    source = _source(state, path, label=label)
+    holding = [
+        segment
+        for node in ast.walk(_parse(state, path, label=label))
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        and (segment := ast.get_source_segment(source, node)) is not None
+        and all(needle in segment for needle in needles)
+    ]
+    _require(
+        len(holding) == 1,
+        f"{label}: expected exactly one function in {path} holding "
+        f"{list(needles)!r}; found {len(holding)}",
+    )
+    return holding[0]
+
+
 def _if_node(
     node: ast.AST,
     test: str,
@@ -1889,9 +1911,9 @@ def _validate_reasoning_usage_after(state: State) -> None:
         label=label,
     )
 
-    # The composed parser the endpoint runs: ids reach the reasoning engine
-    # on the batch path too, every delta is counted, and the count is read
-    # through one property on every Parser.
+    # The composed parser: ids reach the reasoning engine on the batch path
+    # too, every delta is counted, and the count is read through one property
+    # on every Parser.
     require_text(
         state, abstract, "    generated_token_count: int = 0\n", label=label
     )
@@ -4151,10 +4173,11 @@ def _validate_responses_function_list_after(state: State) -> None:
             'parameter=f"tool_choice.tools[{index}]"',
             "cannot be enforced",
         ), label=label)
-    # allowed_tools reaches the tool grammar the composed parser arms; where
-    # none is armed, the tool parser has refused it (qwen-owned-tool-grammar).
-    _require_in_symbol(state, "vllm/parser/abstract_parser.py",
-        "DelegatingParser._apply_structural_tag", ("ToolChoiceAllowed,",), label=label)
+    # allowed_tools reaches the tool grammar a request arms; where none is
+    # armed, the tool parser has refused it (qwen-owned-tool-grammar).
+    _function_holding(state, "vllm/parser/abstract_parser.py", (
+        "need_tool_calling = (", "ToolChoiceAllowed,", ".get_structural_tag(",
+    ), label=label)
     forbid_text(state, "vllm/parser/abstract_parser.py",
                 "tool_choice allowed_tools is enforced by a tool-call", label=label)
     # A choice that lets the model call is refused alike on chat and on
@@ -5226,14 +5249,15 @@ def _validate_forced_choice_reasoning_after(state: State) -> None:
     forbid_text(state, registry, "content=AnyTextFormat(), end=_QWEN_THINK_END",
                 label=label)
     # One value decides what the grammar covers and where the engine applies
-    # it, for the prompt the request rendered.
-    _require_in_symbol(state, _ABSTRACT_PARSER, "DelegatingParser._grammar_holds_reasoning", (
+    # it, for the prompt the request rendered: one function decides it, and
+    # the one function that arms the grammar hands that value to both.
+    _function_holding(state, _ABSTRACT_PARSER, (
         "holds_choice_through_reasoning(",
         "reasoning_parser.reasoning_end_str,",
         "reasoning_parser.prompt_leaves_reasoning_open(prompt_token_ids)",
     ), label=label)
-    _require_in_symbol(state, _ABSTRACT_PARSER, "DelegatingParser._apply_structural_tag", (
-        "holds_reasoning = self._grammar_holds_reasoning(request, prompt_token_ids)",
+    _function_holding(state, _ABSTRACT_PARSER, (
+        "holds_reasoning = ",
         "reasoning=holds_reasoning,",
         "enable_in_reasoning=holds_reasoning,",
     ), label=label)
@@ -5274,6 +5298,119 @@ def _validate_forced_choice_reasoning_after(state: State) -> None:
         "test_a_caller_stop_inside_the_reasoning_waits_for_the_call": None,
         "test_render_carries_the_hold_to_generate": None,
     }, label=label)
+
+
+_QWEN_PARSER = "vllm/parser/qwen3.py"
+_PARSER_MANAGER = "vllm/parser/parser_manager.py"
+_CHAT_COMPLETION_SERVING = "vllm/entrypoints/openai/chat_completion/serving.py"
+_RESPONSES_SERVING = "vllm/entrypoints/openai/responses/serving.py"
+
+
+def _validate_qwen_one_engine_before(state: State) -> None:
+    label = "Qwen served as one engine precondition"
+    forbid_text(state, _QWEN_PARSER, "class Qwen3ServedParser(", label=label)
+    forbid_text(state, _ABSTRACT_PARSER, "def apply_tool_structural_tag(", label=label)
+    # A prompt that closed reasoning was read only by the composed parser.
+    _require_in_symbol(state, _QWEN_PARSER, "Qwen3Parser.adjust_initial_state_from_prompt",
+                       ("if token_id == end_id:",), label=label)
+    _require_in_symbol(state, _CHAT_COMPLETION_SERVING,
+                       "OpenAIServingChat._create_chat_completion",
+                       ("parser.reasoning_parser is not None",), label=label)
+    _require_in_symbol(state, _RESPONSES_SERVING, "OpenAIServingResponses._create_responses",
+                       ("context.response_parser.reasoning_parser is not None",), label=label)
+
+
+def _validate_qwen_one_engine_after(state: State) -> None:
+    label = "Qwen served as one engine"
+    # Where both parsers adapt the Qwen engine, the engine is the parser, with
+    # the two configured parsers bound where the serving layer reads them.
+    manager = _require_in_symbol(state, _PARSER_MANAGER, "ParserManager.get_parser", (
+        "issubclass(reasoning_parser_cls, ParserEngineReasoningAdapter)",
+        "issubclass(tool_parser_cls, ParserEngineToolAdapter)",
+        "reasoning_parser_cls._parser_engine_cls is Qwen3Parser",
+        "tool_parser_cls._parser_engine_cls is Qwen3Parser",
+        "class _Qwen3ServedParser(Qwen3ServedParser):",
+    ), label=label)
+    _require_ordered(manager, (
+        "if is_harmony:", "class _KimiK3Parser(KimiK3Parser):",
+        "class _Qwen3ServedParser(Qwen3ServedParser):",
+        "reasoning_parser_cls = r_cls", "tool_parser_cls = t_cls",
+        "return _Qwen3ServedParser", "class _Parser(DelegatingParser):",
+    ), label=label, location=f"{_PARSER_MANAGER}:ParserManager.get_parser")
+    require_python_symbols(state, _QWEN_PARSER, {
+        "Qwen3ServedParser.adjust_request": ("self", "request", "prompt_token_ids"),
+    }, label=label)
+    served = _symbol_source(state, _QWEN_PARSER, "Qwen3ServedParser", label=label)
+    _require(served.startswith("class Qwen3ServedParser(Qwen3Parser):"),
+             f"{label}: Qwen3ServedParser is not the Qwen engine")
+    _require_ordered(served, (
+        "reasoning_parser_cls = None", "tool_parser_cls = None",
+        "request = super().adjust_request(request, prompt_token_ids=prompt_token_ids)",
+        "tool_parser = self.tool_parser_cls(self.model_tokenizer, request.tools)",
+        "apply_tool_structural_tag(", "request, tool_parser, self, prompt_token_ids",
+        "return tool_parser.adjust_request(request)",
+    ), label=label, location=f"{_QWEN_PARSER}:Qwen3ServedParser")
+    # The engine reads a prompt that closed reasoning by the reading the
+    # structured-output gate takes of it, on the stream and the batch parse.
+    opener = _require_in_symbol(
+        state, _QWEN_PARSER, "Qwen3Parser.adjust_initial_state_from_prompt", (),
+        label=label)
+    _require_ordered(opener, (
+        "if not self.thinking_enabled:",
+        "if self.is_reasoning_end(list(prompt_token_ids)):",
+        "self._start_in(ParserState.CONTENT)",
+        "self._start_in(ParserState.REASONING, reasoning_opened=True)",
+    ), label=label, location=f"{_QWEN_PARSER}:Qwen3Parser.adjust_initial_state_from_prompt")
+    _require("end_id" not in opener, f"{label}: the opener scan still reads a closer")
+    # One function arms every format's tool grammar, the composed parser's and
+    # the engine's, by the one decision of what it covers.
+    require_python_symbols(state, _ABSTRACT_PARSER, {
+        "apply_tool_structural_tag": (
+            "request", "tool_parser", "reasoning_parser", "prompt_token_ids"),
+        "tool_grammar_holds_reasoning": (
+            "request", "tool_parser", "reasoning_parser", "prompt_token_ids"),
+    }, label=label)
+    arming = _function_holding(state, _ABSTRACT_PARSER, (
+        "need_tool_calling = (", ".get_structural_tag(",), label=label)
+    _require(arming.startswith("def apply_tool_structural_tag("),
+             f"{label}: the tool grammar is armed outside apply_tool_structural_tag")
+    _require_in_symbol(state, _ABSTRACT_PARSER, "apply_tool_structural_tag", (
+        "holds_reasoning = tool_grammar_holds_reasoning(",
+    ), label=label)
+    _require_in_symbol(state, _ABSTRACT_PARSER, "DelegatingParser._apply_structural_tag", (
+        "return apply_tool_structural_tag(",
+        "request, self._tool_parser, self._reasoning_parser, prompt_token_ids",
+    ), label=label)
+    forbid_text(state, _ABSTRACT_PARSER, "def _grammar_holds_reasoning(", label=label)
+    # Whether a parser reads reasoning is a property of its class, as every
+    # other parser property the serving layer reads is: the engine holds no
+    # separate reasoning parser.
+    _require_in_symbol(state, _CHAT_COMPLETION_SERVING,
+                       "OpenAIServingChat._create_chat_completion", (
+                           "elif parser is not None and parser.reasoning_parser_cls is not None:",
+                           "if parser is not None and parser.reasoning_parser_cls is not None",
+                       ), label=label)
+    forbid_text(state, _CHAT_COMPLETION_SERVING, "parser.reasoning_parser is not None",
+                label=label)
+    _require_in_symbol(state, _RESPONSES_SERVING, "OpenAIServingResponses._create_responses", (
+        "and context.response_parser.reasoning_parser_cls is not None",
+        "reasoning_parser = context.response_parser.reasoning_parser",
+        "reasoning_parser.prepare_structured_tag(",
+    ), label=label)
+    forbid_text(state, _RESPONSES_SERVING,
+                "context.response_parser.reasoning_parser is not None", label=label)
+    require_python_symbols(state, "tests/parser/engine/test_qwen3.py", {
+        "test_the_qwen_format_is_served_as_one_engine": None,
+        "test_the_one_engine_arms_the_grammar_a_composition_arms": ("thinking",),
+    }, label=label)
+    require_python_symbols(state, "tests/parser/engine/test_qwen3_reasoning.py", {
+        "TestNonStreaming.test_prompt_that_closed_reasoning_leaves_only_content": (
+            "self", "parser", "prompt"),
+        "TestStreaming.test_streaming_after_a_prompt_that_closed_reasoning_is_content":
+            None,
+    }, label=label)
+    forbid_text(state, "tests/parser/engine/test_reasoning_token_count.py",
+                "composed_parser", label=label)
 
 
 def validate_final(state: State) -> None:
@@ -6760,5 +6897,36 @@ CONTRACTS: Mapping[str, SemanticContract] = {
         ),
         validate_before=_validate_forced_choice_reasoning_before,
         validate_after=_validate_forced_choice_reasoning_after,
+    ),
+    "qwen-format-is-served-as-one-engine": SemanticContract(
+        rationale=(
+            "Serving parsed the Qwen format with two instances of its one "
+            "engine, the reasoning adapter's and then the tool adapter's, "
+            "joined by DelegatingParser, which made decisions the engine does "
+            "not: only it read a prompt that had closed reasoning, it handed "
+            "content ids and buffered text across the reasoning boundary, and "
+            "with thinking off its stream never reached the tool pass, so a "
+            "call the batch parse read stayed text. Where the reasoning parser "
+            "and the tool parser both adapt Qwen3Parser, ParserManager serves "
+            "that engine, Qwen3ServedParser, with the two bound as "
+            "reasoning_parser_cls and tool_parser_cls: one pass decides "
+            "reasoning, content and calls. The engine reads a closed prompt "
+            "by is_reasoning_end, the reading the structured-output gate "
+            "takes. apply_tool_structural_tag, the one function the composed "
+            "parser arms with, arms the engine's tool grammar too, so what the "
+            "grammar covers and where the engine applies it are one decision "
+            "for both. Chat and Responses ask a parser's class whether it "
+            "reads reasoning, as they ask it for every other parser, since the "
+            "engine holds no separate reasoning parser: asked of the instance, "
+            "chat admitted no reasoning state and Responses raised. Every "
+            "other pair stays composed."
+        ),
+        removal_condition=(
+            "Remove when pinned upstream serves an engine whose reasoning and "
+            "tool adapters are the configured parsers as that engine, arming "
+            "its tool grammar as the composed parser arms it."
+        ),
+        validate_before=_validate_qwen_one_engine_before,
+        validate_after=_validate_qwen_one_engine_after,
     ),
 }

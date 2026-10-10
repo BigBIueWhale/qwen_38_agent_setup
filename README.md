@@ -122,13 +122,13 @@ alone still proves is the image's own assembly -- the copied modes, the removed
 modules and the upstream-verifier hashes -- together with the vision MLP unit,
 which runs only against the installed tree; the vision workspace unit runs in
 check as well. The parser unit parses as
-serving does: the reasoning and tool-call parsers the launch names, composed into
-the two-pass parser serving builds, with the launch's default template
-arguments, on the served model's tokenizer and generation files, each checked
-against the model manifest before it is mounted, fed the deltas the native
-decoder produces. The image does not carry that tokenizer, so the build runs this
-unit in check and in build rather than inside the Dockerfile. The probes that
-parse fixed outputs locally build the same composition (`scripts/probe_parser.py`),
+serving does: with the parser serving builds for the reasoning and tool-call
+parsers the launch names -- the one Qwen engine both adapt -- and the launch's
+default template arguments, on the served model's tokenizer and generation files,
+each checked against the model manifest before it is mounted, fed the deltas the
+native decoder produces. The image does not carry that tokenizer, so the build
+runs this unit in check and in build rather than inside the Dockerfile. The probes
+that parse fixed outputs locally build the same parser (`scripts/probe_parser.py`),
 named by `run-probe.sh` from the launch.
 
 Every test file the reviewed stages change or add is collected, and each of its
@@ -431,6 +431,7 @@ It is intentionally reconstructed by the ordered, reviewed semantic transformati
 | patches/vllm-reviewed-tests-declare-what-they-need.patch | 7954646a17b9cdedaeab47bc57581924fbf2049b36a61261240bd63f3f7851b9 |
 | patches/vllm-priority-is-refused-where-nothing-orders-by-it.patch | 96346e5bf71726008f4449389d91a18531fd57fe63f930b2400e059ab168571a |
 | patches/vllm-forced-tool-choice-is-held-through-reasoning.patch | 1fe814cd8618d2d0ecd414f7c4e6e341b89f9ef016c1f727fd87d44a01a98e96 |
+| patches/vllm-qwen-format-is-served-as-one-engine.patch | 470c5801cc66e1554cefe90dd06db92d97a593c57dd9f1c6c419bc18bac93809 |
 
 The reconstructed tree's runtime-source and test changes, new files and
 deletions are counted by ./scripts/build-vllm.sh check, which derives and prints
@@ -489,7 +490,7 @@ Pinned build inputs and products:
 | Immutable base tag | qwen38-vllm:main-9df9b0b |
 | Immutable base ID | sha256:fa4a002a88b7043a1a89966dea8a500fe9696f84e75730d9da916f916048d401 |
 | Runtime Dockerfile SHA-256 | ebf001f705dd37cac3f60665e661ccf2385fbf15325cd998e3e600860494f44f |
-| Build verifier SHA-256 | 6e8ae5db9093dda4686ce9f222f5c4805c8bd6e642d0321382875a6f82709efe |
+| Build verifier SHA-256 | 6a0d2c68fad31637f911b8b64b260cfc7443ad63a7dc4e5127e234a8e180f7e0 |
 | Runtime validator SHA-256 | e4ea7693d3f30e00de4a6b5733a0fb490c6f9deee927d42580083c9c851a04f8 |
 
 The runtime image's profile, tag and archive name, which every release advances
@@ -1407,6 +1408,23 @@ tool_choice=none remain valid. Unknown names, wrong nested types, extra properti
 duplicate IDs, orphan results, missing or out-of-order results, and incomplete chains
 fail closed.
 
+The Qwen format is served as one engine. The two parsers the launch names are both
+adapters of one parser engine, `Qwen3Parser`, and serving builds that engine as the
+parser (`Qwen3ServedParser`), with the two bound where the serving layer reads a
+launch's parsers: one pass over each generation decides reasoning, content and
+calls, beginning where the rendered prompt leaves reasoning -- inside it after every
+generation prompt the served template writes, and outside it after a prompt that
+closed it, such as a continued final message, whose generation is then content from
+its first token, read by the same `is_reasoning_end` the structured-output gate
+reads. Its tool grammar is armed by the function every composed parser arms with
+(`apply_tool_structural_tag`), from the same decision of what the grammar covers.
+Every other configuration -- parsers of two different engines, either kind of
+parser served alone, a parser not built on the engine -- is served by the composed
+parser (`DelegatingParser`). The
+`/metrics` counter `vllm:tool_call_parser_invocations_total` counts calls into a
+tool parser, which the one engine never makes, so on this launch its series stay at
+zero.
+
 A call reaches a client only as the grammar constrained it, and what the server cannot
 enforce it refuses. The qwen3_coder tool parser is neither selected nor built while
 `VLLM_ENFORCE_STRICT_TOOL_CALLING` is off, since that arms no grammar. On a server
@@ -1777,7 +1795,7 @@ generations; it is absent, never zero and never a failed response, when a
 generation had no exact split. `--enable-prompt-tokens-details`
 serves `prompt_tokens_details.cached_tokens`, the prompt tokens the scheduler
 actually reused from the prefix cache, so a client never has to invent a zero for
-it. The exact-reasoning-usage build unit exercises the composed qwen3 parsers on
+it. The exact-reasoning-usage build unit exercises the served qwen3 parser on
 CPU inside the immutable build and holds every reasoning parser to one count: the
 whole-generation count a parser exposes is the count its feed took for every
 format built on the engine, and none for a parser that splits on text, so it is
