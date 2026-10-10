@@ -1514,3 +1514,87 @@ diff --git a/vllm/model_executor/models/registry.py b/vllm/model_executor/models
          )
  
  
+diff --git a/tests/models/language/pooling/test_reward.py b/tests/models/language/pooling/test_reward.py
+--- a/tests/models/language/pooling/test_reward.py
++++ b/tests/models/language/pooling/test_reward.py
+@@ -8,9 +8,6 @@
+ import torch.nn.functional as F
+ from transformers import AutoModel
+ 
+-from vllm.platforms import current_platform
+-from vllm.utils.mem_constants import MiB_bytes
+-
+ from ....conftest import HfRunner
+ from ....utils import VLLM_PATH
+ from ...registry import HF_EXAMPLE_MODELS
+@@ -105,17 +102,16 @@
+     model_info = HF_EXAMPLE_MODELS.find_hf_info(model)
+     model_info.check_transformers_version(on_fail="skip")
+ 
+-    if current_platform.is_cpu():
+-        pytest.skip("CPU only supports V1")
+-
+-    monkeypatch.setenv("VLLM_USE_V2_MODEL_RUNNER", "1")
++    # The V1 model runner serves it: it holds the declared pool, which the V2
++    # runner does not (test_prm_models_refuse_the_v2_runner below).
++    monkeypatch.delenv("VLLM_USE_V2_MODEL_RUNNER", raising=False)
+     with vllm_runner(
+         model,
+         max_model_len=1024,
+         dtype=dtype,
+         kv_cache_users=1,
+     ) as vllm_model:
+-        assert vllm_model.llm.llm_engine.vllm_config.use_v2_model_runner
++        assert vllm_model.llm.llm_engine.vllm_config.use_v2_model_runner is False
+         vllm_outputs = vllm_model.token_classify(math_step_prompts)
+ 
+     with hf_runner(model, dtype=dtype, auto_cls=AutoModel) as hf_model:
+@@ -155,18 +151,16 @@
+     if not FIXTURE_REWARD_RESULT.get(model):
+         pytest.skip(f"No available golden outputs for {model}.")
+ 
+-    use_v2_model_runner = not current_platform.is_cpu()
+-    monkeypatch.setenv("VLLM_USE_V2_MODEL_RUNNER", "1" if use_v2_model_runner else "0")
++    # The V1 model runner serves it: it holds the declared pool, which the V2
++    # runner does not (test_prm_models_refuse_the_v2_runner below).
++    monkeypatch.delenv("VLLM_USE_V2_MODEL_RUNNER", raising=False)
+     with vllm_runner(
+         model,
+         max_model_len=1024,
+         dtype=dtype,
+         kv_cache_users=1,
+     ) as vllm_model:
+-        assert (
+-            vllm_model.llm.llm_engine.vllm_config.use_v2_model_runner
+-            is use_v2_model_runner
+-        )
++        assert vllm_model.llm.llm_engine.vllm_config.use_v2_model_runner is False
+         vllm_outputs = vllm_model.token_classify(math_step_prompts)
+ 
+     golden_outputs = load_reward_outputs(FIXTURE_REWARD_RESULT[model])
+@@ -177,3 +171,25 @@
+         vllm_output = torch.tensor(vllm_output).float()
+ 
+         assert torch.allclose(golden_output, vllm_output, 1.5e-2)
++
++
++@pytest.mark.parametrize("model", ["Qwen/Qwen2.5-Math-PRM-7B"])
++def test_prm_models_refuse_the_v2_runner(
++    vllm_runner,
++    monkeypatch,
++    model: str,
++) -> None:
++    """A model with a KV cache is served only with a declared pool, which the
++    V2 model runner does not hold: forcing V2 is refused at configuration, by
++    that cause and with the one next action that serves it, before the engine
++    starts or any weights load."""
++    monkeypatch.setenv("VLLM_USE_V2_MODEL_RUNNER", "1")
++    with pytest.raises(
++        ValueError,
++        match=(
++            r"Model Runner V2 does not yet support: a KV pool declared with "
++            r"--kv-cache-users \(.*\)\. Next: unset VLLM_USE_V2_MODEL_RUNNER, "
++            r"so that the V1 model runner serves it\."
++        ),
++    ):
++        vllm_runner(model, max_model_len=1024, dtype="half", kv_cache_users=1)

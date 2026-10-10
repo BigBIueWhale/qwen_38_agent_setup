@@ -60621,7 +60621,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'only 8-bit RGB or "\n'})},
  {'name': 'kv-physical-free-memory',
   'review_patch': 'patches/vllm-kv-physical-free-memory.patch',
-  'review_sha256': '1d5324b3443e0f4f5d503d0cf8d97649204689932d82cbd25343d16c91dfb969',
+  'review_sha256': 'fb747012c1dcb3da3bf4b9ed3518ac145e765845086daca3d46a085d7d74266f',
   'files': ({'path': 'tests/v1/worker/test_gpu_worker.py',
              'before_sha256': 'b140e35c5a06fd6f9c08937e705d904967dbf23c02f72f1b17185b8171fb08c6',
              'after_sha256': '12e6c5a8428a04aeae7e85ca7c34891745897a28c9da779029329adafd4b7b23'},
@@ -60660,7 +60660,10 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'after_sha256': '841207d4f7ab69682913bd6d0a6f4ef5b2017a2d6f0702e5b1a197a95b7046af'},
             {'path': 'vllm/model_executor/models/registry.py',
              'before_sha256': '1b47a85b3c9a415fcec99e2eca6347a361c21fa896b75075ce649f642069a18e',
-             'after_sha256': '63a8e648cf1c2696abcf148cbb47ed46fe83899f31c8ee44ed8ae2eecfbd2ac9'}),
+             'after_sha256': '63a8e648cf1c2696abcf148cbb47ed46fe83899f31c8ee44ed8ae2eecfbd2ac9'},
+            {'path': 'tests/models/language/pooling/test_reward.py',
+             'before_sha256': '768653da76744a46273b18aad25342b48a7accd8be31b4cfaad71bd0e7f7f6e0',
+             'after_sha256': '5b04ec2eed6eea0103f6b1872d8d94fbcd95bd8593e8606723030567c480318e'}),
   'edits': ({'name': 'tests/v1/worker/test_gpu_worker.py:landmark-1',
              'path': 'tests/v1/worker/test_gpu_worker.py',
              'before': '# SPDX-License-Identifier: Apache-2.0\n'
@@ -65368,7 +65371,304 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '"requires_v2_model_runner", False),\n'
                              '        )\n'
                              '\n'
-                             '\n'})},
+                             '\n'},
+            {'name': 'tests/models/language/pooling/test_reward.py:landmark-1',
+             'path': 'tests/models/language/pooling/test_reward.py',
+             'before': 'import torch.nn.functional as F\n'
+                       'from transformers import AutoModel\n'
+                       '\n'
+                       'from vllm.platforms import current_platform\n'
+                       'from vllm.utils.mem_constants import MiB_bytes\n'
+                       '\n'
+                       'from ....conftest import HfRunner\n'
+                       'from ....utils import VLLM_PATH\n'
+                       'from ...registry import HF_EXAMPLE_MODELS\n',
+             'after': 'import torch.nn.functional as F\n'
+                      'from transformers import AutoModel\n'
+                      '\n'
+                      'from ....conftest import HfRunner\n'
+                      'from ....utils import VLLM_PATH\n'
+                      'from ...registry import HF_EXAMPLE_MODELS\n',
+             'review_before': 'import torch.nn.functional as F\n'
+                              'from transformers import AutoModel\n'
+                              '\n'
+                              'from vllm.platforms import current_platform\n'
+                              'from vllm.utils.mem_constants import MiB_bytes\n'
+                              '\n'
+                              'from ....conftest import HfRunner\n'
+                              'from ....utils import VLLM_PATH\n'
+                              'from ...registry import HF_EXAMPLE_MODELS\n',
+             'review_after': 'import torch.nn.functional as F\n'
+                             'from transformers import AutoModel\n'
+                             '\n'
+                             'from ....conftest import HfRunner\n'
+                             'from ....utils import VLLM_PATH\n'
+                             'from ...registry import HF_EXAMPLE_MODELS\n'},
+            {'name': 'tests/models/language/pooling/test_reward.py:landmark-2',
+             'path': 'tests/models/language/pooling/test_reward.py',
+             'before': '    model_info = HF_EXAMPLE_MODELS.find_hf_info(model)\n'
+                       '    model_info.check_transformers_version(on_fail="skip")\n'
+                       '\n'
+                       '    if current_platform.is_cpu():\n'
+                       '        pytest.skip("CPU only supports V1")\n'
+                       '\n'
+                       '    monkeypatch.setenv("VLLM_USE_V2_MODEL_RUNNER", "1")\n'
+                       '    with vllm_runner(\n'
+                       '        model,\n'
+                       '        max_model_len=1024,\n'
+                       '        dtype=dtype,\n'
+                       '        kv_cache_users=1,\n'
+                       '    ) as vllm_model:\n'
+                       '        assert '
+                       'vllm_model.llm.llm_engine.vllm_config.use_v2_model_runner\n'
+                       '        vllm_outputs = '
+                       'vllm_model.token_classify(math_step_prompts)\n'
+                       '\n'
+                       '    with hf_runner(model, dtype=dtype, auto_cls=AutoModel) as '
+                       'hf_model:\n',
+             'after': '    model_info = HF_EXAMPLE_MODELS.find_hf_info(model)\n'
+                      '    model_info.check_transformers_version(on_fail="skip")\n'
+                      '\n'
+                      '    # The V1 model runner serves it: it holds the declared '
+                      'pool, which the V2\n'
+                      '    # runner does not (test_prm_models_refuse_the_v2_runner '
+                      'below).\n'
+                      '    monkeypatch.delenv("VLLM_USE_V2_MODEL_RUNNER", '
+                      'raising=False)\n'
+                      '    with vllm_runner(\n'
+                      '        model,\n'
+                      '        max_model_len=1024,\n'
+                      '        dtype=dtype,\n'
+                      '        kv_cache_users=1,\n'
+                      '    ) as vllm_model:\n'
+                      '        assert '
+                      'vllm_model.llm.llm_engine.vllm_config.use_v2_model_runner is '
+                      'False\n'
+                      '        vllm_outputs = '
+                      'vllm_model.token_classify(math_step_prompts)\n'
+                      '\n'
+                      '    with hf_runner(model, dtype=dtype, auto_cls=AutoModel) as '
+                      'hf_model:\n',
+             'review_before': '    model_info = HF_EXAMPLE_MODELS.find_hf_info(model)\n'
+                              '    '
+                              'model_info.check_transformers_version(on_fail="skip")\n'
+                              '\n'
+                              '    if current_platform.is_cpu():\n'
+                              '        pytest.skip("CPU only supports V1")\n'
+                              '\n'
+                              '    monkeypatch.setenv("VLLM_USE_V2_MODEL_RUNNER", '
+                              '"1")\n'
+                              '    with vllm_runner(\n'
+                              '        model,\n'
+                              '        max_model_len=1024,\n'
+                              '        dtype=dtype,\n'
+                              '        kv_cache_users=1,\n'
+                              '    ) as vllm_model:\n'
+                              '        assert '
+                              'vllm_model.llm.llm_engine.vllm_config.use_v2_model_runner\n'
+                              '        vllm_outputs = '
+                              'vllm_model.token_classify(math_step_prompts)\n'
+                              '\n'
+                              '    with hf_runner(model, dtype=dtype, '
+                              'auto_cls=AutoModel) as hf_model:\n',
+             'review_after': '    model_info = HF_EXAMPLE_MODELS.find_hf_info(model)\n'
+                             '    '
+                             'model_info.check_transformers_version(on_fail="skip")\n'
+                             '\n'
+                             '    # The V1 model runner serves it: it holds the '
+                             'declared pool, which the V2\n'
+                             '    # runner does not '
+                             '(test_prm_models_refuse_the_v2_runner below).\n'
+                             '    monkeypatch.delenv("VLLM_USE_V2_MODEL_RUNNER", '
+                             'raising=False)\n'
+                             '    with vllm_runner(\n'
+                             '        model,\n'
+                             '        max_model_len=1024,\n'
+                             '        dtype=dtype,\n'
+                             '        kv_cache_users=1,\n'
+                             '    ) as vllm_model:\n'
+                             '        assert '
+                             'vllm_model.llm.llm_engine.vllm_config.use_v2_model_runner '
+                             'is False\n'
+                             '        vllm_outputs = '
+                             'vllm_model.token_classify(math_step_prompts)\n'
+                             '\n'
+                             '    with hf_runner(model, dtype=dtype, '
+                             'auto_cls=AutoModel) as hf_model:\n'},
+            {'name': 'tests/models/language/pooling/test_reward.py:landmark-3',
+             'path': 'tests/models/language/pooling/test_reward.py',
+             'before': '    if not FIXTURE_REWARD_RESULT.get(model):\n'
+                       '        pytest.skip(f"No available golden outputs for '
+                       '{model}.")\n'
+                       '\n'
+                       '    use_v2_model_runner = not current_platform.is_cpu()\n'
+                       '    monkeypatch.setenv("VLLM_USE_V2_MODEL_RUNNER", "1" if '
+                       'use_v2_model_runner else "0")\n'
+                       '    with vllm_runner(\n'
+                       '        model,\n'
+                       '        max_model_len=1024,\n'
+                       '        dtype=dtype,\n'
+                       '        kv_cache_users=1,\n'
+                       '    ) as vllm_model:\n'
+                       '        assert (\n'
+                       '            '
+                       'vllm_model.llm.llm_engine.vllm_config.use_v2_model_runner\n'
+                       '            is use_v2_model_runner\n'
+                       '        )\n'
+                       '        vllm_outputs = '
+                       'vllm_model.token_classify(math_step_prompts)\n'
+                       '\n'
+                       '    golden_outputs = '
+                       'load_reward_outputs(FIXTURE_REWARD_RESULT[model])\n',
+             'after': '    if not FIXTURE_REWARD_RESULT.get(model):\n'
+                      '        pytest.skip(f"No available golden outputs for '
+                      '{model}.")\n'
+                      '\n'
+                      '    # The V1 model runner serves it: it holds the declared '
+                      'pool, which the V2\n'
+                      '    # runner does not (test_prm_models_refuse_the_v2_runner '
+                      'below).\n'
+                      '    monkeypatch.delenv("VLLM_USE_V2_MODEL_RUNNER", '
+                      'raising=False)\n'
+                      '    with vllm_runner(\n'
+                      '        model,\n'
+                      '        max_model_len=1024,\n'
+                      '        dtype=dtype,\n'
+                      '        kv_cache_users=1,\n'
+                      '    ) as vllm_model:\n'
+                      '        assert '
+                      'vllm_model.llm.llm_engine.vllm_config.use_v2_model_runner is '
+                      'False\n'
+                      '        vllm_outputs = '
+                      'vllm_model.token_classify(math_step_prompts)\n'
+                      '\n'
+                      '    golden_outputs = '
+                      'load_reward_outputs(FIXTURE_REWARD_RESULT[model])\n',
+             'review_before': '    if not FIXTURE_REWARD_RESULT.get(model):\n'
+                              '        pytest.skip(f"No available golden outputs for '
+                              '{model}.")\n'
+                              '\n'
+                              '    use_v2_model_runner = not '
+                              'current_platform.is_cpu()\n'
+                              '    monkeypatch.setenv("VLLM_USE_V2_MODEL_RUNNER", "1" '
+                              'if use_v2_model_runner else "0")\n'
+                              '    with vllm_runner(\n'
+                              '        model,\n'
+                              '        max_model_len=1024,\n'
+                              '        dtype=dtype,\n'
+                              '        kv_cache_users=1,\n'
+                              '    ) as vllm_model:\n'
+                              '        assert (\n'
+                              '            '
+                              'vllm_model.llm.llm_engine.vllm_config.use_v2_model_runner\n'
+                              '            is use_v2_model_runner\n'
+                              '        )\n'
+                              '        vllm_outputs = '
+                              'vllm_model.token_classify(math_step_prompts)\n'
+                              '\n'
+                              '    golden_outputs = '
+                              'load_reward_outputs(FIXTURE_REWARD_RESULT[model])\n',
+             'review_after': '    if not FIXTURE_REWARD_RESULT.get(model):\n'
+                             '        pytest.skip(f"No available golden outputs for '
+                             '{model}.")\n'
+                             '\n'
+                             '    # The V1 model runner serves it: it holds the '
+                             'declared pool, which the V2\n'
+                             '    # runner does not '
+                             '(test_prm_models_refuse_the_v2_runner below).\n'
+                             '    monkeypatch.delenv("VLLM_USE_V2_MODEL_RUNNER", '
+                             'raising=False)\n'
+                             '    with vllm_runner(\n'
+                             '        model,\n'
+                             '        max_model_len=1024,\n'
+                             '        dtype=dtype,\n'
+                             '        kv_cache_users=1,\n'
+                             '    ) as vllm_model:\n'
+                             '        assert '
+                             'vllm_model.llm.llm_engine.vllm_config.use_v2_model_runner '
+                             'is False\n'
+                             '        vllm_outputs = '
+                             'vllm_model.token_classify(math_step_prompts)\n'
+                             '\n'
+                             '    golden_outputs = '
+                             'load_reward_outputs(FIXTURE_REWARD_RESULT[model])\n'},
+            {'name': 'tests/models/language/pooling/test_reward.py:landmark-4',
+             'path': 'tests/models/language/pooling/test_reward.py',
+             'before': '        vllm_output = torch.tensor(vllm_output).float()\n'
+                       '\n'
+                       '        assert torch.allclose(golden_output, vllm_output, '
+                       '1.5e-2)\n',
+             'after': '        vllm_output = torch.tensor(vllm_output).float()\n'
+                      '\n'
+                      '        assert torch.allclose(golden_output, vllm_output, '
+                      '1.5e-2)\n'
+                      '\n'
+                      '\n'
+                      '@pytest.mark.parametrize("model", '
+                      '["Qwen/Qwen2.5-Math-PRM-7B"])\n'
+                      'def test_prm_models_refuse_the_v2_runner(\n'
+                      '    vllm_runner,\n'
+                      '    monkeypatch,\n'
+                      '    model: str,\n'
+                      ') -> None:\n'
+                      '    """A model with a KV cache is served only with a declared '
+                      'pool, which the\n'
+                      '    V2 model runner does not hold: forcing V2 is refused at '
+                      'configuration, by\n'
+                      '    that cause and with the one next action that serves it, '
+                      'before the engine\n'
+                      '    starts or any weights load."""\n'
+                      '    monkeypatch.setenv("VLLM_USE_V2_MODEL_RUNNER", "1")\n'
+                      '    with pytest.raises(\n'
+                      '        ValueError,\n'
+                      '        match=(\n'
+                      '            r"Model Runner V2 does not yet support: a KV pool '
+                      'declared with "\n'
+                      '            r"--kv-cache-users \\(.*\\)\\. Next: unset '
+                      'VLLM_USE_V2_MODEL_RUNNER, "\n'
+                      '            r"so that the V1 model runner serves it\\."\n'
+                      '        ),\n'
+                      '    ):\n'
+                      '        vllm_runner(model, max_model_len=1024, dtype="half", '
+                      'kv_cache_users=1)\n',
+             'review_before': '        vllm_output = '
+                              'torch.tensor(vllm_output).float()\n'
+                              '\n'
+                              '        assert torch.allclose(golden_output, '
+                              'vllm_output, 1.5e-2)\n',
+             'review_after': '        vllm_output = torch.tensor(vllm_output).float()\n'
+                             '\n'
+                             '        assert torch.allclose(golden_output, '
+                             'vllm_output, 1.5e-2)\n'
+                             '\n'
+                             '\n'
+                             '@pytest.mark.parametrize("model", '
+                             '["Qwen/Qwen2.5-Math-PRM-7B"])\n'
+                             'def test_prm_models_refuse_the_v2_runner(\n'
+                             '    vllm_runner,\n'
+                             '    monkeypatch,\n'
+                             '    model: str,\n'
+                             ') -> None:\n'
+                             '    """A model with a KV cache is served only with a '
+                             'declared pool, which the\n'
+                             '    V2 model runner does not hold: forcing V2 is refused '
+                             'at configuration, by\n'
+                             '    that cause and with the one next action that serves '
+                             'it, before the engine\n'
+                             '    starts or any weights load."""\n'
+                             '    monkeypatch.setenv("VLLM_USE_V2_MODEL_RUNNER", "1")\n'
+                             '    with pytest.raises(\n'
+                             '        ValueError,\n'
+                             '        match=(\n'
+                             '            r"Model Runner V2 does not yet support: a KV '
+                             'pool declared with "\n'
+                             '            r"--kv-cache-users \\(.*\\)\\. Next: unset '
+                             'VLLM_USE_V2_MODEL_RUNNER, "\n'
+                             '            r"so that the V1 model runner serves it\\."\n'
+                             '        ),\n'
+                             '    ):\n'
+                             '        vllm_runner(model, max_model_len=1024, '
+                             'dtype="half", kv_cache_users=1)\n'})},
  {'name': 'qwen-single-call-grammar',
   'review_patch': 'patches/vllm-qwen-single-call-grammar.patch',
   'review_sha256': 'e3859bebf3b97cc05446859f1cb13b1ba6c4048728394f876bd3a109fa9a80d9',
@@ -164742,7 +165042,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    async def _process_simple_streaming_events(\n'})},
  {'name': 'reviewed-tests-declare-what-they-need',
   'review_patch': 'patches/vllm-reviewed-tests-declare-what-they-need.patch',
-  'review_sha256': 'e130a96a50fd0c5adfb5a102784aa5ad33991d82dbe506ba204b2c426b6a098d',
+  'review_sha256': 'e8e48b898b8c6ee8e6a34e3efebc2ada7bca4841bd9c8903967b6d44ceac2bb7',
   'files': ({'path': 'tests/conftest.py',
              'before_sha256': '9bd103ee369ded600a0cad2a5414a2337bcbc00ec86d66d039a8c14032deee42',
              'after_sha256': '6aa1c39d3d977ac381290eb00adb9a3c33fd34733c95623a07fd6c171d7840f4'},
@@ -164751,7 +165051,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'after_sha256': 'cff7046330ea0a76c835d5c4c9fe42baf32130720ae8c6adae5620ff1e0bde9f'},
             {'path': 'tests/distributed/test_rocm_quick_reduce.py',
              'before_sha256': 'bf6f8a5708568b1f4d96dcc59f42258f8680e5b03bb4abdddcb0c7ead9d414bd',
-             'after_sha256': '42b0322b676ef66d634d533aad4fa8aa92f29717cf26e9d5de44351daaf1d632'},
+             'after_sha256': 'dadd64f6ff63dda16d458bcaac5bbb9b342a5f5e98245fd470b98649db4dcc61'},
             {'path': 'tests/engine/test_arg_utils.py',
              'before_sha256': '858f15c077a1fa031228bcf8e2d92a7a479a07f2d7da32b106f8eab419b7901b',
              'after_sha256': '5879353972adb96ecff43c8017432c5e3057fe344ab08dfa5bf63938249ad7c7'},
@@ -164816,8 +165116,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': '23ecf6b73c1af45b9440f57b175660bfed485a5e2d4fe1b029cf012cd54f777b',
              'after_sha256': '6be36b463dacf6c9d25c0742177fd8beec60fbc8ae49b2fcee250ee6afc55bce'},
             {'path': 'tests/models/language/pooling/test_reward.py',
-             'before_sha256': '768653da76744a46273b18aad25342b48a7accd8be31b4cfaad71bd0e7f7f6e0',
-             'after_sha256': 'ac833e9859fe892d7568c051222c4bc87adc538110076b412df4b1b812f9479d'},
+             'before_sha256': '5b04ec2eed6eea0103f6b1872d8d94fbcd95bd8593e8606723030567c480318e',
+             'after_sha256': 'bb24a60b6184c26fae0ad7aa393dd96f3297ba25840ff9f1f2fc453c4de4209c'},
             {'path': 'tests/multimodal/media/test_connector.py',
              'before_sha256': 'a1d5fa45a5e6ed9188abe1d47375b6e0e23417f009fe3ed35455e95de4b78c64',
              'after_sha256': '4221d7f6b2dd9950a627aa60d24ce7763af1782bf2fa626c94f9882df1135d07'},
@@ -164847,7 +165147,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'after_sha256': '5c4c50f679572cf201c64097121bde27dfc603869c4335e0506e913df70097d4'},
             {'path': 'tests/v1/e2e/general/test_context_length.py',
              'before_sha256': '11f1dc8484d92d6414607a3cb1670d2832919166450f4ed684e1cdc59b4ead81',
-             'after_sha256': '8147e5c25a69016b74075d3061984463debbf00877a463d3d2bc333fbf42bb49'},
+             'after_sha256': '86c0088bfb7afa4aff4801742089cc0e73c4073990be20e15d21d87230182554'},
             {'path': 'tests/v1/engine/test_fast_incdec_prefix_err.py',
              'before_sha256': '2a0cfd6b4d151db30253ac7cde7503838894eaefb71834bd7d5947f705017b53',
              'after_sha256': '71c0fec8e157c046b9b8623e93845550d00a733e15be5c6eaf59afde69eeba43'},
@@ -164865,7 +165165,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'after_sha256': '664a830528faf8d69dfe361c57176a834b204383383683890b6ba63164013ea9'},
             {'path': 'tests/v1/logits_processors/test_correctness.py',
              'before_sha256': 'ce76f8c40dd6028b195600a2733656a877952b01eacd55b63dd9e619dd2f1290',
-             'after_sha256': 'adfdff01806aec6ae5f10f88e89b48b8ceeba6a015bff701434f05cf36cc9b9f'},
+             'after_sha256': '453d3c5591c25edb3c3c389c63e2d2f60309d74e94d4b3eac3555aec52ea7c6f'},
             {'path': 'tests/v1/simple_kv_offload/test_scheduler.py',
              'before_sha256': '430db8cc9d99844e7fd6099a6c7eac9ecadc4c0cff820db6ea62582de2443316',
              'after_sha256': '038c017d6e2bff9336497806ae2ce837d1010859b5d84907819e40f13ab8d1f0'},
@@ -164874,7 +165174,22 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'after_sha256': '665040a33a0f729c8f34169addeb554c37e2432071ccad20cb989575d7937baa'},
             {'path': 'tests/v1/worker/test_gpu_model_runner_mm_gather.py',
              'before_sha256': '7076e2415a3a1246d6f1e22e978a4c32e7b87713d6d7ae5743960c3d31592759',
-             'after_sha256': '37e656077f517eb3d47a3bf772f4288a21c764a5ee59a63a9711db0e0dd1411b'}),
+             'after_sha256': '37e656077f517eb3d47a3bf772f4288a21c764a5ee59a63a9711db0e0dd1411b'},
+            {'path': 'tests/evals/gsm8k/test_gsm8k_offloading.py',
+             'before_sha256': 'a7ced3b714c418120c2e4d5cfb55690d3b11baa96083256c2bb640dc80eec3f6',
+             'after_sha256': 'fcd7ca13bb9d06cf7c8062e6d9217fac6f61678dfa46458fde1564940312f8ed'},
+            {'path': 'tests/v1/engine/test_engine_core.py',
+             'before_sha256': '7834fa7eaeb25518e4af756f0dc56c420a1c8e5c906057643a41241a17162485',
+             'after_sha256': 'e5e0c4e0eadf6fdfc790272127e727d01fcc6867f8ea7fa54f09cdcbd3be802a'},
+            {'path': 'tests/v1/engine/test_engine_core_client.py',
+             'before_sha256': 'f395ab80e7d75fce9007629c5a1c696ca675a41de25e9837d5916f8d1b916a2a',
+             'after_sha256': '9b53214be8bcddfd14b90867a539660d3ebde257e8b7e6e3b1c5c6cc298a94bd'},
+            {'path': 'tests/v1/simple_kv_offload/test_integration.py',
+             'before_sha256': '0dd7471507c88e209fe6a72359dfc655368c836cbe2cd3d95e1c0f72d38a4241',
+             'after_sha256': '430c9a9e40ca17452465846f5bd0a7405bb782b8e4a73154e1b0496e6369701d'},
+            {'path': 'vllm/platforms/interface.py',
+             'before_sha256': 'ace47344b0d65e4351fa57285c6df74f3f30ca66b6ddbe24cdc2d6a4a7ee8768',
+             'after_sha256': '79d62b073ff1c2b0e953738967db71a00090d6e70a4ecc68cc34f21c658486f3'}),
   'edits': ({'name': 'tests/conftest.py:landmark-1',
              'path': 'tests/conftest.py',
              'before': '    )\n'
@@ -164988,7 +165303,9 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '\n'},
             {'name': 'tests/distributed/test_rocm_quick_reduce.py:landmark-1',
              'path': 'tests/distributed/test_rocm_quick_reduce.py',
-             'before': '\n'
+             'before': 'from vllm.transformers_utils.repo_utils import hf_api\n'
+                       'from vllm.utils.network_utils import get_open_port\n'
+                       '\n'
                        'from ..utils import multi_gpu_test\n'
                        '\n'
                        'pytestmark = pytest.mark.skipif(\n'
@@ -164998,8 +165315,11 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                        '\n'
                        'MB = 1024 * 1024\n'
                        'WORLD_SIZE = 2\n',
-             'after': '\n'
-                      'from ..utils import multi_gpu_test\n'
+             'after': 'from vllm.transformers_utils.repo_utils import hf_api\n'
+                      'from vllm.utils.network_utils import get_open_port\n'
+                      '\n'
+                      'from ..utils import create_new_process_for_each_test, '
+                      'multi_gpu_only\n'
                       '\n'
                       'pytestmark = [\n'
                       '    pytest.mark.gpu,\n'
@@ -165011,7 +165331,9 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '\n'
                       'MB = 1024 * 1024\n'
                       'WORLD_SIZE = 2\n',
-             'review_before': '\n'
+             'review_before': 'from vllm.transformers_utils.repo_utils import hf_api\n'
+                              'from vllm.utils.network_utils import get_open_port\n'
+                              '\n'
                               'from ..utils import multi_gpu_test\n'
                               '\n'
                               'pytestmark = pytest.mark.skipif(\n'
@@ -165021,8 +165343,11 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                               '\n'
                               'MB = 1024 * 1024\n'
                               'WORLD_SIZE = 2\n',
-             'review_after': '\n'
-                             'from ..utils import multi_gpu_test\n'
+             'review_after': 'from vllm.transformers_utils.repo_utils import hf_api\n'
+                             'from vllm.utils.network_utils import get_open_port\n'
+                             '\n'
+                             'from ..utils import create_new_process_for_each_test, '
+                             'multi_gpu_only\n'
                              '\n'
                              'pytestmark = [\n'
                              '    pytest.mark.gpu,\n'
@@ -165034,6 +165359,46 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '\n'
                              'MB = 1024 * 1024\n'
                              'WORLD_SIZE = 2\n'},
+            {'name': 'tests/distributed/test_rocm_quick_reduce.py:landmark-2',
+             'path': 'tests/distributed/test_rocm_quick_reduce.py',
+             'before': '    )\n'
+                       '\n'
+                       '\n'
+                       '@multi_gpu_test(num_gpus=CUDAGRAPH_WORLD_SIZE)\n'
+                       'def test_quick_allreduce_cudagraph_replay():\n'
+                       '    # Regression test for the stale flag_color bug: a '
+                       'quick-reduce captured in a\n'
+                       '    # CUDA graph must return correct results on every replay, '
+                       'not the data from\n',
+             'after': '    )\n'
+                      '\n'
+                      '\n'
+                      '@multi_gpu_only(num_gpus=CUDAGRAPH_WORLD_SIZE)\n'
+                      '@create_new_process_for_each_test("spawn")\n'
+                      'def test_quick_allreduce_cudagraph_replay():\n'
+                      '    # Regression test for the stale flag_color bug: a '
+                      'quick-reduce captured in a\n'
+                      '    # CUDA graph must return correct results on every replay, '
+                      'not the data from\n',
+             'review_before': '    )\n'
+                              '\n'
+                              '\n'
+                              '@multi_gpu_test(num_gpus=CUDAGRAPH_WORLD_SIZE)\n'
+                              'def test_quick_allreduce_cudagraph_replay():\n'
+                              '    # Regression test for the stale flag_color bug: a '
+                              'quick-reduce captured in a\n'
+                              '    # CUDA graph must return correct results on every '
+                              'replay, not the data from\n',
+             'review_after': '    )\n'
+                             '\n'
+                             '\n'
+                             '@multi_gpu_only(num_gpus=CUDAGRAPH_WORLD_SIZE)\n'
+                             '@create_new_process_for_each_test("spawn")\n'
+                             'def test_quick_allreduce_cudagraph_replay():\n'
+                             '    # Regression test for the stale flag_color bug: a '
+                             'quick-reduce captured in a\n'
+                             '    # CUDA graph must return correct results on every '
+                             'replay, not the data from\n'},
             {'name': 'tests/engine/test_arg_utils.py:landmark-1',
              'path': 'tests/engine/test_arg_utils.py',
              'before': '    assert kwargs["nested_config"]["type"](\'{"field": 2}\') '
@@ -169696,16 +170061,20 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                        '\n'
                        '@create_new_process_for_each_test()\n'
                        '@pytest.mark.parametrize("model, max_model_len", '
-                       '[("JackFram/llama-160m", 2048)])\n',
+                       '[("JackFram/llama-160m", 2048)])\n'
+                       '@pytest.mark.parametrize(\n'
+                       '    "prompt_len, max_tokens",\n',
              'after': 'from tests.utils import create_new_process_for_each_test\n'
                       'from vllm.exceptions import VLLMValidationError\n'
                       '\n'
                       'pytestmark = [pytest.mark.gpu, pytest.mark.network]\n'
                       '\n'
                       '\n'
-                      '@create_new_process_for_each_test()\n'
+                      '@create_new_process_for_each_test("spawn")\n'
                       '@pytest.mark.parametrize("model, max_model_len", '
-                      '[("JackFram/llama-160m", 2048)])\n',
+                      '[("JackFram/llama-160m", 2048)])\n'
+                      '@pytest.mark.parametrize(\n'
+                      '    "prompt_len, max_tokens",\n',
              'review_before': 'from tests.utils import '
                               'create_new_process_for_each_test\n'
                               'from vllm.exceptions import VLLMValidationError\n'
@@ -169713,7 +170082,9 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                               '\n'
                               '@create_new_process_for_each_test()\n'
                               '@pytest.mark.parametrize("model, max_model_len", '
-                              '[("JackFram/llama-160m", 2048)])\n',
+                              '[("JackFram/llama-160m", 2048)])\n'
+                              '@pytest.mark.parametrize(\n'
+                              '    "prompt_len, max_tokens",\n',
              'review_after': 'from tests.utils import '
                              'create_new_process_for_each_test\n'
                              'from vllm.exceptions import VLLMValidationError\n'
@@ -169721,9 +170092,45 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'pytestmark = [pytest.mark.gpu, pytest.mark.network]\n'
                              '\n'
                              '\n'
-                             '@create_new_process_for_each_test()\n'
+                             '@create_new_process_for_each_test("spawn")\n'
                              '@pytest.mark.parametrize("model, max_model_len", '
-                             '[("JackFram/llama-160m", 2048)])\n'},
+                             '[("JackFram/llama-160m", 2048)])\n'
+                             '@pytest.mark.parametrize(\n'
+                             '    "prompt_len, max_tokens",\n'},
+            {'name': 'tests/v1/e2e/general/test_context_length.py:landmark-2',
+             'path': 'tests/v1/e2e/general/test_context_length.py',
+             'before': '            assert expected_msg in str(excinfo.value)\n'
+                       '\n'
+                       '\n'
+                       '@create_new_process_for_each_test()\n'
+                       '@pytest.mark.parametrize("model", ["JackFram/llama-160m"])\n'
+                       'def test_auto_fit_max_model_len_rejects_oversized_input(\n'
+                       '    model: str,\n',
+             'after': '            assert expected_msg in str(excinfo.value)\n'
+                      '\n'
+                      '\n'
+                      '@create_new_process_for_each_test("spawn")\n'
+                      '@pytest.mark.parametrize("model", ["JackFram/llama-160m"])\n'
+                      'def test_auto_fit_max_model_len_rejects_oversized_input(\n'
+                      '    model: str,\n',
+             'review_before': '            assert expected_msg in str(excinfo.value)\n'
+                              '\n'
+                              '\n'
+                              '@create_new_process_for_each_test()\n'
+                              '@pytest.mark.parametrize("model", '
+                              '["JackFram/llama-160m"])\n'
+                              'def '
+                              'test_auto_fit_max_model_len_rejects_oversized_input(\n'
+                              '    model: str,\n',
+             'review_after': '            assert expected_msg in str(excinfo.value)\n'
+                             '\n'
+                             '\n'
+                             '@create_new_process_for_each_test("spawn")\n'
+                             '@pytest.mark.parametrize("model", '
+                             '["JackFram/llama-160m"])\n'
+                             'def '
+                             'test_auto_fit_max_model_len_rejects_oversized_input(\n'
+                             '    model: str,\n'},
             {'name': 'tests/v1/engine/test_fast_incdec_prefix_err.py:landmark-1',
              'path': 'tests/v1/engine/test_fast_incdec_prefix_err.py',
              'before': '# SPDX-License-Identifier: Apache-2.0\n'
@@ -171774,6 +172181,44 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'PIN_MEMORY_AVAILABLE = is_pin_memory_available()\n'
                              'MAX_NUM_REQS = 256\n'
                              'VOCAB_SIZE = 1024\n'},
+            {'name': 'tests/v1/logits_processors/test_correctness.py:landmark-2',
+             'path': 'tests/v1/logits_processors/test_correctness.py',
+             'before': '    return rows\n'
+                       '\n'
+                       '\n'
+                       '@create_new_process_for_each_test()\n'
+                       '@pytest.mark.parametrize("device", DEVICES)\n'
+                       '@pytest.mark.parametrize("reqs_per_logitproc", '
+                       '[REQS_PER_LOGITPROC])\n'
+                       '@pytest.mark.parametrize("logitsprocs_under_test", '
+                       '_get_test_cases())\n',
+             'after': '    return rows\n'
+                      '\n'
+                      '\n'
+                      '@create_new_process_for_each_test("spawn")\n'
+                      '@pytest.mark.parametrize("device", DEVICES)\n'
+                      '@pytest.mark.parametrize("reqs_per_logitproc", '
+                      '[REQS_PER_LOGITPROC])\n'
+                      '@pytest.mark.parametrize("logitsprocs_under_test", '
+                      '_get_test_cases())\n',
+             'review_before': '    return rows\n'
+                              '\n'
+                              '\n'
+                              '@create_new_process_for_each_test()\n'
+                              '@pytest.mark.parametrize("device", DEVICES)\n'
+                              '@pytest.mark.parametrize("reqs_per_logitproc", '
+                              '[REQS_PER_LOGITPROC])\n'
+                              '@pytest.mark.parametrize("logitsprocs_under_test", '
+                              '_get_test_cases())\n',
+             'review_after': '    return rows\n'
+                             '\n'
+                             '\n'
+                             '@create_new_process_for_each_test("spawn")\n'
+                             '@pytest.mark.parametrize("device", DEVICES)\n'
+                             '@pytest.mark.parametrize("reqs_per_logitproc", '
+                             '[REQS_PER_LOGITPROC])\n'
+                             '@pytest.mark.parametrize("logitsprocs_under_test", '
+                             '_get_test_cases())\n'},
             {'name': 'tests/v1/simple_kv_offload/test_scheduler.py:landmark-1',
              'path': 'tests/v1/simple_kv_offload/test_scheduler.py',
              'before': 'from vllm.v1.simple_kv_offload.manager import '
@@ -172005,7 +172450,793 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'def test_target_path_raises_on_encoder_cache_miss():\n'
                              '    """On the target path (no shift) a miss is a real '
                              'invariant violation."""\n'
-                             '    f0 = _feature("h0", offset=0, length=8)\n'})},
+                             '    f0 = _feature("h0", offset=0, length=8)\n'},
+            {'name': 'tests/evals/gsm8k/test_gsm8k_offloading.py:landmark-1',
+             'path': 'tests/evals/gsm8k/test_gsm8k_offloading.py',
+             'before': '\n'
+                       'from .gsm8k_eval import evaluate_gsm8k\n'
+                       '\n'
+                       'if not current_platform.is_cuda_alike():\n'
+                       '    pytest.skip("Requires CUDA or ROCm", '
+                       'allow_module_level=True)\n'
+                       '\n'
+                       'NUM_QUESTIONS = 200\n'
+                       'NUM_FEWSHOT = 5\n',
+             'after': '\n'
+                      'from .gsm8k_eval import evaluate_gsm8k\n'
+                      '\n'
+                      'pytestmark = pytest.mark.skipif(\n'
+                      '    not current_platform.is_cuda_alike(), reason="Requires CUDA '
+                      'or ROCm"\n'
+                      ')\n'
+                      '\n'
+                      'NUM_QUESTIONS = 200\n'
+                      'NUM_FEWSHOT = 5\n',
+             'review_before': '\n'
+                              'from .gsm8k_eval import evaluate_gsm8k\n'
+                              '\n'
+                              'if not current_platform.is_cuda_alike():\n'
+                              '    pytest.skip("Requires CUDA or ROCm", '
+                              'allow_module_level=True)\n'
+                              '\n'
+                              'NUM_QUESTIONS = 200\n'
+                              'NUM_FEWSHOT = 5\n',
+             'review_after': '\n'
+                             'from .gsm8k_eval import evaluate_gsm8k\n'
+                             '\n'
+                             'pytestmark = pytest.mark.skipif(\n'
+                             '    not current_platform.is_cuda_alike(), '
+                             'reason="Requires CUDA or ROCm"\n'
+                             ')\n'
+                             '\n'
+                             'NUM_QUESTIONS = 200\n'
+                             'NUM_FEWSHOT = 5\n'},
+            {'name': 'tests/v1/engine/test_engine_core.py:landmark-1',
+             'path': 'tests/v1/engine/test_engine_core.py',
+             'before': '# SPDX-FileCopyrightText: Copyright contributors to the vLLM '
+                       'project\n'
+                       '\n'
+                       'import copy\n'
+                       'import time\n'
+                       'import uuid\n'
+                       'from concurrent.futures import Future, ThreadPoolExecutor\n',
+             'after': '# SPDX-FileCopyrightText: Copyright contributors to the vLLM '
+                      'project\n'
+                      '\n'
+                      'import copy\n'
+                      'import functools\n'
+                      'import time\n'
+                      'import uuid\n'
+                      'from concurrent.futures import Future, ThreadPoolExecutor\n',
+             'review_before': '# SPDX-FileCopyrightText: Copyright contributors to the '
+                              'vLLM project\n'
+                              '\n'
+                              'import copy\n'
+                              'import time\n'
+                              'import uuid\n'
+                              'from concurrent.futures import Future, '
+                              'ThreadPoolExecutor\n',
+             'review_after': '# SPDX-FileCopyrightText: Copyright contributors to the '
+                             'vLLM project\n'
+                             '\n'
+                             'import copy\n'
+                             'import functools\n'
+                             'import time\n'
+                             'import uuid\n'
+                             'from concurrent.futures import Future, '
+                             'ThreadPoolExecutor\n'},
+            {'name': 'tests/v1/engine/test_engine_core.py:landmark-2',
+             'path': 'tests/v1/engine/test_engine_core.py',
+             'before': 'from vllm.v1.kv_cache_interface import KVCacheConfig\n'
+                       'from vllm.v1.outputs import ModelRunnerOutput\n'
+                       '\n'
+                       'from ...utils import create_new_process_for_each_test, '
+                       'multi_gpu_test\n'
+                       '\n'
+                       'if not current_platform.is_cuda():\n'
+                       '    pytest.skip(reason="V1 currently only supported on CUDA.", '
+                       'allow_module_level=True)\n'
+                       '\n'
+                       'MODEL_NAME = "hmellor/tiny-random-LlamaForCausalLM"\n'
+                       'TOKENIZER = AutoTokenizer.from_pretrained(MODEL_NAME)\n'
+                       '# test_engine_core_concurrent_batches assumes exactly 12 '
+                       'tokens per prompt.\n'
+                       '# Adjust prompt if changing model to maintain 12-token '
+                       'length.\n'
+                       'PROMPT = "I am Gyoubu Masataka Oniwa"\n'
+                       'PROMPT_TOKENS = TOKENIZER(PROMPT).input_ids\n'
+                       '\n'
+                       '_REQUEST_COUNTER = 0\n'
+                       '\n',
+             'after': 'from vllm.v1.kv_cache_interface import KVCacheConfig\n'
+                      'from vllm.v1.outputs import ModelRunnerOutput\n'
+                      '\n'
+                      'from ...utils import create_new_process_for_each_test, '
+                      'multi_gpu_only\n'
+                      '\n'
+                      'pytestmark = pytest.mark.skipif(\n'
+                      '    not current_platform.is_cuda(), reason="V1 currently only '
+                      'supported on CUDA."\n'
+                      ')\n'
+                      '\n'
+                      'MODEL_NAME = "hmellor/tiny-random-LlamaForCausalLM"\n'
+                      '# test_engine_core_concurrent_batches assumes exactly 12 tokens '
+                      'per prompt.\n'
+                      '# Adjust prompt if changing model to maintain 12-token length.\n'
+                      'PROMPT = "I am Gyoubu Masataka Oniwa"\n'
+                      '\n'
+                      '\n'
+                      '@functools.cache\n'
+                      'def _prompt_tokens() -> list[int]:\n'
+                      '    # Read from the hub where a test first needs it, not at '
+                      'import.\n'
+                      '    return '
+                      'AutoTokenizer.from_pretrained(MODEL_NAME)(PROMPT).input_ids\n'
+                      '\n'
+                      '\n'
+                      '_REQUEST_COUNTER = 0\n'
+                      '\n',
+             'review_before': 'from vllm.v1.kv_cache_interface import KVCacheConfig\n'
+                              'from vllm.v1.outputs import ModelRunnerOutput\n'
+                              '\n'
+                              'from ...utils import create_new_process_for_each_test, '
+                              'multi_gpu_test\n'
+                              '\n'
+                              'if not current_platform.is_cuda():\n'
+                              '    pytest.skip(reason="V1 currently only supported on '
+                              'CUDA.", allow_module_level=True)\n'
+                              '\n'
+                              'MODEL_NAME = "hmellor/tiny-random-LlamaForCausalLM"\n'
+                              'TOKENIZER = AutoTokenizer.from_pretrained(MODEL_NAME)\n'
+                              '# test_engine_core_concurrent_batches assumes exactly '
+                              '12 tokens per prompt.\n'
+                              '# Adjust prompt if changing model to maintain 12-token '
+                              'length.\n'
+                              'PROMPT = "I am Gyoubu Masataka Oniwa"\n'
+                              'PROMPT_TOKENS = TOKENIZER(PROMPT).input_ids\n'
+                              '\n'
+                              '_REQUEST_COUNTER = 0\n'
+                              '\n',
+             'review_after': 'from vllm.v1.kv_cache_interface import KVCacheConfig\n'
+                             'from vllm.v1.outputs import ModelRunnerOutput\n'
+                             '\n'
+                             'from ...utils import create_new_process_for_each_test, '
+                             'multi_gpu_only\n'
+                             '\n'
+                             'pytestmark = pytest.mark.skipif(\n'
+                             '    not current_platform.is_cuda(), reason="V1 currently '
+                             'only supported on CUDA."\n'
+                             ')\n'
+                             '\n'
+                             'MODEL_NAME = "hmellor/tiny-random-LlamaForCausalLM"\n'
+                             '# test_engine_core_concurrent_batches assumes exactly 12 '
+                             'tokens per prompt.\n'
+                             '# Adjust prompt if changing model to maintain 12-token '
+                             'length.\n'
+                             'PROMPT = "I am Gyoubu Masataka Oniwa"\n'
+                             '\n'
+                             '\n'
+                             '@functools.cache\n'
+                             'def _prompt_tokens() -> list[int]:\n'
+                             '    # Read from the hub where a test first needs it, not '
+                             'at import.\n'
+                             '    return '
+                             'AutoTokenizer.from_pretrained(MODEL_NAME)(PROMPT).input_ids\n'
+                             '\n'
+                             '\n'
+                             '_REQUEST_COUNTER = 0\n'
+                             '\n'},
+            {'name': 'tests/v1/engine/test_engine_core.py:landmark-3',
+             'path': 'tests/v1/engine/test_engine_core.py',
+             'before': '    return EngineCoreRequest(\n'
+                       '        request_id=request_id,\n'
+                       '        external_req_id=f"{request_id}-{uuid.uuid4()}",\n'
+                       '        prompt_token_ids=PROMPT_TOKENS,\n'
+                       '        mm_features=None,\n'
+                       '        sampling_params=SamplingParams(extra_args={"kv_scope": '
+                       'request_id}),\n'
+                       '        pooling_params=None,\n',
+             'after': '    return EngineCoreRequest(\n'
+                      '        request_id=request_id,\n'
+                      '        external_req_id=f"{request_id}-{uuid.uuid4()}",\n'
+                      '        prompt_token_ids=_prompt_tokens(),\n'
+                      '        mm_features=None,\n'
+                      '        sampling_params=SamplingParams(extra_args={"kv_scope": '
+                      'request_id}),\n'
+                      '        pooling_params=None,\n',
+             'review_before': '    return EngineCoreRequest(\n'
+                              '        request_id=request_id,\n'
+                              '        '
+                              'external_req_id=f"{request_id}-{uuid.uuid4()}",\n'
+                              '        prompt_token_ids=PROMPT_TOKENS,\n'
+                              '        mm_features=None,\n'
+                              '        '
+                              'sampling_params=SamplingParams(extra_args={"kv_scope": '
+                              'request_id}),\n'
+                              '        pooling_params=None,\n',
+             'review_after': '    return EngineCoreRequest(\n'
+                             '        request_id=request_id,\n'
+                             '        external_req_id=f"{request_id}-{uuid.uuid4()}",\n'
+                             '        prompt_token_ids=_prompt_tokens(),\n'
+                             '        mm_features=None,\n'
+                             '        '
+                             'sampling_params=SamplingParams(extra_args={"kv_scope": '
+                             'request_id}),\n'
+                             '        pooling_params=None,\n'},
+            {'name': 'tests/v1/engine/test_engine_core.py:landmark-4',
+             'path': 'tests/v1/engine/test_engine_core.py',
+             'before': '    )\n'
+                       '\n'
+                       '\n'
+                       '@create_new_process_for_each_test()\n'
+                       'def test_engine_core():\n'
+                       '    """Setup the EngineCore."""\n'
+                       '    engine_args = EngineArgs(model=MODEL_NAME)\n',
+             'after': '    )\n'
+                      '\n'
+                      '\n'
+                      '@create_new_process_for_each_test("spawn")\n'
+                      'def test_engine_core():\n'
+                      '    """Setup the EngineCore."""\n'
+                      '    engine_args = EngineArgs(model=MODEL_NAME)\n',
+             'review_before': '    )\n'
+                              '\n'
+                              '\n'
+                              '@create_new_process_for_each_test()\n'
+                              'def test_engine_core():\n'
+                              '    """Setup the EngineCore."""\n'
+                              '    engine_args = EngineArgs(model=MODEL_NAME)\n',
+             'review_after': '    )\n'
+                             '\n'
+                             '\n'
+                             '@create_new_process_for_each_test("spawn")\n'
+                             'def test_engine_core():\n'
+                             '    """Setup the EngineCore."""\n'
+                             '    engine_args = EngineArgs(model=MODEL_NAME)\n'},
+            {'name': 'tests/v1/engine/test_engine_core.py:landmark-5',
+             'path': 'tests/v1/engine/test_engine_core.py',
+             'before': '    assert len(engine_core.scheduler.running) == 0\n'
+                       '\n'
+                       '\n'
+                       '@create_new_process_for_each_test()\n'
+                       'def test_engine_core_advanced_sampling():\n'
+                       '    """\n'
+                       '    A basic end-to-end test to verify that the engine '
+                       'functions correctly\n',
+             'after': '    assert len(engine_core.scheduler.running) == 0\n'
+                      '\n'
+                      '\n'
+                      '@create_new_process_for_each_test("spawn")\n'
+                      'def test_engine_core_advanced_sampling():\n'
+                      '    """\n'
+                      '    A basic end-to-end test to verify that the engine functions '
+                      'correctly\n',
+             'review_before': '    assert len(engine_core.scheduler.running) == 0\n'
+                              '\n'
+                              '\n'
+                              '@create_new_process_for_each_test()\n'
+                              'def test_engine_core_advanced_sampling():\n'
+                              '    """\n'
+                              '    A basic end-to-end test to verify that the engine '
+                              'functions correctly\n',
+             'review_after': '    assert len(engine_core.scheduler.running) == 0\n'
+                             '\n'
+                             '\n'
+                             '@create_new_process_for_each_test("spawn")\n'
+                             'def test_engine_core_advanced_sampling():\n'
+                             '    """\n'
+                             '    A basic end-to-end test to verify that the engine '
+                             'functions correctly\n'},
+            {'name': 'tests/v1/engine/test_engine_core.py:landmark-6',
+             'path': 'tests/v1/engine/test_engine_core.py',
+             'before': '    _check_engine_state()\n'
+                       '\n'
+                       '\n'
+                       '@create_new_process_for_each_test()\n'
+                       'def test_engine_core_concurrent_batches():\n'
+                       '    """\n'
+                       '    Test that the engine can handle multiple concurrent '
+                       'batches.\n',
+             'after': '    _check_engine_state()\n'
+                      '\n'
+                      '\n'
+                      '@create_new_process_for_each_test("spawn")\n'
+                      'def test_engine_core_concurrent_batches():\n'
+                      '    """\n'
+                      '    Test that the engine can handle multiple concurrent '
+                      'batches.\n',
+             'review_before': '    _check_engine_state()\n'
+                              '\n'
+                              '\n'
+                              '@create_new_process_for_each_test()\n'
+                              'def test_engine_core_concurrent_batches():\n'
+                              '    """\n'
+                              '    Test that the engine can handle multiple concurrent '
+                              'batches.\n',
+             'review_after': '    _check_engine_state()\n'
+                             '\n'
+                             '\n'
+                             '@create_new_process_for_each_test("spawn")\n'
+                             'def test_engine_core_concurrent_batches():\n'
+                             '    """\n'
+                             '    Test that the engine can handle multiple concurrent '
+                             'batches.\n'},
+            {'name': 'tests/v1/engine/test_engine_core.py:landmark-7',
+             'path': 'tests/v1/engine/test_engine_core.py',
+             'before': '        req_id = (req_id + 1) % 2\n'
+                       '\n'
+                       '\n'
+                       '@multi_gpu_test(num_gpus=2)\n'
+                       'def test_engine_core_tp():\n'
+                       '    """\n'
+                       '    Test engine can initialize worker in tp properly\n',
+             'after': '        req_id = (req_id + 1) % 2\n'
+                      '\n'
+                      '\n'
+                      '@multi_gpu_only(num_gpus=2)\n'
+                      '@create_new_process_for_each_test("spawn")\n'
+                      'def test_engine_core_tp():\n'
+                      '    """\n'
+                      '    Test engine can initialize worker in tp properly\n',
+             'review_before': '        req_id = (req_id + 1) % 2\n'
+                              '\n'
+                              '\n'
+                              '@multi_gpu_test(num_gpus=2)\n'
+                              'def test_engine_core_tp():\n'
+                              '    """\n'
+                              '    Test engine can initialize worker in tp properly\n',
+             'review_after': '        req_id = (req_id + 1) % 2\n'
+                             '\n'
+                             '\n'
+                             '@multi_gpu_only(num_gpus=2)\n'
+                             '@create_new_process_for_each_test("spawn")\n'
+                             'def test_engine_core_tp():\n'
+                             '    """\n'
+                             '    Test engine can initialize worker in tp properly\n'},
+            {'name': 'tests/v1/engine/test_engine_core.py:landmark-8',
+             'path': 'tests/v1/engine/test_engine_core.py',
+             'before': '    assert all(x is not None for x in num_cpu_blocks)\n'
+                       '\n'
+                       '\n'
+                       '@create_new_process_for_each_test()\n'
+                       'def test_engine_core_invalid_request_id_type():\n'
+                       '    """Test that engine raises TypeError for non-string '
+                       'request_id."""\n'
+                       '    engine_args = EngineArgs(model=MODEL_NAME)\n',
+             'after': '    assert all(x is not None for x in num_cpu_blocks)\n'
+                      '\n'
+                      '\n'
+                      '@create_new_process_for_each_test("spawn")\n'
+                      'def test_engine_core_invalid_request_id_type():\n'
+                      '    """Test that engine raises TypeError for non-string '
+                      'request_id."""\n'
+                      '    engine_args = EngineArgs(model=MODEL_NAME)\n',
+             'review_before': '    assert all(x is not None for x in num_cpu_blocks)\n'
+                              '\n'
+                              '\n'
+                              '@create_new_process_for_each_test()\n'
+                              'def test_engine_core_invalid_request_id_type():\n'
+                              '    """Test that engine raises TypeError for non-string '
+                              'request_id."""\n'
+                              '    engine_args = EngineArgs(model=MODEL_NAME)\n',
+             'review_after': '    assert all(x is not None for x in num_cpu_blocks)\n'
+                             '\n'
+                             '\n'
+                             '@create_new_process_for_each_test("spawn")\n'
+                             'def test_engine_core_invalid_request_id_type():\n'
+                             '    """Test that engine raises TypeError for non-string '
+                             'request_id."""\n'
+                             '    engine_args = EngineArgs(model=MODEL_NAME)\n'},
+            {'name': 'tests/v1/engine/test_engine_core.py:landmark-9',
+             'path': 'tests/v1/engine/test_engine_core.py',
+             'before': '    assert len(engine_core.scheduler.running) == 0\n'
+                       '\n'
+                       '\n'
+                       '@create_new_process_for_each_test()\n'
+                       '@pytest.mark.parametrize(\n'
+                       '    ("ec_role", "gpu_memory_utilization", '
+                       '"enable_prefix_caching"),\n'
+                       '    [\n',
+             'after': '    assert len(engine_core.scheduler.running) == 0\n'
+                      '\n'
+                      '\n'
+                      '@create_new_process_for_each_test("spawn")\n'
+                      '@pytest.mark.parametrize(\n'
+                      '    ("ec_role", "gpu_memory_utilization", '
+                      '"enable_prefix_caching"),\n'
+                      '    [\n',
+             'review_before': '    assert len(engine_core.scheduler.running) == 0\n'
+                              '\n'
+                              '\n'
+                              '@create_new_process_for_each_test()\n'
+                              '@pytest.mark.parametrize(\n'
+                              '    ("ec_role", "gpu_memory_utilization", '
+                              '"enable_prefix_caching"),\n'
+                              '    [\n',
+             'review_after': '    assert len(engine_core.scheduler.running) == 0\n'
+                             '\n'
+                             '\n'
+                             '@create_new_process_for_each_test("spawn")\n'
+                             '@pytest.mark.parametrize(\n'
+                             '    ("ec_role", "gpu_memory_utilization", '
+                             '"enable_prefix_caching"),\n'
+                             '    [\n'},
+            {'name': 'tests/v1/engine/test_engine_core_client.py:landmark-1',
+             'path': 'tests/v1/engine/test_engine_core_client.py',
+             'before': '# SPDX-FileCopyrightText: Copyright contributors to the vLLM '
+                       'project\n'
+                       '\n'
+                       'import asyncio\n'
+                       'import importlib\n'
+                       'import inspect\n'
+                       'import os\n',
+             'after': '# SPDX-FileCopyrightText: Copyright contributors to the vLLM '
+                      'project\n'
+                      '\n'
+                      'import asyncio\n'
+                      'import functools\n'
+                      'import importlib\n'
+                      'import inspect\n'
+                      'import os\n',
+             'review_before': '# SPDX-FileCopyrightText: Copyright contributors to the '
+                              'vLLM project\n'
+                              '\n'
+                              'import asyncio\n'
+                              'import importlib\n'
+                              'import inspect\n'
+                              'import os\n',
+             'review_after': '# SPDX-FileCopyrightText: Copyright contributors to the '
+                             'vLLM project\n'
+                             '\n'
+                             'import asyncio\n'
+                             'import functools\n'
+                             'import importlib\n'
+                             'import inspect\n'
+                             'import os\n'},
+            {'name': 'tests/v1/engine/test_engine_core_client.py:landmark-2',
+             'path': 'tests/v1/engine/test_engine_core_client.py',
+             'before': 'import torch\n'
+                       'from transformers import AutoTokenizer\n'
+                       '\n'
+                       'from tests.utils import multi_gpu_test\n'
+                       'from vllm import SamplingParams\n'
+                       'from vllm.distributed.kv_events import BlockStored, '
+                       'KVEventBatch, ZmqEventPublisher\n'
+                       'from vllm.engine.arg_utils import EngineArgs\n',
+             'after': 'import torch\n'
+                      'from transformers import AutoTokenizer\n'
+                      '\n'
+                      'from tests.utils import multi_gpu_only\n'
+                      'from vllm import SamplingParams\n'
+                      'from vllm.distributed.kv_events import BlockStored, '
+                      'KVEventBatch, ZmqEventPublisher\n'
+                      'from vllm.engine.arg_utils import EngineArgs\n',
+             'review_before': 'import torch\n'
+                              'from transformers import AutoTokenizer\n'
+                              '\n'
+                              'from tests.utils import multi_gpu_test\n'
+                              'from vllm import SamplingParams\n'
+                              'from vllm.distributed.kv_events import BlockStored, '
+                              'KVEventBatch, ZmqEventPublisher\n'
+                              'from vllm.engine.arg_utils import EngineArgs\n',
+             'review_after': 'import torch\n'
+                             'from transformers import AutoTokenizer\n'
+                             '\n'
+                             'from tests.utils import multi_gpu_only\n'
+                             'from vllm import SamplingParams\n'
+                             'from vllm.distributed.kv_events import BlockStored, '
+                             'KVEventBatch, ZmqEventPublisher\n'
+                             'from vllm.engine.arg_utils import EngineArgs\n'},
+            {'name': 'tests/v1/engine/test_engine_core_client.py:landmark-3',
+             'path': 'tests/v1/engine/test_engine_core_client.py',
+             'before': 'from ...distributed.conftest import MockSubscriber\n'
+                       'from ...utils import create_new_process_for_each_test\n'
+                       '\n'
+                       'if not current_platform.is_cuda_alike():\n'
+                       '    pytest.skip(\n'
+                       '        reason="V1 currently only supported on CUDA-alike '
+                       'platforms.",\n'
+                       '        allow_module_level=True,\n'
+                       '    )\n'
+                       '\n'
+                       'MODEL_NAME = "meta-llama/Llama-3.2-1B-Instruct"\n'
+                       'TOKENIZER = AutoTokenizer.from_pretrained(MODEL_NAME)\n'
+                       'PROMPT = "Hello my name is Robert and I love quantization '
+                       'kernels"\n'
+                       'PROMPT_TOKENS = TOKENIZER(PROMPT).input_ids\n'
+                       'TEST_MODULE = "tests.v1.engine.test_engine_core_client"\n'
+                       '\n'
+                       '_REQUEST_COUNTER = 0\n',
+             'after': 'from ...distributed.conftest import MockSubscriber\n'
+                      'from ...utils import create_new_process_for_each_test\n'
+                      '\n'
+                      'pytestmark = pytest.mark.skipif(\n'
+                      '    not current_platform.is_cuda_alike(),\n'
+                      '    reason="V1 currently only supported on CUDA-alike '
+                      'platforms.",\n'
+                      ')\n'
+                      '\n'
+                      'MODEL_NAME = "meta-llama/Llama-3.2-1B-Instruct"\n'
+                      'PROMPT = "Hello my name is Robert and I love quantization '
+                      'kernels"\n'
+                      '\n'
+                      '\n'
+                      '@functools.cache\n'
+                      'def _prompt_tokens() -> list[int]:\n'
+                      '    # Read from the hub where a test first needs it, not at '
+                      'import.\n'
+                      '    return '
+                      'AutoTokenizer.from_pretrained(MODEL_NAME)(PROMPT).input_ids\n'
+                      '\n'
+                      '\n'
+                      'TEST_MODULE = "tests.v1.engine.test_engine_core_client"\n'
+                      '\n'
+                      '_REQUEST_COUNTER = 0\n',
+             'review_before': 'from ...distributed.conftest import MockSubscriber\n'
+                              'from ...utils import create_new_process_for_each_test\n'
+                              '\n'
+                              'if not current_platform.is_cuda_alike():\n'
+                              '    pytest.skip(\n'
+                              '        reason="V1 currently only supported on '
+                              'CUDA-alike platforms.",\n'
+                              '        allow_module_level=True,\n'
+                              '    )\n'
+                              '\n'
+                              'MODEL_NAME = "meta-llama/Llama-3.2-1B-Instruct"\n'
+                              'TOKENIZER = AutoTokenizer.from_pretrained(MODEL_NAME)\n'
+                              'PROMPT = "Hello my name is Robert and I love '
+                              'quantization kernels"\n'
+                              'PROMPT_TOKENS = TOKENIZER(PROMPT).input_ids\n'
+                              'TEST_MODULE = '
+                              '"tests.v1.engine.test_engine_core_client"\n'
+                              '\n'
+                              '_REQUEST_COUNTER = 0\n',
+             'review_after': 'from ...distributed.conftest import MockSubscriber\n'
+                             'from ...utils import create_new_process_for_each_test\n'
+                             '\n'
+                             'pytestmark = pytest.mark.skipif(\n'
+                             '    not current_platform.is_cuda_alike(),\n'
+                             '    reason="V1 currently only supported on CUDA-alike '
+                             'platforms.",\n'
+                             ')\n'
+                             '\n'
+                             'MODEL_NAME = "meta-llama/Llama-3.2-1B-Instruct"\n'
+                             'PROMPT = "Hello my name is Robert and I love '
+                             'quantization kernels"\n'
+                             '\n'
+                             '\n'
+                             '@functools.cache\n'
+                             'def _prompt_tokens() -> list[int]:\n'
+                             '    # Read from the hub where a test first needs it, not '
+                             'at import.\n'
+                             '    return '
+                             'AutoTokenizer.from_pretrained(MODEL_NAME)(PROMPT).input_ids\n'
+                             '\n'
+                             '\n'
+                             'TEST_MODULE = "tests.v1.engine.test_engine_core_client"\n'
+                             '\n'
+                             '_REQUEST_COUNTER = 0\n'},
+            {'name': 'tests/v1/engine/test_engine_core_client.py:landmark-4',
+             'path': 'tests/v1/engine/test_engine_core_client.py',
+             'before': '    params: SamplingParams, prompt_tokens_ids: list[int] | '
+                       'None = None\n'
+                       ') -> EngineCoreRequest:\n'
+                       '    if not prompt_tokens_ids:\n'
+                       '        prompt_tokens_ids = PROMPT_TOKENS\n'
+                       '\n'
+                       '    global _REQUEST_COUNTER\n'
+                       '    _REQUEST_COUNTER += 1\n',
+             'after': '    params: SamplingParams, prompt_tokens_ids: list[int] | None '
+                      '= None\n'
+                      ') -> EngineCoreRequest:\n'
+                      '    if not prompt_tokens_ids:\n'
+                      '        prompt_tokens_ids = _prompt_tokens()\n'
+                      '\n'
+                      '    global _REQUEST_COUNTER\n'
+                      '    _REQUEST_COUNTER += 1\n',
+             'review_before': '    params: SamplingParams, prompt_tokens_ids: '
+                              'list[int] | None = None\n'
+                              ') -> EngineCoreRequest:\n'
+                              '    if not prompt_tokens_ids:\n'
+                              '        prompt_tokens_ids = PROMPT_TOKENS\n'
+                              '\n'
+                              '    global _REQUEST_COUNTER\n'
+                              '    _REQUEST_COUNTER += 1\n',
+             'review_after': '    params: SamplingParams, prompt_tokens_ids: list[int] '
+                             '| None = None\n'
+                             ') -> EngineCoreRequest:\n'
+                             '    if not prompt_tokens_ids:\n'
+                             '        prompt_tokens_ids = _prompt_tokens()\n'
+                             '\n'
+                             '    global _REQUEST_COUNTER\n'
+                             '    _REQUEST_COUNTER += 1\n'},
+            {'name': 'tests/v1/engine/test_engine_core_client.py:landmark-5',
+             'path': 'tests/v1/engine/test_engine_core_client.py',
+             'before': '    )\n'
+                       '\n'
+                       '\n'
+                       '@create_new_process_for_each_test()\n'
+                       '@pytest.mark.parametrize("multiprocessing_mode", [True, '
+                       'False])\n'
+                       'def test_engine_core_client(\n'
+                       '    monkeypatch: pytest.MonkeyPatch,\n',
+             'after': '    )\n'
+                      '\n'
+                      '\n'
+                      '@create_new_process_for_each_test("spawn")\n'
+                      '@pytest.mark.parametrize("multiprocessing_mode", [True, '
+                      'False])\n'
+                      'def test_engine_core_client(\n'
+                      '    monkeypatch: pytest.MonkeyPatch,\n',
+             'review_before': '    )\n'
+                              '\n'
+                              '\n'
+                              '@create_new_process_for_each_test()\n'
+                              '@pytest.mark.parametrize("multiprocessing_mode", [True, '
+                              'False])\n'
+                              'def test_engine_core_client(\n'
+                              '    monkeypatch: pytest.MonkeyPatch,\n',
+             'review_after': '    )\n'
+                             '\n'
+                             '\n'
+                             '@create_new_process_for_each_test("spawn")\n'
+                             '@pytest.mark.parametrize("multiprocessing_mode", [True, '
+                             'False])\n'
+                             'def test_engine_core_client(\n'
+                             '    monkeypatch: pytest.MonkeyPatch,\n'},
+            {'name': 'tests/v1/engine/test_engine_core_client.py:landmark-6',
+             'path': 'tests/v1/engine/test_engine_core_client.py',
+             'before': '    [(True, "tcp")],\n'
+                       '    indirect=["publisher_config"],\n'
+                       ')\n'
+                       '@multi_gpu_test(num_gpus=4)\n'
+                       'async def test_kv_cache_events_dp(\n'
+                       '    multiprocessing_mode: bool,\n'
+                       '    publisher_config,\n',
+             'after': '    [(True, "tcp")],\n'
+                      '    indirect=["publisher_config"],\n'
+                      ')\n'
+                      '@multi_gpu_only(num_gpus=4)\n'
+                      '@create_new_process_for_each_test("spawn")\n'
+                      'async def test_kv_cache_events_dp(\n'
+                      '    multiprocessing_mode: bool,\n'
+                      '    publisher_config,\n',
+             'review_before': '    [(True, "tcp")],\n'
+                              '    indirect=["publisher_config"],\n'
+                              ')\n'
+                              '@multi_gpu_test(num_gpus=4)\n'
+                              'async def test_kv_cache_events_dp(\n'
+                              '    multiprocessing_mode: bool,\n'
+                              '    publisher_config,\n',
+             'review_after': '    [(True, "tcp")],\n'
+                             '    indirect=["publisher_config"],\n'
+                             ')\n'
+                             '@multi_gpu_only(num_gpus=4)\n'
+                             '@create_new_process_for_each_test("spawn")\n'
+                             'async def test_kv_cache_events_dp(\n'
+                             '    multiprocessing_mode: bool,\n'
+                             '    publisher_config,\n'},
+            {'name': 'tests/v1/engine/test_engine_core_client.py:landmark-7',
+             'path': 'tests/v1/engine/test_engine_core_client.py',
+             'before': '    assert "Engine core initialization failed" in '
+                       'str(e_info.value)\n'
+                       '\n'
+                       '\n'
+                       '@create_new_process_for_each_test()\n'
+                       'def '
+                       'test_engine_core_proc_instantiation_cuda_empty(monkeypatch: '
+                       'pytest.MonkeyPatch):\n'
+                       '    """\n'
+                       '    Test that EngineCoreProc can be instantiated when '
+                       'CUDA_VISIBLE_DEVICES\n',
+             'after': '    assert "Engine core initialization failed" in '
+                      'str(e_info.value)\n'
+                      '\n'
+                      '\n'
+                      '@create_new_process_for_each_test("spawn")\n'
+                      'def test_engine_core_proc_instantiation_cuda_empty(monkeypatch: '
+                      'pytest.MonkeyPatch):\n'
+                      '    """\n'
+                      '    Test that EngineCoreProc can be instantiated when '
+                      'CUDA_VISIBLE_DEVICES\n',
+             'review_before': '    assert "Engine core initialization failed" in '
+                              'str(e_info.value)\n'
+                              '\n'
+                              '\n'
+                              '@create_new_process_for_each_test()\n'
+                              'def '
+                              'test_engine_core_proc_instantiation_cuda_empty(monkeypatch: '
+                              'pytest.MonkeyPatch):\n'
+                              '    """\n'
+                              '    Test that EngineCoreProc can be instantiated when '
+                              'CUDA_VISIBLE_DEVICES\n',
+             'review_after': '    assert "Engine core initialization failed" in '
+                             'str(e_info.value)\n'
+                             '\n'
+                             '\n'
+                             '@create_new_process_for_each_test("spawn")\n'
+                             'def '
+                             'test_engine_core_proc_instantiation_cuda_empty(monkeypatch: '
+                             'pytest.MonkeyPatch):\n'
+                             '    """\n'
+                             '    Test that EngineCoreProc can be instantiated when '
+                             'CUDA_VISIBLE_DEVICES\n'},
+            {'name': 'tests/v1/simple_kv_offload/test_integration.py:landmark-1',
+             'path': 'tests/v1/simple_kv_offload/test_integration.py',
+             'before': 'from vllm.config import KVTransferConfig\n'
+                       'from vllm.platforms import current_platform\n'
+                       '\n'
+                       'if not current_platform.is_cuda_alike():\n'
+                       '    pytest.skip("Requires CUDA or ROCm", '
+                       'allow_module_level=True)\n'
+                       '\n'
+                       '# Small models for default CI / local runs (accuracy only).\n'
+                       'SMALL_MODELS = [\n',
+             'after': 'from vllm.config import KVTransferConfig\n'
+                      'from vllm.platforms import current_platform\n'
+                      '\n'
+                      'pytestmark = pytest.mark.skipif(\n'
+                      '    not current_platform.is_cuda_alike(), reason="Requires CUDA '
+                      'or ROCm"\n'
+                      ')\n'
+                      '\n'
+                      '# Small models for default CI / local runs (accuracy only).\n'
+                      'SMALL_MODELS = [\n',
+             'review_before': 'from vllm.config import KVTransferConfig\n'
+                              'from vllm.platforms import current_platform\n'
+                              '\n'
+                              'if not current_platform.is_cuda_alike():\n'
+                              '    pytest.skip("Requires CUDA or ROCm", '
+                              'allow_module_level=True)\n'
+                              '\n'
+                              '# Small models for default CI / local runs (accuracy '
+                              'only).\n'
+                              'SMALL_MODELS = [\n',
+             'review_after': 'from vllm.config import KVTransferConfig\n'
+                             'from vllm.platforms import current_platform\n'
+                             '\n'
+                             'pytestmark = pytest.mark.skipif(\n'
+                             '    not current_platform.is_cuda_alike(), '
+                             'reason="Requires CUDA or ROCm"\n'
+                             ')\n'
+                             '\n'
+                             '# Small models for default CI / local runs (accuracy '
+                             'only).\n'
+                             'SMALL_MODELS = [\n'},
+            {'name': 'vllm/platforms/interface.py:landmark-1',
+             'path': 'vllm/platforms/interface.py',
+             'before': 'class UnspecifiedPlatform(Platform):\n'
+                       '    _enum = PlatformEnum.UNSPECIFIED\n'
+                       '    device_type = ""\n',
+             'after': 'class UnspecifiedPlatform(Platform):\n'
+                      '    _enum = PlatformEnum.UNSPECIFIED\n'
+                      '    device_type = ""\n'
+                      '\n'
+                      '    @classmethod\n'
+                      '    def device_count(cls) -> int:\n'
+                      '        # No device was detected, so there is none. The count '
+                      'is declared\n'
+                      '        # here because Platform.__getattr__ resolves an '
+                      'attribute through the\n'
+                      '        # torch module of the device type, and an empty device '
+                      'type names none.\n'
+                      '        return 0\n',
+             'review_before': 'class UnspecifiedPlatform(Platform):\n'
+                              '    _enum = PlatformEnum.UNSPECIFIED\n'
+                              '    device_type = ""\n',
+             'review_after': 'class UnspecifiedPlatform(Platform):\n'
+                             '    _enum = PlatformEnum.UNSPECIFIED\n'
+                             '    device_type = ""\n'
+                             '\n'
+                             '    @classmethod\n'
+                             '    def device_count(cls) -> int:\n'
+                             '        # No device was detected, so there is none. The '
+                             'count is declared\n'
+                             '        # here because Platform.__getattr__ resolves an '
+                             'attribute through the\n'
+                             '        # torch module of the device type, and an empty '
+                             'device type names none.\n'
+                             '        return 0\n'})},
  {'name': 'priority-is-refused-where-nothing-orders-by-it',
   'review_patch': 'patches/vllm-priority-is-refused-where-nothing-orders-by-it.patch',
   'review_sha256': '96346e5bf71726008f4449389d91a18531fd57fe63f930b2400e059ab168571a',
@@ -177539,7 +178770,7 @@ FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5d
  'tests/conftest.py': '6aa1c39d3d977ac381290eb00adb9a3c33fd34733c95623a07fd6c171d7840f4',
  'tests/detokenizer/test_min_tokens.py': 'cff7046330ea0a76c835d5c4c9fe42baf32130720ae8c6adae5620ff1e0bde9f',
  'tests/detokenizer/test_stop_string_while_stop_model_terminates.py': 'a575db162d04feb30942438f02f89d7f69292ca66c4bd391e89b2755966c62f4',
- 'tests/distributed/test_rocm_quick_reduce.py': '42b0322b676ef66d634d533aad4fa8aa92f29717cf26e9d5de44351daaf1d632',
+ 'tests/distributed/test_rocm_quick_reduce.py': 'dadd64f6ff63dda16d458bcaac5bbb9b342a5f5e98245fd470b98649db4dcc61',
  'tests/engine/test_arg_utils.py': '5879353972adb96ecff43c8017432c5e3057fe344ab08dfa5bf63938249ad7c7',
  'tests/entrypoints/anthropic/test_anthropic_messages_conversion.py': '30e03a0608325ec676971d1a02a04512004a3d61cb07875cbb36458162a94007',
  'tests/entrypoints/multimodal/openai/chat_completion/test_video.py': '86c58a7f4d155191d5dbeee20fc530c75fb080bc91fb8ce0f908c1f6ee600bd6',
@@ -177589,9 +178820,9 @@ FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5d
  'tests/entrypoints/test_generation_admission.py': '21f70cf0354f6aef59480eb0cc1b2a6407ed94ca68887af65f95218200e8e409',
  'tests/entrypoints/test_kv_scope_protocol.py': '30dfe8005dcb5431f094f7344dd44d5ed928bbd4a55f08a7433738abfd6502cf',
  'tests/entrypoints/unit_tests/test_chat_utils.py': '6be36b463dacf6c9d25c0742177fd8beec60fbc8ae49b2fcee250ee6afc55bce',
- 'tests/evals/gsm8k/test_gsm8k_offloading.py': 'a7ced3b714c418120c2e4d5cfb55690d3b11baa96083256c2bb640dc80eec3f6',
+ 'tests/evals/gsm8k/test_gsm8k_offloading.py': 'fcd7ca13bb9d06cf7c8062e6d9217fac6f61678dfa46458fde1564940312f8ed',
  'tests/model_executor/kernels/test_nvfp4_native_selection.py': '734053c7d0594ac215a3305105aaf122315b5ae2f2ca8d91ed35d73a18c20f90',
- 'tests/models/language/pooling/test_reward.py': 'ac833e9859fe892d7568c051222c4bc87adc538110076b412df4b1b812f9479d',
+ 'tests/models/language/pooling/test_reward.py': 'bb24a60b6184c26fae0ad7aa393dd96f3297ba25840ff9f1f2fc453c4de4209c',
  'tests/multimodal/media/test_connector.py': '4221d7f6b2dd9950a627aa60d24ce7763af1782bf2fa626c94f9882df1135d07',
  'tests/multimodal/media/test_image.py': '7fae5970499f78c6e67f31e5870f8dce77836d38f2d3a1252d85d4fbf444d215',
  'tests/multimodal/media/test_unprocessable_entity_error.py': '4a53412f2e66b610f78b2678bcbf259bc97d98360640ae767f87bc3a14de7684',
@@ -177633,10 +178864,10 @@ FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5d
  'tests/tool_use/test_responses_request_validations.py': '3beee4d51e4523bf93e1fc5a6fa3e74191be620b1c3bb5c339507077e90bbb79',
  'tests/v1/core/test_kv_cache_users_sizing.py': '5c4c50f679572cf201c64097121bde27dfc603869c4335e0506e913df70097d4',
  'tests/v1/core/test_prefix_caching.py': '7ceb00826d43dc4186bb746e64c6e650784d536a04127ccd7d02162f1fea4c4f',
- 'tests/v1/e2e/general/test_context_length.py': '8147e5c25a69016b74075d3061984463debbf00877a463d3d2bc333fbf42bb49',
+ 'tests/v1/e2e/general/test_context_length.py': '86c0088bfb7afa4aff4801742089cc0e73c4073990be20e15d21d87230182554',
  'tests/v1/engine/test_async_llm_admission.py': '4a5421ef0cffc3d68484ef0d8caf1d9082e7fc3ab0dc943e7488d59420b41ca5',
- 'tests/v1/engine/test_engine_core.py': '7834fa7eaeb25518e4af756f0dc56c420a1c8e5c906057643a41241a17162485',
- 'tests/v1/engine/test_engine_core_client.py': 'f395ab80e7d75fce9007629c5a1c696ca675a41de25e9837d5916f8d1b916a2a',
+ 'tests/v1/engine/test_engine_core.py': 'e5e0c4e0eadf6fdfc790272127e727d01fcc6867f8ea7fa54f09cdcbd3be802a',
+ 'tests/v1/engine/test_engine_core_client.py': '9b53214be8bcddfd14b90867a539660d3ebde257e8b7e6e3b1c5c6cc298a94bd',
  'tests/v1/engine/test_engine_request_identity.py': 'ab2797f33f2cd1aeaa07bf7c35cd1d51665d2de4c91406a21d3c696f50423938',
  'tests/v1/engine/test_fast_incdec_prefix_err.py': '71c0fec8e157c046b9b8623e93845550d00a733e15be5c6eaf59afde69eeba43',
  'tests/v1/engine/test_kv_scope_single_flight.py': 'b201e5a9ce502d182fcc5d5d10f2fc64333308642586398e9b594c79365af0a0',
@@ -177662,8 +178893,8 @@ FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5d
  'tests/v1/kv_offload/tiering/test_fs_tier.py': 'c170b6f37add5189a9e0d240a36835f69879d86afd9c81ebfec4e14acabec64a',
  'tests/v1/kv_offload/tiering/test_obj_tier.py': 'f7e8f3250c2a79ede185dad669bf50b1bb81d01eac3744d98dc9d649a0ff53b6',
  'tests/v1/kv_offload/tiering/test_tiering_offloading.py': '2106bb9a5cf1dbbd9a869bc97b11e88aa55831a45bff13d27ab52c4dc96d8564',
- 'tests/v1/logits_processors/test_correctness.py': 'adfdff01806aec6ae5f10f88e89b48b8ceeba6a015bff701434f05cf36cc9b9f',
- 'tests/v1/simple_kv_offload/test_integration.py': '0dd7471507c88e209fe6a72359dfc655368c836cbe2cd3d95e1c0f72d38a4241',
+ 'tests/v1/logits_processors/test_correctness.py': '453d3c5591c25edb3c3c389c63e2d2f60309d74e94d4b3eac3555aec52ea7c6f',
+ 'tests/v1/simple_kv_offload/test_integration.py': '430c9a9e40ca17452465846f5bd0a7405bb782b8e4a73154e1b0496e6369701d',
  'tests/v1/simple_kv_offload/test_scheduler.py': '038c017d6e2bff9336497806ae2ce837d1010859b5d84907819e40f13ab8d1f0',
  'tests/v1/streaming_input/test_async_llm_streaming.py': '72f195575d01e0ed48fa0b3d426951b46393cfde3f434a5863e6c169c82bf3ba',
  'tests/v1/structured_output/test_backend_xgrammar_stop_tokens.py': '665040a33a0f729c8f34169addeb554c37e2432071ccad20cb989575d7937baa',
@@ -177759,6 +178990,7 @@ FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5d
  'vllm/parser/parser_manager.py': 'c3174da47cf85db7fb8a2db4e70014814697f724feb0a86fe3b7b244be7b2789',
  'vllm/parser/qwen3.py': '32d31cfc07b3ac214237134e11f9f45c1931252d2edca965efe943643c8f1603',
  'vllm/parser/seed_oss.py': '9e50fd8b12f8bac832bbe79eaccd19ed9b667cc23b1b53cd08434c4e8c0b627b',
+ 'vllm/platforms/interface.py': '79d62b073ff1c2b0e953738967db71a00090d6e70a4ecc68cc34f21c658486f3',
  'vllm/reasoning/abs_reasoning_parsers.py': 'f386d2591f01dca1970ff6ca3c6579a3376d47becd30d276d321695b9dbcdf69',
  'vllm/reasoning/basic_parsers.py': 'daf62cc0685705b5cac7c4c6e2c6d9a0182960b5d8ebafc2ca3c45f39653c598',
  'vllm/reasoning/minimax_m3_reasoning_parser.py': 'd91a8f1c7c34bc4d32d374e68038c719e61a1cac456c0538025bcbba0daf3cab',

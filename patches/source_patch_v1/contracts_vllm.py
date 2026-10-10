@@ -2437,6 +2437,21 @@ def _validate_kv_physical_after(state: State) -> None:
         "test_v2_model_runner_serves_no_declared_kv_pool": None,
         "test_what_only_the_v2_runner_serves_selects_it_and_its_refusal": None,
     }, label=label)
+    # So a reward model with a KV cache is served by the V1 runner, which holds
+    # its declared pool, and forcing V2 is refused by that cause.
+    reward = "tests/models/language/pooling/test_reward.py"
+    require_text(state, reward,
+                 "assert vllm_model.llm.llm_engine.vllm_config.use_v2_model_runner "
+                 "is False\n", count=2, label=label)
+    forbid_text(state, reward, 'setenv("VLLM_USE_V2_MODEL_RUNNER", "1" if', label=label)
+    require_python_symbols(state, reward, {
+        "test_prm_models_refuse_the_v2_runner": ("vllm_runner", "monkeypatch", "model"),
+    }, label=label)
+    _require_in_symbol(state, reward, "test_prm_models_refuse_the_v2_runner", (
+        'monkeypatch.setenv("VLLM_USE_V2_MODEL_RUNNER", "1")',
+        "Next: unset VLLM_USE_V2_MODEL_RUNNER",
+        "kv_cache_users=1",
+    ), label=label)
     forbid_text(state, worker, "Residents allocated after profiling", label=label)
     require_python_symbols(state, "tests/v1/worker/test_gpu_worker.py", {
         "test_physical_bound_charges_preexisting_residents_once": None,
@@ -5259,12 +5274,42 @@ def _validate_test_declarations_after(state: State) -> None:
                  '            suffix, marks=() if suffix == ".png" else '
                  "IMAGE_CONTRACT_REFUSES\n",
                  label=label)
-    # A module that cannot be imported without a GPU says so where the runner
-    # reads it without importing it: its module-level pytestmark.
+    # A module that needs a GPU says so where the runner reads it without
+    # importing it: its module-level pytestmark.
     require_text(state, "tests/distributed/test_rocm_quick_reduce.py",
                  "pytestmark = [\n    pytest.mark.gpu,\n", label=label)
     require_text(state, "tests/v1/logits_processors/test_correctness.py",
                  "\npytestmark = pytest.mark.gpu\n", label=label)
+    # Every module imports whole without a device: a platform with no device
+    # counts none, a condition on the machine is a skipif mark, and the hub is
+    # read where a test first needs it.
+    _require_in_symbol(state, "vllm/platforms/interface.py",
+                       "UnspecifiedPlatform.device_count", ("return 0",), label=label)
+    for module in (
+        "tests/evals/gsm8k/test_gsm8k_offloading.py",
+        "tests/v1/simple_kv_offload/test_integration.py",
+        "tests/v1/engine/test_engine_core.py",
+        "tests/v1/engine/test_engine_core_client.py",
+    ):
+        require_text(state, module, "\npytestmark = pytest.mark.skipif(\n", label=label)
+        forbid_text(state, module, "allow_module_level=True", label=label)
+    for module in ("tests/v1/engine/test_engine_core.py",
+                   "tests/v1/engine/test_engine_core_client.py"):
+        require_python_symbols(state, module, {"_prompt_tokens": ()}, label=label)
+        forbid_text(state, module, "\nTOKENIZER = AutoTokenizer.from_pretrained(",
+                    label=label)
+    # A test that needs a process of its own spawns it.
+    for module, count in (
+        ("tests/v1/e2e/general/test_context_length.py", 2),
+        ("tests/v1/engine/test_engine_core.py", 6),
+        ("tests/v1/engine/test_engine_core_client.py", 3),
+        ("tests/v1/logits_processors/test_correctness.py", 1),
+        ("tests/distributed/test_rocm_quick_reduce.py", 1),
+    ):
+        require_text(state, module, '\n@create_new_process_for_each_test("spawn")\n',
+                     count=count, label=label)
+        forbid_text(state, module, "@create_new_process_for_each_test()", label=label)
+        forbid_text(state, module, "@multi_gpu_test(", label=label)
 
 
 _INPUT_PROCESSOR = "vllm/v1/engine/input_processor.py"
@@ -6947,10 +6992,17 @@ CONTRACTS: Mapping[str, SemanticContract] = {
             "statement: tests/conftest.py registers a gpu and a network mark, "
             "and a test that needs a GPU or the network -- the Hugging Face hub "
             "or a remote URL -- carries the mark on itself, its class, or its "
-            "module's pytestmark, which is read without importing the module, "
-            "so a module that cannot even be imported without a GPU says so the "
-            "same way. Every test that carries neither runs with no GPU and no "
-            "network, and fails there if it needs one unsaid. Upstream's tests "
+            "module's pytestmark, which is read without importing the module. "
+            "Every test that carries neither runs with no GPU and no network, "
+            "and fails there if it needs one unsaid. Every module imports whole "
+            "without a device, as the runner collects it before anything runs: "
+            "a platform with no device counts none, a module's condition on the "
+            "machine is a skipif mark rather than a skip at import, and a hub "
+            "read happens where a test first needs it, not at import. A test "
+            "that needs a process of its own spawns it, as upstream's spawn "
+            "form does, since every reviewed test runs in one pytest process on "
+            "the GPU, which a fork made once CUDA is initialised cannot use. "
+            "Upstream's tests "
             "of image fetching the Qwen3.8 image contract refuses are strict "
             "xfails naming the contract and the exception it raises, as is each "
             "non-PNG case of the base64 round trip, whose reference images are "

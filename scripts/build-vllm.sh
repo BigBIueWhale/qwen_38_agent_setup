@@ -796,6 +796,8 @@ image_build_options=(
   --build-arg "STREAMING_PARSER_ENGINE_PATCHED_FILE_SHA256=${STREAMING_PARSER_ENGINE_PATCHED_FILE_SHA256}"
   --build-arg "TOKEN_ID_SCANNER_PATCHED_FILE_SHA256=${TOKEN_ID_SCANNER_PATCHED_FILE_SHA256}"
   --build-arg "ENGINE_PROTOCOL_PATCHED_FILE_SHA256=${ENGINE_PROTOCOL_PATCHED_FILE_SHA256}"
+  --build-arg "PLATFORM_INTERFACE_PATCHED_FILE_SHA256=${PLATFORM_INTERFACE_PATCHED_FILE_SHA256}"
+  --build-arg "PLATFORM_INTERFACE_UPSTREAM_FILE_SHA256=${PLATFORM_INTERFACE_UPSTREAM_FILE_SHA256}"
   --build-arg "LONGCAT_FLASH_NGRAM_MODEL_PATCHED_FILE_SHA256=${LONGCAT_FLASH_NGRAM_MODEL_PATCHED_FILE_SHA256}"
   --build-arg "LONGCAT_FLASH_NGRAM_MODEL_UPSTREAM_FILE_SHA256=${LONGCAT_FLASH_NGRAM_MODEL_UPSTREAM_FILE_SHA256}"
   --build-arg "MODEL_REGISTRY_PATCHED_FILE_SHA256=${MODEL_REGISTRY_PATCHED_FILE_SHA256}"
@@ -1021,13 +1023,15 @@ readonly -a test_runner_wheels
 # with the network; a gated Hugging Face repository is read with the HF_TOKEN of
 # the environment build runs in, and what the tests download is kept under this
 # run's export directory and removed with it.
-# collection: every reviewed test file, imported and its tests built as the
-# release set collects them, and none run, on the offline machine. A release run
-# that meets a collection error runs nothing, so build could pin no image; this
-# is where such an error is found. The plugin names what only build can collect:
-# a module that skips itself at import without a GPU, and one that declares a
-# GPU and cannot be imported without one -- whose imports and declaration must
-# still run here.
+# collection: every reviewed test file, imported whole and its tests built as
+# the release set collects them, and none run, on the offline machine. A release
+# run that meets a collection error runs nothing, so build could pin no image;
+# this is where such an error is found, and no module is excused: none may skip
+# itself at import, and every name the code of a reviewed module reads must be
+# one the module binds or a builtin, read from its source -- all that check
+# holds of the code a module runs at import only on a GPU platform. In every
+# set, a test that would run in a fork of the pytest process fails the run: the
+# release set is one process, on the GPU.
 # Both read the served model's tokenizer files, checked against the model manifest
 # above, where a test asks for the pinned local tokenizer (QWEN_TOKENIZER_PATH).
 # The tree's own vllm/ is masked, so a test imports the installed package, and a
@@ -1038,13 +1042,17 @@ readonly -a test_runner_wheels
 # result does not depend on the count.
 readonly OFFLINE_REVIEWED_TEST_SHARDS=12
 # Every reviewed test runs under this timeout, setup and teardown included
-# (pytest-timeout, pinned with the runner), so a test that hangs ends its run
-# naming itself instead of holding check or build forever. It is a declared
-# policy, not a measurement: the longest offline test measured 34 seconds, and
-# a release test's first use of a server pays for a model download and for
-# upstream's own wait of up to 480 seconds for that server to come up, so half
-# an hour is past anything a test legitimately does and ends a hung build
-# within the hour.
+# (pytest-timeout, pinned with the runner), by its thread method: the signal
+# method's alarm is raised in whatever runs, and a test whose event loop a busy
+# task holds catches it there and runs on. At the timeout the thread method
+# dumps every thread's stack and ends the pytest process, so a test that hangs
+# ends its run -- the rest of that process's tests unrun and its report
+# unwritten, which the merge refuses -- instead of holding check or build
+# forever. The half hour is a declared policy, not a measurement: the longest
+# offline test measured 34 seconds, and a release test's first use of a server
+# pays for a model download and for upstream's own wait of up to 480 seconds
+# for that server to come up, so half an hour is past anything a test
+# legitimately does and ends a hung build within the hour.
 readonly REVIEWED_TEST_TIMEOUT_SECONDS=1800
 run_reviewed_tests() {
   local reviewed_set="$1" image="$2" shards="$3" image_note="" shard failed=false
@@ -1090,7 +1098,8 @@ run_reviewed_tests() {
         for wheel in "$@"; do python3 -m zipfile -e "${wheel}" /tmp/test-runner; done
         PYTHONPATH=/tmp/test-runner:/test-runner-plugin exec python3 -m pytest \
           -p no:cacheprovider -p reviewed_tests_plugin --reviewed-set "${reviewed_set}" \
-          --reviewed-shard "${shard}" --timeout "${timeout}" "${verbosity}" -rfE \
+          --reviewed-shard "${shard}" --timeout "${timeout}" --timeout-method thread \
+          "${verbosity}" -rfE \
           --tb=short --disable-warnings tests' \
       run-reviewed-tests "${reviewed_set}" "$1" "${REVIEWED_TEST_TIMEOUT_SECONDS}" \
       "${verbosity[@]}" "${test_runner_wheels[@]}"
@@ -1260,6 +1269,7 @@ actual_installed_report="$(
     /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/detokenizer.py \
     /usr/local/lib/python3.12/dist-packages/vllm/v1/core/sched/scheduler.py \
     /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/async_llm.py \
+    /usr/local/lib/python3.12/dist-packages/vllm/platforms/interface.py \
     /usr/local/lib/python3.12/dist-packages/vllm/model_executor/models/longcat_flash_ngram.py \
     /usr/local/lib/python3.12/dist-packages/vllm/model_executor/models/registry.py \
     /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/tiering/p2p/control/zmq.py \
@@ -1367,6 +1377,7 @@ expected_installed_report="$(printf '%s  %s\n' \
   "${V1_DETOKENIZER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/detokenizer.py \
   "${V1_SCHEDULER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/core/sched/scheduler.py \
   "${ASYNC_LLM_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/async_llm.py \
+  "${PLATFORM_INTERFACE_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/platforms/interface.py \
   "${LONGCAT_FLASH_NGRAM_MODEL_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/model_executor/models/longcat_flash_ngram.py \
   "${MODEL_REGISTRY_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/model_executor/models/registry.py \
   "${P2P_ZMQ_TRANSPORT_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/tiering/p2p/control/zmq.py \

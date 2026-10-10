@@ -886,6 +886,7 @@ assert_running_profile() {
       /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/detokenizer.py \
       /usr/local/lib/python3.12/dist-packages/vllm/v1/core/sched/scheduler.py \
       /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/async_llm.py \
+      /usr/local/lib/python3.12/dist-packages/vllm/platforms/interface.py \
       /usr/local/lib/python3.12/dist-packages/vllm/model_executor/models/longcat_flash_ngram.py \
       /usr/local/lib/python3.12/dist-packages/vllm/model_executor/models/registry.py \
       /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/tiering/p2p/control/zmq.py \
@@ -993,6 +994,7 @@ assert_running_profile() {
     "${V1_DETOKENIZER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/detokenizer.py \
     "${V1_SCHEDULER_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/core/sched/scheduler.py \
     "${ASYNC_LLM_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/async_llm.py \
+    "${PLATFORM_INTERFACE_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/platforms/interface.py \
     "${LONGCAT_FLASH_NGRAM_MODEL_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/model_executor/models/longcat_flash_ngram.py \
     "${MODEL_REGISTRY_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/model_executor/models/registry.py \
     "${P2P_ZMQ_TRANSPORT_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/v1/kv_offload/tiering/p2p/control/zmq.py \

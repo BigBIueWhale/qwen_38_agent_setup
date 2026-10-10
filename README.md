@@ -141,18 +141,25 @@ unpacked inside the container, never installed on the host. Where a test runs is
 the test's own statement: a test that needs a GPU or the network (the Hugging
 Face hub, or a remote URL) carries the `gpu` or `network` mark the tree's
 `tests/conftest.py` registers, on itself, its class or its module, and a
-module-level `pytestmark` is read without importing the module, so a module that
-cannot even be imported without a GPU says so the same way.
+module-level `pytestmark` is read without importing the module, so the run
+without a GPU never imports a module that declares a need.
 `scripts/reviewed_tests_plugin.py` collects those files and nothing else.
-`check` first collects every one of them exactly as `build`'s release set will --
-every module imported and its tests built, none run -- because a release run that
-meets one collection error runs nothing, and `build` could then pin no image; so a
-module whose declaration, import or test construction is broken fails `check`.
-Two kinds of module can be collected whole only where a GPU is, and `check` names
-both: one that skips itself at import without a GPU, and one that declares a GPU
-in its `pytestmark` and cannot be imported without one, whose imports and
-declaration -- its source up to and including that `pytestmark` -- must still run
-in `check`, so a broken declaration fails there too.
+`check` first collects every one of them as `build`'s release set will -- every
+module imported whole and its tests built, none run -- because a release run
+that meets one collection error runs nothing, and `build` could then pin no
+image; so a module whose declaration, import or test construction is broken
+fails `check`, and no module is excused: every one imports without a device,
+and none may skip itself at import, since nothing after the skip would be
+collected (a condition on the machine is a `skipif` mark). What `check` cannot
+run is the code a module runs at import only on a GPU platform, a branch on the
+platform; of it, `check` holds what can be read without running it -- every
+name the code of a reviewed module or support module reads, there and in every
+test body, must be one the module binds or a builtin -- and only `build` finds
+any other error there. No reviewed test runs in a fork of the pytest process:
+the release set is one process on the GPU, and a process forked once CUDA is
+initialised cannot use it, so a test that needs a process of its own takes
+upstream's spawn form, `create_new_process_for_each_test("spawn")`, and one
+that runs through the fork wrapper fails every set, `check` included.
 `check` then runs every reviewed test that carries neither mark, on the base image
 with exactly the reviewed runtime files the image carries and the runtime files
 the patch set deletes made unimportable, with no GPU and no network, so a test
@@ -164,8 +171,13 @@ and `HF_TOKEN` in the environment for the gated repositories some tests read;
 what it downloads is kept under the run's export directory and removed with it,
 at whatever revision the hub serves -- the one test input that is not pinned.
 `serve-check` does not run the tests. Every test runs under a per-test timeout
-(`REVIEWED_TEST_TIMEOUT_SECONDS` in `scripts/build-vllm.sh`), so a test that hangs
-ends its run naming itself instead of holding `check` or `build` forever. A test
+(`REVIEWED_TEST_TIMEOUT_SECONDS` in `scripts/build-vllm.sh`), by pytest-timeout's
+thread method -- the one that also ends a test whose event loop a busy
+background task holds, where the signal method's alarm is caught inside the
+loop and the test runs on -- so a test that hangs ends its run instead of
+holding `check` or `build` forever: the pytest process dumps every thread's
+stack, which locates the hang, and exits, the rest of its tests unrun and its
+report unwritten, and the run is refused as failed. A test
 that fails for a cause this tree keeps by design says so with a strict `xfail`
 naming the cause and the exception it raises: the upstream image-fetching tests
 the Qwen3.8 image contract refuses, and each non-PNG case of the base64 round
@@ -384,7 +396,7 @@ It is intentionally reconstructed by the ordered, reviewed semantic transformati
 | patches/vllm-anthropic-input-fidelity.patch | 3252e25a6c2e9d8ee0eec4cb383fc292bff2afaac2e3becdc1006c68b3b02c3c |
 | patches/vllm-qwen-exact-tool-language.patch | 59b8cf13cbd9f3d036eb1f2fe5d4ce52dbdfdb41bee641b84c85de95525170ed |
 | patches/vllm-png-source-admission.patch | b1b684a96d7243ae647d4d8ce2fe69b7330b3ab243ea77903c4cfb346bc80549 |
-| patches/vllm-kv-physical-free-memory.patch | 1d5324b3443e0f4f5d503d0cf8d97649204689932d82cbd25343d16c91dfb969 |
+| patches/vllm-kv-physical-free-memory.patch | fb747012c1dcb3da3bf4b9ed3518ac145e765845086daca3d46a085d7d74266f |
 | patches/vllm-qwen-single-call-grammar.patch | e3859bebf3b97cc05446859f1cb13b1ba6c4048728394f876bd3a109fa9a80d9 |
 | patches/vllm-responses-history-integrity.patch | d2c6343087fc287eb6afe315cdfb9caa2909de140c82b57ee9d0c3ed9473983c |
 | patches/vllm-responses-stream-identity.patch | 9a3f1fb54f3e22f3df621ab681e675f7a916849bdceb6e555242df29d6028095 |
@@ -428,7 +440,7 @@ It is intentionally reconstructed by the ordered, reviewed semantic transformati
 | patches/vllm-chat-stream-carries-every-token-logprob.patch | ca15dadd152454fe5b3fbcb710b8c7b5ce3221c038617b9e0d0985953aecbf47 |
 | patches/vllm-chat-messages-read-by-one-rule.patch | 5bf8a2d69d7ab1c6b9ee423740d34616a69e857d64816f68b9b9b1d509455f7f |
 | patches/vllm-responses-refuses-what-it-cannot-honour.patch | 35fcb2a68faa1a6fb99a83b6d7726ffc45f1b6e84cbb2ed7d9fe152575bf10f3 |
-| patches/vllm-reviewed-tests-declare-what-they-need.patch | e130a96a50fd0c5adfb5a102784aa5ad33991d82dbe506ba204b2c426b6a098d |
+| patches/vllm-reviewed-tests-declare-what-they-need.patch | e8e48b898b8c6ee8e6a34e3efebc2ada7bca4841bd9c8903967b6d44ceac2bb7 |
 | patches/vllm-priority-is-refused-where-nothing-orders-by-it.patch | 96346e5bf71726008f4449389d91a18531fd57fe63f930b2400e059ab168571a |
 | patches/vllm-forced-tool-choice-is-held-through-reasoning.patch | 9dd2c950842869d1456bf8d61d6738e7222c6f352c280ba7faa200ab9b43964d |
 | patches/vllm-qwen-format-is-served-as-one-engine.patch | e06d5ea04c1e63a216d99cc27767cd3e295342bca68851f5a48f0a497a43e775 |
@@ -489,9 +501,9 @@ Pinned build inputs and products:
 |---|---|
 | Immutable base tag | qwen38-vllm:main-9df9b0b |
 | Immutable base ID | sha256:fa4a002a88b7043a1a89966dea8a500fe9696f84e75730d9da916f916048d401 |
-| Runtime Dockerfile SHA-256 | 803c7bbeb4af50a79aedb9dad84115859778b534b94e0f586c2e43fa2c06f6e6 |
-| Build verifier SHA-256 | 4ecb246b263348bbf33b5bb9644dab05d989fdd0d2bbbbbd50857cca5111376a |
-| Runtime validator SHA-256 | a41148448cd4232cd43797225b34e456153d4c36a1e256644423afefe68ec567 |
+| Runtime Dockerfile SHA-256 | 9de0f573b4cb9a1c8fffceb2697bbc254b5ba949dd6e54d9403e3c43f3d36b8c |
+| Build verifier SHA-256 | 9fba46023c12ab428b1687dcc4108cabe65c5c9cdd7311528bd761969e2d717f |
+| Runtime validator SHA-256 | 8d5837dce7c667f80dead94a9aefd5da41230860b5c22e33e7525fa0b5ff5976 |
 
 The runtime image's profile, tag and archive name, which every release advances
 together, are declared in `config/runtime-v1.sh`, and the archive lives under

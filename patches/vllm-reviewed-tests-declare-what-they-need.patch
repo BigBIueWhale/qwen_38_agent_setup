@@ -39,12 +39,15 @@ index e0c376094f59ec1300a86170ba003f7645d88f31..7731b700ac420b4294d8b3f58e1e6ac3
  
  
 diff --git a/tests/distributed/test_rocm_quick_reduce.py b/tests/distributed/test_rocm_quick_reduce.py
-index 2db724dc70e23a4f8d017e0f6935bea18da1d949..310bf42419079db8bba0a7052df011ab7a61e3a2 100644
+index 2db724dc70e23a4f8d017e0f6935bea18da1d949..c3ecfb72460360e6f06a6db3ef153fb49299f943 100644
 --- a/tests/distributed/test_rocm_quick_reduce.py
 +++ b/tests/distributed/test_rocm_quick_reduce.py
-@@ -25,10 +25,13 @@ from vllm.utils.network_utils import get_open_port
+@@ -23,12 +23,15 @@ from vllm.platforms import current_platform
+ from vllm.transformers_utils.repo_utils import hf_api
+ from vllm.utils.network_utils import get_open_port
  
- from ..utils import multi_gpu_test
+-from ..utils import multi_gpu_test
++from ..utils import create_new_process_for_each_test, multi_gpu_only
  
 -pytestmark = pytest.mark.skipif(
 -    not current_platform.is_rocm(),
@@ -60,6 +63,16 @@ index 2db724dc70e23a4f8d017e0f6935bea18da1d949..310bf42419079db8bba0a7052df011ab
  
  MB = 1024 * 1024
  WORLD_SIZE = 2
+@@ -841,7 +844,8 @@ def test_quick_allreduce_two_gpu_correctness(quant_level):
+     )
+ 
+ 
+-@multi_gpu_test(num_gpus=CUDAGRAPH_WORLD_SIZE)
++@multi_gpu_only(num_gpus=CUDAGRAPH_WORLD_SIZE)
++@create_new_process_for_each_test("spawn")
+ def test_quick_allreduce_cudagraph_replay():
+     # Regression test for the stale flag_color bug: a quick-reduce captured in a
+     # CUDA graph must return correct results on every replay, not the data from
 diff --git a/tests/engine/test_arg_utils.py b/tests/engine/test_arg_utils.py
 index 7e82694e486e84a823220b12cbe3bb593ea9ef91..eef1090a7be7e3a54e4dc0251902307e94873295 100644
 --- a/tests/engine/test_arg_utils.py
@@ -742,10 +755,10 @@ index a75292d8e8f5ff5fbc50d1af682cd92cb66bc0d4..5d4868bd037302390dd654de32ff338c
  PHI3V_MODEL_ID = "microsoft/Phi-3.5-vision-instruct"
  QWEN2AUDIO_MODEL_ID = "Qwen/Qwen2-Audio-7B-Instruct"
 diff --git a/tests/models/language/pooling/test_reward.py b/tests/models/language/pooling/test_reward.py
-index 7ec1f2f358c9aa0ead01cd12ffe5f328221689da..169a692fe4343396a5b2e868bab4042c5f158ba5 100644
+index fa4553c15bb7bfb799cc3500fe260686a0f155d0..7abe46bb232a012d8d5025ff09c465112715baa0 100644
 --- a/tests/models/language/pooling/test_reward.py
 +++ b/tests/models/language/pooling/test_reward.py
-@@ -15,6 +15,8 @@ from ....conftest import HfRunner
+@@ -12,6 +12,8 @@ from ....conftest import HfRunner
  from ....utils import VLLM_PATH
  from ...registry import HF_EXAMPLE_MODELS
  
@@ -1347,18 +1360,30 @@ index 90deb9323343640c60f7e6c0a6eed23d98691c16..9c662dd7fcf413c6243e3bf6fd2f209e
  BLOCK_SIZE = 16
  
 diff --git a/tests/v1/e2e/general/test_context_length.py b/tests/v1/e2e/general/test_context_length.py
-index b313a74b687e46de9f4c04fd8dd119d3fda77057..5e00792d06d03e237a7841e7555cbd0bc192c9d9 100644
+index b313a74b687e46de9f4c04fd8dd119d3fda77057..467f7b9ea9fe2acc3d08ed9c35be440e6fd78d88 100644
 --- a/tests/v1/e2e/general/test_context_length.py
 +++ b/tests/v1/e2e/general/test_context_length.py
-@@ -17,6 +17,8 @@ from tests.conftest import VllmRunner
+@@ -17,8 +17,10 @@ from tests.conftest import VllmRunner
  from tests.utils import create_new_process_for_each_test
  from vllm.exceptions import VLLMValidationError
  
 +pytestmark = [pytest.mark.gpu, pytest.mark.network]
-+
  
- @create_new_process_for_each_test()
+-@create_new_process_for_each_test()
++
++@create_new_process_for_each_test("spawn")
  @pytest.mark.parametrize("model, max_model_len", [("JackFram/llama-160m", 2048)])
+ @pytest.mark.parametrize(
+     "prompt_len, max_tokens",
+@@ -64,7 +66,7 @@ def test_decoder_max_context_length_validation(
+             assert expected_msg in str(excinfo.value)
+ 
+ 
+-@create_new_process_for_each_test()
++@create_new_process_for_each_test("spawn")
+ @pytest.mark.parametrize("model", ["JackFram/llama-160m"])
+ def test_auto_fit_max_model_len_rejects_oversized_input(
+     model: str,
 diff --git a/tests/v1/engine/test_fast_incdec_prefix_err.py b/tests/v1/engine/test_fast_incdec_prefix_err.py
 index f87b32758768bfad3bb2e31f44ba05290aeff865..2a0cc77df65d4cd0383e988d4b01ba39937f4d5c 100644
 --- a/tests/v1/engine/test_fast_incdec_prefix_err.py
@@ -1846,7 +1871,7 @@ index 5e9c622868d23b599503c4956d0b389e354e7f76..4d7a37c757ddba5a9800bfa8003055b7
  _ATTN_BACKENDS: list[str] = []
  if current_platform.is_cuda():
 diff --git a/tests/v1/logits_processors/test_correctness.py b/tests/v1/logits_processors/test_correctness.py
-index 6fb9924f3f9549a6344a262229e3951b306bdd01..2f2e462bb0d6293d57e56b99d908a10237b1df17 100644
+index 6fb9924f3f9549a6344a262229e3951b306bdd01..6d2a5403166ce80e203cda99a794642b0c1c728f 100644
 --- a/tests/v1/logits_processors/test_correctness.py
 +++ b/tests/v1/logits_processors/test_correctness.py
 @@ -38,6 +38,8 @@ from vllm.v1.sample.thinking_budget_state import (
@@ -1858,6 +1883,15 @@ index 6fb9924f3f9549a6344a262229e3951b306bdd01..2f2e462bb0d6293d57e56b99d908a102
  PIN_MEMORY_AVAILABLE = is_pin_memory_available()
  MAX_NUM_REQS = 256
  VOCAB_SIZE = 1024
+@@ -795,7 +797,7 @@ def _slot_outputs_for_metadata(
+     return rows
+ 
+ 
+-@create_new_process_for_each_test()
++@create_new_process_for_each_test("spawn")
+ @pytest.mark.parametrize("device", DEVICES)
+ @pytest.mark.parametrize("reqs_per_logitproc", [REQS_PER_LOGITPROC])
+ @pytest.mark.parametrize("logitsprocs_under_test", _get_test_cases())
 diff --git a/tests/v1/simple_kv_offload/test_scheduler.py b/tests/v1/simple_kv_offload/test_scheduler.py
 index 7d8bc5d29c360b4d2ddd3b8e076d94e4643549a7..24481d0d82ec2438e621337b66e977eefc7d7002 100644
 --- a/tests/v1/simple_kv_offload/test_scheduler.py
@@ -1919,3 +1953,242 @@ index 9f549b6070922137b5e77d7073875026b1622f68..baf834e3f7a75940b9e81442c73c1e68
  def test_target_path_raises_on_encoder_cache_miss():
      """On the target path (no shift) a miss is a real invariant violation."""
      f0 = _feature("h0", offset=0, length=8)
+diff --git a/tests/evals/gsm8k/test_gsm8k_offloading.py b/tests/evals/gsm8k/test_gsm8k_offloading.py
+index c85b5db9f21cc0d66f752134d26521745e712df1..9e619f2368187261eec965b63d2cd577a4684656 100644
+--- a/tests/evals/gsm8k/test_gsm8k_offloading.py
++++ b/tests/evals/gsm8k/test_gsm8k_offloading.py
+@@ -40,8 +40,9 @@ from vllm.platforms import current_platform
+ 
+ from .gsm8k_eval import evaluate_gsm8k
+ 
+-if not current_platform.is_cuda_alike():
+-    pytest.skip("Requires CUDA or ROCm", allow_module_level=True)
++pytestmark = pytest.mark.skipif(
++    not current_platform.is_cuda_alike(), reason="Requires CUDA or ROCm"
++)
+ 
+ NUM_QUESTIONS = 200
+ NUM_FEWSHOT = 5
+diff --git a/tests/v1/engine/test_engine_core.py b/tests/v1/engine/test_engine_core.py
+index 66df628ed62e17569a8ac18feefdaeba526c1c4d..c4b4ceeb70a77f2469664004fd48cb9566c587eb 100644
+--- a/tests/v1/engine/test_engine_core.py
++++ b/tests/v1/engine/test_engine_core.py
+@@ -2,6 +2,7 @@
+ # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
+ 
+ import copy
++import functools
+ import time
+ import uuid
+ from concurrent.futures import Future, ThreadPoolExecutor
+@@ -29,17 +30,23 @@ from vllm.v1.executor.uniproc_executor import UniProcExecutor
+ from vllm.v1.kv_cache_interface import KVCacheConfig
+ from vllm.v1.outputs import ModelRunnerOutput
+ 
+-from ...utils import create_new_process_for_each_test, multi_gpu_test
++from ...utils import create_new_process_for_each_test, multi_gpu_only
+ 
+-if not current_platform.is_cuda():
+-    pytest.skip(reason="V1 currently only supported on CUDA.", allow_module_level=True)
++pytestmark = pytest.mark.skipif(
++    not current_platform.is_cuda(), reason="V1 currently only supported on CUDA."
++)
+ 
+ MODEL_NAME = "hmellor/tiny-random-LlamaForCausalLM"
+-TOKENIZER = AutoTokenizer.from_pretrained(MODEL_NAME)
+ # test_engine_core_concurrent_batches assumes exactly 12 tokens per prompt.
+ # Adjust prompt if changing model to maintain 12-token length.
+ PROMPT = "I am Gyoubu Masataka Oniwa"
+-PROMPT_TOKENS = TOKENIZER(PROMPT).input_ids
++
++
++@functools.cache
++def _prompt_tokens() -> list[int]:
++    # Read from the hub where a test first needs it, not at import.
++    return AutoTokenizer.from_pretrained(MODEL_NAME)(PROMPT).input_ids
++
+ 
+ _REQUEST_COUNTER = 0
+ 
+@@ -51,7 +58,7 @@ def make_request() -> EngineCoreRequest:
+     return EngineCoreRequest(
+         request_id=request_id,
+         external_req_id=f"{request_id}-{uuid.uuid4()}",
+-        prompt_token_ids=PROMPT_TOKENS,
++        prompt_token_ids=_prompt_tokens(),
+         mm_features=None,
+         sampling_params=SamplingParams(extra_args={"kv_scope": request_id}),
+         pooling_params=None,
+@@ -62,7 +69,7 @@ def make_request() -> EngineCoreRequest:
+     )
+ 
+ 
+-@create_new_process_for_each_test()
++@create_new_process_for_each_test("spawn")
+ def test_engine_core():
+     """Setup the EngineCore."""
+     engine_args = EngineArgs(model=MODEL_NAME)
+@@ -190,7 +197,7 @@ def test_engine_core():
+     assert len(engine_core.scheduler.running) == 0
+ 
+ 
+-@create_new_process_for_each_test()
++@create_new_process_for_each_test("spawn")
+ def test_engine_core_advanced_sampling():
+     """
+     A basic end-to-end test to verify that the engine functions correctly
+@@ -239,7 +246,7 @@ def test_engine_core_advanced_sampling():
+     _check_engine_state()
+ 
+ 
+-@create_new_process_for_each_test()
++@create_new_process_for_each_test("spawn")
+ def test_engine_core_concurrent_batches():
+     """
+     Test that the engine can handle multiple concurrent batches.
+@@ -398,7 +405,8 @@ def test_engine_core_concurrent_batches():
+         req_id = (req_id + 1) % 2
+ 
+ 
+-@multi_gpu_test(num_gpus=2)
++@multi_gpu_only(num_gpus=2)
++@create_new_process_for_each_test("spawn")
+ def test_engine_core_tp():
+     """
+     Test engine can initialize worker in tp properly
+@@ -432,7 +440,7 @@ def test_engine_core_tp():
+     assert all(x is not None for x in num_cpu_blocks)
+ 
+ 
+-@create_new_process_for_each_test()
++@create_new_process_for_each_test("spawn")
+ def test_engine_core_invalid_request_id_type():
+     """Test that engine raises TypeError for non-string request_id."""
+     engine_args = EngineArgs(model=MODEL_NAME)
+@@ -472,7 +480,7 @@ def test_engine_core_invalid_request_id_type():
+     assert len(engine_core.scheduler.running) == 0
+ 
+ 
+-@create_new_process_for_each_test()
++@create_new_process_for_each_test("spawn")
+ @pytest.mark.parametrize(
+     ("ec_role", "gpu_memory_utilization", "enable_prefix_caching"),
+     [
+diff --git a/tests/v1/engine/test_engine_core_client.py b/tests/v1/engine/test_engine_core_client.py
+index 473d668e235e0218f15858858d73e7d25e17e462..901191bb258717041b82575ee285ad0047f2b173 100644
+--- a/tests/v1/engine/test_engine_core_client.py
++++ b/tests/v1/engine/test_engine_core_client.py
+@@ -2,6 +2,7 @@
+ # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
+ 
+ import asyncio
++import functools
+ import importlib
+ import inspect
+ import os
+@@ -20,7 +21,7 @@ import pytest
+ import torch
+ from transformers import AutoTokenizer
+ 
+-from tests.utils import multi_gpu_test
++from tests.utils import multi_gpu_only
+ from vllm import SamplingParams
+ from vllm.distributed.kv_events import BlockStored, KVEventBatch, ZmqEventPublisher
+ from vllm.engine.arg_utils import EngineArgs
+@@ -51,16 +52,21 @@ from vllm.v1.pool.late_interaction import (
+ from ...distributed.conftest import MockSubscriber
+ from ...utils import create_new_process_for_each_test
+ 
+-if not current_platform.is_cuda_alike():
+-    pytest.skip(
+-        reason="V1 currently only supported on CUDA-alike platforms.",
+-        allow_module_level=True,
+-    )
++pytestmark = pytest.mark.skipif(
++    not current_platform.is_cuda_alike(),
++    reason="V1 currently only supported on CUDA-alike platforms.",
++)
+ 
+ MODEL_NAME = "meta-llama/Llama-3.2-1B-Instruct"
+-TOKENIZER = AutoTokenizer.from_pretrained(MODEL_NAME)
+ PROMPT = "Hello my name is Robert and I love quantization kernels"
+-PROMPT_TOKENS = TOKENIZER(PROMPT).input_ids
++
++
++@functools.cache
++def _prompt_tokens() -> list[int]:
++    # Read from the hub where a test first needs it, not at import.
++    return AutoTokenizer.from_pretrained(MODEL_NAME)(PROMPT).input_ids
++
++
+ TEST_MODULE = "tests.v1.engine.test_engine_core_client"
+ 
+ _REQUEST_COUNTER = 0
+@@ -70,7 +76,7 @@ def make_request(
+     params: SamplingParams, prompt_tokens_ids: list[int] | None = None
+ ) -> EngineCoreRequest:
+     if not prompt_tokens_ids:
+-        prompt_tokens_ids = PROMPT_TOKENS
++        prompt_tokens_ids = _prompt_tokens()
+ 
+     global _REQUEST_COUNTER
+     _REQUEST_COUNTER += 1
+@@ -597,7 +603,7 @@ def subprocess_future_echo_patch(monkeypatch, tmp_path):
+     )
+ 
+ 
+-@create_new_process_for_each_test()
++@create_new_process_for_each_test("spawn")
+ @pytest.mark.parametrize("multiprocessing_mode", [True, False])
+ def test_engine_core_client(
+     monkeypatch: pytest.MonkeyPatch,
+@@ -1134,7 +1140,8 @@ def test_kv_cache_events(
+     [(True, "tcp")],
+     indirect=["publisher_config"],
+ )
+-@multi_gpu_test(num_gpus=4)
++@multi_gpu_only(num_gpus=4)
++@create_new_process_for_each_test("spawn")
+ async def test_kv_cache_events_dp(
+     multiprocessing_mode: bool,
+     publisher_config,
+@@ -1267,7 +1274,7 @@ def test_startup_failure(monkeypatch: pytest.MonkeyPatch):
+     assert "Engine core initialization failed" in str(e_info.value)
+ 
+ 
+-@create_new_process_for_each_test()
++@create_new_process_for_each_test("spawn")
+ def test_engine_core_proc_instantiation_cuda_empty(monkeypatch: pytest.MonkeyPatch):
+     """
+     Test that EngineCoreProc can be instantiated when CUDA_VISIBLE_DEVICES
+diff --git a/tests/v1/simple_kv_offload/test_integration.py b/tests/v1/simple_kv_offload/test_integration.py
+index f7d0c4743407464953e5ccd5f9138d12229a6eaa..5b57abc3d8749aa27ede1eee1411d605b80150d8 100644
+--- a/tests/v1/simple_kv_offload/test_integration.py
++++ b/tests/v1/simple_kv_offload/test_integration.py
+@@ -10,8 +10,9 @@ from vllm import LLM, SamplingParams, TokensPrompt
+ from vllm.config import KVTransferConfig
+ from vllm.platforms import current_platform
+ 
+-if not current_platform.is_cuda_alike():
+-    pytest.skip("Requires CUDA or ROCm", allow_module_level=True)
++pytestmark = pytest.mark.skipif(
++    not current_platform.is_cuda_alike(), reason="Requires CUDA or ROCm"
++)
+ 
+ # Small models for default CI / local runs (accuracy only).
+ SMALL_MODELS = [
+diff --git a/vllm/platforms/interface.py b/vllm/platforms/interface.py
+index c3ade53ca139b1c40cf9250be0578eb6d3d5c744..b5aacc658a247b832354ba706b9e2f9bf4c2ec46 100644
+--- a/vllm/platforms/interface.py
++++ b/vllm/platforms/interface.py
+@@ -1314,3 +1314,10 @@ class Platform:
+ class UnspecifiedPlatform(Platform):
+     _enum = PlatformEnum.UNSPECIFIED
+     device_type = ""
++
++    @classmethod
++    def device_count(cls) -> int:
++        # No device was detected, so there is none. The count is declared
++        # here because Platform.__getattr__ resolves an attribute through the
++        # torch module of the device type, and an empty device type names none.
++        return 0

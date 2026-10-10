@@ -544,6 +544,11 @@ RUN printf '%s  %s\n' \
   "${LONGCAT_FLASH_NGRAM_MODEL_UPSTREAM_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/model_executor/models/longcat_flash_ngram.py \
   | sha256sum --check --strict
 
+ARG PLATFORM_INTERFACE_UPSTREAM_FILE_SHA256
+RUN printf '%s  %s\n' \
+  "${PLATFORM_INTERFACE_UPSTREAM_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/platforms/interface.py \
+  | sha256sum --check --strict
+
 FROM upstream-verifier AS runtime
 ARG HF_RENDERER_PATCHED_FILE_SHA256
 ARG TEMPLATE_AUTHORSHIP_PATCHED_FILE_SHA256
@@ -564,6 +569,7 @@ ARG V1_OUTPUT_PROCESSOR_PATCHED_FILE_SHA256
 ARG V1_DETOKENIZER_PATCHED_FILE_SHA256
 ARG V1_SCHEDULER_PATCHED_FILE_SHA256
 ARG ASYNC_LLM_PATCHED_FILE_SHA256
+ARG PLATFORM_INTERFACE_PATCHED_FILE_SHA256
 ARG LONGCAT_FLASH_NGRAM_MODEL_PATCHED_FILE_SHA256
 ARG MODEL_REGISTRY_PATCHED_FILE_SHA256
 ARG P2P_ZMQ_TRANSPORT_PATCHED_FILE_SHA256
@@ -1219,6 +1225,10 @@ RUN printf '%s  %s\n' \
 COPY --chmod=0644 vllm/vllm/model_executor/models/longcat_flash_ngram.py /usr/local/lib/python3.12/dist-packages/vllm/model_executor/models/longcat_flash_ngram.py
 RUN printf '%s  %s\n' \
   "${LONGCAT_FLASH_NGRAM_MODEL_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/model_executor/models/longcat_flash_ngram.py \
+  | sha256sum --check --strict
+COPY --chmod=0644 vllm/vllm/platforms/interface.py /usr/local/lib/python3.12/dist-packages/vllm/platforms/interface.py
+RUN printf '%s  %s\n' \
+  "${PLATFORM_INTERFACE_PATCHED_FILE_SHA256}" /usr/local/lib/python3.12/dist-packages/vllm/platforms/interface.py \
   | sha256sum --check --strict
 COPY --chmod=0644 chat_template.jinja /opt/qwen38/chat_template.jinja
 COPY --chmod=0644 scripts/phase_budget_unit.py /opt/qwen38/phase_budget_unit.py
