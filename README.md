@@ -1473,6 +1473,16 @@ plain answer, or the forced JSON as text, under the choice. Kimi K2 with the swi
 off armed nothing and read any answer as the call, and now arms the call schema
 through the base hook as every other format there does. Every format holds a forced
 choice once armed, so turning the switch on is offered wherever a parser names one.
+What it holds of the call's arguments is the format's: Kimi K3's grammar, whose
+argument block is upstream's, holds a call to the chosen tool, not its argument
+set -- arguments in any order, a key repeated, a required one missing -- and its
+upstream parser keeps the last of a repeated key, reads undecodable JSON as its
+text and returns output it fails to parse as content. Neither is changed here.
+Each of K3's arguments names its key, so holding every required key exactly
+once in any order takes a grammar state for every subset of the keys, 2^n of
+them; the one bounded form that holds the set writes the declared order, which
+would steer K3 to an argument order nothing here shows it was trained to write,
+and no K3 model or tokenizer is here to measure that cost against.
 
 The exact `<tool_call>\n<function=` trigger starts a constrained call. While
 reasoning is active, the reasoning boundary requires its actual token ID. After
