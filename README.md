@@ -615,8 +615,17 @@ Consequences:
 - There is no language-model-only flag. The complete vision model is loaded.
 - There is no speculative/MTP argument.
 - CUDA graphs remain enabled. Vision was not bought by forcing eager text execution.
-- The measured 2,048-token prefill chunk remains fixed. Vision was not bought by
-  reducing text prefill performance.
+- The 2,048-token prefill chunk (`--max-num-batched-tokens 2048`) is upstream's
+  default for an API server on a GPU with less than 70 GiB, this card's class
+  (`EngineArgs.get_batch_defaults`, under upstream's "TODO(woosuk): Tune the
+  default values for other hardware"), declared in the launch so that it does not
+  move with the device. It is not a measurement. The deployment's first README
+  called it the measured safe size and said a provisional 8,192 was rejected
+  after long-continuation testing; no record of that test is kept -- no numbers,
+  log or failure -- and vision did not change the value. Measuring it would take
+  this card: at each candidate size, the startup profile -- whether the one-user
+  pool still fits beside the larger text step and its prompt log probabilities --
+  and the prefill time of a long prompt.
 - FlashAttention 2 is explicit because automatic selection otherwise changes the
   TurboQuant path. FlashInfer autotuning is explicitly off so probe-OOM-and-fallback
   behavior cannot be mistaken for normal startup.

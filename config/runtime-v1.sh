@@ -345,6 +345,10 @@ VLLM_ARGS=(
   --kv-cache-dtype turboquant_k8v4
   --max-model-len "${MAX_MODEL_LEN}"
   --max-num-seqs 1
+  # Upstream's default prefill chunk for an API server on a GPU with less than
+  # 70 GiB (EngineArgs.get_batch_defaults, beside "TODO(woosuk): Tune the
+  # default values for other hardware"), declared so that it does not move with
+  # the device; not measured on this card (README, Exact launch contract).
   --max-num-batched-tokens 2048
   # Both KV tiers are declared as counts of resident 262,144-token user
   # contexts; vLLM derives the bytes post-engine-init from the KV cache spec,
