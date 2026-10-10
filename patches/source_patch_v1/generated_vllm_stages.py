@@ -143568,7 +143568,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    serving.chat_template = None\n'})},
  {'name': 'batch-parse-starts-where-the-prompt-leaves',
   'review_patch': 'patches/vllm-batch-parse-starts-where-the-prompt-leaves.patch',
-  'review_sha256': '73b441f3cd6dbcce1013bc50c3e99c423bf8df5da1921d8854e7f71507c47c08',
+  'review_sha256': '024ab581b360770d2fc79b737b892ff2e9b525f18f92914222bc73eda4e17362',
   'files': ({'path': 'tests/entrypoints/openai/responses/test_parsable_context_unit.py',
              'before_sha256': '8fd0bd655d13abdc9fe03e1c0bb0625225431624db8257e1db07c00ac3da2779',
              'after_sha256': '95f50d93d97370d426319b5dc94fce55b9cbca4ce9b3b95a930e42990dcbf4a2'},
@@ -143589,7 +143589,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'after_sha256': 'a844fe5cac07d9a7eb80c8c68fd306ac58935f2f821eb76c546a5440fe161599'},
             {'path': 'vllm/entrypoints/openai/chat_completion/batch_serving.py',
              'before_sha256': '90dee26650b749fec50ebc7bcf461ae5566c48e66bd0ccdb2b6d726c1ae2dd7a',
-             'after_sha256': 'e48a1aaf594d7fcbb0979a1e48785ed37d2b109e6343beb318cb9145486efebe'},
+             'after_sha256': '0128239bec0d027246d4b7d63762ed188831bc6caf1a0243698fa64e5f36c5d9'},
             {'path': 'vllm/entrypoints/openai/chat_completion/serving.py',
              'before_sha256': '1cb92c8486cb36ec85cbf9f1af172c91815d6c8e2da2336828c25d6c7432f39e',
              'after_sha256': 'e7157b8038f29f2ab9d4c1677e334ed201256f95af7c0d39f89d9a3e66597e2c'},
@@ -143601,7 +143601,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'after_sha256': 'a86dbdced94dccaad07bc7bb2dfb8ddcda5693b08efa7332e042ed74bd08605e'},
             {'path': 'vllm/parser/abstract_parser.py',
              'before_sha256': '5b7b7af61b3b5b91b02d77607446b6820eecf337958d2eb07cbf1f9a9f2901c9',
-             'after_sha256': '2f03dbae35caeaf68d801c59312c3116467022ed5b882558a7d8cf3ba75b099c'},
+             'after_sha256': 'c12de53fc081a75a87cf52a21055cb03a3f1fd2f7dd14bd976af6799e75aeacb'},
             {'path': 'vllm/parser/engine/parser_engine.py',
              'before_sha256': 'a868ba32cfea9c2e685b78a4fd505ba42f9616db0b3b15e828ac3a4b6eafcf8c',
              'after_sha256': 'c16a765917aa45519a82c681def062a50a9a653e13c353cd6eb0468a7ae1fc0f'},
@@ -143634,7 +143634,13 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'after_sha256': '282ef80ea470eee299c6c1f7510ca259c6b4dcd4a2787d7f2946335a723dc5bb'},
             {'path': 'vllm/entrypoints/scale_out/derender/serving.py',
              'before_sha256': '3beb23995dddcfac4b98bf38f5948bd992ff06bf99290157317ba7018f57a6d7',
-             'after_sha256': 'a0e5d8bb78802f26e77849ef9622a4863d9596aa13bf6bd808c3399099431321'}),
+             'after_sha256': 'a0e5d8bb78802f26e77849ef9622a4863d9596aa13bf6bd808c3399099431321'},
+            {'path': 'tests/entrypoints/openai/test_beam_search_boundary.py',
+             'before_sha256': '34bb27d9fc4952429dd4f31199a57ecef0ca049ac76c4040e548e9773fbd4cb1',
+             'after_sha256': 'df11ab40b94ea9c87aadddb46526cba543a10590768a601bcb17afbd107f8939'},
+            {'path': 'vllm/entrypoints/openai/chat_completion/protocol.py',
+             'before_sha256': '0d200a798bb9fa7911ff2c2c84bae744b23f815b39b52ce0f69f533b1def60d4',
+             'after_sha256': 'b54d8b6f05d57b907141f6b8a7110d113fda26ea119c0a79fadd1450b69e4146'}),
   'edits': ({'name': 'tests/entrypoints/openai/responses/test_parsable_context_unit.py:landmark-1',
              'path': 'tests/entrypoints/openai/responses/test_parsable_context_unit.py',
              'before': '\n'
@@ -144367,7 +144373,412 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'stop_reason=completion.stop_reason,\n'},
             {'name': 'vllm/entrypoints/openai/chat_completion/batch_serving.py:landmark-1',
              'path': 'vllm/entrypoints/openai/chat_completion/batch_serving.py',
-             'before': '                    logprobs = None\n'
+             'before': 'from vllm.entrypoints.chat_utils import ConversationMessage\n'
+                       'from vllm.entrypoints.openai.chat_completion.protocol import '
+                       '(\n'
+                       '    BatchChatCompletionRequest,\n'
+                       '    ChatCompletionResponse,\n'
+                       '    ChatCompletionResponseChoice,\n'
+                       '    ChatMessage,\n',
+             'after': 'from vllm.entrypoints.chat_utils import ConversationMessage\n'
+                      'from vllm.entrypoints.openai.chat_completion.protocol import (\n'
+                      '    BatchChatCompletionRequest,\n'
+                      '    ChatCompletionGenerationRequest,\n'
+                      '    ChatCompletionResponse,\n'
+                      '    ChatCompletionResponseChoice,\n'
+                      '    ChatMessage,\n',
+             'review_before': 'from vllm.entrypoints.chat_utils import '
+                              'ConversationMessage\n'
+                              'from vllm.entrypoints.openai.chat_completion.protocol '
+                              'import (\n'
+                              '    BatchChatCompletionRequest,\n'
+                              '    ChatCompletionResponse,\n'
+                              '    ChatCompletionResponseChoice,\n'
+                              '    ChatMessage,\n',
+             'review_after': 'from vllm.entrypoints.chat_utils import '
+                             'ConversationMessage\n'
+                             'from vllm.entrypoints.openai.chat_completion.protocol '
+                             'import (\n'
+                             '    BatchChatCompletionRequest,\n'
+                             '    ChatCompletionGenerationRequest,\n'
+                             '    ChatCompletionResponse,\n'
+                             '    ChatCompletionResponseChoice,\n'
+                             '    ChatMessage,\n'},
+            {'name': 'vllm/entrypoints/openai/chat_completion/batch_serving.py:landmark-2',
+             'path': 'vllm/entrypoints/openai/chat_completion/batch_serving.py',
+             'before': '    async def render_batch_chat_request(\n'
+                       '        self,\n'
+                       '        request: BatchChatCompletionRequest,\n'
+                       '    ) -> tuple[list[list[ConversationMessage]], '
+                       'list[EngineInput]] | ErrorResponse:\n'
+                       '        """Validate the model and preprocess a batched chat '
+                       'completion request.\n'
+                       '\n'
+                       '        Performs engine-aware checks then delegates '
+                       'per-conversation\n'
+                       '        preprocessing to OnlineRenderer, validating the chat '
+                       'template\n'
+                       '        once for the whole batch.\n'
+                       '\n'
+                       '        Returns:\n'
+                       '            A tuple of (all_conversations, engine_prompts) on '
+                       'success — one\n',
+             'after': '    async def render_batch_chat_request(\n'
+                      '        self,\n'
+                      '        request: BatchChatCompletionRequest,\n'
+                      '        single_requests: '
+                      'list[ChatCompletionGenerationRequest],\n'
+                      '    ) -> tuple[list[list[ConversationMessage]], '
+                      'list[EngineInput]] | ErrorResponse:\n'
+                      '        """Validate the model and preprocess a batched chat '
+                      'completion request.\n'
+                      '\n'
+                      '        Performs engine-aware checks then delegates '
+                      'per-conversation\n'
+                      '        preprocessing to OnlineRenderer, validating the chat '
+                      'template\n'
+                      '        once for the whole batch. ``single_requests`` are the '
+                      "batch's\n"
+                      '        conversations as chat requests '
+                      '(``to_chat_completion_requests``); the\n'
+                      '        renderer adjusts each for the prompt it renders, as it '
+                      'adjusts a chat\n'
+                      '        request, and the caller generates and parses each '
+                      'conversation from\n'
+                      '        that same request.\n'
+                      '\n'
+                      '        Returns:\n'
+                      '            A tuple of (all_conversations, engine_prompts) on '
+                      'success — one\n',
+             'review_before': '    async def render_batch_chat_request(\n'
+                              '        self,\n'
+                              '        request: BatchChatCompletionRequest,\n'
+                              '    ) -> tuple[list[list[ConversationMessage]], '
+                              'list[EngineInput]] | ErrorResponse:\n'
+                              '        """Validate the model and preprocess a batched '
+                              'chat completion request.\n'
+                              '\n'
+                              '        Performs engine-aware checks then delegates '
+                              'per-conversation\n'
+                              '        preprocessing to OnlineRenderer, validating the '
+                              'chat template\n'
+                              '        once for the whole batch.\n'
+                              '\n'
+                              '        Returns:\n'
+                              '            A tuple of (all_conversations, '
+                              'engine_prompts) on success — one\n',
+             'review_after': '    async def render_batch_chat_request(\n'
+                             '        self,\n'
+                             '        request: BatchChatCompletionRequest,\n'
+                             '        single_requests: '
+                             'list[ChatCompletionGenerationRequest],\n'
+                             '    ) -> tuple[list[list[ConversationMessage]], '
+                             'list[EngineInput]] | ErrorResponse:\n'
+                             '        """Validate the model and preprocess a batched '
+                             'chat completion request.\n'
+                             '\n'
+                             '        Performs engine-aware checks then delegates '
+                             'per-conversation\n'
+                             '        preprocessing to OnlineRenderer, validating the '
+                             'chat template\n'
+                             '        once for the whole batch. ``single_requests`` '
+                             "are the batch's\n"
+                             '        conversations as chat requests '
+                             '(``to_chat_completion_requests``); the\n'
+                             '        renderer adjusts each for the prompt it renders, '
+                             'as it adjusts a chat\n'
+                             '        request, and the caller generates and parses '
+                             'each conversation from\n'
+                             '        that same request.\n'
+                             '\n'
+                             '        Returns:\n'
+                             '            A tuple of (all_conversations, '
+                             'engine_prompts) on success — one\n'},
+            {'name': 'vllm/entrypoints/openai/chat_completion/batch_serving.py:landmark-3',
+             'path': 'vllm/entrypoints/openai/chat_completion/batch_serving.py',
+             'before': '        all_engine_prompts: list[EngineInput] = []\n'
+                       '\n'
+                       '        for messages, single_request in zip(\n'
+                       '            request.messages, '
+                       'request.to_chat_completion_requests(), strict=True\n'
+                       '        ):\n'
+                       '            if renderer.use_harmony:\n'
+                       '                conversation, engine_prompts = '
+                       'renderer._make_request_with_harmony(\n',
+             'after': '        all_engine_prompts: list[EngineInput] = []\n'
+                      '\n'
+                      '        for messages, single_request in zip(\n'
+                      '            request.messages, single_requests, strict=True\n'
+                      '        ):\n'
+                      '            if renderer.use_harmony:\n'
+                      '                conversation, engine_prompts = '
+                      'renderer._make_request_with_harmony(\n',
+             'review_before': '        all_engine_prompts: list[EngineInput] = []\n'
+                              '\n'
+                              '        for messages, single_request in zip(\n'
+                              '            request.messages, '
+                              'request.to_chat_completion_requests(), strict=True\n'
+                              '        ):\n'
+                              '            if renderer.use_harmony:\n'
+                              '                conversation, engine_prompts = '
+                              'renderer._make_request_with_harmony(\n',
+             'review_after': '        all_engine_prompts: list[EngineInput] = []\n'
+                             '\n'
+                             '        for messages, single_request in zip(\n'
+                             '            request.messages, single_requests, '
+                             'strict=True\n'
+                             '        ):\n'
+                             '            if renderer.use_harmony:\n'
+                             '                conversation, engine_prompts = '
+                             'renderer._make_request_with_harmony(\n'},
+            {'name': 'vllm/entrypoints/openai/chat_completion/batch_serving.py:landmark-4',
+             'path': 'vllm/entrypoints/openai/chat_completion/batch_serving.py',
+             'before': '        """\n'
+                       '        tokenizer = self.renderer.tokenizer\n'
+                       '        assert tokenizer is not None\n'
+                       '        single_requests = '
+                       'request.to_chat_completion_requests()\n'
+                       '\n'
+                       '        parser: Parser | None = None\n'
+                       '        if self.parser_cls is not None:\n'
+                       '            chat_template_kwargs = '
+                       'self._effective_chat_template_kwargs(\n'
+                       '                single_requests[0]\n'
+                       '            )\n'
+                       '            parser = self.parser_cls(\n'
+                       '                tokenizer,\n'
+                       '                None,  # tools\n'
+                       '                chat_template_kwargs=chat_template_kwargs,\n'
+                       '            )\n'
+                       '\n'
+                       '        render_result = await '
+                       'self.render_batch_chat_request(request)\n'
+                       '        if isinstance(render_result, ErrorResponse):\n'
+                       '            return render_result\n'
+                       '        all_conversations, engine_prompts = render_result\n',
+             'after': '        """\n'
+                      '        tokenizer = self.renderer.tokenizer\n'
+                      '        assert tokenizer is not None\n'
+                      '        # One chat request per conversation: the renderer '
+                      'adjusts each for the\n'
+                      '        # prompt it renders, and that conversation is generated '
+                      'and parsed\n'
+                      '        # from it, by a parser of its own built as chat builds '
+                      'one.\n'
+                      '        single_requests = '
+                      'request.to_chat_completion_requests()\n'
+                      '        parsers: list[Parser | None] = [\n'
+                      '            None\n'
+                      '            if self.parser_cls is None\n'
+                      '            else self.parser_cls(\n'
+                      '                tokenizer,\n'
+                      '                single_request.tools,\n'
+                      '                '
+                      'chat_template_kwargs=self._effective_chat_template_kwargs(\n'
+                      '                    single_request\n'
+                      '                ),\n'
+                      '                model_config=self.model_config,\n'
+                      '            )\n'
+                      '            for single_request in single_requests\n'
+                      '        ]\n'
+                      '\n'
+                      '        render_result = await '
+                      'self.render_batch_chat_request(request, single_requests)\n'
+                      '        if isinstance(render_result, ErrorResponse):\n'
+                      '            return render_result\n'
+                      '        all_conversations, engine_prompts = render_result\n',
+             'review_before': '        """\n'
+                              '        tokenizer = self.renderer.tokenizer\n'
+                              '        assert tokenizer is not None\n'
+                              '        single_requests = '
+                              'request.to_chat_completion_requests()\n'
+                              '\n'
+                              '        parser: Parser | None = None\n'
+                              '        if self.parser_cls is not None:\n'
+                              '            chat_template_kwargs = '
+                              'self._effective_chat_template_kwargs(\n'
+                              '                single_requests[0]\n'
+                              '            )\n'
+                              '            parser = self.parser_cls(\n'
+                              '                tokenizer,\n'
+                              '                None,  # tools\n'
+                              '                '
+                              'chat_template_kwargs=chat_template_kwargs,\n'
+                              '            )\n'
+                              '\n'
+                              '        render_result = await '
+                              'self.render_batch_chat_request(request)\n'
+                              '        if isinstance(render_result, ErrorResponse):\n'
+                              '            return render_result\n'
+                              '        all_conversations, engine_prompts = '
+                              'render_result\n',
+             'review_after': '        """\n'
+                             '        tokenizer = self.renderer.tokenizer\n'
+                             '        assert tokenizer is not None\n'
+                             '        # One chat request per conversation: the '
+                             'renderer adjusts each for the\n'
+                             '        # prompt it renders, and that conversation is '
+                             'generated and parsed\n'
+                             '        # from it, by a parser of its own built as chat '
+                             'builds one.\n'
+                             '        single_requests = '
+                             'request.to_chat_completion_requests()\n'
+                             '        parsers: list[Parser | None] = [\n'
+                             '            None\n'
+                             '            if self.parser_cls is None\n'
+                             '            else self.parser_cls(\n'
+                             '                tokenizer,\n'
+                             '                single_request.tools,\n'
+                             '                '
+                             'chat_template_kwargs=self._effective_chat_template_kwargs(\n'
+                             '                    single_request\n'
+                             '                ),\n'
+                             '                model_config=self.model_config,\n'
+                             '            )\n'
+                             '            for single_request in single_requests\n'
+                             '        ]\n'
+                             '\n'
+                             '        render_result = await '
+                             'self.render_batch_chat_request(request, '
+                             'single_requests)\n'
+                             '        if isinstance(render_result, ErrorResponse):\n'
+                             '            return render_result\n'
+                             '        all_conversations, engine_prompts = '
+                             'render_result\n'},
+            {'name': 'vllm/entrypoints/openai/chat_completion/batch_serving.py:landmark-5',
+             'path': 'vllm/entrypoints/openai/chat_completion/batch_serving.py',
+             'before': '            all_conversations,\n'
+                       '            tokenizer,\n'
+                       '            request_metadata,\n'
+                       '            parser,\n'
+                       '        )\n'
+                       '\n'
+                       '    async def chat_completion_full_generator_batch(\n',
+             'after': '            all_conversations,\n'
+                      '            tokenizer,\n'
+                      '            request_metadata,\n'
+                      '            single_requests,\n'
+                      '            parsers,\n'
+                      '        )\n'
+                      '\n'
+                      '    async def chat_completion_full_generator_batch(\n',
+             'review_before': '            all_conversations,\n'
+                              '            tokenizer,\n'
+                              '            request_metadata,\n'
+                              '            parser,\n'
+                              '        )\n'
+                              '\n'
+                              '    async def chat_completion_full_generator_batch(\n',
+             'review_after': '            all_conversations,\n'
+                             '            tokenizer,\n'
+                             '            request_metadata,\n'
+                             '            single_requests,\n'
+                             '            parsers,\n'
+                             '        )\n'
+                             '\n'
+                             '    async def chat_completion_full_generator_batch(\n'},
+            {'name': 'vllm/entrypoints/openai/chat_completion/batch_serving.py:landmark-6',
+             'path': 'vllm/entrypoints/openai/chat_completion/batch_serving.py',
+             'before': '        all_conversations: list[list[ConversationMessage]],\n'
+                       '        tokenizer: TokenizerLike,\n'
+                       '        request_metadata: RequestResponseMetadata,\n'
+                       '        parser: Parser | None = None,\n'
+                       '    ) -> ErrorResponse | ChatCompletionResponse:\n'
+                       '        """Handle batched (non-streaming) chat completions.\n'
+                       '\n'
+                       '        Fans out N generators (one per conversation in the '
+                       'batch), collects\n'
+                       '        the final output for each, and assembles a single\n'
+                       '        ``ChatCompletionResponse`` whose ``choices`` are '
+                       'indexed 0,...,N-1.\n'
+                       '\n'
+                       '        Tool-use and streaming are rejected upstream by the\n'
+                       '        ``check_batch_mode`` validator, so neither needs to be '
+                       'handled here.\n'
+                       '        """\n'
+                       '        created_time = int(time.time())\n'
+                       '        final_results: dict[int, RequestOutput] = {}\n',
+             'after': '        all_conversations: list[list[ConversationMessage]],\n'
+                      '        tokenizer: TokenizerLike,\n'
+                      '        request_metadata: RequestResponseMetadata,\n'
+                      '        single_requests: '
+                      'list[ChatCompletionGenerationRequest],\n'
+                      '        parsers: list[Parser | None],\n'
+                      '    ) -> ErrorResponse | ChatCompletionResponse:\n'
+                      '        """Handle batched (non-streaming) chat completions.\n'
+                      '\n'
+                      '        Fans out N generators (one per conversation in the '
+                      'batch), collects\n'
+                      '        the final output for each, and assembles a single\n'
+                      '        ``ChatCompletionResponse`` whose ``choices`` are '
+                      'indexed 0,...,N-1.\n'
+                      '        Each conversation is parsed by its own parser, from its '
+                      'own adjusted\n'
+                      "        request, so nothing one conversation's prompt leaves "
+                      'reaches another.\n'
+                      '\n'
+                      '        The ``check_batch_mode`` validator refuses tool use and '
+                      'streaming, so\n'
+                      '        a conversation here neither carries tools nor streams.\n'
+                      '        """\n'
+                      '        created_time = int(time.time())\n'
+                      '        final_results: dict[int, RequestOutput] = {}\n',
+             'review_before': '        all_conversations: '
+                              'list[list[ConversationMessage]],\n'
+                              '        tokenizer: TokenizerLike,\n'
+                              '        request_metadata: RequestResponseMetadata,\n'
+                              '        parser: Parser | None = None,\n'
+                              '    ) -> ErrorResponse | ChatCompletionResponse:\n'
+                              '        """Handle batched (non-streaming) chat '
+                              'completions.\n'
+                              '\n'
+                              '        Fans out N generators (one per conversation in '
+                              'the batch), collects\n'
+                              '        the final output for each, and assembles a '
+                              'single\n'
+                              '        ``ChatCompletionResponse`` whose ``choices`` '
+                              'are indexed 0,...,N-1.\n'
+                              '\n'
+                              '        Tool-use and streaming are rejected upstream by '
+                              'the\n'
+                              '        ``check_batch_mode`` validator, so neither '
+                              'needs to be handled here.\n'
+                              '        """\n'
+                              '        created_time = int(time.time())\n'
+                              '        final_results: dict[int, RequestOutput] = {}\n',
+             'review_after': '        all_conversations: '
+                             'list[list[ConversationMessage]],\n'
+                             '        tokenizer: TokenizerLike,\n'
+                             '        request_metadata: RequestResponseMetadata,\n'
+                             '        single_requests: '
+                             'list[ChatCompletionGenerationRequest],\n'
+                             '        parsers: list[Parser | None],\n'
+                             '    ) -> ErrorResponse | ChatCompletionResponse:\n'
+                             '        """Handle batched (non-streaming) chat '
+                             'completions.\n'
+                             '\n'
+                             '        Fans out N generators (one per conversation in '
+                             'the batch), collects\n'
+                             '        the final output for each, and assembles a '
+                             'single\n'
+                             '        ``ChatCompletionResponse`` whose ``choices`` are '
+                             'indexed 0,...,N-1.\n'
+                             '        Each conversation is parsed by its own parser, '
+                             'from its own adjusted\n'
+                             "        request, so nothing one conversation's prompt "
+                             'leaves reaches another.\n'
+                             '\n'
+                             '        The ``check_batch_mode`` validator refuses tool '
+                             'use and streaming, so\n'
+                             '        a conversation here neither carries tools nor '
+                             'streams.\n'
+                             '        """\n'
+                             '        created_time = int(time.time())\n'
+                             '        final_results: dict[int, RequestOutput] = {}\n'},
+            {'name': 'vllm/entrypoints/openai/chat_completion/batch_serving.py:landmark-7',
+             'path': 'vllm/entrypoints/openai/chat_completion/batch_serving.py',
+             'before': '                else:\n'
+                       '                    logprobs = None\n'
                        '\n'
                        '                if parser is not None:\n'
                        '                    reasoning, content, _ = parser.parse(\n'
@@ -144379,15 +144790,22 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                        '                    )\n'
                        '                    if not request.include_reasoning:\n'
                        '                        reasoning = None\n',
-             'after': '                    logprobs = None\n'
+             'after': '                else:\n'
+                      '                    logprobs = None\n'
                       '\n'
+                      '                parser = parsers[prompt_idx]\n'
                       '                if parser is not None:\n'
+                      '                    # A conversation carries no tools '
+                      '(check_batch_mode), so no\n'
+                      '                    # call is parsed from it.\n'
                       '                    reasoning, content, _ = '
                       'parser.parse_output(\n'
                       '                        output.text,\n'
-                      '                        request,  # type: ignore[arg-type]\n'
+                      '                        single_requests[prompt_idx],\n'
                       '                        '
                       'prompt_token_ids=final_res.prompt_token_ids,\n'
+                      '                        '
+                      'enable_auto_tools=self.enable_auto_tools,\n'
                       '                        '
                       'model_output_token_ids=output.token_ids,\n'
                       '                        finish_reason=output.finish_reason,\n'
@@ -144395,7 +144813,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '                    )\n'
                       '                    if not request.include_reasoning:\n'
                       '                        reasoning = None\n',
-             'review_before': '                    logprobs = None\n'
+             'review_before': '                else:\n'
+                              '                    logprobs = None\n'
                               '\n'
                               '                if parser is not None:\n'
                               '                    reasoning, content, _ = '
@@ -144408,16 +144827,22 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                               '                    )\n'
                               '                    if not request.include_reasoning:\n'
                               '                        reasoning = None\n',
-             'review_after': '                    logprobs = None\n'
+             'review_after': '                else:\n'
+                             '                    logprobs = None\n'
                              '\n'
+                             '                parser = parsers[prompt_idx]\n'
                              '                if parser is not None:\n'
+                             '                    # A conversation carries no tools '
+                             '(check_batch_mode), so no\n'
+                             '                    # call is parsed from it.\n'
                              '                    reasoning, content, _ = '
                              'parser.parse_output(\n'
                              '                        output.text,\n'
-                             '                        request,  # type: '
-                             'ignore[arg-type]\n'
+                             '                        single_requests[prompt_idx],\n'
                              '                        '
                              'prompt_token_ids=final_res.prompt_token_ids,\n'
+                             '                        '
+                             'enable_auto_tools=self.enable_auto_tools,\n'
                              '                        '
                              'model_output_token_ids=output.token_ids,\n'
                              '                        '
@@ -144878,11 +145303,21 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '        self._stream_state.generated_token_count = '
                       'len(model_output_token_ids)\n'
                       '        if self._reasoning_ended_in_prompt(prompt_token_ids):\n'
-                      '            # Nothing generated is reasoning, exactly as when '
-                      'no reasoning\n'
-                      '            # parser is configured: the content is every '
-                      'generated byte.\n'
-                      '            reasoning, content = None, model_output\n'
+                      '            # Nothing generated is reasoning: the content is '
+                      'every generated\n'
+                      '            # byte. An answer of nothing is what this '
+                      'composition answers\n'
+                      '            # after a prompt that leaves reasoning open: None '
+                      'where a\n'
+                      '            # reasoning parser is composed, as reasoning '
+                      'parsers answer it,\n'
+                      '            # and the empty text where none is, which is the '
+                      'only path then.\n'
+                      '            reasoning = None\n'
+                      '            content = (\n'
+                      '                model_output if self._reasoning_parser is None '
+                      'else model_output or None\n'
+                      '            )\n'
                       '            content_token_ids: Sequence[int] = '
                       'model_output_token_ids\n'
                       '        else:\n'
@@ -144925,11 +145360,21 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'len(model_output_token_ids)\n'
                              '        if '
                              'self._reasoning_ended_in_prompt(prompt_token_ids):\n'
-                             '            # Nothing generated is reasoning, exactly as '
-                             'when no reasoning\n'
-                             '            # parser is configured: the content is every '
-                             'generated byte.\n'
-                             '            reasoning, content = None, model_output\n'
+                             '            # Nothing generated is reasoning: the '
+                             'content is every generated\n'
+                             '            # byte. An answer of nothing is what this '
+                             'composition answers\n'
+                             '            # after a prompt that leaves reasoning open: '
+                             'None where a\n'
+                             '            # reasoning parser is composed, as reasoning '
+                             'parsers answer it,\n'
+                             '            # and the empty text where none is, which is '
+                             'the only path then.\n'
+                             '            reasoning = None\n'
+                             '            content = (\n'
+                             '                model_output if self._reasoning_parser '
+                             'is None else model_output or None\n'
+                             '            )\n'
                              '            content_token_ids: Sequence[int] = '
                              'model_output_token_ids\n'
                              '        else:\n'
@@ -147034,7 +147479,384 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '\n'
                              '        prompt_tokens = (\n'
                              '            request.prompt_tokens if '
-                             'request.prompt_tokens is not None else 0\n'})},
+                             'request.prompt_tokens is not None else 0\n'},
+            {'name': 'tests/entrypoints/openai/test_beam_search_boundary.py:landmark-1',
+             'path': 'tests/entrypoints/openai/test_beam_search_boundary.py',
+             'before': '    return {"model": "m", **prompt, **kwargs}\n'
+                       '\n'
+                       '\n'
+                       '@pytest.mark.asyncio\n'
+                       '@pytest.mark.parametrize("request_type, path", SURFACES)\n'
+                       '@pytest.mark.parametrize("stream", [False, True])\n'
+                       'async def '
+                       'test_unsupported_beam_search_returns_the_same_boundary_error(\n'
+                       '    request_type, path, stream,\n'
+                       '):\n'
+                       '    with pytest.raises(VLLMValidationError, match="Beam search '
+                       'is not supported") as error:\n'
+                       '        request_type.model_validate(payload(request_type, '
+                       'use_beam_search=True, stream=stream))\n'
+                       '    assert error.value.parameter == "use_beam_search"\n'
+                       '    request = SimpleNamespace(\n'
+                       '        scope={"type": "http", "path": path}, '
+                       'state=SimpleNamespace(),\n'
+                       '        '
+                       'app=SimpleNamespace(state=SimpleNamespace(args=SimpleNamespace(log_error_stack=False))),\n'
+                       '    )\n'
+                       '    response = await vllm_error_handler(request, error.value)\n'
+                       '    body = json.loads(response.body)\n'
+                       '    assert response.status_code == 400\n'
+                       '    assert body["error"]["param"] == "use_beam_search"\n'
+                       '    assert "Beam search is not supported" in '
+                       'body["error"]["message"]\n'
+                       '    assert "kv_scope" not in body["error"]["message"]\n'
+                       '\n'
+                       '\n'
+                       '@pytest.mark.parametrize("request_type, _path", SURFACES)\n'
+                       '@pytest.mark.parametrize("explicit", [False, True])\n'
+                       'def '
+                       'test_supported_sampling_does_not_require_a_decoding_flag(request_type, '
+                       '_path, explicit):\n',
+             'after': '    return {"model": "m", **prompt, **kwargs}\n'
+                      '\n'
+                      '\n'
+                      'async def _boundary_error(path, error):\n'
+                      '    request = SimpleNamespace(\n'
+                      '        scope={"type": "http", "path": path}, '
+                      'state=SimpleNamespace(),\n'
+                      '        '
+                      'app=SimpleNamespace(state=SimpleNamespace(args=SimpleNamespace(log_error_stack=False))),\n'
+                      '    )\n'
+                      '    response = await vllm_error_handler(request, error)\n'
+                      '    return response.status_code, json.loads(response.body)\n'
+                      '\n'
+                      '\n'
+                      '# Every stream setting a surface serves; the batch route '
+                      'streams nothing.\n'
+                      'STREAMED_SURFACES = [\n'
+                      '    (request_type, path, stream)\n'
+                      '    for request_type, path in SURFACES\n'
+                      '    for stream in ((False,) if request_type is '
+                      'BatchChatCompletionRequest else (False, True))\n'
+                      ']\n'
+                      '\n'
+                      '\n'
+                      '@pytest.mark.asyncio\n'
+                      '@pytest.mark.parametrize("request_type, path, stream", '
+                      'STREAMED_SURFACES)\n'
+                      'async def '
+                      'test_unsupported_beam_search_returns_the_same_boundary_error(\n'
+                      '    request_type, path, stream,\n'
+                      '):\n'
+                      '    with pytest.raises(VLLMValidationError, match="Beam search '
+                      'is not supported") as error:\n'
+                      '        request_type.model_validate(payload(request_type, '
+                      'use_beam_search=True, stream=stream))\n'
+                      '    assert error.value.parameter == "use_beam_search"\n'
+                      '    status, body = await _boundary_error(path, error.value)\n'
+                      '    assert status == 400\n'
+                      '    assert body["error"]["param"] == "use_beam_search"\n'
+                      '    assert "Beam search is not supported" in '
+                      'body["error"]["message"]\n'
+                      '    assert "kv_scope" not in body["error"]["message"]\n'
+                      '\n'
+                      '\n'
+                      '@pytest.mark.asyncio\n'
+                      '@pytest.mark.parametrize("use_beam_search", [False, True])\n'
+                      'async def '
+                      'test_a_streamed_batch_is_refused_by_its_stream(use_beam_search):\n'
+                      '    """The batch route returns each conversation\'s whole '
+                      'response, so a\n'
+                      '    batch asking to stream is refused for that, at the same '
+                      'boundary,\n'
+                      '    whatever else it asks."""\n'
+                      '    with pytest.raises(VLLMValidationError, match="streams '
+                      'none") as error:\n'
+                      '        BatchChatCompletionRequest.model_validate(payload(\n'
+                      '            BatchChatCompletionRequest, '
+                      'use_beam_search=use_beam_search, stream=True))\n'
+                      '    assert error.value.parameter == "stream"\n'
+                      '    status, body = await '
+                      '_boundary_error("/v1/chat/completions/batch", error.value)\n'
+                      '    assert status == 400\n'
+                      '    assert body["error"]["param"] == "stream"\n'
+                      '    assert body["error"]["message"].startswith(\n'
+                      '        "The batch chat route returns each conversation\'s '
+                      'whole response")\n'
+                      '\n'
+                      '\n'
+                      '@pytest.mark.parametrize("request_type, _path", SURFACES)\n'
+                      '@pytest.mark.parametrize("explicit", [False, True])\n'
+                      'def '
+                      'test_supported_sampling_does_not_require_a_decoding_flag(request_type, '
+                      '_path, explicit):\n',
+             'review_before': '    return {"model": "m", **prompt, **kwargs}\n'
+                              '\n'
+                              '\n'
+                              '@pytest.mark.asyncio\n'
+                              '@pytest.mark.parametrize("request_type, path", '
+                              'SURFACES)\n'
+                              '@pytest.mark.parametrize("stream", [False, True])\n'
+                              'async def '
+                              'test_unsupported_beam_search_returns_the_same_boundary_error(\n'
+                              '    request_type, path, stream,\n'
+                              '):\n'
+                              '    with pytest.raises(VLLMValidationError, match="Beam '
+                              'search is not supported") as error:\n'
+                              '        '
+                              'request_type.model_validate(payload(request_type, '
+                              'use_beam_search=True, stream=stream))\n'
+                              '    assert error.value.parameter == "use_beam_search"\n'
+                              '    request = SimpleNamespace(\n'
+                              '        scope={"type": "http", "path": path}, '
+                              'state=SimpleNamespace(),\n'
+                              '        '
+                              'app=SimpleNamespace(state=SimpleNamespace(args=SimpleNamespace(log_error_stack=False))),\n'
+                              '    )\n'
+                              '    response = await vllm_error_handler(request, '
+                              'error.value)\n'
+                              '    body = json.loads(response.body)\n'
+                              '    assert response.status_code == 400\n'
+                              '    assert body["error"]["param"] == "use_beam_search"\n'
+                              '    assert "Beam search is not supported" in '
+                              'body["error"]["message"]\n'
+                              '    assert "kv_scope" not in body["error"]["message"]\n'
+                              '\n'
+                              '\n'
+                              '@pytest.mark.parametrize("request_type, _path", '
+                              'SURFACES)\n'
+                              '@pytest.mark.parametrize("explicit", [False, True])\n'
+                              'def '
+                              'test_supported_sampling_does_not_require_a_decoding_flag(request_type, '
+                              '_path, explicit):\n',
+             'review_after': '    return {"model": "m", **prompt, **kwargs}\n'
+                             '\n'
+                             '\n'
+                             'async def _boundary_error(path, error):\n'
+                             '    request = SimpleNamespace(\n'
+                             '        scope={"type": "http", "path": path}, '
+                             'state=SimpleNamespace(),\n'
+                             '        '
+                             'app=SimpleNamespace(state=SimpleNamespace(args=SimpleNamespace(log_error_stack=False))),\n'
+                             '    )\n'
+                             '    response = await vllm_error_handler(request, error)\n'
+                             '    return response.status_code, '
+                             'json.loads(response.body)\n'
+                             '\n'
+                             '\n'
+                             '# Every stream setting a surface serves; the batch route '
+                             'streams nothing.\n'
+                             'STREAMED_SURFACES = [\n'
+                             '    (request_type, path, stream)\n'
+                             '    for request_type, path in SURFACES\n'
+                             '    for stream in ((False,) if request_type is '
+                             'BatchChatCompletionRequest else (False, True))\n'
+                             ']\n'
+                             '\n'
+                             '\n'
+                             '@pytest.mark.asyncio\n'
+                             '@pytest.mark.parametrize("request_type, path, stream", '
+                             'STREAMED_SURFACES)\n'
+                             'async def '
+                             'test_unsupported_beam_search_returns_the_same_boundary_error(\n'
+                             '    request_type, path, stream,\n'
+                             '):\n'
+                             '    with pytest.raises(VLLMValidationError, match="Beam '
+                             'search is not supported") as error:\n'
+                             '        '
+                             'request_type.model_validate(payload(request_type, '
+                             'use_beam_search=True, stream=stream))\n'
+                             '    assert error.value.parameter == "use_beam_search"\n'
+                             '    status, body = await _boundary_error(path, '
+                             'error.value)\n'
+                             '    assert status == 400\n'
+                             '    assert body["error"]["param"] == "use_beam_search"\n'
+                             '    assert "Beam search is not supported" in '
+                             'body["error"]["message"]\n'
+                             '    assert "kv_scope" not in body["error"]["message"]\n'
+                             '\n'
+                             '\n'
+                             '@pytest.mark.asyncio\n'
+                             '@pytest.mark.parametrize("use_beam_search", [False, '
+                             'True])\n'
+                             'async def '
+                             'test_a_streamed_batch_is_refused_by_its_stream(use_beam_search):\n'
+                             '    """The batch route returns each conversation\'s '
+                             'whole response, so a\n'
+                             '    batch asking to stream is refused for that, at the '
+                             'same boundary,\n'
+                             '    whatever else it asks."""\n'
+                             '    with pytest.raises(VLLMValidationError, '
+                             'match="streams none") as error:\n'
+                             '        '
+                             'BatchChatCompletionRequest.model_validate(payload(\n'
+                             '            BatchChatCompletionRequest, '
+                             'use_beam_search=use_beam_search, stream=True))\n'
+                             '    assert error.value.parameter == "stream"\n'
+                             '    status, body = await '
+                             '_boundary_error("/v1/chat/completions/batch", '
+                             'error.value)\n'
+                             '    assert status == 400\n'
+                             '    assert body["error"]["param"] == "stream"\n'
+                             '    assert body["error"]["message"].startswith(\n'
+                             '        "The batch chat route returns each '
+                             'conversation\'s whole response")\n'
+                             '\n'
+                             '\n'
+                             '@pytest.mark.parametrize("request_type, _path", '
+                             'SURFACES)\n'
+                             '@pytest.mark.parametrize("explicit", [False, True])\n'
+                             'def '
+                             'test_supported_sampling_does_not_require_a_decoding_flag(request_type, '
+                             '_path, explicit):\n'},
+            {'name': 'vllm/entrypoints/openai/chat_completion/protocol.py:landmark-1',
+             'path': 'vllm/entrypoints/openai/chat_completion/protocol.py',
+             'before': '    Each conversation is its own line of work, so ``kv_scope`` '
+                       'lists one\n'
+                       '    distinct agent ID per conversation, in the order of '
+                       '``messages``.\n'
+                       '\n'
+                       '    Current limitations compared to the single-conversation '
+                       'endpoint:\n'
+                       '    - Streaming is not supported (``stream`` must be False or '
+                       'omitted).\n'
+                       '    - Tool use is not supported (``tools`` must be omitted).\n'
+                       '    - Beam search is not supported (``use_beam_search`` must '
+                       'be False or omitted).\n'
+                       '    - The ``n`` parameter must be 1 (or omitted).\n'
+                       '    """\n',
+             'after': '    Each conversation is its own line of work, so ``kv_scope`` '
+                      'lists one\n'
+                      '    distinct agent ID per conversation, in the order of '
+                      '``messages``.\n'
+                      '\n'
+                      '    Current limitations compared to the single-conversation '
+                      'endpoint, each\n'
+                      "    refused by ``check_batch_mode`` or the field's own type:\n"
+                      '    - Streaming is not supported (``stream`` must be False or '
+                      'omitted).\n'
+                      '    - Tool use is not supported (``tools`` must be omitted or '
+                      'empty).\n'
+                      '    - Beam search is not supported (``use_beam_search`` must be '
+                      'False or omitted).\n'
+                      '    - The ``n`` parameter must be 1 (or omitted).\n'
+                      '    """\n',
+             'review_before': '    Each conversation is its own line of work, so '
+                              '``kv_scope`` lists one\n'
+                              '    distinct agent ID per conversation, in the order of '
+                              '``messages``.\n'
+                              '\n'
+                              '    Current limitations compared to the '
+                              'single-conversation endpoint:\n'
+                              '    - Streaming is not supported (``stream`` must be '
+                              'False or omitted).\n'
+                              '    - Tool use is not supported (``tools`` must be '
+                              'omitted).\n'
+                              '    - Beam search is not supported (``use_beam_search`` '
+                              'must be False or omitted).\n'
+                              '    - The ``n`` parameter must be 1 (or omitted).\n'
+                              '    """\n',
+             'review_after': '    Each conversation is its own line of work, so '
+                             '``kv_scope`` lists one\n'
+                             '    distinct agent ID per conversation, in the order of '
+                             '``messages``.\n'
+                             '\n'
+                             '    Current limitations compared to the '
+                             'single-conversation endpoint, each\n'
+                             "    refused by ``check_batch_mode`` or the field's own "
+                             'type:\n'
+                             '    - Streaming is not supported (``stream`` must be '
+                             'False or omitted).\n'
+                             '    - Tool use is not supported (``tools`` must be '
+                             'omitted or empty).\n'
+                             '    - Beam search is not supported (``use_beam_search`` '
+                             'must be False or omitted).\n'
+                             '    - The ``n`` parameter must be 1 (or omitted).\n'
+                             '    """\n'},
+            {'name': 'vllm/entrypoints/openai/chat_completion/protocol.py:landmark-2',
+             'path': 'vllm/entrypoints/openai/chat_completion/protocol.py',
+             'before': '                "when using `logprob_token_ids`, `logprobs` '
+                       'must be set to true.",\n'
+                       '                parameter="logprob_token_ids",\n'
+                       '            )\n'
+                       '        response_format = data.get("response_format")\n'
+                       '        if response_format is not None:\n'
+                       '            rf_type = (\n',
+             'after': '                "when using `logprob_token_ids`, `logprobs` '
+                      'must be set to true.",\n'
+                      '                parameter="logprob_token_ids",\n'
+                      '            )\n'
+                      '        # Neither is a field of this request, so each would '
+                      'reach every\n'
+                      "        # conversation's chat request as an extra key and be "
+                      'served there in\n'
+                      '        # part: tools the prompt is never given, and a stream '
+                      'of which only the\n'
+                      '        # last delta of each conversation would be returned.\n'
+                      '        if data.get("tools"):\n'
+                      '            raise VLLMValidationError(\n'
+                      '                "The batch chat route serves no tool use: it '
+                      'renders no tool "\n'
+                      '                "into a conversation\'s prompt and returns no '
+                      'call. Send a "\n'
+                      '                "conversation that may call tools to '
+                      '/v1/chat/completions.",\n'
+                      '                parameter="tools",\n'
+                      '            )\n'
+                      '        if data.get("stream"):\n'
+                      '            raise VLLMValidationError(\n'
+                      '                "The batch chat route returns each '
+                      'conversation\'s whole "\n'
+                      '                "response and streams none. Omit stream, or '
+                      'stream a "\n'
+                      '                "conversation from /v1/chat/completions.",\n'
+                      '                parameter="stream",\n'
+                      '            )\n'
+                      '        response_format = data.get("response_format")\n'
+                      '        if response_format is not None:\n'
+                      '            rf_type = (\n',
+             'review_before': '                "when using `logprob_token_ids`, '
+                              '`logprobs` must be set to true.",\n'
+                              '                parameter="logprob_token_ids",\n'
+                              '            )\n'
+                              '        response_format = data.get("response_format")\n'
+                              '        if response_format is not None:\n'
+                              '            rf_type = (\n',
+             'review_after': '                "when using `logprob_token_ids`, '
+                             '`logprobs` must be set to true.",\n'
+                             '                parameter="logprob_token_ids",\n'
+                             '            )\n'
+                             '        # Neither is a field of this request, so each '
+                             'would reach every\n'
+                             "        # conversation's chat request as an extra key "
+                             'and be served there in\n'
+                             '        # part: tools the prompt is never given, and a '
+                             'stream of which only the\n'
+                             '        # last delta of each conversation would be '
+                             'returned.\n'
+                             '        if data.get("tools"):\n'
+                             '            raise VLLMValidationError(\n'
+                             '                "The batch chat route serves no tool '
+                             'use: it renders no tool "\n'
+                             '                "into a conversation\'s prompt and '
+                             'returns no call. Send a "\n'
+                             '                "conversation that may call tools to '
+                             '/v1/chat/completions.",\n'
+                             '                parameter="tools",\n'
+                             '            )\n'
+                             '        if data.get("stream"):\n'
+                             '            raise VLLMValidationError(\n'
+                             '                "The batch chat route returns each '
+                             'conversation\'s whole "\n'
+                             '                "response and streams none. Omit stream, '
+                             'or stream a "\n'
+                             '                "conversation from '
+                             '/v1/chat/completions.",\n'
+                             '                parameter="stream",\n'
+                             '            )\n'
+                             '        response_format = data.get("response_format")\n'
+                             '        if response_format is not None:\n'
+                             '            rf_type = (\n'})},
  {'name': 'derender-text-is-the-detokenizers',
   'review_patch': 'patches/vllm-derender-text-is-the-detokenizers.patch',
   'review_sha256': '6d58660374c6280441e8e950001d4585859b98684f8ecf0ef5ba1aa7ea40e4dd',
@@ -150065,7 +150887,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'set(self.stop_token_ids or ())\n'})},
  {'name': 'output-constraints-refused-beside-tool-calls',
   'review_patch': 'patches/vllm-output-constraints-refused-beside-tool-calls.patch',
-  'review_sha256': 'c28ddd98041162bc918980e71eb3e60d756c3d7199993277b81974e06bf16dd2',
+  'review_sha256': '63c51d73a14b6e26114ce09f634833fa3a5f7663c6b5b4c746559ceb6d4ad3f2',
   'files': ({'path': 'tests/entrypoints/openai/test_output_constraint_beside_tools.py',
              'before_sha256': None,
              'after_sha256': '836be0512b50a3c2877a99ef7166b59bc50c7aa535a7cf653edebf57028f9b39'},
@@ -150082,8 +150904,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': 'e6f1e2257df53672a5d2bd434eb6b0f9025a10ad8bda80f08af8924f241679a8',
              'after_sha256': 'e268ce5922cefa06377dc7b0abe70b96bd9c33f82c5f5c9a53ce91375ba5bbdf'},
             {'path': 'vllm/entrypoints/openai/chat_completion/protocol.py',
-             'before_sha256': '0d200a798bb9fa7911ff2c2c84bae744b23f815b39b52ce0f69f533b1def60d4',
-             'after_sha256': '327b4ee4a029ece964413b15c687cf7790f8aa3a4f87f0c06ab8e37b70581750'},
+             'before_sha256': 'b54d8b6f05d57b907141f6b8a7110d113fda26ea119c0a79fadd1450b69e4146',
+             'after_sha256': 'ca2461789388844bc3fc1d4907f718a3882c671756126e98a9e491729a379797'},
             {'path': 'vllm/entrypoints/openai/engine/protocol.py',
              'before_sha256': '443d872bf278c2955a14f4500a7fb2ae706c5b4c991fd08e78cc249d7193f933',
              'after_sha256': 'f14144bf2e0b8b597e542d024ee1b0c073fef3056970984dd8c046c2cf193800'},
@@ -154420,7 +155242,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '@dataclass\n'})},
  {'name': 'rendered-prompts-are-never-truncated',
   'review_patch': 'patches/vllm-rendered-prompts-are-never-truncated.patch',
-  'review_sha256': '6b629d01855f66c75ebdf66481944890b4ccd6d841173283ed8d4e30334079e2',
+  'review_sha256': '863da8f15c8fe43a96d5d74e3a683066b318e13b65c44deb57cd2a181c2b0eb6',
   'files': ({'path': 'tests/entrypoints/openai/chat_completion/test_serving_chat.py',
              'before_sha256': '82a3f7dad3c315ce9fa205613f8ab817a879d1a3ddb9a8c3fa72d43af51412c9',
              'after_sha256': '3a452a168070dbbbd75c879507ab7f0126290db385c44fd94776b144922d4795'},
@@ -154428,8 +155250,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': None,
              'after_sha256': 'db436cb68152f60985f802cb63ecaaaca47e6e857a82056751ed730566e3aa86'},
             {'path': 'vllm/entrypoints/openai/chat_completion/protocol.py',
-             'before_sha256': '327b4ee4a029ece964413b15c687cf7790f8aa3a4f87f0c06ab8e37b70581750',
-             'after_sha256': '4c2bb4939c7d7d17d006373d0c0b2cfc2c4f9bbc7e4afc268f50ed5fb0db1b3a'},
+             'before_sha256': 'ca2461789388844bc3fc1d4907f718a3882c671756126e98a9e491729a379797',
+             'after_sha256': '92ea987da7211e4164d7a520c1ca79f7eb3713ddf40d3a765e76c8da5bd02a4a'},
             {'path': 'vllm/entrypoints/openai/chat_completion/serving.py',
              'before_sha256': 'e7157b8038f29f2ab9d4c1677e334ed201256f95af7c0d39f89d9a3e66597e2c',
              'after_sha256': '715a0dc12045d03b58c1dd0546c13dfd5b61ab582981e4a69a846225da1ece90'},
@@ -164045,7 +164867,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '\n'})},
  {'name': 'chat-messages-read-by-one-rule',
   'review_patch': 'patches/vllm-chat-messages-read-by-one-rule.patch',
-  'review_sha256': '5bf8a2d69d7ab1c6b9ee423740d34616a69e857d64816f68b9b9b1d509455f7f',
+  'review_sha256': '5b8648ba48900da0cffc9b57c34cf723f9829d4ee79111fa5f1145528afa6f3a',
   'files': ({'path': 'tests/tool_use/test_chat_completion_request_validations.py',
              'before_sha256': '8717564eac279b5b5b25d2bf03f42e4922f455bd0360ff23cd073d59f857759f',
              'after_sha256': '425f06bb3482be83e0e0ed88ec38ff5832f7f856e2ef35ed34b5b921535fe2f1'},
@@ -164053,8 +164875,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': 'b6a8c6ef3d744dd0aeafa5532d00f72299c0b4bb6de3216ad26735ef7530ccac',
              'after_sha256': '0a52bb17559d5491327b67cde19d30ecf70b9310cf8c3e8f3130b6dac364d15b'},
             {'path': 'vllm/entrypoints/openai/chat_completion/protocol.py',
-             'before_sha256': '4c2bb4939c7d7d17d006373d0c0b2cfc2c4f9bbc7e4afc268f50ed5fb0db1b3a',
-             'after_sha256': '8012f7b7afc6709bfa2bd4449a51171bf1b4a3e9d380dfe6c43dcb7228ea6682'},
+             'before_sha256': '92ea987da7211e4164d7a520c1ca79f7eb3713ddf40d3a765e76c8da5bd02a4a',
+             'after_sha256': '65d1ce949ff2358f120642e7182c37bc30acb99066b8df78a59a2ae00604bf17'},
             {'path': 'vllm/entrypoints/pooling/base/protocol.py',
              'before_sha256': 'f42dc70590a379e1109dd47666586aa82df915e1401c4d4cb16f8cb0202b9275',
              'after_sha256': '59c55f568cb5b333272ca122f302f667bf971613d1628602373b50e12898844b'},
@@ -175065,13 +175887,13 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '\n'})},
  {'name': 'forced-tool-choice-is-held-through-reasoning',
   'review_patch': 'patches/vllm-forced-tool-choice-is-held-through-reasoning.patch',
-  'review_sha256': 'f26d3f1d8e864561d1e85c1b45305aab6ec054100fa3888ad050c4b0ee08a2f0',
+  'review_sha256': '54ee3ace70dd9cbbce22b24a4e862f4352f02ddb5fdd7ce165395234e4a8a704',
   'files': ({'path': 'tests/v1/structured_output/test_forced_choice_holds_through_reasoning.py',
              'before_sha256': None,
              'after_sha256': '57f4218e5a2bc19447f458f8c92c7eb37c9292a9a9f4bd6ee799b5efccc2796c'},
             {'path': 'vllm/parser/abstract_parser.py',
-             'before_sha256': '2f03dbae35caeaf68d801c59312c3116467022ed5b882558a7d8cf3ba75b099c',
-             'after_sha256': '72664cd25461a0a1f85fdc0a6c577b3a6b3dbfe00bcf525139bf2677390d4c5c'},
+             'before_sha256': 'c12de53fc081a75a87cf52a21055cb03a3f1fd2f7dd14bd976af6799e75aeacb',
+             'after_sha256': '8ebe4f08c43aef333850ec8f361eee61c6cd394977f7ba0e3d0426693602826c'},
             {'path': 'vllm/parser/engine/adapters.py',
              'before_sha256': '929160563db76367ed29643459be0da5e7c85ca723ce0e9627c8a6e51b7f3377',
              'after_sha256': 'dadb674c29b4bef109c3dfe53b82f6f6207d8c58b14798485b43bdc68f8c2352'},
@@ -177692,7 +178514,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '**(request.reasoning_parser_kwargs or {})\n'})},
  {'name': 'qwen-format-is-served-as-one-engine',
   'review_patch': 'patches/vllm-qwen-format-is-served-as-one-engine.patch',
-  'review_sha256': '097eccef3e69f3f1f1805252c4f696bf1c7e417ac579d99060cd27e7923b98df',
+  'review_sha256': '56bc4387db6a732ee7deecf89edcc60c8e7d20f46eae88e4f1a6d0deb6020644',
   'files': ({'path': 'tests/parser/engine/test_qwen3.py',
              'before_sha256': '55644d168c156fd5a018f23f500870d7d6aa45fa0421b8e58809a07470db3dd1',
              'after_sha256': 'e2de6d03656c4fe5c8ba34fcfc17690eb5f12ed2e5dc4542507ddd496a141ec5'},
@@ -177709,8 +178531,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': 'c2b565ba84d36a2f6132797256049493ce0be952f59e053c7bd5653b5625c1c4',
              'after_sha256': '016a873050426d5d6d2aca25e1ed571d04b67e1f7f5feb9504e1d1cdf7c2f845'},
             {'path': 'vllm/parser/abstract_parser.py',
-             'before_sha256': '72664cd25461a0a1f85fdc0a6c577b3a6b3dbfe00bcf525139bf2677390d4c5c',
-             'after_sha256': '4f8b6c0fa381892adfb0f26c6e7557cbb2df1beed9f2fbb17f2618b31bea6376'},
+             'before_sha256': '8ebe4f08c43aef333850ec8f361eee61c6cd394977f7ba0e3d0426693602826c',
+             'after_sha256': '06006c3c748d8727dd26f2552848833db2db22209cc2c58e316b946e9074983f'},
             {'path': 'vllm/parser/parser_manager.py',
              'before_sha256': '7b0217aa315fdcf5ae602d62dad8e2380772662d4946933a92491a28ad4082f4',
              'after_sha256': 'c3174da47cf85db7fb8a2db4e70014814697f724feb0a86fe3b7b244be7b2789'},
@@ -180172,7 +180994,7 @@ FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5d
  'tests/entrypoints/openai/responses/test_serving_responses.py': '81ceb0dee1fc3170fbaab52b6e31498bf74d352de9d49184499d2ba8b129326e',
  'tests/entrypoints/openai/responses/test_simple.py': 'd9e6ee3e43cd758891b1c3a79f13d5be19707e9514a712229da745f6906a1c63',
  'tests/entrypoints/openai/responses/test_streaming_events.py': 'adc8778744b27e9e1ea5a4d680f211fce8b068e492c27549f234224030af70bd',
- 'tests/entrypoints/openai/test_beam_search_boundary.py': '34bb27d9fc4952429dd4f31199a57ecef0ca049ac76c4040e548e9773fbd4cb1',
+ 'tests/entrypoints/openai/test_beam_search_boundary.py': 'df11ab40b94ea9c87aadddb46526cba543a10590768a601bcb17afbd107f8939',
  'tests/entrypoints/openai/test_output_constraint_beside_tools.py': '836be0512b50a3c2877a99ef7166b59bc50c7aa535a7cf653edebf57028f9b39',
  'tests/entrypoints/openai/test_prompt_truncation_refused.py': 'db436cb68152f60985f802cb63ecaaaca47e6e857a82056751ed730566e3aa86',
  'tests/entrypoints/openai/test_reasoning_enable_thinking.py': 'f196f90544a39ee15f045b6684a13197d5fce22432c5d3509e37f11fdd22314e',
@@ -180308,8 +181130,8 @@ FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5d
  'vllm/entrypoints/generate/factories.py': 'd40aa14aad43cbb67b51568c56d5de76e43a3f9d8dc12a813b85d0e079323298',
  'vllm/entrypoints/llm.py': '79f9bb1212884746964a347f7e4b39087b5ac084b1d72821a12efd2fb85bcb03',
  'vllm/entrypoints/openai/chat_completion/api_router.py': '9cb8a56328bcfea734cc252e1291b17aee6c42e7208c9c8f883ad5a434bace17',
- 'vllm/entrypoints/openai/chat_completion/batch_serving.py': 'e48a1aaf594d7fcbb0979a1e48785ed37d2b109e6343beb318cb9145486efebe',
- 'vllm/entrypoints/openai/chat_completion/protocol.py': '8012f7b7afc6709bfa2bd4449a51171bf1b4a3e9d380dfe6c43dcb7228ea6682',
+ 'vllm/entrypoints/openai/chat_completion/batch_serving.py': '0128239bec0d027246d4b7d63762ed188831bc6caf1a0243698fa64e5f36c5d9',
+ 'vllm/entrypoints/openai/chat_completion/protocol.py': '65d1ce949ff2358f120642e7182c37bc30acb99066b8df78a59a2ae00604bf17',
  'vllm/entrypoints/openai/chat_completion/serving.py': '7dbe634a0d87ccfbfc967955d6e6967259bf6895feeaa564fcf0f0070a5df36e',
  'vllm/entrypoints/openai/cli_args.py': '2c74b481652e1b7154df7836a98eb3ef1377092dc8ac4ae02095160907b5e36e',
  'vllm/entrypoints/openai/completion/api_router.py': '95f7e88069d896bb2a616a50ca3c3c9d1fd1b2314b785b87696ad936fd205363',
@@ -180346,7 +181168,7 @@ FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5d
  'vllm/multimodal/media/image.py': '2858f153037359fc0a089e2b4aa21bfe97f1c38860a2118f48b501c0259cd329',
  'vllm/multimodal/processing/inputs.py': '7a0720aee40ef4fa4f42a1a9fa580408eb6f8160d80f09b502baf8f333c337a0',
  'vllm/multimodal/processing/processor.py': 'd45ab2fa2006da80e27bf92fd7dc6e4354646d099e11dabd641f714937ad5111',
- 'vllm/parser/abstract_parser.py': '4f8b6c0fa381892adfb0f26c6e7557cbb2df1beed9f2fbb17f2618b31bea6376',
+ 'vllm/parser/abstract_parser.py': '06006c3c748d8727dd26f2552848833db2db22209cc2c58e316b946e9074983f',
  'vllm/parser/deepseek_v32.py': '1fe0aec597caf6c10ff9905a3b1918c2a8608b5b1df32127ff8038c10f5d9b1c',
  'vllm/parser/deepseek_v4.py': 'a95f86eb4146d3096a73f1076260bbc58630a74c377b9da1d7e66d65e898465f',
  'vllm/parser/engine/adapters.py': 'dadb674c29b4bef109c3dfe53b82f6f6207d8c58b14798485b43bdc68f8c2352',

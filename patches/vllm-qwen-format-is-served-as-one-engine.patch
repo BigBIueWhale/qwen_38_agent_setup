@@ -436,7 +436,7 @@ index 7d2ec0e4f46bedcc20118b3213de935a1268728a..be67ac623b3501ce6a40ab24307184df
                              )
                          ),
 diff --git a/vllm/parser/abstract_parser.py b/vllm/parser/abstract_parser.py
-index ba379a74d1f0544d0bda6bc771188633fc8d0113..f7d896a0ef94bece399e3e17d27c99fbefb3bb33 100644
+index 1bdb97e0e88e234627565af5064f73098cfc960f..5029f18124c973798b887133f236c8d2843fa2b0 100644
 --- a/vllm/parser/abstract_parser.py
 +++ b/vllm/parser/abstract_parser.py
 @@ -7,6 +7,7 @@ from abc import abstractmethod

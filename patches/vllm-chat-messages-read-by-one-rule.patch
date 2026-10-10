@@ -97,7 +97,7 @@ index 2beceb22c9fb0dfd240fb664413465df24392ce8..fc6045fa5c1d35344f1cb94b94c26e6f
  class ToolHistoryOrigin:
      """Where each message of a tool history, and each call in it, came from
 diff --git a/vllm/entrypoints/openai/chat_completion/protocol.py b/vllm/entrypoints/openai/chat_completion/protocol.py
-index 7b5408d5cf9e2943b25ee1eb7e846ef5753a6cc0..fdad8fbe9281050ab8aaef0cb8b452dc37c93d1f 100644
+index 8082675450772524e37fad718432718c1eb4e302..b0b2792504c8c7f034216ce3bd9e700d503f5bd5 100644
 --- a/vllm/entrypoints/openai/chat_completion/protocol.py
 +++ b/vllm/entrypoints/openai/chat_completion/protocol.py
 @@ -23,6 +23,7 @@ from vllm.entrypoints.chat_utils import (

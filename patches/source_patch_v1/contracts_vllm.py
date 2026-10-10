@@ -4502,6 +4502,44 @@ def _validate_batch_parse_from_prompt_after(state: State) -> None:
                        ), label=label)
     forbid_text(state, "vllm/entrypoints/openai/chat_completion/batch_serving.py",
                 "parser.parse(", label=label)
+    # A batch conversation is generated and parsed from its own chat request,
+    # the one the renderer adjusted, by a parser of its own; the route serves
+    # no tool use and no stream, and refuses both by their parameter.
+    batch = "vllm/entrypoints/openai/chat_completion/batch_serving.py"
+    _require_in_symbol(state, batch, "OpenAIServingChatBatch.create_batch_chat_completion", (
+        "single_requests = request.to_chat_completion_requests()",
+        "                single_request.tools,\n",
+        "model_config=self.model_config,",
+        "for single_request in single_requests\n",
+        "await self.render_batch_chat_request(request, single_requests)",
+        "sampling_params = single_request.to_sampling_params(",
+    ), label=label)
+    forbid_text(state, batch, "None,  # tools", label=label)
+    _require_in_symbol(state, batch, "OpenAIServingChatBatch.render_batch_chat_request", (
+        "request.messages, single_requests, strict=True",
+    ), label=label)
+    forbid_text(state, batch, "request.messages, request.to_chat_completion_requests()",
+                label=label)
+    _require_in_symbol(state, batch,
+                       "OpenAIServingChatBatch.chat_completion_full_generator_batch", (
+        "parser = parsers[prompt_idx]",
+        "single_requests[prompt_idx],",
+    ), label=label)
+    _require_in_symbol(state, "vllm/entrypoints/openai/chat_completion/protocol.py",
+                       "BatchChatCompletionRequest.check_batch_mode", (
+        'if data.get("tools"):',
+        'parameter="tools",',
+        'if data.get("stream"):',
+        'parameter="stream",',
+    ), label=label)
+    require_python_symbols(state, "tests/entrypoints/openai/test_beam_search_boundary.py", {
+        "test_a_streamed_batch_is_refused_by_its_stream": ("use_beam_search",),
+    }, label=label)
+    # An answer of nothing is answered alike after any prompt.
+    _require_in_symbol(state, "vllm/parser/abstract_parser.py",
+                       "DelegatingParser.parse_output", (
+        "model_output if self._reasoning_parser is None else model_output or None",
+    ), label=label)
     for path, tests in (
         ("tests/entrypoints/openai/responses/test_serving_responses.py",
          {"test_a_continued_final_message_is_the_answer_on_both_responses_paths": None}),
@@ -6746,11 +6784,26 @@ CONTRACTS: Mapping[str, SemanticContract] = {
             "CPU), "
             "refuses a request that does not render as /render refuses it, and "
             "parses from the prompt as chat does: a second render on that route "
-            "rather than a token of the model's text lost, and no new protocol."
+            "rather than a token of the model's text lost, and no new protocol. "
+            "Batch chat parsed every conversation with one parser, so the state "
+            "one conversation's prompt left decided how the next was read, by "
+            "the batch's order; and it generated each from a request the "
+            "renderer had not adjusted, so a generated special token's text was "
+            "dropped and the parse refused it as a server error, while tools "
+            "and a stream it never serves reached each conversation as extra "
+            "keys. Each conversation is generated and parsed from its own chat "
+            "request, adjusted as chat's is, by a parser of its own, and tools "
+            "and stream: true are refused naming the parameter. After a closed "
+            "prompt, an answer of nothing was the empty text where the same "
+            "composition answers None after an open one; it is what the "
+            "composition answers after an open prompt, which is upstream's: "
+            "None where a reasoning parser is composed, the empty text for a "
+            "tool parser alone."
         ),
         removal_condition=(
             "Remove when pinned upstream's complete-output parse starts from the "
-            "state the prompt leaves, as its streaming parse does."
+            "state the prompt leaves, as its streaming parse does, and its batch "
+            "chat generates and parses each conversation from its own request."
         ),
         validate_before=_validate_batch_parse_from_prompt_before,
         validate_after=_validate_batch_parse_from_prompt_after,

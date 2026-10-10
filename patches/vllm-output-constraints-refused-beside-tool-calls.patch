@@ -347,7 +347,7 @@ index 312cc0a464b87001a8e96de75c5eafeaef91cb3c..e94ce273bdec17ae892572817ba804d8
                  type=output_config.format.type,
                  json_schema=JsonSchemaResponseFormat(
 diff --git a/vllm/entrypoints/openai/chat_completion/protocol.py b/vllm/entrypoints/openai/chat_completion/protocol.py
-index ae1cd615d876a4615861f42e17a1af25bd4d484c..a4b9935ccd2020b6734ce8696a8feb37d44586d8 100644
+index 0acbd0c2b6da11f368a7fb233d2657254cd995a7..536790e5ff4652a4054c56d078d52035908e7455 100644
 --- a/vllm/entrypoints/openai/chat_completion/protocol.py
 +++ b/vllm/entrypoints/openai/chat_completion/protocol.py
 @@ -38,6 +38,7 @@ from vllm.entrypoints.openai.engine.protocol import (

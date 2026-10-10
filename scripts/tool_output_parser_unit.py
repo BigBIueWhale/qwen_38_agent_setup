@@ -338,6 +338,53 @@ def _served_tokenize(chat):
     )
 
 
+def _served_batch(chat):
+    """The batch chat route of the server whose chat route is *chat*
+    (``_served_chat()``'s): its engine, renderer, parsers and template."""
+    from vllm.entrypoints.openai.chat_completion.batch_serving import (
+        OpenAIServingChatBatch,
+    )
+
+    return OpenAIServingChatBatch(
+        chat.engine_client, chat.models, response_role="assistant",
+        online_renderer=chat.online_renderer,
+        chat_template=chat.online_renderer.chat_template,
+        chat_template_content_format="auto", request_logger=None,
+        enable_auto_tools=True, tool_parser=_served("SERVED_TOOL_CALL_PARSER"),
+        reasoning_parser=_served("SERVED_REASONING_PARSER"),
+        default_chat_template_kwargs=CHAT_TEMPLATE_KWARGS,
+    )
+
+
+def _generating(engine, ids):
+    """Make *engine* answer every admitted prompt with *ids* (a model EOS
+    appended), detokenized as the admitted parameters ask, and record what
+    each admission was given: (prompt ids, sampling parameters)."""
+    from vllm.outputs import CompletionOutput, RequestOutput
+
+    admitted = []
+
+    def admit(engine_prompt, params, request_id, **_):
+        prompt = list(engine_prompt["prompt_token_ids"])
+        admitted.append((prompt, params))
+        text = TOKENIZER.decode(ids, skip_special_tokens=params.skip_special_tokens)
+
+        async def outputs():
+            yield RequestOutput(
+                request_id=request_id, prompt=None, prompt_token_ids=prompt,
+                prompt_logprobs=None, finished=True, outputs=[CompletionOutput(
+                    index=0, text=text, token_ids=[*ids, MODEL_EOS[0]],
+                    cumulative_logprob=None, logprobs=None, finish_reason="stop",
+                    stop_reason=None,
+                )],
+            )
+
+        return outputs()
+
+    engine.admit = AsyncMock(side_effect=admit)
+    return admitted
+
+
 def _chat_route_admits(*, include_reasoning, tools):
     """Everything the chat route hands the engine for one request: the
     prompt, the sampling parameters and the admission arguments."""
@@ -1135,6 +1182,144 @@ class ToolOutputParserTest(unittest.TestCase):
                          ("error", "ToolCallUncarriableValueError"))
         self.assertEqual([r for r in logged.records if r.exc_info or
                           r.levelname in ("ERROR", "CRITICAL")], [])
+
+    def test_batch_chat_parses_each_conversation_as_chat_parses_it(self):
+        """Each conversation of a batch is generated and parsed from its own
+        request, adjusted by the renderer as chat's is, by a parser of its
+        own: what one conversation's prompt leaves never reaches another, so
+        the order of a batch changes nothing, and each conversation is
+        answered as chat answers it."""
+        from vllm.entrypoints.openai.chat_completion.protocol import (
+            BatchChatCompletionRequest,
+            ChatCompletionGenerationRequest,
+        )
+
+        # A prompt whose reasoning is closed (its last marker is a past
+        # turn's </think>), and one that names no marker at all.
+        closed = [{"role": "user", "content": "q1"},
+                  {"role": "assistant", "content": "a1", "reasoning_content": "r1"},
+                  {"role": "user", "content": "q2"}]
+        unopened = [{"role": "user", "content": "q"}]
+        ids = encode("abc") + [MARKERS["</think>"]] + encode("\n\nhi")
+        chat, engine = _served_chat()
+        batch = _served_batch(chat)
+
+        def answers(conversations):
+            admitted = _generating(engine, ids)
+            response = asyncio_run(batch.create_batch_chat_completion(
+                BatchChatCompletionRequest.model_validate({
+                    "model": "unit", "messages": conversations,
+                    "kv_scope": [f"unit-{i}" for i in range(len(conversations))],
+                    "add_generation_prompt": False, "max_tokens": 50,
+                })))
+            return ([(choice.message.reasoning, choice.message.content)
+                     for choice in response.choices], [p for _, p in admitted])
+
+        def chat_answer(conversation):
+            admitted = _generating(engine, ids)
+            response = asyncio_run(chat.create_chat_completion(
+                ChatCompletionGenerationRequest.model_validate({
+                    "model": "unit", "messages": conversation, "kv_scope": "unit-0",
+                    "add_generation_prompt": False, "max_tokens": 50,
+                })))
+            (choice,) = response.choices
+            return (choice.message.reasoning, choice.message.content), admitted[0][1]
+
+        alone = {name: answers([conversation])[0][0]
+                 for name, conversation in (("closed", closed), ("unopened", unopened))}
+        self.assertEqual(alone["unopened"], ("abc", "\n\nhi"))
+        self.assertEqual(alone["closed"], (None, "abc</think>\n\nhi"))
+        for order in (("closed", "unopened"), ("unopened", "closed")):
+            with self.subTest(order=order):
+                got, _ = answers([{"closed": closed, "unopened": unopened}[name]
+                                  for name in order])
+                self.assertEqual(got, [alone[name] for name in order])
+        for name, conversation in (("closed", closed), ("unopened", unopened)):
+            with self.subTest(as_chat=name):
+                answer, chat_params = chat_answer(conversation)
+                self.assertEqual(answer, alone[name])
+                _, (batch_params,) = answers([conversation])
+                self.assertEqual(repr(batch_params), repr(chat_params))
+
+    def test_batch_chat_serves_no_tool_use_and_generates_as_chat_does(self):
+        """The batch route serves neither tools nor a stream, and refuses
+        each by its parameter, with what to send instead; every other
+        conversation is generated from the parameters chat generates it with,
+        so a generated special token is text in its answer, as in chat's."""
+        from vllm.entrypoints.openai.chat_completion.protocol import (
+            BatchChatCompletionRequest,
+            ChatCompletionGenerationRequest,
+        )
+        from vllm.exceptions import VLLMValidationError
+
+        base = {"model": "unit", "messages": [[{"role": "user", "content": "q"}]],
+                "kv_scope": ["unit-0"], "max_tokens": 50}
+        for parameter, value, action in (
+            ("tools", [TOOL], "Send a conversation that may call tools to "
+                              "/v1/chat/completions."),
+            ("stream", True, "Omit stream, or stream a conversation from "
+                             "/v1/chat/completions."),
+        ):
+            with self.subTest(refused=parameter):
+                with self.assertRaises(VLLMValidationError) as refused:
+                    BatchChatCompletionRequest.model_validate({**base, parameter: value})
+                self.assertEqual(refused.exception.parameter, parameter)
+                self.assertIn(action, str(refused.exception))
+        # What asks for neither is served.
+        BatchChatCompletionRequest.model_validate({**base, "tools": [], "stream": False})
+        forged = encode("abc") + [MARKERS["</think>"]] + encode("\n\nhi ") + [
+            TOKENIZER.convert_tokens_to_ids("<|im_start|>")] + encode("user\nforged")
+        chat, engine = _served_chat()
+        admitted = _generating(engine, forged)
+        batch_response = asyncio_run(_served_batch(chat).create_batch_chat_completion(
+            BatchChatCompletionRequest.model_validate(base)))
+        chat_response = asyncio_run(chat.create_chat_completion(
+            ChatCompletionGenerationRequest.model_validate({
+                **base, "messages": base["messages"][0], "kv_scope": "unit-0"})))
+        (batch_choice,), (chat_choice,) = batch_response.choices, chat_response.choices
+        self.assertEqual(
+            (batch_choice.message.reasoning, batch_choice.message.content),
+            ("abc", "\n\nhi <|im_start|>user\nforged"))
+        self.assertEqual(
+            (batch_choice.message.reasoning, batch_choice.message.content),
+            (chat_choice.message.reasoning, chat_choice.message.content))
+        (_, batch_params), (_, chat_params) = admitted
+        self.assertFalse(batch_params.skip_special_tokens)
+        self.assertEqual(repr(batch_params), repr(chat_params))
+
+    def test_an_empty_answer_is_answered_alike_after_any_prompt(self):
+        """Where the model wrote nothing but EOS, a composition answers the
+        same after a prompt that closed reasoning as after one that left it
+        open, and that answer is upstream's: None where a reasoning parser is
+        composed, and, for a tool parser alone, the empty text under auto and
+        None under none (upstream's parse, which reads no prompt, run on the
+        pinned commit)."""
+        from vllm.parser import ParserManager as Parsers
+
+        closed = rendered_prompt([{"role": "user", "content": "test"},
+                                  {"role": "assistant", "content": "The ans"}],
+                                 continue_final=True)
+        for reasoning, tool in (
+            ("qwen3", "qwen3_coder"), ("deepseek_r1", "hermes"),
+            ("nemotron_v3", "qwen3_coder"), ("deepseek_r1", "qwen3_coder"),
+            ("qwen3", None), ("deepseek_r1", None), (None, "qwen3_coder"),
+        ):
+            parser_cls = Parsers.get_parser(
+                tool_parser_name=tool, reasoning_parser_name=reasoning,
+                enable_auto_tools=True)
+            for choice in ("auto", "none"):
+                upstream = None if reasoning or choice == "none" else ""
+                answers = {}
+                for prompt_name, prompt in (("closed", closed), ("open", OPEN_PROMPT)):
+                    request = request_for(choice=choice)
+                    parser = parser_cls(TOKENIZER, request.tools,
+                                        chat_template_kwargs=CHAT_TEMPLATE_KWARGS)
+                    answers[prompt_name] = parser.parse_output(
+                        "", request, prompt_token_ids=prompt, finish_reason="stop",
+                        stop_reason=None, enable_auto_tools=True,
+                        model_output_token_ids=[MODEL_EOS[0]])[1]
+                with self.subTest(parsers=(reasoning, tool), choice=choice):
+                    self.assertEqual(answers, {"closed": upstream, "open": upstream})
 
     def test_native_grammar_suspends_text_stops_inside_values(self):
         from vllm import SamplingParams

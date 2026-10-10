@@ -429,21 +429,21 @@ It is intentionally reconstructed by the ordered, reviewed semantic transformati
 | patches/vllm-unspecified-tool-choice-is-the-default.patch | 117d04e45cadbf603df42e7a791a7dbf17e18bc70fe09e651d8d327dbe8ea77f |
 | patches/vllm-call-only-answer-keeps-the-blank-line.patch | ee0a60323a8369fd240d876d8a9cdb3028123e5e944bdfa2a75d485284d7b2c8 |
 | patches/vllm-responses-tools-are-one-function-list.patch | 4dfbcc6e6a98665509ecaf2c62ef6ef588888b1322bbc7cd66c0dee555fee1ba |
-| patches/vllm-batch-parse-starts-where-the-prompt-leaves.patch | 73b441f3cd6dbcce1013bc50c3e99c423bf8df5da1921d8854e7f71507c47c08 |
+| patches/vllm-batch-parse-starts-where-the-prompt-leaves.patch | 024ab581b360770d2fc79b737b892ff2e9b525f18f92914222bc73eda4e17362 |
 | patches/vllm-derender-text-is-the-detokenizers.patch | 6d58660374c6280441e8e950001d4585859b98684f8ecf0ef5ba1aa7ea40e4dd |
-| patches/vllm-output-constraints-refused-beside-tool-calls.patch | c28ddd98041162bc918980e71eb3e60d756c3d7199993277b81974e06bf16dd2 |
+| patches/vllm-output-constraints-refused-beside-tool-calls.patch | 63c51d73a14b6e26114ce09f634833fa3a5f7663c6b5b4c746559ceb6d4ad3f2 |
 | patches/vllm-batch-invariance-substitutes-no-nvfp4-kernel.patch | c79baaee0a51275f5f522d266fe6b315c200e6951920c2454d5c80cadbb92f44 |
 | patches/vllm-render-carries-every-image-chat-renders.patch | fffaffa0ad8a75f44fd701347c33325eab00e33e4e3aff1e4d004ad6305c20db |
-| patches/vllm-rendered-prompts-are-never-truncated.patch | 6b629d01855f66c75ebdf66481944890b4ccd6d841173283ed8d4e30334079e2 |
+| patches/vllm-rendered-prompts-are-never-truncated.patch | 863da8f15c8fe43a96d5d74e3a683066b318e13b65c44deb57cd2a181c2b0eb6 |
 | patches/vllm-kv-transfer-params-are-declared.patch | 79fdec1387802c9fcd952c1b0094598f5d0853bc75401e5040701feab4ea4f14 |
 | patches/vllm-responses-refuses-tools-the-template-is-never-given.patch | 5c3106c820032060101e732329f2d234c9c3c84bcd5e21c4e05ebf55679aecd2 |
 | patches/vllm-chat-stream-carries-every-token-logprob.patch | 9cd91385900057736146a83351f6c625f4983701bf8d3982c0c056bc6df6af62 |
-| patches/vllm-chat-messages-read-by-one-rule.patch | 5bf8a2d69d7ab1c6b9ee423740d34616a69e857d64816f68b9b9b1d509455f7f |
+| patches/vllm-chat-messages-read-by-one-rule.patch | 5b8648ba48900da0cffc9b57c34cf723f9829d4ee79111fa5f1145528afa6f3a |
 | patches/vllm-responses-refuses-what-it-cannot-honour.patch | eb7495a9eae9ad46cd5466d5f61354619012feba5b4bf79bcff6956b19af0cff |
 | patches/vllm-reviewed-tests-declare-what-they-need.patch | e8e48b898b8c6ee8e6a34e3efebc2ada7bca4841bd9c8903967b6d44ceac2bb7 |
 | patches/vllm-priority-is-refused-where-nothing-orders-by-it.patch | 96346e5bf71726008f4449389d91a18531fd57fe63f930b2400e059ab168571a |
-| patches/vllm-forced-tool-choice-is-held-through-reasoning.patch | f26d3f1d8e864561d1e85c1b45305aab6ec054100fa3888ad050c4b0ee08a2f0 |
-| patches/vllm-qwen-format-is-served-as-one-engine.patch | 097eccef3e69f3f1f1805252c4f696bf1c7e417ac579d99060cd27e7923b98df |
+| patches/vllm-forced-tool-choice-is-held-through-reasoning.patch | 54ee3ace70dd9cbbce22b24a4e862f4352f02ddb5fdd7ce165395234e4a8a704 |
+| patches/vllm-qwen-format-is-served-as-one-engine.patch | 56bc4387db6a732ee7deecf89edcc60c8e7d20f46eae88e4f1a6d0deb6020644 |
 
 The reconstructed tree's runtime-source and test changes, new files and
 deletions are counted by ./scripts/build-vllm.sh check, which derives and prints
@@ -823,7 +823,13 @@ batch route, as must `best_of`), and a Completions request carries one prompt.
 Several samples or several prompts are several lines: send one request each,
 each with its own new ID; they share any common prompt prefix by content
 (below). The batch route takes one ID per conversation, as a list in the order
-of `messages`, all distinct.
+of `messages`, all distinct. It serves no tool use and streams nothing: a batch
+request with `tools` or `stream: true` is refused, naming the parameter, and
+`/v1/chat/completions` serves either. Every other key its request does not
+declare it gives, as upstream does, to each conversation's chat request, where
+chat applies it if chat declares it. Each conversation is generated and parsed
+from that chat request, adjusted for its prompt as chat's is, by a parser of its
+own, so nothing one conversation's prompt leaves reaches another.
 
 A line of work also has at most one request in flight. The frontend refuses a
 second request under an ID whose earlier request has not finished, with HTTP 400
@@ -1014,8 +1020,9 @@ the text at the string.
 
 Beam search is unsupported. Chat, Completions, batch Chat and their render requests
 refuse `use_beam_search: true` as HTTP 400 with parameter `use_beam_search`, before
-rendering or engine dispatch, for both stream settings. Their schemas admit only
-false or omission. The served generation path applies sampling, grammar, phase
+rendering or engine dispatch, for every stream setting each serves (batch Chat,
+which streams nothing, refuses `stream: true` at the same boundary). Their
+schemas admit only false or omission. The served generation path applies sampling, grammar, phase
 budgets and output parsing together.
 
 Prompts are not claimed deterministic. Correctness tests compare structure, typed
@@ -1641,8 +1648,9 @@ its `description` reaches the model, as with chat's `response_format` on this
 template -- so its description is accepted with it, like every description
 inside the schema, and what the model should know about the format belongs in
 `instructions` or `input`. A key the Responses API does not define is accepted
-and ignored, as upstream accepts unknown keys on every route (logged at debug
-level). That is deliberate and stays: ignoring keys an API does not define is the
+and ignored, as upstream accepts unknown keys (logged at debug level; batch
+chat gives them to each conversation's chat request, above). That is deliberate
+and stays: ignoring keys an API does not define is the
 convention of the APIs these routes implement, and refusing one would break a
 caller over a key that is the caller's to remove. What Responses refuses is a
 parameter the API defines and this server does not apply (above).

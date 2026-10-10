@@ -218,7 +218,7 @@ index 0000000000000000000000000000000000000000..659087e6ebf26ae157c3ee099dd4e32f
 +    params = request.build_tok_params(SimpleNamespace(max_model_len=64))
 +    assert params.truncate_prompt_tokens is None
 diff --git a/vllm/entrypoints/openai/chat_completion/protocol.py b/vllm/entrypoints/openai/chat_completion/protocol.py
-index a4b9935ccd2020b6734ce8696a8feb37d44586d8..7b5408d5cf9e2943b25ee1eb7e846ef5753a6cc0 100644
+index 536790e5ff4652a4054c56d078d52035908e7455..8082675450772524e37fad718432718c1eb4e302 100644
 --- a/vllm/entrypoints/openai/chat_completion/protocol.py
 +++ b/vllm/entrypoints/openai/chat_completion/protocol.py
 @@ -637,8 +637,6 @@ class ChatCompletionRequest(OpenAIBaseModel):

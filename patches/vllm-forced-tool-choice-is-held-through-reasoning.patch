@@ -383,7 +383,7 @@ index 0000000000000000000000000000000000000000..ba3964fb4a4f8961c4a5ea58b6a4e144
 +    assert params.structured_outputs.enable_in_reasoning is True
 +    assert params.structured_outputs.structural_tag == tag.model_dump_json()
 diff --git a/vllm/parser/abstract_parser.py b/vllm/parser/abstract_parser.py
-index cd939c21edd2b830a9cfea778f81baad06999aea..ba379a74d1f0544d0bda6bc771188633fc8d0113 100644
+index 642ebf1a8e3c16e80c4123ce410abb848186c546..1bdb97e0e88e234627565af5064f73098cfc960f 100644
 --- a/vllm/parser/abstract_parser.py
 +++ b/vllm/parser/abstract_parser.py
 @@ -407,7 +407,10 @@ class Parser:

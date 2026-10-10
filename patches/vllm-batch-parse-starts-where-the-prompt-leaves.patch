@@ -230,19 +230,129 @@ index 226850cdf8bff5726c1502846118a4074c128345..8095ca758217b01f72e9d98bb516b570
                      finish_reason=completion.finish_reason,
                      stop_reason=completion.stop_reason,
 diff --git a/vllm/entrypoints/openai/chat_completion/batch_serving.py b/vllm/entrypoints/openai/chat_completion/batch_serving.py
-index 7b3ab8e0b68bea9d71937a8d598a2f0e06966f85..242d8b95cfd4f0a52467b737e862009804618dfd 100644
+index 7b3ab8e0b68bea9d71937a8d598a2f0e06966f85..f7f4242ad118c1fc2523bbd3d89f20589d2a041a 100644
 --- a/vllm/entrypoints/openai/chat_completion/batch_serving.py
 +++ b/vllm/entrypoints/openai/chat_completion/batch_serving.py
-@@ -272,10 +272,13 @@ class OpenAIServingChatBatch(OpenAIServingChat):
+@@ -12,6 +12,7 @@ from fastapi import Request
+ from vllm.entrypoints.chat_utils import ConversationMessage
+ from vllm.entrypoints.openai.chat_completion.protocol import (
+     BatchChatCompletionRequest,
++    ChatCompletionGenerationRequest,
+     ChatCompletionResponse,
+     ChatCompletionResponseChoice,
+     ChatMessage,
+@@ -44,12 +45,17 @@ class OpenAIServingChatBatch(OpenAIServingChat):
+     async def render_batch_chat_request(
+         self,
+         request: BatchChatCompletionRequest,
++        single_requests: list[ChatCompletionGenerationRequest],
+     ) -> tuple[list[list[ConversationMessage]], list[EngineInput]] | ErrorResponse:
+         """Validate the model and preprocess a batched chat completion request.
+ 
+         Performs engine-aware checks then delegates per-conversation
+         preprocessing to OnlineRenderer, validating the chat template
+-        once for the whole batch.
++        once for the whole batch. ``single_requests`` are the batch's
++        conversations as chat requests (``to_chat_completion_requests``); the
++        renderer adjusts each for the prompt it renders, as it adjusts a chat
++        request, and the caller generates and parses each conversation from
++        that same request.
+ 
+         Returns:
+             A tuple of (all_conversations, engine_prompts) on success — one
+@@ -82,7 +88,7 @@ class OpenAIServingChatBatch(OpenAIServingChat):
+         all_engine_prompts: list[EngineInput] = []
+ 
+         for messages, single_request in zip(
+-            request.messages, request.to_chat_completion_requests(), strict=True
++            request.messages, single_requests, strict=True
+         ):
+             if renderer.use_harmony:
+                 conversation, engine_prompts = renderer._make_request_with_harmony(
+@@ -116,20 +122,25 @@ class OpenAIServingChatBatch(OpenAIServingChat):
+         """
+         tokenizer = self.renderer.tokenizer
+         assert tokenizer is not None
++        # One chat request per conversation: the renderer adjusts each for the
++        # prompt it renders, and that conversation is generated and parsed
++        # from it, by a parser of its own built as chat builds one.
+         single_requests = request.to_chat_completion_requests()
+-
+-        parser: Parser | None = None
+-        if self.parser_cls is not None:
+-            chat_template_kwargs = self._effective_chat_template_kwargs(
+-                single_requests[0]
+-            )
+-            parser = self.parser_cls(
++        parsers: list[Parser | None] = [
++            None
++            if self.parser_cls is None
++            else self.parser_cls(
+                 tokenizer,
+-                None,  # tools
+-                chat_template_kwargs=chat_template_kwargs,
++                single_request.tools,
++                chat_template_kwargs=self._effective_chat_template_kwargs(
++                    single_request
++                ),
++                model_config=self.model_config,
+             )
++            for single_request in single_requests
++        ]
+ 
+-        render_result = await self.render_batch_chat_request(request)
++        render_result = await self.render_batch_chat_request(request, single_requests)
+         if isinstance(render_result, ErrorResponse):
+             return render_result
+         all_conversations, engine_prompts = render_result
+@@ -200,7 +211,8 @@ class OpenAIServingChatBatch(OpenAIServingChat):
+             all_conversations,
+             tokenizer,
+             request_metadata,
+-            parser,
++            single_requests,
++            parsers,
+         )
+ 
+     async def chat_completion_full_generator_batch(
+@@ -212,16 +224,19 @@ class OpenAIServingChatBatch(OpenAIServingChat):
+         all_conversations: list[list[ConversationMessage]],
+         tokenizer: TokenizerLike,
+         request_metadata: RequestResponseMetadata,
+-        parser: Parser | None = None,
++        single_requests: list[ChatCompletionGenerationRequest],
++        parsers: list[Parser | None],
+     ) -> ErrorResponse | ChatCompletionResponse:
+         """Handle batched (non-streaming) chat completions.
+ 
+         Fans out N generators (one per conversation in the batch), collects
+         the final output for each, and assembles a single
+         ``ChatCompletionResponse`` whose ``choices`` are indexed 0,...,N-1.
++        Each conversation is parsed by its own parser, from its own adjusted
++        request, so nothing one conversation's prompt leaves reaches another.
+ 
+-        Tool-use and streaming are rejected upstream by the
+-        ``check_batch_mode`` validator, so neither needs to be handled here.
++        The ``check_batch_mode`` validator refuses tool use and streaming, so
++        a conversation here neither carries tools nor streams.
+         """
+         created_time = int(time.time())
+         final_results: dict[int, RequestOutput] = {}
+@@ -271,11 +286,18 @@ class OpenAIServingChatBatch(OpenAIServingChat):
+                 else:
                      logprobs = None
  
++                parser = parsers[prompt_idx]
                  if parser is not None:
 -                    reasoning, content, _ = parser.parse(
++                    # A conversation carries no tools (check_batch_mode), so no
++                    # call is parsed from it.
 +                    reasoning, content, _ = parser.parse_output(
                          output.text,
 -                        request=request,  # type: ignore[arg-type]
-+                        request,  # type: ignore[arg-type]
++                        single_requests[prompt_idx],
 +                        prompt_token_ids=final_res.prompt_token_ids,
++                        enable_auto_tools=self.enable_auto_tools,
                          model_output_token_ids=output.token_ids,
 +                        finish_reason=output.finish_reason,
 +                        stop_reason=output.stop_reason,
@@ -302,7 +412,7 @@ index ad3c23c9352228332d2f74843e9206ddbb032ce5..18a3f2685b1b1b28f07b13e04e405e4e
                  model_output_token_ids=final_output.token_ids,
                  finish_reason=final_output.finish_reason,
 diff --git a/vllm/parser/abstract_parser.py b/vllm/parser/abstract_parser.py
-index ddacdb6155fd63620f4b4926b1d0d0f3873aac8d..cd939c21edd2b830a9cfea778f81baad06999aea 100644
+index ddacdb6155fd63620f4b4926b1d0d0f3873aac8d..642ebf1a8e3c16e80c4123ce410abb848186c546 100644
 --- a/vllm/parser/abstract_parser.py
 +++ b/vllm/parser/abstract_parser.py
 @@ -229,11 +229,19 @@ class Parser:
@@ -372,7 +482,7 @@ index ddacdb6155fd63620f4b4926b1d0d0f3873aac8d..cd939c21edd2b830a9cfea778f81baad
          finish_reason: str | None,
          stop_reason: str | int | None,
          enable_auto_tools: bool = False,
-@@ -1014,12 +1044,19 @@ class DelegatingParser(Parser):
+@@ -1014,12 +1044,25 @@ class DelegatingParser(Parser):
      ) -> tuple[str | None, str | None, list[FunctionCall] | None]:
          self._initialize_history_tool_call_cnt(request)
          self._stream_state.generated_token_count = len(model_output_token_ids)
@@ -380,9 +490,15 @@ index ddacdb6155fd63620f4b4926b1d0d0f3873aac8d..cd939c21edd2b830a9cfea778f81baad
 -            model_output, request, model_output_token_ids,
 -        )
 +        if self._reasoning_ended_in_prompt(prompt_token_ids):
-+            # Nothing generated is reasoning, exactly as when no reasoning
-+            # parser is configured: the content is every generated byte.
-+            reasoning, content = None, model_output
++            # Nothing generated is reasoning: the content is every generated
++            # byte. An answer of nothing is what this composition answers
++            # after a prompt that leaves reasoning open: None where a
++            # reasoning parser is composed, as reasoning parsers answer it,
++            # and the empty text where none is, which is the only path then.
++            reasoning = None
++            content = (
++                model_output if self._reasoning_parser is None else model_output or None
++            )
 +            content_token_ids: Sequence[int] = model_output_token_ids
 +        else:
 +            reasoning, content = self.extract_reasoning(
@@ -396,7 +512,7 @@ index ddacdb6155fd63620f4b4926b1d0d0f3873aac8d..cd939c21edd2b830a9cfea778f81baad
              output_terminal=(finish_reason, stop_reason),
          )
          return reasoning, content, tool_calls
-@@ -1039,17 +1076,7 @@ class DelegatingParser(Parser):
+@@ -1039,17 +1082,7 @@ class DelegatingParser(Parser):
  
          if not state.prompt_reasoning_checked and prompt_token_ids is not None:
              state.prompt_reasoning_checked = True
@@ -1030,3 +1146,114 @@ index 42feb3c6a5ffe638cb4455aa81bfaebd0c3a0040..9c84edb524d04527a44af6027d25e7fb
  
          prompt_tokens = (
              request.prompt_tokens if request.prompt_tokens is not None else 0
+diff --git a/tests/entrypoints/openai/test_beam_search_boundary.py b/tests/entrypoints/openai/test_beam_search_boundary.py
+index 0138988aa96bceeac14c8704b86594e16d25f0c9..e2459c18eae53857a7eedc30e4d54fb8dd41432f 100644
+--- a/tests/entrypoints/openai/test_beam_search_boundary.py
++++ b/tests/entrypoints/openai/test_beam_search_boundary.py
+@@ -46,27 +46,55 @@ def payload(request_type, **kwargs):
+     return {"model": "m", **prompt, **kwargs}
+ 
+ 
++async def _boundary_error(path, error):
++    request = SimpleNamespace(
++        scope={"type": "http", "path": path}, state=SimpleNamespace(),
++        app=SimpleNamespace(state=SimpleNamespace(args=SimpleNamespace(log_error_stack=False))),
++    )
++    response = await vllm_error_handler(request, error)
++    return response.status_code, json.loads(response.body)
++
++
++# Every stream setting a surface serves; the batch route streams nothing.
++STREAMED_SURFACES = [
++    (request_type, path, stream)
++    for request_type, path in SURFACES
++    for stream in ((False,) if request_type is BatchChatCompletionRequest else (False, True))
++]
++
++
+ @pytest.mark.asyncio
+-@pytest.mark.parametrize("request_type, path", SURFACES)
+-@pytest.mark.parametrize("stream", [False, True])
++@pytest.mark.parametrize("request_type, path, stream", STREAMED_SURFACES)
+ async def test_unsupported_beam_search_returns_the_same_boundary_error(
+     request_type, path, stream,
+ ):
+     with pytest.raises(VLLMValidationError, match="Beam search is not supported") as error:
+         request_type.model_validate(payload(request_type, use_beam_search=True, stream=stream))
+     assert error.value.parameter == "use_beam_search"
+-    request = SimpleNamespace(
+-        scope={"type": "http", "path": path}, state=SimpleNamespace(),
+-        app=SimpleNamespace(state=SimpleNamespace(args=SimpleNamespace(log_error_stack=False))),
+-    )
+-    response = await vllm_error_handler(request, error.value)
+-    body = json.loads(response.body)
+-    assert response.status_code == 400
++    status, body = await _boundary_error(path, error.value)
++    assert status == 400
+     assert body["error"]["param"] == "use_beam_search"
+     assert "Beam search is not supported" in body["error"]["message"]
+     assert "kv_scope" not in body["error"]["message"]
+ 
+ 
++@pytest.mark.asyncio
++@pytest.mark.parametrize("use_beam_search", [False, True])
++async def test_a_streamed_batch_is_refused_by_its_stream(use_beam_search):
++    """The batch route returns each conversation's whole response, so a
++    batch asking to stream is refused for that, at the same boundary,
++    whatever else it asks."""
++    with pytest.raises(VLLMValidationError, match="streams none") as error:
++        BatchChatCompletionRequest.model_validate(payload(
++            BatchChatCompletionRequest, use_beam_search=use_beam_search, stream=True))
++    assert error.value.parameter == "stream"
++    status, body = await _boundary_error("/v1/chat/completions/batch", error.value)
++    assert status == 400
++    assert body["error"]["param"] == "stream"
++    assert body["error"]["message"].startswith(
++        "The batch chat route returns each conversation's whole response")
++
++
+ @pytest.mark.parametrize("request_type, _path", SURFACES)
+ @pytest.mark.parametrize("explicit", [False, True])
+ def test_supported_sampling_does_not_require_a_decoding_flag(request_type, _path, explicit):
+diff --git a/vllm/entrypoints/openai/chat_completion/protocol.py b/vllm/entrypoints/openai/chat_completion/protocol.py
+index ae1cd615d876a4615861f42e17a1af25bd4d484c..0acbd0c2b6da11f368a7fb233d2657254cd995a7 100644
+--- a/vllm/entrypoints/openai/chat_completion/protocol.py
++++ b/vllm/entrypoints/openai/chat_completion/protocol.py
+@@ -1099,9 +1099,10 @@ class BatchChatCompletionRequest(OpenAIBaseModel):
+     Each conversation is its own line of work, so ``kv_scope`` lists one
+     distinct agent ID per conversation, in the order of ``messages``.
+ 
+-    Current limitations compared to the single-conversation endpoint:
++    Current limitations compared to the single-conversation endpoint, each
++    refused by ``check_batch_mode`` or the field's own type:
+     - Streaming is not supported (``stream`` must be False or omitted).
+-    - Tool use is not supported (``tools`` must be omitted).
++    - Tool use is not supported (``tools`` must be omitted or empty).
+     - Beam search is not supported (``use_beam_search`` must be False or omitted).
+     - The ``n`` parameter must be 1 (or omitted).
+     """
+@@ -1182,6 +1183,24 @@ class BatchChatCompletionRequest(OpenAIBaseModel):
+                 "when using `logprob_token_ids`, `logprobs` must be set to true.",
+                 parameter="logprob_token_ids",
+             )
++        # Neither is a field of this request, so each would reach every
++        # conversation's chat request as an extra key and be served there in
++        # part: tools the prompt is never given, and a stream of which only the
++        # last delta of each conversation would be returned.
++        if data.get("tools"):
++            raise VLLMValidationError(
++                "The batch chat route serves no tool use: it renders no tool "
++                "into a conversation's prompt and returns no call. Send a "
++                "conversation that may call tools to /v1/chat/completions.",
++                parameter="tools",
++            )
++        if data.get("stream"):
++            raise VLLMValidationError(
++                "The batch chat route returns each conversation's whole "
++                "response and streams none. Omit stream, or stream a "
++                "conversation from /v1/chat/completions.",
++                parameter="stream",
++            )
+         response_format = data.get("response_format")
+         if response_format is not None:
+             rf_type = (
