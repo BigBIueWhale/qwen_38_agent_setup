@@ -1,0 +1,860 @@
+diff --git a/tests/v1/structured_output/test_forced_choice_holds_through_reasoning.py b/tests/v1/structured_output/test_forced_choice_holds_through_reasoning.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..ba3964fb4a4f8961c4a5ea58b6a4e144587e7564
+--- /dev/null
++++ b/tests/v1/structured_output/test_forced_choice_holds_through_reasoning.py
+@@ -0,0 +1,378 @@
++# SPDX-License-Identifier: Apache-2.0
++# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
++"""A forced tool choice is held over the whole generation, reasoning included.
++
++A choice whose answer is nothing but calls -- "required", a named function,
++allowed_tools in mode "required" -- whose grammar starts only once reasoning has
++ended leaves the model free to end the generation inside its reasoning, and the
++request then ends "stop" with no call. Where the prompt left reasoning open, the
++Qwen format's grammar writes the reasoning as well, the request's structured-
++output parameters say so (``enable_in_reasoning``), and the engine applies the
++grammar from the first generated token: EOS, a caller's stop string and a
++``<tool_call>`` inside the reasoning cannot end it before the call.
++"""
++
++import json
++import os
++
++import pytest
++import xgrammar as xgr
++from transformers import AutoTokenizer
++from xgrammar import Grammar
++from xgrammar.testing import _is_grammar_accept_string
++
++from vllm.entrypoints.openai.chat_completion.protocol import ChatCompletionRequest
++from vllm.entrypoints.openai.responses.protocol import ResponsesRequest
++from vllm.tool_parsers.structural_tag_registry import (
++    get_model_structural_tag,
++    holds_choice_through_reasoning,
++)
++
++PARAMETERS = {
++    "type": "object",
++    "properties": {"text": {"type": "string"}},
++    "required": ["text"],
++    "additionalProperties": False,
++}
++TOOL = {"type": "function", "function": {"name": "write", "parameters": PARAMETERS}}
++FUNCTION = {"type": "function", "name": "write", "parameters": PARAMETERS}
++NAMED = {"type": "function", "function": {"name": "write"}}
++CALL = (
++    "<tool_call>\n<function=write>\n<parameter=text>\none\n</parameter>\n"
++    "</function>\n</tool_call>"
++)
++# The generation prompt the served template writes ends inside ``<think>``.
++OPEN = "<|im_start|>user\nx<|im_end|>\n<|im_start|>assistant\n<think>\n"
++
++
++def _chat(choice):
++    return ChatCompletionRequest(
++        messages=[], model="m", tools=[TOOL], tool_choice=choice
++    )
++
++
++def _responses(choice):
++    return ResponsesRequest.model_validate({
++        "model": "m", "input": "x", "tools": [FUNCTION], "tool_choice": choice,
++        "kv_scope": "unit",
++    })
++
++
++def _allowed(mode):
++    return {"type": "allowed_tools", "mode": mode,
++            "tools": [{"type": "function", "name": "write"}]}
++
++
++@pytest.mark.parametrize(
++    ("request_", "held"),
++    [
++        (_chat("required"), True),
++        (_chat(NAMED), True),
++        (_responses("required"), True),
++        (_responses({"type": "function", "name": "write"}), True),
++        (_responses(_allowed("required")), True),
++        (_responses(_allowed("auto")), False),
++        (_chat("auto"), False),
++        (_chat("none"), False),
++    ],
++)
++def test_only_a_choice_whose_answer_is_calls_is_held_through_reasoning(
++    request_, held
++):
++    assert holds_choice_through_reasoning(
++        "qwen_3_coder", request_.tool_choice, "</think>"
++    ) is held
++
++
++@pytest.mark.parametrize(
++    ("model", "reasoning_end"),
++    [
++        # The reasoning parser closes reasoning elsewhere than the format does.
++        ("qwen_3_coder", "</seed:think>"),
++        ("qwen_3_coder", None),
++        # Formats with no reasoning form: vLLM's own, and XGrammar's builtins.
++        ("hermes", "</think>"),
++        ("minimax", "</think>"),
++        ("kimi_k3", "</think>"),
++        ("qwen_3", "</think>"),
++        (None, "</think>"),
++    ],
++)
++def test_no_other_format_or_reasoning_parser_holds_it(model, reasoning_end):
++    for choice in ("required", NAMED):
++        assert not holds_choice_through_reasoning(
++            model, _chat(choice).tool_choice, reasoning_end
++        )
++
++
++@pytest.mark.parametrize("model", ["hermes", "minimax", "kimi_k3"])
++def test_a_format_without_a_reasoning_form_never_builds_one(model):
++    with pytest.raises(ValueError, match="has no reasoning form"):
++        get_model_structural_tag(model, _chat("required").tools, "required", True)
++
++
++@pytest.mark.parametrize("choice", ["required", NAMED])
++def test_the_qwen_reasoning_form_closes_reasoning_before_the_call(choice):
++    request = _chat(choice)
++    grammar = Grammar.from_structural_tag(get_model_structural_tag(
++        "qwen_3_coder", request.tools, request.tool_choice, True
++    ))
++    assert _is_grammar_accept_string(grammar, "plan</think>\n\n" + CALL)
++    assert _is_grammar_accept_string(grammar, "pl<think>an</think>\n\n" + CALL)
++    # Reasoning alone is no answer, and the call follows the blank line.
++    assert not _is_grammar_accept_string(grammar, "plan")
++    assert not _is_grammar_accept_string(grammar, "plan</think>\n\n")
++    assert not _is_grammar_accept_string(grammar, "plan</think>" + CALL)
++    # The reasoning parser ends reasoning at <tool_call>: a call opened inside
++    # the grammar's reasoning would be one no grammar held.
++    assert not _is_grammar_accept_string(grammar, "plan" + CALL)
++    assert not _is_grammar_accept_string(
++        grammar, "plan" + CALL + "</think>\n\n" + CALL
++    )
++
++
++@pytest.fixture(scope="module")
++def served():
++    path = os.environ.get("QWEN_TOKENIZER_PATH")
++    if path is None:
++        pytest.skip("Set QWEN_TOKENIZER_PATH to the pinned local tokenizer")
++    tokenizer = AutoTokenizer.from_pretrained(path, local_files_only=True)
++    with open(os.path.join(path, "generation_config.json")) as config:
++        eos = list(json.load(config)["eos_token_id"])
++    return tokenizer, eos
++
++
++def _encode(tokenizer, text):
++    return tokenizer.encode(text, add_special_tokens=False)
++
++
++def _armed(tokenizer, request, prompt, *, thinking=True):
++    from vllm.parser import ParserManager
++
++    parser_cls = ParserManager.get_parser(
++        tool_parser_name="qwen3_coder", reasoning_parser_name="qwen3",
++        enable_auto_tools=True,
++    )
++    parser = parser_cls(
++        tokenizer, request.tools, chat_template_kwargs={"enable_thinking": thinking}
++    )
++    return parser.adjust_request(request, prompt_token_ids=prompt).structured_outputs
++
++
++def _reasoning_form(structured_outputs):
++    fmt = json.loads(structured_outputs.structural_tag)["format"]
++    if fmt["type"] != "sequence":
++        return False
++    first = fmt["elements"][0]
++    return first["type"] == "tag" and first["end"] == "</think>"
++
++
++@pytest.mark.parametrize(
++    "request_",
++    [_chat("required"), _chat(NAMED), _responses(_allowed("required"))],
++    ids=["required", "named", "allowed_required"],
++)
++def test_the_parser_holds_it_only_where_the_prompt_left_reasoning_open(
++    served, request_
++):
++    tokenizer, _ = served
++    held = _armed(tokenizer, request_.model_copy(deep=True), _encode(tokenizer, OPEN))
++    assert held.enable_in_reasoning is True
++    assert _reasoning_form(held)
++    reasoning = json.loads(held.structural_tag)["format"]["elements"][0]
++    assert reasoning["begin"] == ""
++    assert reasoning["content"]["excludes"] == ["<tool_call>"]
++
++    for prompt, thinking in (
++        # A continued final message whose prompt closed reasoning.
++        (OPEN + "plan\n</think>\n\n", True),
++        # A call the prompt opened after the reasoning ends it.
++        (OPEN + "plan<tool_call>", True),
++        # A template that leaves the opener to the model, which may not reason.
++        ("<|im_start|>user\nx<|im_end|>\n<|im_start|>assistant\n", True),
++        # The model does not think.
++        (OPEN, False),
++    ):
++        armed = _armed(
++            tokenizer, request_.model_copy(deep=True),
++            _encode(tokenizer, prompt), thinking=thinking,
++        )
++        assert armed.enable_in_reasoning is False, (prompt, thinking)
++        assert not _reasoning_form(armed), (prompt, thinking)
++    # No rendered prompt: nothing says where the generation begins.
++    unrendered = _armed(tokenizer, request_.model_copy(deep=True), None)
++    assert unrendered.enable_in_reasoning is False
++    assert not _reasoning_form(unrendered)
++
++
++@pytest.mark.parametrize(
++    "request_", [_chat("auto"), _responses(_allowed("auto"))],
++    ids=["auto", "allowed_auto"],
++)
++def test_a_choice_that_asks_for_no_call_is_armed_as_before(served, request_):
++    tokenizer, _ = served
++    armed = _armed(tokenizer, request_.model_copy(deep=True), _encode(tokenizer, OPEN))
++    assert armed.enable_in_reasoning is False
++    assert not _reasoning_form(armed)
++
++
++def _engine(tokenizer, eos, structured_outputs, prompt, *, stop=None):
++    """The engine's request for *structured_outputs*, admitted as chat admits
++    it (reasoning open in the prompt), with its grammar compiled as the
++    engine compiles it, and the structured-output manager that steps it."""
++    from vllm import SamplingParams
++    from vllm.reasoning import ReasoningParserManager
++    from vllm.v1.engine import EngineCoreRequest
++    from vllm.v1.request import Request
++    from vllm.v1.structured_output import StructuredOutputManager
++    from vllm.v1.structured_output.backend_xgrammar import XgrammarBackend
++
++    params = SamplingParams(
++        stop=stop, structured_outputs=structured_outputs,
++        extra_args={"kv_scope": "unit"}, max_tokens=4096,
++    )
++    params.update_from_generation_config({"eos_token_id": eos}, eos[0])
++    params.structured_outputs._backend = "xgrammar"
++    engine_request = EngineCoreRequest(
++        request_id="unit", prompt_token_ids=prompt, mm_features=None,
++        sampling_params=params, pooling_params=None, arrival_time=0,
++        lora_request=None, cache_salt=None, data_parallel_rank=None,
++        external_req_id="unit", reasoning_ended=False,
++        reasoning_parser_kwargs={"chat_template_kwargs": {"enable_thinking": True}},
++    )
++    info = xgr.TokenizerInfo.from_huggingface(tokenizer, stop_token_ids=eos)
++    backend = XgrammarBackend.__new__(XgrammarBackend)
++    backend.compiler = xgr.GrammarCompiler(info, max_threads=1)
++    backend.vocab_size = info.vocab_size
++    backend.num_speculative_tokens = 0
++    backend.disable_any_whitespace = False
++    manager = StructuredOutputManager.__new__(StructuredOutputManager)
++    manager.backend = backend
++    manager.reasoner_cls = ReasoningParserManager.get_reasoning_parser("qwen3")
++    manager.tokenizer = tokenizer
++    manager.enable_in_reasoning = False
++    request = Request.from_engine_core_request(engine_request, block_hasher=None)
++    request.structured_output_request.grammar = manager._create_grammar(request)
++    return engine_request, request, manager
++
++
++def _walk(manager, request, ids, watched):
++    """Step *ids* as the scheduler does, one token per step: for each, whether
++    the mask was applied and which of *watched* and the token it allowed.
++    Stops at the first token the mask forbids."""
++    grammar = request.structured_output_request.grammar
++    bitmask = manager.backend.allocate_token_bitmask(1)
++    steps = []
++    for token in ids:
++        masked = manager.should_fill_bitmask(request)
++        allowed = {}
++        if masked:
++            grammar.fill_bitmask(bitmask, 0)
++            for checked in (*watched, token):
++                word = int(bitmask[0][checked // 32].item()) & 0xFFFFFFFF
++                allowed[checked] = bool(word & (1 << (checked % 32)))
++        steps.append((masked, allowed))
++        if masked and not allowed[token]:
++            break
++        request.append_output_token_ids(token)
++        if manager.should_advance(request, new_token_ids=[token]):
++            advance = manager.trim_reasoning_for_advance(request, [token])
++            assert grammar.accept_tokens(request.request_id, advance)
++    return steps
++
++
++@pytest.mark.parametrize("choice", ["required", NAMED], ids=["required", "named"])
++def test_the_engine_holds_it_from_the_first_generated_token(served, choice):
++    tokenizer, eos = served
++    prompt = _encode(tokenizer, OPEN)
++    held = _armed(tokenizer, _chat(choice), prompt)
++    think_end, tool_call = (
++        tokenizer.convert_tokens_to_ids(marker) for marker in ("</think>", "<tool_call>")
++    )
++    reasoning = _encode(tokenizer, "I read the files, so I will record it.")
++    answer = [think_end] + _encode(tokenizer, "\n\n" + CALL)
++
++    _, request, manager = _engine(tokenizer, eos, held, prompt)
++    steps = _walk(manager, request, reasoning + answer + [eos[0]],
++                  (*eos, tool_call, think_end))
++    assert len(steps) == len(reasoning) + len(answer) + 1
++    assert all(masked for masked, _ in steps)
++    assert all(allowed[token] for token, (_, allowed) in zip(
++        reasoning + answer + [eos[0]], steps))
++    # EOS is refused until the call is complete, reasoning included; the
++    # closer -- a thinking budget's forced one too -- may come at every
++    # reasoning position, and a call opener at none.
++    assert not any(allowed[e] for _, allowed in steps[:-1] for e in eos)
++    assert all(steps[i][1][think_end] for i in range(len(reasoning) + 1))
++    assert not any(steps[i][1][tool_call] for i in range(len(reasoning) + 1))
++    assert request.structured_output_request.grammar.is_terminated()
++
++    # A call opened inside the reasoning is masked at its opener.
++    _, request, manager = _engine(tokenizer, eos, held, prompt)
++    steps = _walk(manager, request, reasoning + _encode(tokenizer, CALL), eos)
++    assert len(steps) == len(reasoning) + 1
++    assert steps[-1][1][tool_call] is False
++
++    # An "auto" turn is masked only once reasoning has ended, as before.
++    unheld = _armed(tokenizer, _chat("auto"), prompt)
++    _, request, manager = _engine(tokenizer, eos, unheld, prompt)
++    steps = _walk(manager, request, reasoning + answer + [eos[0]], eos)
++    assert not any(masked for masked, _ in steps[:len(reasoning) + 1])
++    assert all(masked for masked, _ in steps[len(reasoning) + 1:])
++
++
++def test_a_caller_stop_inside_the_reasoning_waits_for_the_call(served):
++    from vllm.config import StructuredOutputsConfig
++    from vllm.tokenizers.detokenizer_utils import NativeDecodeStream
++    from vllm.v1.engine.detokenizer import check_stop_strings
++    from vllm.v1.structured_output.stop_checker import StructuralTagStopChecker
++
++    tokenizer, eos = served
++    prompt = _encode(tokenizer, OPEN)
++    text = "Next I summarise it."
++    ids = (_encode(tokenizer, text) + [tokenizer.convert_tokens_to_ids("</think>")]
++           + _encode(tokenizer, "\n\n" + CALL))
++    for choice, fires in (("required", False), ("auto", True)):
++        structured_outputs = _armed(tokenizer, _chat(choice), prompt)
++        engine_request, _, _ = _engine(
++            tokenizer, eos, structured_outputs, prompt, stop=["summarise"]
++        )
++        checker = StructuralTagStopChecker(
++            tokenizer, engine_request,
++            StructuredOutputsConfig(reasoning_parser="qwen3"),
++        )
++        decoder = NativeDecodeStream(tokenizer.backend_tokenizer)
++        output, hit = "", None
++        for token in ids:
++            piece = decoder.step(token) or ""
++            output += piece
++            checker.feed(piece, token)
++            hit = hit or check_stop_strings(
++                output, len(piece), ["summarise"], False, checker.protected_spans
++            )
++        assert (hit is not None) is fires, choice
++
++
++def test_render_carries_the_hold_to_generate():
++    from vllm import SamplingParams
++    from vllm.entrypoints.scale_out.token_in_token_out.protocol import (
++        GenerateRequest,
++        TokenGenerationRequest,
++    )
++    from vllm.sampling_params import StructuredOutputsParams
++
++    tag = get_model_structural_tag("qwen_3_coder", _chat("required").tools,
++                                   "required", True)
++    rendered = GenerateRequest(
++        token_ids=[1, 2], sampling_params=SamplingParams(
++            structured_outputs=StructuredOutputsParams(
++                structural_tag=tag.model_dump_json(), enable_in_reasoning=True),
++            extra_args={"kv_scope": "unit"},
++        ),
++    )
++    generation = TokenGenerationRequest.model_validate(
++        {**json.loads(rendered.model_dump_json()), "kv_scope": "unit"}
++    )
++    params = generation.to_sampling_params(16, {})
++    assert params.structured_outputs.enable_in_reasoning is True
++    assert params.structured_outputs.structural_tag == tag.model_dump_json()
+diff --git a/vllm/parser/abstract_parser.py b/vllm/parser/abstract_parser.py
+index cd939c21edd2b830a9cfea778f81baad06999aea..ba379a74d1f0544d0bda6bc771188633fc8d0113 100644
+--- a/vllm/parser/abstract_parser.py
++++ b/vllm/parser/abstract_parser.py
+@@ -407,7 +407,10 @@ class Parser:
+     # ========== Tool Parser Methods ==========
+ 
+     def adjust_request(
+-        self, request: ChatCompletionRequest | ResponsesRequest
++        self,
++        request: ChatCompletionRequest | ResponsesRequest,
++        *,
++        prompt_token_ids: Sequence[int] | None = None,
+     ) -> ChatCompletionRequest | ResponsesRequest:
+         """
+         Adjust the request parameters for tool calling.
+@@ -417,6 +420,10 @@ class Parser:
+ 
+         Args:
+             request: The original request.
++            prompt_token_ids: The ids of the prompt the request rendered, which
++                decide where its generation begins; None where none was
++                rendered, and then every grammar starts where the reasoning
++                parser finds the end of reasoning.
+ 
+         Returns:
+             The adjusted request.
+@@ -709,18 +716,52 @@ class DelegatingParser(Parser):
+         return tool_calls, content
+ 
+     def adjust_request(
+-        self, request: ChatCompletionRequest | ResponsesRequest
++        self,
++        request: ChatCompletionRequest | ResponsesRequest,
++        *,
++        prompt_token_ids: Sequence[int] | None = None,
+     ) -> ChatCompletionRequest | ResponsesRequest:
+         if self._reasoning_parser is not None:
+             request = self._reasoning_parser.adjust_request(request)
+         if self._tool_parser is not None:
+-            request = self._apply_structural_tag(request)
++            request = self._apply_structural_tag(request, prompt_token_ids)
+         if self._tool_parser is not None:
+             request = self._tool_parser.adjust_request(request)
+         return request
+ 
++    def _grammar_holds_reasoning(
++        self,
++        request: ChatCompletionRequest | ResponsesRequest,
++        prompt_token_ids: Sequence[int] | None,
++    ) -> bool:
++        """Whether the tool grammar armed for *request* also writes the
++        reasoning: its choice's answer is only calls, the generation that
++        continues *prompt_token_ids* begins inside reasoning the prompt
++        opened, and the tool format writes reasoning closed as the reasoning
++        parser closes it. A grammar that starts once reasoning has ended
++        leaves the model free to end such a generation inside its reasoning,
++        with no call."""
++        from vllm.tool_parsers.structural_tag_registry import (
++            holds_choice_through_reasoning,
++        )
++
++        reasoning_parser = self._reasoning_parser
++        return (
++            prompt_token_ids is not None
++            and reasoning_parser is not None
++            and self._tool_parser is not None
++            and holds_choice_through_reasoning(
++                self._tool_parser.structural_tag_model,
++                request.tool_choice,
++                reasoning_parser.reasoning_end_str,
++            )
++            and reasoning_parser.prompt_leaves_reasoning_open(prompt_token_ids)
++        )
++
+     def _apply_structural_tag(
+-        self, request: ChatCompletionRequest | ResponsesRequest
++        self,
++        request: ChatCompletionRequest | ResponsesRequest,
++        prompt_token_ids: Sequence[int] | None,
+     ) -> ChatCompletionRequest | ResponsesRequest:
+         if self._tool_parser is None or not request.tools:
+             return request
+@@ -740,9 +781,12 @@ class DelegatingParser(Parser):
+         if not need_tool_calling:
+             return request
+ 
++        # One value decides both what the grammar covers and where the engine
++        # applies it, so the two cannot disagree on any route.
++        holds_reasoning = self._grammar_holds_reasoning(request, prompt_token_ids)
+         structure_tag = self._tool_parser.get_structural_tag(
+             request,
+-            reasoning=False,
++            reasoning=holds_reasoning,
+         )
+         if structure_tag is None:
+             return request
+@@ -750,6 +794,7 @@ class DelegatingParser(Parser):
+         structural_tag = json.dumps(structure_tag.model_dump())
+         request.structured_outputs = StructuredOutputsParams(
+             structural_tag=structural_tag,
++            enable_in_reasoning=holds_reasoning,
+         )
+         if isinstance(request, ResponsesRequest):
+             request.text = None
+diff --git a/vllm/parser/engine/adapters.py b/vllm/parser/engine/adapters.py
+index bf514f70d1a727daae2ad9b06b2221a8249a84dd..60396d242ca3f3ba7a4ed2f7960b6cf2ef1d4d12 100644
+--- a/vllm/parser/engine/adapters.py
++++ b/vllm/parser/engine/adapters.py
+@@ -85,6 +85,9 @@ class ParserEngineReasoningAdapter(ReasoningParser):
+     def adjust_initial_state_from_prompt(self, prompt_token_ids: Sequence[int]) -> None:
+         self._parser_engine.adjust_initial_state_from_prompt(prompt_token_ids)
+ 
++    def prompt_leaves_reasoning_open(self, prompt_token_ids: Sequence[int]) -> bool:
++        return self._parser_engine.prompt_leaves_reasoning_open(prompt_token_ids)
++
+     def extract_content_ids(self, input_ids: list[int]) -> list[int]:
+         return self._parser_engine.extract_content_ids(input_ids)
+ 
+diff --git a/vllm/parser/engine/parser_engine.py b/vllm/parser/engine/parser_engine.py
+index 96871b30f620bd804e5936caede4378f9eb41c18..3e1ff6136d3523fdfd6e38edba5a328eaaee5f14 100644
+--- a/vllm/parser/engine/parser_engine.py
++++ b/vllm/parser/engine/parser_engine.py
+@@ -281,6 +281,13 @@ class ParserEngine(Parser):
+         """
+         return
+ 
++    def prompt_leaves_reasoning_open(self, prompt_token_ids: Sequence[int]) -> bool:
++        """See :meth:`ReasoningParser.prompt_leaves_reasoning_open`.
++
++        A grammar that knows where its prompt leaves it overrides this.
++        """
++        return False
++
+     def _start_in(
+         self, state: ParserState, *, reasoning_opened: bool = False
+     ) -> None:
+@@ -328,8 +335,14 @@ class ParserEngine(Parser):
+         self._reasoning_fed_without_ids = False
+ 
+     def adjust_request(
+-        self, request: ChatCompletionRequest | ResponsesRequest
++        self,
++        request: ChatCompletionRequest | ResponsesRequest,
++        *,
++        prompt_token_ids: Sequence[int] | None = None,
+     ) -> ChatCompletionRequest | ResponsesRequest:
++        # Keeping special tokens does not depend on where the prompt leaves
++        # the generation.
++        del prompt_token_ids
+         request.skip_special_tokens = False
+         return request
+ 
+diff --git a/vllm/parser/harmony.py b/vllm/parser/harmony.py
+index b237354c9c177e8203f2041e96b4a5b607ae6936..643ba571076c9e02d3850453b0eb7eec142ac91b 100644
+--- a/vllm/parser/harmony.py
++++ b/vllm/parser/harmony.py
+@@ -370,10 +370,13 @@ class HarmonyParser(DelegatingParser):
+         )
+ 
+     def adjust_request(
+-        self, request: ChatCompletionRequest | ResponsesRequest
++        self,
++        request: ChatCompletionRequest | ResponsesRequest,
++        *,
++        prompt_token_ids: Sequence[int] | None = None,
+     ) -> ChatCompletionRequest | ResponsesRequest:
+         request = _adjust_output_format(request)
+-        return super().adjust_request(request)
++        return super().adjust_request(request, prompt_token_ids=prompt_token_ids)
+ 
+     @staticmethod
+     def _normalize_recipient(recipient: str | None) -> str | None:
+diff --git a/vllm/parser/mistral.py b/vllm/parser/mistral.py
+index 20fe7ae058082d96f865b5401d8eda44c877209e..31799773bbce3849a9338d4bbca4af734f5b4953 100644
+--- a/vllm/parser/mistral.py
++++ b/vllm/parser/mistral.py
+@@ -339,8 +339,15 @@ class MistralParser(ParserEngine):
+         )
+ 
+     def adjust_request(
+-        self, request: ChatCompletionRequest | ResponsesRequest
++        self,
++        request: ChatCompletionRequest | ResponsesRequest,
++        *,
++        prompt_token_ids: Sequence[int] | None = None,
+     ) -> ChatCompletionRequest | ResponsesRequest:
++        # Neither arming depends on where the prompt leaves the generation:
++        # mistral-common's grammar covers the reasoning itself (its optional
++        # think rule), and the legacy path arms a call schema.
++        del prompt_token_ids
+         if not isinstance(request, ResponsesRequest) and request._grammar_from_parser:
+             return request
+ 
+diff --git a/vllm/parser/qwen3.py b/vllm/parser/qwen3.py
+index d8dd36b89e17d01eaa817f96e78294e50c0feb17..3c635d8015bb42ff662c7f6a39fc33771647ad0d 100644
+--- a/vllm/parser/qwen3.py
++++ b/vllm/parser/qwen3.py
+@@ -585,6 +585,28 @@ class Qwen3Parser(ParserEngine):
+             if token_id == end_id:
+                 return
+ 
++    def prompt_leaves_reasoning_open(self, prompt_token_ids: Sequence[int]) -> bool:
++        """The prompt's last reasoning marker is ``<think>`` -- every
++        generation prompt the served template writes ends inside it -- and
++        nothing after it ended reasoning, while the model thinks: the
++        generation is reasoning from its first token to its ``</think>``.
++
++        A prompt that closed reasoning (a continued final message), and one
++        that leaves the opener to the model, which may answer without
++        reasoning, do not.
++        """
++        prompt = list(prompt_token_ids)
++        if not self.thinking_enabled or self.is_reasoning_end(prompt):
++            return False
++        start_id = self._reasoning_start_token_id
++        end_id = self._reasoning_end_token_id
++        for token_id in reversed(prompt):
++            if token_id == start_id:
++                return True
++            if token_id == end_id:
++                return False
++        return False
++
+     def is_reasoning_end(self, input_ids: list[int]) -> bool:
+         if super().is_reasoning_end(input_ids):
+             return True
+diff --git a/vllm/reasoning/abs_reasoning_parsers.py b/vllm/reasoning/abs_reasoning_parsers.py
+index 389a4613f6a5fc2d2b9e31d2699fa0ef3dac906a..40875df6cec853c58637fd72a2e3f4ee9db0214b 100644
+--- a/vllm/reasoning/abs_reasoning_parsers.py
++++ b/vllm/reasoning/abs_reasoning_parsers.py
+@@ -207,6 +207,17 @@ class ReasoningParser:
+         """
+         return
+ 
++    def prompt_leaves_reasoning_open(self, prompt_token_ids: Sequence[int]) -> bool:
++        """Whether *prompt_token_ids* opened reasoning and left it open, so a
++        generation continuing it is reasoning from its first token until this
++        parser's reasoning end.
++
++        A tool-call grammar that writes the reasoning as well is armed only
++        where this holds. The default is False: a parser that does not say
++        so has every grammar start where it finds the end of reasoning.
++        """
++        return False
++
+     def prepare_structured_tag(
+         self,
+         original_tag: str | None,
+diff --git a/vllm/renderers/online_renderer.py b/vllm/renderers/online_renderer.py
+index a8f480965423741617dace87eba9a25f3137c12e..bb6810229e955147251a1694ac14edb5640de24b 100644
+--- a/vllm/renderers/online_renderer.py
++++ b/vllm/renderers/online_renderer.py
+@@ -41,6 +41,7 @@ from vllm.logger import init_logger
+ from vllm.parser import Parser, ParserManager
+ from vllm.renderers import BaseRenderer, ChatParams, merge_kwargs
+ from vllm.renderers.inputs.preprocess import (
++    extract_prompt_components,
+     parse_model_prompt,
+     prompt_to_seq,
+ )
+@@ -447,6 +448,11 @@ class OnlineRenderer:
+                     chat_template_kwargs=chat_params.chat_template_kwargs,
+                 ).adjust_request(
+                     request=request,
++                    # The grammar is armed for the prompt rendered above: where
++                    # it leaves the generation decides what the grammar covers.
++                    prompt_token_ids=extract_prompt_components(
++                        self.model_config, engine_input
++                    ).token_ids,
+                 )
+ 
+         return conversation, [engine_input]
+diff --git a/vllm/sampling_params.py b/vllm/sampling_params.py
+index ce6d6d5cf50cc8f9ad01b6cdaeb48a7a0a7ef33e..975457a06785d634d128d57c534c2ba5e965c1c5 100644
+--- a/vllm/sampling_params.py
++++ b/vllm/sampling_params.py
+@@ -190,6 +190,13 @@ class StructuredOutputsParams:
+     disable_additional_properties: bool = False
+     whitespace_pattern: str | None = None
+     structural_tag: str | None = None
++    enable_in_reasoning: bool = False
++    """Hold the constraint while the model reasons as well: the engine applies
++    it from the first generated token, whatever the prompt left, as
++    ``StructuredOutputsConfig.enable_in_reasoning`` does for every request. A
++    tool-call grammar that writes the reasoning itself sets it, so the two
++    travel together on every route that carries these parameters, /render and
++    /generate among them."""
+ 
+     _backend: str | None = field(default=None, init=False)
+     """CAUTION: Should only be set by Processor._validate_structured_output"""
+diff --git a/vllm/tool_parsers/structural_tag_registry.py b/vllm/tool_parsers/structural_tag_registry.py
+index 91fb5c71a501778c36a5d4ac26681e8171c9e23a..04c50aff9ec862da295a3af694f974959f6bb837 100644
+--- a/vllm/tool_parsers/structural_tag_registry.py
++++ b/vllm/tool_parsers/structural_tag_registry.py
+@@ -79,18 +79,55 @@ XGRAMMAR_BUILTIN_STRUCTURAL_TAG_MODELS = frozenset(
+ # ``structural_tag_model``. Registration is the only list of them: a second,
+ # hand-kept set of the same names is what fell behind the builders twice.
+ _VLLM_STRUCTURAL_TAG_REGISTRY: dict[str, StructuralTagBuilder] = {}
++# The closer each format whose builder can also write the reasoning writes at
++# its end, filled by the same registration.
++_VLLM_REASONING_CLOSERS: dict[str, str] = {}
+ 
+ 
+-def register_vllm_structural_tag(model: str):
+-    """Register a vLLM-owned structural tag builder."""
++def register_vllm_structural_tag(model: str, *, reasoning_end: str | None = None):
++    """Register a vLLM-owned structural tag builder. *reasoning_end* is the
++    closer the builder writes when asked to write the reasoning as well; a
++    builder registered without one has no reasoning form and is never asked
++    for it."""
+ 
+     def decorator(func: StructuralTagBuilder) -> StructuralTagBuilder:
+         _VLLM_STRUCTURAL_TAG_REGISTRY[model] = func
++        if reasoning_end is not None:
++            _VLLM_REASONING_CLOSERS[model] = reasoning_end
+         return func
+ 
+     return decorator
+ 
+ 
++def holds_choice_through_reasoning(
++    model: str | None, tool_choice: ToolChoice, reasoning_end: str | None
++) -> bool:
++    """Whether the grammar *model*'s format arms for *tool_choice* also writes
++    the reasoning of a generation that begins inside it, which the reasoning
++    parser closes with *reasoning_end*.
++
++    A choice whose answer is nothing but calls -- "required", a named
++    function, allowed_tools in mode "required" -- is held over the whole
++    generation: a grammar that starts only once reasoning has ended leaves
++    the model free to end the generation inside its reasoning, with no call.
++    Only a format vLLM builds with a reasoning form writes it, and only where
++    the reasoning parser closes reasoning as the format does. "auto" and
++    "none" ask for no call; under them, and in every other format, the
++    grammar starts where the reasoning parser finds the end of reasoning.
++    """
++    if (
++        model is None
++        or reasoning_end is None
++        or _VLLM_REASONING_CLOSERS.get(model) != reasoning_end
++    ):
++        return False
++    if isinstance(tool_choice, ToolChoiceAllowed):
++        return tool_choice.mode == "required"
++    return tool_choice == "required" or isinstance(
++        tool_choice, ChatCompletionNamedToolChoiceParam | ToolChoiceFunction
++    )
++
++
+ def _any_tool_strict(
+     tools: Sequence[ChatCompletionToolsParam | ResponsesTool],
+ ) -> bool:
+@@ -317,6 +354,16 @@ def get_model_structural_tag(
+     dumped_tool_choice = _dump_tool_choice_for_xgrammar(tool_choice)
+ 
+     if model in _VLLM_STRUCTURAL_TAG_REGISTRY:
++        if reasoning and model not in _VLLM_REASONING_CLOSERS:
++            # Deliberately not a typed request refusal: only
++            # holds_choice_through_reasoning asks a format to write the
++            # reasoning, and only one registered with a reasoning form, so
++            # this is a caller inside the server asking a builder for a
++            # grammar it would silently not build.
++            raise ValueError(
++                f"The {model!r} tool-call format has no reasoning form: its "
++                "grammar cannot write the reasoning."
++            )
+         function_tools, builtin_tools, simplified_tool_choice = normalize_tool_choice(
+             dumped_tools,
+             dumped_tool_choice,
+@@ -866,12 +913,17 @@ def get_kimi_k3_structural_tag(
+ # Every other production this builder has reproduces XGrammar's Qwen language
+ # exactly, including its ``[ \n\t]*`` padding around every value, its ordered
+ # required chain, and its treatment of enums, constants and references, with
+-# two deliberate differences. It has no constrained-string regex;
+-# ``_QWEN_REFUSED_STRING_KEYS`` refuses that declaration instead. And a forced
+-# or required call may follow the blank line the template writes after
+-# ``</think>``: XGrammar writes that line only inside the reasoning prefix of a
+-# grammar that contains the reasoning, which vLLM never builds, since the
+-# reasoning parser starts the grammar after the reasoning has ended.
++# three deliberate differences. It has no constrained-string regex;
++# ``_QWEN_REFUSED_STRING_KEYS`` refuses that declaration instead. A forced or
++# required call whose grammar starts where the reasoning parser found the end
++# of reasoning may follow the blank line the template writes after
++# ``</think>``, which XGrammar writes only inside the reasoning prefix of a
++# grammar that contains the reasoning. And that prefix, this builder's
++# reasoning form -- armed where a forced or required choice is held through
++# the reasoning (``holds_choice_through_reasoning``) -- is any text but
++# ``<tool_call>``, where XGrammar's is any text: the reasoning parser ends
++# reasoning at that token, so a call opened inside the grammar's reasoning
++# would be parsed as a call no grammar held.
+ #
+ # The language is defined once, as ``_QwenArguments``: which production each
+ # parameter's value is written in and where undeclared names may appear. The
+@@ -884,6 +936,7 @@ _QWEN_CALL_BEGIN_PREFIX = "<tool_call>\n<function="
+ _QWEN_CALL_BEGIN_SUFFIX = ">\n"
+ _QWEN_CALL_END = "\n</function>\n</tool_call>"
+ _QWEN_CALL_TRIGGER = "<tool_call>\n<function="
++_QWEN_CALL_OPENER = "<tool_call>"
+ _QWEN_THINK_END = "</think>"
+ _QWEN_THINK_SUFFIX = "\n\n"
+ _QWEN_THINK_EXCLUDE_TOKENS = ["<think>", "</think>"]
+@@ -1370,7 +1423,7 @@ def _qwen_tool_tags(tools: list[FunctionToolParam]) -> list[TagFormat]:
+     ]
+ 
+ 
+-@register_vllm_structural_tag("qwen_3_coder")
++@register_vllm_structural_tag("qwen_3_coder", reasoning_end=_QWEN_THINK_END)
+ def get_qwen_3_coder_structural_tag(
+     tools: list[FunctionToolParam],
+     builtin_tools: list[BuiltinToolParam],
+@@ -1429,9 +1482,19 @@ def get_qwen_3_coder_structural_tag(
+     # call, which is the shape the model is trained to produce.
+     separator = ConstStringFormat(value=_QWEN_THINK_SUFFIX)
+     if reasoning:
+-        # The grammar writes the reasoning and its closer itself.
++        # The grammar writes the reasoning and its closer itself, from the
++        # first token generated after a prompt that left reasoning open, so
++        # the generation cannot end inside it. The reasoning is any text but
++        # ``<tool_call>``: the reasoning parser ends reasoning at that token,
++        # and a call opened inside the grammar's reasoning would be one no
++        # grammar held. The answer follows ``</think>`` and the blank line,
++        # the shape the template renders.
+         return StructuralTag(format=SequenceFormat(elements=[
+-            TagFormat(begin="", content=AnyTextFormat(), end=_QWEN_THINK_END),
++            TagFormat(
++                begin="",
++                content=AnyTextFormat(excludes=[_QWEN_CALL_OPENER]),
++                end=_QWEN_THINK_END,
++            ),
+             separator,
+             answer,
+         ]))
+diff --git a/vllm/v1/request.py b/vllm/v1/request.py
+index d190d2d5b04fdb31b2345aba362ad74f51f4616b..96e59bcf8197e2b055698ab6f22cf0fbac4a8aa8 100644
+--- a/vllm/v1/request.py
++++ b/vllm/v1/request.py
+@@ -89,7 +89,15 @@ class Request:
+             sampling_params
+         )
+         if self.structured_output_request is not None:
+-            self.structured_output_request.reasoning_ended = reasoning_ended
++            # A constraint held in reasoning as well applies from the first
++            # generated token, exactly as one does once reasoning has ended,
++            # whatever the prompt left: every structured-output decision
++            # reads it here.
++            self.structured_output_request.reasoning_ended = (
++                True
++                if self.structured_output_request.params.enable_in_reasoning
++                else reasoning_ended
++            )
+             self.structured_output_request.reasoning_parser_kwargs = (
+                 reasoning_parser_kwargs
+             )
+diff --git a/vllm/v1/structured_output/stop_checker.py b/vllm/v1/structured_output/stop_checker.py
+index e820079aa7a86c5a9c27dc9a399cf6ea9173f06c..b307d175aaae1a67f60f710ee5134f5fca7b36a8 100644
+--- a/vllm/v1/structured_output/stop_checker.py
++++ b/vllm/v1/structured_output/stop_checker.py
+@@ -45,7 +45,16 @@ class StructuralTagStopChecker:
+         self.reasoner = None
+         self.reasoning_ended = request.reasoning_ended
+         self.reasoning_ids = list(request.prompt_token_ids or ())
+-        if config and config.reasoning_parser and not config.enable_in_reasoning:
++        # A constraint held in reasoning as well -- by the server's
++        # configuration or by the request's own parameters -- is matched from
++        # the first generated character, as the engine applies it from the
++        # first token.
++        if (
++            config
++            and config.reasoning_parser
++            and not config.enable_in_reasoning
++            and not params.structured_outputs.enable_in_reasoning
++        ):
+             cls = ReasoningParserManager.get_reasoning_parser(config.reasoning_parser)
+             self.reasoner = cls(
+                 tokenizer=tokenizer, **(request.reasoning_parser_kwargs or {})

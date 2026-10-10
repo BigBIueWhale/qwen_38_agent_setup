@@ -13,6 +13,7 @@ the unit fails at import, naming what it lacks.
 """
 
 import asyncio
+import functools
 import json
 import os
 import unittest
@@ -473,6 +474,139 @@ def _responses_events(text, chunk_size, finish="stop"):
         )]
 
     return asyncio_run(collect())
+
+
+def _chat_admission(served, **fields):
+    """What the chat route *served* (``_served_chat()``) hands the engine for
+    one request carrying *fields*: the prompt ids it rendered, its sampling
+    parameters and the admission arguments."""
+    from vllm.entrypoints.openai.chat_completion.protocol import (
+        ChatCompletionGenerationRequest,
+    )
+
+    serving, engine = served
+    engine.admit.reset_mock()
+    request = ChatCompletionGenerationRequest(
+        model="unit", kv_scope="unit", max_tokens=64, **fields)
+    try:
+        asyncio_run(serving.create_chat_completion(request))
+    except Exception:
+        pass  # the mocked engine generates nothing; admission has happened
+    if engine.admit.call_args is None:
+        raise AssertionError("the chat route admitted nothing")
+    engine_input, params = engine.admit.call_args.args[:2]
+    return (list(engine_input["prompt_token_ids"]), params,
+            dict(engine.admit.call_args.kwargs))
+
+
+def _responses_admission(served, **fields):
+    """What the Responses route of the server whose chat route is *served*
+    hands the engine for one request."""
+    from vllm.entrypoints.openai.responses.protocol import ResponsesRequest
+
+    responses, engine = _served_responses(
+        served[0].online_renderer, tool_parser=_served("SERVED_TOOL_CALL_PARSER"),
+        enable_auto_tools=True)
+    engine.admit = AsyncMock(side_effect=RuntimeError("admitted"))
+    request = ResponsesRequest.model_validate(
+        {"model": "unit", "input": "test", "kv_scope": "unit", **fields})
+    try:
+        asyncio_run(responses.create_responses(request))
+    except Exception:
+        pass
+    if engine.admit.call_args is None:
+        raise AssertionError("the Responses route admitted nothing")
+    engine_input, params = engine.admit.call_args.args[:2]
+    return (list(engine_input["prompt_token_ids"]), params,
+            dict(engine.admit.call_args.kwargs))
+
+
+def _render_admission(served, **fields):
+    """What /generate hands the engine for the request /render, of the server
+    whose chat route is *served*, renders: the rendered request's JSON is all
+    that crosses between the two."""
+    from vllm.entrypoints.scale_out.render.serving import ServingRender
+    from vllm.entrypoints.scale_out.token_in_token_out.protocol import (
+        TokenGenerationRequest,
+    )
+
+    chat, _ = served
+    rendered = asyncio_run(ServingRender(chat.models, chat.online_renderer)
+                           .render_chat_request(ChatCompletionRequest(
+                               model="unit", **fields)))
+    generation = TokenGenerationRequest.model_validate(
+        {**json.loads(rendered.model_dump_json()), "kv_scope": "unit"})
+    return generation.token_ids, generation.to_sampling_params(64, {}), {}
+
+
+@functools.cache
+def _engine_grammar_compiler():
+    """The grammar compiler the engine builds: the served vocabulary at the
+    model's vocabulary size."""
+    import xgrammar as xgr
+
+    with open(os.path.join(SERVED_MODEL, "config.json")) as config:
+        vocab_size = json.load(config)["text_config"]["vocab_size"]
+    info = xgr.TokenizerInfo.from_huggingface(TOKENIZER, vocab_size=vocab_size)
+    return xgr.GrammarCompiler(info, max_threads=1), info.vocab_size
+
+
+def engine_walk(prompt, params, admitted, ids):
+    """The engine's structured-output decisions over *ids* for a request
+    admitted with *prompt*, *params* and the admission arguments *admitted*,
+    stepped as the scheduler steps them, one generated token per step, under
+    the launch's structured-output configuration (no grammar is held in
+    reasoning server-wide). For each token: whether the grammar's mask
+    applied, and whether it allowed a model EOS, ``<tool_call>`` and the
+    token. Stops at the first token the mask forbids."""
+    from vllm.reasoning import ReasoningParserManager
+    from vllm.v1.engine import EngineCoreRequest
+    from vllm.v1.request import Request
+    from vllm.v1.structured_output import StructuredOutputManager
+    from vllm.v1.structured_output.backend_xgrammar import XgrammarBackend
+
+    params = params.clone()
+    params.update_from_generation_config(
+        {"eos_token_id": list(MODEL_EOS)}, MODEL_EOS[0])
+    engine_request = EngineCoreRequest(
+        request_id="unit", prompt_token_ids=list(prompt), mm_features=None,
+        sampling_params=params, pooling_params=None, arrival_time=0,
+        lora_request=None, cache_salt=None, data_parallel_rank=None,
+        external_req_id="unit", reasoning_ended=admitted.get("reasoning_ended"),
+        reasoning_parser_kwargs=admitted.get("reasoning_parser_kwargs"),
+    )
+    backend = XgrammarBackend.__new__(XgrammarBackend)
+    backend.compiler, backend.vocab_size = _engine_grammar_compiler()
+    backend.num_speculative_tokens = 0
+    backend.disable_any_whitespace = False
+    manager = StructuredOutputManager.__new__(StructuredOutputManager)
+    manager.backend = backend
+    manager.reasoner_cls = ReasoningParserManager.get_reasoning_parser(
+        _served("SERVED_REASONING_PARSER"))
+    manager.tokenizer = TOKENIZER
+    manager.enable_in_reasoning = False
+    request = Request.from_engine_core_request(engine_request, block_hasher=None)
+    grammar = manager._create_grammar(request)
+    request.structured_output_request.grammar = grammar
+    bitmask = backend.allocate_token_bitmask(1)
+    steps = []
+    for token in ids:
+        masked = manager.should_fill_bitmask(request)
+        allowed = {}
+        if masked:
+            grammar.fill_bitmask(bitmask, 0)
+            for checked in (*MODEL_EOS, MARKERS["<tool_call>"], token):
+                word = int(bitmask[0][checked // 32].item()) & 0xFFFFFFFF
+                allowed[checked] = bool(word & (1 << (checked % 32)))
+        steps.append((masked, allowed))
+        if masked and not allowed[token]:
+            break
+        request.append_output_token_ids(token)
+        if manager.should_advance(request, new_token_ids=[token]):
+            advanced = manager.trim_reasoning_for_advance(request, [token])
+            if not grammar.accept_tokens(request.request_id, advanced):
+                raise AssertionError(f"the grammar rejected {advanced}")
+    return steps, grammar
 
 
 def _item_text(item):
@@ -1217,6 +1351,88 @@ class ToolOutputParserTest(unittest.TestCase):
                         parse("plan</think>\n\n" + call("one"), chunk, choice=choice)[:3],
                         ("plan", "\n\n", [("write", '{"text": "one"}')]),
                     )
+    def test_a_forced_choice_is_held_through_reasoning_on_every_route(self):
+        """A choice whose answer is nothing but calls -- "required", a named
+        function, allowed_tools in mode "required" -- is held over the whole
+        generation, reasoning included. Chat, Responses and /render, whose
+        rendered request is all /generate admits, arm for the prompt they
+        render a grammar that writes the reasoning, and the engine applies it
+        from the first generated token: a model EOS is masked until the call
+        is complete, so the generation cannot end inside its reasoning with
+        no call, and a ``<tool_call>`` inside the reasoning is masked at its
+        opener. "auto" and allowed_tools in mode "auto", which ask for no
+        call, and a prompt that closed reasoning arm the grammar that starts
+        once reasoning has ended."""
+        reasoning = encode("I read the files, so I record what I found.")
+        answer = [MARKERS["</think>"]] + encode("\n\n" + call("one"))
+        chat = {"messages": [{"role": "user", "content": "test"}], "tools": [TOOL]}
+        responses = {"tools": [FUNCTION]}
+        named = {"type": "function", "function": {"name": "write"}}
+
+        def allowed_tools(mode):
+            return {"type": "allowed_tools", "mode": mode,
+                    "tools": [{"type": "function", "name": "write"}]}
+
+        held = (
+            (_chat_admission, chat, "required"),
+            (_chat_admission, chat, named),
+            (_render_admission, chat, "required"),
+            (_render_admission, chat, named),
+            (_responses_admission, responses, "required"),
+            (_responses_admission, responses, {"type": "function", "name": "write"}),
+            (_responses_admission, responses, allowed_tools("required")),
+        )
+        served = _served_chat()
+        for admission, fields, choice in held:
+            with self.subTest(route=admission.__name__, choice=choice):
+                prompt, params, admitted = admission(
+                    served, **fields, tool_choice=choice)
+                self.assertTrue(TOKENIZER.decode(prompt).endswith("<think>\n"))
+                ids = reasoning + answer + [MODEL_EOS[0]]
+                steps, grammar = engine_walk(prompt, params, admitted, ids)
+                self.assertEqual(len(steps), len(ids))
+                self.assertTrue(
+                    all(masked for masked, _ in steps),
+                    "the grammar is not applied while the model reasons, so a "
+                    "model EOS there ends the forced choice with no call")
+                self.assertTrue(all(allowed[token]
+                                    for token, (_, allowed) in zip(ids, steps)))
+                self.assertFalse(any(allowed[eos] for _, allowed in steps[:-1]
+                                     for eos in MODEL_EOS))
+                self.assertTrue(grammar.is_terminated())
+                steps, _ = engine_walk(prompt, params, admitted,
+                                       reasoning + encode(call("one")))
+                self.assertEqual(len(steps), len(reasoning) + 1)
+                self.assertFalse(any(steps[i][1][MARKERS["<tool_call>"]]
+                                     for i in range(len(reasoning) + 1)))
+        unheld = (
+            (_chat_admission, chat, "auto"),
+            (_responses_admission, responses, allowed_tools("auto")),
+        )
+        for admission, fields, choice in unheld:
+            with self.subTest(route=admission.__name__, choice=choice):
+                prompt, params, admitted = admission(
+                    served, **fields, tool_choice=choice)
+                steps, _ = engine_walk(prompt, params, admitted,
+                                       reasoning + answer + [MODEL_EOS[0]])
+                self.assertFalse(any(masked for masked, _ in
+                                     steps[:len(reasoning) + 1]))
+                self.assertTrue(all(masked for masked, _ in
+                                    steps[len(reasoning) + 1:]))
+        # A continued final message closed reasoning: the forced call is the
+        # whole generation, masked from its first token, as it was.
+        prompt, params, admitted = _chat_admission(
+            served, messages=[{"role": "user", "content": "test"},
+                      {"role": "assistant", "content": "The ans"}],
+            continue_final_message=True, add_generation_prompt=False,
+            tool_choice="required", tools=[TOOL])
+        self.assertTrue(TOKENIZER.decode(prompt).endswith("</think>\n\nThe ans"))
+        ids = encode(call("one")) + [MODEL_EOS[0]]
+        steps, grammar = engine_walk(prompt, params, admitted, ids)
+        self.assertEqual(len(steps), len(ids))
+        self.assertTrue(all(masked and allowed[token]
+                            for token, (masked, allowed) in zip(ids, steps)))
+        self.assertTrue(grammar.is_terminated())
 
     def test_a_responses_choice_enforces_exactly_the_offered_functions(self):
         """Responses offers a namespace's function under its flat name. The

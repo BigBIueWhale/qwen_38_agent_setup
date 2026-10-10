@@ -430,6 +430,7 @@ It is intentionally reconstructed by the ordered, reviewed semantic transformati
 | patches/vllm-responses-refuses-what-it-cannot-honour.patch | 35fcb2a68faa1a6fb99a83b6d7726ffc45f1b6e84cbb2ed7d9fe152575bf10f3 |
 | patches/vllm-reviewed-tests-declare-what-they-need.patch | 7954646a17b9cdedaeab47bc57581924fbf2049b36a61261240bd63f3f7851b9 |
 | patches/vllm-priority-is-refused-where-nothing-orders-by-it.patch | 96346e5bf71726008f4449389d91a18531fd57fe63f930b2400e059ab168571a |
+| patches/vllm-forced-tool-choice-is-held-through-reasoning.patch | 1fe814cd8618d2d0ecd414f7c4e6e341b89f9ef016c1f727fd87d44a01a98e96 |
 
 The reconstructed tree's runtime-source and test changes, new files and
 deletions are counted by ./scripts/build-vllm.sh check, which derives and prints
@@ -488,7 +489,7 @@ Pinned build inputs and products:
 | Immutable base tag | qwen38-vllm:main-9df9b0b |
 | Immutable base ID | sha256:fa4a002a88b7043a1a89966dea8a500fe9696f84e75730d9da916f916048d401 |
 | Runtime Dockerfile SHA-256 | ebf001f705dd37cac3f60665e661ccf2385fbf15325cd998e3e600860494f44f |
-| Build verifier SHA-256 | 3d3427a638fae536a4b4170fd558b4d991abc3cc41786bfbe8e9e0f0df58661d |
+| Build verifier SHA-256 | 6e8ae5db9093dda4686ce9f222f5c4805c8bd6e642d0321382875a6f82709efe |
 | Runtime validator SHA-256 | e4ea7693d3f30e00de4a6b5733a0fb490c6f9deee927d42580083c9c851a04f8 |
 
 The runtime image's profile, tag and archive name, which every release advances
@@ -1483,12 +1484,38 @@ A tool choice that is not specified -- omitted or `null` -- is `auto` when tools
 are declared and `none` otherwise. The chat request and the Anthropic conversion
 decide it once, so one value decides both whether the call grammar is armed and
 whether calls are parsed; `none` is the only choice under which a call-shaped
-span is text. A forced (named) or `required` choice may begin with the blank line
-the template writes after `</think>`, so the call-only answer the model is
-trained on -- `</think>`, a blank line, `<tool_call>` -- is generable; nothing
-else may precede the call. XGrammar writes that line only inside a grammar that
-also covers the reasoning, which vLLM never builds, since the reasoning parser
-starts the grammar once reasoning has ended.
+span is text.
+
+A choice whose answer is nothing but calls -- `required`, a named function, or
+`allowed_tools` in mode `required` -- is held over the whole generation, its
+reasoning included, wherever the prompt leaves reasoning open while the model
+thinks, as every generation prompt the served template writes does. The grammar
+then writes the reasoning too -- any text but `<tool_call>`, closed by
+`</think>` -- then the blank line the template writes after `</think>`, then the
+call: the call-only answer the model is trained on. The engine applies it from
+the first generated token, so a model EOS is masked until the call is complete
+and the generation cannot end inside its reasoning with no call; a length stop
+remains possible. Chat, Responses, Anthropic and `/render` arm it for the prompt
+they render, and the request's `structured_outputs.enable_in_reasoning` carries
+it to the engine and the stop checker on every route, `/generate` included. A
+caller may set that field on a constraint of its own, which is then applied in
+reasoning as well, as `--structured-outputs-config` `enable_in_reasoning` applies
+every constraint. XGrammar reads text: a `</think>` the model spells in ordinary
+tokens also ends the reasoning the grammar holds, so the blank line and the call
+must follow it, while the parser, which ends reasoning only at the token, keeps
+that text as reasoning; and the reasoning cannot contain the text `<tool_call>`,
+at which the parser would end it with a call no grammar held. Only a format vLLM
+builds with a reasoning form, for a reasoning parser that closes reasoning as the
+format does, holds it: the Qwen XML format (`qwen3_coder`) with the Qwen3
+reasoning language (`qwen3`, `mimo`, `nemotron_v3`). Everywhere else -- a prompt
+that closed reasoning, such as a continued final message; a prompt that leaves
+the opener to the model, which may not reason; a model that does not think;
+`auto` and `allowed_tools` in mode `auto`, which ask for no call; and every other
+format and reasoning parser -- the grammar starts where the reasoning parser
+finds the end of reasoning. A forced or `required` choice there may begin with
+the blank line the template writes after `</think>`, so the same trained answer
+is generable, and nothing else may precede the call: XGrammar writes that line
+only inside a grammar that also covers the reasoning.
 
 On Responses, a namespace's functions are offered to the model under flat names
 (`namespace__name`), and the prompt, the call grammar and the parser read that
@@ -1556,9 +1583,13 @@ constraint, and a forced call of a function whose parameters are the schema
 returns structured data through the grammar.
 
 Qwen's natural `</think>` token or implicit `<tool_call>` token ends thinking
-once per generation. The deployed V1 thinking-budget tracker and grammar
-use that parser-derived boundary. Later marker text in a response or a tool
-value cannot restart the budget or inject a forced closer into the call.
+once per generation. The deployed V1 thinking-budget tracker uses that
+parser-derived boundary, and so does every grammar that starts once reasoning
+has ended; a grammar that holds a forced choice through the reasoning writes the
+`</think>` itself, admits it at every reasoning position, a budget's forced
+closer included, and admits no `<tool_call>` before it. Later marker text in a
+response or a tool value cannot restart the budget or inject a forced closer
+into the call.
 The implicit trigger itself belongs to grammar content. The existing final
 response counter still starts only at the explicit reasoning closer.
 
@@ -1571,9 +1602,10 @@ that decision, while preceding content and reasoning continue to stream.
 
 Caller stop strings and stop-token IDs apply to text outside armed calls.
 The native structural grammar suspends them inside a call, including literal
-wrapper text in parameter values. A stop overlapping the closing wrapper
-cannot remove part of the call. Stop tokens remain available as literal
-argument content; only model EOS tokens serve as grammar terminators.
+wrapper text in parameter values, and in the reasoning a forced choice holds,
+where a stop would end the generation before its call. A stop overlapping the
+closing wrapper cannot remove part of the call. Stop tokens remain available as
+literal argument content; only model EOS tokens serve as grammar terminators.
 Unknown emitted names and their whitespace remain exact for client error
 feedback. The parser does not silently delete or rename them.
 

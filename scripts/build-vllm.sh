@@ -189,6 +189,7 @@ CHAT_MESSAGES_ONE_RULE_PATCH_FILE="${PROJECT_DIR}/patches/vllm-chat-messages-rea
 RESPONSES_REFUSES_UNHONOURED_PATCH_FILE="${PROJECT_DIR}/patches/vllm-responses-refuses-what-it-cannot-honour.patch"
 REVIEWED_TESTS_DECLARE_NEEDS_PATCH_FILE="${PROJECT_DIR}/patches/vllm-reviewed-tests-declare-what-they-need.patch"
 PRIORITY_REFUSED_PATCH_FILE="${PROJECT_DIR}/patches/vllm-priority-is-refused-where-nothing-orders-by-it.patch"
+FORCED_CHOICE_THROUGH_REASONING_PATCH_FILE="${PROJECT_DIR}/patches/vllm-forced-tool-choice-is-held-through-reasoning.patch"
 
 if [[ ! -f "${DEPLOYMENT_INPUT_MANIFEST}" || -L "${DEPLOYMENT_INPUT_MANIFEST}" ]]; then
   echo "Deployment-input manifest is missing or is not a regular non-symlink file." >&2
@@ -344,7 +345,8 @@ printf '%s  %s\n' \
   "${CHAT_MESSAGES_ONE_RULE_PATCH_DIFF_SHA256}" "${CHAT_MESSAGES_ONE_RULE_PATCH_FILE}" \
   "${RESPONSES_REFUSES_UNHONOURED_PATCH_DIFF_SHA256}" "${RESPONSES_REFUSES_UNHONOURED_PATCH_FILE}" \
   "${REVIEWED_TESTS_DECLARE_NEEDS_PATCH_DIFF_SHA256}" "${REVIEWED_TESTS_DECLARE_NEEDS_PATCH_FILE}" \
-  "${PRIORITY_REFUSED_PATCH_DIFF_SHA256}" "${PRIORITY_REFUSED_PATCH_FILE}" | \
+  "${PRIORITY_REFUSED_PATCH_DIFF_SHA256}" "${PRIORITY_REFUSED_PATCH_FILE}" \
+  "${FORCED_CHOICE_THROUGH_REASONING_PATCH_DIFF_SHA256}" "${FORCED_CHOICE_THROUGH_REASONING_PATCH_FILE}" | \
   sha256sum --check --strict
 
 printf '%s  %s\n' \

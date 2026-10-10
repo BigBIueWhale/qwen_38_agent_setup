@@ -2938,7 +2938,7 @@ def _validate_qwen_grammar_after(state: State) -> None:
         require_text(state, registry, text, label=label)
     require_text(state, registry, 'reference.startswith("#/")', count=2,
                  label=label)
-    require_text(state, registry, '@register_vllm_structural_tag("qwen_3_coder")',
+    require_text(state, registry, '@register_vllm_structural_tag("qwen_3_coder"',
                  label=label)
     require_text(state, registry, '_QWEN_PARAM_OPEN = "<parameter="', label=label)
     require_text(state, registry, '_QWEN_PARAM_CLOSE = "</parameter>"', label=label)
@@ -5182,6 +5182,100 @@ def _validate_priority_refusal_after(state: State) -> None:
     }, label=label)
 
 
+_STRUCTURAL_TAG_REGISTRY = "vllm/tool_parsers/structural_tag_registry.py"
+_ABSTRACT_PARSER = "vllm/parser/abstract_parser.py"
+_FORCED_CHOICE_REASONING_TEST = (
+    "tests/v1/structured_output/test_forced_choice_holds_through_reasoning.py"
+)
+
+
+def _validate_forced_choice_reasoning_before(state: State) -> None:
+    label = "Forced choice held through reasoning precondition"
+    forbid_text(state, _STRUCTURAL_TAG_REGISTRY, "def holds_choice_through_reasoning(",
+                label=label)
+    _require_in_symbol(state, _ABSTRACT_PARSER, "DelegatingParser._apply_structural_tag",
+                       ("reasoning=False,",), label=label)
+    forbid_text(state, "vllm/sampling_params.py", "enable_in_reasoning", label=label)
+
+
+def _validate_forced_choice_reasoning_after(state: State) -> None:
+    label = "Forced choice held through reasoning"
+    registry = _STRUCTURAL_TAG_REGISTRY
+    # Only a choice whose answer is calls, of a format registered with a
+    # reasoning form, for a reasoning parser closing reasoning as it does.
+    _require_in_symbol(state, registry, "holds_choice_through_reasoning", (
+        "_VLLM_REASONING_CLOSERS.get(model) != reasoning_end",
+        'return tool_choice.mode == "required"',
+        'return tool_choice == "required" or isinstance(',
+        "ChatCompletionNamedToolChoiceParam | ToolChoiceFunction",
+    ), label=label)
+    require_text(state, registry,
+                 '@register_vllm_structural_tag("qwen_3_coder", '
+                 "reasoning_end=_QWEN_THINK_END)", label=label)
+    # A builder without a reasoning form is never asked for one silently.
+    _require_in_symbol(state, registry, "get_model_structural_tag", (
+        "if reasoning and model not in _VLLM_REASONING_CLOSERS:",
+    ), label=label)
+    # The grammar's reasoning cannot open a call the parser would end
+    # reasoning at and no grammar would hold.
+    require_text(state, registry, '_QWEN_CALL_OPENER = "<tool_call>"', label=label)
+    _require_in_symbol(state, registry, "get_qwen_3_coder_structural_tag", (
+        "content=AnyTextFormat(excludes=[_QWEN_CALL_OPENER]),",
+        "end=_QWEN_THINK_END,",
+    ), label=label)
+    forbid_text(state, registry, "content=AnyTextFormat(), end=_QWEN_THINK_END",
+                label=label)
+    # One value decides what the grammar covers and where the engine applies
+    # it, for the prompt the request rendered.
+    _require_in_symbol(state, _ABSTRACT_PARSER, "DelegatingParser._grammar_holds_reasoning", (
+        "holds_choice_through_reasoning(",
+        "reasoning_parser.reasoning_end_str,",
+        "reasoning_parser.prompt_leaves_reasoning_open(prompt_token_ids)",
+    ), label=label)
+    _require_in_symbol(state, _ABSTRACT_PARSER, "DelegatingParser._apply_structural_tag", (
+        "holds_reasoning = self._grammar_holds_reasoning(request, prompt_token_ids)",
+        "reasoning=holds_reasoning,",
+        "enable_in_reasoning=holds_reasoning,",
+    ), label=label)
+    _require_in_symbol(state, "vllm/renderers/online_renderer.py",
+                       "OnlineRenderer.preprocess_chat", (
+                           "prompt_token_ids=extract_prompt_components(",
+                       ), label=label)
+    _require_in_symbol(state, "vllm/reasoning/abs_reasoning_parsers.py",
+                       "ReasoningParser.prompt_leaves_reasoning_open",
+                       ("return False",), label=label)
+    _require_in_symbol(state, "vllm/parser/engine/adapters.py",
+                       "ParserEngineReasoningAdapter.prompt_leaves_reasoning_open", (
+                           "self._parser_engine.prompt_leaves_reasoning_open(",
+                       ), label=label)
+    _require_in_symbol(state, "vllm/parser/qwen3.py",
+                       "Qwen3Parser.prompt_leaves_reasoning_open", (
+                           "if not self.thinking_enabled or self.is_reasoning_end(prompt):",
+                           "if token_id == start_id:\n                return True",
+                       ), label=label)
+    # The engine and the stop checker read the request's own parameter, which
+    # every route carries, /render to /generate included.
+    require_text(state, "vllm/sampling_params.py",
+                 "    enable_in_reasoning: bool = False\n", label=label)
+    _require_in_symbol(state, "vllm/v1/request.py", "Request.__init__", (
+        "if self.structured_output_request.params.enable_in_reasoning",
+    ), label=label)
+    _require_in_symbol(state, "vllm/v1/structured_output/stop_checker.py",
+                       "StructuralTagStopChecker.__init__", (
+                           "and not params.structured_outputs.enable_in_reasoning",
+                       ), label=label)
+    require_python_symbols(state, _FORCED_CHOICE_REASONING_TEST, {
+        "test_only_a_choice_whose_answer_is_calls_is_held_through_reasoning": None,
+        "test_no_other_format_or_reasoning_parser_holds_it": None,
+        "test_a_format_without_a_reasoning_form_never_builds_one": None,
+        "test_the_qwen_reasoning_form_closes_reasoning_before_the_call": None,
+        "test_the_parser_holds_it_only_where_the_prompt_left_reasoning_open": None,
+        "test_the_engine_holds_it_from_the_first_generated_token": None,
+        "test_a_caller_stop_inside_the_reasoning_waits_for_the_call": None,
+        "test_render_carries_the_hold_to_generate": None,
+    }, label=label)
+
+
 def validate_final(state: State) -> None:
     """Reassert every durable semantic invariant on the complete tree.
 
@@ -6217,14 +6311,15 @@ CONTRACTS: Mapping[str, SemanticContract] = {
     "call-only-answer-keeps-the-blank-line": SemanticContract(
         rationale=(
             "Under tool_choice required or a named function the Qwen grammar "
+            "that starts where the reasoning parser finds the end of reasoning "
             "began with <tool_call>, because XGrammar writes the template's "
-            "blank line after </think> only inside a reasoning prefix vLLM never "
-            "builds: the reasoning parser starts the grammar after reasoning "
-            "ends. A model trained on </think>, a blank line, then the call was "
-            "masked from that line on every forced or required call. The answer "
-            "may now begin with it, and nothing else may precede the call; it "
-            "stays optional because a <tool_call> that ends reasoning itself, "
-            "or a model that does not reason, starts the grammar at the call."
+            "blank line after </think> only inside a reasoning prefix, which a "
+            "grammar starting after reasoning has none of. A model trained on "
+            "</think>, a blank line, then the call was masked from that line on "
+            "every such forced or required call. The answer may now begin with "
+            "it, and nothing else may precede the call; it stays optional "
+            "because a <tool_call> that ends reasoning itself, or a model that "
+            "does not reason, starts the grammar at the call."
         ),
         removal_condition=(
             "Remove when upstream's Qwen builder admits the template's blank "
@@ -6637,5 +6732,33 @@ CONTRACTS: Mapping[str, SemanticContract] = {
         ),
         validate_before=_validate_priority_refusal_before,
         validate_after=_validate_priority_refusal_after,
+    ),
+    "forced-tool-choice-is-held-through-reasoning": SemanticContract(
+        rationale=(
+            "A choice whose answer is nothing but calls -- required, a named "
+            "function, allowed_tools in mode required -- was held by a grammar "
+            "the engine started only once reasoning had ended, so the model "
+            "could end the generation inside its reasoning, and the request "
+            "ended stop with no call. Where the prompt left reasoning open "
+            "while the model thinks, the Qwen format's grammar writes the "
+            "reasoning too -- any text but <tool_call>, at which the reasoning "
+            "parser would end it with a call no grammar held -- then </think>, "
+            "the template's blank line and the call, and the request's "
+            "structured-output parameters say so (enable_in_reasoning), so the "
+            "engine and the stop checker apply it from the first generated "
+            "token on every route that carries them, /render to /generate "
+            "included. EOS and a caller stop are held until the call is "
+            "complete; a length stop remains. Only a format vLLM builds with a "
+            "reasoning form, for a reasoning parser that closes reasoning as it "
+            "does, is armed so; every other format, a closed prompt and a "
+            "choice that asks for no call start the grammar where reasoning "
+            "ends."
+        ),
+        removal_condition=(
+            "Remove when pinned upstream holds a forced or required tool choice "
+            "over the reasoning of a generation whose prompt left it open."
+        ),
+        validate_before=_validate_forced_choice_reasoning_before,
+        validate_after=_validate_forced_choice_reasoning_after,
     ),
 }
